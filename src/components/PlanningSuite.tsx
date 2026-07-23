@@ -871,6 +871,7 @@ function JobPlan({
   const [msForm, setMsForm] = useState<{ open: boolean; name: string; days: number }>({ open: false, name: "", days: 3 });
   const [showPastMs, setShowPastMs] = useState(false);
   const [lightbox, setLightbox] = useState<Task | null>(null);
+  const [matForm, setMatForm] = useState({ item: "", qty: "" });
   const dirty = useRef(false);
   const seededMat = useRef<string | null>(null);
 
@@ -973,7 +974,6 @@ function JobPlan({
   };
   const setMatStatus = async (id: string, status: string, item: string) => { await api.post("/api/materials", { action: "status", id, status }); pushERP("Job Material", dj.id, "status", item + " → " + status); await reload(); };
   const delMat = async (id: string) => { await api.post("/api/materials", { action: "delete", id }); await reload(); };
-  const [matForm, setMatForm] = useState({ item: "", qty: "" });
   const addMat = async () => { if (!matForm.item.trim()) return; await api.post("/api/materials", { action: "add", job_id: dj.id, item: matForm.item.trim(), qty: matForm.qty || "as BOM", custom: true }); setMatForm({ item: "", qty: "" }); await reload(); };
 
   // ---- tasks for this job ----
