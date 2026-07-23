@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: #f1efe9;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  color: #22303c;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+input[type="date"] {
+  font-family: inherit;
+}
+
+/* tabular figures for all the man-day / value columns */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
