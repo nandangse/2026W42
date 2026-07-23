@@ -188,8 +188,22 @@ export default function PlanningSuite({
 
   if (!board) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ color: "#8A94A0" }}>
-        {err ? <span style={{ color: "#B3261E" }}>{err}</span> : "Loading board…"}
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: "#16232F" }}>
+        <div className="rounded bg-white px-3 py-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={LOGO} alt="Nandan GSE" style={{ height: 40 }} />
+        </div>
+        {err ? (
+          <>
+            <div className="text-sm font-bold" style={{ color: "#B3261E" }}>{err}</div>
+            <button onClick={() => reload()} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}>↻ Retry</button>
+          </>
+        ) : (
+          <>
+            <div className="animate-spin rounded-full" style={{ width: 36, height: 36, border: "3px solid #22303C", borderTopColor: "#E8600A" }} />
+            <div className="text-sm font-semibold" style={{ color: "#F5B32B" }}>Loading the works planning boards…</div>
+          </>
+        )}
       </div>
     );
   }

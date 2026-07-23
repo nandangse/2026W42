@@ -6,7 +6,7 @@ import { LOGO } from "@/lib/logo";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("raghu@nandan.co.in");
+  const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -20,11 +20,12 @@ export default function LoginPage() {
       email: email.trim().toLowerCase(),
       password: pw,
     });
-    setBusy(false);
     if (error) {
+      setBusy(false);
       setErr("Invalid email or password");
       return;
     }
+    // keep the loading overlay up through the redirect — busy stays true
     router.replace("/");
     router.refresh();
   };
@@ -34,6 +35,29 @@ export default function LoginPage() {
       className="min-h-screen flex items-center justify-center p-4"
       style={{ background: "#16232F" }}
     >
+      {busy && (
+        <div
+          className="fixed inset-0 flex flex-col items-center justify-center gap-4"
+          style={{ background: "rgba(13,22,31,0.92)", zIndex: 100 }}
+        >
+          <div className="rounded bg-white px-3 py-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={LOGO} alt="Nandan GSE" style={{ height: 40 }} />
+          </div>
+          <div
+            className="animate-spin rounded-full"
+            style={{
+              width: 36,
+              height: 36,
+              border: "3px solid #22303C",
+              borderTopColor: "#E8600A",
+            }}
+          />
+          <div className="text-sm font-semibold" style={{ color: "#F5B32B" }}>
+            Signing in · loading your boards…
+          </div>
+        </div>
+      )}
       <form
         onSubmit={submit}
         className="w-full max-w-sm rounded-lg p-6"

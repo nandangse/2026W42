@@ -77,7 +77,9 @@ export async function buildBoard(supabase: SupabaseClient) {
     supabase.from("materials").select("*"),
     supabase.from("settings").select("priority_order").eq("id", 1).maybeSingle(),
     supabase.from("family_templates").select("*"),
-    supabase.from("import_batches").select("*").order("uploaded_at", { ascending: false }),
+    // only recent batches — the header just needs the latest per kind, and this
+    // table grows by 3-4 rows every morning forever
+    supabase.from("import_batches").select("*").order("uploaded_at", { ascending: false }).limit(24),
   ]);
 
   const firstErr =

@@ -17,6 +17,13 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
+    // 25 MB cap — the real morning exports are <5 MB; this blocks memory-DoS uploads
+    if (file.size > 25 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: "File too large (max 25 MB). The morning exports are well under this." },
+        { status: 413 },
+      );
+    }
     const buf = await file.arrayBuffer();
     const summary = await applyUpload(
       adminClient(),

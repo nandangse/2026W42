@@ -37,6 +37,8 @@ export async function POST(req: Request) {
       const role: Role = ROLES.includes(body.role) ? body.role : "planner";
       if (!email || !body.password)
         return NextResponse.json({ error: "email and password required" }, { status: 400 });
+      if (String(body.password).length < 8)
+        return NextResponse.json({ error: "password must be at least 8 characters" }, { status: 400 });
       const { data, error } = await admin.auth.admin.createUser({
         email,
         password: body.password,
