@@ -16,6 +16,7 @@ import {
   addDays,
   computeSchedule,
   planEnd,
+  manDays,
   isoWeek,
   otdColor,
   otdDelay,
@@ -281,7 +282,7 @@ export default function PlanningSuite({
       {tab === "delivery" && <DeliveryBoard board={board} V={V} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} pushERP={pushERP} />}
       {tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
       {tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} pushERP={pushERP} />}
-      {tab === "tasking" && <Tasking board={board} reload={reload} />}
+      {tab === "tasking" && <Tasking board={board} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} />}
       {tab === "erp" && <UpdateToErp erpLog={erpLog} />}
       {tab === "admin" && isAdmin && <Admin board={board} reload={reload} />}
     </div>
@@ -835,6 +836,12 @@ function LoadBoard({ board, byTDD }: { board: Board; byTDD: Job[] }) {
 }
 
 // ============================ Job Plan ============================
+const MAT_ITEMS = [
+  "Chassis / base frame steel", "Structural sections & plates", "Hydraulic powerpack",
+  "Hydraulic cylinders & hoses", "Control panel & wiring loom", "Bought-out wheels / castors",
+  "Paint & consumables", "Fasteners & hardware",
+];
+
 function JobPlan({
   board,
   activeId,
@@ -855,18 +862,52 @@ function JobPlan({
   const byTDD = [...board.jobs].sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1));
   const job = board.jobs.find((j) => j.id === activeId) || (activeId ? board.archived[activeId] : undefined);
 
-  // working copy of the plan (saved plan, or a fresh template for an unplanned job)
+  const [planView, setPlanView] = useState<"plan" | "mat">("plan");
   const [draft, setDraft] = useState<Plan | null>(null);
+  const [dragMi, setDragMi] = useState<number | null>(null);
+  const [warned, setWarned] = useState<Set<string>>(new Set());
+  const [addingTask, setAddingTask] = useState<string | null>(null);
+  const [form, setForm] = useState({ t: "", who: "", due: TODAY, cat: "Production", esc: "None" });
+  const [msForm, setMsForm] = useState<{ open: boolean; name: string; days: number }>({ open: false, name: "", days: 3 });
+  const [showPastMs, setShowPastMs] = useState(false);
+  const [lightbox, setLightbox] = useState<Task | null>(null);
+  const dirty = useRef(false);
+  const seededMat = useRef<string | null>(null);
+
+  const baseFor = (j: Job): Plan => {
+    const saved = board.plans[j.id];
+    if (saved && saved.milestones.length)
+      return { start: saved.start || j.start || TODAY, milestones: saved.milestones.map((m) => ({ ...m, crew: { ...m.crew }, preds: [...m.preds] })) };
+    return { start: j.start && j.start >= TODAY ? j.start : TODAY, milestones: templateFor(j.fam).map((m) => ({ name: m.name, days: m.days, preds: m.pred ? [m.pred] : [], crew: { ...m.crew }, shift: "D", offset: m.offset })) };
+  };
   useEffect(() => {
     if (!job) { setDraft(null); return; }
-    const saved = board.plans[job.id];
-    if (saved) setDraft({ start: saved.start || job.start || TODAY, milestones: saved.milestones.map((m) => ({ ...m, crew: { ...m.crew }, preds: [...m.preds] })) });
-    else setDraft({ start: job.start && job.start >= TODAY ? job.start : TODAY, milestones: templateFor(job.fam).map((m) => ({ name: m.name, days: m.days, preds: m.pred ? [m.pred] : [], crew: { ...m.crew }, shift: "D", offset: m.offset })) });
-  }, [activeId, board]);
+    dirty.current = false;
+    setDraft(baseFor(job));
+  }, [activeId, board]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // debounced auto-save (only after an actual edit) — persists milestones incl. done flags
+  useEffect(() => {
+    if (!job || !draft || !dirty.current) return;
+    const t = setTimeout(() => {
+      api.post("/api/plan", { job_id: job.id, start: draft.start, milestones: draft.milestones }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+  }, [draft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sched = useMemo(() => (draft ? computeSchedule(draft) : []), [draft]);
   const ends = sched.length ? planEnd(sched) : TODAY;
-  const grandTotal = useMemo(() => sched.reduce((s, m) => s + TRADES.reduce((a, t) => a + (m.crew[t.key] || 0), 0) * Math.max(1, m.days), 0), [sched]);
+  const successors = useMemo(() => {
+    const map: Record<number, number[]> = {};
+    sched.forEach((m) => (m.preds || []).forEach((p) => (map[p] = map[p] || []).push(m.idx)));
+    return map;
+  }, [sched]);
+  const tradeTotals = useMemo(() => {
+    const t = zeroCrew();
+    sched.forEach((m) => TRADES.forEach((tr) => (t[tr.key] += (m.crew[tr.key] || 0) * Math.max(1, m.days))));
+    return t;
+  }, [sched]);
+  const grandTotal = TRADES.reduce((s, t) => s + tradeTotals[t.key], 0);
   const savedPlan = job ? board.plans[job.id] : undefined;
   const baseline = job ? board.baselines[job.id] : undefined;
   const baselineEnd = savedPlan?.baseline_end || null;
@@ -875,52 +916,78 @@ function JobPlan({
   const realEnd = allDone ? sched.reduce((mx, m) => (m.done_on && m.done_on > mx ? m.done_on : mx), "") : null;
 
   if (!job || !draft) return <div className="p-4 text-sm" style={{ color: "#8A94A0" }}>Pick a job.</div>;
+  const dj = job;
 
-  const setMilestone = (mi: number, patch: Partial<PlanMilestone>) =>
-    setDraft((pl) => (pl ? { ...pl, milestones: pl.milestones.map((m, i) => (i === mi ? { ...m, ...patch } : m)) } : pl));
-  const setCrew = (mi: number, key: keyof Crew, v: number) =>
-    setDraft((pl) => (pl ? { ...pl, milestones: pl.milestones.map((m, i) => (i === mi ? { ...m, crew: { ...m.crew, [key]: v } } : m)) } : pl));
-  const togglePred = (mi: number, p: number) =>
-    setDraft((pl) => (pl ? { ...pl, milestones: pl.milestones.map((m, i) => (i === mi ? { ...m, preds: m.preds.includes(p) ? m.preds.filter((x) => x !== p) : [...m.preds, p].sort((a, b) => a - b) } : m)) } : pl));
-  const addMilestone = () =>
-    setDraft((pl) => (pl && pl.milestones.length < 50 ? { ...pl, milestones: [...pl.milestones, { name: `Milestone ${pl.milestones.length + 1}`, days: 3, preds: pl.milestones.length ? [pl.milestones.length] : [], crew: zeroCrew(), shift: "D", offset: 0 }] } : pl));
-  const removeMilestone = (mi: number) =>
-    setDraft((pl) => (pl ? { ...pl, milestones: pl.milestones.filter((_, i) => i !== mi).map((m) => ({ ...m, preds: m.preds.filter((p) => p !== mi + 1).map((p) => (p > mi + 1 ? p - 1 : p)) })) } : pl));
+  const edit = (fn: (pl: Plan) => Plan) => { dirty.current = true; setDraft((pl) => (pl ? fn(pl) : pl)); };
+  const setMilestone = (mi: number, patch: Partial<PlanMilestone>) => edit((pl) => ({ ...pl, milestones: pl.milestones.map((m, i) => (i === mi ? { ...m, ...patch } : m)) }));
+  const setCrewVal = (mi: number, key: keyof Crew, v: number) => edit((pl) => ({ ...pl, milestones: pl.milestones.map((m, i) => (i === mi ? { ...m, crew: { ...m.crew, [key]: v } } : m)) }));
+  const togglePred = (mi: number, p: number) => edit((pl) => ({ ...pl, milestones: pl.milestones.map((m, i) => (i === mi ? { ...m, preds: m.preds.includes(p) ? m.preds.filter((x) => x !== p) : [...m.preds, p].sort((a, b) => a - b) } : m)) }));
+  const toggleMsDone = (mi: number) => edit((pl) => ({ ...pl, milestones: pl.milestones.map((m, k) => (k === mi ? { ...m, done: !m.done, done_on: !m.done ? TODAY : null } : m)) }));
+  const addMilestone = () => edit((pl) => (pl.milestones.length < 50 ? { ...pl, milestones: [...pl.milestones, { name: `Milestone ${pl.milestones.length + 1}`, days: 3, preds: pl.milestones.length ? [pl.milestones.length] : [], crew: zeroCrew(), shift: "D", offset: 0 }] } : pl));
+  const addMilestoneNamed = (name: string, days: number) => edit((pl) => (pl.milestones.length < 50 ? { ...pl, milestones: [...pl.milestones, { name: (name || "").trim() || `Milestone ${pl.milestones.length + 1}`, days: Math.max(1, days || 1), preds: pl.milestones.length ? [pl.milestones.length] : [], crew: zeroCrew(), shift: "D", offset: 0 }] } : pl));
+  const removeMilestone = (mi: number) => edit((pl) => ({ ...pl, milestones: pl.milestones.filter((_, i) => i !== mi).map((m) => ({ ...m, preds: m.preds.filter((p) => p !== mi + 1).map((p) => (p > mi + 1 ? p - 1 : p)) })) }));
+  const moveMilestone = (mi: number, dir: number) => edit((pl) => {
+    const j2 = mi + dir; if (j2 < 0 || j2 >= pl.milestones.length) return pl;
+    const arr = [...pl.milestones]; [arr[mi], arr[j2]] = [arr[j2], arr[mi]];
+    const p1 = mi + 1, p2 = j2 + 1;
+    const remapped = arr.map((m) => ({ ...m, preds: m.preds.map((p) => (p === p1 ? p2 : p === p2 ? p1 : p)) }));
+    return { ...pl, milestones: remapped.map((m, idx) => ({ ...m, preds: m.preds.filter((p) => p <= idx) })) };
+  });
+  const moveMilestoneTo = (from: number | null, to: number) => { if (from == null || from === to) return; edit((pl) => {
+    const oldArr = pl.milestones; const arr = [...oldArr]; const [mv] = arr.splice(from, 1); arr.splice(to, 0, mv);
+    const posMap: Record<number, number> = {}; oldArr.forEach((m, i) => { posMap[i + 1] = arr.indexOf(m) + 1; });
+    const remapped = arr.map((m) => ({ ...m, preds: m.preds.map((p) => posMap[p]).filter(Boolean) }));
+    return { ...pl, milestones: remapped.map((m, idx) => ({ ...m, preds: m.preds.filter((p) => p <= idx) })) };
+  }); };
+  const reloadDefault = () => { dirty.current = true; setDraft({ start: dj.start && dj.start >= TODAY ? dj.start : TODAY, milestones: templateFor(dj.fam).map((m) => ({ name: m.name, days: m.days, preds: m.pred ? [m.pred] : [], crew: { ...m.crew }, shift: "D", offset: m.offset })) }); };
 
-  const savePlan = async () => {
-    await api.post("/api/plan", { job_id: job.id, start: draft.start, milestones: draft.milestones });
-    await reload();
-    alert("Plan saved ✓");
-  };
+  const savePlanNow = async () => { await api.post("/api/plan", { job_id: dj.id, start: draft.start, milestones: draft.milestones }); await reload(); };
   const saveBaseline = async () => {
     if (!sched.length) return;
-    const payload = { job_id: job.id, baseline_end: ends, milestones: sched.map((m) => ({ idx: m.idx, title: m.name, start: m.start, end: m.end })), force: false };
+    await api.post("/api/plan", { job_id: dj.id, start: draft.start, milestones: draft.milestones }); // ensure plan persisted first
+    const payload = { job_id: dj.id, baseline_end: ends, milestones: sched.map((m) => ({ idx: m.idx, title: m.name, start: m.start, end: m.end })), force: false };
     try {
       const r = await api.post("/api/baseline", payload);
-      pushERP("Job Plan Baseline", job.id, "baseline_end", fmtFull(ends));
+      pushERP("Job Plan Baseline", dj.id, "baseline_end", fmtFull(ends));
       await reload();
       alert("Baseline saved ✓ (" + r.baseline_on + ")");
     } catch (e) {
       if (e instanceof Error && /baseline_exists|409/.test(e.message)) {
-        if (window.confirm("A baseline already exists. Overwrite with today's planned timeline?")) {
-          await api.post("/api/baseline", { ...payload, force: true });
-          await reload();
-          alert("Baseline overwritten ✓");
+        if (window.confirm("A baseline saved earlier already exists. Overwrite with today's planned timeline?")) {
+          await api.post("/api/baseline", { ...payload, force: true }); await reload(); alert("Baseline overwritten ✓");
         }
       } else alert(e instanceof Error ? e.message : String(e));
     }
   };
-  const toggleDone = async (idx: number, done: boolean) => {
-    // ensure the plan exists before toggling a milestone
-    if (!savedPlan) await api.post("/api/plan", { job_id: job.id, start: draft.start, milestones: draft.milestones });
-    await api.post("/api/milestone/toggle", { job_id: job.id, idx, done });
+
+  // ---- materials ----
+  const mats = board.materials[dj.id] || [];
+  const ensureMats = async () => {
+    if (mats.length || seededMat.current === dj.id) return;
+    seededMat.current = dj.id;
+    const recv = Math.round((MAT_ITEMS.length * (dj.kit || 0)) / 100);
+    for (let i = 0; i < MAT_ITEMS.length; i++) {
+      await api.post("/api/materials", { action: "add", job_id: dj.id, item: MAT_ITEMS[i], qty: "as BOM", status: i < recv ? "Received" : "Pending" });
+    }
     await reload();
   };
+  const setMatStatus = async (id: string, status: string, item: string) => { await api.post("/api/materials", { action: "status", id, status }); pushERP("Job Material", dj.id, "status", item + " → " + status); await reload(); };
+  const delMat = async (id: string) => { await api.post("/api/materials", { action: "delete", id }); await reload(); };
+  const [matForm, setMatForm] = useState({ item: "", qty: "" });
+  const addMat = async () => { if (!matForm.item.trim()) return; await api.post("/api/materials", { action: "add", job_id: dj.id, item: matForm.item.trim(), qty: matForm.qty || "as BOM", custom: true }); setMatForm({ item: "", qty: "" }); await reload(); };
+
+  // ---- tasks for this job ----
+  const jobTasks = board.tasks.filter((t) => t.j === dj.id);
+  const jobCats = [...new Set(jobTasks.map((t) => t.cat))];
+  const submitTask = async () => { if (!form.t.trim()) return; await api.post("/api/tasks", { action: "create", job_id: dj.id, title: form.t.trim(), who: form.who, due: form.due, cat: form.cat, esc: form.esc }); setForm({ t: "", who: "", due: TODAY, cat: form.cat, esc: "None" }); setAddingTask(null); await reload(); };
+
+  const matVal = dj.val * (1 - (dj.tpp || 0) / 100);
+  const recvN = mats.filter((m) => m.status === "Received").length;
 
   return (
     <div className="p-4">
       <div className="flex flex-wrap items-center gap-2 mb-3">
-        <select value={job.id} onChange={(e) => setActiveId(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm font-semibold" style={{ borderColor: "#D9D6CD", maxWidth: 420 }}>
+        <select value={dj.id} onChange={(e) => setActiveId(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm font-semibold" style={{ borderColor: "#D9D6CD", maxWidth: 420 }}>
           {byTDD.map((j) => (<option key={j.id} value={j.id}>{jobNo(j.id)} · {j.tag}</option>))}
           {Object.keys(board.archived).length > 0 && (
             <optgroup label="— delivered / no longer in the export (plans archived) —">
@@ -928,7 +995,7 @@ function JobPlan({
             </optgroup>
           )}
         </select>
-        <span className="text-xs" style={{ color: "#8A94A0" }}>{Object.keys(board.plans).length} of {board.jobs.length} jobs planned</span>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>{Object.keys(board.plans).length} of {board.jobs.length} jobs planned · edits auto-save</span>
       </div>
 
       {/* header card */}
@@ -936,31 +1003,28 @@ function JobPlan({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="text-2xl font-bold" style={{ color: "#16232F" }}>JOB {jobNo(job.id)}</span>
-              <a href={erpJobLink(job.id)} target="_blank" rel="noreferrer" className="text-xs underline" style={{ color: "#8A94A0" }}>{job.id} ↗</a>
+              <span className="text-2xl font-bold" style={{ color: "#16232F" }}>JOB {jobNo(dj.id)}</span>
+              <a href={erpJobLink(dj.id)} target="_blank" rel="noreferrer" className="text-xs underline" style={{ color: "#8A94A0" }}>{dj.id} ↗</a>
             </div>
-            <div className="text-sm font-semibold" style={{ color: "#1B3A5C" }}>{job.tag}</div>
-            <div className="text-xs mt-0.5" style={{ color: "#8A94A0" }}>{job.cust} · {job.fam} · {V(job.val)} · {job.stat}</div>
+            <div className="text-sm font-semibold" style={{ color: "#1B3A5C" }}>{dj.tag}</div>
+            <div className="text-xs mt-0.5" style={{ color: "#8A94A0" }}>{dj.cust} · {dj.fam} · {V(dj.val)} · {dj.stat}</div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Chip label="TARGET DELIVERY (ERP)" value={fmtFull(job.tdd)} color="#B3261E" />
-            <Chip label="OTD DATE (ERP)" value={fmtFull(job.otd) + (otdDelay(job) ? ` · +${otdDelay(job)}d late` : "")} color={otdColor(job.otd)} />
+            <Chip label="TARGET DELIVERY (ERP)" value={fmtFull(dj.tdd)} color="#B3261E" />
+            <Chip label="OTD DATE (ERP)" value={fmtFull(dj.otd) + (otdDelay(dj) ? ` · +${otdDelay(dj)}d late` : "")} color={otdColor(dj.otd)} />
             <div className="rounded px-2 py-1" style={{ background: isRaghu ? "#F3EEFB" : "#F4F2EC" }}>
               <div className="text-xs" style={{ color: "#8A94A0" }}>MGMT TARGET {isRaghu ? "✎" : "🔒"}</div>
               {isRaghu ? (
-                <input type="date" value={job.mgmt || ""} onChange={async (e) => { await api.post("/api/job-field", { job_id: job.id, field: "mgmt", value: e.target.value }); pushERP("Jobmaster", job.id, "mgmt", fmtFull(e.target.value)); await reload(); }} className="text-sm font-bold bg-transparent" style={{ color: "#7C3AED", border: "none" }} />
-              ) : (<div className="text-sm font-bold" style={{ color: "#7C3AED" }}>{fmtFull(job.mgmt)}</div>)}
+                <input type="date" value={dj.mgmt || ""} onChange={async (e) => { await api.post("/api/job-field", { job_id: dj.id, field: "mgmt", value: e.target.value }); pushERP("Jobmaster", dj.id, "mgmt", fmtFull(e.target.value)); await reload(); }} className="text-sm font-bold bg-transparent" style={{ color: "#7C3AED", border: "none" }} />
+              ) : (<div className="text-sm font-bold" style={{ color: "#7C3AED" }}>{fmtFull(dj.mgmt)}</div>)}
             </div>
-            <Chip label="PLAN END" value={fmtFull(ends)} color={ends > (job.tdd || "9999") ? "#B3261E" : "#0D7A3F"} />
+            <Chip label="PLAN END" value={fmtFull(ends)} color={ends > (dj.tdd || "9999") ? "#B3261E" : "#0D7A3F"} />
             <Chip label="TOTAL MAN-DAYS" value={grandTotal + " md"} color="#E8600A" />
             <Chip label="MILESTONES DONE" value={msDone + " / " + sched.length} color={allDone ? "#0D7A3F" : "#22303C"} />
             {baseline && baselineEnd && (
               <div className="rounded px-2 py-1" style={{ background: "#EFF6EF", border: "1px dashed #0D7A3F" }}>
                 <div className="text-xs" style={{ color: "#8A94A0" }}>📌 BASELINE ({fmt(savedPlan?.baseline_on || null)})</div>
-                <div className="text-sm font-bold" style={{ color: "#0D7A3F" }}>
-                  ends {fmtFull(baselineEnd)}
-                  {(() => { const d = diffDays(baselineEnd, ends); return d ? <span style={{ color: d > 0 ? "#B3261E" : "#0D7A3F" }}> · {d > 0 ? "+" : ""}{d}d now</span> : null; })()}
-                </div>
+                <div className="text-sm font-bold" style={{ color: "#0D7A3F" }}>ends {fmtFull(baselineEnd)}{(() => { const d = diffDays(baselineEnd, ends); return d ? <span style={{ color: d > 0 ? "#B3261E" : "#0D7A3F" }}> · {d > 0 ? "+" : ""}{d}d now</span> : null; })()}</div>
               </div>
             )}
             {baseline && baselineEnd && allDone && (
@@ -969,82 +1033,267 @@ function JobPlan({
                 <div className="text-sm font-bold">{fmt(baselineEnd)} → {fmt(realEnd || TODAY)} {(() => { const d = diffDays(baselineEnd, realEnd || TODAY); return <span style={{ color: d > 0 ? "#B3261E" : "#0D7A3F" }}>({d > 0 ? "+" : ""}{d}d)</span>; })()}</div>
               </div>
             )}
+            <button onClick={saveBaseline} className="rounded px-2 py-1 text-xs font-bold self-start" style={baseline ? { background: "#F4F2EC", color: "#0D7A3F", border: "1px solid #0D7A3F" } : { background: "#0D7A3F", color: "#fff" }}>📌 {baseline ? "Re-save Baseline" : "Save as Baseline"}</button>
           </div>
         </div>
-        <div className="flex gap-2 mt-3 flex-wrap">
-          <button onClick={savePlan} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}>💾 Save plan</button>
-          <button onClick={saveBaseline} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#0D7A3F", color: "#fff" }}>📌 Save as Baseline</button>
-          <button onClick={addMilestone} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#1B3A5C", color: "#fff" }}>+ Milestone</button>
-        </div>
+        {dj.tdd && ends > dj.tdd && (
+          <div className="mt-2 text-xs font-bold rounded px-2 py-1 inline-block" style={{ background: "#B3261E", color: "#fff" }}>⚠ Plan ends {diffDays(dj.tdd, ends)} days after Target Delivery — compress durations or add crew</div>
+        )}
       </div>
 
-      {/* milestone table */}
-      <div className="overflow-x-auto bg-white rounded-lg border" style={{ borderColor: "#E2E0DA" }}>
-        <table className="text-xs tnum" style={{ borderCollapse: "collapse", minWidth: 820 }}>
-          <thead>
-            <tr style={{ background: "#F4F2EC", color: "#5A6672" }}>
-              <th className="px-2 py-1 text-left">#</th>
-              <th className="px-2 py-1 text-left" style={{ minWidth: 200 }}>Milestone</th>
-              <th className="px-2 py-1">Days</th>
-              <th className="px-2 py-1">Preds</th>
-              <th className="px-2 py-1">Start</th>
-              <th className="px-2 py-1">End</th>
-              {TRADES.map((t) => (<th key={t.key} className="px-1 py-1" style={{ color: t.color }} title={t.label}>{t.tiny}</th>))}
-              <th className="px-2 py-1">✓</th>
-              <th className="px-2 py-1"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {sched.map((m, i) => (
-              <tr key={i} style={{ borderTop: "1px solid #EEECE6", opacity: m.done ? 0.6 : 1 }}>
-                <td className="px-2 py-1" style={{ color: "#8A94A0" }}>{m.idx}</td>
-                <td className="px-2 py-1">
-                  <input value={m.name} onChange={(e) => setMilestone(i, { name: e.target.value })} className="w-full text-xs border rounded px-1 py-0.5" style={{ borderColor: "#E2E0DA" }} />
-                </td>
-                <td className="px-2 py-1 text-center">
-                  <input type="number" min={1} value={m.days} onChange={(e) => setMilestone(i, { days: Math.max(1, parseInt(e.target.value || "1", 10)) })} className="w-12 text-center border rounded px-1 py-0.5" style={{ borderColor: "#E2E0DA" }} />
-                </td>
-                <td className="px-2 py-1 text-center" style={{ maxWidth: 120 }}>
-                  <div className="flex flex-wrap gap-0.5 justify-center">
-                    {sched.slice(0, i).map((_, k) => (
-                      <button key={k} onClick={() => togglePred(i, k + 1)} className="rounded px-1" style={m.preds.includes(k + 1) ? { background: "#1B3A5C", color: "#fff" } : { background: "#E7E4DC", color: "#8A94A0" }}>{k + 1}</button>
-                    ))}
+      {/* plan / materials sub-tabs */}
+      <div className="flex gap-1 rounded p-1 bg-white border mb-3" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
+        {(["plan", "mat"] as const).map((k) => (
+          <button key={k} onClick={() => { if (k === "mat") ensureMats(); setPlanView(k); }} className="px-3 py-1 rounded text-sm font-semibold" style={planView === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>{k === "plan" ? "Milestone Plan" : "Materials"}</button>
+        ))}
+      </div>
+
+      {planView === "mat" && (
+        <div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+            <Chip label="KITTING %" value={(dj.kit || 0) + "%"} color="#0D9488" />
+            <Chip label="MATERIAL VALUE = val × (1−T%)" value={V(matVal)} />
+            <Chip label="KITTED VALUE = val × (1−T%) × Kit%" value={V((matVal * (dj.kit || 0)) / 100)} color="#0D7A3F" />
+            <Chip label="YET TO RECEIVE" value={V(matVal * (1 - (dj.kit || 0) / 100))} color="#B3261E" />
+          </div>
+          <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
+            <table className="w-full text-sm">
+              <thead><tr style={{ background: "#22303C", color: "#fff" }} className="text-xs"><th className="px-3 py-2 text-left">#</th><th className="px-3 py-2 text-left">Material / kit item</th><th className="px-3 py-2 text-left">Qty</th><th className="px-3 py-2">Status ✎</th></tr></thead>
+              <tbody>
+                {mats.map((m, i) => (
+                  <tr key={m.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                    <td className="px-3 py-1.5" style={{ color: "#8A94A0" }}>{i + 1}</td>
+                    <td className="px-3 py-1.5 font-medium">{m.item}{m.custom && <span title="Custom item added by you" style={{ color: "#E8600A" }}> ✎</span>}</td>
+                    <td className="px-3 py-1.5" style={{ color: "#5A6672" }}>{m.qty}</td>
+                    <td className="px-3 py-1.5 text-center">
+                      <button onClick={() => setMatStatus(m.id, m.status === "Received" ? "Pending" : "Received", m.item)} className="text-xs font-bold rounded px-2 py-0.5" style={m.status === "Received" ? { background: "#E6F4EA", color: "#0D7A3F" } : { background: "#FBEDEA", color: "#B3261E" }}>{m.status === "Received" ? "✓ Received" : "⏳ Yet to receive"}</button>
+                      <button onClick={() => delMat(m.id)} title="Remove line" className="ml-1 text-xs" style={{ color: "#B3261E" }}>✕</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex gap-1 mt-2 items-center flex-wrap">
+            <input placeholder="Custom material / bought-out item…" value={matForm.item} onChange={(e) => setMatForm({ ...matForm, item: e.target.value })} className="text-xs border rounded px-2 py-1.5" style={{ borderColor: "#E2E0DA", minWidth: 240 }} />
+            <input placeholder="Qty" value={matForm.qty} onChange={(e) => setMatForm({ ...matForm, qty: e.target.value })} className="text-xs border rounded px-2 py-1.5 w-24" style={{ borderColor: "#E2E0DA" }} />
+            <button onClick={addMat} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}>+ Add material</button>
+          </div>
+          <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>{recvN}/{mats.length} kit items received (checklist tracker only — the boards use Kitting % in Σ val × (1−T%) × Kit%). Rows marked ✎ are custom items you added.</div>
+        </div>
+      )}
+
+      {planView === "plan" && (
+        <>
+          <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
+            <table className="w-full text-sm" style={{ minWidth: 1100 }}>
+              <thead>
+                <tr style={{ background: "#22303C", color: "#fff" }} className="text-xs">
+                  <th className="px-2 py-2 text-center" title="Tick when done on the floor">✓</th>
+                  <th className="px-2 py-2 text-left">#</th>
+                  <th className="px-2 py-2 text-left" style={{ minWidth: 200 }}>Milestone (editable)</th>
+                  <th className="px-2 py-2">Pred(s)</th>
+                  <th className="px-2 py-2">Succ</th>
+                  <th className="px-2 py-2">Start</th>
+                  <th className="px-2 py-2">Days</th>
+                  <th className="px-2 py-2">End</th>
+                  <th className="px-2 py-2">Shift</th>
+                  {TRADES.map((t) => (<th key={t.key} className="px-1 py-2" title={t.label + " per day"}><span style={{ color: t.color, filter: "brightness(1.7)" }}>{t.tiny}</span></th>))}
+                  <th className="px-2 py-2">MD</th>
+                  <th className="px-1 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sched.map((m, i) => (
+                  <tr key={i} className="border-t" onDragOver={(e) => e.preventDefault()} onDrop={() => { moveMilestoneTo(dragMi, i); setDragMi(null); }} style={{ borderColor: "#EFEDE7", background: dragMi === i ? "#FFF3E8" : i % 2 ? "#FAF9F5" : "#fff" }}>
+                    <td className="px-2 py-1 text-center"><input type="checkbox" checked={!!m.done} onChange={() => { toggleMsDone(i); pushERP("Job Plan", dj.id, "milestone_" + m.idx + "_done", !m.done ? "completed " + fmtFull(TODAY) : "re-opened"); }} title={m.done ? "Completed " + fmtFull(m.done_on || "") : "Mark milestone complete"} style={{ accentColor: "#0D7A3F", width: 15, height: 15, cursor: "pointer" }} /></td>
+                    <td className="px-2 py-1 font-bold whitespace-nowrap" style={{ color: "#E8600A", textDecoration: m.done ? "line-through" : "none", opacity: m.done ? 0.6 : 1 }}><span draggable onDragStart={() => setDragMi(i)} title="Drag to reorder" style={{ cursor: "grab", color: "#B8B5AC" }}>⠿ </span>{m.idx}</td>
+                    <td className="px-2 py-1"><input value={m.name} onChange={(e) => setMilestone(i, { name: e.target.value })} className="w-full px-1 py-0.5 rounded border bg-transparent" style={{ borderColor: "transparent" }} onFocus={(e) => (e.target.style.borderColor = "#E8600A")} onBlur={(e) => (e.target.style.borderColor = "transparent")} /></td>
+                    <td className="px-1 py-1 text-center">
+                      <div className="flex flex-wrap gap-0.5 justify-center items-center" style={{ maxWidth: 92 }}>
+                        {(m.preds || []).map((p) => (<button key={p} onClick={() => togglePred(i, p)} title={`Remove predecessor ${p}`} className="text-xs rounded px-1 font-bold" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>{p}×</button>))}
+                        {i > 0 && (
+                          <select value="" onChange={(e) => { const v = parseInt(e.target.value, 10); if (v) togglePred(i, v); }} className="rounded border bg-white text-xs" style={{ borderColor: "#E2E0DA", width: 30 }} title="Add predecessor">
+                            <option value="">+</option>
+                            {sched.slice(0, i).filter((p) => !(m.preds || []).includes(p.idx)).map((p) => (<option key={p.idx} value={p.idx}>{p.idx}</option>))}
+                          </select>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-1 py-1 text-center text-xs" style={{ color: "#8A94A0" }}>{(successors[m.idx] || []).join(",") || "—"}</td>
+                    <td className="px-1 py-1 text-center whitespace-nowrap tnum">{(m.preds || []).length > 0 ? (<span title="Auto: latest predecessor end + 1">{fmt(m.start)}</span>) : (<input type="date" value={m.start} onChange={(e) => setMilestone(i, { offset: diffDays(draft.start, e.target.value) })} className="text-xs border rounded px-1 bg-white" style={{ borderColor: "#E2E0DA" }} />)}</td>
+                    <td className="px-1 py-1 text-center"><input type="number" min={1} value={m.days} onChange={(e) => setMilestone(i, { days: Math.max(1, parseInt(e.target.value || "1", 10)) })} className="w-12 text-center rounded border py-0.5 tnum" style={{ borderColor: "#E2E0DA" }} /></td>
+                    <td className="px-1 py-1 text-center font-semibold whitespace-nowrap tnum" style={{ color: "#1B3A5C" }}>{fmt(m.end)}</td>
+                    <td className="px-1 py-1 text-center"><select value={m.shift || "D"} onChange={(e) => setMilestone(i, { shift: e.target.value })} className="rounded border bg-white text-xs px-0.5 py-0.5" style={{ borderColor: "#E2E0DA" }} title="Which shift works this milestone"><option value="D">☀ Day</option><option value="N">☾ Night</option><option value="DN">☀+☾</option></select></td>
+                    {TRADES.map((t) => (<td key={t.key} className="px-0.5 py-1 text-center"><CrewCell value={m.crew[t.key] || 0} color={t.color} onChange={(v) => setCrewVal(i, t.key as keyof Crew, v)} /></td>))}
+                    <td className="px-2 py-1 text-center font-bold tnum">{manDays(m) || "—"}</td>
+                    <td className="px-1 py-1 text-center whitespace-nowrap">
+                      <button onClick={() => moveMilestone(i, -1)} title="Move up" className="text-xs px-0.5" style={{ color: i === 0 ? "#D5D2C9" : "#1B3A5C" }}>▲</button>
+                      <button onClick={() => moveMilestone(i, 1)} title="Move down" className="text-xs px-0.5" style={{ color: i === sched.length - 1 ? "#D5D2C9" : "#1B3A5C" }}>▼</button>
+                      <button onClick={() => removeMilestone(i)} className="text-xs px-0.5" style={{ color: "#B3261E" }}>✕</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ background: "#F2EFE6", borderTop: "2px solid #22303C" }} className="font-bold text-sm">
+                  <td colSpan={8} className="px-2 py-2 text-right">Total man-days by trade →</td>
+                  {TRADES.map((t) => (<td key={t.key} className="text-center tnum" style={{ color: t.color }}>{tradeTotals[t.key]}</td>))}
+                  <td className="text-center" style={{ color: "#E8600A" }}>{grandTotal}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
+            <div className="flex gap-2">
+              <button onClick={addMilestone} disabled={draft.milestones.length >= 50} className="px-3 py-1.5 rounded font-semibold text-sm" style={{ background: draft.milestones.length >= 50 ? "#D9D6CD" : "#22303C", color: "#fff" }}>+ Add milestone ({draft.milestones.length}/50)</button>
+              <button onClick={reloadDefault} className="px-3 py-1.5 rounded font-semibold text-sm border" style={{ borderColor: "#22303C", color: "#22303C" }}>↺ Reload {dj.fam} default</button>
+              <button onClick={savePlanNow} className="px-3 py-1.5 rounded font-semibold text-sm" style={{ background: "#E8600A", color: "#fff" }}>💾 Save now</button>
+            </div>
+            <div className="text-xs" style={{ color: "#8A94A0" }}>Crew = men per day · MD = crew × duration</div>
+          </div>
+
+          {/* mini gantt */}
+          <div className="bg-white rounded-lg border mt-3 p-3 overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
+            <div className="text-xs font-bold mb-1" style={{ color: "#8A94A0" }}>JOB GANTT <span className="font-normal">· week gridlines · red line = Target Delivery</span></div>
+            {(() => {
+              const gEnd = dj.tdd && dj.tdd > ends ? dj.tdd : ends;
+              const total = diffDays(draft.start, gEnd) + 1;
+              const tddPos = dj.tdd ? (diffDays(draft.start, dj.tdd) / total) * 100 : null;
+              const ticks: { pct: number; wk: number }[] = [];
+              for (let d = 0; d < total; d++) { const iso = addDays(draft.start, d); if (parseISO(iso).getUTCDay() === 1) ticks.push({ pct: (d / total) * 100, wk: isoWeek(iso) }); }
+              return (
+                <div style={{ width: Math.max(620, total * 5), minWidth: 620 }}>
+                  <div className="flex items-center gap-2 mb-1"><div style={{ width: 175 }} /><div className="flex-1 relative" style={{ height: 14 }}>{ticks.map((t, k) => (<span key={k} className="absolute text-xs font-bold" style={{ left: t.pct + "%", color: "#B8B5AC", fontSize: 9, transform: "translateX(2px)" }}>W{t.wk}</span>))}</div></div>
+                  {sched.map((m, i) => {
+                    const l = (diffDays(draft.start, m.start) / total) * 100;
+                    const w = (Math.max(1, m.days) / total) * 100;
+                    return (
+                      <div key={i} className="flex items-center gap-2 mb-1">
+                        <div className="text-xs truncate" style={{ width: 175, color: "#5A6672" }}>{m.idx}. {m.name}</div>
+                        <div className="flex-1 h-4 rounded relative" style={{ background: "#F4F2EC" }}>
+                          {ticks.map((t, k) => (<div key={k} className="absolute h-4" style={{ left: t.pct + "%", width: 1, background: "#DDDACF" }} />))}
+                          <div className="absolute h-4 rounded" title={`${fmt(m.start)} → ${fmt(m.end)}`} style={{ left: l + "%", width: Math.max(w, 0.8) + "%", background: manDays(m) ? "#1B3A5C" : "#A8B4C0" }} />
+                          {tddPos !== null && (<div className="absolute h-4" style={{ left: tddPos + "%", width: 2, background: "#B3261E" }} />)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* pending tasks & milestones kanban */}
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+              <h2 className="font-bold" style={{ color: "#16232F" }}>Pending Tasks &amp; Milestones — JOB {jobNo(dj.id)} <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>ERP ToDo + open milestones · headed by Category</span></h2>
+              <button onClick={() => { setAddingTask(dj.id); setForm((f) => ({ ...f, cat: jobCats[0] || "Production" })); }} className="px-3 py-1 rounded text-sm font-bold" style={{ background: "#E8600A", color: "#fff" }}>+ Task</button>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2 items-start">
+              {(() => {
+                const open = sched.filter((m) => !m.done);
+                const doneMs = sched.filter((m) => m.done);
+                const card = (m: typeof sched[number]) => (
+                  <TaskCard key={"ms" + m.idx} onOpen={() => {}} t={{ id: "ms" + m.idx, kind: "manual", done: !!m.done, j: dj.id, t: `M${m.idx} · ${m.name}`, d: `${fmt(m.start)} → ${fmt(m.end)} · ${manDays(m)} man-days`, who: dj.own || "plan", due: m.end, cat: "Milestone", esc: "None", comments: 0 }} />
+                );
+                return (
+                  <div className="rounded-lg p-2" style={{ background: "#DDE6EE", minWidth: 230, maxWidth: 260, border: "1px solid #B9C7D4" }}>
+                    <div className="text-xs font-bold px-1 pb-1.5 flex justify-between" style={{ color: "#1B3A5C" }}><span>⚑ MILESTONES</span><span style={{ color: "#8A94A0" }}>{open.length} pending · {doneMs.length} done</span></div>
+                    {open.map((m) => card(m))}
+                    {open.length === 0 && sched.length > 0 && (<div className="text-xs text-center rounded py-1 my-1 font-bold" style={{ background: "#E6F4EA", color: "#0D7A3F" }}>All milestones checked off ✓</div>)}
+                    {doneMs.length > 0 && (<button onClick={() => setShowPastMs(!showPastMs)} className="w-full text-xs font-bold rounded border border-dashed py-1 my-1" style={{ borderColor: "#8FA1B3", color: "#0D7A3F" }}>{showPastMs ? "▴ hide" : "▾ show"} {doneMs.length} completed ✓</button>)}
+                    {showPastMs && doneMs.map((m) => card(m))}
+                    {msForm.open ? (
+                      <div className="rounded border p-2 mt-1 bg-white" style={{ borderColor: "#1B3A5C" }}>
+                        <input autoFocus placeholder="New milestone…" value={msForm.name} onChange={(e) => setMsForm({ ...msForm, name: e.target.value })} className="w-full text-xs border rounded px-1 py-1 mb-1" style={{ borderColor: "#E2E0DA" }} />
+                        <div className="flex gap-1 items-center">
+                          <input type="number" min={1} value={msForm.days} onChange={(e) => setMsForm({ ...msForm, days: parseInt(e.target.value || "1", 10) })} className="w-14 text-xs border rounded px-1 py-1" style={{ borderColor: "#E2E0DA" }} />
+                          <span className="text-xs" style={{ color: "#8A94A0" }}>days</span>
+                          <button onClick={() => { addMilestoneNamed(msForm.name, msForm.days); setMsForm({ open: false, name: "", days: 3 }); }} className="text-xs font-bold rounded px-2 py-1" style={{ background: "#1B3A5C", color: "#fff" }}>Add</button>
+                          <button onClick={() => setMsForm({ open: false, name: "", days: 3 })} className="text-xs rounded px-1" style={{ color: "#8A94A0" }}>✕</button>
+                        </div>
+                      </div>
+                    ) : (<button onClick={() => setMsForm({ open: true, name: "", days: 3 })} className="w-full text-xs font-bold rounded py-1 mt-1" style={{ background: "#1B3A5C", color: "#fff" }}>+ Milestone</button>)}
                   </div>
-                </td>
-                <td className="px-2 py-1 text-center" style={{ color: "#5A6672" }}>{fmt(m.start)}</td>
-                <td className="px-2 py-1 text-center" style={{ color: "#5A6672" }}>{fmt(m.end)}</td>
-                {TRADES.map((t) => (<td key={t.key} className="px-1 py-1 text-center"><CrewCell value={m.crew[t.key] || 0} onChange={(v) => setCrew(i, t.key as keyof Crew, v)} color={t.color} /></td>))}
-                <td className="px-2 py-1 text-center">
-                  <input type="checkbox" checked={!!m.done} onChange={(e) => toggleDone(m.idx - 1, e.target.checked)} />
-                </td>
-                <td className="px-2 py-1 text-center">
-                  <button onClick={() => removeMilestone(i)} style={{ color: "#B3261E" }}>✕</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                );
+              })()}
+              {(jobCats.length ? jobCats : addingTask === dj.id ? [form.cat] : []).map((cat) => (
+                <div key={cat} className="rounded-lg p-2" style={{ background: "#E9E6DD", minWidth: 230, maxWidth: 260 }}>
+                  <div className="text-xs font-bold px-1 pb-1.5 flex justify-between" style={{ color: "#16232F" }}><span>{cat.toUpperCase()}</span><span style={{ color: "#8A94A0" }}>{jobTasks.filter((t) => t.cat === cat && !t.done).length} open</span></div>
+                  {jobTasks.filter((t) => t.cat === cat).sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1)).map((t) => (<TaskCard key={t.id} onOpen={setLightbox} t={t} />))}
+                  {addingTask === dj.id && form.cat === cat && (<AddTaskForm owners={board.owners} form={form} setForm={setForm} onSubmit={submitTask} onCancel={() => setAddingTask(null)} />)}
+                </div>
+              ))}
+              {addingTask === dj.id && jobCats.length > 0 && !jobCats.includes(form.cat) && (
+                <div className="rounded-lg p-2" style={{ background: "#E9E6DD", minWidth: 230 }}>
+                  <div className="text-xs font-bold px-1 pb-1.5">{form.cat.toUpperCase()}</div>
+                  <AddTaskForm owners={board.owners} form={form} setForm={setForm} onSubmit={submitTask} onCancel={() => setAddingTask(null)} />
+                </div>
+              )}
+            </div>
+            {jobTasks.length === 0 && (<div className="text-xs mt-1" style={{ color: "#8A94A0" }}>No ERP ToDos linked yet — upload the ToDo Dashboard, or add a manual task with + Task.</div>)}
+          </div>
+        </>
+      )}
+
+      {lightbox && <TaskModal task={lightbox} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+
+      {/* management date breach popup */}
+      {dj.mgmt && ends > dj.mgmt && !warned.has(dj.id) && (
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(13,22,31,0.75)", zIndex: 60 }}>
+          <div className="bg-white rounded-lg p-5 w-full" style={{ maxWidth: 460, borderTop: "5px solid #B3261E" }}>
+            <div className="text-xs font-bold tracking-widest" style={{ color: "#B3261E" }}>⚠ MANAGEMENT TARGET BREACH</div>
+            <div className="font-bold text-lg mt-1" style={{ color: "#16232F" }}>JOB {jobNo(dj.id)} · {dj.tag}</div>
+            <div className="text-sm mt-2" style={{ color: "#5A6672" }}>The current milestone plan ends <b style={{ color: "#B3261E" }}>{fmtFull(ends)}</b> — that is <b>{diffDays(dj.mgmt, ends)} days beyond</b> the Management target of <b style={{ color: "#7C3AED" }}>{fmtFull(dj.mgmt)}</b>.</div>
+            <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>Compress durations, add crew, run parallel milestones — or escalate to raghu@nandan.co.in for a revised target.</div>
+            <div className="flex gap-2 mt-4"><button onClick={() => setWarned((s) => new Set([...s, dj.id]))} className="flex-1 py-2 rounded font-bold text-sm" style={{ background: "#22303C", color: "#fff" }}>Acknowledge — I will re-plan</button></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// task card used in the Job Plan kanban + Tasking board
+function TaskCard({ t, onOpen }: { t: Task; onOpen: (t: Task) => void }) {
+  return (
+    <div onClick={() => onOpen(t)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ ...dueStyle(t.done ? null : t.due), borderColor: "rgba(0,0,0,0.08)", opacity: t.done ? 0.45 : 1 }}>
+      <div className="text-xs font-semibold" style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", textDecoration: t.done ? "line-through" : "none" }}>{t.t}</div>
+      <div className="flex items-center justify-between mt-1 text-xs" style={{ opacity: 0.85 }}>
+        <span className="font-bold rounded px-1" style={{ background: "rgba(0,0,0,0.12)" }}>{initials(t.who)}</span>
+        {t.esc && t.esc !== "None" && (<span className="font-bold rounded px-1" style={{ background: "#B3261E", color: "#fff", fontSize: 9 }}>⚠ {t.esc.slice(0, 2)}</span>)}
+        <span style={{ fontSize: 10 }}>{(t.cat || "").toLowerCase()}</span>
+        <span className="tnum">{fmt(t.due)}</span>
       </div>
     </div>
   );
 }
 
 // ============================ Tasking ============================
-function Tasking({ board, reload }: { board: Board; reload: () => Promise<Board | null> }) {
+function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string) => void; reload: () => Promise<Board | null> }) {
   const [filterCust, setFilterCust] = useState("all");
   const [filterFam, setFilterFam] = useState("all");
+  const [filterOwn, setFilterOwn] = useState("all");
+  const [taskAll, setTaskAll] = useState(false);
+  const [taskView, setTaskView] = useState<"board" | "cal">("board");
+  const [calMonth, setCalMonth] = useState(TODAY.slice(0, 7));
   const [adding, setAdding] = useState<string | null>(null);
   const [form, setForm] = useState({ t: "", who: "", due: TODAY, cat: "Production", esc: "None" });
-  const [openTask, setOpenTask] = useState<Task | null>(null);
+  const [lightbox, setLightbox] = useState<Task | null>(null);
 
   const custs = useMemo(() => [...new Set(board.jobs.map((j) => j.cust))].sort(), [board]);
   const fams = useMemo(() => [...new Set(board.jobs.map((j) => j.fam))].sort(), [board]);
-  const jobsWithTasks = board.jobs
-    .filter((j) => (filterCust === "all" || j.cust === filterCust) && (filterFam === "all" || j.fam === filterFam))
-    .filter((j) => board.tasks.some((t) => t.j === j.id))
-    .sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1));
+  const owners = board.owners;
+  const tasks = board.tasks;
+  const taskingJobs = useMemo(() => {
+    const withTasks = taskAll ? board.jobs : board.jobs.filter((j) => tasks.some((t) => t.j === j.id));
+    return withTasks
+      .filter((j) => (filterCust === "all" || j.cust === filterCust) && (filterFam === "all" || j.fam === filterFam) && (filterOwn === "all" || j.own === filterOwn))
+      .sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1));
+  }, [board, tasks, filterCust, filterFam, filterOwn, taskAll]);
 
-  const toggle = async (t: Task) => { await api.post("/api/tasks", { action: "toggle", id: t.id, kind: t.kind, done: !t.done }); await reload(); };
   const submit = async (jid: string) => {
     if (!form.t.trim()) return;
     await api.post("/api/tasks", { action: "create", job_id: jid, title: form.t.trim(), who: form.who, due: form.due, cat: form.cat, esc: form.esc });
@@ -1055,49 +1304,117 @@ function Tasking({ board, reload }: { board: Board; reload: () => Promise<Board 
 
   return (
     <div className="p-4">
-      <div className="flex gap-2 mb-3 flex-wrap">
-        <select value={filterCust} onChange={(e) => setFilterCust(e.target.value)} className="text-xs border rounded px-2 py-1 bg-white" style={{ borderColor: "#D9D6CD" }}>
-          <option value="all">All customers</option>
-          {custs.map((c) => (<option key={c}>{c}</option>))}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <select value={filterCust} onChange={(e) => setFilterCust(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm" style={{ borderColor: "#D9D6CD", maxWidth: 240 }}>
+          <option value="all">All customers</option>{custs.map((c) => (<option key={c}>{c}</option>))}
         </select>
-        <select value={filterFam} onChange={(e) => setFilterFam(e.target.value)} className="text-xs border rounded px-2 py-1 bg-white" style={{ borderColor: "#D9D6CD" }}>
-          <option value="all">All families</option>
-          {fams.map((f) => (<option key={f}>{f}</option>))}
+        <select value={filterOwn} onChange={(e) => setFilterOwn(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm" style={{ borderColor: "#D9D6CD" }}>
+          <option value="all">All job owners</option>{owners.map((o) => (<option key={o}>{o}</option>))}
         </select>
-      </div>
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {jobsWithTasks.map((j) => {
-          const jt = board.tasks.filter((t) => t.j === j.id);
-          return (
-            <div key={j.id} className="rounded-lg border bg-white p-2 flex-shrink-0" style={{ width: 260, borderColor: "#E2E0DA" }}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="font-bold text-sm" style={{ color: "#1B3A5C" }}>JOB {jobNo(j.id)}</div>
-                <a href={erpJobLink(j.id)} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "#8A94A0" }}>↗</a>
-              </div>
-              <div className="text-xs mb-2" style={{ color: "#8A94A0" }}>{j.tag}</div>
-              {jt.map((t) => (
-                <div key={t.id} onClick={() => setOpenTask(t)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ ...dueStyle(t.done ? null : t.due), borderColor: "rgba(0,0,0,0.08)", opacity: t.done ? 0.45 : 1 }}>
-                  <div className="text-xs font-semibold" style={{ textDecoration: t.done ? "line-through" : "none" }}>{t.t}</div>
-                  <div className="flex items-center justify-between mt-1 text-xs" style={{ opacity: 0.85 }}>
-                    <span className="font-bold rounded px-1" style={{ background: "rgba(0,0,0,0.12)" }}>{initials(t.who)}</span>
-                    {t.kind === "manual" && <span className="rounded px-1" style={{ background: "#E8600A", color: "#fff", fontSize: 9 }}>manual</span>}
-                    <span style={{ fontSize: 10 }}>{(t.cat || "").toLowerCase()}</span>
-                    <span className="tnum">{fmt(t.due)}</span>
-                  </div>
-                </div>
-              ))}
-              {adding === j.id ? (
-                <AddTaskForm form={form} setForm={setForm} owners={board.owners} onSubmit={() => submit(j.id)} onCancel={() => setAdding(null)} />
-              ) : (
-                <button onClick={() => setAdding(j.id)} className="text-xs font-bold w-full rounded py-1 mt-1" style={{ background: "#F4F2EC", color: "#E8600A" }}>+ Add task</button>
-              )}
-            </div>
-          );
-        })}
-        {jobsWithTasks.length === 0 && <div className="text-sm" style={{ color: "#8A94A0" }}>No tasks yet. Upload the ToDo Dashboard or add a manual task after opening a job.</div>}
+        <select value={filterFam} onChange={(e) => setFilterFam(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm" style={{ borderColor: "#D9D6CD" }}>
+          <option value="all">All products</option>{fams.map((f) => (<option key={f}>{f}</option>))}
+        </select>
+        <label className="text-xs flex items-center gap-1 px-2 py-1.5 rounded border bg-white cursor-pointer" style={{ borderColor: "#D9D6CD", color: "#5A6672" }}>
+          <input type="checkbox" checked={taskAll} onChange={(e) => setTaskAll(e.target.checked)} /> include jobs without tasks
+        </label>
+        <div className="flex gap-1 rounded p-1 bg-white border" style={{ borderColor: "#D9D6CD" }}>
+          {(["board", "cal"] as const).map((k) => (<button key={k} onClick={() => setTaskView(k)} className="px-3 py-1 rounded text-sm font-semibold" style={taskView === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>{k === "board" ? "Board" : "📅 Calendar (ISO weeks)"}</button>))}
+        </div>
       </div>
 
-      {openTask && <TaskModal task={openTask} onClose={() => setOpenTask(null)} onToggle={() => toggle(openTask)} reload={reload} />}
+      {taskView === "board" && taskingJobs.length === 0 && (
+        <div className="bg-white border rounded-lg p-6 text-center text-sm" style={{ borderColor: "#E2E0DA", color: "#8A94A0" }}>No jobs with open tasks match this filter — tick &quot;include jobs without tasks&quot; to board every job and add their first tasks here.</div>
+      )}
+
+      {taskView === "board" && (
+        <div className="flex gap-3 overflow-x-auto pb-2 items-start">
+          {taskingJobs.map((j) => {
+            const jt = tasks.filter((t) => t.j === j.id).sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1));
+            const open = jt.filter((t) => !t.done).length;
+            const plan = board.plans[j.id];
+            const nx = plan ? computeSchedule({ start: plan.start || TODAY, milestones: plan.milestones }).find((m) => m.end >= TODAY && manDays(m) > 0) : null;
+            return (
+              <div key={j.id} style={{ minWidth: 240, maxWidth: 260 }}>
+                <div className="rounded-t-lg p-2" style={{ background: "#16232F", color: "#fff", borderBottom: "3px solid #E8600A" }}>
+                  <div className="flex justify-between items-baseline">
+                    <button onClick={() => onOpen(j.id)} className="font-bold text-sm underline decoration-dotted" style={{ color: "#F5B32B" }}>JOB {jobNo(j.id)}</button>
+                    <span className="text-xs font-bold" style={{ color: open ? "#F5B32B" : "#7BC67E" }}>{open} open</span>
+                  </div>
+                  <div className="text-xs truncate" title={j.tag}>{j.tag}</div>
+                  <div className="text-xs opacity-70">TDD {fmt(j.tdd)}{j.own ? " · " + j.own : ""} · {j.cust.slice(0, 20)}</div>
+                </div>
+                <div className="rounded-b-lg p-2" style={{ background: "#E9E6DD" }}>
+                  {nx && (
+                    <div onClick={() => onOpen(j.id)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ background: "#DDE6EE", borderColor: "#B9C7D4" }}>
+                      <div className="text-xs font-bold" style={{ color: "#1B3A5C" }}>⚑ Next milestone: M{nx.idx} {nx.name}</div>
+                      <div className="text-xs flex justify-between mt-0.5" style={{ color: "#5A6672" }}><span>from the job plan</span><span className="tnum">{fmt(nx.end)}</span></div>
+                    </div>
+                  )}
+                  {jt.map((t) => (<TaskCard key={t.id} onOpen={setLightbox} t={t} />))}
+                  {adding === j.id ? (
+                    <AddTaskForm form={form} setForm={setForm} owners={owners} onSubmit={() => submit(j.id)} onCancel={() => setAdding(null)} />
+                  ) : (
+                    <button onClick={() => setAdding(j.id)} className="w-full text-xs font-bold rounded border border-dashed py-1 mt-1" style={{ borderColor: "#E8600A", color: "#E8600A" }}>+ Add task</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {taskView === "cal" && (() => {
+        const [yy, mm] = calMonth.split("-").map(Number);
+        const first = new Date(Date.UTC(yy, mm - 1, 1));
+        const monStart = new Date(first); monStart.setUTCDate(monStart.getUTCDate() - ((monStart.getUTCDay() + 6) % 7));
+        const lastD = new Date(Date.UTC(yy, mm, 0)); const sunEnd = new Date(lastD); sunEnd.setUTCDate(sunEnd.getUTCDate() + (6 - ((sunEnd.getUTCDay() + 6) % 7)));
+        const days: string[] = []; for (let d = new Date(monStart); d <= sunEnd; d.setUTCDate(d.getUTCDate() + 1)) days.push(toISO(new Date(d)));
+        const weeks: string[][] = []; for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+        const jset = new Set(taskingJobs.map((j) => j.id));
+        const openT = tasks.filter((t) => !t.done && t.due && jset.has(t.j));
+        const byDay: Record<string, Task[]> = {}; openT.forEach((t) => (byDay[t.due!] = byDay[t.due!] || []).push(t));
+        const overdue = openT.filter((t) => t.due! < TODAY);
+        const monthLabel = first.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
+        const shiftMonth = (d: number) => setCalMonth(toISO(new Date(Date.UTC(yy, mm - 1 + d, 1))).slice(0, 7));
+        return (
+          <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+              <button onClick={() => shiftMonth(-1)} className="px-3 py-1 rounded font-bold text-sm" style={{ background: "#F4F2EC", color: "#22303C" }}>◀</button>
+              <div className="font-bold text-center" style={{ color: "#16232F" }}>{monthLabel} <span className="text-xs font-normal" style={{ color: "#8A94A0" }}>· open tasks on their due dates · respects the filters above</span></div>
+              <div className="flex gap-1"><button onClick={() => setCalMonth(TODAY.slice(0, 7))} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }}>Today</button><button onClick={() => shiftMonth(1)} className="px-3 py-1 rounded font-bold text-sm" style={{ background: "#F4F2EC", color: "#22303C" }}>▶</button></div>
+            </div>
+            {overdue.length > 0 && (<div className="text-xs font-bold rounded px-2 py-1 mb-2 inline-block" style={{ background: "#B3261E", color: "#fff" }}>⚠ {overdue.length} overdue task{overdue.length === 1 ? "" : "s"} — red chips on their original due dates</div>)}
+            <table className="w-full text-xs" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
+              <thead><tr style={{ background: "#22303C", color: "#fff" }}><th className="px-1 py-1.5" style={{ width: 58 }}>ISO Wk</th>{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (<th key={d} className="px-1 py-1.5">{d}</th>))}</tr></thead>
+              <tbody>
+                {weeks.map((wk) => {
+                  const wkCount = wk.reduce((n, d) => n + (byDay[d] || []).length, 0);
+                  return (
+                    <tr key={wk[0]} className="border-t align-top" style={{ borderColor: "#EFEDE7" }}>
+                      <td className="px-1 py-1 font-bold text-center" style={{ background: wk[0] <= TODAY && TODAY <= wk[6] ? "#FFF3E8" : "#F4F2EC", color: "#1B3A5C" }}>W{isoWeek(wk[0])}{wkCount > 0 && (<div className="font-normal" style={{ color: "#8A94A0", fontSize: 9 }}>{wkCount} task{wkCount === 1 ? "" : "s"}</div>)}</td>
+                      {wk.map((d) => {
+                        const inM = d.slice(0, 7) === calMonth;
+                        const list = byDay[d] || [];
+                        return (
+                          <td key={d} className="px-1 py-1 border-l" style={{ borderColor: "#EFEDE7", background: d === TODAY ? "#FFF3E8" : inM ? "#fff" : "#FAF9F5", opacity: inM ? 1 : 0.55, height: 64 }}>
+                            <div className="font-bold tnum" style={{ color: d === TODAY ? "#E8600A" : "#8A94A0" }}>{parseInt(d.slice(8), 10)}{d === TODAY ? " · today" : ""}</div>
+                            {list.map((t) => (
+                              <div key={t.id} onClick={() => setLightbox(t)} title={"JOB " + jobNo(t.j) + " · " + t.t + " · " + (t.who || "unassigned")} className="rounded px-1 py-0.5 mb-0.5 cursor-pointer font-semibold" style={{ background: t.due! < TODAY ? "#B3261E" : t.due === TODAY ? "#fff" : "#DCE8F5", color: t.due! < TODAY ? "#fff" : "#1B3A5C", border: t.due === TODAY ? "1px solid #22303C" : "none", fontSize: 9, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{jobNo(t.j)} · {initials(t.who)} · {t.t}</div>
+                            ))}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>Tap a chip to open the task (mark done, comment) · red = overdue · white outline = due today</div>
+          </div>
+        );
+      })()}
+
+      {lightbox && <TaskModal task={lightbox} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
     </div>
   );
 }
