@@ -4,9 +4,10 @@ import { supabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-// POST /api/tasks — manual task create, or close/reopen either kind. planner/admin.
+// POST /api/tasks — manual task create, edit, or close/reopen either kind. planner/admin.
 //   { action: "create", job_id, title, detail?, who?, due?, cat?, esc? }
 //   { action: "toggle", id, kind: "erp"|"manual", done }
+//   { action: "update", id, kind, title?, detail?, who?, due?, cat?, esc? }
 export async function POST(req: Request) {
   try {
     const user = await requirePlanner();
@@ -40,6 +41,23 @@ export async function POST(req: Request) {
         .from(table)
         .update({ done: !!body.done })
         .eq("id", body.id);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body.action === "update") {
+      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+      const table = body.kind === "manual" ? "manual_tasks" : "erp_tasks";
+      const patch: Record<string, unknown> = {};
+      if ("title" in body) patch.title = String(body.title || "").trim();
+      if ("detail" in body) patch.detail = String(body.detail || "");
+      if ("who" in body) patch.who = String(body.who || "unassigned");
+      if ("due" in body) patch.due = body.due || null;
+      if ("cat" in body) patch.cat = String(body.cat || "General");
+      if ("esc" in body) patch.esc = String(body.esc || "None");
+      if (!Object.keys(patch).length)
+        return NextResponse.json({ error: "nothing to update" }, { status: 400 });
+      const { error } = await supabase.from(table).update(patch).eq("id", body.id);
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true });
     }

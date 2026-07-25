@@ -24,9 +24,11 @@ import {
   parseISO,
   toISO,
   TASK_CATS,
+  ESC_LEVELS,
   type Plan,
   type PlanMilestone,
 } from "@/lib/schedule";
+import QuoteOfDay from "./QuoteOfDay";
 
 // The 32 ERP job-status options (verbatim from V1.9), used by the editable
 // Job Status dropdowns.
@@ -108,6 +110,45 @@ interface ErpLogEntry {
 }
 
 const erpJobLink = (id: string) => "https://nandanerp.in/app/jobmaster/" + id;
+
+// Default milestone plan for a product family: admin-saved DB templates first
+// (exact name, then partial match), then the "Default" template, then the
+// built-in V1.9 fallback. This is what makes admin-added products work.
+function templateMilestones(fam: string, templates: Record<string, any>): PlanMilestone[] {
+  const keys = Object.keys(templates || {});
+  const f = (fam || "").toLowerCase();
+  const hit =
+    keys.find((k) => k.toLowerCase() === f) ||
+    keys.find(
+      (k) =>
+        k !== "Default" &&
+        (f.includes(k.toLowerCase()) || k.toLowerCase().includes(f)) &&
+        f !== "",
+    );
+  const src = hit ? templates[hit] : templates["Default"];
+  if (Array.isArray(src) && src.length) {
+    return src.map((m: any, i: number) => ({
+      name: String(m.name || `Milestone ${i + 1}`),
+      days: Math.max(1, Number(m.days) || 1),
+      preds: Array.isArray(m.preds)
+        ? m.preds.filter((p: number) => p > 0 && p <= i)
+        : m.pred
+          ? [m.pred]
+          : [],
+      crew: { ...zeroCrew(), ...(m.crew || {}) },
+      shift: m.shift || "D",
+      offset: Number(m.offset) || 0,
+    }));
+  }
+  return templateFor(fam).map((m) => ({
+    name: m.name,
+    days: m.days,
+    preds: m.pred ? [m.pred] : [],
+    crew: { ...m.crew },
+    shift: "D",
+    offset: m.offset,
+  }));
+}
 
 export default function PlanningSuite({
   email,
@@ -293,6 +334,8 @@ export default function PlanningSuite({
         </div>
       </div>
 
+      <QuoteOfDay />
+
       {tab === "delivery" && <DeliveryBoard board={board} V={V} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} pushERP={pushERP} />}
       {tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
       {tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} pushERP={pushERP} />}
@@ -345,7 +388,18 @@ function DeliveryBoard({
   const [subTab, setSubTab] = useState<"priority" | "okan" | "cal" | "fam" | "cust">("priority");
   const [delOwn, setDelOwn] = useState("all");
   const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const [calMonth, setCalMonth] = useState(TODAY.slice(0, 7));
+  const calRef = useRef<HTMLDivElement | null>(null);
+  const scrollCalToToday = () => {
+    const c = calRef.current;
+    const el = c?.querySelector('[data-today-row="1"]') as HTMLElement | null;
+    if (c && el)
+      c.scrollTop += el.getBoundingClientRect().top - c.getBoundingClientRect().top - c.clientHeight / 2;
+  };
+  useEffect(() => {
+    if (subTab !== "cal") return;
+    const t = setTimeout(scrollCalToToday, 60);
+    return () => clearTimeout(t);
+  }, [subTab]);
 
   const jobs = board.jobs;
   const owners = board.owners;
@@ -422,68 +476,90 @@ function DeliveryBoard({
         </select>
       </div>
 
-      {/* ---- Calendar (ISO weeks) ---- */}
+      {/* ---- Calendar (ISO weeks) — one continuous scroll through the months ---- */}
       {subTab === "cal" && (() => {
-        const [yy, mm] = calMonth.split("-").map(Number);
-        const first = new Date(Date.UTC(yy, mm - 1, 1));
-        const monStart = new Date(first);
-        monStart.setUTCDate(monStart.getUTCDate() - ((monStart.getUTCDay() + 6) % 7));
-        const lastD = new Date(Date.UTC(yy, mm, 0));
-        const sunEnd = new Date(lastD);
-        sunEnd.setUTCDate(sunEnd.getUTCDate() + (6 - ((sunEnd.getUTCDay() + 6) % 7)));
-        const days: string[] = [];
-        for (let d = new Date(monStart); d <= sunEnd; d.setUTCDate(d.getUTCDate() + 1)) days.push(toISO(new Date(d)));
+        const tdds = jobs.map((j) => j.tdd).filter(Boolean) as string[];
+        const lo0 = tdds.length ? tdds.reduce((a, b) => (a < b ? a : b)) : TODAY;
+        const hi0 = tdds.length ? tdds.reduce((a, b) => (a > b ? a : b)) : TODAY;
+        const lo = lo0 < TODAY ? lo0 : TODAY;
+        let hi = hi0 > TODAY ? hi0 : TODAY;
+        if (diffDays(lo, hi) > 730) hi = addDays(lo, 730); // clamp to ~24 months of rows
+        // full Mon–Sun weeks covering from the 1st of the earliest month to the end of the latest
+        const start = parseISO(lo.slice(0, 7) + "-01");
+        start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
+        const hiD = parseISO(hi);
+        const end = new Date(Date.UTC(hiD.getUTCFullYear(), hiD.getUTCMonth() + 1, 0));
+        end.setUTCDate(end.getUTCDate() + (6 - ((end.getUTCDay() + 6) % 7)));
         const weeks: string[][] = [];
-        for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+        for (let d = new Date(start); d <= end; ) {
+          const wk: string[] = [];
+          for (let k = 0; k < 7; k++) { wk.push(toISO(new Date(d))); d.setUTCDate(d.getUTCDate() + 1); }
+          weeks.push(wk);
+        }
         const byDay: Record<string, Job[]> = {};
         jobs.forEach((j) => { if (j.tdd) (byDay[j.tdd] = byDay[j.tdd] || []).push(j); });
-        const monthLabel = first.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
-        const shiftMonth = (d: number) => setCalMonth(toISO(new Date(Date.UTC(yy, mm - 1 + d, 1))).slice(0, 7));
+        const monthOf = (iso: string) => parseISO(iso).toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
+        let lastMonth = "";
         return (
           <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
             <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-              <button onClick={() => shiftMonth(-1)} className="px-3 py-1 rounded font-bold text-sm" style={{ background: "#F4F2EC", color: "#22303C" }}>◀</button>
-              <div className="font-bold text-center" style={{ color: "#16232F" }}>{monthLabel}<span className="text-xs font-normal" style={{ color: "#8A94A0" }}> · jobs on their Target Delivery Date · ISO week numbers on the left</span></div>
-              <div className="flex gap-1">
-                <button onClick={() => setCalMonth(TODAY.slice(0, 7))} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }}>Today</button>
-                <button onClick={() => shiftMonth(1)} className="px-3 py-1 rounded font-bold text-sm" style={{ background: "#F4F2EC", color: "#22303C" }}>▶</button>
-              </div>
+              <div className="font-bold" style={{ color: "#16232F" }}>Delivery calendar <span className="text-xs font-normal" style={{ color: "#8A94A0" }}>· continuous — scroll through the months · jobs on their Target Delivery Date · ISO weeks on the left</span></div>
+              <button onClick={scrollCalToToday} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }}>⤓ Jump to today</button>
             </div>
-            <table className="w-full text-xs" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
-              <thead>
-                <tr style={{ background: "#22303C", color: "#fff" }}>
-                  <th className="px-1 py-1.5" style={{ width: 58 }}>ISO Wk</th>
-                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (<th key={d} className="px-1 py-1.5">{d}</th>))}
-                </tr>
-              </thead>
-              <tbody>
-                {weeks.map((wk) => {
-                  const wkCount = wk.reduce((n, d) => n + (byDay[d] || []).length, 0);
-                  const wkVal = wk.reduce((v, d) => v + (byDay[d] || []).reduce((x, j) => x + (j.val || 0), 0), 0);
-                  return (
-                    <tr key={wk[0]} className="border-t align-top" style={{ borderColor: "#EFEDE7" }}>
-                      <td className="px-1 py-1 font-bold text-center" style={{ background: wk[0] <= TODAY && TODAY <= wk[6] ? "#FFF3E8" : "#F4F2EC", color: "#1B3A5C" }}>
-                        W{isoWeek(wk[0])}
-                        {wkCount > 0 && (<div className="font-normal" style={{ color: "#8A94A0", fontSize: 9 }}>{wkCount} job{wkCount === 1 ? "" : "s"}<br />{V(wkVal)}</div>)}
-                      </td>
-                      {wk.map((d) => {
-                        const inM = d.slice(0, 7) === calMonth;
-                        const list = byDay[d] || [];
-                        return (
-                          <td key={d} className="px-1 py-1 border-l" style={{ borderColor: "#EFEDE7", background: d === TODAY ? "#FFF3E8" : inM ? "#fff" : "#FAF9F5", opacity: inM ? 1 : 0.55, height: 64 }}>
-                            <div className="font-bold tnum" style={{ color: d === TODAY ? "#E8600A" : "#8A94A0" }}>{parseInt(d.slice(8), 10)}{d === TODAY ? " · today" : ""}</div>
-                            {list.map((j) => (
-                              <div key={j.id} onClick={() => onOpen(j.id)} title={j.tag + " · " + j.cust + " · " + (j.stat || "")} className="rounded px-1 py-0.5 mb-0.5 cursor-pointer font-semibold" style={{ background: j.tdd && j.tdd < TODAY ? "#B3261E" : "#DCE8F5", color: j.tdd && j.tdd < TODAY ? "#fff" : "#1B3A5C", fontSize: 9, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{jobNo(j.id)} {j.tag}</div>
-                            ))}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>Tap a job chip to open its milestone plan · red chip = TDD already past · week cell shows count &amp; value due that ISO week</div>
+            <div ref={calRef} style={{ maxHeight: "70vh", overflowY: "auto" }}>
+              <table className="w-full text-xs" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
+                <thead>
+                  <tr>
+                    <th className="px-1 py-1.5" style={{ width: 58, position: "sticky", top: 0, zIndex: 6, background: "#22303C", color: "#fff" }}>ISO Wk</th>
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                      <th key={d} className="px-1 py-1.5" style={{ position: "sticky", top: 0, zIndex: 6, background: "#22303C", color: "#fff" }}>{d}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {weeks.map((wk) => {
+                    const rows: React.ReactNode[] = [];
+                    const mLabel = monthOf(wk[3]); // the week's Thursday decides which month owns it (ISO convention)
+                    if (mLabel !== lastMonth) {
+                      lastMonth = mLabel;
+                      rows.push(
+                        <tr key={"m" + wk[0]}>
+                          <td colSpan={8} className="px-2 py-1.5 font-bold" style={{ background: "#16232F", color: "#F5B32B", position: "sticky", top: 28, zIndex: 5 }}>{mLabel}</td>
+                        </tr>,
+                      );
+                    }
+                    const wkCount = wk.reduce((n, d2) => n + (byDay[d2] || []).length, 0);
+                    const wkVal = wk.reduce((v, d2) => v + (byDay[d2] || []).reduce((x, j) => x + (j.val || 0), 0), 0);
+                    const isTodayWk = wk[0] <= TODAY && TODAY <= wk[6];
+                    rows.push(
+                      <tr key={wk[0]} data-today-row={isTodayWk ? "1" : undefined} className="border-t align-top" style={{ borderColor: "#EFEDE7" }}>
+                        <td className="px-1 py-1 font-bold text-center" style={{ background: isTodayWk ? "#FFF3E8" : "#F4F2EC", color: "#1B3A5C" }}>
+                          W{isoWeek(wk[0])}
+                          {wkCount > 0 && (<div className="font-normal" style={{ color: "#8A94A0", fontSize: 9 }}>{wkCount} job{wkCount === 1 ? "" : "s"}<br />{V(wkVal)}</div>)}
+                        </td>
+                        {wk.map((d2) => {
+                          const list = byDay[d2] || [];
+                          return (
+                            <td key={d2} className="px-1 py-1 border-l" style={{ borderColor: "#EFEDE7", background: d2 === TODAY ? "#FFF3E8" : "#fff", height: 64 }}>
+                              <div className="font-bold tnum" style={{ color: d2 === TODAY ? "#E8600A" : "#8A94A0" }}>
+                                {parseInt(d2.slice(8), 10)}
+                                {list.length > 1 && <span style={{ color: "#1B3A5C" }}> ({list.length})</span>}
+                                {d2 === TODAY ? " · today" : ""}
+                              </div>
+                              {list.map((j) => (
+                                <div key={j.id} onClick={() => onOpen(j.id)} title={j.tag + " · " + j.cust + " · " + (j.stat || "")} className="rounded px-1 py-0.5 mb-0.5 cursor-pointer font-semibold" style={{ background: j.tdd && j.tdd < TODAY ? "#B3261E" : "#DCE8F5", color: j.tdd && j.tdd < TODAY ? "#fff" : "#1B3A5C", fontSize: 9, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{jobNo(j.id)} {j.tag}</div>
+                              ))}
+                            </td>
+                          );
+                        })}
+                      </tr>,
+                    );
+                    return rows;
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>Scroll for more months · tap a job chip to open its milestone plan · red chip = TDD already past · (n) = jobs due that day · week cell shows count &amp; value due that ISO week</div>
           </div>
         );
       })()}
@@ -664,7 +740,7 @@ function LoadBoard({ board, byTDD }: { board: Board; byTDD: Job[] }) {
       const saved = board.plans[j.id];
       const pl: Plan = saved && saved.milestones.length
         ? { start: saved.start || (j.start && j.start >= TODAY ? j.start : TODAY), milestones: saved.milestones }
-        : { start: j.start && j.start >= TODAY ? j.start : TODAY, milestones: templateFor(j.fam).map((m) => ({ name: m.name, days: m.days, preds: m.pred ? [m.pred] : [], crew: { ...m.crew }, shift: "D", offset: m.offset })) };
+        : { start: j.start && j.start >= TODAY ? j.start : TODAY, milestones: templateMilestones(j.fam, board.templates) };
       return { job: j, plan: pl };
     }),
     [board, byTDD],
@@ -893,7 +969,7 @@ function JobPlan({
     const saved = board.plans[j.id];
     if (saved && saved.milestones.length)
       return { start: saved.start || j.start || TODAY, milestones: saved.milestones.map((m) => ({ ...m, crew: { ...m.crew }, preds: [...m.preds] })) };
-    return { start: j.start && j.start >= TODAY ? j.start : TODAY, milestones: templateFor(j.fam).map((m) => ({ name: m.name, days: m.days, preds: m.pred ? [m.pred] : [], crew: { ...m.crew }, shift: "D", offset: m.offset })) };
+    return { start: j.start && j.start >= TODAY ? j.start : TODAY, milestones: templateMilestones(j.fam, board.templates) };
   };
   useEffect(() => {
     if (!job) { setDraft(null); return; }
@@ -954,7 +1030,7 @@ function JobPlan({
     const remapped = arr.map((m) => ({ ...m, preds: m.preds.map((p) => posMap[p]).filter(Boolean) }));
     return { ...pl, milestones: remapped.map((m, idx) => ({ ...m, preds: m.preds.filter((p) => p <= idx) })) };
   }); };
-  const reloadDefault = () => { dirty.current = true; setDraft({ start: dj.start && dj.start >= TODAY ? dj.start : TODAY, milestones: templateFor(dj.fam).map((m) => ({ name: m.name, days: m.days, preds: m.pred ? [m.pred] : [], crew: { ...m.crew }, shift: "D", offset: m.offset })) }); };
+  const reloadDefault = () => { dirty.current = true; setDraft({ start: dj.start && dj.start >= TODAY ? dj.start : TODAY, milestones: templateMilestones(dj.fam, board.templates) }); };
 
   const savePlanNow = async () => { await api.post("/api/plan", { job_id: dj.id, start: draft.start, milestones: draft.milestones }); await reload(); };
   const saveBaseline = async () => {
@@ -1252,7 +1328,7 @@ function JobPlan({
         </>
       )}
 
-      {lightbox && <TaskModal task={lightbox} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal task={lightbox} owners={board.owners} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
 
       {/* management date breach popup */}
       {dj.mgmt && ends > dj.mgmt && !warned.has(dj.id) && (
@@ -1297,16 +1373,22 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
   const [form, setForm] = useState({ t: "", who: "", due: TODAY, cat: "Production", esc: "None" });
   const [lightbox, setLightbox] = useState<Task | null>(null);
 
+  const [dueUpTo, setDueUpTo] = useState("");
+
   const custs = useMemo(() => [...new Set(board.jobs.map((j) => j.cust))].sort(), [board]);
   const fams = useMemo(() => [...new Set(board.jobs.map((j) => j.fam))].sort(), [board]);
   const owners = board.owners;
-  const tasks = board.tasks;
+  // "up to date" filter: only tasks due on/before the chosen date (blank = all)
+  const filteredTasks = useMemo(
+    () => board.tasks.filter((t) => !dueUpTo || ((t.due || "9999-12-31") <= dueUpTo)),
+    [board, dueUpTo],
+  );
   const taskingJobs = useMemo(() => {
-    const withTasks = taskAll ? board.jobs : board.jobs.filter((j) => tasks.some((t) => t.j === j.id));
+    const withTasks = taskAll ? board.jobs : board.jobs.filter((j) => filteredTasks.some((t) => t.j === j.id));
     return withTasks
       .filter((j) => (filterCust === "all" || j.cust === filterCust) && (filterFam === "all" || j.fam === filterFam) && (filterOwn === "all" || j.own === filterOwn))
       .sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1));
-  }, [board, tasks, filterCust, filterFam, filterOwn, taskAll]);
+  }, [board, filteredTasks, filterCust, filterFam, filterOwn, taskAll]);
 
   const submit = async (jid: string) => {
     if (!form.t.trim()) return;
@@ -1331,6 +1413,11 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
         <label className="text-xs flex items-center gap-1 px-2 py-1.5 rounded border bg-white cursor-pointer" style={{ borderColor: "#D9D6CD", color: "#5A6672" }}>
           <input type="checkbox" checked={taskAll} onChange={(e) => setTaskAll(e.target.checked)} /> include jobs without tasks
         </label>
+        <label className="text-xs flex items-center gap-1 px-2 py-1.5 rounded border bg-white" style={{ borderColor: "#D9D6CD", color: "#5A6672" }} title="Only show tasks due on or before this date">
+          due up to
+          <input type="date" value={dueUpTo} onChange={(e) => setDueUpTo(e.target.value)} className="text-xs border rounded px-1 py-0.5" style={{ borderColor: "#E2E0DA" }} />
+          {dueUpTo && (<button onClick={() => setDueUpTo("")} className="font-bold" style={{ color: "#E8600A" }} title="Clear">✕</button>)}
+        </label>
         <div className="flex gap-1 rounded p-1 bg-white border" style={{ borderColor: "#D9D6CD" }}>
           {(["board", "cal"] as const).map((k) => (<button key={k} onClick={() => setTaskView(k)} className="px-3 py-1 rounded text-sm font-semibold" style={taskView === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>{k === "board" ? "Board" : "📅 Calendar (ISO weeks)"}</button>))}
         </div>
@@ -1341,34 +1428,37 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
       )}
 
       {taskView === "board" && (
-        <div className="flex gap-3 overflow-x-auto pb-2 items-start">
+        <div className="space-y-3">
           {taskingJobs.map((j) => {
-            const jt = tasks.filter((t) => t.j === j.id).sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1));
+            const jt = filteredTasks.filter((t) => t.j === j.id).sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1));
             const open = jt.filter((t) => !t.done).length;
             const plan = board.plans[j.id];
             const nx = plan ? computeSchedule({ start: plan.start || TODAY, milestones: plan.milestones }).find((m) => m.end >= TODAY && manDays(m) > 0) : null;
             return (
-              <div key={j.id} style={{ minWidth: 240, maxWidth: 260 }}>
-                <div className="rounded-t-lg p-2" style={{ background: "#16232F", color: "#fff", borderBottom: "3px solid #E8600A" }}>
+              <div key={j.id} className="flex gap-2 items-stretch">
+                {/* job card — fixed on the left */}
+                <div className="rounded-lg p-2 flex-shrink-0" style={{ width: 250, background: "#16232F", color: "#fff", borderLeft: "4px solid #E8600A" }}>
                   <div className="flex justify-between items-baseline">
                     <button onClick={() => onOpen(j.id)} className="font-bold text-sm underline decoration-dotted" style={{ color: "#F5B32B" }}>JOB {jobNo(j.id)}</button>
                     <span className="text-xs font-bold" style={{ color: open ? "#F5B32B" : "#7BC67E" }}>{open} open</span>
                   </div>
                   <div className="text-xs truncate" title={j.tag}>{j.tag}</div>
-                  <div className="text-xs opacity-70">TDD {fmt(j.tdd)}{j.own ? " · " + j.own : ""} · {j.cust.slice(0, 20)}</div>
+                  <div className="text-xs opacity-70">TDD {fmt(j.tdd)}{j.own ? " · " + j.own : ""}</div>
+                  <div className="text-xs opacity-70 truncate">{j.cust}</div>
                 </div>
-                <div className="rounded-b-lg p-2" style={{ background: "#E9E6DD" }}>
+                {/* tasks — flow horizontally across the screen */}
+                <div className="flex flex-wrap gap-1.5 flex-1 items-start rounded-lg p-2" style={{ background: "#E9E6DD" }}>
                   {nx && (
-                    <div onClick={() => onOpen(j.id)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ background: "#DDE6EE", borderColor: "#B9C7D4" }}>
+                    <div onClick={() => onOpen(j.id)} className="rounded p-2 cursor-pointer border" style={{ background: "#DDE6EE", borderColor: "#B9C7D4", width: 210 }}>
                       <div className="text-xs font-bold" style={{ color: "#1B3A5C" }}>⚑ Next milestone: M{nx.idx} {nx.name}</div>
                       <div className="text-xs flex justify-between mt-0.5" style={{ color: "#5A6672" }}><span>from the job plan</span><span className="tnum">{fmt(nx.end)}</span></div>
                     </div>
                   )}
-                  {jt.map((t) => (<TaskCard key={t.id} onOpen={setLightbox} t={t} />))}
+                  {jt.map((t) => (<div key={t.id} style={{ width: 210 }}><TaskCard onOpen={setLightbox} t={t} /></div>))}
                   {adding === j.id ? (
-                    <AddTaskForm form={form} setForm={setForm} owners={owners} onSubmit={() => submit(j.id)} onCancel={() => setAdding(null)} />
+                    <div style={{ width: 240 }}><AddTaskForm form={form} setForm={setForm} owners={owners} onSubmit={() => submit(j.id)} onCancel={() => setAdding(null)} /></div>
                   ) : (
-                    <button onClick={() => setAdding(j.id)} className="w-full text-xs font-bold rounded border border-dashed py-1 mt-1" style={{ borderColor: "#E8600A", color: "#E8600A" }}>+ Add task</button>
+                    <button onClick={() => setAdding(j.id)} className="text-xs font-bold rounded border border-dashed px-3 self-stretch" style={{ borderColor: "#E8600A", color: "#E8600A", minHeight: 40 }}>+ Add task</button>
                   )}
                 </div>
               </div>
@@ -1385,7 +1475,7 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
         const days: string[] = []; for (let d = new Date(monStart); d <= sunEnd; d.setUTCDate(d.getUTCDate() + 1)) days.push(toISO(new Date(d)));
         const weeks: string[][] = []; for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
         const jset = new Set(taskingJobs.map((j) => j.id));
-        const openT = tasks.filter((t) => !t.done && t.due && jset.has(t.j));
+        const openT = filteredTasks.filter((t) => !t.done && t.due && jset.has(t.j));
         const byDay: Record<string, Task[]> = {}; openT.forEach((t) => (byDay[t.due!] = byDay[t.due!] || []).push(t));
         const overdue = openT.filter((t) => t.due! < TODAY);
         const monthLabel = first.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -1428,7 +1518,7 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
         );
       })()}
 
-      {lightbox && <TaskModal task={lightbox} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal task={lightbox} owners={board.owners} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
     </div>
   );
 }
@@ -1444,6 +1534,12 @@ function AddTaskForm({ form, setForm, owners, onSubmit, onCancel }: { form: any;
         </select>
         <input type="date" value={form.due} onChange={(e) => setForm({ ...form, due: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1" style={{ borderColor: "#E2E0DA" }} />
       </div>
+      <div className="mb-1">
+        <div className="text-xs mb-0.5" style={{ color: "#8A94A0" }}>Escalation Log</div>
+        <select value={form.esc} onChange={(e) => setForm({ ...form, esc: e.target.value })} className="w-full text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
+          {ESC_LEVELS.map((c) => (<option key={c}>{c}</option>))}
+        </select>
+      </div>
       <div className="flex gap-1">
         <select value={form.cat} onChange={(e) => setForm({ ...form, cat: e.target.value })} className="flex-1 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
           {TASK_CATS.map((c) => (<option key={c}>{c}</option>))}
@@ -1455,12 +1551,16 @@ function AddTaskForm({ form, setForm, owners, onSubmit, onCancel }: { form: any;
   );
 }
 
-function TaskModal({ task, onClose, onToggle, reload }: { task: Task; onClose: () => void; onToggle: () => void; reload: () => Promise<Board | null> }) {
+function TaskModal({ task, owners = [], onClose, onToggle, reload }: { task: Task; owners?: string[]; onClose: () => void; onToggle: () => void; reload: () => Promise<Board | null> }) {
   const [comments, setComments] = useState<{ by: string; at: string; body: string }[]>([]);
   const [cmt, setCmt] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [ef, setEf] = useState({ t: task.t || "", d: task.d || "", who: task.who || "", due: task.due || "", cat: task.cat || "Production", esc: task.esc || "None" });
+  const isMs = String(task.id).startsWith("ms"); // milestone pseudo-card from the Job Plan kanban
   useEffect(() => {
+    if (isMs) return;
     api.get(`/api/comments?task_id=${task.id}&task_kind=${task.kind}`).then((r) => setComments(r.comments)).catch(() => {});
-  }, [task]);
+  }, [task, isMs]);
   const add = async () => {
     if (!cmt.trim()) return;
     await api.post("/api/comments", { task_id: task.id, task_kind: task.kind, body: cmt.trim() });
@@ -1469,28 +1569,80 @@ function TaskModal({ task, onClose, onToggle, reload }: { task: Task; onClose: (
     setComments(r.comments);
     await reload();
   };
+  const saveEdit = async () => {
+    if (!ef.t.trim()) return;
+    await api.post("/api/tasks", { action: "update", id: task.id, kind: task.kind, title: ef.t.trim(), detail: ef.d, who: ef.who, due: ef.due || null, cat: ef.cat, esc: ef.esc });
+    await reload();
+    onClose();
+  };
   return (
     <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)", zIndex: 60 }}>
       <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg p-4 w-full max-w-md" style={{ maxHeight: "80vh", overflow: "auto" }}>
         <div className="flex items-start justify-between gap-2">
-          <div className="font-bold text-sm">{task.t}</div>
+          {editing ? (
+            <input autoFocus value={ef.t} onChange={(e) => setEf({ ...ef, t: e.target.value })} className="flex-1 text-sm font-bold border rounded px-2 py-1" style={{ borderColor: "#E8600A" }} />
+          ) : (
+            <div className="font-bold text-sm">{task.t}</div>
+          )}
           <button onClick={onClose} style={{ color: "#8A94A0" }}>✕</button>
         </div>
-        {task.d && <div className="text-xs mt-2" style={{ color: "#5A6672" }}>{task.d}</div>}
-        <div className="flex items-center gap-2 mt-2 text-xs" style={{ color: "#8A94A0" }}>
-          <span>{initials(task.who)}</span><span>{task.cat}</span><span className="tnum">{fmt(task.due)}</span>
-          <button onClick={onToggle} className="ml-auto rounded px-2 py-1 font-bold" style={{ background: task.done ? "#E7E4DC" : "#0D7A3F", color: task.done ? "#5A6672" : "#fff" }}>{task.done ? "Reopen" : "✓ Done"}</button>
-        </div>
-        <div className="mt-3 border-t pt-2" style={{ borderColor: "#EEECE6" }}>
-          <div className="text-xs font-bold mb-1" style={{ color: "#5A6672" }}>Comments</div>
-          {comments.map((c, i) => (
-            <div key={i} className="text-xs mb-1"><span className="font-bold">{c.by}</span> <span style={{ color: "#8A94A0" }}>{new Date(c.at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span><div>{c.body}</div></div>
-          ))}
-          <div className="flex gap-1 mt-2">
-            <input value={cmt} onChange={(e) => setCmt(e.target.value)} placeholder="Add a comment…" className="flex-1 text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
-            <button onClick={add} className="text-xs font-bold rounded px-2" style={{ background: "#E8600A", color: "#fff" }}>Post</button>
+
+        {isMs ? (
+          <>
+            {task.d && <div className="text-xs mt-2" style={{ color: "#5A6672" }}>{task.d}</div>}
+            <div className="text-xs mt-3 rounded p-2" style={{ background: "#DDE6EE", color: "#1B3A5C" }}>⚑ This is a plan milestone — edit its name, dates, crew or tick it done in the Milestone table above.</div>
+          </>
+        ) : editing ? (
+          <div className="mt-2 space-y-1.5">
+            <textarea value={ef.d} onChange={(e) => setEf({ ...ef, d: e.target.value })} placeholder="Details…" rows={2} className="w-full text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
+            <div className="flex gap-1">
+              <select value={ef.who} onChange={(e) => setEf({ ...ef, who: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
+                <option value="">Who?</option>
+                {!owners.includes(ef.who) && ef.who && <option value={ef.who}>{ef.who}</option>}
+                {owners.map((o) => (<option key={o} value={o}>{initials(o)} — {o}</option>))}
+              </select>
+              <input type="date" value={ef.due} onChange={(e) => setEf({ ...ef, due: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1" style={{ borderColor: "#E2E0DA" }} />
+            </div>
+            <div className="flex gap-1">
+              <select value={ef.cat} onChange={(e) => setEf({ ...ef, cat: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
+                {!TASK_CATS.includes(ef.cat) && ef.cat && <option value={ef.cat}>{ef.cat}</option>}
+                {TASK_CATS.map((c) => (<option key={c}>{c}</option>))}
+              </select>
+              <select value={ef.esc} onChange={(e) => setEf({ ...ef, esc: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }} title="Escalation Log">
+                {ESC_LEVELS.map((c) => (<option key={c}>{c}</option>))}
+              </select>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={saveEdit} className="flex-1 text-xs font-bold rounded py-1.5" style={{ background: "#E8600A", color: "#fff" }}>💾 Save changes</button>
+              <button onClick={() => setEditing(false)} className="text-xs rounded px-3" style={{ color: "#8A94A0" }}>Cancel</button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            {task.d && <div className="text-xs mt-2" style={{ color: "#5A6672" }}>{task.d}</div>}
+            {task.esc && task.esc !== "None" && (
+              <div className="text-xs mt-2 font-bold rounded px-2 py-1 inline-block" style={{ background: "#B3261E", color: "#fff" }}>⚠ Escalation: {task.esc}</div>
+            )}
+            <div className="flex items-center gap-2 mt-2 text-xs" style={{ color: "#8A94A0" }}>
+              <span>{initials(task.who)}</span><span>{task.cat}</span><span className="tnum">{fmt(task.due)}</span>
+              <button onClick={() => setEditing(true)} className="ml-auto rounded px-2 py-1 font-bold" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>✎ Edit</button>
+              <button onClick={onToggle} className="rounded px-2 py-1 font-bold" style={{ background: task.done ? "#E7E4DC" : "#0D7A3F", color: task.done ? "#5A6672" : "#fff" }}>{task.done ? "Reopen" : "✓ Done"}</button>
+            </div>
+          </>
+        )}
+
+        {!isMs && (
+          <div className="mt-3 border-t pt-2" style={{ borderColor: "#EEECE6" }}>
+            <div className="text-xs font-bold mb-1" style={{ color: "#5A6672" }}>Comments</div>
+            {comments.map((c, i) => (
+              <div key={i} className="text-xs mb-1"><span className="font-bold">{c.by}</span> <span style={{ color: "#8A94A0" }}>{new Date(c.at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span><div>{c.body}</div></div>
+            ))}
+            <div className="flex gap-1 mt-2">
+              <input value={cmt} onChange={(e) => setCmt(e.target.value)} placeholder="Add a comment…" className="flex-1 text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
+              <button onClick={add} className="text-xs font-bold rounded px-2" style={{ background: "#E8600A", color: "#fff" }}>Post</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1533,49 +1685,108 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
 
 // ============================ Admin ============================
 function Admin({ board, reload }: { board: Board; reload: () => Promise<Board | null> }) {
+  // ---- user management ----
   const [users, setUsers] = useState<{ id: string; email: string; role: string; disabled: boolean }[]>([]);
   const [uForm, setUForm] = useState({ email: "", pw: "", role: "planner" });
-  const [fam, setFam] = useState<string>(Object.keys(board.templates)[0] || "Default");
+  const [uMsg, setUMsg] = useState("");
   const loadUsers = () => api.get("/api/admin/users").then((r) => setUsers(r.users)).catch(() => {});
   useEffect(() => { loadUsers(); }, []);
 
   const createUser = async () => {
     if (!uForm.email || !uForm.pw) return;
+    setUMsg("");
     try {
       await api.post("/api/admin/users", { action: "create", email: uForm.email, password: uForm.pw, role: uForm.role });
       setUForm({ email: "", pw: "", role: "planner" });
+      setUMsg("User created ✓");
       await loadUsers();
-    } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+    } catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
   };
-  const setRole = async (id: string, role: string) => { await api.post("/api/admin/users", { action: "role", id, role }); await loadUsers(); };
-  const setDisabled = async (id: string, disabled: boolean) => { await api.post("/api/admin/users", { action: "disable", id, disabled }); await loadUsers(); };
+  const setRole = async (id: string, role: string) => { try { await api.post("/api/admin/users", { action: "role", id, role }); await loadUsers(); } catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); } };
+  const setDisabled = async (id: string, disabled: boolean) => { try { await api.post("/api/admin/users", { action: "disable", id, disabled }); await loadUsers(); } catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); } };
+  const resetPw = async (id: string, email: string) => {
+    const pw = window.prompt(`New password for ${email} (min 8 characters):`);
+    if (!pw) return;
+    try { await api.post("/api/admin/users", { action: "password", id, password: pw }); setUMsg(`Password updated for ${email} ✓`); }
+    catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
+  };
+  const removeUser = async (id: string, email: string) => {
+    if (!window.confirm(`Remove ${email}?\n\nThey will no longer be able to sign in. Their plans, comments and edits remain in the app.`)) return;
+    try { await api.post("/api/admin/users", { action: "delete", id }); setUMsg(`${email} removed`); await loadUsers(); }
+    catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
+  };
 
-  const famTemplate = board.templates[fam] || [];
+  // ---- family milestone template editor ----
+  type TRow = { name: string; days: number; preds: number[]; crew: Crew; shift: string; offset: number };
+  const famList = Object.keys(board.templates).sort();
+  const [fam, setFam] = useState<string>("");
+  const [rows, setRows] = useState<TRow[] | null>(null);
+  const [newFam, setNewFam] = useState("");
+  const [tMsg, setTMsg] = useState("");
+  const loadFam = (f: string) => { setFam(f); setRows(templateMilestones(f, board.templates) as TRow[]); setTMsg(""); };
+  useEffect(() => { if (!fam && famList.length) loadFam(famList[0]); }, [famList.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setRow = (i: number, patch: Partial<TRow>) => setRows((rs) => rs!.map((r, k) => (k === i ? { ...r, ...patch } : r)));
+  const setRowCrew = (i: number, key: keyof Crew, v: number) => setRows((rs) => rs!.map((r, k) => (k === i ? { ...r, crew: { ...r.crew, [key]: v } } : r)));
+  const addRow = () => setRows((rs) => [...(rs || []), { name: `Milestone ${(rs?.length || 0) + 1}`, days: 3, preds: rs && rs.length ? [rs.length] : [], crew: zeroCrew(), shift: "D", offset: 0 }]);
+  const delRow = (i: number) => setRows((rs) => rs!.filter((_, k) => k !== i).map((r) => ({ ...r, preds: r.preds.filter((p) => p !== i + 1).map((p) => (p > i + 1 ? p - 1 : p)) })));
+  const parsePreds = (s: string, i: number) => s.split(/[ ,]+/).map((n) => parseInt(n, 10)).filter((n) => n > 0 && n <= i);
+  const createFam = () => {
+    const f = newFam.trim();
+    if (!f) return;
+    setFam(f);
+    setRows(templateMilestones(f, board.templates) as TRow[]);
+    setNewFam("");
+    setTMsg(`New product family "${f}" — adjust the milestones below, then Save template.`);
+  };
+  const saveTemplate = async () => {
+    if (!rows || !fam.trim()) return;
+    const clean = rows.map((r, i) => ({ name: r.name.trim() || `Milestone ${i + 1}`, days: Math.max(1, Number(r.days) || 1), preds: r.preds.filter((p) => p > 0 && p <= i), crew: r.crew, shift: r.shift || "D", offset: Number(r.offset) || 0 }));
+    try {
+      await api.post("/api/templates", { family: fam.trim(), milestones: clean });
+      await reload();
+      setTMsg(`Saved ✓ — every "${fam}" job without a saved plan now defaults to these milestones.`);
+    } catch (e) { setTMsg(e instanceof Error ? e.message : String(e)); }
+  };
 
   return (
-    <div className="p-4 grid gap-4 md:grid-cols-2">
+    <div className="p-4 space-y-4">
+      {/* ---- users ---- */}
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
         <div className="font-bold text-sm mb-2">User management</div>
         <div className="flex gap-1 mb-2 flex-wrap">
-          <input placeholder="email" value={uForm.email} onChange={(e) => setUForm({ ...uForm, email: e.target.value })} className="text-xs border rounded px-2 py-1 flex-1" style={{ borderColor: "#E2E0DA" }} />
-          <input placeholder="password" value={uForm.pw} onChange={(e) => setUForm({ ...uForm, pw: e.target.value })} className="text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
+          <input placeholder="email" value={uForm.email} onChange={(e) => setUForm({ ...uForm, email: e.target.value })} className="text-xs border rounded px-2 py-1 flex-1" style={{ borderColor: "#E2E0DA", minWidth: 180 }} />
+          <input placeholder="password (min 8)" value={uForm.pw} onChange={(e) => setUForm({ ...uForm, pw: e.target.value })} className="text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
           <select value={uForm.role} onChange={(e) => setUForm({ ...uForm, role: e.target.value })} className="text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
             <option value="admin">admin</option><option value="planner">planner</option><option value="uploader">uploader</option>
           </select>
-          <button onClick={createUser} className="text-xs font-bold rounded px-2" style={{ background: "#E8600A", color: "#fff" }}>Add</button>
+          <button onClick={createUser} className="text-xs font-bold rounded px-2" style={{ background: "#E8600A", color: "#fff" }}>+ Add user</button>
         </div>
+        {uMsg && <div className="text-xs font-semibold mb-2" style={{ color: uMsg.includes("✓") || uMsg.includes("removed") ? "#0D7A3F" : "#B3261E" }}>{uMsg}</div>}
         <table className="text-xs w-full">
+          <thead>
+            <tr style={{ color: "#8A94A0" }}>
+              <th className="text-left py-1 font-semibold">Email</th>
+              <th className="text-left py-1 font-semibold">Role</th>
+              <th className="text-left py-1 font-semibold">Status</th>
+              <th className="text-right py-1 font-semibold">Actions</th>
+            </tr>
+          </thead>
           <tbody>
             {users.map((u) => (
               <tr key={u.id} style={{ borderTop: "1px solid #EEECE6" }}>
-                <td className="py-1">{u.email}</td>
-                <td className="py-1">
+                <td className="py-1.5">{u.email}</td>
+                <td className="py-1.5">
                   <select value={u.role} onChange={(e) => setRole(u.id, e.target.value)} className="text-xs border rounded px-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
                     <option value="admin">admin</option><option value="planner">planner</option><option value="uploader">uploader</option>
                   </select>
                 </td>
-                <td className="py-1 text-right">
-                  <button onClick={() => setDisabled(u.id, !u.disabled)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E7E4DC", color: u.disabled ? "#fff" : "#5A6672" }}>{u.disabled ? "disabled" : "active"}</button>
+                <td className="py-1.5">
+                  <button onClick={() => setDisabled(u.id, !u.disabled)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E6F4EA", color: u.disabled ? "#fff" : "#0D7A3F" }} title="Click to toggle">{u.disabled ? "disabled" : "active"}</button>
+                </td>
+                <td className="py-1.5 text-right whitespace-nowrap">
+                  <button onClick={() => resetPw(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold mr-1" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Set a new password">🔑 password</button>
+                  <button onClick={() => removeUser(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FBEDEA", color: "#B3261E" }} title="Remove this account">✕ remove</button>
                 </td>
               </tr>
             ))}
@@ -1583,15 +1794,59 @@ function Admin({ board, reload }: { board: Board; reload: () => Promise<Board | 
         </table>
       </div>
 
+      {/* ---- family milestone templates ---- */}
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
-        <div className="font-bold text-sm mb-2">Family milestone templates</div>
-        <select value={fam} onChange={(e) => setFam(e.target.value)} className="text-xs border rounded px-2 py-1 bg-white mb-2" style={{ borderColor: "#E2E0DA" }}>
-          {Object.keys(board.templates).map((f) => (<option key={f}>{f}</option>))}
-        </select>
-        <ol className="text-xs list-decimal ml-4">
-          {(famTemplate as any[]).map((m, i) => (<li key={i} className="py-0.5">{m.name} · {m.days}d</li>))}
-        </ol>
-        <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>Templates seed a job&apos;s default plan. Edit via POST /api/templates (admin).</div>
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+          <div className="font-bold text-sm">Family milestone templates <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— every new job of a product family starts with these milestones</span></div>
+          <div className="flex gap-1 items-center">
+            <input placeholder="New product family…" value={newFam} onChange={(e) => setNewFam(e.target.value)} className="text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA", minWidth: 170 }} />
+            <button onClick={createFam} className="text-xs font-bold rounded px-2 py-1" style={{ background: "#1B3A5C", color: "#fff" }}>+ New product</button>
+          </div>
+        </div>
+        <div className="flex gap-1 mb-2 flex-wrap items-center">
+          {famList.map((f) => (
+            <button key={f} onClick={() => loadFam(f)} className="px-2 py-1 rounded text-xs font-semibold" style={fam === f ? { background: "#22303C", color: "#fff" } : { background: "#F4F2EC", color: "#5A6672" }}>{f}</button>
+          ))}
+          {fam && !famList.includes(fam) && (
+            <span className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }}>{fam} (unsaved)</span>
+          )}
+        </div>
+        {rows && (
+          <>
+            <div className="overflow-x-auto">
+              <table className="text-xs" style={{ borderCollapse: "collapse", minWidth: 760 }}>
+                <thead>
+                  <tr style={{ background: "#F4F2EC", color: "#5A6672" }}>
+                    <th className="px-2 py-1 text-left">#</th>
+                    <th className="px-2 py-1 text-left" style={{ minWidth: 220 }}>Milestone</th>
+                    <th className="px-2 py-1">Days</th>
+                    <th className="px-2 py-1" title="Predecessor milestone numbers, comma-separated">Preds</th>
+                    {TRADES.map((t) => (<th key={t.key} className="px-1 py-1" style={{ color: t.color }} title={t.label}>{t.tiny}</th>))}
+                    <th className="px-1 py-1"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => (
+                    <tr key={i} style={{ borderTop: "1px solid #EEECE6" }}>
+                      <td className="px-2 py-1 font-bold" style={{ color: "#E8600A" }}>{i + 1}</td>
+                      <td className="px-2 py-1"><input value={r.name} onChange={(e) => setRow(i, { name: e.target.value })} className="w-full text-xs border rounded px-1 py-0.5" style={{ borderColor: "#E2E0DA" }} /></td>
+                      <td className="px-2 py-1 text-center"><input type="number" min={1} value={r.days} onChange={(e) => setRow(i, { days: Math.max(1, parseInt(e.target.value || "1", 10)) })} className="w-12 text-center border rounded px-1 py-0.5 tnum" style={{ borderColor: "#E2E0DA" }} /></td>
+                      <td className="px-2 py-1 text-center"><input value={r.preds.join(",")} onChange={(e) => setRow(i, { preds: parsePreds(e.target.value, i) })} placeholder="—" className="w-16 text-center border rounded px-1 py-0.5 tnum" style={{ borderColor: "#E2E0DA" }} title="Earlier milestone numbers this one waits for (comma-separated)" /></td>
+                      {TRADES.map((t) => (<td key={t.key} className="px-0.5 py-1 text-center"><CrewCell value={r.crew[t.key] || 0} color={t.color} onChange={(v) => setRowCrew(i, t.key as keyof Crew, v)} /></td>))}
+                      <td className="px-1 py-1 text-center"><button onClick={() => delRow(i)} style={{ color: "#B3261E" }}>✕</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <button onClick={addRow} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#22303C", color: "#fff" }}>+ Add milestone</button>
+              <button onClick={saveTemplate} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}>💾 Save template</button>
+              {tMsg && <span className="text-xs font-semibold" style={{ color: tMsg.includes("✓") ? "#0D7A3F" : "#1B3A5C" }}>{tMsg}</span>}
+            </div>
+            <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>Matching: a job&apos;s Product Family is matched to a template by exact name first, then partial (e.g. template &quot;Hi Lift&quot; covers &quot;Hi Lift 12m&quot;). Changing a template affects jobs that don&apos;t yet have a saved plan; saved plans are never touched.</div>
+          </>
+        )}
       </div>
     </div>
   );

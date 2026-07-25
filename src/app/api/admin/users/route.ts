@@ -26,9 +26,11 @@ export async function GET() {
 //   { action: "create", email, password, role }
 //   { action: "role", id, role }
 //   { action: "disable", id, disabled }
+//   { action: "password", id, password }   — set a new password
+//   { action: "delete", id }               — remove the account (not yourself)
 export async function POST(req: Request) {
   try {
-    await requireAdmin();
+    const caller = await requireAdmin();
     const admin = adminClient();
     const body = await req.json();
 
@@ -66,6 +68,27 @@ export async function POST(req: Request) {
         .from("profiles")
         .update({ disabled: !!body.disabled })
         .eq("id", body.id);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body.action === "password") {
+      if (!body.id || String(body.password || "").length < 8)
+        return NextResponse.json({ error: "password must be at least 8 characters" }, { status: 400 });
+      const { error } = await admin.auth.admin.updateUserById(body.id, {
+        password: body.password,
+      });
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body.action === "delete") {
+      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+      if (body.id === caller.id)
+        return NextResponse.json({ error: "You cannot remove your own account" }, { status: 400 });
+      // deleting the auth user cascades to profiles (FK on delete cascade);
+      // their plans/comments/edits remain — only the login goes away
+      const { error } = await admin.auth.admin.deleteUser(body.id);
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true });
     }

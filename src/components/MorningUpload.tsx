@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { gsExport } from "@/lib/sources";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { LOGO } from "@/lib/logo";
+import QuoteOfDay from "./QuoteOfDay";
 
 interface StatusRow {
   key: string;
@@ -64,6 +65,7 @@ export default function MorningUpload({ email }: { email: string }) {
 
   return (
     <div className="min-h-screen" style={{ background: "#F1EFE9" }}>
+      <QuoteOfDay />
       <div
         className="px-4 py-2.5"
         style={{ background: "#16232F", borderBottom: "3px solid #E8600A" }}
