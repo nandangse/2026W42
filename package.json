@@ -1,6 +1,6 @@
 {
   "name": "nandan-works-planning",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "private": true,
   "description": "Nandan Works Planning Suite — standalone (Excel-fed) planning app. Mirrors the intern portal stack.",
   "scripts": {
