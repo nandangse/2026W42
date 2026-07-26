@@ -1247,10 +1247,20 @@ function JobPlan({
           {/* mini gantt */}
           <div className="bg-white rounded-lg border mt-3 p-3 overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
             <div className="text-xs font-bold mb-1" style={{ color: "#8A94A0" }}>JOB GANTT <span className="font-normal">· week gridlines · red line = Target Delivery</span></div>
+            {dj.tdd && draft.start > dj.tdd && (
+              <div className="text-xs font-bold rounded px-2 py-1 mb-2 inline-block" style={{ background: "#B3261E", color: "#fff" }}>
+                ⚠ Target Delivery {fmtFull(dj.tdd)} is before this plan starts ({fmtFull(draft.start)}) — the red line is pinned to the left edge
+              </div>
+            )}
             {(() => {
               const gEnd = dj.tdd && dj.tdd > ends ? dj.tdd : ends;
               const total = diffDays(draft.start, gEnd) + 1;
-              const tddPos = dj.tdd ? (diffDays(draft.start, dj.tdd) / total) * 100 : null;
+              // Raw position can fall outside 0–100 when the Target Delivery Date
+              // is before the plan start (an already-late job). Clamp it to the
+              // track, and flag it, so the marker can never escape into the labels.
+              const tddRaw = dj.tdd ? (diffDays(draft.start, dj.tdd) / total) * 100 : null;
+              const tddPos = tddRaw === null ? null : Math.max(0, Math.min(99.6, tddRaw));
+              const tddBefore = tddRaw !== null && tddRaw < 0;
               const ticks: { pct: number; wk: number }[] = [];
               for (let d = 0; d < total; d++) { const iso = addDays(draft.start, d); if (parseISO(iso).getUTCDay() === 1) ticks.push({ pct: (d / total) * 100, wk: isoWeek(iso) }); }
               return (
@@ -1262,10 +1272,17 @@ function JobPlan({
                     return (
                       <div key={i} className="flex items-center gap-2 mb-1">
                         <div className="text-xs truncate" style={{ width: 175, color: "#5A6672" }}>{m.idx}. {m.name}</div>
-                        <div className="flex-1 h-4 rounded relative" style={{ background: "#F4F2EC" }}>
+                        {/* overflow:hidden keeps every marker inside its own track */}
+                        <div className="flex-1 h-4 rounded relative" style={{ background: "#F4F2EC", overflow: "hidden" }}>
                           {ticks.map((t, k) => (<div key={k} className="absolute h-4" style={{ left: t.pct + "%", width: 1, background: "#DDDACF" }} />))}
-                          <div className="absolute h-4 rounded" title={`${fmt(m.start)} → ${fmt(m.end)}`} style={{ left: l + "%", width: Math.max(w, 0.8) + "%", background: manDays(m) ? "#1B3A5C" : "#A8B4C0" }} />
-                          {tddPos !== null && (<div className="absolute h-4" style={{ left: tddPos + "%", width: 2, background: "#B3261E" }} />)}
+                          <div className="absolute h-4 rounded" title={`${fmt(m.start)} → ${fmt(m.end)}`} style={{ left: Math.max(0, l) + "%", width: Math.max(w, 0.8) + "%", background: manDays(m) ? "#1B3A5C" : "#A8B4C0" }} />
+                          {tddPos !== null && (
+                            <div
+                              className="absolute h-4"
+                              title={tddBefore ? `Target Delivery ${fmtFull(dj.tdd)} — before the plan even starts` : `Target Delivery ${fmtFull(dj.tdd)}`}
+                              style={{ left: tddPos + "%", width: 2, background: "#B3261E", opacity: tddBefore ? 0.55 : 1 }}
+                            />
+                          )}
                         </div>
                       </div>
                     );
