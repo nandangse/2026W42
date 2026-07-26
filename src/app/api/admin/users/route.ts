@@ -7,6 +7,24 @@ export const dynamic = "force-dynamic";
 
 const ROLES: Role[] = ["admin", "planner", "uploader"];
 
+const LAST_ADMIN_MSG =
+  "This is the last active admin — promote another admin first, or the Admin page becomes unreachable for everyone.";
+
+/**
+ * True if disabling/demoting `id` would leave zero active admins. Losing the
+ * last admin locks user management out for everyone, and only the service key
+ * could undo it — so it is blocked server-side.
+ */
+async function wouldStrandAdmins(id: string): Promise<boolean> {
+  const { data } = await adminClient()
+    .from("profiles")
+    .select("id")
+    .eq("role", "admin")
+    .eq("disabled", false);
+  const active = data || [];
+  return active.length <= 1 && active.some((u) => u.id === id);
+}
+
 // GET /api/admin/users — list users. admin only.
 export async function GET() {
   try {
@@ -58,15 +76,27 @@ export async function POST(req: Request) {
 
     if (body.action === "role") {
       const role: Role = ROLES.includes(body.role) ? body.role : "planner";
+      // never let the last active admin demote themselves out of the system
+      if (role !== "admin" && (await wouldStrandAdmins(body.id)))
+        return NextResponse.json({ error: LAST_ADMIN_MSG }, { status: 400 });
       const { error } = await admin.from("profiles").update({ role }).eq("id", body.id);
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true });
     }
 
     if (body.action === "disable") {
+      const disabled = !!body.disabled;
+      // guard the two ways an admin can lock everyone (including themselves) out
+      if (disabled && body.id === caller.id)
+        return NextResponse.json(
+          { error: "You cannot disable your own account" },
+          { status: 400 },
+        );
+      if (disabled && (await wouldStrandAdmins(body.id)))
+        return NextResponse.json({ error: LAST_ADMIN_MSG }, { status: 400 });
       const { error } = await admin
         .from("profiles")
-        .update({ disabled: !!body.disabled })
+        .update({ disabled })
         .eq("id", body.id);
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true });
@@ -86,6 +116,8 @@ export async function POST(req: Request) {
       if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
       if (body.id === caller.id)
         return NextResponse.json({ error: "You cannot remove your own account" }, { status: 400 });
+      if (await wouldStrandAdmins(body.id))
+        return NextResponse.json({ error: LAST_ADMIN_MSG }, { status: 400 });
       // deleting the auth user cascades to profiles (FK on delete cascade);
       // their plans/comments/edits remain — only the login goes away
       const { error } = await admin.auth.admin.deleteUser(body.id);

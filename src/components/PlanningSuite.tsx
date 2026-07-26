@@ -1703,7 +1703,13 @@ function Admin({ board, reload }: { board: Board; reload: () => Promise<Board | 
     } catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
   };
   const setRole = async (id: string, role: string) => { try { await api.post("/api/admin/users", { action: "role", id, role }); await loadUsers(); } catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); } };
-  const setDisabled = async (id: string, disabled: boolean) => { try { await api.post("/api/admin/users", { action: "disable", id, disabled }); await loadUsers(); } catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); } };
+  const setDisabled = async (id: string, disabled: boolean, email: string) => {
+    // disabling blocks sign-in entirely — confirm it, since this is a one-click toggle
+    if (disabled && !window.confirm(`Disable ${email}?\n\nThey will no longer be able to sign in until re-enabled.`)) return;
+    setUMsg("");
+    try { await api.post("/api/admin/users", { action: "disable", id, disabled }); await loadUsers(); }
+    catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
+  };
   const resetPw = async (id: string, email: string) => {
     const pw = window.prompt(`New password for ${email} (min 8 characters):`);
     if (!pw) return;
@@ -1782,7 +1788,7 @@ function Admin({ board, reload }: { board: Board; reload: () => Promise<Board | 
                   </select>
                 </td>
                 <td className="py-1.5">
-                  <button onClick={() => setDisabled(u.id, !u.disabled)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E6F4EA", color: u.disabled ? "#fff" : "#0D7A3F" }} title="Click to toggle">{u.disabled ? "disabled" : "active"}</button>
+                  <button onClick={() => setDisabled(u.id, !u.disabled, u.email)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E6F4EA", color: u.disabled ? "#fff" : "#0D7A3F" }} title={u.disabled ? "Click to re-enable sign-in" : "Click to disable sign-in"}>{u.disabled ? "disabled" : "active"}</button>
                 </td>
                 <td className="py-1.5 text-right whitespace-nowrap">
                   <button onClick={() => resetPw(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold mr-1" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Set a new password">🔑 password</button>
