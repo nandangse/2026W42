@@ -1827,29 +1827,6 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
     setRows(templateMilestones(f, board.templates) as TRow[]);
   }, [fam, famList, board.templates]);
 
-  // ---- quotes collection ----
-  const [qStats, setQStats] = useState<{ total: number; original: number; attributed: number } | null>(null);
-  const [qMsg, setQMsg] = useState("");
-  const [qBusy, setQBusy] = useState(false);
-  const qFileRef = useRef<HTMLInputElement | null>(null);
-  const loadQStats = useCallback(() => {
-    api.get("/api/quotes").then(setQStats).catch(() => setQStats(null));
-  }, []);
-  useEffect(() => { loadQStats(); }, [loadQStats]);
-  const onQuoteFile = async (f: File | null) => {
-    if (!f) return;
-    setQBusy(true); setQMsg("");
-    try {
-      const fd = new FormData();
-      fd.append("file", f);
-      const res = await fetch("/api/quotes", { method: "POST", body: fd });
-      const r = await res.json();
-      if (!res.ok) throw new Error(r.error || "Upload failed");
-      setQMsg(`Loaded ✓ — ${r.added} new quote${r.added === 1 ? "" : "s"} added, ${r.skipped} already present. Collection now ${r.total}.`);
-      loadQStats();
-    } catch (e) { setQMsg(e instanceof Error ? e.message : String(e)); }
-    finally { setQBusy(false); }
-  };
 
   const setRow = (i: number, patch: Partial<TRow>) => setRows((rs) => rs!.map((r, k) => (k === i ? { ...r, ...patch } : r)));
   const setRowCrew = (i: number, key: keyof Crew, v: number) => setRows((rs) => rs!.map((r, k) => (k === i ? { ...r, crew: { ...r.crew, [key]: v } } : r)));
@@ -1987,28 +1964,6 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
         )}
       </div>
 
-      {/* ---- quote collection ---- */}
-      <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
-        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-          <div className="font-bold text-sm">Quote of the day <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— one quote a day, the same for everyone, cycling through the whole collection before any repeat</span></div>
-          <div className="flex gap-1 items-center">
-            <input ref={qFileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={(e) => { onQuoteFile(e.target.files?.[0] || null); e.target.value = ""; }} />
-            <button onClick={() => qFileRef.current?.click()} disabled={qBusy} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff", opacity: qBusy ? 0.6 : 1 }}>{qBusy ? "Uploading…" : "⬆ Upload quotes sheet"}</button>
-          </div>
-        </div>
-        {qStats && (
-          <div className="flex gap-2 flex-wrap mb-2">
-            <Chip label="TOTAL QUOTES" value={String(qStats.total)} color="#16232F" />
-            <Chip label="ORIGINAL (NANDAN)" value={String(qStats.original)} color="#7C3AED" />
-            <Chip label="ATTRIBUTED" value={String(qStats.attributed)} color="#1B3A5C" />
-            <Chip label="DAYS OF COVER" value={qStats.total ? `${qStats.total} days` : "—"} color="#0D7A3F" />
-          </div>
-        )}
-        {qMsg && <div className="text-xs font-semibold mb-2" style={{ color: qMsg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{qMsg}</div>}
-        <div className="text-xs" style={{ color: "#8A94A0" }}>
-          Sheet format: any tab with a <b>Quote</b> column (plus optional <b>Category</b>, <b>Author / Attribution</b>, <b>Source / Work</b>). Rows whose author reads &quot;Original collection&quot; or is blank are credited to the Nandan original collection and badged ORIGINAL; rows naming a real author keep that attribution. Re-uploading the same sheet is safe — duplicates are skipped.
-        </div>
-      </div>
     </div>
   );
 }

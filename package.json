@@ -10,7 +10,6 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
-    "seed:quotes": "tsx scripts/seed-quotes.ts",
     "test:acceptance": "tsx scripts/acceptance-test.ts"
   },
   "dependencies": {

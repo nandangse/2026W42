@@ -1,71 +1,46 @@
 "use client";
-// Quote of the day — shown once after login, fetched from the collection in the
-// database (600+ quotes, extendable by an admin upload). Everyone sees the same
-// quote on a given day. "Don't show again" is remembered per-browser until the
-// date changes.
+// Quote of the day — shown once after login, plus on demand via the header
+// button. Quotes are bundled as static data (src/lib/quotes-data.ts), NOT
+// stored in the database. Everyone sees the same quote on a given day, and the
+// collection cycles fully before anything repeats.
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { QUOTES } from "@/lib/quotes-data";
 
 const KEY = "nps-quote-hide-until";
-
-interface Quote {
-  body: string;
-  author: string;
-  category: string;
-  original: boolean;
-}
+const DAY_MS = 86400000;
 
 function todayISO(): string {
   const d = new Date();
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
+/** Same quote for everyone on a given date; cycles the whole list. */
+function quoteFor(iso: string) {
+  const dayNo = Math.floor(Date.parse(iso + "T00:00:00Z") / DAY_MS);
+  return QUOTES[((dayNo % QUOTES.length) + QUOTES.length) % QUOTES.length];
+}
+
 /**
- * @param trigger increment this to force the quote open on demand (the header
- *        "☀ Quote" button), bypassing the don't-show-again-today flag.
+ * @param trigger increment to force the quote open on demand (header button),
+ *        bypassing the don't-show-again-today flag.
  */
 export default function QuoteOfDay({ trigger = 0 }: { trigger?: number }) {
-  const [quote, setQuote] = useState<Quote | null>(null);
   const [show, setShow] = useState(false);
   const today = todayISO();
+  const quote = quoteFor(today);
 
-  // auto-show once per day on first load
+  // auto-show once per day
   useEffect(() => {
-    let hidden = false;
     try {
-      hidden = localStorage.getItem(KEY) === today;
+      if (localStorage.getItem(KEY) !== today) setShow(true);
     } catch {
-      /* private mode — treat as not hidden */
+      setShow(true); // private mode — still show it
     }
-    if (hidden) return;
-    // only fetch when we actually intend to show it
-    api
-      .get("/api/quotes/today")
-      .then((r) => {
-        if (r?.quote) {
-          setQuote(r.quote);
-          setShow(true);
-        }
-      })
-      .catch(() => {
-        /* quotes are decorative — never block the app on them */
-      });
   }, [today]);
 
-  // manual open — always shows, even after "don't show again till tomorrow"
+  // manual open — always shows, even after dismissing for the day
   useEffect(() => {
-    if (!trigger) return;
-    api
-      .get("/api/quotes/today")
-      .then((r) => {
-        if (r?.quote) {
-          setQuote(r.quote);
-          setShow(true);
-        } else {
-          alert("No quotes loaded yet — an admin can upload a quotes sheet from the Admin tab.");
-        }
-      })
-      .catch((e) => alert(e instanceof Error ? e.message : String(e)));
+    if (trigger) setShow(true);
   }, [trigger]);
 
   if (!show || !quote) return null;
@@ -94,20 +69,20 @@ export default function QuoteOfDay({ trigger = 0 }: { trigger?: number }) {
           <div className="text-xs font-bold tracking-widest" style={{ color: "#E8600A" }}>
             ☀ QUOTE OF THE DAY
           </div>
-          {quote.category && (
+          {quote.cat && (
             <div className="text-xs font-semibold" style={{ color: "#8A94A0" }}>
-              {quote.category}
+              {quote.cat}
             </div>
           )}
         </div>
 
         <div className="text-lg mt-3" style={{ color: "#16232F", lineHeight: 1.45 }}>
-          &ldquo;{quote.body}&rdquo;
+          &ldquo;{quote.q}&rdquo;
         </div>
 
         <div className="text-sm mt-2 font-semibold" style={{ color: "#8A94A0" }}>
-          — {quote.author || "Unattributed"}
-          {quote.original && (
+          — {quote.by || "Unattributed"}
+          {quote.orig && (
             <span
               className="ml-2 rounded px-1.5 py-0.5 font-bold"
               style={{ background: "#F3EEFB", color: "#7C3AED", fontSize: 10 }}
