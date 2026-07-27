@@ -1,4 +1,4 @@
-# Nandan Works Planning Suite — Standalone (v2.2)
+# Nandan Works Planning Suite — Standalone (v2.3)
 
 Standalone, Excel-fed planning app. **No ERPNext connection** — the only data
 source is the three morning Excel exports (Jobs / Projects / ToDo) or the full
