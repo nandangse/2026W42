@@ -20,11 +20,16 @@ function todayISO(): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
-export default function QuoteOfDay() {
+/**
+ * @param trigger increment this to force the quote open on demand (the header
+ *        "☀ Quote" button), bypassing the don't-show-again-today flag.
+ */
+export default function QuoteOfDay({ trigger = 0 }: { trigger?: number }) {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [show, setShow] = useState(false);
   const today = todayISO();
 
+  // auto-show once per day on first load
   useEffect(() => {
     let hidden = false;
     try {
@@ -46,6 +51,22 @@ export default function QuoteOfDay() {
         /* quotes are decorative — never block the app on them */
       });
   }, [today]);
+
+  // manual open — always shows, even after "don't show again till tomorrow"
+  useEffect(() => {
+    if (!trigger) return;
+    api
+      .get("/api/quotes/today")
+      .then((r) => {
+        if (r?.quote) {
+          setQuote(r.quote);
+          setShow(true);
+        } else {
+          alert("No quotes loaded yet — an admin can upload a quotes sheet from the Admin tab.");
+        }
+      })
+      .catch((e) => alert(e instanceof Error ? e.message : String(e)));
+  }, [trigger]);
 
   if (!show || !quote) return null;
 

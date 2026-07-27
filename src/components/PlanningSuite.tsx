@@ -174,6 +174,7 @@ export default function PlanningSuite({
   const [showVal, setShowVal] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erpLog, setErpLog] = useState<ErpLogEntry[]>([]);
+  const [quoteTrigger, setQuoteTrigger] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   // Admin users live here, not inside <Admin>, so switching tabs doesn't unmount
@@ -321,6 +322,14 @@ export default function PlanningSuite({
             <span className="text-xs rounded px-2 py-1.5 font-bold" style={{ background: "#0D161F", color: loadedCount === 3 ? "#7BC67E" : "#8FA1B3", border: "1px solid #22303C" }}>
               🌅 Morning update {loadedCount}/3
             </span>
+            <button
+              onClick={() => setQuoteTrigger((n) => n + 1)}
+              className="text-xs rounded px-2 py-1.5 font-bold"
+              style={{ background: "#0D161F", color: "#F5B32B", border: "1px solid #22303C" }}
+              title="Show today's quote"
+            >
+              ☀ Quote
+            </button>
             <select
               value={showVal ? "with" : "without"}
               onChange={(e) => setShowVal(e.target.value === "with")}
@@ -358,7 +367,7 @@ export default function PlanningSuite({
         </div>
       </div>
 
-      <QuoteOfDay />
+      <QuoteOfDay trigger={quoteTrigger} />
 
       {tab === "delivery" && <DeliveryBoard board={board} V={V} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} pushERP={pushERP} />}
       {tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
