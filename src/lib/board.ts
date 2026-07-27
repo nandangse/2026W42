@@ -217,6 +217,7 @@ export async function buildBoard(supabase: SupabaseClient) {
   // ---- kitting aggregate (fixed formula, spec §0.4) ----
   // material_value = val × (1 − tpp/100); kitted_value = material_value × kit/100
   // board kitting % = Σ kitted_value ÷ Σ material_value  (active jobs)
+  // single pass; identical arithmetic to before
   let matSum = 0;
   let kitSum = 0;
   for (const j of activeJobs) {

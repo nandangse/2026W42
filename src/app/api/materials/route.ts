@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 // POST /api/materials — planner/admin. Materials checklist per job.
 //   { action: "add", job_id, item, qty?, custom? }
+//   { action: "seed", job_id, items: [{item, qty?, status?}] }  — one round trip
 //   { action: "status", id, status: "Pending"|"Received" }
 //   { action: "delete", id }
 export async function POST(req: Request) {
@@ -30,6 +31,27 @@ export async function POST(req: Request) {
         .single();
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true, id: data.id });
+    }
+
+    if (body.action === "seed") {
+      // seed the default checklist in a single insert; no-op if lines already exist
+      if (!body.job_id || !Array.isArray(body.items) || !body.items.length)
+        return NextResponse.json({ error: "job_id and items required" }, { status: 400 });
+      const { count } = await supabase
+        .from("materials")
+        .select("id", { count: "exact", head: true })
+        .eq("job_id", body.job_id);
+      if (count) return NextResponse.json({ ok: true, seeded: 0 });
+      const rows = body.items.slice(0, 100).map((m: any) => ({
+        job_id: body.job_id,
+        item: String(m.item || "").slice(0, 200),
+        qty: String(m.qty ?? "as BOM"),
+        status: m.status === "Received" ? "Received" : "Pending",
+        custom: false,
+      }));
+      const { error } = await supabase.from("materials").insert(rows);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, seeded: rows.length });
     }
 
     if (body.action === "status") {

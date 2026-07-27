@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { supabaseBrowser } from "@/lib/supabase/browser";
@@ -99,6 +99,13 @@ interface Board {
   aggregates: { kittingPct: number; materialValueSum: number; kittedValueSum: number; activeJobCount: number };
 }
 
+interface AdminUser {
+  id: string;
+  email: string;
+  role: string;
+  disabled: boolean;
+}
+
 interface ErpLogEntry {
   id: string;
   time: string;
@@ -168,6 +175,23 @@ export default function PlanningSuite({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erpLog, setErpLog] = useState<ErpLogEntry[]>([]);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  // Admin users live here, not inside <Admin>, so switching tabs doesn't unmount
+  // the list and refetch it — that empty-then-populate cycle was the flicker.
+  // null = never loaded yet (show a skeleton); [] = loaded and genuinely empty.
+  const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const loadUsers = useCallback(async () => {
+    try {
+      const r = await api.get("/api/admin/users");
+      setUsers(r.users || []);
+    } catch {
+      setUsers([]);
+    }
+  }, []);
+  // prefetch for admins so the tab is already populated when first opened
+  useEffect(() => {
+    if (isAdmin) loadUsers();
+  }, [isAdmin, loadUsers]);
 
   const reload = async () => {
     try {
@@ -341,7 +365,7 @@ export default function PlanningSuite({
       {tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} pushERP={pushERP} />}
       {tab === "tasking" && <Tasking board={board} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} />}
       {tab === "erp" && <UpdateToErp erpLog={erpLog} />}
-      {tab === "admin" && isAdmin && <Admin board={board} reload={reload} />}
+      {tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} />}
     </div>
   );
 }
@@ -949,8 +973,15 @@ function JobPlan({
   isRaghu: boolean;
   pushERP: (dt: string, id: string, f: string, v: string) => void;
 }) {
-  const byTDD = [...board.jobs].sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1));
-  const job = board.jobs.find((j) => j.id === activeId) || (activeId ? board.archived[activeId] : undefined);
+  // re-sorted on every keystroke before — the job list only changes when the board does
+  const byTDD = useMemo(
+    () => [...board.jobs].sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1)),
+    [board.jobs],
+  );
+  const job = useMemo(
+    () => board.jobs.find((j) => j.id === activeId) || (activeId ? board.archived[activeId] : undefined),
+    [board.jobs, board.archived, activeId],
+  );
 
   const [planView, setPlanView] = useState<"plan" | "mat">("plan");
   const [draft, setDraft] = useState<Plan | null>(null);
@@ -1006,6 +1037,15 @@ function JobPlan({
   const allDone = sched.length > 0 && msDone === sched.length;
   const realEnd = allDone ? sched.reduce((mx, m) => (m.done_on && m.done_on > mx ? m.done_on : mx), "") : null;
 
+  // tasks for the open job — memoised here, above the early return, so the hook
+  // order stays constant (every hook must run on every render)
+  const jobId = job?.id ?? null;
+  const jobTasks = useMemo(
+    () => (jobId ? board.tasks.filter((t) => t.j === jobId) : []),
+    [board.tasks, jobId],
+  );
+  const jobCats = useMemo(() => [...new Set(jobTasks.map((t) => t.cat))], [jobTasks]);
+
   if (!job || !draft) return <div className="p-4 text-sm" style={{ color: "#8A94A0" }}>Pick a job.</div>;
   const dj = job;
 
@@ -1057,18 +1097,19 @@ function JobPlan({
     if (mats.length || seededMat.current === dj.id) return;
     seededMat.current = dj.id;
     const recv = Math.round((MAT_ITEMS.length * (dj.kit || 0)) / 100);
-    for (let i = 0; i < MAT_ITEMS.length; i++) {
-      await api.post("/api/materials", { action: "add", job_id: dj.id, item: MAT_ITEMS[i], qty: "as BOM", status: i < recv ? "Received" : "Pending" });
-    }
+    // one request instead of eight sequential round trips
+    await api.post("/api/materials", {
+      action: "seed",
+      job_id: dj.id,
+      items: MAT_ITEMS.map((item, i) => ({ item, qty: "as BOM", status: i < recv ? "Received" : "Pending" })),
+    });
     await reload();
   };
   const setMatStatus = async (id: string, status: string, item: string) => { await api.post("/api/materials", { action: "status", id, status }); pushERP("Job Material", dj.id, "status", item + " → " + status); await reload(); };
   const delMat = async (id: string) => { await api.post("/api/materials", { action: "delete", id }); await reload(); };
   const addMat = async () => { if (!matForm.item.trim()) return; await api.post("/api/materials", { action: "add", job_id: dj.id, item: matForm.item.trim(), qty: matForm.qty || "as BOM", custom: true }); setMatForm({ item: "", qty: "" }); await reload(); };
 
-  // ---- tasks for this job ----
-  const jobTasks = board.tasks.filter((t) => t.j === dj.id);
-  const jobCats = [...new Set(jobTasks.map((t) => t.cat))];
+  // ---- tasks for this job (memoised above the guard — see jobTasks/jobCats) ----
   const submitTask = async () => { if (!form.t.trim()) return; await api.post("/api/tasks", { action: "create", job_id: dj.id, title: form.t.trim(), who: form.who, due: form.due, cat: form.cat, esc: form.esc }); setForm({ t: "", who: "", due: TODAY, cat: form.cat, esc: "None" }); setAddingTask(null); await reload(); };
 
   const matVal = dj.val * (1 - (dj.tpp || 0) / 100);
@@ -1400,12 +1441,38 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
     () => board.tasks.filter((t) => !dueUpTo || ((t.due || "9999-12-31") <= dueUpTo)),
     [board, dueUpTo],
   );
+  // group tasks by job once instead of scanning the whole task list per job
+  const tasksByJob = useMemo(() => {
+    const m = new Map<string, Task[]>();
+    for (const t of filteredTasks) {
+      const arr = m.get(t.j);
+      if (arr) arr.push(t);
+      else m.set(t.j, [t]);
+    }
+    // pre-sort each bucket by due date — the render used to sort on every pass
+    for (const arr of m.values()) arr.sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1));
+    return m;
+  }, [filteredTasks]);
+
   const taskingJobs = useMemo(() => {
-    const withTasks = taskAll ? board.jobs : board.jobs.filter((j) => filteredTasks.some((t) => t.j === j.id));
+    const withTasks = taskAll ? board.jobs : board.jobs.filter((j) => tasksByJob.has(j.id));
     return withTasks
       .filter((j) => (filterCust === "all" || j.cust === filterCust) && (filterFam === "all" || j.fam === filterFam) && (filterOwn === "all" || j.own === filterOwn))
       .sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1));
-  }, [board, filteredTasks, filterCust, filterFam, filterOwn, taskAll]);
+  }, [board.jobs, tasksByJob, filterCust, filterFam, filterOwn, taskAll]);
+
+  // next upcoming crewed milestone per job — computeSchedule ran for every job
+  // on every render (including every keystroke in a filter); now once per plan change
+  const nextMilestone = useMemo(() => {
+    const m = new Map<string, { idx: number; name: string; end: string }>();
+    for (const [jobId, plan] of Object.entries(board.plans)) {
+      if (!plan?.milestones?.length) continue;
+      const nx = computeSchedule({ start: plan.start || TODAY, milestones: plan.milestones })
+        .find((s) => s.end >= TODAY && manDays(s) > 0);
+      if (nx) m.set(jobId, { idx: nx.idx, name: nx.name, end: nx.end });
+    }
+    return m;
+  }, [board.plans]);
 
   const submit = async (jid: string) => {
     if (!form.t.trim()) return;
@@ -1447,10 +1514,10 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
       {taskView === "board" && (
         <div className="space-y-3">
           {taskingJobs.map((j) => {
-            const jt = filteredTasks.filter((t) => t.j === j.id).sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1));
-            const open = jt.filter((t) => !t.done).length;
-            const plan = board.plans[j.id];
-            const nx = plan ? computeSchedule({ start: plan.start || TODAY, milestones: plan.milestones }).find((m) => m.end >= TODAY && manDays(m) > 0) : null;
+            const jt = tasksByJob.get(j.id) ?? [];
+            let open = 0;
+            for (const t of jt) if (!t.done) open++;
+            const nx = nextMilestone.get(j.id) ?? null;
             return (
               <div key={j.id} className="flex gap-2 items-stretch">
                 {/* job card — fixed on the left */}
@@ -1701,13 +1768,10 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
 }
 
 // ============================ Admin ============================
-function Admin({ board, reload }: { board: Board; reload: () => Promise<Board | null> }) {
-  // ---- user management ----
-  const [users, setUsers] = useState<{ id: string; email: string; role: string; disabled: boolean }[]>([]);
+function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () => Promise<Board | null>; users: AdminUser[] | null; loadUsers: () => Promise<void> }) {
+  // ---- user management (list state lives in the parent so the tab doesn't flicker) ----
   const [uForm, setUForm] = useState({ email: "", pw: "", role: "planner" });
   const [uMsg, setUMsg] = useState("");
-  const loadUsers = () => api.get("/api/admin/users").then((r) => setUsers(r.users)).catch(() => {});
-  useEffect(() => { loadUsers(); }, []);
 
   const createUser = async () => {
     if (!uForm.email || !uForm.pw) return;
@@ -1741,13 +1805,42 @@ function Admin({ board, reload }: { board: Board; reload: () => Promise<Board | 
 
   // ---- family milestone template editor ----
   type TRow = { name: string; days: number; preds: number[]; crew: Crew; shift: string; offset: number };
-  const famList = Object.keys(board.templates).sort();
+  const famList = useMemo(() => Object.keys(board.templates).sort(), [board.templates]);
   const [fam, setFam] = useState<string>("");
   const [rows, setRows] = useState<TRow[] | null>(null);
   const [newFam, setNewFam] = useState("");
   const [tMsg, setTMsg] = useState("");
   const loadFam = (f: string) => { setFam(f); setRows(templateMilestones(f, board.templates) as TRow[]); setTMsg(""); };
-  useEffect(() => { if (!fam && famList.length) loadFam(famList[0]); }, [famList.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (fam || !famList.length) return;
+    const f = famList[0];
+    setFam(f);
+    setRows(templateMilestones(f, board.templates) as TRow[]);
+  }, [fam, famList, board.templates]);
+
+  // ---- quotes collection ----
+  const [qStats, setQStats] = useState<{ total: number; original: number; attributed: number } | null>(null);
+  const [qMsg, setQMsg] = useState("");
+  const [qBusy, setQBusy] = useState(false);
+  const qFileRef = useRef<HTMLInputElement | null>(null);
+  const loadQStats = useCallback(() => {
+    api.get("/api/quotes").then(setQStats).catch(() => setQStats(null));
+  }, []);
+  useEffect(() => { loadQStats(); }, [loadQStats]);
+  const onQuoteFile = async (f: File | null) => {
+    if (!f) return;
+    setQBusy(true); setQMsg("");
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      const res = await fetch("/api/quotes", { method: "POST", body: fd });
+      const r = await res.json();
+      if (!res.ok) throw new Error(r.error || "Upload failed");
+      setQMsg(`Loaded ✓ — ${r.added} new quote${r.added === 1 ? "" : "s"} added, ${r.skipped} already present. Collection now ${r.total}.`);
+      loadQStats();
+    } catch (e) { setQMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setQBusy(false); }
+  };
 
   const setRow = (i: number, patch: Partial<TRow>) => setRows((rs) => rs!.map((r, k) => (k === i ? { ...r, ...patch } : r)));
   const setRowCrew = (i: number, key: keyof Crew, v: number) => setRows((rs) => rs!.map((r, k) => (k === i ? { ...r, crew: { ...r.crew, [key]: v } } : r)));
@@ -1796,7 +1889,20 @@ function Admin({ board, reload }: { board: Board; reload: () => Promise<Board | 
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
+            {users === null && (
+              // skeleton rows — keeps the table height stable while loading
+              [0, 1, 2].map((i) => (
+                <tr key={"sk" + i} style={{ borderTop: "1px solid #EEECE6" }}>
+                  <td className="py-2" colSpan={4}>
+                    <div className="rounded" style={{ height: 12, width: `${60 - i * 10}%`, background: "#EFEDE7" }} />
+                  </td>
+                </tr>
+              ))
+            )}
+            {users?.length === 0 && (
+              <tr><td className="py-3" colSpan={4} style={{ color: "#8A94A0" }}>No users found.</td></tr>
+            )}
+            {(users ?? []).map((u) => (
               <tr key={u.id} style={{ borderTop: "1px solid #EEECE6" }}>
                 <td className="py-1.5">{u.email}</td>
                 <td className="py-1.5">
@@ -1870,6 +1976,29 @@ function Admin({ board, reload }: { board: Board; reload: () => Promise<Board | 
             <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>Matching: a job&apos;s Product Family is matched to a template by exact name first, then partial (e.g. template &quot;Hi Lift&quot; covers &quot;Hi Lift 12m&quot;). Changing a template affects jobs that don&apos;t yet have a saved plan; saved plans are never touched.</div>
           </>
         )}
+      </div>
+
+      {/* ---- quote collection ---- */}
+      <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+          <div className="font-bold text-sm">Quote of the day <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— one quote a day, the same for everyone, cycling through the whole collection before any repeat</span></div>
+          <div className="flex gap-1 items-center">
+            <input ref={qFileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={(e) => { onQuoteFile(e.target.files?.[0] || null); e.target.value = ""; }} />
+            <button onClick={() => qFileRef.current?.click()} disabled={qBusy} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff", opacity: qBusy ? 0.6 : 1 }}>{qBusy ? "Uploading…" : "⬆ Upload quotes sheet"}</button>
+          </div>
+        </div>
+        {qStats && (
+          <div className="flex gap-2 flex-wrap mb-2">
+            <Chip label="TOTAL QUOTES" value={String(qStats.total)} color="#16232F" />
+            <Chip label="ORIGINAL (NANDAN)" value={String(qStats.original)} color="#7C3AED" />
+            <Chip label="ATTRIBUTED" value={String(qStats.attributed)} color="#1B3A5C" />
+            <Chip label="DAYS OF COVER" value={qStats.total ? `${qStats.total} days` : "—"} color="#0D7A3F" />
+          </div>
+        )}
+        {qMsg && <div className="text-xs font-semibold mb-2" style={{ color: qMsg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{qMsg}</div>}
+        <div className="text-xs" style={{ color: "#8A94A0" }}>
+          Sheet format: any tab with a <b>Quote</b> column (plus optional <b>Category</b>, <b>Author / Attribution</b>, <b>Source / Work</b>). Rows whose author reads &quot;Original collection&quot; or is blank are credited to the Nandan original collection and badged ORIGINAL; rows naming a real author keep that attribution. Re-uploading the same sheet is safe — duplicates are skipped.
+        </div>
       </div>
     </div>
   );
