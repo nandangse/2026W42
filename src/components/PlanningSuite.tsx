@@ -434,9 +434,16 @@ function DeliveryBoard({
     return () => clearTimeout(t);
   }, [subTab]);
 
-  const jobs = board.jobs;
+  const allJobs = board.jobs;
   const owners = board.owners;
   const prio = board.priority; // array or null
+
+  // The owner filter is applied ONCE here so every sub-view (priority list,
+  // kanban, calendar, by-product, by-customer) and the KPI cards all honour it.
+  const jobs = useMemo(
+    () => (delOwn === "all" ? allJobs : allJobs.filter((j) => j.own === delOwn)),
+    [allJobs, delOwn],
+  );
   const byTDD = useMemo(
     () => [...jobs].sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1)),
     [jobs],
@@ -503,10 +510,15 @@ function DeliveryBoard({
         <SubBtn k="cal" l="📅 Calendar (ISO weeks)" />
         <SubBtn k="fam" l="Schedule by Product" />
         <SubBtn k="cust" l="Schedule by Customer" />
-        <select value={delOwn} onChange={(e) => setDelOwn(e.target.value)} className="px-2 py-1 rounded border bg-white text-sm ml-1" style={{ borderColor: "#D9D6CD" }}>
+        <select value={delOwn} onChange={(e) => setDelOwn(e.target.value)} className="px-2 py-1 rounded border text-sm ml-1 font-semibold" style={{ borderColor: delOwn === "all" ? "#D9D6CD" : "#E8600A", background: delOwn === "all" ? "#fff" : "#FFF3E8", color: delOwn === "all" ? "#22303C" : "#E8600A" }} title="Filter every view on this board by job owner">
           <option value="all">All owners</option>
           {owners.map((o) => (<option key={o}>{o}</option>))}
         </select>
+        {delOwn !== "all" && (
+          <button onClick={() => setDelOwn("all")} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }} title="Clear the owner filter">
+            {jobs.length} of {allJobs.length} jobs · clear ✕
+          </button>
+        )}
       </div>
 
       {/* ---- Calendar (ISO weeks) — one continuous scroll through the months ---- */}
@@ -602,7 +614,8 @@ function DeliveryBoard({
         const base = prio
           ? prio.map((id) => byTDD.find((j) => j.id === id)).filter(Boolean).concat(byTDD.filter((j) => !prio.includes(j.id))) as Job[]
           : byTDD;
-        const plist = base.filter((j) => delOwn === "all" || j.own === delOwn);
+        const plist = base; // already owner-filtered upstream
+        // reordering writes the full priority list, so only allow it unfiltered
         const canDrag = delOwn === "all";
         const onDrop = (ti: number) => {
           if (dragIdx === null || dragIdx === ti) return;
