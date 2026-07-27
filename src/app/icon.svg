@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Nandan Works Planning Suite">
+  <!-- Browser-tab icon. A wordmark is illegible at 16px, so this is the Nandan
+       monogram in the app's own palette: #16232F header navy + #E8600A accent. -->
+  <rect width="64" height="64" rx="13" fill="#16232F"/>
+  <!-- bold N -->
+  <path d="M14 50 V14 h9 l18 25 V14 h9 v36 h-9 L23 25 v25 z" fill="#FFFFFF"/>
+  <!-- accent bar, mirroring the orange rule under the app header -->
+  <rect x="8" y="53" width="48" height="5" rx="2.5" fill="#E8600A"/>
+</svg>
