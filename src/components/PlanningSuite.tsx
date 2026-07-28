@@ -46,8 +46,48 @@ const STATUSES = [
   "I: Installation in progress", "I: Installation Completed", "C: Job Handed Over",
 ];
 
-type Role = "admin" | "planner";
+type Role = "admin" | "planner" | "project_owner" | "user" | "viewer";
 const TODAY = today();
+
+interface Person {
+  id: string;
+  email: string;
+  role: string;
+  initials: string | null;
+  name: string | null;
+  erpOwner: string | null;
+}
+
+/** Label for a person: "RK · Ravi Kumar" style, falling back sensibly. */
+const personLabel = (p: Person) =>
+  `${p.initials ? p.initials + " · " : ""}${p.name || p.email.split("@")[0]}`;
+
+/** Every string a task's `who` might hold for this person. */
+function myHandles(me: { initials: string | null; displayName: string | null; erpOwner: string | null; email: string }) {
+  return new Set(
+    [me.initials, me.displayName, me.erpOwner, me.email, me.email.split("@")[0]]
+      .filter(Boolean)
+      .map((s) => String(s).toLowerCase()),
+  );
+}
+
+/**
+ * Assignee keys for the task pickers: everyone's initials (the assignment key),
+ * falling back to the raw Jobmaster owner strings when initials aren't set up.
+ */
+function assignees(board: Board): string[] {
+  const withInitials = (board.people || []).filter((p) => p.initials && p.role !== "uploader");
+  if (withInitials.length) return withInitials.map((p) => p.initials!).sort();
+  return board.owners || [];
+}
+
+/** Date+time stamp for "last updated". */
+const stamp = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleString("en-IN", {
+        day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+      })
+    : "—";
 
 interface Job {
   id: string;
@@ -70,6 +110,7 @@ interface Job {
   kit: number;
   active: boolean;
   archived: boolean;
+  updated_at: string | null;
 }
 interface Task {
   id: string;
@@ -95,6 +136,9 @@ interface Board {
   priority: string[] | null;
   templates: Record<string, any>;
   owners: string[];
+  people: Person[];
+  projectOwners: Person[];
+  lastUpdated: string | null;
   batches: Record<string, { uploaded_at: string; filename: string } | undefined>;
   aggregates: { kittingPct: number; materialValueSum: number; kittedValueSum: number; activeJobCount: number };
 }
@@ -104,7 +148,19 @@ interface AdminUser {
   email: string;
   role: string;
   disabled: boolean;
+  initials: string | null;
+  display_name: string | null;
+  erp_owner: string | null;
 }
+
+const ROLE_OPTIONS: { value: string; label: string; hint: string }[] = [
+  { value: "admin", label: "Admin", hint: "Everything, plus the Admin page" },
+  { value: "planner", label: "Planner", hint: "All boards and editing" },
+  { value: "project_owner", label: "Project Owner", hint: "Owns jobs — the boards filter by these people" },
+  { value: "user", label: "User", hint: "Works tasks assigned to them" },
+  { value: "viewer", label: "Viewer", hint: "Read-only" },
+  { value: "uploader", label: "Uploader", hint: "Morning Update page only" },
+];
 
 interface ErpLogEntry {
   id: string;
@@ -160,17 +216,29 @@ function templateMilestones(fam: string, templates: Record<string, any>): PlanMi
 export default function PlanningSuite({
   email,
   role,
+  initials,
+  displayName,
+  erpOwner,
   isRaghu,
 }: {
   email: string;
   role: Role;
+  initials: string | null;
+  displayName: string | null;
+  erpOwner: string | null;
   isRaghu: boolean;
 }) {
   const router = useRouter();
   const isAdmin = role === "admin";
+  const canEdit = role === "admin" || role === "planner" || role === "project_owner";
+  const me = useMemo(
+    () => ({ email, initials, displayName, erpOwner, role }),
+    [email, initials, displayName, erpOwner, role],
+  );
   const [board, setBoard] = useState<Board | null>(null);
   const [err, setErr] = useState("");
-  const [tab, setTab] = useState<"delivery" | "load" | "plan" | "tasking" | "erp" | "admin">("delivery");
+  // land on "My Week", not the delivery board
+  const [tab, setTab] = useState<"home" | "delivery" | "load" | "plan" | "tasking" | "erp" | "admin">("home");
   const [showVal, setShowVal] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erpLog, setErpLog] = useState<ErpLogEntry[]>([]);
@@ -281,6 +349,7 @@ export default function PlanningSuite({
   }).length;
 
   const TAB_DEFS: [typeof tab, string][] = [
+    ["home", "🏠 My Week"],
     ["delivery", "Job Delivery Board"],
     ["load", "Load Board"],
     ["plan", "Job Plan"],
@@ -316,9 +385,16 @@ export default function PlanningSuite({
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={(e) => onFile(e.target.files?.[0] || null)} />
-            <button onClick={() => fileRef.current?.click()} className="text-xs rounded px-3 py-1.5 font-bold" style={{ background: "#E8600A", color: "#fff" }}>
-              ⬆ Upload Excel
-            </button>
+            {isAdmin && (
+              <button onClick={() => fileRef.current?.click()} className="text-xs rounded px-3 py-1.5 font-bold" style={{ background: "#E8600A", color: "#fff" }}>
+                ⬆ Upload Excel
+              </button>
+            )}
+            {role === "viewer" && (
+              <span className="text-xs rounded px-2 py-1.5 font-bold" style={{ background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }} title="Your account is read-only">
+                👁 Read-only
+              </span>
+            )}
             <span className="text-xs rounded px-2 py-1.5 font-bold" style={{ background: "#0D161F", color: loadedCount === 3 ? "#7BC67E" : "#8FA1B3", border: "1px solid #22303C" }}>
               🌅 Morning update {loadedCount}/3
             </span>
@@ -340,7 +416,13 @@ export default function PlanningSuite({
               <option value="without">Without value</option>
             </select>
             <span className="text-xs rounded px-2 py-1.5" style={{ background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }}>
-              👤 {email}
+              {initials ? (
+                <span className="font-bold rounded px-1 mr-1" style={{ background: "#E8600A", color: "#fff" }} title="Your initials — the key used to assign your tasks">{initials}</span>
+              ) : (
+                <span className="font-bold rounded px-1 mr-1" style={{ background: "#B3261E", color: "#fff" }} title="No initials set — ask an admin to assign yours">??</span>
+              )}
+              {displayName || email}
+              <span className="ml-1" style={{ color: "#3A4A5A" }}>· {role.replace("_", " ")}</span>
               <button onClick={logout} className="ml-1 font-bold" style={{ color: "#E8600A" }}>
                 Logout
               </button>
@@ -364,11 +446,13 @@ export default function PlanningSuite({
           <span style={{ color: "#F5B32B" }}>
             Data: {board.jobs.length} active jobs · kitting {board.aggregates.kittingPct.toFixed(1)}%
           </span>
+          <span style={{ color: "#8FA1B3" }}>🕒 Last updated {stamp(board.lastUpdated)}</span>
         </div>
       </div>
 
       <QuoteOfDay trigger={quoteTrigger} />
 
+      {tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} goTasks={() => setTab("tasking")} />}
       {tab === "delivery" && <DeliveryBoard board={board} V={V} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} pushERP={pushERP} />}
       {tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
       {tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} pushERP={pushERP} />}
@@ -404,6 +488,223 @@ function CrewCell({ value, onChange, color }: { value: number; onChange: (v: num
   );
 }
 
+// ============================ My Week (landing) ============================
+function MyWeek({
+  board,
+  me,
+  V,
+  onOpen,
+  reload,
+  goTasks,
+}: {
+  board: Board;
+  me: { email: string; initials: string | null; displayName: string | null; erpOwner: string | null; role: string };
+  V: (v: number) => string;
+  onOpen: (id: string) => void;
+  reload: () => Promise<Board | null>;
+  goTasks: () => void;
+}) {
+  const weekEnd = addDays(TODAY, 7);
+  const handles = useMemo(() => myHandles(me), [me]);
+
+  // my open tasks: overdue, or due within the next seven days
+  const myTasks = useMemo(() => {
+    const mine = board.tasks.filter((t) => !t.done && handles.has(String(t.who || "").toLowerCase()));
+    return mine
+      .filter((t) => !t.due || t.due <= weekEnd)
+      .sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1));
+  }, [board.tasks, handles, weekEnd]);
+  const overdue = myTasks.filter((t) => t.due && t.due < TODAY);
+  const dueToday = myTasks.filter((t) => t.due === TODAY);
+  const laterThisWeek = myTasks.filter((t) => !t.due || t.due > TODAY);
+
+  // jobs I own (matched on the ERP owner string or my initials)
+  const myJobs = useMemo(
+    () => board.jobs.filter((j) => handles.has(String(j.own || "").toLowerCase())),
+    [board.jobs, handles],
+  );
+
+  // delivery expected in the next seven days — shop-wide
+  const dueJobs = useMemo(
+    () =>
+      board.jobs
+        .filter((j) => j.tdd && j.tdd <= weekEnd)
+        .sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1)),
+    [board.jobs, weekEnd],
+  );
+
+  // milestones of mine landing this week
+  const myMilestones = useMemo(() => {
+    const out: { job: Job; idx: number; name: string; end: string }[] = [];
+    for (const j of myJobs) {
+      const plan = board.plans[j.id];
+      if (!plan?.milestones?.length) continue;
+      for (const m of computeSchedule({ start: plan.start || TODAY, milestones: plan.milestones })) {
+        if (!m.done && m.end >= TODAY && m.end <= weekEnd && manDays(m) > 0)
+          out.push({ job: j, idx: m.idx, name: m.name, end: m.end });
+      }
+    }
+    return out.sort((a, b) => (a.end < b.end ? -1 : 1));
+  }, [myJobs, board.plans, weekEnd]);
+
+  const [lightbox, setLightbox] = useState<Task | null>(null);
+  const who = me.displayName || me.email.split("@")[0];
+
+  const Card = ({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color: string }) => (
+    <div className="bg-white rounded-lg border px-3 py-2" style={{ borderColor: "#E2E0DA", borderTop: `3px solid ${color}` }}>
+      <div className="text-xs font-bold" style={{ color: "#8A94A0" }}>{label}</div>
+      <div className="text-xl font-bold tnum" style={{ color }}>{value}</div>
+      {sub && <div className="text-xs" style={{ color: "#8A94A0" }}>{sub}</div>}
+    </div>
+  );
+
+  return (
+    <div className="p-4">
+      <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
+        <h2 className="text-xl font-bold" style={{ color: "#16232F" }}>
+          Good day, {who}
+          {me.initials && <span className="ml-2 rounded px-1.5 py-0.5 text-sm font-bold" style={{ background: "#E8600A", color: "#fff" }}>{me.initials}</span>}
+        </h2>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>
+          Week of {fmtFull(TODAY)} → {fmtFull(weekEnd)} · 🕒 last updated {stamp(board.lastUpdated)}
+        </span>
+      </div>
+
+      {!me.initials && (
+        <div className="text-xs font-bold rounded px-2 py-1.5 mb-3" style={{ background: "#FFF3E8", color: "#B3261E", border: "1px solid #E8600A" }}>
+          ⚠ You have no initials assigned yet, so tasks can&apos;t be matched to you. An admin can set them in Admin → User management.
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+        <Card label="MY OPEN TASKS" value={myTasks.length} sub="this week" color="#16232F" />
+        <Card label="OVERDUE" value={overdue.length} sub={overdue.length ? "needs attention" : "all clear"} color={overdue.length ? "#B3261E" : "#0D7A3F"} />
+        <Card label="DUE TODAY" value={dueToday.length} color="#E8600A" />
+        <Card label="MY JOBS" value={myJobs.length} sub={V(myJobs.reduce((s, j) => s + j.val, 0))} color="#1B3A5C" />
+        <Card label="DELIVERIES THIS WEEK" value={dueJobs.length} sub="shop-wide" color="#7C3AED" />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* my tasks */}
+        <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="font-bold text-sm">My tasks this week</div>
+            <button onClick={goTasks} className="text-xs font-bold" style={{ color: "#E8600A" }}>Open Tasking →</button>
+          </div>
+          {myTasks.length === 0 ? (
+            <div className="text-sm py-4 text-center" style={{ color: "#8A94A0" }}>
+              {me.initials ? "Nothing assigned to you this week ✓" : "Assign initials to see your tasks here."}
+            </div>
+          ) : (
+            <>
+              {overdue.length > 0 && (
+                <div className="text-xs font-bold rounded px-2 py-1 mb-2 inline-block" style={{ background: "#B3261E", color: "#fff" }}>
+                  ⚠ {overdue.length} overdue
+                </div>
+              )}
+              {[...overdue, ...dueToday, ...laterThisWeek].map((t) => {
+                const job = board.jobs.find((j) => j.id === t.j);
+                return (
+                  <div key={t.id} onClick={() => setLightbox(t)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ ...dueStyle(t.due), borderColor: "rgba(0,0,0,0.08)" }}>
+                    <div className="text-xs font-semibold">{t.t}</div>
+                    <div className="flex items-center justify-between mt-1 text-xs" style={{ opacity: 0.85 }}>
+                      <span className="font-bold">{job ? "JOB " + jobNo(t.j) : "—"}</span>
+                      {t.esc && t.esc !== "None" && <span className="font-bold rounded px-1" style={{ background: "#B3261E", color: "#fff", fontSize: 9 }}>⚠ {t.esc.slice(0, 2)}</span>}
+                      <span style={{ fontSize: 10 }}>{(t.cat || "").toLowerCase()}</span>
+                      <span className="tnum">{fmt(t.due)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+
+        {/* deliveries expected this week */}
+        <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+          <div className="font-bold text-sm mb-2">Delivery expected in the next 7 days</div>
+          {dueJobs.length === 0 ? (
+            <div className="text-sm py-4 text-center" style={{ color: "#8A94A0" }}>No deliveries due this week.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr style={{ color: "#8A94A0" }}>
+                    <th className="text-left py-1 font-semibold">Job</th>
+                    <th className="text-left py-1 font-semibold">Customer tag</th>
+                    <th className="text-left py-1 font-semibold">Owner</th>
+                    <th className="text-center py-1 font-semibold">TDD</th>
+                    <th className="text-center py-1 font-semibold">Prod %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dueJobs.map((j) => (
+                    <tr key={j.id} className="border-t" style={{ borderColor: "#EFEDE7" }}>
+                      <td className="py-1.5">
+                        <button onClick={() => onOpen(j.id)} className="font-bold underline decoration-dotted" style={{ color: "#1B3A5C" }}>{jobNo(j.id)}</button>
+                      </td>
+                      <td className="py-1.5">{j.tag}</td>
+                      <td className="py-1.5" style={{ color: "#5A6672" }}>{j.own || "—"}</td>
+                      <td className="py-1.5 text-center font-bold tnum" style={{ color: j.tdd && j.tdd < TODAY ? "#B3261E" : "#22303C" }}>{fmtFull(j.tdd)}</td>
+                      <td className="py-1.5 text-center tnum">{j.pct}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* my milestones this week */}
+        <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+          <div className="font-bold text-sm mb-2">My milestones landing this week</div>
+          {myMilestones.length === 0 ? (
+            <div className="text-sm py-4 text-center" style={{ color: "#8A94A0" }}>No milestones due on your jobs this week.</div>
+          ) : (
+            myMilestones.map((m, i) => (
+              <div key={i} onClick={() => onOpen(m.job.id)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ background: "#DDE6EE", borderColor: "#B9C7D4" }}>
+                <div className="text-xs font-bold" style={{ color: "#1B3A5C" }}>⚑ M{m.idx} · {m.name}</div>
+                <div className="text-xs flex justify-between mt-0.5" style={{ color: "#5A6672" }}>
+                  <span>JOB {jobNo(m.job.id)} · {m.job.tag}</span>
+                  <span className="tnum">{fmt(m.end)}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* my jobs */}
+        <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+          <div className="font-bold text-sm mb-2">My jobs {myJobs.length > 0 && <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>· {myJobs.length}</span>}</div>
+          {myJobs.length === 0 ? (
+            <div className="text-sm py-4 text-center" style={{ color: "#8A94A0" }}>
+              No jobs list you as owner. Owner matching uses your initials or the ERP owner name on your profile.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <tbody>
+                  {myJobs.slice(0, 12).map((j) => (
+                    <tr key={j.id} className="border-t" style={{ borderColor: "#EFEDE7" }}>
+                      <td className="py-1.5"><button onClick={() => onOpen(j.id)} className="font-bold underline decoration-dotted" style={{ color: "#1B3A5C" }}>{jobNo(j.id)}</button></td>
+                      <td className="py-1.5">{j.tag}</td>
+                      <td className="py-1.5 text-center font-bold tnum" style={{ color: j.tdd && j.tdd < TODAY ? "#B3261E" : "#22303C" }}>{fmtFull(j.tdd)}</td>
+                      <td className="py-1.5 text-right" style={{ color: "#8A94A0" }}>{stamp(j.updated_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {myJobs.length > 12 && <div className="text-xs mt-1" style={{ color: "#8A94A0" }}>+{myJobs.length - 12} more…</div>}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {lightbox && <TaskModal task={lightbox} owners={board.people.map((p) => p.initials || p.email).filter(Boolean) as string[]} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+    </div>
+  );
+}
+
 // ============================ Delivery board ============================
 function DeliveryBoard({
   board,
@@ -434,15 +735,92 @@ function DeliveryBoard({
     return () => clearTimeout(t);
   }, [subTab]);
 
+  const [q, setQ] = useState("");
+  const [sortKey, setSortKey] = useState<string>("");
+  const [sortDir, setSortDir] = useState<1 | -1>(1);
+
   const allJobs = board.jobs;
-  const owners = board.owners;
   const prio = board.priority; // array or null
 
-  // The owner filter is applied ONCE here so every sub-view (priority list,
-  // kanban, calendar, by-product, by-customer) and the KPI cards all honour it.
-  const jobs = useMemo(
-    () => (delOwn === "all" ? allJobs : allJobs.filter((j) => j.own === delOwn)),
-    [allJobs, delOwn],
+  // Only Project Owners are offered as the job filter. Fall back to the raw
+  // owner strings from the Jobmaster if no POs have been set up yet.
+  const ownerOptions = useMemo(() => {
+    const pos = board.projectOwners || [];
+    if (pos.length)
+      return pos.map((p) => ({ value: p.erpOwner || p.initials || p.email, label: personLabel(p) }));
+    return (board.owners || []).map((o) => ({ value: o, label: o }));
+  }, [board.projectOwners, board.owners]);
+
+  // Owner + search are applied ONCE here so every sub-view (priority list,
+  // kanban, calendar, by-product, by-customer) and the KPI cards all honour them.
+  const jobs = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return allJobs.filter((j) => {
+      if (delOwn !== "all" && String(j.own || "").toLowerCase() !== delOwn.toLowerCase()) return false;
+      if (!needle) return true;
+      return (
+        j.id.includes(needle) ||
+        jobNo(j.id).includes(needle) ||
+        j.tag.toLowerCase().includes(needle) ||
+        j.cust.toLowerCase().includes(needle) ||
+        j.fam.toLowerCase().includes(needle) ||
+        j.stat.toLowerCase().includes(needle) ||
+        String(j.own || "").toLowerCase().includes(needle) ||
+        String(j.proj || "").toLowerCase().includes(needle)
+      );
+    });
+  }, [allJobs, delOwn, q]);
+
+  /** Column sorting for the priority table. Click a header to cycle asc/desc. */
+  const sortJobs = (list: Job[]): Job[] => {
+    if (!sortKey) return list;
+    const val = (j: Job): string | number => {
+      switch (sortKey) {
+        case "job": return j.id;
+        case "tag": return j.tag.toLowerCase();
+        case "fam": return j.fam.toLowerCase();
+        case "cust": return j.cust.toLowerCase();
+        case "tdd": return j.tdd || "9999-12-31";
+        case "otd": return j.otd || "9999-12-31";
+        case "own": return String(j.own || "").toLowerCase();
+        case "stat": return j.stat.toLowerCase();
+        case "pct": return j.pct;
+        case "val": return j.val;
+        case "tpv": return j.tpv;
+        case "tpp": return j.tpp;
+        case "kit": return j.kit;
+        case "upd": return j.updated_at || "";
+        default: return 0;
+      }
+    };
+    return [...list].sort((a, b) => {
+      const x = val(a), y = val(b);
+      if (x === y) return 0;
+      return (x < y ? -1 : 1) * sortDir;
+    });
+  };
+  const toggleSort = (k: string) => {
+    if (sortKey === k) setSortDir((d) => (d === 1 ? -1 : 1));
+    else { setSortKey(k); setSortDir(1); }
+  };
+
+  // Kanban columns come from the owners actually present on the filtered jobs,
+  // so a column never renders empty.
+  const kanbanOwners = useMemo(() => {
+    const set = new Set(jobs.map((j) => (j.own || "").trim()).filter(Boolean));
+    const list = [...set].sort();
+    return jobs.some((j) => !j.own) ? [...list, "Unassigned"] : list;
+  }, [jobs]);
+  /** Sortable <th>. */
+  const SortTh = ({ k, label, align = "left" }: { k: string; label: string; align?: "left" | "center" | "right" }) => (
+    <th
+      onClick={() => toggleSort(k)}
+      className={`px-2 py-2 text-${align} cursor-pointer select-none whitespace-nowrap`}
+      style={{ position: "sticky", top: 0, zIndex: 3, background: "#22303C", color: sortKey === k ? "#F5B32B" : "#fff" }}
+      title={`Sort by ${label}`}
+    >
+      {label}{sortKey === k ? (sortDir === 1 ? " ▲" : " ▼") : " ⇅"}
+    </th>
   );
   const byTDD = useMemo(
     () => [...jobs].sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1)),
@@ -510,12 +888,24 @@ function DeliveryBoard({
         <SubBtn k="cal" l="📅 Calendar (ISO weeks)" />
         <SubBtn k="fam" l="Schedule by Product" />
         <SubBtn k="cust" l="Schedule by Customer" />
-        <select value={delOwn} onChange={(e) => setDelOwn(e.target.value)} className="px-2 py-1 rounded border text-sm ml-1 font-semibold" style={{ borderColor: delOwn === "all" ? "#D9D6CD" : "#E8600A", background: delOwn === "all" ? "#fff" : "#FFF3E8", color: delOwn === "all" ? "#22303C" : "#E8600A" }} title="Filter every view on this board by job owner">
-          <option value="all">All owners</option>
-          {owners.map((o) => (<option key={o}>{o}</option>))}
+        <select value={delOwn} onChange={(e) => setDelOwn(e.target.value)} className="px-2 py-1 rounded border text-sm ml-1 font-semibold" style={{ borderColor: delOwn === "all" ? "#D9D6CD" : "#E8600A", background: delOwn === "all" ? "#fff" : "#FFF3E8", color: delOwn === "all" ? "#22303C" : "#E8600A" }} title="Filter every view on this board by Project Owner">
+          <option value="all">All project owners</option>
+          {ownerOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
         </select>
-        {delOwn !== "all" && (
-          <button onClick={() => setDelOwn("all")} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }} title="Clear the owner filter">
+        <div className="relative">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="🔍 Search job no, tag, customer, product, status…"
+            className="px-2 py-1 rounded border text-sm"
+            style={{ borderColor: q ? "#E8600A" : "#D9D6CD", minWidth: 290 }}
+          />
+          {q && (
+            <button onClick={() => setQ("")} className="absolute right-2 top-1 font-bold" style={{ color: "#E8600A" }} title="Clear search">✕</button>
+          )}
+        </div>
+        {(delOwn !== "all" || q) && (
+          <button onClick={() => { setDelOwn("all"); setQ(""); }} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }} title="Clear filters">
             {jobs.length} of {allJobs.length} jobs · clear ✕
           </button>
         )}
@@ -614,9 +1004,9 @@ function DeliveryBoard({
         const base = prio
           ? prio.map((id) => byTDD.find((j) => j.id === id)).filter(Boolean).concat(byTDD.filter((j) => !prio.includes(j.id))) as Job[]
           : byTDD;
-        const plist = base; // already owner-filtered upstream
+        const plist = sortJobs(base); // owner/search filtered upstream, then sorted
         // reordering writes the full priority list, so only allow it unfiltered
-        const canDrag = delOwn === "all";
+        const canDrag = delOwn === "all" && !q && !sortKey;
         const onDrop = (ti: number) => {
           if (dragIdx === null || dragIdx === ti) return;
           const ids = base.map((j) => j.id);
@@ -627,15 +1017,38 @@ function DeliveryBoard({
           setPrio(ids);
         };
         return (
-          <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
+          <div className="bg-white rounded-lg border" style={{ borderColor: "#E2E0DA" }}>
             <div className="px-3 pt-2 pb-1 text-xs flex justify-between flex-wrap gap-2" style={{ color: "#8A94A0" }}>
-              <span>{canDrag ? "⠿ Drag any row to set manual priority" : "Owner filter active — clear it to drag-reorder"}{prio ? " · manual order active" : " · sorted by Target Delivery Date"}</span>
+              <span>
+                {canDrag
+                  ? "⠿ Drag any row to set manual priority"
+                  : sortKey
+                    ? "Sorted by column — clear the sort to drag-reorder"
+                    : "Filter active — clear it to drag-reorder"}
+                {prio ? " · manual order active" : " · sorted by Target Delivery Date"}
+                {sortKey && <button onClick={() => setSortKey("")} className="ml-2 font-bold" style={{ color: "#E8600A" }}>↺ clear sort</button>}
+              </span>
               {prio && <button onClick={() => setPrio(null)} className="font-bold" style={{ color: "#E8600A" }}>↺ Reset to TDD order</button>}
             </div>
-            <table className="w-full text-xs" style={{ minWidth: 900 }}>
+            {/* the header sticks while the rows scroll */}
+            <div className="overflow-auto" style={{ maxHeight: "68vh" }}>
+            <table className="w-full text-xs" style={{ minWidth: 1040, borderCollapse: "separate", borderSpacing: 0 }}>
               <thead>
                 <tr style={{ background: "#22303C", color: "#fff" }}>
-                  <th className="px-2 py-2 text-left">Pri</th><th className="px-2 py-2 text-left">Job</th><th className="px-2 py-2 text-left">Customer Tag</th><th className="px-2 py-2 text-left">Product Family</th><th className="px-2 py-2">Target Delivery</th><th className="px-2 py-2">OTD Date</th><th className="px-2 py-2 text-left">Owner</th><th className="px-2 py-2 text-left">Job Status ✎</th><th className="px-2 py-2">Prod %</th><th className="px-2 py-2">Value</th><th className="px-2 py-2">Throughput</th><th className="px-2 py-2">T%</th><th className="px-2 py-2">Kit%</th>
+                  <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, zIndex: 3, background: "#22303C" }}>Pri</th>
+                  <SortTh k="job" label="Job" />
+                  <SortTh k="tag" label="Customer Tag" />
+                  <SortTh k="fam" label="Product Family" />
+                  <SortTh k="tdd" label="Target Delivery" align="center" />
+                  <SortTh k="otd" label="OTD Date" align="center" />
+                  <SortTh k="own" label="Owner" />
+                  <SortTh k="stat" label="Job Status ✎" />
+                  <SortTh k="pct" label="Prod %" align="center" />
+                  <SortTh k="val" label="Value" align="center" />
+                  <SortTh k="tpv" label="Throughput" align="center" />
+                  <SortTh k="tpp" label="T%" align="center" />
+                  <SortTh k="kit" label="Kit%" align="center" />
+                  <SortTh k="upd" label="Last updated" align="center" />
                 </tr>
               </thead>
               <tbody>
@@ -659,10 +1072,15 @@ function DeliveryBoard({
                     <td className="px-2 py-1.5 text-right whitespace-nowrap tnum" style={{ color: "#E8600A" }}>{V(j.tpv || 0)}</td>
                     <td className="px-2 py-1.5 text-center tnum">{j.tpp || 0}%</td>
                     <td className="px-2 py-1.5 text-center tnum" style={{ color: (j.kit || 0) >= 80 ? "#0D7A3F" : (j.kit || 0) >= 40 ? "#D97706" : "#B3261E" }}>{j.kit || 0}%</td>
+                    <td className="px-2 py-1.5 text-center whitespace-nowrap" style={{ color: "#8A94A0" }}>{stamp(j.updated_at)}</td>
                   </tr>
                 ))}
+                {plist.length === 0 && (
+                  <tr><td colSpan={14} className="py-6 text-center" style={{ color: "#8A94A0" }}>No jobs match this filter.</td></tr>
+                )}
               </tbody>
             </table>
+            </div>
           </div>
         );
       })()}
@@ -670,7 +1088,7 @@ function DeliveryBoard({
       {/* ---- By Owner (Kanban) ---- */}
       {subTab === "okan" && (
         <div className="flex gap-3 overflow-x-auto pb-2 items-start">
-          {(delOwn === "all" ? owners.concat(jobs.some((j) => !j.own) ? ["Unassigned"] : []) : [delOwn]).map((o) => {
+          {(delOwn === "all" ? kanbanOwners : [delOwn]).map((o) => {
             const ojobs = byTDD.filter((j) => (o === "Unassigned" ? !j.own : j.own === o));
             if (!ojobs.length) return null;
             return (
@@ -1393,13 +1811,13 @@ function JobPlan({
                 <div key={cat} className="rounded-lg p-2" style={{ background: "#E9E6DD", minWidth: 230, maxWidth: 260 }}>
                   <div className="text-xs font-bold px-1 pb-1.5 flex justify-between" style={{ color: "#16232F" }}><span>{cat.toUpperCase()}</span><span style={{ color: "#8A94A0" }}>{jobTasks.filter((t) => t.cat === cat && !t.done).length} open</span></div>
                   {jobTasks.filter((t) => t.cat === cat).sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1)).map((t) => (<TaskCard key={t.id} onOpen={setLightbox} t={t} />))}
-                  {addingTask === dj.id && form.cat === cat && (<AddTaskForm owners={board.owners} form={form} setForm={setForm} onSubmit={submitTask} onCancel={() => setAddingTask(null)} />)}
+                  {addingTask === dj.id && form.cat === cat && (<AddTaskForm owners={assignees(board)} form={form} setForm={setForm} onSubmit={submitTask} onCancel={() => setAddingTask(null)} />)}
                 </div>
               ))}
               {addingTask === dj.id && jobCats.length > 0 && !jobCats.includes(form.cat) && (
                 <div className="rounded-lg p-2" style={{ background: "#E9E6DD", minWidth: 230 }}>
                   <div className="text-xs font-bold px-1 pb-1.5">{form.cat.toUpperCase()}</div>
-                  <AddTaskForm owners={board.owners} form={form} setForm={setForm} onSubmit={submitTask} onCancel={() => setAddingTask(null)} />
+                  <AddTaskForm owners={assignees(board)} form={form} setForm={setForm} onSubmit={submitTask} onCancel={() => setAddingTask(null)} />
                 </div>
               )}
             </div>
@@ -1408,7 +1826,7 @@ function JobPlan({
         </>
       )}
 
-      {lightbox && <TaskModal task={lightbox} owners={board.owners} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
 
       {/* management date breach popup */}
       {dj.mgmt && ends > dj.mgmt && !warned.has(dj.id) && (
@@ -1562,7 +1980,7 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
                   )}
                   {jt.map((t) => (<div key={t.id} style={{ width: 210 }}><TaskCard onOpen={setLightbox} t={t} /></div>))}
                   {adding === j.id ? (
-                    <div style={{ width: 240 }}><AddTaskForm form={form} setForm={setForm} owners={owners} onSubmit={() => submit(j.id)} onCancel={() => setAdding(null)} /></div>
+                    <div style={{ width: 240 }}><AddTaskForm form={form} setForm={setForm} owners={assignees(board)} onSubmit={() => submit(j.id)} onCancel={() => setAdding(null)} /></div>
                   ) : (
                     <button onClick={() => setAdding(j.id)} className="text-xs font-bold rounded border border-dashed px-3 self-stretch" style={{ borderColor: "#E8600A", color: "#E8600A", minHeight: 40 }}>+ Add task</button>
                   )}
@@ -1624,7 +2042,7 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
         );
       })()}
 
-      {lightbox && <TaskModal task={lightbox} owners={board.owners} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
     </div>
   );
 }
@@ -1634,9 +2052,9 @@ function AddTaskForm({ form, setForm, owners, onSubmit, onCancel }: { form: any;
     <div className="rounded border p-2 mt-1 bg-white" style={{ borderColor: "#E8600A" }}>
       <input autoFocus placeholder="Task…" value={form.t} onChange={(e) => setForm({ ...form, t: e.target.value })} className="w-full text-xs border rounded px-1 py-1 mb-1" style={{ borderColor: "#E2E0DA" }} />
       <div className="flex gap-1 mb-1">
-        <select value={form.who} onChange={(e) => setForm({ ...form, who: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
+        <select value={form.who} onChange={(e) => setForm({ ...form, who: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }} title="Assign by initials">
           <option value="">Who?</option>
-          {owners.map((o) => (<option key={o} value={o}>{initials(o)} — {o}</option>))}
+          {owners.map((o) => (<option key={o} value={o}>{o}</option>))}
         </select>
         <input type="date" value={form.due} onChange={(e) => setForm({ ...form, due: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1" style={{ borderColor: "#E2E0DA" }} />
       </div>
@@ -1792,18 +2210,30 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
 // ============================ Admin ============================
 function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () => Promise<Board | null>; users: AdminUser[] | null; loadUsers: () => Promise<void> }) {
   // ---- user management (list state lives in the parent so the tab doesn't flicker) ----
-  const [uForm, setUForm] = useState({ email: "", pw: "", role: "planner" });
+  const [uForm, setUForm] = useState({ email: "", pw: "", role: "planner", name: "", initials: "" });
   const [uMsg, setUMsg] = useState("");
 
   const createUser = async () => {
     if (!uForm.email || !uForm.pw) return;
     setUMsg("");
     try {
-      await api.post("/api/admin/users", { action: "create", email: uForm.email, password: uForm.pw, role: uForm.role });
-      setUForm({ email: "", pw: "", role: "planner" });
-      setUMsg("User created ✓");
+      const r = await api.post("/api/admin/users", {
+        action: "create",
+        email: uForm.email,
+        password: uForm.pw,
+        role: uForm.role,
+        display_name: uForm.name,
+        initials: uForm.initials,
+      });
+      setUForm({ email: "", pw: "", role: "planner", name: "", initials: "" });
+      setUMsg(`User created ✓ — initials ${r.initials || "not set"}`);
       await loadUsers();
     } catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
+  };
+  const saveProfile = async (id: string, patch: Record<string, string>) => {
+    setUMsg("");
+    try { await api.post("/api/admin/users", { action: "profile", id, ...patch }); await loadUsers(); }
+    catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
   };
   const setRole = async (id: string, role: string) => { try { await api.post("/api/admin/users", { action: "role", id, role }); await loadUsers(); } catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); } };
   const setDisabled = async (id: string, disabled: boolean, email: string) => {
@@ -1868,20 +2298,26 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
     <div className="p-4 space-y-4">
       {/* ---- users ---- */}
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
-        <div className="font-bold text-sm mb-2">User management</div>
-        <div className="flex gap-1 mb-2 flex-wrap">
-          <input placeholder="email" value={uForm.email} onChange={(e) => setUForm({ ...uForm, email: e.target.value })} className="text-xs border rounded px-2 py-1 flex-1" style={{ borderColor: "#E2E0DA", minWidth: 180 }} />
-          <input placeholder="password (min 8)" value={uForm.pw} onChange={(e) => setUForm({ ...uForm, pw: e.target.value })} className="text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
+        <div className="font-bold text-sm mb-2">User management <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— initials are the key used to assign tasks and filter the boards</span></div>
+        <div className="flex gap-1 mb-2 flex-wrap items-center">
+          <input placeholder="email" value={uForm.email} onChange={(e) => setUForm({ ...uForm, email: e.target.value })} className="text-xs border rounded px-2 py-1 flex-1" style={{ borderColor: "#E2E0DA", minWidth: 170 }} />
+          <input placeholder="full name" value={uForm.name} onChange={(e) => setUForm({ ...uForm, name: e.target.value })} className="text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA", width: 130 }} />
+          <input placeholder="AB" maxLength={2} value={uForm.initials} onChange={(e) => setUForm({ ...uForm, initials: e.target.value.toUpperCase() })} className="text-xs border rounded px-2 py-1 text-center font-bold" style={{ borderColor: "#E2E0DA", width: 52 }} title="Two-letter initials — leave blank to auto-generate" />
+          <input placeholder="password (min 8)" value={uForm.pw} onChange={(e) => setUForm({ ...uForm, pw: e.target.value })} className="text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA", width: 130 }} />
           <select value={uForm.role} onChange={(e) => setUForm({ ...uForm, role: e.target.value })} className="text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
-            <option value="admin">admin</option><option value="planner">planner</option><option value="uploader">uploader</option>
+            {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
           </select>
-          <button onClick={createUser} className="text-xs font-bold rounded px-2" style={{ background: "#E8600A", color: "#fff" }}>+ Add user</button>
+          <button onClick={createUser} className="text-xs font-bold rounded px-2 py-1" style={{ background: "#E8600A", color: "#fff" }}>+ Add user</button>
         </div>
         {uMsg && <div className="text-xs font-semibold mb-2" style={{ color: uMsg.includes("✓") || uMsg.includes("removed") ? "#0D7A3F" : "#B3261E" }}>{uMsg}</div>}
-        <table className="text-xs w-full">
+        <div className="overflow-x-auto">
+        <table className="text-xs w-full" style={{ minWidth: 720 }}>
           <thead>
             <tr style={{ color: "#8A94A0" }}>
+              <th className="text-left py-1 font-semibold">Initials</th>
+              <th className="text-left py-1 font-semibold">Name</th>
               <th className="text-left py-1 font-semibold">Email</th>
+              <th className="text-left py-1 font-semibold" title="The Project Owner text as it appears in the Jobmaster — links this login to its jobs">ERP owner name</th>
               <th className="text-left py-1 font-semibold">Role</th>
               <th className="text-left py-1 font-semibold">Status</th>
               <th className="text-right py-1 font-semibold">Actions</th>
@@ -1892,34 +2328,68 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
               // skeleton rows — keeps the table height stable while loading
               [0, 1, 2].map((i) => (
                 <tr key={"sk" + i} style={{ borderTop: "1px solid #EEECE6" }}>
-                  <td className="py-2" colSpan={4}>
+                  <td className="py-2" colSpan={7}>
                     <div className="rounded" style={{ height: 12, width: `${60 - i * 10}%`, background: "#EFEDE7" }} />
                   </td>
                 </tr>
               ))
             )}
             {users?.length === 0 && (
-              <tr><td className="py-3" colSpan={4} style={{ color: "#8A94A0" }}>No users found.</td></tr>
+              <tr><td className="py-3" colSpan={7} style={{ color: "#8A94A0" }}>No users found.</td></tr>
             )}
             {(users ?? []).map((u) => (
               <tr key={u.id} style={{ borderTop: "1px solid #EEECE6" }}>
+                <td className="py-1.5">
+                  <input
+                    defaultValue={u.initials || ""}
+                    maxLength={2}
+                    placeholder="—"
+                    onBlur={(e) => { const v = e.target.value.toUpperCase(); if (v !== (u.initials || "")) saveProfile(u.id, { initials: v }); }}
+                    className="text-xs border rounded px-1 py-0.5 text-center font-bold w-12"
+                    style={{ borderColor: u.initials ? "#E2E0DA" : "#E8600A", color: "#E8600A" }}
+                    title="Two letters — press Tab to save"
+                  />
+                </td>
+                <td className="py-1.5">
+                  <input
+                    defaultValue={u.display_name || ""}
+                    placeholder="—"
+                    onBlur={(e) => { if (e.target.value !== (u.display_name || "")) saveProfile(u.id, { display_name: e.target.value }); }}
+                    className="text-xs border rounded px-1 py-0.5 w-28"
+                    style={{ borderColor: "#E2E0DA" }}
+                  />
+                </td>
                 <td className="py-1.5">{u.email}</td>
                 <td className="py-1.5">
-                  <select value={u.role} onChange={(e) => setRole(u.id, e.target.value)} className="text-xs border rounded px-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
-                    <option value="admin">admin</option><option value="planner">planner</option><option value="uploader">uploader</option>
+                  <input
+                    defaultValue={u.erp_owner || ""}
+                    placeholder="e.g. ravi.k"
+                    onBlur={(e) => { if (e.target.value !== (u.erp_owner || "")) saveProfile(u.id, { erp_owner: e.target.value }); }}
+                    className="text-xs border rounded px-1 py-0.5 w-28"
+                    style={{ borderColor: "#E2E0DA" }}
+                    title="Must match the Project Owner value in the Jobmaster export"
+                  />
+                </td>
+                <td className="py-1.5">
+                  <select value={u.role} onChange={(e) => setRole(u.id, e.target.value)} className="text-xs border rounded px-1 bg-white" style={{ borderColor: "#E2E0DA" }} title={ROLE_OPTIONS.find((r) => r.value === u.role)?.hint}>
+                    {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
                   </select>
                 </td>
                 <td className="py-1.5">
                   <button onClick={() => setDisabled(u.id, !u.disabled, u.email)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E6F4EA", color: u.disabled ? "#fff" : "#0D7A3F" }} title={u.disabled ? "Click to re-enable sign-in" : "Click to disable sign-in"}>{u.disabled ? "disabled" : "active"}</button>
                 </td>
                 <td className="py-1.5 text-right whitespace-nowrap">
-                  <button onClick={() => resetPw(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold mr-1" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Set a new password">🔑 password</button>
-                  <button onClick={() => removeUser(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FBEDEA", color: "#B3261E" }} title="Remove this account">✕ remove</button>
+                  <button onClick={() => resetPw(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold mr-1" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Set a new password">🔑</button>
+                  <button onClick={() => removeUser(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FBEDEA", color: "#B3261E" }} title="Remove this account">✕</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
+        <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>
+          Initials and names save when you click away from the field. <b>ERP owner name</b> must match the Project Owner text in the Jobmaster export — that is what links a login to its jobs on the boards and the My Week page. Only <b>Project Owners</b> appear in the Delivery board&apos;s owner filter.
+        </div>
       </div>
 
       {/* ---- family milestone templates ---- */}

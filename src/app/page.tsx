@@ -20,6 +20,9 @@ export default async function Home() {
     <PlanningSuite
       email={user.email}
       role={user.role}
+      initials={user.initials}
+      displayName={user.displayName}
+      erpOwner={user.erpOwner}
       isRaghu={user.email.toLowerCase() === RAGHU_EMAIL}
     />
   );

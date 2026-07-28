@@ -14,6 +14,9 @@ export async function GET() {
       email: u.email,
       role: u.role,
       disabled: u.disabled,
+      initials: u.initials,
+      displayName: u.displayName,
+      erpOwner: u.erpOwner,
       isRaghu: u.email.toLowerCase() === RAGHU_EMAIL,
     },
   });

@@ -24,6 +24,17 @@ export interface BoardJob {
   kit: number;
   active: boolean;
   archived: boolean;
+  updated_at: string | null;
+}
+
+/** A person who can own jobs or be assigned tasks. */
+export interface Person {
+  id: string;
+  email: string;
+  role: string;
+  initials: string | null;
+  name: string | null;
+  erpOwner: string | null;
 }
 
 function mapJob(r: any): BoardJob {
@@ -48,6 +59,7 @@ function mapJob(r: any): BoardJob {
     kit: Number(r.kit || 0),
     active: !!r.active,
     archived: !r.active,
+    updated_at: r.updated_at ?? null,
   };
 }
 
@@ -65,6 +77,7 @@ export async function buildBoard(supabase: SupabaseClient) {
     settingsRes,
     templatesRes,
     batchesRes,
+    peopleRes,
   ] = await Promise.all([
     supabase.from("jobs").select("*"),
     supabase.from("projects").select("*"),
@@ -80,6 +93,11 @@ export async function buildBoard(supabase: SupabaseClient) {
     // only recent batches — the header just needs the latest per kind, and this
     // table grows by 3-4 rows every morning forever
     supabase.from("import_batches").select("*").order("uploaded_at", { ascending: false }).limit(24),
+    // people — drives the Project Owner filter and the assignee pickers
+    supabase
+      .from("profiles")
+      .select("id, email, role, initials, display_name, erp_owner, disabled")
+      .eq("disabled", false),
   ]);
 
   const firstErr =
@@ -94,8 +112,20 @@ export async function buildBoard(supabase: SupabaseClient) {
     materialsRes.error ||
     settingsRes.error ||
     templatesRes.error ||
-    batchesRes.error;
+    batchesRes.error ||
+    peopleRes.error;
   if (firstErr) throw new Error(firstErr.message);
+
+  const people: Person[] = (peopleRes.data || []).map((p) => ({
+    id: p.id,
+    email: p.email,
+    role: p.role,
+    initials: p.initials ?? null,
+    name: p.display_name ?? null,
+    erpOwner: p.erp_owner ?? null,
+  }));
+  // only Project Owners are offered as the job-owner filter
+  const projectOwners = people.filter((p) => p.role === "project_owner");
 
   const allJobs = (jobsRes.data || []).map(mapJob);
   const activeJobs = allJobs.filter((j) => j.active);
@@ -240,6 +270,14 @@ export async function buildBoard(supabase: SupabaseClient) {
       : null,
     templates,
     owners,
+    people,
+    projectOwners,
+    // newest job change across the board — the header "last updated" stamp
+    lastUpdated:
+      allJobs.reduce<string | null>(
+        (mx, j) => (j.updated_at && (!mx || j.updated_at > mx) ? j.updated_at : mx),
+        null,
+      ) ?? batchesRes.data?.[0]?.uploaded_at ?? null,
     batches,
     aggregates: {
       kittingPct,

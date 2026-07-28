@@ -23,11 +23,11 @@ const DEFAULT_PW = process.env.SEED_PASSWORD || "nandan100";
 
 // Spec §2 seeds: raghu + medhansh (admin), shweta (uploader). A planner is
 // added for day-one boards + acceptance testing.
-const USERS: { email: string; role: Role }[] = [
-  { email: "raghu@nandan.co.in", role: "admin" },
-  { email: "medhansh@nandan.co.in", role: "admin" },
-  { email: "priya@nandan.co.in", role: "planner" },
-  { email: "shweta@nandan.co.in", role: "uploader" },
+const USERS: { email: string; role: Role; initials: string; name: string }[] = [
+  { email: "raghu@nandan.co.in", role: "admin", initials: "RG", name: "Dr Raghu" },
+  { email: "medhansh@nandan.co.in", role: "admin", initials: "MG", name: "Medhansh" },
+  { email: "priya@nandan.co.in", role: "planner", initials: "PR", name: "Priya" },
+  { email: "shweta@nandan.co.in", role: "uploader", initials: "SH", name: "Shweta" },
 ];
 
 async function findUserByEmail(email: string): Promise<string | null> {
@@ -62,10 +62,13 @@ async function seedUsers() {
     } else {
       console.log(`  = ${email} exists`);
     }
-    // ensure profile role is correct (trigger inserts; we enforce role here)
+    // ensure profile role/initials are correct (trigger inserts; we enforce here)
     const { error: pe } = await admin
       .from("profiles")
-      .upsert({ id, email, role: u.role, disabled: false }, { onConflict: "id" });
+      .upsert(
+        { id, email, role: u.role, disabled: false, initials: u.initials, display_name: u.name },
+        { onConflict: "id" },
+      );
     if (pe) console.error(`  ! profile ${email}: ${pe.message}`);
   }
 }

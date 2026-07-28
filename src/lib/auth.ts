@@ -11,7 +11,17 @@ export interface AuthedUser {
   email: string;
   role: Role;
   disabled: boolean;
+  initials: string | null;
+  displayName: string | null;
+  erpOwner: string | null;
 }
+
+/** Tiers, mirroring the SQL helpers in migration 0008. */
+export const READER_ROLES: Role[] = ["admin", "planner", "project_owner", "user", "viewer"];
+/** May write the planning layer (plans, milestones, materials, priority). */
+export const EDITOR_ROLES: Role[] = ["admin", "planner", "project_owner"];
+/** May write tasks & comments — editors plus rank-and-file users. */
+export const TASKER_ROLES: Role[] = ["admin", "planner", "project_owner", "user"];
 
 export const RAGHU_EMAIL = (
   process.env.RAGHU_EMAIL || "raghu@nandan.co.in"
@@ -28,7 +38,7 @@ export async function currentUser(): Promise<AuthedUser | null> {
   // the caller's own role from this lookup.
   const { data: profile } = await adminClient()
     .from("profiles")
-    .select("role, disabled, email")
+    .select("role, disabled, email, initials, display_name, erp_owner")
     .eq("id", user.id)
     .maybeSingle();
   const role = (profile?.role as Role) ?? "planner";
@@ -37,6 +47,9 @@ export async function currentUser(): Promise<AuthedUser | null> {
     email: (profile?.email || user.email || "").toLowerCase(),
     role,
     disabled: !!profile?.disabled,
+    initials: profile?.initials ?? null,
+    displayName: profile?.display_name ?? null,
+    erpOwner: profile?.erp_owner ?? null,
   };
 }
 
@@ -63,8 +76,12 @@ export async function requireRole(...roles: Role[]): Promise<AuthedUser> {
   return u;
 }
 
-/** planner or admin — the planning-layer write tier. */
-export const requirePlanner = () => requireRole("planner", "admin");
+/** May read the boards. */
+export const requireReader = () => requireRole(...READER_ROLES);
+/** May write the planning layer (plans, milestones, materials, priority). */
+export const requirePlanner = () => requireRole(...EDITOR_ROLES);
+/** May write tasks & comments — editors plus rank-and-file users. */
+export const requireTasker = () => requireRole(...TASKER_ROLES);
 /** admin only. */
 export const requireAdmin = () => requireRole("admin");
 /** uploader or admin — the upload door. */

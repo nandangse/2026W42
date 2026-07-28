@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePlanner, errJson } from "@/lib/auth";
+import { requireTasker, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 // GET  /api/comments?task_id=&task_kind= — list comments for a task.
 export async function POST(req: Request) {
   try {
-    const user = await requirePlanner();
+    const user = await requireTasker();
     const supabase = supabaseServer();
     const body = await req.json();
     if (!body.task_id || !body.body)
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   try {
-    await requirePlanner();
+    await requireTasker();
     const supabase = supabaseServer();
     const url = new URL(req.url);
     const taskId = url.searchParams.get("task_id");

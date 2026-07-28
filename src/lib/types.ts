@@ -2,7 +2,21 @@
 // The ERP-derived shapes mirror the V1.9 parser output verbatim so the ported
 // parseUpload module stays byte-compatible with the battle-tested logic.
 
-export type Role = "admin" | "planner" | "uploader";
+/**
+ * admin         — everything, plus the Admin page
+ * planner       — all boards and editing
+ * project_owner — all boards and editing; jobs are filtered by these people
+ * user          — reads the boards, works its own tasks (assign/close/comment)
+ * viewer        — read-only
+ * uploader      — the Morning Update page only
+ */
+export type Role =
+  | "admin"
+  | "planner"
+  | "project_owner"
+  | "user"
+  | "viewer"
+  | "uploader";
 
 /** A parsed job row exactly as V1.9's parseUpload emits it. */
 export interface ParsedJob {

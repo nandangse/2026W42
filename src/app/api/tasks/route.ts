@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePlanner, errJson } from "@/lib/auth";
+import { requireTasker, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 //   { action: "update", id, kind, title?, detail?, who?, due?, cat?, esc? }
 export async function POST(req: Request) {
   try {
-    const user = await requirePlanner();
+    const user = await requireTasker();
     const supabase = supabaseServer();
     const body = await req.json();
 
