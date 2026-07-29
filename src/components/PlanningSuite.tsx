@@ -377,7 +377,7 @@ export default function PlanningSuite({
         style={{ background: "#16232F", borderBottom: "3px solid #E8600A", position: "sticky", top: 0, zIndex: 45 }}
       >
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <div className="rounded bg-white px-2 py-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={LOGO} alt="Nandan GSE" style={{ height: 34 }} />
@@ -394,7 +394,7 @@ export default function PlanningSuite({
               </h1>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={(e) => onFile(e.target.files?.[0] || null)} />
             {isAdmin && (
               <button onClick={() => fileRef.current?.click()} className="text-xs rounded px-3 py-1.5 font-bold" style={{ background: "#E8600A", color: "#fff" }}>
@@ -438,19 +438,26 @@ export default function PlanningSuite({
                 Logout
               </button>
             </span>
-            <div className="flex gap-1 rounded p-1 flex-wrap" style={{ background: "#0D161F" }}>
-              {TAB_DEFS.map(([k, l]) => (
-                <button
-                  key={k}
-                  onClick={() => setTab(k)}
-                  className="px-3 py-1.5 rounded text-sm font-semibold"
-                  style={tab === k ? { background: "#E8600A", color: "#fff" } : { color: "#8FA1B3" }}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
           </div>
+        </div>
+
+        {/* Tabs always occupy their own row, at every width, so the header never
+            reflows between one and two lines. On narrow screens the row scrolls
+            sideways rather than wrapping, keeping the header height fixed. */}
+        <div
+          className="flex gap-1 rounded p-1 mt-2"
+          style={{ background: "#0D161F", overflowX: "auto", scrollbarWidth: "thin" }}
+        >
+          {TAB_DEFS.map(([k, l]) => (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className="px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap flex-shrink-0"
+              style={tab === k ? { background: "#E8600A", color: "#fff" } : { color: "#8FA1B3" }}
+            >
+              {l}
+            </button>
+          ))}
         </div>
         <div className="text-xs mt-1 flex gap-3 flex-wrap" style={{ color: "#3A4A5A" }}>
           <span>🔒 Restricted — visible only to authorised planning users</span>
