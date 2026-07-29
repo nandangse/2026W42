@@ -616,8 +616,20 @@ function MyWeek({
               {[...overdue, ...dueToday, ...laterThisWeek].map((t) => {
                 const job = board.jobs.find((j) => j.id === t.j);
                 return (
-                  <div key={t.id} onClick={() => setLightbox(t)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ ...dueStyle(t.due), borderColor: "rgba(0,0,0,0.08)" }}>
-                    <div className="text-xs font-semibold">{t.t}</div>
+                  <div key={t.id} onClick={() => setLightbox(t)} className="rounded p-2 mb-1.5 cursor-pointer border relative" style={{ ...dueStyle(t.due), borderColor: "rgba(0,0,0,0.08)" }}>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const warn = t.kind === "erp" ? "\n\n⚠ From the ERP ToDo list — the next upload will bring it back unless it is closed in the ERP." : "";
+                        if (!window.confirm(`Delete "${t.t}"?${warn}\n\nThis cannot be undone.`)) return;
+                        try { await api.post("/api/tasks", { action: "delete", id: t.id, kind: t.kind }); await reload(); }
+                        catch (err) { alert(err instanceof Error ? err.message : String(err)); }
+                      }}
+                      className="absolute rounded font-bold"
+                      style={{ top: 2, right: 3, width: 16, height: 16, lineHeight: "14px", fontSize: 11, background: "rgba(0,0,0,0.10)", color: "#B3261E" }}
+                      title="Delete this task"
+                    >✕</button>
+                    <div className="text-xs font-semibold" style={{ paddingRight: 16 }}>{t.t}</div>
                     <div className="flex items-center justify-between mt-1 text-xs" style={{ opacity: 0.85 }}>
                       <span className="font-bold">{job ? "JOB " + jobNo(t.j) : "—"}</span>
                       {t.esc && t.esc !== "None" && <span className="font-bold rounded px-1" style={{ background: "#B3261E", color: "#fff", fontSize: 9 }}>⚠ {t.esc.slice(0, 2)}</span>}
@@ -1572,6 +1584,14 @@ function JobPlan({
 
   // ---- tasks for this job (memoised above the guard — see jobTasks/jobCats) ----
   const submitTask = async () => { if (!form.t.trim()) return; await api.post("/api/tasks", { action: "create", job_id: dj.id, title: form.t.trim(), who: form.who, due: form.due, cat: form.cat, esc: form.esc }); setForm({ t: "", who: "", due: TODAY, cat: form.cat, esc: "None" }); setAddingTask(null); await reload(); };
+  const deleteJobTask = async (t: Task) => {
+    const warn = t.kind === "erp"
+      ? "\n\n⚠ From the ERP ToDo list — the next upload will bring it back unless it is closed in the ERP."
+      : "";
+    if (!window.confirm(`Delete "${t.t}"?${warn}\n\nThis cannot be undone.`)) return;
+    try { await api.post("/api/tasks", { action: "delete", id: t.id, kind: t.kind }); await reload(); }
+    catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+  };
 
   const matVal = dj.val * (1 - (dj.tpp || 0) / 100);
   const recvN = mats.filter((m) => m.status === "Received").length;
@@ -1831,7 +1851,7 @@ function JobPlan({
               {(jobCats.length ? jobCats : addingTask === dj.id ? [form.cat] : []).map((cat) => (
                 <div key={cat} className="rounded-lg p-2" style={{ background: "#E9E6DD", minWidth: 230, maxWidth: 260 }}>
                   <div className="text-xs font-bold px-1 pb-1.5 flex justify-between" style={{ color: "#16232F" }}><span>{cat.toUpperCase()}</span><span style={{ color: "#8A94A0" }}>{jobTasks.filter((t) => t.cat === cat && !t.done).length} open</span></div>
-                  {jobTasks.filter((t) => t.cat === cat).sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1)).map((t) => (<TaskCard key={t.id} onOpen={setLightbox} t={t} />))}
+                  {jobTasks.filter((t) => t.cat === cat).sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1)).map((t) => (<TaskCard key={t.id} onOpen={setLightbox} onDelete={deleteJobTask} t={t} />))}
                   {addingTask === dj.id && form.cat === cat && (<AddTaskForm owners={assignees(board)} form={form} setForm={setForm} onSubmit={submitTask} onCancel={() => setAddingTask(null)} />)}
                 </div>
               ))}
@@ -1866,12 +1886,22 @@ function JobPlan({
 }
 
 // task card used in the Job Plan kanban + Tasking board
-function TaskCard({ t, onOpen }: { t: Task; onOpen: (t: Task) => void }) {
+function TaskCard({ t, onOpen, onDelete }: { t: Task; onOpen: (t: Task) => void; onDelete?: (t: Task) => void }) {
   return (
-    <div onClick={() => onOpen(t)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ ...dueStyle(t.done ? null : t.due), borderColor: "rgba(0,0,0,0.08)", opacity: t.done ? 0.45 : 1 }}>
-      <div className="text-xs font-semibold" style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", textDecoration: t.done ? "line-through" : "none" }}>{t.t}</div>
+    <div onClick={() => onOpen(t)} className="rounded p-2 mb-1.5 cursor-pointer border relative group" style={{ ...dueStyle(t.done ? null : t.due), borderColor: "rgba(0,0,0,0.08)", opacity: t.done ? 0.45 : 1 }}>
+      {onDelete && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(t); }}
+          className="absolute rounded font-bold"
+          style={{ top: 2, right: 3, width: 16, height: 16, lineHeight: "14px", fontSize: 11, background: "rgba(0,0,0,0.10)", color: "#B3261E" }}
+          title="Delete this task"
+        >
+          ✕
+        </button>
+      )}
+      <div className="text-xs font-semibold" style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", textDecoration: t.done ? "line-through" : "none", paddingRight: onDelete ? 16 : 0 }}>{t.t}</div>
       <div className="flex items-center justify-between mt-1 text-xs" style={{ opacity: 0.85 }}>
-        <span className="font-bold rounded px-1" style={{ background: "rgba(0,0,0,0.12)" }}>{initials(t.who)}</span>
+        <span className="font-bold rounded px-1" style={{ background: "rgba(0,0,0,0.12)" }}>{t.who ? (t.who.length <= 3 ? t.who.toUpperCase() : initials(t.who)) : "—"}</span>
         {t.esc && t.esc !== "None" && (<span className="font-bold rounded px-1" style={{ background: "#B3261E", color: "#fff", fontSize: 9 }}>⚠ {t.esc.slice(0, 2)}</span>)}
         <span style={{ fontSize: 10 }}>{(t.cat || "").toLowerCase()}</span>
         <span className="tnum">{fmt(t.due)}</span>
@@ -1942,6 +1972,14 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
     setAdding(null);
     await reload();
   };
+  const deleteTask = async (t: Task) => {
+    const warn = t.kind === "erp"
+      ? "\n\n⚠ From the ERP ToDo list — the next upload will bring it back unless it is closed in the ERP."
+      : "";
+    if (!window.confirm(`Delete "${t.t}"?${warn}\n\nThis cannot be undone.`)) return;
+    try { await api.post("/api/tasks", { action: "delete", id: t.id, kind: t.kind }); await reload(); }
+    catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+  };
 
   return (
     <div className="p-4">
@@ -2000,7 +2038,7 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
                       <div className="text-xs flex justify-between mt-0.5" style={{ color: "#5A6672" }}><span>from the job plan</span><span className="tnum">{fmt(nx.end)}</span></div>
                     </div>
                   )}
-                  {jt.map((t) => (<div key={t.id} style={{ width: 210 }}><TaskCard onOpen={setLightbox} t={t} /></div>))}
+                  {jt.map((t) => (<div key={t.id} style={{ width: 210 }}><TaskCard onOpen={setLightbox} onDelete={deleteTask} t={t} /></div>))}
                   {adding === j.id ? (
                     <div style={{ width: 240 }}><AddTaskForm form={form} setForm={setForm} owners={assignees(board)} onSubmit={() => submit(j.id)} onCancel={() => setAdding(null)} /></div>
                   ) : (
@@ -2144,6 +2182,20 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload }: { task: Tas
     await reload();
     onClose();
   };
+  const remove = async () => {
+    const warn =
+      task.kind === "erp"
+        ? "\n\n⚠ This task came from the ERP ToDo list. Deleting it here removes it now, but the next ToDo upload will bring it back unless it is also closed in the ERP."
+        : "";
+    if (!window.confirm(`Delete this task?\n\n"${task.t}"${warn}\n\nIts comments are deleted too. This cannot be undone.`)) return;
+    try {
+      await api.post("/api/tasks", { action: "delete", id: task.id, kind: task.kind });
+      await reload();
+      onClose();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  };
   return (
     <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)", zIndex: 60 }}>
       <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg p-4 w-full max-w-md" style={{ maxHeight: "80vh", overflow: "auto" }}>
@@ -2195,6 +2247,7 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload }: { task: Tas
               <span>{initials(task.who)}</span><span>{task.cat}</span><span className="tnum">{fmt(task.due)}</span>
               <button onClick={() => setEditing(true)} className="ml-auto rounded px-2 py-1 font-bold" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>✎ Edit</button>
               <button onClick={onToggle} className="rounded px-2 py-1 font-bold" style={{ background: task.done ? "#E7E4DC" : "#0D7A3F", color: task.done ? "#5A6672" : "#fff" }}>{task.done ? "Reopen" : "✓ Done"}</button>
+              <button onClick={remove} className="rounded px-2 py-1 font-bold" style={{ background: "#FBEDEA", color: "#B3261E" }} title="Delete this task">🗑</button>
             </div>
           </>
         )}

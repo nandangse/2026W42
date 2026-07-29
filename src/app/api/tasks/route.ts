@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireTasker, errJson } from "@/lib/auth";
+import { requireTasker, errJson, EDITOR_ROLES } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 //   { action: "create", job_id, title, detail?, who?, due?, cat?, esc? }
 //   { action: "toggle", id, kind: "erp"|"manual", done }
 //   { action: "update", id, kind, title?, detail?, who?, due?, cat?, esc? }
+//   { action: "delete", id, kind }  — removes the task and its comments
 export async function POST(req: Request) {
   try {
     const user = await requireTasker();
@@ -60,6 +61,53 @@ export async function POST(req: Request) {
       const { error } = await supabase.from(table).update(patch).eq("id", body.id);
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true });
+    }
+
+    if (body.action === "delete") {
+      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+      const manual = body.kind === "manual";
+      const table = manual ? "manual_tasks" : "erp_tasks";
+
+      // A plain "user" may only remove their own work; editors may remove any.
+      if (!EDITOR_ROLES.includes(user.role)) {
+        const { data: t } = await supabase
+          .from(table)
+          .select(manual ? "who, created_by" : "who")
+          .eq("id", body.id)
+          .maybeSingle();
+        const mine =
+          t &&
+          [(t as any).who, (t as any).created_by]
+            .filter(Boolean)
+            .some(
+              (v: string) =>
+                v.toLowerCase() === user.email.toLowerCase() ||
+                (!!user.initials && v.toUpperCase() === user.initials),
+            );
+        if (!mine)
+          return NextResponse.json(
+            { error: "You can only delete tasks assigned to you or created by you" },
+            { status: 403 },
+          );
+      }
+
+      // comments are polymorphic (no FK), so clear them explicitly
+      const { error: ce } = await supabase
+        .from("task_comments")
+        .delete()
+        .eq("task_id", body.id)
+        .eq("task_kind", manual ? "manual" : "erp");
+      if (ce) throw new Error(ce.message);
+
+      const { error } = await supabase.from(table).delete().eq("id", body.id);
+      if (error) throw new Error(error.message);
+
+      // An ERP task is re-created by the next ToDo upload while it still exists
+      // in the ERP — say so rather than letting it silently reappear.
+      return NextResponse.json({
+        ok: true,
+        willReturn: !manual,
+      });
     }
 
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
