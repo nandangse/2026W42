@@ -72,13 +72,20 @@ function myHandles(me: { initials: string | null; displayName: string | null; er
 }
 
 /**
- * Assignee keys for the task pickers: everyone's initials (the assignment key),
- * falling back to the raw Jobmaster owner strings when initials aren't set up.
+ * People a task can be assigned to — ONLY real accounts, never raw Jobmaster
+ * text. Users first (the people Project Owners hand work to), then the Project
+ * Owners themselves. The initials are the stored value; the label is readable.
  */
-function assignees(board: Board): string[] {
-  const withInitials = (board.people || []).filter((p) => p.initials && p.role !== "uploader");
-  if (withInitials.length) return withInitials.map((p) => p.initials!).sort();
-  return board.owners || [];
+function assignees(board: Board): { value: string; label: string; group: string }[] {
+  const list = (board.assignableUsers || []).filter((p) => p.initials);
+  const rank = (r: string) => (r === "user" ? 0 : 1);
+  return [...list]
+    .sort((a, b) => rank(a.role) - rank(b.role) || (a.initials! < b.initials! ? -1 : 1))
+    .map((p) => ({
+      value: p.initials!,
+      label: `${p.initials} · ${p.name || p.email.split("@")[0]}`,
+      group: p.role === "user" ? "Users" : "Project Owners",
+    }));
 }
 
 /** Date+time stamp for "last updated". */
@@ -111,6 +118,8 @@ interface Job {
   active: boolean;
   archived: boolean;
   updated_at: string | null;
+  ownerInitials: string | null;
+  ownerName: string | null;
 }
 interface Task {
   id: string;
@@ -138,6 +147,8 @@ interface Board {
   owners: string[];
   people: Person[];
   projectOwners: Person[];
+  assignableUsers: Person[];
+  unlinkedOwners: string[];
   lastUpdated: string | null;
   batches: Record<string, { uploaded_at: string; filename: string } | undefined>;
   aggregates: { kittingPct: number; materialValueSum: number; kittedValueSum: number; activeJobCount: number };
@@ -518,10 +529,10 @@ function MyWeek({
   const dueToday = myTasks.filter((t) => t.due === TODAY);
   const laterThisWeek = myTasks.filter((t) => !t.due || t.due > TODAY);
 
-  // jobs I own (matched on the ERP owner string or my initials)
+  // jobs I own — matched on the resolved Project Owner account
   const myJobs = useMemo(
-    () => board.jobs.filter((j) => handles.has(String(j.own || "").toLowerCase())),
-    [board.jobs, handles],
+    () => board.jobs.filter((j) => j.ownerInitials && j.ownerInitials === me.initials),
+    [board.jobs, me.initials],
   );
 
   // delivery expected in the next seven days — shop-wide
@@ -700,7 +711,7 @@ function MyWeek({
         </div>
       </div>
 
-      {lightbox && <TaskModal task={lightbox} owners={board.people.map((p) => p.initials || p.email).filter(Boolean) as string[]} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
     </div>
   );
 }
@@ -742,21 +753,21 @@ function DeliveryBoard({
   const allJobs = board.jobs;
   const prio = board.priority; // array or null
 
-  // Only Project Owners are offered as the job filter. Fall back to the raw
-  // owner strings from the Jobmaster if no POs have been set up yet.
-  const ownerOptions = useMemo(() => {
-    const pos = board.projectOwners || [];
-    if (pos.length)
-      return pos.map((p) => ({ value: p.erpOwner || p.initials || p.email, label: personLabel(p) }));
-    return (board.owners || []).map((o) => ({ value: o, label: o }));
-  }, [board.projectOwners, board.owners]);
+  // Only Project Owner ACCOUNTS are offered — never raw Jobmaster text. Jobs
+  // carry a resolved ownerInitials (see resolveOwners on the server), so the
+  // filter matches on that.
+  const ownerOptions = useMemo(
+    () => (board.projectOwners || []).map((p) => ({ value: p.initials!, label: personLabel(p) })),
+    [board.projectOwners],
+  );
 
   // Owner + search are applied ONCE here so every sub-view (priority list,
   // kanban, calendar, by-product, by-customer) and the KPI cards all honour them.
   const jobs = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return allJobs.filter((j) => {
-      if (delOwn !== "all" && String(j.own || "").toLowerCase() !== delOwn.toLowerCase()) return false;
+      if (delOwn === "none" && j.ownerInitials) return false;
+      if (delOwn !== "all" && delOwn !== "none" && j.ownerInitials !== delOwn) return false;
       if (!needle) return true;
       return (
         j.id.includes(needle) ||
@@ -804,13 +815,17 @@ function DeliveryBoard({
     else { setSortKey(k); setSortDir(1); }
   };
 
-  // Kanban columns come from the owners actually present on the filtered jobs,
-  // so a column never renders empty.
+  // Kanban columns are Project Owner accounts present on the filtered jobs,
+  // plus one Unassigned column for jobs whose ERP owner matches no account.
   const kanbanOwners = useMemo(() => {
-    const set = new Set(jobs.map((j) => (j.own || "").trim()).filter(Boolean));
+    const set = new Set(jobs.map((j) => j.ownerInitials).filter(Boolean) as string[]);
     const list = [...set].sort();
-    return jobs.some((j) => !j.own) ? [...list, "Unassigned"] : list;
+    return jobs.some((j) => !j.ownerInitials) ? [...list, "Unassigned"] : list;
   }, [jobs]);
+  const ownerLabel = (init: string) =>
+    init === "Unassigned"
+      ? "Unassigned"
+      : ownerOptions.find((o) => o.value === init)?.label || init;
   /** Sortable <th>. */
   const SortTh = ({ k, label, align = "left" }: { k: string; label: string; align?: "left" | "center" | "right" }) => (
     <th
@@ -891,6 +906,8 @@ function DeliveryBoard({
         <select value={delOwn} onChange={(e) => setDelOwn(e.target.value)} className="px-2 py-1 rounded border text-sm ml-1 font-semibold" style={{ borderColor: delOwn === "all" ? "#D9D6CD" : "#E8600A", background: delOwn === "all" ? "#fff" : "#FFF3E8", color: delOwn === "all" ? "#22303C" : "#E8600A" }} title="Filter every view on this board by Project Owner">
           <option value="all">All project owners</option>
           {ownerOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+          {ownerOptions.length === 0 && <option disabled>No Project Owner accounts yet</option>}
+          <option value="none">— Unassigned jobs —</option>
         </select>
         <div className="relative">
           <input
@@ -1060,7 +1077,11 @@ function DeliveryBoard({
                     <td className="px-2 py-1.5" style={{ color: "#5A6672" }}>{j.fam}</td>
                     <td className="px-2 py-1.5 text-center font-bold whitespace-nowrap tnum" style={{ color: j.tdd && j.tdd < TODAY ? "#B3261E" : "#22303C" }}>{fmtFull(j.tdd)}</td>
                     <td className="px-2 py-1.5 text-center font-bold whitespace-nowrap tnum" style={{ color: otdColor(j.otd) }}>{fmtFull(j.otd)}{otdDelay(j) && (<div style={{ fontSize: 10 }}>+{otdDelay(j)}d late</div>)}</td>
-                    <td className="px-2 py-1.5" style={{ color: "#1B3A5C" }}>{j.own || "—"}</td>
+                    <td className="px-2 py-1.5" style={{ color: j.ownerInitials ? "#1B3A5C" : "#B8B5AC" }} title={j.own ? `Jobmaster: ${j.own}` : "No owner in the Jobmaster"}>
+                      {j.ownerInitials ? (
+                        <><span className="font-bold rounded px-1 mr-1" style={{ background: "#DCE8F5" }}>{j.ownerInitials}</span>{j.ownerName}</>
+                      ) : (j.own || "—")}
+                    </td>
                     <td className="px-2 py-1.5">
                       <select value={j.stat} onChange={(e) => editStat(j, e.target.value)} className="text-xs border rounded px-1 py-0.5 bg-white w-full" style={{ borderColor: "#E2E0DA", maxWidth: 190 }}>
                         {!STATUSES.includes(j.stat) && j.stat && <option value={j.stat}>{j.stat}</option>}
@@ -1089,13 +1110,13 @@ function DeliveryBoard({
       {subTab === "okan" && (
         <div className="flex gap-3 overflow-x-auto pb-2 items-start">
           {(delOwn === "all" ? kanbanOwners : [delOwn]).map((o) => {
-            const ojobs = byTDD.filter((j) => (o === "Unassigned" ? !j.own : j.own === o));
+            const ojobs = byTDD.filter((j) => (o === "Unassigned" ? !j.ownerInitials : j.ownerInitials === o));
             if (!ojobs.length) return null;
             return (
               <div key={o} style={{ minWidth: 250, maxWidth: 270 }}>
                 <div className="rounded-t-lg p-2" style={{ background: "#16232F", color: "#fff", borderBottom: "3px solid #E8600A" }}>
                   <div className="flex justify-between items-baseline">
-                    <span className="font-bold text-sm" style={{ color: "#F5B32B" }}>{o}</span>
+                    <span className="font-bold text-sm" style={{ color: "#F5B32B" }}>{ownerLabel(o)}</span>
                     <span className="text-xs">{ojobs.length} jobs · {V(ojobs.reduce((s, j) => s + j.val, 0))}</span>
                   </div>
                 </div>
@@ -1897,7 +1918,7 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
   const taskingJobs = useMemo(() => {
     const withTasks = taskAll ? board.jobs : board.jobs.filter((j) => tasksByJob.has(j.id));
     return withTasks
-      .filter((j) => (filterCust === "all" || j.cust === filterCust) && (filterFam === "all" || j.fam === filterFam) && (filterOwn === "all" || j.own === filterOwn))
+      .filter((j) => (filterCust === "all" || j.cust === filterCust) && (filterFam === "all" || j.fam === filterFam) && (filterOwn === "all" || j.ownerInitials === filterOwn))
       .sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1));
   }, [board.jobs, tasksByJob, filterCust, filterFam, filterOwn, taskAll]);
 
@@ -1928,8 +1949,9 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
         <select value={filterCust} onChange={(e) => setFilterCust(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm" style={{ borderColor: "#D9D6CD", maxWidth: 240 }}>
           <option value="all">All customers</option>{custs.map((c) => (<option key={c}>{c}</option>))}
         </select>
-        <select value={filterOwn} onChange={(e) => setFilterOwn(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm" style={{ borderColor: "#D9D6CD" }}>
-          <option value="all">All job owners</option>{owners.map((o) => (<option key={o}>{o}</option>))}
+        <select value={filterOwn} onChange={(e) => setFilterOwn(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm" style={{ borderColor: "#D9D6CD" }} title="Filter by the job's Project Owner">
+          <option value="all">All project owners</option>
+          {(board.projectOwners || []).map((p) => (<option key={p.initials!} value={p.initials!}>{personLabel(p)}</option>))}
         </select>
         <select value={filterFam} onChange={(e) => setFilterFam(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm" style={{ borderColor: "#D9D6CD" }}>
           <option value="all">All products</option>{fams.map((f) => (<option key={f}>{f}</option>))}
@@ -2047,14 +2069,37 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
   );
 }
 
-function AddTaskForm({ form, setForm, owners, onSubmit, onCancel }: { form: any; setForm: (f: any) => void; owners: string[]; onSubmit: () => void; onCancel: () => void }) {
+type Assignee = { value: string; label: string; group: string };
+
+/** <option>s grouped by Users / Project Owners, plus the current value if it's
+ *  an orphan (e.g. legacy ERP text on an imported task). */
+function AssigneeOptions({ owners, current }: { owners: Assignee[]; current?: string }) {
+  const groups = ["Users", "Project Owners"];
+  const orphan = current && !owners.some((o) => o.value === current);
+  return (
+    <>
+      {orphan && <option value={current}>{current} (not a user)</option>}
+      {groups.map((g) => {
+        const items = owners.filter((o) => o.group === g);
+        if (!items.length) return null;
+        return (
+          <optgroup key={g} label={g}>
+            {items.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+          </optgroup>
+        );
+      })}
+    </>
+  );
+}
+
+function AddTaskForm({ form, setForm, owners, onSubmit, onCancel }: { form: any; setForm: (f: any) => void; owners: Assignee[]; onSubmit: () => void; onCancel: () => void }) {
   return (
     <div className="rounded border p-2 mt-1 bg-white" style={{ borderColor: "#E8600A" }}>
       <input autoFocus placeholder="Task…" value={form.t} onChange={(e) => setForm({ ...form, t: e.target.value })} className="w-full text-xs border rounded px-1 py-1 mb-1" style={{ borderColor: "#E2E0DA" }} />
       <div className="flex gap-1 mb-1">
-        <select value={form.who} onChange={(e) => setForm({ ...form, who: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }} title="Assign by initials">
+        <select value={form.who} onChange={(e) => setForm({ ...form, who: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }} title="Assign to a user — the list comes from created accounts">
           <option value="">Who?</option>
-          {owners.map((o) => (<option key={o} value={o}>{o}</option>))}
+          <AssigneeOptions owners={owners} current={form.who} />
         </select>
         <input type="date" value={form.due} onChange={(e) => setForm({ ...form, due: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1" style={{ borderColor: "#E2E0DA" }} />
       </div>
@@ -2075,7 +2120,7 @@ function AddTaskForm({ form, setForm, owners, onSubmit, onCancel }: { form: any;
   );
 }
 
-function TaskModal({ task, owners = [], onClose, onToggle, reload }: { task: Task; owners?: string[]; onClose: () => void; onToggle: () => void; reload: () => Promise<Board | null> }) {
+function TaskModal({ task, owners = [], onClose, onToggle, reload }: { task: Task; owners?: Assignee[]; onClose: () => void; onToggle: () => void; reload: () => Promise<Board | null> }) {
   const [comments, setComments] = useState<{ by: string; at: string; body: string }[]>([]);
   const [cmt, setCmt] = useState("");
   const [editing, setEditing] = useState(false);
@@ -2120,10 +2165,9 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload }: { task: Tas
           <div className="mt-2 space-y-1.5">
             <textarea value={ef.d} onChange={(e) => setEf({ ...ef, d: e.target.value })} placeholder="Details…" rows={2} className="w-full text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
             <div className="flex gap-1">
-              <select value={ef.who} onChange={(e) => setEf({ ...ef, who: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
+              <select value={ef.who} onChange={(e) => setEf({ ...ef, who: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }} title="Assign to a user — the list comes from created accounts">
                 <option value="">Who?</option>
-                {!owners.includes(ef.who) && ef.who && <option value={ef.who}>{ef.who}</option>}
-                {owners.map((o) => (<option key={o} value={o}>{initials(o)} — {o}</option>))}
+                <AssigneeOptions owners={owners} current={ef.who} />
               </select>
               <input type="date" value={ef.due} onChange={(e) => setEf({ ...ef, due: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1" style={{ borderColor: "#E2E0DA" }} />
             </div>
@@ -2388,8 +2432,25 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
         </table>
         </div>
         <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>
-          Initials and names save when you click away from the field. <b>ERP owner name</b> must match the Project Owner text in the Jobmaster export — that is what links a login to its jobs on the boards and the My Week page. Only <b>Project Owners</b> appear in the Delivery board&apos;s owner filter.
+          Initials and names save when you click away from the field. Jobs are filtered by <b>Project Owners</b>; tasks are assigned to <b>Users</b> — both lists come only from accounts created here, never from raw spreadsheet text.
         </div>
+
+        {/* the bridge between Jobmaster text and accounts */}
+        {(board.unlinkedOwners || []).length > 0 && (
+          <div className="mt-3 rounded p-2" style={{ background: "#FFF7E6", border: "1px solid #F5B32B" }}>
+            <div className="text-xs font-bold mb-1" style={{ color: "#8A5B00" }}>
+              ⚠ {board.unlinkedOwners.length} owner name{board.unlinkedOwners.length === 1 ? "" : "s"} in the Jobmaster match no account
+            </div>
+            <div className="flex gap-1 flex-wrap mb-1">
+              {board.unlinkedOwners.map((o) => (
+                <span key={o} className="rounded px-1.5 py-0.5 text-xs font-semibold" style={{ background: "#fff", border: "1px solid #E2E0DA" }}>{o}</span>
+              ))}
+            </div>
+            <div className="text-xs" style={{ color: "#8A5B00" }}>
+              Their jobs show as <b>Unassigned</b>. To link them, create a <b>Project Owner</b> account above and paste the exact name into its <b>ERP owner name</b> field.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ---- family milestone templates ---- */}

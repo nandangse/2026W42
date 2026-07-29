@@ -25,6 +25,9 @@ export interface BoardJob {
   active: boolean;
   archived: boolean;
   updated_at: string | null;
+  /** Resolved Project Owner account, if the ERP owner text matches one. */
+  ownerInitials: string | null;
+  ownerName: string | null;
 }
 
 /** A person who can own jobs or be assigned tasks. */
@@ -60,7 +63,38 @@ function mapJob(r: any): BoardJob {
     active: !!r.active,
     archived: !r.active,
     updated_at: r.updated_at ?? null,
+    ownerInitials: null, // filled in by resolveOwners() once people are loaded
+    ownerName: null,
   };
+}
+
+/**
+ * Link each job's ERP "Project Owner" text to a real Project Owner account.
+ * Every people-picker in the app is driven by accounts, so this is the single
+ * bridge between the Jobmaster's free text and the user list. A job whose owner
+ * text matches nobody stays unresolved and shows as Unassigned.
+ */
+function resolveOwners(jobs: BoardJob[], people: Person[]): string[] {
+  const byKey = new Map<string, Person>();
+  for (const p of people) {
+    for (const k of [p.erpOwner, p.initials, p.name, p.email, p.email.split("@")[0]]) {
+      const key = String(k ?? "").trim().toLowerCase();
+      if (key && !byKey.has(key)) byKey.set(key, p);
+    }
+  }
+  const unmatched = new Set<string>();
+  for (const j of jobs) {
+    const raw = String(j.own || "").trim();
+    if (!raw) continue;
+    const hit = byKey.get(raw.toLowerCase());
+    if (hit) {
+      j.ownerInitials = hit.initials;
+      j.ownerName = hit.name || hit.email.split("@")[0];
+    } else {
+      unmatched.add(raw);
+    }
+  }
+  return [...unmatched].sort();
 }
 
 export async function buildBoard(supabase: SupabaseClient) {
@@ -124,10 +158,17 @@ export async function buildBoard(supabase: SupabaseClient) {
     name: p.display_name ?? null,
     erpOwner: p.erp_owner ?? null,
   }));
-  // only Project Owners are offered as the job-owner filter
-  const projectOwners = people.filter((p) => p.role === "project_owner");
+  // Jobs are filtered by Project Owners; tasks are assigned to Users. Both
+  // lists come only from real accounts — never from raw ERP text.
+  const projectOwners = people.filter((p) => p.role === "project_owner" && p.initials);
+  const assignableUsers = people.filter(
+    (p) => (p.role === "user" || p.role === "project_owner") && p.initials,
+  );
 
   const allJobs = (jobsRes.data || []).map(mapJob);
+  // ERP owner text → Project Owner account. Returns the names that matched
+  // nobody, which Admin surfaces so they can be linked.
+  const unlinkedOwners = resolveOwners(allJobs, people);
   const activeJobs = allJobs.filter((j) => j.active);
 
   // plans keyed by job_id (+ milestones grouped, reshaped to the UI plan object)
@@ -272,6 +313,8 @@ export async function buildBoard(supabase: SupabaseClient) {
     owners,
     people,
     projectOwners,
+    assignableUsers,
+    unlinkedOwners,
     // newest job change across the board — the header "last updated" stamp
     lastUpdated:
       allJobs.reduce<string | null>(
