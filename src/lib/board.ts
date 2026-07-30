@@ -158,12 +158,11 @@ export async function buildBoard(supabase: SupabaseClient) {
     name: p.display_name ?? null,
     erpOwner: p.erp_owner ?? null,
   }));
-  // Jobs are filtered by Project Owners; tasks are assigned to Users. Both
-  // lists come only from real accounts — never from raw ERP text.
+  // Jobs are filtered by Project Owners only. Tasks, by contrast, can be
+  // assigned to ANY account that exists — whatever their role. Both lists come
+  // only from real accounts, never from raw ERP text.
   const projectOwners = people.filter((p) => p.role === "project_owner" && p.initials);
-  const assignableUsers = people.filter(
-    (p) => (p.role === "user" || p.role === "project_owner") && p.initials,
-  );
+  const assignableUsers = people;
 
   const allJobs = (jobsRes.data || []).map(mapJob);
   // ERP owner text → Project Owner account. Returns the names that matched

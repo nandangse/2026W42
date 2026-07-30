@@ -72,20 +72,39 @@ function myHandles(me: { initials: string | null; displayName: string | null; er
 }
 
 /**
- * People a task can be assigned to — ONLY real accounts, never raw Jobmaster
- * text. Users first (the people Project Owners hand work to), then the Project
- * Owners themselves. The initials are the stored value; the label is readable.
+ * People a task can be assigned to: EVERY account that exists, whatever its
+ * role — never raw Jobmaster text. (Job ownership is separate and restricted to
+ * Project Owners.) Initials are the stored value; accounts without initials yet
+ * fall back to their email handle so a new user is still assignable.
  */
+const ROLE_GROUP: Record<string, string> = {
+  user: "Users",
+  project_owner: "Project Owners",
+  planner: "Planners",
+  admin: "Admins",
+  viewer: "Viewers",
+  uploader: "Uploaders",
+};
+const GROUP_ORDER = ["Users", "Project Owners", "Planners", "Admins", "Viewers", "Uploaders"];
+
 function assignees(board: Board): { value: string; label: string; group: string }[] {
-  const list = (board.assignableUsers || []).filter((p) => p.initials);
-  const rank = (r: string) => (r === "user" ? 0 : 1);
-  return [...list]
-    .sort((a, b) => rank(a.role) - rank(b.role) || (a.initials! < b.initials! ? -1 : 1))
-    .map((p) => ({
-      value: p.initials!,
-      label: `${p.initials} · ${p.name || p.email.split("@")[0]}`,
-      group: p.role === "user" ? "Users" : "Project Owners",
-    }));
+  return (board.assignableUsers || [])
+    .map((p) => {
+      const handle = p.initials || p.email.split("@")[0];
+      const name = p.name || p.email.split("@")[0];
+      return {
+        value: handle,
+        label: p.initials ? `${p.initials} · ${name}` : `${name} (no initials)`,
+        group: ROLE_GROUP[p.role] || "Others",
+        _sort: (p.initials || name).toLowerCase(),
+      };
+    })
+    .sort(
+      (a, b) =>
+        GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group) ||
+        (a._sort < b._sort ? -1 : 1),
+    )
+    .map(({ _sort, ...rest }) => rest);
 }
 
 /** Date+time stamp for "last updated". */
@@ -2119,8 +2138,9 @@ type Assignee = { value: string; label: string; group: string };
 /** <option>s grouped by Users / Project Owners, plus the current value if it's
  *  an orphan (e.g. legacy ERP text on an imported task). */
 function AssigneeOptions({ owners, current }: { owners: Assignee[]; current?: string }) {
-  const groups = ["Users", "Project Owners"];
   const orphan = current && !owners.some((o) => o.value === current);
+  // keep the declared order, but never drop a group we don't know about
+  const groups = [...new Set([...GROUP_ORDER, ...owners.map((o) => o.group)])];
   return (
     <>
       {orphan && <option value={current}>{current} (not a user)</option>}
