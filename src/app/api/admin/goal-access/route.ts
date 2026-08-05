@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin, errJson } from "@/lib/auth";
+import { requireAdmin, errJson, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export type AccessLevel = "none" | "view" | "edit";
 // deciding what to grant).
 export async function GET() {
   try {
-    await requireAdmin();
+    const caller = await requireAdmin();
     const admin = adminClient();
 
     const [people, grants, owned] = await Promise.all([
@@ -30,10 +30,12 @@ export async function GET() {
       ownCount.set(o.person_id, (ownCount.get(o.person_id) || 0) + 1);
 
     const users = (people.data || []).map((p) => {
-      const isAdmin = p.role === "admin";
+      const isOwner = String(p.email || "").toLowerCase() === RAGHU_EMAIL;
       const g = grantBy.get(p.id);
-      // admins always reach the tree — has_goals_access() short-circuits on role
-      const level: AccessLevel = isAdmin ? "edit" : g === undefined ? "none" : g ? "edit" : "view";
+      // Only the OWNER has implicit access now; every other account, admins
+      // included, needs an explicit grant — that is what lets the owner
+      // govern admin access at all.
+      const level: AccessLevel = isOwner ? "edit" : g === undefined ? "none" : g ? "edit" : "view";
       return {
         id: p.id,
         email: p.email,
@@ -42,12 +44,15 @@ export async function GET() {
         role: p.role,
         disabled: p.disabled,
         level,
-        implicit: isAdmin, // granted by being an admin, not by a row
+        implicit: isOwner,
+        isOwner,
+        // an admin's access is the owner's call; everyone else any admin may set
+        locked: isOwner || (p.role === "admin" && !caller.isOwner),
         ownsNodes: ownCount.get(p.id) || 0,
       };
     });
 
-    return NextResponse.json({ users });
+    return NextResponse.json({ users, callerIsOwner: caller.isOwner });
   } catch (e) {
     return errJson(e);
   }
@@ -56,17 +61,22 @@ export async function GET() {
 // POST /api/admin/goal-access — { person_id, level: "none" | "view" | "edit" }
 export async function POST(req: Request) {
   try {
-    await requireAdmin();
+    const caller = await requireAdmin();
     const admin = adminClient();
     const { person_id, level } = await req.json();
     if (!person_id || !["none", "view", "edit"].includes(level))
       return NextResponse.json({ error: "person_id and a valid level required" }, { status: 400 });
 
-    const { data: who } = await admin.from("profiles").select("role").eq("id", person_id).maybeSingle();
-    if (who?.role === "admin")
+    const { data: who } = await admin.from("profiles").select("role, email").eq("id", person_id).maybeSingle();
+    if (String(who?.email || "").toLowerCase() === RAGHU_EMAIL)
       return NextResponse.json(
-        { error: "Admins always have goals access. Change their role first if you need to remove it." },
+        { error: "The owner always has full goals access." },
         { status: 400 },
+      );
+    if (who?.role === "admin" && !caller.isOwner)
+      return NextResponse.json(
+        { error: `Only ${RAGHU_EMAIL} may change another admin's goals access.` },
+        { status: 403 },
       );
 
     if (level === "none") {

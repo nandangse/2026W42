@@ -14,6 +14,8 @@ export interface AuthedUser {
   initials: string | null;
   displayName: string | null;
   erpOwner: string | null;
+  /** The single account above the admin tier — governs the other admins. */
+  isOwner: boolean;
 }
 
 /** Tiers, mirroring the SQL helpers in migration 0008. */
@@ -42,15 +44,24 @@ export async function currentUser(): Promise<AuthedUser | null> {
     .eq("id", user.id)
     .maybeSingle();
   const role = (profile?.role as Role) ?? "planner";
+  const email = (profile?.email || user.email || "").toLowerCase();
   return {
     id: user.id,
-    email: (profile?.email || user.email || "").toLowerCase(),
+    email,
     role,
     disabled: !!profile?.disabled,
     initials: profile?.initials ?? null,
     displayName: profile?.display_name ?? null,
     erpOwner: profile?.erp_owner ?? null,
+    isOwner: email === RAGHU_EMAIL,
   };
+}
+
+/** Require the owner account. */
+export async function requireOwner(): Promise<AuthedUser> {
+  const u = await requireUser();
+  if (!u.isOwner) throw new HttpError(403, `Only ${RAGHU_EMAIL} may do this`);
+  return u;
 }
 
 export class HttpError extends Error {

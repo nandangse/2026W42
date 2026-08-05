@@ -205,6 +205,9 @@ interface ErpLogEntry {
 
 const erpJobLink = (id: string) => "https://nandanerp.in/app/jobmaster/" + id;
 
+/** The single account above the admin tier. Mirrors RAGHU_EMAIL on the server. */
+const OWNER_EMAIL = "raghu@nandan.co.in";
+
 // Default milestone plan for a product family: admin-saved DB templates first
 // (exact name, then partial match), then the "Default" template, then the
 // built-in V1.9 fallback. This is what makes admin-added products work.
@@ -498,7 +501,7 @@ export default function PlanningSuite({
       {tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} pushERP={pushERP} />}
       {tab === "tasking" && <Tasking board={board} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} />}
       {tab === "erp" && <UpdateToErp erpLog={erpLog} />}
-      {tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} />}
+      {tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} isOwner={isRaghu} />}
     </div>
   );
 }
@@ -2386,7 +2389,10 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
 }
 
 // ============================ Admin ============================
-function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () => Promise<Board | null>; users: AdminUser[] | null; loadUsers: () => Promise<void> }) {
+function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; reload: () => Promise<Board | null>; users: AdminUser[] | null; loadUsers: () => Promise<void>; isOwner: boolean }) {
+  /** Who this admin may act on: never the owner, and other admins only if owner. */
+  const mayManage = (u: AdminUser) =>
+    u.email.toLowerCase() !== OWNER_EMAIL && (isOwner || u.role !== "admin");
   // ---- user management (list state lives in the parent so the tab doesn't flicker) ----
   const [uForm, setUForm] = useState({ email: "", pw: "", role: "planner", name: "", initials: "" });
   const [uMsg, setUMsg] = useState("");
@@ -2437,7 +2443,7 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
   type GoalAccessRow = {
     id: string; email: string; initials: string | null; name: string | null;
     role: string; disabled: boolean; level: "none" | "view" | "edit";
-    implicit: boolean; ownsNodes: number;
+    implicit: boolean; isOwner: boolean; locked: boolean; ownsNodes: number;
   };
   const [gaRows, setGaRows] = useState<GoalAccessRow[] | null>(null);
   const [gaMsg, setGaMsg] = useState("");
@@ -2558,7 +2564,14 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
                     style={{ borderColor: "#E2E0DA" }}
                   />
                 </td>
-                <td className="py-1.5">{u.email}</td>
+                <td className="py-1.5">
+                  {u.email}
+                  {u.email.toLowerCase() === OWNER_EMAIL && (
+                    <span className="ml-1 rounded px-1 font-bold" style={{ background: "#FFF3E8", color: "#E8600A", fontSize: 9 }} title="Owner — governs the other admins and cannot be demoted, disabled or removed">
+                      OWNER
+                    </span>
+                  )}
+                </td>
                 <td className="py-1.5">
                   <input
                     defaultValue={u.erp_owner || ""}
@@ -2570,16 +2583,22 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
                   />
                 </td>
                 <td className="py-1.5">
-                  <select value={u.role} onChange={(e) => setRole(u.id, e.target.value)} className="text-xs border rounded px-1 bg-white" style={{ borderColor: "#E2E0DA" }} title={ROLE_OPTIONS.find((r) => r.value === u.role)?.hint}>
+                  <select value={u.role} onChange={(e) => setRole(u.id, e.target.value)} disabled={!mayManage(u)} className="text-xs border rounded px-1" style={{ borderColor: "#E2E0DA", background: mayManage(u) ? "#fff" : "#F4F2EC", color: mayManage(u) ? "#22303C" : "#8A94A0" }} title={mayManage(u) ? ROLE_OPTIONS.find((r) => r.value === u.role)?.hint : `Only ${OWNER_EMAIL} may change this account`}>
                     {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
                   </select>
                 </td>
                 <td className="py-1.5">
-                  <button onClick={() => setDisabled(u.id, !u.disabled, u.email)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E6F4EA", color: u.disabled ? "#fff" : "#0D7A3F" }} title={u.disabled ? "Click to re-enable sign-in" : "Click to disable sign-in"}>{u.disabled ? "disabled" : "active"}</button>
+                  <button onClick={() => setDisabled(u.id, !u.disabled, u.email)} disabled={!mayManage(u)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E6F4EA", color: u.disabled ? "#fff" : "#0D7A3F", opacity: mayManage(u) ? 1 : 0.5, cursor: mayManage(u) ? "pointer" : "not-allowed" }} title={mayManage(u) ? (u.disabled ? "Click to re-enable sign-in" : "Click to disable sign-in") : `Only ${OWNER_EMAIL} may change this account`}>{u.disabled ? "disabled" : "active"}</button>
                 </td>
                 <td className="py-1.5 text-right whitespace-nowrap">
-                  <button onClick={() => resetPw(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold mr-1" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Set a new password">🔑</button>
-                  <button onClick={() => removeUser(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FBEDEA", color: "#B3261E" }} title="Remove this account">✕</button>
+                  {mayManage(u) ? (
+                    <>
+                      <button onClick={() => resetPw(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold mr-1" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Set a new password">🔑</button>
+                      <button onClick={() => removeUser(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FBEDEA", color: "#B3261E" }} title="Remove this account">✕</button>
+                    </>
+                  ) : (
+                    <span style={{ color: "#B8B5AC" }} title={u.email.toLowerCase() === OWNER_EMAIL ? "The owner account is protected" : `Only ${OWNER_EMAIL} may change another admin`}>🔒</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -2646,9 +2665,13 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
                   <td className="py-1.5" style={{ color: "#8A94A0" }}>{u.role.replace("_", " ")}</td>
                   <td className="py-1.5 text-center tnum" style={{ color: u.ownsNodes ? "#1B3A5C" : "#B8B5AC" }}>{u.ownsNodes || "—"}</td>
                   <td className="py-1.5">
-                    {u.implicit ? (
-                      <span className="rounded px-2 py-0.5 font-semibold" style={{ background: "#F3EEFB", color: "#7C3AED" }} title="Admins always have full goals access">
-                        full · via admin role
+                    {u.isOwner ? (
+                      <span className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FFF3E8", color: "#E8600A" }} title="The owner always has full access and cannot be restricted">
+                        full · owner
+                      </span>
+                    ) : u.locked ? (
+                      <span className="rounded px-2 py-0.5 font-semibold" style={{ background: "#F4F2EC", color: "#8A94A0" }} title={`Only ${OWNER_EMAIL} may change another admin's goals access`}>
+                        {u.level === "none" ? "No access" : u.level === "view" ? "View" : "Edit"} 🔒
                       </span>
                     ) : (
                       <div className="flex gap-1">
