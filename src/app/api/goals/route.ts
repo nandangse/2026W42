@@ -3,21 +3,11 @@ import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { buildGoalTree } from "@/lib/goal-tree";
+import { resolveGoalAccess } from "@/lib/goal-access";
 import { CHILD_OF, type NodeType } from "@/lib/goals";
 import { METRICS } from "@/lib/goal-metrics";
 
 export const dynamic = "force-dynamic";
-
-/** Goals access is granted, not implied by planning role (spec §9). */
-async function goalAccess(userId: string, role: string) {
-  if (role === "admin") return { see: true, edit: true };
-  const { data } = await adminClient()
-    .from("goal_access")
-    .select("can_edit")
-    .eq("person_id", userId)
-    .maybeSingle();
-  return { see: !!data, edit: !!data?.can_edit };
-}
 
 // GET /api/goals — the whole tree for the period, plus masters.
 // Tree visibility and own-work visibility are different checks: someone without
@@ -25,7 +15,7 @@ async function goalAccess(userId: string, role: string) {
 export async function GET(req: Request) {
   try {
     const user = await requireUser();
-    const access = await goalAccess(user.id, user.role);
+    const access = await resolveGoalAccess(adminClient(), user.id, user.isOwner);
     if (!access.see)
       return NextResponse.json(
         { error: "no_goal_access", message: "The goal tree has not been shared with this account." },
@@ -48,7 +38,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
-    const access = await goalAccess(user.id, user.role);
+    const access = await resolveGoalAccess(adminClient(), user.id, user.isOwner);
     const db = supabaseServer();
     const body = await req.json();
 

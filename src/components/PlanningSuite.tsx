@@ -271,13 +271,36 @@ export default function PlanningSuite({
   );
   const [board, setBoard] = useState<Board | null>(null);
   const [err, setErr] = useState("");
-  // land on "My Week", not the delivery board
-  const [tab, setTab] = useState<"home" | "goals" | "delivery" | "load" | "plan" | "tasking" | "erp" | "admin">("home");
+
+  // Three top-level workspaces (per-access, see below), each with its own
+  // sticky sub-nav. "tab" is only meaningful inside the Planning Suite
+  // workspace now — Goals and Tasking are whole workspaces, not sub-tabs.
+  const [workspace, setWorkspace] = useState<"suite" | "goals" | "tasking">("suite");
+  // land on "My Week" within the suite, not the delivery board
+  const [tab, setTab] = useState<"home" | "delivery" | "load" | "plan" | "erp" | "admin">("home");
   const [showVal, setShowVal] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erpLog, setErpLog] = useState<ErpLogEntry[]>([]);
   const [quoteTrigger, setQuoteTrigger] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  // Goals is gated by an explicit grant (spec §9), not by role — fetch just
+  // enough to decide whether its tab appears. null while loading so the tab
+  // doesn't flash in and out; the heavier /api/goals call happens only once
+  // that workspace is actually opened.
+  const [goalsAccess, setGoalsAccess] = useState<boolean | null>(null);
+  useEffect(() => {
+    api.get("/api/goals/access").then((r) => setGoalsAccess(!!r.see)).catch(() => setGoalsAccess(false));
+  }, []);
+
+  // Opening a job's plan can be triggered from Tasking or Goals, both of which
+  // are now separate workspaces from Job Plan — so jumping there must also
+  // switch back to the Planning Suite workspace, not just change the sub-tab.
+  const openJobPlan = (id: string) => {
+    setActiveId(id);
+    setWorkspace("suite");
+    setTab("plan");
+  };
 
   // Admin users live here, not inside <Admin>, so switching tabs doesn't unmount
   // the list and refetch it — that empty-then-populate cycle was the flicker.
@@ -382,13 +405,20 @@ export default function PlanningSuite({
     return b && b.uploaded_at.slice(0, 10) === TODAY;
   }).length;
 
-  const TAB_DEFS: [typeof tab, string][] = [
+  // The three workspaces. Goals only appears once its access check resolves
+  // true — never shown while loading or when access is absent, matching the
+  // spec's "granted, not default" rule.
+  const WORKSPACE_DEFS: [typeof workspace, string][] = [
+    ["suite", "🧭 Planning Suite"],
+    ...(goalsAccess ? ([["goals", "🎯 Goals"]] as [typeof workspace, string][]) : []),
+    ["tasking", "📋 Nandan Tasking"],
+  ];
+  // Sub-nav inside the Planning Suite workspace only.
+  const SUITE_TAB_DEFS: [typeof tab, string][] = [
     ["home", "🏠 My Week"],
-    ["goals", "🎯 Goals"],
     ["delivery", "Job Delivery Board"],
     ["load", "Load Board"],
     ["plan", "Job Plan"],
-    ["tasking", "Nandan Tasking"],
     ["erp", `Update to ERP${queued ? " (" + queued + ")" : ""}`],
     ...(isAdmin ? ([["admin", "Admin ⚙"]] as [typeof tab, string][]) : []),
   ];
@@ -408,9 +438,9 @@ export default function PlanningSuite({
             </div>
             <div>
               <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>
-                WORKS PLANNING SUITE
+                GENIE
                 <span style={{ background: "#E8600A", color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6 }}>
-                  V 2.4
+                  V 2.5
                 </span>
               </div>
               <h1 className="text-lg font-bold text-white leading-tight">
@@ -465,24 +495,46 @@ export default function PlanningSuite({
           </div>
         </div>
 
-        {/* Tabs always occupy their own row, at every width, so the header never
-            reflows between one and two lines. On narrow screens the row scrolls
-            sideways rather than wrapping, keeping the header height fixed. */}
+        {/* Workspace row always occupies its own line, at every width, so the
+            header never reflows between one and two lines. On narrow screens
+            it scrolls sideways rather than wrapping, keeping the header
+            height fixed within a workspace. */}
         <div
           className="flex gap-1 rounded p-1 mt-2"
           style={{ background: "#0D161F", overflowX: "auto", scrollbarWidth: "thin" }}
         >
-          {TAB_DEFS.map(([k, l]) => (
+          {WORKSPACE_DEFS.map(([k, l]) => (
             <button
               key={k}
-              onClick={() => setTab(k)}
+              onClick={() => setWorkspace(k)}
               className="px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap flex-shrink-0"
-              style={tab === k ? { background: "#E8600A", color: "#fff" } : { color: "#8FA1B3" }}
+              style={workspace === k ? { background: "#E8600A", color: "#fff" } : { color: "#8FA1B3" }}
             >
               {l}
             </button>
           ))}
         </div>
+
+        {/* Sub-nav for the Planning Suite workspace only — Goals and Tasking
+            are whole workspaces with their own internal navigation. */}
+        {workspace === "suite" && (
+          <div
+            className="flex gap-1 rounded p-1 mt-1.5"
+            style={{ background: "#0D161F", overflowX: "auto", scrollbarWidth: "thin" }}
+          >
+            {SUITE_TAB_DEFS.map(([k, l]) => (
+              <button
+                key={k}
+                onClick={() => setTab(k)}
+                className="px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap flex-shrink-0"
+                style={tab === k ? { background: "#1B3A5C", color: "#fff" } : { color: "#5C6B7A" }}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="text-xs mt-1 flex gap-3 flex-wrap" style={{ color: "#3A4A5A" }}>
           <span>🔒 Restricted — visible only to authorised planning users</span>
           <span style={{ color: "#F5B32B" }}>
@@ -494,14 +546,14 @@ export default function PlanningSuite({
 
       <QuoteOfDay trigger={quoteTrigger} />
 
-      {tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} goTasks={() => setTab("tasking")} goGoals={() => setTab("goals")} />}
-      {tab === "goals" && <GoalsBoard canEditPlanning={canEdit} />}
-      {tab === "delivery" && <DeliveryBoard board={board} V={V} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} pushERP={pushERP} />}
-      {tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
-      {tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} pushERP={pushERP} />}
-      {tab === "tasking" && <Tasking board={board} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} />}
-      {tab === "erp" && <UpdateToErp erpLog={erpLog} />}
-      {tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} isOwner={isRaghu} />}
+      {workspace === "suite" && tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={openJobPlan} reload={reload} goTasks={() => setWorkspace("tasking")} goGoals={() => setWorkspace("goals")} />}
+      {workspace === "suite" && tab === "delivery" && <DeliveryBoard board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />}
+      {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
+      {workspace === "suite" && tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} pushERP={pushERP} />}
+      {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} />}
+      {workspace === "suite" && tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} isOwner={isRaghu} />}
+      {workspace === "goals" && <GoalsBoard canEditPlanning={canEdit} />}
+      {workspace === "tasking" && <Tasking board={board} onOpen={openJobPlan} reload={reload} />}
     </div>
   );
 }
@@ -2460,6 +2512,35 @@ function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; rel
     } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
   };
 
+  // ---- goal categories (swimlanes) — any admin may manage these ----
+  type Swimlane = { id: string; name: string; color: string; sort_order: number; nodeCount: number };
+  const [lanes, setLanes] = useState<Swimlane[] | null>(null);
+  const [laneMsg, setLaneMsg] = useState("");
+  const [newLaneName, setNewLaneName] = useState("");
+  const loadLanes = useCallback(() => {
+    api.get("/api/admin/swimlanes").then((r) => setLanes(r.swimlanes)).catch(() => setLanes([]));
+  }, []);
+  useEffect(() => { loadLanes(); }, [loadLanes]);
+  const addLane = async () => {
+    const name = newLaneName.trim();
+    if (!name) return;
+    setLaneMsg("");
+    try { await api.post("/api/admin/swimlanes", { action: "create", name }); setNewLaneName(""); loadLanes(); }
+    catch (e) { setLaneMsg(e instanceof Error ? e.message : String(e)); }
+  };
+  const saveLane = async (id: string, patch: { name?: string; color?: string }) => {
+    setLaneMsg("");
+    try { await api.post("/api/admin/swimlanes", { action: "update", id, ...patch }); loadLanes(); }
+    catch (e) { setLaneMsg(e instanceof Error ? e.message : String(e)); }
+  };
+  const removeLane = async (l: Swimlane) => {
+    if (l.nodeCount) { alert(`"${l.name}" is used by ${l.nodeCount} goal item${l.nodeCount === 1 ? "" : "s"} — move them to another category first.`); return; }
+    if (!window.confirm(`Delete the "${l.name}" category?`)) return;
+    setLaneMsg("");
+    try { await api.post("/api/admin/swimlanes", { action: "delete", id: l.id }); loadLanes(); }
+    catch (e) { setLaneMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
   // ---- family milestone template editor ----
   type TRow = { name: string; days: number; preds: number[]; crew: Crew; shift: string; offset: number };
   const famList = useMemo(() => Object.keys(board.templates).sort(), [board.templates]);
@@ -2695,6 +2776,40 @@ function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; rel
         <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>
           <b>View</b> opens the tree read-only. <b>Edit</b> also allows adding, changing and reassigning nodes.
           Owners can always update their own node&apos;s numbers and comment on it, whatever is set here.
+        </div>
+      </div>
+
+      {/* ---- goal categories (swimlanes) ---- */}
+      <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+        <div className="font-bold text-sm mb-1">
+          🏷 Goal categories <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— the fields goals and tactics are filed under (Growth, Operations, People, …)</span>
+        </div>
+        <div className="text-xs mb-3 rounded p-2" style={{ background: "#F4F2EC", color: "#5A6672", lineHeight: 1.5 }}>
+          Any admin may add or edit categories here — this is separate from goals access, since organising the
+          categories isn&apos;t the same as being allowed into the tree. The Swimlanes view on the Goals tab lays
+          work out one column per category.
+        </div>
+        <div className="flex gap-1 mb-2">
+          <input value={newLaneName} onChange={(e) => setNewLaneName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addLane()} placeholder="New category…" className="text-xs border rounded px-2 py-1 flex-1" style={{ borderColor: "#E2E0DA" }} />
+          <button onClick={addLane} className="text-xs font-bold rounded px-3 py-1" style={{ background: "#E8600A", color: "#fff" }}>+ Add</button>
+        </div>
+        {laneMsg && <div className="text-xs font-semibold mb-2" style={{ color: "#B3261E" }}>{laneMsg}</div>}
+        <div className="space-y-1">
+          {lanes === null && [0, 1, 2].map((i) => (
+            <div key={"ln" + i} className="rounded" style={{ height: 30, width: `${60 - i * 8}%`, background: "#F4F2EC" }} />
+          ))}
+          {lanes?.length === 0 && <div className="text-xs" style={{ color: "#8A94A0" }}>No categories yet.</div>}
+          {(lanes ?? []).map((l) => (
+            <div key={l.id} className="flex items-center gap-2 rounded p-1.5" style={{ background: "#F4F2EC" }}>
+              <input type="color" defaultValue={l.color} onBlur={(e) => { if (e.target.value !== l.color) saveLane(l.id, { color: e.target.value }); }} style={{ width: 26, height: 26, border: "none", background: "none", padding: 0, cursor: "pointer" }} title="Category colour" />
+              <input defaultValue={l.name} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== l.name) saveLane(l.id, { name: v }); }} className="text-xs border rounded px-2 py-1 flex-1" style={{ borderColor: "#E2E0DA" }} />
+              <span className="text-xs tnum" style={{ color: l.nodeCount ? "#1B3A5C" : "#B8B5AC" }}>{l.nodeCount} item{l.nodeCount === 1 ? "" : "s"}</span>
+              <button onClick={() => removeLane(l)} className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: "#FBEDEA", color: "#B3261E" }} title="Delete — only while unused">✕</button>
+            </div>
+          ))}
+        </div>
+        <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>
+          Name and colour save when you click away. A category can only be deleted while no goal item still uses it.
         </div>
       </div>
 

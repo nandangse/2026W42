@@ -73,7 +73,7 @@ export default function LoginPage() {
               className="text-xs tracking-widest font-bold"
               style={{ color: "#E8600A" }}
             >
-              WORKS PLANNING SUITE
+              GENIE
             </div>
             <div className="text-sm font-bold" style={{ color: "#16232F" }}>
               Milestones · Load · Tasking · Delivery

@@ -52,16 +52,19 @@ function Who({ ids, size = 20 }: { ids: string[]; size?: number }) {
   );
 }
 
-/** Swimlane colours, so a category is recognisable at a glance across the tree. */
-const SWIM_COLOR: Record<string, [string, string]> = {
-  Growth: ["#0D7A3F", "#E6F4EA"],
-  Operations: ["#1B3A5C", "#DCE8F5"],
-  People: ["#7C3AED", "#F3EEFB"],
-  Quality: ["#0D9488", "#E6F4F3"],
-  Cash: ["#D97706", "#FFF3E8"],
-};
-const swimColor = (s: string) => SWIM_COLOR[s]?.[0] ?? "#5A6672";
-const swimBg = (s: string) => SWIM_COLOR[s]?.[1] ?? "#F4F2EC";
+/**
+ * Swimlane colours come from the category itself (admin-managed in Admin →
+ * Goal categories), not a fixed map — so a newly added category is styled
+ * without a code change. Background is a light tint of the same colour; the
+ * fallback covers a node whose category was since deleted.
+ */
+const HEX6 = /^#[0-9a-f]{6}$/i;
+function makeSwimColorers(swimlanes: { name: string; color: string }[]) {
+  const byName = new Map(swimlanes.map((s) => [s.name, HEX6.test(s.color) ? s.color : "#5A6672"]));
+  const color = (name: string | null) => (name && byName.get(name)) || "#5A6672";
+  const bg = (name: string | null) => color(name) + "1A"; // ~10% alpha tint
+  return { color, bg };
+}
 
 function Chip({ children, color = "#5A6672", bg = "#F4F2EC" }: { children: React.ReactNode; color?: string; bg?: string }) {
   return (
@@ -180,6 +183,7 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
     );
   }
 
+  const { color: swimColor, bg: swimBg } = makeSwimColorers(tree.swimlanes);
   const visibleGoals = tree.goals;
   const crumbs = [goal, ...path.filter(Boolean)].filter(Boolean) as string[];
 
@@ -247,15 +251,37 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
 
       {/* ---- swimlane kanban: one column per category ---- */}
       {view === "swim" && (() => {
-        const all = Object.values(nodes).filter((n) => levels.includes(n.node_type));
-        const lanes = tree.swimlanes.map((s) => ({
-          ...s,
-          items: all
-            .filter((n) => n.swimlane === s.name)
-            .sort((a, b) => LEVEL_ORDER.indexOf(a.node_type) - LEVEL_ORDER.indexOf(b.node_type) || a.sort_order - b.sort_order),
-        }));
-        const unassigned = all.filter((n) => !n.swimlane);
-        const cols = [...lanes, ...(unassigned.length ? [{ id: "none", name: "No category", color: "#8A94A0", items: unassigned }] : [])];
+        // Counts in the lane header always reflect EVERY level in that
+        // category, regardless of the level filter — "how many tactics/
+        // subfields live in this field" shouldn't disappear just because the
+        // Tactics chip is toggled off. Only the cards actually rendered
+        // respect the filter.
+        const allNodes = Object.values(nodes);
+        const shown = allNodes.filter((n) => levels.includes(n.node_type));
+        const countsFor = (list: GoalNode[]) => LEVEL_ORDER.map((lv) => list.filter((n) => n.node_type === lv).length);
+
+        const lanes = tree.swimlanes.map((s) => {
+          const laneAll = allNodes.filter((n) => n.swimlane === s.name);
+          return {
+            ...s,
+            total: laneAll.length,
+            counts: countsFor(laneAll),
+            items: shown
+              .filter((n) => n.swimlane === s.name)
+              .sort((a, b) => LEVEL_ORDER.indexOf(a.node_type) - LEVEL_ORDER.indexOf(b.node_type) || a.sort_order - b.sort_order),
+          };
+        });
+        const unassignedAll = allNodes.filter((n) => !n.swimlane);
+        const cols = [
+          ...lanes,
+          ...(unassignedAll.length
+            ? [{
+                id: "none", name: "No category", color: "#8A94A0",
+                total: unassignedAll.length, counts: countsFor(unassignedAll),
+                items: shown.filter((n) => !n.swimlane),
+              }]
+            : []),
+        ];
 
         return (
           <>
@@ -273,7 +299,7 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
                 );
               })}
               <span className="text-xs ml-2" style={{ color: "#8A94A0" }}>
-                {all.length} item{all.length === 1 ? "" : "s"} across {cols.length} categories
+                {shown.length} shown across {cols.length} categories
               </span>
             </div>
 
@@ -283,14 +309,19 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
                 const avg = lane.items.length
                   ? lane.items.reduce((s, n) => s + progressOf(nodes, n.id), 0) / lane.items.length
                   : 0;
+                const breakdown = LEVEL_ORDER.map((lv, i) => (lane.counts[i] > 0 ? `${lane.counts[i]} ${LEVEL_LABEL[lv]}${lane.counts[i] === 1 ? "" : "s"}` : null)).filter(Boolean);
                 return (
                   <div key={lane.id} className="flex-shrink-0" style={{ width: 268 }}>
                     <div className="rounded-t-lg p-2" style={{ background: swimBg(lane.name), borderBottom: `3px solid ${swimColor(lane.name)}` }}>
                       <div className="flex items-baseline justify-between">
                         <span className="font-bold text-sm" style={{ color: swimColor(lane.name) }}>{lane.name}</span>
-                        <span className="text-xs tnum" style={{ color: "#5A6672" }}>{lane.items.length}</span>
+                        <span className="text-xs tnum" style={{ color: "#5A6672" }}>{lane.total}</span>
                       </div>
-                      <div className="flex items-center gap-2 mt-1">
+                      {/* the number of tactics/subfields within this field, by level */}
+                      <div className="text-xs mt-0.5" style={{ color: "#5A6672", lineHeight: 1.4 }}>
+                        {breakdown.length ? breakdown.join(" · ") : "empty"}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5">
                         <Gauge pct={avg} color={swimColor(lane.name)} seg={12} w={4} h={6} />
                         <span className="text-xs tnum" style={{ color: "#5A6672" }}>{Math.round(avg)}%</span>
                         {done > 0 && <span className="text-xs ml-auto" style={{ color: "#0D7A3F" }}>{done} done</span>}

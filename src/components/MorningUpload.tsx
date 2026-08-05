@@ -78,7 +78,7 @@ export default function MorningUpload({ email }: { email: string }) {
             </div>
             <div>
               <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>
-                WORKS PLANNING SUITE
+                GENIE
               </div>
               <h1 className="text-base font-bold text-white leading-tight">
                 🌅 Morning Update
