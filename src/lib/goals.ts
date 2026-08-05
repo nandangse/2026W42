@@ -23,8 +23,20 @@ export const LEVEL_LABEL: Record<NodeType, string> = {
   tactic: "Tactic",
 };
 
-/** Column headings for the cascade, in depth order below a goal. */
+/** Column headings for the cascade, indexed by depth BELOW a goal. */
 export const LEVEL_COLUMNS = ["Projects", "Objectives", "Key results", "Tactics", "Subtasks"];
+
+/** Levels top-down — orders the swimlane board and its filter chips. */
+export const LEVEL_ORDER: NodeType[] = ["goal", "project", "objective", "key_result", "tactic"];
+
+/** Plural label per level, for the swimlane filter chips. */
+export const LEVEL_PLURAL: Record<NodeType, string> = {
+  goal: "Goals",
+  project: "Projects",
+  objective: "Objectives",
+  key_result: "Key results",
+  tactic: "Tactics",
+};
 
 export const STATUS_META: Record<GoalStatus, { label: string; color: string }> = {
   not_started: { label: "Not started", color: "#8A94A0" },

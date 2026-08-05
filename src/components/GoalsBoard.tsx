@@ -5,7 +5,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import {
-  progressOf, progressBasis, isLate, LEVEL_COLUMNS, LEVEL_LABEL, STATUS_META, CHILD_OF,
+  progressOf, progressBasis, isLate, LEVEL_COLUMNS, LEVEL_LABEL, LEVEL_ORDER, LEVEL_PLURAL,
+  STATUS_META, CHILD_OF,
   type GoalNode, type NodeMap, type GoalStatus, type NodeType,
 } from "@/lib/goals";
 import { today, fmt, fmtFull, diffDays } from "@/lib/schedule";
@@ -79,7 +80,8 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
   const [goal, setGoal] = useState<string | null>(null);
   const [path, setPath] = useState<string[]>([]);
   const [inspect, setInspect] = useState<string | null>(null);
-  const [swim, setSwim] = useState("All");
+  const [view, setView] = useState<"cascade" | "swim">("cascade");
+  const [levels, setLevels] = useState<NodeType[]>(["key_result", "tactic"]);
 
   const load = useCallback(async () => {
     try {
@@ -101,21 +103,21 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
   const nodes = tree?.nodes ?? {};
 
   // one column per level, opening to the right as you pick.
-  // The swimlane filter narrows every column, not just the goal cards.
+  // Browsing by category happens in the Swimlanes view, so the cascade shows
+  // the tree whole rather than filtering it.
   const columns = useMemo(() => {
     if (!goal) return [] as { parent: string; kids: string[]; depth: number }[];
     const cols: { parent: string; kids: string[]; depth: number }[] = [];
     let parent = goal;
     for (let i = 0; i < 5; i++) {
-      const all = nodes[parent]?.kids || [];
-      const kids = swim === "All" ? all : all.filter((k) => nodes[k]?.swimlane === swim);
+      const kids = nodes[parent]?.kids || [];
       if (!kids.length) break;
       cols.push({ parent, kids, depth: i });
       if (!path[i] || !kids.includes(path[i])) break;
       parent = path[i];
     }
     return cols;
-  }, [nodes, goal, path, swim]);
+  }, [nodes, goal, path]);
 
   if (notInstalled) {
     return (
@@ -178,7 +180,7 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
     );
   }
 
-  const visibleGoals = tree.goals.filter((g) => swim === "All" || nodes[g]?.swimlane === swim);
+  const visibleGoals = tree.goals;
   const crumbs = [goal, ...path.filter(Boolean)].filter(Boolean) as string[];
 
   const select = (depth: number, id: string) => {
@@ -195,10 +197,14 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
           THE FIVE · {tree.period}
         </div>
         <div className="flex-1" style={{ height: 1, background: "#E2E0DA", minWidth: 40 }} />
-        <select value={swim} onChange={(e) => setSwim(e.target.value)} className="text-xs border rounded px-2 py-1 bg-white" style={{ borderColor: "#D9D6CD" }}>
-          <option>All</option>
-          {tree.swimlanes.map((s) => (<option key={s.id}>{s.name}</option>))}
-        </select>
+        <div className="flex gap-1 rounded p-1 border" style={{ background: "#fff", borderColor: "#E2E0DA" }}>
+          {([["cascade", "Cascade"], ["swim", "Swimlanes"]] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setView(k)} className="px-3 py-1 rounded text-xs font-bold"
+              style={view === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>
+              {l}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex gap-2 flex-wrap mb-4">
@@ -239,8 +245,105 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
         })}
       </div>
 
+      {/* ---- swimlane kanban: one column per category ---- */}
+      {view === "swim" && (() => {
+        const all = Object.values(nodes).filter((n) => levels.includes(n.node_type));
+        const lanes = tree.swimlanes.map((s) => ({
+          ...s,
+          items: all
+            .filter((n) => n.swimlane === s.name)
+            .sort((a, b) => LEVEL_ORDER.indexOf(a.node_type) - LEVEL_ORDER.indexOf(b.node_type) || a.sort_order - b.sort_order),
+        }));
+        const unassigned = all.filter((n) => !n.swimlane);
+        const cols = [...lanes, ...(unassigned.length ? [{ id: "none", name: "No category", color: "#8A94A0", items: unassigned }] : [])];
+
+        return (
+          <>
+            <div className="flex items-center gap-2 flex-wrap mb-3">
+              <span className="text-xs font-bold" style={{ color: "#8A94A0" }}>SHOW</span>
+              {(LEVEL_ORDER as NodeType[]).map((lv) => {
+                const on = levels.includes(lv);
+                return (
+                  <button key={lv}
+                    onClick={() => setLevels((p) => (on ? p.filter((x) => x !== lv) : [...p, lv]))}
+                    className="text-xs font-bold rounded px-2 py-1"
+                    style={on ? { background: "#22303C", color: "#fff" } : { background: "#F4F2EC", color: "#8A94A0" }}>
+                    {LEVEL_PLURAL[lv]}
+                  </button>
+                );
+              })}
+              <span className="text-xs ml-2" style={{ color: "#8A94A0" }}>
+                {all.length} item{all.length === 1 ? "" : "s"} across {cols.length} categories
+              </span>
+            </div>
+
+            <div className="flex gap-3 overflow-x-auto items-start pb-4">
+              {cols.map((lane) => {
+                const done = lane.items.filter((n) => n.status === "done").length;
+                const avg = lane.items.length
+                  ? lane.items.reduce((s, n) => s + progressOf(nodes, n.id), 0) / lane.items.length
+                  : 0;
+                return (
+                  <div key={lane.id} className="flex-shrink-0" style={{ width: 268 }}>
+                    <div className="rounded-t-lg p-2" style={{ background: swimBg(lane.name), borderBottom: `3px solid ${swimColor(lane.name)}` }}>
+                      <div className="flex items-baseline justify-between">
+                        <span className="font-bold text-sm" style={{ color: swimColor(lane.name) }}>{lane.name}</span>
+                        <span className="text-xs tnum" style={{ color: "#5A6672" }}>{lane.items.length}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Gauge pct={avg} color={swimColor(lane.name)} seg={12} w={4} h={6} />
+                        <span className="text-xs tnum" style={{ color: "#5A6672" }}>{Math.round(avg)}%</span>
+                        {done > 0 && <span className="text-xs ml-auto" style={{ color: "#0D7A3F" }}>{done} done</span>}
+                      </div>
+                    </div>
+                    <div className="rounded-b-lg p-2" style={{ background: "#EFEDE7", minHeight: 90 }}>
+                      {lane.items.length === 0 && (
+                        <div className="text-xs text-center py-4" style={{ color: "#B8B5AC" }}>Nothing here</div>
+                      )}
+                      {lane.items.map((n) => {
+                        const pct = progressOf(nodes, n.id);
+                        const st = STATUS_META[n.status];
+                        const late = isLate(n, TODAY);
+                        const goalNum = n.goal_id ? nodes[n.goal_id]?.goal_num : n.goal_num;
+                        return (
+                          <div key={n.id} onClick={() => setInspect(n.id)}
+                            className="rounded border mb-1.5 cursor-pointer p-2 bg-white"
+                            style={{ borderColor: "#E2E0DA", borderLeft: `3px solid ${st.color}` }}>
+                            <div className="flex items-center gap-1 mb-1">
+                              <Chip color="#5A6672" bg="#F4F2EC">{LEVEL_LABEL[n.node_type]}</Chip>
+                              {goalNum != null && <Chip color="#E8600A" bg="#FFF3E8">G{goalNum}</Chip>}
+                              {n.metric_source && <Chip color="#0D7A3F" bg="#E6F4EA">live</Chip>}
+                            </div>
+                            <div className="text-xs font-semibold" style={{
+                              lineHeight: 1.35, color: "#16232F",
+                              textDecoration: n.status === "done" ? "line-through" : "none",
+                              opacity: n.status === "done" ? 0.55 : 1,
+                              display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
+                            }}>{n.what}</div>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <Who ids={n.owners} size={17} />
+                              <span className="tnum" style={{ fontSize: 10, color: late ? "#B3261E" : "#8A94A0" }}>{fmt(n.end_date)}</span>
+                              <span className="ml-auto tnum" style={{ fontSize: 10, color: "#5A6672" }}>{Math.round(pct)}%</span>
+                            </div>
+                            <div className="mt-1"><Gauge pct={pct} color={st.color} seg={16} w={3} h={4} /></div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-xs" style={{ color: "#8A94A0" }}>
+              Every node carries a category, so the same work appears here and in the cascade — this is the same tree
+              sliced the other way. Tap any card to open it.
+            </div>
+          </>
+        );
+      })()}
+
       {/* ---- breadcrumb ---- */}
-      {goal && (
+      {view === "cascade" && goal && (
         <div className="flex items-center gap-2 flex-wrap mb-2">
           {crumbs.map((id, i) => (
             <span key={id} className="flex items-center gap-2">
@@ -260,6 +363,7 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
       )}
 
       {/* ---- cascade ---- */}
+      {view === "cascade" && (
       <div className="flex overflow-x-auto items-start pb-4" style={{ gap: 0 }}>
         {columns.map((col) => (
           <div key={col.depth} className="flex-shrink-0" style={{ width: 264, borderRight: "1px solid #E2E0DA", paddingRight: 12, marginRight: 12 }}>
@@ -327,6 +431,7 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
           </div>
         )}
       </div>
+      )}
 
       {inspect && nodes[inspect] && (
         <Inspector tree={tree} id={inspect} onClose={() => setInspect(null)} reload={load} />
