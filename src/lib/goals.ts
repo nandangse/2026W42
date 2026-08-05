@@ -79,11 +79,23 @@ export type NodeMap = Record<string, GoalNode>;
 
 const clamp = (n: number) => Math.max(0, Math.min(100, n));
 
+/** True when this node's number is measured from live data rather than reported. */
+const isMeasured = (n: GoalNode) =>
+  !!n.metric_source &&
+  n.target_no != null &&
+  n.start_no != null &&
+  n.current_no != null &&
+  n.target_no !== n.start_no;
+
 /**
- * A node's completion, by the rule in the brief:
- *   1. children  → weighted average of their completion (roll-up)
- *   2. numbers   → (current − start) ÷ (target − start), never typed
- *   3. otherwise → the manually entered percentage
+ * A node's completion:
+ *   1. MEASURED  → a live-fed node uses its own reading, even when it has
+ *      children. The tactics are how you move the number; the number itself is
+ *      the fact. Averaging the tactics instead would let a key result read 48%
+ *      while the thing it measures sits at 6%.
+ *   2. children  → weighted average of their completion (roll-up)
+ *   3. numbers   → (current − start) ÷ (target − start), never typed
+ *   4. otherwise → the manually entered percentage
  * `done` always reads 100.
  */
 export function progressOf(nodes: NodeMap, id: string, seen = new Set<string>()): number {
@@ -92,6 +104,10 @@ export function progressOf(nodes: NodeMap, id: string, seen = new Set<string>())
   if (n.status === "done") return 100;
   if (seen.has(id)) return 0; // defensive: a cycle should never happen, but never hang
   seen.add(id);
+
+  if (isMeasured(n)) {
+    return clamp(((n.current_no! - n.start_no!) / (n.target_no! - n.start_no!)) * 100);
+  }
 
   const kids = (n.kids || []).filter((k) => nodes[k]);
   if (kids.length) {
@@ -117,9 +133,10 @@ export function progressOf(nodes: NodeMap, id: string, seen = new Set<string>())
 }
 
 /** How this node's percentage is arrived at — shown in the inspector. */
-export function progressBasis(nodes: NodeMap, id: string): "rolled" | "derived" | "manual" {
+export function progressBasis(nodes: NodeMap, id: string): "measured" | "rolled" | "derived" | "manual" {
   const n = nodes[id];
   if (!n) return "manual";
+  if (isMeasured(n)) return "measured";
   if ((n.kids || []).filter((k) => nodes[k]).length) return "rolled";
   if (n.target_no != null && n.start_no != null && n.target_no !== n.start_no) return "derived";
   return "manual";

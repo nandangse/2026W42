@@ -492,9 +492,9 @@ function Inspector({ tree, id, onClose, reload }: { tree: Tree; id: string; onCl
 
               <div className="rounded p-3 my-3" style={{ background: "#F4F2EC", border: "1px solid #E2E0DA" }}>
                 <Label>
-                  Measure {basis === "rolled" ? "· rolled up from below" : basis === "derived" ? "· derived from the numbers" : "· entered manually"}
+                  Measure {basis === "measured" ? "· measured live" : basis === "rolled" ? "· rolled up from below" : basis === "derived" ? "· derived from the numbers" : "· entered manually"}
                 </Label>
-                {basis === "derived" && (
+                {(basis === "derived" || basis === "measured") && (
                   <>
                     <div className="flex items-end gap-4 mb-2">
                       {([["Start", n.start_no], ["Current", n.current_no], ["Target", n.target_no]] as const).map(([l, v], i) => (
@@ -520,6 +520,12 @@ function Inspector({ tree, id, onClose, reload }: { tree: Tree; id: string; onCl
                 {n.metric_source && (
                   <div className="text-xs mt-2 rounded p-2" style={{ background: "#E6F4EA", color: "#0D7A3F" }}>
                     <b>Live</b> — {n.metricNote || "read from the planning data"}. Nobody types this number.
+                    {n.kids.length > 0 && (
+                      <div className="mt-1" style={{ color: "#5A6672" }}>
+                        The {n.kids.length} item{n.kids.length === 1 ? "" : "s"} below are how this moves, but the
+                        measurement is what counts — so this percentage is the reading, not their average.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
