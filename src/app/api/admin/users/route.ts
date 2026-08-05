@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin, errJson, HttpError } from "@/lib/auth";
+import { requireAdmin, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import type { Role } from "@/lib/types";
 
@@ -74,6 +74,32 @@ export async function POST(req: Request) {
     const caller = await requireAdmin();
     const admin = adminClient();
     const body = await req.json();
+
+    /**
+     * The owner sits above the admin tier:
+     *   · the owner's own account can never be demoted, disabled or removed
+     *   · only the owner may act on ANOTHER admin
+     * Ordinary admins keep full control of everyone below them.
+     */
+    const guardTarget = async (id: string) => {
+      if (!id) return;
+      const { data: t } = await admin.from("profiles").select("email, role").eq("id", id).maybeSingle();
+      if (!t) return;
+      const targetIsOwner = String(t.email || "").toLowerCase() === RAGHU_EMAIL;
+      if (targetIsOwner)
+        throw new HttpError(403, "The owner account cannot be changed here.");
+      if (t.role === "admin" && !caller.isOwner)
+        throw new HttpError(
+          403,
+          `Only ${RAGHU_EMAIL} may change another admin. Ask them to make this change.`,
+        );
+    };
+    if (["role", "disable", "password", "delete", "profile"].includes(body.action))
+      await guardTarget(body.id);
+
+    // making a new admin creates a peer, so that too is the owner's call
+    if ((body.action === "create" || body.action === "role") && body.role === "admin" && !caller.isOwner)
+      throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant the admin role.`);
 
     if (body.action === "create") {
       const email = String(body.email || "").trim().toLowerCase();

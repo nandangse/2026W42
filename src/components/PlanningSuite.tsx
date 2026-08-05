@@ -29,6 +29,7 @@ import {
   type PlanMilestone,
 } from "@/lib/schedule";
 import QuoteOfDay from "./QuoteOfDay";
+import GoalsBoard from "./GoalsBoard";
 
 // The 32 ERP job-status options (verbatim from V1.9), used by the editable
 // Job Status dropdowns.
@@ -204,6 +205,9 @@ interface ErpLogEntry {
 
 const erpJobLink = (id: string) => "https://nandanerp.in/app/jobmaster/" + id;
 
+/** The single account above the admin tier. Mirrors RAGHU_EMAIL on the server. */
+const OWNER_EMAIL = "raghu@nandan.co.in";
+
 // Default milestone plan for a product family: admin-saved DB templates first
 // (exact name, then partial match), then the "Default" template, then the
 // built-in V1.9 fallback. This is what makes admin-added products work.
@@ -268,7 +272,7 @@ export default function PlanningSuite({
   const [board, setBoard] = useState<Board | null>(null);
   const [err, setErr] = useState("");
   // land on "My Week", not the delivery board
-  const [tab, setTab] = useState<"home" | "delivery" | "load" | "plan" | "tasking" | "erp" | "admin">("home");
+  const [tab, setTab] = useState<"home" | "goals" | "delivery" | "load" | "plan" | "tasking" | "erp" | "admin">("home");
   const [showVal, setShowVal] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erpLog, setErpLog] = useState<ErpLogEntry[]>([]);
@@ -380,6 +384,7 @@ export default function PlanningSuite({
 
   const TAB_DEFS: [typeof tab, string][] = [
     ["home", "🏠 My Week"],
+    ["goals", "🎯 Goals"],
     ["delivery", "Job Delivery Board"],
     ["load", "Load Board"],
     ["plan", "Job Plan"],
@@ -489,13 +494,14 @@ export default function PlanningSuite({
 
       <QuoteOfDay trigger={quoteTrigger} />
 
-      {tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} goTasks={() => setTab("tasking")} />}
+      {tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} goTasks={() => setTab("tasking")} goGoals={() => setTab("goals")} />}
+      {tab === "goals" && <GoalsBoard canEditPlanning={canEdit} />}
       {tab === "delivery" && <DeliveryBoard board={board} V={V} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} pushERP={pushERP} />}
       {tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
       {tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} pushERP={pushERP} />}
       {tab === "tasking" && <Tasking board={board} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} />}
       {tab === "erp" && <UpdateToErp erpLog={erpLog} />}
-      {tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} />}
+      {tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} isOwner={isRaghu} />}
     </div>
   );
 }
@@ -526,6 +532,21 @@ function CrewCell({ value, onChange, color }: { value: number; onChange: (v: num
 }
 
 // ============================ My Week (landing) ============================
+interface TodayItem {
+  source: "goal" | "task";
+  id: string;
+  kind: string;
+  title: string;
+  job_id: string | null;
+  due: string | null;
+  originalDue: string | null;
+  pushCount: number;
+  carriedDays: number;
+  cat: string;
+  esc: string | null;
+  late: boolean;
+}
+
 function MyWeek({
   board,
   me,
@@ -533,6 +554,7 @@ function MyWeek({
   onOpen,
   reload,
   goTasks,
+  goGoals,
 }: {
   board: Board;
   me: { email: string; initials: string | null; displayName: string | null; erpOwner: string | null; role: string };
@@ -540,9 +562,19 @@ function MyWeek({
   onOpen: (id: string) => void;
   reload: () => Promise<Board | null>;
   goTasks: () => void;
+  goGoals: () => void;
 }) {
   const weekEnd = addDays(TODAY, 7);
   const handles = useMemo(() => myHandles(me), [me]);
+
+  // goal work owed today, merged in from the goals layer. Fetched separately so
+  // a person with no goal grant still gets a full page.
+  const [goalItems, setGoalItems] = useState<TodayItem[]>([]);
+  useEffect(() => {
+    api.get("/api/today")
+      .then((r) => setGoalItems((r.items || []).filter((i: TodayItem) => i.source === "goal")))
+      .catch(() => setGoalItems([]));
+  }, []);
 
   // my open tasks: overdue, or due within the next seven days
   const myTasks = useMemo(() => {
@@ -668,6 +700,31 @@ function MyWeek({
             </>
           )}
         </div>
+
+        {/* goal work owed today — the merge of the two layers */}
+        {goalItems.length > 0 && (
+          <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-bold text-sm">🎯 My goal work</div>
+              <button onClick={goGoals} className="text-xs font-bold" style={{ color: "#E8600A" }}>Open Goals →</button>
+            </div>
+            {goalItems.map((g) => (
+              <div key={g.id} className="rounded p-2 mb-1.5 border" style={{ background: g.late ? "#FBEDEA" : "#F4F2EC", borderColor: g.late ? "#B3261E" : "#E2E0DA", borderLeft: `3px solid ${g.late ? "#B3261E" : "#7C3AED"}` }}>
+                <div className="text-xs font-semibold" style={{ color: "#16232F" }}>{g.title}</div>
+                <div className="flex items-center gap-2 mt-1 text-xs flex-wrap" style={{ color: "#8A94A0" }}>
+                  <span className="rounded px-1 font-bold" style={{ background: "#F3EEFB", color: "#7C3AED", fontSize: 9 }}>{g.cat.toUpperCase()}</span>
+                  {g.carriedDays > 0 && <span className="tnum">carried {g.carriedDays}d</span>}
+                  {g.pushCount > 0 && <span style={{ color: "#D97706" }}>pushed {g.pushCount}×</span>}
+                  {g.late && <span className="font-bold" style={{ color: "#B3261E" }}>past {fmt(g.originalDue)}</span>}
+                  <span className="ml-auto tnum">{fmt(g.due)}</span>
+                </div>
+              </div>
+            ))}
+            <div className="text-xs mt-1" style={{ color: "#8A94A0" }}>
+              Carried days and pushes are counted against the date first committed, not the one on screen.
+            </div>
+          </div>
+        )}
 
         {/* deliveries expected this week */}
         <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
@@ -2332,7 +2389,10 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
 }
 
 // ============================ Admin ============================
-function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () => Promise<Board | null>; users: AdminUser[] | null; loadUsers: () => Promise<void> }) {
+function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; reload: () => Promise<Board | null>; users: AdminUser[] | null; loadUsers: () => Promise<void>; isOwner: boolean }) {
+  /** Who this admin may act on: never the owner, and other admins only if owner. */
+  const mayManage = (u: AdminUser) =>
+    u.email.toLowerCase() !== OWNER_EMAIL && (isOwner || u.role !== "admin");
   // ---- user management (list state lives in the parent so the tab doesn't flicker) ----
   const [uForm, setUForm] = useState({ email: "", pw: "", role: "planner", name: "", initials: "" });
   const [uMsg, setUMsg] = useState("");
@@ -2377,6 +2437,27 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
     if (!window.confirm(`Remove ${email}?\n\nThey will no longer be able to sign in. Their plans, comments and edits remain in the app.`)) return;
     try { await api.post("/api/admin/users", { action: "delete", id }); setUMsg(`${email} removed`); await loadUsers(); }
     catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
+  // ---- goals access ----
+  type GoalAccessRow = {
+    id: string; email: string; initials: string | null; name: string | null;
+    role: string; disabled: boolean; level: "none" | "view" | "edit";
+    implicit: boolean; isOwner: boolean; locked: boolean; ownsNodes: number;
+  };
+  const [gaRows, setGaRows] = useState<GoalAccessRow[] | null>(null);
+  const [gaMsg, setGaMsg] = useState("");
+  const loadAccess = useCallback(() => {
+    api.get("/api/admin/goal-access").then((r) => setGaRows(r.users)).catch(() => setGaRows([]));
+  }, []);
+  useEffect(() => { loadAccess(); }, [loadAccess]);
+  const setAccess = async (id: string, level: string, who: string) => {
+    setGaMsg("");
+    try {
+      await api.post("/api/admin/goal-access", { person_id: id, level });
+      setGaMsg(`${who} → ${level === "none" ? "no goals access" : level === "view" ? "can view the goal tree" : "can edit the goal tree"} ✓`);
+      loadAccess();
+    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
   };
 
   // ---- family milestone template editor ----
@@ -2483,7 +2564,14 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
                     style={{ borderColor: "#E2E0DA" }}
                   />
                 </td>
-                <td className="py-1.5">{u.email}</td>
+                <td className="py-1.5">
+                  {u.email}
+                  {u.email.toLowerCase() === OWNER_EMAIL && (
+                    <span className="ml-1 rounded px-1 font-bold" style={{ background: "#FFF3E8", color: "#E8600A", fontSize: 9 }} title="Owner — governs the other admins and cannot be demoted, disabled or removed">
+                      OWNER
+                    </span>
+                  )}
+                </td>
                 <td className="py-1.5">
                   <input
                     defaultValue={u.erp_owner || ""}
@@ -2495,16 +2583,22 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
                   />
                 </td>
                 <td className="py-1.5">
-                  <select value={u.role} onChange={(e) => setRole(u.id, e.target.value)} className="text-xs border rounded px-1 bg-white" style={{ borderColor: "#E2E0DA" }} title={ROLE_OPTIONS.find((r) => r.value === u.role)?.hint}>
+                  <select value={u.role} onChange={(e) => setRole(u.id, e.target.value)} disabled={!mayManage(u)} className="text-xs border rounded px-1" style={{ borderColor: "#E2E0DA", background: mayManage(u) ? "#fff" : "#F4F2EC", color: mayManage(u) ? "#22303C" : "#8A94A0" }} title={mayManage(u) ? ROLE_OPTIONS.find((r) => r.value === u.role)?.hint : `Only ${OWNER_EMAIL} may change this account`}>
                     {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
                   </select>
                 </td>
                 <td className="py-1.5">
-                  <button onClick={() => setDisabled(u.id, !u.disabled, u.email)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E6F4EA", color: u.disabled ? "#fff" : "#0D7A3F" }} title={u.disabled ? "Click to re-enable sign-in" : "Click to disable sign-in"}>{u.disabled ? "disabled" : "active"}</button>
+                  <button onClick={() => setDisabled(u.id, !u.disabled, u.email)} disabled={!mayManage(u)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E6F4EA", color: u.disabled ? "#fff" : "#0D7A3F", opacity: mayManage(u) ? 1 : 0.5, cursor: mayManage(u) ? "pointer" : "not-allowed" }} title={mayManage(u) ? (u.disabled ? "Click to re-enable sign-in" : "Click to disable sign-in") : `Only ${OWNER_EMAIL} may change this account`}>{u.disabled ? "disabled" : "active"}</button>
                 </td>
                 <td className="py-1.5 text-right whitespace-nowrap">
-                  <button onClick={() => resetPw(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold mr-1" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Set a new password">🔑</button>
-                  <button onClick={() => removeUser(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FBEDEA", color: "#B3261E" }} title="Remove this account">✕</button>
+                  {mayManage(u) ? (
+                    <>
+                      <button onClick={() => resetPw(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold mr-1" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Set a new password">🔑</button>
+                      <button onClick={() => removeUser(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FBEDEA", color: "#B3261E" }} title="Remove this account">✕</button>
+                    </>
+                  ) : (
+                    <span style={{ color: "#B8B5AC" }} title={u.email.toLowerCase() === OWNER_EMAIL ? "The owner account is protected" : `Only ${OWNER_EMAIL} may change another admin`}>🔒</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -2531,6 +2625,77 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
             </div>
           </div>
         )}
+      </div>
+
+      {/* ---- goals access ---- */}
+      <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+        <div className="font-bold text-sm mb-1">
+          🎯 Goals access <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— who can open the goal tree</span>
+        </div>
+        <div className="text-xs mb-3 rounded p-2" style={{ background: "#F4F2EC", color: "#5A6672", lineHeight: 1.5 }}>
+          Access is <b>granted, not automatic</b>. Someone with <b>no access</b> still sees the tactics assigned to
+          them on <b>My Week</b> — seeing the tree and seeing your own work are separate checks, so removing access
+          never hides a person&apos;s own to-do list.
+        </div>
+        {gaMsg && (
+          <div className="text-xs font-semibold mb-2" style={{ color: gaMsg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{gaMsg}</div>
+        )}
+        <div className="overflow-x-auto">
+          <table className="text-xs w-full" style={{ minWidth: 560 }}>
+            <thead>
+              <tr style={{ color: "#8A94A0" }}>
+                <th className="text-left py-1 font-semibold">Person</th>
+                <th className="text-left py-1 font-semibold">Role</th>
+                <th className="text-center py-1 font-semibold" title="How many goal nodes they own">Owns</th>
+                <th className="text-left py-1 font-semibold">Goals access</th>
+              </tr>
+            </thead>
+            <tbody>
+              {gaRows === null && [0, 1, 2].map((i) => (
+                <tr key={"g" + i} style={{ borderTop: "1px solid #EEECE6" }}>
+                  <td className="py-2" colSpan={4}><div className="rounded" style={{ height: 12, width: `${55 - i * 8}%`, background: "#EFEDE7" }} /></td>
+                </tr>
+              ))}
+              {(gaRows ?? []).filter((u) => !u.disabled).map((u) => (
+                <tr key={u.id} style={{ borderTop: "1px solid #EEECE6" }}>
+                  <td className="py-1.5">
+                    {u.initials && <span className="font-bold rounded px-1 mr-1" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>{u.initials}</span>}
+                    {u.name || u.email.split("@")[0]}
+                  </td>
+                  <td className="py-1.5" style={{ color: "#8A94A0" }}>{u.role.replace("_", " ")}</td>
+                  <td className="py-1.5 text-center tnum" style={{ color: u.ownsNodes ? "#1B3A5C" : "#B8B5AC" }}>{u.ownsNodes || "—"}</td>
+                  <td className="py-1.5">
+                    {u.isOwner ? (
+                      <span className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FFF3E8", color: "#E8600A" }} title="The owner always has full access and cannot be restricted">
+                        full · owner
+                      </span>
+                    ) : u.locked ? (
+                      <span className="rounded px-2 py-0.5 font-semibold" style={{ background: "#F4F2EC", color: "#8A94A0" }} title={`Only ${OWNER_EMAIL} may change another admin's goals access`}>
+                        {u.level === "none" ? "No access" : u.level === "view" ? "View" : "Edit"} 🔒
+                      </span>
+                    ) : (
+                      <div className="flex gap-1">
+                        {([["none", "No access"], ["view", "View"], ["edit", "Edit"]] as const).map(([lv, label]) => (
+                          <button key={lv} onClick={() => setAccess(u.id, lv, u.name || u.email.split("@")[0])}
+                            className="rounded px-2 py-0.5 font-semibold"
+                            style={u.level === lv
+                              ? { background: lv === "none" ? "#E7E4DC" : lv === "view" ? "#DCE8F5" : "#E8600A", color: lv === "edit" ? "#fff" : lv === "view" ? "#1B3A5C" : "#5A6672" }
+                              : { background: "#F4F2EC", color: "#B8B5AC" }}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>
+          <b>View</b> opens the tree read-only. <b>Edit</b> also allows adding, changing and reassigning nodes.
+          Owners can always update their own node&apos;s numbers and comment on it, whatever is set here.
+        </div>
       </div>
 
       {/* ---- family milestone templates ---- */}
