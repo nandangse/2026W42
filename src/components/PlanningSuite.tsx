@@ -29,6 +29,7 @@ import {
   type PlanMilestone,
 } from "@/lib/schedule";
 import QuoteOfDay from "./QuoteOfDay";
+import GoalsBoard from "./GoalsBoard";
 
 // The 32 ERP job-status options (verbatim from V1.9), used by the editable
 // Job Status dropdowns.
@@ -268,7 +269,7 @@ export default function PlanningSuite({
   const [board, setBoard] = useState<Board | null>(null);
   const [err, setErr] = useState("");
   // land on "My Week", not the delivery board
-  const [tab, setTab] = useState<"home" | "delivery" | "load" | "plan" | "tasking" | "erp" | "admin">("home");
+  const [tab, setTab] = useState<"home" | "goals" | "delivery" | "load" | "plan" | "tasking" | "erp" | "admin">("home");
   const [showVal, setShowVal] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erpLog, setErpLog] = useState<ErpLogEntry[]>([]);
@@ -380,6 +381,7 @@ export default function PlanningSuite({
 
   const TAB_DEFS: [typeof tab, string][] = [
     ["home", "🏠 My Week"],
+    ["goals", "🎯 Goals"],
     ["delivery", "Job Delivery Board"],
     ["load", "Load Board"],
     ["plan", "Job Plan"],
@@ -489,7 +491,8 @@ export default function PlanningSuite({
 
       <QuoteOfDay trigger={quoteTrigger} />
 
-      {tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} goTasks={() => setTab("tasking")} />}
+      {tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} goTasks={() => setTab("tasking")} goGoals={() => setTab("goals")} />}
+      {tab === "goals" && <GoalsBoard canEditPlanning={canEdit} />}
       {tab === "delivery" && <DeliveryBoard board={board} V={V} onOpen={(id) => { setActiveId(id); setTab("plan"); }} reload={reload} pushERP={pushERP} />}
       {tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
       {tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} pushERP={pushERP} />}
@@ -526,6 +529,21 @@ function CrewCell({ value, onChange, color }: { value: number; onChange: (v: num
 }
 
 // ============================ My Week (landing) ============================
+interface TodayItem {
+  source: "goal" | "task";
+  id: string;
+  kind: string;
+  title: string;
+  job_id: string | null;
+  due: string | null;
+  originalDue: string | null;
+  pushCount: number;
+  carriedDays: number;
+  cat: string;
+  esc: string | null;
+  late: boolean;
+}
+
 function MyWeek({
   board,
   me,
@@ -533,6 +551,7 @@ function MyWeek({
   onOpen,
   reload,
   goTasks,
+  goGoals,
 }: {
   board: Board;
   me: { email: string; initials: string | null; displayName: string | null; erpOwner: string | null; role: string };
@@ -540,9 +559,19 @@ function MyWeek({
   onOpen: (id: string) => void;
   reload: () => Promise<Board | null>;
   goTasks: () => void;
+  goGoals: () => void;
 }) {
   const weekEnd = addDays(TODAY, 7);
   const handles = useMemo(() => myHandles(me), [me]);
+
+  // goal work owed today, merged in from the goals layer. Fetched separately so
+  // a person with no goal grant still gets a full page.
+  const [goalItems, setGoalItems] = useState<TodayItem[]>([]);
+  useEffect(() => {
+    api.get("/api/today")
+      .then((r) => setGoalItems((r.items || []).filter((i: TodayItem) => i.source === "goal")))
+      .catch(() => setGoalItems([]));
+  }, []);
 
   // my open tasks: overdue, or due within the next seven days
   const myTasks = useMemo(() => {
@@ -668,6 +697,31 @@ function MyWeek({
             </>
           )}
         </div>
+
+        {/* goal work owed today — the merge of the two layers */}
+        {goalItems.length > 0 && (
+          <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-bold text-sm">🎯 My goal work</div>
+              <button onClick={goGoals} className="text-xs font-bold" style={{ color: "#E8600A" }}>Open Goals →</button>
+            </div>
+            {goalItems.map((g) => (
+              <div key={g.id} className="rounded p-2 mb-1.5 border" style={{ background: g.late ? "#FBEDEA" : "#F4F2EC", borderColor: g.late ? "#B3261E" : "#E2E0DA", borderLeft: `3px solid ${g.late ? "#B3261E" : "#7C3AED"}` }}>
+                <div className="text-xs font-semibold" style={{ color: "#16232F" }}>{g.title}</div>
+                <div className="flex items-center gap-2 mt-1 text-xs flex-wrap" style={{ color: "#8A94A0" }}>
+                  <span className="rounded px-1 font-bold" style={{ background: "#F3EEFB", color: "#7C3AED", fontSize: 9 }}>{g.cat.toUpperCase()}</span>
+                  {g.carriedDays > 0 && <span className="tnum">carried {g.carriedDays}d</span>}
+                  {g.pushCount > 0 && <span style={{ color: "#D97706" }}>pushed {g.pushCount}×</span>}
+                  {g.late && <span className="font-bold" style={{ color: "#B3261E" }}>past {fmt(g.originalDue)}</span>}
+                  <span className="ml-auto tnum">{fmt(g.due)}</span>
+                </div>
+              </div>
+            ))}
+            <div className="text-xs mt-1" style={{ color: "#8A94A0" }}>
+              Carried days and pushes are counted against the date first committed, not the one on screen.
+            </div>
+          </div>
+        )}
 
         {/* deliveries expected this week */}
         <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
