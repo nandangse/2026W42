@@ -2433,6 +2433,27 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
     catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
   };
 
+  // ---- goals access ----
+  type GoalAccessRow = {
+    id: string; email: string; initials: string | null; name: string | null;
+    role: string; disabled: boolean; level: "none" | "view" | "edit";
+    implicit: boolean; ownsNodes: number;
+  };
+  const [gaRows, setGaRows] = useState<GoalAccessRow[] | null>(null);
+  const [gaMsg, setGaMsg] = useState("");
+  const loadAccess = useCallback(() => {
+    api.get("/api/admin/goal-access").then((r) => setGaRows(r.users)).catch(() => setGaRows([]));
+  }, []);
+  useEffect(() => { loadAccess(); }, [loadAccess]);
+  const setAccess = async (id: string, level: string, who: string) => {
+    setGaMsg("");
+    try {
+      await api.post("/api/admin/goal-access", { person_id: id, level });
+      setGaMsg(`${who} → ${level === "none" ? "no goals access" : level === "view" ? "can view the goal tree" : "can edit the goal tree"} ✓`);
+      loadAccess();
+    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
   // ---- family milestone template editor ----
   type TRow = { name: string; days: number; preds: number[]; crew: Crew; shift: string; offset: number };
   const famList = useMemo(() => Object.keys(board.templates).sort(), [board.templates]);
@@ -2585,6 +2606,73 @@ function Admin({ board, reload, users, loadUsers }: { board: Board; reload: () =
             </div>
           </div>
         )}
+      </div>
+
+      {/* ---- goals access ---- */}
+      <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+        <div className="font-bold text-sm mb-1">
+          🎯 Goals access <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— who can open the goal tree</span>
+        </div>
+        <div className="text-xs mb-3 rounded p-2" style={{ background: "#F4F2EC", color: "#5A6672", lineHeight: 1.5 }}>
+          Access is <b>granted, not automatic</b>. Someone with <b>no access</b> still sees the tactics assigned to
+          them on <b>My Week</b> — seeing the tree and seeing your own work are separate checks, so removing access
+          never hides a person&apos;s own to-do list.
+        </div>
+        {gaMsg && (
+          <div className="text-xs font-semibold mb-2" style={{ color: gaMsg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{gaMsg}</div>
+        )}
+        <div className="overflow-x-auto">
+          <table className="text-xs w-full" style={{ minWidth: 560 }}>
+            <thead>
+              <tr style={{ color: "#8A94A0" }}>
+                <th className="text-left py-1 font-semibold">Person</th>
+                <th className="text-left py-1 font-semibold">Role</th>
+                <th className="text-center py-1 font-semibold" title="How many goal nodes they own">Owns</th>
+                <th className="text-left py-1 font-semibold">Goals access</th>
+              </tr>
+            </thead>
+            <tbody>
+              {gaRows === null && [0, 1, 2].map((i) => (
+                <tr key={"g" + i} style={{ borderTop: "1px solid #EEECE6" }}>
+                  <td className="py-2" colSpan={4}><div className="rounded" style={{ height: 12, width: `${55 - i * 8}%`, background: "#EFEDE7" }} /></td>
+                </tr>
+              ))}
+              {(gaRows ?? []).filter((u) => !u.disabled).map((u) => (
+                <tr key={u.id} style={{ borderTop: "1px solid #EEECE6" }}>
+                  <td className="py-1.5">
+                    {u.initials && <span className="font-bold rounded px-1 mr-1" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>{u.initials}</span>}
+                    {u.name || u.email.split("@")[0]}
+                  </td>
+                  <td className="py-1.5" style={{ color: "#8A94A0" }}>{u.role.replace("_", " ")}</td>
+                  <td className="py-1.5 text-center tnum" style={{ color: u.ownsNodes ? "#1B3A5C" : "#B8B5AC" }}>{u.ownsNodes || "—"}</td>
+                  <td className="py-1.5">
+                    {u.implicit ? (
+                      <span className="rounded px-2 py-0.5 font-semibold" style={{ background: "#F3EEFB", color: "#7C3AED" }} title="Admins always have full goals access">
+                        full · via admin role
+                      </span>
+                    ) : (
+                      <div className="flex gap-1">
+                        {([["none", "No access"], ["view", "View"], ["edit", "Edit"]] as const).map(([lv, label]) => (
+                          <button key={lv} onClick={() => setAccess(u.id, lv, u.name || u.email.split("@")[0])}
+                            className="rounded px-2 py-0.5 font-semibold"
+                            style={u.level === lv
+                              ? { background: lv === "none" ? "#E7E4DC" : lv === "view" ? "#DCE8F5" : "#E8600A", color: lv === "edit" ? "#fff" : lv === "view" ? "#1B3A5C" : "#5A6672" }
+                              : { background: "#F4F2EC", color: "#B8B5AC" }}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>
+          <b>View</b> opens the tree read-only. <b>Edit</b> also allows adding, changing and reassigning nodes.
+          Owners can always update their own node&apos;s numbers and comment on it, whatever is set here.
+        </div>
       </div>
 
       {/* ---- family milestone templates ---- */}
