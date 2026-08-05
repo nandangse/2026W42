@@ -51,6 +51,17 @@ function Who({ ids, size = 20 }: { ids: string[]; size?: number }) {
   );
 }
 
+/** Swimlane colours, so a category is recognisable at a glance across the tree. */
+const SWIM_COLOR: Record<string, [string, string]> = {
+  Growth: ["#0D7A3F", "#E6F4EA"],
+  Operations: ["#1B3A5C", "#DCE8F5"],
+  People: ["#7C3AED", "#F3EEFB"],
+  Quality: ["#0D9488", "#E6F4F3"],
+  Cash: ["#D97706", "#FFF3E8"],
+};
+const swimColor = (s: string) => SWIM_COLOR[s]?.[0] ?? "#5A6672";
+const swimBg = (s: string) => SWIM_COLOR[s]?.[1] ?? "#F4F2EC";
+
 function Chip({ children, color = "#5A6672", bg = "#F4F2EC" }: { children: React.ReactNode; color?: string; bg?: string }) {
   return (
     <span className="rounded px-1.5 py-0.5 font-bold whitespace-nowrap"
@@ -89,20 +100,22 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
 
   const nodes = tree?.nodes ?? {};
 
-  // one column per level, opening to the right as you pick
+  // one column per level, opening to the right as you pick.
+  // The swimlane filter narrows every column, not just the goal cards.
   const columns = useMemo(() => {
     if (!goal) return [] as { parent: string; kids: string[]; depth: number }[];
     const cols: { parent: string; kids: string[]; depth: number }[] = [];
     let parent = goal;
     for (let i = 0; i < 5; i++) {
-      const kids = nodes[parent]?.kids || [];
+      const all = nodes[parent]?.kids || [];
+      const kids = swim === "All" ? all : all.filter((k) => nodes[k]?.swimlane === swim);
       if (!kids.length) break;
       cols.push({ parent, kids, depth: i });
       if (!path[i] || !kids.includes(path[i])) break;
       parent = path[i];
     }
     return cols;
-  }, [nodes, goal, path]);
+  }, [nodes, goal, path, swim]);
 
   if (notInstalled) {
     return (
@@ -209,6 +222,7 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
                 <span className="ml-auto"><Chip color={st.color}>{st.label}</Chip></span>
               </div>
               <div className="text-sm font-semibold" style={{ minHeight: 40, lineHeight: 1.35, color: "#16232F" }}>{n.what}</div>
+              {n.swimlane && <div><Chip color={swimColor(n.swimlane)} bg={swimBg(n.swimlane)}>{n.swimlane}</Chip></div>}
               <div className="flex items-end justify-between gap-2">
                 <div>
                   {n.target_no != null && (
@@ -278,13 +292,16 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
                       className="rounded" style={{ border: "1px solid #E2E0DA", width: 18, height: 18, fontSize: 11, lineHeight: 1, color: "#5A6672" }}>⋯</button>
                   </div>
                   <div className="mt-1.5"><Gauge pct={pct} color={st.color} seg={16} w={3} h={5} /></div>
-                  {n.metric_source && <div className="mt-1"><Chip color="#0D7A3F" bg="#E6F4EA">live</Chip></div>}
-                  {n.kids.length > 0 && (
-                    <div className="mt-1.5 flex items-center gap-1">
-                      <Chip>{n.kids.length} below</Chip>
-                      <span style={{ color: sel ? "#E8600A" : "#B8B5AC", fontSize: 12 }}>›</span>
-                    </div>
-                  )}
+                  <div className="mt-1.5 flex items-center gap-1 flex-wrap">
+                    {n.swimlane && <Chip color={swimColor(n.swimlane)} bg={swimBg(n.swimlane)}>{n.swimlane}</Chip>}
+                    {n.metric_source && <Chip color="#0D7A3F" bg="#E6F4EA">live</Chip>}
+                    {n.kids.length > 0 && (
+                      <>
+                        <Chip>{n.kids.length} below</Chip>
+                        <span style={{ color: sel ? "#E8600A" : "#B8B5AC", fontSize: 12 }}>›</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })}
