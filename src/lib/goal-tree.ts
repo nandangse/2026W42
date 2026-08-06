@@ -23,6 +23,20 @@ export async function buildGoalTree(
 ): Promise<GoalTree> {
   const period = opts.period || "FY2026-27";
 
+  // The live-metric resolvers are the slowest part of this payload (they scan
+  // jobs and import_batches), and they only need the distinct metric_source
+  // keys — so fetch those with one tiny query and run the resolvers
+  // CONCURRENTLY with the nine main queries, instead of after them. This
+  // roughly halves the route's wall-clock time.
+  const metricsPromise = db
+    .from("goal_node")
+    .select("metric_source")
+    .eq("period", period)
+    .not("metric_source", "is", null)
+    .then(({ data }) =>
+      resolveMetrics(db, (data || []).map((r) => r.metric_source as string)),
+    );
+
   const [nodesRes, ownersRes, commentsRes, swimRes, unitRes, csfRes, linkRes, opspRes, peopleRes] =
     await Promise.all([
       db.from("goal_node").select("*").eq("period", period).order("sort_order"),
@@ -58,11 +72,8 @@ export async function buildGoalTree(
   for (const c of commentsRes.data || [])
     commentCount.set(c.node_id, (commentCount.get(c.node_id) || 0) + 1);
 
-  // live readings for any node that declares a metric_source
-  const metrics = await resolveMetrics(
-    db,
-    (nodesRes.data || []).map((n) => n.metric_source).filter(Boolean) as string[],
-  );
+  // live readings, already resolving since before the main queries ran
+  const metrics = await metricsPromise;
 
   const nodes: NodeMap = {};
   for (const r of nodesRes.data || []) {

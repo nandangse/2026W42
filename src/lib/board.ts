@@ -314,12 +314,10 @@ export async function buildBoard(supabase: SupabaseClient) {
     projectOwners,
     assignableUsers,
     unlinkedOwners,
-    // newest job change across the board — the header "last updated" stamp
-    lastUpdated:
-      allJobs.reduce<string | null>(
-        (mx, j) => (j.updated_at && (!mx || j.updated_at > mx) ? j.updated_at : mx),
-        null,
-      ) ?? batchesRes.data?.[0]?.uploaded_at ?? null,
+    // When the morning files last landed — informational, per Dr Raghu: this
+    // stamp answers "how fresh is the data", not "when was a job last edited"
+    // (per-job edit times still live on each row's updated_at).
+    lastUpdated: batchesRes.data?.[0]?.uploaded_at ?? null,
     batches,
     aggregates: {
       kittingPct,

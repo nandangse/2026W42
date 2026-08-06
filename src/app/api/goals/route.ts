@@ -15,15 +15,25 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const user = await requireUser();
-    const access = await resolveGoalAccess(adminClient(), user.id, user.isOwner);
+    const period = new URL(req.url).searchParams.get("period") || undefined;
+    // Run the access check and the tree build CONCURRENTLY: RLS on the
+    // user-scoped client is the real gate on the data, so the check only
+    // decides between 403 and 200 — no reason to serialise two Mumbai round
+    // trips before nine more. If access is denied the built tree is discarded.
+    const [access, tree] = await Promise.all([
+      resolveGoalAccess(adminClient(), user.id, user.isOwner),
+      buildGoalTree(supabaseServer(), { period, canEdit: false }),
+    ]);
     if (!access.see)
       return NextResponse.json(
         { error: "no_goal_access", message: "The goal tree has not been shared with this account." },
         { status: 403 },
       );
-    const period = new URL(req.url).searchParams.get("period") || undefined;
-    const tree = await buildGoalTree(supabaseServer(), { period, canEdit: access.edit });
-    return NextResponse.json({ ...tree, metrics: METRICS.map(({ key, label, unitHint, describe }) => ({ key, label, unitHint, describe })) });
+    return NextResponse.json({
+      ...tree,
+      canEdit: access.edit,
+      metrics: METRICS.map(({ key, label, unitHint, describe }) => ({ key, label, unitHint, describe })),
+    });
   } catch (e) {
     return errJson(e);
   }

@@ -318,6 +318,11 @@ export default function PlanningSuite({
   useEffect(() => {
     api.get("/api/goals/access").then((r) => setGoalsAccess(!!r.see)).catch(() => setGoalsAccess(false));
   }, []);
+  // once the Goals workspace has been opened, keep its component alive
+  const [goalsVisited, setGoalsVisited] = useState(false);
+  useEffect(() => {
+    if (workspace === "goals") setGoalsVisited(true);
+  }, [workspace]);
 
   // Opening a job's plan can be triggered from Tasking or Goals, both of which
   // are now separate workspaces from Job Plan — so jumping there must also
@@ -567,7 +572,7 @@ export default function PlanningSuite({
           <span style={{ color: "#F5B32B" }}>
             Data: {board.jobs.length} active jobs · kitting {board.aggregates.kittingPct.toFixed(1)}%
           </span>
-          <span style={{ color: "#8FA1B3" }}>🕒 Last updated {stamp(board.lastUpdated)}</span>
+          <span style={{ color: "#8FA1B3" }} title="When the morning files were last uploaded">🕒 Files as of {stamp(board.lastUpdated)}</span>
         </div>
       </div>
 
@@ -584,7 +589,15 @@ export default function PlanningSuite({
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} />}
       {workspace === "suite" && tab === "upload" && isAdmin && <MorningUpload email={email} embedded />}
       {workspace === "suite" && tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} isOwner={isRaghu} />}
-      {workspace === "goals" && <GoalsBoard canEditPlanning={canEdit} />}
+      {/* Mounted on first visit and then kept (hidden) — the tree is a slow
+          payload (auth + 10 queries + live metrics), so re-fetching it on
+          every workspace switch made Goals feel sluggish. Its own load()
+          still refreshes after each edit. */}
+      {goalsVisited && (
+        <div style={{ display: workspace === "goals" ? undefined : "none" }}>
+          <GoalsBoard canEditPlanning={canEdit} />
+        </div>
+      )}
       {workspace === "tasking" && <Tasking board={board} onOpen={openJobPlan} reload={reload} />}
     </div>
   );
@@ -726,7 +739,7 @@ function MyWeek({
           {me.initials && <span className="ml-2 rounded px-1.5 py-0.5 text-sm font-bold" style={{ background: "#E8600A", color: "#fff" }}>{me.initials}</span>}
         </h2>
         <span className="text-xs" style={{ color: "#8A94A0" }}>
-          Week of {fmtFull(TODAY)} → {fmtFull(weekEnd)} · 🕒 last updated {stamp(board.lastUpdated)}
+          Week of {fmtFull(TODAY)} → {fmtFull(weekEnd)} · 🕒 files as of {stamp(board.lastUpdated)}
         </span>
       </div>
 
@@ -1754,6 +1767,37 @@ function JobPlan({
   const reloadDefault = () => { dirty.current = true; setDraft({ start: dj.start && dj.start >= TODAY ? dj.start : TODAY, milestones: templateMilestones(dj.fam, board.templates) }); };
 
   const savePlanNow = async () => { await api.post("/api/plan", { job_id: dj.id, start: draft.start, milestones: draft.milestones }); await reload(); };
+  // ---- mark the job completed once every milestone is done ----
+  // "Completed" here means the job's status is at or past Delivered in the
+  // ERP's own status ladder; the button sets "D: Delivered".
+  const COMPLETED_STATUSES = [
+    "D: Delivered",
+    "I: Installation Not Started due to Client",
+    "I: Installation in progress",
+    "I: Installation Completed",
+    "C: Job Handed Over",
+  ];
+  const isCompleted = COMPLETED_STATUSES.includes(dj.stat);
+  const markCompleted = async () => {
+    if (!window.confirm(`Mark JOB ${jobNo(dj.id)} — ${dj.tag} as COMPLETED?\n\nAll ${sched.length} milestones are done. This sets the job status to "D: Delivered" in Genie.`)) return;
+    try {
+      await api.post("/api/job-field", { job_id: dj.id, field: "stat", value: "D: Delivered" });
+      pushERP("Jobmaster", dj.id, "job_status", "D: Delivered (job completed)");
+      await reload();
+      // The warning the button exists for: Genie's status is overwritten by
+      // tomorrow's file, so the ERP must be told by hand — immediately.
+      window.alert(
+        `✔ JOB ${jobNo(dj.id)} marked completed in Genie.\n\n` +
+        `⚠ NOW UPDATE THE ERP — this change lives only here until you do.\n` +
+        `Open the Jobmaster (link on this page and in the Update-to-ERP tab)\n` +
+        `and set its Job Status there too. Tomorrow's morning file will\n` +
+        `otherwise overwrite this back to the old status.`,
+      );
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const saveBaseline = async () => {
     if (!sched.length) return;
     await api.post("/api/plan", { job_id: dj.id, start: draft.start, milestones: draft.milestones }); // ensure plan persisted first
@@ -1883,6 +1927,18 @@ function JobPlan({
             )}
             {canEdit && (
               <button onClick={saveBaseline} className="rounded px-2 py-1 text-xs font-bold self-start" style={baseline ? { background: "#F4F2EC", color: "#0D7A3F", border: "1px solid #0D7A3F" } : { background: "#0D7A3F", color: "#fff" }}>📌 {baseline ? "Re-save Baseline" : "Save as Baseline"}</button>
+            )}
+            {/* the finish line: only offered once every milestone is ticked */}
+            {canEdit && allDone && !isCompleted && (
+              <button onClick={markCompleted} className="rounded px-2 py-1 text-xs font-bold self-start" style={{ background: "#16232F", color: "#7BC67E", border: "1px solid #0D7A3F" }} title="All milestones are done — mark the whole job completed">
+                ✔ Mark job completed
+              </button>
+            )}
+            {isCompleted && (
+              <div className="rounded px-2 py-1 self-start" style={{ background: "#E6F4EA", border: "1px solid #0D7A3F" }}>
+                <div className="text-xs font-bold" style={{ color: "#0D7A3F" }}>✔ COMPLETED</div>
+                <div style={{ fontSize: 10, color: "#5A6672" }}>confirm in ERP so tomorrow&apos;s file agrees</div>
+              </div>
             )}
           </div>
         </div>
