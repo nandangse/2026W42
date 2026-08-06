@@ -30,6 +30,7 @@ import {
 } from "@/lib/schedule";
 import QuoteOfDay from "./QuoteOfDay";
 import GoalsBoard from "./GoalsBoard";
+import MorningUpload from "./MorningUpload";
 
 // The 32 ERP job-status options (verbatim from V1.9), used by the editable
 // Job Status dropdowns.
@@ -277,7 +278,32 @@ export default function PlanningSuite({
   // workspace now — Goals and Tasking are whole workspaces, not sub-tabs.
   const [workspace, setWorkspace] = useState<"suite" | "goals" | "tasking">("suite");
   // land on "My Week" within the suite, not the delivery board
-  const [tab, setTab] = useState<"home" | "delivery" | "load" | "plan" | "erp" | "admin">("home");
+  const [tab, setTab] = useState<"home" | "delivery" | "load" | "plan" | "erp" | "upload" | "admin">("home");
+
+  // ---- browser back/forward navigates within the app, not out of it ----
+  // Every workspace/tab change pushes a history entry; popstate restores it.
+  // Without this the whole app is one history entry and Back exits to the
+  // login redirect — the complaint that prompted this.
+  const popNav = useRef(false);   // true while applying a popstate, so we don't re-push it
+  const navMounted = useRef(false); // skip the push on first render (replaceState seeds it)
+  useEffect(() => {
+    window.history.replaceState({ genie: true, workspace, tab }, "");
+    const onPop = (e: PopStateEvent) => {
+      if (e.state?.genie) {
+        popNav.current = true;
+        setWorkspace(e.state.workspace);
+        setTab(e.state.tab ?? "home");
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!navMounted.current) { navMounted.current = true; return; }
+    if (popNav.current) { popNav.current = false; return; }
+    window.history.pushState({ genie: true, workspace, tab }, "");
+  }, [workspace, tab]);
   const [showVal, setShowVal] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erpLog, setErpLog] = useState<ErpLogEntry[]>([]);
@@ -420,7 +446,8 @@ export default function PlanningSuite({
     ["load", "Load Board"],
     ["plan", "Job Plan"],
     ["erp", `Update to ERP${queued ? " (" + queued + ")" : ""}`],
-    ...(isAdmin ? ([["admin", "Admin ⚙"]] as [typeof tab, string][]) : []),
+    // admins get the uploader's page too, so they can load the morning files
+    ...(isAdmin ? ([["upload", "🌅 Morning Update"], ["admin", "Admin ⚙"]] as [typeof tab, string][]) : []),
   ];
 
   return (
@@ -546,11 +573,16 @@ export default function PlanningSuite({
 
       <QuoteOfDay trigger={quoteTrigger} />
 
-      {workspace === "suite" && tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={openJobPlan} reload={reload} goTasks={() => setWorkspace("tasking")} goGoals={() => setWorkspace("goals")} />}
-      {workspace === "suite" && tab === "delivery" && <DeliveryBoard board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />}
+      {workspace === "suite" && tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={openJobPlan} reload={reload} goTasks={() => setWorkspace("tasking")} goGoals={() => setWorkspace("goals")} goalsAccess={!!goalsAccess} />}
+      {/* Kept MOUNTED and merely hidden, so its filters, search, sort and view
+          survive a round-trip through Job Plan — unmounting was wiping them. */}
+      <div style={{ display: workspace === "suite" && tab === "delivery" ? undefined : "none" }}>
+        <DeliveryBoard board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
+      </div>
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
-      {workspace === "suite" && tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} pushERP={pushERP} />}
+      {workspace === "suite" && tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} />}
+      {workspace === "suite" && tab === "upload" && isAdmin && <MorningUpload email={email} embedded />}
       {workspace === "suite" && tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} isOwner={isRaghu} />}
       {workspace === "goals" && <GoalsBoard canEditPlanning={canEdit} />}
       {workspace === "tasking" && <Tasking board={board} onOpen={openJobPlan} reload={reload} />}
@@ -607,6 +639,7 @@ function MyWeek({
   reload,
   goTasks,
   goGoals,
+  goalsAccess,
 }: {
   board: Board;
   me: { email: string; initials: string | null; displayName: string | null; erpOwner: string | null; role: string };
@@ -615,18 +648,24 @@ function MyWeek({
   reload: () => Promise<Board | null>;
   goTasks: () => void;
   goGoals: () => void;
+  goalsAccess: boolean;
 }) {
   const weekEnd = addDays(TODAY, 7);
   const handles = useMemo(() => myHandles(me), [me]);
 
-  // goal work owed today, merged in from the goals layer. Fetched separately so
-  // a person with no goal grant still gets a full page.
+  // Goal work owed today, merged in from the goals layer — but ONLY for people
+  // who hold a goals grant. Showing goal items to someone whose Goals tab is
+  // hidden read as an inconsistency ("why can I see this but not open it"), so
+  // the whole card follows the same grant as the workspace. Trade-off, made
+  // deliberately: a person with tactics assigned but no grant won't see them
+  // anywhere — if someone is expected to work goal tactics, give them View.
   const [goalItems, setGoalItems] = useState<TodayItem[]>([]);
   useEffect(() => {
+    if (!goalsAccess) { setGoalItems([]); return; }
     api.get("/api/today")
       .then((r) => setGoalItems((r.items || []).filter((i: TodayItem) => i.source === "goal")))
       .catch(() => setGoalItems([]));
-  }, []);
+  }, [goalsAccess]);
 
   // my open tasks: overdue, or due within the next seven days
   const myTasks = useMemo(() => {
@@ -740,11 +779,14 @@ function MyWeek({
                       title="Delete this task"
                     >✕</button>
                     <div className="text-xs font-semibold" style={{ paddingRight: 16 }}>{t.t}</div>
-                    <div className="flex items-center justify-between mt-1 text-xs" style={{ opacity: 0.85 }}>
-                      <span className="font-bold">{job ? "JOB " + jobNo(t.j) : "—"}</span>
-                      {t.esc && t.esc !== "None" && <span className="font-bold rounded px-1" style={{ background: "#B3261E", color: "#fff", fontSize: 9 }}>⚠ {t.esc.slice(0, 2)}</span>}
-                      <span style={{ fontSize: 10 }}>{(t.cat || "").toLowerCase()}</span>
-                      <span className="tnum">{fmt(t.due)}</span>
+                    <div className="flex items-center justify-between mt-1 text-xs gap-2" style={{ opacity: 0.85 }}>
+                      {/* the customer tag says which machine this is; the bare job number didn't */}
+                      <span className="font-bold truncate" style={{ maxWidth: 150 }} title={job ? `${job.tag} · JOB ${jobNo(t.j)}` : undefined}>
+                        {job ? job.tag : "—"}
+                      </span>
+                      {t.esc && t.esc !== "None" && <span className="font-bold rounded px-1 flex-shrink-0" style={{ background: "#B3261E", color: "#fff", fontSize: 9 }}>⚠ {t.esc.slice(0, 2)}</span>}
+                      <span className="flex-shrink-0" style={{ fontSize: 10 }}>{(t.cat || "").toLowerCase()}</span>
+                      <span className="tnum flex-shrink-0">{fmt(t.due)}</span>
                     </div>
                   </div>
                 );
@@ -1571,6 +1613,7 @@ function JobPlan({
   V,
   reload,
   isRaghu,
+  canEdit,
   pushERP,
 }: {
   board: Board;
@@ -1579,6 +1622,10 @@ function JobPlan({
   V: (v: number) => string;
   reload: () => Promise<Board | null>;
   isRaghu: boolean;
+  /** admin / planner / project_owner. Others see the plan read-only — the
+   *  server already rejected their writes, but the UI let them type, which
+   *  looked like "changes not saving" rather than "no permission". */
+  canEdit: boolean;
   pushERP: (dt: string, id: string, f: string, v: string) => void;
 }) {
   // re-sorted on every keystroke before — the job list only changes when the board does
@@ -1586,6 +1633,24 @@ function JobPlan({
     () => [...board.jobs].sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1)),
     [board.jobs],
   );
+
+  // job-picker search + Project Owner filter (in addition to the dropdown)
+  const [planQ, setPlanQ] = useState("");
+  const [planPO, setPlanPO] = useState("all");
+  const pickerJobs = useMemo(() => {
+    const needle = planQ.trim().toLowerCase();
+    return byTDD.filter((j) => {
+      if (planPO !== "all" && j.ownerInitials !== planPO) return false;
+      if (!needle) return true;
+      return (
+        j.id.includes(needle) ||
+        jobNo(j.id).includes(needle) ||
+        j.tag.toLowerCase().includes(needle) ||
+        j.cust.toLowerCase().includes(needle) ||
+        j.fam.toLowerCase().includes(needle)
+      );
+    });
+  }, [byTDD, planQ, planPO]);
   const job = useMemo(
     () => board.jobs.find((j) => j.id === activeId) || (activeId ? board.archived[activeId] : undefined),
     [board.jobs, board.archived, activeId],
@@ -1618,6 +1683,7 @@ function JobPlan({
 
   // debounced auto-save (only after an actual edit) — persists milestones incl. done flags
   useEffect(() => {
+    if (!canEdit) return; // read-only roles never write, so never try
     if (!job || !draft || !dirty.current) return;
     const t = setTimeout(() => {
       api.post("/api/plan", { job_id: job.id, start: draft.start, milestones: draft.milestones }).catch(() => {});
@@ -1657,7 +1723,14 @@ function JobPlan({
   if (!job || !draft) return <div className="p-4 text-sm" style={{ color: "#8A94A0" }}>Pick a job.</div>;
   const dj = job;
 
-  const edit = (fn: (pl: Plan) => Plan) => { dirty.current = true; setDraft((pl) => (pl ? fn(pl) : pl)); };
+  // Single chokepoint for every plan mutation. The permission guard lives here
+  // so no drag-handler, checkbox or kanban shortcut can slip an edit past the
+  // read-only rule — the disabled UI is cosmetics; this is the enforcement.
+  const edit = (fn: (pl: Plan) => Plan) => {
+    if (!canEdit) return;
+    dirty.current = true;
+    setDraft((pl) => (pl ? fn(pl) : pl));
+  };
   const setMilestone = (mi: number, patch: Partial<PlanMilestone>) => edit((pl) => ({ ...pl, milestones: pl.milestones.map((m, i) => (i === mi ? { ...m, ...patch } : m)) }));
   const setCrewVal = (mi: number, key: keyof Crew, v: number) => edit((pl) => ({ ...pl, milestones: pl.milestones.map((m, i) => (i === mi ? { ...m, crew: { ...m.crew, [key]: v } } : m)) }));
   const togglePred = (mi: number, p: number) => edit((pl) => ({ ...pl, milestones: pl.milestones.map((m, i) => (i === mi ? { ...m, preds: m.preds.includes(p) ? m.preds.filter((x) => x !== p) : [...m.preds, p].sort((a, b) => a - b) } : m)) }));
@@ -1702,6 +1775,7 @@ function JobPlan({
   // ---- materials ----
   const mats = board.materials[dj.id] || [];
   const ensureMats = async () => {
+    if (!canEdit) return; // seeding the default checklist is a write
     if (mats.length || seededMat.current === dj.id) return;
     seededMat.current = dj.id;
     const recv = Math.round((MAT_ITEMS.length * (dj.kit || 0)) / 100);
@@ -1734,15 +1808,42 @@ function JobPlan({
   return (
     <div className="p-4">
       <div className="flex flex-wrap items-center gap-2 mb-3">
+        {/* search + Project Owner filter narrow the dropdown; the dropdown stays the picker */}
+        <div className="relative">
+          <input
+            value={planQ}
+            onChange={(e) => setPlanQ(e.target.value)}
+            placeholder="🔍 Search job no, tag, customer…"
+            className="px-2 py-1.5 rounded border text-sm"
+            style={{ borderColor: planQ ? "#E8600A" : "#D9D6CD", minWidth: 220 }}
+          />
+          {planQ && <button onClick={() => setPlanQ("")} className="absolute right-2 top-1.5 font-bold" style={{ color: "#E8600A" }} title="Clear search">✕</button>}
+        </div>
+        <select value={planPO} onChange={(e) => setPlanPO(e.target.value)} className="px-2 py-1.5 rounded border text-sm font-semibold" style={{ borderColor: planPO === "all" ? "#D9D6CD" : "#E8600A", background: planPO === "all" ? "#fff" : "#FFF3E8", color: planPO === "all" ? "#22303C" : "#E8600A" }} title="Only this Project Owner's jobs in the dropdown">
+          <option value="all">All project owners</option>
+          {(board.projectOwners || []).map((p) => (<option key={p.initials!} value={p.initials!}>{personLabel(p)}</option>))}
+        </select>
         <select value={dj.id} onChange={(e) => setActiveId(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm font-semibold" style={{ borderColor: "#D9D6CD", maxWidth: 420 }}>
-          {byTDD.map((j) => (<option key={j.id} value={j.id}>{jobNo(j.id)} · {j.tag}</option>))}
+          {/* keep the open job selectable even when the filter excludes it, so the select never goes blank */}
+          {!pickerJobs.some((j) => j.id === dj.id) && !board.archived[dj.id] && (
+            <option value={dj.id}>{jobNo(dj.id)} · {dj.tag} (outside filter)</option>
+          )}
+          {pickerJobs.map((j) => (<option key={j.id} value={j.id}>{jobNo(j.id)} · {j.tag}</option>))}
           {Object.keys(board.archived).length > 0 && (
             <optgroup label="— delivered / no longer in the export (plans archived) —">
               {Object.values(board.archived).map((j) => (<option key={j.id} value={j.id}>✓ {jobNo(j.id)} · {j.tag}</option>))}
             </optgroup>
           )}
         </select>
-        <span className="text-xs" style={{ color: "#8A94A0" }}>{Object.keys(board.plans).length} of {board.jobs.length} jobs planned · edits auto-save</span>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>
+          {(planQ || planPO !== "all") ? `${pickerJobs.length} of ${byTDD.length} jobs match · ` : ""}
+          {Object.keys(board.plans).length} of {board.jobs.length} jobs planned{canEdit ? " · edits auto-save" : ""}
+        </span>
+        {!canEdit && (
+          <span className="text-xs font-bold rounded px-2 py-1" style={{ background: "#F4F2EC", color: "#8A94A0", border: "1px solid #D9D6CD" }} title="Only admins, planners and project owners can change plans">
+            👁 View only — plans are edited by admins, planners &amp; project owners
+          </span>
+        )}
       </div>
 
       {/* header card */}
@@ -1780,7 +1881,9 @@ function JobPlan({
                 <div className="text-sm font-bold">{fmt(baselineEnd)} → {fmt(realEnd || TODAY)} {(() => { const d = diffDays(baselineEnd, realEnd || TODAY); return <span style={{ color: d > 0 ? "#B3261E" : "#0D7A3F" }}>({d > 0 ? "+" : ""}{d}d)</span>; })()}</div>
               </div>
             )}
-            <button onClick={saveBaseline} className="rounded px-2 py-1 text-xs font-bold self-start" style={baseline ? { background: "#F4F2EC", color: "#0D7A3F", border: "1px solid #0D7A3F" } : { background: "#0D7A3F", color: "#fff" }}>📌 {baseline ? "Re-save Baseline" : "Save as Baseline"}</button>
+            {canEdit && (
+              <button onClick={saveBaseline} className="rounded px-2 py-1 text-xs font-bold self-start" style={baseline ? { background: "#F4F2EC", color: "#0D7A3F", border: "1px solid #0D7A3F" } : { background: "#0D7A3F", color: "#fff" }}>📌 {baseline ? "Re-save Baseline" : "Save as Baseline"}</button>
+            )}
           </div>
         </div>
         {dj.tdd && ends > dj.tdd && (
@@ -1813,19 +1916,21 @@ function JobPlan({
                     <td className="px-3 py-1.5 font-medium">{m.item}{m.custom && <span title="Custom item added by you" style={{ color: "#E8600A" }}> ✎</span>}</td>
                     <td className="px-3 py-1.5" style={{ color: "#5A6672" }}>{m.qty}</td>
                     <td className="px-3 py-1.5 text-center">
-                      <button onClick={() => setMatStatus(m.id, m.status === "Received" ? "Pending" : "Received", m.item)} className="text-xs font-bold rounded px-2 py-0.5" style={m.status === "Received" ? { background: "#E6F4EA", color: "#0D7A3F" } : { background: "#FBEDEA", color: "#B3261E" }}>{m.status === "Received" ? "✓ Received" : "⏳ Yet to receive"}</button>
-                      <button onClick={() => delMat(m.id)} title="Remove line" className="ml-1 text-xs" style={{ color: "#B3261E" }}>✕</button>
+                      <button onClick={() => canEdit && setMatStatus(m.id, m.status === "Received" ? "Pending" : "Received", m.item)} disabled={!canEdit} className="text-xs font-bold rounded px-2 py-0.5" style={{ ...(m.status === "Received" ? { background: "#E6F4EA", color: "#0D7A3F" } : { background: "#FBEDEA", color: "#B3261E" }), cursor: canEdit ? "pointer" : "default" }}>{m.status === "Received" ? "✓ Received" : "⏳ Yet to receive"}</button>
+                      {canEdit && <button onClick={() => delMat(m.id)} title="Remove line" className="ml-1 text-xs" style={{ color: "#B3261E" }}>✕</button>}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="flex gap-1 mt-2 items-center flex-wrap">
-            <input placeholder="Custom material / bought-out item…" value={matForm.item} onChange={(e) => setMatForm({ ...matForm, item: e.target.value })} className="text-xs border rounded px-2 py-1.5" style={{ borderColor: "#E2E0DA", minWidth: 240 }} />
-            <input placeholder="Qty" value={matForm.qty} onChange={(e) => setMatForm({ ...matForm, qty: e.target.value })} className="text-xs border rounded px-2 py-1.5 w-24" style={{ borderColor: "#E2E0DA" }} />
-            <button onClick={addMat} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}>+ Add material</button>
-          </div>
+          {canEdit && (
+            <div className="flex gap-1 mt-2 items-center flex-wrap">
+              <input placeholder="Custom material / bought-out item…" value={matForm.item} onChange={(e) => setMatForm({ ...matForm, item: e.target.value })} className="text-xs border rounded px-2 py-1.5" style={{ borderColor: "#E2E0DA", minWidth: 240 }} />
+              <input placeholder="Qty" value={matForm.qty} onChange={(e) => setMatForm({ ...matForm, qty: e.target.value })} className="text-xs border rounded px-2 py-1.5 w-24" style={{ borderColor: "#E2E0DA" }} />
+              <button onClick={addMat} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}>+ Add material</button>
+            </div>
+          )}
           <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>{recvN}/{mats.length} kit items received (checklist tracker only — the boards use Kitting % in Σ val × (1−T%) × Kit%). Rows marked ✎ are custom items you added.</div>
         </div>
       )}
@@ -1833,12 +1938,16 @@ function JobPlan({
       {planView === "plan" && (
         <>
           <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
+            {/* fieldset[disabled] greys every input, select, checkbox and button
+                in the table at once for read-only roles; edit() is the actual
+                enforcement, this is the honest UI for it */}
+            <fieldset disabled={!canEdit} style={{ border: "none", margin: 0, padding: 0, opacity: canEdit ? 1 : 0.75 }}>
             <table className="w-full text-sm" style={{ minWidth: 1100 }}>
               <thead>
                 <tr style={{ background: "#22303C", color: "#fff" }} className="text-xs">
                   <th className="px-2 py-2 text-center" title="Tick when done on the floor">✓</th>
                   <th className="px-2 py-2 text-left">#</th>
-                  <th className="px-2 py-2 text-left" style={{ minWidth: 200 }}>Milestone (editable)</th>
+                  <th className="px-2 py-2 text-left" style={{ minWidth: 200 }}>{canEdit ? "Milestone (editable)" : "Milestone"}</th>
                   <th className="px-2 py-2">Pred(s)</th>
                   <th className="px-2 py-2">Succ</th>
                   <th className="px-2 py-2">Start</th>
@@ -1891,13 +2000,18 @@ function JobPlan({
                 </tr>
               </tfoot>
             </table>
+            </fieldset>
           </div>
           <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
-            <div className="flex gap-2">
-              <button onClick={addMilestone} disabled={draft.milestones.length >= 50} className="px-3 py-1.5 rounded font-semibold text-sm" style={{ background: draft.milestones.length >= 50 ? "#D9D6CD" : "#22303C", color: "#fff" }}>+ Add milestone ({draft.milestones.length}/50)</button>
-              <button onClick={reloadDefault} className="px-3 py-1.5 rounded font-semibold text-sm border" style={{ borderColor: "#22303C", color: "#22303C" }}>↺ Reload {dj.fam} default</button>
-              <button onClick={savePlanNow} className="px-3 py-1.5 rounded font-semibold text-sm" style={{ background: "#E8600A", color: "#fff" }}>💾 Save now</button>
-            </div>
+            {canEdit ? (
+              <div className="flex gap-2">
+                <button onClick={addMilestone} disabled={draft.milestones.length >= 50} className="px-3 py-1.5 rounded font-semibold text-sm" style={{ background: draft.milestones.length >= 50 ? "#D9D6CD" : "#22303C", color: "#fff" }}>+ Add milestone ({draft.milestones.length}/50)</button>
+                <button onClick={reloadDefault} className="px-3 py-1.5 rounded font-semibold text-sm border" style={{ borderColor: "#22303C", color: "#22303C" }}>↺ Reload {dj.fam} default</button>
+                <button onClick={savePlanNow} className="px-3 py-1.5 rounded font-semibold text-sm" style={{ background: "#E8600A", color: "#fff" }}>💾 Save now</button>
+              </div>
+            ) : (
+              <div className="text-xs font-semibold" style={{ color: "#8A94A0" }}>👁 View only — ask an admin, planner or project owner to change this plan</div>
+            )}
             <div className="text-xs" style={{ color: "#8A94A0" }}>Crew = men per day · MD = crew × duration</div>
           </div>
 
@@ -1969,7 +2083,7 @@ function JobPlan({
                     {open.length === 0 && sched.length > 0 && (<div className="text-xs text-center rounded py-1 my-1 font-bold" style={{ background: "#E6F4EA", color: "#0D7A3F" }}>All milestones checked off ✓</div>)}
                     {doneMs.length > 0 && (<button onClick={() => setShowPastMs(!showPastMs)} className="w-full text-xs font-bold rounded border border-dashed py-1 my-1" style={{ borderColor: "#8FA1B3", color: "#0D7A3F" }}>{showPastMs ? "▴ hide" : "▾ show"} {doneMs.length} completed ✓</button>)}
                     {showPastMs && doneMs.map((m) => card(m))}
-                    {msForm.open ? (
+                    {canEdit && msForm.open && (
                       <div className="rounded border p-2 mt-1 bg-white" style={{ borderColor: "#1B3A5C" }}>
                         <input autoFocus placeholder="New milestone…" value={msForm.name} onChange={(e) => setMsForm({ ...msForm, name: e.target.value })} className="w-full text-xs border rounded px-1 py-1 mb-1" style={{ borderColor: "#E2E0DA" }} />
                         <div className="flex gap-1 items-center">
@@ -1979,7 +2093,8 @@ function JobPlan({
                           <button onClick={() => setMsForm({ open: false, name: "", days: 3 })} className="text-xs rounded px-1" style={{ color: "#8A94A0" }}>✕</button>
                         </div>
                       </div>
-                    ) : (<button onClick={() => setMsForm({ open: true, name: "", days: 3 })} className="w-full text-xs font-bold rounded py-1 mt-1" style={{ background: "#1B3A5C", color: "#fff" }}>+ Milestone</button>)}
+                    )}
+                    {canEdit && !msForm.open && (<button onClick={() => setMsForm({ open: true, name: "", days: 3 })} className="w-full text-xs font-bold rounded py-1 mt-1" style={{ background: "#1B3A5C", color: "#fff" }}>+ Milestone</button>)}
                   </div>
                 );
               })()}
@@ -2157,12 +2272,12 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
               <div key={j.id} className="flex gap-2 items-stretch">
                 {/* job card — fixed on the left */}
                 <div className="rounded-lg p-2 flex-shrink-0" style={{ width: 250, background: "#16232F", color: "#fff", borderLeft: "4px solid #E8600A" }}>
-                  <div className="flex justify-between items-baseline">
-                    <button onClick={() => onOpen(j.id)} className="font-bold text-sm underline decoration-dotted" style={{ color: "#F5B32B" }}>JOB {jobNo(j.id)}</button>
-                    <span className="text-xs font-bold" style={{ color: open ? "#F5B32B" : "#7BC67E" }}>{open} open</span>
+                  {/* the customer tag is the identity people recognise; job no is the fine print */}
+                  <div className="flex justify-between items-baseline gap-2">
+                    <button onClick={() => onOpen(j.id)} className="font-bold text-sm underline decoration-dotted truncate text-left" style={{ color: "#F5B32B", maxWidth: 175 }} title={`${j.tag} · JOB ${jobNo(j.id)}`}>{j.tag}</button>
+                    <span className="text-xs font-bold flex-shrink-0" style={{ color: open ? "#F5B32B" : "#7BC67E" }}>{open} open</span>
                   </div>
-                  <div className="text-xs truncate" title={j.tag}>{j.tag}</div>
-                  <div className="text-xs opacity-70">TDD {fmt(j.tdd)}{j.own ? " · " + j.own : ""}</div>
+                  <div className="text-xs opacity-70">JOB {jobNo(j.id)} · TDD {fmt(j.tdd)}{j.own ? " · " + j.own : ""}</div>
                   <div className="text-xs opacity-70 truncate">{j.cust}</div>
                 </div>
                 {/* tasks — flow horizontally across the screen */}
@@ -2471,7 +2586,23 @@ function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; rel
     try { await api.post("/api/admin/users", { action: "profile", id, ...patch }); await loadUsers(); }
     catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
   };
-  const setRole = async (id: string, role: string) => { try { await api.post("/api/admin/users", { action: "role", id, role }); await loadUsers(); } catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); } };
+  // Optimistic role change: the select shows the chosen value immediately and a
+  // small pending mark while the server confirms. Without this it snapped back
+  // to the old role for a beat, which read as "didn't take" and invited
+  // repeated clicking.
+  const [rolePending, setRolePending] = useState<Record<string, string>>({});
+  const setRole = async (id: string, role: string) => {
+    setUMsg("");
+    setRolePending((p) => ({ ...p, [id]: role }));
+    try {
+      await api.post("/api/admin/users", { action: "role", id, role });
+      await loadUsers();
+    } catch (e) {
+      setUMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRolePending((p) => { const { [id]: _, ...rest } = p; return rest; });
+    }
+  };
   const setDisabled = async (id: string, disabled: boolean, email: string) => {
     // disabling blocks sign-in entirely — confirm it, since this is a one-click toggle
     if (disabled && !window.confirm(`Disable ${email}?\n\nThey will no longer be able to sign in until re-enabled.`)) return;
@@ -2664,7 +2795,8 @@ function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; rel
                   />
                 </td>
                 <td className="py-1.5">
-                  <select value={u.role} onChange={(e) => setRole(u.id, e.target.value)} disabled={!mayManage(u)} className="text-xs border rounded px-1" style={{ borderColor: "#E2E0DA", background: mayManage(u) ? "#fff" : "#F4F2EC", color: mayManage(u) ? "#22303C" : "#8A94A0" }} title={mayManage(u) ? ROLE_OPTIONS.find((r) => r.value === u.role)?.hint : `Only ${OWNER_EMAIL} may change this account`}>
+                  {rolePending[u.id] && <span className="mr-1" title="Saving…">⏳</span>}
+                  <select value={rolePending[u.id] ?? u.role} onChange={(e) => setRole(u.id, e.target.value)} disabled={!mayManage(u) || !!rolePending[u.id]} className="text-xs border rounded px-1" style={{ borderColor: rolePending[u.id] ? "#E8600A" : "#E2E0DA", background: mayManage(u) ? "#fff" : "#F4F2EC", color: mayManage(u) ? "#22303C" : "#8A94A0", opacity: rolePending[u.id] ? 0.7 : 1 }} title={rolePending[u.id] ? "Saving…" : mayManage(u) ? ROLE_OPTIONS.find((r) => r.value === u.role)?.hint : `Only ${OWNER_EMAIL} may change this account`}>
                     {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
                   </select>
                 </td>

@@ -8,6 +8,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -94,14 +95,26 @@ export default function LoginPage() {
         <label className="block text-xs font-semibold mb-1" style={{ color: "#5A6672" }}>
           Password
         </label>
-        <input
-          type="password"
-          value={pw}
-          onChange={(e) => setPw(e.target.value)}
-          className="w-full border rounded px-2 py-2 mb-4 text-sm"
-          style={{ borderColor: "#D9D6CD" }}
-          autoComplete="current-password"
-        />
+        <div className="relative mb-4">
+          <input
+            type={showPw ? "text" : "password"}
+            value={pw}
+            onChange={(e) => setPw(e.target.value)}
+            className="w-full border rounded px-2 py-2 text-sm"
+            style={{ borderColor: "#D9D6CD", paddingRight: 38 }}
+            autoComplete="current-password"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPw((s) => !s)}
+            className="absolute"
+            style={{ right: 8, top: "50%", transform: "translateY(-50%)", color: "#8A94A0", fontSize: 15 }}
+            title={showPw ? "Hide password" : "Show password"}
+            aria-label={showPw ? "Hide password" : "Show password"}
+          >
+            {showPw ? "🙈" : "👁"}
+          </button>
+        </div>
         {err && (
           <div className="text-xs mb-3 font-semibold" style={{ color: "#B3261E" }}>
             {err}

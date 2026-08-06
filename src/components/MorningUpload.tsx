@@ -18,7 +18,12 @@ interface StatusRow {
   rows: number | null;
 }
 
-export default function MorningUpload({ email }: { email: string }) {
+/**
+ * @param embedded true when rendered as a tab inside the Genie suite (admins) —
+ *        skips this page's own masthead and quote popup, which the suite
+ *        already provides. Standalone (Shweta's login) keeps both.
+ */
+export default function MorningUpload({ email, embedded = false }: { email: string; embedded?: boolean }) {
   const router = useRouter();
   const [rows, setRows] = useState<StatusRow[]>([]);
   const [date, setDate] = useState("");
@@ -64,35 +69,37 @@ export default function MorningUpload({ email }: { email: string }) {
   const loadedCount = rows.filter((r) => r.loadedToday).length;
 
   return (
-    <div className="min-h-screen" style={{ background: "#F1EFE9" }}>
-      <QuoteOfDay />
-      <div
-        className="px-4 py-2.5"
-        style={{ background: "#16232F", borderBottom: "3px solid #E8600A" }}
-      >
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-3">
-            <div className="rounded bg-white px-2 py-1">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={LOGO} alt="Nandan GSE" style={{ height: 30 }} />
-            </div>
-            <div>
-              <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>
-                GENIE
+    <div className={embedded ? "" : "min-h-screen"} style={embedded ? {} : { background: "#F1EFE9" }}>
+      {!embedded && <QuoteOfDay />}
+      {!embedded && (
+        <div
+          className="px-4 py-2.5"
+          style={{ background: "#16232F", borderBottom: "3px solid #E8600A" }}
+        >
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-3">
+              <div className="rounded bg-white px-2 py-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={LOGO} alt="Nandan GSE" style={{ height: 30 }} />
               </div>
-              <h1 className="text-base font-bold text-white leading-tight">
-                🌅 Morning Update
-              </h1>
+              <div>
+                <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>
+                  GENIE
+                </div>
+                <h1 className="text-base font-bold text-white leading-tight">
+                  🌅 Morning Update
+                </h1>
+              </div>
             </div>
+            <span className="text-xs rounded px-2 py-1.5" style={{ background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }}>
+              👤 {email}
+              <button onClick={logout} className="ml-1 font-bold" style={{ color: "#E8600A" }}>
+                Logout
+              </button>
+            </span>
           </div>
-          <span className="text-xs rounded px-2 py-1.5" style={{ background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }}>
-            👤 {email}
-            <button onClick={logout} className="ml-1 font-bold" style={{ color: "#E8600A" }}>
-              Logout
-            </button>
-          </span>
         </div>
-      </div>
+      )}
 
       <div className="p-4 max-w-3xl mx-auto">
         <div className="mb-3 flex items-baseline justify-between flex-wrap gap-2">
