@@ -324,6 +324,25 @@ export default function PlanningSuite({
     if (workspace === "goals") setGoalsVisited(true);
   }, [workspace]);
 
+  // ---- notification bell: new assignments land here, polled once a minute ----
+  interface Notif { id: string; kind: string; title: string; body: string; created_by: string | null; read_at: string | null; created_at: string }
+  const [notifs, setNotifs] = useState<{ installed: boolean; items: Notif[]; unread: number } | null>(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const loadNotifs = useCallback(() => {
+    api.get("/api/notifications").then(setNotifs).catch(() => {});
+  }, []);
+  useEffect(() => {
+    loadNotifs();
+    const t = setInterval(loadNotifs, 60_000);
+    return () => clearInterval(t);
+  }, [loadNotifs]);
+  const markAllRead = async () => {
+    try { await api.post("/api/notifications", { action: "read_all" }); loadNotifs(); } catch { /* bell is best-effort */ }
+  };
+  const markRead = async (id: string) => {
+    try { await api.post("/api/notifications", { action: "read", ids: [id] }); loadNotifs(); } catch { /* ditto */ }
+  };
+
   // Opening a job's plan can be triggered from Tasking or Goals, both of which
   // are now separate workspaces from Job Plan — so jumping there must also
   // switch back to the Planning Suite workspace, not just change the sub-tab.
@@ -495,6 +514,57 @@ export default function PlanningSuite({
             <span className="text-xs rounded px-2 py-1.5 font-bold" style={{ background: "#0D161F", color: loadedCount === 3 ? "#7BC67E" : "#8FA1B3", border: "1px solid #22303C" }}>
               🌅 Morning update {loadedCount}/3
             </span>
+            {/* bell renders only once the notifications table exists */}
+            {notifs?.installed && (
+              <span className="relative">
+                <button
+                  onClick={() => setNotifOpen((o) => !o)}
+                  className="text-xs rounded px-2 py-1.5 font-bold"
+                  style={{ background: "#0D161F", color: notifs.unread ? "#F5B32B" : "#8FA1B3", border: "1px solid #22303C" }}
+                  title="Notifications"
+                >
+                  🔔{notifs.unread > 0 && (
+                    <span className="ml-1 rounded-full px-1.5 font-bold tnum" style={{ background: "#B3261E", color: "#fff", fontSize: 10 }}>
+                      {notifs.unread}
+                    </span>
+                  )}
+                </button>
+                {notifOpen && (
+                  <>
+                    <div className="fixed inset-0" style={{ zIndex: 58 }} onClick={() => setNotifOpen(false)} />
+                    <div className="absolute rounded-lg border bg-white" style={{ top: "calc(100% + 6px)", right: 0, width: 330, maxHeight: 420, overflowY: "auto", borderColor: "#E2E0DA", boxShadow: "0 12px 30px rgba(0,0,0,.25)", zIndex: 59 }}>
+                      <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: "1px solid #EEECE6" }}>
+                        <span className="text-xs font-bold" style={{ color: "#16232F" }}>Notifications</span>
+                        {notifs.unread > 0 && (
+                          <button onClick={markAllRead} className="text-xs font-bold" style={{ color: "#E8600A" }}>Mark all read</button>
+                        )}
+                      </div>
+                      {notifs.items.length === 0 && (
+                        <div className="text-xs text-center py-6" style={{ color: "#8A94A0" }}>Nothing yet — you&apos;ll hear when a task is assigned to you.</div>
+                      )}
+                      {notifs.items.map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={() => { if (!n.read_at) markRead(n.id); }}
+                          className="px-3 py-2 cursor-pointer"
+                          style={{ borderBottom: "1px solid #F4F2EC", background: n.read_at ? "#fff" : "#FFF7E6" }}
+                          title={n.read_at ? undefined : "Click to mark read"}
+                        >
+                          <div className="flex items-start gap-2">
+                            {!n.read_at && <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: "#E8600A", marginTop: 5 }} />}
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold" style={{ color: "#16232F" }}>{n.title}</div>
+                              {n.body && <div className="text-xs truncate" style={{ color: "#5A6672" }}>{n.body}</div>}
+                              <div className="tnum" style={{ fontSize: 10, color: "#8A94A0" }}>{stamp(n.created_at)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </span>
+            )}
             <button
               onClick={() => setQuoteTrigger((n) => n + 1)}
               className="text-xs rounded px-2 py-1.5 font-bold"

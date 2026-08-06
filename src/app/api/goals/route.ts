@@ -4,8 +4,36 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { buildGoalTree } from "@/lib/goal-tree";
 import { resolveGoalAccess } from "@/lib/goal-access";
-import { CHILD_OF, type NodeType } from "@/lib/goals";
+import { CHILD_OF, LEVEL_LABEL, type NodeType } from "@/lib/goals";
 import { METRICS } from "@/lib/goal-metrics";
+import { notify } from "@/lib/notify";
+
+/** Bell for each newly added goal-node owner (never the actor themselves). */
+async function notifyGoalOwners(
+  actor: { id: string; label: string },
+  nodeId: string,
+  personIds: string[],
+) {
+  const admin = adminClient();
+  const fresh = personIds.filter((p) => p && p !== actor.id);
+  if (!fresh.length) return;
+  let what = "a goal item";
+  try {
+    const { data } = await admin.from("goal_node").select("what, node_type").eq("id", nodeId).maybeSingle();
+    if (data) what = `${LEVEL_LABEL[data.node_type as NodeType].toLowerCase()} "${data.what}"`;
+  } catch { /* description is decoration */ }
+  for (const pid of fresh) {
+    await notify(admin, {
+      person_id: pid,
+      kind: "goal_assigned",
+      title: `${actor.label} made you owner of a goal item`,
+      body: what,
+      ref_kind: "goal",
+      ref_id: nodeId,
+      created_by: actor.label,
+    });
+  }
+}
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +141,11 @@ export async function POST(req: Request) {
         await db.from("goal_node_owner").insert(
           body.owner_ids.map((p: string) => ({ node_id: data.id, person_id: p })),
         );
+        await notifyGoalOwners(
+          { id: user.id, label: user.initials || user.email.split("@")[0] },
+          data.id,
+          body.owner_ids,
+        );
       }
       return NextResponse.json({ ok: true, id: data.id });
     }
@@ -155,12 +188,20 @@ export async function POST(req: Request) {
 
     if (body.action === "owners") {
       if (!access.edit) throw new HttpError(403, "You may not reassign goal nodes");
+      // remember who already owned it, so only genuinely NEW owners get a bell
+      const { data: prev } = await db.from("goal_node_owner").select("person_id").eq("node_id", body.id);
+      const prevIds = new Set((prev || []).map((r) => r.person_id as string));
       await db.from("goal_node_owner").delete().eq("node_id", body.id);
       if (body.person_ids?.length) {
         const { error } = await db.from("goal_node_owner").insert(
           body.person_ids.map((p: string) => ({ node_id: body.id, person_id: p })),
         );
         if (error) throw new Error(error.message);
+        await notifyGoalOwners(
+          { id: user.id, label: user.initials || user.email.split("@")[0] },
+          body.id,
+          (body.person_ids as string[]).filter((p) => !prevIds.has(p)),
+        );
       }
       return NextResponse.json({ ok: true });
     }

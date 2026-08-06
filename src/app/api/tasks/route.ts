@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireTasker, errJson, EDITOR_ROLES } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
+import { adminClient } from "@/lib/supabase/admin";
+import { notifyTaskAssignment } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,18 @@ export async function POST(req: Request) {
         .select("id")
         .single();
       if (error) throw new Error(error.message);
+      // ring the assignee's bell (self-assignment stays silent; failures never
+      // break the create itself)
+      await notifyTaskAssignment(adminClient(), {
+        who: body.who,
+        actorId: user.id,
+        actorLabel: user.initials || user.displayName || user.email.split("@")[0],
+        taskTitle: String(body.title),
+        jobId: body.job_id || null,
+        kind: "task_assigned",
+        refKind: "manual",
+        refId: data.id,
+      });
       return NextResponse.json({ ok: true, id: data.id });
     }
 
@@ -58,8 +72,31 @@ export async function POST(req: Request) {
       if ("esc" in body) patch.esc = String(body.esc || "None");
       if (!Object.keys(patch).length)
         return NextResponse.json({ error: "nothing to update" }, { status: 400 });
+
+      // read the old assignee first, so a reassignment can be detected after
+      const oldWho =
+        "who" in body
+          ? (await supabase.from(table).select("who, title").eq("id", body.id).maybeSingle()).data
+          : null;
+
       const { error } = await supabase.from(table).update(patch).eq("id", body.id);
       if (error) throw new Error(error.message);
+
+      if (
+        oldWho &&
+        String(patch.who ?? "").toLowerCase() !== String(oldWho.who ?? "").toLowerCase()
+      ) {
+        await notifyTaskAssignment(adminClient(), {
+          who: patch.who,
+          actorId: user.id,
+          actorLabel: user.initials || user.displayName || user.email.split("@")[0],
+          taskTitle: String(patch.title ?? oldWho.title ?? "task"),
+          jobId: null,
+          kind: "task_reassigned",
+          refKind: body.kind === "manual" ? "manual" : "erp",
+          refId: String(body.id),
+        });
+      }
       return NextResponse.json({ ok: true });
     }
 
