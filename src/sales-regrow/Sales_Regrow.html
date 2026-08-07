@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sales Regrow · Nandan GSE Sales Strategy Playbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#1B2A5E;--ink:#0E1730;--orange:#F04E23;--steel:#EDEFF5;--line:#D5DAE7;--slate:#5B6785;--wash:#FAFBFD;
+--display:"Barlow Condensed","Arial Narrow",sans-serif;--body:"IBM Plex Sans",-apple-system,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);background:#fff;color:var(--ink);font-size:15px;line-height:1.62;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+img{-webkit-user-drag:none;pointer-events:none}
+header{position:sticky;top:0;z-index:60;background:#fff;border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:16px;padding:11px 22px;flex-wrap:wrap}
+.logo{height:32px;background:#fff}
+.titleblock{border-left:2px solid var(--line);padding-left:15px;line-height:1.12}
+.titleblock h1{font-family:var(--display);font-weight:700;font-size:23px;letter-spacing:.05em;text-transform:uppercase;color:var(--navy)}
+.titleblock h1 em{font-style:normal;color:var(--orange)}
+.titleblock span{font-family:var(--mono);font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--slate)}
+.spacer{flex:1}
+.confbadge{font-family:var(--mono);font-size:9px;letter-spacing:.15em;text-transform:uppercase;background:var(--orange);color:#fff;padding:5px 10px;white-space:nowrap}
+button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+nav.tabs{display:flex;overflow-x:auto;background:var(--navy);scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+.tab{font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.66);background:none;border:0;border-bottom:3px solid transparent;padding:12px 19px;cursor:pointer;white-space:nowrap;transition:.15s}
+.tab:hover{color:#fff}
+.tab[aria-selected=true]{color:#fff;border-bottom-color:var(--orange)}
+.wrap{display:grid;grid-template-columns:250px 1fr;max-width:1420px;margin:0 auto;min-height:70vh}
+.subnav{border-right:1px solid var(--line);padding:26px 0 60px;position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto}
+.subnav .eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.17em;text-transform:uppercase;color:var(--slate);padding:0 22px 11px}
+.subnav a{display:block;padding:8px 22px;font-size:13.5px;color:var(--slate);text-decoration:none;border-left:2px solid transparent;transition:.12s}
+.subnav a:hover{color:var(--navy);background:var(--steel)}
+.subnav a.active{color:var(--navy);font-weight:600;border-left-color:var(--orange);background:var(--steel)}
+main{padding:34px 44px 110px;min-width:0}
+.panel{display:none}.panel.on{display:block}
+section.sec{padding-bottom:44px;margin-bottom:36px;border-bottom:1px solid var(--line);scroll-margin-top:130px}
+section.sec:last-child{border-bottom:0}
+.kicker{font-family:var(--mono);font-size:9.5px;letter-spacing:.19em;text-transform:uppercase;color:var(--orange);display:block;margin-bottom:9px}
+h2{font-family:var(--display);font-weight:700;font-size:34px;letter-spacing:.02em;text-transform:uppercase;color:var(--navy);line-height:1.05;margin-bottom:14px}
+h3{font-family:var(--display);font-weight:600;font-size:21px;letter-spacing:.045em;text-transform:uppercase;color:var(--navy);margin:26px 0 10px}
+h4{font-size:13.5px;font-weight:700;margin:17px 0 6px}
+p{margin-bottom:13px;max-width:76ch}
+ul,ol{margin:0 0 15px 19px;max-width:76ch}li{margin-bottom:6px}
+strong,b{color:var(--navy)}
+.lead{font-size:17px;color:var(--slate);max-width:70ch;margin-bottom:20px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin-bottom:18px}
+.card{border:1px solid var(--line);padding:17px 18px}
+.card .n{font-family:var(--mono);font-size:9px;letter-spacing:.15em;color:var(--orange);text-transform:uppercase;display:block;margin-bottom:7px}
+.card h4{margin:0 0 6px;font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--navy)}
+.card p{font-size:13px;margin:0;color:var(--slate)}
+table{border-collapse:collapse;width:100%;margin:8px 0 20px;font-size:13px}
+th{background:var(--navy);color:#fff;font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;text-align:left;padding:9px 11px;font-weight:500}
+td{border-bottom:1px solid var(--line);padding:9px 11px;vertical-align:top}
+tr:nth-child(even) td{background:var(--wash)}
+.chip{display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.11em;text-transform:uppercase;padding:3px 8px;margin:0 5px 5px 0;border:1px solid var(--line);color:var(--slate)}
+.chip.go{background:var(--navy);color:#fff;border-color:var(--navy)}
+.chip.hot{background:var(--orange);color:#fff;border-color:var(--orange)}
+.chip.tbc{border-color:var(--orange);color:var(--orange)}
+.note{border-left:3px solid var(--orange);background:var(--steel);padding:14px 17px;margin:16px 0;font-size:13.5px}
+.note b{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--orange);display:block;margin-bottom:5px}
+.note.src{border-left-color:var(--navy);background:var(--wash)}
+.note.src b{color:var(--navy)}
+.rail{position:relative;margin:26px 0 10px;padding-left:58px}
+.rail::before{content:"";position:absolute;left:20px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.stage{position:relative;padding:0 0 28px}
+.stage::before{content:attr(data-n);position:absolute;left:-58px;top:0;width:40px;height:40px;background:var(--navy);color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.stage.gate::before{background:var(--orange)}
+.stage h4{font-family:var(--display);font-size:19px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--navy);margin:8px 0 4px}
+.stage .meta{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--orange);margin-bottom:8px}
+.stage .crit{font-size:13px;color:var(--slate);border-left:2px solid var(--line);padding-left:13px;margin-top:9px}
+.stage .crit b{font-size:12px}
+.metric{display:flex;gap:26px;flex-wrap:wrap;margin:18px 0 6px;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.metric div{min-width:92px}
+.metric .v{font-family:var(--display);font-size:31px;font-weight:700;color:var(--navy);line-height:1}
+.metric .l{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);margin-top:4px}
+.opsp{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));border:1px solid var(--navy);margin:20px 0}
+.opsp>div{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:15px 16px}
+.opsp .hd{font-family:var(--mono);font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--orange);display:block;margin-bottom:8px}
+.opsp p{font-size:13px;margin:0 0 7px}
+.opsp ul{margin:0 0 0 16px;font-size:13px}
+.acr{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0;border:1px solid var(--line);margin:14px 0 20px}
+.acr div{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:9px 12px;font-size:13px}
+.acr b{font-family:var(--display);font-size:20px;color:var(--orange);margin-right:8px}
+.qg{border:1px solid var(--navy);margin:20px 0}
+.qghd{background:var(--navy);color:#fff;padding:11px 16px;font-family:var(--display);font-size:18px;letter-spacing:.06em;text-transform:uppercase}
+.qgbody{display:grid;grid-template-columns:1fr 1fr}
+.qgin{padding:18px 20px;border-right:1px solid var(--line)}
+.qgout{padding:18px 20px;background:var(--wash)}
+.fld{margin-bottom:12px}
+.fld label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--slate);margin-bottom:4px}
+.fld input,.fld select,.fld textarea{width:100%;font-family:var(--body);font-size:13.5px;padding:7px 9px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:0}
+.fld textarea{resize:vertical;min-height:52px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.f3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px}
+.qgsub{font-family:var(--mono);font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--orange);margin:18px 0 9px;padding-top:12px;border-top:1px solid var(--line)}
+.qgsub:first-child{border-top:0;padding-top:0;margin-top:0}
+.qline{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--line)}
+.qline.tot{border-bottom:0;border-top:2px solid var(--navy);margin-top:6px;padding-top:9px;font-family:var(--display);font-size:21px;letter-spacing:.03em;text-transform:uppercase;color:var(--navy);font-weight:700}
+.qline span:last-child{font-family:var(--mono);white-space:nowrap}
+.words{font-family:var(--mono);font-size:11px;color:var(--orange);letter-spacing:.06em;margin-top:5px;text-align:right}
+.flag{font-size:12px;padding:7px 10px;border-left:3px solid var(--orange);background:#fff;margin-bottom:6px}
+.flag.ok{border-left-color:var(--navy);color:var(--slate)}
+#wm{position:fixed;inset:0;z-index:900;pointer-events:none;opacity:.055;background-repeat:repeat;transform:rotate(-24deg) scale(1.5)}
+#shield{position:fixed;inset:0;z-index:950;background:var(--navy);color:#fff;display:none;align-items:center;justify-content:center;flex-direction:column;gap:9px;text-align:center;padding:30px}
+#shield.on{display:flex}
+#shield .sh1{font-family:var(--display);font-size:28px;letter-spacing:.09em;text-transform:uppercase}
+#shield .sh2{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:rgba(255,255,255,.75);text-transform:uppercase}
+footer{border-top:1px solid var(--line);padding:20px 44px;font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--slate);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}
+@media (max-width:980px){.qgbody{grid-template-columns:1fr}.qgin{border-right:0;border-bottom:1px solid var(--line)}}
+@media (max-width:900px){
+ .wrap{grid-template-columns:1fr}
+ .subnav{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:14px 0;display:flex;gap:4px;overflow-x:auto}
+ .subnav .eyebrow{display:none}
+ .subnav a{white-space:nowrap;border-left:0;border-bottom:2px solid transparent;padding:6px 15px}
+ .subnav a.active{border-left:0;border-bottom-color:var(--orange)}
+ main{padding:24px 20px 90px}h2{font-size:27px}
+ .bar{padding:10px 16px;gap:11px}footer{padding:18px 20px}
+ .f2,.f3{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}html{scroll-behavior:auto}}
+@media print{body>*{display:none!important}
+ body::after{content:"Printing and PDF export are disabled. Sales Regrow — Nandan GSE Confidential.";font-family:sans-serif;font-size:15px;display:block;padding:40px}}
+</style>
+</head>
+<body>
+<div id="wm"></div>
+<div id="shield"><div class="sh1">Content hidden</div><div class="sh2">Return focus to this window to continue</div></div>
+<header>
+ <div class="bar">
+  <img class="logo" src="data:image/jpeg;base64,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" alt="Nandan GSE">
+  <div class="titleblock"><h1>Sales <em>Regrow</em></h1><span id="stamp">salesregrow.nandan.co.in</span></div>
+  <div class="spacer"></div>
+  <div class="confbadge">Confidential</div>
+ </div>
+ <nav class="tabs" id="tabs" role="tablist"></nav>
+</header>
+<div class="wrap"><aside class="subnav" id="subnav"></aside><main id="main"></main></div>
+<footer><span>Nandan GSE Pvt. Ltd. · Khalapur, Maharashtra</span><span id="foot"></span></footer>
+
+<script>
+const CONTENT=[
+
+/* ============ OUR OPSP ============ */
+{id:"opsp",tab:"Our OPSP",secs:[
+ {id:"o-plan",kicker:"OPSP 2026-27",h2:"Breakthrough 2027",
+  html:`<p style="font-family:var(--display);font-size:30px;letter-spacing:.03em;text-transform:uppercase;color:var(--orange);line-height:1.1;max-width:30ch;margin-bottom:6px">One team.<br>Every promise kept.</p>
+  <p class="lead">Safe work. On-time delivery. Right the first time. This is the year Nandan becomes the company we know it can be. <b>Building today. Leading tomorrow.</b></p>
+  <div class="opsp">
+   <div><span class="hd">Purpose — the why</span><p>To build serious machines that make dangerous work safe — and to prove that an Indian company can do it well enough that the world comes to us first.</p></div>
+   <div><span class="hd">Mission</span><p>We design and build mission-critical lifting and support systems for customers who cannot afford failure. We improve our customers' productivity, performance and safety by helping them save money, time and effort. We are known for our quality, reliability and after-sales service.</p></div>
+   <div><span class="hd">BHAG — by 2029</span><p>A <b>Rs. 350 Cr</b> engineering institution where half our revenue comes from <b>65 countries</b> — the Indian choice for the world's aviation and defence operators.</p><p>Listed, professionally led, running on systems rather than on any one person. The benchmark in India for safety, first-time-right quality, and delivery you can set your watch by. Work made safer for more than <b>2 million people</b> across <b>1,000+ customers</b>.</p></div>
+   <div><span class="hd">Brand promise — what we will not settle on</span><ul><li>Innovation · quality and reliability</li><li>Meet or exceed safety standards</li><li>Customised solutions and consultative selling</li><li>Sustainable lean practices</li><li>Fantastic after-sales service</li></ul></div>
+   <div><span class="hd">This year — the mission for 2026-27</span><p><b>Rs. 100 Cr at 10% PBT by 31 March 2027.</b> A stabilised, optimised company with profitable revenue streams and teams executing smoothly. Exports at Rs. 50 Cr — half the business. The founder out of daily operations.</p></div>
+   <div><span class="hd">Critical numbers</span><p><b>OTIF</b> from below 60% to 95%. <b>40% gross margin</b> enforced at quote stage. <b>Working capital under 30 days.</b> Everything else supports these three.</p></div>
+  </div>
+  <h3>The Nandan Oath</h3>
+  <div class="grid">
+   <div class="card"><span class="n">01</span><h4>Deliver predictably</h4><p>When Nandan commits, Nandan delivers.</p></div>
+   <div class="card"><span class="n">02</span><h4>Build quality right first time</h4><p>Prevention over inspection — always.</p></div>
+   <div class="card"><span class="n">03</span><h4>Use resources wisely</h4><p>Value from every rupee and every hour.</p></div>
+   <div class="card"><span class="n">04</span><h4>Solve root causes</h4><p>Never the same problem twice.</p></div>
+   <div class="card"><span class="n">05</span><h4>Build systems, develop leaders</h4><p>Not dependence on heroics.</p></div>
+   <div class="card"><span class="n">06</span><h4>Grow profitably</h4><p>Never chase revenue at any cost.</p></div>
+  </div>
+  <div class="note"><b>What this means for sales</b>Three lines of the OPSP land directly on this team. <b>Margin Fortress</b> — 40% gross margin is enforced at the quote, not reviewed after the fact. <b>Delivery Spine</b> — we quote the honest date; trust is the raw material of the order book. <b>Export Engine</b> — half of revenue, Rs. 50 Cr, from exports. Every page on this site should be read against those three.</div>`},
+
+ {id:"o-values",kicker:"REALISTICS",h2:"Our core values",
+  html:`<p class="lead">Ten values, one acronym. This is now the single set — the alternative lists that were circulating in the old playbook are superseded.</p>
+  <table><tr><th></th><th>Value</th><th>What it means</th></tr>
+  <tr><td><b>R</b></td><td><b>Responsiveness</b></td><td>We react quickly and positively to every situation, even if in the negation</td></tr>
+  <tr><td><b>E</b></td><td><b>Excellence</b></td><td>We are extremely good on our quality and be outstanding in all aspects</td></tr>
+  <tr><td><b>A</b></td><td><b>Accountability</b></td><td>We are acceptable for honest and ethical conduct to what is assigned to us as responsibility</td></tr>
+  <tr><td><b>L</b></td><td><b>Lean</b></td><td>We work to eliminate all waste so that we add value in every step and every process</td></tr>
+  <tr><td><b>I</b></td><td><b>Innovation</b></td><td>We are always innovating new thoughts and ideas for the value addition for the customer</td></tr>
+  <tr><td><b>S</b></td><td><b>Speed</b></td><td>We work at the Nandan Speed on ideas and action</td></tr>
+  <tr><td><b>T</b></td><td><b>Trust</b></td><td>We work with full trust with each other and never let this break</td></tr>
+  <tr><td><b>I</b></td><td><b>Integrity</b></td><td>We say what we will do and actually do what we said without fail</td></tr>
+  <tr><td><b>C</b></td><td><b>Continual improvement</b></td><td>We always look to make small changes on a day-to-day basis so we can improve value</td></tr>
+  <tr><td><b>S</b></td><td><b>Safety · Quality · On-time · Happiness</b></td><td>We work with the four magic words that guide us towards our goals</td></tr></table>
+  <h3>How we live it</h3>
+  <ul><li>Weekly assembly and town halls with the team, so everyone knows what they have done and how they have done on continuous learning</li>
+  <li>Relentless tracking of all metrics on ERP dashboards</li>
+  <li>Continuous Kaizen initiatives for lean deployment on the Gemba, with constant reduction of wastes</li>
+  <li>An accountable culture with SLAs defined for everything</li>
+  <li>Speed of implementation constantly challenged by cross-functional team meetings and actions</li></ul>`},
+
+ {id:"o-drivers",kicker:"Three-year drivers",h2:"The six engines",
+  html:`<p class="lead">Six drivers carry us from here to the 2029 BHAG. Two of them are owned by sales outright, and a third is set at the quote.</p>
+  <div class="grid">
+   <div class="card"><span class="n">Driver 01</span><h4>Delivery spine</h4><p>Predictable delivery before anything else. Planning gates, one owner per project, OTIF from below 60% to 95%. <b>Trust is the raw material of the order book.</b></p></div>
+   <div class="card"><span class="n">Driver 02</span><h4>Margin fortress</h4><p>40% gross margin enforced <i>at quote stage</i>, not reviewed after the fact. Purchase managed as margin protection. Platformisation so repeatability protects the margin instead of heroics.</p></div>
+   <div class="card"><span class="n">Driver 03</span><h4>Export engine</h4><p>Half our revenue will be exports. Structured distributors in three focus geographies, two anchor customers, and one flagship platform built for the world rather than for one buyer.</p></div>
+   <div class="card"><span class="n">Driver 04</span><h4>Leadership depth</h4><p>Accountable teams that own outcomes. Every key position with a named successor. The measure is simple: the business runs, and improves, when the founder is not in the room.</p></div>
+   <div class="card"><span class="n">Driver 05</span><h4>Cash discipline</h4><p>Working capital under 30 days. Rolling 13-week forecast. Every rupee of throughput above the floor is profit that funds the next move, not a number in a review deck.</p></div>
+   <div class="card"><span class="n">Driver 06</span><h4>Technology edge</h4><p>ERP as the single source of truth, AI in every function, and electrification on the product roadmap — so we compete on capability, not on effort.</p></div>
+  </div>
+  <h3>Three-year targets</h3>
+  <table><tr><th>Target</th><th>What it means</th></tr>
+  <tr><td><b>1,000+ customers with repeat business</b></td><td>Strong retention and referrals by delivering consistent value at scale</td></tr>
+  <tr><td><b>95% OTIF, sustained</b></td><td>Not achieved once. Held for four consecutive quarters, until a Nandan date means something in the market.</td></tr>
+  <tr><td><b>A 250-person institution</b></td><td>Attrition under 15%. PLI for every employee. ESOP for the next line of leaders.</td></tr>
+  <tr><td><b>Top-tier certifications, held</b></td><td>ISO 3834, EN 1090, AS9100D, DGCA — maintained and audit-ready. In defence and aviation these are the entry ticket, not the trophy.</td></tr>
+  <tr><td><b>Zero founder dependency</b></td><td>Operations run entirely by a professional leadership team. Every key role with a named successor and a development plan.</td></tr>
+  <tr><td><b>Rs. 1,000 Cr+ enterprise valuation</b></td><td>Through EBITDA strength, strategic partnerships and global relevance</td></tr></table>
+  <h3>The visioning blocks</h3>
+  <table><tr><th>2027</th><th>2028</th><th>2031</th></tr>
+  <tr><td>Rs. 100 Cr — stabilised and optimised, profitable revenue streams, 10% PBT, teams executing smoothly. <b>Exports at Rs. 50 Cr, half the business. The founder out of daily operations.</b></td>
+  <td>Rs. 200 Cr+, presence across 40+ countries, platformised products, and a professional leadership team running the business without founder intervention.</td>
+  <td>Rs. 350 Cr at 15% PBT. A listed-ready entity with robust systems, automation, an innovation lab, 50% export revenue across 65 countries, 250 professionals, and Raghu as Chairman.</td></tr></table>`},
+
+ {id:"o-csf",kicker:"Breakthrough 2027",h2:"Ten critical success factors",
+  html:`<p class="lead">The year we stop firefighting and start finishing. Each factor carries its own KPI — four of the ten are wholly or partly sales-owned.</p>
+  <table><tr><th>#</th><th>Factor</th><th>KPI</th></tr>
+  <tr><td>1</td><td><b>Safety first</b> — zero compromise on safety in every activity. A preventive culture with PPE discipline, induction training and visible safety ownership.</td><td>PPE non-compliance, induction completion, safety observations</td></tr>
+  <tr><td>2</td><td><b>On-time delivery</b> — predict and achieve project delivery with 90%+ OTD performance. Drive execution through milestone tracking, accountability and disciplined follow-up.</td><td>OTD %, milestone adherence, delayed-project count</td></tr>
+  <tr><td>3</td><td><b>Customer responsiveness</b> <span class="chip hot">Sales</span> — every customer interaction must feel special, timely and professional. No customer should need repeated reminders to get a response.</td><td>Customer reminders, response time, closure time</td></tr>
+  <tr><td>4</td><td><b>Deep project planning</b> — plan every project deeply from start to finish. TDS, design, sign-off, review, and execution milestones must all be time-bound.</td><td>Planning completeness, milestone closure, variance to plan</td></tr>
+  <tr><td>5</td><td><b>Supplier &amp; material excellence</b> — improve material cost competitiveness through stronger supplier management, new supplier development, and better commercial terms.</td><td>Supplier visits, new suppliers onboarded, purchase % of sales</td></tr>
+  <tr><td>6</td><td><b>First-time-right quality</b> — raise fabrication and production quality by building process discipline, training and quality ownership into everyday work.</td><td>Training hours, NC count, rework %, rejection rate</td></tr>
+  <tr><td>7</td><td><b>Team strengthening</b> — add critical capability across sales, PPC, quality, purchase, stores, production, safety, process and shopfloor roles to support scale.</td><td>Critical hires closed, team capacity, skill coverage</td></tr>
+  <tr><td>8</td><td><b>AI-enabled sales</b> <span class="chip hot">Sales</span> — use AI to improve prospecting, research, communication, follow-up quality, and speed in the sales process.</td><td>Prospects reached, response quality, qualified opportunities</td></tr>
+  <tr><td>9</td><td><b>Disciplined shopfloor &amp; night shift</b> — run the factory with better daily discipline and make the night shift operate properly every day with clear ownership and control.</td><td>Night-shift uptime, output, attendance, supervision</td></tr>
+  <tr><td>10</td><td><b>Checklist-based delivery &amp; handover</b> <span class="chip hot">Sales</span> — before dispatch, every project must pass a proper checklist on delivery, handover, and customer experience, are consistently A1.</td><td>Dispatch checklist completion, installation readiness, customer satisfaction</td></tr></table>
+  <h3>The mission for 2026-27 — ten objectives</h3>
+  <table><tr><th>Objective</th><th>By</th></tr>
+  <tr><td><b>Rs. 100 Cr at 10% PBT</b></td><td>31 Mar 2027</td></tr>
+  <tr><td>Improve EBITDA margin to <b>≥18%</b></td><td>Mar 2027</td></tr>
+  <tr><td>Achieve <b>100% project and job tracking</b> in NandanERP</td><td>—</td></tr>
+  <tr><td>Reduce working capital cycle to <b>&lt;30 days</b></td><td>Mar 2027</td></tr>
+  <tr><td><b>Standardise 45%</b> of the product portfolio</td><td>—</td></tr>
+  <tr><td>Export order execution excellence — <b>90% customer satisfaction</b></td><td>—</td></tr>
+  <tr><td>Institutionalise weekly execution reviews with <b>100% functional usage</b></td><td>—</td></tr>
+  <tr><td>Role clarity, growth paths and upskilling for <b>100% of key staff</b></td><td>Sept 2026</td></tr>
+  <tr><td>Operationalise <b>AI across 5 core use cases</b> — sales, marketing, purchase, project management, decision support</td><td>Dec 2026</td></tr></table>
+  <div class="note"><b>We pledge</b>Every person goes home safe. Every date we give, we keep. Every job is right the first time. Every customer hears from us before they have to ask. Design plans it properly. Purchase brings it in on time. The floor builds it right. Quality proves it. Service stands behind it. <b>No department wins alone — a project is only as strong as its weakest gate.</b></div>`},
+
+ {id:"o-meet",kicker:"Rhythm",h2:"The strategic meetings tracker",
+  html:`<p class="lead">Twelve standing forums. The sales cadence in <b>Metrics → The review cadence</b> sits inside this, not alongside it.</p>
+  <table><tr><th>Weekly</th><th>Daily / fortnightly</th><th>Monthly / quarterly</th></tr>
+  <tr><td>Weekly Monday Morning Assembly</td><td>Daily Tool Talk</td><td>Monday PRE Meeting</td></tr>
+  <tr><td>Weekly Leader Parking Lot</td><td>Fortnightly Leaders Council</td><td>Monthly Reviews — MRM</td></tr>
+  <tr><td>Design Reviews</td><td>Stratcom Meeting</td><td>Quarterly Goals Meeting</td></tr>
+  <tr><td>1-2-1 Meetings</td><td>WCM Gemba Walk</td><td>Individual Development Plan (IDP)</td></tr></table>
+  <div class="note"><b>One reconciliation needed</b>The sales process defines a Monday sales meeting chaired by Nitu, a monthly business review and a quarterly review. The OPSP defines a Monday Morning Assembly, a Monday PRE Meeting, an MRM and a Quarterly Goals Meeting. These are almost certainly the same forums under two names. Map them once, so nobody attends two versions of the same meeting. <span class="chip tbc">To map</span></div>`}
+]},
+
+{id:"plan",tab:"Our Sales Plan",secs:[
+ {id:"p-field",kicker:"The playing field",h2:"Who we are playing for",
+  html:`<p class="lead">From the Game Plan for Breakthrough 2027. This is the definition of a Nandan customer — use it at Gate 1, not as background reading.</p>
+  <h3>Our target audience</h3>
+  <ul><li>Defence PSU / DRDO / DPSU procurement heads and programme managers</li>
+  <li>Airline ground support procurement and ground handling companies</li>
+  <li>Flight kitchen CXOs and catering operators at major airports</li>
+  <li>EPC contractors for industrial projects</li>
+  <li>Large industry groups in other countries</li>
+  <li>Supply chain managers in the EU and US</li>
+  <li>Aviation OEMs and MRO operators</li>
+  <li><b>Export distributors and channel partners — the Rs. 50 Cr engine</b></li></ul>
+  <h3>Geography we choose to serve</h3>
+  <p><span class="chip go">All India — West, North, East, North East, South</span><span class="chip">Middle East — Saudi, UAE, Bahrain, Oman, Qatar, Kuwait, Israel, Iran</span><span class="chip">Africa — whole of Africa</span><span class="chip">Asia except China — Malaysia, Singapore, Indonesia, Taiwan</span><span class="chip">SAARC</span><span class="chip go">Europe — UK, France, Germany, Switzerland, Spain, East Europe</span><span class="chip">South America — Peru, Brazil, Mexico</span><span class="chip">Australia and USA</span></p>
+  <h3>The attributes that make a target a target</h3>
+  <ul><li>Safety and quality focused — failure is a mission risk, not an inconvenience</li>
+  <li>Value engineering focused — not cheapest, not most expensive</li>
+  <li>High compliance requirements — ISO, DGCA, MIL standards, AS9100D</li>
+  <li>Procurement process-driven with tendering cycles</li>
+  <li>Looking for end-to-end solutions: design, build, maintain</li>
+  <li>Prefers a proven track record in defence and aviation</li>
+  <li>Gives weightage to infrastructure</li>
+  <li>Accepts milestone-based payment structures</li>
+  <li>Has repeat or multi-location deployment potential</li>
+  <li>Has an internal technical team capable of evaluating engineered systems</li></ul>
+  <div class="note"><b>Use this as the disqualifier</b>An enquiry that matches none of these attributes is not a small opportunity — it is the wrong opportunity, and the process says regret it at Gate 1.</div>`},
+
+ {id:"p-uvp",kicker:"Our UVP",h2:"What we say, and why they buy",
+  html:`<p style="font-family:var(--display);font-size:30px;letter-spacing:.03em;text-transform:uppercase;color:var(--orange);line-height:1.1;max-width:28ch;margin-bottom:12px">We help to make the world a safer place.</p>
+  <p>We elevate the operational efficiency of organisations with innovative material handling solutions that enhance productivity, performance and safety — helping them save time, money and effort. We are well known for our proven quality, reliability and after-sales service.</p>
+  <div class="note"><b>The narrative shift</b>From <i>"we can build it cheaper"</i> to <b>"when failure is not an option, choose Nandan."</b> Every conversation, every deck, every quote should carry that shift. If a proposal wins on price, we have sold the wrong thing.</div>
+  <h3>Buying drivers — why they choose us</h3>
+  <ul><li>Proven delivery record for quality-conscious companies with mission-critical equipment needs</li>
+  <li>Compliance and certification readiness</li>
+  <li>Customisation plus engineering strength</li>
+  <li>Full lifecycle support</li>
+  <li>Buying experience built on relationship</li>
+  <li>Indigenous alternative to imports</li>
+  <li>Responsiveness that global OEMs cannot match</li></ul>
+  <h3>What they need versus what they want</h3>
+  <table><tr><th>Customer needs — the specification</th><th>Customer desires — what actually wins it</th></tr>
+  <tr><td>Value for investment — not cheap, not very expensive</td><td>A partner who understands their strategic goals</td></tr>
+  <tr><td>Timely delivery with zero slippage</td><td>Proactive updates on progress — before they have to ask</td></tr>
+  <tr><td>After-sales support and AMC availability</td><td>Lifetime cost of operation should be low</td></tr>
+  <tr><td>Custom engineering and quick iterations</td><td>Enhances their productivity · reduces manpower</td></tr>
+  <tr><td>Certifications — CE, ISO 3834, EN 1090, DGCA, AS9100D</td><td>A reputation-enhancing supplier relationship</td></tr>
+  <tr><td>Lifecycle cost optimisation</td><td>Ease of documentation and compliance handling</td></tr>
+  <tr><td>Audit-ready documentation and traceability</td><td>Quick technical support and spares availability</td></tr>
+  <tr><td>A single accountable owner for the whole project, not five departments</td><td><b>To never have to chase Nandan for anything</b></td></tr>
+  <tr><td>—</td><td><b>The truth told early when something slips — and a recovery date that then holds</b></td></tr></table>
+  <div class="note"><b>Read the right-hand column again</b>Nothing there is about the machine. Every desire is about how it feels to buy from us. That is where the deal is actually won, and it is the column our competitors cannot copy.</div>
+  <h3>Core capabilities that hold the UVP up</h3>
+  <p><span class="chip go">Integrated design and fabrication shop with ISO / EN compliance</span><span class="chip">Software-based execution tracking — NandanERP + Genie</span><span class="chip">In-house testing infrastructure</span><span class="chip go">Heavy-duty hydraulic system engineering — the hardest thing to copy</span><span class="chip">Defence-grade documentation and QMS</span><span class="chip">Export compliance</span><span class="chip">Electrification and IoT integration</span></p>`},
+
+ {id:"p-products",kicker:"Products and services",h2:"What we sell",
+  html:`<p class="lead">The Breakthrough 2027 product line. Two entries are new strategic bets, and one is the recurring revenue layer we have never systematically sold.</p>
+  <div class="grid">
+   <div class="card"><span class="n">Flagship export platform</span><h4>Catering hi-lifts</h4><p>Built for the world rather than for one buyer. This is the platform the Export Engine runs on.</p></div>
+   <div class="card"><span class="n">Aviation</span><h4>Ambulifts</h4><p>Passenger and paramedic handling at the aircraft.</p></div>
+   <div class="card"><span class="n">Launching Sept 2026</span><h4>Electric hi-lift</h4><p>The electrification pilot. First proof of the Technology Edge driver on the product roadmap.</p></div>
+   <div class="card"><span class="n">Defence</span><h4>Defence scissor lifts</h4><p>Ministry, PSU and prime applications.</p></div>
+   <div class="card"><span class="n">Defence</span><h4>Defence ASRS and handling systems</h4><p>Automated storage and retrieval for strategic material.</p></div>
+   <div class="card"><span class="n">Defence</span><h4>Workshop vehicles and special bodies</h4><p>Vehicle-mounted systems on customer-supplied chassis.</p></div>
+   <div class="card"><span class="n">Industrial</span><h4>Truck loading platforms</h4><p>Loading and unloading without dock infrastructure.</p></div>
+   <div class="card"><span class="n">Industrial</span><h4>Goods lifts</h4><p>Vertical travel of goods, including flameproof variants.</p></div>
+   <div class="card"><span class="n">Industrial</span><h4>Heavy-duty turnkey lifting platforms</h4><p>Engineered for industrial use where standard equipment will not do.</p></div>
+   <div class="card"><span class="n">Speciality</span><h4>Entertainment systems</h4><p>Stage and venue lifting applications.</p></div>
+   <div class="card"><span class="n">Growth engine</span><h4>Contract manufacturing for foreign OEMs</h4><p>Their design, their market, our factory. Now named in the OPSP product list, not just in strategy.</p></div>
+   <div class="card"><span class="n">Recurring revenue</span><h4>AMC, spares and lifecycle service</h4><p>The recurring revenue layer. Built into the initial sale, not sold afterwards.</p></div>
+   <div class="card"><span class="n">Recurring revenue</span><h4>Refurbishment and upgrade programmes</h4><p>Rebuilding our own installed base before a competitor pitches a replacement.</p></div>
+  </div>
+  <h3>Credentials</h3>
+  <p><span class="chip go">AS9100D</span><span class="chip">ISO 9001</span><span class="chip">ISO 14001</span><span class="chip">ISO 45001</span><span class="chip">ZED Gold</span><span class="chip go">EN 1090 EXC3</span><span class="chip go">ISO 3834</span><span class="chip">AWS D1.1</span><span class="chip">SAMAR</span><span class="chip">NDT — LP, MPI</span><span class="chip">GeM · SIDM · NSIC</span><span class="chip tbc">DGCA — a three-year target, not yet held</span></p>
+  <p>Design on licensed SolidWorks; FE analysis in Ansys. Facility audited by Airbus and HAL.</p>
+  <div class="note"><b>Two OPSP objectives land on this page</b><b>Standardise 45% of the product portfolio</b> and <b>platformisation so repeatability protects the margin instead of heroics</b>. Both require the product master — model, capacity, configuration, base cost, margin band, lead time, certifications. It still does not exist and still has no owner, and it now blocks a named Mission 2026-27 objective, not just the quotation generator. <span class="chip tbc">Assign an owner</span></div>`},
+
+ {id:"p-industries",kicker:"Our industries",h2:"Where we sell — and where we do not",
+  html:`<p class="lead">The playbook is clearest where most playbooks are vaguest: it names what to walk away from. That discipline is worth more than the target list.</p>
+  <h3>Segments we serve</h3>
+  <div class="grid">
+   <div class="card"><span class="n">01</span><h4>Aviation GSE</h4><p>Airlines, airports, ground handlers, flight kitchens. Hi-lifts, ambulifts, baggage conveyors, step ladders, tugs, water and toilet service.</p></div>
+   <div class="card"><span class="n">02</span><h4>Defence &amp; aerospace</h4><p>Air Force stations, defence PSUs, DRDO labs, BARC, ISRO, L&amp;T HED. Bomb loaders, VMSL, ASRS, scissor platforms, electric vehicles. Owned by Col. Acharya.</p></div>
+   <div class="card"><span class="n">03</span><h4>Speciality handling</h4><p>Engineering, steel, pharma, chemical, paper, ports, warehousing, e-commerce, cold chain, data centres.</p></div>
+   <div class="card"><span class="n">04</span><h4>Truck loading</h4><p>Logistics, transporters, distribution centres, FMCG, retail chains.</p></div>
+   <div class="card"><span class="n">05</span><h4>Car parking</h4><p>Turntables, car lifts, rotary carousels. Builders, architects, hotels, malls, housing societies.</p></div>
+   <div class="card"><span class="n">06</span><h4>Contract manufacturing <span class="chip hot" style="margin-left:4px">New</span></h4><p>European OEMs building under their own design and IP. Not in the 2025-26 playbook at all — the largest gap between the document and the strategy.</p></div>
+  </div>
+  <h3>Where we do not play</h3>
+  <p>The playbook explicitly regrets: stack and puzzle parking, tower parking, wire rope lifts, passenger lifts, reefer trucks, aerial access boom lifts, stackers, pallet trucks, cranes, body building, workshop vans, manual scissor lifts, die loaders, dock levellers, and fuel bowsers above 950 litres. IndiaMART and trader enquiries in these categories are regretted at first contact.</p>
+  <p>Geographic caution: general Middle East enquiries unless they call in or make second contact; Gujarat, North and South India regretted unless from a corporate or dealer.</p>
+  <div class="note"><b>Review this list</b>It was written for 2020-21 and has not been revisited. Two entries now look wrong against current strategy: fuel bowsers above 950 litres are regretted, yet the live KDAIL programme is a 5,000 L bowser at Rs. 187.50 Cr; and blanket regional regrets sit oddly with a national defence and export ambition. <span class="chip tbc">Refresh needed</span></div>
+  <h3>Who we avoid — the BANTTC test</h3>
+  <div class="acr">
+   <div><b>B</b>Budget</div><div><b>A</b>Authority</div><div><b>N</b>Need</div><div><b>T</b>Time</div><div><b>T</b>Technical</div><div><b>C</b>Competition</div>
+  </div>
+  <p>Plus the counterparty test added since: no MCA registration or corporate trace and a free email domain means Watchlist, and no facility access without an executed NDA. Anyone offering influence or access rather than a requirement — particularly on defence procurement — is refused and reported. Under DAP-2020 agent provisions and pre-contract integrity pacts this is business-ending, not grey.</p>`},
+
+ {id:"p-customers",kicker:"Our customers",h2:"Who buys from us",
+  html:`<p class="lead">Two reference sets, used for different jobs. Never attach volumes, values or commercial terms to any of them without written clearance.</p>
+  <h3>European and aviation references</h3>
+  <table><tr><th>Reference</th><th>What it proves</th><th>Use it with</th></tr>
+  <tr><td>Airbus Defence and Space</td><td>Aerospace build discipline accepted by a tier-one European prime. Facility audited.</td><td>European OEMs, defence primes, aerospace tier-1s</td></tr>
+  <tr><td>HAL</td><td>Facility audited by an Indian aerospace prime</td><td>Defence PSUs, Indian aerospace</td></tr>
+  <tr><td>Safran / Cenco</td><td>Aerospace supply chain credibility</td><td>Aerospace and engine ecosystem</td></tr>
+  <tr><td>LSG Sky Chefs — Zurich, Frankfurt</td><td>Equipment performing in demanding European hub operations</td><td>Flight kitchens, ground handlers, catering groups</td></tr>
+  <tr><td>Paris-HQ African flight kitchen group</td><td>Multi-country catering deployment</td><td>Catering groups, Africa, francophone markets</td></tr>
+  <tr><td>Gatwick Airport</td><td>Equipment in a major European hub</td><td>Airports, ground handlers, UK market</td></tr></table>
+  <h3>Flagship case study</h3>
+  <p>The Rapid Runway Repair vehicle is the case study the playbook leads with. Case studies are published at nandan.co.in/case-studies.</p>
+  <div class="metric">
+   <div><div class="v">35+</div><div class="l">Years</div></div>
+   <div><div class="v">350+</div><div class="l">Team</div></div>
+   <div><div class="v">1,20,000</div><div class="l">Sq ft · Khalapur</div></div>
+   <div><div class="v">35+</div><div class="l">Countries</div></div>
+   <div><div class="v">10,000+</div><div class="l">Units</div></div>
+  </div>
+  <h3>When and how to use a success story</h3>
+  <p>Use it at the consultative interview, not before — a story lands only once you know the problem it should match. Name the customer, name what we did, and stop. When price becomes the objection, offer a reference call: it closes faster than any specification sheet.</p>
+  <div class="note"><b>The asset we do not have</b>Over 10,000 units delivered into 35+ countries, and no register of who has what. Customer, equipment, year, location, last contact. Without it there is no aftermarket programme, no AMC campaign, no cross-sell, and stage 12 of our own process cannot be executed. <span class="chip tbc">Not built · owner not assigned</span></div>`},
+
+ {id:"p-who",kicker:"Accountability",h2:"Who owns what",
+  html:`<table><tr><th>Name</th><th>Role</th><th>Owns</th></tr>
+  <tr><td>J.C. Kumar</td><td>Chairman &amp; Founder</td><td>Strategic relationships; final approval on equity and M&amp;A</td></tr>
+  <tr><td>Dr. Raghu</td><td>Managing Director &amp; CEO</td><td>Aviation &amp; aerospace, contract manufacturing, defence. Pricing beyond delegated limits. Gate 3 and Gate 4 sign-off.</td></tr>
+  <tr><td>Col. K.R. Acharya (Retd.)</td><td>President, Defence Business</td><td>Defence, end to end</td></tr>
+  <tr><td>Gen P.M. Mohandas (Retd.)</td><td>Advisor</td><td>Defence PSU introductions — requested through Col. Acharya with a written brief</td></tr>
+  <tr><td>Cdr Tushar Giri (Retd.)</td><td>COO</td><td>Delivery commitments; capacity confirmation before any quote</td></tr>
+  <tr><td>Santosh Patra</td><td>Material handling, aerial access; Sales/Strategy</td><td>Gate 1, pipeline hygiene, EVA programme</td></tr>
+  <tr><td>Ankeet Trivedi</td><td>Senior Sales Manager — aviation, aerospace</td><td>Export strategy, European accounts, trade fairs</td></tr>
+  <tr><td>Neetu Sharan</td><td>GM, Institutional Sales</td><td>Institutional and government-channel accounts</td></tr>
+  <tr><td>Shweta Bilouhan</td><td>Sales coordination</td><td>Research, intro mail, first call, quote coordination</td></tr>
+  <tr><td>Pankaj Sutar</td><td>PPC Engineer</td><td>Lead time and slotting input to every quote</td></tr>
+  <tr><td>Suresh Lalzare</td><td>Accounts Head</td><td>Payment terms, credit checks, LC and BG structure</td></tr>
+  <tr><td>Mohnish Nair</td><td>Sales Coach</td><td>Playbook training, review discipline</td></tr></table>
+  <div class="note"><b>The named weakness, restated</b>The playbook's own weakness list opens with "everything pointed towards the owners for decision making", and the 3–5 year priority is Dr. Raghu at zero involvement in transactions. Yet Dr. Raghu is still listed as the owner of three of six segments and the approver of every discount. Delegated price bands are the specific mechanism that closes this gap. Until they exist, the priority cannot be achieved.</div>
+  <h3>Enquiry to sales order — the handoff</h3>
+  <ol><li>Inbound enquiries dumped into ERP Opportunities</li><li>Outbound enquiries entered into ERP Opportunities by the segment owner</li><li>Vetting; anything not regretted is assigned to sales coordination</li><li>Coordination researches industry, customer and contact — reports, website, news, LinkedIn</li><li>Intro mail sent, then a call four hours later with a prepared script</li></ol>`}
+]},
+
+/* ============ OUR SALES KIT ============ */
+{id:"process",tab:"Sales Process",secs:[
+ {id:"pr-a",kicker:"Part A",h2:"Always-on disciplines",
+  html:`<p class="lead">Three disciplines that run every day regardless of what is in the pipeline. An opportunity does not pass <i>through</i> these — they are the conditions that make the nine stages work. Audited weekly, never "completed".</p>
+  <div class="grid">
+   <div class="card"><span class="n">A1</span><h4>Activity</h4><p><b>Daily:</b> recite the manifesto · hotlists · opportunities · inbound calls · email customers · LinkedIn post and 10 connects · shopfloor · customer visit. Every interaction into ERP. Daily report 8 pm, screenshot to the group.<br><br><b>Weekly:</b> collections · prospect bucket · tasklist · sales plan · visits · recording · review with coach or CEO · dashboard · <b>lost quote analysis, including who won and why</b>.</p></div>
+   <div class="card"><span class="n">A2</span><h4>Resources</h4><p><b>Open:</b> nandan.co.in — /movie, /ppt-[sector], /case-studies · nandangse.com/[product] · nandan.ch · YouTube · LinkedIn.<br><br><b>Internal:</b> salesregrow.nandan.co.in · NandanERP and New Deal · Playbook · Drive — EVA briefs, InstaFinancials · Mygyaan.ai · dealers.nandan.co.in · Sheets · screenrec.com.<br><br><b>Raghu is your resource.</b></p></div>
+   <div class="card"><span class="n">A3</span><h4>Way of working</h4><p>All emails read · open opportunities and draft quotes under control numbers · target quote status current · sales and visit plan updated · weekly intention Monday 9 am · recordings, screenshots and interactions filed.</p></div>
+  </div>
+  <h3>The weekly standard — per person</h3>
+  <table><tr><th>Prospect calls</th><th>Prospect emails</th><th>Follow-up calls</th><th>Screen recordings</th><th>Customer visits</th><th>Zoom calls</th><th>Prospect bucket</th><th>Prospect · learn · strategy</th></tr>
+  <tr><td><b>40</b></td><td><b>50</b></td><td><b>25</b></td><td><b>5</b></td><td><b>4</b></td><td><b>5</b></td><td><b>50+</b> in ERP</td><td><b>2 · 2 · 1</b> hrs</td></tr></table>
+  <h3>Meeting cadence</h3>
+  <table><tr><th>Meeting</th><th>When</th><th>Chair</th><th>Reviews</th></tr>
+  <tr><td>Daily huddle</td><td>Morning · 15–30 min</td><td>Segment lead</td><td>Activities, blockers, plan for the day</td></tr>
+  <tr><td>Weekly sales meeting</td><td>Monday · 60 min</td><td>Nitu</td><td><b>Lead metrics only</b> — activity, pipeline health, stage movements</td></tr>
+  <tr><td>Monthly business review</td><td>Monthly · 2–3 hrs</td><td>Dr. Raghu</td><td><b>Results</b> — intake, profit, conversion, wins and losses, EVA board</td></tr>
+  <tr><td>Quarterly business review</td><td>Half to full day</td><td>Chairman + Dr. Raghu</td><td><b>The OPSP</b> — targets, priorities, price bands, capability gaps</td></tr></table>
+  <h3>The four standing rules</h3>
+  <ul><li>If it is not in ERP, it did not happen</li>
+  <li>One named owner and one dated next action, on every opportunity</li>
+  <li>Every customer-facing number traces back to an approved source</li>
+  <li>Keep documentation · know the margin on every case</li></ul>
+  <div class="note"><b>Missing resources</b>Three things A2 should list and cannot: the <b>product master</b>, the <b>installed-base register</b>, and <b>competitor battlecards</b>. None exist and none have an owner. <span class="chip tbc">Assign</span></div>`},
+
+ {id:"pr-b",kicker:"Part B",h2:"The nine stages",
+  html:`<p class="lead">Nine stages, four gates. Orange markers are gates: a named person signs off, or the opportunity does not move.</p>
+  <div class="rail">
+   <div class="stage" data-n="B1"><h4>Lead generation</h4><div class="meta">Owner: segment lead</div><p><b>Inbound —</b> website · IndiaMART · TradeIndia · inbound call · existing client · referral · campaign · LinkedIn · Facebook · service · exhibition visitor · follow on live quotes.<br><b>Outbound —</b> Apollo.io campaign · cold call · self network · referrals · LinkedIn · tenders on GeM, NSIC and portals · networking · expo · visits · <b>EVA brief</b> for targeted account research.</p><div class="crit"><b>Intake routing:</b> inbound into ERP Opportunities by coordination or automation; outbound by the segment owner. Vet — anything not regretted goes to coordination, which researches industry, customer and contact. Intro mail, then a call four hours later with a prepared script, then a WhatsApp message.</div></div>
+
+   <div class="stage gate" data-n="B2"><h4>Customer contact — Gate 1 · Qualify</h4><div class="meta">Decide whether this is worth Nandan's time — and prove it</div><p><b>Classify:</b> to regret — decline politely, record the reason, close, do not carry it · simple to validate · complex to validate, engineering input first · high priority, senior involvement.<br><b>Qualify:</b> one named owner · checklist complete · identify the <b>MAN</b> · probe <b>BANTTC</b> — budget, authority, need, time, technical, competition · counterparty verification, <b>MCA checked and InstaFinancials taken</b> · select the method for this deal — SPIN, MEDDIC, Gap, Challenger, TAS or Value.<br><b>Research and first call:</b> industry, customer and contact profiling · probe script · unique value messaging · name drops · content to mail · document in interactions · schedule the visit or Zoom.</p><div class="crit"><b>Hard stops — refuse and report:</b> no MCA trace plus a free email domain → Watchlist, and no facility access without an executed NDA. Anyone offering influence or access rather than a requirement. Any request for agency, commission or a success fee on defence procurement — under DAP-2020 agent provisions and pre-contract integrity pacts this is business-ending, not grey.</div></div>
+
+   <div class="stage" data-n="B3"><h4>Consultative interview</h4><div class="meta">Understand the problem so well that the solution is obvious to them</div><p><b>Prepare:</b> appointment taken · calendar request with agenda, cc sales@nandan.co.in · study ERP history for person, company and industry · website, LinkedIn, YouTube · seniors' feedback · pre-call kit — brochures, testimonials, laptop with custom-headlined deck, cards, capture sheets · deck sent one hour before · WhatsApp of relevance · reconfirm in the morning · multiple meetings planned nearby.<br><b>The engage ladder:</b> <b>Opening →</b> attention — agenda, permission for time and questions, all key people present, phones silent. <b>Probing →</b> interest — SPIN and STAR questions, present mode, difficulties, critical concerns, the competition's weak areas; write it down. <b>Supporting →</b> conviction — implication and need-payoff, proof, name drops, benefits tied to <i>their</i> stated problems. <b>Motivating →</b> desire — dramatise, show the implication of not solving, under-promise, and <b>no ballpark figures</b>.</p><div class="crit"><b>Before you leave:</b> grade the prospect high, medium or low · probe future potential, repeat business, other locations, upsell and cross-sell · ask for references · identify the coach inside the account · fix the date and time of the next action.<br><b>After:</b> minutes of discussion by email and thanks on WhatsApp · the GAIN of acting and the PAIN of not acting · case studies · situation document capturing current state · <b>interaction posted in ERP within 4 hours</b>.</div></div>
+
+   <div class="stage gate" data-n="B4"><h4>Quotation — Gate 2 · Offer</h4><div class="meta">A priced, scoped, defensible offer nobody has to explain afterwards</div><p><b>Build it:</b> issued from ERP with a control number · one-time costs quoted separately — design development, type testing, tooling — never absorbed into unit price · buyer-supplied items named and excluded · ex-works unless otherwise agreed in writing · validity date stated · price-variation clause on steel and bought-out content · justify VALUE, not just price.<br><b>Send it properly:</b> screenrec video on email and WhatsApp · call after sending · courier for high value · classify immediately, never left "to be assigned".<br><b>Classify:</b> <b>Target</b> — closing this month or next · <b>Live</b> — beyond two months or long term · <b>Lost, dropped</b> → record the reason, return to nurture · <b>Lost to competition</b> → record the reason <b>and who won and why</b> → analyse → battlecard.</p><div class="crit"><b>Three checks before issuing:</b> BANTTC revalidated · credit position cleared with Suresh Lalzare · PPC slot confirmed by Pankaj Sutar — never improvise a date.<br><b>Escalation:</b> above Rs. 10 lakh → detailed proposal with three options, RJ told. Above Rs. 50 lakh → <b>RJ approval in writing</b>.</div></div>
+
+   <div class="stage" data-n="B5"><h4>Follow up</h4><div class="meta">Stay in the frame without becoming noise</div><p><b>Methods:</b> call · WhatsApp · email · Zoom · visit · engage on their LinkedIn · send data by post.<br><b>Standard:</b> add value on every contact, never "just checking in" · interaction posted within 48 hours · next action fixed and in the calendar · maintain a mailing rhythm · every message carries a call to action · personalise.</p><div class="crit"><b>Escalation:</b> no response after 3 contacts → change channel. After 5 contacts → change person. Static 30 days → flag at the Monday review. Static 60 days → close with a reason code, or re-qualify.</div></div>
+
+   <div class="stage gate" data-n="B6"><h4>Closing — Gate 3 · Commercial</h4><div class="meta">Convert without conceding what we cannot afford to concede</div><p><b>ERP complete first:</b> interactions · research · competition identified · influencer identified · MAN confirmed.<br><b>Trial close:</b> price · deliverables · date of delivery · exceptions of scope · GA drawings · payment terms · <b>make three options and show them on the negotiating playbook</b>.<br><b>Negotiate:</b> limits set and written down <i>before</i> the meeting — nothing conceded in the room · objections answered from the standard list · any concession outside band goes back for sign-off.</p><div class="crit"><b>Non-negotiable:</b> safety features and compliance to the certified standard · design and testing costs on a bespoke build · any term breaching DAP-2020 or a pre-contract integrity pact · a delivery date PPC has not confirmed — PPC emails a response time for standard products.<br><b>Walk away when:</b> the margin will not cover the risk and there is no repeat path · terms or liquidated damages could break cash flow · mandatory requirements need a waiver · the counterparty offers influence rather than a requirement.</div></div>
+
+   <div class="stage gate" data-n="B7"><h4>Sales order — Gate 4 · Contract review</h4><div class="meta">Hand a clean, unambiguous order to operations</div><p><b>Proforma invoice:</b> technical compliance · GA drawing · commercial terms · payment terms · <b>soft commitments recorded</b> · delivery dates and milestones.<br><b>Create the order:</b> sales order booking updated in ERP · entire TDS and all details filled · all communication summarised · pre-kickoff mail to RJ and PPC.<br><b>Handover:</b> project page created and email sent · design handover to design TDS · <b>advance received or LC established</b>.</p><div class="crit"><b>Contract review — the PO must pass all three:</b> commercially correct · technically correct · dates still valid. Any "no" goes back to the customer before acceptance. <b>Do not book a defective order.</b></div></div>
+
+   <div class="stage" data-n="B8"><h4>Delivery</h4><div class="meta">Operations delivers exactly what sales committed. Sales does not disappear at order.</div><p><b>Run the project:</b> weekly update through PPC · status, photos and deadline · weekly review of dates and progress · make the milestone plan · decide what the customer's focus is.<br><b>Before delivery:</b> confirm operations is delivering what was committed · payment proforma sent one week before · proving batch or first-article inspection where applicable.<br><b>After:</b> payment follow-up · thank-you mail with the document bundle · billing updated · after-action report · satisfaction survey.</p></div>
+
+   <div class="stage" data-n="B9"><h4>KAM — key account management</h4><div class="meta">The second order should cost a fraction of the first</div><p><b>Close it properly:</b> formal handover to the customer · thank-you gift · closing documentation by email · formal customer feedback · <b>testimonial taken in a letter</b> · full payment received · references and more orders sought.<br><b>Grow the account:</b> AMC proposal · cross-sell · up-sell · spares — contact <i>before</i> the failure, not after · refurbishment of our own older units.<br><b>Stay in view:</b> remain in the customer's vision · WhatsApp broadcast · email rhythm · one order in an industry → mailer to everyone else in that industry.</p><div class="crit"><b>Feed the loop:</b> new requirement identified → back to B2 as a new opportunity. None identified → the account is not being managed. Escalate at the monthly review.</div></div>
+  </div>
+  <div class="note"><b>The gap that remains</b>Every stage now has steps, owners and gates. What it does not have is <b>exit criteria</b> — the evidenced test that says an opportunity may advance. Without them a gate is a label rather than a control, and Gate 2 in particular cannot function until segment price bands exist. <span class="chip tbc">Dr. Raghu to restore or replace</span></div>`},
+
+ {id:"pr-lead",kicker:"OPSP alignment",h2:"Lead conversion excellence",
+  html:`<p class="lead">The OPSP names the sales process in five words — Suspect, Prospect, Proposal, Closure, Handover. The nine stages are that same process with the gates made explicit. Here is the mapping, so both documents describe one thing.</p>
+  <table><tr><th>OPSP stage</th><th>Our stages</th><th>What has to be true</th></tr>
+  <tr><td><b>Suspect</b></td><td>B1 Lead generation</td><td>A real company, a plausible requirement, a named person — in ERP</td></tr>
+  <tr><td><b>Prospect</b></td><td>B2 Customer contact · B3 Consultative interview</td><td>Gate 1 passed. BANTTC probed, MAN identified, requirement documented</td></tr>
+  <tr><td><b>Proposal</b></td><td>B4 Quotation · B5 Follow up</td><td>Gate 2 passed. 40% margin held, honest date, classified Target or Live</td></tr>
+  <tr><td><b>Closure</b></td><td>B6 Closing</td><td>Gate 3 passed. Nothing conceded in the room</td></tr>
+  <tr><td><b>Handover</b></td><td>B7 Sales order · B8 Delivery · B9 KAM</td><td>Gate 4 passed. <b>No order enters the floor without handover</b></td></tr></table>
+  <h3>The six rules the OPSP sets for this team</h3>
+  <div class="rail">
+   <div class="stage gate" data-n="1"><h4>Quote to the 40% margin minimum</h4><div class="meta">Margin Fortress · enforced at quote stage</div><p>Not reviewed after the fact. A quote below 40% gross margin is a decision, taken deliberately and approved — never an accident discovered at review.</p></div>
+   <div class="stage gate" data-n="2"><h4>Quote the honest date</h4><div class="meta">Delivery Spine</div><p>Win on reliability, not on an impossible promise we pay for twice. The date comes from PPC. Trust is the raw material of the order book.</p></div>
+   <div class="stage" data-n="3"><h4>Engineering sells engineering</h4><div class="meta">Technical walkthroughs</div><p>Conduct technical walkthroughs with client teams. <b>The plant walk closes what the proposal opens.</b> Bring the customer to Khalapur.</p></div>
+   <div class="stage" data-n="4"><h4>Know the tender calendar before the tender</h4><div class="meta">AI-Enabled Sales · CSF 8</div><p>Early identification of budget cycles and gatekeeper roles, using AI and personal connection. By the time the tender is published, the requirement is already written.</p></div>
+   <div class="stage" data-n="5"><h4>Weekly funnel review, with the team</h4><div class="meta">Sales leadership</div><p>Every opportunity carries one owner, one next action, one date. This is the Monday meeting.</p></div>
+   <div class="stage" data-n="6"><h4>Handover into execution</h4><div class="meta">CSF 10 · checklist-based</div><p>No order enters the floor without it. Dispatch checklist, installation readiness, customer satisfaction — all tracked.</p></div>
+  </div>
+  <h3>Long-term client loyalty — stage B9, expanded</h3>
+  <ul><li>Quarterly reviews with top clients — <b>insight calls, not sales calls</b></li>
+  <li>Spares and AMC packages built into the initial sale</li>
+  <li>A dedicated Key Account Manager for the top 10 clients</li>
+  <li>Offer new product trials to existing customers</li>
+  <li>Referral and testimonial requests with loyalty rewards</li>
+  <li>Annual equipment health audits</li>
+  <li>Weekly project updates for every live order — <b>good news and bad, before the customer asks</b></li>
+  <li>Proactive commissioning call after dispatch</li>
+  <li><b>Zero customer reminders — tracked as a negative KPI</b></li></ul>
+  <div class="note"><b>The sharpest metric on this site</b>"Zero customer reminders" turns responsiveness into something countable. Every time a customer has to chase us, it is logged against us. That single measure carries CSF 3, and it costs nothing to start.</div>`},
+
+ {id:"pr-loops",kicker:"The loops",h2:"Six routes go backwards",
+  html:`<p class="lead">The process is not a straight line. These six returns matter as much as the forward flow, and five of the six are where learning is either captured or lost.</p>
+  <table><tr><th>#</th><th>From</th><th>Back to</th><th>Trigger</th></tr>
+  <tr><td>1</td><td>B2 Customer contact</td><td>Closed — regretted</td><td>Fails BANTTC, or hits a hard stop</td></tr>
+  <tr><td>2</td><td>B4 Quotation — lost</td><td>B1 / nurture</td><td>Requirement dropped</td></tr>
+  <tr><td>3</td><td>B4 Lost to competition</td><td>Battlecard</td><td>Winner and reason recorded, analysed</td></tr>
+  <tr><td>4</td><td>B5 Follow up, static 60 days</td><td>Closed with a reason code</td><td>No movement</td></tr>
+  <tr><td>5</td><td>B7 Contract review fails</td><td>Back to the customer</td><td>Commercial, technical or date defect</td></tr>
+  <tr><td>6</td><td>B9 KAM</td><td>B2 as a new opportunity</td><td>New requirement identified</td></tr></table>
+  <div class="note"><b>Loop 3 is the cheapest asset we are not collecting</b>Lost quote analysis is already a weekly activity, and the process already says to record who won and why. Capture that against a competitor name and the battlecards build themselves within a quarter, at no cost.</div>`},
+
+ {id:"pr-gates",kicker:"Authority",h2:"Who signs what",
+  html:`<p class="lead">A gate is passed by a person, not by optimism.</p>
+  <table><tr><th>Gate</th><th>Decision</th><th>Cleared by</th></tr>
+  <tr><td>1</td><td>Qualification — the opportunity enters the funnel</td><td>Segment lead <span class="chip tbc">Confirm</span></td></tr>
+  <tr><td>2</td><td>Offer inside the approved price band</td><td>Opportunity owner</td></tr>
+  <tr><td>2</td><td>Quote above Rs. 10 lakh</td><td>RJ — intimation</td></tr>
+  <tr><td>2</td><td>Quote above Rs. 50 lakh</td><td>RJ — approval in writing</td></tr>
+  <tr><td>2</td><td>Credit exposure, LC and BG structure</td><td>Suresh Lalzare</td></tr>
+  <tr><td>2</td><td>Delivery commitment</td><td>Cdr Giri with Pankaj Sutar</td></tr>
+  <tr><td>3</td><td>Discount beyond band, or softened payment terms</td><td>Dr. Raghu</td></tr>
+  <tr><td>4</td><td>Contract review — all three counts</td><td>Opportunity owner</td></tr>
+  <tr><td>—</td><td>Equity, M&amp;A or JV structure</td><td>Dr. Raghu</td></tr></table>
+  <h3>Standard payment terms</h3>
+  <table><tr><th>Advance</th><th>On GAD approval</th><th>On delivery, incl. full GST</th><th>On commissioning</th></tr>
+  <tr><td><b>20%</b></td><td><b>30%</b></td><td><b>40%</b></td><td><b>10%</b></td></tr></table>
+  <div class="note"><b>One conflict to settle</b>This 20 / 30 / 40 / 10 split is the new standard. The live KDAIL programme runs 20 / 60 / 20 with no commissioning retention. Confirm whether KDAIL is a deliberate exception or needs realigning — the quotation generator currently defaults to the new standard.</div>
+  <h3>Still open</h3>
+  <ol><li><b>Exit criteria</b> for each gate — restore, or accept that gates run on judgement</li>
+  <li><b>Price bands and delegated discount limits</b> per business line — without these, Gate 2 has no band to be inside and every discount reaches Dr. Raghu</li>
+  <li><b>Gate 1 sign-off</b> — Santosh Patra previously held it; Nitu now chairs the Monday meeting</li>
+  <li><b>Interaction posting</b> — 4 hours at B3, 48 hours at B5. One rule, please</li>
+  <li><b>Owners</b> for the product master, installed-base register and battlecards</li></ol>`}
+]},
+
+{id:"kit",tab:"Our sales kit",secs:[
+ {id:"k-ladder",kicker:"How we sell",h2:"The engage ladder",
+  html:`<p class="lead">Nandan's own selling technique, from the playbook. Six moves, each with an objective. Learn the ladder, not a script — a script fails the moment the customer says something unexpected.</p>
+  <div class="rail">
+   <div class="stage" data-n="1"><h4>Opening</h4><div class="meta">Objective: attention</div><p>Preliminary pleasantries that establish you as a sales consultant, not a vendor. Smile, introduction, eye contact, greeting, compliment, handshake. Agenda stated. Permission for time. Permission to ask questions. Cards exchanged. All key people present. Phones on silent.</p></div>
+   <div class="stage" data-n="2"><h4>Probing</h4><div class="meta">Objective: interest — find the hot button</div><p>Situation and problem questions. Probe for MAN. Identify present mode, difficulties in it, critical concern areas, problems caused by lack of a solution. Note the competition's weak areas. Write down their problems, inputs and expectations — do not carry them in your head.</p></div>
+   <div class="stage" data-n="3"><h4>Supporting</h4><div class="meta">Objective: conviction</div><p>Implication and need-payoff explained. Company presentation. Photos, videos, testimonials. Name-dropping and success stories. Features, advantages and benefits tied to the problems <i>they</i> described — not a generic list.</p></div>
+   <div class="stage" data-n="4"><h4>Motivating</h4><div class="meta">Objective: desire — convert need into want</div><p>Dramatise. Show the implication of not solving the problem. Assure them their problem will be solved. Be honest and under-promise on results. And avoid giving a ballpark figure — a number given here is a number you negotiate down from later.</p></div>
+   <div class="stage" data-n="5"><h4>Closing</h4><div class="meta">Objective: action — ask for the order</div><p>Grade the prospect high, medium or low. Probe for future potential, repeat business, other locations, upsell and cross-sell. Ask for references. Handle prepared objections. Ask closed questions to fix the next step. End positively, and fix the date and time before leaving.</p></div>
+   <div class="stage gate" data-n="6"><h4>Negotiating and final closing</h4><div class="meta">Objective: contract and payment</div><p>Terms, payment, exceptions, GA drawings. Limits set <i>before</i> the meeting, written down, not decided in the room.</p></div>
+   <div class="stage" data-n="7"><h4>Keeping</h4><div class="meta">Objective: maximise the relationship</div><p>Repeat sales, upselling, cross-selling, references. Stage 12 of the process.</p></div>
+  </div>
+  <h3>The MAN checklist — take this to every meeting</h3>
+  <p>Organisation name and address · telephone, website · organisational chart · man in charge · decision influencers · levels of personnel · organisational goals and values · history · decision-making procedure and route · evaluation criteria · budget · expansion plans · employee strength.</p>
+  <h3>Pre-call checklist</h3>
+  <p>Elevator pitch prepared · past interactions and quotations on ERP studied · company website, LinkedIn, YouTube reviewed · seniors' feedback taken · brochures, testimonials, marketing tools carried · laptop with custom-headlined presentation · visiting cards · pen, paper, diary, data-capture and checklist sheets · multiple meetings planned in the same organisation · other prospects nearby scheduled · well groomed.</p>`},
+
+ {id:"k-method",kicker:"Method map",h2:"Which methodology, for which sale",
+  html:`<p class="lead">Nandan's process is the container; the methodology is what you do inside it. Different sales need different methods, and using one method everywhere is why some conversations feel effortless and others stall.</p>
+  <table><tr><th>Situation</th><th>Method</th><th>Why it fits, and where to use it</th></tr>
+  <tr><td>Consultative interview, most deals</td><td><b>SPIN</b></td><td>Situation, problem, implication, need-payoff. Already embedded in stage 6 and in the engage ladder. This is the house method.</td></tr>
+  <tr><td>Large, complex, multi-stakeholder — defence, PSU, KDAIL-scale programmes</td><td><b>MEDDIC</b></td><td>Metrics, economic buyer, decision criteria, decision process, identify pain, champion. Structured qualification for long B2B cycles. Use it where BANTTC is too coarse.</td></tr>
+  <tr><td>Customer knows something is wrong but not what</td><td><b>Gap Selling</b></td><td>Map current state versus desired future state, then sell the bridge. Strongest with airlines and handlers: ask what fails most often, then quantify the gap.</td></tr>
+  <tr><td>Well-informed buyer who thinks they know the answer</td><td><b>Challenger</b></td><td>Teach, tailor, take control. Use with European OEMs who have already decided outsourcing to India is risky — reframe rather than reassure.</td></tr>
+  <tr><td>Named high-value accounts we want to break into</td><td><b>Target Account Selling</b></td><td>Select on criteria, research deeply, personalise, involve multiple functions. This is what the EVA brief programme already is — TAS with a research spine.</td></tr>
+  <tr><td>Existing customers, stage 12 KAM</td><td><b>Value Selling</b></td><td>Quantify benefit in their numbers — cost per operating year, downtime avoided. Essential when the objection is price.</td></tr>
+  <tr><td>Busy buyer, short attention, cold outreach</td><td><b>SNAP</b></td><td>Simple, invaluable, aligned, priority. Keep it short and lead with what matters to them.</td></tr>
+  <tr><td>Inbound enquiries — IndiaMART, TradeIndia, website</td><td><b>Inbound Selling</b></td><td>Identify, connect, explore, advise. Do not pitch on an inbound; explore first, because inbound volume hides both the best and worst leads.</td></tr>
+  </table>
+  <div class="note"><b>How to use this table</b>Not as a menu to pick from mid-call. Decide the method at Gate 1 when the opportunity is classified, record it on the opportunity, and prepare accordingly. A complex defence programme run on a simple product script is the most common avoidable loss.</div>`},
+
+ {id:"k-obj",kicker:"Section 10.1 — now filled",h2:"Objection handling",
+  html:`<p class="lead">Section 10.1 of the playbook is a two-column table with no rows. Losing the same objection repeatedly because nobody wrote down the answer is the most expensive kind of silence. This is a first draft for the team to argue with and finish.</p>
+  <table><tr><th>What they say</th><th>What we say</th></tr>
+  <tr><td>"You are more expensive than the alternative."</td><td>Do not discount to match. Reframe on cost per operating year and the cost of an hour of downtime in their operation. Then offer one trial unit rather than defending a fleet price.</td></tr>
+  <tr><td>"Your delivery is too long."</td><td>Never improvise a date. Give the slot PPC confirmed, and offer a phased delivery with a proving unit first — that usually solves their real problem, which is risk, not weeks.</td></tr>
+  <tr><td>"How fast can you get me spares?"</td><td>Put a stocking commitment and a named service contact in the offer document, in writing. A verbal assurance is worth nothing against a competitor's written one.</td></tr>
+  <tr><td>"Indian quality won't meet our standard."</td><td>AS9100D, EN 1090-1 EXC3, ISO 3834-2, AWS D1.1 welders, NDT in-house. Facility audited by Airbus and HAL. Equipment running at Zurich, Frankfurt and Gatwick. Then invite the audit — the invitation does more than the list.</td></tr>
+  <tr><td>"We already have a supplier."</td><td>Good — the requirement is real and budgeted. Ask what their supplier cannot do. Target that single gap with one unit.</td></tr>
+  <tr><td>"Send me your best price and I'll compare."</td><td>Decline politely. Price without the requirement defined is a number you will be held to. Return to probing: what does it have to do, in what cycle, in what environment.</td></tr>
+  <tr><td>"We need it customised."</td><td>Ask what the customisation is protecting — a process, a constraint, or a preference. Preferences we can often standardise around; constraints we engineer for and price separately.</td></tr>
+  <tr><td>"Send it and we'll get back to you."</td><td>Agree, and fix the date of the call before you leave. An opportunity without a dated next action is not an opportunity.</td></tr>
+  <tr><td>"Can you give agency terms / a commission?" <span class="chip hot">Defence</span></td><td>No, and the conversation ends there. Under DAP-2020 agent provisions and pre-contract integrity pacts this is business-ending. Refuse, document, and report.</td></tr>
+  </table>
+  <h3>The objections we cannot answer yet</h3>
+  <p>Every one of these needs the product master or a written discount policy before a seller can answer it consistently: what is the price of the standard model; what is the standard lead time; what discount can I actually give; what is included and what is extra. Until those exist, every seller answers differently and the customer notices.</p>`},
+
+ {id:"k-nego",kicker:"Section 12 — proposed",h2:"Negotiation and discount policy",
+  html:`<p class="lead">Section 12 of the playbook asks six questions about negotiation and answers none of them. Below is a proposed policy — drafted, not adopted. It needs Dr. Raghu's approval before it means anything.</p>
+  <h3>12.1 — Policy on negotiation and discounts <span class="chip tbc">Proposed</span></h3>
+  <ul><li>No ballpark figures. Ever. The first number the customer hears is the formal quote.</li>
+  <li>One-time costs — design development, type testing, tooling — are always quoted as separate, visible lines. They are never absorbed into unit price.</li>
+  <li>Quotes are ex-works unless otherwise agreed in writing. Freight, insurance and duty scoped explicitly.</li>
+  <li>Buyer-supplied items are named in the offer and excluded from scope.</li>
+  <li>Every offer carries a validity date and a price-variation clause on steel and bought-out content.</li>
+  <li>Credit position cleared with Accounts <i>before</i> the offer goes out.</li>
+  <li>Limits are set and written down before the meeting. Nothing is conceded in the room.</li></ul>
+  <h3>12.2 — Approval route <span class="chip tbc">Proposed</span></h3>
+  <table><tr><th>Decision</th><th>Cleared by</th></tr>
+  <tr><td>Offer inside the approved price band</td><td>Opportunity owner</td></tr>
+  <tr><td>Discount beyond band, or softened payment terms</td><td>Dr. Raghu</td></tr>
+  <tr><td>Delivery commitment</td><td>Cdr Giri with Pankaj Sutar</td></tr>
+  <tr><td>Credit exposure, LC and BG structure</td><td>Suresh Lalzare</td></tr>
+  <tr><td>Equity, M&amp;A or JV structure</td><td>Chairman J.C. Kumar and Dr. Raghu</td></tr></table>
+  <h3>Reference payment structure</h3>
+  <p><b>20%</b> advance with order · <b>30%</b> on GAD approval · <b>40%</b> on delivery plus full GST · <b>10%</b> on commissioning. Anything softer is a Dr. Raghu decision, not a seller's. See <b>Sales Process → Who signs what</b>.</p>
+  <h3>12.5 — What is non-negotiable</h3>
+  <ul><li>Safety features and compliance to the certified standard</li><li>Design and testing costs on a bespoke build</li><li>Any term that breaches DAP-2020 or a pre-contract integrity pact</li><li>Delivery dates PPC has not confirmed</li></ul>
+  <h3>12.6 — When to walk away</h3>
+  <ul><li>The margin will not cover the risk carried, and there is no repeat path to justify it</li><li>Payment terms or liquidated damages that could break cash flow — a named weakness we cannot afford to test</li><li>Mandatory requirements we cannot meet without a waiver</li><li>Any counterparty offering influence rather than a requirement</li></ul>
+  <div class="note"><b>Why this is still a draft</b>A discount policy needs a floor, and a floor needs product costing. The playbook's own weakness list says product costing is not complete. Until it is, "the approved band" is a phrase, not a number — and every discount will keep routing to Dr. Raghu.</div>`},
+
+ {id:"k-assets",kicker:"Tools",h2:"Scripts, templates and where things live",
+  html:`<h3>Outreach assets in the playbook</h3>
+  <table><tr><th>Channel</th><th>What exists</th><th>Section</th></tr>
+  <tr><td>Phone</td><td>Two call scripts — project-today, and general introduction</td><td>7.3, 7.4</td></tr>
+  <tr><td>Email</td><td>Two introduction templates — Vertilift, tyre handling</td><td>7.5, 7.6</td></tr>
+  <tr><td>WhatsApp</td><td>Two introduction templates</td><td>7.7, 7.8</td></tr>
+  <tr><td>LinkedIn</td><td>Two templates — community post, product post</td><td>7.9, 7.10</td></tr>
+  <tr><td>Post-event / post-referral</td><td>WhatsApp and email templates</td><td>7.11, 7.12</td></tr>
+  <tr><td>Follow-up</td><td>Email and WhatsApp templates</td><td>8.2, 8.3</td></tr>
+  <tr><td>Post-presentation follow-up</td><td>Call, WhatsApp, email templates</td><td>11.2–11.4</td></tr>
+  <tr><td>Referrals</td><td>Call, WhatsApp and email scripts</td><td>13.2, 13.3</td></tr>
+  <tr><td>Discovery</td><td>Question bank and discovery questions</td><td>9.4, Question Bank</td></tr>
+  </table>
+  <div class="note"><b>Every template needs a factual pass</b>Templates written when we were "30 years and 150 people across 2 factories" are still going out. Before any further outreach, sweep every script and template for: years in business, team size, number of facilities, certification status. This is a half-day of work that stops a wrong number reaching a customer.</div>
+  <h3>ERP — the single system of record</h3>
+  <p>NandanERP holds client list, potentials list, open opportunities, draft quotes, target quotes, live quotes, lost quotes, open sales orders, interaction master and the daily reporting form. Every seller bookmarks all of them.</p>
+  <p><b>The rule:</b> if it is not in ERP, it did not happen. Interactions posted within 48 hours. Prospect bucket at 50+. No quote left "to be assigned".</p>
+  <h3>Brand discipline</h3>
+  <p>Navy #1B2A5E, Orange #F04E23, white background. Logo top-left on white, never on a coloured or photographic field. Currency written as "Rs." throughout, never as a symbol.</p>
+  <p><b>LinkedIn:</b> Tuesday to Thursday, IST mornings. Native video upload over YouTube links — YouTube link in the first comment. Early comment engagement drives reach. Maximum seven hashtags.</p>
+  <h3>Training and guardianship</h3>
+  <p>Section 17 sets the playbook's own maintenance: how the team trains and retrains on it, who guards it for the financial year, how feedback is gathered, and how often it evolves. Mohnish Nair coaches. The read log at the front of the playbook is how compliance is evidenced.</p>`}
+]},
+
+/* ============ OUR COMPETITORS ============ */
+{id:"comp",tab:"Our competitors",secs:[
+ {id:"c-land",kicker:"Landscape",h2:"Who we run into",
+  html:`<p class="lead">Section 5.1 of the playbook asks who our competitors are. It is blank. Section 5.2 asks how we play to win, and answers with five words. That is the whole competitive intelligence Nandan holds in writing.</p>
+  <h3>What 5.2 says we win on</h3>
+  <p><span class="chip go">Bespoke solution provider</span><span class="chip go">Unique in market</span><span class="chip go">Safety features</span><span class="chip go">Quick service accessibility</span><span class="chip go">Documentation</span></p>
+  <p>Those are real strengths, and they are consistent with the strengths list — responsiveness and out-of-the-box solutioning. But they are claims, not comparisons. A claim only becomes a competitive argument when it is set against a named alternative.</p>
+  <h3>The groups we actually meet</h3>
+  <table><tr><th>Group</th><th>Where they beat us</th><th>Where we beat them</th></tr>
+  <tr><td>Global GSE majors — TLD, JBT AeroTech, Textron GSE, Charlatte, Vestergaard, Mallaghan, Aviogei</td><td>Brand, global service network, financing, installed base</td><td>Price position, willingness to build bespoke, responsiveness on non-standard requirements</td></tr>
+  <tr><td>Chinese manufacturers — Weihai Guangtai and peers</td><td>Unit price, delivery speed on standard models</td><td>Certification depth, European references, build to Western standards, defence acceptability</td></tr>
+  <tr><td>Indian competitors — Three D Integrated Solutions and regional fabricators</td><td>Local relationships, lower overhead on simple work</td><td>AS9100D, EN 1090-1 EXC3, export track record, Airbus and HAL audits</td></tr>
+  <tr><td>Eastern European contract manufacturers</td><td>Proximity, no customs friction, shorter logistics</td><td>Cost position, skilled welding capacity at scale, aerospace certification</td></tr>
+  <tr><td>IndiaMART traders and body builders</td><td>Speed and price on commodity work</td><td>We do not compete here — the playbook already regrets this category, correctly</td></tr>
+  </table>
+  <div class="note"><b>Signal worth acting on now</b>Three D Integrated Solutions is debarred by AAI. That creates a live gap in airport tenders and in accounts where they were incumbent. The EVA brief mapping it is still pending. This is a competitor situation that converts to revenue, not just intelligence.</div>
+  <div class="note"><b>The cheapest intelligence we are not collecting</b>Every lost quote already tells us who won and why. The 2023 process has "Lost to Competition → Analyze and Learn" built in, and Lost Quote Analysis is a weekly activity on the checklist. If that analysis were captured against a competitor name, we would have battlecards within a quarter at no cost. <span class="chip tbc">Not being captured</span></div>`},
+
+ {id:"c-battle",kicker:"Battlecard",h2:"The standard battlecard",
+  html:`<p class="lead">One per named competitor. Short enough to read before a call, specific enough to change what you say in it.</p>
+  <table><tr><th>Field</th><th>What goes in it</th></tr>
+  <tr><td>Who they are</td><td>Origin, size, ownership, where they manufacture</td></tr>
+  <tr><td>Products that overlap</td><td>Model for model against ours</td></tr>
+  <tr><td>Price position</td><td>Above, at or below us — with a percentage where we have evidence from a lost quote</td></tr>
+  <tr><td>Lead time</td><td>Theirs versus ours on comparable equipment</td></tr>
+  <tr><td>Their pitch</td><td>The three things they say in the room</td></tr>
+  <tr><td>Their weak point</td><td>Where customers complain — service response, spares cost, refusal to customise</td></tr>
+  <tr><td>How we win</td><td>The specific reframe, not a general claim</td></tr>
+  <tr><td>How we lose</td><td>Honestly. If we cannot beat them on a requirement, no-bid earlier.</td></tr>
+  <tr><td>Accounts contested</td><td>Where we met them and what happened</td></tr>
+  <tr><td>Last updated</td><td>Date and owner. A battlecard older than six months is misinformation.</td></tr></table>
+  <h3>Where the input comes from</h3>
+  <ul><li><b>Lost quote analysis</b> — already a weekly activity. Add one field: who won.</li>
+  <li><b>Trade fairs</b> — Eurosatory, Farnborough, GSE Expo Europe. Walk competitor stands deliberately and file a note.</li>
+  <li><b>Published tender awards</b> — show price and winner.</li>
+  <li><b>Customers</b> — the most honest source. Ask what else they evaluated, and why they chose what they chose.</li></ul>
+  <div class="note"><b>Discipline</b>Never disparage a competitor to a customer. State what we do, name our references, and let the comparison make itself. Buyers remember who ran down a rival, and it is rarely the one they buy from.</div>`}
+]},
+
+/* ============ QUOTATION GENERATOR ============ */
+{id:"quote",tab:"Quotation generator",secs:[
+ {id:"q-tool",kicker:"Working prototype",h2:"Build a quotation",
+  html:`<p class="lead">A working v1 that applies our commercial rules automatically — one-time costs separated, Indian formatting, milestone amounts calculated, and approval flags raised where a rule is breached. The Rs. 10 lakh threshold from playbook section 7.1.2 is built in.</p>
+  <div class="qg">
+   <div class="qghd">Quotation builder</div>
+   <div class="qgbody">
+    <div class="qgin">
+     <div class="qgsub">Customer</div>
+     <div class="f2">
+      <div class="fld"><label>Customer name</label><input id="q_cust" type="text" placeholder="Customer name"></div>
+      <div class="fld"><label>Quote reference</label><input id="q_ref" type="text"></div>
+     </div>
+     <div class="f2">
+      <div class="fld"><label>Business line</label><select id="q_line">
+        <option>Aviation GSE</option><option>Defence &amp; aerospace</option><option>Speciality handling systems</option>
+        <option>Truck loading solutions</option><option>Car parking solutions</option><option>Contract manufacturing</option></select></div>
+      <div class="fld"><label>Validity (days)</label><input id="q_val" type="number" value="30"></div>
+     </div>
+     <div class="fld"><label>Equipment description</label><textarea id="q_desc" placeholder="e.g. 5,000 L SS-316L insulated water bowser — tank system design, fabrication and integration"></textarea></div>
+     <div class="qgsub">Pricing</div>
+     <div class="f3">
+      <div class="fld"><label>Quantity</label><input id="q_qty" type="number" value="1" min="1"></div>
+      <div class="fld"><label>Unit price (Rs.)</label><input id="q_unit" type="number" value="3750000"></div>
+      <div class="fld"><label>Discount %</label><input id="q_disc" type="number" value="0" step="0.5"></div>
+      <div class="fld"><label>Unit cost — bought-out + labour (Rs.)</label><input id="q_cost" type="number" value="0"></div>
+     </div>
+     <div class="f3">
+      <div class="fld"><label>Design development (Rs.)</label><input id="q_dd" type="number" value="0"></div>
+      <div class="fld"><label>Type testing (Rs.)</label><input id="q_tt" type="number" value="0"></div>
+      <div class="fld"><label>Tooling (Rs.)</label><input id="q_tool" type="number" value="0"></div>
+     </div>
+     <div class="f3">
+      <div class="fld"><label>Incoterm</label><select id="q_inco"><option>Ex-works</option><option>FOB</option><option>CIF</option></select></div>
+      <div class="fld"><label>Freight &amp; insurance (Rs.)</label><input id="q_frt" type="number" value="0"></div>
+      <div class="fld"><label>GST %</label><input id="q_gst" type="number" value="18" step="0.5"></div>
+     </div>
+     <div class="qgsub">Terms &amp; schedule</div>
+     <div class="f3">
+      <div class="fld"><label>Advance %</label><input id="q_p1" type="number" value="20"></div>
+      <div class="fld"><label>GAD approval %</label><input id="q_p2" type="number" value="30"></div>
+      <div class="fld"><label>On delivery %</label><input id="q_p3" type="number" value="40"></div>
+      <div class="fld"><label>Commissioning %</label><input id="q_p4" type="number" value="10"></div>
+     </div>
+     <div class="f3">
+      <div class="fld"><label>Proving batch (units)</label><input id="q_pb" type="number" value="5"></div>
+      <div class="fld"><label>Proving batch at month</label><input id="q_pm" type="number" value="4"></div>
+      <div class="fld"><label>Rate after ramp (units/mo)</label><input id="q_rate" type="number" value="25"></div>
+     </div>
+     <div class="fld"><label>Buyer-supplied items (excluded from scope)</label><input id="q_bsi" type="text" placeholder="e.g. Ashok Leyland Stallion 4x4 chassis"></div>
+     <div class="f3">
+      <div class="fld"><label>BANTTC revalidated</label><select id="q_bt"><option>Not yet</option><option>Yes</option></select></div>
+      <div class="fld"><label>Credit cleared</label><select id="q_cred"><option>Not yet</option><option>Cleared</option></select></div>
+      <div class="fld"><label>PPC slot confirmed</label><select id="q_ppc"><option>Not yet</option><option>Confirmed</option></select></div>
+     </div>
+    </div>
+    <div class="qgout" id="q_out"></div>
+   </div>
+  </div>`},
+
+ {id:"q-scope",kicker:"The big project",h2:"What the full generator needs",
+  html:`<p class="lead">The prototype proves the logic. The system you actually want depends on data Nandan does not yet hold — and the playbook says so itself.</p>
+  <h3>Prerequisite: the product master</h3>
+  <p>For every sellable item: model number, business line, description, capacity or rating, standard configuration, common options, base cost, target margin band, standard lead time, applicable certifications. The playbook's weakness list already names this — "product costing is not complete" — and one of the quarterly transformational priorities is "standardisation of the products for sales, design and production". That priority and this document are the same task.</p>
+  <div class="note"><b>Honest sequencing</b>The product master is worth more than the generator. Build it first even if the generator waits. A good salesperson with a product master beats a poor one with software.</div>
+  <h3>Build phases</h3>
+  <div class="rail">
+   <div class="stage" data-n="1"><h4>Product master</h4><div class="meta">Owner: Santosh Patra with PPC, design and Accounts</div><p>One sheet, every sellable item, costs and lead times validated. Closes a named weakness and a stated quarterly priority at the same time.</p></div>
+   <div class="stage" data-n="2"><h4>Rules engine</h4><div class="meta">Owner: Sales with Accounts</div><p>Price bands per line, delegated discount limits, GST logic, incoterm handling, freight tables, price-variation clause on steel, the Rs. 10 lakh detailed-proposal threshold, three-option logic.</p></div>
+   <div class="stage gate" data-n="3"><h4>Approval workflow</h4><div class="meta">Sign-off: Dr. Raghu</div><p>Routes automatically by value and discount. Nothing leaves without BANTTC revalidated, credit cleared and PPC slot confirmed.</p></div>
+   <div class="stage" data-n="4"><h4>Document output</h4><div class="meta">Owner: Sales with brand</div><p>Branded PDF in house style — navy and orange, logo top-left on white, Rs. throughout. Scope, exclusions, buyer-supplied items, validity and terms all printed. Three options where the threshold applies.</p></div>
+   <div class="stage" data-n="5"><h4>ERP integration and register</h4><div class="meta">Owner: Santosh Patra</div><p>Every quote numbered, logged, versioned and linked to its opportunity, classified Target, Live or Lost. Feeds the offer-to-order rate directly. NandanERP already holds these reports — the generator should write into them, not beside them.</p></div>
+   <div class="stage" data-n="6"><h4>Multi-currency and export</h4><div class="meta">Owner: Ankeet Trivedi</div><p>EUR, USD and CHF quoting, incoterm variants, export documentation checklist. Required before Europe scales.</p></div>
+  </div>
+  <h3>Decisions needed before phase 2</h3>
+  <ul><li>Price bands and delegated discount limits per business line</li>
+  <li>Standard margin targets — and whether contract manufacturing differs from product sales</li>
+  <li>Whether export quotes are held in Rs. or customer currency, and who carries FX risk</li>
+  <li>Quote numbering convention, and whether it extends the existing ERP series</li></ul>`}
+]},
+
+/* ============ METRICS ============ */
+{id:"metrics",tab:"Metrics",secs:[
+ {id:"m-results",kicker:"Results",h2:"Lagging metrics",
+  html:`<p class="lead">These tell us what happened. They are the score, and by the time they move it is too late to change them.</p>
+  <table><tr><th>Metric</th><th>Definition</th><th>Reviewed</th><th>Target</th></tr>
+  <tr><td>Revenue</td><td>Billing revenue against the Mission 2026-27 number</td><td>Monthly</td><td><b>Rs. 100 Cr</b> by 31 Mar 2027</td></tr>
+  <tr><td>Order intake</td><td>Value of orders bagged in the period, by line and segment</td><td>Monthly</td><td>Ahead of the revenue run rate</td></tr>
+  <tr><td>PBT %</td><td>Profit before tax</td><td>Monthly</td><td><b>10%</b> by 31 Mar 2027</td></tr>
+  <tr><td>EBITDA margin</td><td>OPSP objective</td><td>Monthly</td><td><b>≥18%</b> by Mar 2027</td></tr>
+  <tr><td>Gross margin at quote</td><td>Margin Fortress — enforced at quote stage, not reviewed after</td><td>Every quote</td><td><b>40% minimum</b></td></tr>
+  <tr><td>Export revenue</td><td>Export Engine — half the business</td><td>Monthly</td><td><b>Rs. 50 Cr</b> · 50% of revenue</td></tr>
+  <tr><td>OTIF</td><td>On time in full. Delivery Spine — the trust metric.</td><td>Monthly</td><td><b>95%</b>, held four consecutive quarters</td></tr>
+  <tr><td>Working capital cycle</td><td>Cash Discipline</td><td>Monthly</td><td><b>&lt;30 days</b> by Mar 2027</td></tr>
+  <tr><td>Product portfolio standardised</td><td>Platformisation — protects margin without heroics</td><td>Quarterly</td><td><b>45%</b></td></tr>
+  <tr><td>Pipeline value</td><td>Total value of active opportunities. Already defined as a CRM metric in section 15.2.</td><td>Weekly</td><td>Baseline first</td></tr>
+  <tr><td>Quote conversion rate</td><td>Percentage of quotes that close. Defined in 15.2; not yet reported.</td><td>Monthly</td><td>Baseline first</td></tr>
+  <tr><td>Gate conversion</td><td>Percentage clearing each of the four gates. Shows where we actually lose.</td><td>Monthly</td><td>Baseline first</td></tr>
+  <tr><td>Loss reason distribution</td><td>Across the reason codes, with the winning competitor named</td><td>Monthly</td><td>—</td></tr>
+  <tr><td>Cash: collections</td><td>Debtors collected. Rolling 13-week forecast.</td><td>Weekly</td><td>Working capital under 30 days</td></tr>
+  <tr><td>Export order execution</td><td>Customer satisfaction on export orders</td><td>Quarterly</td><td><b>90%</b></td></tr>
+  <tr><td>Customer retention</td><td>Repeat business across the base</td><td>Quarterly</td><td><b>1,000+ customers</b> with repeat business</td></tr>
+  <tr><td>Aftermarket share</td><td>Spares, AMC, refurbishment and service as a percentage of revenue</td><td>Monthly</td><td><span class="chip tbc">Currently unmeasured</span></td></tr>
+  </table>
+  <h3>Loss reason codes</h3>
+  <p><span class="chip">Price</span><span class="chip">Lead time</span><span class="chip">Technical capability</span><span class="chip">Certification gap</span><span class="chip">Payment terms</span><span class="chip">Incumbent</span><span class="chip">Customer deferred</span><span class="chip">We regretted</span><span class="chip">No decision</span><span class="chip hot">+ who won</span></p>
+  <div class="note"><b>Baseline before target</b>Setting a target on a metric never measured produces a number nobody believes. Measure one quarter, then set the target from evidence. The exception is order intake and profit, where the numbers already exist and only need to be dated to a financial year.</div>`},
+
+ {id:"m-lead",kicker:"Lead metrics",h2:"Leading indicators",
+  html:`<p class="lead">These are the ones we can act on this week. Nandan already has them — the weekly salesman checklist is a lead-metric system, it just is not being read as one.</p>
+  <h3>The activity standard, already set</h3>
+  <table><tr><th>Activity</th><th>Per person, per week</th><th>Team, per month</th></tr>
+  <tr><td>Prospecting calls</td><td>40</td><td>200</td></tr>
+  <tr><td>Prospecting emails</td><td>20</td><td>100</td></tr>
+  <tr><td>Follow-up calls</td><td>20</td><td>100</td></tr>
+  <tr><td>Loom recordings</td><td>2</td><td>10</td></tr>
+  <tr><td>Customer visits</td><td>2</td><td>10</td></tr>
+  <tr><td>Zoom calls</td><td>1</td><td>5</td></tr>
+  <tr><td>Prospect bucket in ERP</td><td>50+ maintained</td><td>—</td></tr></table>
+  <h3>Weekly discipline checklist</h3>
+  <p>Opportunity attended within 24 hours · two hours of prospecting blocked each week · hot target quotes called · live quotes called · smart task updated and followed · manifesto recited · excellence discussion on prospecting · two hours of learning · one hour of strategy work planned.</p>
+  <h3>The pipeline-health metrics to add</h3>
+  <table><tr><th>Metric</th><th>Why it predicts</th><th>Owner</th></tr>
+  <tr><td>Opportunities with no dated next action</td><td>Should be zero. Anything above zero is decay in progress.</td><td>Santosh Patra</td></tr>
+  <tr><td>Opportunities static over 30 days</td><td>Early warning of a stalling pipeline, well before results move</td><td>Santosh Patra</td></tr>
+  <tr><td>Interactions posted within 48 hours</td><td>The single best proxy for whether the process is being followed at all</td><td>Santosh Patra</td></tr>
+  <tr><td>Quotes still "to be assigned"</td><td>Should be zero. An unclassified quote is an unmanaged one.</td><td>Opportunity owners</td></tr>
+  <tr><td>Gate 1 clearances</td><td>New qualified opportunities entering the funnel</td><td>Santosh Patra</td></tr>
+  <tr><td>NDAs executed</td><td>The real gate for contract manufacturing. No NDA, no drawings, no order.</td><td>Ankeet Trivedi</td></tr>
+  <tr><td>Installed-base contacts made</td><td>Aftermarket cannot grow without outbound contact to existing customers</td><td><span class="chip tbc">Unassigned</span></td></tr>
+  <tr><td>Lost quote analyses completed with competitor named</td><td>Builds the battlecards at zero cost</td><td>Opportunity owners</td></tr>
+  <tr><td><b>Customer reminders received</b></td><td>The OPSP negative KPI. Every time a customer chases us it is logged against us. Target: zero.</td><td>Opportunity owners</td></tr>
+  <tr><td>Quotes below 40% gross margin</td><td>Margin Fortress leakage, caught at quote rather than at review</td><td>Santosh Patra</td></tr>
+  <tr><td>Technical walkthroughs and plant visits held</td><td>The plant walk closes what the proposal opens</td><td>Opportunity owners</td></tr>
+  <tr><td>Weekly project updates sent on live orders</td><td>Good news and bad, before the customer asks. Carries CSF 3 and CSF 10.</td><td>Opportunity owners</td></tr>
+  </table>
+  <div class="note"><b>The gap is not measurement, it is use</b>The activity targets have existed for years. What is missing is the loop: activity numbers reviewed weekly against gate conversion, so the team can see which activity actually produces orders. Forty calls a week is only a good target if we know what forty calls converts to.</div>`},
+
+ {id:"m-cadence",kicker:"Rhythm",h2:"The review cadence",
+  html:`<p class="lead">Four rhythms, all already defined in section 16 of the playbook. The change Sales Regrow makes is what each one looks at.</p>
+  <div class="rail">
+   <div class="stage" data-n="D"><h4>Daily huddle</h4><div class="meta">15–30 min · morning</div><p>Key activities, blockers, plan for the day. Daily report by 8 pm. No metrics review here — this is unblocking, not reporting.</p></div>
+   <div class="stage" data-n="W"><h4>Weekly sales meeting</h4><div class="meta">60 min · Monday · Santosh Patra chairs</div><p><b>Lead metrics only.</b> Activity against standard. Opportunities with no next action. Static over 30 days. Quotes unclassified. What advanced a stage and on what evidence. Weekly intention posted by 9 am.</p></div>
+   <div class="stage gate" data-n="M"><h4>Monthly business review</h4><div class="meta">2–3 hours · Dr. Raghu chairs</div><p><b>Results.</b> Order intake, profit, export share, quote conversion, gate conversion. Wins and losses with reason codes and who won. The EVA verdict board account by account. Capacity versus committed delivery with Cdr Giri and Pankaj Sutar.</p></div>
+   <div class="stage gate" data-n="Q"><h4>Quarterly business review</h4><div class="meta">Half to full day · Chairman and Dr. Raghu</div><p><b>The OPSP itself.</b> Performance against targets, financial review, strategic initiatives, next quarter's priorities. Europe across all four prongs. Price bands and approval limits reset. Capability gaps — what we lost for reasons we could have fixed.</p></div>
+  </div>
+  <div class="note"><b>One change worth making</b>Split the weekly and the monthly by metric type. If the Monday meeting reviews revenue, the team spends Monday explaining the past. If it reviews activity and pipeline health, they spend Monday changing the future. The playbook already sets the cadence correctly — this is only about what gets put on the table.</div>`}
+]},
+
+/* ============ CURRENT ============ */
+{id:"current",tab:"Current",secs:[
+ {id:"cu-gaps",kicker:"Gap register",h2:"What the playbook is missing",
+  html:`<p class="lead">The 2025-26 playbook runs to 267 pages and contains real, hard-won material. But several of its most commercially important sections are headings with nothing underneath. Those blanks are where deals are being lost.</p>
+  <table><tr><th>Section</th><th>What it asks</th><th>State</th></tr>
+  <tr><td>5.1</td><td>Who are our competitors?</td><td><span class="chip hot">Empty</span> Frame drafted in Our competitors</td></tr>
+  <tr><td>6.1</td><td>What are the stages in our sales process and what do they mean?</td><td><span class="chip hot">Empty table</span> Filled in Our Sales Plan — needs sign-off</td></tr>
+  <tr><td>7.1</td><td>Where do we find data on our prospects?</td><td><span class="chip hot">Empty table</span></td></tr>
+  <tr><td>10.1</td><td>Objection handling</td><td><span class="chip hot">Empty table</span> Draft in Our sales kit</td></tr>
+  <tr><td>10.2</td><td>Frequently asked questions</td><td><span class="chip hot">Empty table</span></td></tr>
+  <tr><td>11.1–11.3</td><td>Post-presentation follow-up timing and scripts</td><td><span class="chip hot">Headings only</span></td></tr>
+  <tr><td>12.1–12.6</td><td>Negotiation, discount policy, approvals, non-negotiables, walk-away</td><td><span class="chip hot">All empty</span> Draft in Our sales kit</td></tr>
+  <tr><td>9.8</td><td>What to avoid, from failed conversations</td><td><span class="chip hot">Heading only</span></td></tr>
+  <tr><td>—</td><td>Contract manufacturing / Europe</td><td><span class="chip hot">Absent entirely</span></td></tr>
+  </table>
+  <h3>Factual corrections needed</h3>
+  <table><tr><th>Where</th><th>Says</th><th>Should say</th></tr>
+  <tr><td>UVM page 93, UVP page 135</td><td>30 years · 150 members · 2 factories · "on the way to AS9100D"</td><td>35+ years · 350+ team · 1,20,000 sq ft Khalapur · AS9100D certified</td></tr>
+  <tr><td>Section 2.5</td><td>Almost 33 years · 250 members · 2 factories</td><td>As above</td></tr>
+  <tr><td>Company Basics — BHAG</td><td>Preferred choice by 2025</td><td>Date passed — reset required</td></tr>
+  <tr><td>Hot / not-hot products and industries</td><td>2020-21</td><td>Refresh; the bowser exclusion now contradicts a live Rs. 187.50 Cr programme</td></tr>
+  <tr><td>Sales team page</td><td>Current allocation</td><td>Add Neetu Sharan, Cdr Giri, Gen Mohandas; confirm coordination</td></tr>
+  <tr><td>Values</td><td>Three different sets</td><td>Choose one and delete the others</td></tr>
+  </table>
+  <div class="note"><b>What is genuinely strong and should be protected</b>The engage ladder, the MAN and pre-call checklists, the BANTTC test, the problem-to-product table, the regret list, the weekly activity standard, the salesman manifesto, and the honesty of the weakness list. These are better than most manufacturers have. The playbook does not need rewriting — it needs its empty tables filled and its numbers corrected.</div>`},
+
+ {id:"cu-board",kicker:"Verdict board",h2:"Where each account stands",
+  html:`<table><tr><th>Account</th><th>Score</th><th>Verdict</th><th>Active thread</th><th>Owner</th></tr>
+  <tr><td>KDAIL</td><td>7.6</td><td><span class="chip hot">Live</span></td><td>500-unit water bowser programme; Ankur Ashwin Shah, Rohit Shintre</td><td>Col. Acharya</td></tr>
+  <tr><td>BDL</td><td>7.9</td><td><span class="chip go">Pursue</span></td><td>Introduction pathway via Gen Mohandas</td><td>Col. Acharya</td></tr>
+  <tr><td>AIS</td><td>6.9</td><td><span class="chip go">Pursue</span></td><td>OEM glass supply, and MHE vendor for the Taloja greenfield</td><td><span class="chip tbc">Assign</span></td></tr>
+  <tr><td>Exim Bank</td><td>—</td><td><span class="chip go">Pursue</span></td><td>Ubharte Sitaare as the priority route</td><td><span class="chip tbc">Assign</span></td></tr>
+  <tr><td>Adani Defence · Cochin Shipyard · Elbit · Veda Aeronautics · Autoquip</td><td>—</td><td>Brief complete</td><td>No active thread</td><td><span class="chip tbc">None</span></td></tr>
+  <tr><td>P&amp;MG</td><td>2.4</td><td><span class="chip" style="border-color:#F04E23;color:#F04E23">Do not engage</span></td><td>Closed. Integrity and compliance risk documented; NDA gap from factory tour flagged.</td><td>Closed</td></tr></table>
+  <h3>KDAIL — the live programme</h3>
+  <table><tr><th>Element</th><th>Position</th></tr>
+  <tr><td>Scope</td><td>500 units · 5,000 L SS-316L insulated water bowser</td></tr>
+  <tr><td>Platform</td><td>Ashok Leyland Stallion 4×4 — buyer-supplied, excluded from scope</td></tr>
+  <tr><td>Our role</td><td>Tank system design, fabrication and integration</td></tr>
+  <tr><td>Unit price</td><td>Rs. 37.50 lakh ex-works</td></tr>
+  <tr><td>Design development · Type testing</td><td>Rs. 18 lakh · Rs. 75 lakh — both one-time, both separate</td></tr>
+  <tr><td>Programme value ex-works</td><td>Rs. 187.50 Cr</td></tr>
+  <tr><td>Payment</td><td>20% advance / 60% + full GST on delivery / 20% within 30 days <span class="chip tbc">Differs from the 20/30/40/10 standard — confirm as exception</span></td></tr>
+  <tr><td>Ramp</td><td>5-unit proving batch at Month 4, then 20–35 per month</td></tr></table>
+  <div class="note"><b>Two things this programme tells us</b>First, its structure is the right template for large repeat builds — one-time costs separated, buyer-supplied items excluded, proving batch before ramp. Second, at Rs. 187.50 Cr it is more than three times the one-year billing target of Rs. 60 Cr. If it converts, the OPSP numbers are not stretch targets — they are already out of date.</div>
+  <div class="note"><b>Five briefs, no owner</b>Adani Defence, Cochin Shipyard, Elbit, Veda Aeronautics and Autoquip all have complete EVA briefs and no active thread. Research without follow-through is cost, not intelligence. Assign an owner and a next action, or move them to Watchlist and stop counting them.</div>`},
+
+ {id:"cu-next",kicker:"Decisions",h2:"What unblocks the most",
+  html:`<p class="lead">Almost everything below is blocked on a decision or an owner, not on capability. The work is largely done.</p>
+  <h3>The seven decisions</h3>
+  <ol>
+   <li><b>Cascade the OPSP into sales targets.</b> Rs. 100 Cr at 10% PBT and Rs. 50 Cr exports are set. What is not set is how that splits by segment, by person and by quarter. Until it does, the OPSP is a company number rather than a sales plan.</li>
+   <li><b>Map the meeting calendars.</b> The OPSP names twelve standing forums; the sales process names four. They overlap. Reconcile once so nobody attends two versions of the same meeting.</li>
+   <li><b>Set price bands and delegated discount limits</b> per business line. This is the single mechanism that delivers the 3–5 year priority of Dr. Raghu at zero involvement in transactions. Until it exists, that priority is a wish.</li>
+   <li><b>Assign an owner to the product master.</b> It closes a named weakness, a quarterly priority, section 12 of the playbook, and the quotation generator — all at once.</li>
+   <li><b>Assign an owner to the installed-base register.</b> Without it, stage 12 of our own process cannot be executed and aftermarket revenue stays at zero.</li>
+   <li><b>Approve the filled sections</b> — stage definitions, objection handling, negotiation policy — or mark them up. Drafts that sit unapproved are worse than blanks, because people half-follow them.</li>
+   <li><b>Name the three export focus geographies</b>, the two anchor customers and the one flagship platform the Export Engine calls for. The platform is almost certainly the catering hi-lift; the rest is open.</li>
+  </ol>
+  <h3>Also open</h3>
+  <table><tr><th>Initiative</th><th>Next action</th><th>Blocked on</th></tr>
+  <tr><td>nandan.ch launch</td><td>Deploy</td><td><b>Dr. Raghu</b> — photograph, LinkedIn URL, 10 product images; then native DE/FR/IT review</td></tr>
+  <tr><td>CopyLove brand programme</td><td>Brand guide delivery</td><td>Five factual errors corrected first — and the playbook corrections above feed the same sweep</td></tr>
+  <tr><td>Template factual sweep</td><td>Correct every script and template</td><td>Owner not assigned. Half a day of work.</td></tr>
+  <tr><td>Three D Integrated Solutions</td><td>EVA brief</td><td>AAI debarment creates a live tender gap — prioritise</td></tr>
+  <tr><td>Eternalwin electric tuggers</td><td>CIF quote on the 10T ML-1000L</td><td>Supplier; factory audit under consideration</td></tr>
+  <tr><td>Railway sector</td><td>Start outreach</td><td>877-company directory built; no owner, no plan</td></tr>
+  <tr><td>Trade fairs</td><td>Decide participation</td><td><b>Dr. Raghu</b> — Eurosatory, Farnborough, GSE Expo Europe</td></tr>
+  <tr><td>InstaFinancials database</td><td>Mine for targets</td><td>363 companies, 1,280 directors — currently an archive</td></tr>
+  <tr><td>Lost quote analysis</td><td>Add "who won" field</td><td>Nothing. This can start Monday.</td></tr>
+  </table>
+  <div class="note"><b>Where Sales Regrow actually lands</b>Nandan does not have a sales knowledge problem. The 2023 process map, the engage ladder, the checklists and the activity standards are strong and were built with care. What is missing is the small number of decisions that turn a document into a system: one goal, one value set, price bands, and two owners. Four of those cost nothing but a decision.</div>`}
+]}
+];
+
+/* ===== RENDER ===== */
+const tabsEl=document.getElementById('tabs'),mainEl=document.getElementById('main'),subEl=document.getElementById('subnav');
+let activeTab=0;
+CONTENT.forEach((t,i)=>{
+ const b=document.createElement('button');
+ b.className='tab';b.textContent=t.tab;b.setAttribute('role','tab');
+ b.setAttribute('aria-selected',i===0?'true':'false');b.onclick=()=>selectTab(i);
+ tabsEl.appendChild(b);
+ const p=document.createElement('div');p.className='panel'+(i===0?' on':'');p.id='p-'+t.id;
+ p.innerHTML=t.secs.map(s=>`<section class="sec" id="${s.id}"><span class="kicker">${s.kicker}</span><h2>${s.h2}</h2>${s.html}</section>`).join('');
+ mainEl.appendChild(p);
+});
+function selectTab(i){
+ activeTab=i;
+ [...tabsEl.children].forEach((b,j)=>b.setAttribute('aria-selected',j===i?'true':'false'));
+ [...mainEl.children].forEach((p,j)=>p.classList.toggle('on',j===i));
+ buildSubnav();window.scrollTo({top:0});
+}
+function buildSubnav(){
+ subEl.innerHTML='<div class="eyebrow">In this section</div>';
+ CONTENT[activeTab].secs.forEach((s,k)=>{
+  const a=document.createElement('a');a.href='#'+s.id;a.textContent=s.h2;if(k===0)a.className='active';
+  a.onclick=e=>{e.preventDefault();document.getElementById(s.id).scrollIntoView({block:'start'});markSub(k);};
+  subEl.appendChild(a);
+ });
+}
+function markSub(k){[...subEl.querySelectorAll('a')].forEach((a,j)=>a.classList.toggle('active',j===k));}
+buildSubnav();
+const spy=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){
+ const idx=CONTENT[activeTab].secs.findIndex(s=>s.id===e.target.id);if(idx>-1)markSub(idx);}});},
+ {rootMargin:'-140px 0px -65% 0px'});
+document.querySelectorAll('section.sec').forEach(s=>spy.observe(s));
+
+/* ===== QUOTATION ENGINE ===== */
+const $=id=>document.getElementById(id);
+function inr(n){return 'Rs. '+Math.round(n).toLocaleString('en-IN');}
+function words(n){if(n>=1e7)return '('+(n/1e7).toFixed(2)+' Cr)';if(n>=1e5)return '('+(n/1e5).toFixed(2)+' lakh)';return '';}
+function num(id){const v=parseFloat($(id).value);return isNaN(v)?0:v;}
+function quote(){
+ const out=$('q_out');if(!out)return;
+ const qty=Math.max(1,num('q_qty')),unit=num('q_unit'),disc=num('q_disc');
+ const net=unit*(1-disc/100), goods=net*qty;
+ const cost=num('q_cost'); const gm=(cost>0&&net>0)?((net-cost)/net*100):null;
+ const dd=num('q_dd'),tt=num('q_tt'),tl=num('q_tool'),one=dd+tt+tl;
+ const inco=$('q_inco').value, frt=inco==='Ex-works'?0:num('q_frt');
+ const sub=goods+one+frt, gstR=num('q_gst'), gst=sub*gstR/100, tot=sub+gst;
+ const p1=num('q_p1'),p2=num('q_p2'),p3=num('q_p3'),p4=num('q_p4'),psum=p1+p2+p3+p4;
+ const pb=num('q_pb'),pm=num('q_pm'),rate=Math.max(1,num('q_rate'));
+ const months=pb>=qty?pm:pm+Math.ceil((qty-pb)/rate);
+ const val=num('q_val');
+ const vd=new Date(Date.now()+val*864e5).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+ let f='';
+ if(gm!==null&&gm<40)f+=`<div class="flag"><b>Gross margin ${gm.toFixed(1)}% — below the 40% Margin Fortress floor.</b> The OPSP enforces 40% at quote stage, not at review. This needs a deliberate, approved decision before the offer is issued.</div>`;
+ if(gm!==null&&gm>=40)f+=`<div class="flag ok">Gross margin ${gm.toFixed(1)}% — clears the 40% floor.</div>`;
+ if(cost===0)f+=`<div class="flag">Unit cost not entered, so margin cannot be checked against the 40% floor. Enter it, or confirm the margin separately.</div>`;
+ if(sub>=5000000)f+=`<div class="flag">Value above Rs. 50 lakh — RJ approval required <b>in writing</b> before this offer is issued.</div>`;
+ else if(sub>=1000000)f+=`<div class="flag">Value above Rs. 10 lakh — issue as a detailed proposal with three options, tell RJ, send a screenrec video on email and WhatsApp, and call after sending.</div>`;
+ if(disc>0)f+=`<div class="flag">Discount of ${disc}% applied — Dr. Raghu's approval required before this offer is issued.</div>`;
+ if(psum!==100)f+=`<div class="flag">Payment split totals ${psum}%. It must total 100%.</div>`;
+ if(p1<20)f+=`<div class="flag">Advance below 20% — softer than the standard terms. Dr. Raghu sign-off required.</div>`;
+ if($('q_bt').value!=='Yes')f+=`<div class="flag">BANTTC not revalidated. Playbook 7.1.9 requires revalidation before the quote is issued.</div>`;
+ if($('q_cred').value!=='Cleared')f+=`<div class="flag">Credit position not cleared with Suresh Lalzare. Offers do not leave before this is done.</div>`;
+ if($('q_ppc').value!=='Confirmed')f+=`<div class="flag">PPC slot not confirmed. Do not commit a delivery date Pankaj Sutar has not given you.</div>`;
+ if(inco!=='Ex-works'&&frt===0)f+=`<div class="flag">${inco} selected with zero freight and insurance. Scope it explicitly or quote Ex-works.</div>`;
+ if(!$('q_bsi').value.trim())f+=`<div class="flag">No buyer-supplied items named. If the customer supplies a chassis or major component, state it and exclude it.</div>`;
+ if(one===0&&qty>=25)f+=`<div class="flag">Volume order with no design development or type testing quoted. Confirm these are genuinely not required — they are never absorbed into unit price.</div>`;
+ if(!f)f='<div class="flag ok">All commercial rules satisfied. This offer can be issued by the opportunity owner.</div>';
+ out.innerHTML=`
+  <div class="qgsub">Offer summary</div>
+  <div class="qline"><span>${$('q_line').value}${$('q_desc').value?' — '+$('q_desc').value.slice(0,70):''}</span><span></span></div>
+  <div class="qline"><span>${qty} × ${inr(net)} ex-works${disc>0?' (after '+disc+'% discount)':''}</span><span>${inr(goods)}</span></div>
+  ${dd?`<div class="qline"><span>Design development — one-time</span><span>${inr(dd)}</span></div>`:''}
+  ${tt?`<div class="qline"><span>Type testing — one-time</span><span>${inr(tt)}</span></div>`:''}
+  ${tl?`<div class="qline"><span>Tooling — one-time</span><span>${inr(tl)}</span></div>`:''}
+  ${frt?`<div class="qline"><span>Freight &amp; insurance (${inco})</span><span>${inr(frt)}</span></div>`:''}
+  <div class="qline"><span>Sub-total</span><span>${inr(sub)}</span></div>
+  <div class="qline"><span>GST @ ${gstR}%</span><span>${inr(gst)}</span></div>
+  <div class="qline tot"><span>Total</span><span>${inr(tot)}</span></div>
+  <div class="words">${words(tot)}</div>
+  <div class="qgsub">Payment milestones</div>
+  <div class="qline"><span>${p1}% advance with order</span><span>${inr(tot*p1/100)}</span></div>
+  <div class="qline"><span>${p2}% on GAD approval</span><span>${inr(tot*p2/100)}</span></div>
+  <div class="qline"><span>${p3}% on delivery, incl. full GST</span><span>${inr(tot*p3/100)}</span></div>
+  <div class="qline"><span>${p4}% on commissioning</span><span>${inr(tot*p4/100)}</span></div>
+  <div class="qgsub">Delivery &amp; scope</div>
+  <div class="qline"><span>Proving batch</span><span>${pb} units at Month ${pm}</span></div>
+  <div class="qline"><span>Rate after ramp</span><span>${rate} units / month</span></div>
+  <div class="qline"><span>Full quantity delivered by</span><span>Month ${months}</span></div>
+  <div class="qline"><span>Incoterm</span><span>${inco}</span></div>
+  <div class="qline"><span>Excluded — buyer supplied</span><span>${$('q_bsi').value.trim()||'None stated'}</span></div>
+  <div class="qline"><span>Offer valid until</span><span>${vd}</span></div>
+  <div class="qline"><span>Price variation</span><span>Applies on steel &amp; bought-out</span></div>
+  ${gm!==null?`<div class="qline"><span>Gross margin at quote</span><span>${gm.toFixed(1)}% ${gm<40?"— BELOW FLOOR":"✓"}</span></div>`:''}
+  <div class="qgsub">Compliance check</div>
+  <div class="flagbox">${f}</div>`;
+}
+['q_cust','q_ref','q_line','q_val','q_desc','q_qty','q_unit','q_disc','q_cost','q_dd','q_tt','q_tool','q_inco','q_frt','q_gst','q_p1','q_p2','q_p3','q_p4','q_pb','q_pm','q_rate','q_bsi','q_bt','q_cred','q_ppc']
+ .forEach(id=>{const el=$(id);if(el){el.addEventListener('input',quote);el.addEventListener('change',quote);}});
+if($('q_ref'))$('q_ref').value='NGSE/Q/'+new Date().getFullYear()+'/____';
+quote();
+
+/* ===== READ-ONLY ===== */
+document.addEventListener('contextmenu',e=>e.preventDefault());
+document.addEventListener('dragstart',e=>e.preventDefault());
+['copy','cut','selectstart'].forEach(ev=>document.addEventListener(ev,e=>{
+ if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+ e.preventDefault();return false;}));
+document.addEventListener('keydown',e=>{
+ const t=e.target.tagName;if(t==='INPUT'||t==='TEXTAREA'||t==='SELECT')return;
+ const k=e.key.toLowerCase();
+ if((e.ctrlKey||e.metaKey)&&['s','p','u','c','x','a'].includes(k)){e.preventDefault();return false;}
+ if(k==='f12'){e.preventDefault();return false;}
+ if((e.ctrlKey||e.metaKey)&&e.shiftKey&&['i','j','c'].includes(k)){e.preventDefault();return false;}
+});
+const shield=$('shield');
+window.addEventListener('blur',()=>shield.classList.add('on'));
+window.addEventListener('focus',()=>shield.classList.remove('on'));
+document.addEventListener('visibilitychange',()=>shield.classList.toggle('on',document.hidden));
+const VIEWER="NANDAN GSE · CONFIDENTIAL";
+(function(){
+ const d=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+ const s=VIEWER+"  ·  "+d;
+ const c=document.createElement('canvas');c.width=470;c.height=134;
+ const x=c.getContext('2d');x.font='600 15px monospace';x.fillStyle='#1B2A5E';x.fillText(s,10,74);
+ $('wm').style.backgroundImage='url('+c.toDataURL()+')';
+ $('stamp').textContent='salesregrow.nandan.co.in · '+d;
+ $('foot').textContent='Sales Regrow · Read-only · '+s;
+})();
+</script>
+</body>
+</html>

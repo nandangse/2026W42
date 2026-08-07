@@ -31,6 +31,7 @@ import {
 import QuoteOfDay from "./QuoteOfDay";
 import GoalsBoard from "./GoalsBoard";
 import MorningUpload from "./MorningUpload";
+import SalesGenie from "./SalesGenie";
 
 // The 32 ERP job-status options (verbatim from V1.9), used by the editable
 // Job Status dropdowns.
@@ -183,6 +184,8 @@ interface AdminUser {
   initials: string | null;
   display_name: string | null;
   erp_owner: string | null;
+  sales_access: boolean;
+  sales_implicit: boolean; // the owner — always yes, not toggleable
 }
 
 const ROLE_OPTIONS: { value: string; label: string; hint: string }[] = [
@@ -276,7 +279,7 @@ export default function PlanningSuite({
   // Three top-level workspaces (per-access, see below), each with its own
   // sticky sub-nav. "tab" is only meaningful inside the Planning Suite
   // workspace now — Goals and Tasking are whole workspaces, not sub-tabs.
-  const [workspace, setWorkspace] = useState<"suite" | "goals" | "tasking">("suite");
+  const [workspace, setWorkspace] = useState<"suite" | "goals" | "tasking" | "sales">("suite");
   // land on "My Week" within the suite, not the delivery board
   const [tab, setTab] = useState<"home" | "delivery" | "load" | "plan" | "erp" | "upload" | "admin">("home");
 
@@ -322,6 +325,18 @@ export default function PlanningSuite({
   const [goalsVisited, setGoalsVisited] = useState(false);
   useEffect(() => {
     if (workspace === "goals") setGoalsVisited(true);
+  }, [workspace]);
+
+  // Sales Genie is granted per person (default nobody) — the tab only renders
+  // once the check says yes. Same lazy keep-alive pattern as Goals so the
+  // iframe isn't reloaded on every workspace switch.
+  const [salesAccess, setSalesAccess] = useState(false);
+  useEffect(() => {
+    api.get("/api/sales/access").then((r) => setSalesAccess(!!r.see)).catch(() => setSalesAccess(false));
+  }, []);
+  const [salesVisited, setSalesVisited] = useState(false);
+  useEffect(() => {
+    if (workspace === "sales") setSalesVisited(true);
   }, [workspace]);
 
   // ---- notification bell: new assignments land here, polled once a minute ----
@@ -462,6 +477,7 @@ export default function PlanningSuite({
     ["suite", "🧭 Planning Suite"],
     ...(goalsAccess ? ([["goals", "🎯 Goals"]] as [typeof workspace, string][]) : []),
     ["tasking", "📋 Nandan Tasking"],
+    ...(salesAccess ? ([["sales", "💼 Sales Genie"]] as [typeof workspace, string][]) : []),
   ];
   // Sub-nav inside the Planning Suite workspace only.
   const SUITE_TAB_DEFS: [typeof tab, string][] = [
@@ -669,6 +685,12 @@ export default function PlanningSuite({
         </div>
       )}
       {workspace === "tasking" && <Tasking board={board} onOpen={openJobPlan} reload={reload} />}
+      {/* same keep-alive pattern as Goals — the playbook iframe loads once */}
+      {salesVisited && salesAccess && (
+        <div style={{ display: workspace === "sales" ? undefined : "none" }}>
+          <SalesGenie email={email} isAdmin={isAdmin} />
+        </div>
+      )}
     </div>
   );
 }
@@ -2736,6 +2758,17 @@ function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; rel
     try { await api.post("/api/admin/users", { action: "disable", id, disabled }); await loadUsers(); }
     catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
   };
+  const setSales = async (u: AdminUser) => {
+    setUMsg("");
+    const granting = !u.sales_access;
+    if (!granting && !window.confirm(`Remove Sales Genie access from ${u.display_name || u.email}?`)) return;
+    try {
+      await api.post("/api/admin/users", { action: "sales_access", id: u.id, grant: granting });
+      setUMsg(`${u.display_name || u.email.split("@")[0]} → Sales Genie ${granting ? "granted" : "removed"} ✓`);
+      await loadUsers();
+    } catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
   const resetPw = async (id: string, email: string) => {
     const pw = window.prompt(`New password for ${email} (min 8 characters):`);
     if (!pw) return;
@@ -2862,6 +2895,7 @@ function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; rel
               <th className="text-left py-1 font-semibold">Email</th>
               <th className="text-left py-1 font-semibold" title="The Project Owner text as it appears in the Jobmaster — links this login to its jobs">ERP owner name</th>
               <th className="text-left py-1 font-semibold">Role</th>
+              <th className="text-left py-1 font-semibold" title="May this person open the Sales Genie workspace? Default is No for everyone.">Sales Genie</th>
               <th className="text-left py-1 font-semibold">Status</th>
               <th className="text-right py-1 font-semibold">Actions</th>
             </tr>
@@ -2871,14 +2905,14 @@ function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; rel
               // skeleton rows — keeps the table height stable while loading
               [0, 1, 2].map((i) => (
                 <tr key={"sk" + i} style={{ borderTop: "1px solid #EEECE6" }}>
-                  <td className="py-2" colSpan={7}>
+                  <td className="py-2" colSpan={8}>
                     <div className="rounded" style={{ height: 12, width: `${60 - i * 10}%`, background: "#EFEDE7" }} />
                   </td>
                 </tr>
               ))
             )}
             {users?.length === 0 && (
-              <tr><td className="py-3" colSpan={7} style={{ color: "#8A94A0" }}>No users found.</td></tr>
+              <tr><td className="py-3" colSpan={8} style={{ color: "#8A94A0" }}>No users found.</td></tr>
             )}
             {(users ?? []).map((u) => (
               <tr key={u.id} style={{ borderTop: "1px solid #EEECE6" }}>
@@ -2925,6 +2959,26 @@ function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; rel
                   <select value={rolePending[u.id] ?? u.role} onChange={(e) => setRole(u.id, e.target.value)} disabled={!mayManage(u) || !!rolePending[u.id]} className="text-xs border rounded px-1" style={{ borderColor: rolePending[u.id] ? "#E8600A" : "#E2E0DA", background: mayManage(u) ? "#fff" : "#F4F2EC", color: mayManage(u) ? "#22303C" : "#8A94A0", opacity: rolePending[u.id] ? 0.7 : 1 }} title={rolePending[u.id] ? "Saving…" : mayManage(u) ? ROLE_OPTIONS.find((r) => r.value === u.role)?.hint : `Only ${OWNER_EMAIL} may change this account`}>
                     {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
                   </select>
+                </td>
+                <td className="py-1.5">
+                  {u.sales_implicit ? (
+                    <span className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FFF3E8", color: "#E8600A" }} title="The owner always has Sales Genie access">Yes · owner</span>
+                  ) : (
+                    <button
+                      onClick={() => mayManage(u) && setSales(u)}
+                      disabled={!mayManage(u)}
+                      className="rounded px-2 py-0.5 font-semibold"
+                      style={{
+                        background: u.sales_access ? "#E6F4EA" : "#F4F2EC",
+                        color: u.sales_access ? "#0D7A3F" : "#8A94A0",
+                        opacity: mayManage(u) ? 1 : 0.5,
+                        cursor: mayManage(u) ? "pointer" : "not-allowed",
+                      }}
+                      title={mayManage(u) ? (u.sales_access ? "Click to remove Sales Genie access" : "Click to grant Sales Genie access") : `Only ${OWNER_EMAIL} may change this account`}
+                    >
+                      {u.sales_access ? "Yes" : "No"}
+                    </button>
+                  )}
                 </td>
                 <td className="py-1.5">
                   <button onClick={() => setDisabled(u.id, !u.disabled, u.email)} disabled={!mayManage(u)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E6F4EA", color: u.disabled ? "#fff" : "#0D7A3F", opacity: mayManage(u) ? 1 : 0.5, cursor: mayManage(u) ? "pointer" : "not-allowed" }} title={mayManage(u) ? (u.disabled ? "Click to re-enable sign-in" : "Click to disable sign-in") : `Only ${OWNER_EMAIL} may change this account`}>{u.disabled ? "disabled" : "active"}</button>

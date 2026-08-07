@@ -52,12 +52,28 @@ async function wouldStrandAdmins(id: string): Promise<boolean> {
 export async function GET() {
   try {
     await requireAdmin();
-    const { data, error } = await adminClient()
+    const admin = adminClient();
+    const { data, error } = await admin
       .from("profiles")
       .select("id, email, role, disabled, initials, display_name, erp_owner, created_at")
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
-    return NextResponse.json({ users: data || [] });
+
+    // Sales Genie grants — default NO for everyone; absent table (pre-0013)
+    // simply reads as nobody granted.
+    const salesIds = new Set<string>();
+    try {
+      const { data: grants } = await admin.from("sales_access").select("person_id");
+      for (const g of grants || []) salesIds.add(g.person_id as string);
+    } catch { /* pre-0013 */ }
+
+    return NextResponse.json({
+      users: (data || []).map((u) => ({
+        ...u,
+        sales_access: salesIds.has(u.id) || String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        sales_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+      })),
+    });
   } catch (e) {
     return errJson(e);
   }
@@ -94,7 +110,7 @@ export async function POST(req: Request) {
           `Only ${RAGHU_EMAIL} may change another admin. Ask them to make this change.`,
         );
     };
-    if (["role", "disable", "password", "delete", "profile"].includes(body.action))
+    if (["role", "disable", "password", "delete", "profile", "sales_access"].includes(body.action))
       await guardTarget(body.id);
 
     // making a new admin creates a peer, so that too is the owner's call
@@ -180,6 +196,25 @@ export async function POST(req: Request) {
         if (/initials/i.test(error.message))
           return NextResponse.json({ error: `Initials "${patch.initials}" are already taken` }, { status: 409 });
         throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body.action === "sales_access") {
+      // grant or revoke Sales Genie for one person (default is no for everyone)
+      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+      if (body.grant) {
+        const { error } = await admin
+          .from("sales_access")
+          .upsert({ person_id: body.id, granted_by: caller.email }, { onConflict: "person_id" });
+        if (error) {
+          if (/sales_access|schema cache|does not exist/i.test(error.message))
+            return NextResponse.json({ error: "Run migration 0013 first — the sales tables don't exist yet" }, { status: 400 });
+          throw new Error(error.message);
+        }
+      } else {
+        const { error } = await admin.from("sales_access").delete().eq("person_id", body.id);
+        if (error) throw new Error(error.message);
       }
       return NextResponse.json({ ok: true });
     }
