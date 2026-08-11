@@ -54,7 +54,7 @@ export async function GET() {
   try {
     const user = await requireUser();
     const admin = adminClient();
-    if (!(await resolveSalesAccess(admin, user.id, user.isOwner)))
+    if (!(await resolveSalesAccess(admin, user.id, user.isOwner, user.role)))
       throw new HttpError(403, "Sales Genie has not been shared with this account");
 
     return new NextResponse(await assemble(), {

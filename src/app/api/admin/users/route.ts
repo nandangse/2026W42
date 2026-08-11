@@ -5,7 +5,7 @@ import type { Role } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const ROLES: Role[] = ["admin", "planner", "project_owner", "user", "viewer", "uploader"];
+const ROLES: Role[] = ["admin", "planner", "project_owner", "user", "sales", "viewer", "uploader"];
 
 /** Normalise a 2-letter initials key, or null. Throws on a bad value. */
 function normInitials(v: unknown): string | null {

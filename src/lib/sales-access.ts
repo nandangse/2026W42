@@ -1,14 +1,18 @@
-// Sales Genie access — granted per person, default NOBODY (spec: the product
-// and pricing material is the most commercially sensitive data in Nandan).
-// The owner is implicit, mirroring the goals-access pattern.
+// Sales Genie access — role-based since the "Sales team" role landed:
+// the owner, admins and sales-team members get in; everyone else does not.
+// A legacy per-person sales_access grant (0013) is still honoured so nothing
+// that was shared before the role existed silently disappears.
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Role } from "./types";
 
 export async function resolveSalesAccess(
   admin: SupabaseClient,
   personId: string,
   isOwner: boolean,
+  role?: Role,
 ): Promise<boolean> {
   if (isOwner) return true;
+  if (role === "admin" || role === "sales") return true;
   try {
     const { data } = await admin
       .from("sales_access")
@@ -17,6 +21,6 @@ export async function resolveSalesAccess(
       .maybeSingle();
     return !!data;
   } catch {
-    return false; // table missing (pre-0013) reads as "no access"
+    return false; // table missing reads as "no access"
   }
 }

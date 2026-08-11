@@ -49,7 +49,7 @@ const STATUSES = [
   "I: Installation in progress", "I: Installation Completed", "C: Job Handed Over",
 ];
 
-type Role = "admin" | "planner" | "project_owner" | "user" | "viewer";
+type Role = "admin" | "planner" | "project_owner" | "user" | "viewer" | "sales";
 const TODAY = today();
 
 interface Person {
@@ -85,10 +85,11 @@ const ROLE_GROUP: Record<string, string> = {
   project_owner: "Project Owners",
   planner: "Planners",
   admin: "Admins",
+  sales: "Sales team",
   viewer: "Viewers",
   uploader: "Uploaders",
 };
-const GROUP_ORDER = ["Users", "Project Owners", "Planners", "Admins", "Viewers", "Uploaders"];
+const GROUP_ORDER = ["Users", "Project Owners", "Planners", "Admins", "Sales team", "Viewers", "Uploaders"];
 
 function assignees(board: Board): { value: string; label: string; group: string }[] {
   return (board.assignableUsers || [])
@@ -193,6 +194,7 @@ const ROLE_OPTIONS: { value: string; label: string; hint: string }[] = [
   { value: "planner", label: "Planner", hint: "All boards and editing" },
   { value: "project_owner", label: "Project Owner", hint: "Owns jobs — the boards filter by these people" },
   { value: "user", label: "User", hint: "Works tasks assigned to them" },
+  { value: "sales", label: "Sales team", hint: "Sales Genie by default, plus the boards" },
   { value: "viewer", label: "Viewer", hint: "Read-only" },
   { value: "uploader", label: "Uploader", hint: "Morning Update page only" },
 ];
@@ -279,7 +281,10 @@ export default function PlanningSuite({
   // Three top-level workspaces (per-access, see below), each with its own
   // sticky sub-nav. "tab" is only meaningful inside the Planning Suite
   // workspace now — Goals and Tasking are whole workspaces, not sub-tabs.
-  const [workspace, setWorkspace] = useState<"suite" | "goals" | "tasking" | "sales">("suite");
+  // Sales-team members live in Sales Genie — land them there directly.
+  const [workspace, setWorkspace] = useState<"suite" | "goals" | "tasking" | "sales">(
+    role === "sales" ? "sales" : "suite",
+  );
   // land on "My Week" within the suite, not the delivery board
   const [tab, setTab] = useState<"home" | "delivery" | "load" | "plan" | "erp" | "upload" | "admin">("home");
 
@@ -2758,17 +2763,6 @@ function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; rel
     try { await api.post("/api/admin/users", { action: "disable", id, disabled }); await loadUsers(); }
     catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
   };
-  const setSales = async (u: AdminUser) => {
-    setUMsg("");
-    const granting = !u.sales_access;
-    if (!granting && !window.confirm(`Remove Sales Genie access from ${u.display_name || u.email}?`)) return;
-    try {
-      await api.post("/api/admin/users", { action: "sales_access", id: u.id, grant: granting });
-      setUMsg(`${u.display_name || u.email.split("@")[0]} → Sales Genie ${granting ? "granted" : "removed"} ✓`);
-      await loadUsers();
-    } catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
-  };
-
   const resetPw = async (id: string, email: string) => {
     const pw = window.prompt(`New password for ${email} (min 8 characters):`);
     if (!pw) return;
@@ -2894,8 +2888,7 @@ function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; rel
               <th className="text-left py-1 font-semibold">Name</th>
               <th className="text-left py-1 font-semibold">Email</th>
               <th className="text-left py-1 font-semibold" title="The Project Owner text as it appears in the Jobmaster — links this login to its jobs">ERP owner name</th>
-              <th className="text-left py-1 font-semibold">Role</th>
-              <th className="text-left py-1 font-semibold" title="May this person open the Sales Genie workspace? Default is No for everyone.">Sales Genie</th>
+              <th className="text-left py-1 font-semibold" title="Sales Genie access comes with the role now: Sales team, Admins and the owner">Role</th>
               <th className="text-left py-1 font-semibold">Status</th>
               <th className="text-right py-1 font-semibold">Actions</th>
             </tr>
@@ -2959,26 +2952,6 @@ function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; rel
                   <select value={rolePending[u.id] ?? u.role} onChange={(e) => setRole(u.id, e.target.value)} disabled={!mayManage(u) || !!rolePending[u.id]} className="text-xs border rounded px-1" style={{ borderColor: rolePending[u.id] ? "#E8600A" : "#E2E0DA", background: mayManage(u) ? "#fff" : "#F4F2EC", color: mayManage(u) ? "#22303C" : "#8A94A0", opacity: rolePending[u.id] ? 0.7 : 1 }} title={rolePending[u.id] ? "Saving…" : mayManage(u) ? ROLE_OPTIONS.find((r) => r.value === u.role)?.hint : `Only ${OWNER_EMAIL} may change this account`}>
                     {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
                   </select>
-                </td>
-                <td className="py-1.5">
-                  {u.sales_implicit ? (
-                    <span className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FFF3E8", color: "#E8600A" }} title="The owner always has Sales Genie access">Yes · owner</span>
-                  ) : (
-                    <button
-                      onClick={() => mayManage(u) && setSales(u)}
-                      disabled={!mayManage(u)}
-                      className="rounded px-2 py-0.5 font-semibold"
-                      style={{
-                        background: u.sales_access ? "#E6F4EA" : "#F4F2EC",
-                        color: u.sales_access ? "#0D7A3F" : "#8A94A0",
-                        opacity: mayManage(u) ? 1 : 0.5,
-                        cursor: mayManage(u) ? "pointer" : "not-allowed",
-                      }}
-                      title={mayManage(u) ? (u.sales_access ? "Click to remove Sales Genie access" : "Click to grant Sales Genie access") : `Only ${OWNER_EMAIL} may change this account`}
-                    >
-                      {u.sales_access ? "Yes" : "No"}
-                    </button>
-                  )}
                 </td>
                 <td className="py-1.5">
                   <button onClick={() => setDisabled(u.id, !u.disabled, u.email)} disabled={!mayManage(u)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E6F4EA", color: u.disabled ? "#fff" : "#0D7A3F", opacity: mayManage(u) ? 1 : 0.5, cursor: mayManage(u) ? "pointer" : "not-allowed" }} title={mayManage(u) ? (u.disabled ? "Click to re-enable sign-in" : "Click to disable sign-in") : `Only ${OWNER_EMAIL} may change this account`}>{u.disabled ? "disabled" : "active"}</button>

@@ -86,6 +86,7 @@ export default function SalesGenie({
           <iframe
             src="/api/sales/plan"
             title="My Sales Plan — Nandan GSE"
+            allow="microphone"
             style={{ width: "100%", flex: 1, border: "none", background: "#fff", display: "block" }}
           />
         )}

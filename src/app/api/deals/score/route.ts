@@ -50,7 +50,7 @@ const SCHEMA = {
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
-    if (!(await resolveSalesAccess(adminClient(), user.id, user.isOwner)))
+    if (!(await resolveSalesAccess(adminClient(), user.id, user.isOwner, user.role)))
       throw new HttpError(403, "Sales Genie has not been shared with this account");
 
     if (!process.env.ANTHROPIC_API_KEY)

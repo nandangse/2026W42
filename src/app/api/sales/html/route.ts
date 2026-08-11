@@ -21,7 +21,7 @@ export async function GET() {
   try {
     const user = await requireUser();
     const admin = adminClient();
-    if (!(await resolveSalesAccess(admin, user.id, user.isOwner)))
+    if (!(await resolveSalesAccess(admin, user.id, user.isOwner, user.role)))
       throw new HttpError(403, "Sales Genie has not been shared with this account");
 
     let html: string | null = null;
@@ -37,6 +37,11 @@ export async function GET() {
       /* table missing → bundled fallback below */
     }
     if (!html) html = await fs.readFile(BUNDLED, "utf8");
+
+    // Genie's chrome is the only header — hide the artifact's own masthead bar
+    // at serve time. The stored HTML (DB + bundled file) is never modified;
+    // its internal tab nav stays.
+    html = html.replace(/<\/head>/i, "<style>/* injected by Genie */header .bar{display:none}</style></head>");
 
     return new NextResponse(html, {
       headers: {
@@ -61,7 +66,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireAdmin();
     const admin = adminClient();
-    if (!(await resolveSalesAccess(admin, user.id, user.isOwner)))
+    if (!(await resolveSalesAccess(admin, user.id, user.isOwner, user.role)))
       throw new HttpError(403, "Sales Genie has not been shared with this account");
 
     const form = await req.formData();

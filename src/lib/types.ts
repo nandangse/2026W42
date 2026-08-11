@@ -15,6 +15,7 @@ export type Role =
   | "planner"
   | "project_owner"
   | "user"
+  | "sales"
   | "viewer"
   | "uploader";
 

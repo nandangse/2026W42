@@ -71,6 +71,38 @@ const mdlite=t=>esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>
 const isAdmin=()=>!!profile&&profile.role==='admin';
 const $id=i=>document.getElementById(i);
 const val=i=>{const el=$id(i);return el?el.value.trim():'';};
+/* Indian date formats: dd/mm/yyyy (+ hh:mm for timestamps) */
+const fmtD=iso=>{if(!iso)return '';const m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m?`${m[3]}/${m[2]}/${m[1]}`:String(iso);};
+const fmtDT=iso=>iso?fmtD(iso)+(String(iso).length>10?' '+String(iso).slice(11,16):''):'';
+
+/* Tell Genie's bell when work is assigned to someone else (fire-and-forget). */
+function notifyAssign(kind,who,text,company){
+  if(!who||who===currentUser)return;
+  fetch('/api/sales/plan/notify',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({assignee:who,kind,text,company:company||''})}).catch(()=>{});
+}
+
+/* Voice dictation into a rich-text field (Web Speech API). */
+let dictState=null;
+function dictate(elId,btn,ev){
+  if(ev)ev.preventDefault();
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR)return alert('Voice input needs Chrome or Edge — this browser has no speech recognition.');
+  if(dictState){dictState.rec.stop();return;}
+  const el=$id(elId);if(!el)return;
+  const rec=new SR();rec.lang='en-IN';rec.continuous=true;rec.interimResults=false;
+  dictState={rec,btn};btn.classList.add('rec');btn.textContent='◼ stop';
+  rec.onresult=e=>{
+    let t='';for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal)t+=e.results[i][0].transcript;
+    t=t.trim();if(!t)return;
+    el.innerHTML+=(el.innerHTML?' ':'')+esc(t);
+    if(el.id&&el.id.startsWith('offer-'))saveOffer(el.id.slice(6));
+  };
+  rec.onerror=e=>{if(e.error==='not-allowed')alert('Microphone access was blocked — allow the mic and try again.');};
+  rec.onend=()=>{if(dictState){dictState.btn.classList.remove('rec');dictState.btn.textContent='🎤 speak';dictState=null;}};
+  rec.start();
+}
 
 /* ---------- sync layer: debounced diff-save + realtime ---------- */
 const ENTITY_TABLES=['industries','products','companies','people','todos','deals','support'];
@@ -313,6 +345,13 @@ const TAB_COLOR={deals:'#F04E23',companies:'#1B2D6B',industries:'#0B9B93',people
   locations:'#B45309',products:'#2A46A8',process:'#1a7f4e',todos:'#C2185B',
   support:'#DC2626',stats:'#6D28D9',team:'#0891B2'};
 const tabColor=t=>TAB_COLOR[t]||'#F04E23';
+/* The tab bar is sticky ("frozen"), collapsed by default; ☰ opens it and 📌
+   freezes it open. Both choices persist per browser. */
+let tabsPinned=localStorage.getItem('msp-tabs-pin')==='1';
+let tabsOpen=tabsPinned||localStorage.getItem('msp-tabs-open')==='1';
+function toggleTabs(){tabsOpen=!tabsOpen;localStorage.setItem('msp-tabs-open',tabsOpen?'1':'0');renderTabs();}
+function pinTabs(){tabsPinned=!tabsPinned;localStorage.setItem('msp-tabs-pin',tabsPinned?'1':'0');
+  if(tabsPinned){tabsOpen=true;localStorage.setItem('msp-tabs-open','1');}renderTabs();}
 function renderTabs(){
   const tabs=BASE_TABS; // team management lives in the Genie admin tab
   const counts={companies:S.companies.filter(c=>ownersOk(c.owners)).length,industries:S.industries.length,
@@ -320,11 +359,20 @@ function renderTabs(){
     products:S.products.length,process:'',todos:S.todos.filter(t=>ownerOk(t.owner)&&t.status!=='done').length,
     deals:S.deals.filter(d=>ownerOk(d.owner)&&isOpen(d)).length,stats:'',
     support:S.support.filter(x=>ownerOk(x.assignedTo)&&x.status!=='done').length};
-  $id('tabs').innerHTML=tabs.map(([k,l])=>
-    `<button class="${currentTab===k?'active':''}" style="--tabc:${tabColor(k)}" onclick="setTab('${k}')">${l}${counts[k]!==''?`<span class="cnt">${counts[k]}</span>`:''}</button>`).join('');
+  const burger=`<button class="tabtoggle" onclick="toggleTabs()" title="${tabsOpen?'Collapse the tab bar':'Open the tab bar'}">☰</button>`;
+  const pin=`<button class="tabpin ${tabsPinned?'on':''}" onclick="pinTabs()" title="${tabsPinned?'Unfreeze — bar collapses after you pick a tab':'Freeze the tab bar open'}">📌</button>`;
+  if(!tabsOpen){
+    const cur=BASE_TABS.find(([k])=>k===currentTab);
+    $id('tabs').innerHTML=burger+`<button class="active" style="--tabc:${tabColor(currentTab)}" onclick="toggleTabs()">${cur?cur[1]:''}${counts[currentTab]!==''&&counts[currentTab]!==undefined?`<span class="cnt">${counts[currentTab]}</span>`:''}</button>`;
+  }else{
+    $id('tabs').innerHTML=burger+tabs.map(([k,l])=>
+      `<button class="${currentTab===k?'active':''}" style="--tabc:${tabColor(k)}" onclick="setTab('${k}')">${l}${counts[k]!==''?`<span class="cnt">${counts[k]}</span>`:''}</button>`).join('')+pin;
+  }
   $id('main').style.setProperty('--tabc',tabColor(currentTab));
 }
-function setTab(t){currentTab=t;detailId=null;render();}
+function setTab(t){currentTab=t;detailId=null;
+  if(!tabsPinned&&tabsOpen){tabsOpen=false;localStorage.setItem('msp-tabs-open','0');}
+  render();}
 
 /* ---------- filter setters (inline handlers can't touch module vars) ---------- */
 function _setF(k,v){
@@ -347,12 +395,13 @@ const prioTag=p=>({Highest:'<span class="prio p0">Highest</span>',High:'<span cl
 const goalTag=g=>g?`<span class="tag ${g==='FOCUS'?'orange':''}" style="font-size:11px">${esc(g)}</span>`:'';
 function showImg(src){const lb=$id('lightbox');$id('lightimg').src=src;lb.style.display='flex';}
 function rtc(cmd,ev){ev.preventDefault();document.execCommand(cmd,false,null);}
-const rtToolbar=()=>`<div class="rt-toolbar">
+const rtToolbar=(voiceTarget)=>`<div class="rt-toolbar">
   <button type="button" onmousedown="rtc('bold',event)"><b>B</b></button>
   <button type="button" onmousedown="rtc('italic',event)"><i>I</i></button>
   <button type="button" onmousedown="rtc('underline',event)"><u>U</u></button>
   <button type="button" onmousedown="rtc('insertUnorderedList',event)">• List</button>
-  <button type="button" onmousedown="rtc('removeFormat',event)">Clear</button></div>`;
+  <button type="button" onmousedown="rtc('removeFormat',event)">Clear</button>${voiceTarget?`
+  <button type="button" class="mic" onmousedown="dictate('${voiceTarget}',this,event)" title="Dictate — speak and it types">🎤 speak</button>`:''}</div>`;
 
 /* ---------- autocomplete (masters-first, add-if-missing) ---------- */
 function acHtml(id,kind,ctx,placeholder){
@@ -451,7 +500,7 @@ function companyForm(){
       ${acHtml('c_loc','loc','form','Start typing a city / site…')}
       <div id="c_locchips"></div></div>
     <div class="field"><label>What we can do for them — rich text</label>
-      ${rtToolbar()}<div class="richtext rt-lg" id="c_offer" contenteditable="true"></div></div>
+      ${rtToolbar('c_offer')}<div class="richtext rt-lg" id="c_offer" contenteditable="true"></div></div>
     <div style="margin-top:10px"><button class="btn btn-primary" onclick="addCompany()">Save company</button>
     <button class="btn btn-ghost" onclick="toggleForm('cform')">Cancel</button></div>
   </div>`;
@@ -493,7 +542,7 @@ function viewCompanyPage(c){
     <div class="pagegrid">
       <div>
         <div class="panel"><div class="st">What we can do for them — rich text</div>
-          ${rtToolbar()}<div class="richtext rt-lg" id="offer-${c.id}" contenteditable="true" onblur="saveOffer('${c.id}')">${c.offer||''}</div></div>
+          ${rtToolbar('offer-'+c.id)}<div class="richtext rt-lg" id="offer-${c.id}" contenteditable="true" onblur="saveOffer('${c.id}')">${c.offer||''}</div></div>
 
         <div class="panel"><div class="st">Locations & people</div>
           ${(c.locations&&c.locations.length)?c.locations.map(loc=>{
@@ -531,13 +580,13 @@ function viewCompanyPage(c){
           <div class="inline-add"><button class="btn btn-ghost btn-sm" onclick="openDealModal(null,'${c.id}')">+ Add a deal for ${esc(c.name)}</button></div></div>
 
         <div class="panel"><div class="st">To-dos</div>
-          ${tds.map(t=>`<div class="mini"><input type="checkbox" style="width:16px;height:16px;accent-color:var(--orange)" ${t.status==='done'?'checked':''} onclick="event.stopPropagation();toggleTodo('${t.id}')"><span class="linkish" onclick="openTodoModal('${t.id}')">${esc(t.text)}</span>${ownerPill(t.owner)}${t.due?`<span class="hint">due ${esc(t.due)}</span>`:''}</div>`).join('')||'<div class="hint">None yet.</div>'}
+          ${tds.map(t=>`<div class="mini"><input type="checkbox" style="width:16px;height:16px;accent-color:var(--orange)" ${t.status==='done'?'checked':''} onclick="event.stopPropagation();toggleTodo('${t.id}')"><span class="linkish" onclick="openTodoModal('${t.id}')">${esc(t.text)}</span>${ownerPill(t.owner)}${t.due?`<span class="hint">due ${esc(fmtD(t.due))}</span>`:''}</div>`).join('')||'<div class="hint">None yet.</div>'}
           <div class="inline-add"><input id="td-${c.id}" placeholder="New to-do — press Enter to add another…" onkeydown="if(event.key==='Enter')quickAddTodo('${c.id}')">
             ${ownerSelect('to-'+c.id,currentUser||(c.owners||[])[0]||S.owners[0])}
             <button class="btn btn-ghost btn-sm" onclick="quickAddTodo('${c.id}')">Add to-do</button></div></div>
 
         <div class="panel"><div class="st">Comments — team discussion</div>
-          ${(c.comments||[]).map(cm=>`<div class="comment"><div class="cmeta">${ownerPill(cm.author)}<span class="hint">${esc((cm.at||'').slice(0,16).replace('T',' '))}</span></div><div>${esc(cm.text)}</div></div>`).join('')||'<div class="hint">No comments yet.</div>'}
+          ${(c.comments||[]).map(cm=>`<div class="comment"><div class="cmeta">${ownerPill(cm.author)}<span class="hint">${esc(fmtDT(cm.at))}</span></div><div>${esc(cm.text)}</div></div>`).join('')||'<div class="hint">No comments yet.</div>'}
           <div class="inline-add"><input id="cm-${c.id}" placeholder="Write a comment as ${esc(currentUser)}…" onkeydown="if(event.key==='Enter')addComment('${c.id}')"><button class="btn btn-ghost btn-sm" onclick="addComment('${c.id}')">Post</button></div></div>
       </div>
       <div>
@@ -557,7 +606,7 @@ function evaCtx(c){
     products:(c.productIds||[]).map(productById).filter(Boolean), stages:S.stages};
 }
 const fmtDay=d=>{if(!d)return '—';const x=new Date(d);
-  return isNaN(x)?'—':x.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});};
+  return isNaN(x)?'—':x.toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'});};
 
 function evaBriefPanel(c){
   const live=buildEva(c,evaCtx(c));
@@ -619,6 +668,7 @@ function quickAddPerson(cid){const n=$id('pn-'+cid).value.trim();if(!n)return;
     phone:'',email:'',linkedin:'',notes:''});
   markDirty();render();focusAfterRender('pn-'+cid);}
 function quickAddTodo(cid){const v=$id('td-'+cid).value.trim();if(!v)return;
+  notifyAssign('todo',currentUser||((companyById(cid)||{}).owners||[])[0],v,(companyById(cid)||{}).name);
   const c=companyById(cid), own=$id('to-'+cid);
   S.todos.push({id:uid(),text:v,companyId:cid,owner:(own&&own.value)||currentUser||(c.owners||[])[0]||S.owners[0],due:'',status:'open'});
   markDirty();render();focusAfterRender('td-'+cid);}
@@ -795,7 +845,8 @@ function viewLocations(){
     <div>${rows.length?rows.map(r=>`<div class="card" id="loc-${enc(r.loc)}"><div class="card-head" onclick="toggleCard(this)">
       <span class="name">📍 ${esc(r.loc)}</span><span class="tag">${r.comps.length} companies</span>
       <span class="tag orange">${r.ppl.length} people</span>
-      ${r.coords?'':'<span class="hint">not on the map</span>'}<span class="caret">▶</span></div>
+      ${r.coords?'':'<span class="hint">not on the map</span>'}
+      ${isAdmin()?`<button class="edit" onclick="event.stopPropagation();renameLocation('${enc(r.loc)}')">✏ edit</button>`:''}<span class="caret">▶</span></div>
       <div class="card-body">
         <div class="subsec"><div class="st">Companies here</div>
         ${r.comps.length?r.comps.map(c=>`<div class="mini"><span class="who">${esc(c.name)}</span>${typeTag(c.type)}<span class="hint">${esc(c.industry||'')}</span>${ownerPills(c.owners)}<span class="rowbtns"><button class="edit" onclick="openCompany('${c.id}')">open</button></span></div>`).join(''):'<div class="hint">None recorded.</div>'}</div>
@@ -810,16 +861,17 @@ function viewLocations(){
 }
 
 function locationMap(onMap,offMap){
-  const W=420,H=460;
-  const path=INDIA_OUTLINE.map(([la,ln],i)=>{const [x,y]=project(la,ln,W,H);
-    return `${i?'L':'M'}${x.toFixed(1)},${y.toFixed(1)}`;}).join('')+'Z';
+  const W=420,H=Math.round(W*GEO.aspect);
+  const toPath=poly=>poly.map(([nx,ny],i)=>`${i?'L':'M'}${(nx/1000*W).toFixed(1)},${(ny/1000*H).toFixed(1)}`).join('')+'Z';
+  const path=toPath(INDIA_OUTLINE);
   const peak=Math.max(1,...onMap.map(r=>r.comps.length+r.ppl.length));
   return `<div class="mapcard">
     <div class="st">Where we are</div>
     <div class="hint">${onMap.length} of ${onMap.length+offMap.length} locations placed · dot size = companies + people</div>
     <div style="position:relative">
-      <svg class="mapsvg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Schematic map of India showing our locations">
+      <svg class="mapsvg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Map of India (Survey of India boundary) showing our locations">
         <path class="land" d="${path}"></path>
+        ${INDIA_ISLANDS.map(p=>`<path class="land" d="${toPath(p)}"></path>`).join('')}
         ${onMap.map(r=>{const [x,y]=project(r.coords[0],r.coords[1],W,H);
           const n=r.comps.length+r.ppl.length;
           const rad=(5+Math.sqrt(n/peak)*9).toFixed(1);
@@ -829,7 +881,7 @@ function locationMap(onMap,offMap){
       </svg>
       <div class="maptip" id="maptip"></div>
     </div>
-    <div class="hint" style="margin-top:8px">Schematic map — dots are approximate city positions, not survey coordinates.</div>
+    <div class="hint" style="margin-top:8px">Boundary traced from the Survey of India Political Map of India, 13th Edition (2026).</div>
     ${offMap.length?`<div class="hint" style="margin-top:6px">Not placed: ${offMap.map(r=>esc(r.loc)).join(', ')}</div>`:''}
   </div>`;
 }
@@ -847,6 +899,26 @@ function jumpToLocation(e){
 }
 
 function delMasterLoc(e){const l=dec(e);S.locations=S.locations.filter(x=>x!==l);markDirty();render();}
+function renameLocation(e){
+  if(!isAdmin())return alert('Only an admin can edit locations.');
+  const old=dec(e);
+  const nn=(prompt('Rename location:',old)||'').trim();
+  if(!nn||nn===old)return;
+  const existing=allLocations().find(l=>l.toLowerCase()===nn.toLowerCase()&&l.toLowerCase()!==old.toLowerCase());
+  const target=existing||nn;
+  if(existing&&!confirm(`"${existing}" already exists.\n\nMerge "${old}" into "${existing}"? Every company and person here moves over.`))return;
+  S.locations=S.locations.filter(l=>l.toLowerCase()!==old.toLowerCase());
+  if(!S.locations.some(l=>l.toLowerCase()===target.toLowerCase()))S.locations.push(target);
+  S.companies.forEach(c=>{
+    if(!(c.locations||[]).length)return;
+    const had=c.locations.some(l=>l.toLowerCase()===old.toLowerCase());
+    if(!had)return;
+    c.locations=c.locations.filter(l=>l.toLowerCase()!==old.toLowerCase());
+    if(!c.locations.some(l=>l.toLowerCase()===target.toLowerCase()))c.locations.push(target);
+  });
+  S.people.forEach(p=>{if((p.location||'').toLowerCase()===old.toLowerCase())p.location=target;});
+  markDirty();render();
+}
 
 /* ---------- PRODUCTS ---------- */
 let editingProduct=null,pendingImg='';
@@ -993,16 +1065,19 @@ function viewTodos(){
       <input type="checkbox" ${t.status==='done'?'checked':''} onchange="toggleTodo('${t.id}')">
       <div style="flex:1"><div class="txt linkish" onclick="openTodoModal('${t.id}')">${esc(t.text)}</div>
         <div class="meta">${ownerPill(t.owner)}${c?`<span class="tag" style="cursor:pointer" onclick="openCompany('${c.id}')">${esc(c.name)}</span>`:''}
-        ${t.due?`<span class="${overdue?'overdue':''}">${overdue?'⚠ overdue ':''}due ${esc(t.due)}</span>`:''}</div></div>
-      <button class="del" onclick="delTodo('${t.id}')">delete</button></div>`;}).join('')
+        ${t.due?`<span class="${overdue?'overdue':''}">${overdue?'⚠ overdue ':''}due ${esc(fmtD(t.due))}</span>`:''}</div></div>
+      ${isAdmin()?`<button class="del" onclick="delTodo('${t.id}')">delete</button>`:''}</div>`;}).join('')
    :'<div class="empty"><b>No to-dos.</b><br>Add tasks here or from inside a company page.</div>'}`;
 }
 function addTodo(){const v=$id('t_text').value.trim();if(!v)return alert('Task text is required.');
-  S.todos.push({id:uid(),text:v,owner:$id('t_own').value,
+  const owner=$id('t_own').value;
+  S.todos.push({id:uid(),text:v,owner,
     companyId:$id('t_comp').value,due:$id('t_due').value,status:'open'});
+  notifyAssign('todo',owner,v,(companyById($id('t_comp').value)||{}).name);
   markDirty();render();}
 function toggleTodo(id){const t=S.todos.find(x=>x.id===id);t.status=t.status==='done'?'open':'done';markDirty();render();}
-function delTodo(id){S.todos=S.todos.filter(t=>t.id!==id);markDirty();render();}
+function delTodo(id){if(!isAdmin())return alert('Only an admin can delete a to-do.');
+  S.todos=S.todos.filter(t=>t.id!==id);markDirty();render();}
 function copyTodosForGenie(){
   const payload=S.todos.map(t=>({id:t.id,task:t.text,owner:t.owner,company:(companyById(t.companyId)||{}).name||null,due:t.due||null,status:t.status,source:"my-sales-plan"}));
   navigator.clipboard.writeText(JSON.stringify(payload,null,2)).then(()=>alert('To-dos copied as JSON — paste into Sales Genie / share with Claude to sync.'))
@@ -1089,17 +1164,20 @@ function openTodoModal(tid){
       <button class="btn btn-primary btn-sm" onclick="saveTodoModal('${t.id}')">Save</button>
       <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
       <span class="spacer"></span>
-      <button class="del" onclick="delTodoModal('${t.id}')">delete to-do</button>
+      ${isAdmin()?`<button class="del" onclick="delTodoModal('${t.id}')">delete to-do</button>`:''}
     </div>`);
   setTimeout(()=>{const el=$id('m_ttext');if(el)el.focus();},30);
 }
 function saveTodoModal(tid){
   const t=S.todos.find(x=>x.id===tid);if(!t)return;
   const v=val('m_ttext');if(!v)return alert('Task text is required.');
+  const prevOwner=t.owner;
   Object.assign(t,{text:v,owner:val('m_town'),companyId:val('m_tcomp'),due:val('m_tdue'),status:val('m_tstatus')});
+  if(t.owner!==prevOwner)notifyAssign('todo',t.owner,t.text,(companyById(t.companyId)||{}).name);
   markDirty();closeModal();
 }
 function delTodoModal(tid){
+  if(!isAdmin())return alert('Only an admin can delete a to-do.');
   if(!confirm('Delete this to-do?'))return;
   S.todos=S.todos.filter(x=>x.id!==tid);markDirty();closeModal();
 }
@@ -1110,12 +1188,11 @@ async function researchEva(cid){
   const btn=$id('evaresbtn-'+cid);
   if(btn){btn.disabled=true;btn.textContent='🌐 Researching…';}
   try{
-    const {data:{session}}=await sb.auth.getSession();
-    if(!session)throw new Error('Not signed in');
+    // Genie edition: the route authenticates via the Genie session cookie
     const ind=indByName(c.industry);
     const r=await fetch('/api/eva/research',{
       method:'POST',
-      headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},
+      headers:{'content-type':'application/json'},
       body:JSON.stringify({company:{
         name:c.name,type:c.type,industry:c.industry,locations:c.locations||[],
         offer:buildEva(c,evaCtx(c)).text.split('\n2 WHAT WE CAN DO\n')[1]||'',
@@ -1234,7 +1311,7 @@ function movementLog(list){
   return `<div class="dealtl">${evs.slice(0,80).map(e=>`<div class="ev">
     <b class="linkish" onclick="openDealModal('${e.deal.id}')">${esc(e.deal.name)}</b>
     ${e.from?`moved <b>${esc(dealStageName(e.from))}</b> → <b>${esc(dealStageName(e.to))}</b>`:`created at <b>${esc(dealStageName(e.to))}</b>`}
-    <span class="when">· ${esc((e.at||'').slice(0,16).replace('T',' '))}${e.by?' · '+esc(e.by):''}</span></div>`).join('')}</div>`;
+    <span class="when">· ${esc(fmtDT(e.at))}${e.by?' · '+esc(e.by):''}</span></div>`).join('')}</div>`;
 }
 
 /* ---------- drag & drop ---------- */
@@ -1276,7 +1353,7 @@ function openDealModal(id,presetCompany){
         <div class="field"><label>Customer</label><select id="d_comp"><option value="">— none —</option>${S.companies.slice().sort(byName).map(c=>`<option value="${c.id}" ${d&&c.id===d.companyId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
         <div class="field"><label>Segment</label><select id="d_seg">${SEGMENTS.map(sg=>`<option ${v('segment','MHE')===sg?'selected':''}>${sg}</option>`).join('')}</select></div>
         <div class="field"><label>Deal stage</label><select id="d_stage">${DEAL_STAGES.map(st=>`<option value="${st.key}" ${v('stage','suspecting')===st.key?'selected':''}>${esc(st.name)}</option>`).join('')}</select></div>
-        <div class="field"><label>Amount (₹)</label><input id="d_amt" type="number" min="0" step="1000" value="${v('amount',0)}"></div>
+        <div class="field"><label>Amount (₹ Lakhs)</label><input id="d_amt" type="number" min="0" step="0.5" value="${(v('amount',0)/100000)||''}" placeholder="e.g. 25 = ₹25 L"></div>
         <div class="field"><label>Due date</label><input id="d_due" type="date" value="${esc(v('due'))}"></div>
         <div class="field"><label>Salesperson</label>${ownerSelect('d_own',v('owner',currentUser))}</div>
         <div class="field"><label>Opportunity No</label><input id="d_opp" value="${esc(v('oppNo'))}" placeholder="if an opportunity"></div>
@@ -1302,7 +1379,7 @@ function openDealModal(id,presetCompany){
       <div class="subsec" style="margin-top:14px"><div class="st">History — how it moved</div>
         ${(d.history||[]).length?`<div class="dealtl">${d.history.slice().reverse().map(h=>`<div class="ev">
           ${h.from?`<b>${esc(dealStageName(h.from))}</b> → <b>${esc(dealStageName(h.to))}</b>`:`created at <b>${esc(dealStageName(h.to))}</b>`}
-          <span class="when">· ${esc((h.at||'').slice(0,16).replace('T',' '))}${h.by?' · '+esc(h.by):''}</span></div>`).join('')}</div>`
+          <span class="when">· ${esc(fmtDT(h.at))}${h.by?' · '+esc(h.by):''}</span></div>`).join('')}</div>`
         :'<div class="hint">Created but not moved yet.</div>'}</div>`:''}
     </div>
     <div class="modalfoot">
@@ -1329,7 +1406,7 @@ function saveDeal(id){
   const name=val('d_name');if(!name)return alert('Deal name is required.');
   const stage=val('d_stage');
   const fields={name,companyId:val('d_comp'),segment:val('d_seg'),stage,
-    amount:+val('d_amt')||0,due:val('d_due'),owner:val('d_own'),
+    amount:Math.round((+val('d_amt')||0)*100000),due:val('d_due'),owner:val('d_own'),
     oppNo:val('d_opp'),quoteNo:val('d_quote'),soNo:val('d_so'),
     interactions:+val('d_ix')||0,statusNow:$id('d_status').value.trim(),productIds:[...dealFormProds]};
   let d=id?S.deals.find(x=>x.id===id):null;
@@ -1348,6 +1425,7 @@ function saveDeal(id){
   }else if(d.chanceSource!=='manual'&&d.chanceSource!=='ai'){
     d.chance=auto.chance;d.chanceWhy=auto.why;
   }
+  notifyAssign('deal',d.owner,d.name,(companyById(d.companyId)||{}).name);
   markDirty();closeModal();
 }
 function delDeal(id){
@@ -1364,11 +1442,10 @@ async function scoreDeal(id){
   const d=S.deals.find(x=>x.id===id);if(!d)return;
   const btn=$id('d_aibtn');if(btn){btn.disabled=true;btn.textContent='✨ Thinking…';}
   try{
-    const {data:{session}}=await sb.auth.getSession();
-    if(!session)throw new Error('Not signed in');
+    // Genie edition: the route authenticates via the Genie session cookie
     const co=companyById(d.companyId);
     const r=await fetch('/api/deals/score',{method:'POST',
-      headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},
+      headers:{'content-type':'application/json'},
       body:JSON.stringify({deal:{
         name:d.name,segment:d.segment,stage:dealStageName(d.stage),amount:d.amount,due:d.due,
         interactions:d.interactions,statusNow:d.statusNow,oppNo:d.oppNo,quoteNo:d.quoteNo,soNo:d.soNo,
@@ -1416,7 +1493,7 @@ function viewSupport(){
       return `<tr class="${x.status==='done'?'supdone':''}" onclick="openSupportModal('${x.id}')">
         <td class="cname">${esc(x.task)}</td>
         <td><span class="esc esc-${esc((x.escalation||'Medium').toLowerCase())}">${esc(x.escalation||'Medium')}</span></td>
-        <td class="${late?'':'hint'}" style="${late?'color:#c0392b;font-weight:800':''}">${x.requested?(late?'⚠ ':'')+esc(x.requested):'—'}</td>
+        <td class="${late?'':'hint'}" style="${late?'color:#c0392b;font-weight:800':''}">${x.requested?(late?'⚠ ':'')+esc(fmtD(x.requested)):'—'}</td>
         <td>${x.assignedTo?ownerPill(x.assignedTo):'<span class="hint">unassigned</span>'}</td>
         <td class="hint">${c?esc(c.name):'—'}</td>
         <td class="hint">${esc(x.raisedBy||'—')}</td>
@@ -1460,7 +1537,11 @@ function saveSupport(id){
     raisedBy:val('s_by'),companyId:val('s_comp'),status:val('s_status'),notes:$id('s_notes').value.trim()};
   let x=id?S.support.find(y=>y.id===id):null;
   if(!x){x={id:uid(),createdAt:new Date().toISOString()};S.support.push(x);}
-  Object.assign(x,fields);markDirty();closeModal();
+  const prevAssign=x.assignedTo;
+  Object.assign(x,fields);
+  if(x.assignedTo&&x.assignedTo!==prevAssign)
+    notifyAssign('support',x.assignedTo,x.task,(companyById(x.companyId)||{}).name);
+  markDirty();closeModal();
 }
 function delSupport(id){
   if(!confirm('Delete this support request?'))return;
@@ -1699,7 +1780,8 @@ Object.assign(window,{render,setOwner,addOwnerMaster,setTab,setFilter,clearFilte
   addComment,renameCompany,delCompany,
   removeLocation,quickAddPerson,quickAddTodo,setStage,setCompanyType,setCompanyIndustry,updateOwners,
   unlinkProduct,saveProdNotes,jumpToCompany,setIndSort,toggleInd,addIndustry,delIndustry,renameIndustry,
-  saveIndNote,jumpToProduct,addPerson,editPerson,delPerson,delMasterLoc,readProdImage,openProductForm,
+  saveIndNote,jumpToProduct,addPerson,editPerson,delPerson,delMasterLoc,renameLocation,readProdImage,openProductForm,
+  dictate,toggleTabs,pinTabs,
   closeProductForm,editProduct,saveProduct,delProduct,linkIndToProduct,unlinkIndFromProduct,moveStage,
   addTodo,toggleTodo,delTodo,copyTodosForGenie,initDb,
   openModal,closeModal,openPersonModal,savePersonModal,delPersonModal,

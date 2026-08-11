@@ -19,11 +19,11 @@ export interface AuthedUser {
 }
 
 /** Tiers, mirroring the SQL helpers in migration 0008. */
-export const READER_ROLES: Role[] = ["admin", "planner", "project_owner", "user", "viewer"];
+export const READER_ROLES: Role[] = ["admin", "planner", "project_owner", "user", "sales", "viewer"];
 /** May write the planning layer (plans, milestones, materials, priority). */
 export const EDITOR_ROLES: Role[] = ["admin", "planner", "project_owner"];
 /** May write tasks & comments — editors plus rank-and-file users. */
-export const TASKER_ROLES: Role[] = ["admin", "planner", "project_owner", "user"];
+export const TASKER_ROLES: Role[] = ["admin", "planner", "project_owner", "user", "sales"];
 
 export const RAGHU_EMAIL = (
   process.env.RAGHU_EMAIL || "raghu@nandan.co.in"

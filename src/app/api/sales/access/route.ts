@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const user = await requireUser();
-    const see = await resolveSalesAccess(adminClient(), user.id, user.isOwner);
+    const see = await resolveSalesAccess(adminClient(), user.id, user.isOwner, user.role);
     return NextResponse.json({ see });
   } catch (e) {
     return errJson(e);
