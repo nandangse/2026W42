@@ -345,13 +345,8 @@ const TAB_COLOR={deals:'#F04E23',companies:'#1B2D6B',industries:'#0B9B93',people
   locations:'#B45309',products:'#2A46A8',process:'#1a7f4e',todos:'#C2185B',
   support:'#DC2626',stats:'#6D28D9',team:'#0891B2'};
 const tabColor=t=>TAB_COLOR[t]||'#F04E23';
-/* The tab bar is sticky ("frozen"), collapsed by default; ☰ opens it and 📌
-   freezes it open. Both choices persist per browser. */
-let tabsPinned=localStorage.getItem('msp-tabs-pin')==='1';
-let tabsOpen=tabsPinned||localStorage.getItem('msp-tabs-open')==='1';
-function toggleTabs(){tabsOpen=!tabsOpen;localStorage.setItem('msp-tabs-open',tabsOpen?'1':'0');renderTabs();}
-function pinTabs(){tabsPinned=!tabsPinned;localStorage.setItem('msp-tabs-pin',tabsPinned?'1':'0');
-  if(tabsPinned){tabsOpen=true;localStorage.setItem('msp-tabs-open','1');}renderTabs();}
+/* The tab bar is sticky ("frozen") at the top of the scroll area — always
+   the full strip, no collapse. */
 function renderTabs(){
   const tabs=BASE_TABS; // team management lives in the Genie admin tab
   const counts={companies:S.companies.filter(c=>ownersOk(c.owners)).length,industries:S.industries.length,
@@ -359,20 +354,11 @@ function renderTabs(){
     products:S.products.length,process:'',todos:S.todos.filter(t=>ownerOk(t.owner)&&t.status!=='done').length,
     deals:S.deals.filter(d=>ownerOk(d.owner)&&isOpen(d)).length,stats:'',
     support:S.support.filter(x=>ownerOk(x.assignedTo)&&x.status!=='done').length};
-  const burger=`<button class="tabtoggle" onclick="toggleTabs()" title="${tabsOpen?'Collapse the tab bar':'Open the tab bar'}">☰</button>`;
-  const pin=`<button class="tabpin ${tabsPinned?'on':''}" onclick="pinTabs()" title="${tabsPinned?'Unfreeze — bar collapses after you pick a tab':'Freeze the tab bar open'}">📌</button>`;
-  if(!tabsOpen){
-    const cur=BASE_TABS.find(([k])=>k===currentTab);
-    $id('tabs').innerHTML=burger+`<button class="active" style="--tabc:${tabColor(currentTab)}" onclick="toggleTabs()">${cur?cur[1]:''}${counts[currentTab]!==''&&counts[currentTab]!==undefined?`<span class="cnt">${counts[currentTab]}</span>`:''}</button>`;
-  }else{
-    $id('tabs').innerHTML=burger+tabs.map(([k,l])=>
-      `<button class="${currentTab===k?'active':''}" style="--tabc:${tabColor(k)}" onclick="setTab('${k}')">${l}${counts[k]!==''?`<span class="cnt">${counts[k]}</span>`:''}</button>`).join('')+pin;
-  }
+  $id('tabs').innerHTML=tabs.map(([k,l])=>
+    `<button class="${currentTab===k?'active':''}" style="--tabc:${tabColor(k)}" onclick="setTab('${k}')">${l}${counts[k]!==''?`<span class="cnt">${counts[k]}</span>`:''}</button>`).join('');
   $id('main').style.setProperty('--tabc',tabColor(currentTab));
 }
-function setTab(t){currentTab=t;detailId=null;
-  if(!tabsPinned&&tabsOpen){tabsOpen=false;localStorage.setItem('msp-tabs-open','0');}
-  render();}
+function setTab(t){currentTab=t;detailId=null;render();}
 
 /* ---------- filter setters (inline handlers can't touch module vars) ---------- */
 function _setF(k,v){
@@ -1236,9 +1222,9 @@ function viewDeals(){
   const open=list.filter(isOpen);
   const total=open.reduce((s,d)=>s+(+d.amount||0),0);
   const wtd=open.reduce((s,d)=>s+weighted(d),0);
-  const ends=nextMonthEnds(3);
-  const byEnd=ends.map(e=>{const k=iso(e);const hit=open.filter(d=>d.due&&d.due<=k);
-    return {label:monthLabel(e),n:hit.length,val:hit.reduce((s,d)=>s+(+d.amount||0),0)};});
+  const months=nextMonths(3);
+  const byMonth=months.map(m=>{const hit=open.filter(d=>d.due&&d.due>=m.start&&d.due<=m.end);
+    return {label:m.label,n:hit.length,val:hit.reduce((s,d)=>s+(+d.amount||0),0)};});
 
   // dropdowns list only what actually appears on a deal
   const usedInds=[...new Set(S.deals.map(dealIndustry).filter(Boolean))].sort();
@@ -1268,8 +1254,8 @@ function viewDeals(){
     <div class="tile"><div class="big">${fmtMoney(wtd)}</div><div class="sm">Weighted by % chance</div></div>
   </div>
   <div class="tiles">
-    ${byEnd.map((b,i)=>`<div class="tile ${i===0?'o':''}"><div class="big">${fmtMoney(b.val)}</div>
-      <div class="sm">${b.n} deal${b.n===1?'':'s'} due by ${b.label}</div></div>`).join('')}
+    ${byMonth.map((b,i)=>`<div class="tile ${i===0?'o':''}"><div class="big">${fmtMoney(b.val)}</div>
+      <div class="sm">${b.n} deal${b.n===1?'':'s'} in ${b.label}</div></div>`).join('')}
   </div>
 
   <div class="board">${DEAL_STAGES.map(st=>{
@@ -1781,7 +1767,7 @@ Object.assign(window,{render,setOwner,addOwnerMaster,setTab,setFilter,clearFilte
   removeLocation,quickAddPerson,quickAddTodo,setStage,setCompanyType,setCompanyIndustry,updateOwners,
   unlinkProduct,saveProdNotes,jumpToCompany,setIndSort,toggleInd,addIndustry,delIndustry,renameIndustry,
   saveIndNote,jumpToProduct,addPerson,editPerson,delPerson,delMasterLoc,renameLocation,readProdImage,openProductForm,
-  dictate,toggleTabs,pinTabs,
+  dictate,
   closeProductForm,editProduct,saveProduct,delProduct,linkIndToProduct,unlinkIndFromProduct,moveStage,
   addTodo,toggleTodo,delTodo,copyTodosForGenie,initDb,
   openModal,closeModal,openPersonModal,savePersonModal,delPersonModal,

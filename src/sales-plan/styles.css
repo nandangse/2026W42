@@ -342,13 +342,8 @@ body.embed .ownerbar{padding-top:14px}
 body.embed nav.tabs{top:0}
 
 /* ---------- Genie edition additions ---------- */
-/* frozen (sticky) tab bar */
+/* frozen (sticky) tab bar — always the full strip, no collapse */
 nav.tabs{position:sticky;top:0;z-index:60}
-body.embed nav.tabs{top:0}
-/* collapse / freeze controls */
-nav.tabs .tabtoggle{font-size:17px;padding:10px 14px;color:var(--navy)}
-nav.tabs .tabpin{font-size:14px;padding:10px 12px;margin-left:auto;opacity:.45}
-nav.tabs .tabpin.on{opacity:1}
 /* dictation button */
 .rt-toolbar .mic{margin-left:auto}
 .rt-toolbar .mic.rec{background:#c0392b;color:#fff;border-color:#c0392b;animation:micpulse 1.2s infinite}
