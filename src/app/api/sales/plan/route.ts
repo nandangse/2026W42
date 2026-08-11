@@ -15,9 +15,11 @@ export const maxDuration = 30;
 // sensitive) is ever publicly reachable.
 //
 // Assembly: shell.html + inlined styles.css + supabase-js UMD + one classic
-// script of seed-data.js → app.js → boot.js (in that order — app.js reads
-// SEED, boot.js calls startApp). The source files live in src/sales-plan/;
-// they are the standalone app minus its login screen and Team tab.
+// script of the pure modules (version → plan → deals → geo → eva) →
+// seed-data.js → app.js → boot.js (dependency order — app.js reads all of
+// them, boot.js calls startApp). The sources live in src/sales-plan/; they
+// are MSP 3.2 minus its login screen and Team tab, served in embed mode so
+// Genie's chrome is the only chrome.
 
 const DIR = path.join(process.cwd(), "src", "sales-plan");
 const UMD = path.join(
@@ -28,21 +30,22 @@ const UMD = path.join(
 // assembled once per server instance — the sources only change on deploy
 let cached: string | null = null;
 
+// dependency order — everything app.js references must be defined before it
+const MODULES = ["version.js", "plan.js", "deals.js", "geo.js", "eva.js", "seed-data.js", "app.js", "boot.js"];
+
 async function assemble(): Promise<string> {
   if (cached) return cached;
-  const [shell, styles, umd, seed, app, boot] = await Promise.all([
+  const [shell, styles, umd, ...mods] = await Promise.all([
     fs.readFile(path.join(DIR, "shell.html"), "utf8"),
     fs.readFile(path.join(DIR, "styles.css"), "utf8"),
     fs.readFile(UMD, "utf8"),
-    fs.readFile(path.join(DIR, "seed-data.js"), "utf8"),
-    fs.readFile(path.join(DIR, "app.js"), "utf8"),
-    fs.readFile(path.join(DIR, "boot.js"), "utf8"),
+    ...MODULES.map((m) => fs.readFile(path.join(DIR, m), "utf8")),
   ]);
   cached = shell
     .replace("<!--__STYLES__-->", `<style>\n${styles}\n</style>`)
     .replace(
       "<!--__SCRIPTS__-->",
-      `<script>\n${umd}\n</script>\n<script>\n${seed}\n;\n${app}\n;\n${boot}\n</script>`,
+      `<script>\n${umd}\n</script>\n<script>\n${mods.join("\n;\n")}\n</script>`,
     );
   return cached;
 }

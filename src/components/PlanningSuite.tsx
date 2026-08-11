@@ -511,7 +511,7 @@ export default function PlanningSuite({
                 </span>
               </div>
               <h1 className="text-lg font-bold text-white leading-tight">
-                Milestones · Load · Tasking · Delivery
+                Milestones · Load · Tasking · Delivery · Sales
               </h1>
             </div>
           </div>

@@ -209,3 +209,134 @@ footer{border-top:1px solid var(--line);padding:16px 22px;font-size:12px;color:v
 .sync.saved{background:#e3f5eb;color:var(--green)}
 .sync.error{background:var(--orange-soft);color:#b33a15}
 .userchip{font-size:13px;font-weight:700;color:var(--navy);background:var(--navy-soft);border-radius:20px;padding:5px 12px}
+/* ---------- EVA brief: refresh schedule ---------- */
+.evanote{background:var(--navy-soft);border:1px solid #d7ddf0;border-radius:8px;padding:8px 12px;font-size:12px;color:var(--navy);margin-bottom:10px}
+.evabar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:8px}
+.evabar .hint{font-size:12px}
+.evafreq{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.4px;margin-left:auto}
+.evafreq select{width:auto;padding:5px 8px;font-size:13px;font-weight:600;text-transform:none;letter-spacing:0}
+.evaflag{font-size:12px;font-weight:700;border-radius:8px;padding:7px 12px;margin-bottom:8px}
+.evaflag.due{background:var(--orange-soft);color:#b33a15;border:1px solid #f6c4b5}
+.evaflag.stale{background:var(--navy-soft);color:var(--navy)}
+/* ---------- modal (person / to-do lightbox) ---------- */
+.modalwrap{display:none;position:fixed;inset:0;background:rgba(20,25,50,.55);z-index:120;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto}
+.modalwrap.open{display:flex}
+.modalbox{background:#fff;border-radius:14px;width:100%;max-width:560px;box-shadow:0 20px 70px rgba(20,25,50,.4);overflow:hidden}
+.modalhead{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:3px solid var(--orange);flex-wrap:wrap}
+.modalhead h3{color:var(--navy);font-size:19px;flex:1}
+.modalhead .x{border:none;background:var(--navy-soft);color:var(--navy);border-radius:50%;width:28px;height:28px;font-size:15px;font-weight:800;cursor:pointer}
+.modalbody{padding:16px 18px}
+.modalfoot{display:flex;gap:8px;align-items:center;padding:12px 18px;border-top:1px solid var(--line);background:#fbfcff}
+.modalfoot .spacer{flex:1}
+.linkish{color:var(--navy);font-weight:700;cursor:pointer;text-decoration:underline dotted}
+.linkish:hover{color:var(--orange)}
+.evaresearch{background:#fffdf9;border:1px solid #f0d9c9;border-radius:8px;padding:9px 12px;font-size:13px;line-height:1.5;margin-top:6px}
+/* ---------- deals ---------- */
+.segdd{position:relative}
+.segdd summary{list-style:none;cursor:pointer;border:1.5px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:700;color:var(--navy);white-space:nowrap}
+.segdd summary::-webkit-details-marker{display:none}
+.segdd[open] summary{border-color:var(--orange)}
+.segdd .segbox{position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(27,45,107,.18);padding:8px;z-index:70;min-width:170px}
+.segdd .segbox label{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer}
+.segdd .segbox label:hover{background:var(--navy-soft)}
+.segdd .segbox input{width:15px;height:15px;accent-color:var(--orange)}
+.dealcol{min-width:250px;max-width:250px}
+.dealcol.over{background:var(--orange-soft);border-color:var(--orange)}
+.dealcol .colsum{font-size:11px;font-weight:800;color:var(--navy);background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px 7px;margin-bottom:8px;display:flex;gap:6px;justify-content:space-between}
+.dcard{background:#fff;border:1px solid var(--line);border-left:4px solid var(--navy);border-radius:8px;padding:9px 10px;margin-bottom:8px;font-size:13px;cursor:grab}
+.dcard:active{cursor:grabbing}
+.dcard.dragging{opacity:.4}
+.dcard .dn{font-weight:700;color:var(--navy);margin-bottom:2px}
+.dcard .damt{font-weight:800;color:var(--orange);font-size:14px}
+.dcard .drow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px}
+.chip-chance{border-radius:10px;padding:1px 7px;font-size:11px;font-weight:800;color:#fff}
+.seg-tag{border-radius:5px;padding:1px 6px;font-size:10px;font-weight:800;letter-spacing:.5px;background:var(--navy-soft);color:var(--navy)}
+.dealtl{border-left:2px solid var(--line);margin-left:6px;padding-left:14px}
+.dealtl .ev{position:relative;font-size:13px;padding:5px 0}
+.dealtl .ev::before{content:'';position:absolute;left:-19px;top:11px;width:8px;height:8px;border-radius:50%;background:var(--orange)}
+.dealtl .ev .when{color:var(--muted);font-size:12px}
+.statstbl input{width:100%;min-width:90px;padding:5px 7px;font-size:13px;text-align:right}
+.statstbl td{white-space:nowrap}
+.short{color:#c0392b;font-weight:800}
+.okmark{color:var(--green);font-weight:800}
+/* ---------- salespersons plan ---------- */
+.plantbl{width:100%;border-collapse:collapse;font-size:14px;background:#fff}
+.plantbl th{background:var(--navy);color:#fff;text-align:right;padding:10px 12px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.plantbl th:first-child{text-align:left}
+.plantbl td{padding:10px 12px;border-top:1px solid var(--line);text-align:right;vertical-align:top}
+.plantbl td:first-child{text-align:left;font-weight:800;color:var(--navy);white-space:nowrap}
+.plantbl .metricdot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+.plantbl .ytd{font-size:19px;font-weight:800;color:var(--navy)}
+.pcell{display:flex;flex-direction:column;gap:4px;align-items:flex-end;min-width:130px}
+.pcell .prow{display:flex;align-items:center;gap:6px;width:100%;justify-content:flex-end}
+.pcell .k{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;flex:1;text-align:left}
+.pcell input{width:88px;padding:4px 7px;font-size:13px;text-align:right}
+.varline{font-size:11px;font-weight:800;letter-spacing:.3px}
+.var-over{color:var(--green)}.var-under{color:#c0392b}.var-none{color:var(--muted)}
+/* chart */
+.chartwrap{position:relative;border:1px solid var(--line);border-radius:12px;background:#fff;padding:16px 16px 8px;box-shadow:0 1px 3px rgba(27,45,107,.06)}
+.chartlegend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.chartlegend span{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--ink)}
+.chartlegend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.chartsvg{width:100%;height:auto;display:block;overflow:visible}
+.chartsvg .grid{stroke:var(--line);stroke-width:1}
+.chartsvg .axis{fill:var(--muted);font-size:11px;font-family:inherit}
+.chartsvg .bar{transition:opacity .12s}
+.chartsvg .bar:hover{opacity:.75}
+.charttip{position:absolute;pointer-events:none;background:var(--navy);color:#fff;border-radius:8px;padding:7px 10px;font-size:12px;line-height:1.45;box-shadow:0 6px 20px rgba(20,25,50,.35);opacity:0;transform:translate(-50%,-115%);white-space:nowrap;z-index:5}
+.charttip.on{opacity:1}
+.charttip b{font-weight:800}
+
+.fsel{width:auto;min-width:160px;max-width:230px}
+.toolrow .fsel{flex:0 0 auto}
+/* ---------- version badge ---------- */
+.verbadge{font-size:11px;font-weight:800;letter-spacing:.5px;color:var(--navy);background:var(--navy-soft);border-radius:20px;padding:3px 9px;cursor:help;white-space:nowrap}
+/* ---------- per-tab colour ---------- */
+nav.tabs button{border-bottom-color:transparent}
+nav.tabs button .cnt{background:var(--navy-soft);color:var(--navy)}
+nav.tabs button.active{color:var(--tabc,var(--orange));border-bottom-color:var(--tabc,var(--orange))}
+nav.tabs button.active .cnt{background:var(--tabc,var(--orange));color:#fff}
+nav.tabs button:hover{color:var(--tabc,var(--navy))}
+main .toolrow h2{color:var(--tabc,var(--navy))}
+/* ---------- locations + map ---------- */
+.locgrid{display:grid;grid-template-columns:1fr 420px;gap:16px;align-items:start}
+@media(max-width:1000px){.locgrid{grid-template-columns:1fr}}
+.mapcard{position:sticky;top:96px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:14px;box-shadow:0 1px 3px rgba(27,45,107,.06)}
+.mapcard .st{font-size:12px;font-weight:800;color:var(--orange);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+.mapsvg{width:100%;height:auto;display:block;margin-top:6px}
+.mapsvg .land{fill:#f2f5fc;stroke:#cfd7ea;stroke-width:1.2}
+.mapsvg .dot{fill:var(--orange);fill-opacity:.75;stroke:#fff;stroke-width:1.5;cursor:pointer;transition:fill-opacity .12s}
+.mapsvg .dot:hover{fill-opacity:1}
+.mapsvg .dot.sel{fill:var(--navy);fill-opacity:1}
+.maptip{position:absolute;pointer-events:none;background:var(--navy);color:#fff;border-radius:8px;padding:7px 10px;font-size:12px;line-height:1.45;box-shadow:0 6px 20px rgba(20,25,50,.35);opacity:0;transform:translate(-50%,-118%);white-space:nowrap;z-index:5}
+.maptip.on{opacity:1}
+/* ---------- support needed ---------- */
+.esc{border-radius:6px;padding:2px 9px;font-size:12px;font-weight:800}
+.esc-low{background:var(--navy-soft);color:var(--navy)}
+.esc-medium{background:#FEF3C7;color:#92400E}
+.esc-high{background:var(--orange-soft);color:#b33a15}
+.esc-critical{background:#fee2e2;color:#991b1b}
+.supdone{opacity:.55}.supdone .cname{text-decoration:line-through}
+
+/* ---------- quiet header: status hidden unless it matters ---------- */
+.sync.saved{display:none}
+.usermenu{position:relative}
+.avatar{width:32px;height:32px;border-radius:50%;border:none;background:var(--navy);color:#fff;font-weight:800;font-size:13px;cursor:pointer;letter-spacing:.5px}
+.avatar:hover{background:var(--navy-dark)}
+.usermenubox{position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(27,45,107,.2);padding:12px;min-width:210px;z-index:80;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.usermenubox[hidden]{display:none}
+.usermenubox .userchip{background:none;padding:0;font-size:14px;color:var(--navy)}
+.usermenubox .umsub{font-size:12px;color:var(--muted);word-break:break-all}
+/* ---------- every tab wears its own colour, always ---------- */
+nav.tabs button{color:var(--tabc,var(--muted));opacity:.72}
+nav.tabs button:hover{opacity:1}
+nav.tabs button.active{opacity:1;border-bottom-color:var(--tabc,var(--orange))}
+nav.tabs button .cnt{background:var(--navy-soft);background:color-mix(in srgb,var(--tabc,#1B2D6B) 15%,#fff);color:var(--tabc,var(--navy))}
+nav.tabs button.active .cnt{background:var(--tabc,var(--orange));color:#fff}
+
+.headright{display:flex;align-items:center;gap:10px;margin-left:auto;flex-shrink:0}
+
+/* ---------- embedded in Genie: Genie supplies the chrome ---------- */
+body.embed header{display:none}
+body.embed .ownerbar{padding-top:14px}
+body.embed nav.tabs{top:0}

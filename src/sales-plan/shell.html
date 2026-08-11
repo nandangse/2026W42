@@ -6,9 +6,10 @@
 <title>Genie · My Sales Plan</title>
 <!--__STYLES__-->
 </head>
-<body>
+<body class="embed">
 
-<!-- kept as an empty stub: app.js's bootHtml() toggles it -->
+<!-- kept as an empty stub: app.js's bootHtml() toggles it. There is no login
+     screen — the surrounding Genie app owns the session (boot.js). -->
 <div id="loginScreen" hidden></div>
 
 <div id="bootScreen"><div class="login-card" id="bootCard"><div class="login-title">MY SALES <span>PLAN</span></div><div class="login-sub">Loading…</div></div></div>
@@ -18,17 +19,24 @@
   <img src="data:image/png;base64,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" alt="Nandan GSE">
   <div>
     <div class="title">MY SALES <span>PLAN</span></div>
-    <div class="sub">Nandan GSE · Companies · People · Products · Pipeline</div>
+    <div class="sub">Nandan GSE · Deals · Companies · People · Products · Pipeline</div>
   </div>
   <div class="spacer"></div>
+  <div class="headright">
+  <span class="verbadge" id="verBadge"></span>
   <span class="sync" id="syncStatus"></span>
-  <span class="userchip" id="userChip"></span>
+  <div class="usermenu">
+    <button class="avatar" id="avatarBtn" onclick="toggleUserMenu()" title="Account"></button>
+    <div class="usermenubox" id="userMenuBox" hidden>
+      <div class="userchip" id="userChip"></div>
+      <div class="umsub" id="userSub"></div>
+    </div>
+  </div>
+  </div>
 </header>
 
 <div class="ownerbar">
-  <span class="lbl">Owner</span>
-  <div id="ownerChips" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-  <div class="searchwrap"><input id="searchBox" placeholder="Search companies, people, locations…" oninput="render()"></div>
+  <div class="searchwrap" style="margin-left:0;flex:1 1 320px;max-width:460px"><input id="searchBox" placeholder="Search companies, deals, people, locations…" oninput="render()"></div>
 </div>
 
 <nav class="tabs" id="tabs"></nav>
@@ -37,6 +45,7 @@
 <footer>
   <span class="footer-mark">NANDAN GSE</span> · My Sales Plan · Changes save automatically and sync live to the whole team.
 </footer>
+<div id="modal" class="modalwrap" onclick="if(event.target===this)closeModal()"><div class="modalbox" id="modalbox"></div></div>
 <div id="lightbox" onclick="this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(20,25,50,.88);z-index:100;align-items:center;justify-content:center;cursor:zoom-out"><img id="lightimg" style="max-width:90vw;max-height:90vh;border-radius:12px;box-shadow:0 10px 60px rgba(0,0,0,.5)"></div>
 </div>
 

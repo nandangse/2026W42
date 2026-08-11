@@ -15,7 +15,7 @@ Four workspaces behind one login:
 | 🧭 **Planning Suite** | My Week (landing), Job Delivery Board, Load Board, Job Plan, Update to ERP, Morning Update (admins), Admin | every non-uploader |
 | 🎯 **Goals** | OPSP goal cascade (goal→project→objective→key result→tactic), live-fed key results, swimlane kanban | explicit grant only (`goal_access`) |
 | 📋 **Nandan Tasking** | tasks per job, board + ISO-week calendar | every non-uploader |
-| 💼 **Sales Genie** | two panes: **My Sales Plan** (interactive companies/industries/products/pipeline app, auto-saves + live realtime sync) and **Playbook** (the Sales Regrow HTML served byte-identical, admin backup import/export) | explicit grant only (`sales_access`) — currently raghu + medhansh |
+| 💼 **Sales Genie** | two panes: **My Sales Plan** (MSP 3.2 — Deals pipeline with drag-drop + AI % chance, Companies with per-company deals & EVA research, Industries, People, Locations + India map, Products, Sales Process, ToDo, Support Needed, Salespersons Plan; auto-saves + live realtime sync, served in embed mode so Genie's header is the only header) and **Playbook** (the Sales Regrow HTML served byte-identical, admin backup import/export) | explicit grant only (`sales_access`) — currently raghu + medhansh |
 
 The `uploader` role (Shweta) sees only the Morning Update page.
 
@@ -49,7 +49,9 @@ src/sales-plan/                    My Sales Plan sources — shell.html + styles
                                    boot.js bridges the Genie session, parent keeps the only
                                    refresh token; tables are sp_-prefixed)
 src/app/api/...                    ~20 route handlers, all auth-checked server-side
-supabase/migrations/0001..0014     run IN ORDER in Supabase SQL editor
+supabase/migrations/0001..0015     run IN ORDER in Supabase SQL editor
+src/app/api/eva/research + deals/score  Claude-powered EVA research & deal scoring
+                                   (need ANTHROPIC_API_KEY in Vercel env; clean 503 without)
 supabase/ALL_MIGRATIONS.sql        all of them concatenated (idempotent, safe to re-run)
 scripts/seed.ts                    users + family templates (idempotent)
 scripts/seed-goals.ts              full 43-node goal tree (`-- --reset` to wipe & reseed)
@@ -70,6 +72,7 @@ scripts/acceptance-test.ts         §10 zero-data-loss test — SCRATCH DB ONLY 
 - **Confirmed applied by testing:** 0001–0010 (base + goals), 0009 (updated_at fix), 0013 (sales — grants seeded for raghu + medhansh; playbook seeded byte-identical, sha `8b68c0996…`).
 - **0011 (owner tier) and 0012 (notifications): written and pushed, but never explicitly confirmed as run in the original conversation.** Verify before assuming: the 🔔 bell only renders if 0012 is applied; `is_owner()` RPC existing means 0011 is in. If missing, run them from `supabase/ALL_MIGRATIONS.sql` — everything is idempotent.
 - **0014 (My Sales Plan tables, sp_*) shipped 10 Aug — must be run in the SQL editor before the plan pane can load data.** Until then the pane shows a graceful "run migration 0014" message. RLS gates every sp_ table on the sales_access grant (owner implicit); company delete is admin-only; realtime publication included.
+- **0015 (sp_deals + sp_support) shipped 11 Aug with the MSP 3.2 upgrade — run it too.** Upstream MSP 3.2 never persisted deals/support (a bug: mastersOf() omitted them and no tables existed); the Genie edition fixes this per the project's own CLAUDE.md note — deals and support are real ENTITY_TABLES, salesStats/salesPlan ride in the sp_settings masters blob.
 - Live data (approx at handover): ~111 active jobs, 46 goal nodes (43 seeded + 3 Raghu test nodes), 12 accounts.
 - **Zero-data-loss contract (spec §6):** uploads only touch `jobs/projects/erp_tasks/import_batches`. Plans, milestones, baselines, manual tasks, comments, materials, priority, templates, grants are app-owned and must survive every upload. Jobs are **archived, never deleted**. This was verified end-to-end against live data — keep it true.
 - **Kitting formula is fixed** (spec §0.4): `Σ val×(1−tpp/100)×kit/100 ÷ Σ val×(1−tpp/100)`. Never derive from checklists.
@@ -85,7 +88,7 @@ scripts/acceptance-test.ts         §10 zero-data-loss test — SCRATCH DB ONLY 
 1. **genie.nandan.co.in DNS never completed.** Records must go in **Cloudflare** (authoritative for nandan.co.in — NOT the VPS): CNAME `genie` → `4f4dba9206813907.vercel-dns-017.com` (DNS only/grey) + TXT `_vercel` → `vc-domain-verify=genie.nandan.co.in,945f972ba1818f56ee38`. Then Supabase → Auth → URL config: add the domain. Production runs on the vercel.app URL meanwhile.
 2. **Job-owner linking incomplete.** The Jobmaster's five owner strings (`Pankaj Sutar`, `Anil Shinde`, `Alpesh`, `vikash`, `Pratish Govind`) need Project Owner accounts with matching **ERP owner name** fields; until then those jobs read Unassigned and the owner filter is thin. Raghu was to confirm the mapping (esp. vikash / Pratish Govind).
 3. **Medhansh currently has NO goals access** (his grant row was removed, presumably while testing the admin panel — only the owner can re-grant an admin).
-4. **Run migration 0014** (My Sales Plan tables) in the Supabase SQL editor, then open Sales Genie → My Sales Plan as an admin and click "Load starting data" once (253 industries, 85 products, 9-stage process). Version drift is fixed — badge and package.json both say 2.6 now.
+4. **Run migration 0015** (sp_deals + sp_support — 0014 is done and the masters data is imported). Then add **ANTHROPIC_API_KEY** in Vercel env vars to light up "🌐 Research" (EVA web research) and "✨ Calculate with AI" (deal scoring) — both return a clear "missing key" error until then. The nightly EVA refresh cron from the standalone project was NOT ported (needs vercel.json cron + CRON_SECRET) — refresh is manual for now.
 5. **Sales Regrow phases P1–P5 unbuilt** (product master, quote engine, approvals, metrics — see `Sales_Regrow_Architecture_Spec.md` on the old Desktop). Its §12 lists business decisions that block P2 (price bands, gate criteria, quote numbering ownership). What shipped is P0: the playbook live behind auth with per-user grants + backup import.
 6. **VPS hosting:** a full Hostinger guide was given (fresh VPS — never the ERP VPS; Node 20 + PM2 + Nginx + certbot; build on the server because `NEXT_PUBLIC_*` bakes at build). Not executed; Vercel remains live.
 7. **Notifications are in-app only** (60s poll). Email/WhatsApp would need Resend/API accounts.
