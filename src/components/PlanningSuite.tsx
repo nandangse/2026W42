@@ -1768,6 +1768,8 @@ function JobPlan({
 
   const [planView, setPlanView] = useState<"plan" | "mat">("plan");
   const [draft, setDraft] = useState<Plan | null>(null);
+  const [applyTplName, setApplyTplName] = useState("");
+  const templateNames = useMemo(() => Object.keys(board.templates).sort(), [board.templates]);
   const [dragMi, setDragMi] = useState<number | null>(null);
   const [warned, setWarned] = useState<Set<string>>(new Set());
   const [addingTask, setAddingTask] = useState<string | null>(null);
@@ -1862,6 +1864,13 @@ function JobPlan({
     return { ...pl, milestones: remapped.map((m, idx) => ({ ...m, preds: m.preds.filter((p) => p <= idx) })) };
   }); };
   const reloadDefault = () => { dirty.current = true; setDraft({ start: dj.start && dj.start >= TODAY ? dj.start : TODAY, milestones: templateMilestones(dj.fam, board.templates) }); };
+  const applyTemplate = (name: string) => {
+    if (!name) return;
+    if (!window.confirm(`Replace this job's milestones with the "${name}" template? Any custom changes to the current plan will be lost.`)) { setApplyTplName(""); return; }
+    dirty.current = true;
+    setDraft((pl) => (pl ? { ...pl, milestones: templateMilestones(name, board.templates) } : pl));
+    setApplyTplName("");
+  };
 
   const savePlanNow = async () => { await api.post("/api/plan", { job_id: dj.id, start: draft.start, milestones: draft.milestones }); await reload(); };
   // ---- mark the job completed once every milestone is done ----
@@ -2160,6 +2169,16 @@ function JobPlan({
               <div className="flex gap-2">
                 <button onClick={addMilestone} disabled={draft.milestones.length >= 50} className="px-3 py-1.5 rounded font-semibold text-sm" style={{ background: draft.milestones.length >= 50 ? "#D9D6CD" : "#22303C", color: "#fff" }}>+ Add milestone ({draft.milestones.length}/50)</button>
                 <button onClick={reloadDefault} className="px-3 py-1.5 rounded font-semibold text-sm border" style={{ borderColor: "#22303C", color: "#22303C" }}>↺ Reload {dj.fam} default</button>
+                <select
+                  value={applyTplName}
+                  onChange={(e) => { setApplyTplName(e.target.value); applyTemplate(e.target.value); }}
+                  className="px-2 py-1.5 rounded font-semibold text-sm border bg-white"
+                  style={{ borderColor: "#22303C", color: "#22303C" }}
+                  title="Replace this job's milestones with a saved template, regardless of its product family"
+                >
+                  <option value="">⇄ Apply template…</option>
+                  {templateNames.map((t) => (<option key={t} value={t}>{t}</option>))}
+                </select>
                 <button onClick={savePlanNow} className="px-3 py-1.5 rounded font-semibold text-sm" style={{ background: "#E8600A", color: "#fff" }}>💾 Save now</button>
               </div>
             ) : (
