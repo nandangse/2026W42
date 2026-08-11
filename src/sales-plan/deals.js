@@ -32,15 +32,15 @@ const fmtMoneyFull = n => '₹' + Math.round(+n || 0).toLocaleString('en-IN');
 /* ---------- dates ---------- */
 const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-/** The next `count` calendar months, starting with NEXT month — the current
-    month's tile is noise once you're planning ahead. Each entry is the
+/** `count` calendar months starting with the CURRENT month. Each entry is the
     [start, end] iso range for deals due IN that month (not cumulative —
-    a deal due in August must not show up in September's box). */
-function nextMonths(count = 3, from = new Date()) {
+    a deal due in August must not show up in September's box, and vice
+    versa — it belongs in exactly one bucket). */
+function nextMonths(count = 4, from = new Date()) {
   const out = [];
   for (let i = 0; i < count; i++) {
-    const start = new Date(from.getFullYear(), from.getMonth() + i + 1, 1);
-    const end = new Date(from.getFullYear(), from.getMonth() + i + 2, 0);
+    const start = new Date(from.getFullYear(), from.getMonth() + i, 1);
+    const end = new Date(from.getFullYear(), from.getMonth() + i + 1, 0);
     out.push({
       start: iso(start),
       end: iso(end),

@@ -1222,7 +1222,7 @@ function viewDeals(){
   const open=list.filter(isOpen);
   const total=open.reduce((s,d)=>s+(+d.amount||0),0);
   const wtd=open.reduce((s,d)=>s+weighted(d),0);
-  const months=nextMonths(3);
+  const months=nextMonths(4);
   const byMonth=months.map(m=>{const hit=open.filter(d=>d.due&&d.due>=m.start&&d.due<=m.end);
     return {label:m.label,n:hit.length,val:hit.reduce((s,d)=>s+(+d.amount||0),0)};});
 
