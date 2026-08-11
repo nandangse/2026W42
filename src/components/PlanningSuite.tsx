@@ -507,7 +507,7 @@ export default function PlanningSuite({
               <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>
                 GENIE
                 <span style={{ background: "#E8600A", color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6 }}>
-                  V 2.5
+                  V 2.6
                 </span>
               </div>
               <h1 className="text-lg font-bold text-white leading-tight">
