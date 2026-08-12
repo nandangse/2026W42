@@ -23,6 +23,16 @@ export default function SalesGenie({
   const [seen, setSeen] = useState<Record<Pane, boolean>>({ plan: true, playbook: false });
   const open = (p: Pane) => { setPane(p); setSeen((s) => ({ ...s, [p]: true })); };
 
+  // Search lives here, in Genie's own header — the iframe's own search bar
+  // is hidden and just receives keystrokes via postMessage, so My Sales Plan
+  // and Playbook share one tab-and-search line instead of stacking three.
+  const [search, setSearch] = useState("");
+  const planFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const onSearch = (v: string) => {
+    setSearch(v);
+    planFrameRef.current?.contentWindow?.postMessage({ type: "genie:search", query: v }, window.location.origin);
+  };
+
   const [nonce, setNonce] = useState(0); // bump to reload the playbook iframe after an import
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -75,8 +85,17 @@ export default function SalesGenie({
       <div className="flex items-center gap-1 px-3 py-1.5" style={{ background: "#EAE7DF", borderBottom: "1px solid #DCD9D1" }}>
         {tabBtn("plan", "📊 My Sales Plan")}
         {tabBtn("playbook", "📕 Playbook")}
-        <span className="text-xs ml-auto" style={{ color: "#8A94A0" }}>
-          {pane === "plan" ? "Auto-saves · live to the whole team" : "Reference — never edited in place"}
+        {pane === "plan" && (
+          <input
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder="Search companies, deals, people, locations…"
+            className="text-xs rounded px-2.5 py-1.5 ml-auto"
+            style={{ border: "1px solid #DCD9D1", background: "#fff", color: "#22303C", width: "100%", maxWidth: 360 }}
+          />
+        )}
+        <span className="text-xs flex-shrink-0" style={{ color: "#8A94A0", marginLeft: pane === "plan" ? 8 : "auto" }}>
+          {pane === "plan" ? "Auto-saves · live" : "Reference — never edited in place"}
         </span>
       </div>
 
@@ -84,6 +103,7 @@ export default function SalesGenie({
       <div style={{ display: pane === "plan" ? "flex" : "none", flexDirection: "column", flex: 1, minHeight: 0 }}>
         {seen.plan && (
           <iframe
+            ref={planFrameRef}
             src="/api/sales/plan"
             title="My Sales Plan — Nandan GSE"
             allow="microphone"

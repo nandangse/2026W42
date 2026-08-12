@@ -35,7 +35,10 @@
   </div>
 </header>
 
-<div class="ownerbar">
+<!-- search now lives in Genie's own header, next to the My Sales Plan / Playbook
+     tabs (see SalesGenie.tsx) and is forwarded here via postMessage. The
+     input stays in the DOM, hidden, so q()/render() need no changes. -->
+<div class="ownerbar" style="display:none">
   <div class="searchwrap" style="margin-left:0;flex:1 1 320px;max-width:460px"><input id="searchBox" placeholder="Search companies, deals, people, locations…" oninput="render()"></div>
 </div>
 

@@ -344,6 +344,15 @@ export default function PlanningSuite({
     if (workspace === "sales") setSalesVisited(true);
   }, [workspace]);
 
+  // App identity — name + theme line under the logo, admin-editable so a new
+  // theme doesn't need a deploy. Defaults match the migration's, so the
+  // header never flashes empty while this loads.
+  const [appSettings, setAppSettings] = useState({ app_name: "Genie", theme_name: "Nandan Breakthrough 2026-27" });
+  const loadAppSettings = useCallback(() => {
+    api.get("/api/app-settings").then((r) => setAppSettings({ app_name: r.app_name, theme_name: r.theme_name })).catch(() => {});
+  }, []);
+  useEffect(() => { loadAppSettings(); }, [loadAppSettings]);
+
   // ---- notification bell: new assignments land here, polled once a minute ----
   interface Notif { id: string; kind: string; title: string; body: string; created_by: string | null; read_at: string | null; created_at: string }
   const [notifs, setNotifs] = useState<{ installed: boolean; items: Notif[]; unread: number } | null>(null);
@@ -500,7 +509,7 @@ export default function PlanningSuite({
       {/* ===== frozen header ===== */}
       <div
         className="px-4 py-2.5"
-        style={{ background: "#16232F", borderBottom: "3px solid #E8600A", position: "sticky", top: 0, zIndex: 45 }}
+        style={{ background: "#16232F", position: "sticky", top: 0, zIndex: 45 }}
       >
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3 flex-shrink-0">
@@ -510,13 +519,13 @@ export default function PlanningSuite({
             </div>
             <div>
               <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>
-                GENIE
+                {appSettings.app_name.toUpperCase()}
                 <span style={{ background: "#E8600A", color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6 }}>
-                  V 2.6
+                  V 2.6.1
                 </span>
               </div>
               <h1 className="text-lg font-bold text-white leading-tight">
-                Milestones · Load · Tasking · Delivery · Sales
+                {appSettings.theme_name}
               </h1>
             </div>
           </div>
@@ -626,6 +635,14 @@ export default function PlanningSuite({
           className="flex gap-1 rounded p-1 mt-2"
           style={{ background: "#0D161F", overflowX: "auto", scrollbarWidth: "thin" }}
         >
+          <button
+            onClick={() => { setWorkspace("suite"); setTab("home"); }}
+            className="px-3 py-1.5 rounded text-sm font-semibold flex-shrink-0"
+            style={{ color: "#8FA1B3" }}
+            title="Home — My Week"
+          >
+            🏠
+          </button>
           {WORKSPACE_DEFS.map(([k, l]) => (
             <button
               key={k}
@@ -679,7 +696,7 @@ export default function PlanningSuite({
       {workspace === "suite" && tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} />}
       {workspace === "suite" && tab === "upload" && isAdmin && <MorningUpload email={email} embedded />}
-      {workspace === "suite" && tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} isOwner={isRaghu} />}
+      {workspace === "suite" && tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} isOwner={isRaghu} appSettings={appSettings} loadAppSettings={loadAppSettings} />}
       {/* Mounted on first visit and then kept (hidden) — the tree is a slow
           payload (auth + 10 queries + live metrics), so re-fetching it on
           every workspace switch made Goals feel sluggish. Its own load()
@@ -2728,10 +2745,34 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
 }
 
 // ============================ Admin ============================
-function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; reload: () => Promise<Board | null>; users: AdminUser[] | null; loadUsers: () => Promise<void>; isOwner: boolean }) {
+function Admin({
+  board, reload, users, loadUsers, isOwner, appSettings, loadAppSettings,
+}: {
+  board: Board; reload: () => Promise<Board | null>; users: AdminUser[] | null; loadUsers: () => Promise<void>; isOwner: boolean;
+  appSettings: { app_name: string; theme_name: string }; loadAppSettings: () => void;
+}) {
   /** Who this admin may act on: never the owner, and other admins only if owner. */
   const mayManage = (u: AdminUser) =>
     u.email.toLowerCase() !== OWNER_EMAIL && (isOwner || u.role !== "admin");
+
+  // ---- app identity: logo (fixed), app name + theme name (editable) ----
+  const [idForm, setIdForm] = useState({ app_name: appSettings.app_name, theme_name: appSettings.theme_name });
+  useEffect(() => { setIdForm({ app_name: appSettings.app_name, theme_name: appSettings.theme_name }); }, [appSettings]);
+  const [idMsg, setIdMsg] = useState("");
+  const [idBusy, setIdBusy] = useState(false);
+  const idDirty = idForm.app_name !== appSettings.app_name || idForm.theme_name !== appSettings.theme_name;
+  const saveIdentity = async () => {
+    if (!idForm.app_name.trim() || !idForm.theme_name.trim()) return;
+    setIdBusy(true);
+    setIdMsg("");
+    try {
+      await api.post("/api/app-settings", { app_name: idForm.app_name, theme_name: idForm.theme_name });
+      loadAppSettings();
+      setIdMsg("Saved ✓");
+    } catch (e) { setIdMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setIdBusy(false); }
+  };
+
   // ---- user management (list state lives in the parent so the tab doesn't flicker) ----
   const [uForm, setUForm] = useState({ email: "", pw: "", role: "planner", name: "", initials: "" });
   const [uMsg, setUMsg] = useState("");
@@ -2885,6 +2926,32 @@ function Admin({ board, reload, users, loadUsers, isOwner }: { board: Board; rel
 
   return (
     <div className="p-4 space-y-4">
+      {/* ---- app identity ---- */}
+      <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+        <div className="font-bold text-sm mb-2">App identity <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— the name and theme line shown next to the logo, header-wide</span></div>
+        <div className="flex gap-4 flex-wrap items-end">
+          <div>
+            <div className="text-xs font-semibold mb-1" style={{ color: "#8A94A0" }}>Logo</div>
+            <div className="rounded px-2 py-1 inline-block" style={{ background: "#16232F" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={LOGO} alt="Nandan GSE" style={{ height: 28 }} />
+            </div>
+          </div>
+          <div>
+            <div className="text-xs font-semibold mb-1" style={{ color: "#8A94A0" }}>Name of app</div>
+            <input value={idForm.app_name} onChange={(e) => setIdForm({ ...idForm, app_name: e.target.value })} className="text-xs border rounded px-2 py-1.5" style={{ borderColor: "#E2E0DA", width: 160 }} />
+          </div>
+          <div>
+            <div className="text-xs font-semibold mb-1" style={{ color: "#8A94A0" }}>Theme name</div>
+            <input value={idForm.theme_name} onChange={(e) => setIdForm({ ...idForm, theme_name: e.target.value })} className="text-xs border rounded px-2 py-1.5" style={{ borderColor: "#E2E0DA", width: 260 }} />
+          </div>
+          <button onClick={saveIdentity} disabled={!idDirty || idBusy} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff", opacity: !idDirty || idBusy ? 0.5 : 1 }}>
+            {idBusy ? "Saving…" : "Save"}
+          </button>
+          {idMsg && <span className="text-xs font-semibold" style={{ color: idMsg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{idMsg}</span>}
+        </div>
+      </div>
+
       {/* ---- users ---- */}
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
         <div className="font-bold text-sm mb-2">User management <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— initials are the key used to assign tasks and filter the boards</span></div>

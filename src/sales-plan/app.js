@@ -71,6 +71,17 @@ const mdlite=t=>esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>
 const isAdmin=()=>!!profile&&profile.role==='admin';
 const $id=i=>document.getElementById(i);
 const val=i=>{const el=$id(i);return el?el.value.trim():'';};
+
+/* Genie hosts the search box in its own header, alongside the My Sales Plan /
+   Playbook tabs, and forwards keystrokes here — the ownerbar's #searchBox
+   input stays in the DOM (hidden) so q()/render() are untouched. */
+window.addEventListener('message',e=>{
+  if(!e.data||e.data.type!=='genie:search')return;
+  const sb=$id('searchBox');
+  if(!sb)return;
+  sb.value=e.data.query||'';
+  render();
+});
 /* Indian date formats: dd/mm/yyyy (+ hh:mm for timestamps) */
 const fmtD=iso=>{if(!iso)return '';const m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m?`${m[3]}/${m[2]}/${m[1]}`:String(iso);};
