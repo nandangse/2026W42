@@ -38,6 +38,8 @@ export interface Person {
   initials: string | null;
   name: string | null;
   erpOwner: string | null;
+  /** Line manager (profiles.id) — drives Tasking's "people reporting to me". */
+  reportsTo: string | null;
 }
 
 function mapJob(r: any): BoardJob {
@@ -130,7 +132,7 @@ export async function buildBoard(supabase: SupabaseClient) {
     // people — drives the Project Owner filter and the assignee pickers
     supabase
       .from("profiles")
-      .select("id, email, role, initials, display_name, erp_owner, disabled")
+      .select("id, email, role, initials, display_name, erp_owner, reports_to, disabled")
       .eq("disabled", false),
   ]);
 
@@ -157,6 +159,7 @@ export async function buildBoard(supabase: SupabaseClient) {
     initials: p.initials ?? null,
     name: p.display_name ?? null,
     erpOwner: p.erp_owner ?? null,
+    reportsTo: p.reports_to ?? null,
   }));
   // Jobs are filtered by Project Owners only. Tasks, by contrast, can be
   // assigned to ANY account that exists — whatever their role. Both lists come
@@ -235,6 +238,8 @@ export async function buildBoard(supabase: SupabaseClient) {
       cat: t.cat,
       esc: t.esc,
       done: !!t.done,
+      // ERP ToDos have no author inside Genie — they arrive from the export
+      by: null as string | null,
       comments: commentCounts["erp:" + t.id] || 0,
     })),
     ...(manualRes.data || []).map((t) => ({
@@ -248,6 +253,8 @@ export async function buildBoard(supabase: SupabaseClient) {
       cat: t.cat,
       esc: t.esc,
       done: !!t.done,
+      // who raised it — the key behind Tasking's "tasks I assigned" filter
+      by: (t.created_by ?? null) as string | null,
       comments: commentCounts["manual:" + t.id] || 0,
     })),
   ];

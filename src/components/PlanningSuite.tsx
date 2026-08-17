@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { LOGO } from "@/lib/logo";
+import { APP_VERSION, UPDATES } from "@/lib/changelog";
 import { TRADES, zeroCrew, templateFor, type Crew } from "@/lib/templates";
 import {
   today,
@@ -313,6 +314,10 @@ export default function PlanningSuite({
     window.history.pushState({ genie: true, workspace, tab }, "");
   }, [workspace, tab]);
   const [showVal, setShowVal] = useState(true);
+  // account menu behind the initials avatar — Profile / Change password / Logout
+  const [userOpen, setUserOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erpLog, setErpLog] = useState<ErpLogEntry[]>([]);
   const [quoteTrigger, setQuoteTrigger] = useState(0);
@@ -520,8 +525,8 @@ export default function PlanningSuite({
             <div>
               <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>
                 {appSettings.app_name.toUpperCase()}
-                <span style={{ background: "#E8600A", color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6 }}>
-                  V 2.6.1
+                <span style={{ background: "#E8600A", color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6 }} title="See Admin → Updates for what changed">
+                  V {APP_VERSION}
                 </span>
               </div>
               <h1 className="text-lg font-bold text-white leading-tight">
@@ -612,17 +617,70 @@ export default function PlanningSuite({
               <option value="with">With value ₹</option>
               <option value="without">Without value</option>
             </select>
-            <span className="text-xs rounded px-2 py-1.5" style={{ background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }}>
-              {initials ? (
-                <span className="font-bold rounded px-1 mr-1" style={{ background: "#E8600A", color: "#fff" }} title="Your initials — the key used to assign your tasks">{initials}</span>
-              ) : (
-                <span className="font-bold rounded px-1 mr-1" style={{ background: "#B3261E", color: "#fff" }} title="No initials set — ask an admin to assign yours">??</span>
-              )}
-              {displayName || email}
-              <span className="ml-1" style={{ color: "#3A4A5A" }}>· {role.replace("_", " ")}</span>
-              <button onClick={logout} className="ml-1 font-bold" style={{ color: "#E8600A" }}>
-                Logout
+            {/* account: initials only, everything else behind the dropdown */}
+            <span className="relative">
+              <button
+                onClick={() => setUserOpen((o) => !o)}
+                className="flex items-center gap-1 rounded px-1.5 py-1"
+                style={{ background: "#0D161F", border: "1px solid #22303C" }}
+                title={`${displayName || email} · ${role.replace("_", " ")}`}
+                aria-haspopup="menu"
+                aria-expanded={userOpen}
+              >
+                <span
+                  className="rounded-full font-bold flex items-center justify-center"
+                  style={{
+                    width: 26,
+                    height: 26,
+                    fontSize: 11,
+                    letterSpacing: 0.3,
+                    background: initials ? "#E8600A" : "#B3261E",
+                    color: "#fff",
+                  }}
+                >
+                  {initials || "??"}
+                </span>
+                <span style={{ color: "#8FA1B3", fontSize: 9 }}>▼</span>
               </button>
+              {userOpen && (
+                <>
+                  <div className="fixed inset-0" style={{ zIndex: 58 }} onClick={() => setUserOpen(false)} />
+                  <div
+                    className="absolute rounded-lg border bg-white"
+                    style={{ top: "calc(100% + 6px)", right: 0, width: 232, borderColor: "#E2E0DA", boxShadow: "0 12px 30px rgba(0,0,0,.25)", zIndex: 59 }}
+                  >
+                    <div className="px-3 py-2.5" style={{ borderBottom: "1px solid #EEECE6" }}>
+                      <div className="text-sm font-bold truncate" style={{ color: "#16232F" }}>{displayName || email.split("@")[0]}</div>
+                      <div className="text-xs truncate" style={{ color: "#8A94A0" }}>{email}</div>
+                      <div className="text-xs mt-1 font-semibold" style={{ color: "#5A6672" }}>
+                        {role.replace("_", " ")}
+                        {!initials && <span style={{ color: "#B3261E" }}> · no initials set</span>}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { setUserOpen(false); setProfileOpen(true); }}
+                      className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
+                      style={{ color: "#16232F" }}
+                    >
+                      👤 Profile
+                    </button>
+                    <button
+                      onClick={() => { setUserOpen(false); setPwOpen(true); }}
+                      className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
+                      style={{ color: "#16232F" }}
+                    >
+                      🔑 Change Password
+                    </button>
+                    <button
+                      onClick={() => { setUserOpen(false); logout(); }}
+                      className="w-full text-left px-3 py-2 text-sm font-bold hover:bg-gray-50"
+                      style={{ color: "#E8600A", borderTop: "1px solid #EEECE6" }}
+                    >
+                      ⎋ Logout
+                    </button>
+                  </div>
+                </>
+              )}
             </span>
           </div>
         </div>
@@ -713,6 +771,153 @@ export default function PlanningSuite({
           <SalesGenie email={email} isAdmin={isAdmin} />
         </div>
       )}
+
+      {profileOpen && (
+        <ProfileModal me={{ email, initials, displayName, erpOwner, role }} onClose={() => setProfileOpen(false)} onChangePassword={() => { setProfileOpen(false); setPwOpen(true); }} />
+      )}
+      {pwOpen && <ChangePasswordModal email={email} onClose={() => setPwOpen(false)} />}
+    </div>
+  );
+}
+
+// ============================ account modals ============================
+function ProfileRow({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-2" style={{ borderBottom: "1px solid #F4F2EC" }}>
+      <div className="text-xs font-semibold flex-shrink-0" style={{ color: "#8A94A0" }}>{label}</div>
+      <div className="text-sm text-right" style={{ color: "#16232F" }}>
+        <div className="font-semibold break-words">{value}</div>
+        {hint && <div className="text-xs" style={{ color: "#8A94A0" }}>{hint}</div>}
+      </div>
+    </div>
+  );
+}
+
+function ProfileModal({
+  me,
+  onClose,
+  onChangePassword,
+}: {
+  me: { email: string; initials: string | null; displayName: string | null; erpOwner: string | null; role: Role };
+  onClose: () => void;
+  onChangePassword: () => void;
+}) {
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(13,22,31,0.75)", zIndex: 60 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 400, borderTop: "5px solid #E8600A" }}>
+        <div className="flex items-center gap-3 p-5 pb-4">
+          <span
+            className="rounded-full font-bold flex items-center justify-center flex-shrink-0"
+            style={{ width: 46, height: 46, fontSize: 17, background: me.initials ? "#E8600A" : "#B3261E", color: "#fff" }}
+          >
+            {me.initials || "??"}
+          </span>
+          <div className="min-w-0">
+            <div className="text-lg font-bold leading-tight truncate" style={{ color: "#16232F" }}>{me.displayName || me.email.split("@")[0]}</div>
+            <div className="text-xs truncate" style={{ color: "#8A94A0" }}>{me.email}</div>
+          </div>
+        </div>
+        <div className="px-5">
+          <ProfileRow label="Role" value={me.role.replace("_", " ")} />
+          <ProfileRow
+            label="Initials"
+            value={me.initials || "not set"}
+            hint={me.initials ? "the key your tasks are matched on" : "ask an admin to assign yours"}
+          />
+          <ProfileRow label="ERP owner name" value={me.erpOwner || "—"} hint={me.erpOwner ? undefined : "used to match ERP-owned jobs"} />
+        </div>
+        <div className="text-xs px-5 pt-3" style={{ color: "#8A94A0" }}>
+          Name, initials, role and ERP owner are set by an admin in Admin → User management.
+        </div>
+        <div className="flex gap-2 p-5 pt-4">
+          <button onClick={onChangePassword} className="flex-1 py-2 rounded font-bold text-sm" style={{ background: "#F4F2EC", color: "#16232F" }}>
+            🔑 Change Password
+          </button>
+          <button onClick={onClose} className="flex-1 py-2 rounded font-bold text-sm" style={{ background: "#22303C", color: "#fff" }}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Self-service password change. The current password is verified first (a
+ * re-sign-in with the same account), so a walked-away-from session can't be
+ * used to lock the real owner out.
+ */
+function ChangePasswordModal({ email, onClose }: { email: string; onClose: () => void }) {
+  const [cur, setCur] = useState("");
+  const [pw1, setPw1] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [show, setShow] = useState(false);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr("");
+    if (pw1.length < 8) return setErr("New password must be at least 8 characters");
+    if (pw1 !== pw2) return setErr("The two new passwords don't match");
+    if (pw1 === cur) return setErr("New password must be different from the current one");
+    setBusy(true);
+    const supabase = supabaseBrowser();
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password: cur });
+    if (signInErr) {
+      setBusy(false);
+      return setErr("Current password is incorrect");
+    }
+    const { error } = await supabase.auth.updateUser({ password: pw1 });
+    setBusy(false);
+    if (error) return setErr(error.message || "Could not change the password");
+    setDone(true);
+  };
+
+  const field = (label: string, value: string, set: (v: string) => void, autoComplete: string) => (
+    <>
+      <label className="block text-xs font-semibold mb-1" style={{ color: "#5A6672" }}>{label}</label>
+      <input
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={(e) => set(e.target.value)}
+        className="w-full border rounded px-2 py-2 mb-3 text-sm"
+        style={{ borderColor: "#D9D6CD" }}
+        autoComplete={autoComplete}
+      />
+    </>
+  );
+
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(13,22,31,0.75)", zIndex: 60 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg p-5 w-full" style={{ maxWidth: 380, borderTop: "5px solid #E8600A" }}>
+        <div className="text-xs font-bold tracking-widest" style={{ color: "#E8600A" }}>CHANGE PASSWORD</div>
+        <div className="text-xs mb-4 mt-1" style={{ color: "#8A94A0" }}>{email}</div>
+        {done ? (
+          <>
+            <div className="text-sm font-semibold" style={{ color: "#2E7D32" }}>✓ Password changed. Use the new one next time you sign in.</div>
+            <button onClick={onClose} className="w-full mt-4 py-2 rounded font-bold text-sm" style={{ background: "#22303C", color: "#fff" }}>Done</button>
+          </>
+        ) : (
+          <form onSubmit={submit}>
+            {field("Current password", cur, setCur, "current-password")}
+            {field("New password", pw1, setPw1, "new-password")}
+            {field("Confirm new password", pw2, setPw2, "new-password")}
+            <label className="flex items-center gap-2 text-xs mb-3" style={{ color: "#5A6672" }}>
+              <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} />
+              Show passwords
+            </label>
+            {err && <div className="text-xs mb-3 font-semibold" style={{ color: "#B3261E" }}>{err}</div>}
+            <div className="flex gap-2">
+              <button type="button" onClick={onClose} className="flex-1 py-2 rounded font-bold text-sm" style={{ background: "#F4F2EC", color: "#16232F" }}>Cancel</button>
+              <button type="submit" disabled={busy} className="flex-1 py-2 rounded font-bold text-sm" style={{ background: "#E8600A", color: "#fff", opacity: busy ? 0.6 : 1 }}>
+                {busy ? "Saving…" : "Change password"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
@@ -2745,6 +2950,59 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
 }
 
 // ============================ Admin ============================
+function AdminTabs({ tab, setTab }: { tab: "setup" | "updates"; setTab: (t: "setup" | "updates") => void }) {
+  return (
+    <div className="flex gap-1 rounded p-1 bg-white border" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
+      {([["setup", "⚙ Settings & Users"], ["updates", "🗒 Updates"]] as const).map(([k, l]) => (
+        <button
+          key={k}
+          onClick={() => setTab(k)}
+          className="px-3 py-1 rounded text-sm font-semibold"
+          style={tab === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}
+        >
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The release log. Reads src/lib/changelog.ts, so the version badge in the
+ * header and this page can never disagree — they are the same list.
+ */
+function Updates() {
+  return (
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+      <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
+        <div className="font-bold text-sm">What&apos;s changed in Genie</div>
+        <div className="text-xs" style={{ color: "#8A94A0" }}>
+          Running version <b style={{ color: "#E8600A" }}>{APP_VERSION}</b> · {UPDATES.length} release{UPDATES.length === 1 ? "" : "s"} logged
+        </div>
+      </div>
+      <div className="rounded px-2 py-1.5 mb-3 text-xs" style={{ background: "#F4F2EC", color: "#5A6672" }}>
+        <b>How the number works</b> — <span className="tnum">MAJOR.MINOR.BATCH.PATCH</span>. The last digit moves for
+        every change inside one module; the third moves when several modules change together or on the first release of
+        a new day; the second (2.6 → 2.7) marks a major change or a new week.
+      </div>
+      {UPDATES.map((u) => (
+        <div key={u.v} className="py-2.5" style={{ borderTop: "1px solid #EFEDE7" }}>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-xs font-bold rounded px-1.5 py-0.5 tnum" style={{ background: "#E8600A", color: "#fff" }}>V {u.v}</span>
+            <span className="text-sm font-bold" style={{ color: "#16232F" }}>{u.module}</span>
+            <span className="text-xs tnum" style={{ color: "#8A94A0" }}>{fmtFull(u.date)}</span>
+          </div>
+          <ul className="mt-1" style={{ listStyle: "disc", paddingLeft: 20 }}>
+            {u.items.map((it, i) => (
+              <li key={i} className="text-sm" style={{ color: "#5A6672" }}>{it}</li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Admin({
   board, reload, users, loadUsers, isOwner, appSettings, loadAppSettings,
 }: {
@@ -2924,8 +3182,21 @@ function Admin({
     } catch (e) { setTMsg(e instanceof Error ? e.message : String(e)); }
   };
 
+  // ---- admin sub-tabs: the setup pages, and the release log ----
+  const [adminTab, setAdminTab] = useState<"setup" | "updates">("setup");
+
+  if (adminTab === "updates") {
+    return (
+      <div className="p-4 space-y-4">
+        <AdminTabs tab={adminTab} setTab={setAdminTab} />
+        <Updates />
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 space-y-4">
+      <AdminTabs tab={adminTab} setTab={setAdminTab} />
       {/* ---- app identity ---- */}
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
         <div className="font-bold text-sm mb-2">App identity <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— the name and theme line shown next to the logo, header-wide</span></div>
