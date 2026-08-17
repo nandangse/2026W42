@@ -313,6 +313,105 @@ const EMP_FIELDS: [keyof ParsedEmployee, RegExp][] = [
   ["location", /location|site|branch|plant/i],
 ];
 
+/**
+ * The money side of a job — the four columns the Jobmaster export carries and
+ * Genie never read.
+ *
+ * Matched by MEANING, for the same reason the employee master is: nobody here
+ * controls what the ERP calls its columns, and a field wired to one exact
+ * string stops working silently the morning somebody renames it. Every pattern
+ * below is deliberately loose about the wording and strict about the subject —
+ * "Balance Payment on Delivery", "Payment Due on Dispatch" and "Pending
+ * Collection at Delivery" must all reach payOnDelivery, while "Payment Terms"
+ * must reach none of them.
+ *
+ * Whatever matches is REPORTED in the upload summary. An unmatched field stays
+ * null rather than reading zero — a job with no payment recorded and a job with
+ * nothing to collect are not the same job, and sorting the board by cash must
+ * not confuse them.
+ */
+const EXTRA_JOB_FIELDS: {
+  key: "clientUpdate" | "cashflow" | "amtNeeded" | "payOnDelivery";
+  re: RegExp;
+  numeric: boolean;
+}[] = [
+  // "on delivery" first: it is the most specific, and a sheet carrying both it
+  // and a general "Pending Payment" must bind the specific one.
+  {
+    key: "payOnDelivery",
+    re: /(pending|balance|due|outstanding|collect\w*|receiv\w*)[\s\S]{0,20}(payment|amount|value|collection)?[\s\S]{0,20}(on|at|against|after)?[\s\S]{0,6}(delivery|dispatch|despatch)|payment[\s\S]{0,20}(on|at|against)[\s\S]{0,6}(delivery|dispatch|despatch)/i,
+  numeric: true,
+  },
+  { key: "amtNeeded", re: /(amount|amt|fund|cash|money)[\s\S]{0,12}(needed|required|reqd|to\s*be\s*spent)/i, numeric: true },
+  { key: "cashflow", re: /cash[\s-]*flow/i, numeric: false },
+  { key: "clientUpdate", re: /(client|customer)[\s\S]{0,12}(update|feedback|remark|comment|communication)/i, numeric: false },
+];
+
+/**
+ * Rupees from a cell that may carry "₹ 12,50,000", "12.5 L" or a plain number.
+ * Returns null — never 0 — when there is nothing there, so "not recorded" and
+ * "nothing due" stay different facts all the way to the screen.
+ */
+function money(v: Cell): number | null {
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  const s = String(v).trim();
+  if (!s || /^(na|n\/a|-|—|nil|none)$/i.test(s)) return null;
+  const cleaned = s.replace(/[₹,\s]/g, "");
+  const m = cleaned.match(/^(-?\d*\.?\d+)\s*(cr|crore|l|lakh|lac|k)?$/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n)) return null;
+  const unit = (m[2] || "").toLowerCase();
+  if (/^(cr|crore)$/.test(unit)) return n * 1e7;
+  if (/^(l|lakh|lac)$/.test(unit)) return n * 1e5;
+  if (unit === "k") return n * 1e3;
+  return n;
+}
+
+/**
+ * Bind each money field to a header on this sheet. A header already taken by
+ * an earlier (more specific) field is never reused, so "Pending Payment on
+ * Delivery" cannot also answer for "Amount Needed".
+ */
+function matchExtraJobFields(hdr: string[]): { header: Partial<Record<string, string>>; matched: Record<string, string> } {
+  const header: Partial<Record<string, string>> = {};
+  const matched: Record<string, string> = {};
+  const used = new Set<string>();
+  for (const f of EXTRA_JOB_FIELDS) {
+    const hit = hdr.find((h) => h && !used.has(h) && f.re.test(h));
+    if (hit) {
+      header[f.key] = hit;
+      matched[f.key] = hit;
+      used.add(hit);
+    }
+  }
+  return { header, matched };
+}
+
+/** Read the four money fields off one row, given the bound headers. */
+function extraJobValues(
+  r: Row,
+  ix: Record<string, number>,
+  header: Partial<Record<string, string>>,
+): Pick<ParsedJob, "clientUpdate" | "cashflow" | "amtNeeded" | "payOnDelivery"> {
+  const cell = (key: string): Cell => {
+    const h = header[key];
+    return h && ix[h] != null ? r[ix[h]] : undefined;
+  };
+  const text = (key: string): string | null | undefined => {
+    if (!header[key]) return undefined; // column absent — never overwrite
+    const v = String(cell(key) ?? "").replace(/\s+/g, " ").trim();
+    return v ? v.slice(0, 600) : null;
+  };
+  return {
+    clientUpdate: text("clientUpdate"),
+    cashflow: text("cashflow"),
+    amtNeeded: header.amtNeeded ? money(cell("amtNeeded")) : undefined,
+    payOnDelivery: header.payOnDelivery ? money(cell("payOnDelivery")) : undefined,
+  };
+}
+
 function isEmployeeSheet(hdr: string[]): boolean {
   const has = (re: RegExp) => hdr.some((h) => re.test(h));
   // a name plus either a birthday or a joining date is enough to be sure, and
@@ -429,11 +528,16 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
           };
         });
     } else if (ix["Customer Tag"] != null && ix["ID"] != null) {
+      // The money columns, bound once per sheet and reported in the summary.
+      const money4 = matchExtraJobFields(hdr);
+      out.jobHeaders = hdr.filter(Boolean);
+      out.jobFieldHeaders = money4.matched;
       out.jobs = rows
         .slice(1)
         .filter((r) => r && g(r, "ID"))
         .map(
           (r): ParsedJob => ({
+            ...extraJobValues(r, ix, money4.header),
             id: String(g(r, "ID")),
             tag: String(g(r, "Customer Tag") || "").trim(),
             fam:
@@ -576,11 +680,20 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
             .replace(/\s+/g, " ")
             .trim()
             .slice(0, 150);
+        // The money columns live in this block of the PRE workbook too. Bound
+        // against that block's own header slice, not the sheet's first row.
+        const jHdr = h3.slice(jb, jb + 36).map((h) => String(h || "").trim());
+        const money4 = matchExtraJobFields(jHdr);
+        if (Object.keys(money4.matched).length) {
+          out.jobHeaders = jHdr.filter(Boolean);
+          out.jobFieldHeaders = { ...(out.jobFieldHeaders || {}), ...money4.matched };
+        }
         const dj = rows
           .slice(3)
           .filter((r) => r && /^20\d{8}$/.test(String(gj(r, "ID") || "")))
           .map(
             (r): ParsedJob => ({
+              ...extraJobValues(r, jc, money4.header),
               id: String(gj(r, "ID")),
               tag: String(gj(r, "Customer Tag") || "").trim(),
               fam:

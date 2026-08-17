@@ -37,6 +37,7 @@ import DeliveredJobs from "./DeliveredJobs";
 import MorningUpload from "./MorningUpload";
 import SalesGenie from "./SalesGenie";
 import RunRate from "./RunRate";
+import DeliveryOutlook from "./DeliveryOutlook";
 
 // The 32 ERP job-status options (verbatim from V1.9), used by the editable
 // Job Status dropdowns.
@@ -89,14 +90,14 @@ function myHandles(me: { initials: string | null; displayName: string | null; er
  */
 const ROLE_GROUP: Record<string, string> = {
   user: "Users",
-  project_owner: "Project Owners",
+  project_owner: "Planning Owners",
   planner: "Planners",
   admin: "Admins",
   sales: "Sales team",
   viewer: "Viewers",
   uploader: "Uploaders",
 };
-const GROUP_ORDER = ["Users", "Project Owners", "Planners", "Admins", "Sales team", "Viewers", "Uploaders"];
+const GROUP_ORDER = ["Users", "Planning Owners", "Planners", "Admins", "Sales team", "Viewers", "Uploaders"];
 
 function assignees(board: Board): { value: string; label: string; group: string }[] {
   return (board.assignableUsers || [])
@@ -150,7 +151,25 @@ interface Job {
   updated_at: string | null;
   ownerInitials: string | null;
   ownerName: string | null;
+  /** The money side. Null is NOT RECORDED, and never the same as zero. */
+  clientUpdate: string | null;
+  cashflow: string | null;
+  amtNeeded: number | null;
+  payOnDelivery: number | null;
 }
+
+/**
+ * Money already sunk into a job: (1 − T%) × Kitting% × Value.
+ *
+ * (1 − T%) of the value is the material content — what is bought in rather
+ * than earned — and the kitting percentage says how much of that has actually
+ * been drawn. So this is what the job is holding in steel and parts on the
+ * shop floor, and it is the number that says what finishing the job releases.
+ * Same arithmetic as the KITTED MATERIAL VALUE card, kept in one place.
+ */
+const investedIn = (j: Pick<Job, "val" | "tpp" | "kit">): number =>
+  j.val * (1 - (j.tpp || 0) / 100) * ((j.kit || 0) / 100);
+
 interface Task {
   id: string;
   kind: "erp" | "manual";
@@ -209,7 +228,7 @@ interface AdminUser {
 const ROLE_OPTIONS: { value: string; label: string; hint: string }[] = [
   { value: "admin", label: "Admin", hint: "Everything, plus the Admin page" },
   { value: "planner", label: "Planner", hint: "All boards and editing" },
-  { value: "project_owner", label: "Project Owner", hint: "Owns jobs — the boards filter by these people" },
+  { value: "project_owner", label: "Planning Owner", hint: "Owns jobs — the boards filter by these people. The Jobmaster calls this the Project Owner; it is the same person." },
   { value: "user", label: "User", hint: "Works tasks assigned to them" },
   { value: "sales", label: "Sales team", hint: "Sales Genie by default, plus the boards" },
   { value: "viewer", label: "Viewer", hint: "Read-only" },
@@ -539,8 +558,11 @@ export default function PlanningSuite({
   // Admin, Morning Update and Update to ERP have moved into the account menu
   // (top right, behind the initials). They are tools for the few rather than
   // places everyone visits, and each is gated on the right to use it.
+  // My Week is NOT here. The 🏠 button on the workspace row above is exactly
+  // that page, so listing it again cost a slot on every screen to say the same
+  // thing twice. It is still where you land on sign-in, and still one click
+  // away from anywhere.
   const SUITE_TAB_DEFS: [typeof tab, string][] = [
-    ["home", "🏠 My Week"],
     ["delivery", "Job Delivery Board"],
     ["load", "Load Board"],
     ["plan", "Job Plan"],
@@ -779,7 +801,10 @@ export default function PlanningSuite({
           {WORKSPACE_DEFS.map(([k, l]) => (
             <button
               key={k}
-              onClick={() => setWorkspace(k)}
+              // Planning Suite lands on the Job Delivery Board. My Week has its
+              // own 🏠 beside this row, so arriving here on My Week would leave
+              // the sub-tab bar with nothing lit and look like a fault.
+              onClick={() => { setWorkspace(k); if (k === "suite" && tab === "home") setTab("delivery"); }}
               className="px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap flex-shrink-0"
               style={workspace === k ? { background: "#E8600A", color: "#fff" } : { color: "#8FA1B3" }}
             >
@@ -808,12 +833,13 @@ export default function PlanningSuite({
           </div>
         )}
 
+        {/* The "Restricted — authorised planning users only" line is gone: it
+            was true, and it told nobody anything they could act on, while
+            costing a whole line of a header that is on screen all day. */}
         <div className="text-xs mt-1 flex gap-3 flex-wrap" style={{ color: "#3A4A5A" }}>
-          <span>🔒 Restricted — visible only to authorised planning users</span>
           <span style={{ color: "#F5B32B" }}>
             Data: {board.jobs.length} active jobs · kitting {board.aggregates.kittingPct.toFixed(1)}%
           </span>
-
         </div>
       </div>
 
@@ -1250,7 +1276,7 @@ function MyWeek({
                   <tr style={{ color: "#8A94A0" }}>
                     <th className="text-left py-1 font-semibold">Job</th>
                     <th className="text-left py-1 font-semibold">Customer tag</th>
-                    <th className="text-left py-1 font-semibold">Owner</th>
+                    <th className="text-left py-1 font-semibold">Planning Owner</th>
                     <th className="text-center py-1 font-semibold">TDD</th>
                     <th className="text-center py-1 font-semibold">Prod %</th>
                   </tr>
@@ -1296,7 +1322,7 @@ function MyWeek({
           <div className="font-bold text-sm mb-2">My jobs {myJobs.length > 0 && <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>· {myJobs.length}</span>}</div>
           {myJobs.length === 0 ? (
             <div className="text-sm py-4 text-center" style={{ color: "#8A94A0" }}>
-              No jobs list you as owner. Owner matching uses your initials or the ERP owner name on your profile.
+              No jobs list you as Planning Owner. Matching uses your initials or the ERP owner name on your profile.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -1338,6 +1364,7 @@ function DeliveryBoard({
   pushERP: (dt: string, id: string, f: string, v: string) => void;
 }) {
   const [subTab, setSubTab] = useState<"priority" | "okan" | "cal" | "fam" | "cust">("priority");
+  const [outlook, setOutlook] = useState(false);
   const [delOwn, setDelOwn] = useState("all");
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const calRef = useRef<HTMLDivElement | null>(null);
@@ -1407,6 +1434,10 @@ function DeliveryBoard({
         case "tpv": return j.tpv;
         case "tpp": return j.tpp;
         case "kit": return j.kit;
+        case "inv": return investedIn(j);
+        // Not recorded sorts BELOW nothing-due rather than above it: a job with
+        // no figure is not the biggest collection on the board.
+        case "pod": return j.payOnDelivery == null ? -1 : j.payOnDelivery;
         case "upd": return j.updated_at || "";
         default: return 0;
       }
@@ -1490,6 +1521,24 @@ function DeliveryBoard({
     </div>
   );
 
+  const OutlookCard = ({ label, value, sub, color, onClick, open }: { label: string; value: string | number; sub?: string; color: string; onClick: () => void; open: boolean }) => (
+    <div
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+      className="bg-white rounded-lg border px-3 py-2"
+      style={{ borderColor: open ? color : "#E2E0DA", borderTop: `3px solid ${color}`, cursor: "pointer", boxShadow: open ? `0 0 0 1px ${color}` : undefined }}
+      title={open ? "Hide the delivery outlook" : "Open the delivery outlook — what is coming, month by month, and which jobs are worth finishing"}
+    >
+      <div className="text-xs font-bold flex justify-between" style={{ color: "#8A94A0" }}>
+        <span>{label}</span><span style={{ color }}>{open ? "▲" : "▼"}</span>
+      </div>
+      <div className="text-xl font-bold tnum" style={{ color }}>{value}</div>
+      {sub && <div className="text-xs" style={{ color: "#8A94A0" }}>{sub}</div>}
+    </div>
+  );
+
   const SubBtn = ({ k, l }: { k: typeof subTab; l: string }) => (
     <button onClick={() => setSubTab(k)} className="px-3 py-1 rounded text-sm font-semibold" style={subTab === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>{l}</button>
   );
@@ -1497,12 +1546,19 @@ function DeliveryBoard({
   return (
     <div className="p-4">
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
-        <Card label="PENDING JOBS" value={jobs.length} sub="from Jobmaster · live" color="#16232F" />
+        <OutlookCard label="PENDING JOBS" value={jobs.length} sub={outlook ? "hide the outlook" : "open the delivery outlook"} color="#16232F"
+          open={outlook} onClick={() => setOutlook((o) => !o)} />
         <Card label="TOTAL VALUE" value={V(totVal)} color="#1B3A5C" />
         <Card label="TOTAL THROUGHPUT" value={V(totTp)} sub={totVal ? Math.round((totTp / totVal) * 100) + "% of value" : ""} color="#E8600A" />
         <Card label="KITTING %" value={kitPct + "%"} sub="Σ val × (1−T%) × Kit% ÷ Σ val × (1−T%)" color="#0D9488" />
         <Card label="KITTED MATERIAL VALUE" value={V(kitted)} sub="Σ value × (1 − T%) × Kitting%" color="#7C3AED" />
       </div>
+
+      {/* Opened from the PENDING JOBS card. It reads the SAME filtered list the
+          rest of the board is showing, so the owner filter and the search box
+          carry into it — an analytics panel that quietly ignores the filter
+          above it is how two people end up quoting different numbers. */}
+      {outlook && <DeliveryOutlook jobs={jobs} V={V} onOpen={onOpen} />}
 
       {/* The cards above are the live pending book — what is still to come.
           This is the year against its target — what has actually gone out. The
@@ -1512,14 +1568,14 @@ function DeliveryBoard({
 
       <div className="flex gap-1 rounded p-1 bg-white border mb-3 flex-wrap" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
         <SubBtn k="priority" l="Priority List (A60 → O)" />
-        <SubBtn k="okan" l="By Owner (Kanban)" />
+        <SubBtn k="okan" l="By Planning Owner (Kanban)" />
         <SubBtn k="cal" l="📅 Calendar (ISO weeks)" />
         <SubBtn k="fam" l="Schedule by Product" />
         <SubBtn k="cust" l="Schedule by Customer" />
-        <select value={delOwn} onChange={(e) => setDelOwn(e.target.value)} className="px-2 py-1 rounded border text-sm ml-1 font-semibold" style={{ borderColor: delOwn === "all" ? "#D9D6CD" : "#E8600A", background: delOwn === "all" ? "#fff" : "#FFF3E8", color: delOwn === "all" ? "#22303C" : "#E8600A" }} title="Filter every view on this board by Project Owner">
-          <option value="all">All project owners</option>
+        <select value={delOwn} onChange={(e) => setDelOwn(e.target.value)} className="px-2 py-1 rounded border text-sm ml-1 font-semibold" style={{ borderColor: delOwn === "all" ? "#D9D6CD" : "#E8600A", background: delOwn === "all" ? "#fff" : "#FFF3E8", color: delOwn === "all" ? "#22303C" : "#E8600A" }} title="Filter every view on this board by Planning Owner">
+          <option value="all">All planning owners</option>
           {ownerOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
-          {ownerOptions.length === 0 && <option disabled>No Project Owner accounts yet</option>}
+          {ownerOptions.length === 0 && <option disabled>No Planning Owner accounts yet</option>}
           <option value="none">— Unassigned jobs —</option>
         </select>
         <div className="relative">
@@ -1671,13 +1727,18 @@ function DeliveryBoard({
                   <SortTh k="fam" label="Product Family" />
                   <SortTh k="tdd" label="Target Delivery" align="center" />
                   <SortTh k="otd" label="OTD Date" align="center" />
-                  <SortTh k="own" label="Owner" />
-                  <SortTh k="stat" label="Job Status ✎" />
+                  <SortTh k="own" label="Planning Owner" />
+                  {/* Job Status is gone from this table — it is a 32-value
+                      dropdown that ate 190px on every row to say what Prod %
+                      says in three characters. Still editable on the Job Plan
+                      page and still on the kanban card. */}
                   <SortTh k="pct" label="Prod %" align="center" />
+                  <SortTh k="kit" label="Kit%" align="center" />
                   <SortTh k="val" label="Value" align="center" />
                   <SortTh k="tpv" label="Throughput" align="center" />
                   <SortTh k="tpp" label="T%" align="center" />
-                  <SortTh k="kit" label="Kit%" align="center" />
+                  <SortTh k="inv" label="Invested" align="center" />
+                  <SortTh k="pod" label="Pay on Delivery" align="center" />
                   <SortTh k="upd" label="Last updated" align="center" />
                 </tr>
               </thead>
@@ -1695,22 +1756,28 @@ function DeliveryBoard({
                         <><span className="font-bold rounded px-1 mr-1" style={{ background: "#DCE8F5" }}>{j.ownerInitials}</span>{j.ownerName}</>
                       ) : (j.own || "—")}
                     </td>
-                    <td className="px-2 py-1.5">
-                      <select value={j.stat} onChange={(e) => editStat(j, e.target.value)} className="text-xs border rounded px-1 py-0.5 bg-white w-full" style={{ borderColor: "#E2E0DA", maxWidth: 190 }}>
-                        {!STATUSES.includes(j.stat) && j.stat && <option value={j.stat}>{j.stat}</option>}
-                        {STATUSES.map((s) => (<option key={s}>{s}</option>))}
-                      </select>
-                    </td>
                     <td className="px-2 py-1.5 text-center tnum">{j.pct}%</td>
+                    <td className="px-2 py-1.5 text-center tnum" style={{ color: (j.kit || 0) >= 80 ? "#0D7A3F" : (j.kit || 0) >= 40 ? "#D97706" : "#B3261E" }}>{j.kit || 0}%</td>
                     <td className="px-2 py-1.5 text-right whitespace-nowrap tnum">{V(j.val)}</td>
                     <td className="px-2 py-1.5 text-right whitespace-nowrap tnum" style={{ color: "#E8600A" }}>{V(j.tpv || 0)}</td>
                     <td className="px-2 py-1.5 text-center tnum">{j.tpp || 0}%</td>
-                    <td className="px-2 py-1.5 text-center tnum" style={{ color: (j.kit || 0) >= 80 ? "#0D7A3F" : (j.kit || 0) >= 40 ? "#D97706" : "#B3261E" }}>{j.kit || 0}%</td>
+                    <td className="px-2 py-1.5 text-right whitespace-nowrap tnum" style={{ color: "#7C3AED" }}
+                      title={`Invested = (1 − ${j.tpp || 0}%) × ${j.kit || 0}% × ${V(j.val)}\nMaterial value already drawn against this job.`}>
+                      {V(investedIn(j))}
+                    </td>
+                    {/* Null is "not recorded" and reads as a dash. Zero would be
+                        "nothing to collect", and sorting must not treat a gap in
+                        the export as a job with no money behind it. */}
+                    <td className="px-2 py-1.5 text-right whitespace-nowrap tnum"
+                      style={{ color: j.payOnDelivery == null ? "#B8B5AC" : "#0D7A3F", fontWeight: j.payOnDelivery ? 700 : 400 }}
+                      title={j.payOnDelivery == null ? "Not recorded in the Jobmaster export" : "Falls due when this job is delivered"}>
+                      {j.payOnDelivery == null ? "—" : V(j.payOnDelivery)}
+                    </td>
                     <td className="px-2 py-1.5 text-center whitespace-nowrap" style={{ color: "#8A94A0" }}>{stamp(j.updated_at)}</td>
                   </tr>
                 ))}
                 {plist.length === 0 && (
-                  <tr><td colSpan={14} className="py-6 text-center" style={{ color: "#8A94A0" }}>No jobs match this filter.</td></tr>
+                  <tr><td colSpan={15} className="py-6 text-center" style={{ color: "#8A94A0" }}>No jobs match this filter.</td></tr>
                 )}
               </tbody>
             </table>
@@ -1719,7 +1786,7 @@ function DeliveryBoard({
         );
       })()}
 
-      {/* ---- By Owner (Kanban) ---- */}
+      {/* ---- By Planning Owner (Kanban) ---- */}
       {subTab === "okan" && (
         <div className="flex gap-3 overflow-x-auto pb-2 items-start">
           {(delOwn === "all" ? kanbanOwners : [delOwn]).map((o) => {
@@ -2142,23 +2209,116 @@ const HINT_STATUS: Record<Hint["status"], { label: string; bg: string; fg: strin
  * plans are edited far more often than they are re-read — so the brief is
  * asked for, not pushed. The server caches each job's brief for 30 minutes.
  */
+/**
+ * Where the job stands in words and in money — the two things the milestone
+ * plan below cannot tell you.
+ *
+ * Current Status and Client update are what somebody wrote; the three figures
+ * are what the job is doing to the bank. They sit together because that is how
+ * the decision is actually made: a job with ₹40 L invested and ₹1.2 Cr falling
+ * due on delivery is a different job from one with the same dates and neither.
+ *
+ * Every field is read from the Jobmaster export. A field the export did not
+ * carry is left out entirely rather than shown empty — a blank box invites
+ * somebody to go looking for a way to fill it in, and there isn't one here.
+ */
+function JobStanding({ job, V }: { job: Job; V: (n: number) => string }) {
+  const invested = investedIn(job);
+  const text: [string, string | null][] = [
+    ["Current Status", job.note || null],
+    ["Client update", job.clientUpdate],
+    ["Cash flow", job.cashflow],
+  ];
+  const shownText = text.filter(([, v]) => v && v.trim());
+  const figures: [string, number | null, string, string][] = [
+    ["Invested", invested, "#7C3AED", `(1 − ${job.tpp || 0}%) × ${job.kit || 0}% × ${V(job.val)} — material value already drawn`],
+    ["Amount needed", job.amtNeeded, "#D97706", "Still to be spent to finish the job"],
+    ["Pay on delivery", job.payOnDelivery, "#0D7A3F", "Falls due the day this job goes out"],
+  ];
+
+  return (
+    <div className="bg-white rounded-lg p-3 border" style={{ borderColor: "#E2E0DA", borderLeft: "5px solid #1B3A5C", flex: "1 1 320px", minWidth: 280, maxWidth: 520 }}>
+      <div className="text-xs font-bold tracking-widest mb-1.5" style={{ color: "#1B3A5C" }}>WHERE IT STANDS</div>
+
+      <div className="flex gap-2 flex-wrap mb-2">
+        {figures.map(([label, v, color, tip]) => (
+          <div key={label} className="rounded px-2 py-1" style={{ background: "#F4F2EC", flex: "1 1 0", minWidth: 96 }} title={tip}>
+            <div style={{ fontSize: 10, color: "#8A94A0", letterSpacing: 0.4 }}>{label.toUpperCase()}</div>
+            {/* null is "not in the export", and says so — it is not ₹0 */}
+            <div className="tnum font-bold" style={{ fontSize: 15, color: v == null ? "#B8B5AC" : color }}>
+              {v == null ? "—" : V(v)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {shownText.length === 0 ? (
+        <div className="text-xs" style={{ color: "#B8B5AC", lineHeight: 1.5 }}>
+          No status or client note came across on this job in the last upload.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5" style={{ maxHeight: 190, overflowY: "auto" }}>
+          {shownText.map(([label, v]) => (
+            <div key={label}>
+              <div style={{ fontSize: 10, color: "#8A94A0", letterSpacing: 0.4 }}>{label.toUpperCase()}</div>
+              <div className="text-xs" style={{ color: "#22303C", lineHeight: 1.5 }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GenieHint({ jobId, jobLabel }: { jobId: string; jobLabel: string }) {
   const [hint, setHint] = useState<Hint | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [meta, setMeta] = useState<{ builtBy: string | null; builtAt: string | null; stale: boolean } | null>(null);
 
-  // a different job is a different brief — never show the last job's read
-  useEffect(() => { setHint(null); setErr(""); }, [jobId]);
-
-  const ask = async (refresh = false) => {
+  const ask = useCallback(async (refresh = false) => {
     setBusy(true);
     setErr("");
     try {
       const r = await api.post("/api/genie-hint", { job_id: jobId, refresh });
       setHint(r);
+      setMeta({ builtBy: r.builtBy ?? null, builtAt: r.builtAt ?? null, stale: false });
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
-  };
+  }, [jobId]);
+
+  /**
+   * Opening a job now fills this panel by itself.
+   *
+   * The GET is a single row read of the SHARED cache and generates nothing, so
+   * it can run for everyone on every job: whoever paid for the brief first,
+   * everybody else reads it free. Only the owner and those reporting directly
+   * to him have one BUILT automatically when none exists — that costs a model
+   * call, and it is the people who open twenty jobs before lunch who need it
+   * without a button.
+   */
+  useEffect(() => {
+    let live = true;
+    setHint(null);
+    setErr("");
+    setMeta(null);
+    (async () => {
+      try {
+        const r = await api.get(`/api/genie-hint?job_id=${encodeURIComponent(jobId)}`);
+        if (!live) return;
+        if (r.hint) {
+          setHint(r.hint);
+          setMeta({ builtBy: r.builtBy ?? null, builtAt: r.builtAt ?? null, stale: !!r.stale });
+        }
+        // nothing cached (or what is cached is out of date) and this caller may
+        // have one built — do it without being asked
+        if (r.auto && r.stale && r.configured !== false) ask(!!r.hint);
+      } catch {
+        /* silent: the brief is a companion to the page, never a gate on it */
+      }
+    })();
+    return () => { live = false; };
+  }, [jobId, ask]);
 
   const st = hint ? HINT_STATUS[hint.status] ?? HINT_STATUS.unknown : null;
 
@@ -2172,7 +2332,11 @@ function GenieHint({ jobId, jobLabel }: { jobId: string; jobLabel: string }) {
         <div className="flex items-center gap-2">
           {st && <span className="text-xs font-bold rounded px-1.5 py-0.5" style={{ background: st.bg, color: st.fg }}>{st.label}</span>}
           {hint && (
-            <button onClick={() => ask(true)} disabled={busy} className="text-xs font-bold" style={{ color: "#7C3AED", opacity: busy ? 0.5 : 1 }} title="Re-read the job from scratch">
+            <button onClick={() => ask(true)} disabled={busy} className="text-xs font-bold" style={{ color: "#7C3AED", opacity: busy ? 0.5 : 1 }}
+              title={
+                (meta?.builtBy ? `Read built by ${meta.builtBy}${meta.builtAt ? " on " + fmtFull(String(meta.builtAt).slice(0, 10)) : ""}. ` : "") +
+                "Re-read the job from scratch — everyone sees the new one."
+              }>
               ↻
             </button>
           )}
@@ -2512,8 +2676,8 @@ function JobPlan({
           />
           {planQ && <button onClick={() => setPlanQ("")} className="absolute right-2 top-1.5 font-bold" style={{ color: "#E8600A" }} title="Clear search">✕</button>}
         </div>
-        <select value={planPO} onChange={(e) => setPlanPO(e.target.value)} className="px-2 py-1.5 rounded border text-sm font-semibold" style={{ borderColor: planPO === "all" ? "#D9D6CD" : "#E8600A", background: planPO === "all" ? "#fff" : "#FFF3E8", color: planPO === "all" ? "#22303C" : "#E8600A" }} title="Only this Project Owner's jobs in the dropdown">
-          <option value="all">All project owners</option>
+        <select value={planPO} onChange={(e) => setPlanPO(e.target.value)} className="px-2 py-1.5 rounded border text-sm font-semibold" style={{ borderColor: planPO === "all" ? "#D9D6CD" : "#E8600A", background: planPO === "all" ? "#fff" : "#FFF3E8", color: planPO === "all" ? "#22303C" : "#E8600A" }} title="Only this Planning Owner's jobs in the dropdown">
+          <option value="all">All planning owners</option>
           {(board.projectOwners || []).map((p) => (<option key={p.initials!} value={p.initials!}>{personLabel(p)}</option>))}
         </select>
         <select value={dj.id} onChange={(e) => setActiveId(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm font-semibold" style={{ borderColor: "#D9D6CD", maxWidth: 420 }}>
@@ -2533,8 +2697,8 @@ function JobPlan({
           {Object.keys(board.plans).length} of {board.jobs.length} jobs planned{canEdit ? " · edits auto-save" : ""}
         </span>
         {!canEdit && (
-          <span className="text-xs font-bold rounded px-2 py-1" style={{ background: "#F4F2EC", color: "#8A94A0", border: "1px solid #D9D6CD" }} title="Only admins, planners and project owners can change plans">
-            👁 View only — plans are edited by admins, planners &amp; project owners
+          <span className="text-xs font-bold rounded px-2 py-1" style={{ background: "#F4F2EC", color: "#8A94A0", border: "1px solid #D9D6CD" }} title="Only admins, planners and planning owners can change plans">
+            👁 View only — plans are edited by admins, planners &amp; planning owners
           </span>
         )}
       </div>
@@ -2596,6 +2760,8 @@ function JobPlan({
           <div className="mt-2 text-xs font-bold rounded px-2 py-1 inline-block" style={{ background: "#B3261E", color: "#fff" }}>⚠ Plan ends {diffDays(dj.tdd, ends)} days after Target Delivery — compress durations or add crew</div>
         )}
       </div>
+
+      <JobStanding job={dj} V={V} />
 
       <GenieHint jobId={dj.id} jobLabel={`JOB ${jobNo(dj.id)} · ${dj.tag}`} />
       </div>
@@ -2734,7 +2900,7 @@ function JobPlan({
                 <button onClick={savePlanNow} className="px-3 py-1.5 rounded font-semibold text-sm" style={{ background: "#E8600A", color: "#fff" }}>💾 Save now</button>
               </div>
             ) : (
-              <div className="text-xs font-semibold" style={{ color: "#8A94A0" }}>👁 View only — ask an admin, planner or project owner to change this plan</div>
+              <div className="text-xs font-semibold" style={{ color: "#8A94A0" }}>👁 View only — ask an admin, planner or planning owner to change this plan</div>
             )}
             <div className="text-xs" style={{ color: "#8A94A0" }}>Crew = men per day · MD = crew × duration</div>
           </div>
@@ -3092,8 +3258,8 @@ function Tasking({
         <select value={filterCust} onChange={(e) => setFilterCust(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm" style={{ borderColor: "#D9D6CD", maxWidth: 240 }}>
           <option value="all">All customers</option>{custs.map((c) => (<option key={c}>{c}</option>))}
         </select>
-        <select value={filterOwn} onChange={(e) => setFilterOwn(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm" style={{ borderColor: "#D9D6CD" }} title="Filter by the job's Project Owner">
-          <option value="all">All project owners</option>
+        <select value={filterOwn} onChange={(e) => setFilterOwn(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm" style={{ borderColor: "#D9D6CD" }} title="Filter by the job's Planning Owner">
+          <option value="all">All planning owners</option>
           {(board.projectOwners || []).map((p) => (<option key={p.initials!} value={p.initials!}>{personLabel(p)}</option>))}
         </select>
         <select value={filterFam} onChange={(e) => setFilterFam(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm" style={{ borderColor: "#D9D6CD" }}>
@@ -4503,7 +4669,7 @@ function Admin({
         </table>
         </div>
         <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>
-          Initials and names save when you click away from the field. Jobs are filtered by <b>Project Owners</b>; tasks are assigned to <b>Users</b> — both lists come only from accounts created here, never from raw spreadsheet text.
+          Initials and names save when you click away from the field. Jobs are filtered by <b>Planning Owners</b>; tasks are assigned to <b>Users</b> — both lists come only from accounts created here, never from raw spreadsheet text.
         </div>
 
         {/* the bridge between Jobmaster text and accounts */}

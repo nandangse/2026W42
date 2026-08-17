@@ -37,6 +37,27 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.0.1.11",
+    date: "2026-08-18",
+    module: "Job Delivery Board · Job Plan · Genie Hint",
+    items: [
+      "New: the PENDING JOBS card opens. Click it for the Delivery Outlook — every pending job stacked on the month its target date falls in, switchable between jobs, sales billing and throughput, with an OVERDUE bar of its own at the front. A job whose date has already gone is the most useful bar on the chart and must never be folded into “this month”.",
+      "The required run rate is drawn across it as a dotted line, from the same figures as the run-rate card, so the two can never disagree. A bar chart of what is coming says nothing until you can see the level it has to clear.",
+      "New: a Kitting % × Production % grid, shaded by throughput expected value rather than by job count — four small jobs and one large one in the same square are not the same decision. Click any square for the jobs in it. Two corners are called out: READY TO FINISH (60%+ kitted, 60%+ built — money nearly earned) and KITTED, NOT MOVING (bought and sitting still).",
+      "The outlook reads the same filtered list as the board, so the Planning Owner filter and the search box carry into it.",
+      "New on the job page: Where It Stands — Current Status, Client update and Cash flow, beside Invested, Amount needed and Pay on delivery.",
+      "New job columns from the Jobmaster export: Client update, Cash flow details, Amount needed and Pending payment on delivery. They are matched by MEANING, not by an exact header, and the upload summary names the column each one was read from and how many rows carry a value — so a match is confirmed rather than assumed, and a column renamed in the ERP shows up the morning it happens instead of silently reading zero.",
+      "Pending payment on delivery is now a sortable column on the job list, so the board can be ordered by what finishing a job collects. Not recorded shows as a dash and sorts below zero — a gap in the export is not a job with nothing behind it.",
+      "New Invested column: (1 − T%) × Kitting % × Value — the material already drawn against a job, which is what finishing it releases.",
+      "Job Status has come off the job list. It was a 32-value dropdown taking 190px on every row to say what Prod % says in three characters; it is still editable on the Job Plan page and still on the kanban card. Prod % and Kit % now sit side by side.",
+      "Owner is now Planning Owner everywhere — the boards, the filters, the role list and the kanban. The Jobmaster calls the same person the Project Owner.",
+      "Fixed: the Genie Hint had to be generated again for every single person. It was cached in memory inside one server instance, so the second person to open a job landed somewhere else and paid for a whole fresh read, and any restart threw the lot away. It is now one shared row per job (migration 0026): whoever reads a job first, everybody after them gets it free and instantly.",
+      "The hint now fills itself in when a job is opened — no button — and goes stale when the JOB changes rather than when a timer runs out. For the owner and those reporting directly to him it is also BUILT automatically when there isn’t one.",
+      "Why it was failing: the server has no ANTHROPIC_API_KEY. Nothing in the code was broken — the key was never added to the Vercel project’s Environment Variables. The message now says exactly that, and that nothing else about the job is affected.",
+      "My Week has come off the Planning Suite tab bar — the 🏠 button beside it is that same page. Planning Suite now opens on the Job Delivery Board, and the “Restricted — authorised planning users” line is gone: it was true, told nobody anything they could act on, and cost a line of a header that is on screen all day.",
+    ],
+  },
+  {
     v: "3.0.1.10",
     date: "2026-08-18",
     module: "Morning Update · Goals",

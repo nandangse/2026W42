@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { requireReader, errJson, HttpError } from "@/lib/auth";
+import { requireReader, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { computeSchedule, planEnd, today as todayISO, manDays } from "@/lib/schedule";
@@ -72,9 +72,61 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
-/** job_id → { at, hint }. Re-opening a job inside the window costs nothing. */
-const cache = new Map<string, { at: number; hint: unknown }>();
-const TTL_MS = 30 * 60 * 1000;
+/**
+ * The cache lives in Postgres (job_hint, migration 0026), NOT in this module.
+ *
+ * It used to be `new Map()` in module scope. On Vercel every serverless
+ * instance holds its own copy, so the second person to open a job landed on a
+ * different instance and paid for a whole fresh generation, and any cold start
+ * threw the lot away. That is precisely why it read as "somebody has to click
+ * it again for each person". One row per job is one cache for everybody.
+ */
+const MODEL = "claude-opus-5";
+
+/**
+ * A brief goes stale when the JOB changes, not when a clock runs out. The
+ * morning upload stamps jobs.updated_at, so a hint written before that stamp
+ * is describing yesterday's job and is rebuilt; one written after it is still
+ * true however old it is. The 24-hour floor is only there to catch the things
+ * that move without touching the job row — a task closed, a material received.
+ */
+const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function isStale(builtAt: string | null, jobUpdatedAt: string | null): boolean {
+  if (!builtAt) return true;
+  const built = Date.parse(builtAt);
+  if (!Number.isFinite(built)) return true;
+  if (Date.now() - built > MAX_AGE_MS) return true;
+  if (jobUpdatedAt && Date.parse(jobUpdatedAt) > built) return true;
+  return false;
+}
+
+/**
+ * May this caller have a brief generated for them without asking?
+ *
+ * The owner, and anyone reporting directly to the owner. Generation costs a
+ * model call per job, so it is not turned on for the whole company by clicking
+ * around — but for the people who open twenty jobs in a morning, waiting for a
+ * button is the difference between the panel being used and being ignored.
+ *
+ * Everyone else still gets any brief that already exists, free and instantly.
+ */
+async function mayAutoBrief(userId: string, isOwner: boolean): Promise<boolean> {
+  if (isOwner) return true;
+  const admin = adminClient();
+  const { data: boss } = await admin
+    .from("profiles")
+    .select("id")
+    .ilike("email", RAGHU_EMAIL)
+    .maybeSingle();
+  if (!boss?.id) return false;
+  const { data: me } = await admin
+    .from("profiles")
+    .select("reports_to")
+    .eq("id", userId)
+    .maybeSingle();
+  return me?.reports_to === boss.id;
+}
 
 const fmtINR = (n: number) =>
   n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹${(n / 1e5).toFixed(1)} L` : `₹${Math.round(n)}`;
@@ -82,22 +134,81 @@ const fmtINR = (n: number) =>
 const days = (a: string | null, b: string | null) =>
   a && b ? Math.round((Date.parse(b) - Date.parse(a)) / 86400000) : null;
 
+/**
+ * GET /api/genie-hint?job_id=… — read the shared cache, and NEVER generate.
+ *
+ * This is what lets the panel fill itself in the moment a job is opened: it
+ * costs one indexed row read, so it can run for everybody on every job. If
+ * nothing is cached it says so, and whether this caller is allowed to have one
+ * built automatically.
+ */
+export async function GET(req: Request) {
+  try {
+    const user = await requireReader();
+    const jobId = String(new URL(req.url).searchParams.get("job_id") || "");
+    if (!jobId) throw new HttpError(400, "job_id is required");
+
+    const admin = adminClient();
+    const [hintRes, jobRes] = await Promise.all([
+      admin.from("job_hint").select("hint, built_at, built_by, model").eq("job_id", jobId).maybeSingle(),
+      admin.from("jobs").select("updated_at").eq("id", jobId).maybeSingle(),
+    ]);
+
+    const row = hintRes.data;
+    const stale = !row || isStale(row.built_at, jobRes.data?.updated_at ?? null) || row.model !== MODEL;
+    const auto = await mayAutoBrief(user.id, user.isOwner);
+
+    return NextResponse.json({
+      hint: row?.hint ?? null,
+      builtAt: row?.built_at ?? null,
+      builtBy: row?.built_by ?? null,
+      stale,
+      auto,
+      configured: !!process.env.ANTHROPIC_API_KEY,
+    });
+  } catch (e) {
+    // The panel is a companion to a page that works without it. A cache read
+    // that fails must never take the Job Plan down with it.
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/job_hint|does not exist|schema cache/i.test(msg))
+      return NextResponse.json({ hint: null, stale: true, auto: false, notInstalled: true });
+    return errJson(e);
+  }
+}
+
 export async function POST(req: Request) {
   try {
-    await requireReader();
+    const user = await requireReader();
     const body = await req.json();
     const jobId = String(body.job_id || "");
     if (!jobId) throw new HttpError(400, "job_id is required");
+    const admin = adminClient();
 
+    // The shared cache, read before anything is spent. `refresh` is the ↻
+    // button — one person deciding the read is out of date on everyone's
+    // behalf, which is the right way round for a cache everybody shares.
     if (!body.refresh) {
-      const hit = cache.get(jobId);
-      if (hit && Date.now() - hit.at < TTL_MS)
-        return NextResponse.json({ ...(hit.hint as object), cached: true });
+      try {
+        const [hintRes, jobRes] = await Promise.all([
+          admin.from("job_hint").select("hint, built_at, built_by, model").eq("job_id", jobId).maybeSingle(),
+          admin.from("jobs").select("updated_at").eq("id", jobId).maybeSingle(),
+        ]);
+        const row = hintRes.data;
+        if (row && row.model === MODEL && !isStale(row.built_at, jobRes.data?.updated_at ?? null))
+          return NextResponse.json({ ...(row.hint as object), cached: true, builtBy: row.built_by, builtAt: row.built_at });
+      } catch {
+        /* migration 0026 not run yet — fall through and generate */
+      }
     }
 
     if (!process.env.ANTHROPIC_API_KEY)
       return NextResponse.json(
-        { error: "Server is missing ANTHROPIC_API_KEY — add it in the Vercel project env vars" },
+        {
+          error:
+            "Genie hint is not switched on: the server has no ANTHROPIC_API_KEY. " +
+            "Add it to the Vercel project's Environment Variables and redeploy — nothing else about this job is affected.",
+          config: true,
+        },
         { status: 503 },
       );
 
@@ -216,7 +327,7 @@ Carrying open tasks: ${assignees.length ? assignees.map(nameFor).join(", ") : "n
 
     const anthropic = new Anthropic();
     const response = await anthropic.messages.create({
-      model: "claude-opus-5",
+      model: MODEL,
       max_tokens: 6000,
       system: SYSTEM,
       output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },
@@ -248,8 +359,18 @@ Carrying open tasks: ${assignees.length ? assignees.map(nameFor).join(", ") : "n
       },
       at: new Date().toISOString(),
     };
-    cache.set(jobId, { at: Date.now(), hint });
-    return NextResponse.json({ ...hint, cached: false });
+
+    // Banked for everybody. A write that fails must not lose the brief the
+    // caller just paid for, so it is returned either way.
+    const builtBy = user.displayName || user.initials || user.email.split("@")[0];
+    try {
+      await admin
+        .from("job_hint")
+        .upsert({ job_id: jobId, hint, built_at: new Date().toISOString(), built_by: builtBy, model: MODEL }, { onConflict: "job_id" });
+    } catch {
+      /* the cache is an optimisation, never the answer */
+    }
+    return NextResponse.json({ ...hint, cached: false, builtBy, builtAt: hint.at });
   } catch (e) {
     if (e instanceof HttpError) return errJson(e);
     console.error("Genie hint failed", e);

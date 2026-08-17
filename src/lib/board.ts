@@ -29,9 +29,18 @@ export interface BoardJob {
   /** When it was actually delivered, where the report carried a date. */
   delivered_on: string | null;
   updated_at: string | null;
-  /** Resolved Project Owner account, if the ERP owner text matches one. */
+  /** Resolved Planning Owner account, if the ERP owner text matches one. */
   ownerInitials: string | null;
   ownerName: string | null;
+  /**
+   * The money side, from the Jobmaster export. Null means NOT RECORDED, which
+   * is not zero — a job with no payment figure and a job with nothing left to
+   * collect must never sort together.
+   */
+  clientUpdate: string | null;
+  cashflow: string | null;
+  amtNeeded: number | null;
+  payOnDelivery: number | null;
 }
 
 /** A person who can own jobs or be assigned tasks. */
@@ -73,6 +82,12 @@ function mapJob(r: any): BoardJob {
     updated_at: r.updated_at ?? null,
     ownerInitials: null, // filled in by resolveOwners() once people are loaded
     ownerName: null,
+    clientUpdate: r.client_update ?? null,
+    cashflow: r.cashflow ?? null,
+    // Number(null) is 0, which would turn "not recorded" into "nothing due" —
+    // the one confusion this column must not make.
+    amtNeeded: r.amt_needed == null ? null : Number(r.amt_needed),
+    payOnDelivery: r.pay_on_delivery == null ? null : Number(r.pay_on_delivery),
   };
 }
 

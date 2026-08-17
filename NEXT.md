@@ -1,12 +1,28 @@
 # Genie — outstanding work, with the decisions already made
 
-State: `main` @ 3.0.1.10. Migrations 0021–0025 written and **all run on the
-database** (0024 and 0025 applied 18 Aug 2026). Nothing below is started unless
-it says so.
+State: `main` @ 3.0.1.11. Migrations 0021–0025 are run on the database.
+**0026 is NOT run yet** — until it is, the money columns are read from the file
+but not stored (the upload says so and falls back to the old `apply_jobs`), and
+the Genie hint keeps regenerating per person.
 
-Done so far: **1 (run rate)**, **5 (All Tasks)**, **2 apart from My IDP** (the
-tab exists and is empty by design), and the Employee Master upload now works.
+Done: **1 (run rate)**, **5 (All Tasks)**, **2 apart from My IDP**, the Employee
+Master upload, and the 3.0.1.11 batch below.
 Left: **My IDP** (blocked on what an IDP holds), **3 My Week**, **4 Calendar**.
+
+## ⚠ Genie Hint needs a key, not a code change
+
+`ANTHROPIC_API_KEY` is **not set in the Vercel project**, and not in `.env.local`
+either. Nothing in the route is broken. Add it under the Vercel project's
+Environment Variables (and locally if you want it in dev), redeploy, and the
+panel works. It is the same key Eva and deal scoring use.
+
+## ⚠ The four money columns are matched by GUESS until confirmed
+
+Nobody recorded what the Jobmaster calls them, so `EXTRA_JOB_FIELDS` in
+`src/lib/parse-upload.ts` matches by meaning across ~16 spellings each. **The
+upload summary names the header each one bound to** — read it after the next
+Jobmaster upload. If a field says "no column matched", the summary prints the
+sheet's full column list; paste the right header into the pattern.
 
 Paste migrations ONE file at a time, ASCII-only, comments stripped — a long paste
 truncates in transport and Postgres then fails on a half-statement. Use

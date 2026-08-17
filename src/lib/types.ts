@@ -39,6 +39,16 @@ export interface ParsedJob {
   tpv: number;
   tpp: number;
   kit: number;
+  /**
+   * The money side, matched by meaning rather than by exact header — see
+   * EXTRA_JOB_FIELDS in parse-upload.ts. Undefined means the column was not
+   * found on this sheet, which is NOT the same as zero and must not overwrite
+   * a value already banked.
+   */
+  clientUpdate?: string | null;
+  cashflow?: string | null;
+  amtNeeded?: number | null;
+  payOnDelivery?: number | null;
 }
 
 /**
@@ -117,6 +127,15 @@ export interface ParseResult {
   employees?: ParsedEmployee[];
   /** Every header on the employee sheet — the diagnostic when a field is missed. */
   employeeHeaders?: string[];
+  /**
+   * Which header each money field was read from, e.g.
+   * { payOnDelivery: "Balance Payment on Delivery" }. Reported in the upload
+   * summary so a match is confirmed rather than assumed — and so a column that
+   * got renamed in the ERP shows up as missing the morning it happens.
+   */
+  jobFieldHeaders?: Record<string, string>;
+  /** Every header on the jobs sheet — the diagnostic when a field is missed. */
+  jobHeaders?: string[];
 }
 
 /** A task after linkTasks() merges raw ToDo rows against the job list. */

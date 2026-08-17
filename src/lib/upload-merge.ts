@@ -149,6 +149,53 @@ function isTextTable(filename: string, bytes: Uint8Array): boolean {
   return !zip && !ole;
 }
 
+/** The four money fields, in the order they matter on the board. */
+const MONEY_LABELS: [string, string][] = [
+  ["payOnDelivery", "Pending payment on delivery"],
+  ["amtNeeded", "Amount needed"],
+  ["cashflow", "Cash flow details"],
+  ["clientUpdate", "Client update"],
+];
+
+/**
+ * What the upload found, and — more usefully — what it did not.
+ *
+ * These four columns are matched by meaning, so the summary has to name the
+ * header each one bound to. When nothing matches, the whole header list is
+ * printed: that is exactly how the real delivery-date column was confirmed on
+ * the Delivered Jobs export, and it is the only way to tell "the ERP does not
+ * export this" apart from "the pattern is wrong".
+ */
+function moneyReport(
+  matched: Record<string, string> | undefined,
+  headers: string[] | undefined,
+  jobs: ParsedJob[],
+): string[] {
+  const hit = matched || {};
+  const out: string[] = [];
+  const found = MONEY_LABELS.filter(([k]) => hit[k]);
+  const missing = MONEY_LABELS.filter(([k]) => !hit[k]);
+
+  for (const [k, label] of found) {
+    // how many rows actually carry a value — a bound column that is blank on
+    // every row is a match worth doubting
+    const filled = jobs.filter((j) => {
+      const v = (j as unknown as Record<string, unknown>)[k];
+      return v != null && v !== "";
+    }).length;
+    out.push(`· ${label} ← "${hit[k]}" · ${filled} of ${jobs.length} rows carry a value`);
+  }
+  if (missing.length) {
+    out.push(
+      `· ⚠ no column matched: ${missing.map(([, l]) => l).join(", ")}. ` +
+        `Left as they were rather than blanked.`,
+    );
+    if (!found.length && headers?.length)
+      out.push(`· The sheet's columns are: ${headers.join(" | ")}`);
+  }
+  return out;
+}
+
 export async function applyUpload(
   admin: SupabaseClient,
   fileBuf: ArrayBuffer,
@@ -225,10 +272,25 @@ export async function applyUpload(
     const jobs = parsed.jobs!;
     jobCount = jobs.length;
     await guardMassArchive(admin, jobs);
-    const { error } = await admin.rpc("apply_jobs", {
+    const moneyFields = Object.keys(parsed.jobFieldHeaders || {});
+    let { error } = await admin.rpc("apply_jobs", {
       p_jobs: jobs,
       p_batch: batchId,
+      p_money_fields: moneyFields,
     });
+    // Code deploys and migrations are run by hand, minutes or hours apart. If
+    // 0026 has not been pasted yet the three-argument function does not exist,
+    // and the morning upload must NOT be the thing that discovers it. Fall back
+    // to the old signature and say the money columns were skipped.
+    if (error && /apply_jobs|function|does not exist|schema cache/i.test(error.message)) {
+      const retry = await admin.rpc("apply_jobs", { p_jobs: jobs, p_batch: batchId });
+      error = retry.error;
+      if (!error && moneyFields.length)
+        lines.push(
+          "· ⚠ The money columns were read from the file but not stored — run " +
+            "supabase/migrations/0026_job_money_and_hint_cache.sql, then upload again.",
+        );
+    }
     if (error) throw new UploadError("apply_jobs failed: " + error.message);
     lines.push(
       `· ${jobs.length} jobs from ` +
@@ -238,6 +300,10 @@ export async function applyUpload(
             ? "PRE Milestones for Delivery (fallback)"
             : "Jobmaster sheet"),
     );
+    // Say which header each money field was read from. A match reported is a
+    // match that can be corrected; a match assumed is a column that quietly
+    // stops arriving the day the ERP renames it.
+    lines.push(...moneyReport(parsed.jobFieldHeaders, parsed.jobHeaders, jobs));
     if (kind === "pre" && parsed.projMap) {
       projectCount = Object.keys(parsed.projMap).length;
       const { error: pe } = await admin.rpc("apply_projects", {
