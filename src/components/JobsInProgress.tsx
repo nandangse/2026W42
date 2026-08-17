@@ -15,6 +15,7 @@
 // approximations of a scale: a dot whose radius means throughput has to be
 // laid out against a real axis or it is decoration.
 import { useMemo, useState } from "react";
+import { api } from "@/lib/api";
 import { fmt, fmtFull, jobNo, otdColor } from "@/lib/schedule";
 
 const C = {
@@ -85,12 +86,15 @@ function jobsInBucket(jobs: WipJob[], key: string, today: string, rows: { key: s
 }
 
 export default function JobsInProgress({
-  jobs, today, V, onOpenPlan,
+  jobs, today, V, onOpenPlan, canEdit, onSaved,
 }: {
   jobs: WipJob[];
   today: string;
   V: (n: number) => string;
   onOpenPlan: (id: string) => void;
+  canEdit: boolean;
+  /** re-read the board after a field is corrected */
+  onSaved: () => Promise<unknown>;
 }) {
   const [famFilter, setFamFilter] = useState("");
   const [picked, setPicked] = useState<WipJob | null>(null);
@@ -185,6 +189,7 @@ export default function JobsInProgress({
       )}
       {picked && (
         <JobLightbox job={picked} V={V} colour={colourOf(picked.fam)} onClose={() => setPicked(null)}
+          canEdit={canEdit} onSaved={onSaved}
           onOpenPlan={() => { const id = picked.id; setPicked(null); onOpenPlan(id); }} />
       )}
     </div>
@@ -542,23 +547,35 @@ function Scatter({
  * that not worth doing.
  */
 function JobLightbox({
-  job, V, colour, onClose, onOpenPlan,
+  job, V, colour, onClose, onOpenPlan, canEdit, onSaved,
 }: {
   job: WipJob; V: (n: number) => string; colour: string; onClose: () => void; onOpenPlan: () => void;
+  canEdit: boolean; onSaved: () => Promise<unknown>;
 }) {
-  const money: [string, number | null, string][] = [
-    ["Value", job.val, C.accent],
-    ["Throughput", job.tpv, C.green],
-    ["Amount needed next month", job.amtNeeded, C.amber],
-    ["Pending payment on delivery", job.payOnDelivery, C.green],
-  ];
+  const [msg, setMsg] = useState("");
+  const today = new Date().toISOString().slice(0, 10);
+
+  /**
+   * Correcting a field here does TWO things: it fixes the board now, and it
+   * queues the change for the ERP. Genie is downstream — tomorrow's file
+   * redraws everything — so a correction that never reaches the ERP is a
+   * correction that un-does itself overnight.
+   */
+  const save = async (field: string, value: string) => {
+    setMsg("");
+    try {
+      const r = await api.post("/api/job-field", { job_id: job.id, field, value });
+      await onSaved();
+      setMsg(r.changed ? `Saved ✓ — queued for the ERP as “${r.label}”` : "No change — nothing queued");
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  };
 
   return (
     <div onClick={onClose}
       style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,0.55)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg"
-        style={{ width: "min(640px, 100%)", maxHeight: "88vh", overflowY: "auto" }}>
-        <div className="px-4 py-3 flex items-start gap-3" style={{ background: C.ink }}>
+        style={{ width: "min(660px, 100%)", maxHeight: "88vh", overflowY: "auto" }}>
+        <div className="px-4 py-3 flex items-start gap-3" style={{ background: C.ink, position: "sticky", top: 0, zIndex: 2 }}>
           <div style={{ flex: 1 }}>
             <div className="text-xs font-bold flex items-center gap-2" style={{ color: "#8FA1B3", letterSpacing: 1.2 }}>
               <span style={{ width: 9, height: 9, borderRadius: 2, background: colour }} />
@@ -572,38 +589,143 @@ function JobLightbox({
 
         <div className="p-4">
           <div className="flex gap-2 flex-wrap mb-3">
-            <Bit label="Production" value={`${job.pct || 0}%`} color={C.navy} />
-            <Bit label="Kitting" value={`${job.kit || 0}%`} color={(job.kit || 0) >= 80 ? C.green : (job.kit || 0) >= 40 ? C.amber : C.red} />
-            <Bit label="Target delivery" value={fmt(job.tdd)} color={job.tdd && job.tdd < new Date().toISOString().slice(0, 10) ? C.red : C.body} />
+            <EditBit label="Production" value={String(job.pct ?? 0)} suffix="%" kind="number"
+              canEdit={canEdit} color={C.navy} onSave={(v) => save("pct", v)} />
+            <EditBit label="Kitting" value={String(job.kit ?? 0)} suffix="%" kind="number"
+              canEdit={canEdit} color={(job.kit || 0) >= 80 ? C.green : (job.kit || 0) >= 40 ? C.amber : C.red}
+              onSave={(v) => save("kit", v)} />
+            <EditBit label="Target delivery" value={job.tdd || ""} kind="date"
+              canEdit={canEdit} color={job.tdd && job.tdd < today ? C.red : C.body}
+              display={fmt(job.tdd)} onSave={(v) => save("tdd", v)} />
             <Bit label="OTD date" value={fmt(job.otd)} color={otdColor(job.otd)} />
             <Bit label="Owner" value={job.ownerInitials || "—"} color={C.sub} />
           </div>
 
           <div className="flex gap-2 flex-wrap mb-3">
-            {money.map(([l, v, col]) => (
-              <div key={l} className="rounded px-2 py-1" style={{ background: C.panel, flex: "1 1 120px" }}>
-                <div style={{ fontSize: 10, color: C.mute, letterSpacing: 0.4 }}>{l.toUpperCase()}</div>
-                <div className="tnum font-bold" style={{ fontSize: 15, color: v == null ? C.faint : col }}>
-                  {v == null ? "—" : V(v)}
-                </div>
-              </div>
-            ))}
+            <Bit label="Value" value={V(job.val)} color={C.accent} />
+            <Bit label="Throughput" value={V(job.tpv || 0)} color={C.green} />
+            <EditBit label="Amount needed next month" value={job.amtNeeded == null ? "" : String(job.amtNeeded)}
+              kind="number" canEdit={canEdit} color={C.amber}
+              display={job.amtNeeded == null ? "—" : V(job.amtNeeded)} onSave={(v) => save("amt_needed", v)} />
+            <Bit label="Pending payment on delivery" value={job.payOnDelivery == null ? "—" : V(job.payOnDelivery)} color={C.green} />
           </div>
 
-          {job.escalation && (
-            <div className="rounded p-2 mb-2" style={{ background: "#FBEDEA", borderLeft: `3px solid ${C.red}` }}>
-              <div style={{ fontSize: 10, color: C.red, fontWeight: 700, letterSpacing: 0.4 }}>CURRENT PROJECT ESCALATION</div>
-              <div className="text-xs" style={{ color: C.body, lineHeight: 1.5 }}>{job.escalation}</div>
+          <EditText label="Current Project Escalation" value={job.escalation || ""} canEdit={canEdit}
+            tone={C.red} onSave={(v) => save("escalation", v)} />
+          <EditText label="Current Update" value={job.note || ""} canEdit={canEdit}
+            tone={C.body} onSave={(v) => save("note", v)} hint="The W34-style line the ERP carries as Current Status" />
+
+          {job.stat && <div className="text-xs mt-2" style={{ color: C.sub }}><b>Status:</b> {job.stat}</div>}
+
+          {msg && (
+            <div className="text-xs mt-2 font-semibold" style={{ color: msg.includes("✓") ? C.green : msg.startsWith("No change") ? C.mute : C.red }}>
+              {msg}
             </div>
           )}
-          {job.stat && <div className="text-xs mb-1" style={{ color: C.sub }}><b>Status:</b> {job.stat}</div>}
-          {job.note && <div className="text-xs" style={{ color: C.sub, lineHeight: 1.55 }}>{job.note}</div>}
+          {canEdit && (
+            <div className="text-xs mt-1" style={{ color: C.faint, lineHeight: 1.5 }}>
+              A correction here fixes the board now and joins the <b>ERP Update</b> list, so it can be put back into the
+              ERP in one pass. Without that, tomorrow&apos;s file quietly undoes it.
+            </div>
+          )}
 
           <button onClick={onOpenPlan} className="mt-3 rounded px-4 py-2 text-sm font-bold" style={{ background: C.accent, color: "#fff" }}>
             Open the full job plan →
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** A figure with a pencil. Reads as a chip until somebody wants to change it. */
+function EditBit({
+  label, value, display, suffix, kind, canEdit, color, onSave,
+}: {
+  label: string; value: string; display?: string; suffix?: string;
+  kind: "number" | "date"; canEdit: boolean; color: string; onSave: (v: string) => Promise<void>;
+}) {
+  const [on, setOn] = useState(false);
+  const [v, setV] = useState(value);
+  const [busy, setBusy] = useState(false);
+
+  const commit = async () => {
+    setBusy(true);
+    await onSave(v);
+    setBusy(false);
+    setOn(false);
+  };
+
+  return (
+    <div className="rounded px-2 py-1" style={{ background: C.panel, minWidth: 120 }}>
+      <div style={{ fontSize: 10, color: C.mute, letterSpacing: 0.4 }}>
+        {label.toUpperCase()}
+        {canEdit && !on && (
+          <button onClick={() => { setV(value); setOn(true); }} className="ml-1" style={{ color: C.accent }} title={`Edit ${label} — it will be queued for the ERP`}>✎</button>
+        )}
+      </div>
+      {on ? (
+        <div className="flex items-center gap-1">
+          <input
+            autoFocus type={kind === "date" ? "date" : "number"} value={v}
+            onChange={(e) => setV(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") setOn(false); }}
+            className="text-sm border rounded px-1 py-0.5 tnum"
+            style={{ borderColor: C.accent, width: kind === "date" ? 130 : 74 }}
+          />
+          <button onClick={commit} disabled={busy} className="text-xs font-bold rounded px-1.5" style={{ background: C.green, color: "#fff" }}>✓</button>
+          <button onClick={() => setOn(false)} className="text-xs" style={{ color: C.faint }}>✕</button>
+        </div>
+      ) : (
+        <div className="tnum font-bold" style={{ fontSize: 14, color }}>
+          {display ?? (value === "" ? "—" : value)}{display ? "" : suffix || ""}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A paragraph with a pencil — escalation and the running update. */
+function EditText({
+  label, value, canEdit, tone, onSave, hint,
+}: {
+  label: string; value: string; canEdit: boolean; tone: string; onSave: (v: string) => Promise<void>; hint?: string;
+}) {
+  const [on, setOn] = useState(false);
+  const [v, setV] = useState(value);
+  const [busy, setBusy] = useState(false);
+  const red = tone === C.red;
+
+  const commit = async () => {
+    setBusy(true);
+    await onSave(v);
+    setBusy(false);
+    setOn(false);
+  };
+
+  if (!value && !canEdit) return null;
+
+  return (
+    <div className="rounded p-2 mb-2" style={red ? { background: "#FBEDEA", borderLeft: `3px solid ${C.red}` } : { background: C.panel }}>
+      <div style={{ fontSize: 10, color: red ? C.red : C.mute, fontWeight: red ? 700 : 400, letterSpacing: 0.4 }}>
+        {label.toUpperCase()}
+        {canEdit && !on && (
+          <button onClick={() => { setV(value); setOn(true); }} className="ml-1" style={{ color: C.accent }} title={`Edit ${label} — it will be queued for the ERP`}>✎</button>
+        )}
+      </div>
+      {on ? (
+        <>
+          <textarea autoFocus value={v} onChange={(e) => setV(e.target.value)} rows={3}
+            className="w-full text-xs border rounded p-1.5 mt-1" style={{ borderColor: C.accent, resize: "vertical" }} />
+          {hint && <div style={{ fontSize: 10, color: C.faint }}>{hint}</div>}
+          <div className="flex gap-1 mt-1">
+            <button onClick={commit} disabled={busy} className="text-xs font-bold rounded px-2 py-0.5" style={{ background: C.green, color: "#fff" }}>{busy ? "…" : "Save"}</button>
+            <button onClick={() => setOn(false)} className="text-xs rounded px-2 py-0.5" style={{ color: C.sub }}>Cancel</button>
+          </div>
+        </>
+      ) : (
+        <div className="text-xs" style={{ color: C.body, lineHeight: 1.5 }}>{value || <span style={{ color: C.faint }}>— nothing recorded —</span>}</div>
+      )}
     </div>
   );
 }

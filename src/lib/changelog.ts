@@ -37,6 +37,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.4.0.0",
+    date: "2026-08-18",
+    module: "Jobs in Progress · Update to ERP",
+    items: [
+      "The job lightbox is now editable. A pencil on Production %, Kitting %, Target Delivery Date, Amount Needed next month, Current Project Escalation and the Current Update line — correct any of them without leaving the plot.",
+      "Every correction does two things: it fixes the board now, AND it joins a queue for the ERP. Genie is downstream — tomorrow’s Jobmaster redraws everything — so a correction that never reaches the ERP undoes itself overnight. That is the whole point of the queue.",
+      "ONLY WHAT CHANGED is queued. Re-typing 40 over 40 puts nothing in front of Pankaj.",
+      "ONE LINE PER JOB AND FIELD. Editing the same field three times before an export leaves one line carrying the latest value, not three to apply in order — and it keeps the ORIGINAL old value, because what matters is what the ERP still holds, not what the intermediate edits were.",
+      "Update to ERP is rebuilt around that queue and now SURVIVES THE BROWSER TAB. It was a JavaScript array before, so a day’s corrections died when the tab closed.",
+      "The Job ID leads every line, so a row can be found and overwritten in the ERP without matching on anything softer. Download CSV gives Pankaj the lot in one file — Job ID, Field, New value, Was, Changed by, When — with the field named as the ERP names it, so nobody has to translate “tdd” into “Target Delivery Date Current” at eight in the morning.",
+      "Mark all applied clears the list without deleting anything: the record of what was corrected, by whom, is the only trace that Genie and the ERP ever disagreed.",
+      "Migration 0031.",
+    ],
+  },
+  {
     v: "3.3.0.1",
     date: "2026-08-18",
     module: "Nandan Tasking · Calendar",

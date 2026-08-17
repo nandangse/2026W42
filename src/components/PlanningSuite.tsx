@@ -869,7 +869,7 @@ export default function PlanningSuite({
       <div style={{ display: workspace === "suite" && tab === "delivery" ? undefined : "none" }}>
         <DeliveryBoard board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
       </div>
-      {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} />}
+      {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} canEdit={canEdit} reload={reload} />}
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
       {workspace === "suite" && tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} />}
@@ -1409,7 +1409,7 @@ function MyWeek({
 
 // ============================ Delivery board ============================
 /** Jobs in Progress — the pending book as three charts. See JobsInProgress.tsx. */
-function JobsInProgressTab({ board, V, onOpen }: { board: Board; V: (n: number) => string; onOpen: (id: string) => void }) {
+function JobsInProgressTab({ board, V, onOpen, canEdit, reload }: { board: Board; V: (n: number) => string; onOpen: (id: string) => void; canEdit: boolean; reload: () => Promise<Board | null> }) {
   const jobs: WipJob[] = board.jobs.map((j) => ({
     id: j.id, tag: j.tag, cust: j.cust, fam: j.fam || "Unassigned",
     tdd: j.tdd, otd: j.otd, stat: j.stat, val: j.val, tpv: j.tpv, tpp: j.tpp,
@@ -1417,7 +1417,7 @@ function JobsInProgressTab({ board, V, onOpen }: { board: Board; V: (n: number) 
     amtNeeded: j.amtNeeded, payOnDelivery: j.payOnDelivery,
     ownerInitials: j.ownerInitials, ownerName: j.ownerName,
   }));
-  return <JobsInProgress jobs={jobs} today={TODAY} V={V} onOpenPlan={onOpen} />;
+  return <JobsInProgress jobs={jobs} today={TODAY} V={V} onOpenPlan={onOpen} canEdit={canEdit} onSaved={reload} />;
 }
 
 function DeliveryBoard({
@@ -4336,34 +4336,126 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload }: { task: Tas
 }
 
 // ============================ Update to ERP ============================
+/**
+ * ERP Update — the corrections still to be put back into the ERP.
+ *
+ * Genie is downstream: tomorrow's Jobmaster redraws the board, so a value
+ * corrected here undoes itself overnight unless somebody applies it upstream
+ * too. This is that list, and it survives the browser tab — which the old
+ * session-only change log did not, so a day's corrections died with it.
+ *
+ * The JOB ID leads every line, because the job of this page is to be pasted
+ * over a spreadsheet and uploaded, not read.
+ */
 function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
+  const [rows, setRows] = useState<{ id: string; job_id: string; field: string; label: string; old_value: string | null; new_value: string | null; changed_by: string | null; changed_at: string }[] | null>(null);
+  const [installed, setInstalled] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    api.get("/api/erp-update")
+      .then((r) => { setInstalled(r.installed !== false); setRows(r.rows || []); })
+      .catch(() => setRows([]));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  /** One line per correction, job id first. Excel opens it, the ERP takes it. */
+  const download = () => {
+    if (!rows?.length) return;
+    const esc = (v: unknown) => {
+      const t = String(v ?? "");
+      return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+    };
+    const csv = [
+      ["Job ID", "Field", "New value", "Was", "Changed by", "Changed at"].join(","),
+      ...rows.map((r) => [r.job_id, r.label, r.new_value, r.old_value, r.changed_by, String(r.changed_at).slice(0, 16).replace("T", " ")].map(esc).join(",")),
+    ].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `erp-update-${TODAY}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const markDone = async () => {
+    if (!window.confirm(`Mark all ${rows?.length} lines as applied in the ERP?\n\nThey leave this list. Nothing is deleted — the record of what was corrected stays.`)) return;
+    setBusy(true);
+    try { await api.post("/api/erp-update", { action: "exported" }); load(); }
+    finally { setBusy(false); }
+  };
+
   return (
     <div className="p-4">
-      <div className="mb-3 text-sm font-semibold" style={{ color: "#5A6672" }}>
-        Change log — app-local notes of intent. Apply each in ERP by hand via its link; tomorrow&apos;s upload is the confirmation.
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <div>
+          <div className="text-xs font-bold" style={{ color: "#8A94A0", letterSpacing: 1.4 }}>UPDATE TO ERP</div>
+          <div className="text-lg font-bold" style={{ color: "#16232F", lineHeight: 1.2 }}>
+            Corrections waiting to go back
+          </div>
+        </div>
+        <div className="flex-1" style={{ minWidth: 10 }} />
+        {!!rows?.length && (
+          <>
+            <button onClick={download} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}>
+              ⬇ Download CSV · {rows.length}
+            </button>
+            <button onClick={markDone} disabled={busy} className="text-xs font-bold rounded px-3 py-1.5"
+              style={{ background: "#fff", border: "1px solid #0D7A3F", color: "#0D7A3F", opacity: busy ? 0.5 : 1 }}>
+              ✓ Mark all applied
+            </button>
+          </>
+        )}
       </div>
-      {erpLog.length === 0 ? (
-        <div className="text-sm" style={{ color: "#8A94A0" }}>No changes logged this session.</div>
+
+      {!installed && (
+        <div className="rounded p-3 mb-3 text-sm" style={{ background: "#FFF7E6", border: "1px solid #F0D9A8", color: "#8A5A00" }}>
+          Run <code>supabase/migrations/0031_erp_update_queue.sql</code> and corrections will start collecting here.
+        </div>
+      )}
+
+      <div className="text-xs mb-2" style={{ color: "#8A94A0", lineHeight: 1.5 }}>
+        Everything corrected in Genie that the ERP does not know about yet. The job id leads each line so a row can be
+        found and overwritten. One line per job and field — editing the same field twice before an export leaves the
+        latest value, not two changes to apply in order.
+      </div>
+
+      {rows && rows.length === 0 ? (
+        <div className="bg-white rounded-lg border p-8 text-center text-sm" style={{ borderColor: "#E2E0DA", color: "#8A94A0" }}>
+          Nothing waiting. Everything corrected in Genie has been put back into the ERP.
+        </div>
       ) : (
         <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
-          <table className="text-xs w-full" style={{ borderCollapse: "collapse" }}>
+          <table className="text-xs w-full" style={{ borderCollapse: "collapse", minWidth: 720 }}>
             <thead>
-              <tr style={{ background: "#F4F2EC", color: "#5A6672" }}>
-                <th className="px-2 py-1 text-left">Time</th><th className="px-2 py-1 text-left">Doc</th><th className="px-2 py-1 text-left">Field</th><th className="px-2 py-1 text-left">Value</th><th className="px-2 py-1">ERP</th>
+              <tr style={{ background: "#22303C", color: "#fff" }}>
+                <th className="px-2 py-1.5 text-left">Job ID</th>
+                <th className="px-2 py-1.5 text-left">Field</th>
+                <th className="px-2 py-1.5 text-left">New value</th>
+                <th className="px-2 py-1.5 text-left">Was</th>
+                <th className="px-2 py-1.5 text-left">By</th>
+                <th className="px-2 py-1.5 text-left">When</th>
               </tr>
             </thead>
             <tbody>
-              {erpLog.map((l) => (
-                <tr key={l.id} style={{ borderTop: "1px solid #EEECE6" }}>
-                  <td className="px-2 py-1" style={{ color: "#8A94A0" }}>{l.time}</td>
-                  <td className="px-2 py-1 font-semibold">{l.docname}</td>
-                  <td className="px-2 py-1">{l.field}</td>
-                  <td className="px-2 py-1">{l.value}</td>
-                  <td className="px-2 py-1 text-center">{l.link && <a href={l.link} target="_blank" rel="noreferrer" style={{ color: "#1B3A5C" }}>↗ open</a>}</td>
+              {(rows || []).map((r) => (
+                <tr key={r.id} style={{ borderTop: "1px solid #EEECE6" }}>
+                  <td className="px-2 py-1 font-bold tnum" style={{ color: "#1B3A5C" }}>{r.job_id}</td>
+                  <td className="px-2 py-1" style={{ color: "#5A6672" }}>{r.label}</td>
+                  <td className="px-2 py-1 font-semibold" style={{ color: "#16232F", maxWidth: 280 }}>{r.new_value || <i style={{ color: "#B8B5AC" }}>(cleared)</i>}</td>
+                  <td className="px-2 py-1" style={{ color: "#B8B5AC", maxWidth: 220 }}>{r.old_value || "—"}</td>
+                  <td className="px-2 py-1" style={{ color: "#8A94A0" }}>{r.changed_by}</td>
+                  <td className="px-2 py-1 tnum" style={{ color: "#8A94A0" }}>{String(r.changed_at).slice(0, 16).replace("T", " ")}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {erpLog.length > 0 && (
+        <div className="text-xs mt-3" style={{ color: "#B8B5AC" }}>
+          {erpLog.length} change{erpLog.length === 1 ? "" : "s"} made in this browser session are included above.
         </div>
       )}
     </div>
