@@ -25,6 +25,7 @@ import {
   parseISO,
   toISO,
   TASK_CATS,
+  catColour,
   ESC_LEVELS,
   escalated,
   greeting,
@@ -3163,6 +3164,25 @@ function Tasking({
   const [taskAll, setTaskAll] = useState(false);
   const [taskView, setTaskView] = useState<"board" | "cal">("board");
   const [calMonth, setCalMonth] = useState(TODAY.slice(0, 7));
+  /**
+   * Dragging a chip to another day.
+   *
+   * The date is written straight away and the board re-read — no confirm. A
+   * drag is already a deliberate act, and a dialog after every one would make
+   * re-planning a week slower than typing the dates in, which is the thing
+   * this replaces. Getting it wrong costs one drag back.
+   */
+  const [dragTask, setDragTask] = useState<Task | null>(null);
+  const [newTaskOpen, setNewTaskOpen] = useState(false);
+  const moveTaskTo = async (day: string) => {
+    const t = dragTask;
+    setDragTask(null);
+    if (!t || t.due === day) return;
+    try {
+      await api.post("/api/tasks", { action: "update", id: t.id, kind: t.kind, due: day });
+      await reload();
+    } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+  };
   const [adding, setAdding] = useState<string | null>(null);
   const [form, setForm] = useState({ t: "", who: "", due: TODAY, cat: "Production", esc: "None", esc_why: "" });
   const [lightbox, setLightbox] = useState<Task | null>(null);
@@ -3436,7 +3456,11 @@ function Tasking({
             <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
               <button onClick={() => shiftMonth(-1)} className="px-3 py-1 rounded font-bold text-sm" style={{ background: "#F4F2EC", color: "#22303C" }}>◀</button>
               <div className="font-bold text-center" style={{ color: "#16232F" }}>{monthLabel} <span className="text-xs font-normal" style={{ color: "#8A94A0" }}>· open tasks on their due dates · respects the filters above</span></div>
-              <div className="flex gap-1"><button onClick={() => setCalMonth(TODAY.slice(0, 7))} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }}>Today</button><button onClick={() => shiftMonth(1)} className="px-3 py-1 rounded font-bold text-sm" style={{ background: "#F4F2EC", color: "#22303C" }}>▶</button></div>
+              <div className="flex gap-1 items-center">
+                <button onClick={() => setNewTaskOpen(true)} className="px-3 py-1 rounded text-xs font-bold" style={{ background: "#22303C", color: "#fff" }} title="Raise a task without leaving the calendar">+ Add Task</button>
+                <button onClick={() => setCalMonth(TODAY.slice(0, 7))} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }}>Today</button>
+                <button onClick={() => shiftMonth(1)} className="px-3 py-1 rounded font-bold text-sm" style={{ background: "#F4F2EC", color: "#22303C" }}>▶</button>
+              </div>
             </div>
             {overdue.length > 0 && (<div className="text-xs font-bold rounded px-2 py-1 mb-2 inline-block" style={{ background: "#B3261E", color: "#fff" }}>⚠ {overdue.length} overdue task{overdue.length === 1 ? "" : "s"} — red chips on their original due dates</div>)}
             <table className="w-full text-xs" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
@@ -3451,11 +3475,56 @@ function Tasking({
                         const inM = d.slice(0, 7) === calMonth;
                         const list = byDay[d] || [];
                         return (
-                          <td key={d} className="px-1 py-1 border-l" style={{ borderColor: "#EFEDE7", background: d === TODAY ? "#FFF3E8" : inM ? "#fff" : "#FAF9F5", opacity: inM ? 1 : 0.55, height: 64 }}>
+                          <td
+                            key={d}
+                            onDragOver={(e) => { if (dragTask) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } }}
+                            onDrop={(e) => { e.preventDefault(); moveTaskTo(d); }}
+                            className="px-1 py-1 border-l"
+                            style={{
+                              borderColor: "#EFEDE7",
+                              background: dragTask && dragTask.due !== d ? "#EFF6FF" : d === TODAY ? "#FFF3E8" : inM ? "#fff" : "#FAF9F5",
+                              opacity: inM ? 1 : 0.55, height: 64,
+                            }}
+                          >
                             <div className="font-bold tnum" style={{ color: d === TODAY ? "#E8600A" : "#8A94A0" }}>{parseInt(d.slice(8), 10)}{d === TODAY ? " · today" : ""}</div>
-                            {list.map((t) => (
-                              <div key={t.id} onClick={() => setLightbox(t)} title={"JOB " + jobNo(t.j) + " · " + t.t + " · " + (t.who || "unassigned")} className="rounded px-1 py-0.5 mb-0.5 cursor-pointer font-semibold" style={{ background: t.due! < TODAY ? "#B3261E" : t.due === TODAY ? "#fff" : "#DCE8F5", color: t.due! < TODAY ? "#fff" : "#1B3A5C", border: t.due === TODAY ? "1px solid #22303C" : "none", fontSize: 9, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{jobNo(t.j)} · {initials(t.who)} · {t.t}</div>
-                            ))}
+                            {list.map((t) => {
+                              const c = catColour(t.cat);
+                              const late = t.due! < TODAY;
+                              return (
+                                <div
+                                  key={t.id}
+                                  draggable
+                                  onDragStart={(e) => { setDragTask(t); e.dataTransfer.effectAllowed = "move"; }}
+                                  onDragEnd={() => setDragTask(null)}
+                                  onClick={() => setLightbox(t)}
+                                  title={`JOB ${jobNo(t.j)} · ${t.cat || "General"} · ${t.t}\n${t.who || "unassigned"} · due ${fmtFull(t.due)}${late ? " — OVERDUE" : ""}\nDrag to another day to move the date.`}
+                                  className="rounded px-1 py-0.5 mb-0.5 cursor-grab"
+                                  style={{
+                                    background: c.bg, color: c.ink,
+                                    border: `1px solid ${t.due === TODAY ? "#22303C" : c.edge}`,
+                                    fontSize: 9, lineHeight: 1.25, overflow: "hidden",
+                                  }}
+                                >
+                                  {/* line one: who it belongs to. The job number
+                                      goes red when the date has gone — lateness is
+                                      said HERE so the chip can keep saying what
+                                      kind of work it is. */}
+                                  <div className="flex items-baseline gap-1" style={{ whiteSpace: "nowrap" }}>
+                                    <span className="font-bold" style={late ? { background: "#B3261E", color: "#fff", borderRadius: 2, padding: "0 3px" } : undefined}>
+                                      {jobNo(t.j)}
+                                    </span>
+                                    <span className="font-bold">{initials(t.who)}</span>
+                                    <span style={{ opacity: 0.75, overflow: "hidden", textOverflow: "ellipsis" }}>{t.cat || "General"}</span>
+                                    {t.esc && t.esc !== "None" && <span style={{ color: "#B3261E", fontWeight: 700 }}>⚠</span>}
+                                  </div>
+                                  {/* line two: what it actually is, wrapped to two
+                                      lines rather than cut at the first word */}
+                                  <div style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: 600 }}>
+                                    {t.t}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </td>
                         );
                       })}
@@ -3464,7 +3533,18 @@ function Tasking({
                 })}
               </tbody>
             </table>
-            <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>Tap a chip to open the task (mark done, comment) · red = overdue · white outline = due today</div>
+            <div className="flex items-center gap-2 flex-wrap mt-2">
+              <span className="text-xs" style={{ color: "#8A94A0" }}>Drag a chip to another day to move its due date · tap it to open the task</span>
+              <div className="flex-1" />
+              {TASK_CATS.map((c) => {
+                const k = catColour(c);
+                return (
+                  <span key={c} className="text-xs rounded px-1.5" style={{ background: k.bg, color: k.ink, border: `1px solid ${k.edge}` }}>{c}</span>
+                );
+              })}
+              <span className="text-xs rounded px-1.5 font-bold" style={{ background: "#B3261E", color: "#fff" }}>0000</span>
+              <span className="text-xs" style={{ color: "#8A94A0" }}>= overdue</span>
+            </div>
           </div>
         );
       })()}
@@ -3472,7 +3552,100 @@ function Tasking({
       </>
       )}
 
+      {newTaskOpen && (
+        <NewTaskBox
+          jobs={board.jobs}
+          owners={assignees(board)}
+          onClose={() => setNewTaskOpen(false)}
+          reload={reload}
+        />
+      )}
       {lightbox && <TaskModal task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+    </div>
+  );
+}
+
+/**
+ * Raise a task from the calendar.
+ *
+ * The same fields as everywhere else, plus the one the inline form never needs
+ * and this one always does: WHICH JOB. Everywhere else the form is already
+ * sitting inside a job; here it is sitting on a month.
+ *
+ * "Save and add another" keeps the job, the person, the date and the category
+ * and clears only the text — because tasks are raised in runs, and re-picking
+ * the same job six times is how somebody stops using the button and goes back
+ * to a notebook.
+ */
+function NewTaskBox({
+  jobs, owners, onClose, reload,
+}: {
+  jobs: Job[]; owners: Assignee[]; onClose: () => void; reload: () => Promise<Board | null>;
+}) {
+  const [form, setForm] = useState({ t: "", who: "", due: TODAY, cat: TASK_CATS[0] as string, esc: "None", esc_why: "" });
+  const [jobId, setJobId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [q, setQ] = useState("");
+
+  const needle = q.trim().toLowerCase();
+  const list = jobs
+    .filter((j) => !needle || j.id.includes(needle) || j.tag.toLowerCase().includes(needle) || j.cust.toLowerCase().includes(needle))
+    .slice(0, 400);
+
+  const save = async (again: boolean) => {
+    if (!form.t.trim()) { setMsg("What is the task?"); return; }
+    if (escalated(form.esc) && !form.esc_why.trim()) { setMsg("Say why it is escalated — whoever it lands on needs to know without ringing you."); return; }
+    setBusy(true); setMsg("");
+    try {
+      await api.post("/api/tasks", {
+        action: "create", job_id: jobId || null, title: form.t.trim(),
+        who: form.who, due: form.due, cat: form.cat, esc: form.esc, esc_why: form.esc_why,
+      });
+      await reload();
+      if (again) {
+        // job, person, date and category survive; only the words clear
+        setForm((f) => ({ ...f, t: "", esc: "None", esc_why: "" }));
+        setMsg("Added ✓ — next one");
+      } else onClose();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,0.55)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg" style={{ width: "min(540px, 100%)", maxHeight: "88vh", overflowY: "auto" }}>
+        <div className="px-4 py-3 flex items-center gap-3" style={{ background: "#16232F" }}>
+          <div className="font-bold text-white" style={{ fontSize: 15 }}>New task</div>
+          <div className="flex-1" />
+          <button onClick={onClose} className="font-bold" style={{ color: "#8FA1B3", fontSize: 20, lineHeight: 1 }}>✕</button>
+        </div>
+        <div className="p-4">
+          <div className="text-xs font-bold mb-0.5" style={{ color: "#8A94A0" }}>JOB</div>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 filter by job no, tag or customer"
+            className="w-full text-xs border rounded px-2 py-1.5 mb-1" style={{ borderColor: "#E2E0DA" }} />
+          <select value={jobId} onChange={(e) => setJobId(e.target.value)}
+            className="w-full text-sm border rounded px-2 py-1.5 bg-white mb-3" style={{ borderColor: jobId ? "#E2E0DA" : "#E8600A" }}>
+            <option value="">— no job (a general task) —</option>
+            {list.map((j) => <option key={j.id} value={j.id}>{jobNo(j.id)} · {j.tag} · {j.cust}</option>)}
+          </select>
+
+          <AddTaskForm form={form} setForm={setForm} owners={owners} onSubmit={() => save(false)} onCancel={onClose} hideActions />
+
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <button onClick={() => save(false)} disabled={busy} className="text-sm font-bold rounded px-4 py-1.5" style={{ background: "#E8600A", color: "#fff", opacity: busy ? 0.5 : 1 }}>
+              {busy ? "Saving…" : "Save"}
+            </button>
+            <button onClick={() => save(true)} disabled={busy} className="text-sm font-bold rounded px-3 py-1.5"
+              style={{ background: "#fff", border: "1px solid #22303C", color: "#22303C", opacity: busy ? 0.5 : 1 }}
+              title="Keeps the job, the person, the date and the category — clears only the words">
+              Save &amp; add another
+            </button>
+            {msg && <span className="text-xs font-semibold" style={{ color: msg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{msg}</span>}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -3998,7 +4171,7 @@ function AssigneeOptions({ owners, current }: { owners: Assignee[]; current?: st
   );
 }
 
-function AddTaskForm({ form, setForm, owners, onSubmit, onCancel }: { form: any; setForm: (f: any) => void; owners: Assignee[]; onSubmit: () => void; onCancel: () => void }) {
+function AddTaskForm({ form, setForm, owners, onSubmit, onCancel, hideActions }: { form: any; setForm: (f: any) => void; owners: Assignee[]; onSubmit: () => void; onCancel: () => void; hideActions?: boolean }) {
   return (
     <div className="rounded border p-2 mt-1 bg-white" style={{ borderColor: "#E8600A" }}>
       <datalist id="who-options">
@@ -4042,8 +4215,10 @@ function AddTaskForm({ form, setForm, owners, onSubmit, onCancel }: { form: any;
         <select value={form.cat} onChange={(e) => setForm({ ...form, cat: e.target.value })} className="flex-1 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
           {TASK_CATS.map((c) => (<option key={c}>{c}</option>))}
         </select>
-        <button onClick={onSubmit} className="text-xs font-bold rounded px-2" style={{ background: "#E8600A", color: "#fff" }}>Add</button>
-        <button onClick={onCancel} className="text-xs rounded px-1" style={{ color: "#8A94A0" }}>✕</button>
+        {/* the modal draws its own Save / Save & add another, so the inline
+            pair would be a second Add button saying the same thing */}
+        {!hideActions && <button onClick={onSubmit} className="text-xs font-bold rounded px-2" style={{ background: "#E8600A", color: "#fff" }}>Add</button>}
+        {!hideActions && <button onClick={onCancel} className="text-xs rounded px-1" style={{ color: "#8A94A0" }}>✕</button>}
       </div>
     </div>
   );

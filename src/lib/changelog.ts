@@ -37,6 +37,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.3.0.1",
+    date: "2026-08-18",
+    module: "Nandan Tasking · Calendar",
+    items: [
+      "Drag a task chip onto another day and its due date moves. No confirmation box: a drag is already a deliberate act, and a dialog after each one would make re-planning a week slower than typing the dates in — which is the thing this replaces. Getting it wrong costs one drag back.",
+      "Every chip now shows two lines: the job number, initials and category on the first, the task itself wrapped onto two lines rather than cut off mid-word on the second.",
+      "Chips are colour-coded by task category, in PASTEL. A month of the calendar is made of these chips, and eight saturated blocks a day is a stained-glass window nobody can read a job number off.",
+      "Lateness is said separately: when the date has gone the JOB NUMBER goes red, and the chip keeps its category colour. A late Quality task still reads as quality work instead of becoming one more identical red box — which is what the calendar looked like before.",
+      "New + Add Task button at the top of the calendar. It opens the full task box with a job picker, since here you are sitting on a month rather than inside a job.",
+      "Save & add another keeps the job, the person, the date and the category, and clears only the words. Tasks get raised in runs, and re-picking the same job six times is how somebody stops using the button and goes back to a notebook.",
+      "A legend under the calendar names every category colour.",
+    ],
+  },
+  {
     v: "3.3.0.0",
     date: "2026-08-18",
     module: "Material Kitting",

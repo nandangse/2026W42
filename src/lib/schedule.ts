@@ -143,6 +143,30 @@ export const dueStyle = (due: string | null): StyleObj => {
   return { background: "#DCE8F5", color: "#1B3A5C" };
 };
 
+/**
+ * A pastel per task category, plus the ink to write on it.
+ *
+ * Pastel on purpose. The chips are what a month of the calendar is MADE of,
+ * and eight saturated blocks per day is a stained-glass window nobody can read
+ * a job number off. The colour says what KIND of work it is; lateness is said
+ * separately, by the job number going red, so a late Quality job still reads
+ * as quality work rather than becoming one more identical red box.
+ */
+export const CAT_COLOUR: Record<string, { bg: string; ink: string; edge: string }> = {
+  Projects:   { bg: "#E7EDF6", ink: "#1B3A5C", edge: "#B9CBE2" },
+  Production: { bg: "#FDEBDD", ink: "#8A3D00", edge: "#F2C9A6" },
+  Quality:    { bg: "#E4F2E8", ink: "#0D5A32", edge: "#B6DCC4" },
+  Material:   { bg: "#F5E9F7", ink: "#6B2C77", edge: "#DFC3E5" },
+  Design:     { bg: "#E6F1F4", ink: "#0B5563", edge: "#B8D9E0" },
+  Electrical: { bg: "#FBF0D8", ink: "#7A5600", edge: "#EBD69B" },
+  Hydraulic:  { bg: "#E9ECF7", ink: "#2E3B7A", edge: "#C2C9E6" },
+  Dispatch:   { bg: "#FCE7E7", ink: "#8A2020", edge: "#EFC2C2" },
+};
+
+/** The pastel for a category, falling back to a neutral for anything unlisted. */
+export const catColour = (cat: string | null | undefined) =>
+  CAT_COLOUR[String(cat || "").trim()] ?? { bg: "#EFEDE7", ink: "#5A6672", edge: "#DAD7CF" };
+
 export const TASK_CATS = [
   "Projects",
   "Production",
