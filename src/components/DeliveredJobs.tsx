@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import {
   PERIODS, rangeFor, fyLabel, fqLabel, fyStart, span, within, dated, undated,
-  totalsOf, averagePerMonth, byMonth, byFamily, byCustomer, otdFor, coveredMonths, throughputOf,
+  totalsOf, averagePerMonth, byMonth, byFamily, byCustomer, otdAggregate, coveredMonths, throughputOf,
   dayCount, median, delayDays, rowOtdPct,
   type DeliveredJob, type PeriodKey, type Totals, type Bucket,
 } from "@/lib/delivered";
@@ -47,18 +47,25 @@ const OTD_ROW_FORMULA = [
 
 /** Shown on hover over the OTD card — the formula, in words. */
 const OTD_FORMULA = [
-  "OTD % = jobs delivered on or before their promised date",
-  "        ÷ jobs delivered in the period that carry a promised date",
+  "Per job:",
+  "  OTD % = (1 − Delay Days ÷ (OTD Date − Actual Start Date)) × 100",
+  "  Delay Days = Actual Delivery Date − OTD Date",
   "",
-  "The promise is the OTD Date given to the customer; where that is blank the",
-  "Committed Delivery Date is used instead.",
+  "For the period: the MEAN of that across every job delivered in the window",
+  "that can be measured.",
   "",
-  "A job with no promised date is NOT counted as late — it is excluded and",
-  "reported separately, because a missing date is a record-keeping gap rather",
-  "than a delivery failure.",
+  "This measures how far off we ran, not how often we hit the date. Two jobs",
+  "a day late and two a year late score the same under a count, and very",
+  "differently here.",
   "",
-  "Only jobs DELIVERED inside the chosen period are counted, by their actual",
-  "delivery date.",
+  "100% = delivered exactly on the promised date. Over 100% = early.",
+  "Negative = the job overran its whole promised lead time.",
+  "",
+  "The median is shown beside the mean, because one job 592 days late moves",
+  "the average several points on its own.",
+  "",
+  "The promise is the OTD Date; where blank, the Committed Delivery Date.",
+  "A job with no promise or no start date is excluded, not scored zero.",
 ].join("\n");
 
 const C = {
@@ -128,7 +135,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
   const months = useMemo(() => byMonth(rows, from, to), [rows, from, to]);
   const families = useMemo(() => byFamily(rows, from, to), [rows, from, to]);
   const customers = useMemo(() => byCustomer(rows, from, to), [rows, from, to]);
-  const otd = useMemo(() => otdFor(rows, from, to), [rows, from, to]);
+  const otd = useMemo(() => otdAggregate(rows, from, to), [rows, from, to]);
   const famOptions = useMemo(() => byFamily(all, "0000-01-01", "9999-12-31"), [all]);
 
   if (state === "loading") return <div className="p-8 text-sm" style={{ color: C.mute }}>Loading the delivery ledger…</div>;
@@ -240,22 +247,24 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
           ) : (
             <>
               <div className="flex items-baseline gap-2">
-                <span className="tnum font-bold" style={{ fontSize: 26, color: otd.pct >= 80 ? C.green : otd.pct >= 50 ? C.amber : C.red }}>
+                <span className="tnum font-bold" style={{ fontSize: 26, color: otd.pct >= 90 ? C.green : otd.pct >= 50 ? C.amber : C.red }}>
                   {Math.round(otd.pct)}%
                 </span>
-                <span className="text-xs tnum" style={{ color: C.mute }}>{otd.onTime}/{otd.measurable}</span>
+                <span style={{ fontSize: 12, color: C.mute }}>mean of {otd.measurable}</span>
               </div>
               <div className="mt-1" style={{ height: 7, background: "#EFEDE7", borderRadius: 2, overflow: "hidden" }}>
                 <div style={{
                   width: `${Math.max(0, Math.min(100, otd.pct))}%`, height: 7,
-                  background: otd.pct >= 80 ? C.green : otd.pct >= 50 ? C.amber : C.red,
+                  background: otd.pct >= 90 ? C.green : otd.pct >= 50 ? C.amber : C.red,
                 }} />
               </div>
-              <div className="text-xs mt-1" style={{ color: C.sub, lineHeight: 1.45 }}>
-                Delivered on or before the <b>OTD Date</b> promised to the customer.
-                {otd.late > 0 && otd.avgDaysLate != null && (
-                  <> The {otd.late} late {otd.late === 1 ? "one ran" : "ones ran"} <b>{otd.avgDaysLate} days</b> over on average.</>
-                )}
+              <div style={{ fontSize: 12, marginTop: 4, color: C.sub, lineHeight: 1.45 }}>
+                <b>(1 − Delay ÷ (OTD − Start))</b> averaged over the period. 100% is dead on the promised date.
+              </div>
+              <div style={{ fontSize: 12, marginTop: 2, color: C.mute, lineHeight: 1.45 }}>
+                Median <b className="tnum" style={{ color: C.body }}>{Math.round(otd.median ?? 0)}%</b> ·{" "}
+                <b className="tnum" style={{ color: C.green }}>{otd.onTimeOrBetter}</b> on time or early ·
+                worst <b className="tnum" style={{ color: C.red }}>{Math.round(otd.worst ?? 0)}%</b>
               </div>
               {otd.unjudgeable > 0 && (
                 <div className="text-xs mt-1" style={{ color: C.amber, lineHeight: 1.45 }}>

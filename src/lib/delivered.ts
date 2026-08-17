@@ -352,6 +352,49 @@ export function onTime(rows: DeliveredJob[], from: string, to: string): { onTime
   return { onTime: ok, measurable: m.length, pct: m.length ? (ok / m.length) * 100 : null };
 }
 
+
+/**
+ * Period OTD %, aggregated from the per-job formula rather than counted.
+ *
+ *   per job:  OTD % = (1 - Delay Days / (OTD Date - Actual Start Date)) x 100
+ *   period:   the MEAN of that across every job delivered in the window that
+ *             can be measured
+ *
+ * This is deliberately NOT "how many arrived on time". A count answers how
+ * often we hit the date; this answers how far off we ran, which is the thing
+ * that can be improved. Two jobs a day late and two a year late are the same
+ * number under a count, and very different here.
+ *
+ * The median is carried alongside because the mean is dragged hard by the
+ * worst cases — with slips reaching 592 days, one job can move the average
+ * several points on its own.
+ */
+export interface OtdAgg {
+  pct: number | null;
+  median: number | null;
+  measurable: number;
+  unjudgeable: number;
+  onTimeOrBetter: number;
+  worst: number | null;
+}
+
+export function otdAggregate(rows: DeliveredJob[], from: string, to: string): OtdAgg {
+  const delivered = within(rows, from, to);
+  const scored = delivered
+    .map((j) => rowOtdPct(j))
+    .filter((p): p is number => p != null);
+  if (!scored.length)
+    return { pct: null, median: null, measurable: 0, unjudgeable: delivered.length, onTimeOrBetter: 0, worst: null };
+  return {
+    pct: scored.reduce((s, p) => s + p, 0) / scored.length,
+    median: median(scored),
+    measurable: scored.length,
+    unjudgeable: delivered.length - scored.length,
+    onTimeOrBetter: scored.filter((p) => p >= 100).length,
+    worst: Math.min(...scored),
+  };
+}
+
 /** Which promise a job is being judged against. */
 export type OtdBasis = "otd" | "tdd";
 

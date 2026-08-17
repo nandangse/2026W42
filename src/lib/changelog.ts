@@ -37,6 +37,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.0.1.4",
+    date: "2026-08-18",
+    module: "Delivered Jobs · OTD",
+    items: [
+      "OTD % on the card was the wrong definition — it counted how many jobs arrived on time. It now uses Dr Raghu’s formula, averaged over the period: (1 − Delay Days ÷ (OTD Date − Actual Start Date)) × 100.",
+      "The difference matters. A count says two jobs a day late and two a year late are the same result. This says how far off we ran, which is the part that can be improved.",
+      "The median is shown next to the mean, because one job 592 days late moves the average several points on its own. Also shown: how many were on time or early, and the worst score in the period.",
+      "Hover the ⓘ for the whole formula.",
+    ],
+  },
+  {
     v: "3.0.1.3",
     date: "2026-08-18",
     module: "Tasking · Escalation",
