@@ -37,6 +37,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.0.0.3",
+    date: "2026-08-17",
+    module: "Delivered Jobs",
+    items: [
+      "Fixed: the page was reading only 1,000 of the 2,728 delivered jobs. Supabase caps any single request at 1,000 rows and ignores a larger limit, so the ledger was silently cut short — and it looked complete, which is worse. It now pages through the lot.",
+      "Throughput reads whichever column the file carries. This export has no “Throughput Expected Value (Auto)”; it has a plain Throughput column worth about 160 Cr across 705 jobs, and that was showing as zero.",
+      "New OTD % for the chosen period: jobs delivered on or before the OTD Date promised to the customer, over the jobs delivered in that period that carry a promised date. Hover the ⓘ for the formula in full.",
+      "A job with no promised date is not counted as late. It is excluded and reported separately, because a missing date is a record-keeping gap rather than a delivery failure — and only 305 of 2,728 rows carry an OTD Date.",
+      "OTD % also says how badly, not just how often: the average days over for the ones that ran late.",
+      "The monthly table now runs newest first.",
+    ],
+  },
+  {
     v: "3.0.0.2",
     date: "2026-08-17",
     module: "Morning Update · Delivered Jobs",

@@ -15,12 +15,28 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import {
   PERIODS, rangeFor, fyLabel, fqLabel, fyStart, span, within, dated, undated,
-  totalsOf, averagePerMonth, byMonth, byFamily, byCustomer, onTime, coveredMonths, throughputOf,
+  totalsOf, averagePerMonth, byMonth, byFamily, byCustomer, otdFor, coveredMonths, throughputOf,
   type DeliveredJob, type PeriodKey, type Totals, type Bucket,
 } from "@/lib/delivered";
 import { today, fmt, fmtFull, lakh } from "@/lib/schedule";
 
 const TODAY = today();
+
+/** Shown on hover over the OTD card — the formula, in words. */
+const OTD_FORMULA = [
+  "OTD % = jobs delivered on or before their promised date",
+  "        ÷ jobs delivered in the period that carry a promised date",
+  "",
+  "The promise is the OTD Date given to the customer; where that is blank the",
+  "Committed Delivery Date is used instead.",
+  "",
+  "A job with no promised date is NOT counted as late — it is excluded and",
+  "reported separately, because a missing date is a record-keeping gap rather",
+  "than a delivery failure.",
+  "",
+  "Only jobs DELIVERED inside the chosen period are counted, by their actual",
+  "delivery date.",
+].join("\n");
 
 const C = {
   ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC",
@@ -89,7 +105,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
   const months = useMemo(() => byMonth(rows, from, to), [rows, from, to]);
   const families = useMemo(() => byFamily(rows, from, to), [rows, from, to]);
   const customers = useMemo(() => byCustomer(rows, from, to), [rows, from, to]);
-  const punctual = useMemo(() => onTime(rows, from, to), [rows, from, to]);
+  const otd = useMemo(() => otdFor(rows, from, to), [rows, from, to]);
   const famOptions = useMemo(() => byFamily(all, "0000-01-01", "9999-12-31"), [all]);
 
   if (state === "loading") return <div className="p-8 text-sm" style={{ color: C.mute }}>Loading the delivery ledger…</div>;
@@ -99,7 +115,9 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
 
   if (!all.length) return <NoData lastUpload={data.lastUpload} />;
 
-  const cuts = cut === "month" ? months : cut === "family" ? families : customers;
+  // Months newest-first: the current month is what anyone opens this to see,
+  // and scrolling to the bottom for it gets old immediately.
+  const cuts = cut === "month" ? [...months].reverse() : cut === "family" ? families : customers;
   const cutMax = Math.max(1, ...cuts.map((b) => b.value));
 
   return (
@@ -175,26 +193,44 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
       <div className="flex gap-2 flex-wrap mb-3">
         <AverageCard title={`YTD monthly average · since 1 Apr`} avg={ytd} V={V} />
         <AverageCard title="12-month monthly average" avg={m12} V={V} />
-        <div className="rounded-lg border bg-white p-3" style={{ borderColor: C.line, flex: "1 1 0", minWidth: 210 }}>
-          <div className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>ON TIME</div>
-          {punctual.pct == null ? (
+        <div className="rounded-lg border bg-white p-3" style={{ borderColor: C.line, flex: "1 1 0", minWidth: 232 }} title={OTD_FORMULA}>
+          <div className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>
+            OTD % <span style={{ cursor: "help", color: C.navy }} title={OTD_FORMULA}>ⓘ</span>
+          </div>
+          {otd.pct == null ? (
             <>
               <div className="tnum font-bold" style={{ fontSize: 22, color: C.faint }}>—</div>
               <div className="text-xs" style={{ color: C.faint, lineHeight: 1.45 }}>
-                No job in this period carries both a target date and a delivery date.
+                Nothing delivered in this period carries a promised date, so there is nothing to measure against.
+                {otd.unjudgeable > 0 && <> All {otd.unjudgeable} are unjudgeable rather than late.</>}
               </div>
             </>
           ) : (
             <>
-              <div className="tnum font-bold" style={{ fontSize: 26, color: punctual.pct >= 80 ? C.green : punctual.pct >= 50 ? C.amber : C.red }}>
-                {Math.round(punctual.pct)}%
+              <div className="flex items-baseline gap-2">
+                <span className="tnum font-bold" style={{ fontSize: 26, color: otd.pct >= 80 ? C.green : otd.pct >= 50 ? C.amber : C.red }}>
+                  {Math.round(otd.pct)}%
+                </span>
+                <span className="text-xs tnum" style={{ color: C.mute }}>{otd.onTime}/{otd.measurable}</span>
               </div>
-              <div className="text-xs" style={{ color: C.sub, lineHeight: 1.45 }}>
-                {punctual.onTime} of {punctual.measurable} delivered on or before the target date they carried at the end.
-                {punctual.measurable < totals.nos && (
-                  <span style={{ color: C.faint }}> {totals.nos - punctual.measurable} had no target date to judge against.</span>
+              <div className="mt-1" style={{ height: 7, background: "#EFEDE7", borderRadius: 2, overflow: "hidden" }}>
+                <div style={{
+                  width: `${Math.max(0, Math.min(100, otd.pct))}%`, height: 7,
+                  background: otd.pct >= 80 ? C.green : otd.pct >= 50 ? C.amber : C.red,
+                }} />
+              </div>
+              <div className="text-xs mt-1" style={{ color: C.sub, lineHeight: 1.45 }}>
+                Delivered on or before the <b>OTD Date</b> promised to the customer.
+                {otd.late > 0 && otd.avgDaysLate != null && (
+                  <> The {otd.late} late {otd.late === 1 ? "one ran" : "ones ran"} <b>{otd.avgDaysLate} days</b> over on average.</>
                 )}
               </div>
+              {otd.unjudgeable > 0 && (
+                <div className="text-xs mt-1" style={{ color: C.amber, lineHeight: 1.45 }}>
+                  {otd.unjudgeable} of the {totals.nos} delivered carry no promised date. They are excluded, not counted late —
+                  a missing date is a record-keeping gap, not a delivery failure.
+                </div>
+              )}
             </>
           )}
         </div>

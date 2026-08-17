@@ -19,20 +19,31 @@ const NOT_INSTALLED = /delivered_jobs|does not exist|schema cache/i;
  * being true.
  */
 const MAX_ROWS = 20000;
+/**
+ * PostgREST caps a single response at 1000 rows and IGNORES a larger .limit().
+ * The ledger holds 2,728, so the first cut of this route silently served the
+ * most recent 1000 and the page reported "1000 dated · 0 undated" — a truncation
+ * that reads as a complete answer, which is the worst kind. Page explicitly.
+ */
+const PAGE = 1000;
 
 export async function GET() {
   try {
     await requireReader();
     const db = supabaseServer();
 
-    const { data, error } = await db
-      .from("delivered_jobs")
-      .select("id, tag, fam, cust, val, delivered_on, date_source, tdd, otd, proj, stat, own, tp, tpv, tpp")
-      .order("delivered_on", { ascending: false, nullsFirst: false })
-      .limit(MAX_ROWS);
-    if (error) throw new Error(error.message);
-
-    const rows = data || [];
+    const rows: Record<string, unknown>[] = [];
+    for (let from = 0; from < MAX_ROWS; from += PAGE) {
+      const { data, error } = await db
+        .from("delivered_jobs")
+        .select("id, tag, fam, cust, val, delivered_on, date_source, tdd, otd, proj, stat, own, tp, tpv, tpp")
+        .order("delivered_on", { ascending: false, nullsFirst: false })
+        .order("id", { ascending: true }) // stable tiebreak, so pages can't overlap or skip
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(error.message);
+      rows.push(...(data || []));
+      if (!data || data.length < PAGE) break;
+    }
 
     // When the report last landed, and which header the date was read from —
     // both belong on the page, because a dashboard whose source silently
