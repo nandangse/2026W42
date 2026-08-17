@@ -32,6 +32,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "2.6.2.0",
+    date: "2026-08-17",
+    module: "Tasking · Job Plan · Header · Admin",
+    items: [
+      "Nandan Tasking now has six views: By Jobs, By Projects, By Department, By Goals, By Escalations and Brain Dump.",
+      "Three tick-boxes decide whose tasks you see — my tasks, tasks I assigned, and tasks of people reporting to me. All three are on when you open the page.",
+      "Brain Dump is a private capture pad: type the task, add assignee, due date, category, escalation, project, job, goal and the details, and it drops below the line under its category. Each line is then ticked Done or pushed onto the board as a real task.",
+      "“Reports to” is now set per person in Admin → User management — that is what feeds the reporting-line tick-box.",
+      "Every Job Plan now carries a Genie Hint on the right of the header: a written read of how the job has been handled, what would actually move the delivery date, and everyone on it from the job owner down to each task assignee.",
+      "Each milestone has a spanner beside its name — click it for the full detail (dates, crew, man-days, what it waits on, what it unblocks, and how it sits against Target Delivery). After the first click a hover is enough.",
+      "Upload Excel moved out of the header and into the account menu, and is now limited to admins and Shweta.",
+      "New Delivered Jobs tab next to Planning Suite — reserved, nothing in it yet.",
+    ],
+  },
+  {
     v: "2.6.1.1",
     date: "2026-08-17",
     module: "Header · Account menu",

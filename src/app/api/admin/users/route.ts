@@ -55,7 +55,7 @@ export async function GET() {
     const admin = adminClient();
     const { data, error } = await admin
       .from("profiles")
-      .select("id, email, role, disabled, initials, display_name, erp_owner, created_at")
+      .select("id, email, role, disabled, initials, display_name, erp_owner, reports_to, created_at")
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
 
@@ -189,6 +189,14 @@ export async function POST(req: Request) {
       if ("initials" in body) patch.initials = normInitials(body.initials);
       if ("display_name" in body) patch.display_name = String(body.display_name || "").trim() || null;
       if ("erp_owner" in body) patch.erp_owner = String(body.erp_owner || "").trim() || null;
+      if ("reports_to" in body) {
+        // the line manager, which Tasking's "people reporting to me" reads.
+        // Nobody reports to themselves — that would make them their own report
+        // and double every task in that filter.
+        const mgr = String(body.reports_to || "").trim() || null;
+        if (mgr && mgr === body.id) throw new HttpError(400, "Someone cannot report to themselves");
+        patch.reports_to = mgr;
+      }
       if (!Object.keys(patch).length)
         return NextResponse.json({ error: "nothing to update" }, { status: 400 });
       const { error } = await admin.from("profiles").update(patch).eq("id", body.id);

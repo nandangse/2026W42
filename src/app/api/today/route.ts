@@ -54,6 +54,18 @@ export async function GET() {
       db.from("manual_tasks").select("id, job_id, title, who, due, cat, esc, done").eq("done", false),
     ]);
 
+    // Name of the root goal each item hangs off — Tasking's "By Goals" view
+    // groups on it, and a bare uuid is no use to anyone reading a board.
+    const goalNames: Record<string, string> = {};
+    const rootIds = [...new Set(goalData.map((g: any) => g.goal_id).filter(Boolean))] as string[];
+    if (rootIds.length) {
+      try {
+        const { data } = await admin.from("goal_node").select("id, what, goal_num").in("id", rootIds);
+        for (const g of data || [])
+          goalNames[g.id as string] = `${g.goal_num ? "G" + g.goal_num + " · " : ""}${g.what || "Goal"}`;
+      } catch { /* pre-0010: no goals layer, names stay empty */ }
+    }
+
     if (erpRows.error) throw new Error(erpRows.error.message);
     if (manualRows.error) throw new Error(manualRows.error.message);
 
@@ -73,6 +85,8 @@ export async function GET() {
           ? Math.max(0, Math.round((Date.parse(T) - Date.parse(g.start_date)) / 86400000))
           : 0,
         cat: g.node_type === "key_result" ? "Key result" : "Tactic",
+        goalId: (g.goal_id ?? null) as string | null,
+        goalName: (g.goal_id && goalNames[g.goal_id]) || "Unlinked goal work",
         esc: null as string | null,
         late: !!(g.original_end || g.end_date) && (g.original_end || g.end_date)! < T,
       })),
@@ -90,6 +104,8 @@ export async function GET() {
           pushCount: 0,
           carriedDays: 0,
           cat: t.cat,
+          goalId: null as string | null,
+          goalName: "",
           esc: t.esc,
           late: !!t.due && t.due < T,
         })),

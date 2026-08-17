@@ -60,6 +60,8 @@ interface Person {
   initials: string | null;
   name: string | null;
   erpOwner: string | null;
+  /** Line manager (profiles.id), set in Admin → User management. */
+  reportsTo: string | null;
 }
 
 /** Label for a person: "RK · Ravi Kumar" style, falling back sensibly. */
@@ -156,6 +158,8 @@ interface Task {
   cat: string;
   esc: string;
   done: boolean;
+  /** Email of whoever raised it. null for ERP ToDos — they have no Genie author. */
+  by: string | null;
   comments: number;
 }
 interface Board {
@@ -186,6 +190,7 @@ interface AdminUser {
   initials: string | null;
   display_name: string | null;
   erp_owner: string | null;
+  reports_to: string | null;
   sales_access: boolean;
   sales_implicit: boolean; // the owner — always yes, not toggleable
 }
@@ -214,6 +219,14 @@ const erpJobLink = (id: string) => "https://nandanerp.in/app/jobmaster/" + id;
 
 /** The single account above the admin tier. Mirrors RAGHU_EMAIL on the server. */
 const OWNER_EMAIL = "raghu@nandan.co.in";
+
+/**
+ * Who may push the morning Excel from inside the suite: admins, plus Shweta —
+ * the one non-admin whose job it is. The server still enforces this (the
+ * upload route requires the uploader or admin role); this only decides whether
+ * the menu item is worth showing.
+ */
+const UPLOADER_EMAIL = "shweta@nandan.co.in";
 
 // Default milestone plan for a product family: admin-saved DB templates first
 // (exact name, then partial match), then the "Default" template, then the
@@ -272,6 +285,8 @@ export default function PlanningSuite({
   const router = useRouter();
   const isAdmin = role === "admin";
   const canEdit = role === "admin" || role === "planner" || role === "project_owner";
+  // Upload lives in the account menu now — admins and Shweta only.
+  const canUpload = isAdmin || email.toLowerCase() === UPLOADER_EMAIL;
   const me = useMemo(
     () => ({ email, initials, displayName, erpOwner, role }),
     [email, initials, displayName, erpOwner, role],
@@ -283,7 +298,7 @@ export default function PlanningSuite({
   // sticky sub-nav. "tab" is only meaningful inside the Planning Suite
   // workspace now — Goals and Tasking are whole workspaces, not sub-tabs.
   // Sales-team members live in Sales Genie — land them there directly.
-  const [workspace, setWorkspace] = useState<"suite" | "goals" | "tasking" | "sales">(
+  const [workspace, setWorkspace] = useState<"suite" | "delivered" | "goals" | "tasking" | "sales">(
     role === "sales" ? "sales" : "suite",
   );
   // land on "My Week" within the suite, not the delivery board
@@ -494,6 +509,9 @@ export default function PlanningSuite({
   // spec's "granted, not default" rule.
   const WORKSPACE_DEFS: [typeof workspace, string][] = [
     ["suite", "🧭 Planning Suite"],
+    // Placeholder — the delivered-jobs history board is next; the tab is here
+    // so the header ordering is settled and people know it's coming.
+    ["delivered", "✅ Delivered Jobs"],
     ...(goalsAccess ? ([["goals", "🎯 Goals"]] as [typeof workspace, string][]) : []),
     ["tasking", "📋 Nandan Tasking"],
     ...(salesAccess ? ([["sales", "💼 Sales Genie"]] as [typeof workspace, string][]) : []),
@@ -536,11 +554,6 @@ export default function PlanningSuite({
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={(e) => onFile(e.target.files?.[0] || null)} />
-            {isAdmin && (
-              <button onClick={() => fileRef.current?.click()} className="text-xs rounded px-3 py-1.5 font-bold" style={{ background: "#E8600A", color: "#fff" }}>
-                ⬆ Upload Excel
-              </button>
-            )}
             {role === "viewer" && (
               <span className="text-xs rounded px-2 py-1.5 font-bold" style={{ background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }} title="Your account is read-only">
                 👁 Read-only
@@ -657,6 +670,16 @@ export default function PlanningSuite({
                         {!initials && <span style={{ color: "#B3261E" }}> · no initials set</span>}
                       </div>
                     </div>
+                    {canUpload && (
+                      <button
+                        onClick={() => { setUserOpen(false); fileRef.current?.click(); }}
+                        className="w-full text-left px-3 py-2 text-sm font-bold hover:bg-gray-50"
+                        style={{ color: "#E8600A", borderBottom: "1px solid #EEECE6" }}
+                        title="Push a morning Excel — Jobs, Projects, ToDo, or the full PRE workbook"
+                      >
+                        ⬆ Upload Excel
+                      </button>
+                    )}
                     <button
                       onClick={() => { setUserOpen(false); setProfileOpen(true); }}
                       className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
@@ -764,7 +787,18 @@ export default function PlanningSuite({
           <GoalsBoard canEditPlanning={canEdit} />
         </div>
       )}
-      {workspace === "tasking" && <Tasking board={board} onOpen={openJobPlan} reload={reload} />}
+      {workspace === "delivered" && (
+        <div className="p-4">
+          <div className="bg-white rounded-lg border p-8 text-center" style={{ borderColor: "#E2E0DA" }}>
+            <div className="text-2xl mb-1">✅</div>
+            <div className="font-bold text-lg" style={{ color: "#16232F" }}>Delivered Jobs</div>
+            <div className="text-sm mt-1" style={{ color: "#8A94A0" }}>
+              Reserved — the delivered-jobs history goes here. Nothing to show yet.
+            </div>
+          </div>
+        </div>
+      )}
+      {workspace === "tasking" && <Tasking board={board} onOpen={openJobPlan} reload={reload} me={me} people={board.people || []} />}
       {/* same keep-alive pattern as Goals — the playbook iframe loads once */}
       {salesVisited && salesAccess && (
         <div style={{ display: workspace === "sales" ? undefined : "none" }}>
@@ -959,6 +993,9 @@ interface TodayItem {
   pushCount: number;
   carriedDays: number;
   cat: string;
+  /** Goal items only — the root goal this hangs off, for Tasking's By Goals. */
+  goalId?: string | null;
+  goalName?: string;
   esc: string | null;
   late: boolean;
 }
@@ -1931,6 +1968,232 @@ function LoadBoard({ board, byTDD }: { board: Board; byTDD: Job[] }) {
   );
 }
 
+// ============================ Milestone details ============================
+/**
+ * The spanner beside every milestone name. Click it once and the full detail
+ * opens; after that a hover is enough — the panel follows the mouse until it is
+ * clicked shut again. Read-only: everything here is editable in the row itself,
+ * this just puts the whole picture in one place without widening the table.
+ */
+function MilestoneSpanner({
+  m, job, preds, succ,
+}: {
+  m: ScheduledRow;
+  job: Job;
+  preds: ScheduledRow[];
+  succ: number[];
+}) {
+  const [pinned, setPinned] = useState(false);
+  const [hover, setHover] = useState(false);
+  // hover only reveals it once you've opened it at least once — otherwise the
+  // table twitches at every mouse sweep
+  const [primed, setPrimed] = useState(false);
+  const shown = pinned || (primed && hover);
+
+  const crewList = TRADES.filter((t) => (m.crew[t.key] || 0) > 0);
+  const late = !m.done && m.end < TODAY;
+  const slipVsTdd = job.tdd ? diffDays(job.tdd, m.end) : null;
+
+  return (
+    <span className="relative flex-shrink-0">
+      <button
+        onClick={() => { setPinned((p) => !p); setPrimed(true); }}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        className="rounded px-1"
+        style={{ color: shown ? "#E8600A" : "#B8B5AC", fontSize: 12, lineHeight: 1 }}
+        title={primed ? "Milestone details — hover to peek, click to pin" : "Milestone details"}
+        aria-label="Milestone details"
+      >
+        🔧
+      </button>
+      {shown && (
+        <>
+          {pinned && <div className="fixed inset-0" style={{ zIndex: 58 }} onClick={() => setPinned(false)} />}
+          <div
+            onMouseEnter={() => setHover(true)}
+            onMouseLeave={() => setHover(false)}
+            className="absolute rounded-lg border bg-white p-3 text-left"
+            style={{ top: "calc(100% + 4px)", left: 0, width: 290, borderColor: "#E2E0DA", boxShadow: "0 12px 30px rgba(0,0,0,.22)", zIndex: 59 }}
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="font-bold text-sm" style={{ color: "#16232F" }}>M{m.idx} · {m.name}</div>
+              {pinned && <button onClick={() => setPinned(false)} className="text-xs font-bold" style={{ color: "#8A94A0" }}>✕</button>}
+            </div>
+            <div className="text-xs mb-2" style={{ color: m.done ? "#0D7A3F" : late ? "#B3261E" : "#8A94A0" }}>
+              {m.done ? `Completed${m.done_on ? " " + fmtFull(m.done_on) : ""}` : late ? `Not done — ${diffDays(m.end, TODAY)} days past its end date` : "Pending"}
+            </div>
+
+            <ProfileRow label="Runs" value={`${fmtFull(m.start)} → ${fmtFull(m.end)}`} hint={`${m.days} day${m.days === 1 ? "" : "s"}${m.shift === "N" ? " · night shift" : m.shift === "DN" ? " · day + night" : " · day shift"}`} />
+            <ProfileRow
+              label="Crew"
+              value={crewList.length ? crewList.map((t) => `${m.crew[t.key]} ${t.label.toLowerCase()}`).join(", ") : "none assigned"}
+              hint={`${manDays(m)} man-days`}
+            />
+            <ProfileRow
+              label="Depends on"
+              value={(m.preds || []).length ? (m.preds || []).map((p) => `M${p} ${preds.find((x) => x.idx === p)?.name ?? ""}`.trim()).join(", ") : "nothing — it can start on day one"}
+            />
+            <ProfileRow label="Unblocks" value={succ.length ? succ.map((s) => `M${s} ${preds.find((x) => x.idx === s)?.name ?? ""}`.trim()).join(", ") : "nothing downstream"} />
+            {slipVsTdd !== null && (
+              <ProfileRow
+                label="vs Target Delivery"
+                value={slipVsTdd > 0 ? `ends ${slipVsTdd} days after` : slipVsTdd === 0 ? "ends on the target date" : `ends ${Math.abs(slipVsTdd)} days before`}
+                hint={`Target ${fmtFull(job.tdd)}`}
+              />
+            )}
+            <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>
+              Change any of this in the row itself — this panel is a read-only summary.
+            </div>
+          </div>
+        </>
+      )}
+    </span>
+  );
+}
+
+/** The shape computeSchedule returns — named so the panel above can take one. */
+type ScheduledRow = ReturnType<typeof computeSchedule>[number];
+
+// ============================ Genie Hint ============================
+interface Hint {
+  headline: string;
+  status: "on_track" | "at_risk" | "late" | "done" | "unknown";
+  story: string;
+  actions: string[];
+  watch: string;
+  people: {
+    owner: string | null;
+    manager: string | null;
+    assignees: { handle: string; name: string; open: number }[];
+  };
+  at: string;
+  cached?: boolean;
+}
+
+const HINT_STATUS: Record<Hint["status"], { label: string; bg: string; fg: string }> = {
+  on_track: { label: "ON TRACK", bg: "#E6F4EA", fg: "#0D7A3F" },
+  at_risk: { label: "AT RISK", bg: "#FFF4E0", fg: "#B26A00" },
+  late: { label: "LATE", bg: "#FBEDEA", fg: "#B3261E" },
+  done: { label: "DELIVERED", bg: "#E6F4EA", fg: "#0D7A3F" },
+  unknown: { label: "NOT ENOUGH DATA", bg: "#F4F2EC", fg: "#8A94A0" },
+};
+
+/**
+ * The written read on the right of the Job Plan header: how the job is being
+ * handled, what would actually move it, and who is on it.
+ *
+ * Deliberately click-to-load. Opening a job should never wait on a model, and
+ * plans are edited far more often than they are re-read — so the brief is
+ * asked for, not pushed. The server caches each job's brief for 30 minutes.
+ */
+function GenieHint({ jobId, jobLabel }: { jobId: string; jobLabel: string }) {
+  const [hint, setHint] = useState<Hint | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  // a different job is a different brief — never show the last job's read
+  useEffect(() => { setHint(null); setErr(""); }, [jobId]);
+
+  const ask = async (refresh = false) => {
+    setBusy(true);
+    setErr("");
+    try {
+      const r = await api.post("/api/genie-hint", { job_id: jobId, refresh });
+      setHint(r);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+
+  const st = hint ? HINT_STATUS[hint.status] ?? HINT_STATUS.unknown : null;
+
+  return (
+    <div
+      className="bg-white rounded-lg p-3 border"
+      style={{ borderColor: "#E2E0DA", borderLeft: "5px solid #7C3AED", flex: "1 1 340px", minWidth: 300, maxWidth: 520 }}
+    >
+      <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+        <div className="text-xs font-bold tracking-widest" style={{ color: "#7C3AED" }}>✨ GENIE HINT</div>
+        <div className="flex items-center gap-2">
+          {st && <span className="text-xs font-bold rounded px-1.5 py-0.5" style={{ background: st.bg, color: st.fg }}>{st.label}</span>}
+          {hint && (
+            <button onClick={() => ask(true)} disabled={busy} className="text-xs font-bold" style={{ color: "#7C3AED", opacity: busy ? 0.5 : 1 }} title="Re-read the job from scratch">
+              ↻
+            </button>
+          )}
+        </div>
+      </div>
+
+      {!hint && !busy && !err && (
+        <>
+          <div className="text-xs mb-2" style={{ color: "#5A6672" }}>
+            A written read on <b>{jobLabel}</b> — how it has been handled, what would move the delivery date, and who is on it. Built from this job&apos;s own plan, materials and tasks.
+          </div>
+          <button onClick={() => ask()} className="rounded px-3 py-1.5 font-bold text-sm" style={{ background: "#7C3AED", color: "#fff" }}>
+            Brief me on this job
+          </button>
+        </>
+      )}
+
+      {busy && (
+        <div className="flex items-center gap-2 py-4">
+          <div className="animate-spin rounded-full" style={{ width: 18, height: 18, border: "2px solid #EDE7F9", borderTopColor: "#7C3AED" }} />
+          <span className="text-sm" style={{ color: "#5A6672" }}>Reading the plan, materials and tasks…</span>
+        </div>
+      )}
+
+      {err && !busy && (
+        <div className="text-xs" style={{ color: "#B3261E" }}>
+          {err}
+          <button onClick={() => ask()} className="ml-2 font-bold" style={{ color: "#7C3AED" }}>try again</button>
+        </div>
+      )}
+
+      {hint && !busy && (
+        <div style={{ maxHeight: 420, overflowY: "auto" }}>
+          <div className="text-sm font-bold mb-1" style={{ color: "#16232F" }}>{hint.headline}</div>
+          <div className="text-sm" style={{ color: "#5A6672" }}>{hint.story}</div>
+
+          {hint.actions.length > 0 && (
+            <>
+              <div className="text-xs font-bold mt-2 mb-0.5" style={{ color: "#8A94A0" }}>TO DELIVER THIS JOB</div>
+              <ul style={{ listStyle: "disc", paddingLeft: 18 }}>
+                {hint.actions.map((a, i) => (<li key={i} className="text-sm" style={{ color: "#16232F" }}>{a}</li>))}
+              </ul>
+            </>
+          )}
+
+          {hint.watch && (
+            <div className="rounded px-2 py-1.5 mt-2 text-xs" style={{ background: "#FFF4E0", color: "#7A4A00" }}>
+              <b>Watch:</b> {hint.watch}
+            </div>
+          )}
+
+          <div className="text-xs font-bold mt-2 mb-1" style={{ color: "#8A94A0" }}>WHO IS ON IT</div>
+          <div className="text-xs" style={{ color: "#5A6672" }}>
+            <div><b style={{ color: "#16232F" }}>Job owner:</b> {hint.people.owner || "not recorded"}</div>
+            {hint.people.manager && <div><b style={{ color: "#16232F" }}>Project manager:</b> {hint.people.manager}</div>}
+          </div>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {hint.people.assignees.length === 0 && (
+              <span className="text-xs" style={{ color: "#8A94A0" }}>Nobody is carrying an open task on this job.</span>
+            )}
+            {hint.people.assignees.map((a) => (
+              <span key={a.handle} className="text-xs rounded px-1.5 py-0.5" style={{ background: "#F4F2EC", color: "#16232F" }} title={`${a.open} open task${a.open === 1 ? "" : "s"}`}>
+                {a.name} <b style={{ color: "#E8600A" }}>{a.open}</b>
+              </span>
+            ))}
+          </div>
+
+          <div className="text-xs mt-2" style={{ color: "#B8B5AC" }}>
+            Written by Claude from Genie&apos;s own data{hint.cached ? " · cached" : ""} · check the plan below before acting on it.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============================ Job Plan ============================
 const MAT_ITEMS = [
   "Chassis / base frame steel", "Structural sections & plates", "Hydraulic powerpack",
@@ -2218,8 +2481,9 @@ function JobPlan({
         )}
       </div>
 
-      {/* header card */}
-      <div className="bg-white rounded-lg p-3 mb-3 border" style={{ borderColor: "#E2E0DA", borderLeft: "5px solid #E8600A" }}>
+      {/* header card — facts on the left, Genie's read on the right */}
+      <div className="flex gap-3 mb-3 items-stretch" style={{ flexWrap: "wrap" }}>
+      <div className="bg-white rounded-lg p-3 border" style={{ borderColor: "#E2E0DA", borderLeft: "5px solid #E8600A", flex: "1 1 620px", minWidth: 320 }}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-baseline gap-2 flex-wrap">
@@ -2273,6 +2537,9 @@ function JobPlan({
         {dj.tdd && ends > dj.tdd && (
           <div className="mt-2 text-xs font-bold rounded px-2 py-1 inline-block" style={{ background: "#B3261E", color: "#fff" }}>⚠ Plan ends {diffDays(dj.tdd, ends)} days after Target Delivery — compress durations or add crew</div>
         )}
+      </div>
+
+      <GenieHint jobId={dj.id} jobLabel={`JOB ${jobNo(dj.id)} · ${dj.tag}`} />
       </div>
 
       {/* plan / materials sub-tabs */}
@@ -2348,7 +2615,12 @@ function JobPlan({
                   <tr key={i} className="border-t" onDragOver={(e) => e.preventDefault()} onDrop={() => { moveMilestoneTo(dragMi, i); setDragMi(null); }} style={{ borderColor: "#EFEDE7", background: dragMi === i ? "#FFF3E8" : i % 2 ? "#FAF9F5" : "#fff" }}>
                     <td className="px-2 py-1 text-center"><input type="checkbox" checked={!!m.done} onChange={() => { toggleMsDone(i); pushERP("Job Plan", dj.id, "milestone_" + m.idx + "_done", !m.done ? "completed " + fmtFull(TODAY) : "re-opened"); }} title={m.done ? "Completed " + fmtFull(m.done_on || "") : "Mark milestone complete"} style={{ accentColor: "#0D7A3F", width: 15, height: 15, cursor: "pointer" }} /></td>
                     <td className="px-2 py-1 font-bold whitespace-nowrap" style={{ color: "#E8600A", textDecoration: m.done ? "line-through" : "none", opacity: m.done ? 0.6 : 1 }}><span draggable onDragStart={() => setDragMi(i)} title="Drag to reorder" style={{ cursor: "grab", color: "#B8B5AC" }}>⠿ </span>{m.idx}</td>
-                    <td className="px-2 py-1"><input value={m.name} onChange={(e) => setMilestone(i, { name: e.target.value })} className="w-full px-1 py-0.5 rounded border bg-transparent" style={{ borderColor: "transparent" }} onFocus={(e) => (e.target.style.borderColor = "#E8600A")} onBlur={(e) => (e.target.style.borderColor = "transparent")} /></td>
+                    <td className="px-2 py-1">
+                      <div className="flex items-center gap-1">
+                        <input value={m.name} onChange={(e) => setMilestone(i, { name: e.target.value })} className="flex-1 px-1 py-0.5 rounded border bg-transparent" style={{ borderColor: "transparent" }} onFocus={(e) => (e.target.style.borderColor = "#E8600A")} onBlur={(e) => (e.target.style.borderColor = "transparent")} />
+                        <MilestoneSpanner m={m} job={dj} preds={sched} succ={successors[m.idx] || []} />
+                      </div>
+                    </td>
                     <td className="px-1 py-1 text-center">
                       <div className="flex flex-wrap gap-0.5 justify-center items-center" style={{ maxWidth: 92 }}>
                         {(m.preds || []).map((p) => (<button key={p} onClick={() => togglePred(i, p)} title={`Remove predecessor ${p}`} className="text-xs rounded px-1 font-bold" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>{p}×</button>))}
@@ -2468,7 +2740,7 @@ function JobPlan({
                 const open = sched.filter((m) => !m.done);
                 const doneMs = sched.filter((m) => m.done);
                 const card = (m: typeof sched[number]) => (
-                  <TaskCard key={"ms" + m.idx} onOpen={() => {}} t={{ id: "ms" + m.idx, kind: "manual", done: !!m.done, j: dj.id, t: `M${m.idx} · ${m.name}`, d: `${fmt(m.start)} → ${fmt(m.end)} · ${manDays(m)} man-days`, who: dj.own || "plan", due: m.end, cat: "Milestone", esc: "None", comments: 0 }} />
+                  <TaskCard key={"ms" + m.idx} onOpen={() => {}} t={{ id: "ms" + m.idx, kind: "manual", done: !!m.done, j: dj.id, t: `M${m.idx} · ${m.name}`, d: `${fmt(m.start)} → ${fmt(m.end)} · ${manDays(m)} man-days`, who: dj.own || "plan", due: m.end, cat: "Milestone", esc: "None", by: null, comments: 0 }} />
                 );
                 return (
                   <div className="rounded-lg p-2" style={{ background: "#DDE6EE", minWidth: 230, maxWidth: 260, border: "1px solid #B9C7D4" }}>
@@ -2555,7 +2827,31 @@ function TaskCard({ t, onOpen, onDelete }: { t: Task; onOpen: (t: Task) => void;
 }
 
 // ============================ Tasking ============================
-function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string) => void; reload: () => Promise<Board | null> }) {
+/** The six ways of looking at the same task list. */
+const TASKING_VIEWS = [
+  ["jobs", "By Jobs"],
+  ["projects", "By Projects"],
+  ["dept", "By Department"],
+  ["goals", "By Goals"],
+  ["esc", "By Escalations"],
+  ["dump", "🧠 Brain Dump"],
+] as const;
+type TaskingView = (typeof TASKING_VIEWS)[number][0];
+
+function Tasking({
+  board,
+  onOpen,
+  reload,
+  me,
+  people,
+}: {
+  board: Board;
+  onOpen: (id: string) => void;
+  reload: () => Promise<Board | null>;
+  me: { email: string; initials: string | null; displayName: string | null; erpOwner: string | null; role: string };
+  people: Person[];
+}) {
+  const [view, setView] = useState<TaskingView>("jobs");
   const [filterCust, setFilterCust] = useState("all");
   const [filterFam, setFilterFam] = useState("all");
   const [filterOwn, setFilterOwn] = useState("all");
@@ -2568,13 +2864,52 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
 
   const [dueUpTo, setDueUpTo] = useState("");
 
+  // ---- whose tasks: all three on by default, so the board opens complete ----
+  const [scope, setScope] = useState({ mine: true, byMe: true, reports: true });
+
+  /** My own account row — the anchor for "who reports to me". */
+  const myProfile = useMemo(
+    () => people.find((p) => p.email.toLowerCase() === me.email.toLowerCase()) || null,
+    [people, me.email],
+  );
+  /** Every string a direct report's task might be filed under. */
+  const reportHandles = useMemo(() => {
+    if (!myProfile) return new Set<string>();
+    const s = new Set<string>();
+    for (const p of people) {
+      if (p.reportsTo !== myProfile.id) continue;
+      for (const v of [p.initials, p.name, p.erpOwner, p.email, p.email.split("@")[0]])
+        if (v) s.add(String(v).toLowerCase());
+    }
+    return s;
+  }, [people, myProfile]);
+  const reportCount = useMemo(
+    () => (myProfile ? people.filter((p) => p.reportsTo === myProfile.id).length : 0),
+    [people, myProfile],
+  );
+  const mineHandles = useMemo(() => myHandles(me), [me]);
+
+  const anyScope = scope.mine || scope.byMe || scope.reports;
+  const inScope = useCallback(
+    (t: Task) => {
+      if (!anyScope) return true; // nothing ticked reads as "show me everything"
+      const who = String(t.who || "").toLowerCase();
+      if (scope.mine && mineHandles.has(who)) return true;
+      if (scope.byMe && t.by && t.by.toLowerCase() === me.email.toLowerCase()) return true;
+      if (scope.reports && reportHandles.has(who)) return true;
+      return false;
+    },
+    [anyScope, scope, mineHandles, reportHandles, me.email],
+  );
+
   const custs = useMemo(() => [...new Set(board.jobs.map((j) => j.cust))].sort(), [board]);
   const fams = useMemo(() => [...new Set(board.jobs.map((j) => j.fam))].sort(), [board]);
   const owners = board.owners;
-  // "up to date" filter: only tasks due on/before the chosen date (blank = all)
+  // "up to date" filter: only tasks due on/before the chosen date (blank = all),
+  // then the who-filter above it
   const filteredTasks = useMemo(
-    () => board.tasks.filter((t) => !dueUpTo || ((t.due || "9999-12-31") <= dueUpTo)),
-    [board, dueUpTo],
+    () => board.tasks.filter((t) => (!dueUpTo || (t.due || "9999-12-31") <= dueUpTo) && inScope(t)),
+    [board, dueUpTo, inScope],
   );
   // group tasks by job once instead of scanning the whole task list per job
   const tasksByJob = useMemo(() => {
@@ -2627,6 +2962,53 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
 
   return (
     <div className="p-4">
+      {/* ---- the six ways of reading the same list ---- */}
+      <div className="flex gap-1 rounded p-1 bg-white border mb-2" style={{ borderColor: "#D9D6CD", width: "fit-content", overflowX: "auto" }}>
+        {TASKING_VIEWS.map(([k, l]) => (
+          <button
+            key={k}
+            onClick={() => setView(k)}
+            className="px-3 py-1 rounded text-sm font-semibold whitespace-nowrap"
+            style={view === k ? { background: "#E8600A", color: "#fff" } : { color: "#5A6672" }}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* ---- whose tasks: all three on by default ---- */}
+      {view !== "dump" && (
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <span className="text-xs font-bold" style={{ color: "#8A94A0" }}>SHOW</span>
+          {([
+            ["mine", "My tasks", "Tasks assigned to you"],
+            ["byMe", "Tasks assigned by me", "Tasks you raised, whoever is carrying them"],
+            ["reports", `Tasks of people reporting to me${reportCount ? ` (${reportCount})` : ""}`, reportCount ? "Direct reports, set in Admin → User management" : "Nobody reports to you yet — set it in Admin → User management"],
+          ] as const).map(([k, label, hint]) => (
+            <label
+              key={k}
+              className="text-xs flex items-center gap-1 px-2 py-1.5 rounded border cursor-pointer font-semibold"
+              style={{
+                borderColor: scope[k] ? "#E8600A" : "#D9D6CD",
+                background: scope[k] ? "#FFF3E8" : "#fff",
+                color: scope[k] ? "#E8600A" : "#8A94A0",
+              }}
+              title={hint}
+            >
+              <input type="checkbox" checked={scope[k]} onChange={(e) => setScope({ ...scope, [k]: e.target.checked })} />
+              {label}
+            </label>
+          ))}
+          {!anyScope && (
+            <span className="text-xs" style={{ color: "#8A94A0" }}>nothing ticked — showing everybody&apos;s tasks</span>
+          )}
+        </div>
+      )}
+
+      {view === "dump" ? (
+        <BrainDump board={board} reload={reload} />
+      ) : (
+      <>
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <select value={filterCust} onChange={(e) => setFilterCust(e.target.value)} className="px-2 py-1.5 rounded border bg-white text-sm" style={{ borderColor: "#D9D6CD", maxWidth: 240 }}>
           <option value="all">All customers</option>{custs.map((c) => (<option key={c}>{c}</option>))}
@@ -2646,16 +3028,29 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
           <input type="date" value={dueUpTo} onChange={(e) => setDueUpTo(e.target.value)} className="text-xs border rounded px-1 py-0.5" style={{ borderColor: "#E2E0DA" }} />
           {dueUpTo && (<button onClick={() => setDueUpTo("")} className="font-bold" style={{ color: "#E8600A" }} title="Clear">✕</button>)}
         </label>
-        <div className="flex gap-1 rounded p-1 bg-white border" style={{ borderColor: "#D9D6CD" }}>
-          {(["board", "cal"] as const).map((k) => (<button key={k} onClick={() => setTaskView(k)} className="px-3 py-1 rounded text-sm font-semibold" style={taskView === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>{k === "board" ? "Board" : "📅 Calendar (ISO weeks)"}</button>))}
-        </div>
+        {view === "jobs" && (
+          <div className="flex gap-1 rounded p-1 bg-white border" style={{ borderColor: "#D9D6CD" }}>
+            {(["board", "cal"] as const).map((k) => (<button key={k} onClick={() => setTaskView(k)} className="px-3 py-1 rounded text-sm font-semibold" style={taskView === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>{k === "board" ? "Board" : "📅 Calendar (ISO weeks)"}</button>))}
+          </div>
+        )}
       </div>
 
-      {taskView === "board" && taskingJobs.length === 0 && (
+      {view !== "jobs" && (
+        <GroupedTasks
+          view={view}
+          jobs={taskingJobs}
+          tasksByJob={tasksByJob}
+          onOpen={onOpen}
+          onOpenTask={setLightbox}
+          onDelete={deleteTask}
+        />
+      )}
+
+      {view === "jobs" && taskView === "board" && taskingJobs.length === 0 && (
         <div className="bg-white border rounded-lg p-6 text-center text-sm" style={{ borderColor: "#E2E0DA", color: "#8A94A0" }}>No jobs with open tasks match this filter — tick &quot;include jobs without tasks&quot; to board every job and add their first tasks here.</div>
       )}
 
-      {taskView === "board" && (
+      {view === "jobs" && taskView === "board" && (
         <div className="space-y-3">
           {taskingJobs.map((j) => {
             const jt = tasksByJob.get(j.id) ?? [];
@@ -2695,7 +3090,7 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
         </div>
       )}
 
-      {taskView === "cal" && (() => {
+      {view === "jobs" && taskView === "cal" && (() => {
         const [yy, mm] = calMonth.split("-").map(Number);
         const first = new Date(Date.UTC(yy, mm - 1, 1));
         const monStart = new Date(first); monStart.setUTCDate(monStart.getUTCDate() - ((monStart.getUTCDay() + 6) % 7));
@@ -2746,7 +3141,422 @@ function Tasking({ board, onOpen, reload }: { board: Board; onOpen: (id: string)
         );
       })()}
 
+      </>
+      )}
+
       {lightbox && <TaskModal task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+    </div>
+  );
+}
+
+/**
+ * Projects / Department / Goals / Escalations all show the SAME tasks the Jobs
+ * view shows — only the bucket changes. One renderer, one grouping function,
+ * so a filter change can never mean four different answers.
+ */
+function GroupedTasks({
+  view,
+  jobs,
+  tasksByJob,
+  onOpen,
+  onOpenTask,
+  onDelete,
+}: {
+  view: TaskingView;
+  jobs: Job[];
+  tasksByJob: Map<string, Task[]>;
+  onOpen: (id: string) => void;
+  onOpenTask: (t: Task) => void;
+  onDelete: (t: Task) => void;
+}) {
+  const rows = useMemo(() => {
+    const out: { t: Task; job: Job }[] = [];
+    for (const j of jobs) for (const t of tasksByJob.get(j.id) ?? []) out.push({ t, job: j });
+    return out;
+  }, [jobs, tasksByJob]);
+
+  // "By Goals" is the odd one out — the goals layer keeps its own to-do engine,
+  // so its items come from /api/today rather than the task board.
+  const [goalItems, setGoalItems] = useState<TodayItem[] | null>(null);
+  useEffect(() => {
+    if (view !== "goals") return;
+    api.get("/api/today").then((r) => setGoalItems((r.items || []).filter((i: TodayItem) => i.source === "goal"))).catch(() => setGoalItems([]));
+  }, [view]);
+
+  if (view === "goals") {
+    if (goalItems === null)
+      return <div className="bg-white rounded-lg border p-6 text-center text-sm" style={{ borderColor: "#E2E0DA", color: "#8A94A0" }}>Loading your goal work…</div>;
+    if (!goalItems.length)
+      return (
+        <div className="bg-white rounded-lg border p-6 text-center text-sm" style={{ borderColor: "#E2E0DA", color: "#8A94A0" }}>
+          No open goal work is assigned to you. Key results and tactics you own appear here once their start date arrives — the tree itself lives in the Goals workspace.
+        </div>
+      );
+    const byGoal = new Map<string, TodayItem[]>();
+    for (const g of goalItems) {
+      const k = g.goalName || "Unlinked goal work";
+      (byGoal.get(k) ?? byGoal.set(k, []).get(k)!).push(g);
+    }
+    return (
+      <div className="space-y-3">
+        <div className="text-xs" style={{ color: "#8A94A0" }}>
+          Your own key results and tactics, grouped by goal. The Show filters above apply to jobs tasks — goal work is always your own.
+        </div>
+        {[...byGoal.entries()].map(([goal, items]) => (
+          <GroupBlock key={goal} label={goal} count={items.length} color="#7C3AED">
+            {items.map((g) => (
+              <div key={g.id} className="rounded p-2 border" style={{ width: 230, background: g.late ? "#FBEDEA" : "#F3EEFB", borderColor: g.late ? "#B3261E" : "#D7CBF0" }}>
+                <div className="text-xs font-semibold" style={{ color: "#16232F" }}>{g.title}</div>
+                <div className="flex justify-between text-xs mt-1" style={{ color: "#5A6672" }}>
+                  <span>{g.cat}</span>
+                  <span className="tnum">{fmt(g.due)}{g.late ? " · late" : ""}</span>
+                </div>
+              </div>
+            ))}
+          </GroupBlock>
+        ))}
+      </div>
+    );
+  }
+
+  // the grouping key for the other three views
+  const keyOf = (r: { t: Task; job: Job }) =>
+    view === "projects"
+      ? (r.job.proj || "").trim() || "No project on the job"
+      : view === "dept"
+        ? (r.t.cat || "").trim() || "Uncategorised"
+        : (r.t.esc || "None").trim();
+
+  const visible = view === "esc" ? rows.filter((r) => (r.t.esc || "None") !== "None" && !r.t.done) : rows;
+  const hiddenCount = view === "esc" ? rows.filter((r) => !r.t.done).length - visible.length : 0;
+
+  const groups = new Map<string, { t: Task; job: Job }[]>();
+  for (const r of visible) {
+    const k = keyOf(r);
+    (groups.get(k) ?? groups.set(k, []).get(k)!).push(r);
+  }
+  // escalations read worst-first; the rest read alphabetically
+  const ordered = [...groups.entries()].sort((a, b) =>
+    view === "esc" ? (b[0] < a[0] ? -1 : 1) : a[0].localeCompare(b[0]),
+  );
+
+  if (!ordered.length)
+    return (
+      <div className="bg-white rounded-lg border p-6 text-center text-sm" style={{ borderColor: "#E2E0DA", color: "#8A94A0" }}>
+        {view === "esc"
+          ? "Nothing is escalated right now. Raise the escalation level on a task and it appears here."
+          : "No tasks match the filters above."}
+      </div>
+    );
+
+  return (
+    <div className="space-y-3">
+      {view === "esc" && hiddenCount > 0 && (
+        <div className="text-xs" style={{ color: "#8A94A0" }}>{hiddenCount} open task{hiddenCount === 1 ? "" : "s"} with no escalation are hidden in this view.</div>
+      )}
+      {ordered.map(([label, items]) => (
+        <GroupBlock
+          key={label}
+          label={label}
+          count={items.length}
+          color={view === "esc" ? "#B3261E" : view === "dept" ? "#0D9488" : "#1B3A5C"}
+          openCount={items.filter((r) => !r.t.done).length}
+        >
+          {items.map(({ t, job }) => (
+            <div key={t.kind + t.id} style={{ width: 220 }}>
+              <button
+                onClick={() => onOpen(job.id)}
+                className="text-xs font-bold underline decoration-dotted truncate block text-left w-full"
+                style={{ color: "#1B3A5C" }}
+                title={`${job.tag} · JOB ${jobNo(job.id)} · ${job.cust}`}
+              >
+                {jobNo(job.id)} · {job.tag}
+              </button>
+              <TaskCard t={t} onOpen={onOpenTask} onDelete={onDelete} />
+            </div>
+          ))}
+        </GroupBlock>
+      ))}
+    </div>
+  );
+}
+
+// ============================ Brain Dump ============================
+interface DumpRow {
+  id: string;
+  title: string;
+  detail: string | null;
+  who: string | null;
+  due: string | null;
+  cat: string;
+  esc: string | null;
+  job_id: string | null;
+  project: string | null;
+  goal_id: string | null;
+  done: boolean;
+  promoted_task_id: string | null;
+  created_at: string;
+}
+
+const EMPTY_DUMP = { title: "", detail: "", who: "", due: "", cat: "Production", esc: "None", job_id: "", project: "", goal_id: "" };
+
+/**
+ * The capture pad. Type the thought at the top, add whatever context you have,
+ * and it drops below the line into its category. From there each line is either
+ * ticked DONE or pushed onto the Tasking board as a real task.
+ *
+ * Lines are private to you — nothing here is visible to anyone else until it is
+ * added to the board.
+ */
+function BrainDump({ board, reload }: { board: Board; reload: () => Promise<Board | null> }) {
+  const [rows, setRows] = useState<DumpRow[] | null>(null);
+  const [installed, setInstalled] = useState(true);
+  const [form, setForm] = useState({ ...EMPTY_DUMP });
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [showDone, setShowDone] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await api.get("/api/brain-dump");
+      setInstalled(r.installed !== false);
+      setRows(r.items || []);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+      setRows([]);
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const jobsByTdd = useMemo(
+    () => [...board.jobs].sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1)),
+    [board.jobs],
+  );
+  const projects = useMemo(
+    () => [...new Set(board.jobs.map((j) => (j.proj || "").trim()).filter(Boolean))].sort(),
+    [board.jobs],
+  );
+
+  const add = async () => {
+    if (!form.title.trim()) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      await api.post("/api/brain-dump", { action: "create", ...form, due: form.due || null, job_id: form.job_id || null });
+      // keep the category — people dump in runs of the same kind of thing
+      setForm({ ...EMPTY_DUMP, cat: form.cat });
+      await load();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  const act = async (body: Record<string, unknown>, after?: () => Promise<unknown>) => {
+    setMsg("");
+    try { await api.post("/api/brain-dump", body); await load(); if (after) await after(); }
+    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
+  const open = (rows || []).filter((r) => !r.done && !r.promoted_task_id);
+  const closed = (rows || []).filter((r) => r.done || r.promoted_task_id);
+  const byCat = new Map<string, DumpRow[]>();
+  for (const r of open) {
+    const k = r.cat || "Uncategorised";
+    (byCat.get(k) ?? byCat.set(k, []).get(k)!).push(r);
+  }
+
+  const field = "text-xs border rounded px-2 py-1.5 bg-white";
+  const label = (t: string) => <div className="text-xs font-semibold mb-1" style={{ color: "#8A94A0" }}>{t}</div>;
+
+  return (
+    <div className="space-y-3">
+      {!installed && (
+        <div className="rounded px-3 py-2 text-xs font-semibold" style={{ background: "#FBEDEA", color: "#B3261E" }}>
+          The brain_dump table doesn&apos;t exist yet — run migration 0018 in Supabase, then reload.
+        </div>
+      )}
+
+      {/* ---- the dump box ---- */}
+      <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA", borderTop: "4px solid #E8600A" }}>
+        <div className="font-bold text-sm mb-2">
+          Dump it here
+          <span className="font-normal text-xs ml-2" style={{ color: "#8A94A0" }}>
+            — only the task is required. Everything else can wait until you come back to it. Private to you.
+          </span>
+        </div>
+        <div className="mb-2">
+          {label("Task — what")}
+          <input
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) add(); }}
+            placeholder="e.g. Chase the hydraulic powerpack delivery date"
+            className="w-full border rounded px-2 py-2 text-sm"
+            style={{ borderColor: form.title ? "#E8600A" : "#D9D6CD" }}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2 mb-2">
+          <div>
+            {label("Assignee")}
+            <select value={form.who} onChange={(e) => setForm({ ...form, who: e.target.value })} className={field} style={{ borderColor: "#D9D6CD", width: 150 }}>
+              <option value="">— nobody yet —</option>
+              <AssigneeOptions owners={assignees(board)} current={form.who} />
+            </select>
+          </div>
+          <div>
+            {label("Due date")}
+            <input type="date" value={form.due} onChange={(e) => setForm({ ...form, due: e.target.value })} className={field} style={{ borderColor: "#D9D6CD" }} />
+          </div>
+          <div>
+            {label("Category")}
+            <select value={form.cat} onChange={(e) => setForm({ ...form, cat: e.target.value })} className={field} style={{ borderColor: "#D9D6CD" }}>
+              {TASK_CATS.map((c) => (<option key={c}>{c}</option>))}
+            </select>
+          </div>
+          <div>
+            {label("Escalation")}
+            <select value={form.esc} onChange={(e) => setForm({ ...form, esc: e.target.value })} className={field} style={{ borderColor: "#D9D6CD" }}>
+              {ESC_LEVELS.map((c) => (<option key={c}>{c}</option>))}
+            </select>
+          </div>
+          <div>
+            {label("Project")}
+            <input list="bd-projects" value={form.project} onChange={(e) => setForm({ ...form, project: e.target.value })} placeholder="—" className={field} style={{ borderColor: "#D9D6CD", width: 150 }} />
+            <datalist id="bd-projects">{projects.map((p) => (<option key={p} value={p} />))}</datalist>
+          </div>
+          <div>
+            {label("Job")}
+            <select value={form.job_id} onChange={(e) => setForm({ ...form, job_id: e.target.value })} className={field} style={{ borderColor: "#D9D6CD", maxWidth: 240 }} title="Needed before a line can be added to the board — the board is organised by job">
+              <option value="">— no job —</option>
+              {jobsByTdd.map((j) => (<option key={j.id} value={j.id}>{jobNo(j.id)} · {j.tag}</option>))}
+            </select>
+          </div>
+          <div>
+            {label("Goal")}
+            <input value={form.goal_id} onChange={(e) => setForm({ ...form, goal_id: e.target.value })} placeholder="— link later —" className={field} style={{ borderColor: "#D9D6CD", width: 130 }} title="Paste a goal node id to link this to the cascade" />
+          </div>
+        </div>
+        <div className="mb-2">
+          {label("Details — how")}
+          <textarea
+            value={form.detail}
+            onChange={(e) => setForm({ ...form, detail: e.target.value })}
+            rows={2}
+            placeholder="How it should be handled, who to speak to, what good looks like…"
+            className="w-full border rounded px-2 py-1.5 text-sm"
+            style={{ borderColor: "#D9D6CD" }}
+          />
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={add} disabled={busy || !form.title.trim()} className="rounded px-4 py-1.5 font-bold text-sm" style={{ background: "#E8600A", color: "#fff", opacity: busy || !form.title.trim() ? 0.5 : 1 }}>
+            {busy ? "Adding…" : "+ Add"}
+          </button>
+          <span className="text-xs" style={{ color: "#8A94A0" }}>⌘/Ctrl + Enter also adds it</span>
+          {msg && <span className="text-xs font-semibold" style={{ color: "#B3261E" }}>{msg}</span>}
+        </div>
+      </div>
+
+      {/* ---- below the line, grouped by category ---- */}
+      {rows === null && <div className="text-sm" style={{ color: "#8A94A0" }}>Loading your pad…</div>}
+      {rows !== null && open.length === 0 && (
+        <div className="bg-white rounded-lg border p-6 text-center text-sm" style={{ borderColor: "#E2E0DA", color: "#8A94A0" }}>
+          Nothing on the pad. Whatever you dump above lands here, grouped by category.
+        </div>
+      )}
+      {[...byCat.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([cat, items]) => (
+        <div key={cat} className="bg-white rounded-lg border" style={{ borderColor: "#E2E0DA" }}>
+          <div className="px-3 py-1.5 font-bold text-sm flex justify-between" style={{ background: "#F4F2EC", color: "#16232F" }}>
+            <span>{cat}</span>
+            <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>{items.length} line{items.length === 1 ? "" : "s"}</span>
+          </div>
+          {items.map((r) => {
+            const job = board.jobs.find((j) => j.id === r.job_id);
+            return (
+              <div key={r.id} className="px-3 py-2 flex items-start justify-between gap-3" style={{ borderTop: "1px solid #F4F2EC" }}>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold" style={{ color: "#16232F" }}>{r.title}</div>
+                  {r.detail && <div className="text-xs mt-0.5" style={{ color: "#5A6672", whiteSpace: "pre-wrap" }}>{r.detail}</div>}
+                  <div className="text-xs mt-1 flex flex-wrap gap-2" style={{ color: "#8A94A0" }}>
+                    {r.who && <span className="font-bold rounded px-1" style={{ background: "#E8600A", color: "#fff" }}>{r.who}</span>}
+                    {r.due && <span className="tnum" style={{ color: r.due < TODAY ? "#B3261E" : "#8A94A0" }}>due {fmt(r.due)}</span>}
+                    {job && <span>JOB {jobNo(job.id)} · {job.tag}</span>}
+                    {r.project && <span>{r.project}</span>}
+                    {r.esc && r.esc !== "None" && <span className="font-bold" style={{ color: "#B3261E" }}>⚠ {r.esc}</span>}
+                  </div>
+                </div>
+                <div className="flex gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => act({ action: "done", id: r.id, done: true })}
+                    className="rounded px-2 py-1 text-xs font-bold"
+                    style={{ background: "#E6F4EA", color: "#0D7A3F" }}
+                    title="Handled — file it away"
+                  >
+                    ✓ Done
+                  </button>
+                  <button
+                    onClick={() => act({ action: "promote", id: r.id }, reload)}
+                    disabled={!r.job_id}
+                    className="rounded px-2 py-1 text-xs font-bold"
+                    style={{ background: r.job_id ? "#16232F" : "#F4F2EC", color: r.job_id ? "#fff" : "#B8B5AC", cursor: r.job_id ? "pointer" : "not-allowed" }}
+                    title={r.job_id ? "Make this a real task on the Tasking board" : "Pick a job on this line first — the board is organised by job"}
+                  >
+                    ↗ Add to board
+                  </button>
+                  <button onClick={() => act({ action: "delete", id: r.id })} className="rounded px-2 py-1 text-xs font-bold" style={{ background: "#FBEDEA", color: "#B3261E" }} title="Delete this line">✕</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+
+      {closed.length > 0 && (
+        <div>
+          <button onClick={() => setShowDone((s) => !s)} className="text-xs font-bold" style={{ color: "#E8600A" }}>
+            {showDone ? "▾" : "▸"} {closed.length} line{closed.length === 1 ? "" : "s"} cleared
+          </button>
+          {showDone && (
+            <div className="bg-white rounded-lg border mt-1" style={{ borderColor: "#E2E0DA" }}>
+              {closed.map((r) => (
+                <div key={r.id} className="px-3 py-1.5 flex items-center justify-between text-xs" style={{ borderTop: "1px solid #F4F2EC", color: "#8A94A0" }}>
+                  <span style={{ textDecoration: r.done ? "line-through" : "none" }}>
+                    {r.title}
+                    <span className="ml-2 rounded px-1 font-bold" style={{ background: r.promoted_task_id ? "#DCE8F5" : "#E6F4EA", color: r.promoted_task_id ? "#1B3A5C" : "#0D7A3F" }}>
+                      {r.promoted_task_id ? "on the board" : "done"}
+                    </span>
+                  </span>
+                  <span className="flex gap-1">
+                    {r.done && !r.promoted_task_id && (
+                      <button onClick={() => act({ action: "done", id: r.id, done: false })} className="font-bold" style={{ color: "#E8600A" }}>reopen</button>
+                    )}
+                    <button onClick={() => act({ action: "delete", id: r.id })} className="font-bold" style={{ color: "#B3261E" }}>✕</button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One labelled bucket of cards — the shared frame for every grouped view. */
+function GroupBlock({
+  label, count, color, openCount, children,
+}: {
+  label: string; count: number; color: string; openCount?: number; children: React.ReactNode;
+}) {
+  return (
+    <div className="flex gap-2 items-stretch">
+      <div className="rounded-lg p-2 flex-shrink-0" style={{ width: 210, background: "#16232F", color: "#fff", borderLeft: `4px solid ${color}` }}>
+        <div className="font-bold text-sm break-words">{label}</div>
+        <div className="text-xs opacity-70">
+          {count} task{count === 1 ? "" : "s"}
+          {openCount !== undefined && openCount !== count ? ` · ${openCount} open` : ""}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5 flex-1 items-start rounded-lg p-2" style={{ background: "#E9E6DD" }}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -3245,6 +4055,7 @@ function Admin({
               <th className="text-left py-1 font-semibold">Name</th>
               <th className="text-left py-1 font-semibold">Email</th>
               <th className="text-left py-1 font-semibold" title="The Project Owner text as it appears in the Jobmaster — links this login to its jobs">ERP owner name</th>
+              <th className="text-left py-1 font-semibold" title="Their line manager — drives “tasks of people reporting to me” in Nandan Tasking">Reports to</th>
               <th className="text-left py-1 font-semibold" title="Sales Genie access comes with the role now: Sales team, Admins and the owner">Role</th>
               <th className="text-left py-1 font-semibold">Status</th>
               <th className="text-right py-1 font-semibold">Actions</th>
@@ -3255,14 +4066,14 @@ function Admin({
               // skeleton rows — keeps the table height stable while loading
               [0, 1, 2].map((i) => (
                 <tr key={"sk" + i} style={{ borderTop: "1px solid #EEECE6" }}>
-                  <td className="py-2" colSpan={8}>
+                  <td className="py-2" colSpan={9}>
                     <div className="rounded" style={{ height: 12, width: `${60 - i * 10}%`, background: "#EFEDE7" }} />
                   </td>
                 </tr>
               ))
             )}
             {users?.length === 0 && (
-              <tr><td className="py-3" colSpan={8} style={{ color: "#8A94A0" }}>No users found.</td></tr>
+              <tr><td className="py-3" colSpan={9} style={{ color: "#8A94A0" }}>No users found.</td></tr>
             )}
             {(users ?? []).map((u) => (
               <tr key={u.id} style={{ borderTop: "1px solid #EEECE6" }}>
@@ -3303,6 +4114,20 @@ function Admin({
                     style={{ borderColor: "#E2E0DA" }}
                     title="Must match the Project Owner value in the Jobmaster export"
                   />
+                </td>
+                <td className="py-1.5">
+                  <select
+                    value={u.reports_to || ""}
+                    onChange={(e) => saveProfile(u.id, { reports_to: e.target.value })}
+                    className="text-xs border rounded px-1 py-0.5 bg-white"
+                    style={{ borderColor: "#E2E0DA", maxWidth: 130 }}
+                    title="Their line manager. Tasking's “tasks of people reporting to me” reads this."
+                  >
+                    <option value="">— nobody —</option>
+                    {(users ?? [])
+                      .filter((p) => p.id !== u.id && !p.disabled)
+                      .map((p) => (<option key={p.id} value={p.id}>{p.display_name || p.email.split("@")[0]}</option>))}
+                  </select>
                 </td>
                 <td className="py-1.5">
                   {rolePending[u.id] && <span className="mr-1" title="Saving…">⏳</span>}
