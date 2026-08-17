@@ -3038,6 +3038,8 @@ function Tasking({
       {view !== "jobs" && (
         <GroupedTasks
           view={view}
+          board={board}
+          reload={reload}
           jobs={taskingJobs}
           tasksByJob={tasksByJob}
           onOpen={onOpen}
@@ -3156,6 +3158,8 @@ function Tasking({
  */
 function GroupedTasks({
   view,
+  board,
+  reload,
   jobs,
   tasksByJob,
   onOpen,
@@ -3163,12 +3167,52 @@ function GroupedTasks({
   onDelete,
 }: {
   view: TaskingView;
+  board: Board;
+  reload: () => Promise<Board | null>;
   jobs: Job[];
   tasksByJob: Map<string, Task[]>;
   onOpen: (id: string) => void;
   onOpenTask: (t: Task) => void;
   onDelete: (t: Task) => void;
 }) {
+  // ---- adding a task straight onto a project (By Projects only) ----
+  const [addingProj, setAddingProj] = useState<string | null>(null);
+  const [projForm, setProjForm] = useState({ job_id: "", t: "", who: "", due: TODAY, cat: "Production", esc: "None" });
+
+  /**
+   * Every job in a project, latest deliverable first. A task raised against a
+   * project almost always concerns the work still ahead, so the job that
+   * delivers LAST is the sensible default — the whole project list is right
+   * there in the dropdown when it isn't.
+   */
+  const projectJobs = useCallback(
+    (proj: string) =>
+      board.jobs
+        .filter((j) => ((j.proj || "").trim() || "No project on the job") === proj)
+        .sort((a, b) => ((a.tdd || "0000") > (b.tdd || "0000") ? -1 : 1)),
+    [board.jobs],
+  );
+
+  const openProjForm = (proj: string) => {
+    const last = projectJobs(proj)[0];
+    setProjForm({ job_id: last?.id ?? "", t: "", who: "", due: TODAY, cat: "Production", esc: "None" });
+    setAddingProj(proj);
+  };
+  const submitProjTask = async () => {
+    if (!projForm.t.trim() || !projForm.job_id) return;
+    await api.post("/api/tasks", {
+      action: "create",
+      job_id: projForm.job_id,
+      title: projForm.t.trim(),
+      who: projForm.who,
+      due: projForm.due,
+      cat: projForm.cat,
+      esc: projForm.esc,
+    });
+    setAddingProj(null);
+    await reload();
+  };
+
   const rows = useMemo(() => {
     const out: { t: Task; job: Job }[] = [];
     for (const j of jobs) for (const t of tasksByJob.get(j.id) ?? []) out.push({ t, job: j });
@@ -3231,6 +3275,14 @@ function GroupedTasks({
   const hiddenCount = view === "esc" ? rows.filter((r) => !r.t.done).length - visible.length : 0;
 
   const groups = new Map<string, { t: Task; job: Job }[]>();
+  // A project with no tasks yet still deserves a row — otherwise there is
+  // nowhere to add its first one. Only reachable with "include jobs without
+  // tasks" ticked, which is exactly when someone is looking for that.
+  if (view === "projects")
+    for (const j of jobs) {
+      const k = (j.proj || "").trim() || "No project on the job";
+      if (!groups.has(k)) groups.set(k, []);
+    }
   for (const r of visible) {
     const k = keyOf(r);
     (groups.get(k) ?? groups.set(k, []).get(k)!).push(r);
@@ -3275,6 +3327,41 @@ function GroupedTasks({
               <TaskCard t={t} onOpen={onOpenTask} onDelete={onDelete} />
             </div>
           ))}
+          {view === "projects" && (
+            addingProj === label ? (
+              <div style={{ width: 250 }}>
+                <div className="rounded border px-2 pt-2 bg-white" style={{ borderColor: "#E8600A", borderBottom: "none" }}>
+                  <div className="text-xs mb-0.5" style={{ color: "#8A94A0" }}>Job — defaults to the last one to deliver</div>
+                  <select
+                    value={projForm.job_id}
+                    onChange={(e) => setProjForm({ ...projForm, job_id: e.target.value })}
+                    className="w-full text-xs border rounded px-1 py-1 bg-white"
+                    style={{ borderColor: "#E2E0DA" }}
+                  >
+                    {projectJobs(label).map((j) => (
+                      <option key={j.id} value={j.id}>{jobNo(j.id)} · {j.tag} · TDD {fmt(j.tdd)}</option>
+                    ))}
+                  </select>
+                </div>
+                <AddTaskForm
+                  form={projForm}
+                  setForm={setProjForm}
+                  owners={assignees(board)}
+                  onSubmit={submitProjTask}
+                  onCancel={() => setAddingProj(null)}
+                />
+              </div>
+            ) : (
+              <button
+                onClick={() => openProjForm(label)}
+                className="text-xs font-bold rounded border border-dashed px-3 self-stretch"
+                style={{ borderColor: "#E8600A", color: "#E8600A", minHeight: 40 }}
+                title={`Add a task on ${label} — it lands on the job that delivers last unless you pick another`}
+              >
+                + Add task
+              </button>
+            )
+          )}
         </GroupBlock>
       ))}
     </div>

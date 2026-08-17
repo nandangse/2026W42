@@ -32,6 +32,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "2.6.2.1",
+    date: "2026-08-17",
+    module: "Tasking · By Projects",
+    items: [
+      "Every project row now has its own + Add task.",
+      "The job is pre-picked as the last one in that project to deliver — a task raised on a project is nearly always about the work still ahead. Every other job in the project is one click away in the dropdown, each showing its target delivery date.",
+      "With “include jobs without tasks” ticked, a project with no tasks yet still gets a row, so its first task can be added from here.",
+    ],
+  },
+  {
     v: "2.6.2.0",
     date: "2026-08-17",
     module: "Tasking · Job Plan · Header · Admin",
