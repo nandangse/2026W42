@@ -30,6 +30,8 @@ export interface DeliveredJob {
   date_source: string | null;
   tdd: string | null;
   otd: string | null;
+  /** Actual start — the denominator of the per-job OTD %. */
+  start_date: string | null;
   proj: string;
   stat: string;
   own: string;
@@ -117,10 +119,72 @@ export function rangeFor(key: PeriodKey, today: string, earliest: string | null)
     case "mtd": return { from: monthStart(today), to: today };
     case "qtd": return { from: fqStart(today), to: today };
     case "ytd": return { from: fyStart(today), to: today };
-    case "m12": return { from: monthsBefore(today, 12), to: today };
+    // Twelve CALENDAR months ending with the current one. Going back 12
+    // months from today lands mid-month and so touches 13 months — which is
+    // what the monthly table was showing, and what made the average read
+    // "over 13 months of data" under a heading saying 12.
+    case "m12": return { from: monthStart(monthsBefore(today, 11)), to: today };
     case "all": return { from: earliest || fyStart(today), to: today };
     default: return { from: fyStart(today), to: today };
   }
+}
+
+/** Inclusive day count of a range — "how much data is this?" in plain days. */
+export function dayCount(from: string, to: string): number {
+  return Math.max(0, Math.round((Date.parse(to) - Date.parse(from)) / 86400000)) + 1;
+}
+
+/** Median of a list, 0 when empty. Used to mark the middle on the bar charts. */
+export function median(xs: number[]): number {
+  if (!xs.length) return 0;
+  const a = [...xs].sort((x, y) => x - y);
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+// ---------------------------------------------------------------------------
+// Per-job delivery performance
+// ---------------------------------------------------------------------------
+
+/**
+ * Days late against the promise. Negative = early, 0 = on the day.
+ *
+ *   Delay Days = Actual Delivery Date - OTD Date
+ *
+ * Null when either date is missing — an unmeasurable job must never read as 0.
+ */
+export function delayDays(j: DeliveredJob): number | null {
+  const promise = j.otd || j.tdd;
+  if (!promise || !j.delivered_on) return null;
+  return Math.round((Date.parse(j.delivered_on) - Date.parse(promise)) / 86400000);
+}
+
+/**
+ * Per-job OTD %, as specified by Dr Raghu:
+ *
+ *   OTD % = (1 - Delay Days / (OTD Date - Actual Start Date)) x 100
+ *
+ * The denominator is the lead time that was undertaken: from the day the job
+ * actually started to the day it was promised. So the slip is charged against
+ * the size of the promise, which is the point — 30 days late on a 60-day job
+ * is a different failure from 30 days late on a 600-day job.
+ *
+ * 100% = delivered exactly on the promised date. Above 100 = early. It CAN go
+ * negative, and is left negative rather than clamped: a job that took twice
+ * its promised lead time should read -100%, not 0%, or the worst cases all
+ * flatten into one number.
+ *
+ * Null when the promise, the delivery or the start date is missing, or when
+ * the promised lead time is zero or negative (a job promised before it
+ * started tells us nothing about how well it ran).
+ */
+export function rowOtdPct(j: DeliveredJob): number | null {
+  const promise = j.otd || j.tdd;
+  const delay = delayDays(j);
+  if (delay == null || !promise || !j.start_date) return null;
+  const promised = Math.round((Date.parse(promise) - Date.parse(j.start_date)) / 86400000);
+  if (promised <= 0) return null;
+  return (1 - delay / promised) * 100;
 }
 
 // ---------------------------------------------------------------------------

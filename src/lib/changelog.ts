@@ -37,6 +37,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.0.1.0",
+    date: "2026-08-18",
+    module: "Delivered Jobs",
+    items: [
+      "Fixed: “12 Months” was showing 13. Counting twelve months back from today lands mid-month, so the window touched thirteen. It now means the last twelve calendar months, ending with this one.",
+      "The chosen period says how many days of data it covers, next to the dates.",
+      "Months run newest first.",
+      "Nos, Value and Throughput each have their own bar in the breakdown table, and each bar carries a median mark — so a month reads as above or below a normal one, not just bigger or smaller than the biggest. Empty months are left out of the median: a month with no deliveries is not a low month.",
+      "Two new columns on the jobs table. Delay Days = Actual Delivery Date − OTD Date, negative for early. OTD % = (1 − Delay Days ÷ (OTD Date − Actual Start Date)) × 100, so a slip is charged against the lead time that was undertaken — 30 days late on a 60-day job scores far worse than 30 days late on a 600-day job. Hover either heading for the formula.",
+      "OTD % is left negative rather than floored at zero: a job that overran its whole promised lead time should read −100%, not 0%, or every disaster looks the same.",
+      "All table figures are now 12px. They were 10px in places, which does not survive being shown on a screen across a room.",
+    ],
+  },
+  {
     v: "3.0.0.3",
     date: "2026-08-17",
     module: "Delivered Jobs",

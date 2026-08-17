@@ -36,7 +36,7 @@ export async function GET() {
     for (let from = 0; from < MAX_ROWS; from += PAGE) {
       const { data, error } = await db
         .from("delivered_jobs")
-        .select("id, tag, fam, cust, val, delivered_on, date_source, tdd, otd, proj, stat, own, tp, tpv, tpp")
+        .select("id, tag, fam, cust, val, delivered_on, date_source, tdd, otd, start_date, proj, stat, own, tp, tpv, tpp")
         .order("delivered_on", { ascending: false, nullsFirst: false })
         .order("id", { ascending: true }) // stable tiebreak, so pages can't overlap or skip
         .range(from, from + PAGE - 1);

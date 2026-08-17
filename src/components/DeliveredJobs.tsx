@@ -16,11 +16,34 @@ import { api } from "@/lib/api";
 import {
   PERIODS, rangeFor, fyLabel, fqLabel, fyStart, span, within, dated, undated,
   totalsOf, averagePerMonth, byMonth, byFamily, byCustomer, otdFor, coveredMonths, throughputOf,
+  dayCount, median, delayDays, rowOtdPct,
   type DeliveredJob, type PeriodKey, type Totals, type Bucket,
 } from "@/lib/delivered";
 import { today, fmt, fmtFull, lakh } from "@/lib/schedule";
 
 const TODAY = today();
+
+/**
+ * Table type scale. 12px for every figure in a table — this gets shown on a
+ * screen in a room, and 10px does not survive that. Chart annotations and
+ * captions may stay smaller; data may not.
+ */
+const TD = { fontSize: 12 } as const;
+const TH = { fontSize: 11, fontWeight: 700, letterSpacing: 0.6, color: "#8A94A0" } as const;
+
+/** Per-row OTD %, on hover over the column header. */
+const OTD_ROW_FORMULA = [
+  "OTD % = (1 − Delay Days ÷ (OTD Date − Actual Start Date)) × 100",
+  "",
+  "Delay Days = Actual Delivery Date − OTD Date.",
+  "",
+  "The slip is charged against the lead time that was undertaken, so 30 days",
+  "late on a 60-day job scores far worse than 30 days late on a 600-day job.",
+  "",
+  "100% = delivered exactly on the promised date. Over 100% = early.",
+  "Negative = the job overran its whole promised lead time.",
+  "Blank = no promised date, no start date, or the promise predates the start.",
+].join("\n");
 
 /** Shown on hover over the OTD card — the formula, in words. */
 const OTD_FORMULA = [
@@ -118,7 +141,15 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
   // Months newest-first: the current month is what anyone opens this to see,
   // and scrolling to the bottom for it gets old immediately.
   const cuts = cut === "month" ? [...months].reverse() : cut === "family" ? families : customers;
-  const cutMax = Math.max(1, ...cuts.map((b) => b.value));
+  // Scale and midpoint per column. Rows with nothing in them are left out of
+  // the median: a month with no deliveries is not a low month, it is no month,
+  // and letting it drag the middle down would flatter every real one.
+  const live = cuts.filter((b) => b.nos > 0);
+  const scale = {
+    nos: { max: Math.max(1, ...cuts.map((b) => b.nos)), mid: median(live.map((b) => b.nos)) },
+    value: { max: Math.max(1, ...cuts.map((b) => b.value)), mid: median(live.map((b) => b.value)) },
+    throughput: { max: Math.max(1, ...cuts.map((b) => b.throughput)), mid: median(live.map((b) => b.throughput)) },
+  };
 
   return (
     <div className="p-4">
@@ -174,9 +205,10 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
             {famOptions.map((f) => <option key={f.key} value={f.key}>{f.label} ({f.nos})</option>)}
           </select>
         </div>
-        <div className="text-xs mt-1.5" style={{ color: C.faint }}>
+        <div style={{ fontSize: 12, marginTop: 6, color: C.sub }}>
           {period === "custom" ? "Custom range" : PERIODS.find((p) => p.key === period)?.note} ·{" "}
-          {fmtFull(from)} → {fmtFull(to)}
+          {fmtFull(from)} → {fmtFull(to)}{" "}
+          <b style={{ color: C.body }}>({dayCount(from, to).toLocaleString("en-IN")} days)</b>
           {period === "qtd" && ` · ${fqLabel(TODAY)}`}
           {fam && ` · ${fam} only`}
         </div>
@@ -273,39 +305,43 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
           <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ color: C.mute, borderBottom: `1px solid ${C.line}` }}>
-                <th className="text-left px-3 py-1.5 font-bold">{cut === "month" ? "MONTH" : cut === "family" ? "FAMILY" : "CUSTOMER"}</th>
-                <th className="text-right px-2 py-1.5 font-bold">NOS</th>
-                <th className="text-right px-2 py-1.5 font-bold">VALUE</th>
-                <th className="text-right px-2 py-1.5 font-bold">THROUGHPUT</th>
-                <th className="px-3 py-1.5" style={{ width: "34%" }} />
+                <th className="text-left px-3 py-2" style={TH}>{cut === "month" ? "MONTH" : cut === "family" ? "FAMILY" : "CUSTOMER"}</th>
+                <th className="text-right px-2 py-2" style={TH}>NOS</th>
+                <th className="px-2 py-2" style={{ ...TH, width: "16%" }} />
+                <th className="text-right px-2 py-2" style={TH}>VALUE</th>
+                <th className="px-2 py-2" style={{ ...TH, width: "16%" }} />
+                <th className="text-right px-2 py-2" style={TH}>THROUGHPUT</th>
+                <th className="px-2 py-2" style={{ ...TH, width: "16%" }} />
               </tr>
             </thead>
             <tbody>
               {cuts.map((b) => (
                 <tr key={b.key} style={{ borderBottom: `1px solid ${C.line}` }}>
-                  <td className="px-3 py-1.5 font-semibold" style={{ color: b.nos ? C.ink : C.faint }}>{b.label}</td>
-                  <td className="text-right px-2 py-1.5 tnum" style={{ color: b.nos ? C.body : C.faint }}>{b.nos || "—"}</td>
-                  <td className="text-right px-2 py-1.5 tnum" style={{ color: b.nos ? C.body : C.faint }}>{b.nos ? V(b.value) : "—"}</td>
-                  <td className="text-right px-2 py-1.5 tnum" style={{ color: b.nos ? C.green : C.faint }}>{b.nos ? V(b.throughput) : "—"}</td>
-                  <td className="px-3 py-1.5">
-                    <div style={{ height: 8, background: "#EFEDE7", borderRadius: 2, overflow: "hidden" }}>
-                      <div style={{ width: `${(b.value / cutMax) * 100}%`, height: 8, background: cut === "month" ? C.navy : C.violet }} />
-                    </div>
-                  </td>
+                  <td className="px-3 py-1.5 font-semibold" style={{ ...TD, color: b.nos ? C.ink : C.faint }}>{b.label}</td>
+                  <td className="text-right px-2 py-1.5 tnum" style={{ ...TD, color: b.nos ? C.body : C.faint }}>{b.nos || "—"}</td>
+                  <td className="px-2 py-1.5"><MiniBar v={b.nos} max={scale.nos.max} mid={scale.nos.mid} color={C.navy} /></td>
+                  <td className="text-right px-2 py-1.5 tnum" style={{ ...TD, color: b.nos ? C.body : C.faint }}>{b.nos ? V(b.value) : "—"}</td>
+                  <td className="px-2 py-1.5"><MiniBar v={b.value} max={scale.value.max} mid={scale.value.mid} color={C.accent} /></td>
+                  <td className="text-right px-2 py-1.5 tnum" style={{ ...TD, color: b.nos ? C.green : C.faint }}>{b.nos ? V(b.throughput) : "—"}</td>
+                  <td className="px-2 py-1.5"><MiniBar v={b.throughput} max={scale.throughput.max} mid={scale.throughput.mid} color={C.green} /></td>
                 </tr>
               ))}
               {cuts.length === 0 && (
-                <tr><td colSpan={5} className="px-3 py-6 text-center" style={{ color: C.mute }}>Nothing delivered in this period.</td></tr>
+                <tr><td colSpan={7} className="px-3 py-6 text-center" style={{ ...TD, color: C.mute }}>Nothing delivered in this period.</td></tr>
               )}
             </tbody>
             {cuts.length > 0 && (
               <tfoot>
                 <tr style={{ background: C.panel, fontWeight: 700 }}>
-                  <td className="px-3 py-1.5" style={{ color: C.ink }}>Total</td>
-                  <td className="text-right px-2 py-1.5 tnum" style={{ color: C.ink }}>{totals.nos}</td>
-                  <td className="text-right px-2 py-1.5 tnum" style={{ color: C.ink }}>{V(totals.value)}</td>
-                  <td className="text-right px-2 py-1.5 tnum" style={{ color: C.green }}>{V(totals.throughput)}</td>
+                  <td className="px-3 py-2" style={{ ...TD, color: C.ink }}>Total</td>
+                  <td className="text-right px-2 py-2 tnum" style={{ ...TD, color: C.ink }}>{totals.nos}</td>
                   <td />
+                  <td className="text-right px-2 py-2 tnum" style={{ ...TD, color: C.ink }}>{V(totals.value)}</td>
+                  <td />
+                  <td className="text-right px-2 py-2 tnum" style={{ ...TD, color: C.green }}>{V(totals.throughput)}</td>
+                  <td className="px-2" style={{ fontSize: 10, color: C.faint }}>
+                    ▏ marks the median of the {live.length} {cut === "month" ? "months" : "rows"} with deliveries
+                  </td>
                 </tr>
               </tfoot>
             )}
@@ -320,6 +356,26 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
 }
 
 // ===========================================================================
+/**
+ * A bar with the median marked. The median is the point of it: a column of
+ * bars says which month was biggest, the tick says whether a month was
+ * actually above or below a normal one.
+ */
+function MiniBar({ v, max, mid, color }: { v: number; max: number; mid: number; color: string }) {
+  if (!v) return <div style={{ height: 9 }} />;
+  const w = Math.max(2, (v / max) * 100);
+  const m = mid > 0 ? (mid / max) * 100 : null;
+  return (
+    <div className="relative" style={{ height: 9, background: "#EFEDE7", borderRadius: 2 }}>
+      <div style={{ width: `${w}%`, height: 9, background: color, borderRadius: 2 }} />
+      {m != null && (
+        <div title={`median ${Math.round(mid).toLocaleString("en-IN")}`}
+          style={{ position: "absolute", left: `calc(${m}% - 1px)`, top: -2, width: 2, height: 13, background: C.ink, opacity: 0.75 }} />
+      )}
+    </div>
+  );
+}
+
 function Headline({ label, value, note, color }: { label: string; value: string; note: string; color: string }) {
   return (
     <div className="rounded-lg border bg-white p-3" style={{ borderColor: C.line, flex: "1 1 0", minWidth: 190, borderTop: `3px solid ${color}` }}>
@@ -400,33 +456,54 @@ function JobTable({ rows, V }: { rows: DeliveredJob[]; V: (n: number) => string 
         <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ color: C.mute, borderBottom: `1px solid ${C.line}` }}>
-              {["DELIVERED", "TAG", "CUSTOMER", "FAMILY", "TARGET", "VS TARGET", "VALUE", "THROUGHPUT"].map((h, i) => (
-                <th key={h} className={`px-2 py-1.5 font-bold ${i >= 6 ? "text-right" : "text-left"}`}>{h}</th>
+              {[
+                ["DELIVERED", ""], ["TAG", ""], ["CUSTOMER", ""], ["FAMILY", ""],
+                ["STARTED", "Actual start date — the denominator of OTD %"],
+                ["OTD DATE", "The date promised to the customer"],
+                ["DELAY DAYS", "Actual Delivery Date − OTD Date. Negative is early."],
+                ["OTD %", OTD_ROW_FORMULA],
+                ["VALUE", ""], ["THROUGHPUT", ""],
+              ].map(([h, tip], i) => (
+                <th key={h} title={tip || undefined}
+                  className={`px-2 py-2 ${i >= 6 ? "text-right" : "text-left"}`}
+                  style={{ ...TH, cursor: tip ? "help" : undefined }}>
+                  {h}{tip ? " ⓘ" : ""}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {sorted.slice(0, limit).map((j) => {
-              const slip = j.tdd && j.delivered_on
-                ? Math.round((Date.parse(j.delivered_on) - Date.parse(j.tdd)) / 86400000)
-                : null;
+              const delay = delayDays(j);
+              const pct = rowOtdPct(j);
+              const promise = j.otd || j.tdd;
               return (
                 <tr key={j.id} style={{ borderBottom: `1px solid ${C.line}` }}>
-                  <td className="px-2 py-1.5 tnum font-semibold" style={{ color: C.ink }}>{fmt(j.delivered_on)}</td>
-                  <td className="px-2 py-1.5" style={{ color: C.body }}>{j.tag || j.id}</td>
-                  <td className="px-2 py-1.5 truncate" style={{ color: C.sub, maxWidth: 190 }}>{j.cust}</td>
-                  <td className="px-2 py-1.5" style={{ color: C.sub }}>{j.fam || "—"}</td>
-                  <td className="px-2 py-1.5 tnum" style={{ color: C.faint }}>{fmt(j.tdd)}</td>
-                  <td className="px-2 py-1.5 tnum" style={{ color: slip == null ? C.faint : slip <= 0 ? C.green : C.red }}>
-                    {slip == null ? "—" : slip === 0 ? "on the day" : slip < 0 ? `${-slip}d early` : `${slip}d late`}
+                  <td className="px-2 py-1.5 tnum font-semibold" style={{ ...TD, color: C.ink }}>{fmt(j.delivered_on)}</td>
+                  <td className="px-2 py-1.5" style={{ ...TD, color: C.body }}>{j.tag || j.id}</td>
+                  <td className="px-2 py-1.5 truncate" style={{ ...TD, color: C.sub, maxWidth: 210 }}>{j.cust}</td>
+                  <td className="px-2 py-1.5" style={{ ...TD, color: C.sub }}>{j.fam || "—"}</td>
+                  <td className="px-2 py-1.5 tnum" style={{ ...TD, color: C.faint }}>{fmt(j.start_date)}</td>
+                  <td className="px-2 py-1.5 tnum" style={{ ...TD, color: C.faint }}>{fmt(promise)}</td>
+                  <td className="px-2 py-1.5 tnum text-right" style={{
+                    ...TD, fontWeight: 600,
+                    color: delay == null ? C.faint : delay > 0 ? C.red : C.green,
+                  }}>
+                    {delay == null ? "—" : delay > 0 ? `+${delay}` : String(delay)}
                   </td>
-                  <td className="px-2 py-1.5 tnum text-right" style={{ color: C.body }}>{V(j.val)}</td>
-                  <td className="px-2 py-1.5 tnum text-right" style={{ color: C.green }}>{V(throughputOf(j))}</td>
+                  <td className="px-2 py-1.5 tnum text-right" style={{
+                    ...TD, fontWeight: 700,
+                    color: pct == null ? C.faint : pct >= 100 ? C.green : pct >= 0 ? C.amber : C.red,
+                  }}>
+                    {pct == null ? "—" : `${Math.round(pct)}%`}
+                  </td>
+                  <td className="px-2 py-1.5 tnum text-right" style={{ ...TD, color: C.body }}>{V(j.val)}</td>
+                  <td className="px-2 py-1.5 tnum text-right" style={{ ...TD, color: C.green }}>{V(throughputOf(j))}</td>
                 </tr>
               );
             })}
             {sorted.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-6 text-center" style={{ color: C.mute }}>Nothing delivered in this period.</td></tr>
+              <tr><td colSpan={10} className="px-3 py-6 text-center" style={{ ...TD, color: C.mute }}>Nothing delivered in this period.</td></tr>
             )}
           </tbody>
         </table>
