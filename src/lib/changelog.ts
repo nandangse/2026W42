@@ -37,6 +37,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.0.1.3",
+    date: "2026-08-18",
+    module: "Tasking · Escalation",
+    items: [
+      "Escalate a task and it now asks Why escalated? — and will not let the task be raised without it. An escalation without a reason costs the person it lands on a phone call before they can do anything about it.",
+      "Who is now typeable as well as pickable. Type a name or initials and the list narrows; the full list of accounts is still one click away. Scrolling a dropdown for a name you already know was the slowest part of raising a task.",
+      "Needs migration 0023.",
+    ],
+  },
+  {
     v: "3.0.1.2",
     date: "2026-08-18",
     module: "Admin · Users",

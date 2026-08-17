@@ -26,6 +26,7 @@ import {
   toISO,
   TASK_CATS,
   ESC_LEVELS,
+  escalated,
   type Plan,
   type PlanMilestone,
 } from "@/lib/schedule";
@@ -2304,7 +2305,7 @@ function JobPlan({
   const [dragMi, setDragMi] = useState<number | null>(null);
   const [warned, setWarned] = useState<Set<string>>(new Set());
   const [addingTask, setAddingTask] = useState<string | null>(null);
-  const [form, setForm] = useState({ t: "", who: "", due: TODAY, cat: "Production", esc: "None" });
+  const [form, setForm] = useState({ t: "", who: "", due: TODAY, cat: "Production", esc: "None", esc_why: "" });
   const [msForm, setMsForm] = useState<{ open: boolean; name: string; days: number }>({ open: false, name: "", days: 3 });
   const [showPastMs, setShowPastMs] = useState(false);
   const [lightbox, setLightbox] = useState<Task | null>(null);
@@ -2473,7 +2474,10 @@ function JobPlan({
   const addMat = async () => { if (!matForm.item.trim()) return; await api.post("/api/materials", { action: "add", job_id: dj.id, item: matForm.item.trim(), qty: matForm.qty || "as BOM", custom: true }); setMatForm({ item: "", qty: "" }); await reload(); };
 
   // ---- tasks for this job (memoised above the guard — see jobTasks/jobCats) ----
-  const submitTask = async () => { if (!form.t.trim()) return; await api.post("/api/tasks", { action: "create", job_id: dj.id, title: form.t.trim(), who: form.who, due: form.due, cat: form.cat, esc: form.esc }); setForm({ t: "", who: "", due: TODAY, cat: form.cat, esc: "None" }); setAddingTask(null); await reload(); };
+  const submitTask = async () => {
+    if (!form.t.trim()) return;
+    if (escalated(form.esc) && !form.esc_why.trim()) { alert("Say why this is being escalated — whoever it lands on needs to know without ringing you."); return; }
+    await api.post("/api/tasks", { action: "create", job_id: dj.id, title: form.t.trim(), who: form.who, due: form.due, cat: form.cat, esc: form.esc, esc_why: form.esc_why }); setForm({ t: "", who: "", due: TODAY, cat: form.cat, esc: "None", esc_why: "" }); setAddingTask(null); await reload(); };
   const deleteJobTask = async (t: Task) => {
     const warn = t.kind === "erp"
       ? "\n\n⚠ From the ERP ToDo list — the next upload will bring it back unless it is closed in the ERP."
@@ -2905,7 +2909,7 @@ function Tasking({
   const [taskView, setTaskView] = useState<"board" | "cal">("board");
   const [calMonth, setCalMonth] = useState(TODAY.slice(0, 7));
   const [adding, setAdding] = useState<string | null>(null);
-  const [form, setForm] = useState({ t: "", who: "", due: TODAY, cat: "Production", esc: "None" });
+  const [form, setForm] = useState({ t: "", who: "", due: TODAY, cat: "Production", esc: "None", esc_why: "" });
   const [lightbox, setLightbox] = useState<Task | null>(null);
 
   const [dueUpTo, setDueUpTo] = useState("");
@@ -2993,7 +2997,7 @@ function Tasking({
   const submit = async (jid: string) => {
     if (!form.t.trim()) return;
     await api.post("/api/tasks", { action: "create", job_id: jid, title: form.t.trim(), who: form.who, due: form.due, cat: form.cat, esc: form.esc });
-    setForm({ t: "", who: "", due: TODAY, cat: form.cat, esc: "None" });
+    setForm({ t: "", who: "", due: TODAY, cat: form.cat, esc: "None", esc_why: "" });
     setAdding(null);
     await reload();
   };
@@ -3721,12 +3725,24 @@ function AssigneeOptions({ owners, current }: { owners: Assignee[]; current?: st
 function AddTaskForm({ form, setForm, owners, onSubmit, onCancel }: { form: any; setForm: (f: any) => void; owners: Assignee[]; onSubmit: () => void; onCancel: () => void }) {
   return (
     <div className="rounded border p-2 mt-1 bg-white" style={{ borderColor: "#E8600A" }}>
+      <datalist id="who-options">
+        <AssigneeOptions owners={owners} current={form.who} />
+      </datalist>
       <input autoFocus placeholder="Task…" value={form.t} onChange={(e) => setForm({ ...form, t: e.target.value })} className="w-full text-xs border rounded px-1 py-1 mb-1" style={{ borderColor: "#E2E0DA" }} />
       <div className="flex gap-1 mb-1">
-        <select value={form.who} onChange={(e) => setForm({ ...form, who: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }} title="Assign to a user — the list comes from created accounts">
-          <option value="">Who?</option>
-          <AssigneeOptions owners={owners} current={form.who} />
-        </select>
+        {/* Typeable as well as pickable. Scrolling a dropdown for a name you
+            already know is the slowest part of raising a task, and the list
+            only grows. The datalist keeps every account one keystroke away
+            while still accepting free text for an ERP handle we don't hold. */}
+        <input
+          list="who-options"
+          value={form.who}
+          onChange={(e) => setForm({ ...form, who: e.target.value })}
+          placeholder="Who? — type or pick"
+          className="w-1/2 text-xs border rounded px-1 py-1"
+          style={{ borderColor: "#E2E0DA" }}
+          title="Type a name or initials, or pick from the list"
+        />
         <input type="date" value={form.due} onChange={(e) => setForm({ ...form, due: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1" style={{ borderColor: "#E2E0DA" }} />
       </div>
       <div className="mb-1">
@@ -3734,6 +3750,17 @@ function AddTaskForm({ form, setForm, owners, onSubmit, onCancel }: { form: any;
         <select value={form.esc} onChange={(e) => setForm({ ...form, esc: e.target.value })} className="w-full text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
           {ESC_LEVELS.map((c) => (<option key={c}>{c}</option>))}
         </select>
+        {escalated(form.esc) && (
+          <input
+            autoFocus
+            value={form.esc_why || ""}
+            onChange={(e) => setForm({ ...form, esc_why: e.target.value })}
+            placeholder="Why escalated? (required)"
+            className="w-full text-xs border rounded px-1 py-1 mt-1"
+            style={{ borderColor: (form.esc_why || "").trim() ? "#E2E0DA" : "#B3261E" }}
+            title="Whoever this lands on needs to know why without having to ring you"
+          />
+        )}
       </div>
       <div className="flex gap-1">
         <select value={form.cat} onChange={(e) => setForm({ ...form, cat: e.target.value })} className="flex-1 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>

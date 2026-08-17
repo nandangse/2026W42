@@ -29,6 +29,7 @@ export async function POST(req: Request) {
           due: body.due || null,
           cat: body.cat || "Production",
           esc: body.esc || "None",
+          esc_why: String(body.esc_why || "").trim() || null,
           done: false,
           created_by: user.email,
         })
@@ -70,6 +71,7 @@ export async function POST(req: Request) {
       if ("due" in body) patch.due = body.due || null;
       if ("cat" in body) patch.cat = String(body.cat || "General");
       if ("esc" in body) patch.esc = String(body.esc || "None");
+      if ("esc_why" in body) patch.esc_why = String(body.esc_why || "").trim() || null;
       if (!Object.keys(patch).length)
         return NextResponse.json({ error: "nothing to update" }, { status: 400 });
 

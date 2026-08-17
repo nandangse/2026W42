@@ -153,6 +153,10 @@ export const TASK_CATS = [
   "Hydraulic",
   "Dispatch",
 ];
+/** True for any level above None — what makes a reason compulsory. */
+export const escalated = (esc: string | null | undefined): boolean =>
+  !!esc && esc !== "None";
+
 export const ESC_LEVELS = [
   "None",
   "L1 — Supervisor",
