@@ -2297,6 +2297,9 @@ function JobStanding({ job, V }: { job: Job; V: (n: number) => string }) {
     ["Cash Flow Details", job.cashflow, "#22303C"],
   ];
   const shownText = text.filter(([, v]) => v && v.trim());
+  // every one of the five absent = the export predates them
+  const stale =
+    !job.escalation && !job.clientUpdate && !job.cashflow && job.amtNeeded == null && job.payOnDelivery == null;
   const figures: [string, number | null, string, string][] = [
     ["Invested", invested, "#7C3AED", `(1 − ${job.tpp || 0}%) × ${job.kit || 0}% × ${V(job.val)} — material value already drawn`],
     ["Amount needed next month", job.amtNeeded, "#D97706", "What this job needs spent on it in the coming month"],
@@ -2319,7 +2322,18 @@ function JobStanding({ job, V }: { job: Job; V: (n: number) => string }) {
         ))}
       </div>
 
-      {shownText.length === 0 ? (
+      {/* An empty field here is nearly always ONE thing: the Jobmaster has not
+          been uploaded since these columns were added. Saying so is the
+          difference between a page that looks broken and a page that tells you
+          what to do about it. */}
+      {stale && (
+        <div className="rounded p-2 mb-2 text-xs" style={{ background: "#FFF7E6", border: "1px solid #F0D9A8", color: "#8A5A00", lineHeight: 1.5 }}>
+          <b>Not loaded yet.</b> These five come from the Jobmaster export, and no jobs file has been uploaded since
+          Genie learned to read them. Load <b>Job in progress - Jobs</b> on Morning Update and they fill — the summary
+          names which column each one matched.
+        </div>
+      )}
+      {shownText.length === 0 && !stale ? (
         <div className="text-xs" style={{ color: "#B8B5AC", lineHeight: 1.5 }}>
           No status or client note came across on this job in the last upload.
         </div>

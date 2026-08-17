@@ -37,6 +37,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.2.0.2",
+    date: "2026-08-18",
+    module: "Morning Update · Job Plan · Genie Hint",
+    items: [
+      "FIXED, and this was the real one: the Planning Owner was blank on all 105 jobs. The jobs parser only ever looked for a column literally called “Project Owner”, and the export calls it PLANNING OWNER. The delivered-jobs parser has understood both names since it was written; the jobs branch never used that list. That single missing header is why the Owner column read “—”, why the owner filter had nobody in it, why the kanban had one Unassigned column, and why My Week showed no jobs of yours.",
+      "Job Status and Target Delivery Date are now matched the same way, so the two exports’ different spellings both work.",
+      "The five new fields — Current Project Escalation, Client Update Latest, Cash Flow Details, Amount Needed next month, Pending Payment on Delivery — are empty because NO JOBMASTER FILE HAS BEEN UPLOADED since Genie learned to read them. The last jobs upload was 17 August. The job page now says exactly that instead of showing five dashes, and names the file to load.",
+      "Genie Hint writes dates as 31-Aug-2026, never 2026-08-31. Both halves were needed: the model was told the rule AND the facts it is handed are now written that way, because it copies back whatever shape it is given.",
+    ],
+  },
+  {
     v: "3.2.0.1",
     date: "2026-08-18",
     module: "Jobs in Progress",

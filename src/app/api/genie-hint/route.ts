@@ -38,7 +38,11 @@ Rules:
   material that is short, the task that is overdue. Never generic advice like "monitor
   progress" or "communicate with stakeholders".
 - Indian business English. Plain, direct, no filler, no flattery, no headings inside the text.
-- Amounts are in rupees; lakh and crore are fine.`;
+- Amounts are in rupees; lakh and crore are fine.
+- DATES ARE WRITTEN DD-MMM, e.g. 31-Aug, or 31-Aug-2026 when the year is not
+  obvious from the sentence. NEVER write a date as 2026-08-31. Nobody at this
+  company reads dates that way and it is the one thing that makes this panel
+  look like machine output.`;
 
 const SCHEMA = {
   type: "object",
@@ -133,6 +137,21 @@ const fmtINR = (n: number) =>
 
 const days = (a: string | null, b: string | null) =>
   a && b ? Math.round((Date.parse(b) - Date.parse(a)) / 86400000) : null;
+
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * 31-Aug-2026, never 2026-08-31.
+ *
+ * The model echoes back whatever shape the facts arrive in, so telling it the
+ * rule is only half the job — the payload has to be written that way too, or
+ * it copies the ISO date straight out of the brief it was handed.
+ */
+const d = (iso: string | null | undefined): string => {
+  const v = String(iso || "").slice(0, 10);
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}-${MON[Number(m[2]) - 1]}-${m[1]}` : "not set";
+};
 
 /**
  * GET /api/genie-hint?job_id=… — read the shared cache, and NEVER generate.
@@ -280,28 +299,28 @@ Product family: ${job.fam || "not recorded"}
 Order value: ${fmtINR(Number(job.val || 0))}
 ERP job status: ${job.stat || "not recorded"}
 Production complete: ${job.pct ?? 0}%
-Today is ${T}.
+Today is ${d(T)}.
 
 DATES
-Target Delivery (ERP): ${job.tdd || "not set"}
-OTD date (ERP): ${job.otd || "not set"}${job.otd && job.tdd && job.otd > job.tdd ? ` — ${days(job.tdd, job.otd)} days beyond target` : ""}
-Management target: ${job.mgmt || "not set"}
-Plan starts: ${start}
-Plan ends: ${ends || "no plan saved"}${overrunVsTdd !== null ? ` — that is ${overrunVsTdd > 0 ? overrunVsTdd + " days AFTER" : Math.abs(overrunVsTdd) + " days before"} the Target Delivery` : ""}
-Baseline saved: ${planRes.data?.baseline_on ? `${planRes.data.baseline_on}, ending ${planRes.data.baseline_end}` : "none"}
+Target Delivery (ERP): ${d(job.tdd)}
+OTD date (ERP): ${d(job.otd)}${job.otd && job.tdd && job.otd > job.tdd ? ` — ${days(job.tdd, job.otd)} days beyond target` : ""}
+Management target: ${d(job.mgmt)}
+Plan starts: ${d(start)}
+Plan ends: ${ends ? d(ends) : "no plan saved"}${overrunVsTdd !== null ? ` — that is ${overrunVsTdd > 0 ? overrunVsTdd + " days AFTER" : Math.abs(overrunVsTdd) + " days before"} the Target Delivery` : ""}
+Baseline saved: ${planRes.data?.baseline_on ? `${d(planRes.data.baseline_on)}, ending ${d(planRes.data.baseline_end)}` : "none"}
 
 MILESTONE PLAN (${doneCount} of ${sched.length} done)
 ${sched.length
         ? sched
             .map(
               (m) =>
-                `M${m.idx} ${m.name}: ${m.start} → ${m.end}, ${m.days}d, ${manDays(m)} man-days, ${
-                  m.done ? "DONE" + (m.done_on ? " " + m.done_on : "") : m.end < T ? "NOT DONE and past its end date" : "pending"
+                `M${m.idx} ${m.name}: ${d(m.start)} → ${d(m.end)}, ${m.days}d, ${manDays(m)} man-days, ${
+                  m.done ? "DONE" + (m.done_on ? " " + d(m.done_on) : "") : m.end < T ? "NOT DONE and past its end date" : "pending"
                 }`,
             )
             .join("\n")
         : "No milestone plan has been saved for this job."}
-Next milestone due: ${nextUp ? `M${nextUp.idx} ${nextUp.name}, ends ${nextUp.end}` : "none pending"}
+Next milestone due: ${nextUp ? `M${nextUp.idx} ${nextUp.name}, ends ${d(nextUp.end)}` : "none pending"}
 
 MATERIALS
 Kitting: ${job.kit ?? 0}% · ${received} of ${mats.length} checklist items received
@@ -312,7 +331,7 @@ ${openTasks.length
         ? openTasks
             .map(
               (t) =>
-                `- "${t.title}" · ${t.who ? nameFor(String(t.who)) : "UNASSIGNED"} · due ${t.due || "no date"}${
+                `- "${t.title}" · ${t.who ? nameFor(String(t.who)) : "UNASSIGNED"} · due ${t.due ? d(t.due) : "no date"}${
                   t.due && t.due < T ? " (OVERDUE)" : ""
                 } · ${t.cat || "uncategorised"}${t.esc && t.esc !== "None" ? ` · ESCALATED ${t.esc}` : ""} · ${t.src}`,
             )

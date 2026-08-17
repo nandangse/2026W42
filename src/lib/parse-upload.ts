@@ -536,6 +536,20 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
     } else if (ix["Customer Tag"] != null && ix["ID"] != null) {
       // The money columns, bound once per sheet and reported in the summary.
       const money4 = matchExtraJobFields(hdr);
+      /**
+       * Owner, status and target date by MEANING, exactly as the delivered
+       * branch has always done them.
+       *
+       * This branch read the literal header "Project Owner" and nothing else.
+       * The export now calls that column PLANNING OWNER, so `own` came back
+       * empty on every row — all 105 of them — and with it the Owner column,
+       * the owner filter, the kanban and "my jobs" on My Week. The header list
+       * for this pair has existed since the delivered report was added; the
+       * jobs branch simply never used it.
+       */
+      const ownH = firstHeader(hdr, OWNER_HEADERS) || "Project Owner";
+      const statH = firstHeader(hdr, STATUS_HEADERS) || "Job Status";
+      const tddH = firstHeader(hdr, TARGET_HEADERS) || "Target Delivery Date Current";
       out.jobHeaders = hdr.filter(Boolean);
       out.jobFieldHeaders = money4.matched;
       out.jobs = rows
@@ -551,16 +565,16 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
               "Unassigned",
             cust: String(g(r, "Customer") || "").trim(),
             val: Number(g(r, "Value") || 0),
-            tdd: ser2iso(g(r, "Target Delivery Date Current")),
+            tdd: ser2iso(g(r, tddH)),
             otd: ser2iso(g(r, "OTD Date")),
             start: ser2iso(g(r, "Job Start Date")),
             proj: String(g(r, "Project") || ""),
-            stat: String(g(r, "Job Status") || "").trim(),
+            stat: String(g(r, statH) || "").trim(),
             pct: Number(g(r, "Production Completion %") || 0),
             note: String(g(r, "Current Status") || "")
               .replace(/\s+/g, " ")
               .slice(0, 150),
-            own: String(g(r, "Project Owner") || "").trim(),
+            own: String(g(r, ownH) || "").trim(),
             mgmt: ser2iso(g(r, "Management Target Date Request")),
             tp: Number(g(r, "Throughput") || 0),
             tpv: Number(g(r, "Throughput Expected Value (Auto)") || 0),
@@ -690,6 +704,8 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
         // against that block's own header slice, not the sheet's first row.
         const jHdr = h3.slice(jb, jb + 36).map((h) => String(h || "").trim());
         const money4 = matchExtraJobFields(jHdr);
+        const ownH = firstHeader(jHdr, OWNER_HEADERS) || "Project Owner";
+        const statH = firstHeader(jHdr, STATUS_HEADERS) || "Job Status";
         if (Object.keys(money4.matched).length) {
           out.jobHeaders = jHdr.filter(Boolean);
           out.jobFieldHeaders = { ...(out.jobFieldHeaders || {}), ...money4.matched };
@@ -711,10 +727,10 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
               otd: ser2iso(gj(r, "OTD Date")),
               start: ser2iso(gj(r, "Job Start Date")),
               proj: String(gj(r, "Project") || ""),
-              stat: String(gj(r, "Job Status") || "").trim(),
+              stat: String(gj(r, statH) || "").trim(),
               pct: Number(gj(r, "Production Completion %") || 0),
               note: cleanN(gj(r, "Current Status")),
-              own: String(gj(r, "Project Owner") || "").trim(),
+              own: String(gj(r, ownH) || "").trim(),
               mgmt: ser2iso(gj(r, "Management Target Date Request")),
               tp: Number(gj(r, "Throughput") || 0),
               tpv: Number(gj(r, "Throughput Expected Value (Auto)") || 0),
