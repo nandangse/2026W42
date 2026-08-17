@@ -2898,13 +2898,17 @@ comment on table public.image_quote is
 -- folder can be changed without a deploy -- and cached into image_quote above,
 -- so a bad morning at Google leaves yesterday's pictures working instead of a
 -- blank panel.
-alter table public.app_settings add column if not exists quote_folder text;
-
-update public.app_settings
-   set quote_folder = '18YpET3C1DOgSssADYfB8qTzZdJbJNaqI'
- where id = true and coalesce(quote_folder, '') = '';
-
-comment on column public.app_settings.quote_folder is
-  'Google Drive folder id holding the image quotes. Must be shared '
-  '"anyone with the link".';
+-- Guarded, because app_settings comes from 0017 and this file must not fail
+-- on a database where that has not been pasted yet. The day_mood and
+-- image_quote tables above are the part My Week actually needs; the folder id
+-- can be typed into Admin instead.
+do $$
+begin
+  if to_regclass('public.app_settings') is not null then
+    execute 'alter table public.app_settings add column if not exists quote_folder text';
+    execute $q$update public.app_settings
+                 set quote_folder = '18YpET3C1DOgSssADYfB8qTzZdJbJNaqI'
+               where id = true and coalesce(quote_folder, '') = ''$q$;
+  end if;
+end $$;
 
