@@ -2491,8 +2491,15 @@ function GenieHint({ jobId, jobLabel }: { jobId: string; jobLabel: string }) {
             ))}
           </div>
 
-          <div className="text-xs mt-2" style={{ color: "#B8B5AC" }}>
-            Written by Claude from Genie&apos;s own data{hint.cached ? " · cached" : ""} · check the plan below before acting on it.
+          {/* The sign-off is an instruction, not a disclaimer. "Check before
+              acting" told somebody to distrust the panel and stop; this tells
+              them what the panel is FOR — move the plan, and escalate to the
+              person who can actually clear it. */}
+          <div className="text-xs mt-2" style={{ color: "#8A94A0", lineHeight: 1.5 }}>
+            Written by Genie based on coaching by Raghu{hint.cached ? " · cached" : ""}
+            <div style={{ color: "#B8B5AC" }}>
+              Work on the plan, and escalate as needed — to the right person, at the right time.
+            </div>
           </div>
         </div>
       )}

@@ -37,6 +37,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.2.0.4",
+    date: "2026-08-18",
+    module: "Genie Hint",
+    items: [
+      "The sign-off under a job brief now reads “Written by Genie based on coaching by Raghu · Work on the plan, and escalate as needed — to the right person, at the right time.”",
+      "It replaces “Written by Claude … check the plan below before acting on it”, which told somebody to distrust the panel and stop. The line is an instruction, not a disclaimer: the brief exists to move a plan and get the right person told, and the last thing on it should say so.",
+    ],
+  },
+  {
     v: "3.2.0.3",
     date: "2026-08-18",
     module: "My Week",
