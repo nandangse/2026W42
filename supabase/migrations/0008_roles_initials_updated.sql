@@ -31,12 +31,20 @@ create index if not exists profiles_erp_owner_idx
   on public.profiles (lower(erp_owner)) where erp_owner is not null;
 
 -- ---------------------------------------------------------------------------
--- 2. roles: admin | planner | project_owner | user | viewer | uploader
+-- 2. roles: admin | planner | project_owner | user | sales | viewer | uploader
 -- ---------------------------------------------------------------------------
+-- 'sales' arrived later, in 0016. It is listed HERE too so that re-running the
+-- migrations end to end still works: without it, this line re-applies the old
+-- narrower constraint to a database that by now holds sales accounts, and the
+-- whole run dies on
+--     check constraint "profiles_role_check" of relation "profiles" is violated
+-- Re-runnability is the property that makes ALL_MIGRATIONS.sql usable at all,
+-- so the list here tracks the widest it ever becomes. 0016 then re-adds the
+-- identical constraint, which is a no-op.
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles
   add constraint profiles_role_check
-  check (role in ('admin', 'planner', 'project_owner', 'user', 'viewer', 'uploader'));
+  check (role in ('admin', 'planner', 'project_owner', 'user', 'sales', 'viewer', 'uploader'));
 
 -- Role tiers used by every RLS policy.
 --   reader  — may read the boards (everyone except the uploader)
