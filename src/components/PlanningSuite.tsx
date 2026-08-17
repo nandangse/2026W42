@@ -31,6 +31,7 @@ import {
 } from "@/lib/schedule";
 import QuoteOfDay from "./QuoteOfDay";
 import GoalsWorkspace from "./GoalsWorkspace";
+import DeliveredJobs from "./DeliveredJobs";
 import MorningUpload from "./MorningUpload";
 import SalesGenie from "./SalesGenie";
 
@@ -351,6 +352,12 @@ export default function PlanningSuite({
   useEffect(() => {
     if (workspace === "goals") setGoalsVisited(true);
   }, [workspace]);
+  // same for Delivered Jobs — the whole ledger comes down in one payload and
+  // every period cut is computed over it in memory
+  const [deliveredVisited, setDeliveredVisited] = useState(false);
+  useEffect(() => {
+    if (workspace === "delivered") setDeliveredVisited(true);
+  }, [workspace]);
 
   // Sales Genie is granted per person (default nobody) — the tab only renders
   // once the check says yes. Same lazy keep-alive pattern as Goals so the
@@ -509,8 +516,6 @@ export default function PlanningSuite({
   // spec's "granted, not default" rule.
   const WORKSPACE_DEFS: [typeof workspace, string][] = [
     ["suite", "🧭 Planning Suite"],
-    // Placeholder — the delivered-jobs history board is next; the tab is here
-    // so the header ordering is settled and people know it's coming.
     ["delivered", "✅ Delivered Jobs"],
     ...(goalsAccess ? ([["goals", "🎯 Goals"]] as [typeof workspace, string][]) : []),
     ["tasking", "📋 Nandan Tasking"],
@@ -787,15 +792,12 @@ export default function PlanningSuite({
           <GoalsWorkspace />
         </div>
       )}
-      {workspace === "delivered" && (
-        <div className="p-4">
-          <div className="bg-white rounded-lg border p-8 text-center" style={{ borderColor: "#E2E0DA" }}>
-            <div className="text-2xl mb-1">✅</div>
-            <div className="font-bold text-lg" style={{ color: "#16232F" }}>Delivered Jobs</div>
-            <div className="text-sm mt-1" style={{ color: "#8A94A0" }}>
-              Reserved — the delivered-jobs history goes here. Nothing to show yet.
-            </div>
-          </div>
+      {/* Kept mounted once visited, like Goals — the whole ledger comes down in
+          one payload and every period cut is computed over it in memory, so
+          re-fetching on each workspace switch would be pure waste. */}
+      {deliveredVisited && (
+        <div style={{ display: workspace === "delivered" ? undefined : "none" }}>
+          <DeliveredJobs V={V} />
         </div>
       )}
       {workspace === "tasking" && <Tasking board={board} onOpen={openJobPlan} reload={reload} me={me} people={board.people || []} />}
