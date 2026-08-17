@@ -64,14 +64,14 @@ export function HowsMyDay({ data, onSaved }: { data: MyWeekData | null; onSaved:
   return (
     <div className="bg-white rounded-lg border px-3 py-2" style={{ borderColor: C.line, borderTop: `3px solid ${C.violet}` }}>
       <div className="text-xs font-bold" style={{ color: C.mute }}>HOW&apos;S MY DAY</div>
-      <div className="flex gap-1 mt-1 flex-wrap">
+      <div className="flex gap-0.5 mt-1" style={{ flexWrap: "nowrap" }}>
         {MOODS.map((m) => {
           const on = picked === m.key;
           return (
             <button key={m.key} onClick={() => say(m.key)} disabled={!!busy} title={m.label}
               className="rounded"
               style={{
-                fontSize: 20, lineHeight: 1, padding: "3px 5px",
+                fontSize: 17, lineHeight: 1, padding: "2px 3px", flex: "1 1 0", minWidth: 0,
                 background: on ? m.color : "transparent",
                 border: `1px solid ${on ? m.color : C.line}`,
                 filter: on || !picked ? "none" : "grayscale(1)",
@@ -110,10 +110,10 @@ export function ImageQuote({ data, isAdmin }: { data: MyWeekData | null; isAdmin
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line, minHeight: 120 }}>
         <div className="text-xs font-bold mb-1" style={{ color: C.mute }}>IMAGE QUOTE</div>
         <div className="text-xs" style={{ color: C.faint, lineHeight: 1.5 }}>
-          No images loaded yet.
+          No images yet — Genie reads them from the Drive folder the first time this page is opened.
           {isAdmin
-            ? " Paste the Drive links in Admin → Settings → Image quotes — the folder itself can't be read, so the links live here."
-            : " An admin adds these."}
+            ? " If it stays empty, check the folder is shared “anyone with the link” and press Sync in Admin → Settings → Image quotes."
+            : " An admin sets the folder."}
         </div>
       </div>
     );
@@ -144,7 +144,7 @@ export function ImageQuote({ data, isAdmin }: { data: MyWeekData | null; isAdmin
 export function Birthdays({ data }: { data: MyWeekData | null }) {
   const list = data?.birthdays || [];
   return (
-    <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line }}>
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line, height: "100%" }}>
       <div className="font-bold text-sm mb-1.5">🎂 Birthdays this week</div>
       {list.length === 0 ? (
         <div className="text-xs" style={{ color: C.faint }}>Nobody in the next seven days.</div>

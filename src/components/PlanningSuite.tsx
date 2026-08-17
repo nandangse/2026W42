@@ -1208,25 +1208,27 @@ function MyWeek({
         </div>
       )}
 
-      {/* ===== the top: two columns =====
-          Left, the numbers that describe the person's week. Right, the two
-          things that are not about work at all. They sit side by side rather
-          than stacked because the quote is the reason somebody reads the top
-          of this page twice. */}
-      <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)" }}>
-        <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
-          <Card label="MY OPEN TASKS" value={myTasks.length} sub={overdue.length ? `${overdue.length} overdue` : "this week"} color={overdue.length ? "#B3261E" : "#16232F"} />
-          <Card label="DELIVERIES THIS WEEK" value={dueJobs.length} sub="shop-wide" color="#7C3AED" />
-          <Card label="MY LEARNING · 90 DAYS" value={mw ? hhmm(mw.learning.minutes) : "—"}
-            sub={mw ? `${mw.learning.completed} lesson${mw.learning.completed === 1 ? "" : "s"} finished` : "loading"} color="#0D9488" />
-          <Card label="MY PARTICIPATION" value={mw ? `${mw.participation.days}/${mw.participation.of}` : "—"}
-            sub="days active in the last 30" color="#1B3A5C" />
-          <HowsMyDay data={mw} onSaved={reloadMw} />
+      {/* ===== the top: one five-column band =====
+          Four numbers and the birthdays across the top; the quote runs under
+          the first three and How's My Day sits under the number it belongs
+          with. The quote gets three columns' width because a line of prose set
+          in a narrow card is a line nobody reads. */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 mb-4">
+        <Card label="MY OPEN TASKS" value={myTasks.length} sub={overdue.length ? `${overdue.length} overdue` : "this week"} color={overdue.length ? "#B3261E" : "#16232F"} />
+        <Card label="DELIVERIES THIS WEEK" value={dueJobs.length} sub="shop-wide" color="#7C3AED" />
+        <Card label="MY LEARNING · 90 DAYS" value={mw ? hhmm(mw.learning.minutes) : "—"}
+          sub={mw ? `${mw.learning.completed} lesson${mw.learning.completed === 1 ? "" : "s"} finished` : "loading"} color="#0D9488" />
+        <Card label="MY PARTICIPATION" value={mw ? `${mw.participation.days}/${mw.participation.of}` : "—"}
+          sub="days active in the last 30" color="#1B3A5C" />
+        {/* birthdays hold the fifth column down both rows — a list of names
+            needs the height, and it is the one card here that grows */}
+        <div className="lg:row-span-2" style={{ minWidth: 0 }}>
+          <Birthdays data={mw} />
         </div>
-        <div className="flex flex-col gap-2">
+        <div className="col-span-2 lg:col-span-3" style={{ minWidth: 0 }}>
           <QuoteCard />
-          <ImageQuote data={mw} isAdmin={isAdmin} />
         </div>
+        <HowsMyDay data={mw} onSaved={reloadMw} />
       </div>
 
       {/* ===== three columns ===== */}
@@ -1346,9 +1348,11 @@ function MyWeek({
         )}
         </div>
 
-        {/* RIGHT — the people things first, then my own work */}
+        {/* RIGHT — the picture, then my own work. Birthdays have moved up to
+            the top band; the image quote takes their place here, where it has
+            the width to be looked at rather than glanced past. */}
         <div className="flex flex-col gap-4" style={{ minWidth: 0 }}>
-          <Birthdays data={mw} />
+          <ImageQuote data={mw} isAdmin={isAdmin} />
           <MyLearningCard data={mw} onOpenLms={goLms} />
         {/* my milestones this week */}
         <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>

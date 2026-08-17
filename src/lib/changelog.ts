@@ -37,6 +37,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.2.0.3",
+    date: "2026-08-18",
+    module: "My Week",
+    items: [
+      "The top of My Week is one five-column band. Open Tasks, Deliveries, Learning and Participation across the top, with birthdays holding the fifth column down both rows — a list of names is the one card up there that grows, so it gets the height.",
+      "The Quote of the Day now runs the full width of the first three columns. A line of prose set in a narrow card is a line nobody reads.",
+      "How’s My Day sits directly under My Participation, which is the number it belongs with, and its five faces now fit on one line instead of wrapping onto two.",
+      "The image quote moves down into the right-hand column, where it has the width to be looked at rather than glanced past.",
+    ],
+  },
+  {
     v: "3.2.0.2",
     date: "2026-08-18",
     module: "Morning Update · Job Plan · Genie Hint",
