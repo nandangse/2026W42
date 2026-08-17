@@ -551,7 +551,17 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
       const statH = firstHeader(hdr, STATUS_HEADERS) || "Job Status";
       const tddH = firstHeader(hdr, TARGET_HEADERS) || "Target Delivery Date Current";
       out.jobHeaders = hdr.filter(Boolean);
-      out.jobFieldHeaders = money4.matched;
+      // The owner, status and date headers are reported too. The money fields
+      // have named their columns since they were added, and that is exactly
+      // how the escalation typo ("Currrent") was confirmed in one glance —
+      // while `own` failed silently for months because nothing said which
+      // header it had bound to, or that it had bound to none.
+      out.jobFieldHeaders = {
+        ...money4.matched,
+        ...(firstHeader(hdr, OWNER_HEADERS) ? { own: firstHeader(hdr, OWNER_HEADERS)! } : {}),
+        ...(firstHeader(hdr, STATUS_HEADERS) ? { stat: firstHeader(hdr, STATUS_HEADERS)! } : {}),
+        ...(firstHeader(hdr, TARGET_HEADERS) ? { tdd: firstHeader(hdr, TARGET_HEADERS)! } : {}),
+      };
       out.jobs = rows
         .slice(1)
         .filter((r) => r && g(r, "ID"))

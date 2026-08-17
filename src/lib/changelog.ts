@@ -45,6 +45,7 @@ export const UPDATES: UpdateEntry[] = [
       "Job Status and Target Delivery Date are now matched the same way, so the two exports’ different spellings both work.",
       "The five new fields — Current Project Escalation, Client Update Latest, Cash Flow Details, Amount Needed next month, Pending Payment on Delivery — are empty because NO JOBMASTER FILE HAS BEEN UPLOADED since Genie learned to read them. The last jobs upload was 17 August. The job page now says exactly that instead of showing five dashes, and names the file to load.",
       "Genie Hint writes dates as 31-Aug-2026, never 2026-08-31. Both halves were needed: the model was told the rule AND the facts it is handed are now written that way, because it copies back whatever shape it is given.",
+      "The upload summary now names the column it read Planning Owner, Job Status and Target Delivery Date from — and prints the sheet’s whole header list whenever one of those three fails to match. The money fields have named their columns since the day they were added, which is how the ERP’s “Currrent Project Escalation” typo was confirmed at a glance; Planning Owner failed silently for months because nothing ever said which header it had bound to, or that it had bound to none.",
     ],
   },
   {

@@ -151,6 +151,9 @@ function isTextTable(filename: string, bytes: Uint8Array): boolean {
 
 /** The four money fields, in the order they matter on the board. */
 const MONEY_LABELS: [string, string][] = [
+  ["own", "Planning Owner"],
+  ["stat", "Job status"],
+  ["tdd", "Target delivery date"],
   ["payOnDelivery", "Pending payment on delivery"],
   ["escalation", "Current project escalation"],
   ["amtNeeded", "Amount needed"],
@@ -191,7 +194,12 @@ function moneyReport(
       `· ⚠ no column matched: ${missing.map(([, l]) => l).join(", ")}. ` +
         `Left as they were rather than blanked.`,
     );
-    if (!found.length && headers?.length)
+    // Print the sheet's own headers whenever something IMPORTANT is missing,
+    // not only when everything is. Planning Owner going unmatched is what
+    // empties the owner column, the owner filter, the kanban and My Week, and
+    // it is worth thirty columns of noise to see why.
+    const critical = missing.some(([k]) => k === "own" || k === "stat" || k === "tdd");
+    if ((critical || !found.length) && headers?.length)
       out.push(`· The sheet's columns are: ${headers.join(" | ")}`);
   }
   return out;
