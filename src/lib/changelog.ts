@@ -37,6 +37,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.2.0.1",
+    date: "2026-08-18",
+    module: "Jobs in Progress",
+    items: [
+      "Planned deliveries is now half chart, half table, side by side, and shows at most six months — trimmed to where the book actually ends. It was drawing twelve, eight of them empty: a line lying flat along zero for two thirds of its width reads as a collapse in orders rather than as the end of the data. It now says “nothing planned past November” in words instead.",
+      "The table leads with a TOTAL row, and that total is the whole book — every month shown plus overdue, later and undated — so the rows beneath can never add up to more than the line above them.",
+      "Every total is now clickable. A month, the total, or a product family opens the jobs behind it: job number, customer, tag, target date, value and throughput. A chart that says a month is worth ₹8.38 Cr but cannot tell you which eight jobs is a chart you have to leave in order to act on, and leaving means losing the chart.",
+      "Clicking a job in that list opens the job itself, still without leaving the page.",
+      "On the Type of Jobs list, clicking a family now opens its jobs; the small ◧ button filters the plot instead. Those were the same click before, and only one of them can be the obvious one.",
+      "The kitting-versus-production plot is smaller and squarer, capped so it fits on one screen. A plot you have to scroll to see the top of is two half-plots, and its whole value is seeing all four corners at once.",
+    ],
+  },
+  {
     v: "3.2.0.0",
     date: "2026-08-18",
     module: "My Week rebuilt · Jobs in Progress",

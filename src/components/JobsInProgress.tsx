@@ -59,10 +59,30 @@ const PALETTE = [
   "#6D4C41", "#2E7D32",
 ];
 
-const MONTHS_AHEAD = 12;
+/**
+ * Six months ahead at most — and fewer if the book runs out sooner.
+ *
+ * The first cut drew twelve, and eight of them were empty: a line that lies
+ * flat along zero for two thirds of its width reads as a collapse in orders
+ * rather than as the end of the data. Trailing empty months are dropped and
+ * the count is stated, so "nothing planned past November" is a sentence rather
+ * than a shape.
+ */
+const MONTHS_AHEAD = 6;
 const monthKey = (iso: string) => iso.slice(0, 7);
 const monthLabel = (k: string) =>
   new Date(k + "-01T00:00:00Z").toLocaleDateString("en-IN", { month: "short", year: "2-digit", timeZone: "UTC" });
+
+/** The jobs behind one bar of the delivery chart. */
+function jobsInBucket(jobs: WipJob[], key: string, today: string, rows: { key: string }[]): WipJob[] {
+  const first = rows[0]?.key ?? monthKey(today);
+  const last = rows[rows.length - 1]?.key ?? first;
+  if (key === "overdue") return jobs.filter((j) => j.tdd && monthKey(j.tdd) < first);
+  if (key === "beyond") return jobs.filter((j) => j.tdd && monthKey(j.tdd) > last);
+  if (key === "none") return jobs.filter((j) => !j.tdd);
+  if (key === "all") return jobs;
+  return jobs.filter((j) => j.tdd && monthKey(j.tdd) === key);
+}
 
 export default function JobsInProgress({
   jobs, today, V, onOpenPlan,
@@ -74,6 +94,8 @@ export default function JobsInProgress({
 }) {
   const [famFilter, setFamFilter] = useState("");
   const [picked, setPicked] = useState<WipJob | null>(null);
+  // a named set of jobs behind whatever total was clicked
+  const [list, setList] = useState<{ title: string; jobs: WipJob[] } | null>(null);
 
   // families, biggest throughput first — that ordering is what fixes the colours
   const families = useMemo(() => {
@@ -119,7 +141,15 @@ export default function JobsInProgress({
             : beyond;
       into.nos += 1; into.val += j.val || 0; into.tp += j.tpv || 0;
     }
-    return { rows, late, beyond, undated };
+    // drop the trailing empties; keep at least one so the panel is never blank
+    let last = rows.length - 1;
+    while (last > 0 && rows[last].nos === 0) last--;
+    const trimmed = rows.slice(0, last + 1);
+    const totals = [...trimmed, late, beyond, undated].reduce(
+      (a, r) => ({ nos: a.nos + r.nos, val: a.val + r.val, tp: a.tp + r.tp }),
+      { nos: 0, val: 0, tp: 0 },
+    );
+    return { rows: trimmed, late, beyond, undated, totals, asked: MONTHS_AHEAD };
   }, [shown, today]);
 
   return (
@@ -142,10 +172,17 @@ export default function JobsInProgress({
         )}
       </div>
 
-      <PlannedDeliveries months={months} V={V} />
-      <ByFamily families={families} colourOf={colourOf} V={V} onPick={setFamFilter} picked={famFilter} />
+      <PlannedDeliveries months={months} V={V} today={today}
+        onOpenMonth={(key, label) => setList({ title: label, jobs: jobsInBucket(shown, key, today, months.rows) })} />
+      <ByFamily families={families} colourOf={colourOf} V={V} picked={famFilter}
+        onFilter={(f) => setFamFilter(f)}
+        onOpen={(f) => setList({ title: f, jobs: jobs.filter((j) => (j.fam?.trim() || "Unassigned") === f) })} />
       <Scatter jobs={shown} colourOf={colourOf} V={V} onPick={setPicked} />
 
+      {list && (
+        <JobListBox title={list.title} jobs={list.jobs} V={V} onClose={() => setList(null)}
+          onPick={(j) => { setList(null); setPicked(j); }} />
+      )}
       {picked && (
         <JobLightbox job={picked} V={V} colour={colourOf(picked.fam)} onClose={() => setPicked(null)}
           onOpenPlan={() => { const id = picked.id; setPicked(null); onOpenPlan(id); }} />
@@ -155,6 +192,73 @@ export default function JobsInProgress({
 }
 
 // ===========================================================================
+/**
+ * The jobs behind a number.
+ *
+ * Every total on this page is clickable and lands here. A chart that shows a
+ * month is worth 8.38 Cr and cannot tell you WHICH eight jobs is a chart you
+ * have to leave to act on, and leaving means losing the chart.
+ */
+function JobListBox({
+  title, jobs, V, onClose, onPick,
+}: {
+  title: string; jobs: WipJob[]; V: (n: number) => string; onClose: () => void; onPick: (j: WipJob) => void;
+}) {
+  const rows = [...jobs].sort((a, b) => (a.tdd || "9999").localeCompare(b.tdd || "9999"));
+  const tot = rows.reduce((a, j) => ({ val: a.val + (j.val || 0), tp: a.tp + (j.tpv || 0) }), { val: 0, tp: 0 });
+  return (
+    <div onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,0.55)", zIndex: 68, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg"
+        style={{ width: "min(820px, 100%)", maxHeight: "86vh", display: "flex", flexDirection: "column" }}>
+        <div className="px-4 py-3 flex items-center gap-3" style={{ background: C.ink }}>
+          <div style={{ flex: 1 }}>
+            <div className="text-xs font-bold" style={{ color: "#8FA1B3", letterSpacing: 1.2 }}>{rows.length} JOB{rows.length === 1 ? "" : "S"}</div>
+            <div className="font-bold text-white" style={{ fontSize: 16 }}>{title}</div>
+          </div>
+          <div className="text-right">
+            <div className="tnum font-bold" style={{ color: C.accent, fontSize: 15 }}>{V(tot.val)}</div>
+            <div className="tnum" style={{ color: "#7BC67E", fontSize: 12 }}>{V(tot.tp)} throughput</div>
+          </div>
+          <button onClick={onClose} className="font-bold" style={{ color: "#8FA1B3", fontSize: 20, lineHeight: 1 }}>✕</button>
+        </div>
+        <div style={{ overflowY: "auto" }}>
+          <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ color: C.mute, borderBottom: `1px solid ${C.line}`, position: "sticky", top: 0, background: "#fff" }}>
+                <th className="text-left px-3 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>JOB</th>
+                <th className="text-left px-2 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>CUSTOMER</th>
+                <th className="text-left px-2 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>TAG</th>
+                <th className="text-center px-2 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>TDD</th>
+                <th className="text-right px-2 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>VALUE</th>
+                <th className="text-right px-3 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>THROUGHPUT</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((j) => (
+                <tr key={j.id} onClick={() => onPick(j)} style={{ borderBottom: `1px solid ${C.line}`, cursor: "pointer" }}>
+                  <td className="px-3 py-1.5 font-bold tnum" style={{ color: C.navy }}>{jobNo(j.id)}</td>
+                  <td className="px-2 py-1.5 truncate" style={{ color: C.body, maxWidth: 190 }}>{j.cust}</td>
+                  <td className="px-2 py-1.5 truncate" style={{ color: C.sub, maxWidth: 170 }}>{j.tag}</td>
+                  <td className="px-2 py-1.5 text-center tnum" style={{ color: j.tdd && j.tdd < new Date().toISOString().slice(0, 10) ? C.red : C.sub }}>{fmtFull(j.tdd)}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={{ color: C.accent }}>{V(j.val)}</td>
+                  <td className="px-3 py-1.5 text-right tnum" style={{ color: C.green }}>{V(j.tpv || 0)}</td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr><td colSpan={6} className="px-3 py-8 text-center" style={{ color: C.mute }}>No jobs here.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-3 py-1.5 text-xs" style={{ background: C.panel, color: C.faint, borderTop: `1px solid ${C.line}` }}>
+          Click any row for the job itself.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface MonthRow { key: string; label: string; nos: number; val: number; tp: number }
 
 /**
@@ -166,16 +270,18 @@ interface MonthRow { key: string; label: string; nos: number; val: number; tp: n
  * flat along the bottom and say nothing.
  */
 function PlannedDeliveries({
-  months, V,
+  months, V, today, onOpenMonth,
 }: {
-  months: { rows: MonthRow[]; late: MonthRow; beyond: MonthRow; undated: MonthRow };
+  months: { rows: MonthRow[]; late: MonthRow; beyond: MonthRow; undated: MonthRow; totals: { nos: number; val: number; tp: number }; asked: number };
   V: (n: number) => string;
+  today: string;
+  onOpenMonth: (key: string, label: string) => void;
 }) {
   const rows = months.rows;
-  const W = 900, H = 260, L = 46, R = 40, T = 14, B = 34;
+  const W = 560, H = 250, L = 44, R = 34, T = 16, B = 34;
   const maxMoney = Math.max(1, ...rows.map((r) => Math.max(r.val, r.tp)));
   const maxNos = Math.max(1, ...rows.map((r) => r.nos));
-  const x = (i: number) => L + (i * (W - L - R)) / Math.max(1, rows.length - 1);
+  const x = (i: number) => (rows.length === 1 ? (L + W - R) / 2 : L + (i * (W - L - R)) / (rows.length - 1));
   const yM = (v: number) => H - B - ((H - T - B) * v) / maxMoney;
   const yN = (v: number) => H - B - ((H - T - B) * v) / maxNos;
   const path = (pick: (r: MonthRow) => number, y: (v: number) => number) =>
@@ -184,82 +290,100 @@ function PlannedDeliveries({
   const SERIES = [
     { label: "Value", colour: C.accent, pick: (r: MonthRow) => r.val, y: yM, dash: "" },
     { label: "Throughput", colour: C.green, pick: (r: MonthRow) => r.tp, y: yM, dash: "" },
-    { label: "Jobs (right axis)", colour: C.navy, pick: (r: MonthRow) => r.nos, y: yN, dash: "5 4" },
+    { label: "Jobs", colour: C.navy, pick: (r: MonthRow) => r.nos, y: yN, dash: "5 4" },
   ];
+
+  const extra = [months.late, months.beyond, months.undated].filter((r) => r.nos > 0);
+
+  const Row = ({ r, tone }: { r: MonthRow; tone?: string }) => (
+    <tr onClick={() => onOpenMonth(r.key, r.label)} title={`The ${r.nos} job${r.nos === 1 ? "" : "s"} in ${r.label}`}
+      style={{ borderBottom: `1px solid ${C.line}`, cursor: r.nos ? "pointer" : "default", background: tone }}>
+      <td className="px-2 py-1" style={{ color: tone ? C.red : C.body, fontWeight: tone ? 700 : 500 }}>{r.label}</td>
+      <td className="px-2 py-1 text-right tnum" style={{ color: r.nos ? C.body : C.faint }}>{r.nos || "—"}</td>
+      <td className="px-2 py-1 text-right tnum" style={{ color: r.nos ? C.accent : C.faint }}>{r.nos ? cr(r.val) : "—"}</td>
+      <td className="px-2 py-1 text-right tnum" style={{ color: r.nos ? C.green : C.faint }}>{r.nos ? cr(r.tp) : "—"}</td>
+    </tr>
+  );
 
   return (
     <div className="rounded-lg border bg-white mb-3" style={{ borderColor: C.line, overflow: "hidden" }}>
       <div className="flex items-center gap-3 px-3 py-2 flex-wrap" style={{ background: C.panel, borderBottom: `1px solid ${C.line}` }}>
-        <span className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>PLANNED DELIVERIES · NEXT {MONTHS_AHEAD} MONTHS</span>
+        <span className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>
+          PLANNED DELIVERIES · {rows.length} MONTH{rows.length === 1 ? "" : "S"}
+        </span>
+        <span className="text-xs" style={{ color: C.faint }}>
+          {rows.length < months.asked
+            ? `nothing planned past ${rows[rows.length - 1]?.label} — the empty months are left off rather than drawn flat`
+            : `next ${months.asked} months`}
+        </span>
         <div className="flex-1" />
-        {SERIES.map((s) => (
-          <span key={s.label} className="text-xs flex items-center gap-1" style={{ color: C.sub }}>
-            <span style={{ width: 14, height: 3, background: s.colour, display: "inline-block", borderRadius: 2 }} />
-            {s.label}
+        {SERIES.map((sr) => (
+          <span key={sr.label} className="text-xs flex items-center gap-1" style={{ color: C.sub }}>
+            <span style={{ width: 14, height: 3, background: sr.colour, display: "inline-block", borderRadius: 2 }} />
+            {sr.label}
           </span>
         ))}
       </div>
 
-      <div style={{ overflowX: "auto" }}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 640, display: "block" }} role="img"
-          aria-label="Planned deliveries by month">
-          {[0, 0.25, 0.5, 0.75, 1].map((f) => (
-            <g key={f}>
-              <line x1={L} y1={yM(maxMoney * f)} x2={W - R} y2={yM(maxMoney * f)} stroke={C.line} strokeWidth={1} />
-              <text x={L - 5} y={yM(maxMoney * f) + 3} textAnchor="end" fontSize={9} fill={C.faint}>
-                {cr(maxMoney * f)}
-              </text>
-              <text x={W - R + 5} y={yN(maxNos * f) + 3} fontSize={9} fill={C.navy} opacity={0.7}>
-                {Math.round(maxNos * f)}
-              </text>
-            </g>
-          ))}
-          <text x={L - 5} y={T - 3} textAnchor="end" fontSize={9} fontWeight={700} fill={C.mute}>₹ Cr</text>
-          <text x={W - R + 5} y={T - 3} fontSize={9} fontWeight={700} fill={C.navy}>nos</text>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))" }}>
+        {/* ---- left: the line ---- */}
+        <div style={{ borderRight: `1px solid ${C.line}` }}>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", display: "block" }} role="img"
+            aria-label="Planned deliveries by month">
+            {[0, 0.5, 1].map((f) => (
+              <g key={f}>
+                <line x1={L} y1={yM(maxMoney * f)} x2={W - R} y2={yM(maxMoney * f)} stroke={C.line} strokeWidth={1} />
+                <text x={L - 5} y={yM(maxMoney * f) + 3} textAnchor="end" fontSize={9} fill={C.faint}>{cr(maxMoney * f)}</text>
+                <text x={W - R + 4} y={yN(maxNos * f) + 3} fontSize={9} fill={C.navy} opacity={0.7}>{Math.round(maxNos * f)}</text>
+              </g>
+            ))}
+            <text x={L - 5} y={T - 4} textAnchor="end" fontSize={9} fontWeight={700} fill={C.mute}>₹ Cr</text>
+            <text x={W - R + 4} y={T - 4} fontSize={9} fontWeight={700} fill={C.navy}>nos</text>
 
-          {SERIES.map((s) => (
-            <path key={s.label} d={path(s.pick, s.y)} fill="none" stroke={s.colour} strokeWidth={2}
-              strokeDasharray={s.dash} strokeLinejoin="round" />
-          ))}
-          {rows.map((r, i) => (
-            <g key={r.key}>
-              {SERIES.map((s) => (
-                <circle key={s.label} cx={x(i)} cy={s.y(s.pick(r))} r={2.5} fill={s.colour} />
-              ))}
-              <text x={x(i)} y={H - B + 13} textAnchor="middle" fontSize={9} fill={C.sub}>{r.label}</text>
-              <title>{`${r.label}: ${r.nos} job${r.nos === 1 ? "" : "s"} · ${V(r.val)} · ${V(r.tp)} throughput`}</title>
-            </g>
-          ))}
-        </svg>
-      </div>
+            {SERIES.map((sr) => (
+              <path key={sr.label} d={path(sr.pick, sr.y)} fill="none" stroke={sr.colour} strokeWidth={2}
+                strokeDasharray={sr.dash} strokeLinejoin="round" />
+            ))}
+            {rows.map((r, i) => (
+              <g key={r.key} onClick={() => onOpenMonth(r.key, r.label)} style={{ cursor: "pointer" }}>
+                <rect x={x(i) - (W - L - R) / (rows.length * 2 || 1)} y={T} width={(W - L - R) / (rows.length || 1)} height={H - T - B} fill="transparent" />
+                {SERIES.map((sr) => <circle key={sr.label} cx={x(i)} cy={sr.y(sr.pick(r))} r={3} fill={sr.colour} />)}
+                <text x={x(i)} y={H - B + 14} textAnchor="middle" fontSize={9} fill={C.sub}>{r.label}</text>
+                <title>{`${r.label}: ${r.nos} job${r.nos === 1 ? "" : "s"} · ${V(r.val)} · ${V(r.tp)} throughput\nClick for the jobs`}</title>
+              </g>
+            ))}
+          </svg>
+        </div>
 
-      <div style={{ overflowX: "auto" }}>
-        <table className="w-full text-xs" style={{ borderCollapse: "collapse", minWidth: 520 }}>
-          <thead>
-            <tr style={{ color: C.mute, borderTop: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }}>
-              <th className="text-left px-3 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>MONTH</th>
-              <th className="text-right px-2 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>JOBS</th>
-              <th className="text-right px-2 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>VALUE ₹ Cr</th>
-              <th className="text-right px-2 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>THROUGHPUT ₹ Cr</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* Overdue leads the table and is deliberately NOT on the line: a
-                job whose date has gone is not a future month, and drawing it
-                as one would flatter every month after it. */}
-            {[months.late, ...rows, months.beyond, months.undated].filter((r) => r.nos > 0 || rows.includes(r)).map((r) => {
-              const odd = r.key === "overdue";
-              return (
-                <tr key={r.key} style={{ borderBottom: `1px solid ${C.line}`, background: odd ? "#FBEDEA" : undefined }}>
-                  <td className="px-3 py-1" style={{ color: odd ? C.red : C.body, fontWeight: odd ? 700 : 500 }}>{r.label}</td>
-                  <td className="px-2 py-1 text-right tnum" style={{ color: r.nos ? C.body : C.faint }}>{r.nos || "—"}</td>
-                  <td className="px-2 py-1 text-right tnum" style={{ color: r.nos ? C.accent : C.faint }}>{r.nos ? cr(r.val) : "—"}</td>
-                  <td className="px-2 py-1 text-right tnum" style={{ color: r.nos ? C.green : C.faint }}>{r.nos ? cr(r.tp) : "—"}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        {/* ---- right: the table, totals first ---- */}
+        <div style={{ overflowX: "auto" }}>
+          <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ color: C.mute, borderBottom: `1px solid ${C.line}` }}>
+                <th className="text-left px-2 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>MONTH</th>
+                <th className="text-right px-2 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>JOBS</th>
+                <th className="text-right px-2 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>VALUE ₹ Cr</th>
+                <th className="text-right px-2 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>THRUPUT ₹ Cr</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* The total leads. It is the whole book — every month shown,
+                  plus overdue, later and undated — so the rows beneath can
+                  never add up to more than the line above them. */}
+              <tr onClick={() => onOpenMonth("all", "Every pending job")}
+                style={{ background: C.ink, cursor: "pointer" }} title="Every pending job">
+                <td className="px-2 py-1.5 font-bold" style={{ color: "#fff" }}>TOTAL</td>
+                <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: "#fff" }}>{months.totals.nos}</td>
+                <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: "#F5B32B" }}>{cr(months.totals.val)}</td>
+                <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: "#7BC67E" }}>{cr(months.totals.tp)}</td>
+              </tr>
+              {months.late.nos > 0 && <Row r={months.late} tone="#FBEDEA" />}
+              {rows.map((r) => <Row key={r.key} r={r} />)}
+              {extra.filter((r) => r.key !== "overdue").map((r) => <Row key={r.key} r={r} />)}
+            </tbody>
+          </table>
+          <div className="px-2 py-1.5 text-xs" style={{ color: C.faint }}>Click any row for the jobs behind it.</div>
+        </div>
       </div>
     </div>
   );
@@ -267,12 +391,15 @@ function PlannedDeliveries({
 
 // ===========================================================================
 function ByFamily({
-  families, colourOf, V, onPick, picked,
+  families, colourOf, V, onFilter, onOpen, picked,
 }: {
   families: { fam: string; nos: number; val: number; tp: number }[];
   colourOf: (f: string) => string;
   V: (n: number) => string;
-  onPick: (f: string) => void;
+  /** Narrow the plot below to one family. */
+  onFilter: (f: string) => void;
+  /** Open the jobs in that family. */
+  onOpen: (f: string) => void;
   picked: string;
 }) {
   const max = Math.max(1, ...families.map((f) => f.tp || f.val));
@@ -280,24 +407,33 @@ function ByFamily({
     <div className="rounded-lg border bg-white mb-3" style={{ borderColor: C.line, overflow: "hidden" }}>
       <div className="px-3 py-2" style={{ background: C.panel, borderBottom: `1px solid ${C.line}` }}>
         <span className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>TYPE OF JOBS</span>
-        <span className="text-xs ml-2" style={{ color: C.faint }}>click a family to filter the plot below</span>
+        <span className="text-xs ml-2" style={{ color: C.faint }}>
+          click a family for its jobs · the ◧ button filters the plot below instead
+        </span>
       </div>
       <div className="p-3 flex flex-col gap-1">
         {families.map((f) => {
           const on = picked === f.fam;
           return (
-            <button key={f.fam} onClick={() => onPick(on ? "" : f.fam)}
-              className="flex items-center gap-2 text-left rounded px-1 py-0.5"
-              style={{ background: on ? colourOf(f.fam) + "18" : undefined, cursor: "pointer" }}>
-              <span style={{ width: 10, height: 10, borderRadius: 2, background: colourOf(f.fam), flexShrink: 0 }} />
-              <span className="text-xs font-semibold" style={{ color: C.body, width: 150, flexShrink: 0 }}>{f.fam}</span>
-              <span className="tnum text-xs" style={{ color: C.sub, width: 34, textAlign: "right" }}>{f.nos}</span>
-              <div style={{ flex: 1, height: 10, background: "#EFEDE7", borderRadius: 2, minWidth: 60 }}>
-                <div style={{ width: `${((f.tp || f.val) / max) * 100}%`, height: 10, background: colourOf(f.fam), borderRadius: 2 }} />
-              </div>
-              <span className="tnum text-xs" style={{ color: C.accent, width: 74, textAlign: "right" }}>{V(f.val)}</span>
-              <span className="tnum text-xs" style={{ color: C.green, width: 74, textAlign: "right" }}>{V(f.tp)}</span>
-            </button>
+            <div key={f.fam} className="flex items-center gap-2 rounded px-1"
+              style={{ background: on ? colourOf(f.fam) + "18" : undefined }}>
+              <button onClick={() => onFilter(on ? "" : f.fam)} title={on ? "Show every family again" : `Show only ${f.fam} on the plot`}
+                className="text-xs font-bold rounded"
+                style={{ width: 20, height: 20, flexShrink: 0, background: on ? colourOf(f.fam) : "#fff", color: on ? "#fff" : C.faint, border: `1px solid ${on ? colourOf(f.fam) : C.line}` }}>
+                ◧
+              </button>
+              <button onClick={() => onOpen(f.fam)} className="flex items-center gap-2 text-left py-0.5"
+                style={{ flex: 1, cursor: "pointer", minWidth: 0 }} title={`The ${f.nos} ${f.fam} job${f.nos === 1 ? "" : "s"}`}>
+                <span style={{ width: 10, height: 10, borderRadius: 2, background: colourOf(f.fam), flexShrink: 0 }} />
+                <span className="text-xs font-semibold truncate" style={{ color: C.body, width: 150, flexShrink: 0 }}>{f.fam}</span>
+                <span className="tnum text-xs" style={{ color: C.sub, width: 30, textAlign: "right", flexShrink: 0 }}>{f.nos}</span>
+                <span style={{ flex: 1, height: 10, background: "#EFEDE7", borderRadius: 2, minWidth: 40 }}>
+                  <span style={{ display: "block", width: `${((f.tp || f.val) / max) * 100}%`, height: 10, background: colourOf(f.fam), borderRadius: 2 }} />
+                </span>
+                <span className="tnum text-xs" style={{ color: C.accent, width: 72, textAlign: "right", flexShrink: 0 }}>{V(f.val)}</span>
+                <span className="tnum text-xs" style={{ color: C.green, width: 72, textAlign: "right", flexShrink: 0 }}>{V(f.tp)}</span>
+              </button>
+            </div>
           );
         })}
       </div>
@@ -322,11 +458,15 @@ function Scatter({
   V: (n: number) => string;
   onPick: (j: WipJob) => void;
 }) {
-  const W = 900, H = 520, L = 52, R = 18, T = 18, B = 44;
+  // Squarer and shorter than the first cut, and capped in real pixels below:
+  // a plot you have to scroll to see the top of is not a plot, it is two
+  // half-plots, and the whole value of this one is seeing all four corners at
+  // once.
+  const W = 760, H = 380, L = 44, R = 16, T = 14, B = 38;
   const maxTp = Math.max(1, ...jobs.map((j) => j.tpv || 0));
   const x = (pct: number) => L + ((W - L - R) * Math.max(0, Math.min(100, pct || 0))) / 100;
   const y = (pct: number) => H - B - ((H - T - B) * Math.max(0, Math.min(100, pct || 0))) / 100;
-  const r = (tp: number) => 4 + 26 * Math.sqrt(Math.max(0, tp || 0) / maxTp);
+  const r = (tp: number) => 3 + 19 * Math.sqrt(Math.max(0, tp || 0) / maxTp);
 
   // biggest first so the small ones land on top and stay clickable
   const ordered = [...jobs].sort((a, b) => (b.tpv || 0) - (a.tpv || 0));
@@ -339,9 +479,10 @@ function Scatter({
           dot area = throughput · colour = product family · click one for the job
         </span>
       </div>
-      <div style={{ overflowX: "auto" }}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 620, display: "block" }} role="img"
-          aria-label="Jobs plotted by kitting and production percentage">
+      <div>
+        <svg viewBox={`0 0 ${W} ${H}`}
+          style={{ width: "100%", maxWidth: 760, maxHeight: "58vh", display: "block", margin: "0 auto" }}
+          role="img" aria-label="Jobs plotted by kitting and production percentage">
           {/* quadrant wash: the top-right is the corner worth finishing */}
           <rect x={x(60)} y={y(100)} width={x(100) - x(60)} height={y(60) - y(100)} fill={C.green} opacity={0.05} />
           <text x={x(100) - 6} y={y(100) + 14} textAnchor="end" fontSize={10} fontWeight={700} fill={C.green} opacity={0.75}>
