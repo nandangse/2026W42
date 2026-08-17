@@ -32,17 +32,43 @@ const cleaned = raw
   .filter((l) => l.trim())
   .join("\n");
 
-// statements end at a semicolon that is not inside a string
+// Statements end at a semicolon that is not inside a string OR inside a
+// dollar-quoted body. The dollar-quote case is the one that matters: a plpgsql
+// function is FULL of semicolons, and cutting on them would hand Postgres half
+// a function — the exact failure this script exists to prevent.
 const stmts = [];
-let buf = "", q = null;
+let buf = "", q = null, dollar = null;
 for (let i = 0; i < cleaned.length; i++) {
   const c = cleaned[i];
+
+  if (dollar) {
+    buf += c;
+    if (c === "$" && cleaned.startsWith(dollar, i)) {
+      buf += cleaned.slice(i + 1, i + dollar.length);
+      i += dollar.length - 1;
+      dollar = null;
+    }
+    continue;
+  }
+  if (q) { buf += c; if (c === q) q = null; continue; }
+
+  // $$ or $tag$ opens a body that runs to the matching closer
+  if (c === "$") {
+    const m = cleaned.slice(i).match(/^\$[A-Za-z_]*\$/);
+    if (m) { dollar = m[0]; buf += m[0]; i += m[0].length - 1; continue; }
+  }
+
   buf += c;
-  if (q) { if (c === q) q = null; continue; }
   if (c === "'" || c === '"') { q = c; continue; }
   if (c === ";") { stmts.push(buf.trim()); buf = ""; }
 }
 if (buf.trim()) stmts.push(buf.trim());
+
+// A single statement bigger than the budget cannot be cut — say so rather than
+// splitting it and producing something that will not run.
+for (const s of stmts)
+  if (Buffer.byteLength(s) > MAX)
+    console.error(`NOTE: one statement is ${Buffer.byteLength(s)} bytes and cannot be split — paste that part on its own.`);
 
 const chunks = [];
 let cur = "";
