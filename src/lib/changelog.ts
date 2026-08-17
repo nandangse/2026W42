@@ -37,6 +37,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.0.0.0",
+    date: "2026-08-17",
+    module: "Genie 3 — everything on one line",
+    items: [
+      "Genie 3. Called by Dr Raghu, and the only reason the first digit ever moves.",
+      "Everything built today is now on main, in one line, with no side branches left to reconcile: the rebuilt Goals section, the Delivered Jobs feed and its analysis workspace, and the migration fixes.",
+      "🎯 Goals — six tabs: Company Goals, Quarterly Rocks, Departmental Goals, My Goals, My Key Result Areas and KPIs Relevant to me. Company goals are set by an admin alone; the person a goal lands on can move its current metric and status, and nothing else. Sub goals and initiatives cascade as a tree to any depth. % completion is computed from the start, current and goal metrics and cannot be typed over. Management / Stratcom / LC / All decides who sees what.",
+      "✅ Delivered Jobs — Genie had never recorded a single delivery, because a delivered job simply stopped appearing in the morning export. It now has its own ledger, fed by a fourth report, and an analysis workspace over it: MTD / QTD / YTD / 12 Months / custom, Nos · Value · Throughput, monthly averages, and cuts by month, product family and customer.",
+      "That workspace refuses to flatter itself. An average is withheld where the data does not span the window — four weeks of history will not be divided by twelve — and a delivery banked without a date is shown separately rather than folded into a period it may not belong to.",
+      "Delivered Jobs now sits third on Morning Update, and stays marked “when it changes” rather than being chased daily.",
+      "Fixed: re-running the migrations died on profiles_role_check, because migration 0008 re-applied a role list written before the sales role existed. Pasting the whole chain works again.",
+      "Needs migrations 0019 and 0020, both already applied.",
+    ],
+  },
+  {
     v: "2.8.0.1",
     date: "2026-08-17",
     module: "Morning Update",
