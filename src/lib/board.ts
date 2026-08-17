@@ -39,6 +39,7 @@ export interface BoardJob {
    */
   clientUpdate: string | null;
   cashflow: string | null;
+  escalation: string | null;
   amtNeeded: number | null;
   payOnDelivery: number | null;
 }
@@ -84,6 +85,7 @@ function mapJob(r: any): BoardJob {
     ownerName: null,
     clientUpdate: r.client_update ?? null,
     cashflow: r.cashflow ?? null,
+    escalation: r.escalation ?? null,
     // Number(null) is 0, which would turn "not recorded" into "nothing due" —
     // the one confusion this column must not make.
     amtNeeded: r.amt_needed == null ? null : Number(r.amt_needed),
@@ -98,20 +100,41 @@ function mapJob(r: any): BoardJob {
  * text matches nobody stays unresolved and shows as Unassigned.
  */
 function resolveOwners(jobs: BoardJob[], people: Person[]): string[] {
+  /**
+   * The Jobmaster writes the Planning Owner as an EMAIL — pankajs@nandan.co.in
+   * — while accounts are found by initials, display name or erp_owner. So both
+   * sides are reduced to the same thing before comparing: lower-cased, and with
+   * anything after an @ dropped. pankajs@nandan.co.in, PankajS@nandan.co.in and
+   * a profile whose erp_owner is simply "pankajs" all land on one key.
+   *
+   * Without this the Owner column read "—" on nearly every job, and the boards'
+   * owner filter had almost nobody in it.
+   */
+  const norm = (v: unknown) => String(v ?? "").trim().toLowerCase().split("@")[0].trim();
+
   const byKey = new Map<string, Person>();
+  const add = (k: unknown, p: Person) => {
+    const key = norm(k);
+    if (key && !byKey.has(key)) byKey.set(key, p);
+  };
   for (const p of people) {
-    for (const k of [p.erpOwner, p.initials, p.name, p.email, p.email.split("@")[0]]) {
-      const key = String(k ?? "").trim().toLowerCase();
-      if (key && !byKey.has(key)) byKey.set(key, p);
-    }
+    // erp_owner first so an explicitly configured mapping always wins over a
+    // coincidence between somebody's initials and another person's login
+    add(p.erpOwner, p);
+    add(p.email, p);
+    add(p.initials, p);
+    add(p.name, p);
   }
+
   const unmatched = new Set<string>();
   for (const j of jobs) {
     const raw = String(j.own || "").trim();
     if (!raw) continue;
-    const hit = byKey.get(raw.toLowerCase());
+    const hit = byKey.get(norm(raw));
     if (hit) {
       j.ownerInitials = hit.initials;
+      // the person's real name where we have it; otherwise the part of their
+      // login before the @, which is at least a name somebody recognises
       j.ownerName = hit.name || hit.email.split("@")[0];
     } else {
       unmatched.add(raw);

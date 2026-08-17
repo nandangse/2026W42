@@ -83,7 +83,7 @@ const bandList = (v: unknown): string[] => {
 const ITEM_FIELDS = [
   "title", "detail", "assignee_type", "assignee_id", "dept_id", "start_date", "due_date",
   "start_metric", "current_metric", "goal_metric", "metric_unit", "manual_pct", "weight",
-  "status", "sort_order", "kra_id", "kpi_id", "rock_id",
+  "status", "sort_order", "kra_id", "kpi_id", "rock_id", "swimlane_id",
 ] as const;
 
 /** Bell for a newly assigned owner — never for the person doing the assigning. */

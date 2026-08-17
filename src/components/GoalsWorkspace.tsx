@@ -1418,6 +1418,7 @@ function GoalEditor({ ctx, target, onClose }: { ctx: Ctx; target: EditTarget; on
     bands: existing?.bands ?? parent?.bands ?? ["all"],
     kpi_id: existing?.kpi_id ?? "",
     kra_id: existing?.kra_id ?? target.kra_id ?? "",
+    swimlane_id: existing?.swimlane_id ?? "",
   }));
   const [busy, setBusy] = useState(false);
   const [comments, setComments] = useState<{ by: string; at: string; body: string }[]>([]);
@@ -1455,6 +1456,7 @@ function GoalEditor({ ctx, target, onClose }: { ctx: Ctx; target: EditTarget; on
         metric_unit: f.metric_unit, manual_pct: Number(f.manual_pct) || 0, weight: Number(f.weight) || 1,
         status: f.status,
         kpi_id: f.kpi_id || null, kra_id: f.kra_id || null,
+        swimlane_id: f.swimlane_id || null,
       };
       if (mayBand) payload.bands = f.bands;
       if (isNew) {
@@ -1610,6 +1612,22 @@ function GoalEditor({ ctx, target, onClose }: { ctx: Ctx; target: EditTarget; on
       </div>
 
       {/* ---- links ---- */}
+      {/* Goal Category — on every goal, sub-goal and initiative alike, because
+          a category that only the top of a tree can carry cannot group the
+          work underneath it. The list is the swimlanes Admin manages, so what
+          a board groups by later and what a goal carries now are one thing. */}
+      <Label>Goal category</Label>
+      <select value={f.swimlane_id} onChange={(e) => set("swimlane_id", e.target.value)} disabled={!mayEdit}
+        className="w-full text-sm border rounded px-2 py-1.5 bg-white mb-2" style={{ borderColor: C.line }}>
+        <option value="">— no category —</option>
+        {(ctx.data.swimlanes || []).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+      </select>
+      {!(ctx.data.swimlanes || []).length && (
+        <div className="text-xs mb-2" style={{ color: C.amber, lineHeight: 1.45 }}>
+          No categories exist yet — an admin adds them in Admin → Milestones → Goal categories.
+        </div>
+      )}
+
       <Label>Measured by a KPI (optional)</Label>
       <select value={f.kpi_id} onChange={(e) => set("kpi_id", e.target.value)} disabled={!mayEdit}
         className="w-full text-xs border rounded px-2 py-1.5 bg-white" style={inputStyle}>

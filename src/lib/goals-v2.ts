@@ -89,6 +89,14 @@ export interface Band {
   note: string | null;
 }
 
+/** A goal category — the swimlanes table, managed from Admin since 0010. */
+export interface Swimlane {
+  id: string;
+  name: string;
+  color: string;
+  sort_order: number;
+}
+
 export interface Department {
   id: string;
   name: string;
@@ -119,6 +127,13 @@ export interface GoalItem {
   rock_id: string | null;
   kra_id: string | null;
   kpi_id: string | null;
+  /**
+   * Goal Category. Points at the swimlanes list Admin already manages, so the
+   * categories a goal can carry and the lanes a board groups by are ONE list
+   * rather than two that drift. Free text would have become fifteen spellings
+   * of "Operations" inside a month.
+   */
+  swimlane_id: string | null;
 
   title: string;
   detail: string;

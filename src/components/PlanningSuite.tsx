@@ -155,6 +155,7 @@ interface Job {
   /** The money side. Null is NOT RECORDED, and never the same as zero. */
   clientUpdate: string | null;
   cashflow: string | null;
+  escalation: string | null;
   amtNeeded: number | null;
   payOnDelivery: number | null;
 }
@@ -333,7 +334,7 @@ export default function PlanningSuite({
     role === "sales" ? "sales" : "suite",
   );
   // land on "My Week" within the suite, not the delivery board
-  const [tab, setTab] = useState<"home" | "delivery" | "load" | "plan" | "erp" | "upload" | "admin">("home");
+  const [tab, setTab] = useState<"home" | "wip" | "delivery" | "load" | "plan" | "erp" | "upload" | "admin">("home");
 
   // ---- browser back/forward navigates within the app, not out of it ----
   // Every workspace/tab change pushes a history entry; popstate restores it.
@@ -556,14 +557,14 @@ export default function PlanningSuite({
   // true — never shown while loading or when access is absent, matching the
   // spec's "granted, not default" rule.
   const WORKSPACE_DEFS: [typeof workspace, string][] = [
-    // Learning sits first, ahead of the work. That is the point of putting it
-    // in the header at all.
-    ["lms", "📚 LMS"],
     ["suite", "🧭 Planning Suite"],
     ["delivered", "✅ Delivered Jobs"],
     ...(goalsAccess ? ([["goals", "🎯 Goals"]] as [typeof workspace, string][]) : []),
     ["tasking", "📋 Nandan Tasking"],
     ...(salesAccess ? ([["sales", "💼 Sales Genie"]] as [typeof workspace, string][]) : []),
+    // Learning sits last: it is the section somebody goes to deliberately,
+    // not one they pass through on the way to the day's work.
+    ["lms", "📚 LMS"],
   ];
   // Sub-nav inside the Planning Suite workspace only.
   // Admin, Morning Update and Update to ERP have moved into the account menu
@@ -574,6 +575,7 @@ export default function PlanningSuite({
   // thing twice. It is still where you land on sign-in, and still one click
   // away from anywhere.
   const SUITE_TAB_DEFS: [typeof tab, string][] = [
+    ["wip", "Jobs in Progress"],
     ["delivery", "Job Delivery Board"],
     ["load", "Load Board"],
     ["plan", "Job Plan"],
@@ -815,7 +817,7 @@ export default function PlanningSuite({
               // Planning Suite lands on the Job Delivery Board. My Week has its
               // own 🏠 beside this row, so arriving here on My Week would leave
               // the sub-tab bar with nothing lit and look like a fault.
-              onClick={() => { setWorkspace(k); if (k === "suite" && tab === "home") setTab("delivery"); }}
+              onClick={() => { setWorkspace(k); if (k === "suite" && tab === "home") setTab("wip"); }}
               className="px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap flex-shrink-0"
               style={workspace === k ? { background: "#E8600A", color: "#fff" } : { color: "#8FA1B3" }}
             >
@@ -862,6 +864,7 @@ export default function PlanningSuite({
       <div style={{ display: workspace === "suite" && tab === "delivery" ? undefined : "none" }}>
         <DeliveryBoard board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
       </div>
+      {workspace === "suite" && tab === "wip" && <JobsInProgress board={board} V={V} />}
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
       {workspace === "suite" && tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} />}
@@ -1366,6 +1369,38 @@ function MyWeek({
 }
 
 // ============================ Delivery board ============================
+/**
+ * Jobs in Progress — deliberately blank.
+ *
+ * The tab exists so the slot is claimed and the navigation is settled; what
+ * goes in it has not been decided yet. It says so rather than showing a copy
+ * of the Job Delivery Board that somebody would then have to un-learn.
+ */
+function JobsInProgress({ board, V }: { board: Board; V: (n: number) => string }) {
+  const jobs = board.jobs;
+  const inFlight = jobs.filter((j) => j.pct > 0 && j.pct < 100);
+  return (
+    <div className="p-4">
+      <div className="mb-3">
+        <div className="text-xs font-bold" style={{ color: "#8A94A0", letterSpacing: 1.4 }}>PLANNING SUITE</div>
+        <div className="text-lg font-bold" style={{ color: "#16232F", lineHeight: 1.2 }}>Jobs in Progress</div>
+      </div>
+      <div className="rounded-lg border bg-white p-8" style={{ borderColor: "#E2E0DA", maxWidth: 640 }}>
+        <div className="font-bold text-sm mb-2" style={{ color: "#16232F" }}>Nothing here yet — on purpose</div>
+        <p className="text-sm mb-3" style={{ color: "#5A6672", lineHeight: 1.6 }}>
+          This tab is reserved and empty until you say what belongs on it. It is left blank rather than filled with a
+          second copy of the Job Delivery Board, which would only have to be un-learned later.
+        </p>
+        <p className="text-xs" style={{ color: "#8A94A0", lineHeight: 1.6 }}>
+          For reference, the board currently holds <b>{jobs.length}</b> live jobs, of which <b>{inFlight.length}</b> are
+          part-built (production between 1% and 99%), worth{" "}
+          <b>{V(inFlight.reduce((s, j) => s + j.val, 0))}</b>.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function DeliveryBoard({
   board,
   V,
@@ -2240,16 +2275,19 @@ const HINT_STATUS: Record<Hint["status"], { label: string; bg: string; fg: strin
  */
 function JobStanding({ job, V }: { job: Job; V: (n: number) => string }) {
   const invested = investedIn(job);
-  const text: [string, string | null][] = [
-    ["Current Status", job.note || null],
-    ["Client update", job.clientUpdate],
-    ["Cash flow", job.cashflow],
+  // Escalation first: what is holding a job up outranks what it is worth, and
+  // burying it under two paragraphs of status would be the wrong order.
+  const text: [string, string | null, string][] = [
+    ["Current Project Escalation", job.escalation, "#B3261E"],
+    ["Current Status", job.note || null, "#22303C"],
+    ["Client Update Latest", job.clientUpdate, "#22303C"],
+    ["Cash Flow Details", job.cashflow, "#22303C"],
   ];
   const shownText = text.filter(([, v]) => v && v.trim());
   const figures: [string, number | null, string, string][] = [
     ["Invested", invested, "#7C3AED", `(1 − ${job.tpp || 0}%) × ${job.kit || 0}% × ${V(job.val)} — material value already drawn`],
-    ["Amount needed", job.amtNeeded, "#D97706", "Still to be spent to finish the job"],
-    ["Pay on delivery", job.payOnDelivery, "#0D7A3F", "Falls due the day this job goes out"],
+    ["Amount needed next month", job.amtNeeded, "#D97706", "What this job needs spent on it in the coming month"],
+    ["Pending payment on delivery", job.payOnDelivery, "#0D7A3F", "Falls due the day this job goes out"],
   ];
 
   return (
@@ -2273,10 +2311,12 @@ function JobStanding({ job, V }: { job: Job; V: (n: number) => string }) {
           No status or client note came across on this job in the last upload.
         </div>
       ) : (
-        <div className="flex flex-col gap-1.5" style={{ maxHeight: 190, overflowY: "auto" }}>
-          {shownText.map(([label, v]) => (
-            <div key={label}>
-              <div style={{ fontSize: 10, color: "#8A94A0", letterSpacing: 0.4 }}>{label.toUpperCase()}</div>
+        <div className="flex flex-col gap-1.5" style={{ maxHeight: 240, overflowY: "auto" }}>
+          {shownText.map(([label, v, color]) => (
+            <div key={label} style={color === "#B3261E" ? { background: "#FBEDEA", borderLeft: "3px solid #B3261E", padding: "4px 6px", borderRadius: 3 } : undefined}>
+              <div style={{ fontSize: 10, color: color === "#B3261E" ? color : "#8A94A0", letterSpacing: 0.4, fontWeight: color === "#B3261E" ? 700 : 400 }}>
+                {label.toUpperCase()}
+              </div>
               <div className="text-xs" style={{ color: "#22303C", lineHeight: 1.5 }}>{v}</div>
             </div>
           ))}
@@ -4131,7 +4171,7 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
 }
 
 // ============================ Admin ============================
-type AdminTab = "users" | "milestones" | "setup" | "updates";
+type AdminTab = "users" | "org" | "milestones" | "setup" | "updates";
 
 /**
  * The Name column stays put while the rest scrolls. With department,
@@ -4146,10 +4186,127 @@ const STICKY_NAME = {
   boxShadow: "1px 0 0 #EEECE6",
 };
 
+/**
+ * The org chart, drawn from `reports_to` — nobody maintains it.
+ *
+ * That is the whole point: an org chart kept as a separate document is wrong
+ * within a month, because the day somebody changes who they report to, nobody
+ * remembers to redraw it. This one IS the reporting column, so it cannot
+ * disagree with the thing the boards, Tasking and Team Goals already use.
+ *
+ * Two failures it shows rather than hides:
+ *
+ *   ORPHANS. Anybody with no manager set is listed at the top as a root. If
+ *   that list is long, the chart is not a chart yet, and the page says so
+ *   instead of drawing fifteen separate trees and looking finished.
+ *
+ *   CYCLES. A reports to B, B reports to A — a mis-click in the row above.
+ *   Every person is drawn once, so a cycle stops rather than spinning, and the
+ *   people caught in it are named.
+ */
+function OrgChart({ users, departments }: { users: AdminUser[] | null; departments: { id: string; name: string }[] }) {
+  const [deptFilter, setDeptFilter] = useState("");
+  if (!users) return <div className="p-4 text-sm" style={{ color: "#8A94A0" }}>Loading people…</div>;
+
+  const live = users.filter((u) => !u.disabled);
+  const byId = new Map(live.map((u) => [u.id, u]));
+  const deptName = (id: string | null) => (id ? departments.find((d) => d.id === id)?.name ?? null : null);
+
+  const kids = new Map<string, AdminUser[]>();
+  const roots: AdminUser[] = [];
+  for (const u of live) {
+    const mgr = u.reports_to && byId.has(u.reports_to) && u.reports_to !== u.id ? u.reports_to : null;
+    if (mgr) (kids.get(mgr) ?? kids.set(mgr, []).get(mgr)!).push(u);
+    else roots.push(u);
+  }
+  for (const list of kids.values()) list.sort((a, b) => (a.display_name || a.email).localeCompare(b.display_name || b.email));
+  roots.sort((a, b) => (a.display_name || a.email).localeCompare(b.display_name || b.email));
+
+  // every person drawn once — a cycle terminates instead of recursing forever
+  const drawn = new Set<string>();
+  const countBelow = (id: string, seen = new Set<string>()): number => {
+    if (seen.has(id)) return 0;
+    seen.add(id);
+    return (kids.get(id) || []).reduce((s, k) => s + 1 + countBelow(k.id, seen), 0);
+  };
+
+  const match = (u: AdminUser) => !deptFilter || u.department_id === deptFilter;
+
+  const Node = ({ u, depth }: { u: AdminUser; depth: number }) => {
+    if (drawn.has(u.id)) return null;
+    drawn.add(u.id);
+    const below = kids.get(u.id) || [];
+    const dept = deptName(u.department_id);
+    const dim = deptFilter && !match(u);
+    return (
+      <div style={{ marginLeft: depth ? 18 : 0, borderLeft: depth ? "1px solid #E2E0DA" : undefined, paddingLeft: depth ? 10 : 0 }}>
+        <div className="flex items-center gap-2 flex-wrap py-1" style={{ opacity: dim ? 0.35 : 1 }}>
+          <span className="font-bold rounded px-1.5 text-xs" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>
+            {u.initials || (u.display_name || u.email).slice(0, 2).toUpperCase()}
+          </span>
+          <span className="font-semibold text-sm" style={{ color: "#16232F" }}>{u.display_name || u.email.split("@")[0]}</span>
+          {u.designation && <span className="text-xs" style={{ color: "#5A6672" }}>{u.designation}</span>}
+          {dept && <span className="text-xs rounded px-1.5" style={{ background: "#F4F2EC", color: "#5A6672" }}>{dept}</span>}
+          <span className="text-xs" style={{ color: "#B8B5AC" }}>{u.role}</span>
+          {below.length > 0 && (
+            <span className="text-xs tnum" style={{ color: "#8A94A0" }} title="Everyone below them, all the way down">
+              {below.length} direct · {countBelow(u.id)} in all
+            </span>
+          )}
+        </div>
+        {below.map((k) => <Node key={k.id} u={k} depth={depth + 1} />)}
+      </div>
+    );
+  };
+
+  const realRoots = roots.filter((r) => (kids.get(r.id) || []).length > 0);
+  const loose = roots.filter((r) => (kids.get(r.id) || []).length === 0);
+
+  return (
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+      <div className="flex items-center gap-2 flex-wrap mb-2">
+        <div className="font-bold text-sm">
+          Org chart{" "}
+          <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>
+            — drawn from “Reports to” on the Users tab. Change it there and this redraws itself.
+          </span>
+        </div>
+        <div className="flex-1" style={{ minWidth: 10 }} />
+        <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
+          className="text-xs border rounded px-2 py-1 bg-white font-semibold" style={{ borderColor: "#E2E0DA" }}>
+          <option value="">Highlight: all departments</option>
+          {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+      </div>
+
+      {live.length === 0 && <div className="text-sm" style={{ color: "#8A94A0" }}>No active accounts.</div>}
+
+      {realRoots.map((r) => (
+        <div key={r.id} className="mb-2 pb-2" style={{ borderBottom: "1px solid #EFEDE7" }}>
+          <Node u={r} depth={0} />
+        </div>
+      ))}
+
+      {loose.length > 0 && (
+        <div className="rounded p-2.5 mt-2" style={{ background: "#FFF7E6", border: "1px solid #F0D9A8" }}>
+          <div className="text-xs font-bold mb-1" style={{ color: "#8A5A00" }}>
+            {loose.length} account{loose.length === 1 ? "" : "s"} with nobody above and nobody below
+          </div>
+          <div className="text-xs" style={{ color: "#5A6672", lineHeight: 1.5 }}>
+            {loose.map((u) => u.display_name || u.email.split("@")[0]).join(", ")}.
+            {" "}Set <b>Reports to</b> on the Users tab and they join the chart. Until then the chart is a partial
+            picture, which is worth knowing before anybody reads it as the whole one.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminTabs({ tab, setTab }: { tab: AdminTab; setTab: (t: AdminTab) => void }) {
   return (
     <div className="flex gap-1 rounded p-1 bg-white border" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
-      {([["users", "👥 Users"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["updates", "🗒 Updates"]] as const).map(([k, l]) => (
+      {([["users", "👥 Users"], ["org", "🧬 Org Chart"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["updates", "🗒 Updates"]] as const).map(([k, l]) => (
         <button
           key={k}
           onClick={() => setTab(k)}
@@ -4427,6 +4584,10 @@ function Admin({
 
   // ---- admin sub-tabs: the setup pages, and the release log ----
   const [adminTab, setAdminTab] = useState<AdminTab>("users");
+  // Goals access is folded away behind a toggle on the Users tab. It is the
+  // only place a grant can be revoked, so it is hidden rather than removed —
+  // a page nobody can reach is a permission nobody can take back.
+  const [showGoalsAccess, setShowGoalsAccess] = useState(false);
 
   if (adminTab === "updates") {
     return (
@@ -4440,6 +4601,7 @@ function Admin({
   return (
     <div className="p-4 space-y-4">
       <AdminTabs tab={adminTab} setTab={setAdminTab} />
+      {adminTab === "setup" && (<>
       {/* ---- app identity ---- */}
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
         <div className="font-bold text-sm mb-2">App identity <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— the name and theme line shown next to the logo, header-wide</span></div>
@@ -4465,7 +4627,9 @@ function Admin({
           {idMsg && <span className="text-xs font-semibold" style={{ color: idMsg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{idMsg}</span>}
         </div>
       </div>
+      </>)}
 
+      {adminTab === "setup" && (<>
       {/* ---- financial-year targets ----
           Shown to every admin, editable by the owner alone. A target the board
           can quietly edit is not a target; a target nobody can find is not one
@@ -4473,10 +4637,18 @@ function Admin({
       {tgt.loaded && (
         <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
           <div className="font-bold text-sm mb-2">
-            Targets · {tgt.fy || "this financial year"}{" "}
+            Targets{" "}
             <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>
               — what the Required Run Rate on the Job Delivery Board and Delivered Jobs is measured against
             </span>
+          </div>
+          {/* The year first, then its numbers. A target with no year on it is
+              the thing that gets carried forward by accident. */}
+          <div className="rounded px-2.5 py-1.5 mb-2 inline-block" style={{ background: "#16232F" }}>
+            <div style={{ fontSize: 10, color: "#8FA1B3", letterSpacing: 1.2 }}>FINANCIAL YEAR</div>
+            <div className="font-bold tnum" style={{ fontSize: 17, color: "#F5B32B", lineHeight: 1.2 }}>
+              {tgt.fy || "—"}
+            </div>
           </div>
           {!tgt.installed ? (
             <div className="text-xs" style={{ color: "#D97706", lineHeight: 1.6 }}>
@@ -4520,7 +4692,9 @@ function Admin({
           )}
         </div>
       )}
+      </>)}
 
+      {adminTab === "users" && (<>
       {/* ---- users ---- */}
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
         <div className="font-bold text-sm mb-2">User management <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— initials are the key used to assign tasks and filter the boards</span></div>
@@ -4705,7 +4879,15 @@ function Admin({
           </div>
         )}
       </div>
+      </>)}
 
+      {adminTab === "users" && (
+        <button onClick={() => setShowGoalsAccess((v) => !v)} className="text-xs font-bold rounded px-3 py-1.5"
+          style={{ background: "#fff", border: "1px solid #E2E0DA", color: "#5A6672" }}>
+          {showGoalsAccess ? "▲ Hide goals access" : "▼ Goals access — who can open the goal tree"}
+        </button>
+      )}
+      {adminTab === "users" && showGoalsAccess && (<>
       {/* ---- goals access ---- */}
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
         <div className="font-bold text-sm mb-1">
@@ -4776,7 +4958,11 @@ function Admin({
           Owners can always update their own node&apos;s numbers and comment on it, whatever is set here.
         </div>
       </div>
+      </>)}
 
+      {adminTab === "org" && <OrgChart users={users} departments={departments} />}
+
+      {adminTab === "milestones" && (<>
       {/* ---- goal categories (swimlanes) ---- */}
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
         <div className="font-bold text-sm mb-1">
@@ -4810,7 +4996,9 @@ function Admin({
           Name and colour save when you click away. A category can only be deleted while no goal item still uses it.
         </div>
       </div>
+      </>)}
 
+      {adminTab === "milestones" && (<>
       {/* ---- family milestone templates ---- */}
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
         <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
@@ -4865,6 +5053,7 @@ function Admin({
           </>
         )}
       </div>
+      </>)}
 
     </div>
   );

@@ -10,7 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   bandVisible,
   type Band, type Department, type GoalItem, type ItemMap, type Kpi, type Kra,
-  type Person, type Rock,
+  type Person, type Rock, type Swimlane,
 } from "./goals-v2";
 import { resolveMetrics, METRICS } from "./goal-metrics";
 import { teamOf, type TeamMember } from "./team";
@@ -44,6 +44,8 @@ export interface GoalsPayload {
   kpis: Kpi[];
   /** The viewer's cascade, direct reports first. Empty for anyone with no team. */
   team: TeamMember[];
+  /** Goal categories — the swimlanes list, for the picker on every goal. */
+  swimlanes: Swimlane[];
   period: string;
   periods: string[];
   /** Live metric feeds a KPI can be wired to. */
@@ -62,7 +64,7 @@ export async function buildGoalsPayload(
 
   const [
     profRes, bandRes, personBandRes, deptRes, rockRes, itemRes, commentRes,
-    kraRes, kpiRes, watcherRes, periodRes,
+    kraRes, kpiRes, watcherRes, periodRes, laneRes,
   ] = await Promise.all([
     admin.from("profiles").select("id,email,initials,display_name,department_id,designation,reports_to,disabled").order("display_name"),
     admin.from("goal_band").select("code,label,note,sort_order").order("sort_order"),
@@ -75,6 +77,7 @@ export async function buildGoalsPayload(
     admin.from("kpi").select("*").eq("period", period).eq("active", true).order("sort_order"),
     admin.from("kpi_watcher").select("kpi_id,person_id"),
     admin.from("goal_item").select("period"),
+    admin.from("swimlanes").select("id,name,color,sort_order").order("sort_order"),
   ]);
 
   const firstErr =
@@ -182,6 +185,7 @@ export async function buildGoalsPayload(
       rock_id: r.rock_id,
       kra_id: r.kra_id,
       kpi_id: r.kpi_id,
+      swimlane_id: r.swimlane_id ?? null,
       title: r.title || "",
       detail: r.detail || "",
       assignee_type: r.assignee_type || "person",
@@ -286,6 +290,7 @@ export async function buildGoalsPayload(
     kras,
     kpis,
     team,
+    swimlanes: (laneRes.data || []) as Swimlane[],
     period,
     periods,
     metrics: METRICS.map(({ key, label, unitHint, describe }) => ({ key, label, unitHint, describe })),

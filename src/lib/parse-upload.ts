@@ -331,7 +331,7 @@ const EMP_FIELDS: [keyof ParsedEmployee, RegExp][] = [
  * not confuse them.
  */
 const EXTRA_JOB_FIELDS: {
-  key: "clientUpdate" | "cashflow" | "amtNeeded" | "payOnDelivery";
+  key: "clientUpdate" | "cashflow" | "amtNeeded" | "payOnDelivery" | "escalation";
   re: RegExp;
   numeric: boolean;
 }[] = [
@@ -342,9 +342,14 @@ const EXTRA_JOB_FIELDS: {
     re: /(pending|balance|due|outstanding|collect\w*|receiv\w*)[\s\S]{0,20}(payment|amount|value|collection)?[\s\S]{0,20}(on|at|against|after)?[\s\S]{0,6}(delivery|dispatch|despatch)|payment[\s\S]{0,20}(on|at|against)[\s\S]{0,6}(delivery|dispatch|despatch)/i,
   numeric: true,
   },
+  // "Amount Needed in Next Month" is the real header on the Jobmaster, so the
+  // pattern must not stop at the word after "needed".
   { key: "amtNeeded", re: /(amount|amt|fund|cash|money)[\s\S]{0,12}(needed|required|reqd|to\s*be\s*spent)/i, numeric: true },
   { key: "cashflow", re: /cash[\s-]*flow/i, numeric: false },
   { key: "clientUpdate", re: /(client|customer)[\s\S]{0,12}(update|feedback|remark|comment|communication)/i, numeric: false },
+  // Last, and narrowest: "escalation" on its own is unambiguous, but it must
+  // not be allowed to claim a column an earlier field wanted.
+  { key: "escalation", re: /escalat/i, numeric: false },
 ];
 
 /**
@@ -394,7 +399,7 @@ function extraJobValues(
   r: Row,
   ix: Record<string, number>,
   header: Partial<Record<string, string>>,
-): Pick<ParsedJob, "clientUpdate" | "cashflow" | "amtNeeded" | "payOnDelivery"> {
+): Pick<ParsedJob, "clientUpdate" | "cashflow" | "amtNeeded" | "payOnDelivery" | "escalation"> {
   const cell = (key: string): Cell => {
     const h = header[key];
     return h && ix[h] != null ? r[ix[h]] : undefined;
@@ -407,6 +412,7 @@ function extraJobValues(
   return {
     clientUpdate: text("clientUpdate"),
     cashflow: text("cashflow"),
+    escalation: text("escalation"),
     amtNeeded: header.amtNeeded ? money(cell("amtNeeded")) : undefined,
     payOnDelivery: header.payOnDelivery ? money(cell("payOnDelivery")) : undefined,
   };

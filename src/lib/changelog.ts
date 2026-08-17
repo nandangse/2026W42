@@ -37,6 +37,23 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.1.0.2",
+    date: "2026-08-18",
+    module: "Job Plan · Admin · Goals · Planning Suite",
+    items: [
+      "Planning Owner now resolves. The Jobmaster writes it as an email — pankajs@nandan.co.in — while accounts are matched on initials, name or ERP user. Both sides are now reduced to the same thing before comparing: lower-cased, with anything after the @ dropped. That is why the Owner column read “—” on nearly every job and the owner filter had almost nobody in it.",
+      "New on the job page: Current Project Escalation, shown FIRST and in red. What is holding a job up outranks what it is worth. Client Update Latest, Cash Flow Details and Pending Payment on Delivery now carry their full names, and Amount Needed reads “next month”, which is what the ERP column actually means.",
+      "New tab: Jobs in Progress, first in the Planning Suite and deliberately blank until you say what belongs on it — rather than a second copy of the Job Delivery Board that would have to be un-learned.",
+      "LMS has moved to the end of the header, after Sales Genie.",
+      "Every goal, sub-goal and initiative can now carry a Goal Category — the same swimlanes list Admin already manages, so what a board groups by later and what a goal carries now are one list rather than two that drift. A free-text category would have been fifteen spellings of “Operations” inside a month.",
+      "Admin is now actually separated. The tabs did nothing: every section rendered on all of them, which is why App identity and Targets appeared under Milestones. Users, Org Chart, Milestones, Settings and Updates each show only their own.",
+      "Targets now lead with the financial year, in its own block. A target with no year on it is the one that gets carried forward by accident.",
+      "Goals access is folded away behind a toggle on the Users tab. Hidden, not removed — it is the only place a grant can be revoked, and a page nobody can reach is a permission nobody can take back.",
+      "New: an Org Chart tab beside Users, drawn from “Reports to” and departments. Nobody maintains it — it IS the reporting column, so it cannot disagree with the boards, Tasking or Team Goals. It counts direct and total reports, highlights a department, names anyone with nobody above and nobody below, and draws each person once so a reporting cycle stops rather than spins.",
+      "Migration 0028.",
+    ],
+  },
+  {
     v: "3.1.0.1",
     date: "2026-08-18",
     module: "LMS",

@@ -152,6 +152,7 @@ function isTextTable(filename: string, bytes: Uint8Array): boolean {
 /** The four money fields, in the order they matter on the board. */
 const MONEY_LABELS: [string, string][] = [
   ["payOnDelivery", "Pending payment on delivery"],
+  ["escalation", "Current project escalation"],
   ["amtNeeded", "Amount needed"],
   ["cashflow", "Cash flow details"],
   ["clientUpdate", "Client update"],

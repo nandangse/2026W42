@@ -47,6 +47,8 @@ export interface ParsedJob {
    */
   clientUpdate?: string | null;
   cashflow?: string | null;
+  /** Current Project Escalation — what is holding the job up. */
+  escalation?: string | null;
   amtNeeded?: number | null;
   payOnDelivery?: number | null;
 }
