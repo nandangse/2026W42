@@ -4,12 +4,22 @@ import { adminClient } from "@/lib/supabase/admin";
 import { today, addDays } from "@/lib/schedule";
 import {
   PARTICIPATION_DAYS, LEARNING_DAYS, birthdaysWithin, pickForDay, imageUrl,
-  type Mood,
+  listDriveFolder, folderIdOf, type Mood,
 } from "@/lib/my-week";
 
 export const dynamic = "force-dynamic";
 
 const VALID_MOODS: Mood[] = ["great", "good", "ok", "low", "rough"];
+
+/**
+ * When this instance last tried to read the Drive folder.
+ *
+ * Only consulted when the cache is EMPTY, so in normal running it is never
+ * reached at all. It exists so that a folder which has been unshared does not
+ * get scraped once per page load by every person in the works.
+ */
+let lastFolderTry = 0;
+const FOLDER_RETRY_MS = 10 * 60 * 1000;
 
 /** Every spelling of "me" a comment might have been signed with. */
 function handlesOf(u: { initials: string | null; displayName: string | null; erpOwner: string | null; email: string }) {
@@ -115,13 +125,28 @@ export async function GET() {
 
     // ---- the image quote of the day ----
     const image = await safe(async () => {
-      const { data } = await admin
-        .from("image_quote")
-        .select("id, url, caption")
-        .eq("active", true)
-        .order("sort_order")
-        .order("created_at");
-      const rows = data || [];
+      const read = async () =>
+        (await admin.from("image_quote").select("id, url, caption").eq("active", true).order("sort_order").order("created_at")).data || [];
+
+      let rows = await read();
+      // Nothing cached yet: fill it from the configured folder rather than
+      // showing an empty panel and expecting somebody to find the button in
+      // Admin. Once. The throttle is there so an unreachable folder is not
+      // re-fetched on every page load by every person in the works.
+      if (!rows.length && Date.now() - lastFolderTry > FOLDER_RETRY_MS) {
+        lastFolderTry = Date.now();
+        const { data: st } = await admin.from("app_settings").select("quote_folder").eq("id", true).maybeSingle();
+        const folder = folderIdOf(st?.quote_folder);
+        if (folder) {
+          const ids = await listDriveFolder(folder);
+          if (ids.length) {
+            await admin.from("image_quote").insert(
+              ids.map((i, n) => ({ url: `https://drive.google.com/file/d/${i}/view`, sort_order: n })),
+            );
+            rows = await read();
+          }
+        }
+      }
       const i = pickForDay(rows.length, T);
       if (i < 0) return null;
       // the row's own url is kept alongside, so Admin can show what was pasted
