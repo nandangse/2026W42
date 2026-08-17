@@ -37,6 +37,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.1.0.1",
+    date: "2026-08-18",
+    module: "LMS",
+    items: [
+      "Added: a sixteenth book. The Library tab now has a THE BOOKS panel — add a book, rename one, change its badge, colour, order or one-line description. The API could always do it; there was no button, which made the fifteen seeded books look like the only fifteen there could ever be.",
+      "A book is never deleted, only made inactive: lessons are shelved against its id, and removing the shelf a lesson stands on loses where it belonged.",
+      "Renaming a book keeps its id, so nothing shelved under it is orphaned. A new book gets its id slugged from its name — nobody has to invent one.",
+      "The panel is collapsed by default. Books are set up once; lessons are the daily work.",
+    ],
+  },
+  {
     v: "3.1.0.0",
     date: "2026-08-18",
     module: "LMS — a new section",

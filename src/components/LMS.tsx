@@ -815,6 +815,8 @@ function LibraryTab({ ctx, onEdit }: { ctx: Ctx; onEdit: (t: { id?: string }) =>
 
   return (
     <>
+      <BooksPanel ctx={ctx} />
+
       <div className="flex items-center gap-2 flex-wrap mb-3">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 Search lessons"
           className="text-xs border rounded px-2 py-1.5" style={{ borderColor: C.line, minWidth: 240 }} />
@@ -856,6 +858,125 @@ function LibraryTab({ ctx, onEdit }: { ctx: Ctx; onEdit: (t: { id?: string }) =>
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * The shelves themselves — add a sixteenth book, or rename one of the fifteen.
+ *
+ * Collapsed by default: the books are set up once and the lessons are the
+ * daily work, so this must not sit above the lesson list shouting for
+ * attention every time somebody opens the Library.
+ *
+ * A book is never deleted, only made inactive. Lessons are shelved against its
+ * id, and deleting the shelf a lesson stands on loses where it belonged.
+ */
+function BooksPanel({ ctx }: { ctx: Ctx }) {
+  const [open, setOpen] = useState(false);
+  const [edit, setEdit] = useState<Partial<Book> & { isNew?: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const blank = { isNew: true, name: "", icon: "", color: "#1B3A5C", blurb: "", sort_order: (ctx.d.books.length + 1) * 10 };
+
+  const save = async () => {
+    if (!edit?.name?.trim()) { setMsg("A book needs a name"); return; }
+    setBusy(true); setMsg("");
+    try {
+      await ctx.post({
+        action: "book.save",
+        // no id on a new book — the server slugs the name. Renaming an existing
+        // one keeps its id, so nothing shelved under it is orphaned.
+        id: edit.isNew ? undefined : edit.id,
+        name: edit.name, icon: edit.icon, color: edit.color, blurb: edit.blurb,
+        sort_order: edit.sort_order, active: true,
+      });
+      setEdit(null);
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="rounded-lg border bg-white mb-3" style={{ borderColor: C.line, overflow: "hidden" }}>
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-2 px-3 py-2 text-left" style={{ background: C.panel }}>
+        <span className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>THE BOOKS · {ctx.d.books.length}</span>
+        <span className="text-xs" style={{ color: C.faint }}>add a book, rename one, change its colour or order</span>
+        <div className="flex-1" />
+        <span style={{ color: C.sub }}>{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div className="p-3">
+          <div className="flex gap-1.5 flex-wrap mb-2">
+            {ctx.d.books.map((b) => (
+              <button key={b.id} onClick={() => setEdit({ ...b })} className="text-xs font-bold rounded px-2 py-1"
+                style={{ background: b.color + "1A", color: b.color, border: `1px solid ${b.color}33` }}
+                title={`Edit "${b.name}"`}>
+                {b.icon ? `${b.icon} ` : ""}{b.name}
+              </button>
+            ))}
+            <button onClick={() => setEdit(blank)} className="text-xs font-bold rounded px-2 py-1"
+              style={{ background: C.accent, color: "#fff" }}>
+              + New book
+            </button>
+          </div>
+
+          {edit && (
+            <div className="rounded-lg border p-3" style={{ borderColor: C.line, background: "#FBFAF7" }}>
+              <div className="text-xs font-bold mb-2" style={{ color: C.mute, letterSpacing: 1 }}>
+                {edit.isNew ? "NEW BOOK" : `EDITING · ${edit.name}`}
+              </div>
+              <div className="flex gap-2 flex-wrap items-end">
+                <div style={{ flex: "2 1 200px" }}>
+                  <div className="text-xs font-semibold mb-0.5" style={{ color: C.mute }}>Name</div>
+                  <input value={edit.name || ""} onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+                    className="w-full text-sm border rounded px-2 py-1.5" style={{ borderColor: C.line }} />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold mb-0.5" style={{ color: C.mute }}>Badge</div>
+                  <input value={edit.icon || ""} onChange={(e) => setEdit({ ...edit, icon: e.target.value.slice(0, 2).toUpperCase() })}
+                    maxLength={2} placeholder="KZ"
+                    className="text-sm border rounded px-2 py-1.5 text-center font-bold" style={{ borderColor: C.line, width: 62 }}
+                    title="Two letters, shown on the shelf" />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold mb-0.5" style={{ color: C.mute }}>Colour</div>
+                  <input type="color" value={edit.color || "#1B3A5C"} onChange={(e) => setEdit({ ...edit, color: e.target.value })}
+                    className="border rounded" style={{ borderColor: C.line, width: 48, height: 32, padding: 2 }} />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold mb-0.5" style={{ color: C.mute }}>Order</div>
+                  <input value={String(edit.sort_order ?? 0)} onChange={(e) => setEdit({ ...edit, sort_order: Number(e.target.value) || 0 })}
+                    inputMode="numeric" className="text-sm border rounded px-2 py-1.5 tnum text-right" style={{ borderColor: C.line, width: 70 }} />
+                </div>
+              </div>
+              <div className="mt-2">
+                <div className="text-xs font-semibold mb-0.5" style={{ color: C.mute }}>One line about it</div>
+                <input value={edit.blurb || ""} onChange={(e) => setEdit({ ...edit, blurb: e.target.value })}
+                  className="w-full text-sm border rounded px-2 py-1.5" style={{ borderColor: C.line }}
+                  placeholder="Shown under the name on the shelf" />
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <button onClick={save} disabled={busy} className="text-xs font-bold rounded px-3 py-1.5"
+                  style={{ background: C.accent, color: "#fff", opacity: busy ? 0.5 : 1 }}>
+                  {busy ? "Saving…" : edit.isNew ? "Create book" : "Save changes"}
+                </button>
+                <button onClick={() => { setEdit(null); setMsg(""); }} className="text-xs font-bold rounded px-3 py-1.5"
+                  style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.sub }}>
+                  Cancel
+                </button>
+                {msg && <span className="text-xs font-semibold" style={{ color: C.red }}>{msg}</span>}
+                {!edit.isNew && (
+                  <span className="text-xs" style={{ color: C.faint }}>
+                    Renaming is safe — lessons stay shelved where they are.
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser, requireAdmin, errJson, HttpError } from "@/lib/auth";
+import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { teamOf } from "@/lib/team";
 import { MIN_LEARNING_WORDS, wordCount, type LessonStatus } from "@/lib/lms";
@@ -286,9 +286,15 @@ export async function POST(req: Request) {
     }
 
     if (action === "book.save") {
-      await requireAdmin();
-      const id = str(body.id, 64).trim();
-      if (!id) throw new HttpError(400, "A book needs an id");
+      // needAuthor(), not requireAdmin(): the owner sits above the admin role
+      // and a strict role check would lock him out of his own shelves.
+      needAuthor();
+      const name = str(body.name, 200).trim();
+      // The id is a slug of the name for a new book, so nobody has to invent
+      // one — but an id sent explicitly wins, because renaming a book must
+      // never orphan the lessons shelved under its old id.
+      const id = (str(body.id, 64).trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")).slice(0, 64);
+      if (!id) throw new HttpError(400, "A book needs a name");
       const { error } = await admin.from("lms_book").upsert({
         id,
         name: str(body.name, 200).trim() || id,
