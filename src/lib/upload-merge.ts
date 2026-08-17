@@ -20,6 +20,7 @@ export function detectKind(p: ParseResult): UploadKind {
   // delivered first: it is the one Jobmaster-shaped file that must never reach
   // apply_jobs (see parse-upload's isDeliveredSheet). The parser never sets
   // both, so this is order-of-preference, not a tie-break.
+  if (p.employees) return "employees";
   if (p.deliveredJobs) return "delivered";
   if (p.jobs && p.fromPRE) return "pre";
   if (p.jobs) return "jobs";
@@ -120,6 +121,7 @@ const SLOT_KIND: Record<string, UploadKind[]> = {
   projects: ["projects", "pre"],
   tasks: ["tasks"],
   delivered: ["delivered"],
+  employees: ["employees"],
 };
 
 const SLOT_NAME: Record<string, string> = {
@@ -127,6 +129,7 @@ const SLOT_NAME: Record<string, string> = {
   projects: "Order in Progress - projects",
   tasks: "To Do Dashboard All",
   delivered: "Delivered Jobs",
+  employees: "Employee Master",
 };
 
 export async function applyUpload(
@@ -260,6 +263,22 @@ export async function applyUpload(
               (parsed.deliveredHeaders || []).join(" | ")),
       );
     }
+  } else if (kind === "employees") {
+    const emp = parsed.employees!;
+    jobCount = emp.length;
+    const { error } = await admin.from("employees").upsert(
+      emp.map((e) => ({ ...e, updated_at: new Date().toISOString() })),
+      { onConflict: "id" },
+    );
+    if (error) throw new UploadError("employee master failed: " + error.message);
+    const withDob = emp.filter((e) => e.dob).length;
+    const active = emp.filter((e) => e.active).length;
+    lines.push(`· ${emp.length} employees loaded — ${active} active`);
+    lines.push(
+      withDob
+        ? `· ${withDob} carry a date of birth, so the birthday list can be built`
+        : `· ⚠ NO date of birth was read. Columns in this sheet: ` + (parsed.employeeHeaders || []).join(" | "),
+    );
   } else if (kind === "tasks") {
     // link raw ToDo rows against the current active jobs in the DB
     const { data: jobRows, error: je } = await admin

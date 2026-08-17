@@ -15,6 +15,7 @@ interface StatusRow {
   gs: string;
   /** One of the every-morning files (counted and chased), vs. an occasional one. */
   daily: boolean;
+  ownerOnly?: boolean;
   loadedToday: boolean;
   at: string | null;
   rows: number | null;
@@ -78,6 +79,9 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
 
   // Only the daily files are counted and chased — the occasional ones (Delivered
   // Jobs) would otherwise leave the header permanently short of its total.
+  // RJ Uploads sit in their own section — masters, not part of the round
+  const rjRows = rows.filter((r) => r.ownerOnly);
+  const rows2 = rows.filter((r) => !r.ownerOnly);
   const dailyRows = rows.filter((r) => r.daily);
   const loadedCount = dailyRows.filter((r) => r.loadedToday).length;
   const dailyTotal = dailyRows.length;

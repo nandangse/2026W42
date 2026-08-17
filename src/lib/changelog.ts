@@ -37,6 +37,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.0.1.7",
+    date: "2026-08-18",
+    module: "Tasking · Morning Update",
+    items: [
+      "Fixed: renaming L2 to Leaders did not touch tasks already raised. The level is stored as the label itself, so every older task still read “L2 — Production Head” and By Escalations showed it as a separate lane. Migration 0024 rewrites them.",
+      "New RJ Uploads section on Morning Update, visible only to the owner account. First card: Employee Master, from the HR sheet.",
+      "The employee master is read by meaning rather than by exact column names — name, date of birth, joining date, department, designation, location — and everything else the sheet carries is kept as-is, so HR adding a column never needs a code change. The upload says how many carry a date of birth, and lists every column if it cannot find one.",
+      "This is what the birthday list will read.",
+    ],
+  },
+  {
     v: "3.0.1.5",
     date: "2026-08-18",
     module: "Sales Genie · Salespeople",

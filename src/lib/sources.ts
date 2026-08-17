@@ -2,7 +2,7 @@
 // the user's browser; the app never talks to the ERP itself. Ported from V1.9,
 // plus the Delivered Jobs report added 17 Aug 2026.
 export interface MorningSource {
-  key: "jobs" | "projects" | "tasks" | "delivered";
+  key: "jobs" | "projects" | "tasks" | "delivered" | "employees";
   nm: string;
   desc: string;
   erp: string;
@@ -14,6 +14,11 @@ export interface MorningSource {
    * on the page without nagging — it shows when it was last loaded instead.
    */
   daily: boolean;
+  /**
+   * Restricted to the owner account. "RJ Uploads" on Morning Update — masters
+   * that are Dr Raghu's to load, not part of anyone's morning routine.
+   */
+  ownerOnly?: boolean;
 }
 
 export const DEFAULT_SOURCES: MorningSource[] = [
@@ -54,6 +59,16 @@ export const DEFAULT_SOURCES: MorningSource[] = [
     erp: "https://nandanerp.in/app/todo/view/report/ToDo%20Dashboard%20All",
     gs: "https://docs.google.com/spreadsheets/d/18jCqt8d_sIHsYOYPkHFnavWwclfEMIsqCoOCVJsCxrY/edit",
     daily: true,
+  },
+  // ---- RJ Uploads — owner only ----
+  {
+    key: "employees",
+    nm: "Employee Master",
+    desc: "Active employees from the HR sheet — drives the birthday list, and whatever else we add later",
+    erp: "https://docs.google.com/spreadsheets/d/1dp-ce1pWMMTUFqBgMCeXpWXlRE394VWxrx4Xz-PQhvE/edit?gid=648281746#gid=648281746",
+    gs: "https://docs.google.com/spreadsheets/d/1dp-ce1pWMMTUFqBgMCeXpWXlRE394VWxrx4Xz-PQhvE/edit",
+    daily: false,
+    ownerOnly: true,
   },
 ];
 

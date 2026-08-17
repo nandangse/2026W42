@@ -15,6 +15,7 @@
 import type { WorkBook } from "xlsx";
 import * as XLSX from "xlsx";
 import type {
+  ParsedEmployee,
   ParseResult,
   ParsedJob,
   ParsedDeliveredJob,
@@ -240,6 +241,30 @@ function isDeliveredSheet(
  * Jobs file read as a jobs upload and was caught only by guardMassArchive,
  * one layer from retiring all 105 live jobs. The slot removes the guess.
  */
+/**
+ * The HR sheet's columns are not ours and will change. Match by meaning, not
+ * by an exact header, and keep everything else in `extra` — a master that
+ * needs a migration each time HR adds a column is a master that stops being
+ * uploaded.
+ */
+const EMP_FIELDS: [keyof ParsedEmployee, RegExp][] = [
+  ["id", /^(emp(loyee)?\s*(code|id|no)|id)$/i],
+  ["name", /(employee\s*)?name/i],
+  ["email", /e-?mail/i],
+  ["dob", /birth|^dob$/i],
+  ["doj", /joining|^doj$|date of join/i],
+  ["department", /department|dept/i],
+  ["designation", /designation|title|role/i],
+  ["location", /location|site|branch|plant/i],
+];
+
+function isEmployeeSheet(hdr: string[]): boolean {
+  const has = (re: RegExp) => hdr.some((h) => re.test(h));
+  // a name plus either a birthday or a joining date is enough to be sure, and
+  // no other sheet in the suite carries that pair
+  return has(/(employee\s*)?name/i) && (has(/birth|^dob$/i) || has(/joining|^doj$/i));
+}
+
 export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
   dateFixes.length = 0; // per-parse, so one upload's corrections are its own
   const out: ParseResult = {};
@@ -257,6 +282,53 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
     });
     const g = (r: Row, h: string): Cell =>
       ix[h] != null ? r[ix[h]] : undefined;
+    // ---- Employee master (RJ Uploads) ----
+    if (slot === "employees" || isEmployeeSheet(hdr)) {
+      const pick = (want: keyof ParsedEmployee) =>
+        hdr.find((h) => EMP_FIELDS.find(([k]) => k === want)?.[1].test(h)) || null;
+      const col: Partial<Record<keyof ParsedEmployee, string | null>> = {};
+      for (const [k] of EMP_FIELDS) col[k] = pick(k);
+      const statusHdr = hdr.find((h) => /status|active|resigned|left/i.test(h)) || null;
+      const taken = new Set(Object.values(col).filter(Boolean) as string[]);
+      if (statusHdr) taken.add(statusHdr);
+
+      out.employeeHeaders = hdr.filter(Boolean);
+      const seen = new Set<string>();
+      out.employees = rows
+        .slice(1)
+        .filter((r) => r && col.name && String(g(r, col.name) || "").trim())
+        .map((r): ParsedEmployee => {
+          const name = String(g(r, col.name!) || "").trim();
+          // the sheet's own code where it has one, else a stable slug of the
+          // name so a re-upload updates rather than duplicates
+          let id = col.id ? String(g(r, col.id) || "").trim() : "";
+          if (!id) id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
+          while (seen.has(id)) id = id + "-2";
+          seen.add(id);
+          const status = statusHdr ? String(g(r, statusHdr) || "").trim().toLowerCase() : "";
+          const extra: Record<string, string> = {};
+          for (const h of hdr) {
+            if (!h || taken.has(h)) continue;
+            const v = String(g(r, h) ?? "").trim();
+            if (v) extra[h] = v;
+          }
+          return {
+            id,
+            name,
+            email: col.email ? String(g(r, col.email) || "").trim().toLowerCase() || null : null,
+            dob: col.dob ? ser2iso(g(r, col.dob)) : null,
+            doj: col.doj ? ser2iso(g(r, col.doj)) : null,
+            department: col.department ? String(g(r, col.department) || "").trim() || null : null,
+            designation: col.designation ? String(g(r, col.designation) || "").trim() || null : null,
+            location: col.location ? String(g(r, col.location) || "").trim() || null : null,
+            // absent status means present: an HR master lists who works here
+            active: !status || /active|working|present|yes|y/i.test(status),
+            extra,
+          };
+        });
+      continue;
+    }
+
     // ---- Delivered Jobs report — claimed BEFORE the jobs branch (see above) ----
     // Either the uploader said so, or the content says so. The Jobmaster
     // shape check (ID + Customer Tag) still has to pass either way, so a

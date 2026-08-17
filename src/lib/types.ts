@@ -53,6 +53,20 @@ export interface ParsedDeliveredJob extends ParsedJob {
   dateSource: string | null;
 }
 
+/** A row of the HR employee master. */
+export interface ParsedEmployee {
+  id: string;
+  name: string;
+  email: string | null;
+  dob: string | null;
+  doj: string | null;
+  department: string | null;
+  designation: string | null;
+  location: string | null;
+  active: boolean;
+  extra: Record<string, string>;
+}
+
 export interface ParsedRawTask {
   ref: string;
   refn: string;
@@ -100,6 +114,9 @@ export interface ParseResult {
   deliveredJobs?: ParsedDeliveredJob[];
   /** Every header seen on the delivered sheet — the diagnostic when no date matched. */
   deliveredHeaders?: string[];
+  employees?: ParsedEmployee[];
+  /** Every header on the employee sheet — the diagnostic when a field is missed. */
+  employeeHeaders?: string[];
 }
 
 /** A task after linkTasks() merges raw ToDo rows against the job list. */
@@ -113,4 +130,4 @@ export interface LinkedTask {
 }
 
 /** What kind of workbook a POST /api/upload was detected as. */
-export type UploadKind = "jobs" | "projects" | "tasks" | "pre" | "delivered";
+export type UploadKind = "jobs" | "projects" | "tasks" | "pre" | "delivered" | "employees";

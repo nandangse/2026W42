@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 // Returns per-file "loaded today" ✓ status + the ERP/download links.
 export async function GET() {
   try {
-    await requireUploader();
+    const user = await requireUploader();
     const admin = adminClient();
     const { data, error } = await admin
       .from("import_batches")
@@ -53,7 +53,8 @@ export async function GET() {
       return null;
     };
 
-    const status = DEFAULT_SOURCES.map((s) => {
+    const visible = DEFAULT_SOURCES.filter((s) => !s.ownerOnly || user.isOwner);
+    const status = visible.map((s) => {
       const l = loadedToday(s.key);
       const ever = latest[s.key] || null;
       return {
