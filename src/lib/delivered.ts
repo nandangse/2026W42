@@ -9,11 +9,13 @@
 //      are excluded from every period and counted separately, so a total that
 //      omits them says so rather than reading low.
 //
-//   2. NEVER DIVIDE BY MONTHS THAT DON'T EXIST. Genie has held delivery data
-//      since only 23 Jul 2026. A "12-month average" over four weeks of data is
-//      a twelfth of the truth, and it would be read as a collapse in output.
-//      coveredMonths() is what stops that, and the UI says "insufficient
-//      history" instead of printing the number.
+//   2. NEVER DIVIDE BY MONTHS THAT DON'T EXIST. The ledger reaches back to
+//      2014, but thinly — 2,728 delivered jobs of which only 1,236 carry a
+//      date, and exactly one of those is in 2014. Any window can therefore be
+//      wider than the data behind it, and dividing by the months asked for
+//      rather than the months held reads as a collapse in output that never
+//      happened. coveredMonths() is what stops that, and the UI says
+//      "insufficient history" instead of printing the number.
 
 /** The financial year runs 1 April → 31 March. */
 export const FY_START_MONTH = 4;
@@ -31,12 +33,25 @@ export interface DeliveredJob {
   proj: string;
   stat: string;
   own: string;
-  /** Throughput Expected Value (Auto) — the throughput figure. `tp` is the raw
-   *  column and reads 0 on every row in this database, so it is not used. */
+  /**
+   * The two throughput columns, because the two exports carry different ones.
+   *
+   * The IN-PROGRESS file has "Throughput Expected Value (Auto)" (-> tpv) and
+   * leaves the plain "Throughput" column at 0. The DELIVERED export is the
+   * other way round: no Auto column at all, and "Throughput" (-> tp) filled on
+   * 705 of 2,728 rows, totalling about 160 Cr. Reading only tpv would have
+   * shown a flat zero for every delivery ever made.
+   *
+   * Use throughputOf(), never either field directly.
+   */
+  tp: number;
   tpv: number;
   tpp: number;
-  val_is_zero?: boolean;
 }
+
+/** Whichever throughput column this row actually carries. */
+export const throughputOf = (j: Pick<DeliveredJob, "tp" | "tpv">): number =>
+  Number(j.tpv) || Number(j.tp) || 0;
 
 export type PeriodKey = "mtd" | "qtd" | "ytd" | "m12" | "all" | "custom";
 
@@ -127,7 +142,7 @@ export function totalsOf(rows: DeliveredJob[]): Totals {
   for (const r of rows) {
     t.nos += 1;
     t.value += Number(r.val) || 0;
-    t.throughput += Number(r.tpv) || 0;
+    t.throughput += throughputOf(r);
   }
   return t;
 }
@@ -211,7 +226,7 @@ export function byMonth(rows: DeliveredJob[], from: string, to: string): Bucket[
     const t = seen.get(k) || zero();
     t.nos += 1;
     t.value += Number(r.val) || 0;
-    t.throughput += Number(r.tpv) || 0;
+    t.throughput += throughputOf(r);
     seen.set(k, t);
   }
   const cur = new Date(start.getTime());
@@ -238,7 +253,7 @@ export function byFamily(rows: DeliveredJob[], from: string, to: string): Bucket
     const t = seen.get(k) || zero();
     t.nos += 1;
     t.value += Number(r.val) || 0;
-    t.throughput += Number(r.tpv) || 0;
+    t.throughput += throughputOf(r);
     seen.set(k, t);
   }
   return [...seen.entries()]
@@ -254,7 +269,7 @@ export function byCustomer(rows: DeliveredJob[], from: string, to: string): Buck
     const t = seen.get(k) || zero();
     t.nos += 1;
     t.value += Number(r.val) || 0;
-    t.throughput += Number(r.tpv) || 0;
+    t.throughput += throughputOf(r);
     seen.set(k, t);
   }
   return [...seen.entries()]

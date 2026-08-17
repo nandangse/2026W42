@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import {
   PERIODS, rangeFor, fyLabel, fqLabel, fyStart, span, within, dated, undated,
-  totalsOf, averagePerMonth, byMonth, byFamily, byCustomer, onTime, coveredMonths,
+  totalsOf, averagePerMonth, byMonth, byFamily, byCustomer, onTime, coveredMonths, throughputOf,
   type DeliveredJob, type PeriodKey, type Totals, type Bucket,
 } from "@/lib/delivered";
 import { today, fmt, fmtFull, lakh } from "@/lib/schedule";
@@ -385,7 +385,7 @@ function JobTable({ rows, V }: { rows: DeliveredJob[]; V: (n: number) => string 
                     {slip == null ? "—" : slip === 0 ? "on the day" : slip < 0 ? `${-slip}d early` : `${slip}d late`}
                   </td>
                   <td className="px-2 py-1.5 tnum text-right" style={{ color: C.body }}>{V(j.val)}</td>
-                  <td className="px-2 py-1.5 tnum text-right" style={{ color: C.green }}>{V(j.tpv)}</td>
+                  <td className="px-2 py-1.5 tnum text-right" style={{ color: C.green }}>{V(throughputOf(j))}</td>
                 </tr>
               );
             })}

@@ -57,6 +57,7 @@ export async function GET() {
       jobs: rows.map((r) => ({
         ...r,
         val: Number(r.val) || 0,
+        tp: Number(r.tp) || 0,
         tpv: Number(r.tpv) || 0,
         tpp: Number(r.tpp) || 0,
       })),

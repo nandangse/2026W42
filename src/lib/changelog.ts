@@ -37,6 +37,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.0.0.2",
+    date: "2026-08-17",
+    module: "Morning Update · Delivered Jobs",
+    items: [
+      "Read the real Delivered Jobs export and fixed what it showed. It is recognised on its own now, without needing the right card — though the card still decides.",
+      "It was never detected because it has no “Job Status” column at all: its status lives in a plain “Status” column reading Delivered / Installation Stage. 2,711 of 2,728 rows say Delivered, which would have identified the file instantly. The second test missed it by under five points — “Actual Delivery Date” is filled on 45.3% of rows against a 50% bar, because the history reaches back to 2014 and much of it predates the column.",
+      "Four fields were being read from columns this file does not have, and were silently empty: status, owner, target date, and throughput. Status now reads Delivered on 2,711 rows, Planning Owner on 817, and a target date on 1,090.",
+      "Throughput would have read zero for every delivery ever made. This export has no “Throughput Expected Value (Auto)” column — it carries a plain “Throughput” column instead, worth about 160 Cr across 705 jobs. Both are now read, whichever the file has.",
+      "Planning Owner is the Project Owner under another name, and is now read as the owner.",
+      "Delivery history spans 2014 to 2026, so the 12-month averages have real data behind them rather than reading “insufficient history”.",
+      "New safety net in the other direction: a delivered upload is refused when most of its rows are jobs currently live on the board. That is the wrong-card mistake that would have made no noise — it would have marked live jobs delivered and turned their plans read-only.",
+    ],
+  },
+  {
     v: "3.0.0.1",
     date: "2026-08-17",
     module: "Morning Update · Upload",

@@ -56,6 +56,39 @@ async function guardMassArchive(admin: SupabaseClient, jobs: ParsedJob[]) {
   }
 }
 
+/**
+ * Refuse a delivered upload that is mostly the LIVE board.
+ *
+ * The mirror of guardMassArchive, and it exists because the slot fix opened a
+ * hole: declaring the slot forces the delivered branch, so detectKind agrees
+ * with the slot and the slot/kind mismatch check can never fire. Drop the
+ * in-progress export on the Delivered card and all 105 live jobs would be
+ * banked as delivered — and, worse than the archive case, silently: their
+ * plans, baselines and materials all turn read-only with nothing to notice.
+ *
+ * A genuine delivered export barely intersects the live board. The real one
+ * (2,728 rows, Aug 2026) overlapped it on ZERO of 105. Some overlap is normal
+ * — a job at Installation Stage is delivered and still live — so this only
+ * fails when most of what is being banked is currently in progress.
+ */
+const MAX_LIVE_OVERLAP = 0.4;
+
+async function guardDeliveredOverlap(admin: SupabaseClient, del: ParsedDeliveredJob[]) {
+  const { data, error } = await admin.from("jobs").select("id").eq("active", true);
+  if (error) throw new UploadError("could not read jobs: " + error.message);
+  const live = new Set((data || []).map((r) => r.id as string));
+  if (live.size < 20) return; // fresh install — nothing to protect
+  const overlap = del.filter((d) => live.has(d.id)).length;
+  if (overlap / del.length > MAX_LIVE_OVERLAP) {
+    throw new UploadError(
+      `Refused: ${overlap} of these ${del.length} rows are jobs currently live on the board. ` +
+        `A delivered-jobs file barely overlaps the live board, so this is almost certainly the ` +
+        `"Job in progress - Jobs" export on the wrong card. Banking it would mark those jobs ` +
+        `delivered and make their plans read-only. Nothing was changed.`,
+    );
+  }
+}
+
 /** projMap (keyed by project id) → the jsonb array apply_projects expects. */
 function projectsArray(projMap: Record<string, ParsedProject>) {
   return Object.entries(projMap).map(([id, p]) => ({
@@ -187,6 +220,7 @@ export async function applyUpload(
     const del = [...byId.values()];
     const dupes = parsed.deliveredJobs!.length - del.length;
     if (dupes > 0) lines.push(`· ${dupes} duplicate job rows collapsed (kept the latest of each)`);
+    await guardDeliveredOverlap(admin, del);
     jobCount = del.length;
     const { error } = await admin.rpc("apply_delivered", {
       p_jobs: del,

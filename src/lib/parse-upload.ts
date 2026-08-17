@@ -38,14 +38,56 @@ type Row = Cell[];
 // to be about CONTENT, not the sheet's name, which nobody controls.
 // ---------------------------------------------------------------------------
 
-/** The ERP statuses at or past delivery, verbatim from the 32-status ladder. */
-const DELIVERED_STATUSES = new Set([
-  "D: Delivered",
-  "I: Installation Not Started due to Client",
-  "I: Installation in progress",
-  "I: Installation Completed",
-  "C: Job Handed Over",
-]);
+/**
+ * Statuses at or past delivery.
+ *
+ * Two vocabularies, because the two exports do not agree. The in-progress
+ * file carries the full 32-status ladder ("D: Delivered"); the Delivered Jobs
+ * export carries a plain three-value Status column ("Delivered",
+ * "Installation Stage"). Both are listed, lower-cased on comparison, because
+ * the real file uses the second and matching only the first is what let a
+ * 2,728-row delivered export read as a jobs upload on 17 Aug 2026.
+ */
+const DELIVERED_STATUSES = new Set(
+  [
+    // the 32-status ladder, as the in-progress export spells it
+    "D: Delivered",
+    "I: Installation Not Started due to Client",
+    "I: Installation in progress",
+    "I: Installation Completed",
+    "C: Job Handed Over",
+    // the Delivered Jobs export's own Status column
+    "Delivered",
+    "Installation Stage",
+  ].map((s) => s.toLowerCase()),
+);
+
+/**
+ * The status column, by whichever name this export uses.
+ *
+ * NOT "Current Status" — that is a free-text progress note in the delivered
+ * file (641 distinct values, blank on 1,961 rows) and would read as noise.
+ */
+const STATUS_HEADERS = ["Job Status", "Status"];
+
+/** The owner column. "Planning Owner" is the Project Owner under another name. */
+const OWNER_HEADERS = ["Project Owner", "Planning Owner"];
+
+/** Target/committed date, for measuring a delivery against what was promised. */
+const TARGET_HEADERS = [
+  "Target Delivery Date Current",
+  "Committed Delivery Date to Customer",
+  "OTD Date",
+];
+
+/** First of these headers that exists on the sheet, or null. */
+function firstHeader(hdr: string[], wanted: string[]): string | null {
+  for (const w of wanted) {
+    const hit = hdr.find((h) => h.toLowerCase() === w.toLowerCase());
+    if (hit) return hit;
+  }
+  return null;
+}
 
 /**
  * Headers that mention delivery but mean a TARGET, not an actual — reading a
@@ -122,23 +164,31 @@ function isDeliveredSheet(
   const data = rows.slice(1).filter((r) => r && g(r, "ID"));
   if (!data.length) return false;
 
-  // 1 — status ladder
+  // 1 — status ladder, under whichever header this export uses
+  const statHdr = firstHeader(hdr, STATUS_HEADERS);
   let withStat = 0;
   let delivered = 0;
-  for (const r of data) {
-    const s = String(g(r, "Job Status") || "").trim();
-    if (!s) continue;
-    withStat++;
-    if (DELIVERED_STATUSES.has(s)) delivered++;
+  if (statHdr) {
+    for (const r of data) {
+      const s = String(r[ix[statHdr]] ?? "").trim();
+      if (!s) continue;
+      withStat++;
+      if (DELIVERED_STATUSES.has(s.toLowerCase())) delivered++;
+    }
   }
   // a clear majority, so one stray not-yet-installed row can't flip it back
   if (withStat > 0 && delivered / withStat >= 0.8) return true;
 
   // 2 — a real delivery-date column that is actually filled in
+  // The real export carries "Actual Delivery Date" on 45.3% of rows (1,236 of
+  // 2,728) — twelve years of history, much of it predating the column. The
+  // old 50% bar missed it by under five points. 0.35 clears a genuine export
+  // while staying far above anything the in-progress file could reach, since
+  // that one has no actual-delivery column at all.
   const dateHdr = pickDeliveryDateHeader(hdr);
   if (dateHdr && ix[dateHdr] != null) {
     const dated = data.filter((r) => ser2iso(r[ix[dateHdr]])).length;
-    if (dated / data.length >= 0.5) return true;
+    if (dated / data.length >= 0.35) return true;
   }
   return false;
 }
@@ -183,6 +233,11 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
       (declaredDelivered || isDeliveredSheet(rows, hdr, ix, g))
     ) {
       const dateHdr = pickDeliveryDateHeader(hdr);
+      // These three differ between the two Jobmaster exports; resolve each
+      // once per sheet rather than guessing per row.
+      const statHdr = firstHeader(hdr, STATUS_HEADERS);
+      const ownHdr = firstHeader(hdr, OWNER_HEADERS);
+      const tddHdr = firstHeader(hdr, TARGET_HEADERS);
       out.deliveredHeaders = hdr.filter(Boolean);
       out.deliveredJobs = rows
         .slice(1)
@@ -197,14 +252,14 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
             val: Number(g(r, "Value") || 0),
             delivered,
             dateSource: delivered ? dateHdr : null,
-            tdd: ser2iso(g(r, "Target Delivery Date Current")),
+            tdd: tddHdr ? ser2iso(r[ix[tddHdr]]) : null,
             otd: ser2iso(g(r, "OTD Date")),
             start: ser2iso(g(r, "Job Start Date")),
             proj: String(g(r, "Project") || ""),
-            stat: String(g(r, "Job Status") || "").trim(),
+            stat: statHdr ? String(r[ix[statHdr]] ?? "").trim() : "",
             pct: Number(g(r, "Production Completion %") || 0),
             note: String(g(r, "Current Status") || "").replace(/\s+/g, " ").slice(0, 150),
-            own: String(g(r, "Project Owner") || "").trim(),
+            own: ownHdr ? String(r[ix[ownHdr]] ?? "").trim() : "",
             mgmt: ser2iso(g(r, "Management Target Date Request")),
             tp: Number(g(r, "Throughput") || 0),
             tpv: Number(g(r, "Throughput Expected Value (Auto)") || 0),
