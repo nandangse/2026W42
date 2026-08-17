@@ -37,6 +37,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.0.1.5",
+    date: "2026-08-18",
+    module: "Sales Genie · Salespeople",
+    items: [
+      "A salesperson is now a Genie account, not a spelling. Every duplicate is merged: Santosh + Santosh Patra → Santosh, Nitu + Nitu Sharan → Nitu, Raghu + Raghunandan Jagdish → Raghu, Acharya → Acharya, each tied to their nandan.co.in login.",
+      "The merge rewrites every deal, company, ToDo, support item, monthly stat and plan line that carried the old spelling — so nobody’s numbers are stranded under a name that no longer appears.",
+      "The cause: the app added your display name to the team list whenever it did not match an existing entry. So “Raghu” was seeded, and “Raghunandan Jagdish” appeared the first time he signed in. It now recognises you by email instead, so it cannot happen again.",
+      "Adding a salesperson asks which Genie account it is, and refuses a name with no account behind it — or an account already in the list under another name.",
+      "A salesperson you added who is not on this list is left exactly as they are.",
+    ],
+  },
+  {
     v: "3.0.1.4",
     date: "2026-08-18",
     module: "Delivered Jobs · OTD",

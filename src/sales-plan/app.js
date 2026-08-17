@@ -15,11 +15,72 @@
    (sp_deals / sp_support in ENTITY_TABLES — upstream never persisted them),
    and salesStats / salesPlan ride in the settings masters blob. */
 
+/* ---------- who a salesperson actually IS ----------
+   A salesperson is a Genie account, not a spelling. The owner list used to be
+   plain names, and finishBoot() pushed the signed-in person's DISPLAY name
+   whenever it did not match one — so "Raghu" was seeded and "Raghunandan
+   Jagdish" appeared the first time he logged in. Same person, two entries,
+   two sets of deals, two lines on every plan.
+
+   Owners are now keyed on email. The canonical name is what shows in Sales
+   Genie; the aliases are the spellings already in the data, merged onto it
+   once, in place.                                     (Dr Raghu, 18 Aug 2026) */
+const OWNER_IDENTITY=[
+  {name:'Santosh', email:'santosh@nandan.co.in', aliases:['Santosh','Santosh Patra']},
+  {name:'Nitu',    email:'nitu@nandan.co.in',    aliases:['Nitu','Nitu Sharan']},
+  {name:'Acharya', email:'acharya@nandan.co.in', aliases:['Acharya']},
+  {name:'Raghu',   email:'raghu@nandan.co.in',   aliases:['Raghu','Raghunandan Jagdish']},
+];
+
+/* every alias -> the canonical name, lower-cased for matching */
+const CANON=(()=>{const m={};OWNER_IDENTITY.forEach(o=>o.aliases.forEach(a=>m[a.toLowerCase()]=o.name));return m;})();
+const canonOwner=n=>(n&&CANON[String(n).trim().toLowerCase()])||n;
+
+/* Rewrite every owner reference in place. Generic on purpose: any field named
+   `owner` and any array named `owners`, wherever it sits, plus the three maps
+   keyed by owner name. Missing one would silently orphan somebody's deals. */
+function mergeOwnerAliases(d){
+  let changed=false;
+  const fix=n=>{const c=canonOwner(n);if(c!==n)changed=true;return c;};
+  const walk=v=>{
+    if(!v||typeof v!=='object')return;
+    if(Array.isArray(v))return v.forEach(walk);
+    if(typeof v.owner==='string')v.owner=fix(v.owner);
+    if(Array.isArray(v.owners))v.owners=[...new Set(v.owners.map(fix))];
+    Object.values(v).forEach(walk);
+  };
+  ['industries','products','companies','people','todos','deals','support'].forEach(k=>walk(d[k]));
+  /* maps keyed by the name itself */
+  ['ownerColors','salesStats','salesPlan'].forEach(k=>{
+    if(!d[k])return;
+    const out={};
+    Object.keys(d[k]).forEach(n=>{
+      const c=fix(n);
+      /* an alias merging onto a name that already has data: keep the canonical
+         one and drop the duplicate rather than half-merging two shapes */
+      out[c]=out[c]&&c!==n?out[c]:d[k][n];
+    });
+    d[k]=out;
+  });
+  /* the master list itself */
+  const before=(d.owners||[]).join('|');
+  d.owners=[...new Set((d.owners||[]).map(fix))];
+  if(d.owners.join('|')!==before)changed=true;
+  /* and the name -> email link, seeded for everyone we know */
+  d.ownerUsers=d.ownerUsers||{};
+  OWNER_IDENTITY.forEach(o=>{
+    if(d.ownerUsers[o.name]!==o.email){d.ownerUsers[o.name]=o.email;changed=true;}
+    if(!d.owners.includes(o.name)){d.owners.push(o.name);changed=true;}
+  });
+  return changed;
+}
+
 /* ---------- migrate old data shapes ---------- */
 function migrate(d){
   d.meta=d.meta||{version:3,savedAt:null};
   d.owners=d.owners||["Nitu","Santosh","Raghu","Acharya"];
   d.ownerColors=d.ownerColors||{"Nitu":"#1B2D6B","Santosh":"#F04E23","Raghu":"#0E7C7B","Acharya":"#7A1E6C"};
+  d.ownerUsers=d.ownerUsers||{};
   d.types=d.types||["Client","Prospect","Collaborator"];
   d.stages=d.stages||SEED.stages;
   d.locations=d.locations||[];d.products=d.products||[];d.companies=d.companies||[];d.people=d.people||[];d.todos=d.todos||[];
@@ -120,7 +181,7 @@ const ENTITY_TABLES=['industries','products','companies','people','todos','deals
 let last={masters:'',industries:new Map(),products:new Map(),companies:new Map(),people:new Map(),todos:new Map(),deals:new Map(),support:new Map()};
 let saveTimer=null, saving=false, resaveNeeded=false;
 
-function mastersOf(){return {meta:S.meta,owners:S.owners,ownerColors:S.ownerColors,types:S.types,stages:S.stages,locations:S.locations,
+function mastersOf(){return {meta:S.meta,owners:S.owners,ownerColors:S.ownerColors,ownerUsers:S.ownerUsers,types:S.types,stages:S.stages,locations:S.locations,
   salesStats:S.salesStats,salesPlan:S.salesPlan};}
 function snapshot(){
   last.masters=JSON.stringify(mastersOf());
@@ -286,9 +347,21 @@ async function initDb(){
 function finishBoot(){
   S.industries.forEach(i=>{if(!i.id)i.id=uid();});
   snapshot();
-  // make sure the signed-in person exists in the owner masters
-  if(currentUser&&!S.owners.some(o=>o.toLowerCase()===currentUser.toLowerCase())){
+  // Merge any legacy spellings onto the canonical name before anything reads
+  // the owner list. Idempotent — a second run finds nothing to do.
+  if(mergeOwnerAliases(S))markDirty();
+
+  // Who am I, by EMAIL. This is the line that used to create the duplicates:
+  // it pushed my display name whenever it did not match an existing owner, so
+  // "Raghu" and "Raghunandan Jagdish" both ended up in the list. Now the email
+  // decides, and the display name is only a fallback for an account nobody has
+  // linked yet.
+  const mine=Object.keys(S.ownerUsers||{}).find(n=>(S.ownerUsers[n]||'').toLowerCase()===(myEmail||'').toLowerCase());
+  if(mine){
+    currentUser=mine;
+  }else if(currentUser&&!S.owners.some(o=>o.toLowerCase()===currentUser.toLowerCase())){
     S.owners.push(currentUser);
+    S.ownerUsers[currentUser]=myEmail||'';
     S.ownerColors[currentUser]=profile.color||COLOR_POOL.find(c=>!Object.values(S.ownerColors).includes(c))||'#1B2D6B';
     markDirty();
   }
@@ -342,8 +415,16 @@ const ownerPill=o=>o?`<span class="owner-pill" style="background:${S.ownerColors
 const ownerPills=arr=>(arr||[]).map(ownerPill).join(' ');
 function addOwnerMaster(){
   if(!isAdmin())return alert('Only an admin can add to the team list.');
-  const n=(prompt('Add a salesperson to the master list (name only — logins & access are managed in the Genie admin tab):')||'').trim();if(!n)return;
+  const n=(prompt('Salesperson name as it should show in Sales Genie (e.g. Santosh):')||'').trim();if(!n)return;
   if(S.owners.some(o=>o.toLowerCase()===n.toLowerCase()))return alert(n+' is already in the team list.');
+  // A salesperson without an account is how the duplicates started. Ask which
+  // Genie login this is, and refuse a name that has no account behind it.
+  const e=(prompt('Which Genie account is '+n+'? Enter their email (e.g. santosh@nandan.co.in):')||'').trim().toLowerCase();
+  if(!e)return;
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))return alert('That is not an email address. A salesperson must map to a Genie account.');
+  const clash=Object.keys(S.ownerUsers||{}).find(k=>(S.ownerUsers[k]||'').toLowerCase()===e);
+  if(clash)return alert(e+' is already '+clash+' in this list. Rename that entry rather than adding a second one.');
+  S.ownerUsers=S.ownerUsers||{};S.ownerUsers[n]=e;
   S.owners.push(n);
   S.ownerColors[n]=COLOR_POOL.find(c=>!Object.values(S.ownerColors).includes(c))||'#'+Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0');
   markDirty();render();}
