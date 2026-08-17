@@ -5,7 +5,7 @@
 // no-op (idempotent upserts).
 import * as XLSX from "xlsx";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseUpload, linkTasks } from "./parse-upload";
+import { parseUpload, linkTasks, dateFixes } from "./parse-upload";
 import type {
   ParseResult,
   ParsedJob,
@@ -166,7 +166,19 @@ export async function applyUpload(
   // one import_batch per upload (kept forever — morning snapshot history)
   const batchId = crypto.randomUUID();
 
+  // Impossible dates the ERP produced, corrected to the last real day of the
+  // month. Reported at the top of the summary, because a silently moved date
+  // is exactly the kind of thing that turns up months later in a wrong chart.
+  const fixes = [...dateFixes];
+
   const lines: string[] = [];
+  if (fixes.length) {
+    const shown = fixes.slice(0, 5).map((f) => `${f.raw} → ${f.fixed}`).join(", ");
+    lines.push(
+      `· ⚠ ${fixes.length} impossible date${fixes.length === 1 ? "" : "s"} corrected to the last day of that month: ` +
+        shown + (fixes.length > 5 ? `, and ${fixes.length - 5} more` : ""),
+    );
+  }
   let jobCount: number | null = null;
   let taskCount: number | null = null;
   let projectCount: number | null = null;

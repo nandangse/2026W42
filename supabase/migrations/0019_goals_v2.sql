@@ -33,11 +33,11 @@ insert into public.departments (name, code, color, sort_order) values
   ('Design & Engineering', 'DES', '#1B3A5C', 1),
   ('Production',           'PRD', '#0D7A3F', 2),
   ('Quality',              'QLY', '#0D9488', 3),
-  ('Supply Chain',         'SCM', '#D97706', 4),
+  ('Purchase',             'PUR', '#D97706', 4),
   ('Projects',             'PRJ', '#7C3AED', 5),
   ('Sales & Marketing',    'SLS', '#E8600A', 6),
   ('Service & Support',    'SVC', '#0EA5E9', 7),
-  ('Finance',              'FIN', '#B3261E', 8),
+  ('Accounts',             'ACC', '#B3261E', 8),
   ('HR & Admin',           'HRA', '#8A94A0', 9),
   ('IT',                   'IT',  '#5A6672', 10)
 on conflict (name) do nothing;

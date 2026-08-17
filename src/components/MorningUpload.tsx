@@ -119,13 +119,15 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
       <div className="p-4 max-w-3xl mx-auto">
         <div className="mb-3 flex items-baseline justify-between flex-wrap gap-2">
           <h2 className="text-lg font-bold" style={{ color: "#16232F" }}>
-            Today&apos;s {NUMWORD[dailyTotal] || dailyTotal} files
+            {rows.length === dailyTotal
+              ? `Today's ${NUMWORD[dailyTotal] || dailyTotal} files`
+              : `The ${NUMWORD[rows.length] || rows.length} morning files`}
           </h2>
           <span
             className="text-sm font-semibold"
             style={{ color: dailyTotal > 0 && loadedCount === dailyTotal ? "#0D7A3F" : "#8A94A0" }}
           >
-            {loadedCount}/{dailyTotal} loaded {date && `· ${date}`}
+            {loadedCount}/{dailyTotal} daily loaded{date && ` · ${date.split("-").reverse().join("-")}`}
           </span>
         </div>
 

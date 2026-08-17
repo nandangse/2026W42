@@ -20,23 +20,24 @@ export const addDays = (iso: string, n: number): string =>
 export const diffDays = (a: string, b: string): number =>
   Math.round((parseISO(b).getTime() - parseISO(a).getTime()) / DAY);
 
-export const fmt = (iso: string | null): string =>
-  iso
-    ? parseISO(iso).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        timeZone: "UTC",
-      })
-    : "—";
-export const fmtFull = (iso: string | null): string =>
-  iso
-    ? parseISO(iso).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "2-digit",
-        timeZone: "UTC",
-      })
-    : "—";
+/**
+ * Dates read dd-mm-yyyy across the whole suite. One format, everywhere, so a
+ * date is never ambiguous between the app, the ERP and a printed report —
+ * 03-04-2026 is 3 April, not 4 March, wherever you see it.
+ *
+ * fmt() drops the year for compactness inside a table that is already scoped
+ * to a period; fmtFull() always carries it.
+ */
+export const fmt = (iso: string | null): string => {
+  if (!iso) return "—";
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return `${d}-${m}`;
+};
+export const fmtFull = (iso: string | null): string => {
+  if (!iso) return "—";
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return `${d}-${m}-${y}`;
+};
 export const lakh = (v: number): string =>
   v >= 10000000
     ? (v / 10000000).toFixed(2) + " Cr"
@@ -155,6 +156,6 @@ export const TASK_CATS = [
 export const ESC_LEVELS = [
   "None",
   "L1 — Supervisor",
-  "L2 — Production Head",
+  "L2 — Leaders",
   "L3 — Management",
 ];

@@ -124,6 +124,32 @@ function pickDeliveryDateHeader(hdr: string[]): string | null {
   );
 }
 
+/**
+ * Impossible calendar dates that came out of the ERP, e.g. 31/11/2024.
+ * Keyed by the corrected ISO date so the upload summary can list them.
+ * Reset per parse by parseUpload().
+ */
+export const dateFixes: { raw: string; fixed: string }[] = [];
+
+/** Days in a month, leap years included. */
+const daysIn = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+
+/**
+ * Clamp a day-of-month that cannot exist onto the last real day of that month.
+ *
+ * 31/11/2024 is not a date. Dropping it loses a real delivery; passing it
+ * through gives Postgres "2024-11-31" and the whole upload fails on one bad
+ * cell. Both are worse than recording 30/11/2024 and saying so — the day is
+ * wrong by one, the month and year are certainly right, and the correction is
+ * reported rather than silent.
+ */
+function clampDay(y: number, m: number, d: number): { iso: string; fixed: boolean } {
+  const max = daysIn(y, m);
+  const day = Math.min(Math.max(d, 1), max);
+  const iso = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  return { iso, fixed: day !== d };
+}
+
 export const ser2iso = (v: Cell): string | null => {
   if (v == null || v === "") return null;
   if (v instanceof Date) return v.toISOString().slice(0, 10);
@@ -134,10 +160,17 @@ export const ser2iso = (v: Cell): string | null => {
       .slice(0, 10);
   const sv = String(v).trim();
   let m = sv.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return m[0];
+  if (m) {
+    const c = clampDay(Number(m[1]), Number(m[2]), Number(m[3]));
+    if (c.fixed) dateFixes.push({ raw: sv, fixed: c.iso });
+    return c.iso;
+  }
   m = sv.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/); // dd/mm/yyyy
-  if (m)
-    return m[3] + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0");
+  if (m) {
+    const c = clampDay(Number(m[3]), Number(m[2]), Number(m[1]));
+    if (c.fixed) dateFixes.push({ raw: sv, fixed: c.iso });
+    return c.iso;
+  }
   const d = new Date(String(v));
   return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 };
@@ -208,6 +241,7 @@ function isDeliveredSheet(
  * one layer from retiring all 105 live jobs. The slot removes the guess.
  */
 export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
+  dateFixes.length = 0; // per-parse, so one upload's corrections are its own
   const out: ParseResult = {};
   const declaredDelivered = slot === "delivered";
   for (const name of wb.SheetNames) {

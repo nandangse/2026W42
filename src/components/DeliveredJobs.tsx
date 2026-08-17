@@ -457,7 +457,7 @@ function JobTable({ rows, V }: { rows: DeliveredJob[]; V: (n: number) => string 
           <thead>
             <tr style={{ color: C.mute, borderBottom: `1px solid ${C.line}` }}>
               {[
-                ["DELIVERED", ""], ["TAG", ""], ["CUSTOMER", ""], ["FAMILY", ""],
+                ["DELIVERED", ""], ["JOB NO", "The ERP job number"], ["TAG", ""], ["CUSTOMER", ""], ["FAMILY", ""],
                 ["STARTED", "Actual start date — the denominator of OTD %"],
                 ["OTD DATE", "The date promised to the customer"],
                 ["DELAY DAYS", "Actual Delivery Date − OTD Date. Negative is early."],
@@ -465,7 +465,7 @@ function JobTable({ rows, V }: { rows: DeliveredJob[]; V: (n: number) => string 
                 ["VALUE", ""], ["THROUGHPUT", ""],
               ].map(([h, tip], i) => (
                 <th key={h} title={tip || undefined}
-                  className={`px-2 py-2 ${i >= 6 ? "text-right" : "text-left"}`}
+                  className={`px-2 py-2 ${i >= 7 ? "text-right" : "text-left"}`}
                   style={{ ...TH, cursor: tip ? "help" : undefined }}>
                   {h}{tip ? " ⓘ" : ""}
                 </th>
@@ -480,7 +480,8 @@ function JobTable({ rows, V }: { rows: DeliveredJob[]; V: (n: number) => string 
               return (
                 <tr key={j.id} style={{ borderBottom: `1px solid ${C.line}` }}>
                   <td className="px-2 py-1.5 tnum font-semibold" style={{ ...TD, color: C.ink }}>{fmt(j.delivered_on)}</td>
-                  <td className="px-2 py-1.5" style={{ ...TD, color: C.body }}>{j.tag || j.id}</td>
+                  <td className="px-2 py-1.5 tnum" style={{ ...TD, color: C.sub }}>{j.id}</td>
+                  <td className="px-2 py-1.5" style={{ ...TD, color: C.body }}>{j.tag || "—"}</td>
                   <td className="px-2 py-1.5 truncate" style={{ ...TD, color: C.sub, maxWidth: 210 }}>{j.cust}</td>
                   <td className="px-2 py-1.5" style={{ ...TD, color: C.sub }}>{j.fam || "—"}</td>
                   <td className="px-2 py-1.5 tnum" style={{ ...TD, color: C.faint }}>{fmt(j.start_date)}</td>
@@ -503,7 +504,7 @@ function JobTable({ rows, V }: { rows: DeliveredJob[]; V: (n: number) => string 
               );
             })}
             {sorted.length === 0 && (
-              <tr><td colSpan={10} className="px-3 py-6 text-center" style={{ ...TD, color: C.mute }}>Nothing delivered in this period.</td></tr>
+              <tr><td colSpan={11} className="px-3 py-6 text-center" style={{ ...TD, color: C.mute }}>Nothing delivered in this period.</td></tr>
             )}
           </tbody>
         </table>

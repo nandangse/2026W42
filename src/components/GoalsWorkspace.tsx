@@ -164,6 +164,20 @@ export default function GoalsWorkspace() {
 
   const companyRoots = rootsOf("company");
   const deptRoots = rootsOf("department", (i) => !deptFilter || i.dept_id === deptFilter);
+  // A goal or sub-goal ASSIGNED to a department belongs on this tab whatever
+  // scope it was created under — otherwise a company goal handed to Production
+  // is invisible to Production, which is the opposite of the point. Roots of
+  // scope 'department' are already above, so they are not repeated here.
+  const deptAssigned = Object.values(items)
+    .filter(
+      (i) =>
+        i.assignee_type === "department" &&
+        i.dept_id &&
+        (!deptFilter || i.dept_id === deptFilter) &&
+        !(i.scope === "department" && !i.parent_id),
+    )
+    .sort((a, b) => (a.due_date || "9999").localeCompare(b.due_date || "9999"))
+    .map((i) => i.id);
   const personalRoots = rootsOf("personal", (i) => i.assignee_id === me.id);
   // Anything from the OTHER tabs that landed on me — my list should be my
   // whole list. Personal-scope items are excluded outright: they already
@@ -326,8 +340,37 @@ export default function GoalsWorkspace() {
       )}
 
       {tab === "department" && (
-        <TreeList ctx={ctx} roots={deptRoots}
-          empty={deptFilter ? "Nothing for this department yet." : "No departmental goals yet."} />
+        <>
+          <TreeList ctx={ctx} roots={deptRoots}
+            empty={deptFilter ? "No goals were created directly for this department." : "No departmental goals yet."} />
+          {deptAssigned.length > 0 && (
+            <>
+              <div className="text-xs font-bold mt-5 mb-1.5" style={{ color: C.mute, letterSpacing: 1.1 }}>
+                ASSIGNED TO A DEPARTMENT FROM ELSEWHERE
+              </div>
+              <div className="rounded-lg border bg-white" style={{ borderColor: C.line, overflow: "hidden" }}>
+                <TreeHead />
+                {deptAssigned.map((id, i) => {
+                  const n = ctx.items[id];
+                  return (
+                    <div key={id}>
+                      <div className="px-3 pt-1.5" style={{ borderTop: i === 0 ? "none" : `1px solid ${C.line}` }}>
+                        <Chip color={C.navy} bg="#DCE8F5">{SCOPE_LABEL[n.scope]}</Chip>
+                        <span style={{ marginLeft: 6 }}>
+                          <Chip color={ctx.deptById.get(n.dept_id || "")?.color || C.navy}
+                            bg={(ctx.deptById.get(n.dept_id || "")?.color || C.navy) + "1A"}>
+                            {ctx.deptById.get(n.dept_id || "")?.name}
+                          </Chip>
+                        </span>
+                      </div>
+                      <Row ctx={ctx} id={id} depth={0} first />
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </>
       )}
 
       {tab === "mine" && (

@@ -37,6 +37,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.0.1.1",
+    date: "2026-08-18",
+    module: "Header · Admin · Goals · Morning Update",
+    items: [
+      "Dates read dd-mm-yyyy everywhere. One format across the app, the ERP and anything printed, so 03-04-2026 is 3 April wherever you see it.",
+      "An impossible date in an upload is corrected rather than dropped or crashed on. 31/11/2024 becomes 30/11/2024 — the last real day of that month — and the upload summary lists every one it moved. Before this, such a date reached the database as “2024-11-31” and would have failed the whole upload on one bad cell.",
+      "Departments corrected: Supply Chain is Purchase, Finance is Accounts. Needs migration 0021.",
+      "A goal or sub-goal assigned to a department now appears under Departmental Goals whatever tab it was created on — a company goal handed to Production was invisible to Production.",
+      "Escalation L2 is now Leaders (was Production Head).",
+      "The header shows Last Updated — when the Jobmaster export last landed — instead of a morning-file counter.",
+      "Admin, Morning Update and Update to ERP have moved out of the tab bar and into the menu behind your initials, top right. Each is shown only to those entitled to it, so the tab bar is now the same four boards for everyone.",
+      "Morning Update counts the files that are actually there, and its daily counter says so explicitly.",
+      "Delivered Jobs: the job number is now a column of its own, beside the tag.",
+    ],
+  },
+  {
     v: "3.0.1.0",
     date: "2026-08-18",
     module: "Delivered Jobs",

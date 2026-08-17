@@ -522,14 +522,14 @@ export default function PlanningSuite({
     ...(salesAccess ? ([["sales", "💼 Sales Genie"]] as [typeof workspace, string][]) : []),
   ];
   // Sub-nav inside the Planning Suite workspace only.
+  // Admin, Morning Update and Update to ERP have moved into the account menu
+  // (top right, behind the initials). They are tools for the few rather than
+  // places everyone visits, and each is gated on the right to use it.
   const SUITE_TAB_DEFS: [typeof tab, string][] = [
     ["home", "🏠 My Week"],
     ["delivery", "Job Delivery Board"],
     ["load", "Load Board"],
     ["plan", "Job Plan"],
-    ["erp", `Update to ERP${queued ? " (" + queued + ")" : ""}`],
-    // admins get the uploader's page too, so they can load the morning files
-    ...(isAdmin ? ([["upload", "🌅 Morning Update"], ["admin", "Admin ⚙"]] as [typeof tab, string][]) : []),
   ];
 
   return (
@@ -564,8 +564,13 @@ export default function PlanningSuite({
                 👁 Read-only
               </span>
             )}
-            <span className="text-xs rounded px-2 py-1.5 font-bold" style={{ background: "#0D161F", color: loadedCount === 3 ? "#7BC67E" : "#8FA1B3", border: "1px solid #22303C" }}>
-              🌅 Morning update {loadedCount}/3
+            {/* What matters at a glance is how fresh the data is, not how many
+                files landed — the upload count belongs on Morning Update, which
+                now lives in the account menu. */}
+            <span className="text-xs rounded px-2 py-1.5 font-bold"
+              style={{ background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }}
+              title="When the Jobmaster export was last loaded into Genie">
+              🕒 Last Updated {stamp(board.lastUpdated)}
             </span>
             {/* bell renders only once the notifications table exists */}
             {notifs?.installed && (
@@ -685,6 +690,34 @@ export default function PlanningSuite({
                         ⬆ Upload Excel
                       </button>
                     )}
+                    {canEdit && (
+                      <button
+                        onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("erp"); }}
+                        className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
+                        style={{ color: "#16232F", borderBottom: "1px solid #EEECE6" }}
+                        title="Changes waiting to be pushed back to the ERP"
+                      >
+                        ↗ Update to ERP{queued ? ` (${queued})` : ""}
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button
+                        onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("upload"); }}
+                        className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
+                        style={{ color: "#16232F" }}
+                      >
+                        🌅 Morning Update {loadedCount}/3
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button
+                        onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("admin"); }}
+                        className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
+                        style={{ color: "#16232F", borderBottom: "1px solid #EEECE6" }}
+                      >
+                        ⚙ Admin
+                      </button>
+                    )}
                     <button
                       onClick={() => { setUserOpen(false); setProfileOpen(true); }}
                       className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
@@ -766,7 +799,7 @@ export default function PlanningSuite({
           <span style={{ color: "#F5B32B" }}>
             Data: {board.jobs.length} active jobs · kitting {board.aggregates.kittingPct.toFixed(1)}%
           </span>
-          <span style={{ color: "#8FA1B3" }} title="When the morning files were last uploaded">🕒 Files as of {stamp(board.lastUpdated)}</span>
+
         </div>
       </div>
 
