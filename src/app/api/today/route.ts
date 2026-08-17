@@ -6,14 +6,25 @@ import { today as todayISO } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 
+/** Prefix on the grouping name, so "By Goals" says which list a goal came from. */
+const SCOPE_TAG: Record<string, string> = {
+  company: "🏛 ", rock: "🪨 ", department: "🏢 ", personal: "🎯 ",
+};
+/** Shown in the Category column of My Week. */
+const KIND_CAT: Record<string, string> = {
+  goal: "Goal", subgoal: "Sub goal", initiative: "Initiative",
+};
+
 /**
  * GET /api/today — one list of what a person owes today, drawn from BOTH layers:
- *   · goal tactics / key results whose start date has arrived   (source: "goal")
+ *   · goal work assigned to them whose start date has arrived   (source: "goal")
  *   · ERP and manual tasks assigned to them                     (source: "task")
  *
- * This is deliberately available to everyone, with no goal grant required: tree
- * visibility and own-work visibility are separate checks, so a person always
- * reaches their own work even when the cascade is hidden from them.
+ * This is deliberately available to everyone, with no goal grant required:
+ * seeing the goal tree and seeing your own work are separate checks, so a
+ * person always reaches their own work even when the tree is hidden from them.
+ * That is also why the band marking is not applied here — a goal hidden from
+ * your band but ASSIGNED TO YOU is still yours to do.
  */
 export async function GET() {
   try {
@@ -29,18 +40,16 @@ export async function GET() {
         .map((s) => String(s).toLowerCase()),
     );
 
-    // The goals layer is optional: if migration 0010 has not been applied, the
+    // The goals layer is optional: if migration 0019 has not been applied, the
     // task side of this list must still work rather than 500 the landing page.
     const goalsPromise = (async () => {
       try {
-        const ids = await ownedNodeIds(admin, user.id);
         const { data, error } = await admin
-          .from("goal_node")
-          .select("id, what, node_type, status, start_date, end_date, original_end, push_count, goal_id")
-          .in("node_type", ["tactic", "key_result"])
+          .from("goal_item")
+          .select("id, title, kind, status, start_date, due_date, original_due, push_count, root_id")
+          .eq("assignee_id", user.id)
           .neq("status", "done")
-          .lte("start_date", T)
-          .in("id", ids);
+          .lte("start_date", T);
         if (error) return [];
         return data || [];
       } catch {
@@ -54,16 +63,16 @@ export async function GET() {
       db.from("manual_tasks").select("id, job_id, title, who, due, cat, esc, done").eq("done", false),
     ]);
 
-    // Name of the root goal each item hangs off — Tasking's "By Goals" view
-    // groups on it, and a bare uuid is no use to anyone reading a board.
+    // Name of the goal each item hangs off — Tasking's "By Goals" view groups
+    // on it, and a bare uuid is no use to anyone reading a board.
     const goalNames: Record<string, string> = {};
-    const rootIds = [...new Set(goalData.map((g: any) => g.goal_id).filter(Boolean))] as string[];
+    const rootIds = [...new Set(goalData.map((g: any) => g.root_id).filter(Boolean))] as string[];
     if (rootIds.length) {
       try {
-        const { data } = await admin.from("goal_node").select("id, what, goal_num").in("id", rootIds);
+        const { data } = await admin.from("goal_item").select("id, title, scope").in("id", rootIds);
         for (const g of data || [])
-          goalNames[g.id as string] = `${g.goal_num ? "G" + g.goal_num + " · " : ""}${g.what || "Goal"}`;
-      } catch { /* pre-0010: no goals layer, names stay empty */ }
+          goalNames[g.id as string] = `${SCOPE_TAG[g.scope as string] ?? ""}${g.title || "Goal"}`;
+      } catch { /* pre-0019: no goals layer, names stay empty */ }
     }
 
     if (erpRows.error) throw new Error(erpRows.error.message);
@@ -75,20 +84,20 @@ export async function GET() {
       ...goalData.map((g: any) => ({
         source: "goal" as const,
         id: g.id,
-        kind: g.node_type,
-        title: g.what,
+        kind: g.kind,
+        title: g.title,
         job_id: null as string | null,
-        due: g.end_date,
-        originalDue: g.original_end,
+        due: g.due_date,
+        originalDue: g.original_due,
         pushCount: g.push_count ?? 0,
         carriedDays: g.start_date
           ? Math.max(0, Math.round((Date.parse(T) - Date.parse(g.start_date)) / 86400000))
           : 0,
-        cat: g.node_type === "key_result" ? "Key result" : "Tactic",
-        goalId: (g.goal_id ?? null) as string | null,
-        goalName: (g.goal_id && goalNames[g.goal_id]) || "Unlinked goal work",
+        cat: KIND_CAT[g.kind as string] ?? "Goal",
+        goalId: (g.root_id ?? null) as string | null,
+        goalName: (g.root_id && goalNames[g.root_id]) || "Unlinked goal work",
         esc: null as string | null,
-        late: !!(g.original_end || g.end_date) && (g.original_end || g.end_date)! < T,
+        late: !!(g.original_due || g.due_date) && (g.original_due || g.due_date)! < T,
       })),
       ...[...(erpRows.data || []).map((t) => ({ ...t, k: "erp" as const })),
           ...(manualRows.data || []).map((t) => ({ ...t, k: "manual" as const }))]
@@ -124,12 +133,4 @@ export async function GET() {
   } catch (e) {
     return errJson(e);
   }
-}
-
-async function ownedNodeIds(admin: ReturnType<typeof adminClient>, personId: string) {
-  const { data, error } = await admin.from("goal_node_owner").select("node_id").eq("person_id", personId);
-  if (error) return ["00000000-0000-0000-0000-000000000000"];
-  const ids = (data || []).map((r) => r.node_id as string);
-  // .in() with an empty array matches nothing, which is the behaviour we want
-  return ids.length ? ids : ["00000000-0000-0000-0000-000000000000"];
 }

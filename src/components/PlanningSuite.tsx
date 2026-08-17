@@ -30,7 +30,7 @@ import {
   type PlanMilestone,
 } from "@/lib/schedule";
 import QuoteOfDay from "./QuoteOfDay";
-import GoalsBoard from "./GoalsBoard";
+import GoalsWorkspace from "./GoalsWorkspace";
 import MorningUpload from "./MorningUpload";
 import SalesGenie from "./SalesGenie";
 
@@ -784,7 +784,7 @@ export default function PlanningSuite({
           still refreshes after each edit. */}
       {goalsVisited && (
         <div style={{ display: workspace === "goals" ? undefined : "none" }}>
-          <GoalsBoard canEditPlanning={canEdit} />
+          <GoalsWorkspace />
         </div>
       )}
       {workspace === "delivered" && (
@@ -1026,8 +1026,8 @@ function MyWeek({
   // who hold a goals grant. Showing goal items to someone whose Goals tab is
   // hidden read as an inconsistency ("why can I see this but not open it"), so
   // the whole card follows the same grant as the workspace. Trade-off, made
-  // deliberately: a person with tactics assigned but no grant won't see them
-  // anywhere — if someone is expected to work goal tactics, give them View.
+  // deliberately: a person with goal work assigned but no grant won't see it
+  // anywhere — if someone is expected to work goals, give them View.
   const [goalItems, setGoalItems] = useState<TodayItem[]>([]);
   useEffect(() => {
     if (!goalsAccess) { setGoalItems([]); return; }
@@ -3233,7 +3233,7 @@ function GroupedTasks({
     if (!goalItems.length)
       return (
         <div className="bg-white rounded-lg border p-6 text-center text-sm" style={{ borderColor: "#E2E0DA", color: "#8A94A0" }}>
-          No open goal work is assigned to you. Key results and tactics you own appear here once their start date arrives — the tree itself lives in the Goals workspace.
+          No open goal work is assigned to you. Goals, sub goals and initiatives with your name on appear here once their start date arrives — the tree itself lives in the Goals workspace.
         </div>
       );
     const byGoal = new Map<string, TodayItem[]>();
@@ -3244,7 +3244,7 @@ function GroupedTasks({
     return (
       <div className="space-y-3">
         <div className="text-xs" style={{ color: "#8A94A0" }}>
-          Your own key results and tactics, grouped by goal. The Show filters above apply to jobs tasks — goal work is always your own.
+          Your own goals, sub goals and initiatives, grouped by the goal they hang off. The Show filters above apply to jobs tasks — goal work is always your own.
         </div>
         {[...byGoal.entries()].map(([goal, items]) => (
           <GroupBlock key={goal} label={goal} count={items.length} color="#7C3AED">
@@ -4268,7 +4268,7 @@ function Admin({
           🎯 Goals access <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— who can open the goal tree</span>
         </div>
         <div className="text-xs mb-3 rounded p-2" style={{ background: "#F4F2EC", color: "#5A6672", lineHeight: 1.5 }}>
-          Access is <b>granted, not automatic</b>. Someone with <b>no access</b> still sees the tactics assigned to
+          Access is <b>granted, not automatic</b>. Someone with <b>no access</b> still sees the goal work assigned to
           them on <b>My Week</b> — seeing the tree and seeing your own work are separate checks, so removing access
           never hides a person&apos;s own to-do list.
         </div>
