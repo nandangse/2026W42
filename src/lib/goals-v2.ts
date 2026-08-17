@@ -19,7 +19,15 @@ export type Kind = "goal" | "subgoal" | "initiative";
 export type GoalStatus = "not_started" | "on_track" | "at_risk" | "blocked" | "done";
 export type AssigneeType = "person" | "department";
 
-/** The six tabs, in the order they cascade below the Goals header. */
+/**
+ * The tabs, in the order they cascade below the Goals header: from what the
+ * company is trying to do, down to what lands on you, then out to the people
+ * under you.
+ *
+ * The last two appear only for someone with a team — see hasTeam() in
+ * src/lib/team.ts. A "Team Goals" tab on an account with no reports is an
+ * empty page that reads as a fault.
+ */
 export const TABS = [
   { key: "company", label: "Company Goals", icon: "🏛" },
   { key: "rocks", label: "Quarterly Rocks", icon: "🪨" },
@@ -27,8 +35,14 @@ export const TABS = [
   { key: "mine", label: "My Goals", icon: "🎯" },
   { key: "kra", label: "My Key Result Areas", icon: "🗝" },
   { key: "kpi", label: "KPIs Relevant to me", icon: "📈" },
+  { key: "idp", label: "My IDP", icon: "🌱" },
+  { key: "team", label: "Team Goals", icon: "👥" },
+  { key: "teamkpi", label: "Team KPIs", icon: "📊" },
 ] as const;
 export type TabKey = (typeof TABS)[number]["key"];
+
+/** Hidden from anyone with nobody reporting up to them. */
+export const TEAM_TABS: TabKey[] = ["team", "teamkpi"];
 
 export const SCOPE_LABEL: Record<Scope, string> = {
   company: "Company goal",
@@ -90,6 +104,9 @@ export interface Person {
   initials: string | null;
   name: string | null;
   department_id: string | null;
+  /** Their manager. The whole org chart is this one column — see src/lib/team.ts. */
+  reports_to: string | null;
+  designation: string | null;
   bands: string[];
 }
 
@@ -191,8 +208,20 @@ export interface Kpi {
 // ---------------------------------------------------------------------------
 /**
  * A row is visible when it is open to all, when the viewer sits in one of its
- * bands, or when it is the viewer's own work. Admins see everything: the bands
- * hide work from the wider company, not from the people running it.
+ * bands, when it is the viewer's own work, or when it belongs to somebody who
+ * reports up to the viewer. Admins see everything: the bands hide work from the
+ * wider company, not from the people running it.
+ *
+ * THE TEAM CLAUSE IS A DELIBERATE WIDENING (3.0.1.8). Until Team Goals existed,
+ * a band-restricted goal on a direct report was invisible to their manager, and
+ * a Team tab built on that rule would have shown a manager less than their team
+ * actually holds — while looking complete. Silently under-showing is the one
+ * failure this section cannot afford, so managing somebody now carries the
+ * right to see what they are accountable for. It does not carry the right to
+ * edit it: that is still editModeFor().
+ *
+ * `team` is the RECURSIVE cascade below the viewer, not their direct reports —
+ * see teamOf() in src/lib/team.ts.
  *
  * Mirrors public.band_visible() in migration 0019. The API is the enforcing
  * copy — it reads with the service client — so if these two ever drift, this
@@ -200,7 +229,7 @@ export interface Kpi {
  */
 export function bandVisible(
   bands: string[] | null | undefined,
-  viewer: { id: string; department_id: string | null; bands: string[]; isAdmin: boolean },
+  viewer: { id: string; department_id: string | null; bands: string[]; isAdmin: boolean; team?: string[] },
   row: { assignee_id?: string | null; dept_id?: string | null; owner_id?: string | null; person_id?: string | null },
 ): boolean {
   if (viewer.isAdmin) return true;
@@ -211,6 +240,12 @@ export function bandVisible(
   if (row.owner_id && row.owner_id === viewer.id) return true;
   if (row.person_id && row.person_id === viewer.id) return true;
   if (row.dept_id && viewer.department_id && row.dept_id === viewer.department_id) return true;
+  const team = viewer.team;
+  if (team && team.length) {
+    if (row.assignee_id && team.includes(row.assignee_id)) return true;
+    if (row.owner_id && team.includes(row.owner_id)) return true;
+    if (row.person_id && team.includes(row.person_id)) return true;
+  }
   return false;
 }
 

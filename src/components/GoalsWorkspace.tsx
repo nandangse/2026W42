@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import {
-  TABS, STATUS_META, STATUS_ORDER, KIND_LABEL, SCOPE_LABEL, CHILD_KINDS, QUARTERS,
+  TABS, TEAM_TABS, STATUS_META, STATUS_ORDER, KIND_LABEL, SCOPE_LABEL, CHILD_KINDS, QUARTERS,
   completionOf, rollupOf, metricPct, hasMetrics, kpiPct, branchIds, descendants,
   countBelow, isLate, assigneeLabel, editModeFor,
   type TabKey, type GoalItem, type ItemMap, type Kind, type Scope, type GoalStatus, type EditMode,
@@ -155,6 +155,12 @@ export default function GoalsWorkspace() {
   const peopleById = new Map(people.map((p) => [p.id, p]));
   const deptById = new Map(departments.map((d) => [d.id, d]));
 
+  // Everyone below me in reports_to, walked recursively on the server — direct
+  // reports first, then theirs. Empty for anyone with nobody under them, which
+  // is what hides the two Team tabs.
+  const team = data.team || [];
+  const hasTeam = team.length > 0;
+
   // ---- which roots belong to which tab ------------------------------------
   const rootsOf = (scope: Scope, filter?: (i: GoalItem) => boolean) =>
     Object.values(items)
@@ -238,15 +244,20 @@ export default function GoalsWorkspace() {
         )}
       </div>
 
-      {/* ===== the six tabs, cascading below the header ===== */}
+      {/* ===== the tabs, cascading below the header =====
+          The two Team tabs are dropped for anyone with nobody reporting to
+          them: an empty tab reads as a fault, not as "you have no team". */}
       <div className="flex gap-1 rounded p-1 mb-1 overflow-x-auto" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
-        {TABS.map((t) => {
+        {TABS.filter((t) => hasTeam || !TEAM_TABS.includes(t.key)).map((t) => {
           const on = tab === t.key;
           return (
             <button key={t.key} onClick={() => setTab(t.key)}
               className="px-3 py-1.5 rounded text-xs font-bold whitespace-nowrap flex-shrink-0"
               style={on ? { background: C.body, color: "#fff" } : { color: C.sub }}>
               <span style={{ marginRight: 5 }}>{t.icon}</span>{t.label}
+              {TEAM_TABS.includes(t.key) && (
+                <span className="tnum" style={{ marginLeft: 5, opacity: 0.65, fontWeight: 600 }}>{team.length}</span>
+              )}
             </button>
           );
         })}
@@ -379,6 +390,9 @@ export default function GoalsWorkspace() {
 
       {tab === "kra" && <KraTab ctx={ctx} onEdit={setEditing} />}
       {tab === "kpi" && <KpiTab ctx={ctx} onEdit={setEditing} />}
+      {tab === "idp" && <IdpTab ctx={ctx} />}
+      {tab === "team" && <TeamGoalsTab ctx={ctx} />}
+      {tab === "teamkpi" && <TeamKpisTab ctx={ctx} onEdit={setEditing} />}
 
       {editing && <Editor ctx={ctx} target={editing} onClose={() => setEditing(null)} />}
       {setupOpen && <Setup ctx={ctx} onClose={() => setSetupOpen(false)} />}
@@ -393,6 +407,9 @@ const TAB_NOTE: Record<TabKey, string> = {
   mine: "Goals you set for yourself, plus everything from anywhere else that carries your name.",
   kra: "The standing areas your role is answerable for. Assigned by an admin; the goals you hold against each one show underneath.",
   kpi: "Measures that reach you — ones you own, your department's, ones you watch, and any measuring a goal of yours.",
+  idp: "Your Individual Development Plan — what you are growing into, rather than what you are delivering this quarter.",
+  team: "Everyone who reports up to you, however many levels down — and what each of them is carrying. Read only: their goals stay theirs to move.",
+  teamkpi: "What your team is answerable for: every key result area beneath you, and every KPI somebody under you owns.",
 };
 
 // ===========================================================================
@@ -733,12 +750,323 @@ function Stat({ label, value, note, color = C.ink }: { label: string; value: str
 }
 
 // ===========================================================================
+// My IDP — the tab, ahead of the thing
+// ===========================================================================
+/**
+ * Deliberately empty.
+ *
+ * The tab is here so the shape of the section is settled and the IDP has a
+ * home to appear in. What an IDP LINE actually is has not been decided — a
+ * skill, a competency rated now and rated wanted, a course, a development
+ * action with a date — and each answer is a different table. Building one on a
+ * guess would mean migrating away from it, so the page says what it is waiting
+ * for instead of pretending to be half-built.
+ *
+ * The plumbing it needs already exists: the person picker below is exactly the
+ * one Team Goals uses, and it is shown live so the cascade can be checked
+ * before there is anything to put in it.
+ */
+function IdpTab({ ctx }: { ctx: Ctx }) {
+  const me = ctx.data.me;
+  const team = ctx.data.team || [];
+  const [who, setWho] = useState<string>(me.id);
+  const p = ctx.peopleById.get(who);
+
+  return (
+    <>
+      {team.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap mb-3">
+          <span className="text-xs font-bold" style={{ color: C.mute }}>WHOSE PLAN</span>
+          <select value={who} onChange={(e) => setWho(e.target.value)}
+            className="text-xs border rounded px-2 py-1 bg-white font-bold" style={{ borderColor: C.line, color: C.body }}>
+            <option value={me.id}>{me.name || "Me"} (me)</option>
+            {team.map((m) => {
+              const q = ctx.peopleById.get(m.id);
+              return (
+                <option key={m.id} value={m.id}>
+                  {"— ".repeat(m.depth - 1)}{q?.name || q?.email || m.id}
+                </option>
+              );
+            })}
+          </select>
+          <span className="text-xs" style={{ color: C.faint }}>
+            your own, plus everyone cascaded below you
+          </span>
+        </div>
+      )}
+
+      <div className="rounded-lg border bg-white p-6" style={{ borderColor: C.line, maxWidth: 720 }}>
+        <div className="font-bold text-sm mb-2" style={{ color: C.ink }}>
+          {who === me.id ? "Your development plan" : `${p?.name || p?.email}'s development plan`} isn&apos;t built yet
+        </div>
+        <p className="text-sm mb-3" style={{ color: C.sub, lineHeight: 1.6 }}>
+          An IDP is the one part of this section that is not about this quarter&apos;s delivery. It is what somebody is
+          growing into — and it is worth getting the shape of it right rather than fast.
+        </p>
+        <p className="text-sm" style={{ color: C.sub, lineHeight: 1.6 }}>
+          Four things decide the table it needs, and none of them have been settled: whether a line is a{" "}
+          <b>skill, a competency rated now and rated wanted, a course, or an action with a date</b>; whether the{" "}
+          <b>person or their manager</b> writes it; whether it is <b>reviewed on a cycle</b> and whether the last one is
+          kept; and whether it <b>rolls up</b> to anything or is purely a record of a conversation. Answer those and this
+          page is a short job — the person picker above already walks the whole line below you.
+        </p>
+      </div>
+    </>
+  );
+}
+
+// ===========================================================================
+// Team Goals — the cascade below you
+// ===========================================================================
+/**
+ * A manager's read of their whole line, not just the people one step down.
+ *
+ * The thing this tab exists to show is not the total. It is WHO IS CARRYING
+ * NOTHING. A team average of 64% looks healthy right up until you notice three
+ * of the eleven hold no goal at all, and every per-person block is printed —
+ * including the empty ones — precisely so that cannot hide inside an average.
+ */
+function TeamGoalsTab({ ctx }: { ctx: Ctx }) {
+  const team = ctx.data.team || [];
+  const [who, setWho] = useState<string>("");
+  const [depthCap, setDepthCap] = useState(0); // 0 = the whole cascade
+
+  const shown = team.filter((m) => (!who || m.id === who) && (!depthCap || m.depth <= depthCap));
+  const maxDepth = team.reduce((d, m) => Math.max(d, m.depth), 0);
+
+  // Everything assigned to somebody in the team, filed under them. Nested items
+  // are included: a manager cares that an initiative three levels down the goal
+  // tree has their supervisor's name on it.
+  const byPerson = new Map<string, string[]>();
+  for (const i of Object.values(ctx.items)) {
+    if (!i.assignee_id) continue;
+    const list = byPerson.get(i.assignee_id);
+    if (list) list.push(i.id);
+    else byPerson.set(i.assignee_id, [i.id]);
+  }
+  for (const list of byPerson.values())
+    list.sort((a, b) => (ctx.items[a].due_date || "9999").localeCompare(ctx.items[b].due_date || "9999"));
+
+  const idsFor = (personId: string) => byPerson.get(personId) || [];
+  const all = shown.flatMap((m) => idsFor(m.id));
+  const avg = all.length ? all.reduce((s, id) => s + completionOf(ctx.items, id).pct, 0) / all.length : 0;
+  const overdue = all.filter((id) => isLate(ctx.items[id], TODAY)).length;
+  const empty = shown.filter((m) => idsFor(m.id).length === 0).length;
+
+  return (
+    <>
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <span className="text-xs font-bold" style={{ color: C.mute }}>SHOWING</span>
+        <select value={who} onChange={(e) => setWho(e.target.value)}
+          className="text-xs border rounded px-2 py-1 bg-white font-bold" style={{ borderColor: C.line, color: C.body }}>
+          <option value="">Everyone below me ({team.length})</option>
+          {team.map((m) => {
+            const p = ctx.peopleById.get(m.id);
+            return (
+              <option key={m.id} value={m.id}>
+                {"— ".repeat(m.depth - 1)}{p?.name || p?.email || m.id}
+              </option>
+            );
+          })}
+        </select>
+        {maxDepth > 1 && !who && (
+          <>
+            <span className="text-xs" style={{ color: C.mute }}>levels</span>
+            {[0, ...Array.from({ length: maxDepth }, (_, i) => i + 1)].map((d) => (
+              <button key={d} onClick={() => setDepthCap(d)} className="text-xs font-bold rounded px-2 py-1"
+                style={depthCap === d
+                  ? { background: C.body, color: "#fff" }
+                  : { background: "#fff", border: `1px solid ${C.line}`, color: C.sub }}
+                title={d === 0 ? "The whole cascade, however deep" : d === 1 ? "Direct reports only" : `Down to ${d} levels below you`}>
+                {d === 0 ? "All" : d === 1 ? "Direct" : `+${d}`}
+              </button>
+            ))}
+          </>
+        )}
+      </div>
+
+      <div className="flex gap-2 flex-wrap mb-3">
+        <Stat label="In the team" value={String(shown.length)} note={maxDepth > 1 ? `across ${maxDepth} levels below you` : "all reporting directly to you"} />
+        <Stat label="Goals held" value={String(all.length)} note="goals, sub-goals and initiatives on their names" />
+        <Stat label="Average completion" value={`${Math.round(avg)}%`} note="across everything the team holds" color={C.accent} />
+        <Stat label="Past their date" value={String(overdue)} note="measured against the first date promised" color={overdue ? C.red : C.green} />
+        <Stat label="Holding nothing" value={String(empty)} note="nobody's name is on a goal" color={empty ? C.amber : C.green} />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {shown.map((m) => {
+          const p = ctx.peopleById.get(m.id);
+          const ids = idsFor(m.id);
+          const mgr = m.manager === ctx.data.me.id ? null : ctx.peopleById.get(m.manager);
+          const pct = ids.length ? ids.reduce((s, id) => s + completionOf(ctx.items, id).pct, 0) / ids.length : null;
+          const late = ids.filter((id) => isLate(ctx.items[id], TODAY)).length;
+          const dept = p?.department_id ? ctx.deptById.get(p.department_id) : null;
+
+          return (
+            <div key={m.id} className="rounded-lg border bg-white" style={{ borderColor: C.line, overflow: "hidden" }}>
+              <div className="flex items-center gap-2 flex-wrap px-3 py-2" style={{ background: C.panel }}>
+                {/* indented by depth, so the org chart is readable down the page */}
+                <span style={{ width: (m.depth - 1) * 14 }} />
+                <Avatar text={p?.initials || (p?.name || p?.email || "?").slice(0, 2).toUpperCase()} />
+                <span className="font-bold text-sm" style={{ color: C.ink }}>{p?.name || p?.email || "Unknown"}</span>
+                {p?.designation && <span className="text-xs" style={{ color: C.sub }}>{p.designation}</span>}
+                {dept && <Chip color={dept.color} bg={dept.color + "1A"}>{dept.name}</Chip>}
+                {mgr && <Chip title="Not a direct report — they sit under this person">via {mgr.name || mgr.email}</Chip>}
+                <div className="flex-1" style={{ minWidth: 10 }} />
+                {late > 0 && <Chip color={C.red} bg="#FBEDEA">{late} past date</Chip>}
+                {pct == null ? (
+                  <span className="text-xs font-bold" style={{ color: C.amber }}>no goals</span>
+                ) : (
+                  <>
+                    <span className="text-xs" style={{ color: C.mute }}>{ids.length} item{ids.length === 1 ? "" : "s"}</span>
+                    <span className="tnum font-bold" style={{ fontSize: 17, color: C.accent }}>{Math.round(pct)}%</span>
+                    <div style={{ width: 90 }}><Bar pct={pct} color={C.accent} h={7} /></div>
+                  </>
+                )}
+              </div>
+              {ids.length === 0 ? (
+                <div className="px-3 py-3 text-xs" style={{ color: C.mute, lineHeight: 1.5 }}>
+                  Nothing carries their name this period — no company, rock, departmental or personal goal. Worth a
+                  conversation before the quarter closes rather than after it.
+                </div>
+              ) : (
+                <>
+                  <TreeHead />
+                  {ids.map((id) => (
+                    <div key={id}>
+                      <div className="px-3 pt-1.5">
+                        <Chip color={C.navy} bg="#DCE8F5">{SCOPE_LABEL[ctx.items[id].scope]}</Chip>
+                      </div>
+                      <Row ctx={ctx} id={id} depth={0} first />
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+// ===========================================================================
+// Team KPIs — every KRA and KPI beneath you
+// ===========================================================================
+function TeamKpisTab({ ctx, onEdit }: { ctx: Ctx; onEdit: (t: EditTarget) => void }) {
+  const team = ctx.data.team || [];
+  const teamIds = new Set(team.map((m) => m.id));
+
+  const krasFor = (personId: string) =>
+    ctx.data.kras.filter((k) => k.person_id === personId).sort((a, b) => a.sort_order - b.sort_order);
+  // A KRA reads whatever the goals filed under it read — the same rule as the
+  // personal tab, so a manager and their report see the same number.
+  const pctForKra = (kraId: string): number | null => {
+    const g = Object.values(ctx.items).filter((i) => i.kra_id === kraId);
+    if (!g.length) return null;
+    return g.reduce((s, i) => s + completionOf(ctx.items, i.id).pct, 0) / g.length;
+  };
+
+  const teamKpis = ctx.data.kpis.filter((k) => k.owner_id && teamIds.has(k.owner_id));
+  const kraCount = team.reduce((s, m) => s + krasFor(m.id).length, 0);
+  const noKra = team.filter((m) => krasFor(m.id).length === 0).length;
+
+  return (
+    <>
+      <div className="flex gap-2 flex-wrap mb-3">
+        <Stat label="In the team" value={String(team.length)} note="everyone reporting up to you" />
+        <Stat label="Key result areas" value={String(kraCount)} note="the standing shape of their roles" />
+        <Stat label="Nobody's KRAs set" value={String(noKra)} note="people with no areas defined yet" color={noKra ? C.amber : C.green} />
+        <Stat label="KPIs owned below you" value={String(teamKpis.length)} note="measures somebody under you answers for" color={C.accent} />
+      </div>
+
+      <div className="text-xs font-bold mb-1.5" style={{ color: C.mute, letterSpacing: 1.1 }}>
+        KEY RESULT AREAS ACROSS THE TEAM
+      </div>
+      <div className="flex flex-col gap-2 mb-5">
+        {team.map((m) => {
+          const p = ctx.peopleById.get(m.id);
+          const list = krasFor(m.id);
+          const total = list.reduce((s, k) => s + (k.weight || 1), 0);
+          return (
+            <div key={m.id} className="rounded-lg border bg-white p-3" style={{ borderColor: C.line }}>
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span style={{ width: (m.depth - 1) * 14 }} />
+                <Avatar text={p?.initials || (p?.name || p?.email || "?").slice(0, 2).toUpperCase()} />
+                <span className="font-bold text-sm" style={{ color: C.ink }}>{p?.name || p?.email || "Unknown"}</span>
+                {p?.designation && <span className="text-xs" style={{ color: C.sub }}>{p.designation}</span>}
+                <div className="flex-1" style={{ minWidth: 10 }} />
+                {ctx.data.me.isAdmin && (
+                  <button onClick={() => onEdit({ mode: "kra", assignee_id: m.id })}
+                    className="text-xs font-bold rounded px-2 py-1" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.sub }}>
+                    + KRA
+                  </button>
+                )}
+              </div>
+              {list.length === 0 ? (
+                <div className="text-xs" style={{ color: C.mute, lineHeight: 1.5 }}>
+                  No key result areas set. Until there are, there is nothing describing what the role is answerable for
+                  between one quarter&apos;s goals and the next.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {list.map((k) => {
+                    const pct = pctForKra(k.id);
+                    const share = total ? ((k.weight || 1) / total) * 100 : 0;
+                    return (
+                      <div key={k.id} className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-semibold" style={{ color: C.body, flex: 1, minWidth: 200 }}>{k.title}</span>
+                        <Chip title="This area's share of their role">{Math.round(share)}%</Chip>
+                        <div style={{ width: 110 }}>
+                          {pct == null
+                            ? <span className="text-xs" style={{ color: C.faint }}>no goals filed</span>
+                            : <Bar pct={pct} color={C.accent} h={7} />}
+                        </div>
+                        <span className="tnum text-xs font-bold" style={{ width: 34, textAlign: "right", color: pct == null ? C.faint : C.accent }}>
+                          {pct == null ? "—" : `${Math.round(pct)}%`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="text-xs font-bold mb-1.5" style={{ color: C.mute, letterSpacing: 1.1 }}>
+        KPIs OWNED IN THE TEAM
+      </div>
+      {teamKpis.length === 0 ? (
+        <div className="rounded-lg border bg-white p-6 text-center text-sm" style={{ borderColor: C.line, color: C.mute }}>
+          Nobody below you owns a KPI yet. A KPI needs an owner to be anybody&apos;s to move — set one on the KPI itself.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {teamKpis.map((k) => <KpiCard key={k.id} ctx={ctx} kpi={k} onEdit={onEdit} />)}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ===========================================================================
 // My Key Result Areas
 // ===========================================================================
 function KraTab({ ctx, onEdit }: { ctx: Ctx; onEdit: (t: EditTarget) => void }) {
   const me = ctx.data.me;
   const [who, setWho] = useState<string>(me.id);
   const canManage = me.isAdmin;
+  // The picker is for anyone who has somebody to look at: an admin gets the
+  // whole company, a manager gets themselves plus their cascade, and everyone
+  // else gets no picker at all rather than a dropdown of one.
+  const team = ctx.data.team || [];
+  const pickable: { id: string; depth: number }[] = canManage
+    ? ctx.data.people.map((p) => ({ id: p.id, depth: 0 }))
+    : team.length
+      ? [{ id: me.id, depth: 0 }, ...team.map((m) => ({ id: m.id, depth: m.depth }))]
+      : [];
   const list = ctx.data.kras.filter((k) => k.person_id === who).sort((a, b) => a.sort_order - b.sort_order);
   const totalWeight = list.reduce((s, k) => s + (k.weight || 1), 0);
 
@@ -759,14 +1087,19 @@ function KraTab({ ctx, onEdit }: { ctx: Ctx; onEdit: (t: EditTarget) => void }) 
   return (
     <>
       <div className="flex items-center gap-2 flex-wrap mb-3">
-        {canManage && (
+        {pickable.length > 1 && (
           <>
             <span className="text-xs font-bold" style={{ color: C.mute }}>SHOWING</span>
             <select value={who} onChange={(e) => setWho(e.target.value)}
               className="text-xs border rounded px-2 py-1 bg-white font-bold" style={{ borderColor: C.line, color: C.body }}>
-              {ctx.data.people.map((p) => (
-                <option key={p.id} value={p.id}>{p.name || p.email}{p.id === me.id ? " (me)" : ""}</option>
-              ))}
+              {pickable.map(({ id, depth }) => {
+                const p = ctx.peopleById.get(id);
+                return (
+                  <option key={id} value={id}>
+                    {"— ".repeat(depth)}{p?.name || p?.email || id}{id === me.id ? " (me)" : ""}
+                  </option>
+                );
+              })}
             </select>
           </>
         )}

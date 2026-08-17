@@ -132,6 +132,23 @@ const SLOT_NAME: Record<string, string> = {
   employees: "Employee Master",
 };
 
+/**
+ * Is this a delimited text file rather than a workbook?
+ *
+ * The extension first, because that is what the person meant. Then the bytes,
+ * because a file renamed to .xlsx is still a CSV and refusing it on a
+ * technicality helps nobody: every real spreadsheet format this app accepts is
+ * a ZIP (xlsx, "PK") or an OLE compound file (xls), and neither can begin with
+ * printable text.
+ */
+function isTextTable(filename: string, bytes: Uint8Array): boolean {
+  if (/\.(csv|tsv|txt)$/i.test(filename)) return true;
+  if (!bytes.length) return false;
+  const zip = bytes[0] === 0x50 && bytes[1] === 0x4b; // "PK" — xlsx
+  const ole = bytes[0] === 0xd0 && bytes[1] === 0xcf; // xls
+  return !zip && !ole;
+}
+
 export async function applyUpload(
   admin: SupabaseClient,
   fileBuf: ArrayBuffer,
@@ -142,9 +159,27 @@ export async function applyUpload(
 ): Promise<UploadSummary> {
   let wb: XLSX.WorkBook;
   try {
-    // normalise to a byte array so both ArrayBuffer (route handler) and
-    // Uint8Array (acceptance test) inputs read identically.
-    wb = XLSX.read(new Uint8Array(fileBuf), { type: "array" });
+    const bytes = new Uint8Array(fileBuf);
+    if (isTextTable(filename, bytes)) {
+      // CSV / TSV. Decoded and read as text rather than handed to the binary
+      // reader: sniffing bytes gets a comma-separated file wrong often enough
+      // to matter, and the HR master arrives as a CSV as often as a workbook.
+      // The BOM Excel writes on "CSV UTF-8" export would otherwise become part
+      // of the first header name, so the first column silently stops matching.
+      const text = new TextDecoder("utf-8").decode(bytes).replace(/^﻿/, "");
+      // raw: true keeps every cell as the text the file actually holds.
+      //
+      // Without it the CSV reader converts anything date-shaped ITSELF, in
+      // American month-first order: "08/07/1948" comes back as 7 August, and
+      // "01/04/1990" as 4 January. This whole suite reads dd-mm-yyyy — that is
+      // the rule 3.0.1.1 settled — so the dates have to reach ser2iso as the
+      // strings they were written as, and be read there, once, day first.
+      wb = XLSX.read(text, { type: "string", raw: true });
+    } else {
+      // normalise to a byte array so both ArrayBuffer (route handler) and
+      // Uint8Array (acceptance test) inputs read identically.
+      wb = XLSX.read(bytes, { type: "array" });
+    }
   } catch (e) {
     throw new UploadError(
       "Could not read the file: " + (e instanceof Error ? e.message : String(e)),

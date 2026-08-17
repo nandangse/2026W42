@@ -204,7 +204,7 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
                     fileRefs.current[r.key] = el;
                   }}
                   type="file"
-                  accept=".xlsx,.xls"
+                  accept=".xlsx,.xls,.csv"
                   style={{ display: "none" }}
                   onChange={(e) => onFile(r.key, e.target.files?.[0] || null)}
                 />

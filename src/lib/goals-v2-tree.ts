@@ -13,6 +13,7 @@ import {
   type Person, type Rock,
 } from "./goals-v2";
 import { resolveMetrics, METRICS } from "./goal-metrics";
+import { teamOf, type TeamMember } from "./team";
 
 export const DEFAULT_PERIOD = "FY2026-27";
 
@@ -24,6 +25,12 @@ export interface Viewer {
   bands: string[];
   initials: string | null;
   name: string | null;
+  /**
+   * Everyone below this viewer in reports_to, walked recursively — ids only,
+   * so it can sit inside bandVisible(). The ordered version with depth is
+   * `team` on the payload.
+   */
+  teamIds: string[];
 }
 
 export interface GoalsPayload {
@@ -35,6 +42,8 @@ export interface GoalsPayload {
   items: ItemMap;
   kras: Kra[];
   kpis: Kpi[];
+  /** The viewer's cascade, direct reports first. Empty for anyone with no team. */
+  team: TeamMember[];
   period: string;
   periods: string[];
   /** Live metric feeds a KPI can be wired to. */
@@ -55,7 +64,7 @@ export async function buildGoalsPayload(
     profRes, bandRes, personBandRes, deptRes, rockRes, itemRes, commentRes,
     kraRes, kpiRes, watcherRes, periodRes,
   ] = await Promise.all([
-    admin.from("profiles").select("id,email,initials,display_name,department_id,disabled").order("display_name"),
+    admin.from("profiles").select("id,email,initials,display_name,department_id,designation,reports_to,disabled").order("display_name"),
     admin.from("goal_band").select("code,label,note,sort_order").order("sort_order"),
     admin.from("person_band").select("person_id,band"),
     admin.from("departments").select("id,name,code,color,head_person_id,sort_order,active").order("sort_order"),
@@ -88,8 +97,16 @@ export async function buildGoalsPayload(
       initials: p.initials,
       name: p.display_name,
       department_id: p.department_id ?? null,
+      reports_to: p.reports_to ?? null,
+      designation: p.designation ?? null,
       bands: bandsByPerson.get(p.id) || [],
     }));
+
+  // The cascade below the viewer, walked from the ACTIVE people only — a
+  // disabled account should not carry a live team member up to their manager,
+  // and a disabled manager should not strand their reports halfway up the tree.
+  // (It does strand them, and that is correct: reassign them in Admin.)
+  const team = teamOf(people, opts.viewerId);
 
   const meRow = (profRes.data || []).find((p) => p.id === opts.viewerId);
   const me: Viewer = {
@@ -100,7 +117,11 @@ export async function buildGoalsPayload(
     bands: bandsByPerson.get(opts.viewerId) || [],
     initials: meRow?.initials ?? null,
     name: meRow?.display_name ?? null,
+    teamIds: team.map((m) => m.id),
   };
+  // bandVisible() reads `team`; Viewer names it teamIds so the payload can
+  // carry the ordered walk under `team` without the two colliding.
+  const viewer = { ...me, team: me.teamIds };
 
   const departments: Department[] = (deptRes.data || [])
     .filter((d) => d.active !== false)
@@ -196,7 +217,7 @@ export async function buildGoalsPayload(
     guard.add(id);
     const it = raw[id];
     if (!it) return false;
-    const own = bandVisible(it.bands, me, { assignee_id: it.assignee_id, dept_id: it.dept_id });
+    const own = bandVisible(it.bands, viewer, { assignee_id: it.assignee_id, dept_id: it.dept_id });
     const ok = own && (!it.parent_id || !raw[it.parent_id] || isVisible(it.parent_id, guard));
     visible.set(id, ok);
     return ok;
@@ -211,7 +232,7 @@ export async function buildGoalsPayload(
 
   // ---- rocks, KRAs and KPIs the caller may see ----
   const rocks: Rock[] = (rockRes.data || [])
-    .filter((r) => bandVisible(arr(r.bands), me, { owner_id: r.owner_id, dept_id: r.dept_id }))
+    .filter((r) => bandVisible(arr(r.bands), viewer, { owner_id: r.owner_id, dept_id: r.dept_id }))
     .map((r) => ({
       id: r.id, name: r.name, detail: r.detail || "", quarter: r.quarter, period: r.period,
       owner_id: r.owner_id, dept_id: r.dept_id, start_date: r.start_date, due_date: r.due_date,
@@ -219,9 +240,12 @@ export async function buildGoalsPayload(
     }));
 
   // KRAs are personal. Admins and goal editors get everyone's so they can be
-  // assigned; everyone else gets only their own.
+  // assigned; a manager gets their whole cascade, because "what is this person
+  // answerable for" is the first question a manager has and the Team KPIs tab
+  // is where it gets answered; everyone else gets only their own.
+  const teamSet = new Set(me.teamIds);
   const kras: Kra[] = (kraRes.data || [])
-    .filter((k) => me.isAdmin || me.canEdit || k.person_id === me.id)
+    .filter((k) => me.isAdmin || me.canEdit || k.person_id === me.id || teamSet.has(k.person_id))
     .map((k) => ({
       id: k.id, person_id: k.person_id, dept_id: k.dept_id, title: k.title,
       detail: k.detail || "", weight: Number(k.weight ?? 1), sort_order: k.sort_order ?? 0,
@@ -235,7 +259,7 @@ export async function buildGoalsPayload(
       .map((i) => i.kpi_id as string),
   );
   const kpis: Kpi[] = allKpis
-    .filter((k) => bandVisible(k.bands, me, { owner_id: k.owner_id, dept_id: k.dept_id }))
+    .filter((k) => bandVisible(k.bands, viewer, { owner_id: k.owner_id, dept_id: k.dept_id }))
     .map((k) => ({
       ...k,
       why:
@@ -243,6 +267,7 @@ export async function buildGoalsPayload(
         : k.watchers.includes(me.id) ? "You were added as a watcher"
         : k.dept_id && k.dept_id === me.department_id ? "Your department's KPI"
         : myGoalKpis.has(k.id) ? "A goal assigned to you is measured by it"
+        : k.owner_id && teamSet.has(k.owner_id) ? "Owned by someone in your team"
         : "Open to everyone",
     }));
 
@@ -260,6 +285,7 @@ export async function buildGoalsPayload(
     items,
     kras,
     kpis,
+    team,
     period,
     periods,
     metrics: METRICS.map(({ key, label, unitHint, describe }) => ({ key, label, unitHint, describe })),

@@ -151,29 +151,84 @@ function clampDay(y: number, m: number, d: number): { iso: string; fixed: boolea
   return { iso, fixed: day !== d };
 }
 
+/**
+ * The window a date somebody typed can possibly fall in. Anything outside it
+ * is a misread, not a date, and is returned as null.
+ */
+const MIN_YEAR = 1900;
+const MAX_YEAR = 2100;
+
+/**
+ * yyyy-mm-dd from a Date, WITHOUT toISOString().
+ *
+ * toISOString() prints any year outside 0000–9999 in expanded form —
+ * "+017722-01-01T00:00:00Z" — and slicing that to ten characters gives
+ * "+017722-01", which Postgres rejects with "time zone displacement out of
+ * range". That is exactly how the first Employee Master upload died.
+ *
+ * Local components, not UTC ones: the only way a Date reaches here is from
+ * SheetJS, which builds them at LOCAL midnight. Reading those back in UTC
+ * moves every date in the file back a day for anyone east of Greenwich, which
+ * is all of India.
+ */
+function isoOf(d: Date): string | null {
+  if (isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  if (y < MIN_YEAR || y > MAX_YEAR) return null;
+  return `${y}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Two-digit years, pivoted at 30. A sheet writing "80" means 1980 and "05"
+ * means 2005 — for a date of birth the first is the only sane reading, and for
+ * a delivery date the second is. 30 splits them where nobody is affected: an
+ * employee born in 2029 does not work here yet.
+ */
+const fullYear = (yy: number) => (yy >= 100 ? yy : yy >= 30 ? 1900 + yy : 2000 + yy);
+
 export const ser2iso = (v: Cell): string | null => {
   if (v == null || v === "") return null;
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (v instanceof Date) return isoOf(v);
   const n = Number(v);
-  if (!isNaN(n) && n > 40000 && n < 60000)
-    return new Date(Date.UTC(1899, 11, 30) + n * 86400000)
-      .toISOString()
-      .slice(0, 10);
+  // Excel serials, counted from 1899-12-30.
+  //
+  // The old window was 40000–60000 — June 2009 to 2064. That covers every date
+  // a JOB can carry and NOT ONE a person can be born on: July 1948 is serial
+  // 17722, and it fell straight through to new Date("17722"), which JavaScript
+  // reads as the year 17722. Widened to the whole plausible human span.
+  //
+  // The floor is 2200 (Sept 1906) and it is deliberately ABOVE 2100, so a bare
+  // year sitting in a date column — "2024" — is refused rather than quietly
+  // read as a day in 1905. The price is that a birthday before September 1906
+  // cannot be entered as a serial. Nobody that age works here.
+  if (!isNaN(n) && String(v).trim() !== "" && n >= 2200 && n <= 80000)
+    return isoOf(new Date(Date.UTC(1899, 11, 30) + n * 86400000));
   const sv = String(v).trim();
-  let m = sv.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  let m = sv.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (m) {
     const c = clampDay(Number(m[1]), Number(m[2]), Number(m[3]));
     if (c.fixed) dateFixes.push({ raw: sv, fixed: c.iso });
     return c.iso;
   }
-  m = sv.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/); // dd/mm/yyyy
+  m = sv.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/); // dd/mm/yyyy, dd-mm-yy
   if (m) {
-    const c = clampDay(Number(m[3]), Number(m[2]), Number(m[1]));
+    const y = fullYear(Number(m[3]));
+    if (y < MIN_YEAR || y > MAX_YEAR) return null;
+    const c = clampDay(y, Number(m[2]), Number(m[1]));
     if (c.fixed) dateFixes.push({ raw: sv, fixed: c.iso });
     return c.iso;
   }
-  const d = new Date(String(v));
-  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  // A cell that is nothing but digits and did not land in the serial window is
+  // not a date, and new Date() must not be asked its opinion: it reads "1" as
+  // 1 Jan 2001 and "1998" as 1 Jan 1998. A year with no month or day is not a
+  // birthday anybody can be wished, and inventing the 1st of January for it
+  // would fill the birthday list with people who are not having one. Refused,
+  // and the upload summary's "carry a date of birth" count shows the gap.
+  if (/^\d+$/.test(sv)) return null;
+  // Anything else — "1 Jul 1948", "Jul 1, 1948" — through the engine, then
+  // back through the same year bounds, so no reading of a stray cell can ever
+  // reach the database as a year in five digits again.
+  return isoOf(new Date(sv));
 };
 
 /**

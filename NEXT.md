@@ -1,7 +1,12 @@
 # Genie — outstanding work, with the decisions already made
 
-State at handover: `main` @ 3.0.1.7. Migrations 0021–0024 written; **0021/0022/0023
-sent to Dr Raghu, 0024 not yet sent**. Nothing below is started unless it says so.
+State: `main` @ 3.0.1.10. Migrations 0021–0025 written and **all run on the
+database** (0024 and 0025 applied 18 Aug 2026). Nothing below is started unless
+it says so.
+
+Done so far: **1 (run rate)**, **5 (All Tasks)**, **2 apart from My IDP** (the
+tab exists and is empty by design), and the Employee Master upload now works.
+Left: **My IDP** (blocked on what an IDP holds), **3 My Week**, **4 Calendar**.
 
 Paste migrations ONE file at a time, ASCII-only, comments stripped — a long paste
 truncates in transport and Postgres then fails on a half-statement. Use
@@ -9,42 +14,79 @@ truncates in transport and Postgres then fails on a half-statement. Use
 
 ---
 
-## 1. Targets and Required Run Rate  ← do this first
+## 1. Targets and Required Run Rate  ✅ DONE in 3.0.1.8
 
-**Decided by Dr Raghu:** targets are **FY-wide, this financial year**. **Editable by
-raghu@nandan.co.in only**; everyone else sees them as fixed.
+Built as specified: FY-wide targets, owner-only editing, the card on both the Job
+Delivery Board and Delivered Jobs.
 
-    Sales target       ₹100 Cr
-    Throughput target  ₹40 Cr
+    supabase/migrations/0025_fy_targets.sql   ← NOT YET SENT to Dr Raghu
+    src/lib/run-rate.ts                       the arithmetic, pure
+    src/app/api/run-rate/route.ts             GET targets+actuals · POST owner-only
+    src/components/RunRate.tsx                the shared card
+    PlanningSuite.tsx                         Admin → Targets form
 
-Needs a migration (`fy_target` table or two rows on `app_settings`: period, sales
-target, throughput target, updated_by).
+**Until 0025 is run the card hides itself** — `/api/run-rate` returns
+`installed:false` rather than an error, so neither board breaks. Admin → Targets
+is what tells you it hasn't been run; it names the file.
 
-Show on **both** the Job Delivery Board and Delivered Jobs:
+Notes for whoever touches it next:
 
-    Required Run Rate
-    Sales Billing: ₹x in y days (₹M Cr per month)
-    Throughput:    ₹a in b days (₹N Cr per month)
+- The target is what we *said* (`fy_targets`); the actual is what *went out of the
+  door* (`delivered_jobs`). Jobs on the board are neither. Billing is dated on
+  delivery, so a delivery banked without a date is missing from the totals — the
+  card counts those and says so under the figures rather than folding them in.
+- Ahead/behind is coloured against the **pace**, not the target. 40% of the year's
+  target in month five is on track; colouring it red would make the card cry wolf
+  from April. Amber at 95% of pace, red below.
+- The FY rolls over on its own — `runRate()` derives it from today's date. With no
+  row for the new year the card says "no target set" instead of carrying the old
+  one forward. Someone has to add the FY2027-28 row on 1 April 2027.
+- Targets are typed in **crore** in Admin and stored in **rupees**, like every
+  other value in the suite.
+- Straight-line pace only. If a month-by-month plan ever gets set, `expected` in
+  `src/lib/run-rate.ts` is the one line that changes.
 
-And YTD as a % **against days elapsed in the FY**, plus what *should* have been
-billed by today — i.e. `target × (days elapsed ÷ 365)` — so ahead/behind is
-visible rather than just a total. `src/lib/delivered.ts` already has `fyStart`,
-`dayCount` and the totals; this is mostly a new card plus one admin form.
+## 2. Goals — Team Goals ✅, Team KPIs ✅, My IDP ⏳
 
-## 2. Goals — My IDP, Team Goals, Team KPIs
+Done in 3.0.1.9: **Team Goals** and **Team KPIs**. No migration needed.
 
-Three new tabs in `GoalsWorkspace.tsx` (`TABS` in `src/lib/goals-v2.ts`).
+    src/lib/team.ts            the recursive reports_to walk — SHARED, use it
+    goals-v2.ts                TABS + TEAM_TABS + the team clause in bandVisible
+    goals-v2-tree.ts           walks the team, widens KRAs, ships payload.team
+    GoalsWorkspace.tsx         TeamGoalsTab, TeamKpisTab, wider KRA picker
 
-- **Team** = everyone below you in `profiles.reports_to`, walked **recursively**,
-  not just direct reports. Write that walk once and share it.
-- **Team Goals** — the cascade of goals assigned to anyone in your team.
-- **Team KPIs** — same for `kpi`, so a manager sees every KRA and KPI beneath them.
-- **My IDP** — a new concept. Individual Development Plan per person; the dropdown
-  lists your own plus everyone cascaded below you, "a great way to check up on the
-  IDP". Needs its own table.
+`teamOf()` is breadth-first, cycle-safe, and excludes the root. Tested against a
+three-level org, a reports-to cycle and a self-report. **Tasking's "people
+reporting to me" filter still uses DIRECT reports only** (`board.ts`) — moving it
+onto `teamOf()` is a one-line change, but it silently widens an existing filter,
+so it wants Dr Raghu's word first.
+
+⚠️ **A visibility rule changed.** Managing somebody now lets you SEE their goals,
+KRAs and KPIs even when band-restricted (Management / Stratcom / LC) — not edit
+them. Without it the Team tabs would show a manager less than their team holds
+while looking complete. It is one clause in `bandVisible()` and one line in the
+KRA filter if it has to come out.
+
+### Still outstanding: My IDP — the tab exists, empty on purpose
+
+`IdpTab` in `GoalsWorkspace.tsx`. The person picker is live and walks the whole
+cascade; there is nothing to put in it yet, and the page says so.
+
+**Nobody has said what an IDP holds, and each answer is a different table.**
+Before writing one, get from Dr Raghu:
+
+- what a single IDP line IS — a skill? a course? a competency with a rating now
+  and a rating wanted? a development action with a date?
+- who writes it — the person, their manager, or both
+- whether it is reviewed on a cycle (annual? quarterly?) and whether last cycle's
+  plan is kept
+- whether it rolls up to anything, or is purely a conversation record
+
+The plumbing it needs already exists: `payload.team` carries the cascade, and
+`src/lib/team.ts` has the dropdown helper (`meAndTeam`).
 
 `profiles.department_id` and `designation` are populated from Admin → Users as of
-3.0.1.2, so the grouping data exists.
+3.0.1.2, and both are now on the Goals payload.
 
 ## 3. My Week — the first screen anyone sees
 
@@ -73,13 +115,25 @@ In the Planning Suite calendar view:
   table logging (task, old date, new date, who, when). Nothing records this today;
   `push_count` on goals is the nearest precedent.
 
-## 5. Tasking
+## 5. Tasking  ✅ DONE in 3.0.1.9
 
-- **"All Tasks"** button beside the three Show tick-boxes.
+**"All Tasks"** button beside the three Show tick-boxes. Clearing all three has
+always meant "show everything"; the button is that state with a name on it, and
+toggles back to the three.
 
 ---
 
 ## Notes that cost time to learn
+
+- **Excel date serials are not all 40000-ish.** The reader's old window was
+  40000–60000, which is every date a job can carry and none a person can be born
+  on — a 1948 birthday is serial 17722. It fell through to `new Date("17722")`,
+  which JavaScript reads as the YEAR 17722, and `toISOString()` prints that as
+  `+017722-01-01`. Fixed in 3.0.1.10; `ser2iso` now refuses anything outside
+  1900–2100 rather than writing it.
+- **A CSV read by SheetJS gets dates AMERICAN.** `08/07/1948` comes back as
+  7 August unless you pass `raw: true` and parse the strings yourself. Genie is
+  dd-mm-yyyy everywhere, so `applyUpload` reads text tables with `raw: true`.
 
 - `next dev` never finishes compiling on this Google Drive mount. Verify with
   `node node_modules/next/dist/bin/next build`. `.bin` shims are not executable —

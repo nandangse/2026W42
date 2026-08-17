@@ -20,6 +20,7 @@ import {
   type DeliveredJob, type PeriodKey, type Totals, type Bucket,
 } from "@/lib/delivered";
 import { today, fmt, fmtFull, lakh } from "@/lib/schedule";
+import RunRate from "./RunRate";
 
 const TODAY = today();
 
@@ -182,6 +183,13 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
           )}
         </div>
       </div>
+
+      {/* ===== the year against its target =====
+          Sits ABOVE the period controls on purpose: it is always the whole
+          financial year, and putting it under the MTD/QTD chips would suggest
+          it follows them. It ignores the family filter too — the target is
+          for the company, not for a product line. */}
+      <RunRate V={V} />
 
       {/* ===== period controls ===== */}
       <div className="rounded-lg border bg-white p-2.5 mb-3" style={{ borderColor: C.line }}>

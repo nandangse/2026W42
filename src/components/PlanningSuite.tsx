@@ -36,6 +36,7 @@ import GoalsWorkspace from "./GoalsWorkspace";
 import DeliveredJobs from "./DeliveredJobs";
 import MorningUpload from "./MorningUpload";
 import SalesGenie from "./SalesGenie";
+import RunRate from "./RunRate";
 
 // The 32 ERP job-status options (verbatim from V1.9), used by the editable
 // Job Status dropdowns.
@@ -571,7 +572,7 @@ export default function PlanningSuite({
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={(e) => onFile(e.target.files?.[0] || null)} />
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={(e) => onFile(e.target.files?.[0] || null)} />
             {role === "viewer" && (
               <span className="text-xs rounded px-2 py-1.5 font-bold" style={{ background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }} title="Your account is read-only">
                 👁 Read-only
@@ -1502,6 +1503,12 @@ function DeliveryBoard({
         <Card label="KITTING %" value={kitPct + "%"} sub="Σ val × (1−T%) × Kit% ÷ Σ val × (1−T%)" color="#0D9488" />
         <Card label="KITTED MATERIAL VALUE" value={V(kitted)} sub="Σ value × (1 − T%) × Kitting%" color="#7C3AED" />
       </div>
+
+      {/* The cards above are the live pending book — what is still to come.
+          This is the year against its target — what has actually gone out. The
+          two are deliberately adjacent: what is left to bill only means
+          something beside what is left to build. */}
+      <RunRate V={V} />
 
       <div className="flex gap-1 rounded p-1 bg-white border mb-3 flex-wrap" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
         <SubBtn k="priority" l="Priority List (A60 → O)" />
@@ -3050,8 +3057,29 @@ function Tasking({
               {label}
             </label>
           ))}
+          {/* Everybody's tasks, in one click.
+              It was always possible — clearing all three tick-boxes has always
+              read as "show me everything" — but nobody could be expected to
+              guess that, and "nothing ticked" looks like "nothing shown". This
+              is the same state with a name on it. Pressing it again puts the
+              three back, because the way out of a filter has to be as obvious
+              as the way in. */}
+          <button
+            onClick={() => setScope(anyScope ? { mine: false, byMe: false, reports: false } : { mine: true, byMe: true, reports: true })}
+            className="text-xs px-2 py-1.5 rounded border font-semibold"
+            style={anyScope
+              ? { borderColor: "#D9D6CD", background: "#fff", color: "#5A6672" }
+              : { borderColor: "#22303C", background: "#22303C", color: "#fff" }}
+            title={anyScope
+              ? "Everybody's tasks, whoever they are assigned to and whoever raised them"
+              : "Back to your own three views"}
+          >
+            {anyScope ? "All tasks" : "◉ All tasks"}
+          </button>
           {!anyScope && (
-            <span className="text-xs" style={{ color: "#8A94A0" }}>nothing ticked — showing everybody&apos;s tasks</span>
+            <span className="text-xs" style={{ color: "#8A94A0" }}>
+              everybody&apos;s tasks — the three filters above are off
+            </span>
           )}
         </div>
       )}
@@ -4018,6 +4046,46 @@ function Admin({
     finally { setIdBusy(false); }
   };
 
+  // ---- FY targets: owner-only, the numbers the Required Run Rate is measured
+  // against. Typed in crore because that is how they are set and spoken about;
+  // stored in rupees like every other value in the suite, so nothing downstream
+  // has to know about the unit.
+  const CR = 10000000;
+  const [tgt, setTgt] = useState<{ fy: string; sales: string; throughput: string; loaded: boolean; hasTarget: boolean; installed: boolean; updatedBy: string | null }>(
+    { fy: "", sales: "", throughput: "", loaded: false, hasTarget: false, installed: true, updatedBy: null },
+  );
+  const [tgtMsg, setTgtMsg] = useState("");
+  const [tBusy, setTBusy] = useState(false);
+  const loadTargets = useCallback(async () => {
+    try {
+      const r = await api.get("/api/run-rate");
+      setTgt({
+        fy: r.fy || "",
+        sales: r.installed && r.hasTarget ? String(r.targets.sales / CR) : "",
+        throughput: r.installed && r.hasTarget ? String(r.targets.throughput / CR) : "",
+        loaded: true,
+        hasTarget: !!r.hasTarget,
+        installed: !!r.installed,
+        updatedBy: r.updatedBy ?? null,
+      });
+    } catch { setTgt((t) => ({ ...t, loaded: true, installed: false })); }
+  }, []);
+  useEffect(() => { loadTargets(); }, [loadTargets]);
+  const saveTargets = async () => {
+    const s = Number(tgt.sales), t = Number(tgt.throughput);
+    if (!Number.isFinite(s) || !Number.isFinite(t) || s < 0 || t < 0) {
+      setTgtMsg("Both targets must be a number of crore, zero or more.");
+      return;
+    }
+    setTBusy(true); setTgtMsg("");
+    try {
+      await api.post("/api/run-rate", { fy: tgt.fy, sales_target: s * CR, throughput_target: t * CR });
+      await loadTargets();
+      setTgtMsg("Saved ✓ — the Required Run Rate on both boards now reads against this.");
+    } catch (e) { setTgtMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setTBusy(false); }
+  };
+
   // ---- user management (list state lives in the parent so the tab doesn't flicker) ----
   const [uForm, setUForm] = useState({ email: "", pw: "", role: "planner", name: "", initials: "" });
   const [uMsg, setUMsg] = useState("");
@@ -4215,6 +4283,61 @@ function Admin({
           {idMsg && <span className="text-xs font-semibold" style={{ color: idMsg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{idMsg}</span>}
         </div>
       </div>
+
+      {/* ---- financial-year targets ----
+          Shown to every admin, editable by the owner alone. A target the board
+          can quietly edit is not a target; a target nobody can find is not one
+          either, so the others see it and see who set it. */}
+      {tgt.loaded && (
+        <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+          <div className="font-bold text-sm mb-2">
+            Targets · {tgt.fy || "this financial year"}{" "}
+            <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>
+              — what the Required Run Rate on the Job Delivery Board and Delivered Jobs is measured against
+            </span>
+          </div>
+          {!tgt.installed ? (
+            <div className="text-xs" style={{ color: "#D97706", lineHeight: 1.6 }}>
+              Run <code style={{ background: "#F4F2EC", padding: "1px 5px", borderRadius: 3 }}>supabase/migrations/0025_fy_targets.sql</code>{" "}
+              in the Supabase SQL editor, then reload. Until then the run-rate card stays hidden rather than showing a
+              target of zero.
+            </div>
+          ) : (
+            <>
+              <div className="flex gap-4 flex-wrap items-end">
+                <div>
+                  <div className="text-xs font-semibold mb-1" style={{ color: "#8A94A0" }}>Sales target (₹ Cr)</div>
+                  <input value={tgt.sales} onChange={(e) => setTgt({ ...tgt, sales: e.target.value })} disabled={!isOwner}
+                    inputMode="decimal" className="text-xs border rounded px-2 py-1.5 tnum text-right"
+                    style={{ borderColor: "#E2E0DA", width: 110, background: isOwner ? "#fff" : "#F4F2EC" }} />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold mb-1" style={{ color: "#8A94A0" }}>Throughput target (₹ Cr)</div>
+                  <input value={tgt.throughput} onChange={(e) => setTgt({ ...tgt, throughput: e.target.value })} disabled={!isOwner}
+                    inputMode="decimal" className="text-xs border rounded px-2 py-1.5 tnum text-right"
+                    style={{ borderColor: "#E2E0DA", width: 110, background: isOwner ? "#fff" : "#F4F2EC" }} />
+                </div>
+                {isOwner && (
+                  <button onClick={saveTargets} disabled={tBusy} className="text-xs font-bold rounded px-3 py-1.5"
+                    style={{ background: "#E8600A", color: "#fff", opacity: tBusy ? 0.5 : 1 }}>
+                    {tBusy ? "Saving…" : "Save targets"}
+                  </button>
+                )}
+                {tgtMsg && <span className="text-xs font-semibold" style={{ color: tgtMsg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{tgtMsg}</span>}
+              </div>
+              <div className="text-xs mt-2" style={{ color: "#8A94A0", lineHeight: 1.55 }}>
+                {!tgt.hasTarget
+                  ? `No target is set for ${tgt.fy} yet. The run-rate card says so on both boards rather than carrying last year's number forward.`
+                  : <>Whole-year targets, measured against what has actually been <b>delivered</b> since 1 April — a job counts on the day it goes out of the door, not the day it is promised.</>}
+                {" "}
+                {isOwner
+                  ? "You are the only account that can change these."
+                  : <>Only <b>{OWNER_EMAIL}</b> can change these{tgt.updatedBy ? <>; last set by <b>{tgt.updatedBy}</b></> : null}.</>}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ---- users ---- */}
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>

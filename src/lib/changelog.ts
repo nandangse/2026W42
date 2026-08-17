@@ -37,6 +37,49 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.0.1.10",
+    date: "2026-08-18",
+    module: "Morning Update · Goals",
+    items: [
+      "Fixed: the Employee Master upload failed outright with “time zone displacement out of range: +017722–01”. A date of birth in 1948 is held by Excel as the number 17722, and the date reader only recognised numbers between 40000 and 60000 — which is every date a JOB can carry and not one a person can be born on. 17722 fell through and was read as the YEAR 17722.",
+      "The date reader now covers the whole human span, and no reading of any cell can reach the database as a five-digit year again — a date outside 1900–2100 is refused rather than written.",
+      "Two-digit years now work, pivoted at 30: “15/05/80” is 1980 and “15/05/05” is 2005.",
+      "A cell holding only a year is refused rather than turned into the 1st of January. A year is not a birthday anybody can be wished, and inventing one would have filled the birthday list with people who were not having one. The upload summary’s date-of-birth count is what shows the gap.",
+      "CSV files are now accepted anywhere a spreadsheet is — including a file renamed to .xlsx that is really a CSV. The byte-order mark Excel writes on “CSV UTF-8” export is stripped, so the first column no longer silently stops matching.",
+      "Dates in a CSV are read DAY FIRST, as everywhere else in Genie. Left alone the CSV reader converts them itself in American month-first order, which turned 08/07/1948 into 7 August and 01/04/1990 into 4 January.",
+      "New: a My IDP tab in Goals, with the person picker working — your own plan plus everyone cascaded below you. It is deliberately empty: what a single IDP line actually is has not been decided yet, and the page says what it is waiting for rather than guessing at a table it would have to be migrated off.",
+    ],
+  },
+  {
+    v: "3.0.1.9",
+    date: "2026-08-18",
+    module: "Goals · Tasking",
+    items: [
+      "New: Team Goals and Team KPIs, for anyone with people under them. Both tabs are hidden entirely for anyone who has nobody reporting to them — an empty tab reads as a fault rather than as an answer.",
+      "Team means EVERYONE below you, walked down the whole line, not just your direct reports. A head of production now sees their supervisors' teams too, with a Direct / +2 / All switch and a chip showing who somebody sits under when they are not yours directly.",
+      "Team Goals prints a block per person — INCLUDING the people holding nothing. That is the point of the tab: a team average of 64% looks healthy right up until you notice three of the eleven carry no goal at all, and an average is exactly where that hides.",
+      "Team KPIs shows every key result area beneath you with what the goals filed under each one read, and every KPI somebody under you owns. It also counts how many of your people have no KRAs set at all.",
+      "The My Key Result Areas dropdown now works for managers, not only admins: your own, plus everyone cascaded below you.",
+      "A deliberate change to who can see what: managing somebody now lets you see what they are accountable for, even where a goal is marked Management or Stratcom. It does NOT let you edit it — their goals stay theirs to move. Without this the Team tabs would have shown a manager less than their team actually holds while looking complete, and quietly showing less is the one thing this section cannot do.",
+      "Tasking: an All tasks button beside the three Show tick-boxes. Clearing all three has always meant \"show me everything\" — nobody could be expected to guess that, and \"nothing ticked\" looks like \"nothing shown\". Same state, with a name on it, and pressing it again puts the three back.",
+    ],
+  },
+  {
+    v: "3.0.1.8",
+    date: "2026-08-18",
+    module: "Job Delivery Board · Delivered Jobs · Admin",
+    items: [
+      "New: Required Run Rate, on both the Job Delivery Board and Delivered Jobs. It says what is left to bill, in how many days, and at what rate per month — for Sales Billing and for Throughput.",
+      "It answers the question a running total cannot. ₹62 Cr billed against ₹100 Cr is extraordinary in April and a miss in March, so every figure is shown beside the pace the calendar says we should have kept by today: what should have been billed, and how far ahead or behind that leaves us.",
+      "The bar carries both — the fill is where we are, the tick is where the pace says we should be. A fill short of the tick is the whole message.",
+      "Ahead/behind is coloured against the PACE, not against the target. 40% of a year's target in month five is on track; colouring it red would make the card cry wolf from April.",
+      "Targets are whole-year, set in Admin → Targets, and only raghu@nandan.co.in can change them. Every other admin sees them, sees who set them, and cannot edit. FY2026-27 starts at ₹100 Cr sales and ₹40 Cr throughput (migration 0025).",
+      "Billed means delivered — a job counts on the day it went out of the door, not the day it was promised, so jobs still on the board are not in these numbers.",
+      "Deliveries banked without a delivery date cannot be placed in a financial year. They are counted and named under the card rather than folded into the totals, so a percentage that is short says why it is short.",
+      "On 1 April the year rolls over on its own. With no target set for the new year the card says exactly that, rather than carrying the old number forward.",
+    ],
+  },
+  {
     v: "3.0.1.7",
     date: "2026-08-18",
     module: "Tasking · Morning Update",

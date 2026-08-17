@@ -1607,11 +1607,11 @@ insert into public.departments (name, code, color, sort_order) values
   ('Design & Engineering', 'DES', '#1B3A5C', 1),
   ('Production',           'PRD', '#0D7A3F', 2),
   ('Quality',              'QLY', '#0D9488', 3),
-  ('Supply Chain',         'SCM', '#D97706', 4),
+  ('Purchase',             'PUR', '#D97706', 4),
   ('Projects',             'PRJ', '#7C3AED', 5),
   ('Sales & Marketing',    'SLS', '#E8600A', 6),
   ('Service & Support',    'SVC', '#0EA5E9', 7),
-  ('Finance',              'FIN', '#B3261E', 8),
+  ('Accounts',             'ACC', '#B3261E', 8),
   ('HR & Admin',           'HRA', '#8A94A0', 9),
   ('IT',                   'IT',  '#5A6672', 10)
 on conflict (name) do nothing;
@@ -2100,4 +2100,199 @@ alter table public.delivered_jobs enable row level security;
 drop policy if exists delivered_jobs_read on public.delivered_jobs;
 create policy delivered_jobs_read on public.delivered_jobs
   for select using (public.is_reader());
+
+
+-- >>>>> supabase/migrations/0021_department_names.sql
+-- 0021_department_names.sql
+-- The department names are Nandan's, not mine.
+--
+-- 0019 seeded a plausible-looking list. Two of them were invented rather than
+-- observed, and a goal filed under a department that does not exist is worse
+-- than no goal at all — nobody owns it and nobody argues with it.
+--
+--   Supply Chain -> Purchase
+--   Finance      -> Accounts
+--
+-- Renames rather than delete-and-recreate, so the uuid survives and anything
+-- already filed under them keeps its link.
+
+update public.departments set name = 'Purchase', code = 'PUR' where name = 'Supply Chain';
+update public.departments set name = 'Accounts', code = 'ACC' where name = 'Finance';
+
+-- Idempotent: if a fresh 0019 seed ran after this, fix it the same way.
+insert into public.departments (name, code, color, sort_order)
+values ('Purchase', 'PUR', '#D97706', 4), ('Accounts', 'ACC', '#B3261E', 8)
+on conflict (name) do nothing;
+
+
+-- >>>>> supabase/migrations/0022_initials_three.sql
+-- 0022_initials_three.sql
+-- Initials may be two OR three letters, and must still be unique.
+--
+-- Two letters ran out. With enough people the pairs collide, and the initials
+-- are not decoration — they are the key tasks are assigned by and the boards
+-- filter on, so a collision is two people sharing a to-do list.
+--
+-- Uniqueness was already enforced by profiles_initials_key (0008) and is
+-- untouched here; only the length rule changes. Widening a CHECK can never
+-- invalidate an existing row, so this is safe on live data.
+
+alter table public.profiles drop constraint if exists profiles_initials_fmt;
+alter table public.profiles
+  add constraint profiles_initials_fmt
+  check (initials is null or initials ~ '^[A-Z]{2,3}$');
+
+-- Designation and department already exist (0010 and 0019 respectively); they
+-- are surfaced in Admin -> Users from this release, and are what the Goals
+-- cascade and the Team/IDP tabs read.
+comment on column public.profiles.designation is
+  'Job title, e.g. "Head - Works". Shown in Admin -> Users; read by Goals.';
+
+
+-- >>>>> supabase/migrations/0023_escalation_reason.sql
+-- 0023_escalation_reason.sql
+-- An escalation without a reason is just a raised voice.
+--
+-- Escalating a task moves it in front of a supervisor, a leader or the
+-- management group. Whoever it lands on needs to know WHY without having to
+-- chase the person who raised it — otherwise the first thing every escalation
+-- costs is a phone call.
+--
+-- Compulsory in the UI whenever a level above None is chosen. Nullable in the
+-- schema, because every task raised before today has no reason to give and
+-- backfilling one would be inventing it.
+
+alter table public.manual_tasks add column if not exists esc_why text;
+alter table public.erp_tasks    add column if not exists esc_why text;
+
+comment on column public.manual_tasks.esc_why is
+  'Why this was escalated. Required by the UI when esc is above None.';
+comment on column public.erp_tasks.esc_why is
+  'Why this was escalated. Required by the UI when esc is above None.';
+
+
+-- >>>>> supabase/migrations/0024_esc_rename_and_employees.sql
+-- 0024_esc_rename_and_employees.sql
+--
+-- 1. Rename the escalation level on tasks ALREADY raised.
+--
+--    3.0.1.1 changed the dropdown to "L2 - Leaders", but esc is stored as the
+--    literal label, so every task raised before that still holds "L2 -
+--    Production Head" — and By Escalations groups on the stored string, so the
+--    old wording stayed on screen in its own lane. Renaming the option without
+--    rewriting the rows split one level into two.
+--
+-- 2. The employee master, so Genie knows who works here and when their
+--    birthday is. Uploaded from the HR sheet; see src/lib/sources.ts.
+
+-- ---------------------------------------------------------------------------
+-- 1. Escalation labels, everywhere they are stored
+-- ---------------------------------------------------------------------------
+update public.manual_tasks set esc = 'L2 — Leaders' where esc = 'L2 — Production Head';
+update public.erp_tasks    set esc = 'L2 — Leaders' where esc = 'L2 — Production Head';
+
+-- the same field on the brain dump, when that table is present
+do $$
+begin
+  if to_regclass('public.brain_dump') is not null then
+    execute $q$update public.brain_dump set esc = 'L2 — Leaders' where esc = 'L2 — Production Head'$q$;
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 2. Employee master
+-- ---------------------------------------------------------------------------
+create table if not exists public.employees (
+  -- the HR sheet's own employee code where it has one, else a slug of the name
+  id          text primary key,
+  name        text not null,
+  email       text,
+  dob         date,
+  doj         date,
+  department  text,
+  designation text,
+  location    text,
+  active      boolean not null default true,
+  -- Everything else the sheet carried, kept verbatim. The master will grow
+  -- columns over time and re-migrating for each one is how a feed dies; this
+  -- way an added column survives the next upload without a schema change.
+  extra       jsonb not null default '{}'::jsonb,
+  first_seen  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists employees_dob_idx    on public.employees ((extract(month from dob)), (extract(day from dob)));
+create index if not exists employees_active_idx on public.employees (active);
+create index if not exists employees_email_idx  on public.employees (lower(email));
+
+alter table public.employees enable row level security;
+
+-- Birthdays are for everyone; the rest of the master is not sensitive either,
+-- but writing is the owner's alone and goes through the service role.
+drop policy if exists employees_read on public.employees;
+create policy employees_read on public.employees
+  for select using (auth.uid() is not null);
+
+comment on table public.employees is
+  'Active-employee master, uploaded from the HR sheet by the owner. Drives the '
+  'birthday list; extra jsonb carries whatever else the sheet holds.';
+
+
+-- >>>>> supabase/migrations/0025_fy_targets.sql
+-- 0025_fy_targets.sql
+--
+-- The financial-year targets, and nothing else.
+--
+-- Decided by Dr Raghu: targets are FY-wide (not monthly, not quarterly), and
+-- only raghu@nandan.co.in may change them. Everyone else reads them as fixed,
+-- which is the point -- a target the board can edit is not a target.
+--
+-- One row per financial year, keyed by the label the rest of the suite already
+-- uses (fyLabel() in src/lib/delivered.ts -> "FY2026-27"). Keyed by year rather
+-- than a singleton so last year's target survives the roll-over: on 1 April the
+-- app looks up the new FY, finds nothing, and says "no target set" instead of
+-- silently measuring this year against last year's number.
+--
+-- Amounts are plain rupees, like every other value in the suite. 100 Cr is
+-- 1000000000. The UI does the Cr formatting.
+--
+-- Additive and safe to re-run.
+
+create table if not exists public.fy_targets (
+  fy                text primary key,
+  sales_target      numeric not null default 0,
+  throughput_target numeric not null default 0,
+  updated_at        timestamptz not null default now(),
+  updated_by        uuid references public.profiles(id),
+  constraint fy_targets_sales_nonneg      check (sales_target >= 0),
+  constraint fy_targets_throughput_nonneg check (throughput_target >= 0)
+);
+
+-- FY2026-27, as given: sales 100 Cr, throughput 40 Cr.
+-- on conflict do nothing, so re-running never overwrites an edited target.
+insert into public.fy_targets (fy, sales_target, throughput_target)
+values ('FY2026-27', 1000000000, 400000000)
+on conflict (fy) do nothing;
+
+alter table public.fy_targets enable row level security;
+
+-- Everyone signed in reads them: the run-rate card is on the Job Delivery
+-- Board and on Delivered Jobs, which every role can open.
+drop policy if exists fy_targets_read on public.fy_targets;
+create policy fy_targets_read on public.fy_targets
+  for select to authenticated
+  using (true);
+
+-- Only the owner writes. is_owner() is the same helper the goals tier uses
+-- (migration 0011); the API route gates on it too, and this is the backstop
+-- that survives a mistake in application code.
+drop policy if exists fy_targets_write on public.fy_targets;
+create policy fy_targets_write on public.fy_targets
+  for all to authenticated
+  using (public.is_owner())
+  with check (public.is_owner());
+
+comment on table public.fy_targets is
+  'FY-wide sales and throughput targets, one row per financial year. '
+  'Owner-only writes. Drives the Required Run Rate card.';
 
