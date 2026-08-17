@@ -11,7 +11,8 @@ const ROLES: Role[] = ["admin", "planner", "project_owner", "user", "sales", "vi
 function normInitials(v: unknown): string | null {
   const s = String(v ?? "").trim().toUpperCase();
   if (!s) return null;
-  if (!/^[A-Z]{2}$/.test(s)) throw new HttpError(400, "Initials must be exactly two letters (A–Z)");
+  if (!/^[A-Z]{2,3}$/.test(s))
+    throw new HttpError(400, "Initials must be two or three letters (A–Z)");
   return s;
 }
 
@@ -55,7 +56,7 @@ export async function GET() {
     const admin = adminClient();
     const { data, error } = await admin
       .from("profiles")
-      .select("id, email, role, disabled, initials, display_name, erp_owner, reports_to, created_at")
+      .select("id, email, role, disabled, initials, display_name, erp_owner, reports_to, designation, department_id, created_at")
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
 
@@ -67,11 +68,50 @@ export async function GET() {
       for (const g of grants || []) salesIds.add(g.person_id as string);
     } catch { /* pre-0013 */ }
 
+    // Last sign-in lives in auth.users, not profiles, so it comes from the
+    // admin auth API. Failure here must not take the page down — the column
+    // simply reads "—".
+    const lastSeen = new Map<string, string | null>();
+    try {
+      const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      for (const u of list?.users || []) lastSeen.set(u.id, u.last_sign_in_at ?? null);
+    } catch {
+      /* leave the column empty */
+    }
+
+    // Departments, so the picker has names rather than uuids.
+    let departments: { id: string; name: string }[] = [];
+    try {
+      const { data: d } = await admin.from("departments").select("id,name").order("sort_order");
+      departments = d || [];
+    } catch {
+      /* pre-0019 */
+    }
+
+    // Goals access, merged in so it is one row per person rather than two tables
+    const goalGrant = new Map<string, boolean>();
+    try {
+      const { data: g } = await admin.from("goal_access").select("person_id, can_edit");
+      for (const r of g || []) goalGrant.set(r.person_id as string, !!r.can_edit);
+    } catch {
+      /* pre-0010 */
+    }
+
     return NextResponse.json({
+      departments,
       users: (data || []).map((u) => ({
         ...u,
         sales_access: salesIds.has(u.id) || String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         sales_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        last_sign_in_at: lastSeen.get(u.id) ?? null,
+        goals_level:
+          String(u.email || "").toLowerCase() === RAGHU_EMAIL
+            ? "edit"
+            : goalGrant.has(u.id)
+              ? goalGrant.get(u.id)
+                ? "edit"
+                : "view"
+              : "none",
       })),
     });
   } catch (e) {
@@ -189,6 +229,8 @@ export async function POST(req: Request) {
       if ("initials" in body) patch.initials = normInitials(body.initials);
       if ("display_name" in body) patch.display_name = String(body.display_name || "").trim() || null;
       if ("erp_owner" in body) patch.erp_owner = String(body.erp_owner || "").trim() || null;
+      if ("designation" in body) patch.designation = String(body.designation || "").trim() || null;
+      if ("department_id" in body) patch.department_id = body.department_id || null;
       if ("reports_to" in body) {
         // the line manager, which Tasking's "people reporting to me" reads.
         // Nobody reports to themselves — that would make them their own report
@@ -235,6 +277,28 @@ export async function POST(req: Request) {
       });
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true });
+    }
+
+    /**
+     * Send the person a password-reset email.
+     *
+     * Preferred over typing a password for them: the admin never sees or
+     * handles a credential, and the link lands in the account's own inbox.
+     * The "password" action above stays for the case where someone has lost
+     * access to their mail.
+     */
+    if (body.action === "reset_email") {
+      const { data: who } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
+      if (!who?.email) return NextResponse.json({ error: "no such user" }, { status: 404 });
+      const site =
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        req.headers.get("origin") ||
+        "https://genie.nandan.co.in";
+      const { error } = await admin.auth.resetPasswordForEmail(who.email, {
+        redirectTo: `${site}/login`,
+      });
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, email: who.email });
     }
 
     if (body.action === "delete") {

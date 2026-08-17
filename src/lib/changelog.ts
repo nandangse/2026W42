@@ -37,6 +37,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.0.1.2",
+    date: "2026-08-18",
+    module: "Admin · Users",
+    items: [
+      "Admin is now four tabs: Users, Milestones, Settings and Updates.",
+      "Initials may be two OR three letters, still unique across everyone. Two had run out, and initials are not decoration — they are the key tasks are assigned by, so a collision is two people sharing a to-do list. Needs migration 0022.",
+      "Department and Designation are set per person in Admin → Users. Goals reads both.",
+      "“ERP owner name” is now “ERP User” — it is the Planning Owner in Jobmaster, which is the same person as the Project Owner.",
+      "Goals access has moved into the Users table as a column. One row per person instead of the same people listed twice in two places.",
+      "Last seen shows when each account last signed in, so a login nobody uses is visible.",
+      "The Name column stays put while the rest of the table scrolls sideways.",
+      "Send a password-reset email to anyone from Admin. The link goes to their own inbox, so nobody has to hand a password to anybody.",
+    ],
+  },
+  {
     v: "3.0.1.1",
     date: "2026-08-18",
     module: "Header · Admin · Goals · Morning Update",

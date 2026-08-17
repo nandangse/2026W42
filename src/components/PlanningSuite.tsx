@@ -194,6 +194,13 @@ interface AdminUser {
   reports_to: string | null;
   sales_access: boolean;
   sales_implicit: boolean; // the owner — always yes, not toggleable
+  /** Job title and department, read by Goals. */
+  designation: string | null;
+  department_id: string | null;
+  /** From auth.users — null when the account has never signed in. */
+  last_sign_in_at: string | null;
+  /** Goals access, merged in so a person is one row rather than two tables. */
+  goals_level: "none" | "view" | "edit";
 }
 
 const ROLE_OPTIONS: { value: string; label: string; hint: string }[] = [
@@ -412,10 +419,14 @@ export default function PlanningSuite({
   // the list and refetch it — that empty-then-populate cycle was the flicker.
   // null = never loaded yet (show a skeleton); [] = loaded and genuinely empty.
   const [users, setUsers] = useState<AdminUser[] | null>(null);
+  // The department list rides along with the users payload — the picker in
+  // Admin needs names, and it is the same query either way.
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const loadUsers = useCallback(async () => {
     try {
       const r = await api.get("/api/admin/users");
       setUsers(r.users || []);
+      setDepartments(r.departments || []);
     } catch {
       setUsers([]);
     }
@@ -815,7 +826,7 @@ export default function PlanningSuite({
       {workspace === "suite" && tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} />}
       {workspace === "suite" && tab === "upload" && isAdmin && <MorningUpload email={email} embedded />}
-      {workspace === "suite" && tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} isOwner={isRaghu} appSettings={appSettings} loadAppSettings={loadAppSettings} />}
+      {workspace === "suite" && tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} departments={departments} isOwner={isRaghu} appSettings={appSettings} loadAppSettings={loadAppSettings} />}
       {/* Mounted on first visit and then kept (hidden) — the tree is a slow
           payload (auth + 10 queries + live metrics), so re-fetching it on
           every workspace switch made Goals feel sluggish. Its own load()
@@ -3882,10 +3893,25 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
 }
 
 // ============================ Admin ============================
-function AdminTabs({ tab, setTab }: { tab: "setup" | "updates"; setTab: (t: "setup" | "updates") => void }) {
+type AdminTab = "users" | "milestones" | "setup" | "updates";
+
+/**
+ * The Name column stays put while the rest scrolls. With department,
+ * designation, last login and the access columns the table is now wider than
+ * any screen, and a row of settings with no name attached is unreadable.
+ */
+const STICKY_NAME = {
+  position: "sticky" as const,
+  left: 0,
+  background: "#fff",
+  zIndex: 2,
+  boxShadow: "1px 0 0 #EEECE6",
+};
+
+function AdminTabs({ tab, setTab }: { tab: AdminTab; setTab: (t: AdminTab) => void }) {
   return (
     <div className="flex gap-1 rounded p-1 bg-white border" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
-      {([["setup", "⚙ Settings & Users"], ["updates", "🗒 Updates"]] as const).map(([k, l]) => (
+      {([["users", "👥 Users"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["updates", "🗒 Updates"]] as const).map(([k, l]) => (
         <button
           key={k}
           onClick={() => setTab(k)}
@@ -3936,8 +3962,9 @@ function Updates() {
 }
 
 function Admin({
-  board, reload, users, loadUsers, isOwner, appSettings, loadAppSettings,
+  board, reload, users, loadUsers, departments, isOwner, appSettings, loadAppSettings,
 }: {
+  departments: { id: string; name: string }[];
   board: Board; reload: () => Promise<Board | null>; users: AdminUser[] | null; loadUsers: () => Promise<void>; isOwner: boolean;
   appSettings: { app_name: string; theme_name: string }; loadAppSettings: () => void;
 }) {
@@ -3984,7 +4011,7 @@ function Admin({
       await loadUsers();
     } catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
   };
-  const saveProfile = async (id: string, patch: Record<string, string>) => {
+  const saveProfile = async (id: string, patch: Record<string, string | null>) => {
     setUMsg("");
     try { await api.post("/api/admin/users", { action: "profile", id, ...patch }); await loadUsers(); }
     catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
@@ -4037,6 +4064,12 @@ function Admin({
     api.get("/api/admin/goal-access").then((r) => setGaRows(r.users)).catch(() => setGaRows([]));
   }, []);
   useEffect(() => { loadAccess(); }, [loadAccess]);
+  /** Goals access from inside the Users table. Reloads both lists. */
+  const setGoalsLevel = async (id: string, level: string) => {
+    const who = (users ?? []).find((x) => x.id === id);
+    await setAccess(id, level, who?.display_name || who?.email || "user");
+    loadUsers();
+  };
   const setAccess = async (id: string, level: string, who: string) => {
     setGaMsg("");
     try {
@@ -4115,7 +4148,7 @@ function Admin({
   };
 
   // ---- admin sub-tabs: the setup pages, and the release log ----
-  const [adminTab, setAdminTab] = useState<"setup" | "updates">("setup");
+  const [adminTab, setAdminTab] = useState<AdminTab>("users");
 
   if (adminTab === "updates") {
     return (
@@ -4161,7 +4194,7 @@ function Admin({
         <div className="flex gap-1 mb-2 flex-wrap items-center">
           <input placeholder="email" value={uForm.email} onChange={(e) => setUForm({ ...uForm, email: e.target.value })} className="text-xs border rounded px-2 py-1 flex-1" style={{ borderColor: "#E2E0DA", minWidth: 170 }} />
           <input placeholder="full name" value={uForm.name} onChange={(e) => setUForm({ ...uForm, name: e.target.value })} className="text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA", width: 130 }} />
-          <input placeholder="AB" maxLength={2} value={uForm.initials} onChange={(e) => setUForm({ ...uForm, initials: e.target.value.toUpperCase() })} className="text-xs border rounded px-2 py-1 text-center font-bold" style={{ borderColor: "#E2E0DA", width: 52 }} title="Two-letter initials — leave blank to auto-generate" />
+          <input placeholder="ABC" maxLength={3} value={uForm.initials} onChange={(e) => setUForm({ ...uForm, initials: e.target.value.toUpperCase() })} className="text-xs border rounded px-2 py-1 text-center font-bold" style={{ borderColor: "#E2E0DA", width: 52 }} title="Two or three letters — leave blank to auto-generate" />
           <input placeholder="password (min 8)" value={uForm.pw} onChange={(e) => setUForm({ ...uForm, pw: e.target.value })} className="text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA", width: 130 }} />
           <select value={uForm.role} onChange={(e) => setUForm({ ...uForm, role: e.target.value })} className="text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
             {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
@@ -4174,11 +4207,15 @@ function Admin({
           <thead>
             <tr style={{ color: "#8A94A0" }}>
               <th className="text-left py-1 font-semibold">Initials</th>
-              <th className="text-left py-1 font-semibold">Name</th>
+              <th className="text-left py-1 font-semibold" style={STICKY_NAME}>Name</th>
               <th className="text-left py-1 font-semibold">Email</th>
-              <th className="text-left py-1 font-semibold" title="The Project Owner text as it appears in the Jobmaster — links this login to its jobs">ERP owner name</th>
+              <th className="text-left py-1 font-semibold" title="The Planning Owner / Project Owner text as it appears in the Jobmaster — links this login to its jobs">ERP User</th>
+              <th className="text-left py-1 font-semibold" title="Read by Goals — departmental goals, and who a department's head can edit">Department</th>
+              <th className="text-left py-1 font-semibold" title="Job title, shown on Goals and the org view">Designation</th>
               <th className="text-left py-1 font-semibold" title="Their line manager — drives “tasks of people reporting to me” in Nandan Tasking">Reports to</th>
               <th className="text-left py-1 font-semibold" title="Sales Genie access comes with the role now: Sales team, Admins and the owner">Role</th>
+              <th className="text-left py-1 font-semibold" title="Goals access is granted per person, not by role">Goals</th>
+              <th className="text-left py-1 font-semibold" title="When this account last signed in">Last seen</th>
               <th className="text-left py-1 font-semibold">Status</th>
               <th className="text-right py-1 font-semibold">Actions</th>
             </tr>
@@ -4202,20 +4239,20 @@ function Admin({
                 <td className="py-1.5">
                   <input
                     defaultValue={u.initials || ""}
-                    maxLength={2}
+                    maxLength={3}
                     placeholder="—"
                     onBlur={(e) => { const v = e.target.value.toUpperCase(); if (v !== (u.initials || "")) saveProfile(u.id, { initials: v }); }}
                     className="text-xs border rounded px-1 py-0.5 text-center font-bold w-12"
                     style={{ borderColor: u.initials ? "#E2E0DA" : "#E8600A", color: "#E8600A" }}
-                    title="Two letters — press Tab to save"
+                    title="Two or three letters, unique across everyone — press Tab to save"
                   />
                 </td>
-                <td className="py-1.5">
+                <td className="py-1.5" style={STICKY_NAME}>
                   <input
                     defaultValue={u.display_name || ""}
                     placeholder="—"
                     onBlur={(e) => { if (e.target.value !== (u.display_name || "")) saveProfile(u.id, { display_name: e.target.value }); }}
-                    className="text-xs border rounded px-1 py-0.5 w-28"
+                    className="text-xs border rounded px-1 py-0.5 w-32"
                     style={{ borderColor: "#E2E0DA" }}
                   />
                 </td>
@@ -4234,7 +4271,29 @@ function Admin({
                     onBlur={(e) => { if (e.target.value !== (u.erp_owner || "")) saveProfile(u.id, { erp_owner: e.target.value }); }}
                     className="text-xs border rounded px-1 py-0.5 w-28"
                     style={{ borderColor: "#E2E0DA" }}
-                    title="Must match the Project Owner value in the Jobmaster export"
+                    title="Must match the Planning Owner / Project Owner value in the Jobmaster export"
+                  />
+                </td>
+                <td className="py-1.5">
+                  <select
+                    value={u.department_id || ""}
+                    onChange={(e) => saveProfile(u.id, { department_id: e.target.value || null })}
+                    className="text-xs border rounded px-1 py-0.5 bg-white"
+                    style={{ borderColor: "#E2E0DA", maxWidth: 130 }}
+                    title="Read by Goals — departmental goals, and what a department head may edit"
+                  >
+                    <option value="">— none —</option>
+                    {departments.map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
+                  </select>
+                </td>
+                <td className="py-1.5">
+                  <input
+                    defaultValue={u.designation || ""}
+                    placeholder="—"
+                    onBlur={(e) => { if (e.target.value !== (u.designation || "")) saveProfile(u.id, { designation: e.target.value }); }}
+                    className="text-xs border rounded px-1 py-0.5 w-28"
+                    style={{ borderColor: "#E2E0DA" }}
+                    title="Job title, e.g. Head - Works"
                   />
                 </td>
                 <td className="py-1.5">
@@ -4256,6 +4315,23 @@ function Admin({
                   <select value={rolePending[u.id] ?? u.role} onChange={(e) => setRole(u.id, e.target.value)} disabled={!mayManage(u) || !!rolePending[u.id]} className="text-xs border rounded px-1" style={{ borderColor: rolePending[u.id] ? "#E8600A" : "#E2E0DA", background: mayManage(u) ? "#fff" : "#F4F2EC", color: mayManage(u) ? "#22303C" : "#8A94A0", opacity: rolePending[u.id] ? 0.7 : 1 }} title={rolePending[u.id] ? "Saving…" : mayManage(u) ? ROLE_OPTIONS.find((r) => r.value === u.role)?.hint : `Only ${OWNER_EMAIL} may change this account`}>
                     {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
                   </select>
+                </td>
+                <td className="py-1.5">
+                  <select
+                    value={u.goals_level || "none"}
+                    onChange={(e) => setGoalsLevel(u.id, e.target.value)}
+                    className="text-xs border rounded px-1 py-0.5 bg-white font-semibold"
+                    style={{ borderColor: "#E2E0DA", color: u.goals_level === "edit" ? "#0D7A3F" : u.goals_level === "view" ? "#1B3A5C" : "#8A94A0" }}
+                    disabled={u.email.toLowerCase() === OWNER_EMAIL || (u.role === "admin" && !isOwner)}
+                    title="Seeing the goal tree is granted per person. Work assigned to someone reaches them on My Week either way."
+                  >
+                    <option value="none">no access</option>
+                    <option value="view">can view</option>
+                    <option value="edit">can edit</option>
+                  </select>
+                </td>
+                <td className="py-1.5 tnum" style={{ color: "#8A94A0" }}>
+                  {u.last_sign_in_at ? fmtFull(String(u.last_sign_in_at).slice(0, 10)) : "never"}
                 </td>
                 <td className="py-1.5">
                   <button onClick={() => setDisabled(u.id, !u.disabled, u.email)} disabled={!mayManage(u)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E6F4EA", color: u.disabled ? "#fff" : "#0D7A3F", opacity: mayManage(u) ? 1 : 0.5, cursor: mayManage(u) ? "pointer" : "not-allowed" }} title={mayManage(u) ? (u.disabled ? "Click to re-enable sign-in" : "Click to disable sign-in") : `Only ${OWNER_EMAIL} may change this account`}>{u.disabled ? "disabled" : "active"}</button>
