@@ -37,6 +37,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.0.0.1",
+    date: "2026-08-17",
+    module: "Morning Update · Upload",
+    items: [
+      "The card you upload on now decides what the file is. Until now the app threw that away and guessed from the contents alone.",
+      "That guess failed on the first real Delivered Jobs upload: 2,728 delivered jobs read as a jobs upload, and only the mass-archive guard stopped it retiring all 105 live jobs. The guard held, nothing was changed — but it was the last line of defence, not the first.",
+      "Upload on the wrong card and it now refuses and says so, instead of doing the wrong merge quietly. Dropping the live jobs export on the Delivered card would have banked 105 live jobs as delivered and locked every one of their plans read-only.",
+      "A mis-clicked card still cannot force the wrong shape through: the file must look like a Jobmaster export before it can be treated as one, so a ToDo or Projects file dropped on the Delivered card is still rejected.",
+      "Content detection is unchanged and still guards the generic upload path — it is now the second opinion rather than the only one.",
+    ],
+  },
+  {
     v: "3.0.0.0",
     date: "2026-08-17",
     module: "Genie 3 — everything on one line",

@@ -81,11 +81,28 @@ export interface UploadSummary {
   lines: string[]; // the human "Loaded ✓" bullet lines V1.9 shows
 }
 
+/** Morning Update card key -> the kind that card is allowed to produce. */
+const SLOT_KIND: Record<string, UploadKind[]> = {
+  jobs: ["jobs", "pre"],
+  projects: ["projects", "pre"],
+  tasks: ["tasks"],
+  delivered: ["delivered"],
+};
+
+const SLOT_NAME: Record<string, string> = {
+  jobs: "Job in progress - Jobs",
+  projects: "Order in Progress - projects",
+  tasks: "To Do Dashboard All",
+  delivered: "Delivered Jobs",
+};
+
 export async function applyUpload(
   admin: SupabaseClient,
   fileBuf: ArrayBuffer,
   filename: string,
   uploadedBy: string,
+  /** The card the file was dropped on, when the page sent one. */
+  slot?: string,
 ): Promise<UploadSummary> {
   let wb: XLSX.WorkBook;
   try {
@@ -97,8 +114,21 @@ export async function applyUpload(
       "Could not read the file: " + (e instanceof Error ? e.message : String(e)),
     );
   }
-  const parsed = parseUpload(wb);
+  const parsed = parseUpload(wb, slot);
   const kind = detectKind(parsed); // throws UploadError if unrecognised
+
+  // The slot said one thing and the file is another. Refuse rather than do
+  // the wrong merge quietly: dropping the live jobs export on the Delivered
+  // card would bank 105 live jobs as delivered and lock every one of their
+  // plans read-only, and that is not something a person would notice today.
+  const allowed = slot ? SLOT_KIND[slot] : undefined;
+  if (allowed && !allowed.includes(kind)) {
+    throw new UploadError(
+      `Refused: this was uploaded on the "${SLOT_NAME[slot!] ?? slot}" card, but the file reads as ` +
+        `${kind === "pre" ? "the full PRE workbook" : "the " + kind + " export"}. ` +
+        `Nothing was changed — upload it on the right card, or check the download is the report you meant.`,
+    );
+  }
 
   // one import_batch per upload (kept forever — morning snapshot history)
   const batchId = crypto.randomUUID();

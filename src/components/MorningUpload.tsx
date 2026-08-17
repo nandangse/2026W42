@@ -59,7 +59,7 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
     setBusyKey(key);
     setMsg("");
     try {
-      const res = await api.upload(f);
+      const res = await api.upload(f, key);
       const s = res.summary;
       setMsg(`Loaded ✓ (${s.filename})\n${(s.lines || []).join("\n")}`);
       await load();

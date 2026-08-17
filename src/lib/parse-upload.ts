@@ -143,8 +143,23 @@ function isDeliveredSheet(
   return false;
 }
 
-export function parseUpload(wb: WorkBook): ParseResult {
+/**
+ * `slot` is the Morning Update card the file was dropped on.
+ *
+ * Content-based detection (isDeliveredSheet) stays exactly as it was and is
+ * still what protects the generic upload path. But when the person uploading
+ * has already SAID which report this is, that is better evidence than any
+ * heuristic: the Delivered Jobs export carries the same `ID` + `Customer Tag`
+ * headers as the in-progress one, and the two are told apart only by how many
+ * rows happen to sit at a delivered status.
+ *
+ * That heuristic failed in production on 17 Aug 2026 — a 2,728-row Delivered
+ * Jobs file read as a jobs upload and was caught only by guardMassArchive,
+ * one layer from retiring all 105 live jobs. The slot removes the guess.
+ */
+export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
   const out: ParseResult = {};
+  const declaredDelivered = slot === "delivered";
   for (const name of wb.SheetNames) {
     const rows = XLSX.utils.sheet_to_json<Row>(wb.Sheets[name], {
       header: 1,
@@ -159,7 +174,14 @@ export function parseUpload(wb: WorkBook): ParseResult {
     const g = (r: Row, h: string): Cell =>
       ix[h] != null ? r[ix[h]] : undefined;
     // ---- Delivered Jobs report — claimed BEFORE the jobs branch (see above) ----
-    if (ix["Customer Tag"] != null && ix["ID"] != null && isDeliveredSheet(rows, hdr, ix, g)) {
+    // Either the uploader said so, or the content says so. The Jobmaster
+    // shape check (ID + Customer Tag) still has to pass either way, so a
+    // mis-clicked slot cannot force a ToDo or Projects file down this branch.
+    if (
+      ix["Customer Tag"] != null &&
+      ix["ID"] != null &&
+      (declaredDelivered || isDeliveredSheet(rows, hdr, ix, g))
+    ) {
       const dateHdr = pickDeliveryDateHeader(hdr);
       out.deliveredHeaders = hdr.filter(Boolean);
       out.deliveredJobs = rows

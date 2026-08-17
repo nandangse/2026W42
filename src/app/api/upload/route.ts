@@ -24,12 +24,19 @@ export async function POST(req: Request) {
         { status: 413 },
       );
     }
+    // Which card it was dropped on, when the page sent one. Advisory: the
+    // merge still verifies the content matches, and still refuses a jobs
+    // upload that would retire the board.
+    const slotRaw = form.get("slot");
+    const slot = typeof slotRaw === "string" ? slotRaw : undefined;
+
     const buf = await file.arrayBuffer();
     const summary = await applyUpload(
       adminClient(),
       buf,
       file.name,
       user.email,
+      slot,
     );
     return NextResponse.json({ ok: true, summary });
   } catch (e) {

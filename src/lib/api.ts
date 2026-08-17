@@ -23,9 +23,16 @@ export const api = {
   async uploadStatus() {
     return jsonOrThrow(await fetch("/api/upload-status", { cache: "no-store" }));
   },
-  async upload(file: File) {
+  /**
+   * `slot` is the Morning Update card the file was dropped on. Sending it
+   * turns "guess what this file is" into "check it is what they said it is" —
+   * the Delivered Jobs export carries the same headers as the in-progress one,
+   * so content alone is a weak signal.
+   */
+  async upload(file: File, slot?: string) {
     const fd = new FormData();
     fd.append("file", file);
+    if (slot) fd.append("slot", slot);
     return jsonOrThrow(await fetch("/api/upload", { method: "POST", body: fd }));
   },
   async post(path: string, body: unknown) {
