@@ -157,6 +157,23 @@ export const TASK_CATS = [
 export const escalated = (esc: string | null | undefined): boolean =>
   !!esc && esc !== "None";
 
+/**
+ * Good Morning / Afternoon / Evening / Night, by the clock in India.
+ *
+ * Pinned to Asia/Kolkata rather than the browser: the boards are read from
+ * the shop floor, and a laptop left on UTC should not wish someone good
+ * morning at nine at night.
+ */
+export const greeting = (now: Date = new Date()): string => {
+  const h = Number(
+    new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hour12: false, timeZone: "Asia/Kolkata" }).format(now),
+  );
+  if (h < 12) return "Good Morning";
+  if (h < 17) return "Good Afternoon";
+  if (h < 21) return "Good Evening";
+  return "Good Night";
+};
+
 export const ESC_LEVELS = [
   "None",
   "L1 — Supervisor",

@@ -27,6 +27,7 @@ import {
   TASK_CATS,
   ESC_LEVELS,
   escalated,
+  greeting,
   type Plan,
   type PlanMilestone,
 } from "@/lib/schedule";
@@ -1138,7 +1139,7 @@ function MyWeek({
     <div className="p-4">
       <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
         <h2 className="text-xl font-bold" style={{ color: "#16232F" }}>
-          Good day, {who}
+          {greeting()}, {who}
           {me.initials && <span className="ml-2 rounded px-1.5 py-0.5 text-sm font-bold" style={{ background: "#E8600A", color: "#fff" }}>{me.initials}</span>}
         </h2>
         <span className="text-xs" style={{ color: "#8A94A0" }}>
