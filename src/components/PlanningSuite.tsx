@@ -31,7 +31,7 @@ import {
   type Plan,
   type PlanMilestone,
 } from "@/lib/schedule";
-import QuoteOfDay from "./QuoteOfDay";
+import QuoteOfDay, { QuoteCard } from "./QuoteOfDay";
 import GoalsWorkspace from "./GoalsWorkspace";
 import DeliveredJobs from "./DeliveredJobs";
 import MorningUpload from "./MorningUpload";
@@ -39,6 +39,9 @@ import SalesGenie from "./SalesGenie";
 import RunRate from "./RunRate";
 import DeliveryOutlook from "./DeliveryOutlook";
 import LMS from "./LMS";
+import JobsInProgress, { type WipJob } from "./JobsInProgress";
+import { useMyWeek, HowsMyDay, ImageQuote, Birthdays, MyLearningCard } from "./MyWeekPanels";
+import { hhmm } from "@/lib/lms";
 
 // The 32 ERP job-status options (verbatim from V1.9), used by the editable
 // Job Status dropdowns.
@@ -858,13 +861,13 @@ export default function PlanningSuite({
 
       <QuoteOfDay trigger={quoteTrigger} />
 
-      {workspace === "suite" && tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={openJobPlan} reload={reload} goTasks={() => setWorkspace("tasking")} goGoals={() => setWorkspace("goals")} goalsAccess={!!goalsAccess} />}
+      {workspace === "suite" && tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={openJobPlan} reload={reload} goTasks={() => setWorkspace("tasking")} goGoals={() => setWorkspace("goals")} goalsAccess={!!goalsAccess} goLms={() => setWorkspace("lms")} isAdmin={isAdmin} />}
       {/* Kept MOUNTED and merely hidden, so its filters, search, sort and view
           survive a round-trip through Job Plan — unmounting was wiping them. */}
       <div style={{ display: workspace === "suite" && tab === "delivery" ? undefined : "none" }}>
         <DeliveryBoard board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
       </div>
-      {workspace === "suite" && tab === "wip" && <JobsInProgress board={board} V={V} />}
+      {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} />}
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
       {workspace === "suite" && tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} />}
@@ -1103,6 +1106,8 @@ function MyWeek({
   goTasks,
   goGoals,
   goalsAccess,
+  goLms,
+  isAdmin,
 }: {
   board: Board;
   me: { email: string; initials: string | null; displayName: string | null; erpOwner: string | null; role: string };
@@ -1112,8 +1117,12 @@ function MyWeek({
   goTasks: () => void;
   goGoals: () => void;
   goalsAccess: boolean;
+  goLms: () => void;
+  isAdmin: boolean;
 }) {
   const weekEnd = addDays(TODAY, 7);
+  // mood, learning, participation, birthdays and the image quote — one fetch
+  const [mw, reloadMw] = useMyWeek();
   const handles = useMemo(() => myHandles(me), [me]);
 
   // Goal work owed today, merged in from the goals layer — but ONLY for people
@@ -1199,15 +1208,31 @@ function MyWeek({
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
-        <Card label="MY OPEN TASKS" value={myTasks.length} sub="this week" color="#16232F" />
-        <Card label="OVERDUE" value={overdue.length} sub={overdue.length ? "needs attention" : "all clear"} color={overdue.length ? "#B3261E" : "#0D7A3F"} />
-        <Card label="DUE TODAY" value={dueToday.length} color="#E8600A" />
-        <Card label="MY JOBS" value={myJobs.length} sub={V(myJobs.reduce((s, j) => s + j.val, 0))} color="#1B3A5C" />
-        <Card label="DELIVERIES THIS WEEK" value={dueJobs.length} sub="shop-wide" color="#7C3AED" />
+      {/* ===== the top: two columns =====
+          Left, the numbers that describe the person's week. Right, the two
+          things that are not about work at all. They sit side by side rather
+          than stacked because the quote is the reason somebody reads the top
+          of this page twice. */}
+      <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)" }}>
+        <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+          <Card label="MY OPEN TASKS" value={myTasks.length} sub={overdue.length ? `${overdue.length} overdue` : "this week"} color={overdue.length ? "#B3261E" : "#16232F"} />
+          <Card label="DELIVERIES THIS WEEK" value={dueJobs.length} sub="shop-wide" color="#7C3AED" />
+          <Card label="MY LEARNING · 90 DAYS" value={mw ? hhmm(mw.learning.minutes) : "—"}
+            sub={mw ? `${mw.learning.completed} lesson${mw.learning.completed === 1 ? "" : "s"} finished` : "loading"} color="#0D9488" />
+          <Card label="MY PARTICIPATION" value={mw ? `${mw.participation.days}/${mw.participation.of}` : "—"}
+            sub="days active in the last 30" color="#1B3A5C" />
+          <HowsMyDay data={mw} onSaved={reloadMw} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <QuoteCard />
+          <ImageQuote data={mw} isAdmin={isAdmin} />
+        </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* ===== three columns ===== */}
+      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
+        {/* LEFT — my tasks */}
+        <div className="flex flex-col gap-4" style={{ minWidth: 0 }}>
         {/* my tasks */}
         <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
           <div className="flex items-center justify-between mb-2">
@@ -1257,32 +1282,10 @@ function MyWeek({
             </>
           )}
         </div>
+        </div>
 
-        {/* goal work owed today — the merge of the two layers */}
-        {goalItems.length > 0 && (
-          <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-bold text-sm">🎯 My goal work</div>
-              <button onClick={goGoals} className="text-xs font-bold" style={{ color: "#E8600A" }}>Open Goals →</button>
-            </div>
-            {goalItems.map((g) => (
-              <div key={g.id} className="rounded p-2 mb-1.5 border" style={{ background: g.late ? "#FBEDEA" : "#F4F2EC", borderColor: g.late ? "#B3261E" : "#E2E0DA", borderLeft: `3px solid ${g.late ? "#B3261E" : "#7C3AED"}` }}>
-                <div className="text-xs font-semibold" style={{ color: "#16232F" }}>{g.title}</div>
-                <div className="flex items-center gap-2 mt-1 text-xs flex-wrap" style={{ color: "#8A94A0" }}>
-                  <span className="rounded px-1 font-bold" style={{ background: "#F3EEFB", color: "#7C3AED", fontSize: 9 }}>{g.cat.toUpperCase()}</span>
-                  {g.carriedDays > 0 && <span className="tnum">carried {g.carriedDays}d</span>}
-                  {g.pushCount > 0 && <span style={{ color: "#D97706" }}>pushed {g.pushCount}×</span>}
-                  {g.late && <span className="font-bold" style={{ color: "#B3261E" }}>past {fmt(g.originalDue)}</span>}
-                  <span className="ml-auto tnum">{fmt(g.due)}</span>
-                </div>
-              </div>
-            ))}
-            <div className="text-xs mt-1" style={{ color: "#8A94A0" }}>
-              Carried days and pushes are counted against the date first committed, not the one on screen.
-            </div>
-          </div>
-        )}
-
+        {/* CENTRE — what is going out, and what I am driving */}
+        <div className="flex flex-col gap-4" style={{ minWidth: 0 }}>
         {/* deliveries expected this week */}
         <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
           <div className="font-bold text-sm mb-2">Delivery expected in the next 7 days</div>
@@ -1317,7 +1320,36 @@ function MyWeek({
             </div>
           )}
         </div>
+        {/* goal work owed today — the merge of the two layers */}
+        {goalItems.length > 0 && (
+          <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-bold text-sm">🎯 My goal work</div>
+              <button onClick={goGoals} className="text-xs font-bold" style={{ color: "#E8600A" }}>Open Goals →</button>
+            </div>
+            {goalItems.map((g) => (
+              <div key={g.id} className="rounded p-2 mb-1.5 border" style={{ background: g.late ? "#FBEDEA" : "#F4F2EC", borderColor: g.late ? "#B3261E" : "#E2E0DA", borderLeft: `3px solid ${g.late ? "#B3261E" : "#7C3AED"}` }}>
+                <div className="text-xs font-semibold" style={{ color: "#16232F" }}>{g.title}</div>
+                <div className="flex items-center gap-2 mt-1 text-xs flex-wrap" style={{ color: "#8A94A0" }}>
+                  <span className="rounded px-1 font-bold" style={{ background: "#F3EEFB", color: "#7C3AED", fontSize: 9 }}>{g.cat.toUpperCase()}</span>
+                  {g.carriedDays > 0 && <span className="tnum">carried {g.carriedDays}d</span>}
+                  {g.pushCount > 0 && <span style={{ color: "#D97706" }}>pushed {g.pushCount}×</span>}
+                  {g.late && <span className="font-bold" style={{ color: "#B3261E" }}>past {fmt(g.originalDue)}</span>}
+                  <span className="ml-auto tnum">{fmt(g.due)}</span>
+                </div>
+              </div>
+            ))}
+            <div className="text-xs mt-1" style={{ color: "#8A94A0" }}>
+              Carried days and pushes are counted against the date first committed, not the one on screen.
+            </div>
+          </div>
+        )}
+        </div>
 
+        {/* RIGHT — the people things first, then my own work */}
+        <div className="flex flex-col gap-4" style={{ minWidth: 0 }}>
+          <Birthdays data={mw} />
+          <MyLearningCard data={mw} onOpenLms={goLms} />
         {/* my milestones this week */}
         <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
           <div className="font-bold text-sm mb-2">My milestones landing this week</div>
@@ -1335,7 +1367,6 @@ function MyWeek({
             ))
           )}
         </div>
-
         {/* my jobs */}
         <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
           <div className="font-bold text-sm mb-2">My jobs {myJobs.length > 0 && <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>· {myJobs.length}</span>}</div>
@@ -1361,7 +1392,9 @@ function MyWeek({
             </div>
           )}
         </div>
+        </div>
       </div>
+
 
       {lightbox && <TaskModal task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
     </div>
@@ -1369,36 +1402,16 @@ function MyWeek({
 }
 
 // ============================ Delivery board ============================
-/**
- * Jobs in Progress — deliberately blank.
- *
- * The tab exists so the slot is claimed and the navigation is settled; what
- * goes in it has not been decided yet. It says so rather than showing a copy
- * of the Job Delivery Board that somebody would then have to un-learn.
- */
-function JobsInProgress({ board, V }: { board: Board; V: (n: number) => string }) {
-  const jobs = board.jobs;
-  const inFlight = jobs.filter((j) => j.pct > 0 && j.pct < 100);
-  return (
-    <div className="p-4">
-      <div className="mb-3">
-        <div className="text-xs font-bold" style={{ color: "#8A94A0", letterSpacing: 1.4 }}>PLANNING SUITE</div>
-        <div className="text-lg font-bold" style={{ color: "#16232F", lineHeight: 1.2 }}>Jobs in Progress</div>
-      </div>
-      <div className="rounded-lg border bg-white p-8" style={{ borderColor: "#E2E0DA", maxWidth: 640 }}>
-        <div className="font-bold text-sm mb-2" style={{ color: "#16232F" }}>Nothing here yet — on purpose</div>
-        <p className="text-sm mb-3" style={{ color: "#5A6672", lineHeight: 1.6 }}>
-          This tab is reserved and empty until you say what belongs on it. It is left blank rather than filled with a
-          second copy of the Job Delivery Board, which would only have to be un-learned later.
-        </p>
-        <p className="text-xs" style={{ color: "#8A94A0", lineHeight: 1.6 }}>
-          For reference, the board currently holds <b>{jobs.length}</b> live jobs, of which <b>{inFlight.length}</b> are
-          part-built (production between 1% and 99%), worth{" "}
-          <b>{V(inFlight.reduce((s, j) => s + j.val, 0))}</b>.
-        </p>
-      </div>
-    </div>
-  );
+/** Jobs in Progress — the pending book as three charts. See JobsInProgress.tsx. */
+function JobsInProgressTab({ board, V, onOpen }: { board: Board; V: (n: number) => string; onOpen: (id: string) => void }) {
+  const jobs: WipJob[] = board.jobs.map((j) => ({
+    id: j.id, tag: j.tag, cust: j.cust, fam: j.fam || "Unassigned",
+    tdd: j.tdd, otd: j.otd, stat: j.stat, val: j.val, tpv: j.tpv, tpp: j.tpp,
+    kit: j.kit, pct: j.pct, note: j.note, escalation: j.escalation,
+    amtNeeded: j.amtNeeded, payOnDelivery: j.payOnDelivery,
+    ownerInitials: j.ownerInitials, ownerName: j.ownerName,
+  }));
+  return <JobsInProgress jobs={jobs} today={TODAY} V={V} onOpenPlan={onOpen} />;
 }
 
 function DeliveryBoard({
@@ -4303,6 +4316,83 @@ function OrgChart({ users, departments }: { users: AdminUser[] | null; departmen
   );
 }
 
+/**
+ * The image quotes, read straight out of a Drive folder.
+ *
+ * Sync is a button rather than a schedule: the folder changes when somebody
+ * adds a picture to it, which is not often, and a nightly job that silently
+ * fails is worse than a button that says what it found.
+ */
+function ImageQuotesPanel() {
+  const [d, setD] = useState<{ installed: boolean; folder: string | null; images: { id: string; url: string; src: string | null; active: boolean }[] } | null>(null);
+  const [folder, setFolder] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const load = useCallback(() => {
+    api.get("/api/image-quote").then((r) => { setD(r); setFolder(r.folder || ""); }).catch(() => setD(null));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const sync = async () => {
+    setBusy(true); setMsg("");
+    try {
+      const r = await api.post("/api/image-quote", { action: "sync", folder: folder || undefined });
+      setMsg(r.ok
+        ? `Read ${r.found} file${r.found === 1 ? "" : "s"} · ${r.added} new · ${r.retired} no longer in the folder`
+        : r.error || "Nothing came back");
+      load();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+
+  if (!d) return null;
+  const live = d.images.filter((i) => i.active);
+
+  return (
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+      <div className="font-bold text-sm mb-2">
+        Image quotes{" "}
+        <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>
+          — one shown on My Week each day, the same one for everybody
+        </span>
+      </div>
+      {!d.installed ? (
+        <div className="text-xs" style={{ color: "#D97706" }}>Run migration 0029 first.</div>
+      ) : (
+        <>
+          <div className="flex gap-2 flex-wrap items-end">
+            <div style={{ flex: "1 1 320px" }}>
+              <div className="text-xs font-semibold mb-1" style={{ color: "#8A94A0" }}>Google Drive folder (link or id)</div>
+              <input value={folder} onChange={(e) => setFolder(e.target.value)}
+                className="w-full text-xs border rounded px-2 py-1.5" style={{ borderColor: "#E2E0DA" }}
+                placeholder="https://drive.google.com/drive/folders/…" />
+            </div>
+            <button onClick={sync} disabled={busy} className="text-xs font-bold rounded px-3 py-1.5"
+              style={{ background: "#E8600A", color: "#fff", opacity: busy ? 0.5 : 1 }}>
+              {busy ? "Reading Drive…" : "↻ Sync from Drive"}
+            </button>
+            <span className="text-xs" style={{ color: "#8A94A0" }}>{live.length} live of {d.images.length}</span>
+          </div>
+          {msg && <div className="text-xs mt-1.5 font-semibold" style={{ color: msg.includes("Read") ? "#0D7A3F" : "#B3261E" }}>{msg}</div>}
+          <div className="text-xs mt-1" style={{ color: "#B8B5AC", lineHeight: 1.5 }}>
+            The folder must be shared <b>anyone with the link</b>. Genie caches what it finds, so a bad day at Google
+            leaves yesterday&apos;s pictures working rather than an empty panel.
+          </div>
+          {live.length > 0 && (
+            <div className="flex gap-1 flex-wrap mt-2" style={{ maxHeight: 150, overflowY: "auto" }}>
+              {live.slice(0, 60).map((i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i.id} src={i.src || ""} alt="" style={{ width: 54, height: 40, objectFit: "cover", borderRadius: 3, border: "1px solid #E2E0DA" }} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function AdminTabs({ tab, setTab }: { tab: AdminTab; setTab: (t: AdminTab) => void }) {
   return (
     <div className="flex gap-1 rounded p-1 bg-white border" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
@@ -4601,6 +4691,8 @@ function Admin({
   return (
     <div className="p-4 space-y-4">
       <AdminTabs tab={adminTab} setTab={setAdminTab} />
+      {adminTab === "setup" && <ImageQuotesPanel />}
+
       {adminTab === "setup" && (<>
       {/* ---- app identity ---- */}
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>

@@ -37,6 +37,25 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.2.0.0",
+    date: "2026-08-18",
+    module: "My Week rebuilt · Jobs in Progress",
+    items: [
+      "My Week is rebuilt. The top is two columns: your numbers on the left — My Open Tasks, Deliveries This Week, My Learning over 90 days, My Participation, and How’s My Day — and on the right the two things that are not about work, the Quote of the Day and an image quote.",
+      "How’s My Day is five faces and one click. No scale, no required note: the honest answer is the one given in the second before somebody thinks about it. Answering again the same day changes the answer rather than adding one, and the last fortnight shows as a row of dots underneath — one bad Tuesday is noise, five in a row is something a manager should already know.",
+      "My Participation counts DAYS ENGAGED out of the last 30 — days you logged how it was going, finished a lesson, or wrote a comment. Not a count of clicks: a number that goes up when somebody is busy rather than when somebody takes part would measure the wrong thing.",
+      "The image quote reads your Drive folder directly — all 168 of them — now that it is shared. One a day, the same one for everybody, cycling the whole folder before repeating. Genie caches what it finds, so a bad day at Google leaves yesterday’s pictures working rather than an empty panel. Admin → Settings → Image quotes has the folder and a Sync button.",
+      "Below that, three columns: My Tasks on the left; deliveries in the next 7 days and My Goals in the centre; birthdays, My Learning, milestones and my jobs on the right.",
+      "Birthdays for the next seven days, from the employee master. A 29 February birthday lands on 1 March in the years without one — the alternative is never wishing that person a happy birthday again except in leap years.",
+      "My Learning shows one lesson with its thumbnail — whatever is under way, else whatever is planned, never one already finished — and opens it in a lightbox.",
+      "Jobs in Progress is now built. A table AND a line chart of planned deliveries over the next 12 months: jobs, value and throughput. Value and throughput share the rupee axis because the gap between them IS the material cost; the job count gets its own axis, since forcing a count of 9 onto a rupee scale draws it flat along the bottom.",
+      "Overdue leads that table and is deliberately kept OFF the line: a job whose date has gone is not a future month, and drawing it as one would flatter every month after it.",
+      "The book split by product family, click any family to filter.",
+      "And every job plotted: production % across, kitting % up, dot AREA proportional to throughput, colour by product family. Radius-proportional bubbles overstate the big ones by the square — the eye reads area. Hover for the job, click for a lightbox with its dates, money and escalation; click outside and the plot is exactly where you left it, because exploring a scatter means opening six jobs in a row.",
+      "Migration 0029.",
+    ],
+  },
+  {
     v: "3.1.0.2",
     date: "2026-08-18",
     module: "Job Plan · Admin · Goals · Planning Suite",

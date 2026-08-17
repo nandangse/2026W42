@@ -20,6 +20,22 @@ function quoteFor(iso: string) {
   return QUOTES[((dayNo % QUOTES.length) + QUOTES.length) % QUOTES.length];
 }
 
+/** The quote as a panel on My Week — always there, nothing to dismiss. */
+export function QuoteCard() {
+  const quote = quoteFor(todayISO());
+  if (!quote) return null;
+  return (
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA", borderTop: "3px solid #F5B32B" }}>
+      <div className="text-xs font-bold mb-1" style={{ color: "#8A94A0", letterSpacing: 1.1 }}>QUOTE OF THE DAY</div>
+      <div className="text-sm" style={{ color: "#22303C", lineHeight: 1.55 }}>{quote.q}</div>
+      <div className="text-xs mt-1 flex items-baseline gap-2 flex-wrap">
+        <span className="font-semibold" style={{ color: "#8A94A0" }}>— {quote.by}</span>
+        {quote.cat && <span style={{ color: "#B8B5AC" }}>{quote.cat}</span>}
+      </div>
+    </div>
+  );
+}
+
 /**
  * @param trigger increment to force the quote open on demand (header button),
  *        bypassing the don't-show-again-today flag.
