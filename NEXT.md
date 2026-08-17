@@ -1,9 +1,10 @@
 # Genie — outstanding work, with the decisions already made
 
-State: `main` @ 3.0.1.11. Migrations 0021–0025 are run on the database.
-**0026 is NOT run yet** — until it is, the money columns are read from the file
+State: `main` @ 3.1.0.0. Migrations 0021–0025 are run on the database.
+**0026 and 0027 are NOT run yet** — until it is, the money columns are read from the file
 but not stored (the upload says so and falls back to the old `apply_jobs`), and
-the Genie hint keeps regenerating per person.
+the Genie hint keeps regenerating per person. 0027 creates the whole LMS —
+without it the LMS section shows an install notice and nothing else.
 
 Done: **1 (run rate)**, **5 (All Tasks)**, **2 apart from My IDP**, the Employee
 Master upload, and the 3.0.1.11 batch below.
@@ -62,6 +63,33 @@ Notes for whoever touches it next:
 - Straight-line pace only. If a month-by-month plan ever gets set, `expected` in
   `src/lib/run-rate.ts` is the one line that changes.
 
+## 0. LMS ✅ NEW in 3.1.0.0 — needs content
+
+Built and empty. An intern fills it: **Library** tab → write lessons → tick the
+books each belongs in. The fifteen books are seeded by 0027; sections are added
+per book from inside the book.
+
+    supabase/migrations/0027_lms.sql   ← NOT SENT
+    src/lib/lms.ts                     word floor, totals, video parsing
+    src/app/api/lms/route.ts           library + everyone's record
+    src/app/api/lms/plan/route.ts      Genie writes the learning plan
+    src/components/LMS.tsx             the section
+    src/components/LmsVideo.tsx        the stripped-down YouTube player
+    src/components/LmsText.tsx         markdown -> elements, never raw HTML
+
+The rules that must not be softened, and why:
+
+- **Fifty words or it is not complete.** Enforced in the API, not just the UI.
+  A tick is attendance; the words are the learning, and the words are what the
+  IDP is made of.
+- **Planned time is not time.** Only completed lessons add to a total.
+- **A lesson is authored once** and shelved into many books. Never copy one.
+- **Genie can only recommend lessons that exist** — every id it returns is
+  checked against the library and anything invented is dropped and counted.
+
+The learning plan needs `ANTHROPIC_API_KEY` (see above). Everything else in LMS
+works without it.
+
 ## 2. Goals — Team Goals ✅, Team KPIs ✅, My IDP ⏳
 
 Done in 3.0.1.9: **Team Goals** and **Team KPIs**. No migration needed.
@@ -88,8 +116,10 @@ KRA filter if it has to come out.
 `IdpTab` in `GoalsWorkspace.tsx`. The person picker is live and walks the whole
 cascade; there is nothing to put in it yet, and the page says so.
 
-**Nobody has said what an IDP holds, and each answer is a different table.**
-Before writing one, get from Dr Raghu:
+**Half of it now exists.** LMS records the learning side — lessons completed,
+time, and what each person wrote — and the IDP tab reads those totals live. What
+is still undecided is the rest of a development plan. Before writing a table,
+get from Dr Raghu:
 
 - what a single IDP line IS — a skill? a course? a competency with a rating now
   and a rating wanted? a development action with a date?

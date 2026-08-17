@@ -38,6 +38,7 @@ import MorningUpload from "./MorningUpload";
 import SalesGenie from "./SalesGenie";
 import RunRate from "./RunRate";
 import DeliveryOutlook from "./DeliveryOutlook";
+import LMS from "./LMS";
 
 // The 32 ERP job-status options (verbatim from V1.9), used by the editable
 // Job Status dropdowns.
@@ -328,7 +329,7 @@ export default function PlanningSuite({
   // sticky sub-nav. "tab" is only meaningful inside the Planning Suite
   // workspace now — Goals and Tasking are whole workspaces, not sub-tabs.
   // Sales-team members live in Sales Genie — land them there directly.
-  const [workspace, setWorkspace] = useState<"suite" | "delivered" | "goals" | "tasking" | "sales">(
+  const [workspace, setWorkspace] = useState<"lms" | "suite" | "delivered" | "goals" | "tasking" | "sales">(
     role === "sales" ? "sales" : "suite",
   );
   // land on "My Week" within the suite, not the delivery board
@@ -386,6 +387,13 @@ export default function PlanningSuite({
   const [deliveredVisited, setDeliveredVisited] = useState(false);
   useEffect(() => {
     if (workspace === "delivered") setDeliveredVisited(true);
+  }, [workspace]);
+  // Learning, same lazy keep-alive: the whole library comes down in one payload
+  // and every view of it is computed in memory, so re-fetching on each
+  // workspace switch would be pure waste.
+  const [lmsVisited, setLmsVisited] = useState(false);
+  useEffect(() => {
+    if (workspace === "lms") setLmsVisited(true);
   }, [workspace]);
 
   // Sales Genie is granted per person (default nobody) — the tab only renders
@@ -548,6 +556,9 @@ export default function PlanningSuite({
   // true — never shown while loading or when access is absent, matching the
   // spec's "granted, not default" rule.
   const WORKSPACE_DEFS: [typeof workspace, string][] = [
+    // Learning sits first, ahead of the work. That is the point of putting it
+    // in the header at all.
+    ["lms", "📚 LMS"],
     ["suite", "🧭 Planning Suite"],
     ["delivered", "✅ Delivered Jobs"],
     ...(goalsAccess ? ([["goals", "🎯 Goals"]] as [typeof workspace, string][]) : []),
@@ -871,6 +882,11 @@ export default function PlanningSuite({
       {deliveredVisited && (
         <div style={{ display: workspace === "delivered" ? undefined : "none" }}>
           <DeliveredJobs V={V} />
+        </div>
+      )}
+      {lmsVisited && (
+        <div style={{ display: workspace === "lms" ? undefined : "none" }}>
+          <LMS />
         </div>
       )}
       {workspace === "tasking" && <Tasking board={board} onOpen={openJobPlan} reload={reload} me={me} people={board.people || []} />}

@@ -21,13 +21,20 @@ import {
 } from "@/lib/goals-v2";
 import type { GoalsPayload } from "@/lib/goals-v2-tree";
 import { today, fmt, fmtFull } from "@/lib/schedule";
+import { totalsOf as lmsTotals, hhmm as lmsHhmm } from "@/lib/lms";
+
+/** What Learning has recorded for one person — the built half of an IDP. */
+interface LearningSummary {
+  totals: ReturnType<typeof lmsTotals>;
+  plan: string | null;
+}
 
 const TODAY = today();
 
 const C = {
   ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC",
   line: "#E2E0DA", panel: "#F4F2EC", shell: "#EFEDE7", accent: "#E8600A",
-  navy: "#1B3A5C", green: "#0D7A3F", amber: "#D97706", red: "#B3261E",
+  navy: "#1B3A5C", green: "#0D7A3F", amber: "#D97706", red: "#B3261E", violet: "#7C3AED",
 };
 
 // ===========================================================================
@@ -772,6 +779,24 @@ function IdpTab({ ctx }: { ctx: Ctx }) {
   const [who, setWho] = useState<string>(me.id);
   const p = ctx.peopleById.get(who);
 
+  // The learning half of the IDP already exists — the LMS records it. Pull the
+  // totals in so this tab shows the part that IS built rather than only the
+  // part that is not.
+  const [learning, setLearning] = useState<LearningSummary | null>(null);
+  useEffect(() => {
+    let live = true;
+    setLearning(null);
+    api
+      .get(`/api/lms?person=${encodeURIComponent(who)}`)
+      .then((r) => {
+        if (!live || !r?.installed) return;
+        const lessons = new Map((r.lessons || []).map((l: { id: string }) => [l.id, l]));
+        setLearning({ totals: lmsTotals(r.progress || [], lessons as never, r.extras || []), plan: r.plan?.plan || null });
+      })
+      .catch(() => { /* Learning may not be installed; the tab still stands */ });
+    return () => { live = false; };
+  }, [who]);
+
   return (
     <>
       {team.length > 0 && (
@@ -795,13 +820,36 @@ function IdpTab({ ctx }: { ctx: Ctx }) {
         </div>
       )}
 
+      {/* The part that IS built: everything Learning has recorded. */}
+      {learning && (
+        <div className="mb-3" style={{ maxWidth: 720 }}>
+          <div className="flex gap-2 flex-wrap mb-2">
+            <Stat label="Lessons completed" value={String(learning.totals.completed)} note="each with fifty words written" color={C.green} />
+            <Stat label="Time learned" value={lmsHhmm(learning.totals.totalMinutes)} note={learning.totals.extraMinutes ? `incl. ${lmsHhmm(learning.totals.extraMinutes)} taken elsewhere` : "completed lessons only"} color={C.accent} />
+            <Stat label="Words written" value={learning.totals.words.toLocaleString("en-IN")} note="in their own words, about what they learned" color={C.navy} />
+            <Stat label="Still to do" value={String(learning.totals.planned + learning.totals.inProgress)} note="planned or under way" color={C.mute} />
+          </div>
+          {learning.plan && (
+            <div className="rounded-lg border bg-white p-3" style={{ borderColor: C.line, borderLeft: `5px solid ${C.violet}` }}>
+              <div className="text-xs font-bold tracking-widest mb-1" style={{ color: C.violet }}>LEARNING PLAN · FROM LMS</div>
+              <div className="text-xs" style={{ color: C.sub, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{learning.plan}</div>
+            </div>
+          )}
+          <div className="text-xs mt-1.5" style={{ color: C.faint, lineHeight: 1.5 }}>
+            Read from <b>📚 LMS</b>. Everything above is already part of{" "}
+            {who === me.id ? "your" : "their"} development record — what is missing is the rest of the plan.
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg border bg-white p-6" style={{ borderColor: C.line, maxWidth: 720 }}>
         <div className="font-bold text-sm mb-2" style={{ color: C.ink }}>
-          {who === me.id ? "Your development plan" : `${p?.name || p?.email}'s development plan`} isn&apos;t built yet
+          The rest of {who === me.id ? "your" : `${p?.name || p?.email}'s`} development plan isn&apos;t built yet
         </div>
         <p className="text-sm mb-3" style={{ color: C.sub, lineHeight: 1.6 }}>
           An IDP is the one part of this section that is not about this quarter&apos;s delivery. It is what somebody is
-          growing into — and it is worth getting the shape of it right rather than fast.
+          growing into. The learning half of it is live above, recorded lesson by lesson in LMS; what is still open is
+          how the rest of a development plan is written down.
         </p>
         <p className="text-sm" style={{ color: C.sub, lineHeight: 1.6 }}>
           Four things decide the table it needs, and none of them have been settled: whether a line is a{" "}

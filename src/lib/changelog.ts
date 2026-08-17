@@ -37,6 +37,26 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.1.0.0",
+    date: "2026-08-18",
+    module: "LMS — a new section",
+    items: [
+      "New section: 📚 LMS, first in the header, ahead of the work. That placement is the point.",
+      "Learning Goals is the first tab: your learning plan, then the fifteen books — Employee Handbook, WCM and Kaizen, Production, Design, Digital Tools, Safety, Quality, ISO, Accounting, ToC, Leadership, Worker Skill, Meditation, Mind Practice and Emergency. Each shows how far through it you are.",
+      "A lesson carries a title, a body, a description, a video, a PDF and a length. It is authored ONCE and shelved into as many books as it belongs in — the same CAD lesson can sit in Design and in Digital Tools without becoming two lessons that drift apart. Books have sections, and a lesson can be moved between them per book.",
+      "YouTube lessons play with YouTube's own controls switched off and play, pause, forward-10s and the clock drawn by Genie instead. No suggested videos, no channel, no “watch on YouTube” — every one of those is a door out of the lesson. Drive files keep Google's player, and the panel says so rather than pretending otherwise.",
+      "A LESSON CANNOT BE TICKED. It is complete only when the person has written at least fifty words in their own words about what they took from it — enforced on the server, not just in the browser, with a live word count and a message saying how far short you are. A tick records attendance; fifty words record learning.",
+      "Planned time is not time. Only completed lessons add to a total, because letting intentions accumulate is how a training record ends up flattering everybody in it.",
+      "Training taken elsewhere counts too — a course, a seminar, a site visit, added by hand with its own note, into the same total.",
+      "Genie writes your Learning Plan: it reads your designation, department, key result areas and what you have already finished, writes what you should be building towards, and puts the lessons it picks onto your plan as Planned. It can only choose lessons that actually exist — every id it returns is checked against the library, and anything invented is dropped and reported.",
+      "My Team shows what everyone below you has been learning, walked down the whole line — their totals, their plan, and what they actually wrote.",
+      "The Library tab is where an author writes lessons, ticks the books each belongs in, and sees at a glance which lessons are in no book at all and therefore findable by nobody. Retiring a lesson never deletes anybody's completion or their words.",
+      "Lesson bodies are Markdown rendered to elements, never raw HTML, and only http/https/mailto links survive. Lessons are written by interns and read by the whole company; that is untrusted text on its way to every screen in the works.",
+      "My IDP in Goals now shows the built half of a development record — lessons completed, time learned, words written, and the learning plan — read from LMS. That was always the reason for building this.",
+      "Migration 0027 creates it all and seeds the fifteen books.",
+    ],
+  },
+  {
     v: "3.0.1.11",
     date: "2026-08-18",
     module: "Job Delivery Board · Job Plan · Genie Hint",
