@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePlanner, errJson, RAGHU_EMAIL } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
+import { assertJobEditable } from "@/lib/job-state";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,8 @@ export async function POST(req: Request) {
 
     // user-scoped client → RLS + mgmt trigger both apply (defense in depth)
     const supabase = supabaseServer();
+    // a delivered job's dates and status are settled — the ERP owns them now
+    await assertJobEditable(supabase, body.job_id);
     const { error } = await supabase
       .from("jobs")
       .update({ [field]: value })

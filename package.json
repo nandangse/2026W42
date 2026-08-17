@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "build:migrations": "node scripts/build-all-migrations.mjs",
     "seed": "tsx scripts/seed.ts",
     "seed:goals": "tsx scripts/seed-goals.ts",
     "test:acceptance": "tsx scripts/acceptance-test.ts"

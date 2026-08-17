@@ -24,6 +24,10 @@ export interface BoardJob {
   kit: number;
   active: boolean;
   archived: boolean;
+  /** Confirmed delivered by the Delivered Jobs report — plan is now read-only. */
+  delivered: boolean;
+  /** When it was actually delivered, where the report carried a date. */
+  delivered_on: string | null;
   updated_at: string | null;
   /** Resolved Project Owner account, if the ERP owner text matches one. */
   ownerInitials: string | null;
@@ -64,6 +68,8 @@ function mapJob(r: any): BoardJob {
     kit: Number(r.kit || 0),
     active: !!r.active,
     archived: !r.active,
+    delivered: !!r.delivered,
+    delivered_on: r.delivered_on ?? null,
     updated_at: r.updated_at ?? null,
     ownerInitials: null, // filled in by resolveOwners() once people are loaded
     ownerName: null,
@@ -212,10 +218,15 @@ export async function buildBoard(supabase: SupabaseClient) {
     });
   }
 
-  // archived stubs that still have a plan (so proposed-vs-real stays reachable)
+  // Stubs for jobs that are off the live board but whose work must stay
+  // reachable: anything archived that still has a plan (proposed-vs-real), plus
+  // every delivered job. A delivered job's milestones, baseline and materials
+  // are never deleted — they stop being editable, not readable.
   const archived: Record<string, BoardJob> = {};
+  // (a delivered job still in the export — installation stage — stays on the
+  // live board and must not be listed twice)
   for (const j of allJobs) {
-    if (!j.active && plans[j.id]) archived[j.id] = j;
+    if (!j.active && (plans[j.id] || j.delivered)) archived[j.id] = j;
   }
 
   // comment counts keyed "kind:task_id"

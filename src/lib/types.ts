@@ -41,6 +41,18 @@ export interface ParsedJob {
   kit: number;
 }
 
+/**
+ * A row from the "Delivered Jobs for Analysis" report. Same Jobmaster shape as
+ * ParsedJob plus the one thing no other export carries: the date the job was
+ * actually delivered, and which column that date was read from.
+ */
+export interface ParsedDeliveredJob extends ParsedJob {
+  /** Actual delivery date, ISO. Null when no delivery-date column was matched. */
+  delivered: string | null;
+  /** The header `delivered` came from — surfaced so a mis-match is never silent. */
+  dateSource: string | null;
+}
+
 export interface ParsedRawTask {
   ref: string;
   refn: string;
@@ -84,6 +96,10 @@ export interface ParseResult {
   statMap?: Record<string, { stat: string; kit: number }>;
   fromPRE?: boolean;
   fromDAJobs?: boolean;
+  /** Rows from the Delivered Jobs report. Never merged into `jobs`. */
+  deliveredJobs?: ParsedDeliveredJob[];
+  /** Every header seen on the delivered sheet — the diagnostic when no date matched. */
+  deliveredHeaders?: string[];
 }
 
 /** A task after linkTasks() merges raw ToDo rows against the job list. */
@@ -97,4 +113,4 @@ export interface LinkedTask {
 }
 
 /** What kind of workbook a POST /api/upload was detected as. */
-export type UploadKind = "jobs" | "projects" | "tasks" | "pre";
+export type UploadKind = "jobs" | "projects" | "tasks" | "pre" | "delivered";

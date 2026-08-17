@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePlanner, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
+import { assertJobEditable } from "@/lib/job-state";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ export async function POST(req: Request) {
     const body = await req.json();
     const jobId: string = body.job_id;
     if (!jobId) return NextResponse.json({ error: "job_id required" }, { status: 400 });
+    // a delivered job's plan is a record, not a plan (see lib/job-state)
+    await assertJobEditable(supabase, jobId);
 
     const { error: pe } = await supabase.from("plans").upsert(
       {

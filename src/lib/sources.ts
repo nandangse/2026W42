@@ -1,11 +1,19 @@
-// The three morning files Shweta downloads + uploads. ERP report links open in
-// the user's browser; the app never talks to the ERP itself. Ported from V1.9.
+// The morning files Shweta downloads + uploads. ERP report links open in
+// the user's browser; the app never talks to the ERP itself. Ported from V1.9,
+// plus the Delivered Jobs report added 17 Aug 2026.
 export interface MorningSource {
-  key: "jobs" | "projects" | "tasks";
+  key: "jobs" | "projects" | "tasks" | "delivered";
   nm: string;
   desc: string;
   erp: string;
+  /** Google-Sheets mirror, where one exists. Blank = ERP download only. */
   gs: string;
+  /**
+   * Part of the every-morning ritual (counted in "n/n loaded", chased in red
+   * when missing). Delivered Jobs is history, not a daily snapshot, so it sits
+   * on the page without nagging — it shows when it was last loaded instead.
+   */
+  daily: boolean;
 }
 
 export const DEFAULT_SOURCES: MorningSource[] = [
@@ -15,6 +23,7 @@ export const DEFAULT_SOURCES: MorningSource[] = [
     desc: "All active jobs — TDD, OTD, Job Status, Prod %, value, Mgmt dates (primary file)",
     erp: "https://nandanerp.in/app/jobmaster/view/report/Jobmaster%20-%20Planning%20Reporting",
     gs: "https://docs.google.com/spreadsheets/d/1OURpJfBCohWDRWTBwkBJep0AVUCqGTPWJqsz69sGwl8/edit",
+    daily: true,
   },
   {
     key: "projects",
@@ -22,6 +31,7 @@ export const DEFAULT_SOURCES: MorningSource[] = [
     desc: "Project Managers (job owners) + Customer Committed / Expected End dates",
     erp: "https://nandanerp.in/app/project/view/report/Open%20Projects%20BPP",
     gs: "https://docs.google.com/spreadsheets/d/1zsFATRDFyt1SEIc7bh2MrWPGjE-XKqFW8qhZy4x7Vkg/edit",
+    daily: true,
   },
   {
     key: "tasks",
@@ -29,6 +39,18 @@ export const DEFAULT_SOURCES: MorningSource[] = [
     desc: "ERP ToDos → task cards on the boards",
     erp: "https://nandanerp.in/app/todo/view/report/ToDo%20Dashboard%20All",
     gs: "https://docs.google.com/spreadsheets/d/18jCqt8d_sIHsYOYPkHFnavWwclfEMIsqCoOCVJsCxrY/edit",
+    daily: true,
+  },
+  {
+    key: "delivered",
+    nm: "Delivered Jobs",
+    desc: "Jobs already delivered + the delivery date — the only file that carries delivery history",
+    // URL exactly as given by Dr Raghu (ERPNext serves /desk and /app alike).
+    erp: "https://nandanerp.in/desk/jobmaster/view/report/Delivered%20Jobs%20for%20Analysis",
+    // No Google-Sheets mirror for this report — download it from the ERP itself.
+    gs: "",
+    // History, not a daily snapshot — see MorningSource.daily.
+    daily: false,
   },
 ];
 

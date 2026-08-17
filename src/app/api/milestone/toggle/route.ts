@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePlanner, errJson } from "@/lib/auth";
+import { assertJobEditable } from "@/lib/job-state";
 import { supabaseServer } from "@/lib/supabase/server";
 import { today } from "@/lib/schedule";
 
@@ -14,6 +15,7 @@ export async function POST(req: Request) {
     const { job_id, idx, done } = await req.json();
     if (!job_id || idx == null)
       return NextResponse.json({ error: "job_id and idx required" }, { status: 400 });
+    await assertJobEditable(supabase, job_id);
 
     const { error } = await supabase
       .from("milestones")

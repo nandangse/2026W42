@@ -17,6 +17,7 @@ import * as XLSX from "xlsx";
 import type {
   ParseResult,
   ParsedJob,
+  ParsedDeliveredJob,
   ParsedProject,
   ParsedRawTask,
   LinkedTask,
@@ -25,6 +26,61 @@ import type {
 
 type Cell = unknown;
 type Row = Cell[];
+
+// ---------------------------------------------------------------------------
+// Delivered Jobs report detection
+//
+// "Delivered Jobs for Analysis" is ALSO a Jobmaster report, so it carries the
+// same ID + Customer Tag headers as the in-progress file. Left alone it would
+// fall into the jobs branch below and apply_jobs would archive every live job
+// that is (correctly) absent from a delivered list — i.e. the whole board.
+// So the delivered sheet must be claimed BEFORE that branch, and the test has
+// to be about CONTENT, not the sheet's name, which nobody controls.
+// ---------------------------------------------------------------------------
+
+/** The ERP statuses at or past delivery, verbatim from the 32-status ladder. */
+const DELIVERED_STATUSES = new Set([
+  "D: Delivered",
+  "I: Installation Not Started due to Client",
+  "I: Installation in progress",
+  "I: Installation Completed",
+  "C: Job Handed Over",
+]);
+
+/**
+ * Headers that mention delivery but mean a TARGET, not an actual — reading a
+ * delivery date out of one of these would silently report plan as fact.
+ */
+const NOT_AN_ACTUAL_DATE = /target|committed|expected|planned|request|otd/i;
+
+/** Preferred exact header names, best first. */
+const DELIVERY_DATE_HEADERS = [
+  "Actual Delivery Date",
+  "Delivered Date",
+  "Delivery Date",
+  "Date of Delivery",
+  "Delivered On",
+  "Job Delivered Date",
+  "Actual Delivery",
+  "Dispatch Date",
+];
+
+/**
+ * Which column holds the real delivery date. Exact preferred names first, then
+ * any /deliver/-ish header that isn't a target. Returns null rather than
+ * guessing — an undated delivery is recoverable, a wrongly dated one is not.
+ */
+function pickDeliveryDateHeader(hdr: string[]): string | null {
+  for (const want of DELIVERY_DATE_HEADERS) {
+    const hit = hdr.find((h) => h.toLowerCase() === want.toLowerCase());
+    if (hit) return hit;
+  }
+  return (
+    hdr.find(
+      (h) => /deliver|dispatch/i.test(h) && /date|on\b/i.test(h) && !NOT_AN_ACTUAL_DATE.test(h),
+    ) ?? null
+  );
+}
 
 export const ser2iso = (v: Cell): string | null => {
   if (v == null || v === "") return null;
@@ -44,6 +100,49 @@ export const ser2iso = (v: Cell): string | null => {
   return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 };
 
+/**
+ * Is this Jobmaster sheet the DELIVERED report rather than the in-progress one?
+ *
+ * Two independent content signals, either of which is sufficient:
+ *   1. Job Status — the delivered report's rows sit at or past "D: Delivered".
+ *      The in-progress export has never contained a single such row.
+ *   2. A populated actual-delivery-date column, which the in-progress export
+ *      does not have (its only delivery column is "Target Delivery Date
+ *      Current", excluded by NOT_AN_ACTUAL_DATE).
+ *
+ * Deliberately name-blind: an operator renaming the download must not be able
+ * to turn the delivered file into a board-archiving jobs upload.
+ */
+function isDeliveredSheet(
+  rows: Row[],
+  hdr: string[],
+  ix: Record<string, number>,
+  g: (r: Row, h: string) => Cell,
+): boolean {
+  const data = rows.slice(1).filter((r) => r && g(r, "ID"));
+  if (!data.length) return false;
+
+  // 1 — status ladder
+  let withStat = 0;
+  let delivered = 0;
+  for (const r of data) {
+    const s = String(g(r, "Job Status") || "").trim();
+    if (!s) continue;
+    withStat++;
+    if (DELIVERED_STATUSES.has(s)) delivered++;
+  }
+  // a clear majority, so one stray not-yet-installed row can't flip it back
+  if (withStat > 0 && delivered / withStat >= 0.8) return true;
+
+  // 2 — a real delivery-date column that is actually filled in
+  const dateHdr = pickDeliveryDateHeader(hdr);
+  if (dateHdr && ix[dateHdr] != null) {
+    const dated = data.filter((r) => ser2iso(r[ix[dateHdr]])).length;
+    if (dated / data.length >= 0.5) return true;
+  }
+  return false;
+}
+
 export function parseUpload(wb: WorkBook): ParseResult {
   const out: ParseResult = {};
   for (const name of wb.SheetNames) {
@@ -59,7 +158,39 @@ export function parseUpload(wb: WorkBook): ParseResult {
     });
     const g = (r: Row, h: string): Cell =>
       ix[h] != null ? r[ix[h]] : undefined;
-    if (ix["Customer Tag"] != null && ix["ID"] != null) {
+    // ---- Delivered Jobs report — claimed BEFORE the jobs branch (see above) ----
+    if (ix["Customer Tag"] != null && ix["ID"] != null && isDeliveredSheet(rows, hdr, ix, g)) {
+      const dateHdr = pickDeliveryDateHeader(hdr);
+      out.deliveredHeaders = hdr.filter(Boolean);
+      out.deliveredJobs = rows
+        .slice(1)
+        .filter((r) => r && g(r, "ID"))
+        .map((r): ParsedDeliveredJob => {
+          const delivered = dateHdr ? ser2iso(r[ix[dateHdr]]) : null;
+          return {
+            id: String(g(r, "ID")),
+            tag: String(g(r, "Customer Tag") || "").trim(),
+            fam: String(g(r, "Product Family") || "Unassigned").trim() || "Unassigned",
+            cust: String(g(r, "Customer") || "").trim(),
+            val: Number(g(r, "Value") || 0),
+            delivered,
+            dateSource: delivered ? dateHdr : null,
+            tdd: ser2iso(g(r, "Target Delivery Date Current")),
+            otd: ser2iso(g(r, "OTD Date")),
+            start: ser2iso(g(r, "Job Start Date")),
+            proj: String(g(r, "Project") || ""),
+            stat: String(g(r, "Job Status") || "").trim(),
+            pct: Number(g(r, "Production Completion %") || 0),
+            note: String(g(r, "Current Status") || "").replace(/\s+/g, " ").slice(0, 150),
+            own: String(g(r, "Project Owner") || "").trim(),
+            mgmt: ser2iso(g(r, "Management Target Date Request")),
+            tp: Number(g(r, "Throughput") || 0),
+            tpv: Number(g(r, "Throughput Expected Value (Auto)") || 0),
+            tpp: Number(g(r, "Throughput Expected pc") || 0),
+            kit: Number(g(r, "Kitting percentage") || 0),
+          };
+        });
+    } else if (ix["Customer Tag"] != null && ix["ID"] != null) {
       out.jobs = rows
         .slice(1)
         .filter((r) => r && g(r, "ID"))

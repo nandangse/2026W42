@@ -13,10 +13,20 @@ interface StatusRow {
   desc: string;
   erp: string;
   gs: string;
+  /** One of the every-morning files (counted and chased), vs. an occasional one. */
+  daily: boolean;
   loadedToday: boolean;
   at: string | null;
   rows: number | null;
+  /** When this file last landed, ever — what non-daily files show instead. */
+  lastAt: string | null;
+  lastRows: number | null;
 }
+
+const timeOf = (iso: string) =>
+  new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+const dayOf = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
 /**
  * @param embedded true when rendered as a tab inside the Genie suite (admins) —
@@ -66,7 +76,12 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
     router.refresh();
   };
 
-  const loadedCount = rows.filter((r) => r.loadedToday).length;
+  // Only the daily files are counted and chased — the occasional ones (Delivered
+  // Jobs) would otherwise leave the header permanently short of its total.
+  const dailyRows = rows.filter((r) => r.daily);
+  const loadedCount = dailyRows.filter((r) => r.loadedToday).length;
+  const dailyTotal = dailyRows.length;
+  const NUMWORD = ["no", "one", "two", "three", "four", "five", "six"];
 
   return (
     <div className={embedded ? "" : "min-h-screen"} style={embedded ? {} : { background: "#F1EFE9" }}>
@@ -104,33 +119,55 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
       <div className="p-4 max-w-3xl mx-auto">
         <div className="mb-3 flex items-baseline justify-between flex-wrap gap-2">
           <h2 className="text-lg font-bold" style={{ color: "#16232F" }}>
-            Today&apos;s three files
+            Today&apos;s {NUMWORD[dailyTotal] || dailyTotal} files
           </h2>
-          <span className="text-sm font-semibold" style={{ color: loadedCount === 3 ? "#0D7A3F" : "#8A94A0" }}>
-            {loadedCount}/3 loaded {date && `· ${date}`}
+          <span
+            className="text-sm font-semibold"
+            style={{ color: dailyTotal > 0 && loadedCount === dailyTotal ? "#0D7A3F" : "#8A94A0" }}
+          >
+            {loadedCount}/{dailyTotal} loaded {date && `· ${date}`}
           </span>
         </div>
 
         <div className="space-y-3">
-          {rows.map((r) => (
+          {rows.map((r) => {
+            // Daily files are chased in red until they land. An occasional file
+            // is never overdue, so it reports its own history in a neutral tone
+            // rather than accusing Shweta of missing something.
+            const edge = r.loadedToday ? "#0D7A3F" : r.daily ? "#E8600A" : "#C9C6BE";
+            const tone = r.loadedToday ? "#0D7A3F" : r.daily ? "#B3261E" : "#8A94A0";
+            const statusText = r.loadedToday
+              ? `✓ loaded today${r.at ? " at " + timeOf(r.at) : ""}`
+              : r.daily
+                ? "○ not loaded yet"
+                : r.lastAt
+                  ? `last loaded ${dayOf(r.lastAt)}`
+                  : "not loaded yet";
+            return (
             <div
               key={r.key}
               className="bg-white rounded-lg p-3 border flex flex-col gap-2"
-              style={{ borderColor: "#E2E0DA", borderLeft: `5px solid ${r.loadedToday ? "#0D7A3F" : "#E8600A"}` }}
+              style={{ borderColor: "#E2E0DA", borderLeft: `5px solid ${edge}` }}
             >
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div>
-                  <div className="font-bold text-sm" style={{ color: "#16232F" }}>
+                  <div className="font-bold text-sm flex items-center gap-2" style={{ color: "#16232F" }}>
                     {r.nm}
+                    {!r.daily && (
+                      <span
+                        className="text-[10px] font-bold rounded px-1.5 py-0.5"
+                        style={{ background: "#EDEAE3", color: "#8A94A0" }}
+                      >
+                        WHEN IT CHANGES
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs" style={{ color: "#8A94A0" }}>
                     {r.desc}
                   </div>
                 </div>
-                <div className="text-sm font-bold" style={{ color: r.loadedToday ? "#0D7A3F" : "#B3261E" }}>
-                  {r.loadedToday
-                    ? `✓ loaded today${r.at ? " at " + new Date(r.at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : ""}`
-                    : "○ not loaded yet"}
+                <div className="text-sm font-bold" style={{ color: tone }}>
+                  {statusText}
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -143,15 +180,19 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
                 >
                   ↗ Open in ERP
                 </a>
-                <a
-                  href={gsExport(r.gs)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs rounded px-2 py-1.5 font-semibold"
-                  style={{ background: "#DCE8F5", color: "#1B3A5C" }}
-                >
-                  ⬇ Download sheet
-                </a>
+                {/* Not every report has a Google-Sheets mirror — Delivered Jobs
+                    is downloaded straight from the ERP. */}
+                {r.gs && (
+                  <a
+                    href={gsExport(r.gs)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs rounded px-2 py-1.5 font-semibold"
+                    style={{ background: "#DCE8F5", color: "#1B3A5C" }}
+                  >
+                    ⬇ Download sheet
+                  </a>
+                )}
                 <input
                   ref={(el) => {
                     fileRefs.current[r.key] = el;
@@ -171,7 +212,8 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {msg && (
@@ -186,7 +228,9 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
         <p className="text-xs mt-4" style={{ color: "#8A94A0" }}>
           The full PRE workbook is also accepted here — it covers Jobs + Projects
           in one upload. The app never talks to the ERP; these links just open in
-          your browser.
+          your browser. Delivered Jobs is the one file that is not needed every
+          morning: it builds up delivery history, so each upload adds to what is
+          already banked and nothing is ever lost by loading it late.
         </p>
       </div>
     </div>

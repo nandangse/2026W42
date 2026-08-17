@@ -9,6 +9,7 @@ import { parseUpload, linkTasks } from "./parse-upload";
 import type {
   ParseResult,
   ParsedJob,
+  ParsedDeliveredJob,
   UploadKind,
   ParsedProject,
 } from "./types";
@@ -16,11 +17,43 @@ import type {
 export class UploadError extends Error {}
 
 export function detectKind(p: ParseResult): UploadKind {
+  // delivered first: it is the one Jobmaster-shaped file that must never reach
+  // apply_jobs (see parse-upload's isDeliveredSheet). The parser never sets
+  // both, so this is order-of-preference, not a tie-break.
+  if (p.deliveredJobs) return "delivered";
   if (p.jobs && p.fromPRE) return "pre";
   if (p.jobs) return "jobs";
   if (p.projMap && !p.jobs) return "projects";
   if (p.rawTasks) return "tasks";
   throw new UploadError("Workbook not recognised");
+}
+
+/**
+ * Refuse a jobs upload that would archive most of the live board.
+ *
+ * A normal morning file replaces the board nearly one-for-one — a handful of
+ * jobs drop out. A file that would retire half of it is not a morning file: it
+ * is the wrong export (there are now four Jobmaster-shaped downloads on the
+ * Morning Update page) or a truncated download. Archiving is reversible in
+ * principle, but only by someone who notices, so this fails closed.
+ */
+const MAX_ARCHIVE_SHARE = 0.4;
+
+async function guardMassArchive(admin: SupabaseClient, jobs: ParsedJob[]) {
+  const { data, error } = await admin.from("jobs").select("id").eq("active", true);
+  if (error) throw new UploadError("could not read jobs: " + error.message);
+  const live = (data || []).map((r) => r.id as string);
+  if (live.length < 20) return; // a near-empty board (fresh install) has nothing to protect
+  const incoming = new Set(jobs.map((j) => j.id));
+  const wouldArchive = live.filter((id) => !incoming.has(id)).length;
+  if (wouldArchive / live.length > MAX_ARCHIVE_SHARE) {
+    throw new UploadError(
+      `Refused: this file has ${jobs.length} jobs and would archive ${wouldArchive} of the ${live.length} live jobs. ` +
+        `That is not a normal morning update — it usually means the wrong export was uploaded ` +
+        `(check it is "Job in progress - Jobs", not Delivered Jobs or a filtered view). ` +
+        `Nothing was changed.`,
+    );
+  }
 }
 
 /** projMap (keyed by project id) → the jsonb array apply_projects expects. */
@@ -78,6 +111,7 @@ export async function applyUpload(
   if (kind === "jobs" || kind === "pre") {
     const jobs = parsed.jobs!;
     jobCount = jobs.length;
+    await guardMassArchive(admin, jobs);
     const { error } = await admin.rpc("apply_jobs", {
       p_jobs: jobs,
       p_batch: batchId,
@@ -112,6 +146,43 @@ export async function applyUpload(
       });
       if (oe) throw new UploadError("apply_owners failed: " + oe.message);
       lines.push(`· ${Object.keys(parsed.owners).length} job owners merged`);
+    }
+  } else if (kind === "delivered") {
+    // Dedupe by id first: a history export can repeat a job (one line per
+    // despatch), and ON CONFLICT DO UPDATE refuses to touch the same row twice
+    // in one statement. Last occurrence wins — the report is ordered oldest
+    // first, so that is the most recent state of the job.
+    const byId = new Map<string, ParsedDeliveredJob>();
+    for (const d of parsed.deliveredJobs!) byId.set(d.id, d);
+    const del = [...byId.values()];
+    const dupes = parsed.deliveredJobs!.length - del.length;
+    if (dupes > 0) lines.push(`· ${dupes} duplicate job rows collapsed (kept the latest of each)`);
+    jobCount = del.length;
+    const { error } = await admin.rpc("apply_delivered", {
+      p_jobs: del,
+      p_batch: batchId,
+    });
+    if (error) throw new UploadError("apply_delivered failed: " + error.message);
+
+    // Delivery dates are the entire point of this file, so say plainly how many
+    // landed and which column they came from. A mis-matched header must be
+    // obvious on the first upload, not discovered later in a wrong chart.
+    const dated = del.filter((d) => d.delivered);
+    const col = dated[0]?.dateSource;
+    lines.push(`· ${del.length} delivered jobs banked (never archived — this file is a ledger)`);
+    if (dated.length) {
+      lines.push(`· ${dated.length} carry a delivery date, read from the "${col}" column`);
+      const ds = dated.map((d) => d.delivered!).sort();
+      lines.push(`· delivery dates span ${ds[0]} → ${ds[ds.length - 1]}`);
+    }
+    if (dated.length < del.length) {
+      lines.push(
+        `· ⚠ ${del.length - dated.length} rows have NO delivery date. ` +
+          (col
+            ? `Their "${col}" cell was empty.`
+            : `No delivery-date column was recognised. Columns in this file: ` +
+              (parsed.deliveredHeaders || []).join(" | ")),
+      );
     }
   } else if (kind === "tasks") {
     // link raw ToDo rows against the current active jobs in the DB

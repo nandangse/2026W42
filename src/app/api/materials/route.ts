@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePlanner, errJson } from "@/lib/auth";
+import { assertJobEditable } from "@/lib/job-state";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,19 @@ export async function POST(req: Request) {
     await requirePlanner();
     const supabase = supabaseServer();
     const body = await req.json();
+    // add/seed carry job_id; status/delete identify a row instead, so resolve
+    // the job from the material itself — otherwise the lock would be trivially
+    // sidestepped by deleting a delivered job's material lines one by one.
+    let guardJob: string | null = body.job_id ?? null;
+    if (!guardJob && body.id) {
+      const { data: mat } = await supabase
+        .from("materials")
+        .select("job_id")
+        .eq("id", body.id)
+        .maybeSingle();
+      guardJob = mat?.job_id ?? null;
+    }
+    await assertJobEditable(supabase, guardJob);
 
     if (body.action === "add") {
       if (!body.job_id || !body.item)
