@@ -33,14 +33,9 @@ export const DEFAULT_SOURCES: MorningSource[] = [
     gs: "https://docs.google.com/spreadsheets/d/1zsFATRDFyt1SEIc7bh2MrWPGjE-XKqFW8qhZy4x7Vkg/edit",
     daily: true,
   },
-  {
-    key: "tasks",
-    nm: "To Do Dashboard All",
-    desc: "ERP ToDos → task cards on the boards",
-    erp: "https://nandanerp.in/app/todo/view/report/ToDo%20Dashboard%20All",
-    gs: "https://docs.google.com/spreadsheets/d/18jCqt8d_sIHsYOYPkHFnavWwclfEMIsqCoOCVJsCxrY/edit",
-    daily: true,
-  },
+  // Third on the page by Dr Raghu's instruction (17 Aug 2026). It sits with
+  // the jobs files it belongs beside rather than last, even though it is the
+  // one file that is not part of the daily ritual.
   {
     key: "delivered",
     nm: "Delivered Jobs",
@@ -51,6 +46,14 @@ export const DEFAULT_SOURCES: MorningSource[] = [
     gs: "",
     // History, not a daily snapshot — see MorningSource.daily.
     daily: false,
+  },
+  {
+    key: "tasks",
+    nm: "To Do Dashboard All",
+    desc: "ERP ToDos → task cards on the boards",
+    erp: "https://nandanerp.in/app/todo/view/report/ToDo%20Dashboard%20All",
+    gs: "https://docs.google.com/spreadsheets/d/18jCqt8d_sIHsYOYPkHFnavWwclfEMIsqCoOCVJsCxrY/edit",
+    daily: true,
   },
 ];
 

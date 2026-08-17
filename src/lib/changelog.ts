@@ -1,17 +1,22 @@
 /**
  * Genie version + release log.
  *
- * VERSIONING RULE (set by Dr Raghu, 17 Aug 2026) — MAJOR.MINOR.BATCH.PATCH
+ * VERSIONING RULE (set by Dr Raghu, restated 17 Aug 2026) — MAJOR.MINOR.BATCH.PATCH
  *
  *   2 . 6 . 1 . 1
- *   │   │   │   └── PATCH — bump for every change inside ONE module
- *   │   │   └────── BATCH — bump when several modules change together,
- *   │   │                   or on the first release of a new day
- *   │   └────────── MINOR — bump for major changes, or at the start of a
- *   │                       new week (2.6 → 2.7)
- *   └────────────── MAJOR — a new generation of the app
+ *   │   │   │   └── LAST      — TODAY. Bump for every change shipped today.
+ *   │   │   └────── 2nd LAST  — NEXT DAY. Bump on the first release of a
+ *   │   │                       new day.
+ *   │   └────────── 3rd LAST  — NEW WEEK, or A NEW MODULE IS ADDED.
+ *   │                           A whole new workspace/section counts.
+ *   └────────────── MAIN      — ONLY when Dr Raghu says so. Never inferred.
  *
- * When BATCH bumps, PATCH resets to 0. When MINOR bumps, both reset.
+ * When a digit bumps, everything to its right resets to 0.
+ *
+ * The trap: "a new module" is a MINOR bump, not a patch. Goals rebuilt →
+ * 2.7.0.0; the Delivered Jobs workspace is a second new module → 2.8.0.0,
+ * not 2.7.0.1. Changes *inside* an existing module the same day take the
+ * last digit.
  *
  * ADD A NEW ENTRY AT THE TOP of UPDATES for every shipped change — the header
  * badge and Admin → Updates both read this list, so the log and the version
@@ -32,7 +37,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
-    v: "2.7.0.1",
+    v: "2.8.0.1",
+    date: "2026-08-17",
+    module: "Morning Update",
+    items: [
+      "Delivered Jobs now sits third on Morning Update, above To Do Dashboard All — beside the jobs files it belongs with, rather than last.",
+      "It stays marked “when it changes”, so the header still counts 3/3 for the three daily files and this card shows when it last landed instead of turning red for not being loaded today.",
+    ],
+  },
+  {
+    v: "2.8.0.0",
     date: "2026-08-17",
     module: "Delivered Jobs",
     items: [
