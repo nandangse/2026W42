@@ -317,6 +317,12 @@ export async function buildBoard(supabase: SupabaseClient) {
       qty: m.qty,
       status: m.status,
       custom: !!m.custom,
+      due: m.due ?? null,
+      who: m.who ?? null,
+      note: m.note ?? null,
+      // set once the line has been promoted to a task — the two are then held
+      // in step by the API, in both directions
+      task_id: m.task_id ?? null,
     });
   }
 

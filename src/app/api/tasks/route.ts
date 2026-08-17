@@ -58,6 +58,33 @@ export async function POST(req: Request) {
         .update({ done: !!body.done })
         .eq("id", body.id);
       if (error) throw new Error(error.message);
+
+      /**
+       * The mirror, half two: a task promoted from a kitting line.
+       *
+       * Closing it receives the material; re-opening it puts the material back
+       * to Yet to receive. Without this the two records drift within a week —
+       * somebody ticks the task, the board still shows the item outstanding,
+       * and the kitting percentage is wrong on every screen that reads it.
+       * A QC Defective line is left alone: it is not "not yet received", and
+       * closing the chase must not quietly overwrite a QC call.
+       */
+      if (body.kind === "manual") {
+        try {
+          const { data: mat } = await supabase
+            .from("materials")
+            .select("id, status")
+            .eq("task_id", body.id)
+            .maybeSingle();
+          if (mat && mat.status !== "QC Defective")
+            await supabase
+              .from("materials")
+              .update({ status: body.done ? "Received" : "Yet to receive", updated_at: new Date().toISOString() })
+              .eq("id", mat.id);
+        } catch {
+          /* migration 0030 not run yet — the task still toggles */
+        }
+      }
       return NextResponse.json({ ok: true });
     }
 

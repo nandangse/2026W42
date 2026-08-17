@@ -37,6 +37,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.3.0.0",
+    date: "2026-08-18",
+    module: "Material Kitting",
+    items: [
+      "Materials is now MATERIAL KITTING, and a line is a real record rather than a tick-box. Columns: Material / kit item · Qty · Receivable date · Update · Status.",
+      "Three statuses, not two: Yet to receive, Received, and QC Defective. QC Defective is NOT a kind of received — the item is on site and cannot be used, which for the job is the same position as not having it, so it counts as outstanding everywhere.",
+      "A pencil on every line opens it: item, quantity, receivable date, who is chasing it, a running Update line, and comments — where a delay gets explained next to the thing it is delaying.",
+      "ANSWERING DR RAGHU’S QUESTION — can a kitting line be a task, since it already has a date? Yes, and the answer is a link rather than a copy. The material row stays the record; “Raise a task for this” puts it on somebody’s list in Tasking with the receivable date as its due date, under the Material category, tied back to the line.",
+      "Once linked the two are held in step BOTH WAYS: receiving the material closes the task, and closing the task receives the material. Two records that look alike are not the problem — two that drift are, and this is what stops it. Editing the date or the owner moves the task too.",
+      "QC Defective deliberately re-opens the task. The item is here and useless, so the chasing is not finished; and marking a task done never overwrites a QC call.",
+      "Not every line becomes a task. Eight lines on a hundred and five jobs would be eight hundred and forty tasks and Tasking would become a bill of materials nobody reads — so a line is promoted only when somebody actually has to chase it.",
+      "Migration 0030. Existing “Pending” lines become “Yet to receive” — the same state, said the way the shop floor says it.",
+    ],
+  },
+  {
     v: "3.2.0.4",
     date: "2026-08-18",
     module: "Genie Hint",

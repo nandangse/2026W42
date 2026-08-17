@@ -40,6 +40,7 @@ import RunRate from "./RunRate";
 import DeliveryOutlook from "./DeliveryOutlook";
 import LMS from "./LMS";
 import JobsInProgress, { type WipJob } from "./JobsInProgress";
+import MaterialKitting from "./MaterialKitting";
 import { useMyWeek, HowsMyDay, ImageQuote, Birthdays, MyLearningCard } from "./MyWeekPanels";
 import { hhmm } from "@/lib/lms";
 
@@ -197,7 +198,7 @@ interface Board {
   tasks: Task[];
   plans: Record<string, Plan & { baseline_on?: string | null; baseline_end?: string | null }>;
   baselines: Record<string, { idx: number; title: string; start: string; end: string }[]>;
-  materials: Record<string, { id: string; item: string; qty: string; status: string; custom: boolean }[]>;
+  materials: Record<string, { id: string; item: string; qty: string; status: string; custom: boolean; due?: string | null; who?: string | null; note?: string | null; task_id?: string | null }[]>;
   priority: string[] | null;
   templates: Record<string, any>;
   owners: string[];
@@ -2863,7 +2864,7 @@ function JobPlan({
       {/* plan / materials sub-tabs */}
       <div className="flex gap-1 rounded p-1 bg-white border mb-3" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
         {(["plan", "mat"] as const).map((k) => (
-          <button key={k} onClick={() => { if (k === "mat") ensureMats(); setPlanView(k); }} className="px-3 py-1 rounded text-sm font-semibold" style={planView === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>{k === "plan" ? "Milestone Plan" : "Materials"}</button>
+          <button key={k} onClick={() => { if (k === "mat") ensureMats(); setPlanView(k); }} className="px-3 py-1 rounded text-sm font-semibold" style={planView === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>{k === "plan" ? "Milestone Plan" : "Material Kitting"}</button>
         ))}
       </div>
 
@@ -2875,32 +2876,18 @@ function JobPlan({
             <Chip label="KITTED VALUE = val × (1−T%) × Kit%" value={V((matVal * (dj.kit || 0)) / 100)} color="#0D7A3F" />
             <Chip label="YET TO RECEIVE" value={V(matVal * (1 - (dj.kit || 0) / 100))} color="#B3261E" />
           </div>
-          <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
-            <table className="w-full text-sm">
-              <thead><tr style={{ background: "#22303C", color: "#fff" }} className="text-xs"><th className="px-3 py-2 text-left">#</th><th className="px-3 py-2 text-left">Material / kit item</th><th className="px-3 py-2 text-left">Qty</th><th className="px-3 py-2">Status ✎</th></tr></thead>
-              <tbody>
-                {mats.map((m, i) => (
-                  <tr key={m.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
-                    <td className="px-3 py-1.5" style={{ color: "#8A94A0" }}>{i + 1}</td>
-                    <td className="px-3 py-1.5 font-medium">{m.item}{m.custom && <span title="Custom item added by you" style={{ color: "#E8600A" }}> ✎</span>}</td>
-                    <td className="px-3 py-1.5" style={{ color: "#5A6672" }}>{m.qty}</td>
-                    <td className="px-3 py-1.5 text-center">
-                      <button onClick={() => canEdit && setMatStatus(m.id, m.status === "Received" ? "Pending" : "Received", m.item)} disabled={!canEdit} className="text-xs font-bold rounded px-2 py-0.5" style={{ ...(m.status === "Received" ? { background: "#E6F4EA", color: "#0D7A3F" } : { background: "#FBEDEA", color: "#B3261E" }), cursor: canEdit ? "pointer" : "default" }}>{m.status === "Received" ? "✓ Received" : "⏳ Yet to receive"}</button>
-                      {canEdit && <button onClick={() => delMat(m.id)} title="Remove line" className="ml-1 text-xs" style={{ color: "#B3261E" }}>✕</button>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <MaterialKitting
+            jobId={dj.id}
+            mats={mats}
+            canEdit={canEdit}
+            people={assignees(board).map((a) => ({ value: a.value, label: a.label }))}
+            onChanged={reload}
+          />
+          <div className="text-xs mt-2" style={{ color: "#8A94A0", lineHeight: 1.5 }}>
+            {recvN}/{mats.length} kit items received — a checklist, while the boards read the ERP&apos;s own Kitting % in
+            Σ val × (1−T%) × Kit%. A line marked <b>QC Defective</b> counts as not received: it is on site and cannot be
+            used, which for the job is the same position as not having it.
           </div>
-          {canEdit && (
-            <div className="flex gap-1 mt-2 items-center flex-wrap">
-              <input placeholder="Custom material / bought-out item…" value={matForm.item} onChange={(e) => setMatForm({ ...matForm, item: e.target.value })} className="text-xs border rounded px-2 py-1.5" style={{ borderColor: "#E2E0DA", minWidth: 240 }} />
-              <input placeholder="Qty" value={matForm.qty} onChange={(e) => setMatForm({ ...matForm, qty: e.target.value })} className="text-xs border rounded px-2 py-1.5 w-24" style={{ borderColor: "#E2E0DA" }} />
-              <button onClick={addMat} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}>+ Add material</button>
-            </div>
-          )}
-          <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>{recvN}/{mats.length} kit items received (checklist tracker only — the boards use Kitting % in Σ val × (1−T%) × Kit%). Rows marked ✎ are custom items you added.</div>
         </div>
       )}
 
