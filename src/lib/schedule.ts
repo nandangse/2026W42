@@ -51,6 +51,26 @@ export const initials = (s: string): string =>
     .toUpperCase();
 export const jobNo = (id: string): string => id.slice(-4);
 
+/**
+ * Two or three characters for whoever is carrying something.
+ *
+ * initials() takes the first letter of each word, which is right for "Mukesh
+ * Tiwari" and wrong for everything else: it turns "MT" into "M" and "anils"
+ * into "A". A one-letter tag on a calendar chip identifies nobody in a company
+ * with two Anils.
+ *
+ *   Mukesh Tiwari -> MT     MT    -> MT
+ *   mukesh.tiwari -> MT     anils -> ANI
+ */
+export const whoTag = (s: string | null | undefined): string => {
+  const raw = String(s || "").trim();
+  if (!raw) return "—";
+  const parts = raw.split(/[._\s-]+/).filter(Boolean);
+  if (parts.length > 1) return parts.map((p) => p[0]).join("").slice(0, 3).toUpperCase();
+  // one word: a short one is already a handle, a long one gets its first three
+  return (parts[0].length <= 4 ? parts[0] : parts[0].slice(0, 3)).toUpperCase();
+};
+
 export interface PlanMilestone {
   name: string;
   days: number;

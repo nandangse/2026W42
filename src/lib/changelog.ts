@@ -37,6 +37,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.4.0.2",
+    date: "2026-08-18",
+    module: "Nandan Tasking",
+    items: [
+      "Calendar chips now read: job number · who · escalation · customer tag. The CATEGORY word is gone — the chip is already coloured by it and the legend names the colours, so writing “Material” on a material-coloured chip only ate the room the customer needed.",
+      "Fixed: initials were showing as one letter. The helper took the first letter of each word, which is right for “Mukesh Tiwari” and wrong for everything else — it turned MT into M and anils into A. A one-letter tag identifies nobody in a company with two Anils. Now MT stays MT, anils reads ANI, and Mukesh Tiwari still reads MT.",
+      "The Task box is two lines instead of one. Typing blind past the right-hand edge is how a task ends up named “Chassis spares parts list costing pend”. Ctrl/⌘+Enter still saves it.",
+    ],
+  },
+  {
     v: "3.4.0.1",
     date: "2026-08-18",
     module: "Nandan Tasking",

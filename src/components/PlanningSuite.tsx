@@ -13,6 +13,7 @@ import {
   lakh,
   jobNo,
   initials,
+  whoTag,
   diffDays,
   addDays,
   computeSchedule,
@@ -3462,6 +3463,9 @@ function Tasking({
         const byDay: Record<string, Task[]> = {}; openT.forEach((t) => (byDay[t.due!] = byDay[t.due!] || []).push(t));
         const overdue = openT.filter((t) => taskLate(t, TODAY));
         const monthLabel = first.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
+        // the customer tag says which machine this is; the job number alone does not
+        const tagOf = new Map(board.jobs.map((j) => [j.id, j.tag]));
+        const jobTag = (id: string) => tagOf.get(id) || "";
         const shiftMonth = (d: number) => setCalMonth(toISO(new Date(Date.UTC(yy, mm - 1 + d, 1))).slice(0, 7));
         return (
           <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
@@ -3524,14 +3528,19 @@ function Tasking({
                                       goes red when the date has gone — lateness is
                                       said HERE so the chip can keep saying what
                                       kind of work it is. */}
+                                  {/* Job · who · escalation · customer tag.
+                                      The CATEGORY is not written out: the chip
+                                      is already coloured by it and the legend
+                                      names the colours, so the word only ate
+                                      the room the customer needed. */}
                                   <div className="flex items-baseline gap-1" style={{ whiteSpace: "nowrap" }}>
                                     <span className="font-bold" style={late ? { background: "#B3261E", color: "#fff", borderRadius: 2, padding: "0 3px" } : undefined}>
                                       {jobNo(t.j)}
                                     </span>
-                                    <span className="font-bold">{initials(t.who)}</span>
+                                    <span className="font-bold">{whoTag(t.who)}</span>
+                                    {t.esc && t.esc !== "None" && <span style={{ color: "#B3261E", fontWeight: 700 }} title={t.esc}>⚠</span>}
                                     {pushed && <span style={{ color: "#B3261E", fontWeight: 700 }} title={`Moved ${t.push_count} time${t.push_count === 1 ? "" : "s"} — first promised ${fmtFull(t.original_due!)}`}>↻{t.push_count}</span>}
-                                    <span style={{ opacity: 0.75, overflow: "hidden", textOverflow: "ellipsis" }}>{t.cat || "General"}</span>
-                                    {t.esc && t.esc !== "None" && <span style={{ color: "#B3261E", fontWeight: 700 }}>⚠</span>}
+                                    <span style={{ opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis" }} title={jobTag(t.j)}>{jobTag(t.j)}</span>
                                   </div>
                                   {/* line two: what it actually is, wrapped to two
                                       lines rather than cut at the first word */}
@@ -4193,7 +4202,19 @@ function AddTaskForm({ form, setForm, owners, onSubmit, onCancel, hideActions }:
       <datalist id="who-options">
         <AssigneeOptions owners={owners} current={form.who} />
       </datalist>
-      <input autoFocus placeholder="Task…" value={form.t} onChange={(e) => setForm({ ...form, t: e.target.value })} className="w-full text-xs border rounded px-1 py-1 mb-1" style={{ borderColor: "#E2E0DA" }} />
+      {/* two lines, not one: a task worth raising rarely fits in a single
+          line of a narrow box, and typing blind past the right-hand edge is
+          how tasks end up named "Chassis spares parts list costing pend" */}
+      <textarea
+        autoFocus
+        rows={2}
+        placeholder="Task…"
+        value={form.t}
+        onChange={(e) => setForm({ ...form, t: e.target.value })}
+        onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSubmit(); }}
+        className="w-full text-xs border rounded px-1 py-1 mb-1"
+        style={{ borderColor: "#E2E0DA", resize: "vertical", lineHeight: 1.45 }}
+      />
       <div className="flex gap-1 mb-1">
         {/* Typeable as well as pickable. Scrolling a dropdown for a name you
             already know is the slowest part of raising a task, and the list
