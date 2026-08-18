@@ -37,6 +37,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.6.0.0",
+    date: "2026-08-18",
+    module: "Admin → Report",
+    items: [
+      "A Report tab in Admin, with a Download PDF button. Eight pages, 16:9, built from the boards the moment you press it — the year against target, what has actually gone out since 1 April, the order book and where it stops, the book by product, kitting against production, the jobs closest to going out, one product family looked at properly, and what is being escalated.",
+      "Nothing on it is typed and nothing is cached, so the deck cannot drift from the boards it summarises. The first page carries Date of Report, written out in full, because a deck without a date on it gets presented six weeks later as though it were current.",
+      "A closer look at Hi Lifts, on its own page: all 20 on the board job by job with the customer, kitted and built against each other, who is waiting, and the 16 that went out this financial year. Three of the twenty carry no order value yet — they are named as jobs with no value rather than added in as nothing.",
+      "The PDF comes from your own browser's Save as PDF at a true 13.333 × 7.5in page. That is deliberate: a deck rendered one way on screen and another way on a server is a deck nobody can check before presenting it.",
+      "The escalation figures on the last page count levels, not labels. The ERP writes the full heading in that column — \"L2 — Production Head\" — so the three levels are read off the front of it rather than listed as five separate headings.",
+    ],
+  },
+  {
     v: "3.5.0.2",
     date: "2026-08-18",
     module: "Jobs in Progress",

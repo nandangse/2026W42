@@ -1,3 +1,11 @@
+// LEGACY. This makes the seven-page .pptx from an earlier round and is kept
+// only because a .pptx can be edited and a printed PDF cannot.
+//
+// It does NOT include the focus page (Hi Lifts), and nothing on this machine
+// can render a .pptx to check it -- which is exactly why the deck moved to
+// HTML. The deck proper is Admin -> Report, or scratchpad/deck/render.mjs.
+console.warn("[legacy] 7-page PPTX, no focus page, unrenderable here. The deck is Admin -> Report.");
+
 const pptxgen = require("pptxgenjs");
 const D = require("./deck.json");
 

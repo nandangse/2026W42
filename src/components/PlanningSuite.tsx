@@ -4625,7 +4625,7 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
 }
 
 // ============================ Admin ============================
-type AdminTab = "users" | "org" | "milestones" | "setup" | "updates";
+type AdminTab = "users" | "org" | "milestones" | "setup" | "report" | "updates";
 
 /**
  * The Name column stays put while the rest scrolls. With department,
@@ -4834,10 +4834,98 @@ function ImageQuotesPanel() {
   );
 }
 
+/**
+ * The review deck — eight pages, built from the boards at the moment it is
+ * asked for.
+ *
+ * There is no stored copy and no "last generated" date on purpose. A deck kept
+ * on a shelf goes stale silently, and a stale deck presented as current is
+ * worse than none; this one is rebuilt on every press and carries the date it
+ * was run on its first page.
+ *
+ * The PDF comes from the browser's own Save as PDF rather than a renderer on
+ * the server. That is not a shortcut around a missing library — it is the only
+ * way the page that is checked on screen and the page that comes out of the
+ * printer are the same page.
+ */
+function ReportPanel() {
+  const open = (print: boolean) =>
+    window.open(`/api/deck${print ? "?print=1" : ""}`, "_blank", "noopener");
+
+  const ON_IT = [
+    ["The year", "anticipated sales and throughput against the FY target"],
+    ["Since 1 April", "delivered month by month, under the run rate now required"],
+    ["The order book", "every job by delivery month, and where the book stops"],
+    ["By product", "the families, ordered by what they actually earn"],
+    ["Kitting vs production", "what is nearly out, and what is bought and not moving"],
+    ["Closest to going out", "the jobs at the line, and the tasks still open on them"],
+    ["A closer look", "one family — Hi Lifts — job by job, with who is waiting"],
+    ["Escalations", "how many, at what level, and what the jobs themselves say"],
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-white rounded-lg border p-4" style={{ borderColor: "#E2E0DA" }}>
+        <div className="font-bold text-sm">
+          Review deck{" "}
+          <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>
+            — eight pages, 16:9, built live from the boards
+          </span>
+        </div>
+        <p className="text-xs mt-1 mb-3" style={{ color: "#5A6672", maxWidth: "44rem", lineHeight: 1.6 }}>
+          Every figure on it is queried when you press the button — nothing is typed in and nothing is
+          cached, so the deck cannot drift from the boards. It carries the date it was run on the first
+          page. <b>Download PDF</b> opens the deck and goes straight to your browser&apos;s print dialog;
+          choose <b>Save as PDF</b> and <b>Paper size: 13.33 × 7.5in</b> if it is offered, or leave the
+          default — the page already sets it.
+        </p>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => open(true)}
+            className="px-4 py-2 rounded text-sm font-bold text-white"
+            style={{ background: "#E8600A" }}
+          >
+            ⬇ Download PDF
+          </button>
+          <button
+            onClick={() => open(false)}
+            className="px-4 py-2 rounded text-sm font-semibold border"
+            style={{ borderColor: "#E2E0DA", color: "#22303C" }}
+          >
+            👁 Open on screen
+          </button>
+          <a
+            href="/api/deck?format=json"
+            target="_blank"
+            rel="noreferrer"
+            className="px-4 py-2 rounded text-sm font-semibold border"
+            style={{ borderColor: "#E2E0DA", color: "#5A6672" }}
+          >
+            {"{ }"} The figures behind it
+          </a>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg border p-4" style={{ borderColor: "#E2E0DA" }}>
+        <div className="font-bold text-sm mb-2">What is on it</div>
+        <div className="space-y-1">
+          {ON_IT.map(([t, d], i) => (
+            <div key={t} className="text-xs flex gap-2" style={{ color: "#5A6672", lineHeight: 1.7 }}>
+              <span style={{ color: "#B8B5AC", width: "1rem", flexShrink: 0 }}>{i + 1}</span>
+              <b style={{ color: "#22303C", width: "11rem", flexShrink: 0 }}>{t}</b>
+              <span>{d}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminTabs({ tab, setTab }: { tab: AdminTab; setTab: (t: AdminTab) => void }) {
   return (
     <div className="flex gap-1 rounded p-1 bg-white border" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
-      {([["users", "👥 Users"], ["org", "🧬 Org Chart"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["updates", "🗒 Updates"]] as const).map(([k, l]) => (
+      {([["users", "👥 Users"], ["org", "🧬 Org Chart"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["report", "📊 Report"], ["updates", "🗒 Updates"]] as const).map(([k, l]) => (
         <button
           key={k}
           onClick={() => setTab(k)}
@@ -5492,6 +5580,8 @@ function Admin({
         </div>
       </div>
       </>)}
+
+      {adminTab === "report" && <ReportPanel />}
 
       {adminTab === "org" && <OrgChart users={users} departments={departments} />}
 

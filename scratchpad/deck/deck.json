@@ -1,5 +1,6 @@
 {
  "asOf": "18-08-2026",
+ "asOfLong": "18 August 2026",
  "fy": "FY2026-27",
  "day": 140,
  "total": 365,
@@ -13,6 +14,38 @@
   "tp": 8.68,
   "n": 61
  },
+ "done": [
+  {
+   "k": "2026-04",
+   "n": 26,
+   "v": 6.74,
+   "t": 3.35
+  },
+  {
+   "k": "2026-05",
+   "n": 5,
+   "v": 0.99,
+   "t": 0.51
+  },
+  {
+   "k": "2026-06",
+   "n": 9,
+   "v": 1.89,
+   "t": 1.11
+  },
+  {
+   "k": "2026-07",
+   "n": 16,
+   "v": 5.77,
+   "t": 3
+  },
+  {
+   "k": "2026-08",
+   "n": 5,
+   "v": 1.79,
+   "t": 0.71
+  }
+ ],
  "book": {
   "sales": 33.58,
   "tp": 12.56,
@@ -135,68 +168,12 @@
    "t": 0.17
   }
  ],
- "famOther": [
-  {
-   "f": "MHE - Double Scissor Lift",
-   "n": 1,
-   "v": 1.39,
-   "t": 0.42
-  },
-  {
-   "f": "BB -  Workshop Van",
-   "n": 1,
-   "v": 0.9,
-   "t": 0.36
-  },
-  {
-   "f": "DEF-Customised",
-   "n": 4,
-   "v": 1.04,
-   "t": 0.31
-  },
-  {
-   "f": "MHE - Truck Mounted Crane",
-   "n": 2,
-   "v": 1.02,
-   "t": 0.31
-  },
-  {
-   "f": "MHE - Others",
-   "n": 8,
-   "v": 0.43,
-   "t": 0.17
-  },
-  {
-   "f": "AGSE - Fuel Bowser",
-   "n": 2,
-   "v": 0.52,
-   "t": 0.14
-  },
-  {
-   "f": "AGSE - Others",
-   "n": 1,
-   "v": 0.06,
-   "t": 0.06
-  },
-  {
-   "f": "DEF-MHE",
-   "n": 6,
-   "v": 0.09,
-   "t": 0.03
-  },
-  {
-   "f": "MHE - Tail Lift",
-   "n": 2,
-   "v": 0.07,
-   "t": 0.02
-  },
-  {
-   "f": "Contract Manufacturing",
-   "n": 1,
-   "v": 0.01,
-   "t": 0
-  }
- ],
+ "famCount": 18,
+ "famTop": 7,
+ "famRest": {
+  "n": 12,
+  "t": 0.25
+ },
  "ready": {
   "n": 12,
   "tp": 1.33,
@@ -204,109 +181,145 @@
    {
     "id": "2114",
     "tag": "Spruce Engineering Co - K-Loader - Vishakhapa…",
+    "cust": "Spruce Engineering Co",
     "kit": 70,
     "pct": 70,
+    "val": 2.69,
     "tp": 0.81,
     "tdd": "2026-08-31",
+    "esc": true,
     "tasks": 6
    },
    {
     "id": "2539",
     "tag": "8 BRD - TMC - Chennai - #1",
+    "cust": "8 BRD Chennai",
     "kit": 90,
     "pct": 90,
+    "val": 0.51,
     "tp": 0.15,
     "tdd": "2026-08-25",
+    "esc": false,
     "tasks": 0
    },
    {
     "id": "2540",
     "tag": "8 BRD - TMC - Chennai - #2",
+    "cust": "8 BRD Chennai",
     "kit": 90,
     "pct": 90,
+    "val": 0.51,
     "tp": 0.15,
     "tdd": "2026-08-25",
+    "esc": false,
     "tasks": 0
    },
    {
     "id": "2517",
     "tag": "EIH - HL-FC - 6.3 - #6 of 6 - MUM",
+    "cust": "EIH Limited",
     "kit": 100,
     "pct": 60,
+    "val": 0.27,
     "tp": 0.08,
     "tdd": "2026-08-25",
+    "esc": true,
     "tasks": 0
    },
    {
     "id": "2575",
     "tag": "Fuel Bowsers 990 Ltr Karnavati Aviation (Adan…",
+    "cust": "Karnavati Aviation Pvt Ltd",
     "kit": 90,
     "pct": 60,
+    "val": 0.26,
     "tp": 0.07,
     "tdd": "2026-08-21",
+    "esc": true,
     "tasks": 2
    },
    {
     "id": "2120",
     "tag": "Spruce Eng - Container Cradle Frame 40 FT - V…",
+    "cust": "Spruce Engineering Co",
     "kit": 100,
     "pct": 70,
+    "val": 0.04,
     "tp": 0.02,
     "tdd": "2026-08-31",
+    "esc": false,
     "tasks": 0
    },
    {
     "id": "2116",
     "tag": "Spruce Engineering co - Portable Loading Ramp…",
+    "cust": "Spruce Engineering Co",
     "kit": 90,
     "pct": 80,
+    "val": 0.04,
     "tp": 0.01,
     "tdd": "2026-08-31",
+    "esc": true,
     "tasks": 0
    },
    {
     "id": "2117",
     "tag": "Spruce Engineering co - Portable Loading Ramp…",
+    "cust": "Spruce Engineering Co",
     "kit": 90,
     "pct": 80,
+    "val": 0.04,
     "tp": 0.01,
     "tdd": "2026-08-31",
+    "esc": true,
     "tasks": 0
    },
    {
     "id": "2588",
     "tag": "Verni Hydrocarbon- Vayu TL- 350KG- 1Q",
+    "cust": "Verni Hydrocarbons LLP",
     "kit": 100,
     "pct": 70,
+    "val": 0.03,
     "tp": 0.01,
     "tdd": "2026-08-31",
+    "esc": true,
     "tasks": 0
    },
    {
     "id": "2266",
     "tag": "Spruce Engineering Co - Container Cradle Fram…",
+    "cust": "Spruce Engineering Co",
     "kit": 100,
     "pct": 90,
+    "val": 0.01,
     "tp": 0,
     "tdd": "2026-08-31",
-    "tasks": 0
-   },
-   {
-    "id": "2268",
-    "tag": "Spruce Engineering Co - Container Cradle Fram…",
-    "kit": 100,
-    "pct": 90,
-    "tp": 0,
-    "tdd": "2026-08-31",
+    "esc": false,
     "tasks": 0
    },
    {
     "id": "2267",
     "tag": "Spruce Engineering Co - Container Cradle Fram…",
+    "cust": "Spruce Engineering Co",
     "kit": 100,
     "pct": 80,
+    "val": 0.01,
     "tp": 0,
     "tdd": "2026-08-31",
+    "esc": false,
+    "tasks": 0
+   },
+   {
+    "id": "2268",
+    "tag": "Spruce Engineering Co - Container Cradle Fram…",
+    "cust": "Spruce Engineering Co",
+    "kit": 100,
+    "pct": 90,
+    "val": 0.01,
+    "tp": 0,
+    "tdd": "2026-08-31",
+    "esc": false,
     "tasks": 0
    }
   ]
@@ -317,146 +330,251 @@
   "jobs": [
    {
     "id": "2541",
-    "tag": "Afcon - Truck mounted Scissor lift - 1.5T - Maldives",
+    "tag": "Afcon - Truck mounted Scissor lift - 1.5T - M…",
+    "cust": "Afcons Infrastructure Limited",
     "kit": 60,
     "pct": 0,
-    "tp": 0.42
+    "val": 1.39,
+    "tp": 0.42,
+    "tdd": "2026-08-28",
+    "esc": true,
+    "tasks": 3
    },
    {
     "id": "2599",
-    "tag": "Self Propelled Articulating Boom - Airbus - Spain -…",
+    "tag": "Self Propelled Articulating Boom - Airbus - S…",
+    "cust": "Airbus Defence and Space",
     "kit": 100,
     "pct": 0,
-    "tp": 0.41
+    "val": 0.99,
+    "tp": 0.41,
+    "tdd": "2026-10-01",
+    "esc": false,
+    "tasks": 0
    },
    {
     "id": "2600",
-    "tag": "Self Propelled Articulating Boom - Airbus - Spain -…",
+    "tag": "Self Propelled Articulating Boom - Airbus - S…",
+    "cust": "Airbus Defence and Space",
     "kit": 100,
     "pct": 0,
-    "tp": 0.41
-   },
-   {
-    "id": "2487",
-    "tag": "RRR-TIPL-IAF#75(IMDM - I / 1592)",
-    "kit": 60,
-    "pct": 10,
-    "tp": 0.3
-   },
-   {
-    "id": "2489",
-    "tag": "RRR-TIPL-IAF#77(IMDM - I / 1594)",
-    "kit": 60,
-    "pct": 10,
-    "tp": 0.3
-   },
-   {
-    "id": "2490",
-    "tag": "RRR-TIPL-IAF#78(IMDM - I / 1595)",
-    "kit": 60,
-    "pct": 10,
-    "tp": 0.3
+    "val": 0.99,
+    "tp": 0.41,
+    "tdd": "2026-10-01",
+    "esc": false,
+    "tasks": 0
    },
    {
     "id": "2486",
     "tag": "RRR-TIPL-IAF#74(IMDM - I / 1591)",
+    "cust": "Transweigh (International) Pvt Ltd",
     "kit": 60,
     "pct": 10,
-    "tp": 0.3
+    "val": 0.43,
+    "tp": 0.3,
+    "tdd": "2026-08-22",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2487",
+    "tag": "RRR-TIPL-IAF#75(IMDM - I / 1592)",
+    "cust": "Transweigh (International) Pvt Ltd",
+    "kit": 60,
+    "pct": 10,
+    "val": 0.43,
+    "tp": 0.3,
+    "tdd": "2026-08-26",
+    "esc": true,
+    "tasks": 0
    },
    {
     "id": "2488",
     "tag": "RRR-TIPL-IAF#76(IMDM - I / 1593)",
+    "cust": "Transweigh (International) Pvt Ltd",
     "kit": 60,
     "pct": 10,
-    "tp": 0.3
+    "val": 0.43,
+    "tp": 0.3,
+    "tdd": "2026-08-26",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2489",
+    "tag": "RRR-TIPL-IAF#77(IMDM - I / 1594)",
+    "cust": "Transweigh (International) Pvt Ltd",
+    "kit": 60,
+    "pct": 10,
+    "val": 0.43,
+    "tp": 0.3,
+    "tdd": "2026-09-18",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2490",
+    "tag": "RRR-TIPL-IAF#78(IMDM - I / 1595)",
+    "cust": "Transweigh (International) Pvt Ltd",
+    "kit": 60,
+    "pct": 10,
+    "val": 0.43,
+    "tp": 0.3,
+    "tdd": "2026-09-18",
+    "esc": true,
+    "tasks": 0
    },
    {
     "id": "2471",
     "tag": "RRR-TIPL-Navy#61(IMDM - II / 1806)",
+    "cust": "Transweigh (International) Pvt Ltd",
     "kit": 60,
     "pct": 10,
-    "tp": 0.27
-   },
-   {
-    "id": "2473",
-    "tag": "RRR-TIPL-Navy#63(IMDM - II / 1808)",
-    "kit": 60,
-    "pct": 10,
-    "tp": 0.27
+    "val": 0.38,
+    "tp": 0.27,
+    "tdd": "2026-08-30",
+    "esc": true,
+    "tasks": 0
    },
    {
     "id": "2472",
     "tag": "RRR-TIPL-Navy#62(IMDM - II / 1807)",
+    "cust": "Transweigh (International) Pvt Ltd",
     "kit": 60,
     "pct": 10,
-    "tp": 0.27
+    "val": 0.38,
+    "tp": 0.27,
+    "tdd": "2026-09-10",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2473",
+    "tag": "RRR-TIPL-Navy#63(IMDM - II / 1808)",
+    "cust": "Transweigh (International) Pvt Ltd",
+    "kit": 60,
+    "pct": 10,
+    "val": 0.38,
+    "tp": 0.27,
+    "tdd": "2026-09-10",
+    "esc": true,
+    "tasks": 0
    },
    {
     "id": "2470",
     "tag": "RRR-TIPL-Navy#60(IMDM - II / 1805)",
+    "cust": "Transweigh (International) Pvt Ltd",
     "kit": 60,
     "pct": 10,
-    "tp": 0.17
-   },
-   {
-    "id": "2561",
-    "tag": "EHPL-(Encalm)-HL-FC-6.3-#2-DEL",
-    "kit": 60,
-    "pct": 0,
-    "tp": 0.11
+    "val": 0.38,
+    "tp": 0.17,
+    "tdd": "2026-08-30",
+    "esc": true,
+    "tasks": 1
    },
    {
     "id": "2560",
     "tag": "EHPL-(Encalm)-HL-FC-6.3-#1-DEL",
+    "cust": "Encalm Hospitality Pvt Ltd",
     "kit": 60,
     "pct": 0,
-    "tp": 0.11
+    "val": 0.35,
+    "tp": 0.11,
+    "tdd": "2026-08-21",
+    "esc": true,
+    "tasks": 2
+   },
+   {
+    "id": "2561",
+    "tag": "EHPL-(Encalm)-HL-FC-6.3-#2-DEL",
+    "cust": "Encalm Hospitality Pvt Ltd",
+    "kit": 60,
+    "pct": 0,
+    "val": 0.35,
+    "tp": 0.11,
+    "tdd": "2026-09-01",
+    "esc": true,
+    "tasks": 0
    },
    {
     "id": "2555",
     "tag": "TAJ SATS - FC-HL - 6.3 - #2 of 2- DEL",
+    "cust": "Taj Sats Air Catering Limited",
     "kit": 60,
     "pct": 15,
-    "tp": 0.09
-   },
-   {
-    "id": "2134",
-    "tag": "Veda Def - Catapult - #8 - Noida",
-    "kit": 60,
-    "pct": 30,
-    "tp": 0.08
+    "val": 0.27,
+    "tp": 0.09,
+    "tdd": "2026-09-15",
+    "esc": true,
+    "tasks": 0
    },
    {
     "id": "2133",
     "tag": "Veda Def - Catapult - #7 - Noida",
+    "cust": "Veda Aeronautics Pvt Ltd",
     "kit": 60,
     "pct": 30,
-    "tp": 0.08
+    "val": 0.26,
+    "tp": 0.08,
+    "tdd": "2026-08-26",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2134",
+    "tag": "Veda Def - Catapult - #8 - Noida",
+    "cust": "Veda Aeronautics Pvt Ltd",
+    "kit": 60,
+    "pct": 30,
+    "val": 0.26,
+    "tp": 0.08,
+    "tdd": "2026-08-26",
+    "esc": true,
+    "tasks": 0
    },
    {
     "id": "2513",
     "tag": "EIH - HL-FC - 6.3 - #2 of 6 - MUM",
+    "cust": "EIH Limited",
     "kit": 60,
     "pct": 20,
-    "tp": 0.08
+    "val": 0.27,
+    "tp": 0.08,
+    "tdd": "2026-08-31",
+    "esc": true,
+    "tasks": 3
    },
    {
     "id": "2598",
-    "tag": "Engine Oil Service Unit - Airbus - Spain #1 of 1 (2…",
+    "tag": "Engine Oil Service Unit - Airbus - Spain #1 o…",
+    "cust": "Airbus Defence and Space",
     "kit": 100,
     "pct": 0,
-    "tp": 0.06
+    "val": 0.06,
+    "tp": 0.06,
+    "tdd": "2026-09-10",
+    "esc": false,
+    "tasks": 0
    }
   ]
  },
  "readyTasks": [
+  {
+   "job": "2575",
+   "cat": "Projects",
+   "who": "PS",
+   "due": "2026-08-13",
+   "esc": "L3",
+   "lvl": "L3",
+   "title": "Send nandan Mud flap Size 9\" each"
+  },
   {
    "job": "2114",
    "cat": "Material",
    "who": "MT",
    "due": "2026-08-14",
    "esc": "L1",
+   "lvl": "L1",
    "title": "electrical dash board items"
   },
   {
@@ -465,14 +583,25 @@
    "who": "RJ",
    "due": "2026-08-18",
    "esc": "L1",
+   "lvl": "L1",
    "title": "Braking system finalization"
+  },
+  {
+   "job": "2575",
+   "cat": "Design",
+   "who": "PS",
+   "due": "2026-08-18",
+   "esc": null,
+   "lvl": "",
+   "title": "Will Visit to Supplier at Thane"
   },
   {
    "job": "2114",
    "cat": "Material",
    "who": "MT",
    "due": "2026-08-19",
-   "esc": "",
+   "esc": null,
+   "lvl": "",
    "title": "Quick release pins for railings"
   },
   {
@@ -480,7 +609,8 @@
    "cat": "Material",
    "who": "MT",
    "due": "2026-08-19",
-   "esc": "",
+   "esc": null,
+   "lvl": "",
    "title": "Material: Chassis / base frame steel"
   },
   {
@@ -488,8 +618,9 @@
    "cat": "Material",
    "who": "MT",
    "due": "2026-08-20",
-   "esc": "",
-   "title": "Radiator hoses"
+   "esc": null,
+   "lvl": "",
+   "title": "Radiator  hoses"
   },
   {
    "job": "2114",
@@ -497,7 +628,35 @@
    "who": "RJ",
    "due": "2026-08-20",
    "esc": "L3",
+   "lvl": "L3",
    "title": "IIT Approval to be done"
+  }
+ ],
+ "escJobs": 59,
+ "escTasks": 21,
+ "escLevels": {
+  "L2": 9,
+  "L1": 6,
+  "L3": 6
+ },
+ "escTop": [
+  {
+   "job": "2596",
+   "cat": "Design",
+   "who": "PS",
+   "due": "2026-08-07",
+   "esc": "L2",
+   "lvl": "L2",
+   "title": "Gearbox - Motor mounting plate - AP"
+  },
+  {
+   "job": "2596",
+   "cat": "Production",
+   "who": "PS",
+   "due": "2026-08-07",
+   "esc": "L2",
+   "lvl": "L2",
+   "title": "Modification for 4 Mtr height - YCN"
   },
   {
    "job": "2575",
@@ -505,81 +664,55 @@
    "who": "PS",
    "due": "2026-08-13",
    "esc": "L3",
-   "title": "Send nandan Mud flap Size 9\" each"
-  },
-  {
-   "job": "2575",
-   "cat": "Design",
-   "who": "PS",
-   "due": "2026-08-18",
-   "esc": "",
-   "title": "Will Visit to Supplier at Thane"
-  }
- ],
- "escJobs": 59,
- "escTasks": 21,
- "escLevels": {
-  "L2": 9,
-  "L3": 7,
-  "L1": 5
- },
- "escTop": [
-  {
-   "job": "2596",
-   "lvl": "L2",
-   "who": "PS",
-   "due": "2026-08-07",
-   "title": "Modification for 4 Mtr height - YCN"
-  },
-  {
-   "job": "2596",
-   "lvl": "L2",
-   "who": "PS",
-   "due": "2026-08-07",
-   "title": "Gearbox - Motor mounting plate - AP"
-  },
-  {
-   "job": "2560",
    "lvl": "L3",
-   "who": "PG",
-   "due": "2026-08-08",
-   "title": "AC unit - MT"
-  },
-  {
-   "job": "2575",
-   "lvl": "L3",
-   "who": "PS",
-   "due": "2026-08-13",
    "title": "Send nandan Mud flap Size 9\" each"
   },
   {
    "job": "2114",
-   "lvl": "L1",
+   "cat": "Material",
    "who": "MT",
    "due": "2026-08-14",
+   "esc": "L1",
+   "lvl": "L1",
    "title": "electrical dash board items"
   },
   {
-   "job": "2513",
-   "lvl": "L2",
-   "who": "unassigned",
-   "due": "2026-08-17",
-   "title": "Need manpower for scissor frame, cylinder bracket w…"
-  },
-  {
    "job": "2541",
-   "lvl": "L1",
+   "cat": "Material",
    "who": "MT",
    "due": "2026-08-17",
+   "esc": "L1",
+   "lvl": "L1",
    "title": "MS chequered plate"
+  },
+  {
+   "job": "2513",
+   "cat": "Production",
+   "who": "unassigned",
+   "due": "2026-08-17",
+   "esc": "L2",
+   "lvl": "L2",
+   "title": "Need manpower for scissor frame, cylinder bracket work"
+  },
+  {
+   "job": "2560",
+   "cat": "Production",
+   "who": "PG",
+   "due": "2026-08-18",
+   "esc": "L2",
+   "lvl": "L2",
+   "title": "MOM Action Points"
+  },
+  {
+   "job": "2162",
+   "cat": "Production",
+   "who": "PS",
+   "due": "2026-08-18",
+   "esc": "L2",
+   "lvl": "L2",
+   "title": "Scissor lift to paint and tested - RNN"
   }
  ],
- "famCount": 18,
- "famTop": 8,
- "famRest": {
-  "n": 12,
-  "t": 0.25
- },
  "escQuotes": [
   {
    "id": "2114",
@@ -597,36 +730,406 @@
    "text": "W31: Design: 1. Hyd power pack mounting: Purchase: Chassis pending."
   }
  ],
- "done": [
-  {
-   "k": "2026-04",
-   "n": 26,
-   "v": 6.74,
-   "t": 3.35
-  },
-  {
-   "k": "2026-05",
-   "n": 5,
-   "v": 0.99,
-   "t": 0.51
-  },
-  {
-   "k": "2026-06",
-   "n": 9,
-   "v": 1.89,
-   "t": 1.11
-  },
-  {
-   "k": "2026-07",
+ "focus": {
+  "name": "Hi Lifts",
+  "n": 20,
+  "sales": 6,
+  "tp": 2.38,
+  "jobs": [
+   {
+    "id": "2560",
+    "tag": "EHPL-(Encalm)-HL-FC-6.3-#1-DEL",
+    "cust": "Encalm Hospitality Pvt Ltd",
+    "kit": 60,
+    "pct": 0,
+    "val": 0.35,
+    "tp": 0.11,
+    "tdd": "2026-08-21",
+    "esc": true,
+    "tasks": 2
+   },
+   {
+    "id": "2517",
+    "tag": "EIH - HL-FC - 6.3 - #6 of 6 - MUM",
+    "cust": "EIH Limited",
+    "kit": 100,
+    "pct": 60,
+    "val": 0.27,
+    "tp": 0.08,
+    "tdd": "2026-08-25",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2504",
+    "tag": "EIH - HL-FC - 5.5 - #1 of 2 - MUM",
+    "cust": "EIH Limited",
+    "kit": 80,
+    "pct": 40,
+    "val": 0.25,
+    "tp": 0.08,
+    "tdd": "2026-08-30",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2548",
+    "tag": "TAJ SATS - FC-HL - 6.3 - #3 of 6 BOM",
+    "cust": "Taj Sats Air Catering Limited",
+    "kit": 50,
+    "pct": 20,
+    "val": 0.27,
+    "tp": 0.09,
+    "tdd": "2026-08-30",
+    "esc": true,
+    "tasks": 1
+   },
+   {
+    "id": "2549",
+    "tag": "TAJ SATS -FC- HL - 6.3 - #4 of 6 BOM",
+    "cust": "Taj Sats Air Catering Limited",
+    "kit": 80,
+    "pct": 50,
+    "val": 0.27,
+    "tp": 0.09,
+    "tdd": "2026-08-30",
+    "esc": true,
+    "tasks": 1
+   },
+   {
+    "id": "2513",
+    "tag": "EIH - HL-FC - 6.3 - #2 of 6 - MUM",
+    "cust": "EIH Limited",
+    "kit": 60,
+    "pct": 20,
+    "val": 0.27,
+    "tp": 0.08,
+    "tdd": "2026-08-31",
+    "esc": true,
+    "tasks": 3
+   },
+   {
+    "id": "2514",
+    "tag": "EIH - HL-FC - 6.3 - #3 of 6 - MUM",
+    "cust": "EIH Limited",
+    "kit": 100,
+    "pct": 55,
+    "val": 0.27,
+    "tp": 0.08,
+    "tdd": "2026-08-31",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2561",
+    "tag": "EHPL-(Encalm)-HL-FC-6.3-#2-DEL",
+    "cust": "Encalm Hospitality Pvt Ltd",
+    "kit": 60,
+    "pct": 0,
+    "val": 0.35,
+    "tp": 0.11,
+    "tdd": "2026-09-01",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2550",
+    "tag": "TAJ SATS -FC- HL - 6.3 - #5 of 6 BOM",
+    "cust": "Taj Sats Air Catering Limited",
+    "kit": 10,
+    "pct": 0,
+    "val": 0.27,
+    "tp": 0.09,
+    "tdd": "2026-09-07",
+    "esc": true,
+    "tasks": 1
+   },
+   {
+    "id": "2551",
+    "tag": "TAJ SATS -FC- HL - 6.3 - #6 of 6 BOM",
+    "cust": "Taj Sats Air Catering Limited",
+    "kit": 10,
+    "pct": 0,
+    "val": 0.27,
+    "tp": 0.09,
+    "tdd": "2026-09-10",
+    "esc": true,
+    "tasks": 1
+   },
+   {
+    "id": "2505",
+    "tag": "EIH - MUM - HL-FC - 5.5 - #2 of 2",
+    "cust": "EIH Limited",
+    "kit": 50,
+    "pct": 5,
+    "val": 0.25,
+    "tp": 0.08,
+    "tdd": "2026-09-12",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2555",
+    "tag": "TAJ SATS - FC-HL - 6.3 - #2 of 2- DEL",
+    "cust": "Taj Sats Air Catering Limited",
+    "kit": 60,
+    "pct": 15,
+    "val": 0.27,
+    "tp": 0.09,
+    "tdd": "2026-09-15",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2515",
+    "tag": "EIH - HL-FC - 6.3 - #4 of 6 - MUM",
+    "cust": "EIH Limited",
+    "kit": 50,
+    "pct": 5,
+    "val": 0.27,
+    "tp": 0.08,
+    "tdd": "2026-09-18",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2516",
+    "tag": "EIH - HL-FC - 6.3 - #5 of 6 - MUM",
+    "cust": "EIH Limited",
+    "kit": 50,
+    "pct": 5,
+    "val": 0.27,
+    "tp": 0.08,
+    "tdd": "2026-09-22",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2525",
+    "tag": "MALAWI CSL - HL - 5.5 - 1Q - MALAWI",
+    "cust": "Malawi Catering Services Limited",
+    "kit": 30,
+    "pct": 0,
+    "val": 1.09,
+    "tp": 0.65,
+    "tdd": "2026-09-25",
+    "esc": false,
+    "tasks": 0
+   },
+   {
+    "id": "2562",
+    "tag": "EHPL-(Encalm)-HL-FC-6.3-#3-DEL",
+    "cust": "Encalm Hospitality Pvt Ltd",
+    "kit": 20,
+    "pct": 0,
+    "val": 0.35,
+    "tp": 0.11,
+    "tdd": "2026-09-28",
+    "esc": true,
+    "tasks": 0
+   },
+   {
+    "id": "2620",
+    "tag": "EHPL-HL-6.3FC-3T-DEL#4",
+    "cust": "Encalm Sky Plates Pvt Ltd",
+    "kit": 10,
+    "pct": 0,
+    "val": 0,
+    "tp": 0,
+    "tdd": "2026-09-30",
+    "esc": false,
+    "tasks": 0
+   },
+   {
+    "id": "2621",
+    "tag": "EHPL-HL-6.3FC-3T-DEL#5",
+    "cust": "Encalm Sky Plates Pvt Ltd",
+    "kit": 10,
+    "pct": 0,
+    "val": 0,
+    "tp": 0,
+    "tdd": "2026-10-12",
+    "esc": false,
+    "tasks": 0
+   },
+   {
+    "id": "2622",
+    "tag": "EHPL-HL-6.3FC-3T-DEL#6",
+    "cust": "Encalm Sky Plates Pvt Ltd",
+    "kit": 10,
+    "pct": 0,
+    "val": 0,
+    "tp": 0,
+    "tdd": "2026-10-20",
+    "esc": false,
+    "tasks": 0
+   },
+   {
+    "id": "2597",
+    "tag": "Druk air - HL- FC - 6.3 - 1Q Bhutan",
+    "cust": "DrukAir Corporation Limited",
+    "kit": 10,
+    "pct": 0,
+    "val": 0.63,
+    "tp": 0.38,
+    "tdd": "2026-11-27",
+    "esc": false,
+    "tasks": 0
+   }
+  ],
+  "custs": [
+   {
+    "c": "Malawi Catering Services Limited",
+    "n": 1,
+    "tp": 0.65
+   },
+   {
+    "c": "EIH Limited",
+    "n": 7,
+    "tp": 0.56
+   },
+   {
+    "c": "Taj Sats Air Catering Limited",
+    "n": 5,
+    "tp": 0.45
+   },
+   {
+    "c": "DrukAir Corporation Limited",
+    "n": 1,
+    "tp": 0.38
+   },
+   {
+    "c": "Encalm Hospitality Pvt Ltd",
+    "n": 3,
+    "tp": 0.33
+   },
+   {
+    "c": "Encalm Sky Plates Pvt Ltd",
+    "n": 3,
+    "tp": 0
+   }
+  ],
+  "months": [
+   {
+    "k": "2026-08",
+    "n": 7,
+    "v": 1.95,
+    "t": 0.61
+   },
+   {
+    "k": "2026-09",
+    "n": 10,
+    "v": 3.39,
+    "t": 1.38
+   },
+   {
+    "k": "2026-10",
+    "n": 2,
+    "v": 0,
+    "t": 0
+   },
+   {
+    "k": "2026-11",
+    "n": 1,
+    "v": 0.63,
+    "t": 0.38
+   }
+  ],
+  "done": {
    "n": 16,
-   "v": 5.77,
-   "t": 3
+   "sales": 6.3,
+   "tp": 1.42
   },
-  {
-   "k": "2026-08",
-   "n": 5,
-   "v": 1.79,
-   "t": 0.71
-  }
- ]
+  "escJobs": 15,
+  "novalue": [
+   "2620",
+   "2621",
+   "2622"
+  ],
+  "kitted": 12,
+  "built": 3,
+  "tasks": [
+   {
+    "job": "2549",
+    "cat": "Material",
+    "who": "MT",
+    "due": "2026-08-13",
+    "esc": null,
+    "lvl": "",
+    "title": "Pending material - ISMC 75, tube 20x40, flat 40x5,  SS pipe 30x30x2thk, Alm flat 25x3thk"
+   },
+   {
+    "job": "2513",
+    "cat": "Material",
+    "who": "MT",
+    "due": "2026-08-17",
+    "esc": null,
+    "lvl": "",
+    "title": "Pending material - Body panel, control panel"
+   },
+   {
+    "job": "2513",
+    "cat": "Production",
+    "who": "unassigned",
+    "due": "2026-08-17",
+    "esc": "L2",
+    "lvl": "L2",
+    "title": "Need manpower for scissor frame, cylinder bracket work"
+   },
+   {
+    "job": "2548",
+    "cat": "Material",
+    "who": "MT",
+    "due": "2026-08-17",
+    "esc": null,
+    "lvl": "",
+    "title": "Pending material  - Body panel, control panel"
+   },
+   {
+    "job": "2560",
+    "cat": "Production",
+    "who": "PG",
+    "due": "2026-08-18",
+    "esc": "L2",
+    "lvl": "L2",
+    "title": "MOM Action Points"
+   },
+   {
+    "job": "2550",
+    "cat": "Material",
+    "who": "MT",
+    "due": "2026-08-18",
+    "esc": null,
+    "lvl": "",
+    "title": "pending material - control panel, hydraulic block"
+   },
+   {
+    "job": "2551",
+    "cat": "Production",
+    "who": "MT",
+    "due": "2026-08-18",
+    "esc": null,
+    "lvl": "",
+    "title": "pending materials - control panel, body panel,  hydraulic block"
+   },
+   {
+    "job": "2513",
+    "cat": "Material",
+    "who": "MT",
+    "due": "2026-08-18",
+    "esc": null,
+    "lvl": "",
+    "title": "pending material - control panel"
+   },
+   {
+    "job": "2560",
+    "cat": "Electrical",
+    "who": "PG",
+    "due": "2026-08-19",
+    "esc": "L1",
+    "lvl": "L1",
+    "title": "AC Fitment"
+   }
+  ]
+ }
 }

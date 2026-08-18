@@ -2,3 +2,4 @@ deck.html
 s[0-9].html
 slide-*.png
 node_modules/
+build/
