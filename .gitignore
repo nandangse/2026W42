@@ -28,3 +28,6 @@ yarn-error.log*
 .vercel
 *.tsbuildinfo
 scratchpad/paste/
+scratchpad/deck/node_modules/
+scratchpad/deck/*.pptx
+/*.pptx

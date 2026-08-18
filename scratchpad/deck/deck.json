@@ -1,0 +1,442 @@
+{
+ "asOf": "18-08-2026",
+ "fy": "FY2026-27",
+ "day": 140,
+ "total": 365,
+ "left": 225,
+ "target": {
+  "sales": 100,
+  "tp": 40
+ },
+ "delivered": {
+  "sales": 17.18,
+  "tp": 8.68,
+  "n": 61
+ },
+ "book": {
+  "sales": 33.58,
+  "tp": 12.56,
+  "n": 105
+ },
+ "anticipated": {
+  "sales": 50.76,
+  "tp": 21.24
+ },
+ "paceBy": 38.36,
+ "behind": 21.18,
+ "pacePct": 45,
+ "required": {
+  "sales": 11.2,
+  "tp": 4.23
+ },
+ "months": [
+  {
+   "k": "2026-08",
+   "n": 41,
+   "v": 12.19,
+   "t": 4.54
+  },
+  {
+   "k": "2026-09",
+   "n": 41,
+   "v": 10.73,
+   "t": 4.41
+  },
+  {
+   "k": "2026-10",
+   "n": 18,
+   "v": 8.38,
+   "t": 2.73
+  },
+  {
+   "k": "2026-11",
+   "n": 5,
+   "v": 2.27,
+   "t": 0.87
+  }
+ ],
+ "fams": [
+  {
+   "f": "Rapid Runway Repair",
+   "n": 10,
+   "v": 4.12,
+   "t": 2.68
+  },
+  {
+   "f": "AGSE- LOADER",
+   "n": 2,
+   "v": 5.38,
+   "t": 1.61
+  },
+  {
+   "f": "MHE - Goods Lift",
+   "n": 10,
+   "v": 4.61,
+   "t": 1.38
+  },
+  {
+   "f": "AGSE - Hi Lift",
+   "n": 18,
+   "v": 4.28,
+   "t": 1.35
+  },
+  {
+   "f": "DEF - GSE",
+   "n": 14,
+   "v": 4.19,
+   "t": 1.26
+  },
+  {
+   "f": "AGSE - Export Hi Lift",
+   "n": 2,
+   "v": 1.72,
+   "t": 1.03
+  },
+  {
+   "f": "AAE - JCB - Boomlift",
+   "n": 2,
+   "v": 1.98,
+   "t": 0.81
+  },
+  {
+   "f": "MHE - Single Scissor Lift",
+   "n": 19,
+   "v": 1.8,
+   "t": 0.61
+  }
+ ],
+ "famOther": [
+  {
+   "f": "MHE - Double Scissor Lift",
+   "n": 1,
+   "v": 1.39,
+   "t": 0.42
+  },
+  {
+   "f": "BB -  Workshop Van",
+   "n": 1,
+   "v": 0.9,
+   "t": 0.36
+  },
+  {
+   "f": "DEF-Customised",
+   "n": 4,
+   "v": 1.04,
+   "t": 0.31
+  },
+  {
+   "f": "MHE - Truck Mounted Crane",
+   "n": 2,
+   "v": 1.02,
+   "t": 0.31
+  },
+  {
+   "f": "MHE - Others",
+   "n": 8,
+   "v": 0.43,
+   "t": 0.17
+  },
+  {
+   "f": "AGSE - Fuel Bowser",
+   "n": 2,
+   "v": 0.52,
+   "t": 0.14
+  },
+  {
+   "f": "AGSE - Others",
+   "n": 1,
+   "v": 0.06,
+   "t": 0.06
+  },
+  {
+   "f": "DEF-MHE",
+   "n": 6,
+   "v": 0.09,
+   "t": 0.03
+  },
+  {
+   "f": "MHE - Tail Lift",
+   "n": 2,
+   "v": 0.07,
+   "t": 0.02
+  },
+  {
+   "f": "Contract Manufacturing",
+   "n": 1,
+   "v": 0.01,
+   "t": 0
+  }
+ ],
+ "ready": {
+  "n": 12,
+  "tp": 1.33,
+  "jobs": [
+   {
+    "id": "2114",
+    "tag": "Spruce Engineering Co - K-Loader - Vis",
+    "kit": 70,
+    "pct": 70,
+    "tp": 0.81,
+    "tdd": "2026-08-31",
+    "tasks": 6
+   },
+   {
+    "id": "2539",
+    "tag": "8 BRD - TMC - Chennai - #1",
+    "kit": 90,
+    "pct": 90,
+    "tp": 0.15,
+    "tdd": "2026-08-25",
+    "tasks": 0
+   },
+   {
+    "id": "2540",
+    "tag": "8 BRD - TMC - Chennai - #2",
+    "kit": 90,
+    "pct": 90,
+    "tp": 0.15,
+    "tdd": "2026-08-25",
+    "tasks": 0
+   },
+   {
+    "id": "2517",
+    "tag": "EIH - HL-FC - 6.3 - #6 of 6 - MUM",
+    "kit": 100,
+    "pct": 60,
+    "tp": 0.08,
+    "tdd": "2026-08-25",
+    "tasks": 0
+   },
+   {
+    "id": "2575",
+    "tag": "Fuel Bowsers 990 Ltr Karnavati Aviatio",
+    "kit": 90,
+    "pct": 60,
+    "tp": 0.07,
+    "tdd": "2026-08-21",
+    "tasks": 2
+   },
+   {
+    "id": "2120",
+    "tag": "Spruce Eng - Container Cradle Frame 40",
+    "kit": 100,
+    "pct": 70,
+    "tp": 0.02,
+    "tdd": "2026-08-31",
+    "tasks": 0
+   },
+   {
+    "id": "2116",
+    "tag": "Spruce Engineering co - Portable Loadi",
+    "kit": 90,
+    "pct": 80,
+    "tp": 0.01,
+    "tdd": "2026-08-31",
+    "tasks": 1
+   },
+   {
+    "id": "2117",
+    "tag": "Spruce Engineering co - Portable Loadi",
+    "kit": 90,
+    "pct": 80,
+    "tp": 0.01,
+    "tdd": "2026-08-31",
+    "tasks": 0
+   }
+  ]
+ },
+ "stuck": {
+  "n": 19,
+  "tp": 4.32,
+  "jobs": [
+   {
+    "id": "2541",
+    "tag": "Afcon - Truck mounted Scissor lift - 1",
+    "kit": 60,
+    "pct": 0,
+    "tp": 0.42
+   },
+   {
+    "id": "2599",
+    "tag": "Self Propelled Articulating Boom - Air",
+    "kit": 100,
+    "pct": 0,
+    "tp": 0.41
+   },
+   {
+    "id": "2600",
+    "tag": "Self Propelled Articulating Boom - Air",
+    "kit": 100,
+    "pct": 0,
+    "tp": 0.41
+   },
+   {
+    "id": "2486",
+    "tag": "RRR-TIPL-IAF#74(IMDM - I / 1591)",
+    "kit": 60,
+    "pct": 10,
+    "tp": 0.3
+   },
+   {
+    "id": "2487",
+    "tag": "RRR-TIPL-IAF#75(IMDM - I / 1592)",
+    "kit": 60,
+    "pct": 10,
+    "tp": 0.3
+   },
+   {
+    "id": "2488",
+    "tag": "RRR-TIPL-IAF#76(IMDM - I / 1593)",
+    "kit": 60,
+    "pct": 10,
+    "tp": 0.3
+   },
+   {
+    "id": "2489",
+    "tag": "RRR-TIPL-IAF#77(IMDM - I / 1594)",
+    "kit": 60,
+    "pct": 10,
+    "tp": 0.3
+   }
+  ]
+ },
+ "readyTasks": [
+  {
+   "job": "2114",
+   "cat": "Material",
+   "who": "MT",
+   "due": "2026-08-14",
+   "esc": "L1",
+   "title": "electrical dash board items"
+  },
+  {
+   "job": "2114",
+   "cat": "Projects",
+   "who": "RJ",
+   "due": "2026-08-18",
+   "esc": "L1",
+   "title": "Braking system finalization"
+  },
+  {
+   "job": "2114",
+   "cat": "Material",
+   "who": "MT",
+   "due": "2026-08-19",
+   "esc": "",
+   "title": "Quick release pins for railings"
+  },
+  {
+   "job": "2114",
+   "cat": "Material",
+   "who": "MT",
+   "due": "2026-08-19",
+   "esc": "",
+   "title": "Material: Chassis / base frame steel"
+  },
+  {
+   "job": "2114",
+   "cat": "Material",
+   "who": "MT",
+   "due": "2026-08-20",
+   "esc": "",
+   "title": "Radiator  hoses"
+  },
+  {
+   "job": "2114",
+   "cat": "Design",
+   "who": "RJ",
+   "due": "2026-08-20",
+   "esc": "L3",
+   "title": "IIT Approval to be done"
+  },
+  {
+   "job": "2575",
+   "cat": "Projects",
+   "who": "PS",
+   "due": "2026-08-13",
+   "esc": "L3",
+   "title": "Send nandan Mud flap Size 9\" each"
+  },
+  {
+   "job": "2575",
+   "cat": "Design",
+   "who": "PS",
+   "due": "2026-08-18",
+   "esc": "",
+   "title": "Will Visit to Supplier at Thane"
+  },
+  {
+   "job": "2116",
+   "cat": "Production",
+   "who": "VR",
+   "due": "2026-08-18",
+   "esc": "L2",
+   "title": "Fill this up!!!"
+  }
+ ],
+ "escJobs": 59,
+ "escTasks": 21,
+ "escLevels": {
+  "L2": 9,
+  "L3": 7,
+  "L1": 5
+ },
+ "escTop": [
+  {
+   "job": "2596",
+   "lvl": "L2",
+   "who": "PS",
+   "due": "2026-08-07",
+   "title": "Modification for 4 Mtr height - YCN"
+  },
+  {
+   "job": "2596",
+   "lvl": "L2",
+   "who": "PS",
+   "due": "2026-08-07",
+   "title": "Gearbox - Motor mounting plate - AP"
+  },
+  {
+   "job": "2560",
+   "lvl": "L3",
+   "who": "PG",
+   "due": "2026-08-08",
+   "title": "AC unit - MT"
+  },
+  {
+   "job": "2575",
+   "lvl": "L3",
+   "who": "PS",
+   "due": "2026-08-13",
+   "title": "Send nandan Mud flap Size 9\" each"
+  },
+  {
+   "job": "2114",
+   "lvl": "L1",
+   "who": "MT",
+   "due": "2026-08-14",
+   "title": "electrical dash board items"
+  },
+  {
+   "job": "2164",
+   "lvl": "L1",
+   "who": "MT",
+   "due": "2026-08-17",
+   "title": "test"
+  },
+  {
+   "job": "2513",
+   "lvl": "L2",
+   "who": "unassigned",
+   "due": "2026-08-17",
+   "title": "Need manpower for scissor frame, cylinder brac"
+  },
+  {
+   "job": "2541",
+   "lvl": "L1",
+   "who": "MT",
+   "due": "2026-08-17",
+   "title": "MS chequered plate"
+  }
+ ]
+}
