@@ -14,8 +14,10 @@
 // Everything is drawn as inline SVG. No chart library, and no CSS
 // approximations of a scale: a dot whose radius means throughput has to be
 // laid out against a real axis or it is decoration.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import { runRate } from "@/lib/run-rate";
+import AnticipatedFY, { type Anticipated } from "./AnticipatedFY";
 import { fmt, fmtFull, jobNo, otdColor } from "@/lib/schedule";
 
 const C = {
@@ -98,6 +100,16 @@ export default function JobsInProgress({
 }) {
   const [famFilter, setFamFilter] = useState("");
   const [picked, setPicked] = useState<WipJob | null>(null);
+  /** Targets, what has been billed, and the book still to come. */
+  const [rr, setRr] = useState<{
+    fy: string; end: string; hasTarget: boolean;
+    targets: { sales: number; throughput: number };
+    actuals: { sales: number; throughput: number };
+    anticipated: Anticipated;
+  } | null>(null);
+  useEffect(() => {
+    api.get("/api/run-rate").then((r) => { if (r?.installed && r.anticipated) setRr(r); }).catch(() => {});
+  }, []);
   // a named set of jobs behind whatever total was clicked
   const [list, setList] = useState<{ title: string; jobs: WipJob[] } | null>(null);
 
@@ -176,7 +188,19 @@ export default function JobsInProgress({
         )}
       </div>
 
-      <PlannedDeliveries months={months} V={V} today={today}
+      {/* The same box as Delivered Jobs. What is on this page is the middle
+          line of it — the book still to come — so the total it feeds belongs
+          in front of whoever is reading the book. */}
+      {rr && (
+        <div className="mb-3" style={{ maxWidth: 420 }}>
+          <AnticipatedFY
+            fy={rr.fy} end={rr.end} anticipated={rr.anticipated} actuals={rr.actuals}
+            targets={rr.targets} hasTarget={rr.hasTarget} V={V}
+          />
+        </div>
+      )}
+
+      <PlannedDeliveries months={months} V={V} today={today} rr={rr}
         onOpenMonth={(key, label) => setList({ title: label, jobs: jobsInBucket(shown, key, today, months.rows) })} />
       <ByFamily families={families} colourOf={colourOf} V={V} picked={famFilter}
         onFilter={(f) => setFamFilter(f)}
@@ -275,12 +299,17 @@ interface MonthRow { key: string; label: string; nos: number; val: number; tp: n
  * flat along the bottom and say nothing.
  */
 function PlannedDeliveries({
-  months, V, today, onOpenMonth,
+  months, V, today, onOpenMonth, rr,
 }: {
   months: { rows: MonthRow[]; late: MonthRow; beyond: MonthRow; undated: MonthRow; totals: { nos: number; val: number; tp: number }; asked: number };
   V: (n: number) => string;
   today: string;
   onOpenMonth: (key: string, label: string) => void;
+  rr: {
+    fy: string; hasTarget: boolean;
+    targets: { sales: number; throughput: number };
+    actuals: { sales: number; throughput: number };
+  } | null;
 }) {
   const rows = months.rows;
   const W = 560, H = 250, L = 44, R = 34, T = 16, B = 34;
@@ -321,13 +350,6 @@ function PlannedDeliveries({
             ? `nothing planned past ${rows[rows.length - 1]?.label} — the empty months are left off rather than drawn flat`
             : `next ${months.asked} months`}
         </span>
-        <div className="flex-1" />
-        {SERIES.map((sr) => (
-          <span key={sr.label} className="text-xs flex items-center gap-1" style={{ color: C.sub }}>
-            <span style={{ width: 14, height: 3, background: sr.colour, display: "inline-block", borderRadius: 2 }} />
-            {sr.label}
-          </span>
-        ))}
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))" }}>
@@ -358,6 +380,18 @@ function PlannedDeliveries({
               </g>
             ))}
           </svg>
+          {/* The legend belongs against the lines, not across the panel header
+              two feet away — a key you have to look up from the chart to read
+              is a key nobody uses. */}
+          <div className="flex items-center gap-3 flex-wrap px-3 pb-2" style={{ marginTop: -4 }}>
+            {SERIES.map((sr) => (
+              <span key={sr.label} className="text-xs flex items-center gap-1" style={{ color: C.sub }}>
+                <span style={{ width: 16, height: 3, background: sr.colour, display: "inline-block", borderRadius: 2,
+                  ...(sr.dash ? { backgroundImage: `repeating-linear-gradient(90deg, ${sr.colour} 0 4px, transparent 4px 7px)`, background: "none" } : {}) }} />
+                {sr.label}
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* ---- right: the table, totals first ---- */}
@@ -388,6 +422,27 @@ function PlannedDeliveries({
             </tbody>
           </table>
           <div className="px-2 py-1.5 text-xs" style={{ color: C.faint }}>Click any row for the jobs behind it.</div>
+          {/* What the book above has to clear. The table says what is coming;
+              this says what is required — and the two sitting apart is how a
+              month of orders gets read as good news on its own. */}
+          {rr?.hasTarget && (() => {
+            const r = runRate(today, rr.targets, rr.actuals);
+            return (
+              <div className="px-2 py-2 text-xs" style={{ borderTop: `1px solid ${C.line}`, background: C.panel, lineHeight: 1.6 }}>
+                <span className="font-bold" style={{ color: C.violet }}>Required run rate</span>{" "}
+                <span style={{ color: C.sub }}>to make {rr.fy}:</span>{" "}
+                <b className="tnum" style={{ color: C.accent }}>
+                  {r.sales.perMonth == null ? "—" : `${(r.sales.perMonth / CR).toFixed(2)} Cr`}
+                </b>
+                <span style={{ color: C.sub }}> per month in sales, with a throughput of </span>
+                <b className="tnum" style={{ color: C.green }}>
+                  {r.throughput.perMonth == null ? "—" : `${(r.throughput.perMonth / CR).toFixed(2)} Cr`}
+                </b>
+                <span style={{ color: C.sub }}> per month</span>
+                <span style={{ color: C.faint }}> · {r.left} days left of {r.total}</span>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>

@@ -37,6 +37,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.5.0.2",
+    date: "2026-08-18",
+    module: "Jobs in Progress",
+    items: [
+      "The chart legend has moved down against the lines it names. Across the panel header it was two feet from the chart, and a key you have to look up from the chart to read is a key nobody uses. The dashed Jobs line now shows as dashed in the legend too.",
+      "Under the delivery table: the Required run rate — ₹x Cr per month in sales, with a throughput of ₹y Cr per month, and the days left of the year. The table says what is coming; this says what is required, and the two sitting on separate pages is how a good month of orders gets read as good news on its own.",
+      "Total Anticipated is now on this page as well as Delivered Jobs. What this page shows IS the middle line of that box — the book still to come — so the total it feeds belongs in front of whoever is reading the book.",
+    ],
+  },
+  {
     v: "3.5.0.1",
     date: "2026-08-18",
     module: "Delivered Jobs",
