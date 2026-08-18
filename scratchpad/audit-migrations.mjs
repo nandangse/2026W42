@@ -38,6 +38,13 @@ const PROBES = [
   ["0029 day mood",           "day_mood", "mood"],
   ["0029 image quote",        "image_quote", "url"],
   ["0029 quote folder",       "app_settings", "quote_folder"],
+  ["0030 material due",       "materials", "due"],
+  ["0030 material task link", "materials", "task_id"],
+  ["0030 material comments",  "material_comment", "body"],
+  ["0031 erp update queue",   "erp_update", "job_id"],
+  ["0032 task original due",  "manual_tasks", "original_due"],
+  ["0032 erp task original",  "erp_tasks", "original_due"],
+  ["0032 date log",           "task_date_log", "new_due"],
 ];
 
 const missing = [];
