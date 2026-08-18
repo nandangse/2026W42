@@ -37,6 +37,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.4.0.6",
+    date: "2026-08-18",
+    module: "My Week",
+    items: [
+      "Delivery expected in the next 7 days drops the year from the TDD. The table already says it is the next seven days; 18-08-2026 was saying so a second time and wrapping onto two lines to do it. The full date is still on hover.",
+      "The Planning Owner column shows the person, not their login. It was printing pankajs@nandan.co.in where the name belongs — the address is what the Jobmaster carries, but the name is who anybody actually asks. The email is on hover.",
+    ],
+  },
+  {
     v: "3.4.0.5",
     date: "2026-08-18",
     module: "Morning Update",

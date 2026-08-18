@@ -1327,8 +1327,15 @@ function MyWeek({
                         <button onClick={() => onOpen(j.id)} className="font-bold underline decoration-dotted" style={{ color: "#1B3A5C" }}>{jobNo(j.id)}</button>
                       </td>
                       <td className="py-1.5">{j.tag}</td>
-                      <td className="py-1.5" style={{ color: "#5A6672" }}>{j.own || "—"}</td>
-                      <td className="py-1.5 text-center font-bold tnum" style={{ color: j.tdd && j.tdd < TODAY ? "#B3261E" : "#22303C" }}>{fmtFull(j.tdd)}</td>
+                      {/* the login is what the Jobmaster carries; the person is
+                          who anybody actually asks. Show the name and keep the
+                          address on hover. */}
+                      <td className="py-1.5" style={{ color: "#5A6672" }} title={j.own || undefined}>
+                        {j.ownerName || j.ownerInitials || (j.own ? j.own.split("@")[0] : "—")}
+                      </td>
+                      {/* no year: the table is already headed "the next 7 days",
+                          and 18-08-2026 wrapped onto two lines to say so twice */}
+                      <td className="py-1.5 text-center font-bold tnum whitespace-nowrap" style={{ color: j.tdd && j.tdd < TODAY ? "#B3261E" : "#22303C" }} title={fmtFull(j.tdd)}>{fmt(j.tdd)}</td>
                       <td className="py-1.5 text-center tnum">{j.pct}%</td>
                     </tr>
                   ))}
