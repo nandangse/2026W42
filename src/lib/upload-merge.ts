@@ -434,7 +434,22 @@ export async function applyUpload(
     row_count: rowCount,
     summary,
   });
-  if (be) throw new UploadError("could not record import_batch: " + be.message);
+  /**
+   * A batch stamp that will not write is a WARNING, not a failure.
+   *
+   * By this line every row is already applied. Throwing here told somebody
+   * their Employee Master upload had failed while 364 employees sat in the
+   * database — which is worse than a missing timestamp in every direction: the
+   * upload gets repeated, and nobody trusts the page afterwards.
+   *
+   * The cause that made this obvious: kind = 'employees' was not in the
+   * import_batches check constraint. 0033 adds it.
+   */
+  if (be)
+    lines.push(
+      `· ⚠ The data is loaded, but the upload could not be stamped in the history: ${be.message}. ` +
+        `Nothing was lost — only the "last loaded" time for this file will be missing.`,
+    );
 
   return summary;
 }

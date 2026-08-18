@@ -37,6 +37,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.4.0.5",
+    date: "2026-08-18",
+    module: "Morning Update",
+    items: [
+      "Fixed: the Employee Master upload reported a failure it had not had. 364 employees — 362 with birthdays — were loaded every time; the upload then fell over writing its own audit line, because “employees” was never added to the list of upload kinds that line accepts. 0020 widened it for Delivered Jobs and 0024 added the HR sheet four migrations later without doing the same.",
+      "Migration 0033 adds it, with a note on the constraint telling whoever adds the next upload card to widen it too.",
+      "More importantly: a batch stamp that cannot be written is now a WARNING on the summary, not an exception. By that line every row is already in. Throwing told somebody their upload had failed while the data sat in the database — which is worse in every direction: the upload gets repeated, and nobody trusts the page afterwards. It now says the data is loaded and only the “last loaded” time is missing.",
+      "Your birthdays are already there — My Week will show them as soon as somebody has one in the next seven days.",
+    ],
+  },
+  {
     v: "3.4.0.4",
     date: "2026-08-18",
     module: "Nandan Tasking",
