@@ -37,6 +37,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.5.0.0",
+    date: "2026-08-18",
+    module: "Delivered Jobs",
+    items: [
+      "New: TOTAL ANTICIPATED for the financial year, a large button at the top right of Delivered Jobs. Sales and Throughput, each being what has been delivered since 1 April PLUS everything on the board still due before 31 March.",
+      "It answers a different question from the Required Run Rate below it. The run rate asks what we would have to bill from here; this asks what we already have on the books to do it with.",
+      "Clicking it shows the working: delivered so far, still due, and overdue-but-not-delivered as three separate lines — then the total, the target and the gap. Overdue work is counted in the year (the job exists and will go out) but named, because a total that leans on late work should say so.",
+      "What is NOT in the number is listed too: jobs dated past 31 March belong to next year, and jobs with no target date cannot be placed in a year at all. Left out of a total is not the same as not existing, and a figure this size gets quoted.",
+      "It says plainly that it is an expectation, not a forecast: it assumes every pending job goes out on the date it carries today, and nothing here is weighted by how likely a job is to slip.",
+    ],
+  },
+  {
     v: "3.4.0.7",
     date: "2026-08-18",
     module: "My Week",

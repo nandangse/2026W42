@@ -21,6 +21,7 @@ import {
 } from "@/lib/delivered";
 import { today, fmt, fmtFull, lakh } from "@/lib/schedule";
 import RunRate from "./RunRate";
+import AnticipatedFY, { type Anticipated } from "./AnticipatedFY";
 
 const TODAY = today();
 
@@ -92,6 +93,23 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
   const [to, setTo] = useState(TODAY);
   const [fam, setFam] = useState("");
   const [cut, setCut] = useState<"month" | "family" | "customer">("month");
+
+  /**
+   * The run-rate payload, read here as well as inside <RunRate/>.
+   *
+   * Two reads of the same route rather than threading it through: the route is
+   * force-dynamic and cheap, and the alternative is lifting all of RunRate's
+   * state into this page to serve one button in the header.
+   */
+  const [rr, setRr] = useState<{
+    fy: string; end: string; hasTarget: boolean;
+    targets: { sales: number; throughput: number };
+    actuals: { sales: number; throughput: number };
+    anticipated: Anticipated;
+  } | null>(null);
+  useEffect(() => {
+    api.get("/api/run-rate").then((r) => { if (r?.installed && r.anticipated) setRr(r); }).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -172,6 +190,12 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
           </div>
         </div>
         <div className="flex-1" style={{ minWidth: 20 }} />
+        {rr && (
+          <AnticipatedFY
+            fy={rr.fy} end={rr.end} anticipated={rr.anticipated} actuals={rr.actuals}
+            targets={rr.targets} hasTarget={rr.hasTarget} V={V}
+          />
+        )}
         <div className="text-xs text-right" style={{ color: C.mute, lineHeight: 1.5 }}>
           {dated(all).length} dated · {undatedRows.length} undated · on record from{" "}
           <b style={{ color: C.sub }}>{earliest ? fmtFull(earliest) : "—"}</b> to{" "}

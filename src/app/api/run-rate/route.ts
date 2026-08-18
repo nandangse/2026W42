@@ -89,6 +89,46 @@ export async function GET() {
       /* the caveat is context, never the point */
     }
 
+    /**
+     * What the pending book says is still to come this financial year.
+     *
+     * Delivered + anticipated is the honest answer to "where does the year
+     * finish", and it is a DIFFERENT question from the run rate above: the run
+     * rate asks what we would have to do, this asks what we already have on
+     * the books to do it with.
+     *
+     * Three groups, kept apart on purpose rather than summed into one figure:
+     *
+     *   ON DATE     target date between today and 31 March. The expectation.
+     *   OVERDUE     target date already gone but not delivered. Still counted
+     *               in the year — the job exists and will go out — but named,
+     *               because a total that leans on late work should say so.
+     *   OUTSIDE     dated past 31 March, or carrying no date at all. Excluded,
+     *               and reported, so nobody has to wonder where it went.
+     */
+    const antic = await (async () => {
+      const blank = { sales: 0, throughput: 0, jobs: 0 };
+      try {
+        const { data } = await adminClient()
+          .from("jobs")
+          .select("val,tpv,tp,tdd")
+          .eq("active", true);
+        const end = fyEnd(on);
+        const onDate = { ...blank }, overdue = { ...blank }, beyond = { ...blank }, nodate = { ...blank };
+        for (const j of data || []) {
+          const val = Number(j.val) || 0;
+          const tp = throughputOf({ tp: Number(j.tp) || 0, tpv: Number(j.tpv) || 0 });
+          const bucket = !j.tdd ? nodate : j.tdd > end ? beyond : j.tdd < to ? overdue : onDate;
+          bucket.sales += val;
+          bucket.throughput += tp;
+          bucket.jobs += 1;
+        }
+        return { onDate, overdue, beyond, nodate };
+      } catch {
+        return { onDate: blank, overdue: { ...blank }, beyond: { ...blank }, nodate: { ...blank } };
+      }
+    })();
+
     // Who last set the target — a target with no author invites "says who?".
     let updatedBy: string | null = null;
     if (t?.updated_by) {
@@ -114,6 +154,19 @@ export async function GET() {
         throughput: Number(t?.throughput_target) || 0,
       },
       actuals,
+      /**
+       * Delivered so far PLUS everything on the board still due this year.
+       * `expected` is what the year finishes at if every pending job lands on
+       * the date it currently carries — which is the assumption, and the UI
+       * says so rather than presenting it as a forecast.
+       */
+      anticipated: {
+        ...antic,
+        expected: {
+          sales: actuals.sales + antic.onDate.sales + antic.overdue.sales,
+          throughput: actuals.throughput + antic.onDate.throughput + antic.overdue.throughput,
+        },
+      },
       undated,
       deliveries: rows.length,
       updatedAt: t?.updated_at ?? null,
