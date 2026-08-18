@@ -103,6 +103,36 @@
    "n": 19,
    "v": 1.8,
    "t": 0.61
+  },
+  {
+   "f": "MHE - Double Scissor Lift",
+   "n": 1,
+   "v": 1.39,
+   "t": 0.42
+  },
+  {
+   "f": "BB -  Workshop Van",
+   "n": 1,
+   "v": 0.9,
+   "t": 0.36
+  },
+  {
+   "f": "DEF-Customised",
+   "n": 4,
+   "v": 1.04,
+   "t": 0.31
+  },
+  {
+   "f": "MHE - Truck Mounted Crane",
+   "n": 2,
+   "v": 1.02,
+   "t": 0.31
+  },
+  {
+   "f": "MHE - Others",
+   "n": 8,
+   "v": 0.43,
+   "t": 0.17
   }
  ],
  "famOther": [
@@ -173,7 +203,7 @@
   "jobs": [
    {
     "id": "2114",
-    "tag": "Spruce Engineering Co - K-Loader - Vis",
+    "tag": "Spruce Engineering Co - K-Loader - Vishakhapa…",
     "kit": 70,
     "pct": 70,
     "tp": 0.81,
@@ -209,7 +239,7 @@
    },
    {
     "id": "2575",
-    "tag": "Fuel Bowsers 990 Ltr Karnavati Aviatio",
+    "tag": "Fuel Bowsers 990 Ltr Karnavati Aviation (Adan…",
     "kit": 90,
     "pct": 60,
     "tp": 0.07,
@@ -218,7 +248,7 @@
    },
    {
     "id": "2120",
-    "tag": "Spruce Eng - Container Cradle Frame 40",
+    "tag": "Spruce Eng - Container Cradle Frame 40 FT - V…",
     "kit": 100,
     "pct": 70,
     "tp": 0.02,
@@ -227,19 +257,55 @@
    },
    {
     "id": "2116",
-    "tag": "Spruce Engineering co - Portable Loadi",
+    "tag": "Spruce Engineering co - Portable Loading Ramp…",
     "kit": 90,
     "pct": 80,
     "tp": 0.01,
     "tdd": "2026-08-31",
-    "tasks": 1
+    "tasks": 0
    },
    {
     "id": "2117",
-    "tag": "Spruce Engineering co - Portable Loadi",
+    "tag": "Spruce Engineering co - Portable Loading Ramp…",
     "kit": 90,
     "pct": 80,
     "tp": 0.01,
+    "tdd": "2026-08-31",
+    "tasks": 0
+   },
+   {
+    "id": "2588",
+    "tag": "Verni Hydrocarbon- Vayu TL- 350KG- 1Q",
+    "kit": 100,
+    "pct": 70,
+    "tp": 0.01,
+    "tdd": "2026-08-31",
+    "tasks": 0
+   },
+   {
+    "id": "2266",
+    "tag": "Spruce Engineering Co - Container Cradle Fram…",
+    "kit": 100,
+    "pct": 90,
+    "tp": 0,
+    "tdd": "2026-08-31",
+    "tasks": 0
+   },
+   {
+    "id": "2268",
+    "tag": "Spruce Engineering Co - Container Cradle Fram…",
+    "kit": 100,
+    "pct": 90,
+    "tp": 0,
+    "tdd": "2026-08-31",
+    "tasks": 0
+   },
+   {
+    "id": "2267",
+    "tag": "Spruce Engineering Co - Container Cradle Fram…",
+    "kit": 100,
+    "pct": 80,
+    "tp": 0,
     "tdd": "2026-08-31",
     "tasks": 0
    }
@@ -251,35 +317,49 @@
   "jobs": [
    {
     "id": "2541",
-    "tag": "Afcon - Truck mounted Scissor lift - 1",
+    "tag": "Afcon - Truck mounted Scissor lift - 1.5T - Maldives",
     "kit": 60,
     "pct": 0,
     "tp": 0.42
    },
    {
     "id": "2599",
-    "tag": "Self Propelled Articulating Boom - Air",
+    "tag": "Self Propelled Articulating Boom - Airbus - Spain -…",
     "kit": 100,
     "pct": 0,
     "tp": 0.41
    },
    {
     "id": "2600",
-    "tag": "Self Propelled Articulating Boom - Air",
+    "tag": "Self Propelled Articulating Boom - Airbus - Spain -…",
     "kit": 100,
     "pct": 0,
     "tp": 0.41
    },
    {
-    "id": "2486",
-    "tag": "RRR-TIPL-IAF#74(IMDM - I / 1591)",
+    "id": "2487",
+    "tag": "RRR-TIPL-IAF#75(IMDM - I / 1592)",
     "kit": 60,
     "pct": 10,
     "tp": 0.3
    },
    {
-    "id": "2487",
-    "tag": "RRR-TIPL-IAF#75(IMDM - I / 1592)",
+    "id": "2489",
+    "tag": "RRR-TIPL-IAF#77(IMDM - I / 1594)",
+    "kit": 60,
+    "pct": 10,
+    "tp": 0.3
+   },
+   {
+    "id": "2490",
+    "tag": "RRR-TIPL-IAF#78(IMDM - I / 1595)",
+    "kit": 60,
+    "pct": 10,
+    "tp": 0.3
+   },
+   {
+    "id": "2486",
+    "tag": "RRR-TIPL-IAF#74(IMDM - I / 1591)",
     "kit": 60,
     "pct": 10,
     "tp": 0.3
@@ -292,11 +372,81 @@
     "tp": 0.3
    },
    {
-    "id": "2489",
-    "tag": "RRR-TIPL-IAF#77(IMDM - I / 1594)",
+    "id": "2471",
+    "tag": "RRR-TIPL-Navy#61(IMDM - II / 1806)",
     "kit": 60,
     "pct": 10,
-    "tp": 0.3
+    "tp": 0.27
+   },
+   {
+    "id": "2473",
+    "tag": "RRR-TIPL-Navy#63(IMDM - II / 1808)",
+    "kit": 60,
+    "pct": 10,
+    "tp": 0.27
+   },
+   {
+    "id": "2472",
+    "tag": "RRR-TIPL-Navy#62(IMDM - II / 1807)",
+    "kit": 60,
+    "pct": 10,
+    "tp": 0.27
+   },
+   {
+    "id": "2470",
+    "tag": "RRR-TIPL-Navy#60(IMDM - II / 1805)",
+    "kit": 60,
+    "pct": 10,
+    "tp": 0.17
+   },
+   {
+    "id": "2561",
+    "tag": "EHPL-(Encalm)-HL-FC-6.3-#2-DEL",
+    "kit": 60,
+    "pct": 0,
+    "tp": 0.11
+   },
+   {
+    "id": "2560",
+    "tag": "EHPL-(Encalm)-HL-FC-6.3-#1-DEL",
+    "kit": 60,
+    "pct": 0,
+    "tp": 0.11
+   },
+   {
+    "id": "2555",
+    "tag": "TAJ SATS - FC-HL - 6.3 - #2 of 2- DEL",
+    "kit": 60,
+    "pct": 15,
+    "tp": 0.09
+   },
+   {
+    "id": "2134",
+    "tag": "Veda Def - Catapult - #8 - Noida",
+    "kit": 60,
+    "pct": 30,
+    "tp": 0.08
+   },
+   {
+    "id": "2133",
+    "tag": "Veda Def - Catapult - #7 - Noida",
+    "kit": 60,
+    "pct": 30,
+    "tp": 0.08
+   },
+   {
+    "id": "2513",
+    "tag": "EIH - HL-FC - 6.3 - #2 of 6 - MUM",
+    "kit": 60,
+    "pct": 20,
+    "tp": 0.08
+   },
+   {
+    "id": "2598",
+    "tag": "Engine Oil Service Unit - Airbus - Spain #1 of 1 (2…",
+    "kit": 100,
+    "pct": 0,
+    "tp": 0.06
    }
   ]
  },
@@ -339,7 +489,7 @@
    "who": "MT",
    "due": "2026-08-20",
    "esc": "",
-   "title": "Radiator  hoses"
+   "title": "Radiator hoses"
   },
   {
    "job": "2114",
@@ -364,14 +514,6 @@
    "due": "2026-08-18",
    "esc": "",
    "title": "Will Visit to Supplier at Thane"
-  },
-  {
-   "job": "2116",
-   "cat": "Production",
-   "who": "VR",
-   "due": "2026-08-18",
-   "esc": "L2",
-   "title": "Fill this up!!!"
   }
  ],
  "escJobs": 59,
@@ -418,18 +560,11 @@
    "title": "electrical dash board items"
   },
   {
-   "job": "2164",
-   "lvl": "L1",
-   "who": "MT",
-   "due": "2026-08-17",
-   "title": "test"
-  },
-  {
    "job": "2513",
    "lvl": "L2",
    "who": "unassigned",
    "due": "2026-08-17",
-   "title": "Need manpower for scissor frame, cylinder brac"
+   "title": "Need manpower for scissor frame, cylinder bracket w…"
   },
   {
    "job": "2541",
@@ -437,6 +572,61 @@
    "who": "MT",
    "due": "2026-08-17",
    "title": "MS chequered plate"
+  }
+ ],
+ "famCount": 18,
+ "famTop": 8,
+ "famRest": {
+  "n": 12,
+  "t": 0.25
+ },
+ "escQuotes": [
+  {
+   "id": "2114",
+   "tp": 0.81,
+   "text": "W32 - Design - 1. Braking System design and components release 2. Wireless remote features and controls to be p…"
+  },
+  {
+   "id": "2115",
+   "tp": 0.81,
+   "text": "W30 - Design - 1. Braking System design and components release 2. Type of camera require with features required…"
+  },
+  {
+   "id": "2541",
+   "tp": 0.42,
+   "text": "W31: Design: 1. Hyd power pack mounting: Purchase: Chassis pending."
+  }
+ ],
+ "done": [
+  {
+   "k": "2026-04",
+   "n": 26,
+   "v": 6.74,
+   "t": 3.35
+  },
+  {
+   "k": "2026-05",
+   "n": 5,
+   "v": 0.99,
+   "t": 0.51
+  },
+  {
+   "k": "2026-06",
+   "n": 9,
+   "v": 1.89,
+   "t": 1.11
+  },
+  {
+   "k": "2026-07",
+   "n": 16,
+   "v": 5.77,
+   "t": 3
+  },
+  {
+   "k": "2026-08",
+   "n": 5,
+   "v": 1.79,
+   "t": 0.71
   }
  ]
 }
