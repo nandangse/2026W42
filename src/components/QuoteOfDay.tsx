@@ -20,9 +20,23 @@ function quoteFor(iso: string) {
   return QUOTES[((dayNo % QUOTES.length) + QUOTES.length) % QUOTES.length];
 }
 
-/** The quote as a panel on My Week — always there, nothing to dismiss. */
+/**
+ * The quote as a panel on My Week — always there, nothing to dismiss.
+ *
+ * A different one on every page load, not one a day. The people who read this
+ * page open it eight times between eight and six, and a quote that does not
+ * change stops being read by the second look.
+ *
+ * Chosen in an effect rather than during render: picking at random while
+ * rendering makes the server and the browser disagree about what they drew,
+ * and React reports that as a hydration error. One frame with an empty card is
+ * the cost.
+ */
 export function QuoteCard() {
-  const quote = quoteFor(todayISO());
+  const [quote, setQuote] = useState<(typeof QUOTES)[number] | null>(null);
+  useEffect(() => {
+    setQuote(QUOTES.length ? QUOTES[Math.floor(Math.random() * QUOTES.length)] : null);
+  }, []);
   if (!quote) return null;
   return (
     <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA", borderTop: "3px solid #F5B32B" }}>

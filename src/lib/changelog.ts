@@ -37,6 +37,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.4.0.7",
+    date: "2026-08-18",
+    module: "My Week",
+    items: [
+      "The quote and the picture now change on EVERY page load, not once a day. They were pinned to the date so the whole company saw the same one — right for something mentioned across a room, wrong for a page the same people open eight times between eight and six. A picture that never changes stops being looked at by Tuesday.",
+      "All 168 images and the whole quote list are in play on every load.",
+    ],
+  },
+  {
     v: "3.4.0.6",
     date: "2026-08-18",
     module: "My Week",

@@ -46,16 +46,19 @@ export function imageUrl(raw: string | null | undefined, width = 1000): string |
 }
 
 /**
- * Which of N things today gets.
+ * Which of N things this page load gets.
  *
- * Keyed off the date so everybody in the company sees the SAME image on the
- * same day — a shuffle per browser would mean nobody could mention it to
- * anybody. Rotates through the whole list before repeating.
+ * Random, on purpose, and a reversal of how this started: it used to be keyed
+ * off the date so the whole company saw one picture a day. Dr Raghu asked for
+ * it to change on every load instead, which is the right call for a wall the
+ * same people look at eight times a day — a picture that never changes stops
+ * being looked at by Tuesday.
+ *
+ * Returns -1 when there is nothing to pick from, so the caller can tell "no
+ * images" from "image number zero".
  */
-export function pickForDay(count: number, isoDate: string): number {
-  if (count <= 0) return -1;
-  const days = Math.floor(Date.parse(isoDate + "T00:00:00Z") / 86400000);
-  return ((days % count) + count) % count;
+export function pickAny(count: number): number {
+  return count <= 0 ? -1 : Math.floor(Math.random() * count);
 }
 
 /** A YouTube thumbnail for a lesson card, where the lesson has a video. */

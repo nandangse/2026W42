@@ -3,7 +3,7 @@ import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { today, addDays } from "@/lib/schedule";
 import {
-  PARTICIPATION_DAYS, LEARNING_DAYS, birthdaysWithin, pickForDay, imageUrl,
+  PARTICIPATION_DAYS, LEARNING_DAYS, birthdaysWithin, pickAny, imageUrl,
   listDriveFolder, folderIdOf, type Mood,
 } from "@/lib/my-week";
 
@@ -147,7 +147,8 @@ export async function GET() {
           }
         }
       }
-      const i = pickForDay(rows.length, T);
+      // a different picture on every load, not one a day
+      const i = pickAny(rows.length);
       if (i < 0) return null;
       // the row's own url is kept alongside, so Admin can show what was pasted
       return { ...rows[i], src: imageUrl(rows[i].url), of: rows.length };
