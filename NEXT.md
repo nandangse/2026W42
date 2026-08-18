@@ -47,5 +47,80 @@ filter, so it wants Dr Raghu's word first.
 
 ---
 
+## The next body of work (given 18 Aug 2026)
+
+Seven items. They are not the same size, and three of them overlap things that
+already exist — which changes what each costs.
+
+### 7. Push to ERP  ← the cheapest real win, and the one with a dependency
+
+**The ERP is Frappe/ERPNext.** Its URLs give it away: `/app/jobmaster/<id>`,
+`/app/todo/`, `/desk/`, `view/report/...`. `todo` and `project` are stock
+doctypes; `jobmaster` is custom.
+
+That means it has a REST API — `PUT /api/resource/Jobmaster/<name>` with an
+`Authorization: token <key>:<secret>` header. So the `erp_update` queue built
+in 0031 can stop being a CSV somebody retypes and start being a button.
+
+**Blocked on two things, both Dr Raghu's:**
+
+- an API key and secret from the ERP for a user with write access to Jobmaster
+  (Frappe: User → API Access → Generate Keys). It goes in Vercel as
+  `ERP_API_KEY` / `ERP_API_SECRET`, never in the repo.
+- which fields Genie may write WITHOUT asking. Writing a date is not the same
+  risk as writing a status, and a one-way sync that silently loses an argument
+  between two systems is worse than the CSV.
+
+Everything else is done: the queue knows the job id, the field, the ERP's own
+label for it, the old value and the new one.
+
+### 1 + 3. SOPs / Way of Working, and the Integrated Quality Manual
+
+**These are probably LMS, not a new module.** An SOP is a document that people
+must read, be trained on, and acknowledge — which is books → sections →
+lessons, per-person progress, and the fifty-word completion rule, all of which
+exist. What LMS does NOT have yet, and an SOP needs:
+
+- a **version** on a lesson, and "you acknowledged v2, the current one is v3"
+- **who must read it** — by department or designation, not by choosing
+- an **acknowledgement** that is a signature rather than a lesson completion
+- **review dates** — an SOP unreviewed for two years is a finding in an audit
+
+Decide before building: is an SOP a kind of lesson (extend LMS), or its own
+thing that happens to be taught (new tables, and the training link is a join)?
+The first is a fortnight less work and one place to look.
+
+### 2. Quality Process built in
+
+The vaguest of the seven and needs scoping before anything is written. What
+exists to hang it on: milestones per job, Material Kitting with a QC Defective
+state, and tasks with categories and escalation. Questions:
+
+- is this **inspection gates on milestones** — a milestone that cannot be
+  ticked until QC signs it?
+- is it **NCRs** — raise, assign, close, with a cause?
+- is it **incoming** (the kitting QC we already have), **in-process**, or
+  **final**, or all three?
+
+### 4. IDP — unchanged, still blocked on a definition
+
+See the four questions above. LMS already supplies the learning half.
+
+### 5. Sales Quotation
+
+Sales Genie exists but is a separate HTML app under `src/sales-plan/`, not part
+of the React suite. Decide first: does a quotation live inside Sales Genie, or
+is it a new section of Genie proper? Then: what is on a quotation, who approves
+it, does it become a job when won, and does the ERP already hold quotations
+(Frappe has a stock `Quotation` doctype — worth checking before building one).
+
+### 6. Design Verification System
+
+Undefined. Likely drawing/design checks before release — who verifies, against
+what, and what cannot proceed until they have. The Design Training book exists
+in LMS; `2610 · BOM and MFG drawings release` is already a task category people
+use, so the work is being tracked informally today. Worth watching how, before
+designing around it.
+
 ## Notes that cost time to learn
 
