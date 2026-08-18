@@ -287,6 +287,10 @@ export async function buildBoard(supabase: SupabaseClient) {
       cat: t.cat,
       esc: t.esc,
       done: !!t.done,
+      // the date FIRST promised, and how often it has moved since. Lateness is
+      // measured against this, never against the date currently on screen.
+      original_due: t.original_due ?? t.due ?? null,
+      push_count: t.push_count ?? 0,
       // ERP ToDos have no author inside Genie — they arrive from the export
       by: null as string | null,
       comments: commentCounts["erp:" + t.id] || 0,
@@ -304,6 +308,8 @@ export async function buildBoard(supabase: SupabaseClient) {
       done: !!t.done,
       // who raised it — the key behind Tasking's "tasks I assigned" filter
       by: (t.created_by ?? null) as string | null,
+      original_due: t.original_due ?? t.due ?? null,
+      push_count: t.push_count ?? 0,
       comments: commentCounts["manual:" + t.id] || 0,
     })),
   ];

@@ -102,6 +102,41 @@ export async function POST(req: Request) {
       if (!Object.keys(patch).length)
         return NextResponse.json({ error: "nothing to update" }, { status: 400 });
 
+      /**
+       * A due date that moves is recorded, not just replaced.
+       *
+       * original_due is set from the date the task ALREADY had — that is the
+       * first promise, and it never changes again. push_count and the log say
+       * how far it has drifted since. Without this, dragging a chip forward
+       * deletes the fact that it was ever late, which is the one thing a
+       * delivery board must not let anybody do.
+       */
+      if ("due" in body) {
+        try {
+          const { data: was } = await supabase
+            .from(table)
+            .select("due, original_due, push_count")
+            .eq("id", body.id)
+            .maybeSingle();
+          const oldDue = was?.due ?? null;
+          const newDue = body.due || null;
+          if (was && oldDue !== newDue) {
+            // the first promise is whatever it was carrying before this move
+            if (!was.original_due && oldDue) patch.original_due = oldDue;
+            patch.push_count = (was.push_count ?? 0) + 1;
+            await adminClient().from("task_date_log").insert({
+              task_id: body.id,
+              task_kind: body.kind === "manual" ? "manual" : "erp",
+              old_due: oldDue,
+              new_due: newDue,
+              by: user.initials || user.displayName || user.email.split("@")[0],
+            });
+          }
+        } catch {
+          /* 0032 not run yet — the date still moves, it is just not recorded */
+        }
+      }
+
       // read the old assignee first, so a reassignment can be detected after
       const oldWho =
         "who" in body

@@ -37,6 +37,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.4.0.1",
+    date: "2026-08-18",
+    module: "Nandan Tasking",
+    items: [
+      "A task now remembers the date it was FIRST promised, and lateness is judged on that — never on the date currently showing. Dragging a task from the 11th onto today used to make it stop being late; nothing recorded that it had ever been late, or that anybody had moved it. Lateness had become something you could delete by dragging.",
+      "So the job number stays red on a task whose original date has gone, however many times it has been pushed since. The chip also carries ↻ and the number of moves.",
+      "Every move is logged — from, to, who and when — and shown in the task box ABOVE the comments, because a date that has moved four times IS the story of the task. Burying it in a field somebody has to compare from memory is how a task slips a month one week at a time.",
+      "The overdue counts on My Week and on the calendar are counted the same way, so moving a task does not quietly clear the number.",
+      "Goals have worked like this since they were rebuilt — “carried days and pushes are counted against the date first committed, not the one on screen”. Tasks now match.",
+      "Everything already on the board is treated as promised on the date it currently carries. Inventing an earlier promise would mark tasks late that nobody ever agreed a date for.",
+      "Migration 0032.",
+    ],
+  },
+  {
     v: "3.4.0.0",
     date: "2026-08-18",
     module: "Jobs in Progress · Update to ERP",

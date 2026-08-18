@@ -191,7 +191,18 @@ interface Task {
   /** Email of whoever raised it. null for ERP ToDos — they have no Genie author. */
   by: string | null;
   comments: number;
+  /**
+   * The date FIRST promised, and how many times it has been moved since.
+   * Lateness is judged on this, never on the date currently showing — a task
+   * dragged forward must not stop being late by being dragged.
+   */
+  original_due?: string | null;
+  push_count?: number;
 }
+
+/** Late against the date first committed, not the one on screen. */
+const taskLate = (t: Pick<Task, "due" | "original_due" | "done">, on: string): boolean =>
+  !t.done && !!(t.original_due || t.due) && (t.original_due || t.due)! < on;
 interface Board {
   jobs: Job[];
   archived: Record<string, Job>;
@@ -1148,7 +1159,8 @@ function MyWeek({
       .filter((t) => !t.due || t.due <= weekEnd)
       .sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1));
   }, [board.tasks, handles, weekEnd]);
-  const overdue = myTasks.filter((t) => t.due && t.due < TODAY);
+  // late against the date first promised — see taskLate()
+  const overdue = myTasks.filter((t) => taskLate(t, TODAY));
   const dueToday = myTasks.filter((t) => t.due === TODAY);
   const laterThisWeek = myTasks.filter((t) => !t.due || t.due > TODAY);
 
@@ -3448,7 +3460,7 @@ function Tasking({
         const jset = new Set(taskingJobs.map((j) => j.id));
         const openT = filteredTasks.filter((t) => !t.done && t.due && jset.has(t.j));
         const byDay: Record<string, Task[]> = {}; openT.forEach((t) => (byDay[t.due!] = byDay[t.due!] || []).push(t));
-        const overdue = openT.filter((t) => t.due! < TODAY);
+        const overdue = openT.filter((t) => taskLate(t, TODAY));
         const monthLabel = first.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
         const shiftMonth = (d: number) => setCalMonth(toISO(new Date(Date.UTC(yy, mm - 1 + d, 1))).slice(0, 7));
         return (
@@ -3462,7 +3474,7 @@ function Tasking({
                 <button onClick={() => shiftMonth(1)} className="px-3 py-1 rounded font-bold text-sm" style={{ background: "#F4F2EC", color: "#22303C" }}>▶</button>
               </div>
             </div>
-            {overdue.length > 0 && (<div className="text-xs font-bold rounded px-2 py-1 mb-2 inline-block" style={{ background: "#B3261E", color: "#fff" }}>⚠ {overdue.length} overdue task{overdue.length === 1 ? "" : "s"} — red chips on their original due dates</div>)}
+            {overdue.length > 0 && (<div className="text-xs font-bold rounded px-2 py-1 mb-2 inline-block" style={{ background: "#B3261E", color: "#fff" }}>⚠ {overdue.length} overdue task{overdue.length === 1 ? "" : "s"} — counted against the date FIRST promised, so moving one does not clear it</div>)}
             <table className="w-full text-xs" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
               <thead><tr style={{ background: "#22303C", color: "#fff" }}><th className="px-1 py-1.5" style={{ width: 58 }}>ISO Wk</th>{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (<th key={d} className="px-1 py-1.5">{d}</th>))}</tr></thead>
               <tbody>
@@ -3489,7 +3501,10 @@ function Tasking({
                             <div className="font-bold tnum" style={{ color: d === TODAY ? "#E8600A" : "#8A94A0" }}>{parseInt(d.slice(8), 10)}{d === TODAY ? " · today" : ""}</div>
                             {list.map((t) => {
                               const c = catColour(t.cat);
-                              const late = t.due! < TODAY;
+                              // red on the ORIGINAL promise: a chip dragged
+                              // forward keeps saying it was late, because it was
+                              const late = taskLate(t, TODAY);
+                              const pushed = (t.push_count ?? 0) > 0;
                               return (
                                 <div
                                   key={t.id}
@@ -3497,7 +3512,7 @@ function Tasking({
                                   onDragStart={(e) => { setDragTask(t); e.dataTransfer.effectAllowed = "move"; }}
                                   onDragEnd={() => setDragTask(null)}
                                   onClick={() => setLightbox(t)}
-                                  title={`JOB ${jobNo(t.j)} · ${t.cat || "General"} · ${t.t}\n${t.who || "unassigned"} · due ${fmtFull(t.due)}${late ? " — OVERDUE" : ""}\nDrag to another day to move the date.`}
+                                  title={`JOB ${jobNo(t.j)} · ${t.cat || "General"} · ${t.t}\n${t.who || "unassigned"} · due ${fmtFull(t.due)}${late ? " — OVERDUE" : ""}${pushed ? `\nFirst promised ${fmtFull(t.original_due!)} · moved ${t.push_count} time${t.push_count === 1 ? "" : "s"}` : ""}\nDrag to another day to move the date.`}
                                   className="rounded px-1 py-0.5 mb-0.5 cursor-grab"
                                   style={{
                                     background: c.bg, color: c.ink,
@@ -3514,6 +3529,7 @@ function Tasking({
                                       {jobNo(t.j)}
                                     </span>
                                     <span className="font-bold">{initials(t.who)}</span>
+                                    {pushed && <span style={{ color: "#B3261E", fontWeight: 700 }} title={`Moved ${t.push_count} time${t.push_count === 1 ? "" : "s"} — first promised ${fmtFull(t.original_due!)}`}>↻{t.push_count}</span>}
                                     <span style={{ opacity: 0.75, overflow: "hidden", textOverflow: "ellipsis" }}>{t.cat || "General"}</span>
                                     {t.esc && t.esc !== "None" && <span style={{ color: "#B3261E", fontWeight: 700 }}>⚠</span>}
                                   </div>
@@ -4226,6 +4242,8 @@ function AddTaskForm({ form, setForm, owners, onSubmit, onCancel, hideActions }:
 
 function TaskModal({ task, owners = [], onClose, onToggle, reload }: { task: Task; owners?: Assignee[]; onClose: () => void; onToggle: () => void; reload: () => Promise<Board | null> }) {
   const [comments, setComments] = useState<{ by: string; at: string; body: string }[]>([]);
+  // every time this task's due date has moved
+  const [dateLog, setDateLog] = useState<{ id: string; old_due: string | null; new_due: string | null; by: string | null; at: string }[]>([]);
   const [cmt, setCmt] = useState("");
   const [editing, setEditing] = useState(false);
   const [ef, setEf] = useState({ t: task.t || "", d: task.d || "", who: task.who || "", due: task.due || "", cat: task.cat || "Production", esc: task.esc || "None" });
@@ -4233,6 +4251,9 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload }: { task: Tas
   useEffect(() => {
     if (isMs) return;
     api.get(`/api/comments?task_id=${task.id}&task_kind=${task.kind}`).then((r) => setComments(r.comments)).catch(() => {});
+    api.get(`/api/task-dates?task_id=${task.id}&task_kind=${task.kind}`)
+      .then((r) => setDateLog(r.moves || []))
+      .catch(() => setDateLog([]));
   }, [task, isMs]);
   const add = async () => {
     if (!cmt.trim()) return;
@@ -4320,6 +4341,28 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload }: { task: Tas
 
         {!isMs && (
           <div className="mt-3 border-t pt-2" style={{ borderColor: "#EEECE6" }}>
+            {/* The date history sits ABOVE the comments and reads like one.
+                A due date that has moved four times IS the story of the task,
+                and burying it in a field somebody has to compare by memory is
+                how a task quietly slips a month one week at a time. */}
+            {(dateLog.length > 0 || (task.push_count ?? 0) > 0) && (
+              <div className="rounded p-2 mb-2" style={{ background: "#FBEDEA", border: "1px solid #F0C9C4" }}>
+                <div className="text-xs font-bold mb-1" style={{ color: "#B3261E" }}>
+                  Date moved {task.push_count ?? dateLog.length} time{(task.push_count ?? dateLog.length) === 1 ? "" : "s"}
+                  {task.original_due && <span className="font-normal" style={{ color: "#8A5A00" }}> · first promised {fmtFull(task.original_due)}</span>}
+                </div>
+                {dateLog.map((m) => (
+                  <div key={m.id} className="text-xs" style={{ color: "#5A6672", lineHeight: 1.5 }}>
+                    <b style={{ color: "#22303C" }}>{m.by || "someone"}</b> moved it{" "}
+                    {m.old_due ? fmtFull(m.old_due) : "no date"} → <b style={{ color: "#B3261E" }}>{m.new_due ? fmtFull(m.new_due) : "no date"}</b>
+                    <span style={{ color: "#B8B5AC" }}> · {String(m.at).slice(0, 10).split("-").reverse().join("-")}</span>
+                  </div>
+                ))}
+                {dateLog.length === 0 && (
+                  <div className="text-xs" style={{ color: "#8A94A0" }}>Moved before Genie started recording who moved it.</div>
+                )}
+              </div>
+            )}
             <div className="text-xs font-bold mb-1" style={{ color: "#5A6672" }}>Comments</div>
             {comments.map((c, i) => (
               <div key={i} className="text-xs mb-1"><span className="font-bold">{c.by}</span> <span style={{ color: "#8A94A0" }}>{new Date(c.at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span><div>{c.body}</div></div>
