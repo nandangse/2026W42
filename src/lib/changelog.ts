@@ -37,6 +37,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.4.0.4",
+    date: "2026-08-18",
+    module: "Nandan Tasking",
+    items: [
+      "New: 🖨 Make PDF on the calendar, beside Add Task and Today. It opens a clean printable month — A3 landscape, because a week is seven columns wide — and the browser’s Save as PDF does the rest. No library, a real PDF, on every machine this runs on.",
+      "It prints a page of its own rather than the screen. Printing the live page would carry the header, the workspace bar and the filter row onto the paper, and a wall chart with a navigation menu across the top is not a wall chart.",
+      "The print keeps the category colours, the red job number on anything overdue, the escalation mark and the customer tag — the same chip, on paper.",
+    ],
+  },
+  {
     v: "3.4.0.3",
     date: "2026-08-18",
     module: "Morning Update",

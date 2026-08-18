@@ -3473,6 +3473,11 @@ function Tasking({
               <button onClick={() => shiftMonth(-1)} className="px-3 py-1 rounded font-bold text-sm" style={{ background: "#F4F2EC", color: "#22303C" }}>◀</button>
               <div className="font-bold text-center" style={{ color: "#16232F" }}>{monthLabel} <span className="text-xs font-normal" style={{ color: "#8A94A0" }}>· open tasks on their due dates · respects the filters above</span></div>
               <div className="flex gap-1 items-center">
+                <button onClick={() => makePdf(weeks, byDay, monthLabel, overdue.length, jobTag)} className="px-3 py-1 rounded text-xs font-bold"
+                  style={{ background: "#fff", border: "1px solid #22303C", color: "#22303C" }}
+                  title="A printable month — opens your browser's print dialog, where Save as PDF is the destination">
+                  🖨 Make PDF
+                </button>
                 <button onClick={() => setNewTaskOpen(true)} className="px-3 py-1 rounded text-xs font-bold" style={{ background: "#22303C", color: "#fff" }} title="Raise a task without leaving the calendar">+ Add Task</button>
                 <button onClick={() => setCalMonth(TODAY.slice(0, 7))} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }}>Today</button>
                 <button onClick={() => shiftMonth(1)} className="px-3 py-1 rounded font-bold text-sm" style={{ background: "#F4F2EC", color: "#22303C" }}>▶</button>
@@ -3588,6 +3593,92 @@ function Tasking({
       {lightbox && <TaskModal task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
     </div>
   );
+}
+
+/**
+ * The month as a printable page.
+ *
+ * A new window with its own stylesheet rather than print rules on the app:
+ * printing the live page would carry the header, the nav and the filter bar
+ * onto the paper, and a wall chart with a navigation menu across the top is
+ * not a wall chart. Landscape, because a week is seven columns wide.
+ *
+ * Browsers offer "Save as PDF" as a print destination on every platform this
+ * runs on, so this needs no library and produces a real PDF.
+ */
+function makePdf(
+  weeks: string[][],
+  byDay: Record<string, Task[]>,
+  monthLabel: string,
+  overdueCount: number,
+  jobTag: (id: string) => string,
+) {
+  const esc = (v: unknown) =>
+    String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+
+  const cell = (d: string) => {
+    const list = byDay[d] || [];
+    const chips = list
+      .map((t) => {
+        const c = catColour(t.cat);
+        const late = taskLate(t, TODAY);
+        return `<div class="chip" style="background:${c.bg};color:${c.ink};border-color:${c.edge}">
+          <div class="l1">
+            <b class="${late ? "late" : ""}">${esc(jobNo(t.j))}</b>
+            <b>${esc(whoTag(t.who))}</b>
+            ${t.esc && t.esc !== "None" ? '<span class="esc">&#9888;</span>' : ""}
+            <span class="tag">${esc(jobTag(t.j))}</span>
+          </div>
+          <div class="l2">${esc(t.t)}</div>
+        </div>`;
+      })
+      .join("");
+    const day = parseInt(d.slice(8), 10);
+    return `<td class="${d === TODAY ? "today" : ""}"><div class="dn">${day}</div>${chips}</td>`;
+  };
+
+  const body = weeks
+    .map((wk) => `<tr><td class="wk">W${isoWeek(wk[0])}</td>${wk.map(cell).join("")}</tr>`)
+    .join("");
+
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(monthLabel)} — Nandan Tasking</title>
+<style>
+  @page { size: A3 landscape; margin: 10mm; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: #16232F; margin: 0; }
+  h1 { font-size: 16pt; margin: 0 0 2mm; }
+  .sub { font-size: 9pt; color: #5A6672; margin-bottom: 3mm; }
+  .warn { display: inline-block; background: #B3261E; color: #fff; font-size: 8pt; font-weight: 700; padding: 1mm 2mm; border-radius: 2px; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th { background: #22303C; color: #fff; font-size: 8pt; padding: 1.5mm; }
+  td { border: 0.4pt solid #E2E0DA; vertical-align: top; padding: 1mm; height: 34mm; }
+  td.wk { width: 12mm; background: #F4F2EC; text-align: center; font-weight: 700; font-size: 8pt; color: #1B3A5C; }
+  td.today { background: #FFF3E8; }
+  .dn { font-size: 8pt; font-weight: 700; color: #8A94A0; margin-bottom: 0.8mm; }
+  .chip { border: 0.4pt solid; border-radius: 2px; padding: 0.7mm 1.2mm; margin-bottom: 0.8mm; font-size: 6.5pt; line-height: 1.25; }
+  .l1 { white-space: nowrap; overflow: hidden; }
+  .l1 b { margin-right: 1mm; }
+  .l1 .tag { opacity: .7; }
+  .l1 .late { background: #B3261E; color: #fff; border-radius: 2px; padding: 0 1mm; }
+  .l1 .esc { color: #B3261E; font-weight: 700; }
+  .l2 { font-weight: 600; }
+</style></head><body>
+<h1>${esc(monthLabel)} &middot; Nandan Tasking</h1>
+<div class="sub">Open tasks on their due dates &middot; printed ${esc(fmtFull(TODAY))}
+${overdueCount > 0 ? ` &middot; <span class="warn">${overdueCount} overdue, against the date first promised</span>` : ""}</div>
+<table><thead><tr><th>ISO</th>${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => `<th>${d}</th>`).join("")}</tr></thead>
+<tbody>${body}</tbody></table>
+</body></html>`;
+
+  const w = window.open("", "_blank");
+  if (!w) {
+    alert("Your browser blocked the print window. Allow pop-ups for Genie and press Make PDF again.");
+    return;
+  }
+  w.document.write(html);
+  w.document.close();
+  // let the styles land before the dialog opens, or the first page prints bare
+  w.onload = () => setTimeout(() => w.print(), 120);
 }
 
 /**
