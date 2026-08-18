@@ -52,17 +52,17 @@ export default function AnticipatedFY({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="rounded-lg text-left"
-        style={{ background: C.ink, color: "#fff", padding: "10px 14px", border: `2px solid ${C.accent}`, cursor: "pointer", minWidth: 300 }}
+        className="rounded-lg text-left w-full"
+        style={{ background: C.ink, color: "#fff", padding: "8px 12px", border: `2px solid ${C.accent}`, cursor: "pointer", height: "100%" }}
         title="Delivered so far plus everything still due before 31 March — click for the working"
       >
         <div className="text-xs font-bold" style={{ color: "#8FA1B3", letterSpacing: 1.1 }}>
           TOTAL ANTICIPATED · {fy}
         </div>
-        <div className="flex items-baseline gap-4 flex-wrap mt-0.5">
+        <div className="flex items-baseline gap-4 mt-0.5" style={{ flexWrap: "nowrap" }}>
           <div>
             <div style={{ fontSize: 10, color: "#8FA1B3" }}>SALES</div>
-            <div className="tnum font-bold" style={{ fontSize: 24, lineHeight: 1.1, color: "#F5B32B" }}>
+            <div className="tnum font-bold" style={{ fontSize: 21, lineHeight: 1.1, color: "#F5B32B" }}>
               {V(a.expected.sales)}
             </div>
             {hasTarget && salesPct != null && (
@@ -73,7 +73,7 @@ export default function AnticipatedFY({
           </div>
           <div>
             <div style={{ fontSize: 10, color: "#8FA1B3" }}>THROUGHPUT</div>
-            <div className="tnum font-bold" style={{ fontSize: 24, lineHeight: 1.1, color: "#7BC67E" }}>
+            <div className="tnum font-bold" style={{ fontSize: 21, lineHeight: 1.1, color: "#7BC67E" }}>
               {V(a.expected.throughput)}
             </div>
             {hasTarget && tpPct != null && (

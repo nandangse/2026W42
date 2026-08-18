@@ -37,6 +37,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.5.0.1",
+    date: "2026-08-18",
+    module: "Delivered Jobs",
+    items: [
+      "The top of Delivered Jobs is three boxes on one line: what the page is, what the year comes to, and how much ledger sits behind it. It was a title, a floating dark card and a right-aligned paragraph, which collided with each other at most widths — three equal boxes in one grid cannot.",
+      "The Total Anticipated box now fills its share of the line instead of sitting at its own width and overlapping its neighbours.",
+    ],
+  },
+  {
     v: "3.5.0.0",
     date: "2026-08-18",
     module: "Delivered Jobs",

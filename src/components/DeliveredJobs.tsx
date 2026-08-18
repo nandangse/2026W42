@@ -179,9 +179,13 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
 
   return (
     <div className="p-4">
-      {/* ===== header ===== */}
-      <div className="flex items-center gap-3 flex-wrap mb-3">
-        <div>
+      {/* ===== header: three boxes, one line =====
+          What the page is, what the year comes to, and how much ledger is
+          behind it. They were a title, a floating dark card and a right-aligned
+          paragraph, which collided at every width. Three boxes of equal height
+          in one grid cannot. */}
+      <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))" }}>
+        <div className="rounded-lg border bg-white px-3 py-2 flex flex-col justify-center" style={{ borderColor: C.line, borderTop: `3px solid ${C.accent}` }}>
           <div className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.4 }}>
             DELIVERED JOBS · {fyLabel(TODAY)}
           </div>
@@ -189,22 +193,30 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
             What actually went out of the door
           </div>
         </div>
-        <div className="flex-1" style={{ minWidth: 20 }} />
-        {rr && (
+
+        {rr ? (
           <AnticipatedFY
             fy={rr.fy} end={rr.end} anticipated={rr.anticipated} actuals={rr.actuals}
             targets={rr.targets} hasTarget={rr.hasTarget} V={V}
           />
+        ) : (
+          <div className="rounded-lg border bg-white" style={{ borderColor: C.line }} />
         )}
-        <div className="text-xs text-right" style={{ color: C.mute, lineHeight: 1.5 }}>
-          {dated(all).length} dated · {undatedRows.length} undated · on record from{" "}
-          <b style={{ color: C.sub }}>{earliest ? fmtFull(earliest) : "—"}</b> to{" "}
-          <b style={{ color: C.sub }}>{latest ? fmtFull(latest) : "—"}</b>
-          {data.lastUpload && (
+
+        <div className="rounded-lg border bg-white px-3 py-2 flex flex-col justify-center" style={{ borderColor: C.line }}>
+          <div className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>THE LEDGER</div>
+          <div className="text-xs" style={{ color: C.sub, lineHeight: 1.55 }}>
+            <b className="tnum" style={{ color: C.ink }}>{dated(all).length}</b> dated ·{" "}
+            <b className="tnum" style={{ color: C.ink }}>{undatedRows.length}</b> undated
             <div style={{ color: C.faint }}>
-              report last loaded {fmtFull(String(data.lastUpload).slice(0, 10))}
+              on record {earliest ? fmtFull(earliest) : "—"} → {latest ? fmtFull(latest) : "—"}
             </div>
-          )}
+            {data.lastUpload && (
+              <div style={{ color: C.faint }}>
+                loaded {fmtFull(String(data.lastUpload).slice(0, 10))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
