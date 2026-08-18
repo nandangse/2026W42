@@ -332,24 +332,64 @@ const EMP_FIELDS: [keyof ParsedEmployee, RegExp][] = [
  */
 const EXTRA_JOB_FIELDS: {
   key: "clientUpdate" | "cashflow" | "amtNeeded" | "payOnDelivery" | "escalation";
-  re: RegExp;
+  /**
+   * Patterns in order, STRONGEST FIRST. Every header is tried against the
+   * first pattern before any is tried against the second.
+   *
+   * This ordering is the whole fix for the cash-flow mis-bind: the sheet
+   * carries both "Planned Input Cashflow Pattern" and "Cash flow Details",
+   * a loose /cash.?flow/ matches both, and the pattern column happens to sit
+   * first — so first-header-wins picked the wrong one. Specificity has to beat
+   * position, or the answer depends on what order somebody arranged the sheet.
+   */
+  res: RegExp[];
+  /** A header matching this is never bound, however well it matches above. */
+  not?: RegExp;
   numeric: boolean;
 }[] = [
-  // "on delivery" first: it is the most specific, and a sheet carrying both it
-  // and a general "Pending Payment" must bind the specific one.
   {
     key: "payOnDelivery",
-    re: /(pending|balance|due|outstanding|collect\w*|receiv\w*)[\s\S]{0,20}(payment|amount|value|collection)?[\s\S]{0,20}(on|at|against|after)?[\s\S]{0,6}(delivery|dispatch|despatch)|payment[\s\S]{0,20}(on|at|against)[\s\S]{0,6}(delivery|dispatch|despatch)/i,
-  numeric: true,
+    res: [
+      /^(pending|balance|outstanding)[\s\S]{0,14}payment[\s\S]{0,14}(on|at)[\s\S]{0,6}(delivery|dispatch|despatch)/i,
+      /(pending|balance|due|outstanding|collect\w*|receiv\w*)[\s\S]{0,20}(payment|amount|value|collection)?[\s\S]{0,20}(on|at|against|after)?[\s\S]{0,6}(delivery|dispatch|despatch)/i,
+      /payment[\s\S]{0,20}(on|at|against)[\s\S]{0,6}(delivery|dispatch|despatch)/i,
+    ],
+    numeric: true,
   },
-  // "Amount Needed in Next Month" is the real header on the Jobmaster, so the
-  // pattern must not stop at the word after "needed".
-  { key: "amtNeeded", re: /(amount|amt|fund|cash|money)[\s\S]{0,12}(needed|required|reqd|to\s*be\s*spent)/i, numeric: true },
-  { key: "cashflow", re: /cash[\s-]*flow/i, numeric: false },
-  { key: "clientUpdate", re: /(client|customer)[\s\S]{0,12}(update|feedback|remark|comment|communication)/i, numeric: false },
-  // Last, and narrowest: "escalation" on its own is unambiguous, but it must
-  // not be allowed to claim a column an earlier field wanted.
-  { key: "escalation", re: /escalat/i, numeric: false },
+  {
+    key: "amtNeeded",
+    res: [
+      /^amount[\s\S]{0,12}(needed|required)[\s\S]{0,20}(next|coming)[\s\S]{0,8}month/i,
+      /(amount|amt|fund|cash|money)[\s\S]{0,12}(needed|required|reqd|to\s*be\s*spent)/i,
+    ],
+    numeric: true,
+  },
+  {
+    key: "cashflow",
+    res: [
+      // the real column, named as the ERP names it
+      /^\s*cash[\s-]*flow(\s*details?)?\s*$/i,
+      /cash[\s-]*flow[\s\S]{0,12}detail/i,
+      /cash[\s-]*flow/i,
+    ],
+    // "Planned Input Cashflow Pattern" is a different column carrying a
+    // different thing, and binding to it put the wrong text on every job page.
+    not: /pattern|plan\w*\s+input/i,
+    numeric: false,
+  },
+  {
+    key: "clientUpdate",
+    res: [
+      /^\s*client[\s\S]{0,12}update[\s\S]{0,10}(latest)?\s*$/i,
+      /(client|customer)[\s\S]{0,12}(update|feedback|remark|comment|communication)/i,
+    ],
+    numeric: false,
+  },
+  {
+    key: "escalation",
+    res: [/^\s*curr?r?ent[\s\S]{0,12}(project[\s\S]{0,6})?escalat\w*/i, /escalat/i],
+    numeric: false,
+  },
 ];
 
 /**
@@ -383,12 +423,22 @@ function matchExtraJobFields(hdr: string[]): { header: Partial<Record<string, st
   const header: Partial<Record<string, string>> = {};
   const matched: Record<string, string> = {};
   const used = new Set<string>();
-  for (const f of EXTRA_JOB_FIELDS) {
-    const hit = hdr.find((h) => h && !used.has(h) && f.re.test(h));
-    if (hit) {
-      header[f.key] = hit;
-      matched[f.key] = hit;
-      used.add(hit);
+
+  // Round by round: every field tries its FIRST pattern before any field tries
+  // its second. So an exact "Cash flow Details" is claimed before a loose
+  // /cash.?flow/ can reach "Planned Input Cashflow Pattern".
+  const depth = Math.max(...EXTRA_JOB_FIELDS.map((f) => f.res.length));
+  for (let round = 0; round < depth; round++) {
+    for (const f of EXTRA_JOB_FIELDS) {
+      if (header[f.key] || !f.res[round]) continue;
+      const hit = hdr.find(
+        (h) => h && !used.has(h) && f.res[round].test(h) && !(f.not && f.not.test(h)),
+      );
+      if (hit) {
+        header[f.key] = hit;
+        matched[f.key] = hit;
+        used.add(hit);
+      }
     }
   }
   return { header, matched };

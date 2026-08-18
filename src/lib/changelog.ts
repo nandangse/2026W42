@@ -37,6 +37,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.4.0.3",
+    date: "2026-08-18",
+    module: "Morning Update",
+    items: [
+      "Fixed: Cash Flow Details was reading the wrong column. The sheet carries BOTH “Planned Input Cashflow Pattern” and “Cash flow Details”, a loose match hit both, and the pattern column happens to sit first — so first-header-wins picked it. Every job page has been showing the pattern where the details belong.",
+      "Column matching now works strongest-pattern-first across the whole sheet, so an exact “Cash flow Details” is claimed before a loose “cash flow” can reach anything else. Specificity beats position — otherwise the answer depends on the order somebody arranged the columns in.",
+      "“Planned Input Cashflow Pattern” is now explicitly refused. On a sheet carrying only that column, Cash Flow Details binds to NOTHING and the upload says so, because empty and honest beats full and wrong.",
+      "The next Jobmaster upload will fill it correctly — read the summary line: it should say Cash flow details ← “Cash flow Details”.",
+    ],
+  },
+  {
     v: "3.4.0.2",
     date: "2026-08-18",
     module: "Nandan Tasking",
