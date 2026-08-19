@@ -25,6 +25,8 @@ export interface BoardJob {
   /** Physically being worked on now. Genie's own fact — the ERP has no such field. */
   onFloor: boolean;
   onFloorAt: string | null;
+  /** Who owns QUALITY. jobs.own owns the date; this is a different question. */
+  qualityOwner: string | null;
   active: boolean;
   archived: boolean;
   /** Confirmed delivered by the Delivered Jobs report — plan is now read-only. */
@@ -81,6 +83,7 @@ function mapJob(r: any): BoardJob {
     kit: Number(r.kit || 0),
     onFloor: !!r.on_floor,
     onFloorAt: r.on_floor_at ?? null,
+    qualityOwner: r.quality_owner ?? null,
     active: !!r.active,
     archived: !r.active,
     delivered: !!r.delivered,

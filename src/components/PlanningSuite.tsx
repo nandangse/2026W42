@@ -159,6 +159,7 @@ interface Job {
   /** Physically being worked on now — Stratcom's call, not the ERP's. */
   onFloor?: boolean;
   onFloorAt?: string | null;
+  qualityOwner?: string | null;
   active: boolean;
   archived: boolean;
   updated_at: string | null;
@@ -379,7 +380,7 @@ export default function PlanningSuite({
   }, [workspace, canSeeDelivered]);
 
   // land on "My Week" within the suite, not the delivery board
-  const [tab, setTab] = useState<"home" | "wip" | "delivery" | "load" | "plan" | "material" | "esc" | "erp" | "upload" | "admin">("home");
+  const [tab, setTab] = useState<"home" | "wip" | "delivery" | "load" | "plan" | "floor" | "material" | "esc" | "erp" | "upload" | "admin">("home");
 
   // ---- browser back/forward navigates within the app, not out of it ----
   // Every workspace/tab change pushes a history entry; popstate restores it.
@@ -684,6 +685,7 @@ export default function PlanningSuite({
     ["esc", "Escalations"],
     ["load", "Load Board"],
     ["plan", "Job Plan"],
+    ["floor", "On Floor"],
   ];
 
   return (
@@ -975,6 +977,7 @@ export default function PlanningSuite({
         <DeliveryBoard showForward={canSeeForward} board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
       </div>
       {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} canEdit={canEdit} reload={reload} />}
+      {workspace === "suite" && tab === "floor" && <OnFloor board={board} V={V} onOpen={openJobPlan} reload={reload} canEdit={canEdit} isStrat={canSeeForward} />}
       {workspace === "suite" && tab === "material" && <PendingMaterial board={board} onOpen={openJobPlan} reload={reload} canEdit={canEdit} />}
       {workspace === "suite" && tab === "esc" && <Escalations board={board} V={V} onOpen={openJobPlan} reload={reload} isAdmin={isAdmin} />}
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
@@ -7252,6 +7255,306 @@ function Principles({ isOwner }: { isOwner: boolean }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================ On Floor ============================
+
+/**
+ * What is actually being worked on, and what the floor is saying about it.
+ *
+ * The rest of the suite is written down by people at desks. This page is for
+ * the person standing at the machine: they will SAY what is happening, they
+ * will not type it. So each job takes voice notes — kept as audio because tone
+ * carries what a transcript loses, and as text because nobody scrubs through
+ * ninety seconds to find out whether the part arrived.
+ *
+ * Three notes a job, oldest dropped. That is the point rather than a limit: an
+ * unbounded log is a thing nobody listens to, and the last three are what is
+ * happening now.
+ */
+function OnFloor({
+  board,
+  V,
+  onOpen,
+  reload,
+  canEdit,
+  isStrat,
+}: {
+  board: Board;
+  V: (n: number) => string;
+  onOpen: (id: string) => void;
+  reload: () => Promise<Board | null>;
+  canEdit: boolean;
+  isStrat: boolean;
+}) {
+  interface Note { id: string; job_id: string; url: string | null; seconds: number | null; transcript: string; summary: string; by: string | null; at: string }
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [installed, setInstalled] = useState(true);
+  const [msg, setMsg] = useState("");
+
+  const jobs = useMemo(
+    () => board.jobs.filter((j) => j.onFloor).sort((a, b) => String(a.tdd || "9999").localeCompare(String(b.tdd || "9999"))),
+    [board.jobs],
+  );
+
+  const load = useCallback(() => {
+    api.get("/api/voice-note")
+      .then((r: { installed?: boolean; notes?: Note[] }) => { setInstalled(r.installed !== false); setNotes(r.notes || []); })
+      .catch(() => setInstalled(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const byJob = useMemo(() => {
+    const m = new Map<string, Note[]>();
+    for (const n of notes) m.set(n.job_id, [...(m.get(n.job_id) || []), n]);
+    return m;
+  }, [notes]);
+
+  const setQualityOwner = async (j: Job, who: string) => {
+    try {
+      await api.post("/api/job-field", { job_id: j.id, field: "quality_owner", value: who });
+      await reload();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
+  const totVal = jobs.reduce((s, j) => s + (j.val || 0), 0);
+  const totTp = jobs.reduce((s, j) => s + tpOf(j), 0);
+  const late = jobs.filter((j) => j.tdd && j.tdd < TODAY);
+
+  return (
+    <div className="p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+        <StatCard label="ON FLOOR" value={String(jobs.length)} sub="jobs being worked on now" color="#0D7A3F" />
+        <StatCard label="VALUE" value={V(totVal)} color="#1B3A5C" />
+        <StatCard label="THROUGHPUT" value={V(totTp)} sub={totVal ? `${Math.round((totTp / totVal) * 100)}% of value` : ""} color="#E8600A" />
+        <StatCard label="ALREADY LATE" value={String(late.length)} sub={late.length ? "past target delivery" : "none past target"} color={late.length ? "#B3261E" : "#0D7A3F"} />
+      </div>
+
+      {!installed && (
+        <div className="text-xs rounded p-2 mb-3" style={{ background: "#FFF7E6", color: "#8A5A00" }}>
+          Run migration 0040 — voice notes have nowhere to save yet. The table below works regardless.
+        </div>
+      )}
+      {msg && <div className="text-xs font-bold rounded p-2 mb-2" style={{ background: "#FBEDEA", color: "#B3261E" }}>{msg}</div>}
+
+      {jobs.length === 0 && (
+        <div className="text-sm rounded-lg border p-4" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#8A94A0" }}>
+          No job is ticked as being on the floor. {isStrat ? "Tick them on the Priority List." : "Stratcom tick these on the Priority List."}
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {jobs.map((j) => {
+          // Late against the date on the board — this page is about today.
+          const delay = j.tdd ? diffDays(j.tdd, TODAY) : null;
+          const mine = byJob.get(j.id) || [];
+          return (
+            <div key={j.id} className="bg-white rounded-lg border" style={{ borderColor: "#E2E0DA", borderLeft: `4px solid ${delay && delay > 0 ? "#B3261E" : "#0D7A3F"}` }}>
+              <div className="flex flex-wrap gap-3 p-3">
+                {/* who and what */}
+                <div style={{ flex: "1 1 260px", minWidth: 240 }}>
+                  <div className="flex items-baseline gap-2">
+                    <button onClick={() => onOpen(j.id)} className="font-bold" style={{ color: "#1B3A5C", textDecoration: "underline" }}>{jobNo(j.id)}</button>
+                    <span className="text-xs" style={{ color: "#8A94A0" }}>{j.fam}</span>
+                  </div>
+                  <div className="text-sm font-semibold" style={{ color: "#22303C" }}>{j.tag}</div>
+                  <div className="text-xs mt-0.5 flex gap-3 flex-wrap">
+                    <span style={{ color: "#8A94A0" }}>TDD <b style={{ color: delay && delay > 0 ? "#B3261E" : "#22303C" }}>{fmtFull(j.tdd)}</b></span>
+                    <span style={{ color: delay == null ? "#B8B5AC" : delay > 0 ? "#B3261E" : "#0D7A3F", fontWeight: 700 }}>
+                      {delay == null ? "no date" : delay > 0 ? `${delay}d late` : delay === 0 ? "due today" : `${-delay}d to go`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* owners */}
+                <div style={{ flex: "0 0 210px" }}>
+                  <div className="text-xs font-bold mb-1" style={{ color: "#8A94A0" }}>OWNERS</div>
+                  <div className="text-xs mb-1">
+                    <span style={{ color: "#8A94A0" }}>Job </span>
+                    <b style={{ color: "#22303C" }}>{j.ownerName || j.own || "—"}</b>
+                  </div>
+                  <div className="text-xs flex items-center gap-1">
+                    <span style={{ color: "#8A94A0" }}>Quality </span>
+                    {canEdit ? (
+                      <select
+                        value={j.qualityOwner || ""}
+                        onChange={(e) => setQualityOwner(j, e.target.value)}
+                        className="text-xs border rounded px-1 py-0.5 bg-white font-semibold"
+                        style={{ borderColor: j.qualityOwner ? "#E2E0DA" : "#E8600A", color: j.qualityOwner ? "#22303C" : "#E8600A" }}
+                      >
+                        <option value="">— not set —</option>
+                        {(board.assignableUsers || []).map((p) => (
+                          <option key={p.initials || p.email} value={p.initials || ""}>{personLabel(p)}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <b style={{ color: j.qualityOwner ? "#22303C" : "#B8B5AC" }}>{j.qualityOwner || "not set"}</b>
+                    )}
+                  </div>
+                </div>
+
+                {/* the floor's own words */}
+                <div style={{ flex: "2 1 340px", minWidth: 300 }}>
+                  <VoiceNotes jobId={j.id} notes={mine} installed={installed} onSaved={load} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Record, transcribe, keep.
+ *
+ * Transcription happens IN THE BROWSER, through the Web Speech API, while the
+ * recording is running. That is deliberate: it needs no second API key, costs
+ * nothing per note, and the words appear as they are spoken so somebody can
+ * see it heard them correctly before they stop. Where the browser has no
+ * dictation the audio is still saved — a note you can play is better than no
+ * note, and the summary falls back to whatever text there is.
+ */
+function VoiceNotes({
+  jobId,
+  notes,
+  installed,
+  onSaved,
+}: {
+  jobId: string;
+  notes: { id: string; url: string | null; seconds: number | null; transcript: string; summary: string; by: string | null; at: string }[];
+  installed: boolean;
+  onSaved: () => void;
+}) {
+  const [rec, setRec] = useState(false);
+  const [live, setLive] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [openNote, setOpenNote] = useState<string | null>(null);
+  const mediaRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const srRef = useRef<any>(null);
+  const startedRef = useRef(0);
+  const textRef = useRef("");
+
+  const stop = () => {
+    try { mediaRef.current?.stop(); } catch { /* already stopped */ }
+    try { srRef.current?.stop(); } catch { /* dictation may not be running */ }
+    setRec(false);
+  };
+
+  const start = async () => {
+    setErr(""); setLive(""); textRef.current = "";
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      chunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
+        const seconds = Math.max(1, Math.round((Date.now() - startedRef.current) / 1000));
+        const transcript = textRef.current.trim();
+        if (!blob.size && !transcript) return;
+        setBusy(true);
+        try {
+          const fd = new FormData();
+          fd.append("job_id", jobId);
+          fd.append("transcript", transcript);
+          fd.append("seconds", String(seconds));
+          if (blob.size) fd.append("file", new File([blob], "note.webm", { type: blob.type }));
+          const r = await fetch("/api/voice-note", { method: "POST", body: fd });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.error || "Could not save the note");
+          onSaved();
+        } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+        setBusy(false);
+        setLive("");
+      };
+      mr.start();
+      mediaRef.current = mr;
+      startedRef.current = Date.now();
+      setRec(true);
+
+      // Dictation, where the browser has it. Absence is not an error.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SR) {
+        const sr = new SR();
+        sr.continuous = true;
+        sr.interimResults = true;
+        sr.lang = "en-IN";
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        sr.onresult = (ev: any) => {
+          let done = "", interim = "";
+          for (let i = 0; i < ev.results.length; i++) {
+            const r0 = ev.results[i];
+            if (r0.isFinal) done += r0[0].transcript + " ";
+            else interim += r0[0].transcript;
+          }
+          textRef.current = done.trim();
+          setLive((done + interim).trim());
+        };
+        sr.onerror = () => {};
+        sr.start();
+        srRef.current = sr;
+      }
+    } catch {
+      setErr("No microphone, or permission was refused.");
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1">
+        <div className="text-xs font-bold" style={{ color: "#8A94A0" }}>FROM THE FLOOR</div>
+        {installed && (
+          rec ? (
+            <button onClick={stop} className="rounded px-2 py-0.5 text-xs font-bold text-white" style={{ background: "#B3261E" }}>■ Stop</button>
+          ) : (
+            <button onClick={start} disabled={busy} className="rounded px-2 py-0.5 text-xs font-bold text-white" style={{ background: busy ? "#B8B5AC" : "#0D7A3F" }}>
+              {busy ? "saving…" : "🎙 Record"}
+            </button>
+          )
+        )}
+        <span className="text-xs ml-auto" style={{ color: "#B8B5AC" }}>{notes.length}/3</span>
+      </div>
+
+      {rec && (
+        <div className="rounded p-2 mb-1 text-xs" style={{ background: "#FBEDEA", border: "1px solid #B3261E", color: "#22303C" }}>
+          <b style={{ color: "#B3261E" }}>● recording</b> {live || <span style={{ color: "#8A94A0" }}>speak — the words appear here as you go</span>}
+        </div>
+      )}
+      {err && <div className="text-xs font-bold mb-1" style={{ color: "#B3261E" }}>{err}</div>}
+
+      {notes.length === 0 && !rec && (
+        <div className="text-xs" style={{ color: "#B8B5AC" }}>Nothing recorded on this job yet.</div>
+      )}
+
+      {notes.map((n) => (
+        <div key={n.id} className="rounded mb-1 px-2 py-1.5" style={{ background: "#F4F2EC", border: "1px solid #E2E0DA" }}>
+          <div className="text-xs" style={{ color: "#22303C", lineHeight: 1.5 }}>{n.summary || n.transcript || "(no words captured)"}</div>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {n.url && <audio controls preload="none" src={n.url} style={{ height: 26, maxWidth: 210 }} />}
+            <span style={{ fontSize: 10, color: "#8A94A0" }}>
+              {whoTag(n.by)} · {new Date(n.at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+              {n.seconds ? ` · ${n.seconds}s` : ""}
+            </span>
+            {n.transcript && n.transcript !== n.summary && (
+              <button onClick={() => setOpenNote(openNote === n.id ? null : n.id)} className="font-bold" style={{ fontSize: 10, color: "#1B3A5C" }}>
+                {openNote === n.id ? "hide what was said" : "what was said"}
+              </button>
+            )}
+          </div>
+          {openNote === n.id && (
+            <div className="text-xs mt-1 pt-1" style={{ color: "#5A6672", borderTop: "1px solid #E2E0DA", lineHeight: 1.55 }}>{n.transcript}</div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

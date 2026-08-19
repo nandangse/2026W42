@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * uploads the corrections does not have to translate `tdd` into "Target
  * Delivery Date Current" in their head at eight in the morning.
  */
-const FIELDS: Record<string, { label: string; kind: "date" | "number" | "text" }> = {
+const FIELDS: Record<string, { label: string; kind: "date" | "number" | "text"; genieOnly?: boolean }> = {
   tdd: { label: "Target Delivery Date Current", kind: "date" },
   stat: { label: "Job Status", kind: "text" },
   mgmt: { label: "Management Target Date Request", kind: "date" },
@@ -22,6 +22,9 @@ const FIELDS: Record<string, { label: string; kind: "date" | "number" | "text" }
   amt_needed: { label: "Amount needed in next month", kind: "number" },
   kit: { label: "Kitting percentage", kind: "number" },
   pct: { label: "Production Completion %", kind: "number" },
+  // Genie's own field. The ERP has no column for it, so it is marked so the
+  // export skips it rather than queueing a line nothing can receive.
+  quality_owner: { label: "Quality Owner", kind: "text", genieOnly: true },
 };
 
 /** What goes in the export — never null, never "null". */
@@ -91,9 +94,11 @@ export async function POST(req: Request) {
      * comparison is on the SHOWN value so 40 and "40" are the same thing,
      * which is what they are to anybody reading the export.
      */
+    // A Genie-only field has no ERP column to be pushed to. Queueing one would
+    // put a line in Pankaj's export that nothing on the other side can receive.
     const changed = show(oldValue) !== show(value);
     let queued = false;
-    if (changed) {
+    if (changed && !meta.genieOnly) {
       try {
         const admin = adminClient();
         const who = user.initials || user.displayName || user.email.split("@")[0];

@@ -37,6 +37,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.11.0.0",
+    date: "2026-08-19",
+    module: "On Floor",
+    items: [
+      "NEW TAB — ON FLOOR, next to Job Plan. Every job ticked as being worked on, soonest delivery first: job number, customer tag, TDD and how many days late or still to go.",
+      "Two owners per job, side by side. The Job Owner owns the DATE; the QUALITY OWNER is a different question and usually a different person, and until now the only way to know was to ask. It is a second field rather than two names in one box, because two names in a box cannot be filtered, counted or notified.",
+      "VOICE NOTES. Somebody standing at a machine will say what is happening; they will not type it. Press record, talk, and the words appear as you speak — so you can see it heard you correctly before you stop.",
+      "Both are kept: the recording, because tone carries what a transcript loses, and the text, because nobody scrubs through ninety seconds of audio to find out whether the part arrived. Each note gets a one-line summary you can read straight off the table, with \"what was said\" underneath for the full words.",
+      "Three notes a job, oldest dropped. That is the point rather than a limit — an unbounded log of voice notes is a thing nobody listens to, and the last three are what is happening now. The audio goes with them, so the storage cannot quietly fill with files nothing references.",
+      "Transcription happens in your browser, not on a server. No second API key, nothing charged per note, and where a browser has no dictation the recording is still saved — a note you can play beats no note.",
+      "The audio is NOT in the database. It sits in object storage, billed separately; the table holds a path, a transcript and a summary, all text. Three notes on all 116 jobs is well under a hundred megabytes of objects and not one row heavier.",
+      "Quality Owner is a Genie field and is deliberately not pushed to the ERP — there is no column on the other side to receive it.",
+      "Needs migration 0040.",
+    ],
+  },
+  {
     v: "3.10.0.1",
     date: "2026-08-19",
     module: "Principles",

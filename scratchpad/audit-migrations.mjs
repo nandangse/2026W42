@@ -55,6 +55,8 @@ const PROBES = [
   ["0036 escalation closeout","task_closeout", "body"],
   ["0037 on floor",           "jobs", "on_floor"],
   ["0039 principle doc",      "principle_doc", "raw"],
+  ["0040 quality owner",      "jobs", "quality_owner"],
+  ["0040 voice notes",        "job_voice_note", "transcript"],
 ];
 
 const missing = [];
