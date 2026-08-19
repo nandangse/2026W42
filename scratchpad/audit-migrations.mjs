@@ -54,6 +54,7 @@ const PROBES = [
   ["0035 group rules fix",    "profiles", "stratcom"],
   ["0036 escalation closeout","task_closeout", "body"],
   ["0037 on floor",           "jobs", "on_floor"],
+  ["0038 principles",         "principles", "title"],
 ];
 
 const missing = [];

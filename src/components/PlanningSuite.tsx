@@ -368,7 +368,7 @@ export default function PlanningSuite({
   // sticky sub-nav. "tab" is only meaningful inside the Planning Suite
   // workspace now — Goals and Tasking are whole workspaces, not sub-tabs.
   // Sales-team members live in Sales Genie — land them there directly.
-  const [workspace, setWorkspace] = useState<"lms" | "suite" | "delivered" | "goals" | "tasking" | "sales">(
+  const [workspace, setWorkspace] = useState<"lms" | "suite" | "delivered" | "goals" | "tasking" | "sales" | "consult" | "principles">(
     role === "sales" ? "sales" : "suite",
   );
   // Back/forward can restore a workspace this account cannot open -- the tab
@@ -664,6 +664,10 @@ export default function PlanningSuite({
     // Learning sits last: it is the section somebody goes to deliberately,
     // not one they pass through on the way to the day's work.
     ["lms", "📚 LMS"],
+    // Ask, and read. One is a question about today's board; the other is how
+    // the answers are meant to be reached in the first place.
+    ["consult", "🧭 Consult Raghu"],
+    ["principles", "📜 Principles"],
   ];
   // Sub-nav inside the Planning Suite workspace only.
   // Admin, Morning Update and Update to ERP have moved into the account menu
@@ -1000,6 +1004,8 @@ export default function PlanningSuite({
           <LMS />
         </div>
       )}
+      {workspace === "consult" && <ConsultRaghu />}
+      {workspace === "principles" && <Principles isOwner={isRaghu} />}
       {workspace === "tasking" && <Tasking board={board} onOpen={openJobPlan} reload={reload} me={me} people={board.people || []} />}
       {/* same keep-alive pattern as Goals — the playbook iframe loads once */}
       {salesVisited && salesAccess && (
@@ -6912,6 +6918,213 @@ function Escalations({
           }}
           reload={reload}
         />
+      )}
+    </div>
+  );
+}
+
+// ============================ Consult Raghu ============================
+
+/**
+ * Ask a question, get an answer grounded in today's board.
+ *
+ * The point is not that it is a chat window. It is that the live figures go
+ * with every question, so the answer names job numbers instead of offering
+ * advice — "chase 2114 and 2560" rather than "follow up on overdue jobs".
+ *
+ * Deliberately not persisted. A consultation is about the board as it stands
+ * this morning; an answer kept for three weeks is an answer about a board that
+ * no longer exists, and somebody would quote it.
+ */
+function ConsultRaghu() {
+  const [q, setQ] = useState("");
+  const [turns, setTurns] = useState<{ q: string; a: string }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const SUGGESTIONS = [
+    "What should we finish this week to move the number most?",
+    "Which jobs are stuck and who do I ring about each one?",
+    "What is the single biggest risk to this month's delivery?",
+    "Which escalations are actually the same problem?",
+  ];
+
+  const ask = async (question: string) => {
+    const text = question.trim();
+    if (!text || busy) return;
+    setBusy(true); setErr(""); setQ("");
+    try {
+      const r = await api.post("/api/consult", { question: text });
+      setTurns((t) => [{ q: text, a: String(r.answer || "") }, ...t]);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="p-4" style={{ maxWidth: 900 }}>
+      <h2 className="font-bold text-lg" style={{ color: "#16232F" }}>Consult Raghu</h2>
+      <p className="text-xs mb-3" style={{ color: "#5A6672", lineHeight: 1.6 }}>
+        Ask about the work in front of you. Every question goes with today&apos;s live board — the jobs, what is
+        late, what is kitted and not moving, and every open escalation — so the answer names jobs rather than
+        offering advice. It will say when the board does not answer the question rather than inventing a date.
+      </p>
+
+      <div className="flex gap-2 mb-2">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") ask(q); }}
+          placeholder="Ask anything about the board…"
+          className="flex-1 px-3 py-2 rounded border text-sm"
+          style={{ borderColor: "#D9D6CD" }}
+        />
+        <button
+          onClick={() => ask(q)}
+          disabled={busy || !q.trim()}
+          className="px-4 py-2 rounded text-sm font-bold text-white"
+          style={{ background: busy || !q.trim() ? "#B8B5AC" : "#E8600A" }}
+        >
+          {busy ? "thinking…" : "Ask"}
+        </button>
+      </div>
+
+      {turns.length === 0 && !busy && (
+        <div className="flex gap-1.5 flex-wrap mb-3">
+          {SUGGESTIONS.map((sug) => (
+            <button key={sug} onClick={() => ask(sug)} className="text-xs rounded px-2 py-1 border"
+              style={{ borderColor: "#E2E0DA", color: "#5A6672", background: "#fff" }}>{sug}</button>
+          ))}
+        </div>
+      )}
+
+      {err && <div className="text-xs font-bold rounded p-2 mb-2" style={{ background: "#FBEDEA", color: "#B3261E" }}>{err}</div>}
+
+      {turns.map((t, i) => (
+        <div key={i} className="bg-white rounded-lg border p-3 mb-2" style={{ borderColor: "#E2E0DA" }}>
+          <div className="text-xs font-bold mb-1" style={{ color: "#8A94A0" }}>{t.q}</div>
+          <div className="text-sm" style={{ color: "#22303C", whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{t.a}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================ Principles ============================
+
+/**
+ * How the company is run, in Dr Raghu's words.
+ *
+ * Stored rather than written into the code, because a principle that needs a
+ * deploy to change never gets changed — and a list nobody has edited in a year
+ * is a list nobody is using. Owner writes; everybody reads.
+ *
+ * Seeded with nothing on purpose. An empty page saying "none written yet" is
+ * honest; a page pre-filled with plausible management copy would put words in
+ * his mouth that the whole company would read as his.
+ */
+function Principles({ isOwner }: { isOwner: boolean }) {
+  interface P { id: string; ord: number; title: string; body: string }
+  const [items, setItems] = useState<P[]>([]);
+  const [installed, setInstalled] = useState(true);
+  const [editing, setEditing] = useState<string | "new" | null>(null);
+  const [form, setForm] = useState({ title: "", body: "" });
+  const [msg, setMsg] = useState("");
+
+  const load = useCallback(() => {
+    api.get("/api/principles")
+      .then((r: { installed?: boolean; items?: P[] }) => { setInstalled(r.installed !== false); setItems(r.items || []); })
+      .catch(() => setInstalled(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    setMsg("");
+    try {
+      await api.post("/api/principles", {
+        action: "save",
+        id: editing === "new" ? undefined : editing,
+        title: form.title,
+        body: form.body,
+        ord: editing === "new" ? items.length : items.find((i) => i.id === editing)?.ord ?? 0,
+      });
+      setEditing(null); setForm({ title: "", body: "" }); load();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
+  const remove = async (p: P) => {
+    if (!window.confirm(`Retire "${p.title}"?\n\nIt stops showing here. It is not deleted — how decisions were made while it was in force is part of the record.`)) return;
+    try { await api.post("/api/principles", { action: "remove", id: p.id }); load(); }
+    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
+  return (
+    <div className="p-4" style={{ maxWidth: 860 }}>
+      <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+        <h2 className="font-bold text-lg" style={{ color: "#16232F" }}>Principles</h2>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>how we work — {isOwner ? "yours to write" : "written by Dr Raghu"}</span>
+      </div>
+
+      {!installed && (
+        <div className="text-xs rounded p-2 mb-3" style={{ background: "#FFF7E6", color: "#8A5A00" }}>
+          Run migration 0038 — principles have nowhere to save yet.
+        </div>
+      )}
+      {msg && <div className="text-xs font-bold rounded p-2 mb-2" style={{ background: "#FBEDEA", color: "#B3261E" }}>{msg}</div>}
+
+      {items.length === 0 && installed && (
+        <div className="text-sm rounded-lg border p-4 mb-3" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#8A94A0" }}>
+          None written yet.{isOwner ? " Add the first one below." : " Dr Raghu has not written these yet."}
+        </div>
+      )}
+
+      {items.map((p, i) => (
+        <div key={p.id} className="bg-white rounded-lg border p-3 mb-2" style={{ borderColor: "#E2E0DA", borderLeft: "4px solid #E8600A" }}>
+          {editing === p.id ? (
+            <>
+              <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
+                className="w-full text-sm font-bold border rounded px-2 py-1 mb-1" style={{ borderColor: "#E8600A" }} />
+              <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={3}
+                className="w-full text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
+              <div className="flex gap-2 mt-1.5">
+                <button onClick={save} className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: "#0D7A3F" }}>Save</button>
+                <button onClick={() => setEditing(null)} className="text-xs font-semibold" style={{ color: "#8A94A0" }}>Cancel</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-baseline gap-2">
+                <span className="font-bold tnum" style={{ color: "#E8600A" }}>{i + 1}</span>
+                <span className="font-bold text-sm" style={{ color: "#16232F" }}>{p.title}</span>
+                {isOwner && (
+                  <span className="ml-auto flex gap-1">
+                    <button onClick={() => { setEditing(p.id); setForm({ title: p.title, body: p.body }); }}
+                      className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>✎</button>
+                    <button onClick={() => remove(p)} className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: "#FBEDEA", color: "#B3261E" }}>retire</button>
+                  </span>
+                )}
+              </div>
+              {p.body && <div className="text-xs mt-1" style={{ color: "#5A6672", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{p.body}</div>}
+            </>
+          )}
+        </div>
+      ))}
+
+      {isOwner && installed && (
+        editing === "new" ? (
+          <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E8600A" }}>
+            <input autoFocus value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder="The principle, in a line" className="w-full text-sm font-bold border rounded px-2 py-1 mb-1" style={{ borderColor: "#E8600A" }} />
+            <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={3}
+              placeholder="Why it matters, and what it looks like when it is followed…" className="w-full text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
+            <div className="flex gap-2 mt-1.5">
+              <button onClick={save} className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: "#0D7A3F" }}>Save</button>
+              <button onClick={() => { setEditing(null); setForm({ title: "", body: "" }); }} className="text-xs font-semibold" style={{ color: "#8A94A0" }}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => { setEditing("new"); setForm({ title: "", body: "" }); }}
+            className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: "#E8600A" }}>+ Add a principle</button>
+        )
       )}
     </div>
   );

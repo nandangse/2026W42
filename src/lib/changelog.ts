@@ -37,6 +37,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.10.0.0",
+    date: "2026-08-19",
+    module: "Consult Raghu · Principles",
+    items: [
+      "CONSULT RAGHU — ask anything about the work in front of you. Every question goes with today's live board: the jobs, what is late, what is kitted and not moving, what is on the floor and every open escalation. So the answer names jobs — \"chase 2114 and 2560\" — instead of offering advice you could have written yourself.",
+      "It is told to say when the board does not answer the question rather than inventing a date. A confident invention about a delivery is worse than no answer, because it gets repeated to a customer.",
+      "Nothing is kept. A consultation is about the board as it stands this morning; an answer saved for three weeks describes a board that no longer exists, and somebody would quote it.",
+      "PRINCIPLES — how the company is run, in Dr Raghu's words, where everybody can read them. He writes and rewrites them from the screen; everyone else reads.",
+      "Stored rather than written into the code, because a principle that needs a deploy to change never gets changed — and a list nobody has edited in a year is a list nobody is using.",
+      "Retiring one hides it rather than deleting it. A principle that was in force last year is part of how decisions were made last year, and deleting it rewrites that.",
+      "The page starts empty and says so. Seeding it with plausible management copy would have put words in his mouth that the whole company would read as his.",
+      "Needs migration 0038.",
+    ],
+  },
+  {
     v: "3.9.0.2",
     date: "2026-08-19",
     module: "On Floor",
