@@ -409,7 +409,6 @@ export default function PlanningSuite({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erpLog, setErpLog] = useState<ErpLogEntry[]>([]);
   const [quoteTrigger, setQuoteTrigger] = useState(0);
-  const fileRef = useRef<HTMLInputElement | null>(null);
 
   // Goals is gated by an explicit grant (spec §9), not by role — fetch just
   // enough to decide whether its tab appears. null while loading so the tab
@@ -594,17 +593,6 @@ export default function PlanningSuite({
     router.refresh();
   };
 
-  const onFile = async (f: File | null) => {
-    if (!f) return;
-    try {
-      const res = await api.upload(f);
-      alert("Loaded ✓ (" + res.summary.filename + ")\n" + (res.summary.lines || []).join("\n"));
-      await reload();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
-    }
-  };
-
   const pushERP = (doctype: string, id: string, field: string, value: string) =>
     setErpLog((l) => [
       {
@@ -717,7 +705,6 @@ export default function PlanningSuite({
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={(e) => onFile(e.target.files?.[0] || null)} />
             {role === "viewer" && (
               <span className="text-xs rounded px-2 py-1.5 font-bold" style={{ background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }} title="Your account is read-only">
                 👁 Read-only
@@ -853,16 +840,6 @@ export default function PlanningSuite({
                         {!initials && <span style={{ color: "#B3261E" }}> · no initials set</span>}
                       </div>
                     </div>
-                    {canUpload && (
-                      <button
-                        onClick={() => { setUserOpen(false); fileRef.current?.click(); }}
-                        className="w-full text-left px-3 py-2 text-sm font-bold hover:bg-gray-50"
-                        style={{ color: "#E8600A", borderBottom: "1px solid #EEECE6" }}
-                        title="Push a morning file — Jobs, Projects, ToDo, the Employee Master, or the full PRE workbook. Excel or CSV."
-                      >
-                        ⬆ Upload Data
-                      </button>
-                    )}
                     {canEdit && (
                       <button
                         onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("erp"); }}
@@ -873,13 +850,14 @@ export default function PlanningSuite({
                         ↗ Update to ERP{queued ? ` (${queued})` : ""}
                       </button>
                     )}
-                    {isAdmin && (
+                    {canUpload && (
                       <button
                         onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("upload"); }}
-                        className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
-                        style={{ color: "#16232F" }}
+                        className="w-full text-left px-3 py-2 text-sm font-bold hover:bg-gray-50"
+                        style={{ color: "#E8600A" }}
+                        title="Load the morning files — Jobs, Projects, ToDo, the Employee Master, or the full PRE workbook. Excel or CSV."
                       >
-                        🌅 Morning Update {loadedCount}/3
+                        ⬆ Upload Files {loadedCount}/3
                       </button>
                     )}
                     {isAdmin && (
@@ -994,7 +972,7 @@ export default function PlanningSuite({
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
       {workspace === "suite" && tab === "plan" && <JobPlan isAdmin={isAdmin} board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} />}
-      {workspace === "suite" && tab === "upload" && isAdmin && <MorningUpload email={email} embedded />}
+      {workspace === "suite" && tab === "upload" && canUpload && <MorningUpload email={email} embedded />}
       {workspace === "suite" && tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} departments={departments} isOwner={isRaghu} appSettings={appSettings} loadAppSettings={loadAppSettings} />}
       {/* Mounted on first visit and then kept (hidden) — the tree is a slow
           payload (auth + 10 queries + live metrics), so re-fetching it on

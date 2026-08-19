@@ -37,6 +37,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.8.0.1",
+    date: "2026-08-19",
+    module: "Morning Update",
+    items: [
+      "One upload door, not two. Morning Update is now called UPLOAD FILES, and the separate Upload Data item is gone. They both loaded the same files into the same place — one through a page that shows you what landed and what is still missing, the other through a file dialog that told you the result in an alert box and then vanished. Keeping the better one.",
+      "Upload Files is open to whoever could use Upload Data, which is one person more than could reach Morning Update before. Removing a door should not take somebody's way in with it.",
+      "The old dialog and the code behind it are removed rather than left hidden. An upload path nothing can reach is worse than no path at all, because it still ships.",
+    ],
+  },
+  {
     v: "3.8.0.0",
     date: "2026-08-19",
     module: "Pending Material · Escalations · Projects in Progress",
