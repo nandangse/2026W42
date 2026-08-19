@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireTasker, errJson, EDITOR_ROLES } from "@/lib/auth";
+import { requireTasker, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { notifyTaskAssignment } from "@/lib/notify";
@@ -169,28 +169,22 @@ export async function POST(req: Request) {
       const manual = body.kind === "manual";
       const table = manual ? "manual_tasks" : "erp_tasks";
 
-      // A plain "user" may only remove their own work; editors may remove any.
-      if (!EDITOR_ROLES.includes(user.role)) {
-        const { data: t } = await supabase
-          .from(table)
-          .select(manual ? "who, created_by" : "who")
-          .eq("id", body.id)
-          .maybeSingle();
-        const mine =
-          t &&
-          [(t as any).who, (t as any).created_by]
-            .filter(Boolean)
-            .some(
-              (v: string) =>
-                v.toLowerCase() === user.email.toLowerCase() ||
-                (!!user.initials && v.toUpperCase() === user.initials),
-            );
-        if (!mine)
-          return NextResponse.json(
-            { error: "You can only delete tasks assigned to you or created by you" },
-            { status: 403 },
-          );
-      }
+      /**
+       * ADMINS ONLY, set by Dr Raghu.
+       *
+       * It used to be "your own work, or anything if you are an editor", which
+       * made deleting the ordinary way to make a task you did not want go
+       * away. A deleted task takes its comments and its date history with it
+       * and leaves nothing behind saying it existed -- so the record of who
+       * was asked for what, and how often the date moved, disappears with it.
+       *
+       * Everyone else closes a task instead. Done keeps the trail.
+       */
+      if (user.role !== "admin")
+        return NextResponse.json(
+          { error: "Only an admin can delete a task. Mark it Done instead — that keeps its comments and date history." },
+          { status: 403 },
+        );
 
       // comments are polymorphic (no FK), so clear them explicitly
       const { error: ce } = await supabase

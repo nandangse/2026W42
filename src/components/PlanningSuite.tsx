@@ -465,6 +465,25 @@ export default function PlanningSuite({
   }
   const [notifs, setNotifs] = useState<{ installed: boolean; items: Notif[]; unread: number } | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
+  /**
+   * The height of the frozen header, published as --hdr-h.
+   *
+   * Anything else that wants to stick UNDER it needs that number, and the
+   * header changes height as the nav wraps at narrower widths -- so it is
+   * measured rather than written down. A hard-coded offset is right at one
+   * window size and wrong at every other.
+   */
+  const hdrRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = hdrRef.current;
+    if (!el) return;
+    const set = () => document.documentElement.style.setProperty("--hdr-h", `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   /** The task a notification was followed to, shown in the lightbox. */
   const [notifTask, setNotifTask] = useState<Task | null>(null);
   /** Set when a notification points at a task that is no longer there. */
@@ -670,6 +689,7 @@ export default function PlanningSuite({
     <div className="min-h-screen" style={{ background: "#F1EFE9", color: "#22303C" }}>
       {/* ===== frozen header ===== */}
       <div
+        ref={hdrRef}
         className="px-4 py-2.5"
         style={{ background: "#16232F", position: "sticky", top: 0, zIndex: 45 }}
       >
@@ -833,9 +853,9 @@ export default function PlanningSuite({
                         onClick={() => { setUserOpen(false); fileRef.current?.click(); }}
                         className="w-full text-left px-3 py-2 text-sm font-bold hover:bg-gray-50"
                         style={{ color: "#E8600A", borderBottom: "1px solid #EEECE6" }}
-                        title="Push a morning Excel — Jobs, Projects, ToDo, or the full PRE workbook"
+                        title="Push a morning file — Jobs, Projects, ToDo, the Employee Master, or the full PRE workbook. Excel or CSV."
                       >
-                        ⬆ Upload Excel
+                        ⬆ Upload Data
                       </button>
                     )}
                     {canEdit && (
@@ -965,7 +985,7 @@ export default function PlanningSuite({
       </div>
       {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} canEdit={canEdit} reload={reload} />}
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
-      {workspace === "suite" && tab === "plan" && <JobPlan board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
+      {workspace === "suite" && tab === "plan" && <JobPlan isAdmin={isAdmin} board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} />}
       {workspace === "suite" && tab === "upload" && isAdmin && <MorningUpload email={email} embedded />}
       {workspace === "suite" && tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} departments={departments} isOwner={isRaghu} appSettings={appSettings} loadAppSettings={loadAppSettings} />}
@@ -1008,6 +1028,7 @@ export default function PlanningSuite({
           every other TaskModal belongs to the board that owns the card. */}
       {notifTask && (
         <TaskModal
+          canDelete={isAdmin}
           task={notifTask}
           owners={assignees(board)}
           onClose={() => setNotifTask(null)}
@@ -1244,6 +1265,7 @@ function MyWeek({
   goLms: () => void;
   isAdmin: boolean;
 }) {
+  const isAdminHere = isAdmin;
   const weekEnd = addDays(TODAY, 7);
   // mood, learning, participation, birthdays and the image quote — one fetch
   const [mw, reloadMw] = useMyWeek();
@@ -1532,7 +1554,7 @@ function MyWeek({
       </div>
 
 
-      {lightbox && <TaskModal task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
     </div>
   );
 }
@@ -1581,7 +1603,19 @@ function DeliveryBoard({
   }, [subTab]);
 
   const [q, setQ] = useState("");
-  const [sortKey, setSortKey] = useState<string>("");
+  /**
+   * The board opens sorted by Target Delivery Date, soonest first.
+   *
+   * It used to open on whatever manual priority had last been dragged, which
+   * is an order somebody set on a day that has since passed -- so the first
+   * rows were not the next deliveries, and the list had to be re-read before
+   * it could be used. The date is the one ordering that is right every morning
+   * without anybody maintaining it.
+   *
+   * Manual priority is not lost: "clear sort" puts it straight back, and the
+   * saved order is untouched in the meantime.
+   */
+  const [sortKey, setSortKey] = useState<string>("tdd");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
 
   const allJobs = board.jobs;
@@ -1911,7 +1945,13 @@ function DeliveryBoard({
                   : sortKey
                     ? "Sorted by column — clear the sort to drag-reorder"
                     : "Filter active — clear it to drag-reorder"}
-                {prio ? " · manual order active" : " · sorted by Target Delivery Date"}
+                {sortKey
+                  ? prio
+                    ? " · manual order saved — clear the sort to see it"
+                    : ""
+                  : prio
+                    ? " · manual order active"
+                    : " · sorted by Target Delivery Date"}
                 {sortKey && <button onClick={() => setSortKey("")} className="ml-2 font-bold" style={{ color: "#E8600A" }}>↺ clear sort</button>}
               </span>
               {prio && <button onClick={() => setPrio(null)} className="font-bold" style={{ color: "#E8600A" }}>↺ Reset to TDD order</button>}
@@ -2647,6 +2687,7 @@ const MAT_ITEMS = [
 ];
 
 function JobPlan({
+  isAdmin,
   board,
   activeId,
   setActiveId,
@@ -2661,6 +2702,8 @@ function JobPlan({
   setActiveId: (id: string) => void;
   V: (v: number) => string;
   reload: () => Promise<Board | null>;
+  /** Deleting a task is admin-only — everyone else closes it. */
+  isAdmin: boolean;
   isRaghu: boolean;
   /** admin / planner / project_owner. Others see the plan read-only — the
    *  server already rejected their writes, but the UI let them type, which
@@ -2732,6 +2775,28 @@ function JobPlan({
     }, 800);
     return () => clearTimeout(t);
   }, [draft]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * Has the header card scrolled out of view?
+   *
+   * Watched rather than measured against a scroll position: the card changes
+   * height as its chips wrap, so any fixed threshold would be right at one
+   * window width and wrong at the next.
+   */
+  const isAdminHere = isAdmin;
+  const hdrCardRef = useRef<HTMLDivElement | null>(null);
+  const [hdrGone, setHdrGone] = useState(false);
+  useEffect(() => {
+    const el = hdrCardRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => setHdrGone(!e.isIntersecting), {
+      // fire as the card passes under the frozen header, not the window edge
+      rootMargin: "-120px 0px 0px 0px",
+      threshold: 0,
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   const sched = useMemo(() => (draft ? computeSchedule(draft) : []), [draft]);
   const ends = sched.length ? planEnd(sched) : TODAY;
@@ -2929,8 +2994,34 @@ function JobPlan({
         )}
       </div>
 
+      {/*
+        Which job you are looking at, kept on screen.
+
+        The header card scrolls away within a screen and everything below it --
+        milestones, tasks, materials -- looks the same from job to job. This
+        strip appears only once the card has gone, so nothing is said twice
+        while both are visible, and it sits under the frozen header using the
+        height that header measures for itself.
+      */}
+      {hdrGone && (
+        <div
+          className="rounded-lg border bg-white px-3 py-1.5 mb-2"
+          style={{
+            position: "sticky", top: "var(--hdr-h, 92px)", zIndex: 20,
+            borderColor: "#E2E0DA", borderLeft: "5px solid #E8600A",
+            boxShadow: "0 4px 14px rgba(0,0,0,.10)",
+          }}
+        >
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="font-bold" style={{ color: "#16232F", fontSize: 15 }}>JOB {jobNo(dj.id)}</span>
+            <span className="text-sm font-semibold truncate" style={{ color: "#1B3A5C", maxWidth: "46ch" }}>{dj.tag}</span>
+            <span className="text-xs truncate" style={{ color: "#8A94A0" }}>{dj.cust} · {dj.fam} · {V(dj.val)} · {dj.stat}</span>
+          </div>
+        </div>
+      )}
+
       {/* header card — facts on the left, Genie's read on the right */}
-      <div className="flex gap-3 mb-3 items-stretch" style={{ flexWrap: "wrap" }}>
+      <div ref={hdrCardRef} className="flex gap-3 mb-3 items-stretch" style={{ flexWrap: "wrap" }}>
       <div className="bg-white rounded-lg p-3 border" style={{ borderColor: "#E2E0DA", borderLeft: "5px solid #E8600A", flex: "1 1 620px", minWidth: 320 }}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -3203,7 +3294,7 @@ function JobPlan({
               {(jobCats.length ? jobCats : addingTask === dj.id ? [form.cat] : []).map((cat) => (
                 <div key={cat} className="rounded-lg p-2" style={{ background: "#E9E6DD", minWidth: 230, maxWidth: 260 }}>
                   <div className="text-xs font-bold px-1 pb-1.5 flex justify-between" style={{ color: "#16232F" }}><span>{cat.toUpperCase()}</span><span style={{ color: "#8A94A0" }}>{jobTasks.filter((t) => t.cat === cat && !t.done).length} open</span></div>
-                  {jobTasks.filter((t) => t.cat === cat).sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1)).map((t) => (<TaskCard key={t.id} onOpen={setLightbox} onDelete={deleteJobTask} t={t} />))}
+                  {jobTasks.filter((t) => t.cat === cat).sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1)).map((t) => (<TaskCard key={t.id} onOpen={setLightbox} onDelete={isAdminHere ? deleteJobTask : undefined} t={t} />))}
                   {addingTask === dj.id && form.cat === cat && (<AddTaskForm owners={assignees(board)} form={form} setForm={setForm} onSubmit={submitTask} onCancel={() => setAddingTask(null)} />)}
                 </div>
               ))}
@@ -3219,7 +3310,7 @@ function JobPlan({
         </>
       )}
 
-      {lightbox && <TaskModal task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
 
       {/* management date breach popup */}
       {dj.mgmt && ends > dj.mgmt && !warned.has(dj.id) && (
@@ -3287,6 +3378,8 @@ function Tasking({
   me: { email: string; initials: string | null; displayName: string | null; erpOwner: string | null; role: string };
   people: Person[];
 }) {
+  /** Deleting a task is admin-only; everyone else closes it. */
+  const isAdminHere = me.role === "admin";
   const [view, setView] = useState<TaskingView>("jobs");
   const [filterCust, setFilterCust] = useState("all");
   const [filterFam, setFilterFam] = useState("all");
@@ -3520,7 +3613,7 @@ function Tasking({
           tasksByJob={tasksByJob}
           onOpen={onOpen}
           onOpenTask={setLightbox}
-          onDelete={deleteTask}
+          onDelete={isAdminHere ? deleteTask : undefined}
         />
       )}
 
@@ -3555,7 +3648,7 @@ function Tasking({
                       <div className="text-xs flex justify-between mt-0.5" style={{ color: "#5A6672" }}><span>from the job plan</span><span className="tnum">{fmt(nx.end)}</span></div>
                     </div>
                   )}
-                  {jt.map((t) => (<div key={t.id} style={{ width: 210 }}><TaskCard onOpen={setLightbox} onDelete={deleteTask} t={t} /></div>))}
+                  {jt.map((t) => (<div key={t.id} style={{ width: 210 }}><TaskCard onOpen={setLightbox} onDelete={isAdminHere ? deleteTask : undefined} t={t} /></div>))}
                   {adding === j.id ? (
                     <div style={{ width: 240 }}><AddTaskForm form={form} setForm={setForm} owners={assignees(board)} onSubmit={() => submit(j.id)} onCancel={() => setAdding(null)} /></div>
                   ) : (
@@ -3707,7 +3800,7 @@ function Tasking({
           reload={reload}
         />
       )}
-      {lightbox && <TaskModal task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
     </div>
   );
 }
@@ -3905,7 +3998,8 @@ function GroupedTasks({
   tasksByJob: Map<string, Task[]>;
   onOpen: (id: string) => void;
   onOpenTask: (t: Task) => void;
-  onDelete: (t: Task) => void;
+  /** Absent when the viewer is not an admin — the card then shows no ×. */
+  onDelete?: (t: Task) => void;
 }) {
   // ---- adding a task straight onto a project (By Projects only) ----
   const [addingProj, setAddingProj] = useState<string | null>(null);
@@ -4469,7 +4563,7 @@ function AddTaskForm({ form, setForm, owners, onSubmit, onCancel, hideActions }:
   );
 }
 
-function TaskModal({ task, owners = [], onClose, onToggle, reload }: { task: Task; owners?: Assignee[]; onClose: () => void; onToggle: () => void; reload: () => Promise<Board | null> }) {
+function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = false }: { task: Task; owners?: Assignee[]; onClose: () => void; onToggle: () => void; reload: () => Promise<Board | null>; canDelete?: boolean }) {
   const [comments, setComments] = useState<{ by: string; at: string; body: string }[]>([]);
   // every time this task's due date has moved
   const [dateLog, setDateLog] = useState<{ id: string; old_due: string | null; new_due: string | null; by: string | null; at: string }[]>([]);
@@ -4563,7 +4657,11 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload }: { task: Tas
               <span>{initials(task.who)}</span><span>{task.cat}</span><span className="tnum">{fmt(task.due)}</span>
               <button onClick={() => setEditing(true)} className="ml-auto rounded px-2 py-1 font-bold" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>✎ Edit</button>
               <button onClick={onToggle} className="rounded px-2 py-1 font-bold" style={{ background: task.done ? "#E7E4DC" : "#0D7A3F", color: task.done ? "#5A6672" : "#fff" }}>{task.done ? "Reopen" : "✓ Done"}</button>
-              <button onClick={remove} className="rounded px-2 py-1 font-bold" style={{ background: "#FBEDEA", color: "#B3261E" }} title="Delete this task">🗑</button>
+              {/* Admins only. Everyone else closes it — Done keeps the comments
+                  and the date history that deleting throws away. */}
+              {canDelete && (
+                <button onClick={remove} className="rounded px-2 py-1 font-bold" style={{ background: "#FBEDEA", color: "#B3261E" }} title="Delete this task (admin)">🗑</button>
+              )}
             </div>
           </>
         )}

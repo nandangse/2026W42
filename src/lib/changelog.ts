@@ -37,6 +37,26 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.7.0.4",
+    date: "2026-08-19",
+    module: "Planning Suite",
+    items: [
+      "DELETING A TASK IS NOW ADMIN ONLY. It used to be anyone's own work, or anything at all for a planner — which made deleting the ordinary way to make an unwanted task go away. A deleted task takes its comments and its whole date history with it and leaves nothing saying it existed, so who was asked for what, and how often the date moved, went with it. Everyone else marks it Done, which keeps the trail. The bin is hidden rather than shown and refused, and the server refuses too.",
+      "The job header follows you down the page. Once the header card scrolls away a slim strip pins under the top bar with the job number, the customer tag and the customer line — everything below it looks the same from job to job, and knowing which job you are editing should not need a scroll back up.",
+      "The Priority List opens sorted by Target Delivery Date, soonest first. It used to open on whatever manual order had last been dragged, which is an order somebody set on a day that has since gone — so the top rows were not the next deliveries. Manual priority is not lost: clear the sort and it is exactly where it was.",
+      "The account menu says Upload Data, not Upload Excel. The door takes CSV as well, and the Employee Master and ToDo list as well as the Jobmaster — naming it after one file format made it sound narrower than it is.",
+    ],
+  },
+  {
+    v: "3.7.0.3",
+    date: "2026-08-19",
+    module: "Morning Update",
+    items: [
+      "The account menu says Upload Data, not Upload Excel. The door takes CSV as well as Excel, and it takes the Employee Master and the ToDo list as well as the Jobmaster — naming it after one file format was telling people it was narrower than it is.",
+      "Its tooltip says the same: a morning file, Excel or CSV, and it names the Employee Master among what it accepts.",
+    ],
+  },
+  {
     v: "3.7.0.2",
     date: "2026-08-19",
     module: "Groups — LC, Stratcom, Management",
