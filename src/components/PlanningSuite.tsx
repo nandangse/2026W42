@@ -33,6 +33,7 @@ import {
   type Plan,
   type PlanMilestone,
 } from "@/lib/schedule";
+import { GROUPS, normaliseGroups, isLC, isStratcom } from "@/lib/groups";
 import QuoteOfDay, { QuoteCard } from "./QuoteOfDay";
 import GoalsWorkspace from "./GoalsWorkspace";
 import DeliveredJobs from "./DeliveredJobs";
@@ -323,6 +324,9 @@ export default function PlanningSuite({
   displayName,
   erpOwner,
   isRaghu,
+  lc,
+  stratcom,
+  management,
 }: {
   email: string;
   role: Role;
@@ -330,9 +334,19 @@ export default function PlanningSuite({
   displayName: string | null;
   erpOwner: string | null;
   isRaghu: boolean;
+  lc: boolean;
+  stratcom: boolean;
+  management: boolean;
 }) {
   const router = useRouter();
   const isAdmin = role === "admin";
+  /**
+   * Which room this person is in. Not a role — see src/lib/groups.ts.
+   * The owner is in all three without anything being stored against him.
+   */
+  const groups = { lc, stratcom, management, isRaghu };
+  const canSeeDelivered = isLC(groups);
+  const canSeeForward = isStratcom(groups);
   const canEdit = role === "admin" || role === "planner" || role === "project_owner";
   // Upload lives in the account menu now — admins and Shweta only.
   const canUpload = isAdmin || email.toLowerCase() === UPLOADER_EMAIL;
@@ -350,6 +364,13 @@ export default function PlanningSuite({
   const [workspace, setWorkspace] = useState<"lms" | "suite" | "delivered" | "goals" | "tasking" | "sales">(
     role === "sales" ? "sales" : "suite",
   );
+  // Back/forward can restore a workspace this account cannot open -- the tab
+  // is hidden, but the history entry outlives the permission. Bounce rather
+  // than render an empty board.
+  useEffect(() => {
+    if (workspace === "delivered" && !canSeeDelivered) setWorkspace("suite");
+  }, [workspace, canSeeDelivered]);
+
   // land on "My Week" within the suite, not the delivery board
   const [tab, setTab] = useState<"home" | "wip" | "delivery" | "load" | "plan" | "erp" | "upload" | "admin">("home");
 
@@ -575,7 +596,10 @@ export default function PlanningSuite({
   // spec's "granted, not default" rule.
   const WORKSPACE_DEFS: [typeof workspace, string][] = [
     ["suite", "🧭 Planning Suite"],
-    ["delivered", "✅ Delivered Jobs"],
+    // Delivered Jobs is the LC's page. Hidden rather than shown-and-refused:
+    // a tab that only ever says "not for you" is a tab that gets clicked once
+    // a week by everyone who cannot use it.
+    ...(canSeeDelivered ? ([["delivered", "✅ Delivered Jobs"]] as [typeof workspace, string][]) : []),
     ...(goalsAccess ? ([["goals", "🎯 Goals"]] as [typeof workspace, string][]) : []),
     ["tasking", "📋 Nandan Tasking"],
     ...(salesAccess ? ([["sales", "💼 Sales Genie"]] as [typeof workspace, string][]) : []),
@@ -4909,15 +4933,66 @@ function ReportPanel() {
       <div className="bg-white rounded-lg border p-4" style={{ borderColor: "#E2E0DA" }}>
         <div className="font-bold text-sm mb-2">What is on it</div>
         <div className="space-y-1">
-          {ON_IT.map(([t, d], i) => (
+          {ON_IT.map(([t, d]) => (
             <div key={t} className="text-xs flex gap-2" style={{ color: "#5A6672", lineHeight: 1.7 }}>
-              <span style={{ color: "#B8B5AC", width: "1rem", flexShrink: 0 }}>{i + 1}</span>
               <b style={{ color: "#22303C", width: "11rem", flexShrink: 0 }}>{t}</b>
               <span>{d}</span>
             </div>
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * LC / Stratcom / Management, as three boxes in one cell.
+ *
+ * Read-only for everyone but the owner, and shown rather than hidden to the
+ * rest: who is in the room is not a secret, and a column that appears only for
+ * one person is a column nobody else can ask about.
+ */
+function GroupTicks({
+  u,
+  isOwner,
+  onSet,
+}: {
+  u: { id: string; email: string; lc?: boolean; stratcom?: boolean; management?: boolean };
+  isOwner: boolean;
+  onSet: (id: string, next: { lc: boolean; stratcom: boolean; management: boolean }) => void;
+}) {
+  // The owner is in all three implicitly and has no stored row to tick.
+  const owner = u.email.toLowerCase() === OWNER_EMAIL;
+  const cur = { lc: !!u.lc, stratcom: !!u.stratcom, management: !!u.management };
+  const on = (k: "lc" | "stratcom" | "management") => (owner ? true : cur[k]);
+
+  return (
+    <div className="flex gap-2 whitespace-nowrap">
+      {GROUPS.map((g) => {
+        const checked = on(g.key);
+        // Un-ticking LC would silently drop Stratcom too, so say so on the box
+        // rather than letting the other tick vanish without explanation.
+        const willDrop = g.key === "lc" && checked && cur.stratcom;
+        return (
+          <label
+            key={g.key}
+            className="flex items-center gap-1"
+            style={{ cursor: isOwner && !owner ? "pointer" : "default", opacity: owner ? 0.55 : 1 }}
+            title={owner ? "The owner is in all three already" : willDrop ? `${g.title} — un-ticking this drops Stratcom as well` : g.title}
+          >
+            <input
+              type="checkbox"
+              checked={checked}
+              disabled={!isOwner || owner}
+              onChange={(e) => onSet(u.id, { ...cur, [g.key]: e.target.checked })}
+              style={{ accentColor: "#1B3A5C", width: 13, height: 13, cursor: isOwner && !owner ? "pointer" : "default" }}
+            />
+            <span style={{ fontSize: 10.5, color: checked ? "#1B3A5C" : "#8A94A0", fontWeight: checked ? 700 : 400 }}>
+              {g.label}
+            </span>
+          </label>
+        );
+      })}
     </div>
   );
 }
@@ -5118,6 +5193,23 @@ function Admin({
     api.get("/api/admin/goal-access").then((r) => setGaRows(r.users)).catch(() => setGaRows([]));
   }, []);
   useEffect(() => { loadAccess(); }, [loadAccess]);
+  /**
+   * The three group ticks. Owner only, and Stratcom drags LC with it.
+   *
+   * The whole row is sent every time rather than the one box that changed:
+   * the rule that Stratcom implies LC means one tick can move two values, and
+   * a PATCH of the single changed field would have the server and the screen
+   * disagreeing about the other one until the next reload.
+   */
+  const setGroups = async (id: string, next: { lc: boolean; stratcom: boolean; management: boolean }) => {
+    setGaMsg("");
+    try {
+      const g = normaliseGroups(next);
+      await api.post("/api/admin/users", { action: "groups", id, ...g });
+      loadUsers();
+    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
   /** Goals access from inside the Users table. Reloads both lists. */
   const setGoalsLevel = async (id: string, level: string) => {
     const who = (users ?? []).find((x) => x.id === id);
@@ -5343,6 +5435,7 @@ function Admin({
               <th className="text-left py-1 font-semibold" title="Their line manager — drives “tasks of people reporting to me” in Nandan Tasking">Reports to</th>
               <th className="text-left py-1 font-semibold" title="Sales Genie access comes with the role now: Sales team, Admins and the owner">Role</th>
               <th className="text-left py-1 font-semibold" title="Goals access is granted per person, not by role">Goals</th>
+              <th className="text-left py-1 font-semibold" title="Which room they are in. Not a role — this does not change what they may do, only what they may see. Only the owner may tick these.">Groups</th>
               <th className="text-left py-1 font-semibold" title="When this account last signed in">Last seen</th>
               <th className="text-left py-1 font-semibold">Status</th>
               <th className="text-right py-1 font-semibold">Actions</th>
@@ -5457,6 +5550,9 @@ function Admin({
                     <option value="view">can view</option>
                     <option value="edit">can edit</option>
                   </select>
+                </td>
+                <td className="py-1.5">
+                  <GroupTicks u={u} isOwner={isOwner} onSet={setGroups} />
                 </td>
                 <td className="py-1.5 tnum" style={{ color: "#8A94A0" }}>
                   {u.last_sign_in_at ? fmtFull(String(u.last_sign_in_at).slice(0, 10)) : "never"}

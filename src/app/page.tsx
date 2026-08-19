@@ -24,6 +24,9 @@ export default async function Home() {
       displayName={user.displayName}
       erpOwner={user.erpOwner}
       isRaghu={user.email.toLowerCase() === RAGHU_EMAIL}
+      lc={user.lc}
+      stratcom={user.stratcom}
+      management={user.management}
     />
   );
 }

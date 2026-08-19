@@ -96,6 +96,10 @@ export interface ParsedProject {
   expEnd: string | null;
   so: string;
   mgr: string;
+  /** The project's own name, if the export carries one. Never guessed. */
+  name?: string;
+  /** The customer, if the export carries one. */
+  cust?: string;
 }
 
 export interface ParsedSourceLink {

@@ -37,6 +37,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.7.0.0",
+    date: "2026-08-19",
+    module: "Groups — LC, Stratcom, Management",
+    items: [
+      "Three tick boxes on the Users tab: LC, Stratcom and Management. Only raghu@nandan.co.in can tick them, and every Stratcom member is an LC member — ticking Stratcom ticks LC, and un-ticking LC drops Stratcom with it. The box says so before you click it rather than the other tick just disappearing.",
+      "These are NOT roles. Your role says what you may do — write a plan, upload, administer. These say which room you are in. Keeping them apart is what avoids inventing an \"LC planner\" and an \"LC admin\" and every other combination.",
+      "Delivered Jobs is now the LC's page. The tab is hidden for everyone else rather than shown and refused, and the API behind it refuses too — hiding a tab is not a gate when the URL still works.",
+      "The owner is in all three implicitly, with nothing stored against the account. A tick on a row the admin page deliberately cannot edit could never be taken off again.",
+      "Projects can now carry a name and a customer. The columns were always in the ERP export; the upload simply never read them. They are matched by meaning, so \"Project Name\", \"Project Title\" and a bare \"Name\" all bind — and an export without them no longer wipes the names an earlier one brought in.",
+      "The Report tab's contents list lost its numbering.",
+    ],
+  },
+  {
     v: "3.6.0.0",
     date: "2026-08-18",
     module: "Admin → Report",

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireReader, errJson } from "@/lib/auth";
+import { requireLC, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -29,7 +29,7 @@ const PAGE = 1000;
 
 export async function GET() {
   try {
-    await requireReader();
+    await requireLC();
     const db = supabaseServer();
 
     const rows: Record<string, unknown>[] = [];

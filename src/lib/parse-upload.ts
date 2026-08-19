@@ -475,6 +475,38 @@ function isEmployeeSheet(hdr: string[]): boolean {
   return has(/(employee\s*)?name/i) && (has(/birth|^dob$/i) || has(/joining|^doj$/i));
 }
 
+/**
+ * The project's NAME and CUSTOMER columns, matched by meaning.
+ *
+ * The projects table has carried the id, manager, stage, dates and sales order
+ * since the beginning, but never the name -- the parser simply never looked
+ * for it. It does now, and by meaning rather than by one literal heading,
+ * because the export has spelled it "Project Name", "Project Title" and a bare
+ * "Name" at different times.
+ *
+ * Ordered strongest-first, same rule as EXTRA_JOB_FIELDS: "Project Name" must
+ * win before a bare "Name". `not` is what keeps the manager out of it -- once
+ * the heading reads "Project Manager Name" a loose /name/ match makes every
+ * project on the page called Pankaj Sutar.
+ */
+const PROJECT_NAME_RES: { res: RegExp[]; not?: RegExp } = {
+  res: [/^\s*project\s*(name|title|description)/i, /^\s*(name|title)\s*$/i, /project.*\b(name|title)\b/i],
+  not: /manager|owner|stage|customer|status|id\b/i,
+};
+const PROJECT_CUST_RES: { res: RegExp[]; not?: RegExp } = {
+  res: [/^\s*customer\s*(name)?\s*$/i, /^\s*(client|party)\s*(name)?\s*$/i, /\bcustomer\b/i],
+  not: /committed|delivery|date|tag|\bpo\b/i,
+};
+
+/** Column index of the first header matching any pattern, strongest first. */
+function matchHeader(headers: string[], spec: { res: RegExp[]; not?: RegExp }): number {
+  for (const re of spec.res) {
+    const i = headers.findIndex((h) => h && re.test(h) && !(spec.not && spec.not.test(h)));
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+
 export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
   dateFixes.length = 0; // per-parse, so one upload's corrections are its own
   const out: ParseResult = {};
@@ -709,7 +741,9 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
         cCom = col("Customer Committed"),
         cExp = col("Expected End"),
         cSO = col("Sales Order"),
-        cMgr = col("Project Manager");
+        cMgr = col("Project Manager"),
+        cName = matchHeader(h3, PROJECT_NAME_RES),
+        cCust = matchHeader(h3, PROJECT_CUST_RES);
       if (cID >= 0) {
         const pm: Record<string, ParsedProject> = {};
         rows.slice(3).forEach((r) => {
@@ -723,6 +757,8 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
             expEnd: cExp >= 0 ? ser2iso(r[cExp]) : null,
             so: cSO >= 0 ? String(r[cSO] || "").trim() : "",
             mgr: cMgr >= 0 ? String(r[cMgr] || "").trim() : "",
+            name: cName >= 0 ? String(r[cName] || "").trim() : "",
+            cust: cCust >= 0 ? String(r[cCust] || "").trim() : "",
           };
         });
         out.projMap = pm;
@@ -808,6 +844,8 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
       // standalone "Order in Progress - projects" export (Open Projects BPP)
       const pm = out.projMap || {};
       const own2 = out.owners || {};
+      const pName = matchHeader(hdr, PROJECT_NAME_RES);
+      const pCust = matchHeader(hdr, PROJECT_CUST_RES);
       rows.slice(1).forEach((r) => {
         if (!r) return;
         const pid = String(g(r, "ID") || "").trim();
@@ -820,6 +858,8 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
           expEnd: ser2iso(g(r, "Expected End Date")),
           so: String(g(r, "Sales Order") || "").trim(),
           mgr,
+          name: pName >= 0 ? String(r[pName] || "").trim() : "",
+          cust: pCust >= 0 ? String(r[pCust] || "").trim() : "",
         } as ParsedProject;
         // JobNumbersList lets us assign the manager per job directly
         if (mgr)

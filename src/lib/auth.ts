@@ -16,6 +16,10 @@ export interface AuthedUser {
   erpOwner: string | null;
   /** The single account above the admin tier — governs the other admins. */
   isOwner: boolean;
+  /** Which room they are in. See src/lib/groups.ts — these are not roles. */
+  lc: boolean;
+  stratcom: boolean;
+  management: boolean;
 }
 
 /** Tiers, mirroring the SQL helpers in migration 0008. */
@@ -40,7 +44,7 @@ export async function currentUser(): Promise<AuthedUser | null> {
   // the caller's own role from this lookup.
   const { data: profile } = await adminClient()
     .from("profiles")
-    .select("role, disabled, email, initials, display_name, erp_owner")
+    .select("role, disabled, email, initials, display_name, erp_owner, lc, stratcom, management")
     .eq("id", user.id)
     .maybeSingle();
   const role = (profile?.role as Role) ?? "planner";
@@ -54,6 +58,9 @@ export async function currentUser(): Promise<AuthedUser | null> {
     displayName: profile?.display_name ?? null,
     erpOwner: profile?.erp_owner ?? null,
     isOwner: email === RAGHU_EMAIL,
+    lc: !!profile?.lc,
+    stratcom: !!profile?.stratcom,
+    management: !!profile?.management,
   };
 }
 
@@ -95,6 +102,20 @@ export const requirePlanner = () => requireRole(...EDITOR_ROLES);
 export const requireTasker = () => requireRole(...TASKER_ROLES);
 /** admin only. */
 export const requireAdmin = () => requireRole("admin");
+/**
+ * The Leadership Circle — the Delivered Jobs workspace.
+ *
+ * Hiding the tab is not a gate. Somebody with the URL, an old history entry or
+ * a terminal reaches the route regardless, and the figures behind it are the
+ * ones being restricted.
+ */
+export async function requireLC(): Promise<AuthedUser> {
+  const u = await requireUser();
+  if (!(u.isOwner || u.lc || u.stratcom))
+    throw new HttpError(403, "Delivered Jobs is for the Leadership Circle.");
+  return u;
+}
+
 /** uploader or admin — the upload door. */
 export const requireUploader = () => requireRole("uploader", "admin");
 

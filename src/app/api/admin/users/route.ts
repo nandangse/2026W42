@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
+import { normaliseGroups } from "@/lib/groups";
 import type { Role } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +57,7 @@ export async function GET() {
     const admin = adminClient();
     const { data, error } = await admin
       .from("profiles")
-      .select("id, email, role, disabled, initials, display_name, erp_owner, reports_to, designation, department_id, created_at")
+      .select("id, email, role, disabled, initials, display_name, erp_owner, reports_to, designation, department_id, lc, stratcom, management, created_at")
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
 
@@ -220,6 +221,46 @@ export async function POST(req: Request) {
         .eq("id", body.id);
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true });
+    }
+
+    /**
+     * { action: "groups", id, lc, stratcom, management } — owner only.
+     *
+     * NOT routed through guardTarget(): that blocks any change to an admin
+     * unless the caller is the owner, and blocks the owner's row outright.
+     * Both are right for role and password and wrong here — the whole point of
+     * these three is that the owner decides who is in the room, and admins are
+     * exactly the people most likely to be in it. The owner check below is the
+     * only gate this action needs, and it is stricter than guardTarget's.
+     *
+     * The owner's own row is still refused, because the owner is in all three
+     * implicitly (see src/lib/groups.ts) and a stored tick on a row the admin
+     * page cannot edit could never be taken off again.
+     */
+    if (body.action === "groups") {
+      if (!caller.isOwner)
+        throw new HttpError(403, `Only ${RAGHU_EMAIL} may set LC, Stratcom or Management.`);
+      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+      const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
+      if (String(t?.email || "").toLowerCase() === RAGHU_EMAIL)
+        return NextResponse.json(
+          { error: "The owner is in all three already — there is nothing to tick." },
+          { status: 400 },
+        );
+      // Stratcom implies LC, applied here as well as in the database so the
+      // answer the page gets back is the answer that was stored.
+      const g = normaliseGroups({
+        lc: !!body.lc,
+        stratcom: !!body.stratcom,
+        management: !!body.management,
+      });
+      const { error } = await admin.from("profiles").update(g).eq("id", body.id);
+      if (error) {
+        if (/lc|stratcom|management|column/i.test(error.message))
+          throw new HttpError(503, "Run migration 0034 first — the three groups have nowhere to save yet.");
+        throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true, ...g });
     }
 
     if (body.action === "profile") {

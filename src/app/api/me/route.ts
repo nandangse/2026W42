@@ -18,6 +18,11 @@ export async function GET() {
       displayName: u.displayName,
       erpOwner: u.erpOwner,
       isRaghu: u.email.toLowerCase() === RAGHU_EMAIL,
+      // Which room they are in. isLC()/isStratcom() in src/lib/groups.ts read
+      // these; the owner is in all three without being stored in any.
+      lc: u.lc,
+      stratcom: u.stratcom,
+      management: u.management,
     },
   });
 }

@@ -99,6 +99,11 @@ function projectsArray(projMap: Record<string, ParsedProject>) {
     expEnd: p.expEnd,
     so: p.so,
     stage: p.stage,
+    // Blank when the export has no such column. apply_projects treats blank as
+    // "not supplied" and keeps whatever is already stored, so uploading the
+    // older export does not wipe the names the newer one brought in.
+    name: p.name || "",
+    cust: p.cust || "",
   }));
 }
 
