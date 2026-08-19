@@ -45,7 +45,7 @@ const PACE_FORMULA = [
   "these figures.",
 ].join("\n");
 
-interface Payload {
+export interface Payload {
   installed: boolean;
   fy: string;
   /** The date the actuals were summed up to. Days elapsed is counted to the
@@ -60,6 +60,37 @@ interface Payload {
   updatedBy: string | null;
   editable: boolean;
   ownerEmail: string;
+  /**
+   * Delivered so far PLUS every pending job dated inside this financial year.
+   * `expected` is where the year finishes if the book lands on its dates.
+   */
+  anticipated?: {
+    expected: { sales: number; throughput: number };
+    onDate: { sales: number; throughput: number; jobs: number };
+    overdue: { sales: number; throughput: number; jobs: number };
+    beyond: { sales: number; throughput: number; jobs: number };
+    nodate: { sales: number; throughput: number; jobs: number };
+  };
+}
+
+/**
+ * The run-rate payload on its own, for a caller that wants the figures
+ * without the card.
+ *
+ * Shared so the number cards on the Job Delivery Board and the card below them
+ * cannot disagree: same endpoint, same arithmetic, one definition of the
+ * target. It fails quietly -- every page that uses it works without it.
+ */
+export function useRunRatePayload(): Payload | null {
+  const [d, setD] = useState<Payload | null>(null);
+  useEffect(() => {
+    let live = true;
+    api.get("/api/run-rate")
+      .then((r: Payload) => { if (live && r.installed) setD(r); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
+  return d;
 }
 
 export default function RunRate({ V, compact = false }: { V: (rupees: number) => string; compact?: boolean }) {

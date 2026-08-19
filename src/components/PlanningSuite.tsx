@@ -34,12 +34,13 @@ import {
   type PlanMilestone,
 } from "@/lib/schedule";
 import { GROUPS, normaliseGroups, isLC, isStratcom } from "@/lib/groups";
+import RunRate, { useRunRatePayload, type Payload } from "./RunRate";
+import { runRate } from "@/lib/run-rate";
 import QuoteOfDay, { QuoteCard } from "./QuoteOfDay";
 import GoalsWorkspace from "./GoalsWorkspace";
 import DeliveredJobs from "./DeliveredJobs";
 import MorningUpload from "./MorningUpload";
 import SalesGenie from "./SalesGenie";
-import RunRate from "./RunRate";
 import DeliveryOutlook from "./DeliveryOutlook";
 import LMS from "./LMS";
 import JobsInProgress, { type WipJob } from "./JobsInProgress";
@@ -981,7 +982,7 @@ export default function PlanningSuite({
       {/* Kept MOUNTED and merely hidden, so its filters, search, sort and view
           survive a round-trip through Job Plan — unmounting was wiping them. */}
       <div style={{ display: workspace === "suite" && tab === "delivery" ? undefined : "none" }}>
-        <DeliveryBoard board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
+        <DeliveryBoard showForward={canSeeForward} board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
       </div>
       {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} canEdit={canEdit} reload={reload} />}
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
@@ -1572,19 +1573,173 @@ function JobsInProgressTab({ board, V, onOpen, canEdit, reload }: { board: Board
   return <JobsInProgress jobs={jobs} today={TODAY} V={V} onOpenPlan={onOpen} canEdit={canEdit} onSaved={reload} />;
 }
 
+/**
+ * What has to go out every month from here to reach the target.
+ *
+ * Straight from runRate(), the same function behind the card further down the
+ * page -- not re-derived, so the number card and the card below it cannot
+ * drift apart.
+ */
+function rrPerMonth(p: Payload) {
+  const r = runRate(p.to, p.targets, p.actuals);
+  return { sales: r.sales.perMonth ?? 0, tp: r.throughput.perMonth ?? 0, days: r.left };
+}
+
+/**
+ * How much of the target has NO order behind it yet.
+ *
+ *   target  -  (delivered so far  +  every pending job dated inside this FY)
+ *
+ * This is deliberately a different question from the run rate. The run rate
+ * asks what has to be BUILT from here; this asks what has to be SOLD, because
+ * the book already on the floor cannot reach the target on its own. It is the
+ * gap nobody in production can close, which is exactly why it is worth its own
+ * card rather than being buried in the run rate.
+ *
+ * Never negative: a target already covered by the book is not a debt.
+ */
+function newNeeded(p: Payload) {
+  const e = p.anticipated?.expected;
+  // No anticipated block means the route is older than this card. Showing the
+  // whole target as "new sales needed" would be badly wrong, so show nothing.
+  if (!e) return { sales: 0, tp: 0 };
+  return {
+    sales: Math.max(0, p.targets.sales - e.sales),
+    tp: Math.max(0, p.targets.throughput - e.throughput),
+  };
+}
+
+/**
+ * The delivery calendar as a printable A4 sheet.
+ *
+ * Written into a new window rather than printed from the page: the board's
+ * calendar is a scrolling pane inside a scrolling app, and printing that gives
+ * you whichever fortnight happened to be on screen. This lays every month out
+ * in full, one after another, and prints landscape so a week fits across the
+ * page without the job descriptions collapsing to nothing.
+ *
+ * It carries the date it was produced. A delivery calendar with no date on it
+ * gets pinned to a wall and read for a month.
+ */
+function printCalendar(byDay: Record<string, Job[]>, V: (n: number) => string) {
+  const days = Object.keys(byDay).sort();
+  if (!days.length) { alert("No jobs carry a target delivery date, so there is nothing to print."); return; }
+
+  const esc = (t: unknown) => String(t ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
+  const monthName = (m: string) => parseISO(m + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
+
+  // Every month between the first and last delivery, so an empty month shows
+  // as empty rather than being silently skipped -- a gap in the book is a
+  // finding, not a formatting problem.
+  const months: string[] = [];
+  for (let m = days[0].slice(0, 7); m <= days[days.length - 1].slice(0, 7); ) {
+    months.push(m);
+    const d = parseISO(m + "-01");
+    d.setUTCMonth(d.getUTCMonth() + 1);
+    m = d.toISOString().slice(0, 7);
+  }
+
+  const body = months.map((m) => {
+    const first = parseISO(m + "-01");
+    // Monday-first, matching the board.
+    const lead = (first.getUTCDay() + 6) % 7;
+    const dim = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+    const cells: string[] = [];
+    for (let i = 0; i < lead; i++) cells.push('<td class="off"></td>');
+    let mJobs = 0, mVal = 0;
+    for (let d = 1; d <= dim; d++) {
+      const iso = `${m}-${String(d).padStart(2, "0")}`;
+      const list = byDay[iso] || [];
+      mJobs += list.length;
+      mVal += list.reduce((x, j) => x + (j.val || 0), 0);
+      cells.push(
+        `<td${iso === TODAY ? ' class="today"' : ""}>
+           <div class="dn">${d}${list.length > 1 ? ` <span class="cnt">(${list.length})</span>` : ""}</div>
+           ${list.map((j) => `<div class="chip${j.tdd && j.tdd < TODAY ? " late" : ""}">
+               <b>${esc(jobNo(j.id))}</b><span>${esc(j.tag)}</span></div>`).join("")}
+         </td>`,
+      );
+    }
+    while (cells.length % 7) cells.push('<td class="off"></td>');
+    const rows: string[] = [];
+    for (let i = 0; i < cells.length; i += 7) rows.push(`<tr>${cells.slice(i, i + 7).join("")}</tr>`);
+    return `<section>
+      <h2>${esc(monthName(m))} <small>${mJobs} job${mJobs === 1 ? "" : "s"} · ${esc(V(mVal))}</small></h2>
+      <table><thead><tr>${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => `<th>${d}</th>`).join("")}</tr></thead>
+      <tbody>${rows.join("")}</tbody></table>
+    </section>`;
+  }).join("");
+
+  const total = days.reduce((n, d) => n + byDay[d].length, 0);
+  const totVal = days.reduce((v, d) => v + byDay[d].reduce((x, j) => x + (j.val || 0), 0), 0);
+
+  const html = `<!doctype html><html><head><meta charset="utf-8">
+<title>Delivery calendar · ${esc(fmtFull(TODAY))}</title>
+<style>
+  @page { size: A4 landscape; margin: 10mm; }
+  *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{margin:0;font-family:Calibri,Arial,sans-serif;color:#16232F}
+  header{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #16232F;padding-bottom:5px;margin-bottom:10px}
+  h1{font-size:15pt;margin:0}
+  .meta{font-size:9pt;color:#5A6672}
+  section{page-break-inside:avoid;margin-bottom:11px}
+  h2{font-size:11pt;margin:0 0 4px;color:#1B3A5C}
+  h2 small{font-weight:400;color:#8A94A0;font-size:8.5pt}
+  table{width:100%;border-collapse:collapse;table-layout:fixed}
+  th{background:#22303C;color:#fff;font-size:8pt;padding:2px;text-align:center}
+  td{border:1px solid #E2E0DA;vertical-align:top;height:74px;padding:2px;width:14.28%}
+  td.off{background:#F7F6F2}
+  td.today{background:#FFF3E8}
+  .dn{font-size:8.5pt;font-weight:700;color:#8A94A0}
+  .cnt{color:#1B3A5C}
+  .chip{background:#DCE8F5;color:#1B3A5C;border-radius:2px;padding:1px 2px;margin-top:1px;font-size:6.6pt;line-height:1.2;overflow:hidden}
+  .chip.late{background:#B3261E;color:#fff}
+  .chip b{display:block}
+  .chip span{display:block}
+  @media print{ button{display:none} }
+  button{position:fixed;top:8px;right:8px;background:#E8600A;color:#fff;border:0;border-radius:5px;padding:8px 16px;font-weight:700;cursor:pointer}
+</style></head><body>
+<button onclick="window.print()">Save as PDF</button>
+<header>
+  <h1>Nandan GSE · Delivery calendar</h1>
+  <div class="meta">As at ${esc(fmtFull(TODAY))} &nbsp;·&nbsp; ${total} job${total === 1 ? "" : "s"} dated &nbsp;·&nbsp; ${esc(V(totVal))} &nbsp;·&nbsp; red = target delivery date already past</div>
+</header>
+${body}
+<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},350);});</script>
+</body></html>`;
+
+  const w = window.open("", "_blank");
+  if (!w) { alert("Your browser blocked the print window. Allow pop-ups for this site and press Give PDF again."); return; }
+  w.document.write(html);
+  w.document.close();
+}
+
+/** Throughput in rupees, the same field the TOTAL THROUGHPUT card sums. */
+const tpOf = (j: Job) => j.tpv || 0;
+
 function DeliveryBoard({
   board,
   V,
   onOpen,
   reload,
   pushERP,
+  showForward,
 }: {
   board: Board;
   V: (v: number) => string;
   onOpen: (id: string) => void;
   reload: () => Promise<Board | null>;
   pushERP: (dt: string, id: string, f: string, v: string) => void;
+  /** Stratcom. The two forward-looking cards are theirs. */
+  showForward: boolean;
 }) {
+  /**
+   * The year's targets and what is already on the books against them.
+   *
+   * Read from the same endpoint as the Required Run Rate card further down
+   * this page, so the two cannot say different things about one target.
+   */
+  const rr = useRunRatePayload();
   const [subTab, setSubTab] = useState<"priority" | "okan" | "cal" | "fam" | "cust">("priority");
   const [outlook, setOutlook] = useState(false);
   const [delOwn, setDelOwn] = useState("all");
@@ -1788,6 +1943,36 @@ function DeliveryBoard({
         <Card label="KITTED MATERIAL VALUE" value={V(kitted)} sub="Σ value × (1 − T%) × Kitting%" color="#7C3AED" />
       </div>
 
+      {/*
+        Two forward-looking cards, Stratcom only.
+
+        The five above are the book as it stands. These two are the year: what
+        has to go out every month from here, and how much of the target has no
+        order behind it yet. The second is the one that cannot be fixed on the
+        shop floor, which is why it is stated separately rather than folded
+        into the run rate.
+      */}
+      {showForward && rr?.hasTarget && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+          <Card
+            label="REQUIRED RUN RATE"
+            value={`${V(rrPerMonth(rr).sales)} / month`}
+            sub={`sales · with ${V(rrPerMonth(rr).tp)} / month throughput · ${rrPerMonth(rr).days} days left`}
+            color="#B3261E"
+          />
+          <Card
+            label="NEW SALES NEEDED — WITH DELIVERY INSIDE THIS YEAR"
+            value={V(newNeeded(rr).sales)}
+            sub={
+              newNeeded(rr).sales > 0
+                ? `sales · and ${V(newNeeded(rr).tp)} throughput · orders not yet on the book, to be WON AND DELIVERED before 31 March`
+                : "the book already covers the target — nothing further has to be won to reach it"
+            }
+            color={newNeeded(rr).sales > 0 ? "#D97706" : "#0D7A3F"}
+          />
+        </div>
+      )}
+
       {/* Opened from the PENDING JOBS card. It reads the SAME filtered list the
           rest of the board is showing, so the owner filter and the search box
           carry into it — an analytics panel that quietly ignores the filter
@@ -1859,7 +2044,10 @@ function DeliveryBoard({
           <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
             <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
               <div className="font-bold" style={{ color: "#16232F" }}>Delivery calendar <span className="text-xs font-normal" style={{ color: "#8A94A0" }}>· continuous — scroll through the months · jobs on their Target Delivery Date · ISO weeks on the left</span></div>
-              <button onClick={scrollCalToToday} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }}>⤓ Jump to today</button>
+              <div className="flex gap-2">
+                <button onClick={() => printCalendar(byDay, V)} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#22303C", color: "#fff" }} title="Open a printable A4 landscape copy of this calendar, dated today, and go straight to Save as PDF">🖨 Give PDF</button>
+                <button onClick={scrollCalToToday} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }}>⤓ Jump to today</button>
+              </div>
             </div>
             <div ref={calRef} style={{ maxHeight: "70vh", overflowY: "auto" }}>
               <table className="w-full text-xs" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
@@ -1895,14 +2083,27 @@ function DeliveryBoard({
                         {wk.map((d2) => {
                           const list = byDay[d2] || [];
                           return (
-                            <td key={d2} className="px-1 py-1 border-l" style={{ borderColor: "#EFEDE7", background: d2 === TODAY ? "#FFF3E8" : "#fff", height: 64 }}>
+                            <td key={d2} className="px-1 py-1 border-l" style={{ borderColor: "#EFEDE7", background: d2 === TODAY ? "#FFF3E8" : "#fff", height: 78 }}>
                               <div className="font-bold tnum" style={{ color: d2 === TODAY ? "#E8600A" : "#8A94A0" }}>
                                 {parseInt(d2.slice(8), 10)}
                                 {list.length > 1 && <span style={{ color: "#1B3A5C" }}> ({list.length})</span>}
                                 {d2 === TODAY ? " · today" : ""}
                               </div>
                               {list.map((j) => (
-                                <div key={j.id} onClick={() => onOpen(j.id)} title={j.tag + " · " + j.cust + " · " + (j.stat || "")} className="rounded px-1 py-0.5 mb-0.5 cursor-pointer font-semibold" style={{ background: j.tdd && j.tdd < TODAY ? "#B3261E" : "#DCE8F5", color: j.tdd && j.tdd < TODAY ? "#fff" : "#1B3A5C", fontSize: 9, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{jobNo(j.id)} {j.tag}</div>
+                                <div
+                                  key={j.id}
+                                  onClick={() => onOpen(j.id)}
+                                  title={j.tag + " · " + j.cust + " · " + (j.stat || "")}
+                                  className="rounded px-1 py-0.5 mb-0.5 cursor-pointer"
+                                  style={{ background: j.tdd && j.tdd < TODAY ? "#B3261E" : "#DCE8F5", color: j.tdd && j.tdd < TODAY ? "#fff" : "#1B3A5C", fontSize: 9, overflow: "hidden" }}
+                                >
+                                  {/* Two lines: the job number always readable,
+                                      the description given the room to be read.
+                                      One truncated line meant every chip on a
+                                      busy day said "Single Stage Scissor…". */}
+                                  <div className="font-bold tnum">{jobNo(j.id)}</div>
+                                  <div style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25 }}>{j.tag}</div>
+                                </div>
                               ))}
                             </td>
                           );
@@ -2063,12 +2264,16 @@ function DeliveryBoard({
         const key = subTab;
         const mset = [...new Set(byTDD.map((j) => (j.tdd || "").slice(0, 7)).filter(Boolean))].sort();
         const mlabel = (m: string) => parseISO(m + "-01").toLocaleDateString("en-IN", { month: "short", year: "2-digit", timeZone: "UTC" });
-        const groups: Record<string, { total: { n: number; v: number }; m: Record<string, { n: number; v: number }> }> = {};
+        // Value AND throughput per cell. Value is what the job invoices;
+        // throughput is what the company actually earns on it, and the two
+        // rank the families differently — a big-value family bought in as a
+        // bought-out item can earn less than a small one made in-house.
+        const groups: Record<string, { total: { n: number; v: number; t: number }; m: Record<string, { n: number; v: number; t: number }> }> = {};
         byTDD.forEach((j) => {
-          const g = (groups[j[key]] = groups[j[key]] || { total: { n: 0, v: 0 }, m: {} });
-          g.total.n++; g.total.v += j.val;
+          const g = (groups[j[key]] = groups[j[key]] || { total: { n: 0, v: 0, t: 0 }, m: {} });
+          g.total.n++; g.total.v += j.val; g.total.t += tpOf(j);
           const mm = (j.tdd || "").slice(0, 7);
-          if (mm) { const c = (g.m[mm] = g.m[mm] || { n: 0, v: 0 }); c.n++; c.v += j.val; }
+          if (mm) { const c = (g.m[mm] = g.m[mm] || { n: 0, v: 0, t: 0 }); c.n++; c.v += j.val; c.t += tpOf(j); }
         });
         const names = Object.keys(groups).sort();
         return (
@@ -2077,7 +2282,7 @@ function DeliveryBoard({
             <table className="text-xs w-full" style={{ minWidth: 720 }}>
               <thead>
                 <tr style={{ background: "#22303C", color: "#fff" }}>
-                  <th className="px-3 py-2 text-left">{key === "fam" ? "Product Family" : "Customer"}</th><th className="px-2 py-2">Jobs</th><th className="px-2 py-2">Value</th>
+                  <th className="px-3 py-2 text-left">{key === "fam" ? "Product Family" : "Customer"}</th><th className="px-2 py-2">Jobs</th><th className="px-2 py-2">Value</th><th className="px-2 py-2">Throughput</th>
                   {mset.map((m) => (<th key={m} className="px-2 py-2 whitespace-nowrap">{mlabel(m)}</th>))}
                 </tr>
               </thead>
@@ -2087,12 +2292,13 @@ function DeliveryBoard({
                     <td className="px-3 py-1.5 font-semibold">{n}</td>
                     <td className="px-2 py-1.5 text-center font-bold tnum">{groups[n].total.n}</td>
                     <td className="px-2 py-1.5 text-center whitespace-nowrap tnum">{V(groups[n].total.v)}</td>
-                    {mset.map((m) => { const c = groups[n].m[m]; return (<td key={m} className="px-2 py-1.5 text-center whitespace-nowrap tnum" style={{ background: c ? "#DCE8F5" : "transparent", border: "1px solid #F1EFE9" }}>{c ? (<><b>{c.n}</b> · {V(c.v)}</>) : "·"}</td>); })}
+                    <td className="px-2 py-1.5 text-center whitespace-nowrap tnum font-semibold" style={{ color: "#0D7A3F" }}>{V(groups[n].total.t)}</td>
+                    {mset.map((m) => { const c = groups[n].m[m]; return (<td key={m} className="px-2 py-1.5 text-center whitespace-nowrap tnum" style={{ background: c ? "#DCE8F5" : "transparent", border: "1px solid #F1EFE9" }}>{c ? (<><div><b>{c.n}</b> · {V(c.v)}</div><div style={{ color: "#0D7A3F", fontSize: 10.5 }}>T {V(c.t)}</div></>) : "·"}</td>); })}
                   </tr>
                 ))}
                 <tr style={{ background: "#16232F", color: "#F5B32B" }} className="font-bold">
-                  <td className="px-3 py-2">TOTAL</td><td className="px-2 py-2 text-center">{byTDD.length}</td><td className="px-2 py-2 text-center whitespace-nowrap">{V(byTDD.reduce((s, j) => s + j.val, 0))}</td>
-                  {mset.map((m) => { const list = byTDD.filter((j) => (j.tdd || "").slice(0, 7) === m); return (<td key={m} className="px-2 py-2 text-center whitespace-nowrap">{list.length ? (<>{list.length} · {V(list.reduce((s, j) => s + j.val, 0))}</>) : "·"}</td>); })}
+                  <td className="px-3 py-2">TOTAL</td><td className="px-2 py-2 text-center">{byTDD.length}</td><td className="px-2 py-2 text-center whitespace-nowrap">{V(byTDD.reduce((s, j) => s + j.val, 0))}</td><td className="px-2 py-2 text-center whitespace-nowrap">{V(byTDD.reduce((s, j) => s + tpOf(j), 0))}</td>
+                  {mset.map((m) => { const list = byTDD.filter((j) => (j.tdd || "").slice(0, 7) === m); return (<td key={m} className="px-2 py-2 text-center whitespace-nowrap">{list.length ? (<><div>{list.length} · {V(list.reduce((s, j) => s + j.val, 0))}</div><div style={{ fontSize: 10.5, opacity: .85 }}>T {V(list.reduce((s, j) => s + tpOf(j), 0))}</div></>) : "·"}</td>); })}
                 </tr>
               </tbody>
             </table>
@@ -4613,7 +4819,17 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = f
           {editing ? (
             <input autoFocus value={ef.t} onChange={(e) => setEf({ ...ef, t: e.target.value })} className="flex-1 text-sm font-bold border rounded px-2 py-1" style={{ borderColor: "#E8600A" }} />
           ) : (
-            <div className="font-bold text-sm">{task.t}</div>
+            /* Three lines, then an ellipsis. A pasted paragraph of a task
+               title used to push the Escalation chip, the buttons and the
+               comments off the bottom of the modal; the full text is on hover
+               and in Edit. */
+            <div
+              className="font-bold text-sm"
+              title={task.t}
+              style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+            >
+              {task.t}
+            </div>
           )}
           <button onClick={onClose} style={{ color: "#8A94A0" }}>✕</button>
         </div>

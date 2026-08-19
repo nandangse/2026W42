@@ -37,6 +37,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.7.0.5",
+    date: "2026-08-19",
+    module: "Job Delivery Board",
+    items: [
+      "Two cards at the top, Stratcom only. REQUIRED RUN RATE — what has to go out every month from here, sales and throughput, with the days left. And NEW SALES NEEDED — how much of the year's target has no order behind it yet: target minus what has been delivered minus every pending job dated before 31 March. Today that is ₹43.89 Cr of sales and ₹17.14 Cr of throughput still to be WON and delivered inside the year.",
+      "The second card is the one production cannot fix. It is stated on its own rather than folded into the run rate because the run rate asks what has to be built, and this asks what has to be sold — and the book already on the floor cannot reach the target on its own.",
+      "Both read the same endpoint as the Required Run Rate card lower down the page, so a target shown twice can never be two different numbers.",
+      "Schedule by Product and Schedule by Customer show THROUGHPUT in every cell, under the job count and value, and as its own column. Value is what a job invoices; throughput is what the company actually earns on it — and the two rank the families differently, so a table with only one of them ranks the wrong things first.",
+      "The delivery calendar gives each job two lines: the job number, then the description with room to be read. On a busy day every chip used to say \"Single Stage Scissor…\" and nothing else.",
+      "New on the calendar: GIVE PDF. It opens a printable A4 landscape sheet, dated today, with every month laid out in full — not the fortnight that happened to be on screen. Months with no deliveries are shown empty rather than skipped, because a gap in the book is a finding and not a formatting problem.",
+      "Task lightboxes clamp the task name to three lines. A pasted paragraph of a title used to push the escalation chip, the buttons and the comments off the bottom of the box.",
+    ],
+  },
+  {
     v: "3.7.0.4",
     date: "2026-08-19",
     module: "Planning Suite",
