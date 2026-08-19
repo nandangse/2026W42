@@ -37,6 +37,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.8.0.0",
+    date: "2026-08-19",
+    module: "Pending Material · Escalations · Projects in Progress",
+    items: [
+      "NEW TAB — PENDING MATERIAL. Every kitting line still short, across every job, in one table: job, TDD, item, qty, receivable date, its linked task, the latest word from the supplier, and status. 56 lines are open today across the whole book, one of them QC Defective. The job page already showed a job's own material; this answers the other question — what is holding up the next month of deliveries — which nobody could ask without opening forty jobs one at a time.",
+      "It opens on jobs delivering within 30 days, with 60, 90 and All in the dropdown. Received lines are not listed at all: this is what is still short. Receivable date, the update line and the status are editable straight from the table.",
+      "NEW TAB — ESCALATIONS. All 31 open escalations in one place: level, job, TDD, task date, who it is on, the task, WHY it was escalated, how many times its date has moved and from when — and the two columns that matter, Genie Solution and Prevented by.",
+      "Prevented by is the answer somebody actually gave when they closed an escalation. Read down that column and the same three causes appear over and over, which is the only way a pile of escalations turns into a decision. Tick \"include closed\" to read them.",
+      "Ask Genie sits on each open row and answers for that job specifically — what would most likely clear it, and what would stop it recurring. On demand, not on load: thirty-one automatic calls every time the page opened would be slow and mostly unread.",
+      "NEW — PROJECTS IN PROGRESS, under Jobs in Progress. Project number, name, customer, expected completion and the jobs on it — 41 live projects carrying 104 of the 116 jobs. Click any row to see its jobs. The ERP's expected-completion date is shown in red when it has already passed, which today is most of them; the last job TDD sits beside it, because those two disagreeing IS the finding.",
+      "Everything but the project's own name and dates is worked out from the jobs, because projects.job_numbers has been empty on every row the ERP has ever sent — the link that actually works is the project stamped on each job.",
+      "The delivery calendar shows what WENT OUT in green, for the last 30 days — 12 jobs — placed on the day it actually shipped rather than the day it was promised. A calendar showing only what is still owed never shows anything going right.",
+      "The job picker on Job Plan freezes under the header when you scroll, and the job identity strip freezes under that. Changing job is the one thing you do from anywhere on that page and it used to mean scrolling to the top first.",
+    ],
+  },
+  {
     v: "3.7.0.7",
     date: "2026-08-19",
     module: "Escalations",

@@ -190,6 +190,8 @@ interface Task {
   due: string | null;
   cat: string;
   esc: string;
+  /** Why it was escalated, as typed when the level was set. */
+  esc_why?: string | null;
   done: boolean;
   /** Email of whoever raised it. null for ERP ToDos — they have no Genie author. */
   by: string | null;
@@ -373,7 +375,7 @@ export default function PlanningSuite({
   }, [workspace, canSeeDelivered]);
 
   // land on "My Week" within the suite, not the delivery board
-  const [tab, setTab] = useState<"home" | "wip" | "delivery" | "load" | "plan" | "erp" | "upload" | "admin">("home");
+  const [tab, setTab] = useState<"home" | "wip" | "delivery" | "load" | "plan" | "material" | "esc" | "erp" | "upload" | "admin">("home");
 
   // ---- browser back/forward navigates within the app, not out of it ----
   // Every workspace/tab change pushes a history entry; popstate restores it.
@@ -682,6 +684,8 @@ export default function PlanningSuite({
   const SUITE_TAB_DEFS: [typeof tab, string][] = [
     ["wip", "Jobs in Progress"],
     ["delivery", "Job Delivery Board"],
+    ["material", "Pending Material"],
+    ["esc", "Escalations"],
     ["load", "Load Board"],
     ["plan", "Job Plan"],
   ];
@@ -985,6 +989,8 @@ export default function PlanningSuite({
         <DeliveryBoard showForward={canSeeForward} board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
       </div>
       {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} canEdit={canEdit} reload={reload} />}
+      {workspace === "suite" && tab === "material" && <PendingMaterial board={board} onOpen={openJobPlan} reload={reload} canEdit={canEdit} />}
+      {workspace === "suite" && tab === "esc" && <Escalations board={board} V={V} onOpen={openJobPlan} reload={reload} isAdmin={isAdmin} />}
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
       {workspace === "suite" && tab === "plan" && <JobPlan isAdmin={isAdmin} board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} />}
@@ -1570,7 +1576,157 @@ function JobsInProgressTab({ board, V, onOpen, canEdit, reload }: { board: Board
     amtNeeded: j.amtNeeded, payOnDelivery: j.payOnDelivery,
     ownerInitials: j.ownerInitials, ownerName: j.ownerName,
   }));
-  return <JobsInProgress jobs={jobs} today={TODAY} V={V} onOpenPlan={onOpen} canEdit={canEdit} onSaved={reload} />;
+  return (
+    <>
+      <JobsInProgress jobs={jobs} today={TODAY} V={V} onOpenPlan={onOpen} canEdit={canEdit} onSaved={reload} />
+      <ProjectsInProgress board={board} V={V} onOpen={onOpen} />
+    </>
+  );
+}
+
+/**
+ * The book one level up: projects rather than jobs.
+ *
+ * A project is several jobs sold together, and it is how the customer thinks
+ * about the order — six lifts on one PO is one conversation, not six. The jobs
+ * are the unit of work; this is the unit of the promise.
+ *
+ * Every figure except the project's own name and dates is derived from the
+ * jobs on it, because `projects.job_numbers` is empty on every row the ERP has
+ * ever sent — the link that actually works is jobs.proj.
+ */
+function ProjectsInProgress({
+  board,
+  V,
+  onOpen,
+}: {
+  board: Board;
+  V: (n: number) => string;
+  onOpen: (id: string) => void;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+
+  const rows = useMemo(() => {
+    const byProj = new Map<string, Job[]>();
+    for (const j of board.jobs) {
+      const p = String(j.proj || "").trim();
+      if (!p) continue;                       // a job with no project is just a job
+      byProj.set(p, [...(byProj.get(p) || []), j]);
+    }
+    const meta = new Map<string, Record<string, unknown>>(
+      (board.projects || []).map((p: Record<string, unknown>) => [String(p.id), p]),
+    );
+    return [...byProj.entries()]
+      .map(([id, list]) => {
+        const p = meta.get(id) || {};
+        const tdds = list.map((j) => j.tdd).filter(Boolean).sort() as string[];
+        return {
+          id,
+          // Blank until an upload supplies it (migration 0034) -- deliberately
+          // never guessed from a job description.
+          name: String(p.name || "").trim(),
+          cust: String(p.cust || "").trim() || mode(list.map((j) => j.cust)),
+          stage: String(p.stage || "").trim(),
+          mgr: String(p.mgr || "").trim(),
+          // The ERP's expected end, and what the jobs actually say. Both,
+          // because they disagree on most projects and the gap is the point.
+          expEnd: (p.exp_end as string) || null,
+          lastTdd: tdds.length ? tdds[tdds.length - 1] : null,
+          jobs: list.sort((a, b) => String(a.tdd || "9999").localeCompare(String(b.tdd || "9999"))),
+          val: list.reduce((s, j) => s + (j.val || 0), 0),
+          tp: list.reduce((s, j) => s + tpOf(j), 0),
+        };
+      })
+      // Soonest last delivery first: the project closest to being finished.
+      .sort((a, b) => String(a.lastTdd || "9999").localeCompare(String(b.lastTdd || "9999")));
+  }, [board.jobs, board.projects]);
+
+  if (!rows.length) return null;
+  const noName = rows.filter((r) => !r.name).length;
+
+  return (
+    <div className="px-4 pb-6">
+      <div className="flex items-baseline gap-2 mb-2 flex-wrap">
+        <h2 className="font-bold text-lg" style={{ color: "#16232F" }}>Projects in Progress</h2>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>
+          {rows.length} projects · {rows.reduce((s, r) => s + r.jobs.length, 0)} of the {board.jobs.length} live jobs sit on one
+          {noName > 0 && ` · ${noName} carry no project name yet — the next Projects upload fills them`}
+        </span>
+      </div>
+
+      <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
+        <table className="w-full text-xs" style={{ minWidth: 940 }}>
+          <thead>
+            <tr style={{ background: "#22303C", color: "#fff" }}>
+              <th className="px-2 py-2 text-left">Project No</th>
+              <th className="px-2 py-2 text-left">Project Name</th>
+              <th className="px-2 py-2 text-left">Customer</th>
+              <th className="px-2 py-2 text-center">Expected completion</th>
+              <th className="px-2 py-2 text-center">Last job TDD</th>
+              <th className="px-2 py-2 text-center">Jobs</th>
+              <th className="px-2 py-2 text-center">Value</th>
+              <th className="px-2 py-2 text-center">Throughput</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => {
+              // The ERP's expected end has passed on most of these. Saying so
+              // is the whole reason the column is here.
+              const stale = !!(r.expEnd && r.expEnd < TODAY);
+              return (
+                <React.Fragment key={r.id}>
+                  <tr
+                    className="border-t"
+                    style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}
+                    onClick={() => setOpen(open === r.id ? null : r.id)}
+                    title="Show the jobs on this project"
+                  >
+                    <td className="px-2 py-1.5 font-bold whitespace-nowrap" style={{ color: "#1B3A5C" }}>
+                      {open === r.id ? "▾ " : "▸ "}{r.id.replace(/^NGSE-PROJ-/, "")}
+                    </td>
+                    <td className="px-2 py-1.5" style={{ color: r.name ? "#22303C" : "#B8B5AC" }}>
+                      {r.name || "— not in the export —"}
+                      {r.stage && <div style={{ color: "#8A94A0" }}>{r.stage}</div>}
+                    </td>
+                    <td className="px-2 py-1.5">{r.cust || <span style={{ color: "#B8B5AC" }}>—</span>}</td>
+                    <td className="px-2 py-1.5 text-center whitespace-nowrap" style={{ color: stale ? "#B3261E" : "#22303C", fontWeight: stale ? 700 : 400 }}>
+                      {fmtFull(r.expEnd)}
+                      {stale && <div style={{ fontSize: 10 }}>already passed</div>}
+                    </td>
+                    <td className="px-2 py-1.5 text-center whitespace-nowrap font-bold" style={{ color: r.lastTdd && r.lastTdd < TODAY ? "#B3261E" : "#22303C" }}>{fmtFull(r.lastTdd)}</td>
+                    <td className="px-2 py-1.5 text-center font-bold tnum">{r.jobs.length}</td>
+                    <td className="px-2 py-1.5 text-center whitespace-nowrap tnum">{V(r.val)}</td>
+                    <td className="px-2 py-1.5 text-center whitespace-nowrap tnum font-semibold" style={{ color: "#0D7A3F" }}>{V(r.tp)}</td>
+                  </tr>
+                  {open === r.id && r.jobs.map((j) => (
+                    <tr key={j.id} style={{ background: "#F4F7FB" }}>
+                      <td className="px-2 py-1"></td>
+                      <td className="px-2 py-1 font-bold" style={{ color: "#1B3A5C" }}>
+                        <button onClick={() => onOpen(j.id)} style={{ textDecoration: "underline" }} title="Open this job's plan">{jobNo(j.id)}</button>
+                      </td>
+                      <td className="px-2 py-1" colSpan={2}>{j.tag}</td>
+                      <td className="px-2 py-1 text-center whitespace-nowrap" style={{ color: j.tdd && j.tdd < TODAY ? "#B3261E" : "#5A6672" }}>{fmtFull(j.tdd)}</td>
+                      <td className="px-2 py-1 text-center" style={{ color: "#8A94A0" }}>{j.pct}% built</td>
+                      <td className="px-2 py-1 text-center whitespace-nowrap tnum">{V(j.val)}</td>
+                      <td className="px-2 py-1 text-center whitespace-nowrap tnum" style={{ color: "#0D7A3F" }}>{V(tpOf(j))}</td>
+                    </tr>
+                  ))}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** The commonest non-empty value — used to name a project's customer from its jobs. */
+function mode(vals: (string | null | undefined)[]): string {
+  const c: Record<string, number> = {};
+  for (const v of vals) { const k = String(v || "").trim(); if (k) c[k] = (c[k] || 0) + 1; }
+  const top = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
+  return top ? top[0] : "";
 }
 
 /**
@@ -1740,6 +1896,23 @@ function DeliveryBoard({
    * this page, so the two cannot say different things about one target.
    */
   const rr = useRunRatePayload();
+  /**
+   * What actually went out in the last 30 days, for the calendar.
+   *
+   * Its own endpoint rather than /api/delivered, which is the LC's: that gate
+   * protects the money, and what shipped last week is not a secret from the
+   * people who built it. This carries the job, the tag and the day, and
+   * nothing else.
+   */
+  const [shipped, setShipped] = useState<{ id: string; tag: string; on: string }[]>([]);
+  useEffect(() => {
+    let live = true;
+    api.get("/api/delivered/recent")
+      .then((r: { jobs?: { id: string; tag: string; on: string }[] }) => { if (live) setShipped(r.jobs || []); })
+      // The calendar works without it — green chips are a bonus, not the page.
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
   const [subTab, setSubTab] = useState<"priority" | "okan" | "cal" | "fam" | "cust">("priority");
   /**
    * The figures above the tabs: open on the Priority List, folded away on the
@@ -2091,6 +2264,12 @@ function DeliveryBoard({
         }
         const byDay: Record<string, Job[]> = {};
         jobs.forEach((j) => { if (j.tdd) (byDay[j.tdd] = byDay[j.tdd] || []).push(j); });
+        // Delivered, keyed by the day it actually WENT — not the day it was
+        // promised. A job that shipped late belongs on the day it shipped;
+        // filing it under its old target date would draw a calendar of
+        // intentions rather than of deliveries.
+        const doneDay: Record<string, { id: string; tag: string; on: string }[]> = {};
+        shipped.forEach((d) => { (doneDay[d.on] = doneDay[d.on] || []).push(d); });
         const monthOf = (iso: string) => parseISO(iso).toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
         let lastMonth = "";
         return (
@@ -2158,6 +2337,17 @@ function DeliveryBoard({
                                   <div style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25 }}>{j.tag}</div>
                                 </div>
                               ))}
+                              {(doneDay[d2] || []).map((d) => (
+                                <div
+                                  key={"d" + d.id}
+                                  title={`DELIVERED ${fmtFull(d.on)} · ${d.tag}`}
+                                  className="rounded px-1 py-0.5 mb-0.5"
+                                  style={{ background: "#0D7A3F", color: "#fff", fontSize: 9, overflow: "hidden" }}
+                                >
+                                  <div className="font-bold tnum">✓ {jobNo(d.id)}</div>
+                                  <div style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25 }}>{d.tag}</div>
+                                </div>
+                              ))}
                             </td>
                           );
                         })}
@@ -2168,7 +2358,7 @@ function DeliveryBoard({
                 </tbody>
               </table>
             </div>
-            <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>Scroll for more months · tap a job chip to open its milestone plan · red chip = TDD already past · (n) = jobs due that day · week cell shows count &amp; value due that ISO week</div>
+            <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>Scroll for more months · tap a job chip to open its milestone plan · <b style={{ color: "#0D7A3F" }}>green = delivered</b>, on the day it actually went, last 30 days · red chip = TDD already past · (n) = jobs due that day · week cell shows count &amp; value due that ISO week</div>
           </div>
         );
       })()}
@@ -3214,7 +3404,14 @@ function JobPlan({
 
   return (
     <div className="p-4">
-      <div className="flex flex-wrap items-center gap-2 mb-3">
+      {/* The job picker freezes under the frozen header. Changing job is the
+          one thing you do from anywhere on this page, and it used to mean
+          scrolling to the top first. --hdr-h is measured by the header itself,
+          so this stays right when the nav wraps at narrower widths. */}
+      <div
+        className="flex flex-wrap items-center gap-2 mb-3 -mx-4 px-4 py-2"
+        style={{ position: "sticky", top: "var(--hdr-h, 92px)", zIndex: 24, background: "#F1EFE9", borderBottom: "1px solid #E2E0DA" }}
+      >
         {/* search + Project Owner filter narrow the dropdown; the dropdown stays the picker */}
         <div className="relative">
           <input
@@ -3266,7 +3463,8 @@ function JobPlan({
         <div
           className="rounded-lg border bg-white px-3 py-1.5 mb-2"
           style={{
-            position: "sticky", top: "var(--hdr-h, 92px)", zIndex: 20,
+            // below the picker row, which is itself stuck under the header
+            position: "sticky", top: "calc(var(--hdr-h, 92px) + 46px)", zIndex: 20,
             borderColor: "#E2E0DA", borderLeft: "5px solid #E8600A",
             boxShadow: "0 4px 14px rgba(0,0,0,.10)",
           }}
@@ -6287,6 +6485,462 @@ function Admin({
       </div>
       </>)}
 
+    </div>
+  );
+}
+
+// ============================ Pending Material ============================
+
+/** The same number card the delivery board uses, shared by the new tabs. */
+function StatCard({ label, value, sub, color = "#22303C" }: { label: string; value: string; sub?: string; color?: string }) {
+  return (
+    <div className="bg-white rounded-lg border px-3 py-2" style={{ borderColor: "#E2E0DA", borderTop: `3px solid ${color}` }}>
+      <div className="text-xs font-bold" style={{ color: "#8A94A0" }}>{label}</div>
+      <div className="text-xl font-bold tnum" style={{ color }}>{value}</div>
+      {sub && <div className="text-xs" style={{ color: "#8A94A0" }}>{sub}</div>}
+    </div>
+  );
+}
+
+/**
+ * Every kitting line still outstanding, across every job, in one table.
+ *
+ * The job page already shows a job's own material. This answers the other
+ * question — "what is holding up the next month of deliveries" — which nobody
+ * could ask without opening forty jobs one at a time.
+ *
+ * It opens on the next THIRTY DAYS rather than everything. The whole book is
+ * 150 lines and most of it is not urgent; a list that opens with all of it is
+ * a list that gets skimmed. The horizon is a dropdown, and "All" is in it.
+ */
+function PendingMaterial({
+  board,
+  onOpen,
+  reload,
+  canEdit,
+}: {
+  board: Board;
+  onOpen: (id: string) => void;
+  reload: () => Promise<Board | null>;
+  canEdit: boolean;
+}) {
+  const HORIZONS: [string, string][] = [
+    ["30", "Delivery within 30 days"],
+    ["60", "Delivery within 60 days"],
+    ["90", "Delivery within 90 days"],
+    ["all", "All jobs"],
+  ];
+  const [horizon, setHorizon] = useState("30");
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState("");
+
+  const jobById = useMemo(() => new Map(board.jobs.map((j) => [j.id, j])), [board.jobs]);
+
+  const rows = useMemo(() => {
+    const cutoff = horizon === "all" ? null : addDays(TODAY, Number(horizon));
+    const out: { job: Job; m: Board["materials"][string][number] }[] = [];
+    for (const [jobId, list] of Object.entries(board.materials || {})) {
+      const job = jobById.get(jobId);
+      if (!job) continue;                       // delivered or archived
+      if (cutoff && (!job.tdd || job.tdd > cutoff)) continue;
+      for (const m of list) {
+        // Received is not pending. QC Defective very much is.
+        if (String(m.status || "").toLowerCase() === "received") continue;
+        out.push({ job, m });
+      }
+    }
+    const needle = q.trim().toLowerCase();
+    const hit = needle
+      ? out.filter((r) =>
+          jobNo(r.job.id).includes(needle) ||
+          r.job.tag.toLowerCase().includes(needle) ||
+          String(r.m.item || "").toLowerCase().includes(needle))
+      : out;
+    // Soonest delivery first — this is a list you work down.
+    return hit.sort((a, b) => String(a.job.tdd || "9999").localeCompare(String(b.job.tdd || "9999")));
+  }, [board.materials, jobById, horizon, q]);
+
+  const save = async (m: { id: string }, patch: Record<string, unknown>) => {
+    setBusy(m.id); setMsg("");
+    try {
+      await api.post("/api/materials", { action: "update", id: m.id, ...patch });
+      await reload();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy(null);
+  };
+
+  const late = rows.filter((r) => r.m.due && r.m.due < TODAY).length;
+  const defective = rows.filter((r) => String(r.m.status || "").toLowerCase().includes("defect")).length;
+  const jobsAffected = new Set(rows.map((r) => r.job.id)).size;
+
+  return (
+    <div className="p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+        <StatCard label="LINES OUTSTANDING" value={String(rows.length)} color="#16232F" />
+        <StatCard label="JOBS WAITING" value={String(jobsAffected)} sub="jobs with at least one line open" color="#1B3A5C" />
+        <StatCard label="PAST THEIR RECEIVABLE DATE" value={String(late)} sub={late ? "already overdue from the supplier" : "none overdue"} color={late ? "#B3261E" : "#0D7A3F"} />
+        <StatCard label="QC DEFECTIVE" value={String(defective)} sub={defective ? "received and rejected — still short" : "none rejected"} color={defective ? "#D97706" : "#0D7A3F"} />
+      </div>
+
+      <div className="flex gap-2 mb-3 flex-wrap items-center">
+        <select
+          value={horizon}
+          onChange={(e) => setHorizon(e.target.value)}
+          className="px-2 py-1 rounded border text-sm font-semibold"
+          style={{ borderColor: horizon === "all" ? "#E8600A" : "#D9D6CD", background: horizon === "all" ? "#FFF3E8" : "#fff" }}
+          title="Which jobs to show, by how soon they are due to be delivered"
+        >
+          {HORIZONS.map(([k, l]) => (<option key={k} value={k}>{l}</option>))}
+        </select>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="🔍 Search job no, tag or material"
+          className="px-2 py-1 rounded border text-sm"
+          style={{ borderColor: "#D9D6CD", minWidth: 260 }}
+        />
+        <span className="text-xs" style={{ color: "#8A94A0" }}>
+          Received lines are not shown — this is what is still short.
+        </span>
+        {msg && <span className="text-xs font-bold" style={{ color: "#B3261E" }}>{msg}</span>}
+      </div>
+
+      <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
+        <table className="w-full text-xs" style={{ minWidth: 1040 }}>
+          <thead>
+            <tr style={{ background: "#22303C", color: "#fff" }}>
+              <th className="px-2 py-2 text-left">Job</th>
+              <th className="px-2 py-2 text-center">TDD</th>
+              <th className="px-2 py-2 text-left">Material / kit item</th>
+              <th className="px-2 py-2 text-center">Qty</th>
+              <th className="px-2 py-2 text-center">Receivable</th>
+              <th className="px-2 py-2 text-center">Task</th>
+              <th className="px-2 py-2 text-left">Update</th>
+              <th className="px-2 py-2 text-center">Status</th>
+              <th className="px-2 py-2 text-center">Open</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={9} className="px-3 py-6 text-center" style={{ color: "#8A94A0" }}>
+                Nothing outstanding for jobs delivering in this window.
+              </td></tr>
+            )}
+            {rows.map(({ job, m }, i) => {
+              const overdue = !!(m.due && m.due < TODAY);
+              const linked = m.task_id ? board.tasks.find((t) => t.id === m.task_id) : undefined;
+              return (
+                <tr key={m.id} className="border-t align-top" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <td className="px-2 py-1.5 whitespace-nowrap">
+                    <span className="font-bold" style={{ color: "#1B3A5C" }}>{jobNo(job.id)}</span>
+                    <div className="truncate" style={{ color: "#8A94A0", maxWidth: 190 }} title={job.tag}>{job.tag}</div>
+                  </td>
+                  <td className="px-2 py-1.5 text-center whitespace-nowrap font-bold" style={{ color: job.tdd && job.tdd < TODAY ? "#B3261E" : "#22303C" }}>{fmtFull(job.tdd)}</td>
+                  <td className="px-2 py-1.5" style={{ minWidth: 190 }}>{m.item}</td>
+                  <td className="px-2 py-1.5 text-center tnum">{m.qty || "—"}</td>
+                  <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                    {canEdit ? (
+                      <input
+                        type="date"
+                        value={m.due || ""}
+                        onChange={(e) => save(m, { due: e.target.value || null })}
+                        className="text-xs bg-transparent border rounded px-1"
+                        style={{ borderColor: overdue ? "#B3261E" : "#E2E0DA", color: overdue ? "#B3261E" : "#22303C", fontWeight: overdue ? 700 : 400 }}
+                        title={overdue ? "This date has passed and the material is still not in" : "When the supplier is due to deliver"}
+                      />
+                    ) : (
+                      <span style={{ color: overdue ? "#B3261E" : "#22303C", fontWeight: overdue ? 700 : 400 }}>{fmtFull(m.due || null)}</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                    {linked ? (
+                      <span
+                        className="rounded px-1.5 py-0.5 font-semibold"
+                        style={{ background: linked.done ? "#E6F4EA" : "#DCE8F5", color: linked.done ? "#0D7A3F" : "#1B3A5C" }}
+                        title={`${linked.t} · ${linked.who || "unassigned"}${linked.due ? " · due " + fmtFull(linked.due) : ""}`}
+                      >
+                        {linked.done ? "✓ task" : "task"} {linked.who ? whoTag(linked.who) : ""}
+                      </span>
+                    ) : (
+                      <span style={{ color: "#B8B5AC" }}>—</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-1.5" style={{ minWidth: 200 }}>
+                    {canEdit ? (
+                      <input
+                        defaultValue={m.note || ""}
+                        onBlur={(e) => { if (e.target.value !== (m.note || "")) save(m, { note: e.target.value }); }}
+                        placeholder="latest word from the supplier…"
+                        className="w-full text-xs border rounded px-1 py-0.5"
+                        style={{ borderColor: "#E2E0DA" }}
+                      />
+                    ) : (m.note || <span style={{ color: "#B8B5AC" }}>—</span>)}
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    {canEdit ? (
+                      <select
+                        value={m.status || "Yet to receive"}
+                        onChange={(e) => save(m, { status: e.target.value })}
+                        disabled={busy === m.id}
+                        className="text-xs border rounded px-1 py-0.5 font-semibold"
+                        style={{ borderColor: "#E2E0DA", color: statusColour(m.status) }}
+                      >
+                        <option>Yet to receive</option>
+                        <option>Received</option>
+                        <option>QC Defective</option>
+                      </select>
+                    ) : (
+                      <span className="font-semibold" style={{ color: statusColour(m.status) }}>{m.status || "Yet to receive"}</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <button
+                      onClick={() => onOpen(job.id)}
+                      className="rounded px-2 py-0.5 font-bold"
+                      style={{ background: "#DCE8F5", color: "#1B3A5C" }}
+                      title="Open this job's plan, where its full material list lives"
+                    >
+                      ✎
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** Yet to receive / Received / QC Defective, in the colours used everywhere. */
+function statusColour(s: string | null | undefined): string {
+  const v = String(s || "").toLowerCase();
+  if (v.includes("defect")) return "#D97706";
+  if (v.includes("receiv") && !v.includes("yet")) return "#0D7A3F";
+  return "#B3261E";
+}
+
+// ============================ Escalations ============================
+
+/**
+ * Every escalated task in the works, in one table.
+ *
+ * The point of this page is the last two columns. "Genie Solution" is a
+ * suggestion asked for on demand; "Prevented by" is the answer somebody
+ * actually gave when they closed one. Read down that column and the same
+ * three causes appear over and over — which is the only way a pile of
+ * escalations turns into a decision.
+ *
+ * Open ones first, because those are the ones somebody can still act on.
+ */
+function Escalations({
+  board,
+  onOpen,
+  reload,
+  isAdmin,
+}: {
+  board: Board;
+  V: (v: number) => string;
+  onOpen: (id: string) => void;
+  reload: () => Promise<Board | null>;
+  isAdmin: boolean;
+}) {
+  const [showDone, setShowDone] = useState(false);
+  const [lvl, setLvl] = useState("all");
+  const [lightbox, setLightbox] = useState<Task | null>(null);
+  const [notes, setNotes] = useState<Record<string, { body: string; by: string | null; at: string }>>({});
+  const [hint, setHint] = useState<Record<string, string>>({});
+  const [hinting, setHinting] = useState<string | null>(null);
+
+  const jobById = useMemo(() => new Map(board.jobs.map((j) => [j.id, j])), [board.jobs]);
+
+  // The close-out notes. Keyed the way the table is: kind + id.
+  const loadNotes = useCallback(() => {
+    api.get("/api/closeouts")
+      .then((r: { notes?: { task_id: string; task_kind: string; body: string; by: string | null; at: string }[] }) => {
+        const m: Record<string, { body: string; by: string | null; at: string }> = {};
+        for (const n of r.notes || []) m[`${n.task_kind}:${n.task_id}`] = { body: n.body, by: n.by, at: n.at };
+        setNotes(m);
+      })
+      // Before 0036 there is nothing to read. The column shows empty.
+      .catch(() => {});
+  }, []);
+  useEffect(() => { loadNotes(); }, [loadNotes]);
+
+  const rows = useMemo(() => {
+    const out = board.tasks
+      .filter((t) => escalated(t.esc))
+      .filter((t) => showDone || !t.done)
+      .filter((t) => lvl === "all" || (t.esc || "").startsWith(lvl));
+    // Open first, then oldest-due first — the order you would work them in.
+    return out.sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      return String(a.due || "9999").localeCompare(String(b.due || "9999"));
+    });
+  }, [board.tasks, showDone, lvl]);
+
+  const counts = useMemo(() => {
+    const open = board.tasks.filter((t) => escalated(t.esc) && !t.done);
+    const c = { L1: 0, L2: 0, L3: 0 } as Record<"L1" | "L2" | "L3", number>;
+    for (const t of open) {
+      const k = (t.esc || "").slice(0, 2) as "L1" | "L2" | "L3";
+      if (k in c) c[k]++;
+    }
+    return { open: open.length, L1: c.L1, L2: c.L2, L3: c.L3 };
+  }, [board.tasks]);
+
+  const askGenie = async (t: Task) => {
+    const job = jobById.get(t.j);
+    setHinting(t.id);
+    try {
+      const r = await api.post("/api/genie-hint", {
+        job_id: t.j,
+        job_label: job ? `JOB ${jobNo(job.id)} · ${job.tag}` : t.j,
+        question:
+          `An escalated task (${t.esc}) is open on this job: "${t.t}".` +
+          (t.esc_why ? ` It was escalated because: "${t.esc_why}".` : "") +
+          (t.due ? ` It was due ${fmtFull(t.due)}.` : "") +
+          " In two or three sentences, suggest the most likely way to clear it and what would stop it recurring. Be specific to this job.",
+      });
+      setHint((h) => ({ ...h, [t.id]: String(r.hint || r.text || "").trim() || "No suggestion came back." }));
+    } catch (e) {
+      setHint((h) => ({ ...h, [t.id]: e instanceof Error ? e.message : String(e) }));
+    }
+    setHinting(null);
+  };
+
+  const LvlBtn = ({ k, l }: { k: string; l: string }) => (
+    <button onClick={() => setLvl(k)} className="px-2.5 py-1 rounded text-xs font-bold"
+      style={lvl === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672", background: "#F4F2EC" }}>{l}</button>
+  );
+
+  return (
+    <div className="p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+        <StatCard label="OPEN ESCALATIONS" value={String(counts.open)} color="#B3261E" />
+        <StatCard label="L1 — SUPERVISOR" value={String(counts.L1)} color="#D97706" />
+        <StatCard label="L2 — PRODUCTION / LEADERS" value={String(counts.L2)} color="#E8600A" />
+        <StatCard label="L3 — MANAGEMENT" value={String(counts.L3)} sub={counts.L3 ? "these are yours" : "none at your level"} color="#B3261E" />
+      </div>
+
+      <div className="flex gap-2 mb-3 flex-wrap items-center">
+        <LvlBtn k="all" l="All levels" /><LvlBtn k="L1" l="L1" /><LvlBtn k="L2" l="L2" /><LvlBtn k="L3" l="L3" />
+        <label className="flex items-center gap-1 text-xs font-semibold ml-2" style={{ color: "#5A6672", cursor: "pointer" }}>
+          <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} style={{ accentColor: "#0D7A3F" }} />
+          Include closed — and what was done about them
+        </label>
+        <span className="text-xs ml-auto" style={{ color: "#8A94A0" }}>{rows.length} shown</span>
+      </div>
+
+      <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
+        <table className="w-full text-xs" style={{ minWidth: 1280 }}>
+          <thead>
+            <tr style={{ background: "#22303C", color: "#fff" }}>
+              <th className="px-2 py-2 text-center">Level</th>
+              <th className="px-2 py-2 text-left">Job</th>
+              <th className="px-2 py-2 text-center">TDD</th>
+              <th className="px-2 py-2 text-center">Task date</th>
+              <th className="px-2 py-2 text-center">Assigned</th>
+              <th className="px-2 py-2 text-left">Task</th>
+              <th className="px-2 py-2 text-left">Why it was escalated</th>
+              <th className="px-2 py-2 text-center">Dates moved</th>
+              <th className="px-2 py-2 text-left">Genie solution · Prevented by</th>
+              <th className="px-2 py-2 text-center">Edit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={10} className="px-3 py-6 text-center" style={{ color: "#8A94A0" }}>
+                Nothing escalated at this level. 🙂
+              </td></tr>
+            )}
+            {rows.map((t, i) => {
+              const job = jobById.get(t.j);
+              const note = notes[`${t.kind}:${t.id}`];
+              const moved = t.push_count || 0;
+              return (
+                <tr key={t.kind + t.id} className="border-t align-top" style={{ borderColor: "#EFEDE7", background: t.done ? "#F4F7F4" : i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                    <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: t.done ? "#E7E4DC" : "#B3261E", color: t.done ? "#5A6672" : "#fff" }}>
+                      {(t.esc || "").slice(0, 2)}
+                    </span>
+                    {t.done && <div style={{ color: "#0D7A3F", fontWeight: 700, fontSize: 10 }}>closed</div>}
+                  </td>
+                  <td className="px-2 py-1.5 whitespace-nowrap">
+                    <span className="font-bold" style={{ color: "#1B3A5C" }}>{job ? jobNo(job.id) : jobNo(t.j)}</span>
+                    {job && <div className="truncate" style={{ color: "#8A94A0", maxWidth: 170 }} title={job.tag}>{job.tag}</div>}
+                  </td>
+                  <td className="px-2 py-1.5 text-center whitespace-nowrap font-bold" style={{ color: job?.tdd && job.tdd < TODAY ? "#B3261E" : "#22303C" }}>{fmtFull(job?.tdd || null)}</td>
+                  <td className="px-2 py-1.5 text-center whitespace-nowrap" style={{ color: taskLate(t, TODAY) ? "#B3261E" : "#22303C", fontWeight: taskLate(t, TODAY) ? 700 : 400 }}>{fmtFull(t.due)}</td>
+                  <td className="px-2 py-1.5 text-center whitespace-nowrap" title={t.who || "unassigned"}>{t.who ? whoTag(t.who) : "—"}</td>
+                  <td className="px-2 py-1.5" style={{ minWidth: 200 }}>
+                    <div style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }} title={t.t}>{t.t}</div>
+                    <div style={{ color: "#8A94A0" }}>{t.cat}</div>
+                  </td>
+                  <td className="px-2 py-1.5" style={{ minWidth: 170, color: t.esc_why ? "#22303C" : "#B8B5AC" }}>
+                    {t.esc_why || "— not given —"}
+                  </td>
+                  <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                    {moved > 0 ? (
+                      <span title={t.original_due ? `First promised ${fmtFull(t.original_due)}` : undefined} style={{ color: "#B3261E", fontWeight: 700 }}>
+                        {moved}×<div style={{ fontSize: 10, fontWeight: 400 }}>from {fmtFull(t.original_due || null)}</div>
+                      </span>
+                    ) : (<span style={{ color: "#B8B5AC" }}>never</span>)}
+                  </td>
+                  <td className="px-2 py-1.5" style={{ minWidth: 260 }}>
+                    {note ? (
+                      <div className="rounded p-1.5 mb-1" style={{ background: "#E6F4EA", border: "1px solid #0D7A3F" }}>
+                        <div className="font-bold" style={{ color: "#0D7A3F", fontSize: 10 }}>PREVENTED BY — {note.by || "—"}</div>
+                        <div style={{ color: "#22303C" }}>{note.body}</div>
+                      </div>
+                    ) : t.done ? (
+                      <div style={{ color: "#B8B5AC" }}>closed before this was asked for</div>
+                    ) : null}
+                    {hint[t.id] ? (
+                      <div className="rounded p-1.5" style={{ background: "#F3EEFB", border: "1px solid #7C3AED" }}>
+                        <div className="font-bold" style={{ color: "#7C3AED", fontSize: 10 }}>GENIE</div>
+                        <div style={{ color: "#22303C" }}>{hint[t.id]}</div>
+                      </div>
+                    ) : !t.done ? (
+                      <button
+                        onClick={() => askGenie(t)}
+                        disabled={hinting === t.id}
+                        className="rounded px-2 py-0.5 font-bold"
+                        style={{ background: "#F3EEFB", color: "#7C3AED", opacity: hinting === t.id ? 0.6 : 1 }}
+                        title="Ask Genie what would most likely clear this, and what would stop it recurring"
+                      >
+                        {hinting === t.id ? "thinking…" : "✨ Ask Genie"}
+                      </button>
+                    ) : null}
+                  </td>
+                  <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                    <button onClick={() => setLightbox(t)} className="rounded px-2 py-0.5 font-bold" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Open the task">✎</button>
+                    <button onClick={() => onOpen(t.j)} className="rounded px-2 py-0.5 font-bold ml-1" style={{ background: "#F4F2EC", color: "#5A6672" }} title="Open the job plan">JOB</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {lightbox && (
+        <TaskModal
+          canDelete={isAdmin}
+          task={lightbox}
+          owners={assignees(board)}
+          onClose={() => setLightbox(null)}
+          onToggle={async (prevention) => {
+            await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done, prevention });
+            setLightbox(null);
+            await reload();
+            loadNotes();   // the answer they just typed belongs in the table
+          }}
+          reload={reload}
+        />
+      )}
     </div>
   );
 }

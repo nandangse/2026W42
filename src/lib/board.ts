@@ -286,6 +286,8 @@ export async function buildBoard(supabase: SupabaseClient) {
       due: t.due,
       cat: t.cat,
       esc: t.esc,
+      // why it was escalated — the Escalations table reads it
+      esc_why: (t.esc_why ?? null) as string | null,
       done: !!t.done,
       // the date FIRST promised, and how often it has moved since. Lateness is
       // measured against this, never against the date currently on screen.
@@ -305,6 +307,7 @@ export async function buildBoard(supabase: SupabaseClient) {
       due: t.due,
       cat: t.cat,
       esc: t.esc,
+      esc_why: (t.esc_why ?? null) as string | null,
       done: !!t.done,
       // who raised it — the key behind Tasking's "tasks I assigned" filter
       by: (t.created_by ?? null) as string | null,
