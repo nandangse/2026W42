@@ -45,6 +45,12 @@ const PROBES = [
   ["0032 task original due",  "manual_tasks", "original_due"],
   ["0032 erp task original",  "erp_tasks", "original_due"],
   ["0032 date log",           "task_date_log", "new_due"],
+  ["0033 batch kind employees","import_batches", "kind"],
+  ["0034 groups: lc",         "profiles", "lc"],
+  ["0034 groups: stratcom",   "profiles", "stratcom"],
+  ["0034 groups: management", "profiles", "management"],
+  ["0034 project name",       "projects", "name"],
+  ["0034 project customer",   "projects", "cust"],
 ];
 
 const missing = [];

@@ -37,6 +37,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.7.0.2",
+    date: "2026-08-19",
+    module: "Groups — LC, Stratcom, Management",
+    items: [
+      "Fixed, in migration 0035: un-ticking LC on somebody who is in Stratcom did nothing. The tick simply came back — not an error, not a half-saved row, the instruction was silently ignored, which is the worst of the three.",
+      "The rule was written as a test on the row after the change. On a write that touches only LC, Stratcom is carried over unchanged, so the \"Stratcom means LC\" half fired and forced LC straight back on. The half written for exactly this case could never run. It now compares against the row before the change and acts on what actually moved.",
+      "Through the screen it always behaved correctly — the page sends all three ticks together and had already dropped Stratcom before the database saw it. Only a direct write took the broken path, which is why this needed testing rather than trusting.",
+      "audit-migrations.mjs now probes 0033, 0034 and 0035 too, so \"did that migration run?\" keeps having a one-command answer.",
+    ],
+  },
+  {
     v: "3.7.0.1",
     date: "2026-08-19",
     module: "Notifications",
