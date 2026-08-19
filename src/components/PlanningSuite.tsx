@@ -36,6 +36,7 @@ import {
 import { GROUPS, normaliseGroups, isLC, isStratcom } from "@/lib/groups";
 import RunRate, { useRunRatePayload, type Payload } from "./RunRate";
 import { runRate } from "@/lib/run-rate";
+import { deliveryReportHtml } from "@/lib/delivery-report";
 import QuoteOfDay, { QuoteCard } from "./QuoteOfDay";
 import GoalsWorkspace from "./GoalsWorkspace";
 import DeliveredJobs from "./DeliveredJobs";
@@ -1755,93 +1756,23 @@ function newNeeded(p: Payload) {
  * It carries the date it was produced. A delivery calendar with no date on it
  * gets pinned to a wall and read for a month.
  */
-function printCalendar(byDay: Record<string, Job[]>, V: (n: number) => string) {
-  const days = Object.keys(byDay).sort();
-  if (!days.length) { alert("No jobs carry a target delivery date, so there is nothing to print."); return; }
-
-  const esc = (t: unknown) => String(t ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
-  const monthName = (m: string) => parseISO(m + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
-
-  // Every month between the first and last delivery, so an empty month shows
-  // as empty rather than being silently skipped -- a gap in the book is a
-  // finding, not a formatting problem.
-  const months: string[] = [];
-  for (let m = days[0].slice(0, 7); m <= days[days.length - 1].slice(0, 7); ) {
-    months.push(m);
-    const d = parseISO(m + "-01");
-    d.setUTCMonth(d.getUTCMonth() + 1);
-    m = d.toISOString().slice(0, 7);
-  }
-
-  const body = months.map((m) => {
-    const first = parseISO(m + "-01");
-    // Monday-first, matching the board.
-    const lead = (first.getUTCDay() + 6) % 7;
-    const dim = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
-    const cells: string[] = [];
-    for (let i = 0; i < lead; i++) cells.push('<td class="off"></td>');
-    let mJobs = 0, mVal = 0;
-    for (let d = 1; d <= dim; d++) {
-      const iso = `${m}-${String(d).padStart(2, "0")}`;
-      const list = byDay[iso] || [];
-      mJobs += list.length;
-      mVal += list.reduce((x, j) => x + (j.val || 0), 0);
-      cells.push(
-        `<td${iso === TODAY ? ' class="today"' : ""}>
-           <div class="dn">${d}${list.length > 1 ? ` <span class="cnt">(${list.length})</span>` : ""}</div>
-           ${list.map((j) => `<div class="chip${j.tdd && j.tdd < TODAY ? " late" : ""}">
-               <b>${esc(jobNo(j.id))}</b><span>${esc(j.tag)}</span></div>`).join("")}
-         </td>`,
-      );
-    }
-    while (cells.length % 7) cells.push('<td class="off"></td>');
-    const rows: string[] = [];
-    for (let i = 0; i < cells.length; i += 7) rows.push(`<tr>${cells.slice(i, i + 7).join("")}</tr>`);
-    return `<section>
-      <h2>${esc(monthName(m))} <small>${mJobs} job${mJobs === 1 ? "" : "s"} · ${esc(V(mVal))}</small></h2>
-      <table><thead><tr>${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => `<th>${d}</th>`).join("")}</tr></thead>
-      <tbody>${rows.join("")}</tbody></table>
-    </section>`;
-  }).join("");
-
-  const total = days.reduce((n, d) => n + byDay[d].length, 0);
-  const totVal = days.reduce((v, d) => v + byDay[d].reduce((x, j) => x + (j.val || 0), 0), 0);
-
-  const html = `<!doctype html><html><head><meta charset="utf-8">
-<title>Delivery calendar · ${esc(fmtFull(TODAY))}</title>
-<style>
-  @page { size: A4 landscape; margin: 10mm; }
-  *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  body{margin:0;font-family:Calibri,Arial,sans-serif;color:#16232F}
-  header{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #16232F;padding-bottom:5px;margin-bottom:10px}
-  h1{font-size:15pt;margin:0}
-  .meta{font-size:9pt;color:#5A6672}
-  section{page-break-inside:avoid;margin-bottom:11px}
-  h2{font-size:11pt;margin:0 0 4px;color:#1B3A5C}
-  h2 small{font-weight:400;color:#8A94A0;font-size:8.5pt}
-  table{width:100%;border-collapse:collapse;table-layout:fixed}
-  th{background:#22303C;color:#fff;font-size:8pt;padding:2px;text-align:center}
-  td{border:1px solid #E2E0DA;vertical-align:top;height:74px;padding:2px;width:14.28%}
-  td.off{background:#F7F6F2}
-  td.today{background:#FFF3E8}
-  .dn{font-size:8.5pt;font-weight:700;color:#8A94A0}
-  .cnt{color:#1B3A5C}
-  .chip{background:#DCE8F5;color:#1B3A5C;border-radius:2px;padding:1px 2px;margin-top:1px;font-size:6.6pt;line-height:1.2;overflow:hidden}
-  .chip.late{background:#B3261E;color:#fff}
-  .chip b{display:block}
-  .chip span{display:block}
-  @media print{ button{display:none} }
-  button{position:fixed;top:8px;right:8px;background:#E8600A;color:#fff;border:0;border-radius:5px;padding:8px 16px;font-weight:700;cursor:pointer}
-</style></head><body>
-<button onclick="window.print()">Save as PDF</button>
-<header>
-  <h1>Nandan GSE · Delivery calendar</h1>
-  <div class="meta">As at ${esc(fmtFull(TODAY))} &nbsp;·&nbsp; ${total} job${total === 1 ? "" : "s"} dated &nbsp;·&nbsp; ${esc(V(totVal))} &nbsp;·&nbsp; red = target delivery date already past</div>
-</header>
-${body}
-<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},350);});</script>
-</body></html>`;
-
+/**
+ * Open the delivery report in its own window and go to the print dialog.
+ *
+ * The document itself is built by deliveryReportHtml() in src/lib -- pure, so
+ * it can be rendered and looked at without a browser session (see
+ * scratchpad/report/). The last version of this shipped with a blank first
+ * page precisely because it could not be checked.
+ */
+function printCalendar(
+  byDay: Record<string, Job[]>,
+  V: (n: number) => string,
+  jobs: Job[],
+  shipped: { id: string; tag: string; on: string }[],
+  ytd: { n: number; sales: number; tp: number } | null,
+) {
+  if (!jobs.length) { alert("There are no live jobs to report on."); return; }
+  const html = deliveryReportHtml({ today: TODAY, byDay, jobs, shipped, ytd, logo: LOGO, V });
   const w = window.open("", "_blank");
   if (!w) { alert("Your browser blocked the print window. Allow pop-ups for this site and press Give PDF again."); return; }
   w.document.write(html);
@@ -1883,6 +1814,16 @@ function DeliveryBoard({
    * nothing else.
    */
   const [shipped, setShipped] = useState<{ id: string; tag: string; on: string }[]>([]);
+  /**
+   * Delivered since 1 April, for the report's cover.
+   *
+   * From the run-rate payload rather than counted here: those totals are the
+   * ones the board's own cards show, and a report that disagreed with the
+   * screen it was printed from would be worse than one without the figure.
+   */
+  const ytd = rr
+    ? { n: rr.deliveries, sales: rr.actuals.sales, tp: rr.actuals.throughput }
+    : null;
   useEffect(() => {
     let live = true;
     api.get("/api/delivered/recent")
@@ -2255,7 +2196,7 @@ function DeliveryBoard({
             <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
               <div className="font-bold" style={{ color: "#16232F" }}>Delivery calendar <span className="text-xs font-normal" style={{ color: "#8A94A0" }}>· continuous — scroll through the months · jobs on their Target Delivery Date · ISO weeks on the left</span></div>
               <div className="flex gap-2">
-                <button onClick={() => printCalendar(byDay, V)} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#22303C", color: "#fff" }} title="Open a printable A4 landscape copy of this calendar, dated today, and go straight to Save as PDF">🖨 Give PDF</button>
+                <button onClick={() => printCalendar(byDay, V, jobs, shipped, ytd)} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#22303C", color: "#fff" }} title="Open a printable A4 landscape copy of this calendar, dated today, and go straight to Save as PDF">🖨 Give PDF</button>
                 <button onClick={scrollCalToToday} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }}>⤓ Jump to today</button>
               </div>
             </div>

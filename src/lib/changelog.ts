@@ -37,6 +37,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.8.0.2",
+    date: "2026-08-19",
+    module: "Job Delivery Board",
+    items: [
+      "Give PDF is a proper 13-page pack now, not a calendar with a blank first page. Page one is the logo, THE BRIEF, and the numbers: jobs pending, total value, total throughput, delivered so far (jobs, billed, throughput) and kitting %.",
+      "The brief is composed from the figures rather than written, so it cannot describe a book it is not printed beside. Anything that would read as a nil — no overdue jobs, no undated ones — is left out rather than printed as a zero somebody has to interpret.",
+      "Then every job by delivery date across five pages, the book by product family with a share-of-throughput bar, the kitting-against-production scatter with the kitted-not-moving band marked, and a month to a page.",
+      "Page numbers on every page — \"Page 4 of 13\" — with the report's date beside them. Chrome ignores the CSS that would number pages, so the pack is cut into explicit pages here and each is stamped. That is also what stops a table row being sliced in half by a page break.",
+      "A calendar day shows two jobs and then counts the rest — \"+15 more — see the job table\". A day with five jobs used to push its row straight through the footer.",
+      "The whole pack is built by a pure function that can be rendered and looked at without a browser session. The blank first page shipped precisely because the previous version could not be checked; this one was read page by page before it went out.",
+    ],
+  },
+  {
     v: "3.8.0.1",
     date: "2026-08-19",
     module: "Morning Update",
