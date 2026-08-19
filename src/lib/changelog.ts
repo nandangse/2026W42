@@ -37,6 +37,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.9.0.0",
+    date: "2026-08-19",
+    module: "On Floor",
+    items: [
+      "ON FLOOR — a tick box beside every job number on the Priority List, and a card counting them beside the other totals. Nothing already on a job answered \"is anybody actually working on this right now\": kitting is what was bought, production is what was built, and a job sits at 40% built for six weeks with nobody touching it.",
+      "Only Stratcom can tick it. Everyone else sees it, greyed. It is a claim about capacity, and a board where anyone can mark anything as being worked on stops meaning anything by the second week — enforced in the database as well as the screen.",
+      "It survives the morning upload. The Jobmaster load names the columns it writes, so this is left alone — which it must be, because the ERP has no such field and never will. It is also not pushed to the ERP for the same reason.",
+      "The card shows the throughput on the floor as well as the count — twelve jobs being worked on is a different sentence depending on whether they are worth ₹4 Cr or ₹40 L.",
+      "The Projects upload now says whether it found the project NAME column, every time — \"project NAME read on 51 of 51\", or plainly that no such column was in the sheet. A column matched by meaning is right until it silently matches nothing, and that is the kind of blank somebody notices three weeks later.",
+      "Needs migration 0037.",
+    ],
+  },
+  {
     v: "3.8.0.2",
     date: "2026-08-19",
     module: "Job Delivery Board",

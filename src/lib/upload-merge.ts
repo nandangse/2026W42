@@ -333,6 +333,26 @@ export async function applyUpload(
     });
     if (error) throw new UploadError("apply_projects failed: " + error.message);
     lines.push(`· ${projectCount} projects · owners/committed/expected dates blank-filled`);
+    /**
+     * Did the project NAME and CUSTOMER columns bind?
+     *
+     * They are matched by meaning rather than by one literal heading, which is
+     * right until it silently matches nothing -- and a column that quietly
+     * stays blank is exactly the kind of thing somebody notices three weeks
+     * later. So the upload says, every time, rather than leaving it to be
+     * discovered on a screen.
+     */
+    {
+      const all = Object.values(parsed.projMap!);
+      const named = all.filter((p) => (p.name || "").trim()).length;
+      const custed = all.filter((p) => (p.cust || "").trim()).length;
+      lines.push(
+        named
+          ? `· project NAME read on ${named} of ${all.length}`
+          : "· NO project name column found in this sheet — names left as they were",
+      );
+      if (custed) lines.push(`· project CUSTOMER read on ${custed} of ${all.length}`);
+    }
     if (parsed.owners && Object.keys(parsed.owners).length) {
       const { error: oe } = await admin.rpc("apply_owners", {
         p_owners: parsed.owners,

@@ -116,6 +116,19 @@ export async function requireLC(): Promise<AuthedUser> {
   return u;
 }
 
+/**
+ * Stratcom — the forward-looking figures, and the On Floor flag.
+ *
+ * The owner counts as Stratcom without being stored as one (see
+ * src/lib/groups.ts).
+ */
+export async function requireStratcom(): Promise<AuthedUser> {
+  const u = await requireUser();
+  if (!(u.isOwner || u.stratcom))
+    throw new HttpError(403, "Only Stratcom may change this.");
+  return u;
+}
+
 /** uploader or admin — the upload door. */
 export const requireUploader = () => requireRole("uploader", "admin");
 

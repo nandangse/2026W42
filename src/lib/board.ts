@@ -22,6 +22,9 @@ export interface BoardJob {
   tpv: number;
   tpp: number;
   kit: number;
+  /** Physically being worked on now. Genie's own fact — the ERP has no such field. */
+  onFloor: boolean;
+  onFloorAt: string | null;
   active: boolean;
   archived: boolean;
   /** Confirmed delivered by the Delivered Jobs report — plan is now read-only. */
@@ -76,6 +79,8 @@ function mapJob(r: any): BoardJob {
     tpv: Number(r.tpv || 0),
     tpp: Number(r.tpp || 0),
     kit: Number(r.kit || 0),
+    onFloor: !!r.on_floor,
+    onFloorAt: r.on_floor_at ?? null,
     active: !!r.active,
     archived: !r.active,
     delivered: !!r.delivered,

@@ -156,6 +156,9 @@ interface Job {
   tpv: number;
   tpp: number;
   kit: number;
+  /** Physically being worked on now — Stratcom's call, not the ERP's. */
+  onFloor?: boolean;
+  onFloorAt?: string | null;
   active: boolean;
   archived: boolean;
   updated_at: string | null;
@@ -1806,6 +1809,22 @@ function DeliveryBoard({
    */
   const rr = useRunRatePayload();
   /**
+   * On Floor — is this job actually being worked on right now?
+   *
+   * Nothing else on a job answers that. Kitting is what was bought, Production
+   * is what was built, and a job sits at 40% built for six weeks with nobody
+   * touching it. Stratcom says so; everyone else reads it.
+   */
+  const [floorBusy, setFloorBusy] = useState<string | null>(null);
+  const setOnFloor = async (j: Job, on: boolean) => {
+    setFloorBusy(j.id);
+    try {
+      await api.post("/api/on-floor", { job_id: j.id, on });
+      await reload();
+    } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+    setFloorBusy(null);
+  };
+  /**
    * What actually went out in the last 30 days, for the calendar.
    *
    * Its own endpoint rather than /api/delivered, which is the LC's: that gate
@@ -2006,6 +2025,8 @@ function DeliveryBoard({
   // ---- KPI cards ----
   const totVal = jobs.reduce((s, j) => s + j.val, 0);
   const totTp = jobs.reduce((s, j) => s + (j.tpv || 0), 0);
+  /** Counted from the SAME filtered list as every other card on this row. */
+  const onFloorJobs = jobs.filter((j) => j.onFloor);
   const matVal = jobs.reduce((s, j) => s + j.val * (1 - (j.tpp || 0) / 100), 0);
   const kitted = jobs.reduce((s, j) => s + j.val * (1 - (j.tpp || 0) / 100) * ((j.kit || 0) / 100), 0);
   const kitPct = matVal ? Math.round((kitted / matVal) * 100) : 0;
@@ -2053,6 +2074,7 @@ function DeliveryBoard({
           <span className="text-sm tnum" style={{ color: "#1B3A5C" }}>{V(totVal)}</span>
           <span className="text-sm tnum" style={{ color: "#E8600A" }}>{V(totTp)} throughput</span>
           <span className="text-sm tnum" style={{ color: "#0D9488" }}>{kitPct}% kitted</span>
+          <span className="text-sm tnum" style={{ color: "#0D7A3F" }}>{onFloorJobs.length} on floor</span>
           <button
             onClick={(e) => { e.stopPropagation(); setCardsOpen(true); }}
             className="ml-auto rounded px-2 py-0.5 text-xs font-bold"
@@ -2065,13 +2087,19 @@ function DeliveryBoard({
       )}
 
       {cardsOpen && (<>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
         <OutlookCard label="PENDING JOBS" value={jobs.length} sub={outlook ? "hide the outlook" : "open the delivery outlook"} color="#16232F"
           open={outlook} onClick={() => setOutlook((o) => !o)} />
         <Card label="TOTAL VALUE" value={V(totVal)} color="#1B3A5C" />
         <Card label="TOTAL THROUGHPUT" value={V(totTp)} sub={totVal ? Math.round((totTp / totVal) * 100) + "% of value" : ""} color="#E8600A" />
         <Card label="KITTING %" value={kitPct + "%"} sub="Σ val × (1−T%) × Kit% ÷ Σ val × (1−T%)" color="#0D9488" />
         <Card label="KITTED MATERIAL VALUE" value={V(kitted)} sub="Σ value × (1 − T%) × Kitting%" color="#7C3AED" />
+        <Card
+          label="ON FLOOR"
+          value={String(onFloorJobs.length)}
+          sub={onFloorJobs.length ? `${V(onFloorJobs.reduce((s2, j) => s2 + tpOf(j), 0))} throughput being worked on` : "nothing marked as being worked on"}
+          color={onFloorJobs.length ? "#0D7A3F" : "#8A94A0"}
+        />
       </div>
 
       {/*
@@ -2326,6 +2354,10 @@ function DeliveryBoard({
                 <tr style={{ background: "#22303C", color: "#fff" }}>
                   <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, zIndex: 3, background: "#22303C" }}>Pri</th>
                   <SortTh k="job" label="Job" />
+                  <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, zIndex: 3, background: "#22303C" }}
+                      title={showForward ? "Tick the jobs actually being worked on right now. Stratcom only." : "The jobs actually being worked on right now. Stratcom set this."}>
+                    On Floor
+                  </th>
                   <SortTh k="tag" label="Customer Tag" />
                   <SortTh k="fam" label="Product Family" />
                   <SortTh k="tdd" label="Target Delivery" align="center" />
@@ -2350,6 +2382,20 @@ function DeliveryBoard({
                   <tr key={j.id} draggable={canDrag} onDragStart={() => setDragIdx(i)} onDragOver={(e) => e.preventDefault()} onDrop={() => onDrop(i)} className="border-t" style={{ borderColor: "#EFEDE7", background: dragIdx === i ? "#FFF3E8" : i % 2 ? "#FAF9F5" : "#fff", cursor: canDrag ? "grab" : "default" }} title={j.note}>
                     <td className="px-2 py-1.5 whitespace-nowrap" style={{ color: "#8A94A0" }}>{canDrag && <span style={{ color: "#B8B5AC" }}>⠿ </span>}<b style={{ color: "#E8600A" }}>{i + 1}</b></td>
                     <td className="px-2 py-1.5"><JobLink j={j} /></td>
+                    <td className="px-2 py-1.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={!!j.onFloor}
+                        disabled={!showForward || floorBusy === j.id}
+                        onChange={(e) => setOnFloor(j, e.target.checked)}
+                        style={{ accentColor: "#0D7A3F", width: 14, height: 14, cursor: showForward ? "pointer" : "default" }}
+                        title={
+                          showForward
+                            ? j.onFloor ? "On the floor — untick when it comes off" : "Tick when work actually starts on it"
+                            : j.onFloor ? "On the floor" : "Not on the floor"
+                        }
+                      />
+                    </td>
                     <td className="px-2 py-1.5 font-medium">{j.tag}</td>
                     <td className="px-2 py-1.5" style={{ color: "#5A6672" }}>{j.fam}</td>
                     <td className="px-2 py-1.5 text-center font-bold whitespace-nowrap tnum" style={{ color: j.tdd && j.tdd < TODAY ? "#B3261E" : "#22303C" }}>{fmtFull(j.tdd)}</td>
