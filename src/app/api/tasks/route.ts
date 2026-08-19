@@ -3,6 +3,7 @@ import { requireTasker, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { notifyTaskAssignment } from "@/lib/notify";
+import { escOf } from "@/lib/deck-build";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,66 @@ export async function POST(req: Request) {
 
     if (body.action === "toggle") {
       const table = body.kind === "manual" ? "manual_tasks" : "erp_tasks";
+
+      /**
+       * CLOSING AN ESCALATED TASK COSTS A SENTENCE.
+       *
+       * Set by Dr Raghu for all three levels: what is being done so this does
+       * not happen again. The point is not the record -- it is that an
+       * escalation which is expensive to close is one people think twice about
+       * raising.
+       *
+       * Enforced here rather than only in the form, because a required field
+       * in React is a suggestion the moment anything writes around it, and
+       * this is exactly the field somebody wants to skip at six o'clock. The
+       * table's own length check is the third line of defence.
+       *
+       * Only on the way to done. Re-opening asks nothing, and a task that was
+       * never escalated is unaffected.
+       */
+      if (body.done) {
+        const { data: cur } = await supabase
+          .from(table)
+          .select("esc")
+          .eq("id", body.id)
+          .maybeSingle();
+        const level = escOf((cur as { esc?: string } | null)?.esc);
+        if (level) {
+          const note = String(body.prevention ?? "").trim();
+          if (note.length < 15)
+            return NextResponse.json(
+              {
+                error:
+                  "This task is escalated. Before it can be closed, say what is being done so it does not happen again — a sentence, not \"ok\".",
+                needsPrevention: true,
+                esc: level,
+              },
+              { status: 422 },
+            );
+          const { error: pe } = await adminClient().from("task_closeout").upsert(
+            {
+              task_id: String(body.id),
+              task_kind: body.kind === "manual" ? "manual" : "erp",
+              esc: level,
+              body: note.slice(0, 2000),
+              by: user.email,
+              at: new Date().toISOString(),
+            },
+            // Closed, re-opened, closed again keeps the latest answer rather
+            // than failing on the second close.
+            { onConflict: "task_id,task_kind" },
+          );
+          if (pe) {
+            if (/task_closeout|schema cache|does not exist/i.test(pe.message))
+              return NextResponse.json(
+                { error: "Run migration 0036 first — the close-out note has nowhere to save yet." },
+                { status: 503 },
+              );
+            throw new Error(pe.message);
+          }
+        }
+      }
+
       const { error } = await supabase
         .from(table)
         .update({ done: !!body.done })

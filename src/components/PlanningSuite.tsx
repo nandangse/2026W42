@@ -1033,8 +1033,8 @@ export default function PlanningSuite({
           task={notifTask}
           owners={assignees(board)}
           onClose={() => setNotifTask(null)}
-          onToggle={async () => {
-            await api.post("/api/tasks", { action: "toggle", id: notifTask.id, kind: notifTask.kind, done: !notifTask.done });
+          onToggle={async (prevention) => {
+            await api.post("/api/tasks", { action: "toggle", id: notifTask.id, kind: notifTask.kind, done: !notifTask.done, prevention });
             setNotifTask(null);
             await reload();
           }}
@@ -1555,7 +1555,7 @@ function MyWeek({
       </div>
 
 
-      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async (prevention) => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done, prevention }); setLightbox(null); await reload(); }} reload={reload} />}
     </div>
   );
 }
@@ -3569,7 +3569,7 @@ function JobPlan({
         </>
       )}
 
-      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async (prevention) => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done, prevention }); setLightbox(null); await reload(); }} reload={reload} />}
 
       {/* management date breach popup */}
       {dj.mgmt && ends > dj.mgmt && !warned.has(dj.id) && (
@@ -4059,7 +4059,7 @@ function Tasking({
           reload={reload}
         />
       )}
-      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async () => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async (prevention) => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done, prevention }); setLightbox(null); await reload(); }} reload={reload} />}
     </div>
   );
 }
@@ -4822,12 +4822,20 @@ function AddTaskForm({ form, setForm, owners, onSubmit, onCancel, hideActions }:
   );
 }
 
-function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = false }: { task: Task; owners?: Assignee[]; onClose: () => void; onToggle: () => void; reload: () => Promise<Board | null>; canDelete?: boolean }) {
+function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = false }: { task: Task; owners?: Assignee[]; onClose: () => void; onToggle: (prevention?: string) => Promise<void> | void; reload: () => Promise<Board | null>; canDelete?: boolean }) {
   const [comments, setComments] = useState<{ by: string; at: string; body: string }[]>([]);
   // every time this task's due date has moved
   const [dateLog, setDateLog] = useState<{ id: string; old_due: string | null; new_due: string | null; by: string | null; at: string }[]>([]);
   const [cmt, setCmt] = useState("");
   const [editing, setEditing] = useState(false);
+  /**
+   * Closing an ESCALATED task asks what stops it happening again -- every
+   * level, set by Dr Raghu. The server refuses without it and so does the
+   * table's own check; this is just the place it gets typed.
+   */
+  const [closing, setClosing] = useState(false);
+  const [prevent, setPrevent] = useState("");
+  const [closeErr, setCloseErr] = useState("");
   const [ef, setEf] = useState({ t: task.t || "", d: task.d || "", who: task.who || "", due: task.due || "", cat: task.cat || "Production", esc: task.esc || "None" });
   const isMs = String(task.id).startsWith("ms"); // milestone pseudo-card from the Job Plan kanban
   useEffect(() => {
@@ -4925,7 +4933,17 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = f
             <div className="flex items-center gap-2 mt-2 text-xs" style={{ color: "#8A94A0" }}>
               <span>{initials(task.who)}</span><span>{task.cat}</span><span className="tnum">{fmt(task.due)}</span>
               <button onClick={() => setEditing(true)} className="ml-auto rounded px-2 py-1 font-bold" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>✎ Edit</button>
-              <button onClick={onToggle} className="rounded px-2 py-1 font-bold" style={{ background: task.done ? "#E7E4DC" : "#0D7A3F", color: task.done ? "#5A6672" : "#fff" }}>{task.done ? "Reopen" : "✓ Done"}</button>
+              <button
+                onClick={() => {
+                  // Re-opening asks nothing. Only the way IN to done costs a sentence.
+                  if (!task.done && escalated(task.esc)) { setCloseErr(""); setClosing(true); return; }
+                  onToggle();
+                }}
+                className="rounded px-2 py-1 font-bold"
+                style={{ background: task.done ? "#E7E4DC" : "#0D7A3F", color: task.done ? "#5A6672" : "#fff" }}
+              >
+                {task.done ? "Reopen" : escalated(task.esc) ? "✓ Done…" : "✓ Done"}
+              </button>
               {/* Admins only. Everyone else closes it — Done keeps the comments
                   and the date history that deleting throws away. */}
               {canDelete && (
@@ -4957,6 +4975,48 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = f
                 {dateLog.length === 0 && (
                   <div className="text-xs" style={{ color: "#8A94A0" }}>Moved before Genie started recording who moved it.</div>
                 )}
+              </div>
+            )}
+            {closing && (
+              <div className="rounded p-2.5 mb-2" style={{ background: "#FBEDEA", border: "1px solid #B3261E" }}>
+                <div className="text-xs font-bold mb-1" style={{ color: "#B3261E" }}>
+                  ⚠ Closing an escalated task ({task.esc})
+                </div>
+                <div className="text-xs mb-1.5" style={{ color: "#5A6672", lineHeight: 1.5 }}>
+                  What is being done so this does not happen again? Not what was done to fix this one —
+                  what changes so the next job does not hit it.
+                </div>
+                <textarea
+                  autoFocus
+                  rows={3}
+                  value={prevent}
+                  onChange={(e) => { setPrevent(e.target.value); if (closeErr) setCloseErr(""); }}
+                  placeholder="e.g. BOM now frozen before drawings release — added as a gate on the Design milestone"
+                  className="w-full text-xs border rounded px-2 py-1"
+                  style={{ borderColor: "#D9A9A2" }}
+                />
+                {closeErr && <div className="text-xs font-bold mt-1" style={{ color: "#B3261E" }}>{closeErr}</div>}
+                <div className="flex items-center gap-2 mt-1.5">
+                  <button
+                    onClick={async () => {
+                      const note = prevent.trim();
+                      if (note.length < 15) { setCloseErr("A sentence, please — at least 15 characters."); return; }
+                      try {
+                        await onToggle(note);
+                      } catch (e) {
+                        setCloseErr(e instanceof Error ? e.message : String(e));
+                      }
+                    }}
+                    className="rounded px-3 py-1 text-xs font-bold text-white"
+                    style={{ background: "#0D7A3F" }}
+                  >
+                    ✓ Save and close the task
+                  </button>
+                  <button onClick={() => { setClosing(false); setPrevent(""); setCloseErr(""); }} className="text-xs font-semibold" style={{ color: "#8A94A0" }}>Cancel</button>
+                  <span className="text-xs ml-auto tnum" style={{ color: prevent.trim().length < 15 ? "#B3261E" : "#0D7A3F" }}>
+                    {prevent.trim().length}/15
+                  </span>
+                </div>
               </div>
             )}
             <div className="text-xs font-bold mb-1" style={{ color: "#5A6672" }}>Comments</div>

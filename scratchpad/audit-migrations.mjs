@@ -51,6 +51,8 @@ const PROBES = [
   ["0034 groups: management", "profiles", "management"],
   ["0034 project name",       "projects", "name"],
   ["0034 project customer",   "projects", "cust"],
+  ["0035 group rules fix",    "profiles", "stratcom"],
+  ["0036 escalation closeout","task_closeout", "body"],
 ];
 
 const missing = [];

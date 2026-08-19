@@ -37,6 +37,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.7.0.7",
+    date: "2026-08-19",
+    module: "Escalations",
+    items: [
+      "CLOSING AN ESCALATED TASK NOW COSTS A SENTENCE. Press Done on an L1, L2 or L3 and it asks what is being done so it does not happen again — not what was done to fix this one, what changes so the next job does not hit it. All three levels, as Dr Raghu asked: an escalation that is expensive to close is one people think twice about raising.",
+      "It is compulsory in three places, not one. The form asks, the server refuses without it, and the table itself rejects anything under fifteen characters — because a required field in React is a suggestion the moment anything writes around it, and this is the field somebody wants to skip at six o'clock.",
+      "Fifteen characters is deliberately low. It stops \"ok\" and \"done\" without turning a genuine short answer — \"added to the QC checklist\" — into a fight with the form.",
+      "Re-opening a task asks nothing. Only the way in to Done costs anything, and closing, re-opening and closing again keeps the latest answer rather than failing the second time.",
+      "The notes live in their own table, not on the task. ERP tasks are wiped and re-created by every ToDo upload, so a note stored on the row would vanish with it — and the level it was closed at is frozen alongside, since the task's own escalation can be edited afterwards.",
+      "Needs migration 0036.",
+    ],
+  },
+  {
     v: "3.7.0.6",
     date: "2026-08-19",
     module: "Job Delivery Board",
