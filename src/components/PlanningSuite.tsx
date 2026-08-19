@@ -7012,119 +7012,245 @@ function ConsultRaghu() {
 // ============================ Principles ============================
 
 /**
- * How the company is run, in Dr Raghu's words.
+ * How the company is run — Dr Raghu's thinking, organised.
  *
- * Stored rather than written into the code, because a principle that needs a
- * deploy to change never gets changed — and a list nobody has edited in a year
- * is a list nobody is using. Owner writes; everybody reads.
+ * He types it roughly, in whatever order it arrives. Genie gives it a spine:
+ * groups, a principle per thought, and a drill-down under each — why it
+ * matters, what following it looks like on THIS shop floor, how it usually
+ * gets broken, and a question to ask yourself in the moment.
  *
- * Seeded with nothing on purpose. An empty page saying "none written yet" is
- * honest; a page pre-filled with plausible management copy would put words in
- * his mouth that the whole company would read as his.
+ * BOTH ARE KEPT. The structure is a rendering and can be regenerated; the
+ * thinking cannot be recovered from the rendering, so his raw text is stored
+ * beside it and shown to him whenever he comes back to add to it.
+ *
+ * Closed by default. A wall of open text is a page people scroll past — the
+ * one-liner is what they read, and the detail is there for the day they want
+ * to argue with it.
  */
+interface PrincipleItem {
+  title: string;
+  one_liner?: string;
+  why?: string;
+  looks_like?: string[];
+  not_this?: string[];
+  ask_yourself?: string;
+}
+interface PrincipleGroup {
+  name: string;
+  icon?: string;
+  summary?: string;
+  principles?: PrincipleItem[];
+}
+interface PrincipleDoc {
+  id: string;
+  version: number;
+  raw: string;
+  created_at: string;
+  structured: { title?: string; intro?: string; groups?: PrincipleGroup[] };
+}
+
 function Principles({ isOwner }: { isOwner: boolean }) {
-  interface P { id: string; ord: number; title: string; body: string }
-  const [items, setItems] = useState<P[]>([]);
+  const [doc, setDoc] = useState<PrincipleDoc | null>(null);
   const [installed, setInstalled] = useState(true);
-  const [editing, setEditing] = useState<string | "new" | null>(null);
-  const [form, setForm] = useState({ title: "", body: "" });
+  const [open, setOpen] = useState<string | null>(null);
+  const [writing, setWriting] = useState(false);
+  const [raw, setRaw] = useState("");
+  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
   const load = useCallback(() => {
     api.get("/api/principles")
-      .then((r: { installed?: boolean; items?: P[] }) => { setInstalled(r.installed !== false); setItems(r.items || []); })
+      .then((r: { installed?: boolean; doc?: PrincipleDoc | null }) => {
+        setInstalled(r.installed !== false);
+        setDoc(r.doc ?? null);
+      })
       .catch(() => setInstalled(false));
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const save = async () => {
-    setMsg("");
+  const organise = async () => {
+    if (raw.trim().length < 20) { setMsg("Write a little more — a line or two at least."); return; }
+    setBusy(true); setMsg("");
     try {
-      await api.post("/api/principles", {
-        action: "save",
-        id: editing === "new" ? undefined : editing,
-        title: form.title,
-        body: form.body,
-        ord: editing === "new" ? items.length : items.find((i) => i.id === editing)?.ord ?? 0,
-      });
-      setEditing(null); setForm({ title: "", body: "" }); load();
+      await api.post("/api/principles", { raw });
+      setWriting(false);
+      load();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
   };
 
-  const remove = async (p: P) => {
-    if (!window.confirm(`Retire "${p.title}"?\n\nIt stops showing here. It is not deleted — how decisions were made while it was in force is part of the record.`)) return;
-    try { await api.post("/api/principles", { action: "remove", id: p.id }); load(); }
-    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
-  };
+  const S = doc?.structured || {};
+  const groups = S.groups || [];
+  const total = groups.reduce((n, g) => n + (g.principles?.length || 0), 0);
+  // A soft palette per group, so the page reads as sections rather than a list.
+  const TONE = [
+    { bg: "#FFF3E8", line: "#E8600A" },
+    { bg: "#EAF1F8", line: "#1B3A5C" },
+    { bg: "#E9F5EE", line: "#0D7A3F" },
+    { bg: "#F5EFFA", line: "#7C3AED" },
+    { bg: "#FDF3E3", line: "#D97706" },
+    { bg: "#E9F4F4", line: "#0D9488" },
+  ];
 
   return (
-    <div className="p-4" style={{ maxWidth: 860 }}>
-      <div className="flex items-baseline gap-2 mb-1 flex-wrap">
-        <h2 className="font-bold text-lg" style={{ color: "#16232F" }}>Principles</h2>
-        <span className="text-xs" style={{ color: "#8A94A0" }}>how we work — {isOwner ? "yours to write" : "written by Dr Raghu"}</span>
-      </div>
-
+    <div className="p-4" style={{ maxWidth: 1000, margin: "0 auto" }}>
       {!installed && (
         <div className="text-xs rounded p-2 mb-3" style={{ background: "#FFF7E6", color: "#8A5A00" }}>
-          Run migration 0038 — principles have nowhere to save yet.
+          Run migration 0039 — principles have nowhere to save yet.
         </div>
       )}
       {msg && <div className="text-xs font-bold rounded p-2 mb-2" style={{ background: "#FBEDEA", color: "#B3261E" }}>{msg}</div>}
 
-      {items.length === 0 && installed && (
-        <div className="text-sm rounded-lg border p-4 mb-3" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#8A94A0" }}>
-          None written yet.{isOwner ? " Add the first one below." : " Dr Raghu has not written these yet."}
+      {/* ---- the hero ---- */}
+      <div className="rounded-lg p-5 mb-4" style={{ background: "#16232F", color: "#fff" }}>
+        <div className="text-xs font-bold" style={{ letterSpacing: 2, color: "#F5B32B" }}>NANDAN GSE</div>
+        <h1 className="font-bold" style={{ fontSize: 30, margin: "4px 0 6px" }}>
+          {S.title || "Principles"}
+        </h1>
+        {S.intro ? (
+          <p style={{ color: "#9FB0C0", fontSize: 14, lineHeight: 1.6, maxWidth: "60ch", margin: 0 }}>{S.intro}</p>
+        ) : (
+          <p style={{ color: "#9FB0C0", fontSize: 14, margin: 0 }}>
+            {isOwner ? "Write the thinking below and Genie will organise it." : "Not written yet."}
+          </p>
+        )}
+        {total > 0 && (
+          <div className="flex gap-4 mt-4 flex-wrap" style={{ fontSize: 12, color: "#8FA1B3" }}>
+            <span><b style={{ color: "#fff" }}>{groups.length}</b> themes</span>
+            <span><b style={{ color: "#fff" }}>{total}</b> principles</span>
+            <span>updated {fmtFull(String(doc?.created_at || "").slice(0, 10))}</span>
+            <span style={{ opacity: .7 }}>v{doc?.version}</span>
+          </div>
+        )}
+      </div>
+
+      {/* ---- the groups ---- */}
+      {groups.map((g, gi) => {
+        const tone = TONE[gi % TONE.length];
+        return (
+          <div key={g.name + gi} className="mb-4">
+            <div className="flex items-baseline gap-2 mb-2">
+              <span style={{ fontSize: 20 }}>{g.icon || "◆"}</span>
+              <h2 className="font-bold" style={{ color: "#16232F", fontSize: 18 }}>{g.name}</h2>
+              {g.summary && <span className="text-xs" style={{ color: "#8A94A0" }}>{g.summary}</span>}
+            </div>
+
+            <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))" }}>
+              {(g.principles || []).map((p, pi) => {
+                const key = `${gi}:${pi}`;
+                const isOpen = open === key;
+                return (
+                  <div
+                    key={key}
+                    onClick={() => setOpen(isOpen ? null : key)}
+                    className="rounded-lg border"
+                    style={{
+                      borderColor: isOpen ? tone.line : "#E2E0DA",
+                      borderLeft: `4px solid ${tone.line}`,
+                      background: isOpen ? tone.bg : "#fff",
+                      cursor: "pointer",
+                      gridColumn: isOpen ? "1 / -1" : undefined,
+                      transition: "background .15s",
+                    }}
+                  >
+                    <div className="p-3">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1">
+                          <div className="font-bold text-sm" style={{ color: "#16232F" }}>{p.title}</div>
+                          {p.one_liner && (
+                            <div className="text-xs mt-0.5" style={{ color: "#5A6672", lineHeight: 1.5 }}>{p.one_liner}</div>
+                          )}
+                        </div>
+                        <span style={{ color: tone.line, fontWeight: 700, fontSize: 13 }}>{isOpen ? "−" : "+"}</span>
+                      </div>
+
+                      {isOpen && (
+                        <div className="mt-3" style={{ borderTop: `1px solid ${tone.line}33`, paddingTop: 10 }}>
+                          {p.why && (
+                            <p className="text-xs" style={{ color: "#22303C", lineHeight: 1.65, margin: "0 0 10px" }}>{p.why}</p>
+                          )}
+                          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))" }}>
+                            {!!p.looks_like?.length && (
+                              <div>
+                                <div className="text-xs font-bold mb-1" style={{ color: "#0D7A3F" }}>WHAT IT LOOKS LIKE</div>
+                                {p.looks_like.map((l, i) => (
+                                  <div key={i} className="text-xs" style={{ color: "#22303C", lineHeight: 1.6 }}>· {l}</div>
+                                ))}
+                              </div>
+                            )}
+                            {!!p.not_this?.length && (
+                              <div>
+                                <div className="text-xs font-bold mb-1" style={{ color: "#B3261E" }}>HOW IT GETS BROKEN</div>
+                                {p.not_this.map((l, i) => (
+                                  <div key={i} className="text-xs" style={{ color: "#22303C", lineHeight: 1.6 }}>· {l}</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {p.ask_yourself && (
+                            <div className="rounded mt-3 px-3 py-2 text-xs" style={{ background: "#fff", border: `1px dashed ${tone.line}`, color: "#22303C" }}>
+                              <b style={{ color: tone.line }}>Ask yourself:</b> {p.ask_yourself}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {groups.length === 0 && installed && !isOwner && (
+        <div className="text-sm rounded-lg border p-4" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#8A94A0" }}>
+          Dr Raghu has not written these yet.
         </div>
       )}
 
-      {items.map((p, i) => (
-        <div key={p.id} className="bg-white rounded-lg border p-3 mb-2" style={{ borderColor: "#E2E0DA", borderLeft: "4px solid #E8600A" }}>
-          {editing === p.id ? (
-            <>
-              <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="w-full text-sm font-bold border rounded px-2 py-1 mb-1" style={{ borderColor: "#E8600A" }} />
-              <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={3}
-                className="w-full text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
-              <div className="flex gap-2 mt-1.5">
-                <button onClick={save} className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: "#0D7A3F" }}>Save</button>
-                <button onClick={() => setEditing(null)} className="text-xs font-semibold" style={{ color: "#8A94A0" }}>Cancel</button>
+      {/* ---- the owner's door ---- */}
+      {isOwner && installed && (
+        <div className="mt-5">
+          {writing ? (
+            <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E8600A" }}>
+              <div className="font-bold text-sm mb-1">Write the thinking</div>
+              <p className="text-xs mb-2" style={{ color: "#5A6672", lineHeight: 1.6 }}>
+                However it arrives — bullets, half sentences, out of order. Genie groups it, gives each thought a
+                spine and writes the drill-down. It keeps your words and adds no principle you did not say.
+                {doc && " What is below is the last version, so you can add to it rather than start again."}
+              </p>
+              <textarea
+                autoFocus
+                rows={14}
+                value={raw}
+                onChange={(e) => setRaw(e.target.value)}
+                placeholder={"e.g.\nNever let a missing number read as zero.\nDecide at the lowest level that has the facts.\nA date once promised is the date we are judged on…"}
+                className="w-full text-sm border rounded px-2 py-2"
+                style={{ borderColor: "#E2E0DA", lineHeight: 1.6 }}
+              />
+              <div className="flex gap-2 mt-2 items-center">
+                <button onClick={organise} disabled={busy}
+                  className="rounded px-4 py-1.5 text-sm font-bold text-white"
+                  style={{ background: busy ? "#B8B5AC" : "#E8600A" }}>
+                  {busy ? "organising…" : "✨ Organise & publish"}
+                </button>
+                <button onClick={() => setWriting(false)} className="text-xs font-semibold" style={{ color: "#8A94A0" }}>Cancel</button>
+                <span className="text-xs ml-auto" style={{ color: "#8A94A0" }}>
+                  your text is saved even if the organising fails
+                </span>
               </div>
-            </>
+            </div>
           ) : (
-            <>
-              <div className="flex items-baseline gap-2">
-                <span className="font-bold tnum" style={{ color: "#E8600A" }}>{i + 1}</span>
-                <span className="font-bold text-sm" style={{ color: "#16232F" }}>{p.title}</span>
-                {isOwner && (
-                  <span className="ml-auto flex gap-1">
-                    <button onClick={() => { setEditing(p.id); setForm({ title: p.title, body: p.body }); }}
-                      className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>✎</button>
-                    <button onClick={() => remove(p)} className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: "#FBEDEA", color: "#B3261E" }}>retire</button>
-                  </span>
-                )}
-              </div>
-              {p.body && <div className="text-xs mt-1" style={{ color: "#5A6672", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{p.body}</div>}
-            </>
+            <button
+              onClick={() => { setRaw(doc?.raw || ""); setWriting(true); }}
+              className="rounded px-4 py-2 text-sm font-bold text-white"
+              style={{ background: "#E8600A" }}
+            >
+              {doc ? "✎ Add to the principles" : "✨ Write the principles"}
+            </button>
           )}
         </div>
-      ))}
-
-      {isOwner && installed && (
-        editing === "new" ? (
-          <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E8600A" }}>
-            <input autoFocus value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
-              placeholder="The principle, in a line" className="w-full text-sm font-bold border rounded px-2 py-1 mb-1" style={{ borderColor: "#E8600A" }} />
-            <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={3}
-              placeholder="Why it matters, and what it looks like when it is followed…" className="w-full text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
-            <div className="flex gap-2 mt-1.5">
-              <button onClick={save} className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: "#0D7A3F" }}>Save</button>
-              <button onClick={() => { setEditing(null); setForm({ title: "", body: "" }); }} className="text-xs font-semibold" style={{ color: "#8A94A0" }}>Cancel</button>
-            </div>
-          </div>
-        ) : (
-          <button onClick={() => { setEditing("new"); setForm({ title: "", body: "" }); }}
-            className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: "#E8600A" }}>+ Add a principle</button>
-        )
       )}
     </div>
   );

@@ -37,6 +37,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.10.0.1",
+    date: "2026-08-19",
+    module: "Principles",
+    items: [
+      "Principles rebuilt. The first version handed Dr Raghu an empty list and an \"Add a principle\" button, which is not a feature — it is homework.",
+      "It works the way he actually works now: he types the thinking roughly, in whatever order it arrives, and Genie gives it a spine — themes, a principle per thought, and a drill-down under each. Click any principle and it opens: why it matters, what following it looks like on THIS shop floor, how it usually gets broken, and a question to ask yourself in the moment.",
+      "Closed by default, one card at a time. A wall of open text is a page people scroll past; the one-liner is what gets read, and the detail is there for the day somebody wants to argue with it.",
+      "Genie is told to use his words and add nothing he did not say — no inventing a third principle to round a group out. The team would know instantly if it stopped sounding like him.",
+      "BOTH are kept: what he wrote and what Genie made of it. The structure is a rendering and can be regenerated with a better prompt or a change of mind; the thinking cannot be recovered from the rendering. His raw text comes back into the box next time, so he adds to it rather than starting again.",
+      "Versioned, never overwritten — one live set, and what the principles used to say kept behind it.",
+      "Needs migration 0039. It drops the empty table 0038 made: a table nothing reads is one somebody wires up by mistake in a year.",
+    ],
+  },
+  {
     v: "3.10.0.0",
     date: "2026-08-19",
     module: "Consult Raghu · Principles",
