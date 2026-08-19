@@ -2097,7 +2097,14 @@ function DeliveryBoard({
         <Card
           label="ON FLOOR"
           value={String(onFloorJobs.length)}
-          sub={onFloorJobs.length ? `${V(onFloorJobs.reduce((s2, j) => s2 + tpOf(j), 0))} throughput being worked on` : "nothing marked as being worked on"}
+          sub={
+            onFloorJobs.length
+              // Value AND throughput: nineteen jobs on the floor is a different
+              // sentence depending on whether they invoice ₹10 Cr or ₹1 Cr, and
+              // what the company earns on them is a third number again.
+              ? `${V(onFloorJobs.reduce((s2, j) => s2 + (j.val || 0), 0))} value · ${V(onFloorJobs.reduce((s2, j) => s2 + tpOf(j), 0))} throughput`
+              : "nothing marked as being worked on"
+          }
           color={onFloorJobs.length ? "#0D7A3F" : "#8A94A0"}
         />
       </div>

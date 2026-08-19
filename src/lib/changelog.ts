@@ -37,6 +37,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.9.0.2",
+    date: "2026-08-19",
+    module: "On Floor",
+    items: [
+      "The On Floor card carries the value as well as the throughput — 19 jobs, ₹9.39 Cr of value, ₹3.50 Cr of throughput. Nineteen jobs on the floor is a different sentence depending on whether they invoice ₹9 Cr or ₹1 Cr, and what the company earns on them is a third number again.",
+    ],
+  },
+  {
     v: "3.9.0.1",
     date: "2026-08-19",
     module: "Morning Update",
