@@ -1741,6 +1741,21 @@ function DeliveryBoard({
    */
   const rr = useRunRatePayload();
   const [subTab, setSubTab] = useState<"priority" | "okan" | "cal" | "fam" | "cust">("priority");
+  /**
+   * The figures above the tabs: open on the Priority List, folded away on the
+   * rest.
+   *
+   * They are the header for the priority list -- that view is the whole book,
+   * and the totals are its totals. On the calendar or a product schedule they
+   * are half a screen of the same numbers pushing the thing you actually came
+   * to look at below the fold.
+   *
+   * Following the tab rather than being remembered per person: the right
+   * default is a property of the view, not of the reader. Anyone can open it
+   * anywhere, and it stays open until they move to another tab.
+   */
+  const [cardsOpen, setCardsOpen] = useState(true);
+  useEffect(() => { setCardsOpen(subTab === "priority"); }, [subTab]);
   const [outlook, setOutlook] = useState(false);
   const [delOwn, setDelOwn] = useState("all");
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -1934,6 +1949,30 @@ function DeliveryBoard({
 
   return (
     <div className="p-4">
+      {!cardsOpen && (
+        <div
+          className="bg-white rounded-lg border px-3 py-1.5 mb-3 flex items-center gap-3 flex-wrap"
+          style={{ borderColor: "#E2E0DA", cursor: "pointer" }}
+          onClick={() => setCardsOpen(true)}
+          title="Show the totals and the run rate"
+        >
+          <span className="text-xs font-bold" style={{ color: "#8A94A0" }}>THE BOOK</span>
+          <span className="text-sm font-bold tnum" style={{ color: "#16232F" }}>{jobs.length} jobs</span>
+          <span className="text-sm tnum" style={{ color: "#1B3A5C" }}>{V(totVal)}</span>
+          <span className="text-sm tnum" style={{ color: "#E8600A" }}>{V(totTp)} throughput</span>
+          <span className="text-sm tnum" style={{ color: "#0D9488" }}>{kitPct}% kitted</span>
+          <button
+            onClick={(e) => { e.stopPropagation(); setCardsOpen(true); }}
+            className="ml-auto rounded px-2 py-0.5 text-xs font-bold"
+            style={{ background: "#F4F2EC", color: "#5A6672" }}
+            title="Show the totals and the run rate"
+          >
+            ⌄ Show totals
+          </button>
+        </div>
+      )}
+
+      {cardsOpen && (<>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
         <OutlookCard label="PENDING JOBS" value={jobs.length} sub={outlook ? "hide the outlook" : "open the delivery outlook"} color="#16232F"
           open={outlook} onClick={() => setOutlook((o) => !o)} />
@@ -1984,6 +2023,20 @@ function DeliveryBoard({
           two are deliberately adjacent: what is left to bill only means
           something beside what is left to build. */}
       <RunRate V={V} />
+
+      {/* Collapsing is offered everywhere, including the Priority List --
+          somebody who knows the totals should be able to put them away. */}
+      <div className="flex justify-end -mt-1 mb-2">
+        <button
+          onClick={() => setCardsOpen(false)}
+          className="rounded px-2 py-0.5 text-xs font-bold"
+          style={{ background: "#F4F2EC", color: "#5A6672" }}
+          title="Fold the totals away"
+        >
+          ⌃ Hide totals
+        </button>
+      </div>
+      </>)}
 
       <div className="flex gap-1 rounded p-1 bg-white border mb-3 flex-wrap" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
         <SubBtn k="priority" l="Priority List (A60 → O)" />

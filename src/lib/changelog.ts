@@ -37,6 +37,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.7.0.6",
+    date: "2026-08-19",
+    module: "Job Delivery Board",
+    items: [
+      "The totals and the run rate stay open on the Priority List and fold away on every other tab. They are the header for the priority list — that view IS the whole book, and those are its totals. On the calendar or a product schedule they were half a screen of the same numbers pushing the thing you came to look at below the fold.",
+      "Folded, they leave one line — jobs, value, throughput, kitting % — with a Show totals button on the right. Clicking anywhere on the line opens it too. A collapsed panel that hides its own figures entirely just gets opened again every time.",
+      "Hide totals is offered on the Priority List as well. Somebody who already knows the numbers should be able to put them away.",
+      "It follows the tab rather than being remembered per person: the right default is a property of the view, not of the reader. Open it anywhere you like and it stays open until you move tabs.",
+    ],
+  },
+  {
     v: "3.7.0.5",
     date: "2026-08-19",
     module: "Job Delivery Board",
