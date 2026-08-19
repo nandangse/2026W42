@@ -14,7 +14,10 @@ export async function GET() {
     const [listRes, unreadRes] = await Promise.all([
       db
         .from("notifications")
-        .select("id, kind, title, body, created_by, read_at, created_at")
+        // ref_kind/ref_id have been on the row since 0012 and were never sent
+        // to the client, which is why the bell could only ever be read and not
+        // followed. They are what makes a notification a link to the thing.
+        .select("id, kind, title, body, ref_kind, ref_id, created_by, read_at, created_at")
         .order("created_at", { ascending: false })
         .limit(20),
       db.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),

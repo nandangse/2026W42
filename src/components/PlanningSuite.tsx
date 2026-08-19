@@ -457,9 +457,18 @@ export default function PlanningSuite({
   useEffect(() => { loadAppSettings(); }, [loadAppSettings]);
 
   // ---- notification bell: new assignments land here, polled once a minute ----
-  interface Notif { id: string; kind: string; title: string; body: string; created_by: string | null; read_at: string | null; created_at: string }
+  interface Notif {
+    id: string; kind: string; title: string; body: string;
+    /** 'manual' | 'erp' | 'goal' — what ref_id points at. */
+    ref_kind: string | null; ref_id: string | null;
+    created_by: string | null; read_at: string | null; created_at: string;
+  }
   const [notifs, setNotifs] = useState<{ installed: boolean; items: Notif[]; unread: number } | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
+  /** The task a notification was followed to, shown in the lightbox. */
+  const [notifTask, setNotifTask] = useState<Task | null>(null);
+  /** Set when a notification points at a task that is no longer there. */
+  const [notifGone, setNotifGone] = useState<string | null>(null);
   const loadNotifs = useCallback(() => {
     api.get("/api/notifications").then(setNotifs).catch(() => {});
   }, []);
@@ -473,6 +482,41 @@ export default function PlanningSuite({
   };
   const markRead = async (id: string) => {
     try { await api.post("/api/notifications", { action: "read", ids: [id] }); loadNotifs(); } catch { /* ditto */ }
+  };
+
+  /**
+   * Follow a notification to the thing it is about.
+   *
+   * A notification that can only be marked read makes you go and find the task
+   * yourself, which is the moment most of them get ignored. Reading it and
+   * opening it are the same click now.
+   *
+   * Opens the task in VIEW mode -- the modal's own default. Somebody arriving
+   * from a bell is finding out what they have been given, not editing it; the
+   * Edit button is right there once they have read it.
+   */
+  const openNotif = async (n: Notif) => {
+    if (!n.read_at) markRead(n.id);
+    setNotifOpen(false);
+    // A goal assignment is not a task and has no task lightbox to open.
+    if (n.ref_kind === "goal") { if (goalsAccess) setWorkspace("goals"); return; }
+    if (!n.ref_id) return;
+    const find = (rows: Task[]) => rows.find((x) => x.id === n.ref_id && x.kind === n.ref_kind);
+
+    const known = find(board?.tasks || []);
+    if (known) { setNotifTask(known); return; }
+
+    // Not in the board we are holding. That is the NORMAL case for a fresh
+    // notification: the bell polls every minute and the board does not, so a
+    // task assigned two minutes ago is on the bell before it is on the board.
+    // Fetch once before saying it is gone -- "that task is no longer here" for
+    // a task created moments earlier would be the worst possible answer.
+    try {
+      const fresh = (await api.get("/api/board")) as Board;
+      const t = find(fresh?.tasks || []);
+      if (t) { setNotifTask(t); setBoard(fresh); return; }
+    } catch { /* fall through to the honest answer */ }
+    setNotifGone(n.title);
   };
 
   // Opening a job's plan can be triggered from Tasking or Goals, both of which
@@ -690,24 +734,38 @@ export default function PlanningSuite({
                       {notifs.items.length === 0 && (
                         <div className="text-xs text-center py-6" style={{ color: "#8A94A0" }}>Nothing yet — you&apos;ll hear when a task is assigned to you.</div>
                       )}
-                      {notifs.items.map((n) => (
-                        <div
-                          key={n.id}
-                          onClick={() => { if (!n.read_at) markRead(n.id); }}
-                          className="px-3 py-2 cursor-pointer"
-                          style={{ borderBottom: "1px solid #F4F2EC", background: n.read_at ? "#fff" : "#FFF7E6" }}
-                          title={n.read_at ? undefined : "Click to mark read"}
-                        >
-                          <div className="flex items-start gap-2">
-                            {!n.read_at && <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: "#E8600A", marginTop: 5 }} />}
-                            <div className="min-w-0">
-                              <div className="text-xs font-bold" style={{ color: "#16232F" }}>{n.title}</div>
-                              {n.body && <div className="text-xs truncate" style={{ color: "#5A6672" }}>{n.body}</div>}
-                              <div className="tnum" style={{ fontSize: 10, color: "#8A94A0" }}>{stamp(n.created_at)}</div>
+                      {notifs.items.map((n) => {
+                        // Which job this is about, resolved through the task it
+                        // points at. The notification stores no job of its own,
+                        // and deriving it beats copying it: a job retagged after
+                        // the notification was written still reads correctly.
+                        const nt = n.ref_id ? (board?.tasks || []).find((x) => x.id === n.ref_id && x.kind === n.ref_kind) : undefined;
+                        const nj = nt ? (board?.jobs || []).find((j) => j.id === nt.j) : undefined;
+                        return (
+                          <div
+                            key={n.id}
+                            onClick={() => openNotif(n)}
+                            className="px-3 py-2 cursor-pointer"
+                            style={{ borderBottom: "1px solid #F4F2EC", background: n.read_at ? "#fff" : "#FFF7E6" }}
+                            title={n.ref_kind === "goal" ? "Open Goals" : "Open the task"}
+                          >
+                            <div className="flex items-start gap-2">
+                              {!n.read_at && <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: "#E8600A", marginTop: 5 }} />}
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs font-bold" style={{ color: "#16232F" }}>{n.title}</div>
+                                {n.body && <div className="text-xs truncate" style={{ color: "#5A6672" }}>{n.body}</div>}
+                                {nj && (
+                                  <div className="text-xs truncate" style={{ color: "#1B3A5C", fontWeight: 600 }} title={nj.tag || undefined}>
+                                    JOB {jobNo(nj.id)}{nj.tag ? ` · ${nj.tag}` : ""}
+                                  </div>
+                                )}
+                                <div className="tnum" style={{ fontSize: 10, color: "#8A94A0" }}>{stamp(n.created_at)}</div>
+                              </div>
+                              <span className="flex-shrink-0" style={{ color: "#B8B5AC", fontSize: 12, marginTop: 2 }}>›</span>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -945,6 +1003,34 @@ export default function PlanningSuite({
         <ProfileModal me={{ email, initials, displayName, erpOwner, role }} onClose={() => setProfileOpen(false)} onChangePassword={() => { setProfileOpen(false); setPwOpen(true); }} />
       )}
       {pwOpen && <ChangePasswordModal email={email} onClose={() => setPwOpen(false)} />}
+
+      {/* Followed from the bell. Lives at the top level because the bell does:
+          every other TaskModal belongs to the board that owns the card. */}
+      {notifTask && (
+        <TaskModal
+          task={notifTask}
+          owners={assignees(board)}
+          onClose={() => setNotifTask(null)}
+          onToggle={async () => {
+            await api.post("/api/tasks", { action: "toggle", id: notifTask.id, kind: notifTask.kind, done: !notifTask.done });
+            setNotifTask(null);
+            await reload();
+          }}
+          reload={reload}
+        />
+      )}
+      {notifGone && (
+        <div onClick={() => setNotifGone(null)} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)", zIndex: 61 }}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg p-4 w-full max-w-sm">
+            <div className="font-bold text-sm mb-1">That task is no longer here</div>
+            <div className="text-xs" style={{ color: "#5A6672", lineHeight: 1.6 }}>
+              <b>{notifGone}</b> — the task it points at has been deleted, or it came from the ERP ToDo
+              list and was closed there. The notification stays so you know it happened.
+            </div>
+            <button onClick={() => setNotifGone(null)} className="mt-3 rounded px-3 py-1.5 text-xs font-bold text-white" style={{ background: "#22303C" }}>Close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

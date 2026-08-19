@@ -37,6 +37,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.7.0.1",
+    date: "2026-08-19",
+    module: "Notifications",
+    items: [
+      "The bell is clickable. Clicking a notification marks it read AND opens the task in the lightbox, in view mode — reading it and finding it are the same click now. Before, it could only be marked read, and you still had to go and hunt the task down, which is the moment most of them were ignored.",
+      "Each notification shows the JOB NUMBER and the customer tag on their own line. The job is looked up through the task rather than copied onto the notification, so a job retagged after the notification was written still reads correctly.",
+      "It opens in view mode on purpose. Someone arriving from the bell is finding out what they have been given, not editing it — Edit is one button away once they have read it.",
+      "A notification for a goal opens Goals instead. A notification whose task has since been deleted, or closed in the ERP, says so plainly — it no longer just fails to do anything and looks broken.",
+      "The task list is re-fetched before that message is shown. A task assigned two minutes ago is on the bell before it is on the board, and \"that task is no longer here\" for something created moments earlier would have been the worst possible answer.",
+    ],
+  },
+  {
     v: "3.7.0.0",
     date: "2026-08-19",
     module: "Groups — LC, Stratcom, Management",
