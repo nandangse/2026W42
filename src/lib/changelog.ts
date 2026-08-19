@@ -37,6 +37,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.9.0.1",
+    date: "2026-08-19",
+    module: "Morning Update",
+    items: [
+      "Every uploaded file is now kept in Google Drive, in a folder you can open: FY2026-27 / 01 Jobmaster / 2026-08 / \"2026-08-19 1801 · Jobmaster - Planning Reporting (8).xlsx\". Financial year first because that is what the business closes on, kind next because that is what you are looking for, month last so no folder ever holds more than about thirty files.",
+      "The timestamp leads the filename so Drive's own sort is chronological — and so uploading the same export twice in a day cannot overwrite the first one.",
+      "NOTHING is stored in the database. Genie has never kept an uploaded file and still does not: the sheet is parsed, the rows are written, the bytes go to Drive and nowhere else. import_batches keeps only the filename, who loaded it and when — a few small rows a day.",
+      "Filing a copy can never fail an upload. By the time it runs the rows are in and the boards have moved, so a failure is a line on the summary rather than an error — telling somebody their upload failed when it did not is how an upload gets repeated.",
+      "Needs a Google service account and a shared folder. Until those exist nothing changes and nothing breaks; the archive simply does not run.",
+    ],
+  },
+  {
     v: "3.9.0.0",
     date: "2026-08-19",
     module: "On Floor",
