@@ -15,20 +15,62 @@ const raw = readFileSync(file, "utf8");
 const bad = [...raw].filter((c) => c.charCodeAt(0) > 127);
 if (bad.length) console.error(`WARNING: ${bad.length} non-ASCII character(s): ${[...new Set(bad)].join(" ")}\n`);
 
-// strip -- comments and blank lines, keeping string literals intact
-const cleaned = raw
-  .split("\n")
-  .map((l) => {
-    let out = "", q = null;
-    for (let i = 0; i < l.length; i++) {
-      const c = l[i];
-      if (q) { out += c; if (c === q) q = null; continue; }
-      if (c === "'" || c === '"') { q = c; out += c; continue; }
-      if (c === "-" && l[i + 1] === "-") break;
-      out += c;
+/**
+ * Strip comments, keeping string literals and dollar-quoted bodies intact.
+ *
+ * ONE PASS, not a line filter. The line-by-line version knew about `--` and
+ * about quotes but nothing about block comments -- so a `--` written INSIDE a
+ * /* ... *\/ comment ended the line early and took the closing delimiter with
+ * it, handing Postgres an unterminated comment. That is not a hypothetical: it
+ * is how migration 0038 failed to paste.
+ *
+ * Dollar-quoted bodies are copied verbatim. A plpgsql function may legitimately
+ * contain anything at all, and "cleaning" inside one would corrupt it.
+ */
+function stripComments(src) {
+  let out = "";
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i], two = src.slice(i, i + 2);
+
+    // dollar-quote: copy through to the matching tag, untouched
+    const dq = /^\$[A-Za-z_]*\$/.exec(src.slice(i));
+    if (dq) {
+      const tag = dq[0];
+      const end = src.indexOf(tag, i + tag.length);
+      const stop = end === -1 ? src.length : end + tag.length;
+      out += src.slice(i, stop);
+      i = stop - 1;
+      continue;
     }
-    return out.replace(/\s+$/, "");
-  })
+
+    if (c === "'" || c === '"') {
+      const q = c;
+      let j = i + 1;
+      // '' inside a literal is an escaped quote, not the end of it
+      while (j < src.length) {
+        if (src[j] === q && src[j + 1] === q) { j += 2; continue; }
+        if (src[j] === q) break;
+        j++;
+      }
+      out += src.slice(i, j + 1);
+      i = j;
+      continue;
+    }
+
+    if (two === "--") { while (i < src.length && src[i] !== "\n") i++; out += "\n"; continue; }
+    if (two === "/*") {
+      const end = src.indexOf("*/", i + 2);
+      i = (end === -1 ? src.length : end + 1);
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}
+
+const cleaned = stripComments(raw)
+  .split("\n")
+  .map((l) => l.replace(/\s+$/, ""))
   .filter((l) => l.trim())
   .join("\n");
 
