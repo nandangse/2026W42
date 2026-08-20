@@ -37,6 +37,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.11.1.1",
+    date: "2026-08-20",
+    module: "Pending Material",
+    items: [
+      "The pencil opens the material line itself — the same box the job page uses, with the qty, the receivable date, who is chasing it, the update, Raise a task and the comments. It used to open the job's board and leave you to find the line again.",
+      "It is the SAME box, not a second one built for this page. Two edit forms over one row is two places for the rules about status, the task mirror and who is chasing it to drift apart.",
+      "The job number is a link now — click it to open that job's board. It read like a label and behaved like one, which on a page listing sixty lines across forty jobs is the click people reached for first.",
+    ],
+  },
+  {
     v: "3.11.1.0",
     date: "2026-08-20",
     module: "Job Plan",

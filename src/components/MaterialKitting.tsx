@@ -169,7 +169,14 @@ export default function MaterialKitting({
 }
 
 // ===========================================================================
-function MatBox({
+/**
+ * The line's own box: edit it, raise a task on it, argue about it in comments.
+ *
+ * Exported because Pending Material opens the SAME box rather than growing its
+ * own. Two edit forms over one row is two places for the rules about status,
+ * the task mirror and who is chasing it to drift apart.
+ */
+export function MatBox({
   jobId, mat, canEdit, people, onClose, onChanged,
 }: {
   jobId: string; mat: Mat; canEdit: boolean; people: { value: string; label: string }[];

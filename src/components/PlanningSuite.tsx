@@ -45,7 +45,7 @@ import SalesGenie from "./SalesGenie";
 import DeliveryOutlook from "./DeliveryOutlook";
 import LMS from "./LMS";
 import JobsInProgress, { type WipJob } from "./JobsInProgress";
-import MaterialKitting from "./MaterialKitting";
+import MaterialKitting, { MatBox, type Mat } from "./MaterialKitting";
 import { useMyWeek, HowsMyDay, ImageQuote, Birthdays, MyLearningCard } from "./MyWeekPanels";
 import { hhmm } from "@/lib/lms";
 
@@ -6521,6 +6521,8 @@ function PendingMaterial({
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  /** The line whose own box is open. Same box the job page uses. */
+  const [picked, setPicked] = useState<{ jobId: string; mat: Mat } | null>(null);
 
   const jobById = useMemo(() => new Map(board.jobs.map((j) => [j.id, j])), [board.jobs]);
 
@@ -6620,7 +6622,14 @@ function PendingMaterial({
               return (
                 <tr key={m.id} className="border-t align-top" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   <td className="px-2 py-1.5 whitespace-nowrap">
-                    <span className="font-bold" style={{ color: "#1B3A5C" }}>{jobNo(job.id)}</span>
+                    <button
+                      onClick={() => onOpen(job.id)}
+                      className="font-bold"
+                      style={{ color: "#1B3A5C", textDecoration: "underline" }}
+                      title="Open this job's board"
+                    >
+                      {jobNo(job.id)}
+                    </button>
                     <div className="truncate" style={{ color: "#8A94A0", maxWidth: 190 }} title={job.tag}>{job.tag}</div>
                   </td>
                   <td className="px-2 py-1.5 text-center whitespace-nowrap font-bold" style={{ color: job.tdd && job.tdd < TODAY ? "#B3261E" : "#22303C" }}>{fmtFull(job.tdd)}</td>
@@ -6683,10 +6692,10 @@ function PendingMaterial({
                   </td>
                   <td className="px-2 py-1.5 text-center">
                     <button
-                      onClick={() => onOpen(job.id)}
+                      onClick={() => setPicked({ jobId: job.id, mat: m })}
                       className="rounded px-2 py-0.5 font-bold"
                       style={{ background: "#DCE8F5", color: "#1B3A5C" }}
-                      title="Open this job's plan, where its full material list lives"
+                      title="Open this material line — edit it, raise a task, read the comments"
                     >
                       ✎
                     </button>
@@ -6697,6 +6706,17 @@ function PendingMaterial({
           </tbody>
         </table>
       </div>
+
+      {picked && (
+        <MatBox
+          jobId={picked.jobId}
+          mat={picked.mat}
+          canEdit={canEdit}
+          people={assignees(board).map((a) => ({ value: a.value, label: a.label }))}
+          onClose={() => setPicked(null)}
+          onChanged={reload}
+        />
+      )}
     </div>
   );
 }
