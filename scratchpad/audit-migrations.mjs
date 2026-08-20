@@ -59,6 +59,7 @@ const PROBES = [
   ["0040 voice notes",        "job_voice_note", "transcript"],
   ["0041 principle files",    "principle_file", "path"],
   ["0042 job photos",         "job_photo", "taken_on"],
+  ["0043 floor summary",      "jobs", "floor_summary"],
 ];
 
 const missing = [];

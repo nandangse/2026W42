@@ -28,3 +28,51 @@ input[type="date"] {
 .tnum {
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------------------------------------------------------------------------
+   On Floor, on a phone.
+
+   This page is read standing at a machine far more often than at a desk, so
+   the narrow layout is the real one. The row is four columns side by side on a
+   laptop; below 720px every column takes the full width instead of being
+   squeezed to nothing, and the three "open on it" buttons go across rather
+   than stacking into three screens of very little.
+
+   Everything here is scoped to .floor-* so it cannot reach another board.
+--------------------------------------------------------------------------- */
+@media (max-width: 720px) {
+  .floor-row {
+    gap: 12px !important;
+  }
+  .floor-cell {
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+  }
+  /* side by side, so the notes are not three scrolls down */
+  .floor-btns {
+    flex-direction: row !important;
+    flex-wrap: wrap;
+  }
+  .floor-btns > button {
+    flex: 1 1 30%;
+    text-align: center !important;
+  }
+  /* the player is the widest fixed thing on the row */
+  .floor-cell audio {
+    width: 100%;
+    max-width: 100% !important;
+  }
+}
+
+/* A phone keyboard zooms the page in on any input under 16px. Every board in
+   Genie uses small type on purpose, so the size is pinned only where a tap
+   would otherwise re-scale the whole page. */
+@media (max-width: 720px) {
+  input[type="text"],
+  input[type="date"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}

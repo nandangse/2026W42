@@ -27,6 +27,9 @@ export interface BoardJob {
   onFloorAt: string | null;
   /** Who owns QUALITY. jobs.own owns the date; this is a different question. */
   qualityOwner: string | null;
+  /** Genie's read of the last three voice notes, rewritten when one is added. */
+  floorSummary: string | null;
+  floorSummaryAt: string | null;
   active: boolean;
   archived: boolean;
   /** Confirmed delivered by the Delivered Jobs report — plan is now read-only. */
@@ -84,6 +87,8 @@ function mapJob(r: any): BoardJob {
     onFloor: !!r.on_floor,
     onFloorAt: r.on_floor_at ?? null,
     qualityOwner: r.quality_owner ?? null,
+    floorSummary: r.floor_summary ?? null,
+    floorSummaryAt: r.floor_summary_at ?? null,
     active: !!r.active,
     archived: !r.active,
     delivered: !!r.delivered,

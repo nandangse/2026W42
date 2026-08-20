@@ -5,8 +5,16 @@ import { adminClient } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** The last three are what is happening now. Older ones are noise. */
-const KEEP = 3;
+/**
+ * How many notes Genie reads to write the summary, and how many the page shows
+ * before it offers the rest.
+ *
+ * NOTHING IS DELETED. An earlier version dropped everything past the newest
+ * three, which is wrong for a record of what was said about a customer's job:
+ * the whole point of keeping the audio is that somebody can go back to it.
+ * They are all kept and all auditable; three is simply what is in front of you.
+ */
+const RECENT = 3;
 const BUCKET = "voice-notes";
 /** Signed links, not public URLs — these are people talking about customers. */
 const LINK_TTL = 60 * 60;
@@ -129,24 +137,57 @@ export async function POST(req: Request) {
     }
 
     /**
-     * Keep the latest three. Enforced here rather than by a trigger because
-     * this is also where the orphaned audio has to be removed — a row deleted
-     * without its object leaves the bucket growing forever with files nothing
-     * references.
+     * Genie's read of the last three, written now rather than on every page
+     * load — one call when something changes, instead of one per job per
+     * reader per visit.
+     *
+     * Three separate accounts of one job is not a position. This is.
      */
-    const { data: all } = await admin
-      .from("job_voice_note")
-      .select("id, audio_path")
-      .eq("job_id", jobId)
-      .order("at", { ascending: false });
-    const stale = (all || []).slice(KEEP);
-    if (stale.length) {
-      const paths = stale.map((s) => s.audio_path).filter(Boolean) as string[];
-      if (paths.length) await admin.storage.from(BUCKET).remove(paths);
-      await admin.from("job_voice_note").delete().in("id", stale.map((s) => s.id));
+    let floor: string | null = null;
+    if (key) {
+      try {
+        const { data: recent } = await admin
+          .from("job_voice_note")
+          .select("transcript, summary, by, at")
+          .eq("job_id", jobId)
+          .order("at", { ascending: false })
+          .limit(RECENT);
+        const said = (recent || [])
+          .reverse()
+          .map((n, i) => `(${i + 1}) ${String(n.at).slice(0, 16).replace("T", " ")} — ${n.transcript || n.summary}`)
+          .join("\n");
+        if (said.trim()) {
+          const r = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+            body: JSON.stringify({
+              model: "claude-sonnet-4-5-20250929",
+              max_tokens: 300,
+              system:
+                "You are Genie, reading voice notes left at the machine on a shop floor at Nandan GSE.\n\n" +
+                "Write the CURRENT POSITION on this job in two or three sentences, from the notes below in time order.\n\n" +
+                "- The latest note wins where they disagree — say what changed rather than reporting both.\n" +
+                "- Lead with the blocker if there is one, and name what is needed and from whom.\n" +
+                "- Only what was said. No advice, no encouragement, nothing invented.\n" +
+                "- Plain English, short sentences. No 'the speaker states'.",
+              messages: [{ role: "user", content: said }],
+            }),
+          });
+          const jr = await r.json();
+          const t = (jr.content || []).filter((c: { type: string }) => c.type === "text").map((c: { text: string }) => c.text).join("").trim();
+          if (t) floor = t.slice(0, 1200);
+        }
+      } catch { /* the notes matter more than the paragraph over them */ }
+    }
+    if (floor) {
+      // A missing column means 0043 has not run. The notes are already saved.
+      await admin.from("jobs")
+        .update({ floor_summary: floor, floor_summary_at: new Date().toISOString() })
+        .eq("id", jobId)
+        .then(undefined, () => undefined);
     }
 
-    return NextResponse.json({ ok: true, summary, dropped: stale.length });
+    return NextResponse.json({ ok: true, summary, floor });
   } catch (e) {
     return errJson(e);
   }

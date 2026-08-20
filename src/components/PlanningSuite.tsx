@@ -160,6 +160,8 @@ interface Job {
   onFloor?: boolean;
   onFloorAt?: string | null;
   qualityOwner?: string | null;
+  floorSummary?: string | null;
+  floorSummaryAt?: string | null;
   active: boolean;
   archived: boolean;
   updated_at: string | null;
@@ -7428,9 +7430,12 @@ function OnFloor({
           const mine = byJob.get(j.id) || [];
           return (
             <div key={j.id} className="bg-white rounded-lg border" style={{ borderColor: "#E2E0DA", borderLeft: `4px solid ${delay && delay > 0 ? "#B3261E" : "#0D7A3F"}` }}>
-              <div className="flex flex-wrap gap-3 p-3">
+              {/* Stacks on a phone. This page is read at the machine far more
+                  often than at a desk, so the narrow layout is the real one:
+                  every column goes full width rather than being squeezed. */}
+              <div className="flex flex-wrap gap-3 p-3 floor-row">
                 {/* who and what */}
-                <div style={{ flex: "1 1 260px", minWidth: 240 }}>
+                <div className="floor-cell" style={{ flex: "1 1 260px", minWidth: 0 }}>
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <button onClick={() => setPicked(j)} className="font-bold" style={{ color: "#1B3A5C", textDecoration: "underline" }} title="Open this job">{jobNo(j.id)}</button>
                     <span className="text-xs" style={{ color: "#8A94A0" }}>{j.fam}</span>
@@ -7452,7 +7457,7 @@ function OnFloor({
                 </div>
 
                 {/* owners */}
-                <div style={{ flex: "0 0 210px" }}>
+                <div className="floor-cell" style={{ flex: "0 0 210px" }}>
                   <div className="text-xs font-bold mb-1" style={{ color: "#8A94A0" }}>OWNERS</div>
                   <div className="text-xs mb-1">
                     <span style={{ color: "#8A94A0" }}>Job </span>
@@ -7479,12 +7484,12 @@ function OnFloor({
                 </div>
 
                 {/* what is open on it */}
-                <div style={{ flex: "0 0 150px" }}>
+                <div className="floor-cell floor-work" style={{ flex: "0 0 150px" }}>
                   <div className="text-xs font-bold mb-1" style={{ color: "#8A94A0" }}>OPEN ON IT</div>
                   {(() => {
                     const w = workByJob.get(j.id) || { tasks: [], esc: [] };
                     return (
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-1 floor-btns">
                         <button
                           onClick={() => w.tasks.length && setWork({ job: j, only: "tasks" })}
                           disabled={!w.tasks.length}
@@ -7517,8 +7522,9 @@ function OnFloor({
                 </div>
 
                 {/* the floor's own words */}
-                <div style={{ flex: "2 1 340px", minWidth: 300 }}>
-                  <VoiceNotes jobId={j.id} notes={mine} installed={installed} onSaved={load} />
+                <div className="floor-cell" style={{ flex: "2 1 340px", minWidth: 0 }}>
+                  <VoiceNotes jobId={j.id} notes={mine} installed={installed} onSaved={load}
+                    floor={j.floorSummary} floorAt={j.floorSummaryAt} />
                 </div>
               </div>
             </div>
@@ -7676,12 +7682,20 @@ function VoiceNotes({
   notes,
   installed,
   onSaved,
+  floor,
+  floorAt,
 }: {
   jobId: string;
   notes: { id: string; url: string | null; seconds: number | null; transcript: string; summary: string; by: string | null; at: string }[];
   installed: boolean;
   onSaved: () => void;
+  /** Genie's read of the last three. Written when a note is recorded. */
+  floor?: string | null;
+  floorAt?: string | null;
 }) {
+  /** Three in front of you; the rest a click away, never deleted. */
+  const RECENT = 3;
+  const [showAll, setShowAll] = useState(false);
   const [rec, setRec] = useState(false);
   const [live, setLive] = useState("");
   const [busy, setBusy] = useState(false);
@@ -7785,8 +7799,27 @@ function VoiceNotes({
             </button>
           )
         )}
-        <span className="text-xs ml-auto" style={{ color: "#B8B5AC" }}>{notes.length}/3</span>
+        <span className="text-xs ml-auto" style={{ color: "#B8B5AC" }}>
+          {notes.length} note{notes.length === 1 ? "" : "s"}
+        </span>
       </div>
+
+      {/* Genie's read of the last three. Three separate accounts of one job is
+          not a position; this is. The recordings stay underneath for anyone
+          who wants to hear it said. */}
+      {floor && (
+        <div className="rounded p-2 mb-1.5" style={{ background: "#F3EEFB", border: "1px solid #C9B6EA" }}>
+          <div className="text-xs font-bold" style={{ color: "#7C3AED", letterSpacing: .6 }}>
+            ✨ GENIE — WHERE THIS STANDS
+          </div>
+          <div className="text-xs mt-0.5" style={{ color: "#22303C", lineHeight: 1.55 }}>{floor}</div>
+          {floorAt && (
+            <div style={{ fontSize: 10, color: "#8A94A0", marginTop: 3 }}>
+              from the last {Math.min(notes.length, RECENT)} note{Math.min(notes.length, RECENT) === 1 ? "" : "s"} · {new Date(floorAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+            </div>
+          )}
+        </div>
+      )}
 
       {rec && (
         <div className="rounded p-2 mb-1 text-xs" style={{ background: "#FBEDEA", border: "1px solid #B3261E", color: "#22303C" }}>
@@ -7799,7 +7832,7 @@ function VoiceNotes({
         <div className="text-xs" style={{ color: "#B8B5AC" }}>Nothing recorded on this job yet.</div>
       )}
 
-      {notes.map((n) => (
+      {(showAll ? notes : notes.slice(0, RECENT)).map((n) => (
         <div key={n.id} className="rounded mb-1 px-2 py-1.5" style={{ background: "#F4F2EC", border: "1px solid #E2E0DA" }}>
           <div className="text-xs" style={{ color: "#22303C", lineHeight: 1.5 }}>{n.summary || n.transcript || "(no words captured)"}</div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -7819,6 +7852,16 @@ function VoiceNotes({
           )}
         </div>
       ))}
+
+      {notes.length > RECENT && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          className="text-xs font-bold"
+          style={{ color: "#1B3A5C" }}
+        >
+          {showAll ? `↑ show the latest ${RECENT}` : `↓ all ${notes.length} recordings — nothing is deleted`}
+        </button>
+      )}
     </div>
   );
 }

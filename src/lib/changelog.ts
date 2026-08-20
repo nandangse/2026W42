@@ -63,6 +63,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.12.0.1",
+    date: "2026-08-20",
+    module: "On Floor",
+    items: [
+      "GENIE — WHERE THIS STANDS. Above the recordings, Genie reads the last three notes together and writes the current position in two or three sentences. Three separate accounts of one job is not a position; this is. The latest note wins where they disagree, and it says what changed rather than reporting both.",
+      "It is written when a note is recorded, not when the page is opened — one call when something changes, instead of one per job per reader per visit.",
+      "NOTHING IS DELETED ANY MORE. An earlier version dropped every recording past the newest three. That is wrong for a record of what was said about a customer's job: the reason for keeping audio at all is that somebody can go back to it. Every recording is kept, with who said it, the date, the time and the length — three are in front of you and the rest are one click away.",
+      "The page is built for a phone, because that is where it will mostly be read. Below 720px every column takes the full width instead of being squeezed, the three counts sit side by side rather than becoming three screens of very little, and the player stretches to fit. Checked at 500px: nothing overflows sideways.",
+      "Form fields are pinned to 16px on a phone — under that, tapping one makes the browser zoom the whole page in.",
+      "Needs migration 0043 for the summary. The recordings work without it.",
+    ],
+  },
+  {
     v: "3.12.0.0",
     date: "2026-08-20",
     module: "On Floor",
