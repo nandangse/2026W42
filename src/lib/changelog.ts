@@ -63,6 +63,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.13.0.0",
+    date: "2026-08-20",
+    module: "Job Plan",
+    items: [
+      "A band across the top of Job Plan that follows you down the page, in five parts: the job number with its ERP link; the customer tag with customer and product; value, throughput, kitting and what is built; the money; and the last shop update. The detail card below it scrolls away as normal.",
+      "KITTED AND WIP ARE NOW WORKED OUT, not read. Material is value × (1 − throughput %) — the bought-in part. Kitted value is that × kitting %. WIP is kitted value PLUS throughput × production %.",
+      "That last one is the formula worth arguing about. Material is money spent the day it arrives, so all of the kitted value is already sunk. Throughput is not — it is earned by converting that material, so it accrues with production. \"Value × production %\" would say a job with every plate on the floor and nothing built is worth nothing, which is exactly the job you most need to see.",
+      "Advance received = value − pending payment on delivery. Where nobody has recorded the pending figure it says \"not known\" rather than showing the whole value as an advance — a job with no number is not a job that was paid in full.",
+      "SHOP UPDATES, as a tab beside Milestone Plan and Material Kitting, and from the band. Genie's summary first, then every entry newest first: what was said, and the recording itself.",
+      "All three are kept because they answer different questions. The summary is what you read, the transcript is what you search, and the recording is what you fall back to when the words on the page do not sound like what somebody meant.",
+    ],
+  },
+  {
     v: "3.12.0.1",
     date: "2026-08-20",
     module: "On Floor",

@@ -3171,7 +3171,7 @@ function JobPlan({
     [board.jobs, board.archived, activeId],
   );
 
-  const [planView, setPlanView] = useState<"plan" | "mat">("plan");
+  const [planView, setPlanView] = useState<"plan" | "mat" | "shop">("plan");
   const [draft, setDraft] = useState<Plan | null>(null);
   const [applyTplName, setApplyTplName] = useState("");
   const templateNames = useMemo(() => Object.keys(board.templates).sort(), [board.templates]);
@@ -3218,6 +3218,8 @@ function JobPlan({
   const isAdminHere = isAdmin;
   const hdrCardRef = useRef<HTMLDivElement | null>(null);
   const [hdrGone, setHdrGone] = useState(false);
+  /** The shop-update history, in a lightbox. */
+  const [shopOpen, setShopOpen] = useState(false);
   useEffect(() => {
     const el = hdrCardRef.current;
     if (!el) return;
@@ -3454,20 +3456,19 @@ function JobPlan({
           job to job, and which job you are editing should not need a scroll
           back up. Capped at 42vh so that on a narrow screen, where the three
           cards stack, it scrolls inside itself instead of eating the page. */}
-      <div
-        className="flex gap-3 mb-3 items-stretch"
-        style={{
-          flexWrap: "wrap",
-          position: "sticky",
-          top: "calc(var(--hdr-h, 92px) + 46px)",
-          zIndex: 21,
-          background: "#F1EFE9",
-          paddingTop: 6,
-          maxHeight: "42vh",
-          overflowY: "auto",
-          boxShadow: hdrGone ? "0 10px 18px -12px rgba(0,0,0,.35)" : undefined,
-        }}
-      >
+      {/* The band that follows you down. One line of the things you look up
+          while working: which job, who it is for, what it is worth and how far
+          in, what is owed, and what the floor last said. The detail card below
+          scrolls away as normal. */}
+      <JobTopRow
+        job={dj}
+        V={V}
+        sticky
+        shadow={hdrGone}
+        onShopUpdate={() => setShopOpen(true)}
+      />
+
+      <div className="flex gap-3 mb-3 items-stretch" style={{ flexWrap: "wrap" }}>
       <div className="bg-white rounded-lg p-3 border" style={{ borderColor: "#E2E0DA", borderLeft: "5px solid #E8600A", flex: "1 1 620px", minWidth: 320 }}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -3531,10 +3532,16 @@ function JobPlan({
 
       {/* plan / materials sub-tabs */}
       <div className="flex gap-1 rounded p-1 bg-white border mb-3" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
-        {(["plan", "mat"] as const).map((k) => (
-          <button key={k} onClick={() => { if (k === "mat") ensureMats(); setPlanView(k); }} className="px-3 py-1 rounded text-sm font-semibold" style={planView === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>{k === "plan" ? "Milestone Plan" : "Material Kitting"}</button>
+        {(["plan", "mat", "shop"] as const).map((k) => (
+          <button key={k} onClick={() => { if (k === "mat") ensureMats(); setPlanView(k); }} className="px-3 py-1 rounded text-sm font-semibold" style={planView === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>
+            {k === "plan" ? "Milestone Plan" : k === "mat" ? "Material Kitting" : "Shop Updates"}
+          </button>
         ))}
       </div>
+
+      {/* Shop Updates as a page rather than a lightbox: the same content, for
+          somebody who came to READ the history rather than glance at it. */}
+      {planView === "shop" && <ShopUpdatesPanel job={dj} />}
 
       {planView === "mat" && (
         <div>
@@ -3757,6 +3764,8 @@ function JobPlan({
       )}
 
       {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async (prevention) => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done, prevention }); setLightbox(null); await reload(); }} reload={reload} />}
+
+      {shopOpen && <ShopUpdates job={dj} onClose={() => setShopOpen(false)} />}
 
       {/* management date breach popup */}
       {dj.mgmt && ends > dj.mgmt && !warned.has(dj.id) && (
@@ -8161,6 +8170,245 @@ function PhotoGallery({ job, canEdit, onClose }: { job: Job; canEdit: boolean; o
           <img src={big.url} alt={big.caption || ""} style={{ maxWidth: "94vw", maxHeight: "88vh", objectFit: "contain" }} />
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================ Job top row ============================
+
+/**
+ * What a job is worth, and how much of it is real yet.
+ *
+ * THE FORMULAS. `tpp` is the throughput PERCENTAGE of a job — what the company
+ * earns on it — so the rest of the value is bought-in material:
+ *
+ *   material   = value × (1 − tpp%)         what has to be purchased
+ *   kitted     = material × kitting%        of that, what is in
+ *   throughput = value × tpp%               what the company earns
+ *   WIP        = kitted + throughput × production%
+ *
+ * WIP is the one worth explaining. Material is money spent the day it arrives,
+ * so all of the kitted value is already in the job. Throughput is not: it is
+ * earned by converting that material, so it accrues with production. Adding
+ * them gives what is genuinely sunk into the job today — which is a different
+ * and more useful number than "value × production %", the figure that treats a
+ * job with all its steel on the floor and nothing built as worth nothing.
+ */
+export function jobMoney(j: Job) {
+  const val = j.val || 0;
+  const tpp = (j.tpp || 0) / 100;
+  const material = val * (1 - tpp);
+  const kitted = material * ((j.kit || 0) / 100);
+  // tpv is the throughput in rupees where the export carries it; the
+  // percentage is the fallback, never both.
+  const throughput = j.tpv || val * tpp;
+  const wip = kitted + throughput * ((j.pct || 0) / 100);
+  // Advance is what has already been paid: the order value less whatever is
+  // still due on delivery. Null when nobody has recorded the pending figure —
+  // a job with no number is not a job that was paid in full.
+  const pending = j.payOnDelivery;
+  const advance = pending == null ? null : Math.max(0, val - pending);
+  return { val, material, kitted, throughput, wip, pending, advance };
+}
+
+function JobTopRow({
+  job, V, sticky, shadow, onShopUpdate,
+}: {
+  job: Job; V: (n: number) => string; sticky?: boolean; shadow?: boolean; onShopUpdate: () => void;
+}) {
+  const m = jobMoney(job);
+  const Cell = ({ label, children, grow = "1 1 190px" }: { label: string; children: React.ReactNode; grow?: string }) => (
+    <div style={{ flex: grow, minWidth: 0 }}>
+      <div className="text-xs font-bold" style={{ color: "#8A94A0", letterSpacing: .8, marginBottom: 2 }}>{label}</div>
+      {children}
+    </div>
+  );
+  const Pair = ({ a, av, b, bv, ac, bc }: { a: string; av: string; b: string; bv: string; ac?: string; bc?: string }) => (
+    <div className="flex gap-3 flex-wrap" style={{ fontSize: 12 }}>
+      <span style={{ color: "#8A94A0" }}>{a} <b className="tnum" style={{ color: ac || "#22303C" }}>{av}</b></span>
+      <span style={{ color: "#8A94A0" }}>{b} <b className="tnum" style={{ color: bc || "#22303C" }}>{bv}</b></span>
+    </div>
+  );
+
+  return (
+    <div
+      className="rounded-lg border bg-white px-3 py-2 mb-2 job-top"
+      style={{
+        borderColor: "#E2E0DA",
+        borderLeft: "5px solid #E8600A",
+        ...(sticky
+          ? { position: "sticky" as const, top: "calc(var(--hdr-h, 92px) + 46px)", zIndex: 21 }
+          : {}),
+        boxShadow: shadow ? "0 10px 18px -12px rgba(0,0,0,.35)" : undefined,
+      }}
+    >
+      <div className="flex gap-4 flex-wrap items-start">
+        {/* 1 — which job */}
+        <div style={{ flex: "0 0 150px", minWidth: 0 }}>
+          <div className="font-bold" style={{ color: "#16232F", fontSize: 24, lineHeight: 1.05 }}>JOB {jobNo(job.id)}</div>
+          <a href={erpJobLink(job.id)} target="_blank" rel="noreferrer" className="underline" style={{ color: "#8A94A0", fontSize: 11 }}>
+            {job.id} ↗
+          </a>
+        </div>
+
+        {/* 2 — who it is for */}
+        <Cell label="CUSTOMER TAG" grow="1 1 240px">
+          <div className="text-sm font-semibold truncate" style={{ color: "#1B3A5C" }} title={job.tag}>{job.tag}</div>
+          <div className="text-xs truncate" style={{ color: "#5A6672" }} title={`${job.cust} · ${job.fam}`}>
+            {job.cust} <span style={{ color: "#B8B5AC" }}>|</span> {job.fam}
+          </div>
+        </Cell>
+
+        {/* 3 — what it is worth, and how much of it is real */}
+        <Cell label="VALUE &amp; PROGRESS" grow="1 1 250px">
+          <Pair a="Value" av={V(m.val)} b="Throughput" bv={V(m.throughput)} bc="#0D7A3F" />
+          <Pair a={`Kitting ${job.kit || 0}%`} av={V(m.kitted)} b="of material" bv={V(m.material)} ac="#0D9488" bc="#8A94A0" />
+          <Pair a={`Built ${job.pct || 0}%`} av={V(m.wip)} b="WIP" bv="" ac="#7C3AED" />
+        </Cell>
+
+        {/* 4 — the money */}
+        <Cell label="MONEY" grow="1 1 230px">
+          <Pair
+            a="Needed next month" av={job.amtNeeded == null ? "—" : V(job.amtNeeded)}
+            b="Advance in" bv={m.advance == null ? "not known" : V(m.advance)}
+            ac="#D97706" bc={m.advance == null ? "#B8B5AC" : "#0D7A3F"}
+          />
+          <div style={{ fontSize: 12, color: "#8A94A0" }}>
+            Pending on delivery <b className="tnum" style={{ color: m.pending == null ? "#B8B5AC" : "#B3261E" }}>
+              {m.pending == null ? "not recorded" : V(m.pending)}
+            </b>
+          </div>
+          {m.advance != null && (
+            <div style={{ fontSize: 10, color: "#B8B5AC" }}>advance = value − pending on delivery</div>
+          )}
+        </Cell>
+
+        {/* 5 — what the floor last said */}
+        <Cell label="SHOP UPDATE" grow="2 1 280px">
+          {job.floorSummary ? (
+            <>
+              <div className="text-xs" style={{ color: "#22303C", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                {job.floorSummary}
+              </div>
+              <button onClick={onShopUpdate} className="text-xs font-bold mt-0.5" style={{ color: "#7C3AED" }}>
+                all updates ↗
+              </button>
+            </>
+          ) : (
+            <div className="text-xs" style={{ color: "#B8B5AC" }}>
+              Nothing recorded from the floor yet.{" "}
+              <button onClick={onShopUpdate} className="font-bold" style={{ color: "#7C3AED" }}>open</button>
+            </div>
+          )}
+        </Cell>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Every shop update on a job, newest first — the summary, then what was said,
+ * then the recording itself.
+ *
+ * All three because they answer different questions. The summary is what you
+ * read; the transcript is what you search; the recording is what you fall back
+ * to when the words on the page do not sound like what somebody meant.
+ */
+function ShopUpdates({ job, onClose }: { job: Job; onClose: () => void }) {
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.5)", zIndex: 60 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 720, maxHeight: "88vh", overflow: "auto" }}>
+        <div className="px-4 py-3" style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0, zIndex: 2 }}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs font-bold" style={{ letterSpacing: 1.2, color: "#8FA1B3" }}>SHOP UPDATES</div>
+              <div className="font-bold" style={{ fontSize: 17 }}>JOB {jobNo(job.id)} · {job.tag}</div>
+            </div>
+            <button onClick={onClose} style={{ color: "#8FA1B3", fontSize: 18 }}>✕</button>
+          </div>
+        </div>
+
+        <div className="p-3">
+          <ShopUpdatesBody job={job} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The history itself, shared by the lightbox and the tab. */
+function ShopUpdatesBody({ job }: { job: Job }) {
+  interface N { id: string; url: string | null; seconds: number | null; transcript: string; summary: string; by: string | null; at: string }
+  const [notes, setNotes] = useState<N[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get(`/api/voice-note?job_id=${encodeURIComponent(job.id)}`)
+      .then((r: { notes?: N[] }) => setNotes(r.notes || []))
+      .catch(() => setNotes([]))
+      .finally(() => setLoading(false));
+  }, [job.id]);
+
+  return (
+    <>
+          {job.floorSummary && (
+            <div className="rounded p-3 mb-3" style={{ background: "#F3EEFB", border: "1px solid #C9B6EA" }}>
+              <div className="text-xs font-bold" style={{ color: "#7C3AED", letterSpacing: .6 }}>✨ GENIE — WHERE THIS STANDS</div>
+              <div className="text-sm mt-1" style={{ color: "#22303C", lineHeight: 1.6 }}>{job.floorSummary}</div>
+              {job.floorSummaryAt && (
+                <div style={{ fontSize: 10, color: "#8A94A0", marginTop: 4 }}>
+                  from the latest notes · {new Date(job.floorSummaryAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {loading && <div className="text-sm" style={{ color: "#8A94A0" }}>Reading…</div>}
+          {!loading && notes.length === 0 && (
+            <div className="text-sm" style={{ color: "#8A94A0" }}>
+              Nothing recorded on this job yet. Updates are recorded on the <b>On Floor</b> tab.
+            </div>
+          )}
+
+          {notes.map((n) => (
+            <div key={n.id} className="rounded border p-3 mb-2" style={{ borderColor: "#E2E0DA" }}>
+              <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                <b className="text-sm" style={{ color: "#16232F" }}>{n.summary || "(no summary)"}</b>
+                <span style={{ fontSize: 11, color: "#8A94A0", whiteSpace: "nowrap" }}>
+                  {whoTag(n.by)} · {new Date(n.at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  {n.seconds ? ` · ${n.seconds}s` : ""}
+                </span>
+              </div>
+              {n.transcript && (
+                <div className="text-xs mt-1.5 rounded px-2 py-1.5" style={{ background: "#F4F2EC", color: "#5A6672", lineHeight: 1.55 }}>
+                  {n.transcript}
+                </div>
+              )}
+              {n.url && <audio controls preload="none" src={n.url} style={{ height: 30, width: "100%", marginTop: 6 }} />}
+            </div>
+          ))}
+    </>
+  );
+}
+
+/**
+ * Shop Updates, as a page under the plan rather than a box over it.
+ *
+ * Same content as the lightbox, and deliberately the same component beneath —
+ * the summary first, then every entry newest first with what was said and the
+ * recording. Two renderings of one history is two places for them to disagree
+ * about the order.
+ */
+function ShopUpdatesPanel({ job }: { job: Job }) {
+  return (
+    <div className="bg-white rounded-lg border p-3 mb-4" style={{ borderColor: "#E2E0DA" }}>
+      <div className="flex items-baseline gap-2 flex-wrap mb-2">
+        <h2 className="font-bold" style={{ color: "#16232F" }}>Shop Updates</h2>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>
+          what the floor has said about JOB {jobNo(job.id)} — newest first · recorded on the On Floor tab
+        </span>
+      </div>
+      <ShopUpdatesBody job={job} />
     </div>
   );
 }
