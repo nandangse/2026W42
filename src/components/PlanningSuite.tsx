@@ -44,7 +44,7 @@ import MorningUpload from "./MorningUpload";
 import SalesGenie from "./SalesGenie";
 import DeliveryOutlook from "./DeliveryOutlook";
 import LMS from "./LMS";
-import JobsInProgress, { type WipJob } from "./JobsInProgress";
+import JobsInProgress, { JobLightbox, type WipJob } from "./JobsInProgress";
 import MaterialKitting, { MatBox, type Mat } from "./MaterialKitting";
 import { useMyWeek, HowsMyDay, ImageQuote, Birthdays, MyLearningCard } from "./MyWeekPanels";
 import { hhmm } from "@/lib/lms";
@@ -7348,6 +7348,27 @@ function OnFloor({
   const [notes, setNotes] = useState<Note[]>([]);
   const [installed, setInstalled] = useState(true);
   const [msg, setMsg] = useState("");
+  /** The job whose own lightbox is open — the same one the scatter uses. */
+  const [picked, setPicked] = useState<Job | null>(null);
+  /** A job's open work, listed. "tasks" or "esc" decides which half. */
+  const [work, setWork] = useState<{ job: Job; only: "tasks" | "esc" } | null>(null);
+  /** A project, listed by its jobs. */
+  const [proj, setProj] = useState<string | null>(null);
+  /** The job whose photographs are open. */
+  const [gallery, setGallery] = useState<Job | null>(null);
+
+  // Open work per job, counted once for every row on the page.
+  const workByJob = useMemo(() => {
+    const m = new Map<string, { tasks: Task[]; esc: Task[] }>();
+    for (const t of board.tasks) {
+      if (t.done || !t.j) continue;
+      const cur = m.get(t.j) || { tasks: [], esc: [] };
+      cur.tasks.push(t);
+      if (escalated(t.esc)) cur.esc.push(t);
+      m.set(t.j, cur);
+    }
+    return m;
+  }, [board.tasks]);
 
   const jobs = useMemo(
     () => board.jobs.filter((j) => j.onFloor).sort((a, b) => String(a.tdd || "9999").localeCompare(String(b.tdd || "9999"))),
@@ -7410,8 +7431,8 @@ function OnFloor({
               <div className="flex flex-wrap gap-3 p-3">
                 {/* who and what */}
                 <div style={{ flex: "1 1 260px", minWidth: 240 }}>
-                  <div className="flex items-baseline gap-2">
-                    <button onClick={() => onOpen(j.id)} className="font-bold" style={{ color: "#1B3A5C", textDecoration: "underline" }}>{jobNo(j.id)}</button>
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <button onClick={() => setPicked(j)} className="font-bold" style={{ color: "#1B3A5C", textDecoration: "underline" }} title="Open this job">{jobNo(j.id)}</button>
                     <span className="text-xs" style={{ color: "#8A94A0" }}>{j.fam}</span>
                   </div>
                   <div className="text-sm font-semibold" style={{ color: "#22303C" }}>{j.tag}</div>
@@ -7420,6 +7441,13 @@ function OnFloor({
                     <span style={{ color: delay == null ? "#B8B5AC" : delay > 0 ? "#B3261E" : "#0D7A3F", fontWeight: 700 }}>
                       {delay == null ? "no date" : delay > 0 ? `${delay}d late` : delay === 0 ? "due today" : `${-delay}d to go`}
                     </span>
+                    {j.proj ? (
+                      <button onClick={() => setProj(j.proj)} style={{ color: "#7C3AED", fontWeight: 700, textDecoration: "underline" }} title="Every job on this project">
+                        {String(j.proj).replace(/^NGSE-PROJ-/, "PROJ ")}
+                      </button>
+                    ) : (
+                      <span style={{ color: "#B8B5AC" }}>no project</span>
+                    )}
                   </div>
                 </div>
 
@@ -7450,6 +7478,44 @@ function OnFloor({
                   </div>
                 </div>
 
+                {/* what is open on it */}
+                <div style={{ flex: "0 0 150px" }}>
+                  <div className="text-xs font-bold mb-1" style={{ color: "#8A94A0" }}>OPEN ON IT</div>
+                  {(() => {
+                    const w = workByJob.get(j.id) || { tasks: [], esc: [] };
+                    return (
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => w.tasks.length && setWork({ job: j, only: "tasks" })}
+                          disabled={!w.tasks.length}
+                          className="rounded px-2 py-1 text-left"
+                          style={{ background: w.tasks.length ? "#DCE8F5" : "#F4F2EC", cursor: w.tasks.length ? "pointer" : "default" }}
+                        >
+                          <b className="tnum" style={{ color: w.tasks.length ? "#1B3A5C" : "#B8B5AC", fontSize: 15 }}>{w.tasks.length}</b>
+                          <span className="text-xs" style={{ color: "#5A6672" }}> task{w.tasks.length === 1 ? "" : "s"} pending</span>
+                        </button>
+                        <button
+                          onClick={() => w.esc.length && setWork({ job: j, only: "esc" })}
+                          disabled={!w.esc.length}
+                          className="rounded px-2 py-1 text-left"
+                          style={{ background: w.esc.length ? "#FBEDEA" : "#F4F2EC", cursor: w.esc.length ? "pointer" : "default" }}
+                        >
+                          <b className="tnum" style={{ color: w.esc.length ? "#B3261E" : "#B8B5AC", fontSize: 15 }}>{w.esc.length}</b>
+                          <span className="text-xs" style={{ color: "#5A6672" }}> escalation{w.esc.length === 1 ? "" : "s"}</span>
+                        </button>
+                        <button
+                          onClick={() => setGallery(j)}
+                          className="rounded px-2 py-1 text-left"
+                          style={{ background: "#F3EEFB" }}
+                          title="Photographs of this job as it is built"
+                        >
+                          <span className="text-xs font-bold" style={{ color: "#7C3AED" }}>📷 Photos</span>
+                        </button>
+                      </div>
+                    );
+                  })()}
+                </div>
+
                 {/* the floor's own words */}
                 <div style={{ flex: "2 1 340px", minWidth: 300 }}>
                   <VoiceNotes jobId={j.id} notes={mine} installed={installed} onSaved={load} />
@@ -7458,6 +7524,138 @@ function OnFloor({
             </div>
           );
         })}
+      </div>
+
+      {picked && (
+        <JobLightbox
+          job={toWip(picked)}
+          V={V}
+          colour="#0D7A3F"
+          onClose={() => setPicked(null)}
+          onOpenPlan={() => { const id = picked.id; setPicked(null); onOpen(id); }}
+          canEdit={canEdit}
+          onSaved={reload}
+        />
+      )}
+
+      {work && (
+        <WorkList
+          job={work.job}
+          tasks={(workByJob.get(work.job.id) || { tasks: [], esc: [] })[work.only]}
+          only={work.only}
+          onClose={() => setWork(null)}
+        />
+      )}
+
+      {proj && (
+        <ProjectJobs
+          proj={proj}
+          jobs={board.jobs.filter((x) => x.proj === proj)}
+          V={V}
+          onClose={() => setProj(null)}
+          onOpen={(id) => { setProj(null); onOpen(id); }}
+        />
+      )}
+
+      {gallery && <PhotoGallery job={gallery} canEdit={canEdit} onClose={() => setGallery(null)} />}
+    </div>
+  );
+}
+
+/** A board Job in the shape the scatter's lightbox expects. */
+function toWip(j: Job): WipJob {
+  return {
+    id: j.id, tag: j.tag, cust: j.cust, fam: j.fam || "Unassigned",
+    tdd: j.tdd, otd: j.otd, stat: j.stat, val: j.val, tpv: j.tpv, tpp: j.tpp,
+    kit: j.kit, pct: j.pct, note: j.note, escalation: j.escalation,
+    clientUpdate: j.clientUpdate, cashflow: j.cashflow,
+    amtNeeded: j.amtNeeded, payOnDelivery: j.payOnDelivery,
+    ownerInitials: j.ownerInitials, ownerName: j.ownerName,
+  } as WipJob;
+}
+
+/**
+ * What is open on a job, listed.
+ *
+ * The job name is at the top because this opens from a count on a row: by the
+ * time the box is up, the row that was clicked is behind it, and a list of
+ * tasks with no job on it belongs to nothing.
+ */
+function WorkList({
+  job, tasks, only, onClose,
+}: { job: Job; tasks: Task[]; only: "tasks" | "esc"; onClose: () => void }) {
+  const sorted = [...tasks].sort((a, b) => String(a.due || "9999").localeCompare(String(b.due || "9999")));
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.45)", zIndex: 60 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 620, maxHeight: "82vh", overflow: "auto" }}>
+        <div className="px-4 py-3" style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0 }}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs font-bold" style={{ letterSpacing: 1.2, color: "#8FA1B3" }}>
+                {only === "esc" ? "ESCALATIONS" : "TASKS PENDING"} · {sorted.length}
+              </div>
+              <div className="font-bold" style={{ fontSize: 17 }}>JOB {jobNo(job.id)} · {job.tag}</div>
+            </div>
+            <button onClick={onClose} style={{ color: "#8FA1B3", fontSize: 18 }}>✕</button>
+          </div>
+        </div>
+        <div className="p-3">
+          {sorted.length === 0 && <div className="text-sm" style={{ color: "#8A94A0" }}>Nothing open.</div>}
+          {sorted.map((t) => (
+            <div key={t.kind + t.id} className="rounded border p-2 mb-1.5" style={{ borderColor: "#E2E0DA", borderLeft: `3px solid ${escalated(t.esc) ? "#B3261E" : "#1B3A5C"}` }}>
+              <div className="flex items-start gap-2">
+                <div className="flex-1">
+                  <div className="text-sm font-semibold" style={{ color: "#16232F" }}>{t.t}</div>
+                  <div className="text-xs mt-0.5 flex gap-3 flex-wrap" style={{ color: "#8A94A0" }}>
+                    <span>{t.cat}</span>
+                    <span>{t.who ? whoTag(t.who) : "unassigned"}</span>
+                    <span style={{ color: taskLate(t, TODAY) ? "#B3261E" : "#8A94A0", fontWeight: taskLate(t, TODAY) ? 700 : 400 }}>
+                      due {fmtFull(t.due)}
+                    </span>
+                    {(t.push_count || 0) > 0 && <span style={{ color: "#B3261E" }}>moved {t.push_count}×</span>}
+                  </div>
+                </div>
+                {escalated(t.esc) && (
+                  <span className="rounded px-1.5 py-0.5 text-xs font-bold flex-shrink-0" style={{ background: "#B3261E", color: "#fff" }}>{(t.esc || "").slice(0, 2)}</span>
+                )}
+              </div>
+              {t.esc_why && <div className="text-xs mt-1" style={{ color: "#5A6672" }}>{t.esc_why}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Every job on one project. */
+function ProjectJobs({
+  proj, jobs, V, onClose, onOpen,
+}: { proj: string; jobs: Job[]; V: (n: number) => string; onClose: () => void; onOpen: (id: string) => void }) {
+  const sorted = [...jobs].sort((a, b) => String(a.tdd || "9999").localeCompare(String(b.tdd || "9999")));
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.45)", zIndex: 60 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 680, maxHeight: "82vh", overflow: "auto" }}>
+        <div className="px-4 py-3" style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0 }}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs font-bold" style={{ letterSpacing: 1.2, color: "#8FA1B3" }}>PROJECT · {sorted.length} JOB{sorted.length === 1 ? "" : "S"}</div>
+              <div className="font-bold" style={{ fontSize: 17 }}>{proj}</div>
+            </div>
+            <button onClick={onClose} style={{ color: "#8FA1B3", fontSize: 18 }}>✕</button>
+          </div>
+        </div>
+        <div className="p-3">
+          {sorted.map((j) => (
+            <div key={j.id} className="flex items-baseline gap-2 rounded border p-2 mb-1.5" style={{ borderColor: "#E2E0DA" }}>
+              <button onClick={() => onOpen(j.id)} className="font-bold" style={{ color: "#1B3A5C", textDecoration: "underline" }}>{jobNo(j.id)}</button>
+              <span className="text-sm flex-1" style={{ color: "#22303C" }}>{j.tag}</span>
+              <span className="text-xs tnum" style={{ color: j.tdd && j.tdd < TODAY ? "#B3261E" : "#8A94A0" }}>{fmtFull(j.tdd)}</span>
+              <span className="text-xs tnum" style={{ color: "#5A6672" }}>{V(j.val)}</span>
+              <span className="text-xs tnum" style={{ color: "#8A94A0" }}>{j.pct}%</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -7763,6 +7961,161 @@ function PrincipleFiles({ isOwner }: { isOwner: boolean }) {
             {busy ? "uploading…" : "⬆ Attach a document"}
           </button>
           <span className="text-xs ml-2" style={{ color: "#8A94A0" }}>PDF, Word, slides, a sheet — up to 25 MB</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The build history of a job, in photographs.
+ *
+ * Production completion is a number somebody types. A photograph is not
+ * arguable — and a row of them in date order is the only record in Genie of
+ * what the machine actually looked like on the way.
+ *
+ * Each photo keeps the COMPLETION AS IT WAS on the day it was taken, not a
+ * reading of whatever the job says now. The number on a job moves; the picture
+ * does not, and "70% on 12 August" is what makes the pair worth keeping.
+ */
+function PhotoGallery({ job, canEdit, onClose }: { job: Job; canEdit: boolean; onClose: () => void }) {
+  interface P { id: string; url: string | null; caption: string; pct: number | null; taken_on: string; by: string | null }
+  const [photos, setPhotos] = useState<P[]>([]);
+  const [installed, setInstalled] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [big, setBig] = useState<P | null>(null);
+  const [form, setForm] = useState({ caption: "", pct: String(job.pct ?? ""), taken_on: TODAY });
+  const pick = useRef<HTMLInputElement | null>(null);
+
+  const load = useCallback(() => {
+    api.get(`/api/job-photo?job_id=${encodeURIComponent(job.id)}`)
+      .then((r: { installed?: boolean; photos?: P[] }) => { setInstalled(r.installed !== false); setPhotos(r.photos || []); })
+      .catch(() => setInstalled(false));
+  }, [job.id]);
+  useEffect(() => { load(); }, [load]);
+
+  const upload = async (f: File | null) => {
+    if (!f) return;
+    setBusy(true); setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      fd.append("job_id", job.id);
+      fd.append("caption", form.caption);
+      fd.append("pct", form.pct);
+      fd.append("taken_on", form.taken_on);
+      const r = await fetch("/api/job-photo", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save that photo");
+      setForm({ caption: "", pct: String(job.pct ?? ""), taken_on: TODAY });
+      load();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+    if (pick.current) pick.current.value = "";
+  };
+
+  const remove = async (p: P) => {
+    if (!window.confirm("Remove this photo?\n\nThe file is deleted, not hidden.")) return;
+    try {
+      const r = await fetch(`/api/job-photo?id=${encodeURIComponent(p.id)}`, { method: "DELETE" });
+      if (!r.ok) throw new Error((await r.json()).error || "Could not remove it");
+      load();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+  };
+
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.5)", zIndex: 60 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 860, maxHeight: "88vh", overflow: "auto" }}>
+        <div className="px-4 py-3" style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0, zIndex: 2 }}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs font-bold" style={{ letterSpacing: 1.2, color: "#8FA1B3" }}>PHOTOS · {photos.length}</div>
+              <div className="font-bold" style={{ fontSize: 17 }}>JOB {jobNo(job.id)} · {job.tag}</div>
+            </div>
+            <button onClick={onClose} style={{ color: "#8FA1B3", fontSize: 18 }}>✕</button>
+          </div>
+        </div>
+
+        <div className="p-3">
+          {!installed && (
+            <div className="text-xs rounded p-2 mb-2" style={{ background: "#FFF7E6", color: "#8A5A00" }}>
+              Run migration 0042 — photos have nowhere to go yet.
+            </div>
+          )}
+          {err && <div className="text-xs font-bold rounded p-2 mb-2" style={{ background: "#FBEDEA", color: "#B3261E" }}>{err}</div>}
+
+          {photos.length === 0 && installed && (
+            <div className="text-sm mb-3" style={{ color: "#8A94A0" }}>No photographs of this job yet.</div>
+          )}
+
+          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))" }}>
+            {photos.map((p) => (
+              <div key={p.id} className="rounded-lg border overflow-hidden" style={{ borderColor: "#E2E0DA" }}>
+                {p.url && (
+                  <button onClick={() => setBig(p)} style={{ display: "block", width: "100%", padding: 0, border: 0, cursor: "zoom-in" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.url} alt={p.caption || `Job ${jobNo(job.id)}`} style={{ width: "100%", height: 130, objectFit: "cover", display: "block" }} />
+                  </button>
+                )}
+                <div className="p-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <b className="text-xs tnum" style={{ color: "#16232F" }}>{fmtFull(p.taken_on)}</b>
+                    {p.pct != null && (
+                      <span className="rounded px-1.5 text-xs font-bold" style={{ background: "#E6F4EA", color: "#0D7A3F" }}>{p.pct}%</span>
+                    )}
+                  </div>
+                  {p.caption && <div className="text-xs mt-0.5" style={{ color: "#5A6672", lineHeight: 1.45 }}>{p.caption}</div>}
+                  <div className="flex items-center justify-between mt-1">
+                    <span style={{ fontSize: 10, color: "#B8B5AC" }}>{whoTag(p.by)}</span>
+                    {canEdit && (
+                      <button onClick={() => remove(p)} className="font-bold" style={{ fontSize: 10, color: "#B3261E" }}>remove</button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {canEdit && installed && (
+            <div className="rounded-lg border p-3 mt-3" style={{ borderColor: "#E2E0DA", background: "#FAF9F5" }}>
+              <div className="text-xs font-bold mb-2" style={{ color: "#8A94A0" }}>ADD A PHOTO</div>
+              <div className="flex gap-2 flex-wrap mb-2">
+                <label className="text-xs" style={{ color: "#5A6672" }}>
+                  Taken on<br />
+                  <input type="date" value={form.taken_on} onChange={(e) => setForm({ ...form, taken_on: e.target.value })}
+                    className="text-xs border rounded px-1 py-1" style={{ borderColor: "#E2E0DA" }} />
+                </label>
+                <label className="text-xs" style={{ color: "#5A6672" }}>
+                  Completion %<br />
+                  <input type="number" min={0} max={100} value={form.pct} onChange={(e) => setForm({ ...form, pct: e.target.value })}
+                    className="text-xs border rounded px-1 py-1" style={{ borderColor: "#E2E0DA", width: 80 }} />
+                </label>
+                <label className="text-xs flex-1" style={{ color: "#5A6672", minWidth: 200 }}>
+                  What it shows<br />
+                  <input value={form.caption} onChange={(e) => setForm({ ...form, caption: e.target.value })}
+                    placeholder="optional" className="w-full text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
+                </label>
+              </div>
+              <input ref={pick} type="file" accept="image/*" capture="environment"
+                onChange={(e) => upload(e.target.files?.[0] || null)} style={{ display: "none" }} />
+              <button onClick={() => pick.current?.click()} disabled={busy}
+                className="rounded px-4 py-1.5 text-sm font-bold text-white" style={{ background: busy ? "#B8B5AC" : "#7C3AED" }}>
+                {busy ? "uploading…" : "📷 Take or choose a photo"}
+              </button>
+              <span className="text-xs ml-2" style={{ color: "#8A94A0" }}>
+                the completion is stored as it is today, and does not move afterwards
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {big?.url && (
+        <div onClick={(e) => { e.stopPropagation(); setBig(null); }}
+          className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.85)", zIndex: 61, cursor: "zoom-out" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={big.url} alt={big.caption || ""} style={{ maxWidth: "94vw", maxHeight: "88vh", objectFit: "contain" }} />
         </div>
       )}
     </div>

@@ -601,7 +601,7 @@ function Scatter({
  * means opening six jobs in a row, and losing the chart each time would make
  * that not worth doing.
  */
-function JobLightbox({
+export function JobLightbox({
   job, V, colour, onClose, onOpenPlan, canEdit, onSaved,
 }: {
   job: WipJob; V: (n: number) => string; colour: string; onClose: () => void; onOpenPlan: () => void;

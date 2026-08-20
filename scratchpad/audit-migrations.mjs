@@ -58,6 +58,7 @@ const PROBES = [
   ["0040 quality owner",      "jobs", "quality_owner"],
   ["0040 voice notes",        "job_voice_note", "transcript"],
   ["0041 principle files",    "principle_file", "path"],
+  ["0042 job photos",         "job_photo", "taken_on"],
 ];
 
 const missing = [];

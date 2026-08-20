@@ -63,6 +63,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.12.0.0",
+    date: "2026-08-20",
+    module: "On Floor",
+    items: [
+      "The job number opens the job in a lightbox — the same one the Jobs in Progress scatter uses, so a correction made there queues for the ERP exactly as it does everywhere else. It used to jump you to the Job Plan tab and lose the page you were on.",
+      "OPEN ON IT — a box on each row showing how many tasks are pending and how many are escalated. Click either and they are listed, with the job name at the top: by then the row you clicked is behind the box, and a list of tasks with no job on it belongs to nothing.",
+      "The project number sits beside the delivery date and opens every job on that project — which is usually the real question when one of them slips.",
+      "PHOTOS. A gallery per job: take one on a phone or choose a file, give it a date, a completion % and a line saying what it shows. Tap any photo to see it full size.",
+      "The completion is stored AS IT WAS on the day the photo was taken and never moves afterwards. The number on a job changes; the photograph does not, and \"70% on 12 August\" is what makes the pair worth keeping in six weeks. Reading it live would silently rewrite the past every time production advanced.",
+      "Photos are in object storage, not the database — they are the largest thing Genie will ever hold. Each row keeps a bucket and a path, so moving them to Google Drive later is a copy and one column, not a re-modelling.",
+      "Needs migration 0042.",
+    ],
+  },
+  {
     v: "3.11.2.1",
     date: "2026-08-20",
     module: "On Floor · Updates",
