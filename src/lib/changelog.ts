@@ -23,6 +23,32 @@
  * number can never drift apart.
  */
 
+/**
+ * How much time has gone into Genie.
+ *
+ * MEASURED, not estimated — from the commit history, by
+ * `node scratchpad/effort.mjs`, which prints this block ready to paste back.
+ *
+ * `windowHours` is the sum, over every day worked, of the span between that
+ * day's first and last commit. It is a WINDOW rather than a total, and it is
+ * wrong in both directions: it over-counts, because a day with a commit at
+ * nine and another at six counts nine hours whether or not the middle went on
+ * Genie; and it under-counts, because the thinking, the specifying and the
+ * reviewing happen before the first commit and after the last.
+ *
+ * Dr Raghu's own share is given as a RANGE for the same reason. He specifies
+ * and reviews; he is not at the keyboard for every minute of the window. A
+ * single number would be false precision dressed up as measurement.
+ */
+export const EFFORT = {
+  measuredTo: "2026-08-20",
+  commits: 121,
+  days: 17,
+  windowHours: 46.5,
+  raghuLow: 19,
+  raghuHigh: 28,
+};
+
 export interface UpdateEntry {
   /** Full version this release carries, e.g. "2.6.1.1". */
   v: string;
@@ -36,6 +62,17 @@ export interface UpdateEntry {
 
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
+  {
+    v: "3.11.2.1",
+    date: "2026-08-20",
+    module: "On Floor · Updates",
+    items: [
+      "FIXED: voice notes could never record. The app sent a header switching the microphone off for the whole site — a sensible default for a planning tool with no sensors, and wrong the moment On Floor shipped. The browser refused before it ever asked the person, and the screen blamed the device: \"No microphone, or permission was refused.\" The microphone is now allowed to this site and to nothing embedded in it.",
+      "The message names the real cause too. A blocked prompt now says which padlock to click; no device says so; a device in use by something else says that instead of blaming permission.",
+      "Admin → Updates shows TIME INVESTED — Dr Raghu's hours on Genie, the build window, the commits and the releases.",
+      "It is measured from the commit history, not remembered, and it is shown with its working. The window over-counts where the middle of a day went elsewhere and under-counts the thinking before the first commit, so Dr Raghu's own time is a range rather than a figure that would look measured and would not be.",
+    ],
+  },
   {
     v: "3.11.2.0",
     date: "2026-08-20",

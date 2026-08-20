@@ -36,8 +36,20 @@ const nextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           // don't leak internal URLs to the ERP / Google Sheets when links open
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          // this app needs no browser sensors
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          /**
+           * The microphone is allowed to THIS ORIGIN and nowhere else.
+           *
+           * It was switched off with the camera and geolocation on the grounds
+           * that a planning app needs no sensors. On Floor changed that: voice
+           * notes are recorded at the machine, and this header refused
+           * getUserMedia before the browser ever asked the person -- which
+           * surfaced as "No microphone, or permission was refused", a message
+           * blaming a device that was working fine.
+           *
+           * self, not *: an embedded third-party frame still cannot open the
+           * microphone, which is the thing the header is actually for.
+           */
+          { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=()" },
           // HTTPS only (Vercel serves HTTPS; pin it for a year)
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
         ],

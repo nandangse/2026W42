@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { LOGO } from "@/lib/logo";
-import { APP_VERSION, UPDATES } from "@/lib/changelog";
+import { APP_VERSION, UPDATES, EFFORT } from "@/lib/changelog";
 import { TRADES, zeroCrew, templateFor, type Crew } from "@/lib/templates";
 import {
   today,
@@ -5725,6 +5725,33 @@ function Updates() {
           Running version <b style={{ color: "#E8600A" }}>{APP_VERSION}</b> · {UPDATES.length} release{UPDATES.length === 1 ? "" : "s"} logged
         </div>
       </div>
+      {/* What it has cost, in time. Measured from the commit history rather
+          than remembered — and shown with its working, because a number like
+          this gets repeated without it. */}
+      <div className="rounded px-3 py-2.5 mb-2" style={{ background: "#16232F", color: "#fff" }}>
+        <div className="text-xs font-bold" style={{ letterSpacing: 1.2, color: "#8FA1B3" }}>TIME INVESTED · TO {fmtFull(EFFORT.measuredTo).toUpperCase()}</div>
+        <div className="flex gap-6 flex-wrap items-baseline mt-1">
+          <div>
+            <div className="tnum font-bold" style={{ fontSize: 26, color: "#F5B32B", lineHeight: 1.1 }}>{EFFORT.raghuLow}–{EFFORT.raghuHigh} h</div>
+            <div className="text-xs" style={{ color: "#9FB0C0" }}>Dr Raghu — specifying and reviewing</div>
+          </div>
+          <div>
+            <div className="tnum font-bold" style={{ fontSize: 20, color: "#fff", lineHeight: 1.2 }}>{EFFORT.windowHours} h</div>
+            <div className="text-xs" style={{ color: "#9FB0C0" }}>build window across {EFFORT.days} days</div>
+          </div>
+          <div>
+            <div className="tnum font-bold" style={{ fontSize: 20, color: "#fff", lineHeight: 1.2 }}>{EFFORT.commits}</div>
+            <div className="text-xs" style={{ color: "#9FB0C0" }}>commits · {UPDATES.length} releases</div>
+          </div>
+        </div>
+        <div className="text-xs mt-2" style={{ color: "#6B7C8C", lineHeight: 1.5, maxWidth: "72ch" }}>
+          The window is the sum, over every day worked, of the span between that day&apos;s first and last commit.
+          It over-counts where the middle of a day went elsewhere, and under-counts the thinking that happens
+          before the first commit — so Dr Raghu&apos;s own time is given as a range rather than a figure that
+          would look measured and would not be.
+        </div>
+      </div>
+
       <div className="rounded px-2 py-1.5 mb-3 text-xs" style={{ background: "#F4F2EC", color: "#5A6672" }}>
         <b>How the number works</b> — <span className="tnum">MAJOR.MINOR.BATCH.PATCH</span>. The last digit moves for
         every change inside one module; the third moves when several modules change together or on the first release of
@@ -7531,8 +7558,19 @@ function VoiceNotes({
         sr.start();
         srRef.current = sr;
       }
-    } catch {
-      setErr("No microphone, or permission was refused.");
+    } catch (e) {
+      // The old message blamed the device for what was usually a refused
+      // prompt. Name the actual cause, and say what to do about it.
+      const name = (e as { name?: string })?.name || "";
+      setErr(
+        name === "NotAllowedError"
+          ? "The browser blocked the microphone. Click the padlock in the address bar → Microphone → Allow, then press Record again."
+          : name === "NotFoundError"
+            ? "No microphone is connected to this machine."
+            : name === "NotReadableError"
+              ? "Something else is using the microphone — close it and press Record again."
+              : "Could not open the microphone on this browser.",
+      );
     }
   };
 
