@@ -3219,9 +3219,11 @@ function JobPlan({
   useEffect(() => {
     const el = hdrCardRef.current;
     if (!el) return;
+    // The sentinel sits directly above the pinned row. It leaving the top of
+    // the viewport IS the row becoming stuck -- so the shadow appears exactly
+    // when the row starts covering content, and not a pixel before.
     const io = new IntersectionObserver(([e]) => setHdrGone(!e.isIntersecting), {
-      // fire as the card passes under the frozen header, not the window edge
-      rootMargin: "-120px 0px 0px 0px",
+      rootMargin: "-150px 0px 0px 0px",
       threshold: 0,
     });
     io.observe(el);
@@ -3440,26 +3442,30 @@ function JobPlan({
         while both are visible, and it sits under the frozen header using the
         height that header measures for itself.
       */}
-      {hdrGone && (
-        <div
-          className="rounded-lg border bg-white px-3 py-1.5 mb-2"
-          style={{
-            // below the picker row, which is itself stuck under the header
-            position: "sticky", top: "calc(var(--hdr-h, 92px) + 46px)", zIndex: 20,
-            borderColor: "#E2E0DA", borderLeft: "5px solid #E8600A",
-            boxShadow: "0 4px 14px rgba(0,0,0,.10)",
-          }}
-        >
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="font-bold" style={{ color: "#16232F", fontSize: 15 }}>JOB {jobNo(dj.id)}</span>
-            <span className="text-sm font-semibold truncate" style={{ color: "#1B3A5C", maxWidth: "46ch" }}>{dj.tag}</span>
-            <span className="text-xs truncate" style={{ color: "#8A94A0" }}>{dj.cust} · {dj.fam} · {V(dj.val)} · {dj.stat}</span>
-          </div>
-        </div>
-      )}
+      {/* A 1px sentinel: once THIS leaves the top, the row above is pinned.
+          The row cannot detect that itself -- a sticky element never leaves the
+          viewport, so watching it would never fire. */}
+      <div ref={hdrCardRef} style={{ height: 1 }} />
 
-      {/* header card — facts on the left, Genie's read on the right */}
-      <div ref={hdrCardRef} className="flex gap-3 mb-3 items-stretch" style={{ flexWrap: "wrap" }}>
+      {/* header card — facts on the left, Genie's read on the right.
+          It follows you down the page: everything below it looks the same from
+          job to job, and which job you are editing should not need a scroll
+          back up. Capped at 42vh so that on a narrow screen, where the three
+          cards stack, it scrolls inside itself instead of eating the page. */}
+      <div
+        className="flex gap-3 mb-3 items-stretch"
+        style={{
+          flexWrap: "wrap",
+          position: "sticky",
+          top: "calc(var(--hdr-h, 92px) + 46px)",
+          zIndex: 21,
+          background: "#F1EFE9",
+          paddingTop: 6,
+          maxHeight: "42vh",
+          overflowY: "auto",
+          boxShadow: hdrGone ? "0 10px 18px -12px rgba(0,0,0,.35)" : undefined,
+        }}
+      >
       <div className="bg-white rounded-lg p-3 border" style={{ borderColor: "#E2E0DA", borderLeft: "5px solid #E8600A", flex: "1 1 620px", minWidth: 320 }}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

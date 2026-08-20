@@ -37,6 +37,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.11.1.0",
+    date: "2026-08-20",
+    module: "Job Plan",
+    items: [
+      "The whole job header follows you down the page now — JOB number and tag, WHERE IT STANDS, and the Genie hint with its AT RISK flag. Yesterday it was replaced by a slim strip carrying only the job number and the customer; the figures and the verdict are the half worth keeping on screen while you work down the milestones.",
+      "The slim strip is gone rather than kept alongside. Two versions of the same header, one replacing the other on scroll, is a page that appears to change shape as you read it.",
+      "Capped at 42% of the window height. On a narrow screen the three cards stack, and a header that grows to half a page is not a header — past that it scrolls inside itself and the page keeps its room.",
+      "A shadow appears under it the moment it starts covering content, and not a pixel before: a 1px sentinel above the row is what reports that, because a sticky element never leaves the viewport and so can never detect its own pinning.",
+    ],
+  },
+  {
     v: "3.11.0.0",
     date: "2026-08-19",
     module: "On Floor",
