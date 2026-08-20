@@ -7439,13 +7439,39 @@ function OnFloor({
   const totTp = jobs.reduce((s, j) => s + tpOf(j), 0);
   const late = jobs.filter((j) => j.tdd && j.tdd < TODAY);
 
+  /**
+   * What the floor has said TODAY.
+   *
+   * The count that matters is not how many recordings exist — it is whether
+   * anybody spoke this morning. Two updates across sixty jobs on the floor is
+   * the finding, and it is only visible if today is counted on its own.
+   *
+   * Compared on the local date rather than a 24-hour window: "today" to
+   * somebody on the shop floor means since they came in, not since this time
+   * yesterday.
+   */
+  const todayNotes = notes.filter((n) => String(n.at).slice(0, 10) === TODAY);
+  const todayJobs = new Set(todayNotes.map((n) => n.job_id)).size;
+
   return (
     <div className="p-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
         <StatCard label="ON FLOOR" value={String(jobs.length)} sub="jobs being worked on now" color="#0D7A3F" />
         <StatCard label="VALUE" value={V(totVal)} color="#1B3A5C" />
         <StatCard label="THROUGHPUT" value={V(totTp)} sub={totVal ? `${Math.round((totTp / totVal) * 100)}% of value` : ""} color="#E8600A" />
         <StatCard label="ALREADY LATE" value={String(late.length)} sub={late.length ? "past target delivery" : "none past target"} color={late.length ? "#B3261E" : "#0D7A3F"} />
+        <StatCard
+          label="SHOP UPDATES TODAY"
+          value={String(todayNotes.length)}
+          sub={
+            todayNotes.length
+              ? `on ${todayJobs} of ${jobs.length} job${jobs.length === 1 ? "" : "s"} on the floor`
+              : jobs.length
+                ? "nobody has said anything yet today"
+                : ""
+          }
+          color={todayNotes.length ? "#7C3AED" : "#8A94A0"}
+        />
       </div>
 
       {!installed && (
@@ -8492,8 +8518,24 @@ function ShopUpdatesBody({ job }: { job: Job }) {
       .finally(() => setLoading(false));
   }, [job.id]);
 
+  const todayN = notes.filter((n) => String(n.at).slice(0, 10) === TODAY).length;
+
   return (
     <>
+          {/* Today first. "Nine updates on record" says nothing about whether
+              anybody has looked at this job this morning; "2 today" does. */}
+          {!loading && (
+            <div className="flex items-baseline gap-3 flex-wrap mb-2">
+              <span className="rounded px-2 py-1 text-sm font-bold"
+                style={{ background: todayN ? "#F3EEFB" : "#F4F2EC", color: todayN ? "#7C3AED" : "#8A94A0" }}>
+                {todayN} today
+              </span>
+              <span className="text-xs" style={{ color: "#8A94A0" }}>
+                {notes.length} in total{notes.length ? ` · latest ${new Date(notes[0].at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}
+              </span>
+            </div>
+          )}
+
           {job.floorSummary && (
             <div className="rounded p-3 mb-3" style={{ background: "#F3EEFB", border: "1px solid #C9B6EA" }}>
               <div className="text-xs font-bold" style={{ color: "#7C3AED", letterSpacing: .6 }}>✨ GENIE — THE READ ON THIS JOB</div>

@@ -66,6 +66,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.16.0.1",
+    date: "2026-08-21",
+    module: "On Floor",
+    items: [
+      "SHOP UPDATES TODAY, as a card at the top of On Floor: how many were recorded today, and on how many of the jobs on the floor. The count that matters is not how many recordings exist — it is whether anybody spoke this morning. Two updates across nineteen jobs on the floor is itself the finding, and it is only visible if today is counted on its own.",
+      "Each job's Shop Updates opens with the same thing: how many today, then the total and when the last one was. \"Nine on record\" says nothing about whether anybody has looked at the job this morning.",
+      "Today means the local date, not the last 24 hours — to somebody on the shop floor today means since they came in, not since this time yesterday.",
+    ],
+  },
+  {
     v: "3.16.0.0",
     date: "2026-08-21",
     module: "On Floor",
