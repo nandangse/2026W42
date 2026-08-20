@@ -382,7 +382,7 @@ export default function PlanningSuite({
   }, [workspace, canSeeDelivered]);
 
   // land on "My Week" within the suite, not the delivery board
-  const [tab, setTab] = useState<"home" | "wip" | "delivery" | "load" | "plan" | "floor" | "material" | "esc" | "erp" | "upload" | "admin">("home");
+  const [tab, setTab] = useState<"home" | "wip" | "delivery" | "load" | "plan" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature">("home");
 
   // ---- browser back/forward navigates within the app, not out of it ----
   // Every workspace/tab change pushes a history entry; popstate restores it.
@@ -872,6 +872,14 @@ export default function PlanningSuite({
                         ⬆ Upload Files {loadedCount}/3
                       </button>
                     )}
+                    <button
+                      onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("feature"); }}
+                      className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
+                      style={{ color: "#16232F", borderBottom: "1px solid #EEECE6" }}
+                      title="Ask for something in Genie — anyone can, and everyone can read the rest"
+                    >
+                      💡 Feature Request
+                    </button>
                     {isAdmin && (
                       <button
                         onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("admin"); }}
@@ -979,7 +987,8 @@ export default function PlanningSuite({
         <DeliveryBoard showForward={canSeeForward} board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
       </div>
       {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} canEdit={canEdit} reload={reload} />}
-      {workspace === "suite" && tab === "floor" && <OnFloor board={board} V={V} onOpen={openJobPlan} reload={reload} canEdit={canEdit} isStrat={canSeeForward} />}
+      {workspace === "suite" && tab === "feature" && <FeatureRequests isOwner={isRaghu} />}
+      {workspace === "suite" && tab === "floor" && <OnFloor board={board} V={V} onOpen={openJobPlan} reload={reload} canEdit={canEdit} isStrat={canSeeForward} myName={(displayName || email.split("@")[0]).split(" ")[0]} />}
       {workspace === "suite" && tab === "material" && <PendingMaterial board={board} onOpen={openJobPlan} reload={reload} canEdit={canEdit} />}
       {workspace === "suite" && tab === "esc" && <Escalations board={board} V={V} onOpen={openJobPlan} reload={reload} isAdmin={isAdmin} />}
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
@@ -7347,6 +7356,7 @@ function OnFloor({
   reload,
   canEdit,
   isStrat,
+  myName,
 }: {
   board: Board;
   V: (n: number) => string;
@@ -7354,6 +7364,8 @@ function OnFloor({
   reload: () => Promise<Board | null>;
   canEdit: boolean;
   isStrat: boolean;
+  /** Who to thank when they leave an update. */
+  myName: string;
 }) {
   interface Note { id: string; job_id: string; url: string | null; seconds: number | null; transcript: string; summary: string; by: string | null; at: string }
   const [notes, setNotes] = useState<Note[]>([]);
@@ -7533,7 +7545,8 @@ function OnFloor({
                 {/* the floor's own words */}
                 <div className="floor-cell" style={{ flex: "2 1 340px", minWidth: 0 }}>
                   <VoiceNotes jobId={j.id} notes={mine} installed={installed} onSaved={load}
-                    floor={j.floorSummary} floorAt={j.floorSummaryAt} />
+                    floor={j.floorSummary} floorAt={j.floorSummaryAt}
+                    thanksFor={{ name: myName, tdd: j.tdd, job: jobNo(j.id) }} />
                 </div>
               </div>
             </div>
@@ -7693,6 +7706,7 @@ function VoiceNotes({
   onSaved,
   floor,
   floorAt,
+  thanksFor,
 }: {
   jobId: string;
   notes: { id: string; url: string | null; seconds: number | null; transcript: string; summary: string; by: string | null; at: string }[];
@@ -7701,6 +7715,8 @@ function VoiceNotes({
   /** Genie's read of the last three. Written when a note is recorded. */
   floor?: string | null;
   floorAt?: string | null;
+  /** Enough to thank the person by name and tell them what they just moved. */
+  thanksFor?: { name: string; tdd: string | null; job: string };
 }) {
   /** Three in front of you; the rest a click away, never deleted. */
   const RECENT = 3;
@@ -7710,6 +7726,8 @@ function VoiceNotes({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [openNote, setOpenNote] = useState<string | null>(null);
+  /** Shown once, straight after a note is saved. */
+  const [thanks, setThanks] = useState(false);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -7747,6 +7765,7 @@ function VoiceNotes({
           const j = await r.json();
           if (!r.ok) throw new Error(j.error || "Could not save the note");
           onSaved();
+          setThanks(true);
         } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
         setBusy(false);
         setLive("");
@@ -7863,6 +7882,10 @@ function VoiceNotes({
           )}
         </div>
       ))}
+
+      {thanks && thanksFor && (
+        <ThankYou who={thanksFor.name} tdd={thanksFor.tdd} job={thanksFor.job} onClose={() => setThanks(false)} />
+      )}
 
       {notes.length > RECENT && (
         <button
@@ -8492,6 +8515,341 @@ function TaskProposals({ jobId }: { jobId: string }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ============================ Feature Requests ============================
+
+const WANTS: [string, string, string][] = [
+  ["must", "Must have", "#B3261E"],
+  ["good", "Good to have", "#D97706"],
+  ["future", "Future potential", "#1B3A5C"],
+];
+const FR_STATUSES: [string, string, string][] = [
+  ["open", "Open", "#5A6672"],
+  ["planned", "Planned", "#7C3AED"],
+  ["done", "Done", "#0D7A3F"],
+  ["declined", "Not doing", "#8A94A0"],
+];
+
+/**
+ * Asking for something in Genie, inside Genie.
+ *
+ * Requests arrive today as a sentence in a chat or a remark on a call, and the
+ * ones not acted on the same day are gone. This gives them somewhere to sit
+ * with what was actually meant: the words, a picture of the screen, and how
+ * badly it is wanted.
+ *
+ * HOW BADLY is stated by the person asking, not inferred from how forcefully
+ * they asked. Everything sounds urgent in the sentence it is written in;
+ * almost nothing is, and the person asking knows which.
+ */
+function FeatureRequests({ isOwner }: { isOwner: boolean }) {
+  interface F {
+    id: string; title: string; body: string; want: string; status: string; note: string;
+    by: string | null; at: string; acted_by: string | null;
+    files: { id: string; name: string; mime: string | null; url: string | null }[];
+  }
+  const [items, setItems] = useState<F[]>([]);
+  const [installed, setInstalled] = useState(true);
+  const [writing, setWriting] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [title, setTitle] = useState("");
+  const [want, setWant] = useState("good");
+  const [files, setFiles] = useState<File[]>([]);
+  const editor = useRef<HTMLDivElement | null>(null);
+  const pick = useRef<HTMLInputElement | null>(null);
+
+  const load = useCallback(() => {
+    api.get("/api/feature")
+      .then((r: { installed?: boolean; items?: F[] }) => { setInstalled(r.installed !== false); setItems(r.items || []); })
+      .catch(() => setInstalled(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const cmd = (c: string) => {
+    editor.current?.focus();
+    document.execCommand(c);
+  };
+
+  const submit = async () => {
+    if (title.trim().length < 3) { setErr("Give it a title."); return; }
+    setBusy(true); setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("title", title);
+      fd.append("body", editor.current?.innerHTML || "");
+      fd.append("want", want);
+      files.forEach((f) => fd.append("file", f));
+      const r = await fetch("/api/feature", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save that");
+      setTitle(""); setWant("good"); setFiles([]);
+      if (editor.current) editor.current.innerHTML = "";
+      setWriting(false);
+      load();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+
+  const setStatus = async (f: F, status: string) => {
+    try {
+      await fetch("/api/feature", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: f.id, status, note: f.note }),
+      });
+      load();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+  };
+
+  const shown = items.filter((f) => filter === "all" || f.want === filter || f.status === filter);
+  const count = (k: string) => items.filter((f) => f.want === k && f.status === "open").length;
+
+  return (
+    <div className="p-4" style={{ maxWidth: 980 }}>
+      <div className="flex items-baseline gap-2 flex-wrap mb-1">
+        <h2 className="font-bold text-lg" style={{ color: "#16232F" }}>Feature Requests</h2>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>
+          ask for anything in Genie — everyone can raise one and read the rest
+        </span>
+      </div>
+
+      {!installed && (
+        <div className="text-xs rounded p-2 mb-2" style={{ background: "#FFF7E6", color: "#8A5A00" }}>
+          Run migration 0045 — requests have nowhere to go yet.
+        </div>
+      )}
+      {err && <div className="text-xs font-bold rounded p-2 mb-2" style={{ background: "#FBEDEA", color: "#B3261E" }}>{err}</div>}
+
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        {WANTS.map(([k, label, c]) => (
+          <StatCard key={k} label={label.toUpperCase()} value={String(count(k))} sub="still open" color={c} />
+        ))}
+      </div>
+
+      <div className="flex gap-2 mb-3 flex-wrap items-center">
+        {!writing && installed && (
+          <button onClick={() => setWriting(true)} className="rounded px-4 py-1.5 text-sm font-bold text-white" style={{ background: "#E8600A" }}>
+            + Raise a request
+          </button>
+        )}
+        <select value={filter} onChange={(e) => setFilter(e.target.value)}
+          className="px-2 py-1 rounded border text-sm font-semibold" style={{ borderColor: "#D9D6CD" }}>
+          <option value="all">Everything</option>
+          {WANTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          {FR_STATUSES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </select>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>{shown.length} shown</span>
+      </div>
+
+      {writing && (
+        <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: "#E8600A" }}>
+          <input
+            autoFocus value={title} onChange={(e) => setTitle(e.target.value)}
+            placeholder="What do you want, in one line?"
+            className="w-full text-sm font-bold border rounded px-2 py-1.5 mb-2"
+            style={{ borderColor: "#E2E0DA" }}
+          />
+
+          <div className="flex gap-1 mb-1">
+            {([["bold", "B"], ["italic", "I"], ["insertUnorderedList", "• list"], ["insertOrderedList", "1. list"]] as const).map(([c, l]) => (
+              <button key={c} onMouseDown={(e) => { e.preventDefault(); cmd(c); }}
+                className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: "#F4F2EC", color: "#22303C" }}>{l}</button>
+            ))}
+            <span className="text-xs ml-auto" style={{ color: "#B8B5AC" }}>write as much as you like</span>
+          </div>
+          <div
+            ref={editor}
+            contentEditable
+            suppressContentEditableWarning
+            className="w-full text-sm border rounded px-3 py-2"
+            style={{ borderColor: "#E2E0DA", minHeight: 220, lineHeight: 1.6, outline: "none", background: "#fff" }}
+          />
+
+          <div className="flex gap-2 items-center flex-wrap mt-2">
+            <label className="text-xs font-semibold" style={{ color: "#5A6672" }}>
+              How badly{" "}
+              <select value={want} onChange={(e) => setWant(e.target.value)}
+                className="text-sm border rounded px-2 py-1 font-semibold"
+                style={{ borderColor: "#E2E0DA", color: WANTS.find(([k]) => k === want)?.[2] }}>
+                {WANTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            </label>
+            <input ref={pick} type="file" multiple style={{ display: "none" }}
+              onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 5))} />
+            <button onClick={() => pick.current?.click()} className="rounded px-3 py-1 text-xs font-bold" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>
+              📎 Attach {files.length ? `· ${files.length}` : ""}
+            </button>
+            {files.length > 0 && (
+              <span className="text-xs truncate" style={{ color: "#8A94A0", maxWidth: 260 }}>{files.map((f) => f.name).join(", ")}</span>
+            )}
+            <button onClick={submit} disabled={busy} className="rounded px-4 py-1.5 text-sm font-bold text-white ml-auto"
+              style={{ background: busy ? "#B8B5AC" : "#0D7A3F" }}>{busy ? "sending…" : "Send it"}</button>
+            <button onClick={() => setWriting(false)} className="text-xs font-semibold" style={{ color: "#8A94A0" }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {shown.length === 0 && installed && !writing && (
+        <div className="text-sm rounded-lg border p-4" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#8A94A0" }}>
+          Nothing here yet.
+        </div>
+      )}
+
+      {shown.map((f) => {
+        const w = WANTS.find(([k]) => k === f.want);
+        const st = FR_STATUSES.find(([k]) => k === f.status);
+        return (
+          <div key={f.id} className="bg-white rounded-lg border p-3 mb-2" style={{ borderColor: "#E2E0DA", borderLeft: `4px solid ${w?.[2] || "#E2E0DA"}` }}>
+            <div className="flex items-start gap-2 flex-wrap">
+              <div className="flex-1" style={{ minWidth: 240 }}>
+                <div className="font-bold text-sm" style={{ color: "#16232F" }}>{f.title}</div>
+                <div className="text-xs" style={{ color: "#8A94A0" }}>
+                  {whoTag(f.by)} · {fmtFull(String(f.at).slice(0, 10))}
+                </div>
+              </div>
+              <span className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: `${w?.[2]}18`, color: w?.[2] }}>{w?.[1]}</span>
+              {isOwner ? (
+                <select value={f.status} onChange={(e) => setStatus(f, e.target.value)}
+                  className="text-xs border rounded px-1 py-0.5 font-bold bg-white"
+                  style={{ borderColor: "#E2E0DA", color: st?.[2] }}>
+                  {FR_STATUSES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+              ) : (
+                <span className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: "#F4F2EC", color: st?.[2] }}>{st?.[1]}</span>
+              )}
+            </div>
+
+            {f.body && (
+              <div className="text-sm mt-2 feature-body" style={{ color: "#22303C", lineHeight: 1.6 }}
+                dangerouslySetInnerHTML={{ __html: f.body }} />
+            )}
+
+            {f.files.length > 0 && (
+              <div className="flex gap-2 flex-wrap mt-2">
+                {f.files.map((a) => (
+                  a.url && /^image\//.test(a.mime || "") ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <a key={a.id} href={a.url} target="_blank" rel="noreferrer">
+                      <img src={a.url} alt={a.name} style={{ height: 90, borderRadius: 4, border: "1px solid #E2E0DA" }} />
+                    </a>
+                  ) : (
+                    <a key={a.id} href={a.url || "#"} target="_blank" rel="noreferrer"
+                      className="text-xs rounded px-2 py-1" style={{ background: "#F4F2EC", color: "#1B3A5C" }}>📎 {a.name}</a>
+                  )
+                ))}
+              </div>
+            )}
+
+            {f.note && (
+              <div className="text-xs mt-2 rounded px-2 py-1" style={{ background: "#F4F2EC", color: "#5A6672" }}>
+                <b>{whoTag(f.acted_by)}:</b> {f.note}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The thank-you, straight after a shop-floor update.
+ *
+ * Recording a note is a small act of generosity — somebody stopped work to
+ * tell the rest of the company something. Saying so, by name, and showing what
+ * it just moved, is the cheapest thing in this whole application and probably
+ * the one that decides whether the second note ever gets recorded.
+ *
+ * The days figure is the point. "Thank you" alone is manners; "thank you, and
+ * this job is eleven days overdue" is manners plus a reason to have bothered.
+ *
+ * The photograph is picked at random from public/coach so it is not the same
+ * face every time, and hides itself if that number is not there — no manifest
+ * to keep in step with the folder.
+ */
+function ThankYou({
+  who, tdd, job, onClose,
+}: { who: string; tdd: string | null; job: string; onClose: () => void }) {
+  const COACH_MAX = 12;
+  const [pic, setPic] = useState(() => 1 + Math.floor(Math.random() * COACH_MAX));
+  const [ext, setExt] = useState("jpg");
+  const [hide, setHide] = useState(false);
+
+  // Closes itself: this is a thank-you, not a dialogue.
+  useEffect(() => {
+    const t = setTimeout(onClose, 7000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  const days = tdd ? diffDays(TODAY, tdd) : null;
+  const overdue = days != null && days < 0;
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 flex items-center justify-center p-4"
+      style={{ background: "rgba(13,22,31,.55)", zIndex: 70 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="rounded-lg"
+        style={{ background: "#fff", maxWidth: 470, width: "100%", overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.35)" }}
+      >
+        <div style={{ background: "#16232F", padding: "16px 18px", display: "flex", gap: 14, alignItems: "center" }}>
+          {!hide && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/coach/${pic}.${ext}`}
+              alt=""
+              onError={() => {
+                // try png for the same number, then give up quietly
+                if (ext === "jpg") setExt("png");
+                else if (pic !== 1) { setPic(1); setExt("jpg"); }
+                else setHide(true);
+              }}
+              style={{ width: 54, height: 54, borderRadius: "50%", objectFit: "cover", border: "2px solid #F5B32B", flexShrink: 0 }}
+            />
+          )}
+          <div style={{ color: "#fff" }}>
+            <div style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.2 }}>Thank you {who}!</div>
+            <div style={{ fontSize: 12, color: "#8FA1B3" }}>your update is on JOB {job}</div>
+          </div>
+        </div>
+
+        <div style={{ padding: "16px 18px" }}>
+          <p style={{ margin: 0, fontSize: 14.5, color: "#22303C", lineHeight: 1.6 }}>
+            This update will help move this job.
+          </p>
+          {tdd ? (
+            <p style={{ margin: "8px 0 0", fontSize: 14.5, color: "#22303C", lineHeight: 1.6 }}>
+              Target delivery is <b>{fmtFull(tdd)}</b>
+              {days === 0 ? (
+                <> — <b style={{ color: "#D97706" }}>that is today</b>.</>
+              ) : overdue ? (
+                <> — <b style={{ color: "#B3261E" }}>{Math.abs(days as number)} days overdue!</b></>
+              ) : (
+                <> — <b style={{ color: "#0D7A3F" }}>{days} days away</b>.</>
+              )}
+            </p>
+          ) : (
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: "#8A94A0" }}>
+              This job carries no target delivery date yet.
+            </p>
+          )}
+          <button
+            onClick={onClose}
+            className="rounded px-4 py-1.5 text-sm font-bold text-white"
+            style={{ background: "#E8600A", marginTop: 14 }}
+          >
+            Back to it
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

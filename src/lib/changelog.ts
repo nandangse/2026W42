@@ -63,6 +63,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.15.0.0",
+    date: "2026-08-20",
+    module: "Feature Requests · On Floor",
+    items: [
+      "NEW — FEATURE REQUEST, in the account menu. Anyone signed in can ask for something in Genie, with a large rich text box (bold, italics, lists), attachments including screenshots, and how badly it is wanted: Must have, Good to have, or Future potential.",
+      "How badly is a FIELD, stated by the person asking, not read off how forcefully they asked. Everything sounds urgent in the sentence it is written in; almost nothing is, and the person asking knows which.",
+      "Everyone can read the whole list. A backlog only its owner can see is a list nobody else stops duplicating. Anyone may raise one; only Dr Raghu sets a status — a backlog where everyone can mark their own request \"planned\" is not a backlog.",
+      "THANK YOU, after a shop-floor update. Record a note and it says thank you by name, and what the update just moved: the target delivery date, and whether that is days away or — in red — days overdue.",
+      "Recording a note is somebody stopping work to tell the rest of the company something. Saying so is the cheapest thing in this application and probably what decides whether a second note ever gets recorded. The days figure is the point: \"thank you\" alone is manners; \"thank you, and this job is eleven days overdue\" is manners with a reason to have bothered.",
+      "It shows a photograph of Dr Raghu, picked at random so it is not the same face every time. Drop them into public/coach as 1.jpg … 12.jpg; a missing number simply hides itself, so no list has to be kept in step with the folder.",
+      "Needs migration 0045 for the requests. The thank-you needs nothing.",
+    ],
+  },
+  {
     v: "3.14.0.0",
     date: "2026-08-20",
     module: "On Floor",

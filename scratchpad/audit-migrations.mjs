@@ -61,6 +61,7 @@ const PROBES = [
   ["0042 job photos",         "job_photo", "taken_on"],
   ["0043 floor summary",      "jobs", "floor_summary"],
   ["0044 task proposals",     "task_proposal", "title"],
+  ["0045 feature requests",   "feature_request", "want"],
 ];
 
 const missing = [];
