@@ -66,6 +66,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.15.0.2",
+    date: "2026-08-20",
+    module: "On Floor",
+    items: [
+      "THE READ ON THIS JOB, replacing the summary that only paraphrased the notes. It now gets the JOB as well as the recordings — target date and how far past it, kitted against built, value, throughput, the escalation on record, the money needed, and every open task — so it reads the way somebody running the works would read it, not like a transcript with the verbs changed.",
+      "Speakers are named. Each note goes in tagged with the initials, so the read can say \"MT says the fasteners are stuck on payment; PS has not confirmed the drawings\". Three unattributed accounts read as one confused voice; with initials on them, a disagreement between the shop and purchasing is visible AS a disagreement.",
+      "It is told to say where the notes and the board disagree. A job 90% kitted and 10% built with nobody reporting a blocker is itself the finding, and the old version could never have said so because it had never been shown the board.",
+      "Still told to invent nothing, and that a job with no target date is undated rather than overdue.",
+      "The \"Data: n active jobs · kitting x%\" line is gone from the header. Both figures live on the boards that use them, in context and beside what they mean; repeating them at the top of every screen cost a line to say something nobody read there.",
+      "The migration audit was checking 34 of 45 migrations and still reporting \"everything present\". It now probes the Sales Genie tables and calls the permission functions directly — the ones that create only a function had nothing a column probe could ever see.",
+    ],
+  },
+  {
     v: "3.15.0.1",
     date: "2026-08-20",
     module: "Job photos",

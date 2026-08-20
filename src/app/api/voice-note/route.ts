@@ -153,25 +153,91 @@ export async function POST(req: Request) {
           .eq("job_id", jobId)
           .order("at", { ascending: false })
           .limit(RECENT);
+
+        /**
+         * WHO said it, not just what was said.
+         *
+         * Three unattributed accounts read as one confused voice. With the
+         * initials on each, a disagreement between the shop and purchasing is
+         * visible as a disagreement rather than as Genie contradicting itself.
+         */
+        const initials = (v: unknown) => {
+          const raw = String(v || "").trim();
+          if (!raw) return "??";
+          const local = raw.split("@")[0];
+          const parts = local.split(/[._\s-]+/).filter(Boolean);
+          return (parts.length > 1
+            ? parts.map((x) => x[0]).join("")
+            : local.slice(0, 3)
+          ).toUpperCase().slice(0, 3);
+        };
         const said = (recent || [])
           .reverse()
-          .map((n, i) => `(${i + 1}) ${String(n.at).slice(0, 16).replace("T", " ")} — ${n.transcript || n.summary}`)
+          .map((n) => `[${initials(n.by)} · ${String(n.at).slice(0, 16).replace("T", " ")}] ${n.transcript || n.summary}`)
           .join("\n");
+
+        /**
+         * The job itself, so the read is about THIS job and not just about
+         * three sentences somebody spoke.
+         *
+         * Without it the summary can only paraphrase the notes, which is what
+         * made the first version read like a transcript with the verbs
+         * changed. A delivery date eleven days gone, 90% kitted and 10% built,
+         * an escalation already on the record — that is the context somebody
+         * running the works brings to the same three sentences, and it is what
+         * turns a paraphrase into a read.
+         */
+        const { data: J } = await admin
+          .from("jobs")
+          .select("tag, cust, fam, tdd, val, tpv, kit, pct, stat, escalation, own, amt_needed, pay_on_delivery")
+          .eq("id", jobId)
+          .maybeSingle();
+        const { data: openT } = await admin
+          .from("manual_tasks")
+          .select("title, who, due, esc")
+          .eq("job_id", jobId)
+          .eq("done", false)
+          .limit(12);
+        const cr = (n: unknown) => `${((Number(n) || 0) / 1e7).toFixed(2)} Cr`;
+        const days = J?.tdd
+          ? Math.round((new Date(J.tdd + "T00:00:00Z").getTime() - new Date(today() + "T00:00:00Z").getTime()) / 864e5)
+          : null;
+        const context = J
+          ? [
+              `JOB ${jobId.slice(-4)} — ${J.tag}`,
+              `Customer ${J.cust} · ${J.fam}`,
+              `Target delivery ${J.tdd || "none set"}${days == null ? "" : days < 0 ? ` — ${Math.abs(days)} DAYS OVERDUE` : ` — ${days} days away`}`,
+              `Kitted ${J.kit || 0}% · built ${J.pct || 0}% · ERP status "${J.stat || "—"}"`,
+              `Value ${cr(J.val)} · throughput ${cr(J.tpv)}`,
+              J.escalation ? `Project escalation on record: ${String(J.escalation).slice(0, 400)}` : "",
+              J.amt_needed ? `Amount needed next month: ${cr(J.amt_needed)}` : "",
+              `Planning owner: ${J.own || "unassigned"}`,
+              (openT || []).length
+                ? `Open tasks:\n${(openT || []).map((t) => `  - ${t.title} (${t.who || "unassigned"}${t.due ? `, due ${t.due}` : ""}${t.esc && t.esc !== "None" ? `, ${t.esc}` : ""})`).join("\n")}`
+                : "No open tasks on record.",
+            ].filter(Boolean).join("\n")
+          : "";
         if (said.trim()) {
           const r = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
             headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
             body: JSON.stringify({
               model: "claude-sonnet-4-5-20250929",
-              max_tokens: 300,
+              max_tokens: 700,
               system:
-                "You are Genie, reading voice notes left at the machine on a shop floor at Nandan GSE.\n\n" +
-                "Write the CURRENT POSITION on this job in two or three sentences, from the notes below in time order.\n\n" +
-                "- The latest note wins where they disagree — say what changed rather than reporting both.\n" +
-                "- Lead with the blocker if there is one, and name what is needed and from whom.\n" +
-                "- Only what was said. No advice, no encouragement, nothing invented.\n" +
-                "- Plain English, short sentences. No 'the speaker states'.",
-              messages: [{ role: "user", content: said }],
+                "You are Genie, writing the standing read on a job at Nandan GSE — the way Dr Raghu Nandan would put it to the planning team.\n\n" +
+                "You are given the JOB as it stands and the shop-floor voice notes, each tagged with the speaker's initials.\n\n" +
+                "Write 3 to 5 sentences:\n" +
+                "1. WHERE IT STANDS — the date, how far in, and whether that adds up. Lead with the thing that decides the delivery.\n" +
+                "2. WHAT THE FLOOR IS SAYING — attribute it. 'MT says the fasteners are stuck on payment; PS has not confirmed the drawings.' Name the initials.\n" +
+                "3. WHAT IT MEANS — where the notes and the board disagree, say so. A job 90% kitted and 10% built with nobody reporting a blocker is itself the finding.\n" +
+                "4. WHAT IS NEEDED, from whom, by when — only where somebody actually said it or the board plainly shows it.\n\n" +
+                "Rules that matter more than being helpful:\n" +
+                "- Invent NOTHING. No date, quantity or name that is not in front of you.\n" +
+                "- Never let a missing value read as zero. A job with no target date is undated, not overdue.\n" +
+                "- The latest note wins where notes disagree — say what changed.\n" +
+                "- Plain English, short sentences, no management register. No 'the speaker states'. Never open with 'This job'.",
+              messages: [{ role: "user", content: `${context}\n\nSHOP-FLOOR NOTES, oldest first:\n${said}` }],
             }),
           });
           const jr = await r.json();

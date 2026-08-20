@@ -14,6 +14,39 @@ const URL_ = env.NEXT_PUBLIC_SUPABASE_URL, KEY = env.SUPABASE_SERVICE_ROLE_KEY;
 const H = { apikey: KEY, authorization: `Bearer ${KEY}` };
 
 // migration -> [table, column?] that only exists once it has run
+/**
+ * Migrations that create only FUNCTIONS have no column to look for, which is
+ * why 0004, 0007, 0008, 0011 and 0016 sat unprobed for months while the audit
+ * cheerfully reported "everything present".
+ *
+ * PostgREST exposes a no-argument function as an RPC, so they can simply be
+ * called. A missing one comes back as a schema-cache miss; one that exists but
+ * refuses (no JWT, so is_owner() is null) still proves it is THERE, which is
+ * the only thing this is asking.
+ */
+const FUNCS = [
+  ["0004 jwt_role",           "jwt_role"],
+  ["0008 is_reader",          "is_reader"],
+  ["0011 is_owner",           "is_owner"],
+  ["0011 has_goals_access",   "has_goals_access"],
+  ["0016 is_tasker",          "is_tasker"],
+];
+
+async function probeFuncs() {
+  const out = [];
+  for (const [label, fn] of FUNCS) {
+    const r = await fetch(`${URL_}/rest/v1/rpc/${fn}`, {
+      method: "POST",
+      headers: { ...H, "content-type": "application/json" },
+      body: "{}",
+    });
+    // 404 / PGRST202 means no such function; anything else means it is there.
+    const missing = r.status === 404 || /PGRST202/.test(await r.clone().text());
+    out.push([label, !missing]);
+  }
+  return out;
+}
+
 const PROBES = [
   ["0001 profiles",           "profiles", "id"],
   ["0002 erp tables",         "jobs", "id"],
@@ -62,6 +95,11 @@ const PROBES = [
   ["0043 floor summary",      "jobs", "floor_summary"],
   ["0044 task proposals",     "task_proposal", "title"],
   ["0045 feature requests",   "feature_request", "want"],
+  // Sales Genie's own tables — 0014 and 0015 were never probed at all.
+  ["0014 sales plan",         "sp_companies", "id"],
+  ["0014 sales people",       "sp_people", "id"],
+  ["0015 sales deals",        "sp_deals", "id"],
+  ["0016 sales access",       "sales_access", "person_id"],
 ];
 
 const missing = [];
@@ -73,4 +111,9 @@ for (const [label, table, col] of PROBES) {
   if (!ok) { const b = await r.json().catch(() => ({})); why = "  <- " + (b.message || r.status); }
   console.log(`${ok ? " OK  " : "MISS "} ${label}${why}`);
 }
+for (const [label, ok] of await probeFuncs()) {
+  if (!ok) missing.push(label);
+  console.log(`${ok ? " OK  " : "MISS "} ${label}()`);
+}
+
 console.log(missing.length ? `\n${missing.length} MISSING: ${missing.join(", ")}` : "\neverything present");

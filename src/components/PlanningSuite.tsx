@@ -971,11 +971,10 @@ export default function PlanningSuite({
         {/* The "Restricted — authorised planning users only" line is gone: it
             was true, and it told nobody anything they could act on, while
             costing a whole line of a header that is on screen all day. */}
-        <div className="text-xs mt-1 flex gap-3 flex-wrap" style={{ color: "#3A4A5A" }}>
-          <span style={{ color: "#F5B32B" }}>
-            Data: {board.jobs.length} active jobs · kitting {board.aggregates.kittingPct.toFixed(1)}%
-          </span>
-        </div>
+        {/* The "Data: n active jobs · kitting x%" line is gone too. Both
+            figures are on the boards that use them, in context and next to
+            what they mean — repeating them in the header cost a line on every
+            screen to say something nobody was reading there. */}
       </div>
 
       <QuoteOfDay trigger={quoteTrigger} />
@@ -7853,7 +7852,7 @@ function VoiceNotes({
       {floor && (
         <div className="rounded p-2 mb-1.5" style={{ background: "#F3EEFB", border: "1px solid #C9B6EA" }}>
           <div className="text-xs font-bold" style={{ color: "#7C3AED", letterSpacing: .6 }}>
-            ✨ GENIE — WHERE THIS STANDS
+            ✨ GENIE — THE READ ON THIS JOB
           </div>
           <div className="text-xs mt-0.5" style={{ color: "#22303C", lineHeight: 1.55 }}>{floor}</div>
           {floorAt && (
@@ -8443,7 +8442,7 @@ function ShopUpdatesBody({ job }: { job: Job }) {
     <>
           {job.floorSummary && (
             <div className="rounded p-3 mb-3" style={{ background: "#F3EEFB", border: "1px solid #C9B6EA" }}>
-              <div className="text-xs font-bold" style={{ color: "#7C3AED", letterSpacing: .6 }}>✨ GENIE — WHERE THIS STANDS</div>
+              <div className="text-xs font-bold" style={{ color: "#7C3AED", letterSpacing: .6 }}>✨ GENIE — THE READ ON THIS JOB</div>
               <div className="text-sm mt-1" style={{ color: "#22303C", lineHeight: 1.6 }}>{job.floorSummary}</div>
               {job.floorSummaryAt && (
                 <div style={{ fontSize: 10, color: "#8A94A0", marginTop: 4 }}>
