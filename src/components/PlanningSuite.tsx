@@ -3180,7 +3180,7 @@ function JobPlan({
     [board.jobs, board.archived, activeId],
   );
 
-  const [planView, setPlanView] = useState<"plan" | "mat" | "shop">("plan");
+  const [planView, setPlanView] = useState<"plan" | "mat" | "shop" | "pics">("plan");
   const [draft, setDraft] = useState<Plan | null>(null);
   const [applyTplName, setApplyTplName] = useState("");
   const templateNames = useMemo(() => Object.keys(board.templates).sort(), [board.templates]);
@@ -3541,9 +3541,9 @@ function JobPlan({
 
       {/* plan / materials sub-tabs */}
       <div className="flex gap-1 rounded p-1 bg-white border mb-3" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
-        {(["plan", "mat", "shop"] as const).map((k) => (
+        {(["plan", "mat", "shop", "pics"] as const).map((k) => (
           <button key={k} onClick={() => { if (k === "mat") ensureMats(); setPlanView(k); }} className="px-3 py-1 rounded text-sm font-semibold" style={planView === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>
-            {k === "plan" ? "Milestone Plan" : k === "mat" ? "Material Kitting" : "Shop Updates"}
+            {k === "plan" ? "Milestone Plan" : k === "mat" ? "Material Kitting" : k === "shop" ? "Shop Updates" : "Photos"}
           </button>
         ))}
       </div>
@@ -3551,6 +3551,21 @@ function JobPlan({
       {/* Shop Updates as a page rather than a lightbox: the same content, for
           somebody who came to READ the history rather than glance at it. */}
       {planView === "shop" && <ShopUpdatesPanel job={dj} />}
+
+      {/* The build history in pictures, as a page. Same gallery the On Floor
+          row opens — one component, so the two cannot disagree about what has
+          been taken. */}
+      {planView === "pics" && (
+        <div className="bg-white rounded-lg border p-3 mb-4" style={{ borderColor: "#E2E0DA" }}>
+          <div className="flex items-baseline gap-2 flex-wrap mb-2">
+            <h2 className="font-bold" style={{ color: "#16232F" }}>Photos</h2>
+            <span className="text-xs" style={{ color: "#8A94A0" }}>
+              JOB {jobNo(dj.id)} as it was built — each one keeps the completion it had on the day
+            </span>
+          </div>
+          <PhotoBody job={dj} canEdit={canEdit} />
+        </div>
+      )}
 
       {planView === "mat" && (
         <div>
@@ -8056,6 +8071,26 @@ function PrincipleFiles({ isOwner }: { isOwner: boolean }) {
  * does not, and "70% on 12 August" is what makes the pair worth keeping.
  */
 function PhotoGallery({ job, canEdit, onClose }: { job: Job; canEdit: boolean; onClose: () => void }) {
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.5)", zIndex: 60 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 860, maxHeight: "88vh", overflow: "auto" }}>
+        <div className="px-4 py-3" style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0, zIndex: 2 }}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs font-bold" style={{ letterSpacing: 1.2, color: "#8FA1B3" }}>PHOTOS</div>
+              <div className="font-bold" style={{ fontSize: 17 }}>JOB {jobNo(job.id)} · {job.tag}</div>
+            </div>
+            <button onClick={onClose} style={{ color: "#8FA1B3", fontSize: 18 }}>✕</button>
+          </div>
+        </div>
+        <div className="p-3"><PhotoBody job={job} canEdit={canEdit} /></div>
+      </div>
+    </div>
+  );
+}
+
+/** The gallery itself, shared by the lightbox and the Photos tab. */
+function PhotoBody({ job, canEdit }: { job: Job; canEdit: boolean }) {
   interface P { id: string; url: string | null; caption: string; pct: number | null; taken_on: string; by: string | null }
   const [photos, setPhotos] = useState<P[]>([]);
   const [installed, setInstalled] = useState(true);
@@ -8063,7 +8098,24 @@ function PhotoGallery({ job, canEdit, onClose }: { job: Job; canEdit: boolean; o
   const [err, setErr] = useState("");
   const [big, setBig] = useState<P | null>(null);
   const [form, setForm] = useState({ caption: "", pct: String(job.pct ?? ""), taken_on: TODAY });
+  /**
+   * The photo waiting to be saved.
+   *
+   * It used to upload the instant a file was chosen, which meant you could not
+   * see what you had picked, and the date, completion and caption you typed
+   * were applied to whatever you selected NEXT. Choose, look, then Save.
+   */
+  const [chosen, setChosen] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const pick = useRef<HTMLInputElement | null>(null);
+
+  // Object URLs are held by the browser until told otherwise.
+  useEffect(() => {
+    if (!chosen) { setPreview(null); return; }
+    const url = URL.createObjectURL(chosen);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [chosen]);
 
   const load = useCallback(() => {
     api.get(`/api/job-photo?job_id=${encodeURIComponent(job.id)}`)
@@ -8072,7 +8124,8 @@ function PhotoGallery({ job, canEdit, onClose }: { job: Job; canEdit: boolean; o
   }, [job.id]);
   useEffect(() => { load(); }, [load]);
 
-  const upload = async (f: File | null) => {
+  const upload = async () => {
+    const f = chosen;
     if (!f) return;
     setBusy(true); setErr("");
     try {
@@ -8086,6 +8139,7 @@ function PhotoGallery({ job, canEdit, onClose }: { job: Job; canEdit: boolean; o
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Could not save that photo");
       setForm({ caption: "", pct: String(job.pct ?? ""), taken_on: TODAY });
+      setChosen(null);
       load();
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
@@ -8102,19 +8156,7 @@ function PhotoGallery({ job, canEdit, onClose }: { job: Job; canEdit: boolean; o
   };
 
   return (
-    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.5)", zIndex: 60 }}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 860, maxHeight: "88vh", overflow: "auto" }}>
-        <div className="px-4 py-3" style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0, zIndex: 2 }}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-xs font-bold" style={{ letterSpacing: 1.2, color: "#8FA1B3" }}>PHOTOS · {photos.length}</div>
-              <div className="font-bold" style={{ fontSize: 17 }}>JOB {jobNo(job.id)} · {job.tag}</div>
-            </div>
-            <button onClick={onClose} style={{ color: "#8FA1B3", fontSize: 18 }}>✕</button>
-          </div>
-        </div>
-
-        <div className="p-3">
+    <>
           {!installed && (
             <div className="text-xs rounded p-2 mb-2" style={{ background: "#FFF7E6", color: "#8A5A00" }}>
               Run migration 0042 — photos have nowhere to go yet.
@@ -8175,19 +8217,42 @@ function PhotoGallery({ job, canEdit, onClose }: { job: Job; canEdit: boolean; o
                 </label>
               </div>
               <input ref={pick} type="file" accept="image/*" capture="environment"
-                onChange={(e) => upload(e.target.files?.[0] || null)} style={{ display: "none" }} />
-              <button onClick={() => pick.current?.click()} disabled={busy}
-                className="rounded px-4 py-1.5 text-sm font-bold text-white" style={{ background: busy ? "#B8B5AC" : "#7C3AED" }}>
-                {busy ? "uploading…" : "📷 Take or choose a photo"}
-              </button>
-              <span className="text-xs ml-2" style={{ color: "#8A94A0" }}>
-                the completion is stored as it is today, and does not move afterwards
-              </span>
+                onChange={(e) => { setErr(""); setChosen(e.target.files?.[0] || null); }} style={{ display: "none" }} />
+
+              {chosen && preview ? (
+                <div className="flex gap-3 items-center flex-wrap">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={preview} alt="" style={{ width: 84, height: 84, objectFit: "cover", borderRadius: 6, border: "1px solid #E2E0DA" }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div className="text-xs font-semibold truncate" style={{ color: "#22303C", maxWidth: 220 }}>{chosen.name}</div>
+                    <div style={{ fontSize: 11, color: "#8A94A0" }}>
+                      {chosen.size > 1e6 ? `${(chosen.size / 1e6).toFixed(1)} MB` : `${Math.round(chosen.size / 1e3)} KB`}
+                    </div>
+                    <button onClick={() => pick.current?.click()} className="font-bold" style={{ fontSize: 11, color: "#1B3A5C" }}>
+                      choose a different one
+                    </button>
+                  </div>
+                  <button onClick={upload} disabled={busy}
+                    className="rounded px-4 py-1.5 text-sm font-bold text-white"
+                    style={{ background: busy ? "#B8B5AC" : "#0D7A3F" }}>
+                    {busy ? "saving…" : "💾 Save photo"}
+                  </button>
+                  <button onClick={() => { setChosen(null); if (pick.current) pick.current.value = ""; }}
+                    className="text-xs font-semibold" style={{ color: "#8A94A0" }}>Cancel</button>
+                </div>
+              ) : (
+                <>
+                  <button onClick={() => pick.current?.click()} disabled={busy}
+                    className="rounded px-4 py-1.5 text-sm font-bold text-white" style={{ background: busy ? "#B8B5AC" : "#7C3AED" }}>
+                    📷 Take or choose a photo
+                  </button>
+                  <span className="text-xs ml-2" style={{ color: "#8A94A0" }}>
+                    the completion is stored as it is today, and does not move afterwards
+                  </span>
+                </>
+              )}
             </div>
           )}
-        </div>
-      </div>
-
       {big?.url && (
         <div onClick={(e) => { e.stopPropagation(); setBig(null); }}
           className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.85)", zIndex: 61, cursor: "zoom-out" }}>
@@ -8195,7 +8260,7 @@ function PhotoGallery({ job, canEdit, onClose }: { job: Job; canEdit: boolean; o
           <img src={big.url} alt={big.caption || ""} style={{ maxWidth: "94vw", maxHeight: "88vh", objectFit: "contain" }} />
         </div>
       )}
-    </div>
+    </>
   );
 }
 

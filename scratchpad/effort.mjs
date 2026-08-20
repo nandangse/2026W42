@@ -40,10 +40,16 @@ for (const [d, v] of days) {
   console.log(`${d}  ${String(v.n).padStart(6)}   ${h.toFixed(1).padStart(5)}h   ${f(v.min)}  ${f(v.max)}`);
 }
 
-// Dr Raghu's own share. He specifies and reviews; he is not at the keyboard
-// for every minute of the window. A RANGE, because a single number here would
-// be false precision dressed up as measurement.
-const LOW = 0.4, HIGH = 0.6;
+// Dr Raghu's own share of the window.
+//
+// He specifies and reviews, so he is not at the keyboard for every minute of
+// it -- but the window itself UNDER-counts him, because the thinking, the
+// deciding and the reading of what came back all happen outside the span
+// between a day's first and last commit. Raised by a quarter on his own
+// instruction, which is the only evidence available for the part no clock
+// sees. Still a RANGE: a single number would be false precision dressed up as
+// measurement.
+const LOW = 0.5, HIGH = 0.75;
 console.log(`
 commits            ${log.length}
 days worked        ${days.length}

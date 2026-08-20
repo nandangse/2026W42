@@ -36,17 +36,20 @@
  * Genie; and it under-counts, because the thinking, the specifying and the
  * reviewing happen before the first commit and after the last.
  *
- * Dr Raghu's own share is given as a RANGE for the same reason. He specifies
- * and reviews; he is not at the keyboard for every minute of the window. A
- * single number would be false precision dressed up as measurement.
+ * Dr Raghu's own share is a RANGE for the same reason. He specifies and
+ * reviews, so he is not at the keyboard for every minute of the window -- but
+ * the window also UNDER-counts him, because the thinking, the deciding and the
+ * reading of what came back all happen outside the span between a day's first
+ * and last commit. The band was raised by a quarter on his own instruction,
+ * which is the only evidence available for the part no clock sees.
  */
 export const EFFORT = {
   measuredTo: "2026-08-20",
-  commits: 121,
+  commits: 127,
   days: 17,
-  windowHours: 46.5,
-  raghuLow: 19,
-  raghuHigh: 28,
+  windowHours: 47.5,
+  raghuLow: 24,
+  raghuHigh: 36,
 };
 
 export interface UpdateEntry {
@@ -62,6 +65,16 @@ export interface UpdateEntry {
 
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
+  {
+    v: "3.15.0.1",
+    date: "2026-08-20",
+    module: "Job photos",
+    items: [
+      "A photo now waits for SAVE. Choose one, see it, check the date, completion and caption, then press Save. It used to upload the instant you picked a file — so you could not see what you had chosen, and the fields you had typed were applied to whatever you picked next.",
+      "PHOTOS is a tab on the job, beside Milestone Plan, Material Kitting and Shop Updates. Same gallery the On Floor row opens — one component behind both, so the two cannot disagree about what has been taken.",
+      "Time invested has been raised by a quarter: 24–36 hours. The build window is measured from the commits and cannot see the thinking, the deciding or the reading of what came back, all of which happen outside the span between a day's first and last commit.",
+    ],
+  },
   {
     v: "3.15.0.0",
     date: "2026-08-20",
