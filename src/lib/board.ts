@@ -27,6 +27,9 @@ export interface BoardJob {
   onFloorAt: string | null;
   /** Who owns QUALITY. jobs.own owns the date; this is a different question. */
   qualityOwner: string | null;
+  productionOwner: string | null;
+  kittingOwner: string | null;
+  designOwner: string | null;
   /** Genie's read of the last three voice notes, rewritten when one is added. */
   floorSummary: string | null;
   floorSummaryAt: string | null;
@@ -87,6 +90,9 @@ function mapJob(r: any): BoardJob {
     onFloor: !!r.on_floor,
     onFloorAt: r.on_floor_at ?? null,
     qualityOwner: r.quality_owner ?? null,
+    productionOwner: r.production_owner ?? null,
+    kittingOwner: r.kitting_owner ?? null,
+    designOwner: r.design_owner ?? null,
     floorSummary: r.floor_summary ?? null,
     floorSummaryAt: r.floor_summary_at ?? null,
     active: !!r.active,

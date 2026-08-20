@@ -24,7 +24,10 @@ const FIELDS: Record<string, { label: string; kind: "date" | "number" | "text"; 
   pct: { label: "Production Completion %", kind: "number" },
   // Genie's own field. The ERP has no column for it, so it is marked so the
   // export skips it rather than queueing a line nothing can receive.
-  quality_owner: { label: "Quality Owner", kind: "text", genieOnly: true },
+  quality_owner:    { label: "Quality Owner",    kind: "text", genieOnly: true },
+  production_owner: { label: "Production Owner", kind: "text", genieOnly: true },
+  kitting_owner:    { label: "Kitting Owner",    kind: "text", genieOnly: true },
+  design_owner:     { label: "Design Owner",     kind: "text", genieOnly: true },
 };
 
 /** What goes in the export — never null, never "null". */

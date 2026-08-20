@@ -95,6 +95,9 @@ const PROBES = [
   ["0043 floor summary",      "jobs", "floor_summary"],
   ["0044 task proposals",     "task_proposal", "title"],
   ["0045 feature requests",   "feature_request", "want"],
+  ["0046 production owner",   "jobs", "production_owner"],
+  ["0046 kitting owner",      "jobs", "kitting_owner"],
+  ["0046 design owner",       "jobs", "design_owner"],
   // Sales Genie's own tables — 0014 and 0015 were never probed at all.
   ["0014 sales plan",         "sp_companies", "id"],
   ["0014 sales people",       "sp_people", "id"],

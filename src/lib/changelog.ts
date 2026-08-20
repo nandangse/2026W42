@@ -66,6 +66,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.16.0.0",
+    date: "2026-08-21",
+    module: "On Floor",
+    items: [
+      "FIVE OWNERS on a job: Planning (from the ERP), and Quality, Production, Kitting and Design set here. \"Who do I ring about this\" has a different answer depending on what has gone wrong, and until now the only way to find out was to ask.",
+      "Each is its own field rather than four names in one box — two names in a box cannot be filtered, counted, notified or reassigned, and four is a note to self.",
+      "The read on a job is all you see by default. The recordings and anything Genie heard to do are folded underneath, one click away. On a page listing every job on the floor, three players and two suggestions per row was a wall nobody scrolled past.",
+      "A saved photo says ✓ SAVED, on the panel and on the photo itself. A picture appearing in a grid of pictures is not obviously YOUR picture having saved, particularly on a phone where the grid is below the fold. It clears itself after a few seconds — a confirmation that stays becomes furniture.",
+      "Needs migration 0046.",
+    ],
+  },
+  {
     v: "3.15.0.2",
     date: "2026-08-20",
     module: "On Floor",

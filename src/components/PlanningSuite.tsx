@@ -160,6 +160,9 @@ interface Job {
   onFloor?: boolean;
   onFloorAt?: string | null;
   qualityOwner?: string | null;
+  productionOwner?: string | null;
+  kittingOwner?: string | null;
+  designOwner?: string | null;
   floorSummary?: string | null;
   floorSummaryAt?: string | null;
   active: boolean;
@@ -7425,9 +7428,9 @@ function OnFloor({
     return m;
   }, [notes]);
 
-  const setQualityOwner = async (j: Job, who: string) => {
+  const setOwner = async (j: Job, field: string, who: string) => {
     try {
-      await api.post("/api/job-field", { job_id: j.id, field: "quality_owner", value: who });
+      await api.post("/api/job-field", { job_id: j.id, field, value: who });
       await reload();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   };
@@ -7492,30 +7495,41 @@ function OnFloor({
                 </div>
 
                 {/* owners */}
-                <div className="floor-cell" style={{ flex: "0 0 210px" }}>
+                <div className="floor-cell" style={{ flex: "0 0 230px" }}>
                   <div className="text-xs font-bold mb-1" style={{ color: "#8A94A0" }}>OWNERS</div>
+                  {/* The Planning Owner comes from the ERP and is read-only
+                      here; the other four are Genie's own and are set from
+                      this row. Four names, because "who do I ring about this"
+                      has a different answer depending on what has gone wrong. */}
                   <div className="text-xs mb-1">
                     <span style={{ color: "#8A94A0" }}>Job </span>
                     <b style={{ color: "#22303C" }}>{j.ownerName || j.own || "—"}</b>
                   </div>
-                  <div className="text-xs flex items-center gap-1">
-                    <span style={{ color: "#8A94A0" }}>Quality </span>
-                    {canEdit ? (
-                      <select
-                        value={j.qualityOwner || ""}
-                        onChange={(e) => setQualityOwner(j, e.target.value)}
-                        className="text-xs border rounded px-1 py-0.5 bg-white font-semibold"
-                        style={{ borderColor: j.qualityOwner ? "#E2E0DA" : "#E8600A", color: j.qualityOwner ? "#22303C" : "#E8600A" }}
-                      >
-                        <option value="">— not set —</option>
-                        {(board.assignableUsers || []).map((p) => (
-                          <option key={p.initials || p.email} value={p.initials || ""}>{personLabel(p)}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <b style={{ color: j.qualityOwner ? "#22303C" : "#B8B5AC" }}>{j.qualityOwner || "not set"}</b>
-                    )}
-                  </div>
+                  {([
+                    ["Quality", "quality_owner", j.qualityOwner],
+                    ["Production", "production_owner", j.productionOwner],
+                    ["Kitting", "kitting_owner", j.kittingOwner],
+                    ["Design", "design_owner", j.designOwner],
+                  ] as const).map(([label, field, val]) => (
+                    <div key={field} className="text-xs flex items-center gap-1 mb-0.5">
+                      <span style={{ color: "#8A94A0", width: 58, flexShrink: 0 }}>{label}</span>
+                      {canEdit ? (
+                        <select
+                          value={val || ""}
+                          onChange={(e) => setOwner(j, field, e.target.value)}
+                          className="text-xs border rounded px-1 py-0.5 bg-white font-semibold"
+                          style={{ borderColor: val ? "#E2E0DA" : "#E8600A", color: val ? "#22303C" : "#E8600A", maxWidth: 150 }}
+                        >
+                          <option value="">— not set —</option>
+                          {(board.assignableUsers || []).map((p) => (
+                            <option key={p.initials || p.email} value={p.initials || ""}>{personLabel(p)}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <b style={{ color: val ? "#22303C" : "#B8B5AC" }}>{val || "not set"}</b>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
                 {/* what is open on it */}
@@ -7742,6 +7756,14 @@ function VoiceNotes({
   const [openNote, setOpenNote] = useState<string | null>(null);
   /** Shown once, straight after a note is saved. */
   const [thanks, setThanks] = useState(false);
+  /**
+   * The read is the answer; the recordings are the evidence.
+   *
+   * Folded by default because on a page listing every job on the floor, three
+   * players and two suggestions per row is a wall nobody scrolls past. Open it
+   * when you want to hear it said or act on what was heard.
+   */
+  const [detail, setDetail] = useState(false);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -7870,13 +7892,23 @@ function VoiceNotes({
       )}
       {err && <div className="text-xs font-bold mb-1" style={{ color: "#B3261E" }}>{err}</div>}
 
-      <TaskProposals jobId={jobId} />
+      {(notes.length > 0 || floor) && (
+        <button
+          onClick={() => setDetail((v) => !v)}
+          className="text-xs font-bold w-full text-left rounded px-2 py-1"
+          style={{ background: detail ? "#F4F2EC" : "transparent", color: "#1B3A5C" }}
+        >
+          {detail ? "⌃ hide the recordings" : `⌄ ${notes.length} recording${notes.length === 1 ? "" : "s"} — and anything Genie heard to do`}
+        </button>
+      )}
+
+      {detail && <TaskProposals jobId={jobId} />}
 
       {notes.length === 0 && !rec && (
         <div className="text-xs" style={{ color: "#B8B5AC" }}>Nothing recorded on this job yet.</div>
       )}
 
-      {(showAll ? notes : notes.slice(0, RECENT)).map((n) => (
+      {detail && (showAll ? notes : notes.slice(0, RECENT)).map((n) => (
         <div key={n.id} className="rounded mb-1 px-2 py-1.5" style={{ background: "#F4F2EC", border: "1px solid #E2E0DA" }}>
           <div className="text-xs" style={{ color: "#22303C", lineHeight: 1.5 }}>{n.summary || n.transcript || "(no words captured)"}</div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -7901,7 +7933,7 @@ function VoiceNotes({
         <ThankYou who={thanksFor.name} tdd={thanksFor.tdd} job={thanksFor.job} onClose={() => setThanks(false)} />
       )}
 
-      {notes.length > RECENT && (
+      {detail && notes.length > RECENT && (
         <button
           onClick={() => setShowAll((v) => !v)}
           className="text-xs font-bold"
@@ -8106,6 +8138,14 @@ function PhotoBody({ job, canEdit }: { job: Job; canEdit: boolean }) {
    */
   const [chosen, setChosen] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  /**
+   * Said out loud after a save.
+   *
+   * A photo appearing in a grid of photos is not obviously YOUR photo having
+   * been saved, particularly on a phone where the grid is below the fold. It
+   * clears itself — a confirmation that stays becomes furniture.
+   */
+  const [saved, setSaved] = useState(false);
   const pick = useRef<HTMLInputElement | null>(null);
 
   // Object URLs are held by the browser until told otherwise.
@@ -8139,6 +8179,8 @@ function PhotoBody({ job, canEdit }: { job: Job; canEdit: boolean }) {
       if (!r.ok) throw new Error(j.error || "Could not save that photo");
       setForm({ caption: "", pct: String(job.pct ?? ""), taken_on: TODAY });
       setChosen(null);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 4000);
       load();
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
@@ -8178,7 +8220,12 @@ function PhotoBody({ job, canEdit }: { job: Job; canEdit: boolean }) {
                 )}
                 <div className="p-2">
                   <div className="flex items-baseline justify-between gap-2">
-                    <b className="text-xs tnum" style={{ color: "#16232F" }}>{fmtFull(p.taken_on)}</b>
+                    <b className="text-xs tnum" style={{ color: "#16232F" }}>
+                      {fmtFull(p.taken_on)}
+                      {saved && photos[0]?.id === p.id && (
+                        <span className="ml-1 rounded px-1" style={{ background: "#E6F4EA", color: "#0D7A3F", fontSize: 9 }}>SAVED</span>
+                      )}
+                    </b>
                     {p.pct != null && (
                       <span className="rounded px-1.5 text-xs font-bold" style={{ background: "#E6F4EA", color: "#0D7A3F" }}>{p.pct}%</span>
                     )}
@@ -8197,7 +8244,14 @@ function PhotoBody({ job, canEdit }: { job: Job; canEdit: boolean }) {
 
           {canEdit && installed && (
             <div className="rounded-lg border p-3 mt-3" style={{ borderColor: "#E2E0DA", background: "#FAF9F5" }}>
-              <div className="text-xs font-bold mb-2" style={{ color: "#8A94A0" }}>ADD A PHOTO</div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-bold" style={{ color: "#8A94A0" }}>ADD A PHOTO</span>
+                {saved && (
+                  <span className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: "#E6F4EA", color: "#0D7A3F" }}>
+                    ✓ SAVED
+                  </span>
+                )}
+              </div>
               <div className="flex gap-2 flex-wrap mb-2">
                 <label className="text-xs" style={{ color: "#5A6672" }}>
                   Taken on<br />
