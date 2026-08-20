@@ -7238,6 +7238,8 @@ function Principles({ isOwner }: { isOwner: boolean }) {
         </div>
       )}
 
+      <PrincipleFiles isOwner={isOwner} />
+
       {/* ---- the owner's door ---- */}
       {isOwner && installed && (
         <div className="mt-5">
@@ -7581,6 +7583,150 @@ function VoiceNotes({
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Documents that sit alongside the principles.
+ *
+ * Some of the thinking already exists as a document — Breakthrough 2027, a
+ * manifesto, a one-pager somebody has to sign. Retyping those into the text
+ * box would lose the formatting, the diagrams and the point, so they are
+ * attached rather than transcribed.
+ *
+ * Owner uploads and removes; everybody else opens. The list is shown even when
+ * empty for the owner, so the door is visible without hunting for it — and
+ * hidden when empty for everyone else, because a heading over nothing reads
+ * like something failed to load.
+ */
+function PrincipleFiles({ isOwner }: { isOwner: boolean }) {
+  interface F { id: string; name: string; note: string; mime: string | null; bytes: number | null; by: string | null; at: string; url: string | null }
+  const [files, setFiles] = useState<F[]>([]);
+  const [installed, setInstalled] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [note, setNote] = useState("");
+  const pick = useRef<HTMLInputElement | null>(null);
+
+  const load = useCallback(() => {
+    api.get("/api/principles/files")
+      .then((r: { installed?: boolean; files?: F[] }) => { setInstalled(r.installed !== false); setFiles(r.files || []); })
+      .catch(() => setInstalled(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const upload = async (f: File | null) => {
+    if (!f) return;
+    setBusy(true); setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      fd.append("note", note);
+      const r = await fetch("/api/principles/files", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not upload that");
+      setNote("");
+      load();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+    if (pick.current) pick.current.value = "";
+  };
+
+  const remove = async (f: F) => {
+    if (!window.confirm(`Remove "${f.name}"?\n\nThe file is deleted, not hidden.`)) return;
+    try {
+      const r = await fetch(`/api/principles/files?id=${encodeURIComponent(f.id)}`, { method: "DELETE" });
+      if (!r.ok) throw new Error((await r.json()).error || "Could not remove it");
+      load();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+  };
+
+  const size = (b: number | null) =>
+    !b ? "" : b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`;
+  const icon = (m: string | null, n: string) => {
+    const t = `${m || ""} ${n}`.toLowerCase();
+    if (t.includes("pdf")) return "📕";
+    if (/sheet|excel|\.xlsx?|\.csv/.test(t)) return "📊";
+    if (/presentation|powerpoint|\.pptx?/.test(t)) return "📽";
+    if (/word|\.docx?/.test(t)) return "📄";
+    if (/image|\.png|\.jpe?g/.test(t)) return "🖼";
+    return "📎";
+  };
+
+  if (!installed && !isOwner) return null;
+  if (!files.length && !isOwner) return null;
+
+  return (
+    <div className="mt-6">
+      <h2 className="font-bold" style={{ color: "#16232F", fontSize: 18, marginBottom: 2 }}>Documents</h2>
+      <p className="text-xs" style={{ color: "#8A94A0", marginBottom: 10 }}>
+        The longer form — read them alongside the principles above.
+      </p>
+
+      {!installed && (
+        <div className="text-xs rounded p-2 mb-2" style={{ background: "#FFF7E6", color: "#8A5A00" }}>
+          Run migration 0041 — documents have nowhere to go yet.
+        </div>
+      )}
+      {err && <div className="text-xs font-bold rounded p-2 mb-2" style={{ background: "#FBEDEA", color: "#B3261E" }}>{err}</div>}
+
+      {files.length === 0 && installed && (
+        <div className="text-xs rounded-lg border p-3 mb-2" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#8A94A0" }}>
+          Nothing attached yet.
+        </div>
+      )}
+
+      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))" }}>
+        {files.map((f) => (
+          <div key={f.id} className="rounded-lg border bg-white p-3 flex gap-3 items-start" style={{ borderColor: "#E2E0DA" }}>
+            <span style={{ fontSize: 22, lineHeight: 1 }}>{icon(f.mime, f.name)}</span>
+            <div className="min-w-0 flex-1">
+              {f.url ? (
+                <a href={f.url} target="_blank" rel="noreferrer" className="font-bold text-sm block truncate"
+                   style={{ color: "#1B3A5C" }} title={f.name}>{f.name}</a>
+              ) : (
+                <span className="font-bold text-sm block truncate" style={{ color: "#8A94A0" }}>{f.name}</span>
+              )}
+              {f.note && <div className="text-xs mt-0.5" style={{ color: "#5A6672", lineHeight: 1.5 }}>{f.note}</div>}
+              <div style={{ fontSize: 10.5, color: "#B8B5AC", marginTop: 3 }}>
+                {size(f.bytes)}{f.bytes ? " · " : ""}{whoTag(f.by)} · {fmtFull(String(f.at).slice(0, 10))}
+              </div>
+            </div>
+            {isOwner && (
+              <button onClick={() => remove(f)} className="rounded px-1.5 py-0.5 text-xs font-bold flex-shrink-0"
+                      style={{ background: "#FBEDEA", color: "#B3261E" }} title="Remove this document">✕</button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {isOwner && installed && (
+        <div className="mt-2 rounded-lg border bg-white p-3" style={{ borderColor: "#E2E0DA" }}>
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="One line saying what it is (optional)"
+            className="w-full text-xs border rounded px-2 py-1 mb-2"
+            style={{ borderColor: "#E2E0DA" }}
+          />
+          <input
+            ref={pick}
+            type="file"
+            onChange={(e) => upload(e.target.files?.[0] || null)}
+            style={{ display: "none" }}
+          />
+          <button
+            onClick={() => pick.current?.click()}
+            disabled={busy}
+            className="rounded px-4 py-1.5 text-sm font-bold text-white"
+            style={{ background: busy ? "#B8B5AC" : "#1B3A5C" }}
+          >
+            {busy ? "uploading…" : "⬆ Attach a document"}
+          </button>
+          <span className="text-xs ml-2" style={{ color: "#8A94A0" }}>PDF, Word, slides, a sheet — up to 25 MB</span>
+        </div>
+      )}
     </div>
   );
 }

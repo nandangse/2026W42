@@ -37,6 +37,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.11.2.0",
+    date: "2026-08-20",
+    module: "Principles",
+    items: [
+      "Documents can be attached to the principles — PDFs, slides, a sheet, up to 25 MB each, with a line saying what each one is. Some of the thinking already exists as a document; retyping it into the box would lose the formatting, the diagrams and the point.",
+      "Only the owner uploads or removes. Everybody else opens and reads — the same rule as the principles themselves.",
+      "The files are NOT in the database. They go to private object storage and are served through links signed at the moment you open the page; the table holds a name, a path and a size. A public bucket would put internal documents on a URL that works for anyone who has it, forever, including after somebody leaves.",
+      "A failed upload cleans up after itself. If the file lands but its row does not, the file is removed rather than left in storage as something nothing lists.",
+      "Needs migration 0041.",
+    ],
+  },
+  {
     v: "3.11.1.1",
     date: "2026-08-20",
     module: "Pending Material",
