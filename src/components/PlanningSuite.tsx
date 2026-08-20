@@ -7837,6 +7837,8 @@ function VoiceNotes({
       )}
       {err && <div className="text-xs font-bold mb-1" style={{ color: "#B3261E" }}>{err}</div>}
 
+      <TaskProposals jobId={jobId} />
+
       {notes.length === 0 && !rec && (
         <div className="text-xs" style={{ color: "#B8B5AC" }}>Nothing recorded on this job yet.</div>
       )}
@@ -8409,6 +8411,87 @@ function ShopUpdatesPanel({ job }: { job: Job }) {
         </span>
       </div>
       <ShopUpdatesBody job={job} />
+    </div>
+  );
+}
+
+/**
+ * What Genie heard somebody needs to do — offered, not created.
+ *
+ * A task list is only worth opening if everything on it was put there on
+ * purpose. Things appearing that nobody asked for is how people stop reading
+ * the list within a fortnight, so nothing reaches a task list until a person
+ * presses Add.
+ *
+ * Accepting makes an ORDINARY task on the Planning Owner, who reassigns if it
+ * belongs elsewhere. Once it exists nothing distinguishes it from a typed one:
+ * a task that behaves differently because of where it came from is a task
+ * people have to think about before trusting.
+ */
+function TaskProposals({ jobId }: { jobId: string }) {
+  interface P { id: string; title: string; detail: string; cat: string | null; due: string | null }
+  const [items, setItems] = useState<P[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(() => {
+    api.get(`/api/task-proposal?job_id=${encodeURIComponent(jobId)}`)
+      .then((r: { proposals?: P[] }) => setItems(r.proposals || []))
+      .catch(() => setItems([]));
+  }, [jobId]);
+  useEffect(() => { load(); }, [load]);
+
+  const act = async (p: P, action: "accept" | "dismiss") => {
+    setBusy(p.id); setErr("");
+    try {
+      const r = await api.post("/api/task-proposal", { action, id: p.id });
+      if (action === "accept" && !r.who) {
+        setErr("Added — but this job has no Planning Owner, so it is unassigned. Set one on the job, or assign it from Tasking.");
+      }
+      load();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(null);
+  };
+
+  if (!items.length && !err) return null;
+
+  return (
+    <div className="rounded p-2 mb-1.5" style={{ background: "#FFF7E6", border: "1px solid #E0B25C" }}>
+      {items.length > 0 && (
+        <div className="text-xs font-bold mb-1" style={{ color: "#8A5A00", letterSpacing: .5 }}>
+          ✨ GENIE HEARD {items.length} THING{items.length === 1 ? "" : "S"} TO DO
+        </div>
+      )}
+      {err && <div className="text-xs font-bold mb-1" style={{ color: "#B3261E" }}>{err}</div>}
+      {items.map((p) => (
+        <div key={p.id} className="rounded bg-white px-2 py-1.5 mb-1" style={{ border: "1px solid #EFE3C8" }}>
+          <div className="text-xs font-semibold" style={{ color: "#16232F", lineHeight: 1.45 }}>{p.title}</div>
+          {p.detail && <div className="text-xs" style={{ color: "#8A94A0", lineHeight: 1.4 }}>{p.detail}</div>}
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span style={{ fontSize: 10, color: "#8A94A0" }}>
+              {p.cat || "Production"}{p.due ? ` · due ${fmtFull(p.due)}` : " · no date said"}
+            </span>
+            <button
+              onClick={() => act(p, "accept")}
+              disabled={busy === p.id}
+              className="rounded px-2 py-0.5 font-bold text-white"
+              style={{ background: busy === p.id ? "#B8B5AC" : "#0D7A3F", fontSize: 11 }}
+              title="Create this task on the job's Planning Owner, who can reassign it"
+            >
+              + Add to the job
+            </button>
+            <button
+              onClick={() => act(p, "dismiss")}
+              disabled={busy === p.id}
+              className="font-bold"
+              style={{ color: "#8A94A0", fontSize: 11 }}
+              title="Not a task — Genie keeps the rejection so a suggestion that keeps being wrong can be spotted"
+            >
+              not a task
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

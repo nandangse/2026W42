@@ -63,6 +63,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.14.0.0",
+    date: "2026-08-20",
+    module: "On Floor",
+    items: [
+      "Genie now hears what needs doing. Record a note and anything in it that somebody has to ACT on comes back as a suggested task — one action each, with the category and any date that was actually said.",
+      "NOTHING IS CREATED UNTIL YOU PRESS ADD. A task list is only worth opening if everything on it was put there on purpose; things appearing that nobody asked for is how people stop reading the list within a fortnight. Genie proposes, a person accepts.",
+      "Accepting puts it on the job's PLANNING OWNER, who reassigns if it belongs elsewhere — the owner is the person who knows who should have it, and a task assigned to nobody is a task nobody picks up. They get the usual notification.",
+      "Once added it is an ordinary task, indistinguishable from a typed one. A task that behaves differently because of where it came from is a task people have to think about before trusting.",
+      "\"Not a task\" keeps the rejection rather than deleting it. The same suggestion turned down twice for the same reason is a prompt worth changing, and that is only visible if the rejections are kept.",
+      "Genie is told to return NOTHING when a note is only a report — which most are. A model made to find a task will invent one, and invented tasks are what teach people to ignore the whole feature.",
+      "Needs migration 0044.",
+    ],
+  },
+  {
     v: "3.13.0.0",
     date: "2026-08-20",
     module: "Job Plan",

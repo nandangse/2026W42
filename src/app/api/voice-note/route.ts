@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireReader, requireTasker, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
+import { today } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -187,7 +188,62 @@ export async function POST(req: Request) {
         .then(undefined, () => undefined);
     }
 
-    return NextResponse.json({ ok: true, summary, floor });
+    /**
+     * What needs doing, heard in what was just said.
+     *
+     * PROPOSED, never created. A task list is only worth opening if everything
+     * on it was put there deliberately; things appearing in it that nobody
+     * asked for is how people stop reading the list within a fortnight.
+     *
+     * Told to return nothing when nothing was asked for. Most notes are a
+     * report, not a request, and a model that must find a task will invent
+     * one -- which is worse than missing a real one, because the invented ones
+     * are what teach people to ignore the whole feature.
+     */
+    let proposed = 0;
+    if (key && transcript.length > 30) {
+      try {
+        const r = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-5-20250929",
+            max_tokens: 600,
+            system:
+              "You read shop-floor voice notes at Nandan GSE and pull out what somebody now has to DO.\n\n" +
+              "Return JSON only: {\"tasks\":[{\"title\":\"...\",\"detail\":\"...\",\"cat\":\"Material|Production|Design|Projects|Quality\",\"due\":\"YYYY-MM-DD or null\"}]}\n\n" +
+              "Rules:\n" +
+              "- ONE action per task. 'Chase the gearbox and call Monopol' is two tasks.\n" +
+              "- Return an EMPTY list when the note is only a report. Most are. Never invent work to fill the list.\n" +
+              "- The title is the action, in the speaker's own words where they work: 'Chase Monopol for the fastener payment'.\n" +
+              "- Only a date that was actually said. Otherwise null.\n" +
+              `- Today is ${today()}.`,
+            messages: [{ role: "user", content: transcript.slice(0, 4000) }],
+          }),
+        });
+        const jr = await r.json();
+        const txt = (jr.content || []).filter((c: { type: string }) => c.type === "text").map((c: { text: string }) => c.text).join("").trim();
+        const cut = txt.slice(txt.indexOf("{"), txt.lastIndexOf("}") + 1);
+        const parsed = JSON.parse(cut) as { tasks?: { title?: string; detail?: string; cat?: string; due?: string | null }[] };
+        const rows = (parsed.tasks || [])
+          .filter((t) => String(t.title || "").trim().length >= 3)
+          .slice(0, 5)
+          .map((t) => ({
+            job_id: jobId,
+            source: "voice",
+            title: String(t.title).trim().slice(0, 200),
+            detail: String(t.detail || "").trim().slice(0, 600),
+            cat: String(t.cat || "Production").slice(0, 40),
+            due: /^\d{4}-\d{2}-\d{2}$/.test(String(t.due || "")) ? t.due : null,
+          }));
+        if (rows.length) {
+          const { error: pe } = await admin.from("task_proposal").insert(rows);
+          if (!pe) proposed = rows.length;
+        }
+      } catch { /* a note is worth keeping even when nothing could be pulled from it */ }
+    }
+
+    return NextResponse.json({ ok: true, summary, floor, proposed });
   } catch (e) {
     return errJson(e);
   }
