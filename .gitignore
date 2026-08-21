@@ -11,6 +11,12 @@ next-env.d.ts
 # production
 /build
 
+# live company data — NEVER commit. The ERPNext exports carry every customer,
+# contact and phone number Nandan has. They belong in Drive, not in a repo, and
+# certainly not in one that is cloned onto a laptop.
+/Nandanerp Data/
+*.xlsx
+
 # secrets — NEVER commit (spec §0.6)
 .env
 .env.local

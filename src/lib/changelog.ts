@@ -66,6 +66,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.17.0.0",
+    date: "2026-08-21",
+    module: "Admin — Software description",
+    items: [
+      "NEW TAB — SOFTWARE DESCRIPTION, in Admin. What Genie is, written down: the Spaces and who is admitted to each, the architecture and the path of a single request, the technology, where the thing physically runs, every table grouped by what it is for, the access model, the one door data comes in by, where a language model is used, what keeps it quick, and how a change reaches production.",
+      "It is written for two readers who are not the same person — whoever picks Genie up next, and an auditor. The second one does not care how it works and cares enormously about who can reach what and where the data sits, so those two sections come before the architecture, not after it.",
+      "THE MODULE REGISTER IS THE REPEATABLE PART. Twenty modules, each described in the SAME eight fields — space, purpose, who, server gate, screens, data, API, language model. A new module is a new entry rather than a new format, which is the only way a document like this survives its second year. The CRM will slot in beside the rest.",
+      "AN ANNEX A MAP FOR ISO 27001, twenty controls, each saying what Genie actually does and where to go and look. It is not a certification claim and it does not read like one: eight of them are marked PARTIAL or GAP and are collected into their own list at the end. A description that only lists strengths is worth nothing to the person reading it.",
+      "The first gap is worth reading now. The application is served from the Mumbai edge but EXECUTES in Vercel's US-East region — the default nobody chose — while every user and data subject is in India. That is a setting, not a defect, and it is on the page so the decision gets taken deliberately.",
+      "The version, the release count and the time invested are read live from this log, so they cannot drift. Everything else is prose, and carries the date it was last revised.",
+      "Printable — it saves as a PDF from the page, which is the form an auditor will ask for.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.16.0.1",
     date: "2026-08-21",
     module: "On Floor",

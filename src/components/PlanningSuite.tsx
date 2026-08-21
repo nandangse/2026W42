@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { LOGO } from "@/lib/logo";
 import { APP_VERSION, UPDATES, EFFORT } from "@/lib/changelog";
+import SoftwareDescription from "./SoftwareDescription";
 import { TRADES, zeroCrew, templateFor, type Crew } from "@/lib/templates";
 import {
   today,
@@ -5384,7 +5385,7 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
 }
 
 // ============================ Admin ============================
-type AdminTab = "users" | "org" | "milestones" | "setup" | "report" | "updates";
+type AdminTab = "users" | "org" | "milestones" | "setup" | "report" | "updates" | "software";
 
 /**
  * The Name column stays put while the rest scrolls. With department,
@@ -5735,7 +5736,7 @@ function GroupTicks({
 function AdminTabs({ tab, setTab }: { tab: AdminTab; setTab: (t: AdminTab) => void }) {
   return (
     <div className="flex gap-1 rounded p-1 bg-white border" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
-      {([["users", "👥 Users"], ["org", "🧬 Org Chart"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["report", "📊 Report"], ["updates", "🗒 Updates"]] as const).map(([k, l]) => (
+      {([["users", "👥 Users"], ["org", "🧬 Org Chart"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["report", "📊 Report"], ["updates", "🗒 Updates"], ["software", "📘 Software description"]] as const).map(([k, l]) => (
         <button
           key={k}
           onClick={() => setTab(k)}
@@ -6067,6 +6068,18 @@ function Admin({
       <div className="p-4 space-y-4">
         <AdminTabs tab={adminTab} setTab={setAdminTab} />
         <Updates />
+      </div>
+    );
+  }
+
+  // The software description is a document, not a settings panel — it returns
+  // on its own for the same reason Updates does: the other tabs stack cards
+  // into a shared column and this one owns the width.
+  if (adminTab === "software") {
+    return (
+      <div className="p-4 space-y-4">
+        <AdminTabs tab={adminTab} setTab={setAdminTab} />
+        <SoftwareDescription />
       </div>
     );
   }
