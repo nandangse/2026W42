@@ -66,6 +66,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.18.0.0",
+    date: "2026-08-21",
+    module: "Nandan CRM — genie.nandan.co.in/crm",
+    items: [
+      "NEW — NANDAN CRM, at /crm. A SEPARATE APPLICATION WITH ITS OWN DATABASE, sharing this deployment and this login and nothing else. It cannot read a Genie table and Genie cannot read one of its. Sales Genie is untouched — its sp_ tables, its routes and its grant are exactly as they were.",
+      "One login. The session is Genie's, readable at /crm because it is the same origin, so nobody signs in twice and there is no second user list to fall out of step. Open to Dr Raghu alone today; the check is in one function, which is what makes widening it to the sales team a one-line change rather than a hunt.",
+      "EVERY DOCTYPE CAN ADD RECORDS, and that holds by construction rather than by discipline. A doctype is declared once in a registry — its fields, their types, what links to what, what shows in the list — and the list screen, the Add form, the dropdowns and the server-side validation all read that one declaration. There is no per-doctype screen that could be built without an Add button, because there are no per-doctype screens.",
+      "Eight to start: Deals · Customers, Contacts, Addresses, Phone numbers · Sectors, Industries, Stages, Users.",
+      "The database does the work that should not be left to code. Deal numbers come from a sequence, because counting existing rows hands two people the same number the moment they both save at once. And every stage change writes its own history row from a trigger — so how long a deal sat in each stage is MEASURED, and nobody can forget to log it.",
+      "Fourteen stages and seven sectors are seeded as ROWS, not as fixed lists. Reordering the funnel is a change to a number on screen. ENT and SER are still seeded as their own codes because nobody has said what they stand for, and a master seeded with a wrong expansion is the error nobody notices for a year.",
+      "Its database is locked to the server. Row Level Security is on for every table with no policies at all, so the anon key sees nothing whatsoever; the only way in is the service key, used strictly after the session has been checked. The gate is in code that can be read rather than in a policy that would have to trust a signature from another project.",
+      "Needs CRM_SUPABASE_URL and CRM_SUPABASE_SERVICE_KEY, and migration 0001 in supabase-crm. Without them /crm loads and says exactly which step is missing.",
+    ],
+  },
+  {
     v: "3.17.0.0",
     date: "2026-08-21",
     module: "Admin — Software description",
