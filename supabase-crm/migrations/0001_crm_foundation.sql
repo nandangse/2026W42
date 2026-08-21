@@ -66,10 +66,10 @@ create table if not exists crm_audit (
 create index if not exists crm_audit_entity_idx on crm_audit(entity, entity_id);
 
 -- ================================================== B. ACCOUNTS AND PEOPLE
--- Sector is what NANDAN makes. SEVEN, given by Dr Raghu on 21 Aug. Six of them
+-- Sector is what NANDAN makes. SEVEN, named by Dr Raghu on 21 Aug. Six of them
 -- appear in the live opportunity export (MHE 70%, GSE 12.5%, DEF 9.3%,
 -- CAR 8.2%, ENT and SER a handful each); CM does not appear in that sample but
--- is a real sector. ENT and SER are still codes, not names -- see the note.
+-- is a real sector.
 create table if not exists sector (
   id          smallserial primary key,
   code        text not null unique,
@@ -82,8 +82,8 @@ insert into sector (code, name, sort_order) values
   ('GSE','Ground Support Equipment',2),
   ('DEF','Defence',3),
   ('CAR','Car Parking',4),
-  ('ENT','ENT',5),                      -- expansion not yet given
-  ('SER','SER',6),                      -- expansion not yet given
+  ('ENT','Entertainment',5),
+  ('SER','Service',6),
   ('CM','Contract Manufacturing',7)
 on conflict (code) do update set
   name = excluded.name, sort_order = excluded.sort_order;
