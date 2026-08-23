@@ -304,7 +304,16 @@ function isDeliveredSheet(
  */
 const EMP_FIELDS: [keyof ParsedEmployee, RegExp][] = [
   ["id", /^(emp(loyee)?\s*(code|id|no)|id)$/i],
-  ["name", /(employee\s*)?name/i],
+  /**
+   * NAME, and the order here is the whole point.
+   *
+   * The master carries three headers containing the word: "Name", "UAN Name"
+   * and "Name in bank". A single loose pattern took whichever came first,
+   * which was UAN Name -- so Genie spent weeks showing people's provident-fund
+   * names, and "N/A" for the three whose UAN Name is N/A, the Chairman and the
+   * Managing Director among them. Exact first, fuzzy only as a fallback.
+   */
+  ["name", /^(employee\s*)?name$/i],
   ["email", /e-?mail/i],
   ["dob", /birth|^dob$/i],
   ["doj", /joining|^doj$|date of join/i],
@@ -468,6 +477,33 @@ function extraJobValues(
   };
 }
 
+/**
+ * WHICH ROW IS THE HEADER on the employee master.
+ *
+ * Not row 1. The master opens with a merged banner across the top -- the title
+ * "NANDAN GSE EMPLOYEEMASTER" sits in the Name column, and beneath it a live
+ * count line ("Active: 200 Doubtful: 0 Notice Period: 1 F&F Due: 0") with the
+ * owner of each block beside it. The real headings are the THIRD row.
+ *
+ * Taking row 1 regardless cost three things: the Name column resolved to "UAN
+ * Name", so the board showed provident-fund names; the banner and the repeated
+ * heading row were imported as two employees; and every heading that only
+ * exists on the real row was missed.
+ *
+ * So: look at the first few rows and take the one that reads most like a set
+ * of column headings, ties going to the earlier row.
+ */
+function employeeHeaderRow(rows: Row[]): number {
+  const SIGNS = [/^id$/i, /^name$/i, /^type$/i, /^status$/i, /joining/i, /birth/i, /department/i, /designation/i];
+  let best = 0, bestScore = -1;
+  for (let i = 0; i < Math.min(6, rows.length); i++) {
+    const cells = Array.from(rows[i] || [], (c) => String(c || "").trim());
+    const score = SIGNS.reduce((n, re) => n + (cells.some((c) => re.test(c)) ? 1 : 0), 0);
+    if (score > bestScore) { bestScore = score; best = i; }
+  }
+  return best;
+}
+
 function isEmployeeSheet(hdr: string[]): boolean {
   const has = (re: RegExp) => hdr.some((h) => re.test(h));
   // a name plus either a birthday or a joining date is enough to be sure, and
@@ -525,29 +561,50 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
     const g = (r: Row, h: string): Cell =>
       ix[h] != null ? r[ix[h]] : undefined;
     // ---- Employee master (RJ Uploads) ----
-    if (slot === "employees" || isEmployeeSheet(hdr)) {
+    if (slot === "employees" || isEmployeeSheet(hdr) || isEmployeeSheet(Array.from(rows[2] || [], (h) => String(h || "").trim()))) {
+      // re-read the headings from wherever they actually are
+      const hRow = employeeHeaderRow(rows);
+      const hdrE = Array.from(rows[hRow] || [], (h) => String(h || "").trim());
+      const ixE: Record<string, number> = {};
+      hdrE.forEach((h, i) => { if (h && !(h in ixE)) ixE[h] = i; });
+      const gE = (r: Row, h: string): Cell => (ixE[h] != null ? r[ixE[h]] : undefined);
       const pick = (want: keyof ParsedEmployee) =>
-        hdr.find((h) => EMP_FIELDS.find(([k]) => k === want)?.[1].test(h)) || null;
+        hdrE.find((h) => EMP_FIELDS.find(([k]) => k === want)?.[1].test(h)) || null;
+      /** Looser second pass, used only where the exact one found nothing. */
+      const pickLoose = (want: keyof ParsedEmployee, re: RegExp) =>
+        pick(want) || hdrE.find((h) => re.test(h)) || null;
       const col: Partial<Record<keyof ParsedEmployee, string | null>> = {};
       for (const [k] of EMP_FIELDS) col[k] = pick(k);
-      const statusHdr = hdr.find((h) => /status|active|resigned|left/i.test(h)) || null;
+      // a sheet that calls it "Employee Full Name" is still giving us a name
+      col.name = pickLoose("name", /^(?!.*(uan|bank)).*name/i);
+      const statusHdr = hdrE.find((h) => /status|active|resigned|left/i.test(h)) || null;
       const taken = new Set(Object.values(col).filter(Boolean) as string[]);
       if (statusHdr) taken.add(statusHdr);
 
-      out.employeeHeaders = hdr.filter(Boolean);
+      out.employeeHeaders = hdrE.filter(Boolean);
       const seen = new Set<string>();
       out.employees = rows
-        .slice(1)
-        .filter((r) => r && col.name && String(g(r, col.name) || "").trim())
+        .slice(hRow + 1)
+        .filter((r) => {
+          if (!r || !col.name) return false;
+          const nm = String(gE(r, col.name) || "").trim();
+          if (!nm) return false;
+          // the banner and any repeated heading row are not people
+          const idCell = col.id ? String(gE(r, col.id) || "").trim() : "";
+          if (/^(id|employee\s*(id|code|no))$/i.test(idCell)) return false;
+          if (/^name$/i.test(nm)) return false;
+          if (/^(active|doubtful|notice period|f&f due)\s*:/i.test(idCell)) return false;
+          return true;
+        })
         .map((r): ParsedEmployee => {
-          const name = String(g(r, col.name!) || "").trim();
+          const name = String(gE(r, col.name!) || "").trim();
           // the sheet's own code where it has one, else a stable slug of the
           // name so a re-upload updates rather than duplicates
-          let id = col.id ? String(g(r, col.id) || "").trim() : "";
+          let id = col.id ? String(gE(r, col.id) || "").trim() : "";
           if (!id) id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
           while (seen.has(id)) id = id + "-2";
           seen.add(id);
-          const statusRaw = statusHdr ? String(g(r, statusHdr) || "").trim() : "";
+          const statusRaw = statusHdr ? String(gE(r, statusHdr) || "").trim() : "";
           const status = statusRaw.toLowerCase();
           const extra: Record<string, string> = {};
           /**
@@ -561,20 +618,20 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
            * if the word survives the import.
            */
           if (statusRaw) extra["Status"] = statusRaw;
-          for (const h of hdr) {
+          for (const h of hdrE) {
             if (!h || taken.has(h)) continue;
-            const v = String(g(r, h) ?? "").trim();
+            const v = String(gE(r, h) ?? "").trim();
             if (v) extra[h] = v;
           }
           return {
             id,
             name,
-            email: col.email ? String(g(r, col.email) || "").trim().toLowerCase() || null : null,
-            dob: col.dob ? ser2iso(g(r, col.dob)) : null,
-            doj: col.doj ? ser2iso(g(r, col.doj)) : null,
-            department: col.department ? String(g(r, col.department) || "").trim() || null : null,
-            designation: col.designation ? String(g(r, col.designation) || "").trim() || null : null,
-            location: col.location ? String(g(r, col.location) || "").trim() || null : null,
+            email: col.email ? String(gE(r, col.email) || "").trim().toLowerCase() || null : null,
+            dob: col.dob ? ser2iso(gE(r, col.dob)) : null,
+            doj: col.doj ? ser2iso(gE(r, col.doj)) : null,
+            department: col.department ? String(gE(r, col.department) || "").trim() || null : null,
+            designation: col.designation ? String(gE(r, col.designation) || "").trim() || null : null,
+            location: col.location ? String(gE(r, col.location) || "").trim() || null : null,
             // absent status means present: an HR master lists who works here
             active: !status || /active|working|present|yes|y/i.test(status),
             extra,

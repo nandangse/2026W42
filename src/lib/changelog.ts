@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.1.3",
+    date: "2026-08-23",
+    module: "HRIS — the import was reading the wrong row",
+    items: [
+      "THE EMPLOYEE MASTER HAS BEEN IMPORTED FROM THE WRONG HEADER ROW ALL ALONG, and checking Dr Raghu's re-uploaded CSV against the database is what found it. The master opens with a merged banner — the title in the Name column, and under it a live count line with the owner of each block beside it. The real headings are the THIRD row. The parser took the first.",
+      "THE NAMES WERE NOT THE NAMES. With row 1 as the heading, the Name column resolved to “UAN Name” — the provident-fund name — so Genie has been showing those, and “N/A” for the three people whose UAN Name is N/A: the Chairman, the Managing Director and the President of the Defence business. The real name sat one column away the whole time, under the heading “NANDAN GSE EMPLOYEEMASTER”. Exact matches now win over fuzzy ones, and a heading containing “UAN” or “bank” can never be taken for the name.",
+      "TWO ROWS THAT ARE NOT PEOPLE were being imported as employees — the count banner (“Active: 200 Doubtful: 0 …”) and the repeated heading row. Both are now recognised and skipped.",
+      "STATUS SURVIVES THE IMPORT. It was collapsed into a yes/no and the word thrown away; the six values now come through intact.",
+      "Checked against the file rather than asserted: the corrected parser reads 380 employees, no bad rows, Active 200 · Resigned 143 · Terminated 36 · Notice Period 1, types Labour 207 · Staff 131 · Labour-Contract 25 · Contractor 14 · Management 3, with 380 joining dates, 378 birthdays and 107 columns per record.",
+      "The database holds 364 records today, from the old import. Re-uploading the master through Morning Update corrects every name and status and brings in the 16 people who are new since. The two junk rows have to be removed by hand — an upload adds and updates, it never deletes.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.19.1.2",
     date: "2026-08-23",
     module: "HRIS — the record takes over",
