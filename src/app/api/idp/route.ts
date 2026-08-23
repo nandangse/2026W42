@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser, errJson, HttpError } from "@/lib/auth";
+import { requireUser, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, splitMulti, FIELD_GROUPS, fieldSpec } from "@/lib/hrms";
 
@@ -186,9 +186,42 @@ function salaryTable(get: (k: string) => unknown, type: string | null): { rows: 
 }
 
 // GET /api/idp — am I part-way through one, and have I finished one?
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const u = await requireUser();
+
+    /**
+     * ?diag=1 — the transcription self-test, owner only.
+     *
+     * "The recording attached but no words came" has three possible causes
+     * that all look identical from a phone: no key on the deploy, a wrong
+     * key, or a key with no billing. This asks OpenAI directly and names
+     * which one it is, so the diagnosis is one URL instead of a guessing
+     * conversation.
+     */
+    if (new URL(req.url).searchParams.get("diag") === "1") {
+      if (u.email.toLowerCase() !== RAGHU_EMAIL) throw new HttpError(403, "The diagnostic is the owner's.");
+      const oa = process.env.OPENAI_API_KEY;
+      const out: Record<string, string> = {
+        OPENAI_API_KEY: oa ? `present (${oa.slice(0, 7)}…${oa.slice(-4)}, ${oa.length} chars)` : "NOT SET on this deploy — set it in Vercel and redeploy",
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ? "present" : "NOT SET — summaries and polishing fall back to raw text",
+      };
+      if (oa) {
+        try {
+          const r = await fetch("https://api.openai.com/v1/models/whisper-1", {
+            headers: { authorization: `Bearer ${oa}` },
+          });
+          out.whisper =
+            r.status === 200 ? "OK — the key reaches Whisper; phone transcription should work"
+            : r.status === 401 ? "401 — the key is WRONG (copied incompletely, or revoked)"
+            : r.status === 429 ? "429 — the key has NO CREDITS/BILLING; add billing at platform.openai.com"
+            : `unexpected ${r.status}`;
+        } catch (e) {
+          out.whisper = `network error reaching OpenAI: ${e instanceof Error ? e.message : String(e)}`;
+        }
+      }
+      return NextResponse.json(out);
+    }
     const who = await whoAreThey(u.email);
     let rows: Record<string, unknown>[] = [];
     try { rows = await mine(u.email) as Record<string, unknown>[]; }

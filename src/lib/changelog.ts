@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.5.4",
+    date: "2026-08-23",
+    module: "IDP — the transcription self-test",
+    items: [
+      "“THE RECORDING ATTACHED BUT NO WORDS CAME” has three causes that look identical from a phone: no key on the deploy, a wrong key, or a key with no billing. /api/idp?diag=1 — the owner's alone — now asks OpenAI directly and names which one it is: key present or not (with its first and last characters, so a mis-paste shows), and whether it reaches Whisper — OK, 401 wrong key, or 429 no credits. One URL instead of a guessing conversation.",
+      "For the record: words already in the box never blocked anything — the server's text is APPENDED under what is there, never written over it, and deleting first was never needed.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.5.3",
     date: "2026-08-23",
     module: "IDP — on a phone, the server writes the words",
