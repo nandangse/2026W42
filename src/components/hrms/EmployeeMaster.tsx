@@ -52,6 +52,8 @@ export default function EmployeeMaster({
 }) {
   const [q, setQ] = useState("");
   const [dept, setDept] = useState("");
+  const [role, setRole] = useState("");
+  const [type, setType] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [local, setLocal] = useState<HrmsEmployee[] | null>(null);
@@ -78,15 +80,28 @@ export default function EmployeeMaster({
     });
   }, [all, view]);
 
+  const roles = useMemo(() => {
+    const s = new Set<string>();
+    for (const e of inView) if (val(e, "role")) s.add(val(e, "role"));
+    return [...s].sort();
+  }, [inView]);
+  const types = useMemo(() => {
+    const s = new Set<string>();
+    for (const e of inView) if (val(e, "type")) s.add(val(e, "type"));
+    return [...s].sort();
+  }, [inView]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return inView.filter((e) => {
       if (dept && val(e, "department") !== dept) return false;
+      if (role && val(e, "role") !== role) return false;
+      if (type && val(e, "type") !== type) return false;
       if (!needle) return true;
       return [e.id, val(e, "name"), val(e, "email"), val(e, "department"), val(e, "designation"), val(e, "location"), val(e, "phone")]
         .join(" ").toLowerCase().includes(needle);
     });
-  }, [inView, q, dept]);
+  }, [inView, q, dept, role, type]);
 
   const stats = useMemo(() => {
     const active = inView.filter(isActive);
@@ -108,6 +123,15 @@ export default function EmployeeMaster({
   }, [inView]);
 
   const columns: Column<HrmsEmployee>[] = useMemo(() => [
+    /**
+     * EMPLOYEEID IS THE FIRST COLUMN IN EVERY VIEW (Dr Raghu, 23 Aug 2026).
+     * It is the key every HRIS record hangs off, every upload is filed by and
+     * every Drive folder is named with — so it reads first, and it is the
+     * column frozen by default when the table is scrolled sideways.
+     */
+    { key: "id", label: "EmployeeID", width: 110, value: (e) => e.id,
+      render: (e) => <span className="font-bold tnum">{e.id}</span>,
+      title: "The key every HRIS record hangs off" },
     {
       key: "name", label: "Name", width: 210,
       value: (e) => val(e, "name"),
@@ -118,10 +142,11 @@ export default function EmployeeMaster({
         </span>
       ),
     },
-    { key: "id", label: "EmployeeID", width: 120, value: (e) => e.id,
-      title: "The key every HRIS record hangs off" },
     { key: "department", label: "Department", width: 150, value: (e) => val(e, "department") },
-    { key: "designation", label: "Designation", width: 200, value: (e) => val(e, "designation") },
+    { key: "role", label: "Role", width: 190, value: (e) => val(e, "role"),
+      title: "The enforceable one — defined in IDP → Roles, JD, KRA, KPI" },
+    { key: "designation", label: "Designation", width: 200, value: (e) => val(e, "designation"),
+      title: "What goes on the visiting card. The Role beside it is the accountable one." },
     { key: "email", label: "Work email", width: 210, value: (e) => val(e, "email") },
     { key: "location", label: "Location", width: 120, value: (e) => val(e, "location") },
     { key: "type", label: "Type", width: 130, value: (e) => val(e, "type"),
@@ -235,6 +260,16 @@ export default function EmployeeMaster({
             <option value="">All departments</option>
             {departments.map((d) => (<option key={d} value={d}>{d}</option>))}
           </select>
+          <select value={role} onChange={(e) => setRole(e.target.value)} className="text-xs rounded px-2 py-1.5 bg-white"
+            style={{ border: `1px solid ${C.line}`, maxWidth: 210 }} title="The enforceable one, from the role register">
+            <option value="">All roles</option>
+            {roles.map((d) => (<option key={d} value={d}>{d}</option>))}
+          </select>
+          <select value={type} onChange={(e) => setType(e.target.value)} className="text-xs rounded px-2 py-1.5 bg-white"
+            style={{ border: `1px solid ${C.line}` }} title="Decides payroll — employed types carry PF/ESIC/MLWF, contract types carry 2% TDS">
+            <option value="">All types</option>
+            {types.map((d) => (<option key={d} value={d}>{d}</option>))}
+          </select>
           <span className="text-xs" style={{ color: C.faint }}>
             {all === null ? "loading…" : `${filtered.length} shown`} · click a header to sort, 📌 to freeze columns
           </span>
@@ -269,7 +304,7 @@ export default function EmployeeMaster({
           rowKey={(e) => e.id}
           onRowClick={(e) => setOpenId(e.id)}
           activeKey={openId}
-          initialFrozen={1}
+          initialFrozen={2}
           empty={all === null ? "Loading the master…" : "Nobody matches that."}
         />
       </Pane>

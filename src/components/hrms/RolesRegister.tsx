@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
+import RichText from "./RichText";
 
 interface Role {
   id: string;
@@ -211,13 +212,17 @@ function RoleEditor({
     onRun({ action: "save", id: r.id, [field]: value }, "Saved");
   };
 
-  const Text = ({ f, label, rows = 3, hint }: { f: keyof Role; label: string; rows?: number; hint?: string }) => (
+  /**
+   * Job Description, Deliverable and Measurement Metric are RICH TEXT
+   * (Dr Raghu, 23 Aug 2026) — a job description with three bullets is a
+   * different document from the same words run together in a paragraph.
+   */
+  const Rich = ({ f, label, rows = 3, hint, placeholder }: { f: keyof Role; label: string; rows?: number; hint?: string; placeholder?: string }) => (
     <div className="mb-2">
       <div className="text-xs font-semibold" style={{ color: C.dim }}>{label}</div>
-      {hint && <div style={{ fontSize: 10.5, color: C.faint, lineHeight: 1.5 }}>{hint}</div>}
-      <textarea defaultValue={(r[f] as string) || ""} rows={rows}
-        onBlur={(e) => save(f as string, e.target.value)}
-        className="text-xs rounded px-2 py-1 w-full mt-1" style={{ border: `1px solid ${C.line}` }} />
+      {hint && <div style={{ fontSize: 10.5, color: C.faint, lineHeight: 1.5, marginBottom: 3 }}>{hint}</div>}
+      <RichText value={(r[f] as string) || ""} rows={rows} placeholder={placeholder}
+        onSave={(html) => save(f as string, html)} />
     </div>
   );
 
@@ -230,9 +235,13 @@ function RoleEditor({
         <Field label="Reports To" value={r.reports_to || ""} onSave={(v) => save("reports_to", v)} />
       </div>
 
-      <Text f="job_description" label="Job Description" rows={3} />
-      <Text f="deliverable" label="Deliverable" rows={2} hint="What this role must produce — an outcome, not a list of activities." />
-      <Text f="metric" label="Measurement Metric" rows={2} hint="How the deliverable is measured. A number, a date, or a rate." />
+      <Rich f="job_description" label="Job Description" rows={4} placeholder="What this role exists to do…" />
+      <Rich f="deliverable" label="Deliverable" rows={3}
+        hint="What this role must produce — an outcome, not a list of activities."
+        placeholder="One bullet per outcome…" />
+      <Rich f="metric" label="Measurement Metric" rows={3}
+        hint="How the deliverable is measured. A number, a date, or a rate."
+        placeholder="e.g. On-time delivery ≥ 90% each month…" />
 
       <VoiceNote r={r} reload={reload} />
 

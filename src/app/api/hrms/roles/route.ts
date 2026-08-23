@@ -7,6 +7,27 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const BUCKET = "voice-notes";
+
+/**
+ * Job Description, Deliverable and Measurement Metric are rich text, so what
+ * arrives is HTML. It is scrubbed HERE as well as in the editor: the browser
+ * is not where a security rule is enforced, and a value can reach this route
+ * without going through the editor at all.
+ */
+const RICH = new Set(["job_description", "deliverable", "metric"]);
+
+function scrub(html: string): string {
+  return String(html || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<\/?(?:object|embed|form|input|link|meta|base)\b[^>]*>/gi, "")
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, "")
+    .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
+    .replace(/javascript:/gi, "")
+    .trim();
+}
 const LINK_TTL = 60 * 60;
 
 /** Who holds each role today, and whether they are on the roll. */
@@ -189,7 +210,11 @@ export async function POST(req: Request) {
       if (!body.id) throw new HttpError(400, "id required");
       const patch: Record<string, unknown> = { updated_by: stamp, updated_at: new Date().toISOString() };
       for (const f of ["role", "department", "grade", "reports_to", "job_description", "deliverable", "metric"]) {
-        if (f in body) patch[f] = String(body[f] ?? "").trim() || null;
+        if (!(f in body)) continue;
+        const raw = String(body[f] ?? "");
+        const v = RICH.has(f) ? scrub(raw) : raw.trim();
+        // markup with no words in it is not content
+        patch[f] = (RICH.has(f) ? v.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() : v) ? v : null;
       }
       if (patch.role === null) throw new HttpError(400, "A role must have a name");
       const { error } = await admin.from("hrms_role").update(patch).eq("id", body.id);

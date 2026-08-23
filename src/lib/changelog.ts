@@ -75,6 +75,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.1.7",
+    date: "2026-08-23",
+    module: "HRIS — roles assigned, EmployeeID first, rich text",
+    items: [
+      "ALL 380 PEOPLE NOW HAVE A ROLE. Every designation in the master matched a role in the register exactly, so each person was assigned theirs — 380 assignments, 380 history lines, nothing guessed. Unassigned drops from 201 to nil, and the count now means what it should: a genuine gap, not a field that launched empty.",
+      "EMPLOYEEID IS THE FIRST COLUMN IN EVERY VIEW, and it is one of the two columns frozen by default when the table scrolls sideways. It is the key every record hangs off, every upload is filed by and every Drive folder is named with.",
+      "ROLE HAS ITS OWN COLUMN beside Designation, so the accountable one and the vanity one can be read against each other — and where they differ, that difference is now visible rather than buried.",
+      "TWO MORE FILTERS on the master: ROLE and TYPE, beside the department filter. Both list only what the current view actually contains, so filtering to Labour does not then offer roles no labourer holds.",
+      "JOB DESCRIPTION, DELIVERABLE AND MEASUREMENT METRIC ARE NOW RICH TEXT — bold, italic, underline, bullets, numbering, links. A job description with three bullets is a different document from the same words run together in a paragraph.",
+      "NO EDITOR LIBRARY WAS ADDED. TipTap or Quill would have put several hundred kilobytes on every page of HRIS for a toolbar of six buttons, and a dependency in front of a field somebody has to be able to fix in five years. The markup is scrubbed on the way out of the editor AND again on the server — the browser is not where a security rule is enforced.",
+      "Plain text remains the default everywhere else. Rich text appears only where it has been asked for.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.19.1.6",
     date: "2026-08-23",
     module: "HRIS — Roles, JD, KRA, KPI",
