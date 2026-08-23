@@ -55,7 +55,17 @@ export default function EmployeeRecord({
   }, [id]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    api.get("/api/hrms/masters").then((r) => setMasters(r.masters || {})).catch(() => setMasters({}));
+    /**
+     * BOTH LISTS MERGE INTO THE SAME MAP, and both must MERGE rather than
+     * replace. They did not: whichever request finished second overwrote the
+     * first, and because the masters call is the quicker of the two it
+     * usually landed last and wiped the roles — so every role on every record
+     * displayed as "(not on the list)" while being perfectly well saved. The
+     * value was right and the dropdown was lying about it.
+     */
+    api.get("/api/hrms/masters")
+      .then((r) => setMasters((m) => ({ ...m, ...(r.masters || {}) })))
+      .catch(() => {});
     // Roles are not a Module Master — they are a register with a JD and a
     // metric behind each one. Same dropdown, different source of truth.
     api.get("/api/hrms/roles")
@@ -325,7 +335,9 @@ function EditField({
             // two lists that are policy (Status, Type) before 0049 is run.
             const fromMaster = f.master ? (masters[f.master] || []).map((m) => m.value) : [];
             const opts = fromMaster.length ? fromMaster : f.options || [];
-            const orphan = current && !opts.includes(current);
+            // A list that has not arrived yet is not evidence that the value
+            // is wrong. Only say "not on the list" once there IS a list.
+            const orphan = current && opts.length > 0 && !opts.includes(current);
             return (
               <>
                 <select value={current} onChange={(ev) => onSave(ev.target.value)}

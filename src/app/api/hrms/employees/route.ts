@@ -159,12 +159,48 @@ export async function POST(req: Request) {
         throw new HttpError(400, `${spec.label} must be one of: ${spec.options.join(", ")}`);
 
       /**
+       * ROLE IS ENFORCED (Dr Raghu, 23 Aug 2026).
+       *
+       * Designation is vanity and may say anything. ROLE may not: it is the
+       * accountable one, it carries a job description, a deliverable and a
+       * measurement metric, and an appraisal is run against it. A role that
+       * is not in the register is a role nobody has defined, so it is refused
+       * here rather than accepted and discovered later.
+       *
+       * Checked on the SERVER as well as offered as a dropdown, because a
+       * dropdown is a convenience and not a rule.
+       */
+      if (field === "role" && action === "edit") {
+        const wanted = String(body.value ?? "").trim();
+        if (wanted) {
+          const { data: known } = await admin.from("hrms_role").select("role").eq("role", wanted).maybeSingle();
+          if (!known)
+            throw new HttpError(
+              400,
+              `“${wanted}” is not in the role register. Add it under IDP → Roles, JD, KRA, KPI first — a role ` +
+                `nobody has defined cannot be one somebody is accountable for.`,
+            );
+        }
+      }
+
+      /**
        * Unique fields — initials today.
        *
        * "The first one will be allowed, and the second one says already
        * exists" (Dr Raghu). Checked against every other employee's current
        * value, which for initials lives entirely in the overlay.
        */
+      if (spec.master && spec.master !== "__roles__" && action === "edit" && body.value) {
+        // the value has to be on its master's list too
+        const { data: onList } = await admin
+          .from("hrms_master").select("value").eq("kind", spec.master).eq("value", String(body.value).trim()).maybeSingle();
+        if (!onList)
+          throw new HttpError(
+            400,
+            `“${String(body.value).trim()}” is not on the ${spec.label} list. Add it in Module Masters first.`,
+          );
+      }
+
       if (spec.unique && action === "edit") {
         const wanted = String(body.value ?? "").trim().toUpperCase();
         if (wanted) {

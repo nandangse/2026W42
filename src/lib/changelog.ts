@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.1.1",
+    date: "2026-08-23",
+    module: "HRIS — the dropdown was lying, and Role is now enforced",
+    items: [
+      "EVERY ROLE ON EVERY RECORD WAS SHOWING “(not on the list)”, AND EVERY ONE OF THEM WAS SAVED CORRECTLY. The value was right; the dropdown was wrong about it. Checked against the database before touching anything: all 134 roles are in the register, “Managing Director & CEO” among them, and not one person holds a role the register does not have.",
+      "THE CAUSE WAS MINE. The record page loads two lists into one map — the Module Masters and the role register — and the second call REPLACED the map instead of merging into it. The masters call is the quicker of the two, so it usually landed last and wiped the roles, leaving the page with an empty list and every value looking like an orphan.",
+      "AND A LIST THAT HAS NOT ARRIVED IS NO LONGER TREATED AS EVIDENCE THE VALUE IS WRONG. “Not on the list” now requires there to BE a list.",
+      "ROLE IS ENFORCED, on the server and not merely offered as a dropdown. A role that is not in the register is refused, with the reason: a role nobody has defined cannot be one somebody is accountable for. Add it under IDP → Roles, JD, KRA, KPI first.",
+      "THE SAME NOW HOLDS FOR EVERY MASTER-BACKED FIELD — Department, Grade, Job Location, Qualification, sizes, Blood Group, Religion, Marital Status, Gender, Shift. A value not on its list is refused and says which list to add it to. A dropdown is a convenience; the rule lives on the server.",
+      "Designation is untouched by all this and stays free text. It is what goes on a visiting card, and it is meant to be.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.1.0",
     date: "2026-08-23",
     module: "IDP — speak it, and a section for leaders",
