@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 import { IDP_SECTIONS, IDP_RATINGS } from "@/lib/idp";
-import { salaryTable, scaledGetter, type SalaryRow } from "@/lib/salary";
+import { salaryTable, type SalaryRow, type ExtraRow } from "@/lib/salary";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
 
@@ -38,7 +38,10 @@ interface PersonData {
     gross_current: number | null; gross_proposed: number | null; notes: string | null;
     analysis: string | null; submitted_at: string | null; voice: Rec[];
   }[];
-  appraisal: { new_gross: number | null; prev_gross: number | null; note: string | null; decided_by: string | null; decided_at: string } | null;
+  appraisal: {
+    new_gross: number | null; prev_gross: number | null; note: string | null; decided_by: string | null; decided_at: string;
+    structure?: { components?: Record<string, number>; extras?: Record<string, number> } | null;
+  } | null;
 }
 
 const TABS = ["Self IDP", "Manager IDP comment", "Finalised IDP for Employee", "Appraisal Final"] as const;
@@ -242,39 +245,108 @@ function FinalisedTab({ d }: { d: PersonData }) {
 }
 
 /* ── 4 · the money ── */
+
+/** The five earning components, in table order. */
+const COMPS = [
+  ["basic_da", "Basic and DA", "Basic & DA"],
+  ["hra", "HRA", "HRA"],
+  ["fixed", "Fixed Allowance", "Fixed Allowance"],
+  ["conveyance", "Conveyance", "Conveyance"],
+  ["medical", "Medical Allowance", "Medical Allowance"],
+] as const;
+
+/** The company's investment lines beyond pay. All editable; the rules are the hints. */
+const EXTRAS = [
+  ["lic_yr", "LIC Policy", "yr", ""],
+  ["training_yr", "Training", "yr", ""],
+  ["leader_dev_yr", "Leader Development Investment", "yr", "Rs 50,000/yr for leaders · Rs 75,000/yr for StratCom"],
+  ["leader_tools_mo", "Leader Tools", "mo", "Rs 10,000 per month"],
+] as const;
+
 function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean; onSaved: () => void }) {
   const prev = d.salary?.gross ?? null;
   const proposed = d.reviews.find((r) => r.gross_proposed != null)?.gross_proposed ?? null;
-  const [gross, setGross] = useState(() => String(d.appraisal?.new_gross ?? proposed ?? prev ?? ""));
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
-  const n = Number(gross) || 0;
+  // today's split, off the current table, for proportional scaling
+  const baseComps = useMemo(() => {
+    const base = new Map((d.salary?.rows || []).filter((r) => r.kind === "row").map((r) => [r.label, r.monthly ?? 0]));
+    const out: Record<string, number> = {};
+    for (const [key, , rowLabel] of COMPS) out[key] = base.get(rowLabel) ?? 0;
+    return out;
+  }, [d]);
+
+  const scaleTo = useCallback((target: number) => {
+    const cur = Object.values(baseComps).reduce((a, b) => a + b, 0);
+    const out: Record<string, string> = {};
+    for (const [key] of COMPS) out[key] = String(cur && target ? Math.round((baseComps[key] / cur) * target) : 0);
+    return out;
+  }, [baseComps]);
+
+  // the split being decided: saved tuning first, else today's shares at the decided/proposed gross
+  const [comps, setComps] = useState<Record<string, string>>(() => {
+    const saved = d.appraisal?.structure?.components;
+    if (saved && Object.values(saved).some((v) => Number(v) > 0)) {
+      const out: Record<string, string> = {};
+      for (const [key] of COMPS) out[key] = String(Math.round(Number(saved[key]) || 0));
+      return out;
+    }
+    return scaleTo(Number(d.appraisal?.new_gross ?? proposed ?? prev ?? 0) || 0);
+  });
+  const [extras, setExtras] = useState<Record<string, string>>(() => {
+    const saved = d.appraisal?.structure?.extras || {};
+    const out: Record<string, string> = {};
+    for (const [key] of EXTRAS) out[key] = String(Math.round(Number(saved[key]) || 0) || "");
+    return out;
+  });
+
+  // the gross IS the sum of the components — one source, no drift
+  const n = COMPS.reduce((a, [key]) => a + (Number(comps[key]) || 0), 0);
+  const [grossBox, setGrossBox] = useState(String(n || ""));
+
+  const setGrossAndScale = (raw: string) => {
+    const clean = raw.replace(/[^0-9]/g, "");
+    setGrossBox(clean);
+    setComps(scaleTo(Number(clean) || 0));
+  };
+  const setComp = (key: string, raw: string) => {
+    const next = { ...comps, [key]: raw.replace(/[^0-9]/g, "") };
+    setComps(next);
+    setGrossBox(String(COMPS.reduce((a, [k]) => a + (Number(next[k]) || 0), 0) || ""));
+  };
+
+  const extraRows: ExtraRow[] = EXTRAS.map(([key, label, unit]) => ({
+    label: unit === "yr" ? `${label} (annual)` : label,
+    monthly: unit === "yr" ? (Number(extras[key]) || 0) / 12 : Number(extras[key]) || 0,
+  })).filter((e) => e.monthly > 0);
+
   const newTable = useMemo(() => {
-    if (!n || !d.salary) return null;
-    // the same person, the same shares, at the new number
-    const base = new Map(d.salary.rows.filter((r) => r.kind === "row" || r.kind === "total").map((r) => [r.label, r.monthly ?? 0]));
-    const get = (k: string) =>
-      k === "Basic and DA" ? base.get("Basic & DA") ?? 0
-      : k === "HRA" ? base.get("HRA") ?? 0
-      : k === "Fixed Allowance" ? base.get("Fixed Allowance") ?? 0
-      : k === "Conveyance" ? base.get("Conveyance") ?? 0
-      : k === "Medical Allowance" ? base.get("Medical Allowance") ?? 0
-      : 0;
-    return salaryTable(scaledGetter(get, n), d.employee.type);
-  }, [n, d]);
+    if (!n) return null;
+    const get = (k: string) => {
+      const hit = COMPS.find(([, sheetKey]) => sheetKey === k);
+      return hit ? Number(comps[hit[0]]) || 0 : 0;
+    };
+    return salaryTable(get, d.employee.type, extraRows);
+  }, [n, comps, d, extraRows]);
 
   const inc = prev != null && n ? n - prev : null;
 
   const save = async () => {
     setBusy(true); setMsg("");
     try {
-      await api.post("/api/hrms/idp", { action: "appraisal", employee_id: d.employee.id, new_gross: gross, prev_gross: prev });
-      setMsg("Decision saved ✓");
+      const structure = {
+        components: Object.fromEntries(COMPS.map(([key]) => [key, Number(comps[key]) || 0])),
+        extras: Object.fromEntries(EXTRAS.map(([key]) => [key, Number(extras[key]) || 0])),
+      };
+      const r = await api.post("/api/hrms/idp", { action: "appraisal", employee_id: d.employee.id, new_gross: String(n), prev_gross: prev, structure });
+      setMsg(r?.warning ? String(r.warning) : "Decision saved ✓");
       onSaved();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
   };
+
+  const editable = (label: string) => COMPS.find(([, , rowLabel]) => rowLabel === label)?.[0];
 
   return (
     <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line }}>
@@ -287,19 +359,25 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
       <div className="flex items-center gap-2 mt-3 flex-wrap">
         <span className="font-bold" style={{ fontSize: 15 }}>New Gross:</span>
         <span style={{ fontWeight: 700, color: C.green }}>Rs</span>
-        <input value={gross} inputMode="numeric" onChange={(e) => setGross(e.target.value.replace(/[^0-9]/g, ""))}
+        <input value={grossBox} inputMode="numeric" onChange={(e) => setGrossAndScale(e.target.value)}
           className="rounded px-2 py-2 tnum" style={{ border: `2px solid ${C.green}`, color: C.green, fontWeight: 700, fontSize: 17, width: 160 }} />
-        {inc !== null && (
-          <span style={{ fontSize: 14 }}>
-            Increment <b className="tnum" style={{ color: inc >= 0 ? C.green : C.red }}>{inc >= 0 ? "+" : "−"}₹{inr(Math.abs(inc))}</b>{" "}
-            <span style={{ color: C.faint }}>({prev ? `${inc >= 0 ? "+" : "−"}${Math.abs((inc / prev) * 100).toFixed(1)}%` : ""} increment)</span>
-          </span>
-        )}
       </div>
+
+      {/* the headline, on top — the increment both ways, and the new CTC */}
+      {inc !== null && (
+        <div className="flex gap-2 flex-wrap mt-3">
+          <Head n={`${inc >= 0 ? "+" : "−"}₹${inr(Math.abs(inc))}`} l="Increment / month" sub={prev ? `${inc >= 0 ? "+" : "−"}${Math.abs((inc / prev) * 100).toFixed(1)}% increment` : ""} good={inc >= 0} />
+          <Head n={`${inc >= 0 ? "+" : "−"}₹${inr(Math.abs(inc) * 12)}`} l="Increment / year" good={inc >= 0} />
+          {newTable && <Head n={`Rs ${newTable.ctcLakhs} L`} l="New annual CTC (approx)" good />}
+        </div>
+      )}
 
       {newTable && (
         <div className="mt-3">
-          <div className="font-bold" style={{ fontSize: 14 }}>The New Salary Structure</div>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <div className="font-bold" style={{ fontSize: 14 }}>The New Salary Structure</div>
+            <span style={{ fontSize: 11, color: C.faint }}>the five components are editable — type in the Monthly column and everything recomputes</span>
+          </div>
           <table style={{ fontSize: 12.5, width: "100%", tableLayout: "fixed", borderCollapse: "collapse", marginTop: 6 }}>
             <thead>
               <tr>
@@ -309,17 +387,26 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
               </tr>
             </thead>
             <tbody>
-              {newTable.rows.map((r, i) => (
-                <tr key={i} style={{ background: r.kind === "head" || r.kind === "total" ? "#FFF9C4" : "#fff", fontWeight: r.kind !== "row" && r.kind !== "note" ? 700 : 400 }}>
-                  {r.kind === "note"
-                    ? <td colSpan={3} className="px-1.5 py-1" style={{ border: `1px solid ${C.line}`, fontSize: 11.5, color: C.dim }}>{r.label}</td>
-                    : <>
-                        <td className="px-1.5 py-1" style={{ border: `1px solid ${C.line}` }}>{r.label}</td>
-                        <td className="px-1.5 py-1 text-right tnum" style={{ border: `1px solid ${C.line}` }}>{inr(r.monthly)}</td>
-                        <td className="px-1.5 py-1 text-right tnum" style={{ border: `1px solid ${C.line}` }}>{inr(r.yearly)}</td>
-                      </>}
-                </tr>
-              ))}
+              {newTable.rows.map((r, i) => {
+                const key = r.kind === "row" ? editable(r.label) : undefined;
+                return (
+                  <tr key={i} style={{ background: r.kind === "head" || r.kind === "total" ? "#FFF9C4" : "#fff", fontWeight: r.kind !== "row" && r.kind !== "note" ? 700 : 400 }}>
+                    {r.kind === "note"
+                      ? <td colSpan={3} className="px-1.5 py-1" style={{ border: `1px solid ${C.line}`, fontSize: 11.5, color: C.dim }}>{r.label}</td>
+                      : <>
+                          <td className="px-1.5 py-1" style={{ border: `1px solid ${C.line}` }}>{r.label}</td>
+                          <td className="px-1.5 py-1 text-right tnum" style={{ border: `1px solid ${C.line}`, padding: key ? "2px 4px" : undefined }}>
+                            {key
+                              ? <input value={comps[key]} inputMode="numeric" onChange={(e) => setComp(key, e.target.value)}
+                                  className="tnum rounded text-right px-1.5 py-1 w-full"
+                                  style={{ border: `1.5px solid ${C.green}`, fontWeight: 600, fontSize: 12.5, maxWidth: 130, marginLeft: "auto", display: "block" }} />
+                              : inr(r.monthly)}
+                          </td>
+                          <td className="px-1.5 py-1 text-right tnum" style={{ border: `1px solid ${C.line}` }}>{inr(r.yearly)}</td>
+                        </>}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           <div className="mt-1 font-bold" style={{ fontSize: 14 }}>
@@ -327,6 +414,25 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
           </div>
         </div>
       )}
+
+      {/* the company's investment beyond pay — showcased, and part of the CTC when filled */}
+      <div className="mt-3 rounded-lg border p-2.5" style={{ borderColor: C.line, background: "#FBFAF7" }}>
+        <div className="font-bold" style={{ fontSize: 13 }}>Company Investment in You</div>
+        <div style={{ fontSize: 11, color: C.faint, marginBottom: 6 }}>Fill what applies — filled lines appear in the structure above and count into the CTC.</div>
+        <div className="grid gap-x-4 gap-y-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+          {EXTRAS.map(([key, label, unit, hint]) => (
+            <label key={key} className="flex items-center gap-2" style={{ fontSize: 12.5 }}>
+              <span style={{ flex: 1 }}>
+                {label} <span style={{ color: C.faint }}>({unit === "yr" ? "Rs/year" : "Rs/month"})</span>
+                {hint && <div style={{ fontSize: 10.5, color: C.faint }}>{hint}</div>}
+              </span>
+              <input value={extras[key]} inputMode="numeric"
+                onChange={(e) => setExtras((x) => ({ ...x, [key]: e.target.value.replace(/[^0-9]/g, "") }))}
+                className="tnum rounded text-right px-1.5 py-1" style={{ border: `1px solid ${C.line}`, width: 100 }} />
+            </label>
+          ))}
+        </div>
+      </div>
 
       <div className="rounded p-2.5 mt-3" style={{ background: "#FFF7E6", border: "1px solid #F5D9A8", fontSize: 13, lineHeight: 1.6 }}>
         <b>Note:</b> we will get into <b>Performance Incentives for Q3</b> depending on the IDP work.
@@ -345,6 +451,16 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
         )}
         {msg && <span className="text-xs font-semibold" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</span>}
       </div>
+    </div>
+  );
+}
+
+function Head({ n, l, sub, good }: { n: string; l: string; sub?: string; good?: boolean }) {
+  return (
+    <div className="rounded-lg border px-3 py-2" style={{ borderColor: good ? "#BFE3CB" : "#F0C9C4", background: good ? "#F2FAF4" : "#FDF3F1", minWidth: 150 }}>
+      <div className="font-bold tnum" style={{ fontSize: 18, lineHeight: 1.15, color: good ? C.green : C.red }}>{n}</div>
+      <div style={{ fontSize: 11, color: C.faint }}>{l}</div>
+      {sub && <div style={{ fontSize: 10.5, color: C.faint }}>{sub}</div>}
     </div>
   );
 }

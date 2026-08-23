@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.9.2",
+    date: "2026-08-23",
+    module: "HRIS — the money tab grows up",
+    items: [
+      "NO BENEFITS FOR MANAGEMENT — the Benefits block (mediclaim, shoes, bonus, paid leaves, third Saturday) no longer applies to the Management type, anywhere the salary table is drawn. The section says so in one line instead of listing money that is not real.",
+      "THE STRUCTURE IS EDITABLE — on Appraisal Final, the five components (Basic & DA, HRA, Fixed, Conveyance, Medical) are input boxes. Typing the New Gross splits it in today's proportions; tuning any component recomputes the gross, the deductions, the TDS and the CTC live. The tuned split is SAVED with the decision (migration 0062), so the printed structure and the decided one cannot drift apart.",
+      "THE HEADLINE ON TOP — Increment per month, increment per year, and the new annual CTC sit in three tiles above the table, before any scrolling.",
+      "COMPANY INVESTMENT IN YOU — LIC Policy, Training, Leader Development Investment (Rs 50,000/yr for leaders, Rs 75,000/yr for StratCom) and Leader Tools (Rs 10,000/mo) are their own block. Filled lines appear in the structure as section E and count into the CTC; empty ones stay invisible.",
+      "APPROX TDS AT THE GROSS — right under Total Gross Salary (A), monthly and yearly: flat 2% for the contract types (as the company deducts), the new-regime slab estimate for employees. Marked indicative in the row itself, because a declaration or other income changes it.",
+      "Migration 0062 (run after 0061).",
+    ],
+  },
+  {
     v: "3.20.9.1",
     date: "2026-08-23",
     module: "Roles — the summary names its failure",

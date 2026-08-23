@@ -358,13 +358,22 @@ export async function POST(req: Request) {
       const employee_id = String(body.employee_id || "");
       if (!employee_id) throw new HttpError(400, "employee_id required");
       const new_gross = Number(String(body.new_gross ?? "").replace(/[^0-9.]/g, "")) || null;
-      const { error } = await admin.from("hrms_appraisal").upsert({
+      const row: Record<string, unknown> = {
         employee_id, cycle: "2026-27",
         new_gross, prev_gross: Number(body.prev_gross) || null,
         note: String(body.note || "").trim() || null,
         decided_by: me.initials ? `${me.initials} · ${me.email}` : me.email,
         updated_at: new Date().toISOString(),
-      }, { onConflict: "employee_id,cycle" });
+      };
+      // the hand-tuned split and the investment lines, when the card sent them (0062)
+      if (body.structure && typeof body.structure === "object") row.structure = body.structure;
+      let { error } = await admin.from("hrms_appraisal").upsert(row, { onConflict: "employee_id,cycle" });
+      if (error && row.structure && /structure|schema cache/i.test(error.message)) {
+        // pre-0062: keep the decision, drop only the tuning, and say so
+        delete row.structure;
+        ({ error } = await admin.from("hrms_appraisal").upsert(row, { onConflict: "employee_id,cycle" }));
+        if (!error) return NR.json({ ok: true, warning: "Saved, but the edited structure needs migration 0062 — run it and save once more." });
+      }
       if (error) {
         if (/hrms_appraisal|does not exist|schema cache/i.test(error.message))
           throw new HttpError(503, "Run migration 0061 first — the appraisal decision has nowhere to live yet.");
