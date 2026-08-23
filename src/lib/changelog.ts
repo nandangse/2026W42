@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.3.1",
+    date: "2026-08-23",
+    module: "IDP — the record stops at statutory, and the box gets the answer",
+    items: [
+      "THE RECORD STEP NOW STOPS AT STATUTORY. Pay, Bank, Benefits, Documents, Performance, Leaving and HR notes are gone from the IDP — they are HR's business with the person, not part of a development discussion, and money on the screen changes the mood of everything written after it. Filtered ON THE SERVER, not merely hidden: what the browser never receives, no view can leak. Family-details-updated and WhatsApp are gone too.",
+      "THE RECORDINGS ARE NOT DOWNLOADABLE — the browser's download option is off on every voice player in the IDP and HRIS. The recording is evidence, not a file to hand around.",
+      "THE WORDS AS HEARD NOW SIT BESIDE EACH RECORDING, folded under it, verbatim — each recording keeps its own words instead of all of them blurring into one box.",
+      "AND THAT FREES THE TEXT BOX TO GET THE ANSWER, NOT THE DICTATION. What lands in the box is now written properly — plain English, first person, every distinct point kept but said once and cleanly, the repetitions and microphone-testing asides dropped — and written KNOWING THE ROLE, so the points read against what the company expects of it. Nothing is invented: the verbatim words are always right there beside the audio.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.3.0",
     date: "2026-08-23",
     module: "IDP — begin with the record, and the brief steps aside",

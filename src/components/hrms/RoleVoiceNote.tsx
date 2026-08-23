@@ -159,7 +159,7 @@ export default function VoiceNote({ r, reload, onSaved }: { r: RoleLike; reload:
             ■ Stop
           </button>
         )}
-        {r.url && <audio controls src={r.url} style={{ height: 28 }} />}
+        {r.url && <audio controls controlsList="nodownload" src={r.url} style={{ height: 28 }} />}
         {r.voice_seconds ? <span className="text-xs tnum" style={{ color: C.faint }}>{r.voice_seconds}s</span> : null}
       </div>
       <div style={{ fontSize: 10.5, color: C.faint, lineHeight: 1.5, marginTop: 4 }}>

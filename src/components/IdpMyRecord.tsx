@@ -14,6 +14,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { FIELD_GROUPS, splitMulti, type FieldSpec } from "@/lib/hrms";
+import { IDP_RECORD_GROUPS, IDP_RECORD_HIDE } from "@/lib/idp";
 
 const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
 
@@ -56,8 +57,11 @@ export default function IdpMyRecord({
       </div>
       {msg && <div className="text-sm font-semibold mt-2" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</div>}
 
-      {FIELD_GROUPS.map((g) => {
-        const fields = g.fields.filter((f) => f.key !== "notes");
+      {FIELD_GROUPS.filter((g) => IDP_RECORD_GROUPS.includes(g.key)).map((g) => {
+        // identity, contact, personal, family, statutory — and no further.
+        // Pay and everything after it is HR's business with the person, not
+        // part of a development discussion; the server does not even send it.
+        const fields = g.fields.filter((f) => !IDP_RECORD_HIDE.has(f.key));
         if (!fields.length) return null;
         return (
           <details key={g.key} open={g.key === "identity" || g.key === "contact"} className="mt-3">

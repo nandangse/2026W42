@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { hrmsTables, splitMulti, ALL_FIELDS, fieldSpec } from "@/lib/hrms";
-import { CONSENT_TEXT, isComplete } from "@/lib/idp";
+import { hrmsTables, splitMulti, FIELD_GROUPS, fieldSpec } from "@/lib/hrms";
+import { CONSENT_TEXT, isComplete, IDP_RECORD_GROUPS, IDP_RECORD_HIDE } from "@/lib/idp";
 
 export const dynamic = "force-dynamic";
 /** Tidying ten minutes of speech takes longer than a default timeout allows. */
@@ -135,8 +135,14 @@ export async function GET() {
         );
         const value: Record<string, string | null> = {};
         const pending: Record<string, boolean> = {};
-        for (const f of ALL_FIELDS) {
-          if (f.key === "notes") continue; // HR's, not theirs to read
+        // Only the identity side of the record. Pay, bank, benefits and the
+        // rest are filtered HERE, not merely hidden on the page — what the
+        // browser never receives, no view can leak.
+        const shown = FIELD_GROUPS
+          .filter((g) => IDP_RECORD_GROUPS.includes(g.key))
+          .flatMap((g) => g.fields)
+          .filter((f) => !IDP_RECORD_HIDE.has(f.key));
+        for (const f of shown) {
           let v: string | null = null;
           if (f.column) {
             if (f.column === "active") v = emp?.active ? "yes" : "no";
@@ -157,12 +163,12 @@ export async function GET() {
     const open = rows.find((r) => !r.submitted_at) ?? null;
     if (open) {
       // signed per read; a stored URL either expires in the row or never does
-      const audio = (open.audio || {}) as Record<string, { path: string; seconds: number | null; at: string }[]>;
-      const withUrls: Record<string, { url: string | null; seconds: number | null; at: string }[]> = {};
+      const audio = (open.audio || {}) as Record<string, { path: string; seconds: number | null; at: string; transcript?: string }[]>;
+      const withUrls: Record<string, { url: string | null; seconds: number | null; at: string; transcript: string | null }[]> = {};
       for (const [qid, list] of Object.entries(audio)) {
         withUrls[qid] = await Promise.all(list.map(async (a) => {
           const { data: sgn } = await adminClient().storage.from(BUCKET).createSignedUrl(a.path, LINK_TTL);
-          return { url: sgn?.signedUrl ?? null, seconds: a.seconds, at: a.at };
+          return { url: sgn?.signedUrl ?? null, seconds: a.seconds, at: a.at, transcript: a.transcript ?? null };
         }));
       }
       (open as Record<string, unknown>).audioUrls = withUrls;
@@ -226,8 +232,11 @@ export async function POST(req: Request) {
         .from(BUCKET).upload(path, await file.arrayBuffer(), { contentType: file.type || "audio/webm" });
       if (up) throw new Error(`Could not store the recording: ${up.message}`);
 
-      const audio = (row.audio || {}) as Record<string, { path: string; seconds: number | null; at: string }[]>;
-      audio[qid] = [...(audio[qid] || []), { path, seconds, at: new Date().toISOString() }];
+      const audio = (row.audio || {}) as Record<string, { path: string; seconds: number | null; at: string; transcript?: string }[]>;
+      // the words as heard travel WITH the recording, so each can sit beside
+      // its own audio rather than all of them blurring into one box
+      const transcript = String(form.get("transcript") || "").trim() || undefined;
+      audio[qid] = [...(audio[qid] || []), { path, seconds, at: new Date().toISOString(), transcript }];
       const { error } = await admin
         .from("hrms_idp").update({ audio, updated_at: new Date().toISOString() }).eq("id", id);
       if (error) throw new Error(error.message);
@@ -253,39 +262,40 @@ export async function POST(req: Request) {
       if (!text) throw new HttpError(400, "Nothing was said.");
       const key = process.env.ANTHROPIC_API_KEY;
       if (!key) return NextResponse.json({ text });
+      /**
+       * THE BOX GETS THE ANSWER, NOT THE DICTATION (Dr Raghu, 23 Aug 2026).
+       *
+       * The words as heard are kept verbatim BESIDE the recording, so nothing
+       * is ever lost — which frees this step to do its real job: turn spoken
+       * thinking into the answer the person was giving. Well-organised, plain
+       * English, every distinct point kept but said once and cleanly, and
+       * written knowing what their role is FOR, so the answer lands against
+       * the role rather than in mid-air.
+       */
+      const who = await whoAreThey(u.email);
+      const roleLine = who.role ? `Their role: ${who.role}.` : "";
+      const expectLine = who.roleSummary ? `What the company expects of that role:\n${who.roleSummary}` : "";
       try {
         const r = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
           body: JSON.stringify({
             model: "claude-sonnet-5",
-            /**
-             * ROOM FOR A LONG ANSWER.
-             *
-             * 900 tokens was about 650 words — enough for a minute of speech
-             * and not for five. Somebody asked to say what they are
-             * accountable for can talk for ten minutes, and the answer being
-             * cut off at the point they got interesting is the worst possible
-             * place to stop. 8000 is roughly six thousand words out.
-             */
             max_tokens: 8000,
             system:
-              "Somebody at an Indian engineering company is speaking their answer to a question in their own " +
-              "development plan. The dictation is rough and is often a MIX OF ENGLISH AND HINDI.\n\n" +
-              "Your job is to WRITE OUT what they said in clear simple English. You are a typist, not an editor.\n\n" +
-              "THE MOST IMPORTANT RULE: KEEP EVERY SINGLE POINT THEY MADE.\n" +
-              "If they mentioned twelve things, your answer must contain twelve things. Do not summarise. Do not " +
-              "pick the important ones. Do not merge two points into one. Do not stop early. A point they made " +
-              "that is missing from your answer is a failure — it is their development plan, not yours, and " +
-              "something they said out loud has been taken away from them.\n\n" +
-              "The rest:\n" +
-              "1. FIRST PERSON — write as 'I', because these are their words about themselves.\n" +
-              "2. SIMPLE ENGLISH. Short sentences, ordinary words. A person who finished class 10 must understand it.\n" +
+              "Somebody at an Indian engineering company is speaking an answer for their own development plan (IDP). " +
+              "The dictation is rough, often a MIX OF ENGLISH AND HINDI, and full of thinking-out-loud.\n\n" +
+              (roleLine ? roleLine + "\n" + expectLine + "\n\n" : "") +
+              "Write out THE ANSWER THEY WERE GIVING, properly:\n" +
+              "1. FIRST PERSON, as 'I' — these are their words about themselves.\n" +
+              "2. SIMPLE, CORRECT ENGLISH. Short sentences. A person who finished class 10 must understand it.\n" +
               "3. Translate anything said in Hindi.\n" +
-              "4. ONE LINE PER POINT. Put each on its own line with a single newline between them. NEVER leave a " +
-              "blank line between lines.\n" +
-              "5. If they were clearly listing things, start each line with '- '. Otherwise plain lines.\n" +
-              "6. Fix the grammar and take out the ums, the repetitions and the false starts. Nothing else.\n" +
+              "4. KEEP EVERY DISTINCT POINT they made — but say each ONCE, cleanly. Drop the repetitions, the " +
+              "false starts, the asides about the recording itself, and anything that is plainly testing the " +
+              "microphone rather than answering.\n" +
+              "5. Where their role is given above, phrase the points so they read against that role — the same " +
+              "facts, aimed at what the role is for. INVENT NOTHING they did not say.\n" +
+              "6. One point per line, starting with '- '. No blank lines between lines.\n" +
               "7. Answer with the text only. No preamble, no heading, no closing comment.",
             messages: [{ role: "user", content: text.slice(0, 60000) }],
           }),
@@ -294,12 +304,9 @@ export async function POST(req: Request) {
         const j = await r.json();
         const out = j?.content?.[0]?.text;
         if (typeof out !== "string" || !out.trim()) return NextResponse.json({ text });
-        // one line per point, single-spaced: the model likes a blank line
-        // between sentences and it turns a tight answer into a sparse page
         const tidy = out.trim().replace(/\r/g, "").replace(/\n{2,}/g, "\n");
         return NextResponse.json({ text: tidy });
       } catch {
-        // the words are the person's; hand them back rather than losing them
         return NextResponse.json({ text });
       }
     }
@@ -318,8 +325,10 @@ export async function POST(req: Request) {
       const spec = fieldSpec(field);
       if (!spec) throw new HttpError(400, "That is not a field on the record.");
       if (spec.derived) throw new HttpError(400, `${spec.label} is worked out from another field.`);
-      if (field === "notes" || field === "role")
-        throw new HttpError(403, field === "role" ? "Your role is set by HR, not from here." : "Not yours to edit.");
+      if (field === "role") throw new HttpError(403, "Your role is set by HR, not from here.");
+      const grp = FIELD_GROUPS.find((g) => g.fields.some((f) => f.key === field));
+      if (!grp || !IDP_RECORD_GROUPS.includes(grp.key) || IDP_RECORD_HIDE.has(field))
+        throw new HttpError(403, "That part of the record is not edited from the IDP.");
       const T2 = await hrmsTables(admin);
       let v: string | null = String(body.value ?? "").trim() || null;
       if (spec.kind === "bool") v = body.value === "no" || body.value === false ? "no" : "yes";

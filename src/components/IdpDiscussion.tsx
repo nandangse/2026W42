@@ -652,7 +652,7 @@ function RoleBrief({
               <div style={{ fontSize: 12, color: C.faint, marginBottom: 6 }}>
                 In his own voice. Listen to it before you write.
               </div>
-              {d?.url && <audio controls src={d.url} style={{ width: "100%", maxWidth: 420 }} />}
+              {d?.url && <audio controls controlsList="nodownload" src={d.url} style={{ width: "100%", maxWidth: 420 }} />}
               {(d?.summary || fallbackSummary) && (
                 <div style={{ fontSize: 14, color: C.ink, whiteSpace: "pre-wrap", lineHeight: 1.7, marginTop: 8 }}>
                   {d?.summary || fallbackSummary}

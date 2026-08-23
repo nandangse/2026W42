@@ -330,7 +330,7 @@ function RoleView({ r }: { r: Role }) {
           <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: C.line }}>
             <div className="font-bold text-xs mb-1">Management Expectation Note</div>
             {!r.summary && !r.url && <div className="text-xs" style={{ color: C.faint }}>Not recorded yet.</div>}
-            {r.url && <audio controls src={r.url} style={{ height: 30, width: "100%" }} />}
+            {r.url && <audio controls controlsList="nodownload" src={r.url} style={{ height: 30, width: "100%" }} />}
             {r.summary ? (
               <div className="rounded p-2 mt-2" style={{ background: "#F4F2EC" }}>
                 <div className="text-xs font-bold" style={{ color: C.dim }}>What it comes to — this is what goes into the IDP</div>

@@ -82,7 +82,7 @@ export function RoleClarity({ employeeId, roles }: { employeeId: string; roles: 
           {(d.url || d.summary) && (
             <div className="rounded p-2 mt-3" style={{ background: "#FFF7E6", border: "1px solid #F5D9A8" }}>
               <div className="font-bold text-xs">What the Managing Director expects of this role</div>
-              {d.url && <audio controls src={d.url} className="no-print" style={{ height: 30, width: "100%", maxWidth: 380, marginTop: 4 }} />}
+              {d.url && <audio controls controlsList="nodownload" src={d.url} className="no-print" style={{ height: 30, width: "100%", maxWidth: 380, marginTop: 4 }} />}
               {d.summary && (
                 <div style={{ fontSize: 12.5, whiteSpace: "pre-wrap", lineHeight: 1.7, marginTop: 6 }}>{d.summary}</div>
               )}

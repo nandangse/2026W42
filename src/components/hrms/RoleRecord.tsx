@@ -230,7 +230,7 @@ export default function RoleRecord({
                     {c.oldUrl && (
                       <div className="mt-1">
                         <div style={{ fontSize: 10.5, color: C.faint }}>the recording it replaced</div>
-                        <audio controls src={c.oldUrl} style={{ height: 26, maxWidth: "100%" }} />
+                        <audio controls controlsList="nodownload" src={c.oldUrl} style={{ height: 26, maxWidth: "100%" }} />
                       </div>
                     )}
                   </div>

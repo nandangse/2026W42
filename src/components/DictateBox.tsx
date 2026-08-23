@@ -30,7 +30,7 @@ import { useEffect, useRef, useState } from "react";
 
 const C = { line: "#E2E0DA", dim: "#5A6672", faint: "#8A94A0", orange: "#E8600A", red: "#B3261E", green: "#0D7A3F" };
 
-export interface Recording { url: string | null; seconds: number | null; at: string }
+export interface Recording { url: string | null; seconds: number | null; at: string; transcript?: string | null }
 
 export default function DictateBox({
   value, onChange, rows = 5, placeholder, disabled, idpId, qid, recordings = [], onRecorded,
@@ -94,10 +94,11 @@ export default function DictateBox({
         fd.append("id", idpId);
         fd.append("qid", qid);
         fd.append("seconds", String(seconds));
+        fd.append("transcript", said);
         fd.append("file", new File([blob], "note.webm", { type: blob.type || "audio/webm" }));
         const r = await fetch("/api/idp", { method: "POST", body: fd });
         const j = await r.json();
-        if (r.ok) onRecorded?.({ url: j.url, seconds: j.seconds, at: new Date().toISOString() });
+        if (r.ok) onRecorded?.({ url: j.url, seconds: j.seconds, at: new Date().toISOString(), transcript: said });
       } catch { /* the words are saved; the audio is the bonus */ }
     }
     setBusy(false);
@@ -240,9 +241,21 @@ export default function DictateBox({
             What you said {recordings.length > 1 ? `(${recordings.length} recordings)` : ""} — kept with your answer
           </div>
           {recordings.map((r, i) => (
-            <div key={i} className="flex items-center gap-2 mt-1">
-              {r.url ? <audio controls src={r.url} style={{ height: 28, maxWidth: 320 }} /> : <span style={{ fontSize: 11, color: C.faint }}>saved</span>}
-              {r.seconds ? <span className="tnum" style={{ fontSize: 11, color: C.faint }}>{mmss(r.seconds)}</span> : null}
+            <div key={i} className="mt-1">
+              <div className="flex items-center gap-2">
+                {/* the recording is evidence, not a file to hand around — no download */}
+                {r.url ? (
+                  <audio controls controlsList="nodownload" onContextMenu={(e) => e.preventDefault()}
+                    src={r.url} style={{ height: 28, maxWidth: 320 }} />
+                ) : <span style={{ fontSize: 11, color: C.faint }}>saved</span>}
+                {r.seconds ? <span className="tnum" style={{ fontSize: 11, color: C.faint }}>{mmss(r.seconds)}</span> : null}
+              </div>
+              {r.transcript && (
+                <details className="mt-0.5">
+                  <summary style={{ fontSize: 11, color: C.faint, cursor: "pointer" }}>the words as heard</summary>
+                  <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.6, marginTop: 2 }}>{r.transcript}</div>
+                </details>
+              )}
             </div>
           ))}
         </div>

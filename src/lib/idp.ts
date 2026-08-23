@@ -399,3 +399,16 @@ export function isComplete(
   const unrated = IDP_RATINGS.filter((d) => !ratings[d.key]);
   return { ok: missing.length === 0 && unrated.length === 0, missing, unrated };
 }
+
+/**
+ * WHICH PARTS OF THE RECORD THE IDP SHOWS (Dr Raghu, 23 Aug 2026).
+ *
+ * The record step is for checking WHO YOU ARE — identity, contact, family,
+ * statutory numbers. Pay, bank, benefits, documents, performance and leaving
+ * are HR's business with the person, not part of a development discussion,
+ * and money on the screen changes the mood of everything written after it.
+ */
+export const IDP_RECORD_GROUPS = ["identity", "contact", "personal", "family", "statutory"];
+
+/** Fields left out even inside the shown groups. */
+export const IDP_RECORD_HIDE = new Set(["family_updated", "whatsapp", "notes"]);
