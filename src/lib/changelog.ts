@@ -75,6 +75,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.1.8",
+    date: "2026-08-23",
+    module: "HRIS — the Goalbook's role definitions are in",
+    items: [
+      "THE 84 ROLE DEFINITIONS FROM THE ANNUAL GOALBOOK ARE NOW IN THE REGISTER — job description, deliverable and measurement metric on every one, plus grade and reports-to. 49 roles already in the register were filled in; 35 the register did not have were added.",
+      "160 OF THE 201 ACTIVE EMPLOYEES ARE NOW IN A ROLE THAT IS ACTUALLY DEFINED. That was nil this morning.",
+      "GRADES ARRIVED WITH THEM, so the Grade master is no longer empty: G1 Leadership · G2 Head · G3 Manager · G4 Officer / Engineer · G5 Supervisor / Senior Technician · G6 Skilled Worker · G7 Helper / Support. 0049 left that list deliberately blank rather than guessing; this is what it was waiting for.",
+      "THE A./B./C. AND 1./2./3. NUMBERING IS KEPT EXACTLY AS WRITTEN. Each line became its own paragraph rather than an HTML list, because renumbering them would silently change what “item B” refers to in a conversation about somebody's job.",
+      "EVERY ROLE IS STILL A DRAFT. The Goalbook is a definition, not an approval — Final remains Dr Raghu's, one role at a time.",
+      "WHAT THE IMPORT EXPOSED, and it is the reason a register was worth building: 60 roles in use are NOT in the Goalbook, and most are the same role spelled differently. “Service Techician” holds twelve people. “Jr Service Technican” holds five. There are two spellings of Welder, three of the QA engineer, and “Head, Purchase” beside “Head - Purchase”. 23 of the 60 are confidently the same role as one the Goalbook defines; 30 more have nobody in them at all.",
+      "Nothing has been merged. Moving 33 people between roles is a decision, not a tidy-up, and it is on the table rather than done.",
+      "No migration — this is data, and every change carries its own line in the history.",
+    ],
+  },
+  {
     v: "3.19.1.7",
     date: "2026-08-23",
     module: "HRIS — roles assigned, EmployeeID first, rich text",
