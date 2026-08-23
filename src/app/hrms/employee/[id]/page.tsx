@@ -34,6 +34,7 @@ export default async function EmployeeRecordPage({ params }: { params: { id: str
       email={user!.email}
       initials={user!.initials}
       displayName={user!.displayName}
+      isOwner={user!.isOwner}
     />
   );
 }

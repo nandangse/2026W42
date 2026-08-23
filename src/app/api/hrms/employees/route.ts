@@ -59,9 +59,10 @@ export async function GET(req: Request) {
     if (error) throw new Error(error.message);
     const rows = (data || []) as EmpRow[];
 
-    const overrides = new Map<string, Map<string, { value: string | null; by: string | null; at: string }>>();
+    const overrides = new Map<string, Map<string, { value: string | null; by: string | null; at: string; pending?: boolean }>>();
     try {
-      const { data: eds } = await admin.from(T.edits).select("employee_id, field, value, edited_by, edited_at");
+      const { data: eds } = await admin
+        .from(T.edits).select("employee_id, field, value, edited_by, edited_at, approved_at");
       for (const e of eds || []) {
         const id = String(e.employee_id);
         if (!overrides.has(id)) overrides.set(id, new Map());
@@ -69,6 +70,7 @@ export async function GET(req: Request) {
           value: e.value == null ? null : String(e.value),
           by: e.edited_by ?? null,
           at: String(e.edited_at),
+          pending: (e as { approved_at?: string | null }).approved_at == null,
         });
       }
     } catch { /* pre-0047 */ }
@@ -77,7 +79,7 @@ export async function GET(req: Request) {
       const ov = overrides.get(r.id);
       const value: Record<string, string | null> = {};
       const sheet: Record<string, string | null> = {};
-      const edited: Record<string, { by: string | null; at: string }> = {};
+      const edited: Record<string, { by: string | null; at: string; pending?: boolean }> = {};
 
       for (const f of ALL_FIELDS) value[f.key] = baseValue(r, f);
       for (const [field, o] of ov || []) {
@@ -85,7 +87,7 @@ export async function GET(req: Request) {
         if (!f) continue; // a key dropped from the catalogue must not reappear
         sheet[field] = value[field] ?? null;
         value[field] = o.value;
-        edited[field] = { by: o.by, at: o.at };
+        edited[field] = { by: o.by, at: o.at, pending: o.pending };
       }
 
       // The "From the sheet" tab is gone (Dr Raghu, 23 Aug 2026): every column

@@ -75,6 +75,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.2.3",
+    date: "2026-08-23",
+    module: "HRIS — HR writes, the owner agrees",
+    items: [
+      "EVERY CHANGE TO A PERSONNEL RECORD NOW WAITS FOR DR RAGHU. Vinay may change anything on anybody's record; until it is approved it is a PROPOSED change rather than the record. The same rule the role register already followed, applied to people.",
+      "THE RECORD SAYS BOTH THINGS AT ONCE, because hiding either would be a way of lying about the state of somebody's file: the new value is in the record, AND the field is marked <b>awaiting approval</b> in amber until it is agreed. A banner at the top names the fields and counts them, with an ✓ APPROVE button that only Dr Raghu sees.",
+      "APPROVALS → RJ APPROVAL - RECORDS IS BUILT FOR CLEARING IN ONE SITTING. Every waiting change in one list — people and role definitions together, because two queues means one of them goes unread. TICK BOXES, SELECT ALL, and one Approve. Or ✓ on a single row. Or Approve all, behind a confirmation.",
+      "EACH ROW ALREADY SAYS WHAT CHANGED — “6002 Dr Raghunandan Jagdish · 3 changes · Designation, Mobile and 1 more · RJ · 23 Aug 2026” — and expands to every field and its new value. So OPENING the record is a choice, not a step: there is an <b>open ↗</b> button for when a change deserves a proper look, and a summary for when it does not.",
+      "APPROVING ALTERS NO VALUE. The change was in the record from the moment it was saved; what approval changes is its standing — proposed becomes agreed. Nothing can be lost by pressing it, which is exactly why it can be pressed in bulk.",
+      "APPROVAL IS MARKED ON THE EDIT, NOT ON THE PERSON, so three changes to one record read as three and can be seen individually. It is also what lets the summary say “Designation, Mobile and 2 more” without a second table.",
+      "THE QUEUE STARTS EMPTY, deliberately. Everything in the overlay today was put there by setup rather than by somebody editing a record — 380 role assignments, 760 Drive folder names and links, the master import. Presenting nineteen hundred of those as awaiting approval on the first morning would teach everyone to press Approve without reading, which is worse than having no approval at all.",
+      "Migration 0052.",
+    ],
+  },
+  {
     v: "3.19.2.2",
     date: "2026-08-23",
     module: "HRIS — the note gets its words back, and a summary worth reading",

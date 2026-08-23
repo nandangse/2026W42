@@ -462,8 +462,8 @@ export interface HrmsEmployee {
   value: Record<string, string | null>;
   /** What lies underneath an override, for the fields that carry one. */
   sheet: Record<string, string | null>;
-  /** Which fields carry an override, and who set it. */
-  edited: Record<string, { by: string | null; at: string }>;
+  /** Which fields carry an override, who set it, and whether it is agreed. */
+  edited: Record<string, { by: string | null; at: string; pending?: boolean }>;
   /** Sheet columns the catalogue does NOT claim — nothing is hidden. */
   extra: Record<string, string>;
   firstSeen: string | null;

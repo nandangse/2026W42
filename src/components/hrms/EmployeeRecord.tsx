@@ -31,9 +31,9 @@ interface HistoryRow {
 }
 
 export default function EmployeeRecord({
-  id, email, initials, displayName,
+  id, email, initials, displayName, isOwner,
 }: {
-  id: string; email: string; initials: string | null; displayName: string | null;
+  id: string; email: string; initials: string | null; displayName: string | null; isOwner: boolean;
 }) {
   const [e, setE] = useState<HrmsEmployee | null>(null);
   const [users, setUsers] = useState<GenieUser[]>([]);
@@ -110,6 +110,22 @@ export default function EmployeeRecord({
 
   const group = useMemo(() => FIELD_GROUPS.find((g) => g.key === tab), [tab]);
   const who = displayName || email;
+  /**
+   * HR writes; the owner agrees. Anything changed and not yet approved is a
+   * PROPOSED change — it is in the record, and it is not yet agreed. Both
+   * facts are shown, because hiding either one is a way of lying about the
+   * state of somebody's file.
+   */
+  const pending = e ? Object.entries(e.edited).filter(([, v]) => v.pending) : [];
+
+  const approveAll = async () => {
+    setMsg("");
+    try {
+      await api.post("/api/hrms/approvals", { employeeIds: [id] });
+      setMsg("Approved ✓");
+      await load();
+    } catch (x) { setMsg(x instanceof Error ? x.message : String(x)); }
+  };
 
   if (err) return <Shell who={who} initials={initials}><div className="p-4 text-xs font-semibold" style={{ color: C.red }}>{err}</div></Shell>;
   if (!e) return <Shell who={who} initials={initials}><div className="p-4 text-xs" style={{ color: C.faint }}>Loading the record…</div></Shell>;
@@ -122,6 +138,27 @@ export default function EmployeeRecord({
       sub={[e.value.designation, e.value.department].filter(Boolean).join(" · ")}
       idLine={`Employee ID ${id}${e.value.initials ? ` · ${e.value.initials}` : ""}`}
     >
+      {e && pending.length > 0 && (
+        <div className="px-3 md:px-4 py-2 flex items-center gap-2 flex-wrap no-print"
+          style={{ background: "#FFF7E6", borderBottom: "1px solid #F5B32B" }}>
+          <span className="text-xs" style={{ color: "#8A5B00", lineHeight: 1.5 }}>
+            <b>{pending.length} change{pending.length === 1 ? "" : "s"} waiting on Dr Raghu</b> —{" "}
+            {pending.slice(0, 4).map(([k]) => ALL_FIELDS.find((f) => f.key === k)?.label || k).join(", ")}
+            {pending.length > 4 && ` and ${pending.length - 4} more`}. They are in the record already; approving agrees them.
+          </span>
+          {isOwner ? (
+            <button onClick={approveAll} className="text-xs font-bold rounded px-3 py-1.5 ml-auto"
+              style={{ background: "#0D7A3F", color: "#fff" }}>
+              ✓ Approve
+            </button>
+          ) : (
+            <span className="text-xs ml-auto" style={{ color: "#8A5B00" }}>
+              Also listed under Approvals → RJ Approval - Records.
+            </span>
+          )}
+        </div>
+      )}
+
       {/* ── the tabs ── */}
       <div className="flex gap-1 flex-wrap px-3 pt-2 pb-1" style={{ background: "#EAE7DF", borderBottom: "1px solid #DCD9D1" }}>
         {FIELD_GROUPS.map((g) => (
@@ -355,6 +392,11 @@ function EditField({
         <div className="mt-1" style={{ fontSize: 11, color: overridden ? "#8A5B00" : C.faint, lineHeight: 1.5 }}>
           {overridden && (
             <>
+              {e.edited[f.key].pending && (
+                <span className="rounded px-1 font-bold" style={{ background: "#F5B32B", color: "#4A3300", fontSize: 10, marginRight: 4 }}>
+                  awaiting approval
+                </span>
+              )}
               Changed by {e.edited[f.key].by || "somebody"} on {fmtFull(String(e.edited[f.key].at).slice(0, 10))}
               {was != null && was !== "" && <> — it said <b>{was}</b></>}{" "}
               <button onClick={onClear} className="font-bold rounded px-1.5" style={{ background: "#F4F2EC", color: C.dim }}>
