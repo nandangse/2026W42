@@ -42,16 +42,20 @@ function baseValue(row: EmpRow, f: FieldSpec): string | null {
  * One payload: a few hundred records, and every count, filter and sort on the
  * directory is then computed in the browser without a round trip.
  */
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await requireHrms();
     const admin = adminClient();
     const T = await hrmsTables(admin);
 
-    const { data, error } = await admin
+    // ?id= — one record, for the record page opened in its own tab.
+    const only = new URL(req.url).searchParams.get("id");
+    let sel = admin
       .from(T.employees)
       .select("id, name, email, dob, doj, department, designation, location, active, extra, first_seen, updated_at")
       .order("name");
+    if (only) sel = sel.eq("id", only);
+    const { data, error } = await sel;
     if (error) throw new Error(error.message);
     const rows = (data || []) as EmpRow[];
 
@@ -84,8 +88,10 @@ export async function GET() {
         edited[field] = { by: o.by, at: o.at };
       }
 
-      // Whatever the catalogue does not claim still shows, under the sheet's
-      // own column name. Nothing the master carries is hidden.
+      // The "From the sheet" tab is gone (Dr Raghu, 23 Aug 2026): every column
+      // the master carries now has a field of its own. Anything genuinely new
+      // that turns up in a future import still surfaces here rather than being
+      // swallowed, so a column added at the HR end cannot go unnoticed.
       const leftover: Record<string, string> = {};
       for (const [k, v] of Object.entries(r.extra || {})) {
         if (!CLAIMED_HEADERS.has(k) && String(v).trim()) leftover[k] = String(v);
@@ -94,7 +100,25 @@ export async function GET() {
       return { id: r.id, value, sheet, edited, extra: leftover, firstSeen: r.first_seen, updatedAt: r.updated_at };
     });
 
-    return NextResponse.json({ employees });
+    // Genie's own accounts, for the "Genie user" picker on a record. This is
+    // how HRIS answers "how many of these people actually use Genie".
+    let users: { email: string; name: string | null; initials: string | null; role: string }[] = [];
+    try {
+      const { data: u } = await admin
+        .from("profiles")
+        .select("email, display_name, initials, role, disabled")
+        .order("display_name");
+      users = (u || [])
+        .filter((x) => !x.disabled)
+        .map((x) => ({
+          email: String(x.email || "").toLowerCase(),
+          name: x.display_name ?? null,
+          initials: x.initials ?? null,
+          role: String(x.role || ""),
+        }));
+    } catch { /* the picker simply has no options */ }
+
+    return NextResponse.json({ employees, users });
   } catch (e) {
     return errJson(e);
   }
@@ -129,6 +153,36 @@ export async function POST(req: Request) {
       if (!spec) throw new HttpError(400, `"${field}" is not a field HRMS knows about`);
       if (spec.derived)
         throw new HttpError(400, `${spec.label} is worked out from another field and cannot be typed into.`);
+      if (spec.kind === "select" && spec.options && body.value && !spec.options.includes(String(body.value)))
+        throw new HttpError(400, `${spec.label} must be one of: ${spec.options.join(", ")}`);
+
+      /**
+       * Unique fields — initials today.
+       *
+       * "The first one will be allowed, and the second one says already
+       * exists" (Dr Raghu). Checked against every other employee's current
+       * value, which for initials lives entirely in the overlay.
+       */
+      if (spec.unique && action === "edit") {
+        const wanted = String(body.value ?? "").trim().toUpperCase();
+        if (wanted) {
+          const { data: clash } = await admin
+            .from(T.edits)
+            .select("employee_id, value")
+            .eq("field", field);
+          const taken = (clash || []).find(
+            (c) => String(c.value ?? "").trim().toUpperCase() === wanted && String(c.employee_id) !== id,
+          );
+          if (taken) {
+            const { data: whoHas } = await admin
+              .from(T.employees).select("name").eq("id", taken.employee_id).maybeSingle();
+            throw new HttpError(
+              409,
+              `Already exists — ${wanted} belongs to ${whoHas?.name || taken.employee_id}. Choose different initials.`,
+            );
+          }
+        }
+      }
 
       const { data: cur } = await admin
         .from(T.edits).select("value").eq("employee_id", id).eq("field", field).maybeSingle();
@@ -159,8 +213,12 @@ export async function POST(req: Request) {
 
       if (before !== after) {
         try {
+          // Signed with initials where the account has them — "RJ", not an
+          // email address, because that is how everyone here refers to
+          // everyone here.
           await admin.from(T.log).insert({
-            employee_id: id, field, old_value: before, new_value: after, edited_by: me.email,
+            employee_id: id, field, old_value: before, new_value: after,
+            edited_by: me.initials ? `${me.initials} · ${me.email}` : me.email,
           });
         } catch { /* a lost history line must not fail the edit */ }
       }
@@ -192,7 +250,8 @@ export async function POST(req: Request) {
       try {
         await admin.from(T.log).insert({
           employee_id: id, field: "(record)", old_value: null,
-          new_value: `created in HRMS as "${name}"`, edited_by: me.email,
+          new_value: `created in HRIS as "${name}"`,
+          edited_by: me.initials ? `${me.initials} · ${me.email}` : me.email,
         });
       } catch { /* as above */ }
       return NextResponse.json({ ok: true, id });

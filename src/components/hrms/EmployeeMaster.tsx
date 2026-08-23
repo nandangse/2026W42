@@ -20,7 +20,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
-import { FIELD_GROUPS, ALL_FIELDS, tenure, type FieldSpec, type HrmsEmployee } from "@/lib/hrms";
+import { FIELD_GROUPS, ALL_FIELDS, onRoll, tenure, type HrmsEmployee } from "@/lib/hrms";
+import { ReadField, C as CC } from "./RecordFields";
 import DataTable, { type Column } from "./DataTable";
 import { Pane } from "./Pane";
 
@@ -31,13 +32,14 @@ const FY2526_END = "2026-03-31";
 
 interface HistoryRow {
   id: string; employee_id: string; field: string; label: string;
-  old_value: string | null; new_value: string | null; edited_by: string | null; edited_at: string;
+  old_value: string | null; new_value: string | null;
+  by_initials: string | null; by_email: string | null; edited_at: string;
 }
 
 const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
 
 const val = (e: HrmsEmployee, k: string) => e.value[k] ?? "";
-const isActive = (e: HrmsEmployee) => val(e, "active") !== "no";
+const isActive = (e: HrmsEmployee) => onRoll(e.value);
 
 export default function EmployeeMaster({
   view, rows, reload, who, err,
@@ -116,11 +118,14 @@ export default function EmployeeMaster({
         </span>
       ),
     },
-    { key: "id", label: "Code", width: 110, value: (e) => e.id },
+    { key: "id", label: "Employee ID", width: 120, value: (e) => e.id,
+      title: "The key every HRIS record hangs off" },
     { key: "department", label: "Department", width: 150, value: (e) => val(e, "department") },
     { key: "designation", label: "Designation", width: 200, value: (e) => val(e, "designation") },
     { key: "email", label: "Work email", width: 210, value: (e) => val(e, "email") },
     { key: "location", label: "Location", width: 120, value: (e) => val(e, "location") },
+    { key: "type", label: "Type", width: 130, value: (e) => val(e, "type"),
+      title: "Decides payroll — employed types carry PF/ESIC/MLWF, contract types carry 2% TDS" },
     {
       key: "doj", label: "Joined", width: 110,
       value: (e) => val(e, "doj"),
@@ -139,39 +144,23 @@ export default function EmployeeMaster({
       title: "Sorted by days served, shown in years and months",
     },
     {
-      key: "status", label: "Status", width: 120,
-      value: (e) => (isActive(e) ? "on the roll" : "left"),
-      render: (e) => (
-        <span className="rounded px-1.5 py-0.5 font-semibold"
-          style={isActive(e) ? { background: "#E6F4EA", color: C.green } : { background: "#F1EFE9", color: C.faint }}>
-          {isActive(e) ? "on the roll" : "left"}
-        </span>
-      ),
+      key: "status", label: "Status", width: 140,
+      value: (e) => val(e, "status") || (isActive(e) ? "Active" : "Left"),
+      render: (e) => {
+        const st = val(e, "status");
+        const on = isActive(e);
+        return (
+          <span className="rounded px-1.5 py-0.5 font-semibold"
+            style={on ? { background: "#E6F4EA", color: C.green } : { background: "#FBEDEA", color: C.red }}>
+            {st || (on ? "Active" : "Left")}
+          </span>
+        );
+      },
+      title: "The master's own six: Active, Resigned, Terminated, Doubtful, Notice Period, F&F Due",
     },
   ], []);
 
-  const patch = (id: string, field: string, value: string | null, edited: boolean, by: string) => {
-    setLocal((prev) => (prev || []).map((e) => {
-      if (e.id !== id) return e;
-      const next: HrmsEmployee = { ...e, value: { ...e.value, [field]: value }, sheet: { ...e.sheet }, edited: { ...e.edited } };
-      if (edited) {
-        if (!(field in next.sheet) && ALL_FIELDS.find((f) => f.key === field)?.sheet) next.sheet[field] = e.value[field] ?? null;
-        next.edited[field] = { by, at: new Date().toISOString() };
-      } else {
-        delete next.sheet[field];
-        delete next.edited[field];
-      }
-      return next;
-    }));
-  };
-  const save = async (id: string, field: string, value: string | null) => {
-    const r = await api.post("/api/hrms/employees", { action: "edit", id, field, value });
-    patch(id, field, r.value ?? null, true, who);
-  };
-  const clear = async (id: string, field: string) => {
-    const r = await api.post("/api/hrms/employees", { action: "clear", id, field });
-    patch(id, field, r.value ?? null, false, who);
-  };
+  // Editing moved to the record's own page (3.19.2.0) — the directory only reads.
 
   // Export — Dr Raghu's own wording, and his two options. Built on the
   // server so the file is assembled from the record rather than from what the
@@ -285,7 +274,7 @@ export default function EmployeeMaster({
         />
       </Pane>
 
-      {open && <PersonCard e={open} who={who} onClose={() => setOpenId(null)} onSave={save} onClear={clear} />}
+      {open && <PersonCard e={open} onClose={() => setOpenId(null)} />}
     </>
   );
 }
@@ -299,200 +288,120 @@ function Stat({ n, l, hint, warn }: { n: number | string; l: string; hint?: stri
   );
 }
 
-/* ────────────────────────────── the person ────────────────────────────── */
+/* ────────────────────────── the person, read only ────────────────────────── */
 
-function PersonCard({
-  e, who, onClose, onSave, onClear,
-}: {
-  e: HrmsEmployee; who: string; onClose: () => void;
-  onSave: (id: string, field: string, value: string | null) => Promise<void>;
-  onClear: (id: string, field: string) => Promise<void>;
-}) {
-  const [tab, setTab] = useState<"record" | "sheet" | "history">("record");
+/**
+ * The lightbox is VIEW ONLY (Dr Raghu, 23 Aug 2026).
+ *
+ * Clicking a name in the directory shows the record; it does not put you in
+ * it. Editing happens on the record's own page, opened in a new tab by the
+ * button below — which means the directory you were working through is still
+ * there when you come back, and nobody edits a personnel record by accident
+ * while scrolling a list.
+ */
+function PersonCard({ e, onClose }: { e: HrmsEmployee; onClose: () => void }) {
+  const [tab, setTab] = useState<string>(FIELD_GROUPS[0].key);
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
-  const [msg, setMsg] = useState("");
 
-  useEffect(() => { setTab("record"); setHistory(null); setMsg(""); }, [e.id]);
+  useEffect(() => { setTab(FIELD_GROUPS[0].key); setHistory(null); }, [e.id]);
   useEffect(() => {
     if (tab !== "history" || history) return;
-    api.get(`/api/hrms/history?id=${encodeURIComponent(e.id)}`).then((r) => setHistory(r.history)).catch(() => setHistory([]));
+    api.get(`/api/hrms/history?id=${encodeURIComponent(e.id)}`)
+      .then((r) => setHistory(r.history)).catch(() => setHistory([]));
   }, [tab, history, e.id]);
 
-  const run = async (fn: () => Promise<void>) => {
-    setMsg("");
-    try { await fn(); setMsg("Saved ✓"); } catch (x) { setMsg(x instanceof Error ? x.message : String(x)); }
-  };
-  const extras = Object.entries(e.extra || {});
+  const group = FIELD_GROUPS.find((g) => g.key === tab);
+  const edit = () => window.open(`/hrms/employee/${encodeURIComponent(e.id)}`, "_blank", "noopener");
 
   return (
     <div className="fixed inset-0 flex justify-end no-print" style={{ background: "rgba(13,22,31,0.35)", zIndex: 60 }} onClick={onClose}>
-      <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(560px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} onClick={(ev) => ev.stopPropagation()}>
+      <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(620px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} onClick={(ev) => ev.stopPropagation()}>
         <div className="px-4 py-3 sticky top-0" style={{ background: "#16232F", color: "#fff", zIndex: 2 }}>
           <div className="flex items-start gap-2">
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div className="font-bold">{val(e, "name") || e.id}</div>
+              <div style={{ fontSize: 11, color: "#8FA1B3" }}>
+                Employee ID {e.id}
+                {val(e, "initials") && <> · {val(e, "initials")}</>}
+                {val(e, "type") && <> · {val(e, "type")}</>}
+              </div>
               <div style={{ fontSize: 11, color: "#8FA1B3" }}>
                 {[val(e, "designation"), val(e, "department")].filter(Boolean).join(" · ") || "no designation recorded"}
               </div>
             </div>
             <button onClick={onClose} className="ml-auto text-sm font-bold rounded px-2 py-1" style={{ background: "#22303C", color: "#8FA1B3" }}>✕</button>
           </div>
-          <div className="flex gap-1 mt-2">
-            {([["record", "Record"], ["sheet", `From the sheet${extras.length ? ` (${extras.length})` : ""}`], ["history", "History"]] as const).map(([k, l]) => (
-              <button key={k} onClick={() => setTab(k)} className="text-xs font-bold rounded px-2.5 py-1"
-                style={tab === k ? { background: C.orange, color: "#fff" } : { color: "#8FA1B3" }}>{l}</button>
-            ))}
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#22303C", color: "#8FA1B3" }}>
+              VIEW ONLY
+            </span>
+            <button onClick={edit} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}
+              title="Opens this record in its own tab, where it can be changed. Every change is logged.">
+              ✎ Edit Record ↗
+            </button>
           </div>
         </div>
 
-        <div className="p-4">
-          {msg && <div className="text-xs font-semibold mb-2" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</div>}
+        <div className="flex gap-1 flex-wrap px-3 py-1.5" style={{ background: "#EAE7DF", borderBottom: "1px solid #DCD9D1" }}>
+          {FIELD_GROUPS.map((g) => (
+            <button key={g.key} onClick={() => setTab(g.key)} className="text-xs font-bold rounded px-2 py-1"
+              style={tab === g.key ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
+              {g.label}
+            </button>
+          ))}
+          <button onClick={() => setTab("history")} className="text-xs font-bold rounded px-2 py-1"
+            style={tab === "history" ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
+            History
+          </button>
+        </div>
 
-          {tab === "record" && (
+        <div className="p-3">
+          {group && (
             <>
-              <div className="rounded p-2 mb-2" style={{ background: "#F4F2EC", fontSize: 11, color: "#5A6672", lineHeight: 1.5 }}>
-                The whole record is editable here — all {ALL_FIELDS.length} fields, not the eight Genie used to name.
-                Greyed fields are <b>worked out</b> from another one (age from date of birth, service from joining
-                date) and cannot be typed into, so they stay right on their own.
-              </div>
-              {FIELD_GROUPS.map((g) => (
-                <details key={g.key} open={g.key === "identity" || g.key === "contact"} className="mb-1.5">
-                  <summary className="font-bold text-xs cursor-pointer py-1" style={{ color: C.ink }}>
-                    {g.label}
-                    {g.confidential && (
-                      <span className="rounded px-1 ml-1.5" style={{ fontSize: 9, background: "#FBEDEA", color: C.red, fontWeight: 700 }}>
-                        confidential
-                      </span>
-                    )}
-                  </summary>
-                  {g.note && <div style={{ fontSize: 11, color: C.faint, lineHeight: 1.5, marginBottom: 4 }}>{g.note}</div>}
-                  {g.fields.map((f) => (
-                    <Field key={f.key} f={f} e={e}
-                      onSave={(v) => run(() => onSave(e.id, f.key, v))}
-                      onClear={() => run(() => onClear(e.id, f.key))} />
-                  ))}
-                </details>
-              ))}
-              <div className="text-xs mt-3" style={{ color: C.faint }}>
-                Employee code <b>{e.id}</b> · first seen {e.firstSeen ? fmtFull(String(e.firstSeen).slice(0, 10)) : "—"}
-                {" · "}record last touched {e.updatedAt ? fmtFull(String(e.updatedAt).slice(0, 10)) : "—"}
-              </div>
-            </>
-          )}
-
-          {tab === "sheet" && (
-            <>
-              <Section title="Columns the record does not name" note="Whatever the HR sheet carried that has no field of its own yet, kept verbatim under its own column name. Nothing the master holds is hidden — if something here deserves a proper field, it gets one." />
-              {extras.length === 0 && <div className="text-xs" style={{ color: C.faint }}>Nothing beyond the named columns.</div>}
-              <div className="bg-white rounded-lg border" style={{ borderColor: C.line }}>
-                {extras.map(([k, v], i) => (
-                  <div key={k} className="px-3 py-1.5 flex gap-3" style={{ borderTop: i ? "1px solid #EEECE6" : undefined }}>
-                    <div className="text-xs font-semibold" style={{ color: C.dim, minWidth: 170 }}>{k}</div>
-                    <div className="text-xs" style={{ wordBreak: "break-word" }}>{v}</div>
-                  </div>
-                ))}
+              {group.note && (
+                <div className="rounded p-2 mb-2" style={{ background: "#F4F2EC", fontSize: 11, color: CC.dim, lineHeight: 1.6 }}>
+                  {group.note}
+                </div>
+              )}
+              <div className="bg-white rounded-lg border" style={{ borderColor: CC.line }}>
+                {group.fields.map((f) => (<ReadField key={f.key} f={f} e={e} />))}
               </div>
             </>
           )}
 
           {tab === "history" && (
             <>
-              <Section title="Every change made here" note="Append-only. Nothing on this list can be edited or removed." />
-              {history === null && <div className="text-xs" style={{ color: C.faint }}>loading…</div>}
-              {history?.length === 0 && <div className="text-xs" style={{ color: C.faint }}>Nothing has been changed on this record.</div>}
-              <div className="bg-white rounded-lg border" style={{ borderColor: C.line }}>
+              {history === null && <div className="text-xs" style={{ color: CC.faint }}>loading…</div>}
+              {history?.length === 0 && <div className="text-xs" style={{ color: CC.faint }}>Nothing has been changed on this record.</div>}
+              <div className="bg-white rounded-lg border" style={{ borderColor: CC.line }}>
                 {(history || []).map((h, i) => (
                   <div key={h.id} className="px-3 py-2" style={{ borderTop: i ? "1px solid #EEECE6" : undefined }}>
-                    <div className="text-xs">
-                      <b>{h.label}</b>{" "}
-                      <span style={{ color: C.faint, textDecoration: "line-through" }}>{h.old_value || "—"}</span>{" → "}
-                      <span style={{ color: C.green }}>{h.new_value || "—"}</span>
+                    <div className="text-xs" style={{ lineHeight: 1.6 }}>
+                      <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#E8600A", color: "#fff", fontSize: 10 }}>
+                        {h.by_initials || "—"}
+                      </span>{" "}
+                      <span style={{ color: CC.faint }}>
+                        on {fmtFull(String(h.edited_at).slice(0, 10))} at{" "}
+                        {new Date(h.edited_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                      </span>{" "}
+                      changed <b>{h.label}</b>{" "}
+                      <span style={{ color: CC.faint, textDecoration: "line-through" }}>{h.old_value || "—"}</span>{" → "}
+                      <span style={{ color: CC.green }}>{h.new_value || "—"}</span>
                     </div>
-                    <div style={{ fontSize: 11, color: C.faint }}>{h.edited_by || "—"} · {fmtFull(String(h.edited_at).slice(0, 10))}</div>
                   </div>
                 ))}
               </div>
             </>
           )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function Section({ title, note }: { title: string; note?: string }) {
-  return (
-    <div className="mb-2 mt-3 first:mt-0">
-      <div className="font-bold text-xs" style={{ color: C.ink }}>{title}</div>
-      {note && <div style={{ fontSize: 11, color: C.faint, lineHeight: 1.5 }}>{note}</div>}
-    </div>
-  );
-}
-
-function Field({ f, e, onSave, onClear }: { f: FieldSpec; e: HrmsEmployee; onSave: (v: string | null) => void; onClear: () => void }) {
-  // A derived field is not stored and not typed into — it is recomputed from
-  // whatever it depends on, every time this opens. That is the whole reason
-  // it is derived: the sheet used to recalculate age and service on every
-  // open, and a stored number would start rotting the day the sheet stops.
-  if (f.derived) {
-    const v = f.derived(e.value);
-    return (
-      <div className="rounded px-3 py-1.5 mb-1.5 flex items-center gap-2" style={{ background: "#F4F2EC" }}>
-        <div className="text-xs font-semibold" style={{ color: C.faint, minWidth: 130 }}>{f.label}</div>
-        <div className="text-xs tnum" style={{ color: C.dim }}>{v ?? "—"}</div>
-        <div style={{ fontSize: 10.5, color: "#B8B5AC", marginLeft: "auto", textAlign: "right", maxWidth: 260 }}>
-          {f.hint || "worked out, not typed"}
-        </div>
-      </div>
-    );
-  }
-
-  const current = e.value[f.key] ?? "";
-  const overridden = f.key in e.edited;
-  const sheetSays = e.sheet[f.key];
-  const inputType =
-    f.kind === "date" ? "date" : f.kind === "tel" ? "tel" : f.kind === "email" ? "email"
-      : f.kind === "money" || f.kind === "number" ? "text" : f.kind === "url" ? "url" : "text";
-
-  return (
-    <div className="bg-white rounded-lg border px-3 py-2 mb-1.5" style={{ borderColor: overridden ? "#F5C89F" : C.line }}>
-      <div className="flex items-center gap-2">
-        <div className="text-xs font-semibold" style={{ color: C.dim, minWidth: 130 }}>{f.label}</div>
-        {f.kind === "bool" ? (
-          <select value={current === "no" ? "no" : "yes"} onChange={(ev) => onSave(ev.target.value)}
-            className="text-xs rounded px-2 py-1 bg-white" style={{ border: `1px solid ${C.line}` }}>
-            <option value="yes">on the roll</option>
-            <option value="no">no longer here</option>
-          </select>
-        ) : f.kind === "long" ? (
-          <textarea defaultValue={current} key={f.key + current} rows={2}
-            onBlur={(ev) => { if (ev.target.value !== current) onSave(ev.target.value); }}
-            className="text-xs rounded px-2 py-1 flex-1" style={{ border: `1px solid ${C.line}` }} />
-        ) : (
-          <input defaultValue={current} key={f.key + current} placeholder="—" type={inputType}
-            onBlur={(ev) => { if (ev.target.value !== current) onSave(ev.target.value); }}
-            className={`text-xs rounded px-2 py-1 flex-1 ${f.kind === "money" || f.kind === "number" ? "tnum" : ""}`}
-            style={{ border: `1px solid ${C.line}`, textAlign: f.kind === "money" || f.kind === "number" ? "right" : undefined }} />
-        )}
-        {f.kind === "url" && current && (
-          <a href={current} target="_blank" rel="noopener noreferrer" className="text-xs font-bold" style={{ color: "#1B3A5C" }} title="Open">↗</a>
-        )}
-      </div>
-      {(f.hint || overridden) && (
-        <div className="mt-1" style={{ fontSize: 11, color: overridden ? "#8A5B00" : C.faint, lineHeight: 1.5 }}>
-          {overridden && (
-            <>
-              Edited by {e.edited[f.key].by || "somebody"} on {fmtFull(String(e.edited[f.key].at).slice(0, 10))}
-              {sheetSays != null && sheetSays !== "" && <> — as imported it said <b>{sheetSays}</b></>}{" "}
-              <button onClick={onClear} className="font-bold rounded px-1.5" style={{ background: "#F4F2EC", color: C.dim }}>
-                {sheetSays != null && sheetSays !== "" ? "put the imported value back" : "clear"}
-              </button>
-              {f.hint && <br />}
-            </>
+          {Object.keys(e.extra || {}).length > 0 && (
+            <div className="rounded p-2 mt-3" style={{ background: "#FFF7E6", border: "1px solid #F5B32B", fontSize: 11, color: "#8A5B00", lineHeight: 1.6 }}>
+              <b>{Object.keys(e.extra).length} column(s) arrived in an import that the record does not name yet:</b>{" "}
+              {Object.keys(e.extra).join(", ")}. Tell me and they get proper fields.
+            </div>
           )}
-          {f.hint}
         </div>
-      )}
+      </div>
     </div>
   );
 }

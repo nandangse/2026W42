@@ -17,7 +17,14 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type FieldKind = "text" | "date" | "email" | "tel" | "bool" | "long" | "money" | "number" | "url";
+export type FieldKind =
+  | "text" | "date" | "email" | "tel" | "bool" | "long" | "money" | "number"
+  /** A link, opened in a new tab. Never a file — see the Documents group. */
+  | "url"
+  /** One of `options`. */
+  | "select"
+  /** Picked from Genie's own user list; writes the account's email. */
+  | "user";
 
 export interface FieldSpec {
   key: string;
@@ -33,6 +40,12 @@ export interface FieldSpec {
   sheetHeader?: string;
   /** true where the value came from the sheet — an edit is an override. */
   sheet: boolean;
+  /** For kind "select". */
+  options?: string[];
+  /** Shown under the field once that option is chosen. */
+  optionNotes?: Record<string, string>;
+  /** No two employees may hold the same value. Enforced server-side. */
+  unique?: boolean;
   /**
    * Worked out rather than stored. THIS MATTERS NOW: the sheet recalculated
    * Age, Experience and the rest every time it was opened. Once HRMS is the
@@ -52,6 +65,83 @@ export interface FieldGroup {
   confidential?: boolean;
   fields: FieldSpec[];
 }
+
+/* ── status ─────────────────────────────────────────────────────────────── */
+
+/**
+ * The HR sheet's own six, in its own order and its own words.
+ *
+ * This replaces the yes/no "currently employed" tick. A boolean could not tell
+ * a resignation from a dismissal, and could not hold the two states that are
+ * neither — somebody serving notice is still on the roll, and so is a doubtful
+ * case, but neither is simply "active".
+ */
+export const STATUS_OPTIONS = [
+  "Active",
+  "Resigned",
+  "Terminated",
+  "Doubtful",
+  "Notice Period",
+  "F&F Due",
+] as const;
+
+/** Which of the six count as still employed. */
+export const ON_ROLL = new Set<string>(["Active", "Doubtful", "Notice Period"]);
+
+/**
+ * Is this person on the roll?
+ *
+ * Status decides it where there is one. Where there is not — and today there
+ * mostly is not, because the parser folded the sheet's Status column into a
+ * boolean and threw the word away — the boolean is all there is to go on.
+ */
+export function onRoll(value: Record<string, string | null>): boolean {
+  const st = (value.status || "").trim();
+  if (st) return ON_ROLL.has(st);
+  return value.active !== "no";
+}
+
+/* ── type ───────────────────────────────────────────────────────────────── */
+
+/**
+ * TYPE DECIDES PAYROLL. It is not a description of somebody, it is the rule
+ * for how they are paid and what is deducted, so it is a fixed list of seven
+ * and not a box to type in (Dr Raghu, 23 Aug 2026).
+ *
+ * The distinction that matters most is EMPLOYED vs ON A CONTRACT. An employee
+ * of the company — Staff, Labour, Management — carries PF, ESIC, MLWF and the
+ * rest. Somebody on a contract does not: 2% TDS comes off instead. Getting
+ * this wrong is not a display error, it is a wrong salary and a statutory
+ * filing that does not reconcile.
+ */
+export const TYPE_OPTIONS = [
+  "Management",
+  "Staff",
+  "Labour",
+  "Contractor",
+  "Labour - Contract",
+  "Trainee",
+  "Staff - Contract",
+] as const;
+
+export const TYPE_NOTES: Record<string, string> = {
+  Management: "Employed by the company. Full statutory deductions.",
+  Staff: "Company staff, permanent. PF, ESIC, MLWF and the rest apply.",
+  Labour:
+    "A FULL-TIME EMPLOYEE of the company, not an outsider — own PF, ESIC, MLWF, Medicare and every other formality.",
+  Contractor: "Engaged rather than employed. No company statutory cover.",
+  "Labour - Contract":
+    "On a labour contract, not on the company's rolls. 2% TDS is deducted instead of the statutory set.",
+  "Staff - Contract":
+    "Staff engaged on a contract. 2% TDS is deducted instead of the statutory set.",
+  Trainee: "An intern or trainee.",
+};
+
+/** Types the company employs directly — the ones carrying PF/ESIC/MLWF. */
+export const EMPLOYED_TYPES = new Set<string>(["Management", "Staff", "Labour"]);
+
+/** Types paid against a contract, with TDS rather than statutory deductions. */
+export const CONTRACT_TYPES = new Set<string>(["Contractor", "Labour - Contract", "Staff - Contract"]);
 
 /* ── helpers for the derived fields ─────────────────────────────────────── */
 
@@ -94,11 +184,22 @@ export const FIELD_GROUPS: FieldGroup[] = [
     label: "Identity & role",
     fields: [
       { key: "name", label: "Name", kind: "text", column: "name", sheet: true },
+      { key: "initials", label: "Initials", kind: "text", sheet: true, unique: true,
+        hint: "Two or three letters, unique across everybody. The edit log signs itself with these." },
+      { key: "user_email", label: "Genie user", kind: "user", sheet: true,
+        hint: "The Genie login this person uses, if they have one. Chosen from the user list — it is how HRIS knows who actually uses Genie." },
       t("legal_name", "Full name on record", "NANDAN GSE EMPLOYEEMASTER", "text",
         "The master's own name column. Often fuller than the short name above — this is the one for a letter."),
       t("casual_name", "Known as", "Casual Name"),
-      t("type", "Type", "Type", "text", "Management · Staff · Contractor · Labour."),
-      { key: "active", label: "Currently employed", kind: "bool", column: "active", sheet: true },
+      { key: "type", label: "Type", kind: "select", sheet: true, sheetHeader: "Type",
+        options: [...TYPE_OPTIONS], optionNotes: TYPE_NOTES,
+        hint: "Decides how this person is paid and what is deducted. Employed types carry PF, ESIC and MLWF; contract types carry 2% TDS instead." },
+      { key: "status", label: "Status", kind: "select", sheet: true, sheetHeader: "Status",
+        options: [...STATUS_OPTIONS],
+        hint: "The master's own six. Active, Doubtful and Notice Period count as on the roll." },
+      { key: "active", label: "On the roll", kind: "bool", column: "active", sheet: true,
+        derived: (v) => (onRoll(v) ? "yes" : "no"),
+        hint: "Follows the Status above — Active, Doubtful and Notice Period are on the roll." },
       { key: "doj", label: "Date of joining", kind: "date", column: "doj", sheet: true },
       { key: "department", label: "Department", kind: "text", column: "department", sheet: true },
       { key: "designation", label: "Designation", kind: "text", column: "designation", sheet: true },
@@ -159,7 +260,6 @@ export const FIELD_GROUPS: FieldGroup[] = [
       t("shoe_size", "Shoe size", "Shoe Size"),
       t("vaccine_1", "Vaccine 1", "Vaccine 1 Date", "date"),
       t("vaccine_2", "Vaccine 2", "Vaccine 2 Date", "date"),
-      t("passport_photo", "Passport photo", "Passport Photo"),
     ],
   },
   {
@@ -241,6 +341,24 @@ export const FIELD_GROUPS: FieldGroup[] = [
       t("loan_as_on", "Loan outstanding", "Loan as on 31st June 2026", "money"),
       t("leave_as_on", "Leave balance", "Leave as on 31st june 2026", "number"),
       t("referral", "Referred by", "Referal Employee"),
+      t("cheque_ubi", "UBI cheque no. / dated", "Cheque no.    of Union Bank of India dtd."),
+    ],
+  },
+  {
+    key: "documents",
+    label: "Documents",
+    note:
+      "LINKS ONLY. No document is ever stored in the database — every one of them lives in the employee's own folder on Drive, and what is kept here is the address. That way there is one copy, it is where the rest of HR's paper already is, and Genie holds nothing it would have to be trusted with.",
+    fields: [
+      { key: "drive_folder", label: "Employee folder", kind: "url", sheet: false,
+        hint: "The person's own folder on Drive. Everything below should live inside it." },
+      { key: "doc_photo", label: "Passport photograph", kind: "url", sheet: true, sheetHeader: "Passport Photo" },
+      { key: "doc_aadhaar", label: "Aadhaar card", kind: "url", sheet: false },
+      { key: "doc_pan", label: "PAN card", kind: "url", sheet: false },
+      { key: "doc_bank", label: "Bank proof / cancelled cheque", kind: "url", sheet: false },
+      { key: "doc_education", label: "Education certificates", kind: "url", sheet: false },
+      { key: "doc_offer", label: "Offer / appointment letter", kind: "url", sheet: false },
+      { key: "doc_other", label: "Other documents", kind: "url", sheet: false },
     ],
   },
   {

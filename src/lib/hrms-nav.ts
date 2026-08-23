@@ -37,7 +37,7 @@ export interface NavSection {
 export const NAV: NavSection[] = [
   {
     key: "master",
-    label: "Employee Master",
+    label: "HRIS · Employee Master",
     icon: "👥",
     items: [
       {

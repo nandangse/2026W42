@@ -32,10 +32,19 @@ export async function GET(req: Request) {
       throw new Error(error.message);
     }
     return NextResponse.json({
-      history: (data || []).map((r) => ({
-        ...r,
-        label: fieldSpec(String(r.field))?.label || String(r.field),
-      })),
+      history: (data || []).map((r) => {
+        // edited_by is stored as "RJ · someone@nandan.co.in" from 3.19.2.0 on,
+        // and as a bare address before that. Split it so the screen can say
+        // who without saying it twice.
+        const raw = String(r.edited_by || "");
+        const [a, b] = raw.split("·").map((x) => x.trim());
+        return {
+          ...r,
+          label: fieldSpec(String(r.field))?.label || String(r.field),
+          by_initials: b ? a : null,
+          by_email: b ? b : a || null,
+        };
+      }),
     });
   } catch (e) {
     return errJson(e);

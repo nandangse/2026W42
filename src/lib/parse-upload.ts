@@ -547,8 +547,20 @@ export function parseUpload(wb: WorkBook, slot?: string): ParseResult {
           if (!id) id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
           while (seen.has(id)) id = id + "-2";
           seen.add(id);
-          const status = statusHdr ? String(g(r, statusHdr) || "").trim().toLowerCase() : "";
+          const statusRaw = statusHdr ? String(g(r, statusHdr) || "").trim() : "";
+          const status = statusRaw.toLowerCase();
           const extra: Record<string, string> = {};
+          /**
+           * KEEP THE WORD, not just the yes/no it collapses to.
+           *
+           * The sheet's Status column carries six values -- Active, Resigned,
+           * Terminated, Doubtful, Notice Period, F&F Due -- and this parser
+           * used to reduce all six to `active: true|false` and discard the
+           * original. HRIS makes Status a field in its own right, so a
+           * resignation can be told from a dismissal; that is only possible
+           * if the word survives the import.
+           */
+          if (statusRaw) extra["Status"] = statusRaw;
           for (const h of hdr) {
             if (!h || taken.has(h)) continue;
             const v = String(g(r, h) ?? "").trim();

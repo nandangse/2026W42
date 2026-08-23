@@ -75,6 +75,25 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.1.2",
+    date: "2026-08-23",
+    module: "HRIS — the record takes over",
+    items: [
+      "THE EMPLOYEE MASTER IS NOW HRIS, and the sheet's own vocabulary comes with it. “Code” is EMPLOYEE ID everywhere — it is the key every HRIS record hangs off.",
+      "STATUS IS A FIELD, NOT A TICK BOX. The master's own six: Active · Resigned · Terminated · Doubtful · Notice Period · F&F Due. A yes/no could not tell a resignation from a dismissal, and could not hold the two states that are neither — somebody serving notice is still on the roll, and so is a doubtful case. Active, Doubtful and Notice Period count as on the roll; “On the roll” now follows Status instead of being typed.",
+      "TYPE IS THE PAYROLL RULE, and is now a fixed list of seven rather than free text: Management · Staff · Labour · Contractor · Labour - Contract · Trainee · Staff - Contract. Choosing one shows what it means for pay — an EMPLOYED type (Management, Staff, Labour) carries PF, ESIC, MLWF and the rest; a CONTRACT type carries 2% TDS instead. Labour is a full-time employee of the company with every formality, not an outsider. Getting this wrong is not a display error, it is a wrong salary and a statutory filing that does not reconcile.",
+      "“FROM THE SHEET” IS GONE. Every column the master carries now has a field of its own — the last unclaimed one was picked up. If a future import brings a column nobody has named, the record says so in orange rather than swallowing it.",
+      "CLICKING SOMEBODY OPENS THEIR RECORD, VIEW ONLY. It shows; it does not put you in it. An ✎ Edit Record button opens that person on their own page IN A NEW TAB — so the directory you were working through is still there when you come back, and nobody edits a personnel record by accident while scrolling a list.",
+      "THE RECORD PAGE HAS TABS ACROSS THE TOP, one per part of the record — Identity & role · Contact · Personal · Family · Statutory · Pay · Bank · Benefits · Performance · Leaving · Documents · HR notes — plus History. A hundred fields on one scroll is not a form anybody can fill. There is no Save button, by design: each field saves the moment you leave it, because a Save button on a hundred-field form is a promise to lose somebody's work.",
+      "EVERY CHANGE IS SIGNED WITH INITIALS. The history reads “RJ · on 23 Aug 2026 at 14:32 · changed Designation · Head, Accounts → Head of Finance”. Append-only, as before.",
+      "INITIALS ARE A FIELD, AND THEY ARE UNIQUE. The first person to take a pair keeps them; the second is told “Already exists — RJ belongs to …” and has to choose others.",
+      "GENIE USER is now on the record — a dropdown of Genie's own accounts. That is how HRIS answers how many of these people actually use Genie, and it is the join between a person and their login.",
+      "DOCUMENTS ARE LINKS, NEVER FILES. A Documents tab holds the person's own Drive folder plus links for the photograph, Aadhaar, PAN, bank proof, education certificates and the offer letter. NOTHING is stored in the database — the paper stays in Drive where the rest of HR's paper already is, and Genie holds only the address.",
+      "The import no longer throws the Status word away — it used to collapse all six values into a yes/no and discard the original. One more Employee Master upload would therefore backfill the real statuses for everybody.",
+      "No new migration.",
+    ],
+  },
+  {
     v: "3.19.1.1",
     date: "2026-08-23",
     module: "HRMS becomes the master",
