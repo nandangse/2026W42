@@ -26,6 +26,10 @@ interface PersonPending {
   changes: { field: string; label: string; value: string | null; by: string | null; at: string }[];
 }
 interface RolePending { id: string; role: string; department: string | null; by: string | null; since: string | null }
+interface DoneRow {
+  kind: "Record" | "Role"; id: string; name: string; what: string;
+  asked: string | null; approved: string | null; by: string | null; approvedBy: string | null;
+}
 
 const initialsOf = (s: string | null) => String(s || "—").split("·")[0].trim();
 
@@ -37,12 +41,15 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [done, setDone] = useState<DoneRow[]>([]);
+  const [tab, setTab] = useState<"waiting" | "done">("waiting");
 
   const load = useCallback(async () => {
     try {
       const j = await api.get("/api/hrms/approvals");
       setPeople(j.people || []);
       setRoles(j.roles || []);
+      setDone(j.done || []);
       setPick({}); setRolePick({});
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); setPeople([]); }
   }, []);
@@ -74,6 +81,46 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
     <Pane title="RJ Approval - Records" who={who}
       blurb="Everything HR has changed that you have not yet seen. Approving does not alter a value — it agrees the change that is already there.">
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</div>}
+
+      {/* waiting empties itself; completed is where "when did we settle that" gets answered */}
+      <div className="flex gap-1.5 mb-3 no-print">
+        {(["waiting", "done"] as const).map((t) => (
+          <button key={t} onClick={() => setTab(t)} className="rounded px-3 py-1.5 font-bold"
+            style={{ fontSize: 12.5, background: tab === t ? C.orange : "#fff", color: tab === t ? "#fff" : C.dim, border: `1px solid ${tab === t ? C.orange : C.line}` }}>
+            {t === "waiting" ? `Waiting${total ? ` (${total})` : ""}` : `Completed (${done.length})`}
+          </button>
+        ))}
+      </div>
+
+      {tab === "done" ? (
+        <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflowX: "auto" }}>
+          {!done.length
+            ? <div className="p-4 text-sm" style={{ color: C.faint }}>Nothing has been approved yet. Once you approve something, it is kept here with both dates.</div>
+            : (
+              <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+                <thead><tr style={{ color: C.faint, fontSize: 11 }}>
+                  {["What", "Who / which", "Change", "Asked date", "Approved date", "Changed by", "Approved by"].map((h) => (
+                    <th key={h} className="text-left px-2 py-1.5" style={{ borderBottom: `1px solid ${C.line}` }}>{h}</th>))}
+                </tr></thead>
+                <tbody>
+                  {done.map((r, i) => (
+                    <tr key={`${r.kind}${r.id}${i}`} style={{ borderBottom: "1px solid #F2F0EA" }}>
+                      <td className="px-2 py-1.5">
+                        <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: r.kind === "Role" ? "#EDE7F6" : "#DCE8F5", color: r.kind === "Role" ? "#5B3FA8" : "#1B3A5C" }}>{r.kind}</span>
+                      </td>
+                      <td className="px-2 py-1.5 font-semibold">{r.kind === "Record" ? `${r.id} · ${r.name}` : r.name}</td>
+                      <td className="px-2 py-1.5">{r.what}</td>
+                      <td className="px-2 py-1.5">{r.asked ? fmtFull(String(r.asked).slice(0, 10)) : "—"}</td>
+                      <td className="px-2 py-1.5 font-semibold" style={{ color: C.green }}>{r.approved ? fmtFull(String(r.approved).slice(0, 10)) : "—"}</td>
+                      <td className="px-2 py-1.5">{initialsOf(r.by)}</td>
+                      <td className="px-2 py-1.5">{initialsOf(r.approvedBy)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+        </div>
+      ) : (<>
 
       {!isOwner && (
         <div className="rounded p-2 mb-3" style={{ background: "#F4F2EC", fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
@@ -196,6 +243,7 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
           )}
         </>
       )}
+      </>)}
     </Pane>
   );
 }

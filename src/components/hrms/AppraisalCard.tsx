@@ -41,6 +41,8 @@ interface PersonData {
   appraisal: {
     new_gross: number | null; prev_gross: number | null; note: string | null; decided_by: string | null; decided_at: string;
     structure?: { components?: Record<string, number>; extras?: Record<string, number> } | null;
+    pending_since?: string | null; pending_by?: string | null;
+    approved_at?: string | null; approved_by?: string | null;
   } | null;
 }
 
@@ -340,13 +342,22 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
         extras: Object.fromEntries(EXTRAS.map(([key]) => [key, Number(extras[key]) || 0])),
       };
       const r = await api.post("/api/hrms/idp", { action: "appraisal", employee_id: d.employee.id, new_gross: String(n), prev_gross: prev, structure });
-      setMsg(r?.warning ? String(r.warning) : "Decision saved ✓");
+      setMsg(r?.warning ? String(r.warning) : r?.approved ? "Saved and finalised ✓" : "Saved — it now waits for RJ to finalise ✓");
       onSaved();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
   };
 
   const editable = (label: string) => COMPS.find(([, , rowLabel]) => rowLabel === label)?.[0];
+
+  const approveThis = async () => {
+    setBusy(true); setMsg("");
+    try {
+      await api.post("/api/hrms/idp", { action: "approve-appraisal", ids: [d.employee.id] });
+      setMsg("Finalised ✓"); onSaved();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
 
   return (
     <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line }}>
@@ -361,7 +372,20 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
         <span style={{ fontWeight: 700, color: C.green }}>Rs</span>
         <input value={grossBox} inputMode="numeric" onChange={(e) => setGrossAndScale(e.target.value)}
           className="rounded px-2 py-2 tnum" style={{ border: `2px solid ${C.green}`, color: C.green, fontWeight: 700, fontSize: 17, width: 160 }} />
+        <span className="font-bold" style={{ fontSize: 15, color: C.dim }}>/month</span>
       </div>
+
+      {d.appraisal && (
+        d.appraisal.approved_at
+          ? <div className="rounded px-2.5 py-1.5 mt-2 inline-block" style={{ background: "#E6F4EA", color: "#0D7A3F", fontSize: 12, fontWeight: 700 }}>
+              ✓ Finalised by {String(d.appraisal.approved_by || "").split("·")[0].trim() || "RJ"} on {fmtFull(String(d.appraisal.approved_at).slice(0, 10))}
+            </div>
+          : d.appraisal.pending_since
+            ? <div className="rounded px-2.5 py-1.5 mt-2 inline-block" style={{ background: "#FFF3E8", color: "#8A5B00", fontSize: 12, fontWeight: 700 }}>
+                Proposed by {String(d.appraisal.pending_by || "").split("·")[0].trim() || "HR"} — waiting for RJ to finalise. It is in Approvals → RJ Approval - Commercial.
+              </div>
+            : null
+      )}
 
       {/* the headline, on top — the increment both ways, and the new CTC */}
       {inc !== null && (
@@ -442,8 +466,14 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
         <button onClick={save} disabled={busy || !n}
           className="rounded font-bold px-4 py-2"
           style={{ background: n ? C.green : "#E2E0DA", color: n ? "#fff" : "#8A94A0", fontSize: 14 }}>
-          {busy ? "Saving…" : d.appraisal ? "✓ Update the decision" : "✓ Save the decision"}
+          {busy ? "Saving…" : isOwner ? (d.appraisal ? "✓ Update and finalise" : "✓ Save and finalise") : (d.appraisal ? "Update — send to RJ" : "Save — send to RJ")}
         </button>
+        {isOwner && d.appraisal?.pending_since && !d.appraisal?.approved_at && (
+          <button onClick={approveThis} disabled={busy}
+            className="rounded font-bold px-3 py-2" style={{ background: "#0D7A3F", color: "#fff", fontSize: 13 }}>
+            ✓ Finalise this one
+          </button>
+        )}
         {d.appraisal?.decided_by && (
           <span style={{ fontSize: 11.5, color: C.faint }}>
             last decided by {String(d.appraisal.decided_by).split("·")[0].trim()} on {fmtFull(String(d.appraisal.decided_at).slice(0, 10))}

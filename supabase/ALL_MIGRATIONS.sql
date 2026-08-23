@@ -5185,3 +5185,122 @@ alter table public.hrms_appraisal
 comment on column public.hrms_appraisal.structure is
   'The hand-tuned component split and the company investment lines behind the decided gross.';
 
+
+-- >>>>> supabase/migrations/0063_appraisal_approval.sql
+-- 0063_appraisal_approval.sql
+--
+-- THE APPRAISAL IS PROPOSED BY HR AND FINALISED BY RAGHU (Dr Raghu, 23 Aug
+-- 2026): "HR may update but finalised by me - approval. same ... commercial".
+--
+-- The same standing rule the record edits and the role definitions already
+-- follow: the number is in the row from the moment it is saved, but it is a
+-- PROPOSAL until the owner has seen it. Approving alters no value -- it
+-- changes the standing of one, from proposed to agreed. The queue is
+-- Approvals -> RJ Approval - Commercial, because this is money.
+--
+-- ASCII only, additive, safe to re-run. Run AFTER 0062.
+
+alter table public.hrms_appraisal
+  add column if not exists pending_since timestamptz,
+  add column if not exists pending_by    text,
+  add column if not exists approved_at   timestamptz,
+  add column if not exists approved_by   text;
+
+comment on column public.hrms_appraisal.pending_since is
+  'Set when HR saves a decision the owner has not yet approved. Null once approved.';
+comment on column public.hrms_appraisal.approved_at is
+  'When the owner finalised this number. Until then the decision is a proposal.';
+
+
+-- >>>>> supabase/migrations/0064_hrms_loan.sql
+-- 0064_hrms_loan.sql
+--
+-- LOAN REQUESTS (Dr Raghu, 23 Aug 2026): "build this where its related to
+-- salary and loan approvals". RJ Approval - Commercial is the desk where
+-- anything with money attached gets the owner's word, and there are two such
+-- things: what a person will be PAID (the appraisal, 0061-0063) and what the
+-- company LENDS them.
+--
+-- One row per request. HR raises it on the person's behalf -- or the future
+-- Loan Application module writes the same row -- and it stands as REQUESTED
+-- until the owner approves or declines it. The repayment plan is kept
+-- alongside the amount because "approved" without "over how many months" is
+-- not an approval anybody can act on.
+--
+-- ASCII only, additive, safe to re-run.
+
+create table if not exists public.hrms_loan (
+  id            uuid primary key default gen_random_uuid(),
+  employee_id   text not null,
+  amount        numeric not null,
+  /** Salary Advance, Personal Loan, Medical, Festival, Other. */
+  kind          text not null default 'Loan',
+  reason        text,
+  /** How it comes back: months of deduction, and from when. */
+  months        integer,
+  from_month    text,
+  status        text not null default 'Requested',
+  requested_by  text,
+  requested_at  timestamptz not null default now(),
+  decided_by    text,
+  decided_at    timestamptz,
+  decision_note text,
+  updated_at    timestamptz not null default now()
+);
+
+create index if not exists hrms_loan_status_idx on public.hrms_loan (status, requested_at desc);
+create index if not exists hrms_loan_person_idx on public.hrms_loan (employee_id);
+
+comment on table public.hrms_loan is
+  'A loan or salary advance asked for by (or on behalf of) one employee. '
+  'Requested -> Approved/Declined by the owner in RJ Approval - Commercial.';
+
+alter table public.hrms_loan enable row level security;
+revoke all on public.hrms_loan from anon, authenticated;
+
+
+-- >>>>> supabase/migrations/0065_hrms_query.sql
+-- 0065_hrms_query.sql
+--
+-- RJ APPROVAL - SALARY QUERIES (Dr Raghu, 23 Aug 2026): "this is when HR
+-- raises queries to me for discussion and approvals".
+--
+-- Not a form and not a ticket queue -- a CONVERSATION with a decision at the
+-- end of it. HR raises a question (usually about one person's pay, sometimes
+-- not about anybody in particular), the owner and HR talk it through in
+-- writing, and then it is ANSWERED and closed. The thread is kept because
+-- six months later the question is never "what did we decide" alone, it is
+-- "what did we decide and why".
+--
+-- The thread is a jsonb array of { by, at, text } so a reply costs no schema.
+--
+-- ASCII only, additive, safe to re-run.
+
+create table if not exists public.hrms_query (
+  id           uuid primary key default gen_random_uuid(),
+  /** Optional -- a query may be about a person, or about a policy. */
+  employee_id  text,
+  subject      text not null,
+  question     text not null,
+  /** Salary, Increment, Deduction, Statutory, Policy, Other. */
+  topic        text not null default 'Salary',
+  /** Open -> Answered. Nothing is deleted. */
+  status       text not null default 'Open',
+  thread       jsonb not null default '[]'::jsonb,
+  answer       text,
+  raised_by    text,
+  raised_at    timestamptz not null default now(),
+  answered_by  text,
+  answered_at  timestamptz,
+  updated_at   timestamptz not null default now()
+);
+
+create index if not exists hrms_query_status_idx on public.hrms_query (status, raised_at desc);
+
+comment on table public.hrms_query is
+  'A question HR has put to the owner for discussion and a decision. '
+  'Raised, discussed in the thread, answered, and closed on the record.';
+
+alter table public.hrms_query enable row level security;
+revoke all on public.hrms_query from anon, authenticated;
+

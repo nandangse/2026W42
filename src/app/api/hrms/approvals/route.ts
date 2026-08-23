@@ -72,7 +72,58 @@ export async function GET() {
       }));
     } catch { /* pre-0051 */ }
 
-    return NextResponse.json({ people, roles });
+    /**
+     * ---- what has already been agreed ----
+     * The waiting queue empties itself, and an empty queue tells you nothing
+     * about what was decided. This is the other half: every change that HAS
+     * been approved, with the date it was ASKED and the date it was AGREED,
+     * so a month later the record answers "when did we settle that".
+     */
+    let done: {
+      kind: "Record" | "Role"; id: string; name: string; what: string;
+      asked: string | null; approved: string | null; by: string | null; approvedBy: string | null;
+    }[] = [];
+    try {
+      const { data: seen } = await admin
+        .from(T.edits)
+        .select("employee_id, field, value, edited_by, edited_at, approved_at, approved_by")
+        .not("approved_at", "is", null)
+        .order("approved_at", { ascending: false })
+        .limit(400);
+      const ids = [...new Set((seen || []).map((p) => String(p.employee_id)))];
+      const nameOf = new Map<string, string>();
+      if (ids.length) {
+        const { data: emps } = await admin.from(T.employees).select("id, name").in("id", ids);
+        for (const e of emps || []) nameOf.set(String(e.id), String(e.name || e.id));
+      }
+      done = (seen || []).map((p) => ({
+        kind: "Record" as const,
+        id: String(p.employee_id),
+        name: nameOf.get(String(p.employee_id)) || String(p.employee_id),
+        what: fieldSpec(String(p.field))?.label || String(p.field),
+        asked: p.edited_at ? String(p.edited_at) : null,
+        approved: p.approved_at ? String(p.approved_at) : null,
+        by: p.edited_by ?? null, approvedBy: p.approved_by ?? null,
+      }));
+    } catch { /* pre-0052 */ }
+    try {
+      const { data: doneRoles } = await admin
+        .from("hrms_role")
+        .select("id, role, department, updated_by, updated_at, approved_at, approved_by")
+        .not("approved_at", "is", null)
+        .order("approved_at", { ascending: false })
+        .limit(200);
+      for (const r of doneRoles || [])
+        done.push({
+          kind: "Role", id: String(r.id), name: String(r.role), what: r.department ? `Role definition · ${r.department}` : "Role definition",
+          asked: r.updated_at ? String(r.updated_at) : null,
+          approved: r.approved_at ? String(r.approved_at) : null,
+          by: r.updated_by ?? null, approvedBy: r.approved_by ?? null,
+        });
+    } catch { /* pre-0051 */ }
+    done.sort((a, b) => String(b.approved).localeCompare(String(a.approved)));
+
+    return NextResponse.json({ people, roles, done });
   } catch (e) {
     return errJson(e);
   }

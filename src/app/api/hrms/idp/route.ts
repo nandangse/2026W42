@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireHrms, errJson, HttpError } from "@/lib/auth";
+import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { NextResponse as NR } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, FIELD_GROUPS } from "@/lib/hrms";
@@ -47,9 +47,9 @@ export async function GET(req: Request) {
         admin.from("hrms_idp").select("id, employee_id, submitted_at, ratings, ask:answers->>ask_gross").eq("cycle", CYCLE_TBL),
         admin.from("hrms_idp_review").select("idp_id, submitted_at, ratings, gross_proposed"),
       ]);
-      let appr: { employee_id: string; new_gross: number | null; prev_gross: number | null }[] = [];
+      let appr: { employee_id: string; new_gross: number | null; prev_gross: number | null; approved_at?: string | null }[] = [];
       try {
-        const { data: ap } = await admin.from("hrms_appraisal").select("employee_id, new_gross, prev_gross").eq("cycle", CYCLE_TBL);
+        const { data: ap } = await admin.from("hrms_appraisal").select("employee_id, new_gross, prev_gross, approved_at").eq("cycle", CYCLE_TBL);
         appr = (ap || []) as typeof appr;
       } catch { /* pre-0061 */ }
 
@@ -115,7 +115,8 @@ export async function GET(req: Request) {
           const ap = apprBy.get(id);
           const newGross = ap?.new_gross != null ? Number(ap.new_gross) : null;
           const prev = ap?.prev_gross != null ? Number(ap.prev_gross) : gross || null;
-          const stage = ap?.new_gross != null ? "Final"
+          const stage = ap?.new_gross != null && ap.approved_at ? "Final"
+            : ap?.new_gross != null ? "Awaiting RJ"
             : idp?.submitted && idp.id && reviewed.has(idp.id) ? "Manager Completed"
             : idp?.submitted ? "Completed"
             : idp ? "Started" : "—";
@@ -358,16 +359,30 @@ export async function POST(req: Request) {
       const employee_id = String(body.employee_id || "");
       if (!employee_id) throw new HttpError(400, "employee_id required");
       const new_gross = Number(String(body.new_gross ?? "").replace(/[^0-9.]/g, "")) || null;
+      const stamp = me.initials ? `${me.initials} · ${me.email}` : me.email;
+      const owner = me.email.toLowerCase() === RAGHU_EMAIL;
+      const now = new Date().toISOString();
       const row: Record<string, unknown> = {
         employee_id, cycle: "2026-27",
         new_gross, prev_gross: Number(body.prev_gross) || null,
         note: String(body.note || "").trim() || null,
-        decided_by: me.initials ? `${me.initials} · ${me.email}` : me.email,
-        updated_at: new Date().toISOString(),
+        decided_by: stamp,
+        updated_at: now,
+        // HR proposes, the owner finalises. His own save IS the approval —
+        // sending it to a queue he is standing in front of would be theatre.
+        pending_since: owner ? null : now,
+        pending_by: owner ? null : stamp,
+        ...(owner ? { approved_at: now, approved_by: stamp } : { approved_at: null, approved_by: null }),
       };
       // the hand-tuned split and the investment lines, when the card sent them (0062)
       if (body.structure && typeof body.structure === "object") row.structure = body.structure;
       let { error } = await admin.from("hrms_appraisal").upsert(row, { onConflict: "employee_id,cycle" });
+      if (error && /pending_since|approved_at|schema cache/i.test(error.message)) {
+        // pre-0063: keep the decision, lose only the approval standing
+        for (const k of ["pending_since", "pending_by", "approved_at", "approved_by"]) delete row[k];
+        ({ error } = await admin.from("hrms_appraisal").upsert(row, { onConflict: "employee_id,cycle" }));
+        if (!error) return NR.json({ ok: true, warning: "Saved, but the approval flow needs migration 0063 — run it and save once more." });
+      }
       if (error && row.structure && /structure|schema cache/i.test(error.message)) {
         // pre-0062: keep the decision, drop only the tuning, and say so
         delete row.structure;
@@ -379,7 +394,63 @@ export async function POST(req: Request) {
           throw new HttpError(503, "Run migration 0061 first — the appraisal decision has nowhere to live yet.");
         throw new Error(error.message);
       }
-      return NR.json({ ok: true });
+      return NR.json({ ok: true, approved: owner });
+    }
+
+    /**
+     * { action: "approve-appraisal", ids?: string[], all?: true } — the owner
+     * finalises. Approving alters no number; it changes what the number IS:
+     * a proposal becomes the agreed figure.
+     */
+    if (String(body.action || "") === "approve-appraisal") {
+      if (me.email.toLowerCase() !== RAGHU_EMAIL)
+        throw new HttpError(403, `Only ${RAGHU_EMAIL} may finalise an appraisal.`);
+      const stamp = me.initials ? `${me.initials} · ${me.email}` : me.email;
+      let q = admin.from("hrms_appraisal")
+        .update({ pending_since: null, pending_by: null, approved_at: new Date().toISOString(), approved_by: stamp })
+        .eq("cycle", "2026-27").not("pending_since", "is", null);
+      if (!body.all) {
+        const ids = (Array.isArray(body.ids) ? body.ids : []).map(String).filter(Boolean);
+        if (!ids.length) throw new HttpError(400, "Nothing was ticked.");
+        q = q.in("employee_id", ids);
+      }
+      const { data, error } = await q.select("employee_id");
+      if (error) {
+        if (/pending_since|schema cache/i.test(error.message))
+          throw new HttpError(503, "Run migration 0063 first — the appraisal approval has nowhere to live yet.");
+        throw new Error(error.message);
+      }
+      return NR.json({ ok: true, approved: (data || []).length });
+    }
+
+    /** GET-shaped read of the commercial queue, kept beside its approve. */
+    if (String(body.action || "") === "pending-appraisals") {
+      const T = await hrmsTables(admin);
+      const { data, error } = await admin.from("hrms_appraisal")
+        .select("employee_id, new_gross, prev_gross, pending_since, pending_by, note")
+        .eq("cycle", "2026-27").not("pending_since", "is", null)
+        .order("pending_since", { ascending: false });
+      if (error) {
+        if (/pending_since|schema cache/i.test(error.message)) return NR.json({ rows: [], needsMigration: true });
+        throw new Error(error.message);
+      }
+      const ids = (data || []).map((r) => String(r.employee_id));
+      const nameOf = new Map<string, string>();
+      const deptOf = new Map<string, string>();
+      if (ids.length) {
+        const { data: emps } = await admin.from(T.employees).select("id, name, department").in("id", ids);
+        for (const e of emps || []) { nameOf.set(String(e.id), String(e.name || e.id)); deptOf.set(String(e.id), String(e.department || "")); }
+      }
+      return NR.json({
+        rows: (data || []).map((r) => ({
+          id: String(r.employee_id),
+          name: nameOf.get(String(r.employee_id)) || String(r.employee_id),
+          department: deptOf.get(String(r.employee_id)) || null,
+          prev: r.prev_gross == null ? null : Number(r.prev_gross),
+          next: r.new_gross == null ? null : Number(r.new_gross),
+          since: r.pending_since, by: r.pending_by, note: r.note,
+        })),
+      });
     }
 
     if (String(body.action || "") !== "reopen") throw new HttpError(400, "unknown action");

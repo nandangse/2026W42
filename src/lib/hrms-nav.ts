@@ -190,9 +190,9 @@ export const NAV: NavSection[] = [
     label: "Approvals",
     icon: "✅",
     items: [
-      { key: "approvals.commercial", label: "RJ Approval - Commercial", blurb: "Anything with money attached that needs the owner's word before it happens.", built: false },
+      { key: "approvals.commercial", label: "RJ Approval - Commercial", blurb: "Salary decisions and loan requests — waiting on one side, settled with both dates on the other.", built: true },
       { key: "approvals.records", label: "RJ Approval - Records", blurb: "Role definitions changed since they were last seen. Nothing HR writes is taken as agreed until it has been read here.", built: true },
-      { key: "approvals.salary", label: "RJ Approval - Salary Queries", blurb: "A pay question escalated past HR — raised, answered, and closed on the record.", built: false },
+      { key: "approvals.salary", label: "RJ Approval - Salary Queries", blurb: "Where HR raises a question for discussion and a decision — raised, talked through, answered, closed.", built: true },
     ],
   },
   {

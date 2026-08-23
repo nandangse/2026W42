@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.10.0",
+    date: "2026-08-23",
+    module: "HRMS — the three approval desks",
+    items: [
+      "THE APPRAISAL IS NOW PROPOSED AND FINALISED, not just saved. HR may write any new gross; it stands as a PROPOSAL until RJ finalises it. RJ's own save is the approval — sending it to a queue he is standing in front of would be theatre. The Appraisal Table's \u201cFinal\u201d now means finalised; a proposal reads \u201cAwaiting RJ\u201d.",
+      "RJ APPROVAL - COMMERCIAL, built: the money desk. Salary decisions waiting (previous, new, increase, asked date, by whom) with tick-and-finalise or select-all; and LOAN REQUESTS — salary advance, personal, medical, festival — with amount, repayment months, the monthly deduction worked out, approve or decline. A Completed tab keeps both with the asked date and the approved date side by side.",
+      "RJ APPROVAL - SALARY QUERIES, built: where HR raises a question for RJ. Subject, topic, optionally about one person, then a threaded discussion either side can add to, and an ANSWER that only RJ can write because the answer is what closes it. Answered queries keep the whole thread — six months later the question is never \u201cwhat did we decide\u201d alone, it is \u201cwhat did we decide and why\u201d. Reopen is there for when the answer did not settle it.",
+      "RJ APPROVAL - RECORDS now has a COMPLETED tab: every change already agreed, with the date it was asked and the date it was approved, who changed it and who approved it. The waiting queue empties itself; an empty queue tells you nothing about what was decided.",
+      "The New Gross box now says /month next to it.",
+      "Migrations 0063 (appraisal approval), 0064 (loans), 0065 (queries).",
+    ],
+  },
+  {
     v: "3.20.9.2",
     date: "2026-08-23",
     module: "HRIS — the money tab grows up",
