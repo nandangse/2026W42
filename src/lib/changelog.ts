@@ -75,6 +75,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.6.0",
+    date: "2026-08-23",
+    module: "HRIS — the Individual Report Card for Appraisal",
+    items: [
+      "THE DESK THE APPRAISAL DISCUSSION HAPPENS AT, built in HRMS → Appraisal. One person at a time, four tabs in the order a conversation runs — and HR is the one desk that sees both sides at once, which is exactly what a moderator needs and exactly why neither side sees this screen.",
+      "SELF IDP — everything they wrote, one line per question, their eleven self-ratings, and what they asked to be paid.",
+      "MANAGER IDP COMMENT — only the ratings, the salary direction (current → proposed, with the percentage), the voice note with its words, and the written comments. Nothing else.",
+      "FINALISED IDP FOR EMPLOYEE — exactly the document the person will later see, previewed before they see it: their own words, their role's expectation, and the growth note. No ratings of either side, no salaries. What is on this tab is safe to put in front of them.",
+      "APPRAISAL FINAL — the money. Previous Gross, the manager's proposal and the person's own ask side by side, the NEW GROSS in green, the increment in rupees and percent, and THE NEW SALARY STRUCTURE — the full table at the new figure, every component keeping its share of today's gross, same arithmetic as everywhere else. With the note: performance incentives for Q3 depend on the IDP work.",
+      "THE DECISION IS SAVED — new gross, previous gross, who decided and when — as its own fact, separate from what the person said and what the manager thought, because a decision is a different kind of thing from either.",
+      "The salary arithmetic moved to one shared file. Two screens computing pay separately is how two screens end up telling somebody two different CTCs.",
+      "Migration 0061.",
+    ],
+  },
+  {
     v: "3.20.5.6",
     date: "2026-08-23",
     module: "IDP — the words the server heard always reach the box",

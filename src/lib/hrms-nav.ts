@@ -104,10 +104,8 @@ export const NAV: NavSection[] = [
       {
         key: "appraisal.card",
         label: "Individual Report Card for Appraisal and Edits",
-        blurb: "One person's appraisal, editable, with the rating against each dimension.",
-        built: false,
-        source:
-          "Individual Report Card, plus the four Rating of Individuals tabs — Leaders, Staff, Contract and Labour are rated separately.",
+        blurb: "The desk the appraisal discussion happens at — self IDP, manager's view, the finalised document, and the money.",
+        built: true,
       },
       {
         key: "appraisal.summary",

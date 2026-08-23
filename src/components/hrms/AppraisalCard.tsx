@@ -1,0 +1,346 @@
+"use client";
+/**
+ * Individual Report Card for Appraisal — the desk the discussion happens at.
+ *
+ * One person, four tabs, in the order a conversation runs:
+ *   SELF IDP        what they said about themselves, one line per question
+ *   MANAGER         only the ratings, the salary direction, and the comments
+ *   FINALISED IDP   the document the employee will later see — nothing here
+ *                   that they will not see
+ *   APPRAISAL FINAL the money: previous gross, the new structure, increment
+ *
+ * HR is the one desk that sees both sides at once — the self-view and the
+ * manager's — which is exactly what a discussion moderator needs and exactly
+ * why neither side sees this screen.
+ */
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api } from "@/lib/api";
+import { fmtFull } from "@/lib/schedule";
+import { IDP_SECTIONS, IDP_RATINGS } from "@/lib/idp";
+import { salaryTable, scaledGetter, type SalaryRow } from "@/lib/salary";
+import { Pane } from "./Pane";
+import { C } from "./RecordFields";
+
+const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
+
+interface ListRow { idpId: string; employee_id: string | null; name: string; submitted_at: string | null }
+interface Rec { url: string | null; seconds: number | null; transcript: string | null }
+interface PersonData {
+  employee: { id: string; name: string; department: string | null; designation: string | null; type: string | null };
+  salary: { rows: SalaryRow[]; ctcLakhs: string; exempt: boolean; gross: number } | null;
+  idp: {
+    id: string; submitted_at: string | null; role_at_time: string | null; role_summary: string | null;
+    answers: Record<string, string>; ratings: Record<string, number>;
+    audioUrls: Record<string, Rec[]>;
+  } | null;
+  reviews: {
+    reviewer_name: string | null; reviewer_email: string; ratings: Record<string, number>;
+    gross_current: number | null; gross_proposed: number | null; notes: string | null;
+    analysis: string | null; submitted_at: string | null; voice: Rec[];
+  }[];
+  appraisal: { new_gross: number | null; prev_gross: number | null; note: string | null; decided_by: string | null; decided_at: string } | null;
+}
+
+const TABS = ["Self IDP", "Manager IDP comment", "Finalised IDP for Employee", "Appraisal Final"] as const;
+
+export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: boolean }) {
+  const [people, setPeople] = useState<ListRow[] | null>(null);
+  const [pick, setPick] = useState("");
+  const [d, setD] = useState<PersonData | null>(null);
+  const [tab, setTab] = useState<(typeof TABS)[number]>("Self IDP");
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    api.get("/api/hrms/idp").then((j) => setPeople((j.idps || []).filter((r: ListRow) => r.employee_id)))
+      .catch((e) => setMsg(e instanceof Error ? e.message : String(e)));
+  }, []);
+
+  const load = useCallback(async (emp: string) => {
+    setD(null); setMsg("");
+    try { setD(await api.get(`/api/hrms/idp?person=${encodeURIComponent(emp)}`)); }
+    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  }, []);
+  useEffect(() => { if (pick) load(pick); }, [pick, load]);
+
+  return (
+    <Pane title="Individual Report Card for Appraisal and Edits" who={who}
+      blurb="The desk the appraisal discussion happens at: what they said, what their manager said, what they will be shown, and the money — one person at a time.">
+      {msg && <div className="text-xs font-semibold mb-2" style={{ color: C.red }}>{msg}</div>}
+
+      <div className="flex items-center gap-2 flex-wrap mb-3 no-print">
+        <select value={pick} onChange={(e) => setPick(e.target.value)}
+          className="text-sm rounded px-2 py-2 bg-white" style={{ border: `1px solid ${C.line}`, minWidth: 260 }}>
+          <option value="">— choose a person (those with an IDP) —</option>
+          {(people || []).map((p) => (
+            <option key={p.idpId} value={p.employee_id!}>
+              {p.employee_id} · {p.name}{p.submitted_at ? "" : " (not submitted)"}
+            </option>
+          ))}
+        </select>
+        {people !== null && people.length === 0 && <span className="text-xs" style={{ color: C.faint }}>Nobody has an IDP yet.</span>}
+      </div>
+
+      {pick && !d && <div className="text-xs" style={{ color: C.faint }}>loading…</div>}
+
+      {d && (
+        <>
+          <div className="rounded-lg px-3 py-2 mb-2 flex items-baseline gap-x-4 gap-y-1 flex-wrap" style={{ background: "#16232F", color: "#fff" }}>
+            <span className="font-bold">{d.employee.name}</span>
+            <span style={{ fontSize: 12, color: "#8FA1B3" }}>
+              {d.employee.id} · {[d.employee.designation, d.employee.department, d.employee.type].filter(Boolean).join(" · ")}
+            </span>
+            {d.idp?.submitted_at
+              ? <span style={{ fontSize: 11, color: "#9AD3AE" }}>IDP submitted {fmtFull(String(d.idp.submitted_at).slice(0, 10))}</span>
+              : <span style={{ fontSize: 11, color: "#F5B32B" }}>IDP not submitted — read with that in mind</span>}
+          </div>
+
+          <div className="flex gap-1 flex-wrap mb-3 no-print">
+            {TABS.map((t) => (
+              <button key={t} onClick={() => setTab(t)} className="text-xs font-bold rounded px-2.5 py-1.5"
+                style={tab === t ? { background: "#E8600A", color: "#fff" } : { background: "#fff", border: `1px solid ${C.line}`, color: C.dim }}>
+                {t}
+              </button>
+            ))}
+          </div>
+
+          {tab === "Self IDP" && <SelfTab d={d} />}
+          {tab === "Manager IDP comment" && <ManagerTab d={d} />}
+          {tab === "Finalised IDP for Employee" && <FinalisedTab d={d} />}
+          {tab === "Appraisal Final" && <AppraisalTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
+        </>
+      )}
+    </Pane>
+  );
+}
+
+/* ── 1 · what they said, one line per question ── */
+function SelfTab({ d }: { d: PersonData }) {
+  if (!d.idp) return <None what="No IDP" />;
+  const a = d.idp.answers || {};
+  return (
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line }}>
+      {IDP_SECTIONS.flatMap((s) => s.questions).map((q) => {
+        const v = String(a[q.id] || "").trim();
+        if (!v) return null;
+        return (
+          <div key={q.id} className="py-1.5 flex gap-3" style={{ borderTop: "1px solid #EEECE6", fontSize: 13 }}>
+            <div className="font-semibold" style={{ minWidth: 200, maxWidth: 200, color: C.dim }}>{q.label}</div>
+            <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.6, flex: 1 }}>{v}</div>
+          </div>
+        );
+      })}
+      <div className="py-2 flex gap-3 items-start" style={{ borderTop: "1px solid #EEECE6" }}>
+        <div className="font-semibold" style={{ minWidth: 200, fontSize: 13, color: C.dim }}>Self-ratings</div>
+        <div className="flex gap-1 flex-wrap">
+          {IDP_RATINGS.map((x) => (
+            <span key={x.key} className="rounded px-1.5 py-0.5" style={{ background: "#F4F2EC", fontSize: 11.5 }} title={x.key}>
+              {x.key.split(" ")[0]} <b style={{ color: C.orange }}>{d.idp!.ratings?.[x.key] || "—"}</b>
+            </span>
+          ))}
+        </div>
+      </div>
+      {a["ask_gross"] && (
+        <div className="py-2 flex gap-3" style={{ borderTop: "1px solid #EEECE6", fontSize: 13 }}>
+          <div className="font-semibold" style={{ minWidth: 200, color: C.dim }}>Asked for (gross/mo)</div>
+          <b className="tnum" style={{ color: C.orange }}>₹{inr(Number(a["ask_gross"]))}</b>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── 2 · the manager: ratings, salary direction, comments — nothing else ── */
+function ManagerTab({ d }: { d: PersonData }) {
+  if (!d.reviews.length) return <None what="No manager review yet" />;
+  return (
+    <>
+      {d.reviews.map((r) => (
+        <div key={r.reviewer_email} className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: C.line }}>
+          <div className="font-bold text-sm">
+            {r.reviewer_name || r.reviewer_email}
+            {r.submitted_at
+              ? <span className="font-normal" style={{ fontSize: 11, color: C.green }}> · submitted {fmtFull(String(r.submitted_at).slice(0, 10))}</span>
+              : <span className="font-normal" style={{ fontSize: 11, color: "#8A5B00" }}> · in progress</span>}
+          </div>
+          <div className="flex gap-1 flex-wrap mt-2">
+            {IDP_RATINGS.map((x) => (
+              <span key={x.key} className="rounded px-1.5 py-0.5" style={{ background: "#FFF3E8", fontSize: 11.5 }} title={x.key}>
+                {x.key.split(" ")[0]} <b style={{ color: C.orange }}>{r.ratings?.[x.key] || "—"}</b>
+              </span>
+            ))}
+          </div>
+          <div className="mt-2" style={{ fontSize: 13.5 }}>
+            Salary direction:{" "}
+            <b className="tnum">₹{inr(r.gross_current)}</b> → <b className="tnum" style={{ color: C.green }}>₹{inr(r.gross_proposed)}</b>
+            {r.gross_current != null && r.gross_proposed != null && (
+              <span style={{ color: C.faint }}> ({r.gross_proposed >= r.gross_current ? "+" : ""}{(((r.gross_proposed - r.gross_current) / r.gross_current) * 100).toFixed(1)}%)</span>
+            )}
+          </div>
+          {r.voice.map((v, i) => (
+            <div key={i} className="mt-2">
+              {v.url && <audio controls controlsList="nodownload" src={v.url} style={{ height: 28, maxWidth: 360 }} />}
+              {v.transcript && <div style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.6, marginTop: 3 }}>{v.transcript}</div>}
+            </div>
+          ))}
+          {r.notes && <div className="mt-2" style={{ fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{r.notes}</div>}
+        </div>
+      ))}
+    </>
+  );
+}
+
+/* ── 3 · exactly what the employee will later see, and nothing more ── */
+function FinalisedTab({ d }: { d: PersonData }) {
+  if (!d.idp) return <None what="No IDP" />;
+  const analysis = d.reviews.find((r) => r.analysis)?.analysis;
+  return (
+    <>
+      <div className="rounded p-2 mb-2" style={{ background: "#EDEAF6", fontSize: 11.5, color: "#4A3B7A", lineHeight: 1.5 }}>
+        This is the document {d.employee.name.split(" ")[0]} will see — their own words, their role, and the growth
+        note. No ratings of either side, no salaries. What is on this tab is safe to put in front of them.
+      </div>
+      <div className="bg-white rounded-lg border p-4" style={{ borderColor: C.line }}>
+        <div className="font-bold" style={{ fontSize: 17 }}>Individual Development Plan — {d.employee.name}</div>
+        <div style={{ fontSize: 12, color: C.faint }}>{d.idp.role_at_time || "—"} · cycle 2026-27</div>
+        {d.idp.role_summary && (
+          <div className="rounded p-2 mt-3" style={{ background: "#FFF7E6", fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+            <b>What the role expects:</b><br />{d.idp.role_summary}
+          </div>
+        )}
+        {analysis && (
+          <div className="rounded p-3 mt-3" style={{ background: "#F0FAF3", border: "1px solid #9AD3AE" }}>
+            <div className="font-bold" style={{ fontSize: 14 }}>The growth note</div>
+            <div style={{ fontSize: 13.5, whiteSpace: "pre-wrap", lineHeight: 1.7, marginTop: 4 }}>{analysis}</div>
+          </div>
+        )}
+        {IDP_SECTIONS.map((s) => {
+          const qs = s.questions.filter((q) => String(d.idp!.answers?.[q.id] || "").trim());
+          if (!qs.length) return null;
+          return (
+            <div key={s.key} className="mt-4">
+              <div className="font-bold" style={{ fontSize: 14 }}>{s.title}</div>
+              {qs.map((q) => (
+                <div key={q.id} className="mt-2">
+                  <div className="font-semibold" style={{ fontSize: 12.5, color: C.dim }}>{q.label}</div>
+                  <div style={{ fontSize: 13.5, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{d.idp!.answers[q.id]}</div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+/* ── 4 · the money ── */
+function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean; onSaved: () => void }) {
+  const prev = d.salary?.gross ?? null;
+  const proposed = d.reviews.find((r) => r.gross_proposed != null)?.gross_proposed ?? null;
+  const [gross, setGross] = useState(() => String(d.appraisal?.new_gross ?? proposed ?? prev ?? ""));
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const n = Number(gross) || 0;
+  const newTable = useMemo(() => {
+    if (!n || !d.salary) return null;
+    // the same person, the same shares, at the new number
+    const base = new Map(d.salary.rows.filter((r) => r.kind === "row" || r.kind === "total").map((r) => [r.label, r.monthly ?? 0]));
+    const get = (k: string) =>
+      k === "Basic and DA" ? base.get("Basic & DA") ?? 0
+      : k === "HRA" ? base.get("HRA") ?? 0
+      : k === "Fixed Allowance" ? base.get("Fixed Allowance") ?? 0
+      : k === "Conveyance" ? base.get("Conveyance") ?? 0
+      : k === "Medical Allowance" ? base.get("Medical Allowance") ?? 0
+      : 0;
+    return salaryTable(scaledGetter(get, n), d.employee.type);
+  }, [n, d]);
+
+  const inc = prev != null && n ? n - prev : null;
+
+  const save = async () => {
+    setBusy(true); setMsg("");
+    try {
+      await api.post("/api/hrms/idp", { action: "appraisal", employee_id: d.employee.id, new_gross: gross, prev_gross: prev });
+      setMsg("Decision saved ✓");
+      onSaved();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line }}>
+      <div className="flex gap-x-6 gap-y-1 flex-wrap" style={{ fontSize: 14 }}>
+        <span>Previous Gross: <b className="tnum">₹{inr(prev)}</b>/mo</span>
+        {proposed != null && <span style={{ color: C.faint }}>manager proposed <b className="tnum">₹{inr(proposed)}</b></span>}
+        {d.idp?.answers?.["ask_gross"] && <span style={{ color: C.faint }}>they asked <b className="tnum">₹{inr(Number(d.idp.answers["ask_gross"]))}</b></span>}
+      </div>
+
+      <div className="flex items-center gap-2 mt-3 flex-wrap">
+        <span className="font-bold" style={{ fontSize: 15 }}>New Gross:</span>
+        <span style={{ fontWeight: 700, color: C.green }}>Rs</span>
+        <input value={gross} inputMode="numeric" onChange={(e) => setGross(e.target.value.replace(/[^0-9]/g, ""))}
+          className="rounded px-2 py-2 tnum" style={{ border: `2px solid ${C.green}`, color: C.green, fontWeight: 700, fontSize: 17, width: 160 }} />
+        {inc !== null && (
+          <span style={{ fontSize: 14 }}>
+            Increment <b className="tnum" style={{ color: inc >= 0 ? C.green : C.red }}>{inc >= 0 ? "+" : "−"}₹{inr(Math.abs(inc))}</b>{" "}
+            <span style={{ color: C.faint }}>({prev ? `${inc >= 0 ? "+" : "−"}${Math.abs((inc / prev) * 100).toFixed(1)}%` : ""} increment)</span>
+          </span>
+        )}
+      </div>
+
+      {newTable && (
+        <div className="mt-3">
+          <div className="font-bold" style={{ fontSize: 14 }}>The New Salary Structure</div>
+          <table style={{ fontSize: 12.5, width: "100%", tableLayout: "fixed", borderCollapse: "collapse", marginTop: 6 }}>
+            <thead>
+              <tr>
+                <th className="text-left px-1.5 py-1" style={{ border: `1px solid ${C.line}`, width: "48%" }}>Components of Compensation</th>
+                <th className="text-right px-1.5 py-1" style={{ border: `1px solid ${C.line}`, width: "24%" }}>Monthly (Rs.)</th>
+                <th className="text-right px-1.5 py-1" style={{ border: `1px solid ${C.line}`, width: "28%" }}>Yearly (Rs.)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {newTable.rows.map((r, i) => (
+                <tr key={i} style={{ background: r.kind === "head" || r.kind === "total" ? "#FFF9C4" : "#fff", fontWeight: r.kind !== "row" && r.kind !== "note" ? 700 : 400 }}>
+                  {r.kind === "note"
+                    ? <td colSpan={3} className="px-1.5 py-1" style={{ border: `1px solid ${C.line}`, fontSize: 11.5, color: C.dim }}>{r.label}</td>
+                    : <>
+                        <td className="px-1.5 py-1" style={{ border: `1px solid ${C.line}` }}>{r.label}</td>
+                        <td className="px-1.5 py-1 text-right tnum" style={{ border: `1px solid ${C.line}` }}>{inr(r.monthly)}</td>
+                        <td className="px-1.5 py-1 text-right tnum" style={{ border: `1px solid ${C.line}` }}>{inr(r.yearly)}</td>
+                      </>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="mt-1 font-bold" style={{ fontSize: 14 }}>
+            New CTC ≈ <span style={{ color: C.orange }}>Rs {newTable.ctcLakhs} Lakhs</span> per year
+          </div>
+        </div>
+      )}
+
+      <div className="rounded p-2.5 mt-3" style={{ background: "#FFF7E6", border: "1px solid #F5D9A8", fontSize: 13, lineHeight: 1.6 }}>
+        <b>Note:</b> we will get into <b>Performance Incentives for Q3</b> depending on the IDP work.
+      </div>
+
+      <div className="flex items-center gap-2 mt-3">
+        <button onClick={save} disabled={busy || !n}
+          className="rounded font-bold px-4 py-2"
+          style={{ background: n ? C.green : "#E2E0DA", color: n ? "#fff" : "#8A94A0", fontSize: 14 }}>
+          {busy ? "Saving…" : d.appraisal ? "✓ Update the decision" : "✓ Save the decision"}
+        </button>
+        {d.appraisal?.decided_by && (
+          <span style={{ fontSize: 11.5, color: C.faint }}>
+            last decided by {String(d.appraisal.decided_by).split("·")[0].trim()} on {fmtFull(String(d.appraisal.decided_at).slice(0, 10))}
+          </span>
+        )}
+        {msg && <span className="text-xs font-semibold" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
+const None = ({ what }: { what: string }) => (
+  <div className="bg-white rounded-lg border p-4 text-sm" style={{ borderColor: C.line, color: C.faint }}>{what} for this person yet.</div>
+);

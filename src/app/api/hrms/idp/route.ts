@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { NextResponse as NR } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
-import { hrmsTables } from "@/lib/hrms";
+import { hrmsTables, FIELD_GROUPS } from "@/lib/hrms";
+import { salaryTable, scaledGetter } from "@/lib/salary";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,74 @@ export async function GET(req: Request) {
     await requireHrms();
     const admin = adminClient();
     const id = new URL(req.url).searchParams.get("id");
+    const person = new URL(req.url).searchParams.get("person");
+
+    /**
+     * ?person=<employee_id> — the Individual Report Card for Appraisal.
+     *
+     * One person, everything the discussion needs: their latest IDP with
+     * NOTHING held back (HR is the one desk that sees both sides), every
+     * manager review of it, the current salary structure, and the decided
+     * appraisal if one has been written.
+     */
+    if (person) {
+      const T = await hrmsTables(admin);
+      const { data: emp } = await admin
+        .from(T.employees).select("id, name, department, designation, extra").eq("id", person).maybeSingle();
+      if (!emp) return NextResponse.json({ error: "No such employee" }, { status: 404 });
+      const { data: eds } = await admin
+        .from(T.edits).select("field, value").eq("employee_id", person);
+      const ov = new Map((eds || []).map((e) => [String(e.field), e.value == null ? null : String(e.value)]));
+      const headerToKey = new Map(
+        FIELD_GROUPS.flatMap((g) => g.fields).filter((f) => f.sheetHeader).map((f) => [f.sheetHeader as string, f.key]),
+      );
+      const get = (k: string) => {
+        const fk = headerToKey.get(k);
+        const o = fk ? ov.get(fk) : undefined;
+        if (o != null && String(o).trim() !== "") return o;
+        return ((emp.extra || {}) as Record<string, string>)[k];
+      };
+      const type = (ov.get("type") as string | undefined) || ((emp.extra || {}) as Record<string, string>)["Type"] || null;
+      const salary = salaryTable(get, type);
+
+      const { data: idps } = await admin
+        .from("hrms_idp").select("*").eq("employee_id", person).order("started_at", { ascending: false }).limit(3);
+      const idp = (idps || []).find((r) => r.submitted_at) || (idps || [])[0] || null;
+
+      let idpFull: Record<string, unknown> | null = null;
+      let reviews: Record<string, unknown>[] = [];
+      if (idp) {
+        const audio = (idp.audio || {}) as Record<string, { path: string; seconds: number | null; transcript?: string }[]>;
+        const audioUrls: Record<string, { url: string | null; seconds: number | null; transcript: string | null }[]> = {};
+        for (const [qid, list] of Object.entries(audio)) {
+          audioUrls[qid] = await Promise.all(list.map(async (a) => {
+            const { data: sgn } = await admin.storage.from(BUCKET).createSignedUrl(a.path, LINK_TTL);
+            return { url: sgn?.signedUrl ?? null, seconds: a.seconds, transcript: a.transcript ?? null };
+          }));
+        }
+        idpFull = { ...idp, audioUrls };
+        const { data: rv } = await admin.from("hrms_idp_review").select("*").eq("idp_id", idp.id);
+        reviews = await Promise.all((rv || []).map(async (r) => {
+          const voice = await Promise.all(((r.audio || []) as { path: string; seconds: number | null; transcript?: string }[]).map(async (a) => {
+            const { data: sgn } = await admin.storage.from(BUCKET).createSignedUrl(a.path, LINK_TTL);
+            return { url: sgn?.signedUrl ?? null, seconds: a.seconds, transcript: a.transcript ?? null };
+          }));
+          return { ...r, voice };
+        }));
+      }
+
+      let appraisal: Record<string, unknown> | null = null;
+      try {
+        const { data: ap } = await admin
+          .from("hrms_appraisal").select("*").eq("employee_id", person).eq("cycle", "2026-27").maybeSingle();
+        appraisal = ap ?? null;
+      } catch { /* pre-0061 */ }
+
+      return NextResponse.json({
+        employee: { id: emp.id, name: emp.name, department: emp.department, designation: emp.designation, type },
+        salary, idp: idpFull, reviews, appraisal,
+      });
+    }
 
     if (id) {
       const { data: r, error } = await admin.from("hrms_idp").select("*").eq("id", id).maybeSingle();
@@ -113,6 +182,25 @@ export async function POST(req: Request) {
     const me = await requireHrms();
     const admin = adminClient();
     const body = await req.json();
+    if (String(body.action || "") === "appraisal") {
+      const employee_id = String(body.employee_id || "");
+      if (!employee_id) throw new HttpError(400, "employee_id required");
+      const new_gross = Number(String(body.new_gross ?? "").replace(/[^0-9.]/g, "")) || null;
+      const { error } = await admin.from("hrms_appraisal").upsert({
+        employee_id, cycle: "2026-27",
+        new_gross, prev_gross: Number(body.prev_gross) || null,
+        note: String(body.note || "").trim() || null,
+        decided_by: me.initials ? `${me.initials} · ${me.email}` : me.email,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "employee_id,cycle" });
+      if (error) {
+        if (/hrms_appraisal|does not exist|schema cache/i.test(error.message))
+          throw new HttpError(503, "Run migration 0061 first — the appraisal decision has nowhere to live yet.");
+        throw new Error(error.message);
+      }
+      return NR.json({ ok: true });
+    }
+
     if (String(body.action || "") !== "reopen") throw new HttpError(400, "unknown action");
     const id = String(body.id || "");
     const { data: row } = await admin
