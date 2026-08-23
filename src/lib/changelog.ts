@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.1.7",
+    date: "2026-08-23",
+    module: "HRIS — competencies for a shop floor, not a framework",
+    items: [
+      "THIRTY MORE COMPETENCIES, WRITTEN FOR THE PEOPLE WHO ACTUALLY WORK HERE. More than half of the roll is Labour and Helper grade, several read a job card in Hindi, and the abilities that decide whether their work goes right were not on the list: Reading a Job Card · Basic Numeracy · Following Instructions · Tool Care · Material Handling · Shift Handover · Crane and Slinging · Working at Height · Gas Cutting and Grinding · Torque and Fastening · Waste and Scrap Control · Quality Consciousness · Learning on the Job · Respect and Conduct · Driving and Road Safety · Forklift Operation · Site Installation · Customer Site Conduct · Travel Readiness · Fault Finding · Store Receipt and Issue · Cash Handling, and more.",
+      "68 IN THE MASTER NOW, in six families: Basics · Technical · Quality & Safety · Delivery · Commercial · People.",
+      "WRITTEN TO BE READ BY THE PERSON BEING RATED. Short sentences, ordinary words, no framework vocabulary — “Not passing on work you know is not right, even when nobody is watching” rather than “demonstrates quality orientation”. Somebody who cannot read their own competency cannot argue with their rating, and a rating nobody can argue with is not an assessment, it is a verdict.",
+      "EVERY WRITTEN ROLE GETS 4 TO 10 OF THEM, mapped by what the job actually needs rather than by matching words in its title — 33 families, from helper and welder and turner through to design, quality, stores, service and leadership. A Helper gets Following Instructions, Material Handling, Tool Care and safety; a Draughtsman gets CAD, Drawing Reading and Design Calculation; a Sales Manager gets Negotiation and Commercial Awareness.",
+      "THE LEVEL FOLLOWS THE GRADE, and the two competencies at the heart of a role sit a notch above the rest. A G7 Helper is expected at 2, a G4 Engineer at 3, a G2 Head at 4, a G1 at 5 — and the ability the role is really about is one higher again. So the numbers say something before anybody has typed a word.",
+      "Migration 0057. The mapping runs once it is in — it is written and checked, and it deliberately did not run against a half-seeded master.",
+    ],
+  },
+  {
     v: "3.20.1.6",
     date: "2026-08-23",
     module: "HRIS — the roles read cleanly, and competencies arrive",
