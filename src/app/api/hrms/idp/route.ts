@@ -3,12 +3,13 @@ import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { NextResponse as NR } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, FIELD_GROUPS } from "@/lib/hrms";
-import { salaryTable, scaledGetter } from "@/lib/salary";
+import { salaryTable, scaledGetter, num } from "@/lib/salary";
 
 export const dynamic = "force-dynamic";
 
 const BUCKET = "voice-notes";
 const LINK_TTL = 60 * 60;
+const CYCLE_TBL = "2026-27";
 
 /**
  * GET /api/hrms/idp — the management side of the IDP.
@@ -30,6 +31,177 @@ export async function GET(req: Request) {
     const admin = adminClient();
     const id = new URL(req.url).searchParams.get("id");
     const person = new URL(req.url).searchParams.get("person");
+    const table = new URL(req.url).searchParams.get("table");
+
+    /**
+     * ?table=1 — the Appraisal Table: every active person on one row, with
+     * where their appraisal stands. The row is a summary and the click goes
+     * to the Individual Report Card, so this endpoint carries numbers and
+     * stages, never the words.
+     */
+    if (table) {
+      const T = await hrmsTables(admin);
+      const [{ data: emps }, { data: eds }, { data: idps }, { data: revs }] = await Promise.all([
+        admin.from(T.employees).select("id, name, department, designation, dob, doj, active, extra"),
+        admin.from(T.edits).select("employee_id, field, value").in("field", ["type", "status", "department", "designation", "basic_da", "hra", "fixed_allowance", "conveyance", "medical_allowance"]),
+        admin.from("hrms_idp").select("id, employee_id, submitted_at, ratings, ask:answers->>ask_gross").eq("cycle", CYCLE_TBL),
+        admin.from("hrms_idp_review").select("idp_id, submitted_at, ratings, gross_proposed"),
+      ]);
+      let appr: { employee_id: string; new_gross: number | null; prev_gross: number | null }[] = [];
+      try {
+        const { data: ap } = await admin.from("hrms_appraisal").select("employee_id, new_gross, prev_gross").eq("cycle", CYCLE_TBL);
+        appr = (ap || []) as typeof appr;
+      } catch { /* pre-0061 */ }
+
+      const ovBy = new Map<string, Map<string, string | null>>();
+      for (const e of eds || []) {
+        const id = String(e.employee_id);
+        if (!ovBy.has(id)) ovBy.set(id, new Map());
+        ovBy.get(id)!.set(String(e.field), e.value == null ? null : String(e.value));
+      }
+      const avg = (rt: unknown) => {
+        const v = Object.values((rt || {}) as Record<string, number>).map(Number).filter((n) => n > 0);
+        return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10 : null;
+      };
+      const idpBy = new Map<string, { id: string; submitted: boolean; selfAvg: number | null; ask: number | null }>();
+      for (const r of idps || []) {
+        const id = String(r.employee_id || "");
+        if (!id) continue;
+        const cur = idpBy.get(id);
+        // a submitted one beats an open one for the status column
+        if (!cur || (!cur.submitted && r.submitted_at))
+          idpBy.set(id, { id: String(r.id), submitted: !!r.submitted_at, selfAvg: avg(r.ratings), ask: r.ask ? Number(r.ask) || null : null });
+      }
+      const reviewed = new Set((revs || []).filter((r) => r.submitted_at).map((r) => String(r.idp_id)));
+      const mgrBy = new Map<string, { avg: number | null; proposed: number | null }>();
+      for (const r of revs || []) {
+        if (!r.submitted_at) continue;
+        const k = String(r.idp_id);
+        const prev = mgrBy.get(k);
+        // more than one manager can have reviewed; keep the mean of their means
+        const a = avg(r.ratings);
+        mgrBy.set(k, {
+          avg: prev?.avg != null && a != null ? Math.round(((prev.avg + a) / 2) * 10) / 10 : a ?? prev?.avg ?? null,
+          proposed: r.gross_proposed != null ? Number(r.gross_proposed) : prev?.proposed ?? null,
+        });
+      }
+      const apprBy = new Map(appr.map((a) => [String(a.employee_id), a]));
+
+      const ON = new Set(["Active", "Doubtful", "Notice Period"]);
+      const years = (iso: unknown) => {
+        if (!iso) return null;
+        const d = new Date(String(iso).slice(0, 10) + "T00:00:00");
+        if (Number.isNaN(d.getTime())) return null;
+        return Math.round(((Date.now() - d.getTime()) / (365.25 * 864e5)) * 10) / 10;
+      };
+
+      const rows = (emps || [])
+        .filter((e) => {
+          const ov = ovBy.get(String(e.id));
+          const st = (ov?.get("status") as string) || ((e.extra || {}) as Record<string, string>)["Status"] || "";
+          return st ? ON.has(st) : !!e.active;
+        })
+        .map((e) => {
+          const id = String(e.id);
+          const ov = ovBy.get(id);
+          const ex = (e.extra || {}) as Record<string, string>;
+          const pick = (field: string, header: string, col?: string | null) =>
+            (ov?.get(field) as string | undefined) ?? (col ?? undefined) ?? ex[header] ?? null;
+          const gross =
+            num(pick("basic_da", "Basic and DA")) + num(pick("hra", "HRA")) + num(pick("fixed_allowance", "Fixed Allowance")) +
+            num(pick("conveyance", "Conveyance")) + num(pick("medical_allowance", "Medical Allowance"));
+          const idp = idpBy.get(id);
+          const mgr = idp ? mgrBy.get(idp.id) : undefined;
+          const ap = apprBy.get(id);
+          const newGross = ap?.new_gross != null ? Number(ap.new_gross) : null;
+          const prev = ap?.prev_gross != null ? Number(ap.prev_gross) : gross || null;
+          const stage = ap?.new_gross != null ? "Final"
+            : idp?.submitted && idp.id && reviewed.has(idp.id) ? "Manager Completed"
+            : idp?.submitted ? "Completed"
+            : idp ? "Started" : "—";
+          return {
+            id, name: String(e.name || id),
+            department: pick("department", "Department", e.department) as string | null,
+            designation: pick("designation", "Designation", e.designation) as string | null,
+            type: pick("type", "Type") as string | null,
+            age: years(e.dob), exp: years(e.doj),
+            prevGross: prev, newGross,
+            inc: prev != null && newGross != null ? newGross - prev : null,
+            incPct: prev && newGross != null ? Math.round(((newGross - prev) / prev) * 1000) / 10 : null,
+            stage,
+            selfAvg: idp?.selfAvg ?? null, mgrAvg: mgr?.avg ?? null,
+            askGross: idp?.ask ?? null, mgrProposed: mgr?.proposed ?? null,
+          };
+        });
+      return NextResponse.json({ rows });
+    }
+
+    /**
+     * ?interviews=1 — the audit of the conversations themselves. One row per
+     * person on the roll: did the SELF discussion happen (their own IDP, with
+     * its voice notes), and did the MANAGER one (the review, with its voice
+     * note). Counts and dates only — the words open per person.
+     */
+    if (new URL(req.url).searchParams.get("interviews")) {
+      const T = await hrmsTables(admin);
+      const [{ data: emps }, { data: eds }, { data: idps }, { data: revs }] = await Promise.all([
+        admin.from(T.employees).select("id, name, department, active, extra"),
+        admin.from(T.edits).select("employee_id, field, value").in("field", ["status", "department", "user_email"]),
+        admin.from("hrms_idp").select("id, employee_id, started_at, submitted_at, audio").eq("cycle", CYCLE_TBL),
+        admin.from("hrms_idp_review").select("idp_id, reviewer_email, started_at, submitted_at, audio"),
+      ]);
+      const ovBy = new Map<string, Map<string, string | null>>();
+      const nameByEmail = new Map<string, string>();
+      const nameById = new Map((emps || []).map((e) => [String(e.id), String(e.name || e.id)]));
+      for (const e of eds || []) {
+        const id = String(e.employee_id);
+        if (!ovBy.has(id)) ovBy.set(id, new Map());
+        ovBy.get(id)!.set(String(e.field), e.value == null ? null : String(e.value));
+        if (e.field === "user_email" && e.value) nameByEmail.set(String(e.value).toLowerCase(), nameById.get(id) || String(e.value));
+      }
+      const tally = (audio: unknown) => {
+        const lists = Array.isArray(audio) ? [audio] : Object.values((audio || {}) as Record<string, unknown[]>);
+        let voices = 0, seconds = 0;
+        for (const l of lists) for (const a of (l as { seconds?: number | null }[]) || []) { voices++; seconds += Number(a?.seconds) || 0; }
+        return { voices, seconds: Math.round(seconds) };
+      };
+      const idpBy = new Map<string, (typeof idps extends (infer U)[] | null ? U : never)>();
+      for (const r of idps || []) {
+        const id = String(r.employee_id || "");
+        if (!id) continue;
+        const cur = idpBy.get(id);
+        if (!cur || (!cur.submitted_at && r.submitted_at)) idpBy.set(id, r);
+      }
+      const revsBy = new Map<string, typeof revs>();
+      for (const r of revs || []) {
+        const k = String(r.idp_id);
+        if (!revsBy.has(k)) revsBy.set(k, []);
+        revsBy.get(k)!.push(r);
+      }
+      const ON = new Set(["Active", "Doubtful", "Notice Period"]);
+      const rows = (emps || [])
+        .filter((e) => {
+          const ov = ovBy.get(String(e.id));
+          const st = (ov?.get("status") as string) || ((e.extra || {}) as Record<string, string>)["Status"] || "";
+          return st ? ON.has(st) : !!e.active;
+        })
+        .map((e) => {
+          const id = String(e.id);
+          const ov = ovBy.get(id);
+          const idp = idpBy.get(id);
+          const reviews = (idp ? revsBy.get(String(idp.id)) || [] : []).map((r) => ({
+            by: nameByEmail.get(String(r.reviewer_email).toLowerCase()) || String(r.reviewer_email),
+            submitted: r.submitted_at, started: r.started_at, ...tally(r.audio),
+          }));
+          return {
+            id, name: String(e.name || id),
+            department: (ov?.get("department") as string) || ((e.extra || {}) as Record<string, string>)["Department"] || e.department || null,
+            self: idp ? { started: idp.started_at, submitted: idp.submitted_at, ...tally(idp.audio) } : null,
+            reviews,
+          };
+        });
+      return NextResponse.json({ rows });
+    }
 
     /**
      * ?person=<employee_id> — the Individual Report Card for Appraisal.

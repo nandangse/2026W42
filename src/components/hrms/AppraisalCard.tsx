@@ -53,6 +53,11 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
   useEffect(() => {
     api.get("/api/hrms/idp").then((j) => setPeople((j.idps || []).filter((r: ListRow) => r.employee_id)))
       .catch((e) => setMsg(e instanceof Error ? e.message : String(e)));
+    // arriving from the Appraisal Table with a person already chosen
+    try {
+      const handed = window.sessionStorage.getItem("hrms.appraisal.person");
+      if (handed) { window.sessionStorage.removeItem("hrms.appraisal.person"); setPick(handed); }
+    } catch { /* fine */ }
   }, []);
 
   const load = useCallback(async (emp: string) => {
@@ -71,6 +76,9 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
         <select value={pick} onChange={(e) => setPick(e.target.value)}
           className="text-sm rounded px-2 py-2 bg-white" style={{ border: `1px solid ${C.line}`, minWidth: 260 }}>
           <option value="">— choose a person (those with an IDP) —</option>
+          {pick && !(people || []).some((p) => p.employee_id === pick) && (
+            <option value={pick}>{pick} (no IDP yet)</option>
+          )}
           {(people || []).map((p) => (
             <option key={p.idpId} value={p.employee_id!}>
               {p.employee_id} · {p.name}{p.submitted_at ? "" : " (not submitted)"}

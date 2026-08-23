@@ -97,9 +97,8 @@ export const NAV: NavSection[] = [
       {
         key: "appraisal.table",
         label: "Appraisal Table",
-        blurb: "The decision table: previous gross, increase, %, new gross, variables, CTC.",
-        built: false,
-        source: "Appraisal Discussions in the 2026 Appraisal workbook.",
+        blurb: "Everybody on one row: previous gross, new gross, increase and %, and where each IDP stands. The click opens the Report Card.",
+        built: true,
       },
       {
         key: "appraisal.card",
@@ -110,17 +109,14 @@ export const NAV: NavSection[] = [
       {
         key: "appraisal.summary",
         label: "Appraisal Summary Data Analytics",
-        blurb: "By band and department: headcount, current pay, increase, average, appraisal %.",
-        built: false,
-        source: "Summary of Appraisals — the 2026 cycle came out at 13.25% overall.",
+        blurb: "The CHRO wall: the money, the bell curve, department costs, outliers, gaps, and the PIP screen.",
+        built: true,
       },
       {
         key: "appraisal.interviews",
         label: "Appraisal Interviews (Audit of each)",
-        blurb: "Was the conversation held, by whom, when, and what was said. One row per person, auditable.",
-        built: false,
-        source:
-          "Form Responses Questionnaire — the 41-question self-appraisal, from “list the top 3 outcomes your role delivers” to “if you were MD, what one decision would you take about your own role”.",
+        blurb: "Two conversations per person — Self and Manager. Was each held, by whom, when, and what was said, voice notes included.",
+        built: true,
       },
     ],
   },

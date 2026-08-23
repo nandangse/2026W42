@@ -33,9 +33,16 @@ const RICH = new Set(["job_description", "deliverable", "metric"]);
  * transcript and present that as the summary, which looked like a working
  * feature and was not — that is exactly how a broken thing survives.
  */
-async function summarise(transcript: string): Promise<string | null> {
+/**
+ * Returns the summary, or names the exact reason there is none. "It failed"
+ * from a phone looks the same whether the key is missing, wrong, or the
+ * model was briefly overloaded — and each of those has a different fix, so
+ * the reason travels with the failure instead of being guessed at later.
+ */
+async function summarise(transcript: string): Promise<{ text: string | null; why: string | null }> {
   const key = process.env.ANTHROPIC_API_KEY;
-  if (!key || transcript.trim().length < 40) return null;
+  if (!key) return { text: null, why: "ANTHROPIC_API_KEY is not set on this deploy" };
+  if (transcript.trim().length < 40) return { text: null, why: "the words are too few to summarise" };
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -59,12 +66,20 @@ async function summarise(transcript: string): Promise<string | null> {
         messages: [{ role: "user", content: transcript.slice(0, 8000) }],
       }),
     });
-    if (!r.ok) return null;
+    if (!r.ok)
+      return {
+        text: null,
+        why: r.status === 401 ? "the ANTHROPIC_API_KEY on the server is wrong or revoked"
+          : r.status === 429 || r.status === 529 ? `the model was busy (answered ${r.status}) — press Summarise again in a minute`
+          : `the model answered ${r.status}`,
+      };
     const j = await r.json();
     const text = j?.content?.[0]?.text;
-    return typeof text === "string" && text.trim() ? text.trim() : null;
-  } catch {
-    return null;
+    return typeof text === "string" && text.trim()
+      ? { text: text.trim(), why: null }
+      : { text: null, why: "the model answered empty" };
+  } catch (e) {
+    return { text: null, why: `could not reach the model: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
 
@@ -242,7 +257,7 @@ export async function POST(req: Request) {
        * the transcript when there is no key configured — a worse summary is
        * better than a failed save.
        */
-      const summary = await summarise(transcript);
+      const { text: summary, why } = await summarise(transcript);
 
       const { data: prev } = await admin
         .from("hrms_role").select("voice_path, transcript, summary").eq("id", id).maybeSingle();
@@ -270,7 +285,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         ok: true,
         summary,
-        warning: summary ? null : "The recording and the words were saved, but the summary could not be written. Press “Summarise again”.",
+        warning: summary ? null : `The recording and the words were saved, but the summary could not be written — ${why}. Press “Summarise again”.`,
       });
     }
 
@@ -396,12 +411,8 @@ export async function POST(req: Request) {
       const { data: row } = await admin.from("hrms_role").select("transcript").eq("id", body.id).maybeSingle();
       const t = String(row?.transcript || "");
       if (!t.trim()) throw new HttpError(400, "There are no words to summarise — record the note first.");
-      const summary = await summarise(t);
-      if (!summary)
-        throw new HttpError(
-          503,
-          "The summary could not be written. Either ANTHROPIC_API_KEY is not set on the server, or the model did not answer.",
-        );
+      const { text: summary, why } = await summarise(t);
+      if (!summary) throw new HttpError(503, `The summary could not be written — ${why}.`);
       const { error } = await admin
         .from("hrms_role").update({ summary, updated_by: stamp, updated_at: new Date().toISOString() }).eq("id", body.id);
       if (error) throw new Error(error.message);

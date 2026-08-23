@@ -127,6 +127,20 @@ export async function GET(req: Request) {
         OPENAI_API_KEY: oa ? `present (${oa.slice(0, 7)}…${oa.slice(-4)}, ${oa.length} chars)` : "NOT SET on this deploy — set it in Vercel and redeploy",
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ? "present" : "NOT SET — summaries and polishing fall back to raw text",
       };
+      if (process.env.ANTHROPIC_API_KEY) {
+        try {
+          const r = await fetch("https://api.anthropic.com/v1/models", {
+            headers: { "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+          });
+          out.claude =
+            r.status === 200 ? "OK — the key reaches Claude; summaries and polishing should work"
+            : r.status === 401 ? "401 — the key is WRONG (copied incompletely, or revoked)"
+            : r.status === 429 ? "429 — rate limited or out of credits"
+            : `unexpected ${r.status}`;
+        } catch (e) {
+          out.claude = `network error reaching Anthropic: ${e instanceof Error ? e.message : String(e)}`;
+        }
+      }
       if (oa) {
         try {
           const r = await fetch("https://api.openai.com/v1/models/whisper-1", {

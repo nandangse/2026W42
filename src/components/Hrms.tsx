@@ -30,6 +30,9 @@ import RolesRegister from "./hrms/RolesRegister";
 import ApprovalRecords from "./hrms/ApprovalRecords";
 import IdpRecords from "./hrms/IdpRecords";
 import AppraisalCard from "./hrms/AppraisalCard";
+import AppraisalTable from "./hrms/AppraisalTable";
+import AppraisalAnalytics from "./hrms/AppraisalAnalytics";
+import AppraisalInterviews from "./hrms/AppraisalInterviews";
 
 export default function Hrms({
   email, initials, displayName, role, isOwner,
@@ -214,7 +217,23 @@ export default function Hrms({
         </nav>
 
         {/* ═══════════════════ right side ═══════════════════ */}
-        {nav.key === "appraisal.card" ? (
+        {nav.key === "appraisal.summary" ? (
+          <AppraisalAnalytics who={who}
+            onOpenPerson={(id) => {
+              try { window.sessionStorage.setItem("hrms.appraisal.person", id); } catch { /* fine */ }
+              go("appraisal.card");
+            }} />
+        ) : nav.key === "appraisal.interviews" ? (
+          <AppraisalInterviews who={who} />
+        ) : nav.key === "appraisal.table" ? (
+          <AppraisalTable who={who}
+            onOpenPerson={(id) => {
+              // the table is the index; the card is the page. Hand the person
+              // across and switch — one click from the row to the discussion.
+              try { window.sessionStorage.setItem("hrms.appraisal.person", id); } catch { /* fine */ }
+              go("appraisal.card");
+            }} />
+        ) : nav.key === "appraisal.card" ? (
           <AppraisalCard who={who} isOwner={isOwner} />
         ) : nav.key === "idp.individual" ? (
           <IdpRecords who={who} />
