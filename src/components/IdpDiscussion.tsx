@@ -49,6 +49,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     myRecord: MyRecord | null;
     options: Record<string, string[]>;
     salary: Salary;
+    serverStt?: boolean;
   } | null>(null);
   const [consent, setConsent] = useState(false);
   const [watched, setWatched] = useState(false);
@@ -71,7 +72,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
   const load = useCallback(async () => {
     try {
       const j = await api.get("/api/idp");
-      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, roleDocs: j.roleDocs ?? [], needsMigration: j.needsMigration, employee: j.employee ?? null, isLeader: !!j.isLeader, myRecord: j.myRecord ?? null, options: j.options || {}, salary: j.salary ?? null });
+      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, roleDocs: j.roleDocs ?? [], needsMigration: j.needsMigration, employee: j.employee ?? null, isLeader: !!j.isLeader, myRecord: j.myRecord ?? null, options: j.options || {}, salary: j.salary ?? null, serverStt: !!j.serverStt });
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -90,6 +91,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
       <Shell initials={initials} startedAt={(state.open as unknown as { started_at?: string }).started_at ?? null}>
         <Filling open={state.open} roleDocs={state.roleDocs} isLeader={!!state.isLeader}
           myRecord={state.myRecord} options={state.options} salary={state.salary}
+          serverStt={!!state.serverStt}
           name={name}
           onRecordChanged={(f, v) => setState((st) => st && st.myRecord
             ? { ...st, myRecord: { value: { ...st.myRecord.value, [f]: v }, pending: { ...st.myRecord.pending, [f]: true } } }
@@ -339,10 +341,10 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
 /* ─────────────────────────── the discussion ─────────────────────────── */
 
-function Filling({ open, roleDocs, isLeader, myRecord, options, salary, name, onRecordChanged, onDone, onIntro }: {
+function Filling({ open, roleDocs, isLeader, myRecord, options, salary, name, serverStt, onRecordChanged, onDone, onIntro }: {
   open: Open; roleDocs: RoleDoc[]; isLeader: boolean;
   myRecord: MyRecord | null; options: Record<string, string[]>;
-  salary: Salary; name: string;
+  salary: Salary; name: string; serverStt: boolean;
   onRecordChanged: (field: string, value: string | null) => void;
   onDone: () => Promise<void>; onIntro: () => void;
 }) {
@@ -508,6 +510,7 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, salary, name, on
                 )}
                 <DictateBox
                   value={v} rows={q.rows} onChange={(nv) => setA(q.id, nv)}
+                  serverStt={serverStt}
                   idpId={open.id} qid={q.id}
                   recordings={audio[q.id] || []}
                   onRecorded={(r) => setAudio((a) => ({ ...a, [q.id]: [...(a[q.id] || []), r] }))}
@@ -557,7 +560,7 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, salary, name, on
       {/* ── before you finish ── */}
       {at.key === "__final__" && (
         <IdpFinal
-          name={name} idpId={open.id}
+          name={name} idpId={open.id} serverStt={serverStt}
           salary={salary?.rows ?? null} ctcLakhs={salary?.ctcLakhs ?? null}
           salaryInfo={salary?.info ?? null} exempt={!!salary?.exempt}
           roleName={roleDocs[0]?.role ?? open.role_at_time}

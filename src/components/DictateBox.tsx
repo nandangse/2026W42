@@ -33,7 +33,7 @@ const C = { line: "#E2E0DA", dim: "#5A6672", faint: "#8A94A0", orange: "#E8600A"
 export interface Recording { url: string | null; seconds: number | null; at: string; transcript?: string | null }
 
 export default function DictateBox({
-  value, onChange, rows = 5, placeholder, disabled, idpId, qid, recordings = [], onRecorded, uploadKind, uploadUrl,
+  value, onChange, rows = 5, placeholder, disabled, idpId, qid, recordings = [], onRecorded, uploadKind, uploadUrl, serverStt,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -46,6 +46,8 @@ export default function DictateBox({
   /** Where the recording goes. Default: the person's own IDP. */
   uploadKind?: string;
   uploadUrl?: string;
+  /** True when the server can transcribe the audio (a Whisper key is set). */
+  serverStt?: boolean;
   recordings?: Recording[];
   onRecorded?: (r: Recording) => void;
 }) {
@@ -111,7 +113,7 @@ export default function DictateBox({
         fd.append("transcript", said);
         fd.append("file", new File([blob], "note.webm", { type: blob.type || "audio/webm" }));
         const r = await fetch(uploadUrl || "/api/idp", { method: "POST", body: fd });
-        let j: { url?: string | null; seconds?: number | null; text?: string | null; transcript?: string | null; error?: string } = {};
+        let j: { url?: string | null; seconds?: number | null; text?: string | null; transcript?: string | null; error?: string; stt?: string } = {};
         try { j = await r.json(); } catch { throw new Error(`The upload failed (${r.status}) — the recording may be too long for one go.`); }
         if (r.ok) {
           /**
@@ -124,7 +126,14 @@ export default function DictateBox({
             const base = valueRef.current.trim();
             onChange(base ? `${base}\n${j.text.trim()}` : j.text.trim());
           } else if (!said && !j.text) {
-            setErr("The recording is saved and attached. This browser caught no words — type your answer, or use Chrome on a laptop or Android phone next time.");
+            const why = String(j.stt || "");
+            setErr(
+              why === "no-key"
+                ? "The recording is saved. The server has no transcription key yet — once OPENAI_API_KEY is set and redeployed, phones transcribe."
+                : why.startsWith("failed")
+                  ? `The recording is saved, but the server's transcription failed (${why.split(":")[1] || "error"}) — the key may be wrong or without billing.`
+                  : "The recording is saved, but no words could be made out — it may have been too quiet.",
+            );
           }
           onRecorded?.({ url: j.url ?? null, seconds: j.seconds ?? null, at: new Date().toISOString(), transcript: said || j.transcript || null });
         }
@@ -200,11 +209,25 @@ export default function DictateBox({
       // eight seconds of recording with not one word caught is not a pause —
       // this browser's dictation is not working, and the person should know
       // WHILE speaking, not after
-      if (el >= 8 && !textRef.current.trim()) setDeaf(true);
+      if (el >= 8 && !textRef.current.trim() && !(/Android|iPhone|iPad/i.test(navigator.userAgent) && serverStt)) setDeaf(true);
       else if (textRef.current.trim()) setDeaf(false);
     }, 1000);
 
     // ---- the dictation, restarted for as long as we are recording ----
+    /**
+     * ON A PHONE, THE RECORDER AND THE RECOGNISER FIGHT FOR ONE MICROPHONE.
+     * Android Chrome has both APIs, but once getUserMedia holds the mic the
+     * speech engine is starved and catches nothing — which is exactly the
+     * "recorded perfectly, transcribed nothing" that testing found. So on a
+     * phone the browser recogniser is not even started: the audio goes up
+     * and the SERVER writes the words. On a laptop both run as before.
+     */
+    const phone = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    if (phone && serverStt) return; // the server will do the words
+    if (phone && !serverStt) {
+      setErr("On a phone the words are written by the server, and the server has no transcription key yet — the recording is still kept.");
+      return;
+    }
     if (!SR) { setErr("This browser cannot turn speech into words, but it IS recording you."); return; }
     runningRef.current = true;
     let attempts = 0;
@@ -275,7 +298,9 @@ export default function DictateBox({
           )}
           <span style={{ fontSize: 11, color: rec ? C.red : C.faint }}>
             {rec
-              ? `● listening ${mmss(secs)} · ${textRef.current.trim().split(/\s+/).filter(Boolean).length} words caught — take your time, pauses are fine`
+              ? (/Android|iPhone|iPad/i.test(navigator.userAgent) && serverStt
+                  ? `● recording ${mmss(secs)} — speak freely; the words are written out when you press stop`
+                  : `● listening ${mmss(secs)} · ${textRef.current.trim().split(/\s+/).filter(Boolean).length} words caught — take your time, pauses are fine`)
               : "Speak it and Genie writes it in plain English, added under what is already there. Your recording is kept."}
           </span>
         </div>

@@ -301,6 +301,7 @@ export async function GET() {
       name: u.displayName || u.email,
       email: u.email,
       cycle: CYCLE,
+      serverStt: !!process.env.OPENAI_API_KEY,
       ...who,
       myRecord,
       salary,
@@ -441,6 +442,7 @@ export async function POST(req: Request) {
        * plainly that no words were caught.
        */
       const oa = process.env.OPENAI_API_KEY;
+      let stt = transcript ? "browser" : "no-key";
       if (!transcript && oa) {
         try {
           const fd2 = new FormData();
@@ -455,9 +457,12 @@ export async function POST(req: Request) {
             if (heard) {
               transcript = heard;
               polished = await polishSpoken(u.email, heard);
-            }
+              stt = "ok";
+            } else stt = "empty";
+          } else {
+            stt = `failed:${w.status}`;
           }
-        } catch { /* the recording stands; the words were a second chance */ }
+        } catch { stt = "failed:network"; }
       }
       audio[qid] = [...(audio[qid] || []), { path, seconds, at: new Date().toISOString(), transcript }];
       const { error } = await admin

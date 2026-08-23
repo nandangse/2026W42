@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.5.3",
+    date: "2026-08-23",
+    module: "IDP — on a phone, the server writes the words",
+    items: [
+      "THE ANDROID MYSTERY, SOLVED: Chrome on Android has both the recorder and the speech engine — but they FIGHT FOR THE ONE MICROPHONE. The moment the recorder holds it, recognition is starved and catches nothing, which is exactly the “recorded perfectly, transcribed nothing” that testing found. A laptop runs both; a phone cannot.",
+      "SO ON A PHONE THE BROWSER RECOGNISER IS NOT EVEN STARTED. The phone records; the audio goes up; the SERVER transcribes it with Whisper and writes it out against the role — and the words land in the box just as a laptop's would. While recording, the phone says what is actually happening: “speak freely; the words are written out when you press stop.”",
+      "AND WHEN TRANSCRIPTION FAILS, THE MESSAGE SAYS WHY, not “use another device”: the server has no key yet · the key failed (with the status — wrong key and no billing look different) · the audio was too quiet. A dead key is now diagnosed from the phone in one recording instead of guessed at.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.5.2",
     date: "2026-08-23",
     module: "IDP — the salary page grows up",

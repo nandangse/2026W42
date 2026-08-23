@@ -282,7 +282,7 @@ export function TeamReview({ row, onClose }: { row: TeamRow; onClose: () => void
                   below and you can add anything else.
                 </div>
                 <div className="mt-1">
-                  <DictateBox value={notes} rows={4} disabled={locked}
+                  <DictateBox value={notes} rows={4} disabled={locked} serverStt
                     onChange={(v) => { setNotes(v); save({ notes: v }); }}
                     idpId={row.idpId} qid="review" uploadKind="review-voice" uploadUrl="/api/idp/team"
                     recordings={voice} onRecorded={(r) => setVoice((x) => [...x, r])} />

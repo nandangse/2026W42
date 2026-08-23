@@ -57,10 +57,10 @@ const QUESTIONS = [
 ];
 
 export default function IdpFinal({
-  name, idpId, salary, ctcLakhs, salaryInfo, exempt, roleAudio, roleSummary, roleName,
+  name, idpId, serverStt, salary, ctcLakhs, salaryInfo, exempt, roleAudio, roleSummary, roleName,
   answers, setAnswer, recordings, onRecorded, attachments, onAttached, onOpenBrief,
 }: {
-  name: string; idpId: string;
+  name: string; idpId: string; serverStt?: boolean;
   salary: SalaryRow[] | null; ctcLakhs: string | null; salaryInfo: SalaryInfo | null; exempt: boolean;
   roleAudio: string | null; roleSummary: string | null; roleName: string | null;
   answers: Record<string, string>;
@@ -216,6 +216,7 @@ export default function IdpFinal({
         </ol>
         <div className="mt-2">
           <DictateBox
+            serverStt={serverStt}
             value={answers["final_voice"] || ""}
             rows={5}
             placeholder="Speak first — your words appear here, and you can add to them."
