@@ -189,6 +189,28 @@ export default function IdpFinal({
         </div>
       </div>
 
+      {/* ── the question worth asking ── */}
+      <div className="rounded-lg p-3 mt-4" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
+        <div className="font-bold" style={{ fontSize: 14 }}>
+          What Gross Monthly Salary should the company pay you? <span style={{ color: C.faint, fontWeight: 400 }}>(Optional)</span>
+        </div>
+        <div style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.6, marginTop: 2 }}>
+          Not a demand and not a promise — a number you believe is right, next to the value you have just described.
+          Leave it empty if you would rather not say.
+        </div>
+        <div className="flex items-center gap-2 mt-2">
+          <span style={{ fontSize: 15, fontWeight: 700 }}>Rs</span>
+          <input
+            defaultValue={answers["ask_gross"] || ""}
+            inputMode="numeric"
+            placeholder="per month"
+            onBlur={(e) => setAnswer("ask_gross", e.target.value.replace(/[^0-9]/g, ""))}
+            className="rounded px-2 py-2 tnum"
+            style={{ border: `1px solid ${C.line}`, fontSize: 16, width: 170 }} />
+          <span style={{ fontSize: 12, color: C.faint }}>gross, per month</span>
+        </div>
+      </div>
+
       {/* ── attachments ── */}
       <div className="rounded-lg p-3 mt-4" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
         <div className="font-bold" style={{ fontSize: 14 }}>

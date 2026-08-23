@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.4.1",
+    date: "2026-08-23",
+    module: "HRIS — the management side of the IDP, and the salary question",
+    items: [
+      "IDP → INDIVIDUAL IDP IS NOW THE MANAGEMENT SIDE. Everything a person gave at /idp, read in one place behind the HRMS gate: every answer by section, the eleven self-ratings out of ten, every recording with its own words folded beside it, the attachments, the consent they ticked and when, and the role expectation they were answering against.",
+      "THE REPLY TO RAGHU COMES FIRST in the reading view — the compulsory closing recording and the salary they asked for, boxed in orange at the top, because cost-and-value is the exchange the whole document builds to.",
+      "AN UNSUBMITTED ATTEMPT IS LISTED AND MARKED PLAINLY: “started, not finished — this is not an IDP yet.” Listed at all because who has started and stalled is itself something HR needs to see; marked because acting on a half-written one would be unfair to its writer.",
+      "THE OPTIONAL SALARY QUESTION IS ON THE LAST PAGE: “What Gross Monthly Salary should the company pay you? (Optional)” — a number they believe is right, next to the value they have just described, with no obligation to answer. The list view carries an ASKED FOR column, so the answers can be read side by side across the company.",
+      "The HoD third of the consent — “Management, HR and my HoD” — is NOT built yet, and the reading route says so rather than pretending. An HoD gate that shows a head only their own team is its own piece of work, and doing it half-way would leak sideways.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.4.0",
     date: "2026-08-23",
     module: "IDP — the last page: cost, value, and a voice that answers",

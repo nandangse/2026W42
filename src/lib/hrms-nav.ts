@@ -84,10 +84,8 @@ export const NAV: NavSection[] = [
       {
         key: "idp.individual",
         label: "Individual IDP (current and past)",
-        blurb: "Accountability, tasks, support needed, KPIs, quarterly and learning goals — this cycle and every earlier one.",
-        built: false,
-        source:
-          "The IDP tab of the 2026 Appraisal workbook (116 rows) and INDIVIDUAL DEVELOPMENT PLAN (tab 20) in the Salary Sheet. Eleven rated dimensions from Job Knowledge to Listening Skills.",
+        blurb: "What each person wrote at /idp — answers, self-ratings, recordings, attachments, and what they asked to be paid.",
+        built: true,
       },
     ],
   },

@@ -28,6 +28,7 @@ import { Pane, NotBuilt } from "./hrms/Pane";
 import ModuleMasters from "./hrms/ModuleMasters";
 import RolesRegister from "./hrms/RolesRegister";
 import ApprovalRecords from "./hrms/ApprovalRecords";
+import IdpRecords from "./hrms/IdpRecords";
 
 export default function Hrms({
   email, initials, displayName, role, isOwner,
@@ -212,7 +213,9 @@ export default function Hrms({
         </nav>
 
         {/* ═══════════════════ right side ═══════════════════ */}
-        {nav.key === "approvals.records" ? (
+        {nav.key === "idp.individual" ? (
+          <IdpRecords who={who} />
+        ) : nav.key === "approvals.records" ? (
           <ApprovalRecords who={who} isOwner={isOwner} />
         ) : nav.key === "idp.roles" ? (
           <RolesRegister who={who} isOwner={isOwner} />
