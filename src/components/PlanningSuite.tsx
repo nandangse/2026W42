@@ -3434,7 +3434,7 @@ function JobPlan({
           scrolling to the top first. --hdr-h is measured by the header itself,
           so this stays right when the nav wraps at narrower widths. */}
       <div
-        className="flex flex-wrap items-center gap-2 mb-3 -mx-4 px-4 py-2"
+        className="jobplan-picker flex flex-wrap items-center gap-2 mb-3 -mx-4 px-4 py-2"
         style={{ position: "sticky", top: "var(--hdr-h, 92px)", zIndex: 24, background: "#F1EFE9", borderBottom: "1px solid #E2E0DA" }}
       >
         {/* search + Project Owner filter narrow the dropdown; the dropdown stays the picker */}
@@ -3498,6 +3498,19 @@ function JobPlan({
           while working: which job, who it is for, what it is worth and how far
           in, what is owed, and what the floor last said. The detail card below
           scrolls away as normal. */}
+      {/* ON A PHONE, ONLY THIS IS PINNED (Dr Raghu, 23 Aug 2026). The full
+          card below wraps four rows deep on a narrow screen, and pinning it
+          left a third of the viewport frozen. The phone keeps one thin line —
+          which job, whose it is — and everything else scrolls like content,
+          because on a phone it is content. */}
+      <div className="md:hidden jobplan-ministrip -mx-4 px-4 py-1.5 flex items-baseline"
+        style={{ position: "sticky", top: "var(--hdr-h, 92px)", zIndex: 22, background: "#16232F", color: "#fff", minWidth: 0 }}>
+        <span className="font-bold tnum" style={{ fontSize: 14 }}>JOB {jobNo(dj.id)}</span>
+        <span className="truncate" style={{ fontSize: 12, color: "#B7C4D0", marginLeft: 8 }} title={dj.tag}>
+          {dj.tag}
+        </span>
+      </div>
+
       <JobTopRow
         job={dj}
         V={V}

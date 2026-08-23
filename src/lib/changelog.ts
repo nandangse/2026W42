@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.5.5",
+    date: "2026-08-23",
+    module: "Job Plan — a phone pins one line, not a third of the screen",
+    items: [
+      "ON A PHONE, JOB PLAN FROZE TOO MUCH: the app header, the job-picker row and the whole job card — which wraps four rows deep on a narrow screen — were all pinned, leaving a third of the viewport frozen before any work showed.",
+      "NOW A PHONE PINS ONE THIN LINE: the job number and the customer tag, dark, always in view. The picker row and the full card scroll like ordinary content — on a phone they ARE content. A laptop keeps everything exactly as it was.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.5.4",
     date: "2026-08-23",
     module: "IDP — the transcription self-test",

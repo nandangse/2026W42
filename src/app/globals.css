@@ -175,3 +175,13 @@ input[type="date"] {
   .idp h1 { font-size: 21px; }
   .idp h2 { font-size: 17px; }
 }
+
+/* ── Job Plan on a phone ─────────────────────────────────────────────────
+   Desktop pins the picker row and the whole job card; a phone pins only the
+   thin strip above (job number · customer tag). The card and the picker are
+   demoted to ordinary content here — on a 375px screen the wrapped card was
+   freezing a third of the viewport. */
+@media (max-width: 767.98px) {
+  .jobplan-picker { position: static !important; }
+  .job-top { position: static !important; }
+}
