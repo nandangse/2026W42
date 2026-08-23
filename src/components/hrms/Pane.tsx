@@ -17,6 +17,7 @@ export function Pane({
   tools,
   children,
   who,
+  print = false,
 }: {
   title: string;
   blurb?: string;
@@ -24,6 +25,14 @@ export function Pane({
   children: ReactNode;
   /** Printed on the paper masthead — who took the printout, and when. */
   who: string;
+  /**
+   * PDF / Print is OFF unless a page asks for it (Dr Raghu, 23 Aug 2026).
+   * It was on everything; it is now one flag, set on the pages whose output
+   * actually goes into a physical file. The machinery — the print stylesheet,
+   * the paper masthead, the repeating table header — stays ready for
+   * whichever page is told to have it next.
+   */
+  print?: boolean;
 }) {
   return (
     <div id="hrms-print" className="p-3 md:p-4" style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
@@ -44,6 +53,7 @@ export function Pane({
         </div>
         <div className="flex items-center gap-1.5 ml-auto no-print flex-wrap">
           {tools}
+          {print && (
           <button
             onClick={() => window.print()}
             className="text-xs font-bold rounded px-2.5 py-1.5"
@@ -52,6 +62,7 @@ export function Pane({
           >
             🖨 PDF / Print
           </button>
+          )}
         </div>
       </div>
       {children}

@@ -20,8 +20,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
-import { SHEET_FIELDS, GENIE_FIELDS, ALL_FIELDS, tenure, type FieldSpec, type HrmsEmployee } from "@/lib/hrms";
-import DataTable, { toCsv, type Column } from "./DataTable";
+import { FIELD_GROUPS, ALL_FIELDS, tenure, type FieldSpec, type HrmsEmployee } from "@/lib/hrms";
+import DataTable, { type Column } from "./DataTable";
 import { Pane } from "./Pane";
 
 export type MasterView = "active" | "past" | "left";
@@ -173,16 +173,32 @@ export default function EmployeeMaster({
     patch(id, field, r.value ?? null, false, who);
   };
 
-  const exportCsv = () => {
-    const cols: Column<HrmsEmployee>[] = [
-      { key: "id", label: "Employee code", width: 0, value: (e) => e.id },
-      ...ALL_FIELDS.map((f) => ({ key: f.key, label: f.label, width: 0, value: (e: HrmsEmployee) => val(e, f.key) })),
-    ];
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([toCsv(cols, filtered)], { type: "text/csv" }));
-    a.download = `Nandan_employees_${view}_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+  // Export — Dr Raghu's own wording, and his two options. Built on the
+  // server so the file is assembled from the record rather than from what the
+  // page happens to be holding.
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exporting, setExporting] = useState("");
+  const runExport = async (scope: "filtered" | "all") => {
+    setExporting(scope);
+    try {
+      const res = await fetch("/api/hrms/export", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(scope === "all" ? { scope } : { scope, ids: filtered.map((e) => e.id) }),
+      });
+      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error || "Export failed");
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `Nandan_HRMS_${scope}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      setExportOpen(false);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExporting("");
+    }
   };
 
   const TITLE: Record<MasterView, string> = {
@@ -206,7 +222,7 @@ export default function EmployeeMaster({
         who={who}
         tools={
           <>
-            <button onClick={exportCsv} className="text-xs font-bold rounded px-2.5 py-1.5" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Download exactly what is on screen">⬇ CSV</button>
+            <button onClick={() => setExportOpen((v) => !v)} className="text-xs font-bold rounded px-2.5 py-1.5" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Download the master as an Excel workbook">⬇ Download Excel</button>
             {view === "active" && (
               <button onClick={() => setAdding((v) => !v)} className="text-xs font-bold rounded px-2.5 py-1.5" style={{ background: C.orange, color: "#fff" }} title="Somebody who has joined but is not on the HR sheet yet">+ Add person</button>
             )}
@@ -234,6 +250,27 @@ export default function EmployeeMaster({
             {all === null ? "loading…" : `${filtered.length} shown`} · click a header to sort, 📌 to freeze columns
           </span>
         </div>
+
+        {exportOpen && (
+          <div className="bg-white rounded-lg border p-3 mb-2 no-print" style={{ borderColor: "#F5B32B" }}>
+            <div className="text-xs font-bold mb-2" style={{ color: "#8A5B00", lineHeight: 1.6 }}>
+              Please note the export will be as per chosen options. Dont leave the data here and there
+            </div>
+            <div className="flex gap-1.5 flex-wrap items-center">
+              <button onClick={() => runExport("filtered")} disabled={!!exporting}
+                className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#1B3A5C", color: "#fff", opacity: exporting ? 0.6 : 1 }}>
+                {exporting === "filtered" ? "Building…" : `Export filtered report (${filtered.length})`}
+              </button>
+              <button onClick={() => runExport("all")} disabled={!!exporting}
+                className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff", opacity: exporting ? 0.6 : 1 }}>
+                {exporting === "all" ? "Building…" : "Export All"}
+              </button>
+              <span className="text-xs" style={{ color: C.faint }}>
+                .xlsx · every column, pay and statutory numbers included · the file records who exported it and when
+              </span>
+            </div>
+          </div>
+        )}
 
         {adding && view === "active" && <AddPerson onDone={() => { setAdding(false); reload(); }} />}
 
@@ -313,24 +350,39 @@ function PersonCard({
 
           {tab === "record" && (
             <>
-              <Section title="From the HR sheet" note="Editing one of these keeps the sheet's own value and shows it underneath. The next upload cannot undo your change." />
-              {SHEET_FIELDS.map((f) => (
-                <Field key={f.key} f={f} e={e} onSave={(v) => run(() => onSave(e.id, f.key, v))} onClear={() => run(() => onClear(e.id, f.key))} />
-              ))}
-              <Section title="Recorded in Genie" note="The sheet has never carried these, so nothing overwrites them." />
-              {GENIE_FIELDS.map((f) => (
-                <Field key={f.key} f={f} e={e} onSave={(v) => run(() => onSave(e.id, f.key, v))} onClear={() => run(() => onClear(e.id, f.key))} />
+              <div className="rounded p-2 mb-2" style={{ background: "#F4F2EC", fontSize: 11, color: "#5A6672", lineHeight: 1.5 }}>
+                The whole record is editable here — all {ALL_FIELDS.length} fields, not the eight Genie used to name.
+                Greyed fields are <b>worked out</b> from another one (age from date of birth, service from joining
+                date) and cannot be typed into, so they stay right on their own.
+              </div>
+              {FIELD_GROUPS.map((g) => (
+                <details key={g.key} open={g.key === "identity" || g.key === "contact"} className="mb-1.5">
+                  <summary className="font-bold text-xs cursor-pointer py-1" style={{ color: C.ink }}>
+                    {g.label}
+                    {g.confidential && (
+                      <span className="rounded px-1 ml-1.5" style={{ fontSize: 9, background: "#FBEDEA", color: C.red, fontWeight: 700 }}>
+                        confidential
+                      </span>
+                    )}
+                  </summary>
+                  {g.note && <div style={{ fontSize: 11, color: C.faint, lineHeight: 1.5, marginBottom: 4 }}>{g.note}</div>}
+                  {g.fields.map((f) => (
+                    <Field key={f.key} f={f} e={e}
+                      onSave={(v) => run(() => onSave(e.id, f.key, v))}
+                      onClear={() => run(() => onClear(e.id, f.key))} />
+                  ))}
+                </details>
               ))}
               <div className="text-xs mt-3" style={{ color: C.faint }}>
                 Employee code <b>{e.id}</b> · first seen {e.firstSeen ? fmtFull(String(e.firstSeen).slice(0, 10)) : "—"}
-                {" · "}sheet last touched {e.updatedAt ? fmtFull(String(e.updatedAt).slice(0, 10)) : "—"}
+                {" · "}record last touched {e.updatedAt ? fmtFull(String(e.updatedAt).slice(0, 10)) : "—"}
               </div>
             </>
           )}
 
           {tab === "sheet" && (
             <>
-              <Section title="Everything else the HR sheet carried" note="Kept verbatim, column name and all — the master has 115 columns and Genie names eight of them. The rest are here." />
+              <Section title="Columns the record does not name" note="Whatever the HR sheet carried that has no field of its own yet, kept verbatim under its own column name. Nothing the master holds is hidden — if something here deserves a proper field, it gets one." />
               {extras.length === 0 && <div className="text-xs" style={{ color: C.faint }}>Nothing beyond the named columns.</div>}
               <div className="bg-white rounded-lg border" style={{ borderColor: C.line }}>
                 {extras.map(([k, v], i) => (
@@ -378,9 +430,29 @@ function Section({ title, note }: { title: string; note?: string }) {
 }
 
 function Field({ f, e, onSave, onClear }: { f: FieldSpec; e: HrmsEmployee; onSave: (v: string | null) => void; onClear: () => void }) {
+  // A derived field is not stored and not typed into — it is recomputed from
+  // whatever it depends on, every time this opens. That is the whole reason
+  // it is derived: the sheet used to recalculate age and service on every
+  // open, and a stored number would start rotting the day the sheet stops.
+  if (f.derived) {
+    const v = f.derived(e.value);
+    return (
+      <div className="rounded px-3 py-1.5 mb-1.5 flex items-center gap-2" style={{ background: "#F4F2EC" }}>
+        <div className="text-xs font-semibold" style={{ color: C.faint, minWidth: 130 }}>{f.label}</div>
+        <div className="text-xs tnum" style={{ color: C.dim }}>{v ?? "—"}</div>
+        <div style={{ fontSize: 10.5, color: "#B8B5AC", marginLeft: "auto", textAlign: "right", maxWidth: 260 }}>
+          {f.hint || "worked out, not typed"}
+        </div>
+      </div>
+    );
+  }
+
   const current = e.value[f.key] ?? "";
   const overridden = f.key in e.edited;
   const sheetSays = e.sheet[f.key];
+  const inputType =
+    f.kind === "date" ? "date" : f.kind === "tel" ? "tel" : f.kind === "email" ? "email"
+      : f.kind === "money" || f.kind === "number" ? "text" : f.kind === "url" ? "url" : "text";
 
   return (
     <div className="bg-white rounded-lg border px-3 py-2 mb-1.5" style={{ borderColor: overridden ? "#F5C89F" : C.line }}>
@@ -397,10 +469,13 @@ function Field({ f, e, onSave, onClear }: { f: FieldSpec; e: HrmsEmployee; onSav
             onBlur={(ev) => { if (ev.target.value !== current) onSave(ev.target.value); }}
             className="text-xs rounded px-2 py-1 flex-1" style={{ border: `1px solid ${C.line}` }} />
         ) : (
-          <input defaultValue={current} key={f.key + current} placeholder="—"
-            type={f.kind === "date" ? "date" : f.kind === "tel" ? "tel" : f.kind === "email" ? "email" : "text"}
+          <input defaultValue={current} key={f.key + current} placeholder="—" type={inputType}
             onBlur={(ev) => { if (ev.target.value !== current) onSave(ev.target.value); }}
-            className="text-xs rounded px-2 py-1 flex-1" style={{ border: `1px solid ${C.line}` }} />
+            className={`text-xs rounded px-2 py-1 flex-1 ${f.kind === "money" || f.kind === "number" ? "tnum" : ""}`}
+            style={{ border: `1px solid ${C.line}`, textAlign: f.kind === "money" || f.kind === "number" ? "right" : undefined }} />
+        )}
+        {f.kind === "url" && current && (
+          <a href={current} target="_blank" rel="noopener noreferrer" className="text-xs font-bold" style={{ color: "#1B3A5C" }} title="Open">↗</a>
         )}
       </div>
       {(f.hint || overridden) && (
@@ -408,9 +483,9 @@ function Field({ f, e, onSave, onClear }: { f: FieldSpec; e: HrmsEmployee; onSav
           {overridden && (
             <>
               Edited by {e.edited[f.key].by || "somebody"} on {fmtFull(String(e.edited[f.key].at).slice(0, 10))}
-              {f.sheet && <> — the sheet still says <b>{sheetSays || "nothing"}</b></>}{" "}
+              {sheetSays != null && sheetSays !== "" && <> — as imported it said <b>{sheetSays}</b></>}{" "}
               <button onClick={onClear} className="font-bold rounded px-1.5" style={{ background: "#F4F2EC", color: C.dim }}>
-                {f.sheet ? "use the sheet's value" : "clear"}
+                {sheetSays != null && sheetSays !== "" ? "put the imported value back" : "clear"}
               </button>
               {f.hint && <br />}
             </>

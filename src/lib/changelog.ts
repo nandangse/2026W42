@@ -75,6 +75,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.1.1",
+    date: "2026-08-23",
+    module: "HRMS becomes the master",
+    items: [
+      "HRMS IS NOW THE RECORD, NOT A VIEW OF A SPREADSHEET. Dr Raghu's decision: the employee master lives here, the birthday list is taken from here, and the HR-sheet upload will be switched off when he says so. It is still running today — nothing has been removed.",
+      "THE WHOLE RECORD IS EDITABLE. Genie named eight fields and kept the other 94 columns of the master as read-only text. All of it is now a proper field — around ninety of them, grouped: Identity & role · Contact · Personal · Family & next of kin · Statutory · Pay · Bank · Benefits, loan & leave · Performance · Leaving · HR notes. That is what had to be true before a spreadsheet could be switched off, and it is now true.",
+      "THE WORKED-OUT FIELDS ARE WORKED OUT, and this is the part that would have bitten in three months. The sheet recalculated Age, Age Group, Birthday month, Experience in Nandan and Total months every time it was opened. Stored and never recalculated, a person's age would have sat at 42.3 for the rest of their service. Those five are now computed from the date of birth and the joining date on every open, shown greyed, and cannot be typed into.",
+      "PDF / PRINT IS NO LONGER ON EVERY PAGE — it appears only where it is asked for. The machinery stays ready: the print stylesheet, the paper masthead with who printed it and when, the repeating table header, no row split across a page break. It is one flag per page now.",
+      "DOWNLOAD EXCEL, with two options and a warning that says what it means: “Please note the export will be as per chosen options. Dont leave the data here and there.” Export filtered report takes exactly the rows on screen; Export All takes the master. A real .xlsx, built on the SERVER from the record rather than from what the page is holding, with a second sheet saying who exported it, when, at what scope and how many records.",
+      "EVERY EXPORT IS LOGGED against the record. A file carrying 364 people's statutory numbers, bank details and salaries leaving the building is exactly the event somebody will one day need to reconstruct.",
+      "The overlay and the history are unchanged, which is the point: an edit still lands in hrms_employee_edits with a line in the log, so the day the sheet is switched off is not a day anything has to be migrated.",
+      "Verified after migration 0048: an anonymous read of hrms_employees now returns HTTP 401, permission denied — the tables are shut to the browser outright, not merely filtered.",
+      "No new migration.",
+    ],
+  },
+  {
     v: "3.19.1.0",
     date: "2026-08-23",
     module: "HRMS — the structure",

@@ -17,58 +17,299 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type FieldKind = "text" | "date" | "email" | "tel" | "bool" | "long";
+export type FieldKind = "text" | "date" | "email" | "tel" | "bool" | "long" | "money" | "number" | "url";
 
 export interface FieldSpec {
   key: string;
   label: string;
   kind: FieldKind;
-  /** true = the HR sheet owns it and an edit here is an override. */
+  /** The named column on hrms_employees, where there is one. */
+  column?: string;
+  /**
+   * The HR sheet's own header for this value, as it appears in `extra`.
+   * Verbatim, typos included — "Sikll Level" is what the sheet says, and a
+   * corrected spelling here would simply fail to find the data.
+   */
+  sheetHeader?: string;
+  /** true where the value came from the sheet — an edit is an override. */
   sheet: boolean;
-  /** Shown under the input on the person card. */
+  /**
+   * Worked out rather than stored. THIS MATTERS NOW: the sheet recalculated
+   * Age, Experience and the rest every time it was opened. Once HRMS is the
+   * master and the sheet stops, a stored 42.3 would sit there being wrong for
+   * the rest of the person's service. So these are computed on read and
+   * cannot be typed into.
+   */
+  derived?: (v: Record<string, string | null>) => string | null;
   hint?: string;
 }
 
-/** Columns that come off the HR sheet, in the order they read on a record. */
-export const SHEET_FIELDS: FieldSpec[] = [
-  { key: "name", label: "Name", kind: "text", sheet: true },
-  { key: "email", label: "Work email", kind: "email", sheet: true },
-  { key: "department", label: "Department", kind: "text", sheet: true },
-  { key: "designation", label: "Designation", kind: "text", sheet: true },
-  { key: "location", label: "Location", kind: "text", sheet: true },
-  { key: "doj", label: "Date of joining", kind: "date", sheet: true },
-  { key: "dob", label: "Date of birth", kind: "date", sheet: true, hint: "Drives the birthday list on My Week." },
-  { key: "active", label: "Currently employed", kind: "bool", sheet: true },
+export interface FieldGroup {
+  key: string;
+  label: string;
+  note?: string;
+  /** Pay, bank and statutory identity. Kept out of the CSV unless asked for. */
+  confidential?: boolean;
+  fields: FieldSpec[];
+}
+
+/* ── helpers for the derived fields ─────────────────────────────────────── */
+
+const monthsBetween = (iso: string | null | undefined, to = new Date()): number | null => {
+  if (!iso) return null;
+  const d = new Date(String(iso).slice(0, 10) + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return null;
+  let m = (to.getFullYear() - d.getFullYear()) * 12 + (to.getMonth() - d.getMonth());
+  if (to.getDate() < d.getDate()) m -= 1;
+  return m < 0 ? null : m;
+};
+
+/** Years to one decimal — the form the HR sheet has always used. */
+const yearsTo1 = (iso: string | null | undefined): string | null => {
+  const m = monthsBetween(iso);
+  return m === null ? null : (m / 12).toFixed(1);
+};
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+/** The sheet's own five-year age bands. */
+function ageBand(iso: string | null | undefined): string | null {
+  const m = monthsBetween(iso);
+  if (m === null) return null;
+  const a = Math.floor(m / 12);
+  if (a < 20) return "Under 20";
+  if (a >= 60) return "60+";
+  const lo = Math.floor(a / 5) * 5;
+  return `${lo} - ${lo + 4}`;
+}
+
+/* ── the record, group by group ─────────────────────────────────────────── */
+
+const t = (key: string, label: string, sheetHeader: string, kind: FieldKind = "text", hint?: string): FieldSpec =>
+  ({ key, label, kind, sheetHeader, sheet: true, hint });
+
+export const FIELD_GROUPS: FieldGroup[] = [
+  {
+    key: "identity",
+    label: "Identity & role",
+    fields: [
+      { key: "name", label: "Name", kind: "text", column: "name", sheet: true },
+      t("legal_name", "Full name on record", "NANDAN GSE EMPLOYEEMASTER", "text",
+        "The master's own name column. Often fuller than the short name above — this is the one for a letter."),
+      t("casual_name", "Known as", "Casual Name"),
+      t("type", "Type", "Type", "text", "Management · Staff · Contractor · Labour."),
+      { key: "active", label: "Currently employed", kind: "bool", column: "active", sheet: true },
+      { key: "doj", label: "Date of joining", kind: "date", column: "doj", sheet: true },
+      { key: "department", label: "Department", kind: "text", column: "department", sheet: true },
+      { key: "designation", label: "Designation", kind: "text", column: "designation", sheet: true },
+      t("reporting_manager", "Reporting manager", "Reporting Manager"),
+      { key: "location", label: "Job location", kind: "text", column: "location", sheet: true },
+      t("shift", "Shift", "Shift"),
+      t("skill_level", "Skill level", "Sikll Level"),
+      t("in_lc", "In LC", "In LC"),
+      t("coming_from", "Travels from", "Coming From"),
+      t("bus_status", "Bus", "Bus Status"),
+      t("khalapur_status", "Khalapur", "Khalapur Status"),
+      { key: "experience_in_nandan", label: "Experience in Nandan", kind: "text", sheet: true,
+        sheetHeader: "Experience in Nandan",
+        derived: (v) => yearsTo1(v.doj),
+        hint: "Years since joining. Worked out from the joining date every time this page opens." },
+      { key: "total_months", label: "Total months here", kind: "number", sheet: true,
+        sheetHeader: "Total Months in Nandan",
+        derived: (v) => { const m = monthsBetween(v.doj); return m === null ? null : String(m); } },
+    ],
+  },
+  {
+    key: "contact",
+    label: "Contact",
+    fields: [
+      { key: "email", label: "Work email", kind: "email", column: "email", sheet: true,
+        hint: "Also the nandanerp login." },
+      t("company_mobile", "Company mobile", "Company Mobile No", "tel"),
+      { key: "phone", label: "Personal mobile", kind: "tel", sheetHeader: "PERSONAL Mobile No", sheet: true },
+      t("personal_mobile_2", "Personal mobile 2", "PERSONAL Mobile No 2", "tel"),
+      { key: "personal_email", label: "Personal email", kind: "email", sheetHeader: "Personal Mail ID", sheet: true,
+        hint: "Where to write after somebody leaves." },
+      t("whatsapp", "WhatsApp", "Whatsapp", "url"),
+      t("company_handset", "Company handset", "Company Mobile Handset"),
+      { key: "address", label: "Current address", kind: "long", sheetHeader: "Current Address", sheet: true },
+      t("permanent_address", "Permanent address", "Permanent Address", "long"),
+    ],
+  },
+  {
+    key: "personal",
+    label: "Personal",
+    fields: [
+      { key: "dob", label: "Date of birth", kind: "date", column: "dob", sheet: true,
+        hint: "Drives the birthday list on My Week — which now reads this record, not the sheet." },
+      { key: "age", label: "Age", kind: "text", sheet: true, sheetHeader: "Age",
+        derived: (v) => yearsTo1(v.dob), hint: "Worked out from the date of birth." },
+      { key: "age_group", label: "Age group", kind: "text", sheet: true, sheetHeader: "Age Group",
+        derived: (v) => ageBand(v.dob) },
+      { key: "birthday_month", label: "Birthday month", kind: "text", sheet: true, sheetHeader: "Month of Birthday",
+        derived: (v) => { const d = v.dob; if (!d) return null; const m = Number(String(d).slice(5, 7)); return MONTHS[m - 1] ?? null; } },
+      t("gender", "Gender", "Gender"),
+      t("marital", "Marital status", "Marital Status"),
+      t("religion", "Religion", "Religion"),
+      { key: "blood_group", label: "Blood group", kind: "text", sheetHeader: "Blood Group", sheet: true },
+      t("qualification", "Qualification", "Qualification"),
+      t("exp_before", "Experience before Nandan", "Experience BEFORE Nandan", "text", "Years."),
+      t("shirt_size", "Shirt size", "Shirt Size"),
+      t("pant_size", "Pant size", "Pant Size"),
+      t("shoe_size", "Shoe size", "Shoe Size"),
+      t("vaccine_1", "Vaccine 1", "Vaccine 1 Date", "date"),
+      t("vaccine_2", "Vaccine 2", "Vaccine 2 Date", "date"),
+      t("passport_photo", "Passport photo", "Passport Photo"),
+    ],
+  },
+  {
+    key: "family",
+    label: "Family & next of kin",
+    fields: [
+      { key: "emergency_name", label: "Next of kin", kind: "text", sheetHeader: "Next of Kin (NOK)", sheet: true },
+      t("nok_relation", "Relationship", "NOK Relation"),
+      { key: "emergency_phone", label: "Next of kin contact", kind: "tel", sheetHeader: "Next Of Kin Contact", sheet: true },
+      t("spouse", "Spouse", "Spouse"),
+      t("child_1", "1st child", "1st Child"),
+      t("child_2", "2nd child", "2nd Child"),
+      t("child_3", "3rd child", "Child 3"),
+      t("anniversary", "Wedding anniversary", "Wedding Anniversary", "date"),
+      t("family_updated", "Family details updated", "Family Details update as on", "date"),
+    ],
+  },
+  {
+    key: "statutory",
+    label: "Statutory",
+    confidential: true,
+    note: "Government identity numbers. Never leaves this page except in a CSV you deliberately ask to include them in.",
+    fields: [
+      t("pf_no", "PF No", "PF No"),
+      t("uan_no", "UAN No", "UAN No"),
+      t("uan_name", "UAN name", "UAN Name"),
+      t("aadhaar", "Aadhaar No", "AADHAR No"),
+      t("pan", "PAN No", "PAN No"),
+      t("esic_eligible", "ESIC eligible", "ESIC Eligible"),
+      t("esic_no", "ESIC No", "ESIC No"),
+      t("mlwf", "MLWF LIN No", "MLWF LIN No"),
+      t("income_tax", "Income tax applicable", "Income Tax Applicable in 2024-25"),
+    ],
+  },
+  {
+    key: "pay",
+    label: "Pay",
+    confidential: true,
+    fields: [
+      t("days_paid", "Days paid", "Days Paid", "number"),
+      t("basic_da", "Basic and DA", "Basic and DA", "money"),
+      t("hra", "HRA", "HRA", "money"),
+      t("fixed_allowance", "Fixed allowance", "Fixed Allowance", "money"),
+      t("conveyance", "Conveyance", "Conveyance", "money"),
+      t("medical_allowance", "Medical allowance", "Medical Allowance", "money"),
+      t("gross", "Gross salary", "Gross Salary", "money"),
+      t("per_day_rate", "Per day rate", "Per Day Rate", "money"),
+      t("gross_2024_26", "Gross 2024-26", "Gross Salary 2024-26", "money"),
+      t("gross_2024_25", "Gross 2024-25", "Gross Salary 2024-25", "money"),
+      t("gross_2023_24", "Gross 2023-24", "Gross Salary 2023-24", "money"),
+      t("gross_2022_23", "Gross 2022-23", "Gross Salary 2022-23", "money"),
+      t("gross_2021_22", "Gross 2021-22", "Gross Sal 2021-22", "money"),
+      t("gross_2020_21", "Gross 2020-21", "Gross Sal 2020-21", "money"),
+    ],
+  },
+  {
+    key: "bank",
+    label: "Bank",
+    confidential: true,
+    fields: [
+      t("name_in_bank", "Name in bank", "Name in bank"),
+      t("bank_name", "Bank", "Bank Name"),
+      t("account_no", "Account No", "Account No"),
+      t("account_15", "Account No (15 digit)", "Account No.15 Digit"),
+      t("branch", "Branch", "Branch"),
+      t("ifsc", "IFSC", "IFSC Code"),
+    ],
+  },
+  {
+    key: "benefits",
+    label: "Benefits, loan & leave",
+    confidential: true,
+    fields: [
+      t("mediclaim_premium", "Mediclaim premium", "Mediclaim Premium", "money"),
+      t("mediclaim_id", "Mediclaim ID", "Mediclaim ID"),
+      t("lic_policy", "LIC policy", "LIC Policy Number"),
+      t("lic_premium", "LIC premium", "LIC Premium", "money"),
+      t("lic_sum", "LIC sum assured", "LIC Sum Assuared", "money"),
+      t("loan_as_on", "Loan outstanding", "Loan as on 31st June 2026", "money"),
+      t("leave_as_on", "Leave balance", "Leave as on 31st june 2026", "number"),
+      t("referral", "Referred by", "Referal Employee"),
+    ],
+  },
+  {
+    key: "performance",
+    label: "Performance",
+    fields: [
+      t("evaluation", "Evaluation", "Evaluation"),
+      t("idp_link", "IDP link in ERP", "IDP Link inERP", "url"),
+      t("idp_pdf", "Latest IDP PDF", "Latest IDP PDF", "url"),
+      t("latest_work_resp", "Latest work responsibility", "Latest Work Responsibility", "long"),
+      t("attendance_pct", "Attendance %", "Attendance %"),
+      t("late_pct", "Late coming %", "Late Coming %"),
+    ],
+  },
+  {
+    key: "exit",
+    label: "Leaving",
+    note: "Filled only when somebody goes. “Active” in these columns is the sheet's way of saying not applicable.",
+    fields: [
+      t("leaving_date", "Leaving date", "Leaving Date"),
+      t("left_date", "Left date", "Left Date"),
+      t("leaving_reason", "Reason", "Leaving Reason", "long"),
+      t("gratuity_years", "Years for gratuity", "Years (Application on Gratuity", "number"),
+      t("gratuity_amount", "Gratuity liability", "Risk ( Gratiuty Amount)", "money"),
+    ],
+  },
+  {
+    key: "hr",
+    label: "HR notes",
+    note: "Genie's own. The sheet never carried these.",
+    fields: [
+      { key: "notes", label: "HR notes", kind: "long", sheet: false,
+        hint: "Read by whoever can open HRMS. Nobody else, including the person." },
+      { key: "file_name", label: "File reference", kind: "text", sheetHeader: "File Name", sheet: true },
+      t("last_update_date", "Master last updated", "Last Update Date"),
+    ],
+  },
 ];
 
-/** Ours. The sheet has never carried these and no upload can touch them. */
-export const GENIE_FIELDS: FieldSpec[] = [
-  { key: "phone", label: "Mobile", kind: "tel", sheet: false },
-  { key: "personal_email", label: "Personal email", kind: "email", sheet: false, hint: "Where to write after somebody leaves." },
-  { key: "emergency_name", label: "Emergency contact", kind: "text", sheet: false },
-  { key: "emergency_phone", label: "Emergency number", kind: "tel", sheet: false },
-  { key: "blood_group", label: "Blood group", kind: "text", sheet: false },
-  { key: "address", label: "Address", kind: "long", sheet: false },
-  { key: "notes", label: "HR notes", kind: "long", sheet: false, hint: "Read by whoever can open HRMS. Nobody else, including the person." },
-];
+export const ALL_FIELDS: FieldSpec[] = FIELD_GROUPS.flatMap((g) => g.fields);
 
-export const ALL_FIELDS: FieldSpec[] = [...SHEET_FIELDS, ...GENIE_FIELDS];
+/** The columns a directory listing and a routine CSV should carry. */
+export const SAFE_KEYS = new Set(
+  FIELD_GROUPS.filter((g) => !g.confidential).flatMap((g) => g.fields.map((f) => f.key)),
+);
 
 const BY_KEY = new Map(ALL_FIELDS.map((f) => [f.key, f]));
 
 /** The whitelist. An unknown field name is refused rather than stored. */
 export const fieldSpec = (key: string): FieldSpec | undefined => BY_KEY.get(key);
 
+/** Every sheet header the catalogue claims — the rest stay on the Sheet tab. */
+export const CLAIMED_HEADERS = new Set(
+  ALL_FIELDS.map((f) => f.sheetHeader).filter(Boolean) as string[],
+);
+
+/** The eight named columns on hrms_employees. */
+export const NAMED_COLUMNS = ["name", "email", "dob", "doj", "department", "designation", "location", "active"] as const;
+
 /** One employee, sheet value and override merged, as the screen wants it. */
 export interface HrmsEmployee {
   id: string;
-  /** The merged value of every field — overrides applied. */
+  /** The merged value of every catalogued field — overrides applied. */
   value: Record<string, string | null>;
-  /** Only the SHEET fields that an override is currently masking. */
+  /** What lies underneath an override, for the fields that carry one. */
   sheet: Record<string, string | null>;
   /** Which fields carry an override, and who set it. */
   edited: Record<string, { by: string | null; at: string }>;
-  /** Whatever else the HR sheet's row carried, verbatim. */
+  /** Sheet columns the catalogue does NOT claim — nothing is hidden. */
   extra: Record<string, string>;
   firstSeen: string | null;
   updatedAt: string | null;
