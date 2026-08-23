@@ -278,6 +278,51 @@ export async function GET() {
 }
 
 /**
+ * Spoken thinking → the written answer, in one place, so the browser path and
+ * the server path produce the same kind of text.
+ */
+async function polishSpoken(email: string, text: string): Promise<string> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return text;
+  const who = await whoAreThey(email);
+  const roleLine = who.role ? `Their role: ${who.role}.` : "";
+  const expectLine = who.roleSummary ? `What the company expects of that role:\n${who.roleSummary}` : "";
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: "claude-sonnet-5",
+        max_tokens: 8000,
+        system:
+          "Somebody at an Indian engineering company is speaking an answer for their own development plan (IDP). " +
+          "The dictation is rough, often a MIX OF ENGLISH AND HINDI, and full of thinking-out-loud.\n\n" +
+          (roleLine ? roleLine + "\n" + expectLine + "\n\n" : "") +
+          "Write out THE ANSWER THEY WERE GIVING, properly:\n" +
+          "1. FIRST PERSON, as 'I' — these are their words about themselves.\n" +
+          "2. SIMPLE, CORRECT ENGLISH. Short sentences. A person who finished class 10 must understand it.\n" +
+          "3. Translate anything said in Hindi.\n" +
+          "4. KEEP EVERY DISTINCT POINT they made — but say each ONCE, cleanly. Drop the repetitions, the " +
+          "false starts, the asides about the recording itself, and anything that is plainly testing the " +
+          "microphone rather than answering.\n" +
+          "5. Where their role is given above, phrase the points so they read against that role — the same " +
+          "facts, aimed at what the role is for. INVENT NOTHING they did not say.\n" +
+          "6. One point per line, starting with '- '. No blank lines between lines.\n" +
+          "7. Answer with the text only. No preamble, no heading, no closing comment.",
+        messages: [{ role: "user", content: text.slice(0, 60000) }],
+      }),
+    });
+    if (!r.ok) return text;
+    const j = await r.json();
+    const out = j?.content?.[0]?.text;
+    if (typeof out !== "string" || !out.trim()) return text;
+    return out.trim().replace(/\r/g, "").replace(/\n{2,}/g, "\n");
+  } catch {
+    return text;
+  }
+}
+
+/**
  * POST /api/idp
  *   { action: "start", consent: true }
  *   { action: "save",  id, answers, ratings }   — as they type, so a closed
@@ -335,14 +380,46 @@ export async function POST(req: Request) {
 
       const ext = (file.type.split("/")[1] || "webm").split(";")[0];
       const path = `idp/${id}/${qid}/${Date.now()}.${ext}`;
+      const buf = await file.arrayBuffer();
       const { error: up } = await admin.storage
-        .from(BUCKET).upload(path, await file.arrayBuffer(), { contentType: file.type || "audio/webm" });
+        .from(BUCKET).upload(path, buf, { contentType: file.type || "audio/webm" });
       if (up) throw new Error(`Could not store the recording: ${up.message}`);
 
       const audio = (row.audio || {}) as Record<string, { path: string; seconds: number | null; at: string; transcript?: string }[]>;
       // the words as heard travel WITH the recording, so each can sit beside
       // its own audio rather than all of them blurring into one box
-      const transcript = String(form.get("transcript") || "").trim() || undefined;
+      let transcript = String(form.get("transcript") || "").trim() || undefined;
+      let polished: string | null = null;
+
+      /**
+       * THE SERVER'S SECOND CHANCE AT THE WORDS.
+       *
+       * iPhones and some browsers record perfectly and transcribe nothing —
+       * dictation off, or no speech engine at all. The audio still arrived,
+       * so if a Whisper key is configured the server transcribes it here and
+       * hands back the written answer, and the phone behaves exactly like a
+       * laptop. Without the key, the recording is kept and the page says
+       * plainly that no words were caught.
+       */
+      const oa = process.env.OPENAI_API_KEY;
+      if (!transcript && oa) {
+        try {
+          const fd2 = new FormData();
+          fd2.append("file", new File([buf], `note.${ext}`, { type: file.type || "audio/webm" }));
+          fd2.append("model", "whisper-1");
+          const w = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+            method: "POST", headers: { authorization: `Bearer ${oa}` }, body: fd2,
+          });
+          if (w.ok) {
+            const wj = await w.json();
+            const heard = String(wj?.text || "").trim();
+            if (heard) {
+              transcript = heard;
+              polished = await polishSpoken(u.email, heard);
+            }
+          }
+        } catch { /* the recording stands; the words were a second chance */ }
+      }
       audio[qid] = [...(audio[qid] || []), { path, seconds, at: new Date().toISOString(), transcript }];
       const { error } = await admin
         .from("hrms_idp").update({ audio, updated_at: new Date().toISOString() }).eq("id", id);
@@ -367,55 +444,7 @@ export async function POST(req: Request) {
     if (action === "polish") {
       const text = String(body.text || "").trim();
       if (!text) throw new HttpError(400, "Nothing was said.");
-      const key = process.env.ANTHROPIC_API_KEY;
-      if (!key) return NextResponse.json({ text });
-      /**
-       * THE BOX GETS THE ANSWER, NOT THE DICTATION (Dr Raghu, 23 Aug 2026).
-       *
-       * The words as heard are kept verbatim BESIDE the recording, so nothing
-       * is ever lost — which frees this step to do its real job: turn spoken
-       * thinking into the answer the person was giving. Well-organised, plain
-       * English, every distinct point kept but said once and cleanly, and
-       * written knowing what their role is FOR, so the answer lands against
-       * the role rather than in mid-air.
-       */
-      const who = await whoAreThey(u.email);
-      const roleLine = who.role ? `Their role: ${who.role}.` : "";
-      const expectLine = who.roleSummary ? `What the company expects of that role:\n${who.roleSummary}` : "";
-      try {
-        const r = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-          body: JSON.stringify({
-            model: "claude-sonnet-5",
-            max_tokens: 8000,
-            system:
-              "Somebody at an Indian engineering company is speaking an answer for their own development plan (IDP). " +
-              "The dictation is rough, often a MIX OF ENGLISH AND HINDI, and full of thinking-out-loud.\n\n" +
-              (roleLine ? roleLine + "\n" + expectLine + "\n\n" : "") +
-              "Write out THE ANSWER THEY WERE GIVING, properly:\n" +
-              "1. FIRST PERSON, as 'I' — these are their words about themselves.\n" +
-              "2. SIMPLE, CORRECT ENGLISH. Short sentences. A person who finished class 10 must understand it.\n" +
-              "3. Translate anything said in Hindi.\n" +
-              "4. KEEP EVERY DISTINCT POINT they made — but say each ONCE, cleanly. Drop the repetitions, the " +
-              "false starts, the asides about the recording itself, and anything that is plainly testing the " +
-              "microphone rather than answering.\n" +
-              "5. Where their role is given above, phrase the points so they read against that role — the same " +
-              "facts, aimed at what the role is for. INVENT NOTHING they did not say.\n" +
-              "6. One point per line, starting with '- '. No blank lines between lines.\n" +
-              "7. Answer with the text only. No preamble, no heading, no closing comment.",
-            messages: [{ role: "user", content: text.slice(0, 60000) }],
-          }),
-        });
-        if (!r.ok) return NextResponse.json({ text });
-        const j = await r.json();
-        const out = j?.content?.[0]?.text;
-        if (typeof out !== "string" || !out.trim()) return NextResponse.json({ text });
-        const tidy = out.trim().replace(/\r/g, "").replace(/\n{2,}/g, "\n");
-        return NextResponse.json({ text: tidy });
-      } catch {
-        return NextResponse.json({ text });
-      }
+      return NextResponse.json({ text: await polishSpoken(u.email, text) });
     }
 
     /**

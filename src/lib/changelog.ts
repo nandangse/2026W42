@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.5.1",
+    date: "2026-08-23",
+    module: "IDP — the phone gets its words, a clock, and a second chance",
+    items: [
+      "A REAL DATA-LOSS BUG, FIXED: anything TYPED WHILE A RECORDING WAS RUNNING was silently overwritten when the recording landed, because the append started from the text as it stood when Record was pressed. It now always starts from what is actually in the box.",
+      "WHEN THE BROWSER IS NOT CATCHING WORDS, IT SAYS SO WHILE YOU SPEAK — eight seconds of recording with not one word caught brings up a red notice: your voice IS being recorded, but this browser is not turning it into words, with the iPhone fix named (Settings → General → Keyboard → Enable Dictation). Not after you stop — while you can still do something about it.",
+      "AND THE SERVER GETS A SECOND CHANCE AT THE WORDS. The audio always arrives even when the phone transcribes nothing — so if a Whisper key (OPENAI_API_KEY) is set on the server, the recording is transcribed there, written out properly against the role, and lands in the box exactly as a laptop's would. Without the key the page says plainly that no words were caught and the recording is kept.",
+      "A TIMER UNDER THE IDP TITLE, counting the sitting. Past the hour — the hour the first page asked for — it turns red and says so. It stops nobody; the red is information, not a door.",
+      "AND FROM THE HRMS BACKEND, A SUBMITTED IDP CAN BE REOPENED — the lock comes off, nothing written is lost, and the person carries on where they were. Logged, like everything: a record that moved between submitted and open with no trace would make “when was this finished” unanswerable. Dr Raghu's own case is the point — a first pass to test the machinery, reopened to be done properly before it goes to the Chairman.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.5.0",
     date: "2026-08-23",
     module: "IDP — the manager's side: read, rate, then the money, then speak",

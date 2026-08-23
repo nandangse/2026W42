@@ -112,7 +112,7 @@ export default function IdpRecords({ who }: { who: string }) {
             {!full ? (
               <div className="p-4 text-xs" style={{ color: C.faint }}>loading…</div>
             ) : (
-              <IdpFullView f={full} />
+              <IdpFullView f={full} onReopened={() => { setOpenId(null); load(); }} />
             )}
           </div>
         </div>
@@ -130,8 +130,15 @@ function Stat({ n, l, hint, warn }: { n: number; l: string; hint?: string; warn?
   );
 }
 
-function IdpFullView({ f }: { f: Full }) {
+function IdpFullView({ f, onReopened }: { f: Full; onReopened: () => void }) {
   const finalVoice = f.audioUrls["final_voice"] || [];
+  const [busy, setBusy] = useState(false);
+  const reopen = async () => {
+    if (!window.confirm(`Reopen ${f.person_name || f.person_email}'s IDP?\n\nNothing they wrote is lost — the lock comes off and they can work on it again. It leaves this list until they submit again.`)) return;
+    setBusy(true);
+    try { await api.post("/api/hrms/idp", { action: "reopen", id: f.id }); onReopened(); }
+    catch (e) { alert(e instanceof Error ? e.message : String(e)); setBusy(false); }
+  };
   return (
     <>
       <div className="px-4 py-3 sticky top-0" style={{ background: "#16232F", color: "#fff", zIndex: 2 }}>
@@ -144,6 +151,14 @@ function IdpFullView({ f }: { f: Full }) {
             ? <>Submitted {fmtFull(String(f.submitted_at).slice(0, 10))}</>
             : <b style={{ color: "#F5B32B" }}>Started {fmtFull(String(f.started_at).slice(0, 10))} and NOT submitted — this is not an IDP yet</b>}
         </div>
+        {f.submitted_at && (
+          <button onClick={reopen} disabled={busy}
+            className="mt-2 text-xs font-bold rounded px-2.5 py-1"
+            style={{ background: "#FFF3E8", color: "#8A5B00" }}
+            title="Take the lock off so the person can work on it again. Nothing they wrote is lost.">
+            {busy ? "Reopening…" : "↩ Reopen — let them do it again, properly"}
+          </button>
+        )}
       </div>
 
       <div className="p-4">

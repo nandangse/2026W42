@@ -87,7 +87,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
   if (state.open && !showIntro)
     return (
-      <Shell initials={initials}>
+      <Shell initials={initials} startedAt={(state.open as unknown as { started_at?: string }).started_at ?? null}>
         <Filling open={state.open} roleDocs={state.roleDocs} isLeader={!!state.isLeader}
           myRecord={state.myRecord} options={state.options} salary={state.salary}
           name={name}
@@ -763,7 +763,31 @@ function Written({ label, html }: { label: string; html: string }) {
   );
 }
 
-function Shell({ children, initials }: { children: React.ReactNode; initials: string | null }) {
+/**
+ * The clock under the IDP title. It counts up from when the sitting began,
+ * and past the hour it turns red — the hour was the promise on the first
+ * page, and the colour is the reminder. It never stops anybody: the red is
+ * information, not a door.
+ */
+function SittingTimer({ startedAt }: { startedAt: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const secs = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
+  const over = secs > 3600;
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), sec = secs % 60;
+  const text = h ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}` : `${m}:${String(sec).padStart(2, "0")}`;
+  return (
+    <span className="tnum" style={{ fontSize: 11, color: over ? "#FF6B5E" : "#8FA1B3", fontWeight: over ? 700 : 400 }}
+      title={over ? "Past the hour you set aside — carry on, but this is the reminder" : "How long this sitting has run"}>
+      ⏱ {text}{over ? " — past the hour" : ""}
+    </span>
+  );
+}
+
+function Shell({ children, initials, startedAt }: { children: React.ReactNode; initials: string | null; startedAt?: string | null }) {
   return (
     <div className="min-h-screen idp" style={{ background: "#F1EFE9", color: C.ink }}>
       <div style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0, zIndex: 40 }}>
@@ -777,6 +801,7 @@ function Shell({ children, initials }: { children: React.ReactNode; initials: st
             <div className="font-bold text-white leading-tight truncate" style={{ fontSize: 13 }}>
               IDP Discussion — Individual
             </div>
+            {startedAt && <SittingTimer startedAt={startedAt} />}
           </div>
           <a href="/" className="ml-auto text-xs font-semibold rounded px-2.5 py-1.5"
             style={{ background: "#22303C", color: "#8FA1B3" }}>← Genie</a>

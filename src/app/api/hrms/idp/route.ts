@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireHrms, errJson } from "@/lib/auth";
+import { requireHrms, errJson, HttpError } from "@/lib/auth";
+import { NextResponse as NR } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables } from "@/lib/hrms";
 
@@ -89,6 +90,47 @@ export async function GET(req: Request) {
         };
       }),
     });
+  } catch (e) {
+    return errJson(e);
+  }
+}
+
+/**
+ * POST /api/hrms/idp — { action: "reopen", id }
+ *
+ * Puts a SUBMITTED IDP back into the person's hands, from the HRMS side.
+ * Everything they wrote stays; only the lock comes off, and the next visit
+ * to /idp carries on from what is there. Dr Raghu's own case is the point:
+ * a first pass done to test the machinery, reopened to be done properly
+ * before it goes to the Chairman.
+ *
+ * HRMS-gated like everything else here, and logged: a record that moves
+ * between submitted and open with no trace would make "when was this
+ * finished" unanswerable.
+ */
+export async function POST(req: Request) {
+  try {
+    const me = await requireHrms();
+    const admin = adminClient();
+    const body = await req.json();
+    if (String(body.action || "") !== "reopen") throw new HttpError(400, "unknown action");
+    const id = String(body.id || "");
+    const { data: row } = await admin
+      .from("hrms_idp").select("id, person_email, employee_id, submitted_at").eq("id", id).maybeSingle();
+    if (!row) throw new HttpError(404, "No such IDP.");
+    if (!row.submitted_at) return NR.json({ ok: true, already: "open" });
+    const { error } = await admin
+      .from("hrms_idp").update({ submitted_at: null, updated_at: new Date().toISOString() }).eq("id", id);
+    if (error) throw new Error(error.message);
+    try {
+      const T = await hrmsTables(admin);
+      await admin.from(T.log).insert({
+        employee_id: row.employee_id || "(idp)", field: "idp",
+        old_value: `submitted ${row.submitted_at}`, new_value: "reopened for a proper pass",
+        edited_by: me.initials ? `${me.initials} · ${me.email}` : me.email,
+      });
+    } catch { /* the reopen matters more than the line about it */ }
+    return NR.json({ ok: true });
   } catch (e) {
     return errJson(e);
   }

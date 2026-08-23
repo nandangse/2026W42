@@ -50,10 +50,19 @@ export default function DictateBox({
   onRecorded?: (r: Recording) => void;
 }) {
   const [rec, setRec] = useState(false);
+  /**
+   * THE LATEST TEXT, always. finish() used to append to the value captured
+   * when Record was pressed — so anything typed WHILE recording was silently
+   * overwritten when the recording landed. The ref is updated every render,
+   * so the append always starts from what is actually in the box.
+   */
+  const valueRef = useRef(value);
+  valueRef.current = value;
   const [live, setLive] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [secs, setSecs] = useState(0);
+  const [deaf, setDeaf] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const srRef = useRef<any>(null);
@@ -89,7 +98,8 @@ export default function DictateBox({
     setBusy(true);
     if (said) {
       const text = await polish(said);
-      onChange(value.trim() ? `${value.trim()}\n${text}` : text);
+      const base = valueRef.current.trim();
+      onChange(base ? `${base}\n${text}` : text);
     }
     if (blob && blob.size && idpId && qid) {
       try {
@@ -102,7 +112,21 @@ export default function DictateBox({
         fd.append("file", new File([blob], "note.webm", { type: blob.type || "audio/webm" }));
         const r = await fetch(uploadUrl || "/api/idp", { method: "POST", body: fd });
         const j = await r.json();
-        if (r.ok) onRecorded?.({ url: j.url, seconds: j.seconds, at: new Date().toISOString(), transcript: said });
+        if (r.ok) {
+          /**
+           * THE SERVER GETS A SECOND CHANCE AT THE WORDS. When the browser
+           * caught nothing, the audio still went up — and if the server can
+           * transcribe it, the answer comes back here and lands in the box
+           * exactly as a browser transcription would have.
+           */
+          if (!said && typeof j.text === "string" && j.text.trim()) {
+            const base = valueRef.current.trim();
+            onChange(base ? `${base}\n${j.text.trim()}` : j.text.trim());
+          } else if (!said && !j.text) {
+            setErr("The recording is saved and attached. This browser caught no words — type your answer, or use Chrome on a laptop or Android phone next time.");
+          }
+          onRecorded?.({ url: j.url, seconds: j.seconds, at: new Date().toISOString(), transcript: said || j.transcript || null });
+        }
       } catch { /* the words are saved; the audio is the bonus */ }
     }
     setBusy(false);
@@ -153,7 +177,16 @@ export default function DictateBox({
 
     startedRef.current = Date.now();
     setRec(true);
-    tickRef.current = setInterval(() => setSecs(Math.round((Date.now() - startedRef.current) / 1000)), 1000);
+    setDeaf(false);
+    tickRef.current = setInterval(() => {
+      const el = Math.round((Date.now() - startedRef.current) / 1000);
+      setSecs(el);
+      // eight seconds of recording with not one word caught is not a pause —
+      // this browser's dictation is not working, and the person should know
+      // WHILE speaking, not after
+      if (el >= 8 && !textRef.current.trim()) setDeaf(true);
+      else if (textRef.current.trim()) setDeaf(false);
+    }, 1000);
 
     // ---- the dictation, restarted for as long as we are recording ----
     if (!SR) { setErr("This browser cannot turn speech into words, but it IS recording you."); return; }
@@ -232,6 +265,13 @@ export default function DictateBox({
         </div>
       )}
 
+      {rec && deaf && (
+        <div className="rounded p-2 mt-1" style={{ background: "#FBEDEA", border: "1px solid #E5B3AE", fontSize: 12, color: C.red, lineHeight: 1.5 }}>
+          <b>Your voice IS being recorded, but this browser is not turning it into words.</b> On an iPhone, switch on
+          Settings → General → Keyboard → Enable Dictation, or use Chrome on a laptop or Android phone. Keep talking —
+          the recording is kept either way, and you can type after you stop.
+        </div>
+      )}
       {rec && live && (
         <div className="rounded p-2 mt-1" style={{ background: "#FFF7E6", fontSize: 12, color: C.dim, lineHeight: 1.5, maxHeight: 260, overflowY: "auto" }}>
           {live}
