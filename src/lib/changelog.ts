@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.0.1",
+    date: "2026-08-23",
+    module: "IDP — the login is the key",
+    items: [
+      "NO GENIE LOGIN, NO IDP — and no EMPLOYEE RECORD behind that login, no IDP either. A development plan is filed on somebody's record; one written by a login that matches no employee has nowhere to be filed and nobody to review it. The email address and password they already use is the key, and HRIS holds the join.",
+      "SOMEBODY WHOSE LOGIN IS NOT LINKED IS TOLD WHAT TO DO rather than shown a button that fails at the last step: “Ask HR to set the Genie user field on your record.” Nothing is wrong with their account; the link simply has not been made.",
+      "40 RECORDS WERE LINKED AUTOMATICALLY where the work email on the record is exactly a live Genie login. An exact match is a fact rather than a judgement, so it was written as setup and not put in the approval queue — forty rows of “user_email set” in front of Dr Raghu would only teach him to click through.",
+      "AND HERE IS THE NUMBER THAT MATTERS: of 201 people on the roll, 40 have a Genie login. 161 DO NOT, and cannot fill an IDP today. Almost all of them are Labour and Prod grades who have never needed an account. That is not a fault in this module — it is the question of who gets a login, and it has to be answered before an IDP round can mean anything company-wide.",
+      "21 LIVE LOGINS STILL MATCH NO RECORD, including tushar@, jckumar@, vinaym@ and medhansh@. Most are people whose record carries a different address — Vinay Mande's record says hr@nandan.co.in while he signs in as vinaym@. Those are judgements about who is who, so nothing was guessed: HR sets the Genie user on each record and they resolve.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.0.0",
     date: "2026-08-23",
     module: "IDP Discussion — Individual, at genie.nandan.co.in/idp",

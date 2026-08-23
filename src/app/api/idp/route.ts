@@ -103,6 +103,19 @@ export async function POST(req: Request) {
       if (body.consent !== true)
         throw new HttpError(400, "The IDP cannot be started without consent.");
       const who = await whoAreThey(u.email);
+      /**
+       * NO EMPLOYEE RECORD, NO IDP (Dr Raghu, 23 Aug 2026). A development
+       * plan belongs ON somebody's file; one filled in by a login that
+       * matches no employee has nowhere to be filed and nobody to review it.
+       * The login is the key — the email address and password they already
+       * use — and HRIS holds the join.
+       */
+      if (!who.employee)
+        throw new HttpError(
+          403,
+          "This login is not linked to an employee record yet, so there is nowhere to file an IDP. " +
+            "Ask HR to set the Genie user on your record in HRIS.",
+        );
       // an abandoned attempt is not resumed — starting over is the rule
       await admin.from("hrms_idp").delete().eq("person_email", u.email).eq("cycle", CYCLE).is("submitted_at", null);
       const { data, error } = await admin.from("hrms_idp").insert({

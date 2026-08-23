@@ -25,6 +25,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
   const [state, setState] = useState<{
     open: Open | null; done: { id: string; submitted_at: string }[];
     role: string | null; roleSummary: string | null; needsMigration?: boolean;
+    employee: { id: string; name: string } | null;
   } | null>(null);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -33,7 +34,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
   const load = useCallback(async () => {
     try {
       const j = await api.get("/api/idp");
-      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, needsMigration: j.needsMigration });
+      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, needsMigration: j.needsMigration, employee: j.employee ?? null });
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -48,6 +49,32 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
   if (!state) return <Shell initials={initials}><div className="p-6 text-sm" style={{ color: C.faint }}>Loading…</div></Shell>;
 
   if (state.open) return <Shell initials={initials}><Filling open={state.open} onDone={load} /></Shell>;
+
+  // The login is the key, and it has to reach a record. An IDP filled in by a
+  // login that matches no employee has nowhere to be filed and nobody to
+  // review it, so this says what to do rather than offering a button that
+  // would fail at the last step.
+  if (!state.employee && !state.needsMigration) {
+    return (
+      <Shell initials={initials}>
+        <div className="mx-auto px-4 py-10" style={{ maxWidth: 620 }}>
+          <h1 className="font-bold" style={{ fontSize: 24 }}>Welcome {name}</h1>
+          <div className="rounded-lg p-4 mt-5" style={{ background: "#FFF7E6", border: "1px solid #F5B32B" }}>
+            <div className="font-bold" style={{ fontSize: 15, color: "#8A5B00" }}>
+              Your login is not linked to your employee record yet
+            </div>
+            <div className="mt-2" style={{ fontSize: 14, lineHeight: 1.7, color: C.dim }}>
+              An IDP is filed on your record, so Genie has to know which record is yours before you can begin.
+              Nothing is wrong with your account — the link simply has not been made.
+              <br /><br />
+              <b>Ask HR to open your record in HRIS and set the <i>Genie user</i> field to this login.</b> It takes
+              them a moment, and this page will work the next time you open it.
+            </div>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
 
   return (
     <Shell initials={initials}>
