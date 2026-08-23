@@ -125,14 +125,24 @@ const num = (v: unknown) => {
 
 export interface SalaryRow { label: string; monthly: number | null; yearly: number | null; kind: "head" | "row" | "total" | "note" }
 
-function salaryTable(get: (k: string) => unknown): { rows: SalaryRow[]; ctcLakhs: string } | null {
-  const basic = num(get("Basic and DA")), hra = num(get("HRA")), fixed = num(get("Fixed Allowance"));
+/**
+ * HRA, PF AND PT ARE NOT APPLICABLE to Management and to the contract types
+ * (Dr Raghu, 23 Aug 2026) — a contractor carries 2% TDS instead of the
+ * statutory set, and Management sits outside PF and PT. For those, the three
+ * rows are left out of the table entirely and a note says why, rather than
+ * showing zeros that look like an error.
+ */
+const NO_STATUTORY = new Set(["Management", "Contractor", "Labour - Contract", "Staff - Contract"]);
+
+function salaryTable(get: (k: string) => unknown, type: string | null): { rows: SalaryRow[]; ctcLakhs: string; exempt: boolean } | null {
+  const exempt = NO_STATUTORY.has(String(type || "").trim());
+  const basic = num(get("Basic and DA")), hra = exempt ? 0 : num(get("HRA")), fixed = num(get("Fixed Allowance"));
   const conv = num(get("Conveyance")), med = num(get("Medical Allowance"));
   const gross = basic + hra + fixed + conv + med;
   if (!gross) return null;
 
-  const pf = basic > 0 ? Math.round(Math.min(basic, 15000) * 0.12) : 0;
-  const pt = gross >= 10000 ? 200 : 0;
+  const pf = !exempt && basic > 0 ? Math.round(Math.min(basic, 15000) * 0.12) : 0;
+  const pt = !exempt && gross >= 10000 ? 200 : 0;
   const dedM = pf + pt, dedY = pf * 12 + (pt ? 2500 : 0);
   const netM = gross - dedM, netY = gross * 12 - dedY;
 
@@ -149,23 +159,30 @@ function salaryTable(get: (k: string) => unknown): { rows: SalaryRow[]; ctcLakhs
 
   const rows: SalaryRow[] = [
     { label: "Gross Salary", monthly: null, yearly: null, kind: "head" },
-    R("Basic & DA", basic), R("HRA", hra), R("Fixed Allowance", fixed),
+    R("Basic & DA", basic),
+    ...(exempt ? [] : [R("HRA", hra)]),
+    R("Fixed Allowance", fixed),
     R("Conveyance", conv), R("Medical Allowance", med),
     R("Total Gross Salary (A)", gross, "total"),
     { label: "Deductions", monthly: null, yearly: null, kind: "head" },
-    R("Provident Fund", pf),
-    { label: "Professional Tax (Feb 300 will be deducted)", monthly: pt, yearly: pt ? 2500 : 0, kind: "row" },
+    ...(exempt
+      ? [{ label: "HRA, PF and PT are not applicable for this type of employment", monthly: null, yearly: null, kind: "note" as const }]
+      : [
+          R("Provident Fund", pf),
+          { label: "Professional Tax (Feb 300 will be deducted)", monthly: pt, yearly: pt ? 2500 : 0, kind: "row" as const },
+        ]),
     { label: "Total Deductions (B)", monthly: dedM, yearly: dedY, kind: "total" },
     { label: "Net Salary (C = A - B)", monthly: netM, yearly: netY, kind: "total" },
     { label: "Note : TDS will be deducted if applicable on Gross Salary", monthly: null, yearly: null, kind: "note" },
     { label: "Benefits", monthly: null, yearly: null, kind: "head" },
-    R("Provident Fund Employer", pf), R("Mediclaim of 2 lakhs", mediclaim),
+    ...(exempt ? [] : [R("Provident Fund Employer", pf)]),
+    R("Mediclaim of 2 lakhs", mediclaim),
     R("Shoes & Uniform Allowance", shoes), R("Annual Bonus Approx @10%", bonus),
     R("Annual Paid Leaves Approx 20 days", leaves), R("Third Saturday Paid 52 days", thirdSat),
     R("Total Benefits (D)", benM, "total"),
     { label: "Total Cost To Company (CTC) (C + D)", monthly: Math.round(netM + benM), yearly: Math.round(ctcY), kind: "total" },
   ];
-  return { rows, ctcLakhs: (ctcY / 100000).toFixed(1) };
+  return { rows, ctcLakhs: (ctcY / 100000).toFixed(1), exempt };
 }
 
 // GET /api/idp — am I part-way through one, and have I finished one?
@@ -189,7 +206,10 @@ export async function GET() {
      * self-service.
      */
     let myRecord: { value: Record<string, string | null>; pending: Record<string, boolean> } | null = null;
-    let salary: { rows: SalaryRow[]; ctcLakhs: string } | null = null;
+    let salary: {
+      rows: SalaryRow[]; ctcLakhs: string; exempt: boolean;
+      info: { name: string | null; department: string | null; designation: string | null; type: string | null; years: string | null; age: string | null };
+    } | null = null;
     const options: Record<string, string[]> = {};
     if (who.employee) {
       const admin = adminClient();
@@ -233,7 +253,26 @@ export async function GET() {
           if (o && o.value != null && String(o.value).trim() !== "") return o.value;
           return ((emp?.extra || {}) as Record<string, string>)[k];
         };
-        salary = salaryTable(ovVal);
+        const yearsSince = (iso: string | null) => {
+          if (!iso) return null;
+          const d = new Date(String(iso).slice(0, 10) + "T00:00:00");
+          if (Number.isNaN(d.getTime())) return null;
+          return ((Date.now() - d.getTime()) / (365.25 * 864e5)).toFixed(1);
+        };
+        const base = salaryTable(ovVal, value["type"] ?? null);
+        salary = base
+          ? {
+              ...base,
+              info: {
+                name: value["name"] ?? null,
+                department: value["department"] ?? null,
+                designation: value["designation"] ?? null,
+                type: value["type"] ?? null,
+                years: yearsSince(value["doj"] ?? null),
+                age: yearsSince(value["dob"] ?? null),
+              },
+            }
+          : null;
         const { data: m } = await admin.from("hrms_master").select("kind, value").order("sort_order");
         for (const r of m || []) (options[String(r.kind)] ||= []).push(String(r.value));
       } catch { /* the step simply shows nothing editable */ }
@@ -483,6 +522,47 @@ export async function POST(req: Request) {
         });
       } catch { /* the correction matters more than the line about it */ }
       return NextResponse.json({ ok: true, value: v });
+    }
+
+    /**
+     * ATTACHMENTS GO STRAIGHT TO STORAGE, NOT THROUGH THIS SERVER.
+     *
+     * The old path posted the file through the API, and the platform caps a
+     * request body at ~4.5 MB — so a 6 MB presentation came back as an HTML
+     * error page the client tried to read as JSON: "Unexpected token ... is
+     * not valid JSON". Now the server hands out a one-time signed upload URL,
+     * the browser sends the file directly to the bucket, and the API only
+     * records that it arrived. 25 MB is the new ceiling.
+     */
+    if (action === "attach-url") {
+      const id = String(body.id || "");
+      const name = String(body.name || "file").replace(/[^\w.\- ]+/g, "_").slice(0, 80);
+      const size = Number(body.size || 0);
+      if (size > 25 * 1024 * 1024) throw new HttpError(400, "Keep an attachment under 25 MB.");
+      const { data: row } = await admin
+        .from("hrms_idp").select("id, submitted_at").eq("id", id).eq("person_email", u.email).maybeSingle();
+      if (!row) throw new HttpError(404, "That is not your IDP.");
+      if (row.submitted_at) throw new HttpError(409, "This IDP has already been completed.");
+      const path = `idp/${id}/files/${Date.now()}-${name}`;
+      const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, path, token: data.token, name });
+    }
+
+    if (action === "attach-commit") {
+      const id = String(body.id || "");
+      const path = String(body.path || "");
+      if (!path.startsWith(`idp/${id}/files/`)) throw new HttpError(400, "That path is not yours.");
+      const { data: row } = await admin
+        .from("hrms_idp").select("id, attachments, submitted_at").eq("id", id).eq("person_email", u.email).maybeSingle();
+      if (!row) throw new HttpError(404, "That is not your IDP.");
+      if (row.submitted_at) throw new HttpError(409, "This IDP has already been completed.");
+      const entry = { path, name: String(body.name || "file"), size: Number(body.size || 0), at: new Date().toISOString() };
+      const list = [...((row.attachments || []) as { path: string }[]).filter((a) => a.path !== path), entry];
+      const { error } = await admin.from("hrms_idp").update({ attachments: list, updated_at: new Date().toISOString() }).eq("id", id);
+      if (error) throw new Error(error.message);
+      const { data: sgn } = await admin.storage.from(BUCKET).createSignedUrl(path, LINK_TTL);
+      return NextResponse.json({ ok: true, url: sgn?.signedUrl ?? null, ...entry });
     }
 
     if (action === "start") {

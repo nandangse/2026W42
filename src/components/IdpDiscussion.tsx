@@ -18,7 +18,7 @@ import { LOGO } from "@/lib/logo";
 import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, CONSENT_TEXT, WATCHED_TEXT, LOOM_EMBED, isComplete, bandIndex } from "@/lib/idp";
 import DictateBox from "./DictateBox";
 import IdpMyRecord, { type MyRecord } from "./IdpMyRecord";
-import IdpFinal, { type SalaryRow, type Attachment } from "./IdpFinal";
+import IdpFinal, { type SalaryRow, type SalaryInfo, type Attachment } from "./IdpFinal";
 import { TeamList, TeamReview, type TeamRow } from "./IdpTeamReview";
 import { RichTextView } from "./hrms/RichText";
 
@@ -38,7 +38,7 @@ interface Open {
   attachmentUrls?: Attachment[];
 }
 interface Done extends Open { submitted_at: string }
-type Salary = { rows: SalaryRow[]; ctcLakhs: string } | null;
+type Salary = { rows: SalaryRow[]; ctcLakhs: string; exempt: boolean; info: SalaryInfo } | null;
 
 export default function IdpDiscussion({ name, initials }: { name: string; initials: string | null }) {
   const [state, setState] = useState<{
@@ -559,6 +559,7 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, salary, name, on
         <IdpFinal
           name={name} idpId={open.id}
           salary={salary?.rows ?? null} ctcLakhs={salary?.ctcLakhs ?? null}
+          salaryInfo={salary?.info ?? null} exempt={!!salary?.exempt}
           roleName={roleDocs[0]?.role ?? open.role_at_time}
           roleAudio={roleDocs[0]?.url ?? null}
           roleSummary={roleDocs.length ? (roleDocs[0]?.summary ?? null) : open.role_summary}

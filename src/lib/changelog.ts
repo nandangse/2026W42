@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.5.2",
+    date: "2026-08-23",
+    module: "IDP — the salary page grows up",
+    items: [
+      "THE SALARY TABLE FITS THE SCREEN IT IS ON — fixed column widths in percentages, tighter headings, nothing to scroll sideways for. Above it, the person: Name · Department · Designation · Type · In Company Since · Age.",
+      "HRA, PF AND PT ARE NOT APPLICABLE for Management, Contractor, Labour - Contract and Staff - Contract — those rows now leave the table entirely for such employees, with a note saying why, rather than showing zeros that look like an error.",
+      "THE GROSS-SALARY QUESTION IS GREEN AND NO LONGER SAYS OPTIONAL — it is meant to be answered. As they type, the number reads back in words (₹1.25 Lakhs per month), the INCREMENT shows against today's figure with its percentage, and the INDICATIVE CTC at that gross is worked out with the same arithmetic as the table above — so what they ask for is immediately visible as what it would cost.",
+      "ATTACHMENTS NO LONGER SQUEEZE THROUGH THE API. The platform caps a request at ~4.5 MB, so a 6 MB presentation came back as an HTML error read as JSON — “Unexpected token…”. The server now signs a one-time upload address, the browser sends the file STRAIGHT TO STORAGE, and the API only records that it arrived. The ceiling is 25 MB.",
+      "THE PHONE RECORDER ASKS FOR A CONTAINER THE PHONE SUPPORTS — Safari records mp4 and does not know webm, Chrome the reverse, and asking for the wrong one makes some builds record silence. The supported type is now chosen by name.",
+      "An upload response that is not JSON is reported as what it is, instead of crashing the save.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.5.1",
     date: "2026-08-23",
     module: "IDP — the phone gets its words, a clock, and a second chance",

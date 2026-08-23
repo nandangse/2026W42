@@ -14,14 +14,38 @@
  */
 import { useRef, useState } from "react";
 import DictateBox, { type Recording } from "./DictateBox";
+import { supabaseBrowser } from "@/lib/supabase/browser";
 import { LOOM_EMBED } from "@/lib/idp";
+import { api } from "@/lib/api";
 
 const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
 
 export interface SalaryRow { label: string; monthly: number | null; yearly: number | null; kind: "head" | "row" | "total" | "note" }
+export interface SalaryInfo { name: string | null; department: string | null; designation: string | null; type: string | null; years: string | null; age: string | null }
 export interface Attachment { path: string; name: string; size: number; at: string; url?: string | null }
 
 const inr = (n: number | null) => (n === null ? "" : n.toLocaleString("en-IN"));
+
+/** 125000 → "1.25 Lakhs", 55000 → "55 Thousand" — the words people say. */
+const inWords = (n: number) =>
+  n >= 100000 ? `${(n / 100000).toFixed(2).replace(/\.?0+$/, "")} Lakhs`
+  : n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")} Thousand`
+  : String(n);
+
+/**
+ * THE SAME ARITHMETIC AS THE TABLE ABOVE, run at the figure they typed — so
+ * the number they ask for is immediately shown as what it would COST, not
+ * just what it would pay. Basic is assumed to keep its current share of
+ * gross; the exempt types keep their exemption.
+ */
+function indicativeCtc(askGross: number, basicShare: number, exempt: boolean): number {
+  const basic = askGross * basicShare;
+  const pf = !exempt && basic > 0 ? Math.round(Math.min(basic, 15000) * 0.12) : 0;
+  const pt = !exempt && askGross >= 10000 ? 200 : 0;
+  const perDay = askGross / 26;
+  const benM = pf + 5000 / 12 + 2000 / 12 + basic * 0.10 + (perDay * 20) / 12 + (perDay * 52) / 12;
+  return (askGross - pf - pt + benM) * 12;
+}
 
 const QUESTIONS = [
   "How do you justify your cost to company?",
@@ -33,11 +57,11 @@ const QUESTIONS = [
 ];
 
 export default function IdpFinal({
-  name, idpId, salary, ctcLakhs, roleAudio, roleSummary, roleName,
+  name, idpId, salary, ctcLakhs, salaryInfo, exempt, roleAudio, roleSummary, roleName,
   answers, setAnswer, recordings, onRecorded, attachments, onAttached, onOpenBrief,
 }: {
   name: string; idpId: string;
-  salary: SalaryRow[] | null; ctcLakhs: string | null;
+  salary: SalaryRow[] | null; ctcLakhs: string | null; salaryInfo: SalaryInfo | null; exempt: boolean;
   roleAudio: string | null; roleSummary: string | null; roleName: string | null;
   answers: Record<string, string>;
   setAnswer: (id: string, v: string) => void;
@@ -48,20 +72,25 @@ export default function IdpFinal({
   onOpenBrief: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const [ask, setAsk] = useState(() =>
+    answers["ask_gross"] || String(salary?.find((r) => r.label === "Total Gross Salary (A)")?.monthly ?? ""));
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
 
+  /**
+   * STRAIGHT TO STORAGE. The platform caps an API request at ~4.5 MB, so a
+   * 6 MB deck posted through it came back as an HTML error the page tried to
+   * read as JSON. The server now signs a one-time upload address, the browser
+   * sends the file THERE, and the API only records that it arrived.
+   */
   const attach = async (f: File | null) => {
     if (!f) return;
     setUploading(true); setErr("");
     try {
-      const fd = new FormData();
-      fd.append("kind", "attach");
-      fd.append("id", idpId);
-      fd.append("file", f);
-      const r = await fetch("/api/idp", { method: "POST", body: fd });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Could not attach that");
+      const t = await api.post("/api/idp", { action: "attach-url", id: idpId, name: f.name, size: f.size });
+      const { error: upErr } = await supabaseBrowser().storage.from("voice-notes").uploadToSignedUrl(t.path, t.token, f);
+      if (upErr) throw new Error(`The upload itself failed: ${upErr.message}`);
+      const j = await api.post("/api/idp", { action: "attach-commit", id: idpId, path: t.path, name: t.name, size: f.size });
       onAttached({ path: j.path, name: j.name, size: f.size, at: new Date().toISOString(), url: j.url });
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     setUploading(false);
@@ -108,14 +137,25 @@ export default function IdpFinal({
       {/* ── the salary table ── */}
       {salary ? (
         <div className="rounded-lg p-3 mt-4" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
-          <div className="font-bold" style={{ fontSize: 15 }}>Your current Salary Table</div>
-          <div className="overflow-x-auto mt-2">
-            <table className="w-full" style={{ fontSize: 13.5, minWidth: 420, borderCollapse: "collapse" }}>
+          <div className="font-bold" style={{ fontSize: 15 }}>Your Current Salary Table</div>
+          {salaryInfo && (
+            <div className="mt-1" style={{ fontSize: 13, lineHeight: 1.7, color: C.dim }}>
+              <b>Name:</b> {salaryInfo.name || "—"}<br />
+              <b>Department:</b> {salaryInfo.department || "—"} &nbsp;·&nbsp; <b>Designation:</b> {salaryInfo.designation || "—"}<br />
+              <b>Type:</b> {salaryInfo.type || "—"}<br />
+              <b>In Company Since:</b> {salaryInfo.years ? `${salaryInfo.years} years` : "—"} &nbsp;·&nbsp;{" "}
+              <b>Age:</b> {salaryInfo.age ? `${salaryInfo.age} years` : "—"}
+            </div>
+          )}
+          {/* fits the screen it is on: fixed layout, percentages, and the
+              rupee columns tight — nothing to scroll sideways for */}
+          <div className="mt-2">
+            <table style={{ fontSize: 12.5, width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  <th className="text-left px-2 py-1.5" style={{ border: `1px solid ${C.line}` }}>Components of Compensation</th>
-                  <th className="text-right px-2 py-1.5" style={{ border: `1px solid ${C.line}`, width: 120 }}>Monthly (Rs. / per month)</th>
-                  <th className="text-right px-2 py-1.5" style={{ border: `1px solid ${C.line}`, width: 130 }}>Yearly (Rs. / per annum)</th>
+                  <th className="text-left px-1.5 py-1.5" style={{ border: `1px solid ${C.line}`, width: "48%" }}>Components of Compensation</th>
+                  <th className="text-right px-1.5 py-1.5" style={{ border: `1px solid ${C.line}`, width: "24%" }}>Monthly (Rs.)</th>
+                  <th className="text-right px-1.5 py-1.5" style={{ border: `1px solid ${C.line}`, width: "28%" }}>Yearly (Rs.)</th>
                 </tr>
               </thead>
               <tbody>
@@ -125,12 +165,12 @@ export default function IdpFinal({
                     fontWeight: r.kind === "total" ? 700 : r.kind === "head" ? 700 : 400,
                   }}>
                     {r.kind === "note" ? (
-                      <td colSpan={3} className="px-2 py-1" style={{ border: `1px solid ${C.line}`, fontSize: 12, color: C.dim }}>{r.label}</td>
+                      <td colSpan={3} className="px-1.5 py-1" style={{ border: `1px solid ${C.line}`, fontSize: 11.5, color: C.dim }}>{r.label}</td>
                     ) : (
                       <>
-                        <td className="px-2 py-1" style={{ border: `1px solid ${C.line}` }}>{r.label}</td>
-                        <td className="px-2 py-1 text-right tnum" style={{ border: `1px solid ${C.line}` }}>{inr(r.monthly)}</td>
-                        <td className="px-2 py-1 text-right tnum" style={{ border: `1px solid ${C.line}` }}>{inr(r.yearly)}</td>
+                        <td className="px-1.5 py-1" style={{ border: `1px solid ${C.line}`, wordBreak: "break-word" }}>{r.label}</td>
+                        <td className="px-1.5 py-1 text-right tnum" style={{ border: `1px solid ${C.line}` }}>{inr(r.monthly)}</td>
+                        <td className="px-1.5 py-1 text-right tnum" style={{ border: `1px solid ${C.line}` }}>{inr(r.yearly)}</td>
                       </>
                     )}
                   </tr>
@@ -138,6 +178,11 @@ export default function IdpFinal({
               </tbody>
             </table>
           </div>
+          {exempt && (
+            <div style={{ fontSize: 12, color: "#8A5B00", marginTop: 6, lineHeight: 1.5 }}>
+              HRA, PF and PT are not applicable for Contract, Management and Staff - Contract type of employees.
+            </div>
+          )}
           {ctcLakhs && (
             <div className="mt-2 font-bold" style={{ fontSize: 15 }}>
               Your CTC is approx <span style={{ color: C.orange }}>Rs {ctcLakhs} Lakhs</span> per year.
@@ -192,24 +237,54 @@ export default function IdpFinal({
 
       {/* ── the question worth asking ── */}
       <div className="rounded-lg p-3 mt-4" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
-        <div className="font-bold" style={{ fontSize: 14 }}>
-          What Gross Monthly Salary should the company pay you? <span style={{ color: C.faint, fontWeight: 400 }}>(Optional)</span>
+        <div className="font-bold" style={{ fontSize: 15, color: C.green }}>
+          What Gross Monthly Salary should the company pay you?
         </div>
         <div style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.6, marginTop: 2 }}>
           It starts at what you are paid today — change it to the number you believe is right, next to the value
-          you have just described, or leave it as it is.
+          you have just described.
         </div>
-        <div className="flex items-center gap-2 mt-2">
-          <span style={{ fontSize: 15, fontWeight: 700 }}>Rs</span>
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          <span style={{ fontSize: 16, fontWeight: 700, color: C.green }}>Rs</span>
           <input
-            defaultValue={answers["ask_gross"] || String(salary?.find((r) => r.label === "Total Gross Salary (A)")?.monthly ?? "")}
+            value={ask}
             inputMode="numeric"
             placeholder="per month"
-            onBlur={(e) => setAnswer("ask_gross", e.target.value.replace(/[^0-9]/g, ""))}
+            onChange={(e) => setAsk(e.target.value.replace(/[^0-9]/g, ""))}
+            onBlur={() => setAnswer("ask_gross", ask)}
             className="rounded px-2 py-2 tnum"
-            style={{ border: `1px solid ${C.line}`, fontSize: 16, width: 170 }} />
+            style={{ border: `2px solid ${C.green}`, color: C.green, fontWeight: 700, fontSize: 17, width: 170 }} />
           <span style={{ fontSize: 12, color: C.faint }}>gross, per month</span>
         </div>
+        {(() => {
+          const n = Number(ask || 0);
+          if (!n) return null;
+          const current = salary?.find((r) => r.label === "Total Gross Salary (A)")?.monthly ?? null;
+          const basicNow = salary?.find((r) => r.label === "Basic & DA")?.monthly ?? null;
+          const basicShare = current && basicNow ? basicNow / current : 1;
+          const inc = current !== null ? n - current : null;
+          const ctc = indicativeCtc(n, basicShare, exempt);
+          return (
+            <div className="mt-2" style={{ fontSize: 13.5, lineHeight: 1.8 }}>
+              <b style={{ color: C.green }}>= ₹{inWords(n)} per month</b>
+              {inc !== null && (
+                <div>
+                  Increment <b className="tnum" style={{ color: inc >= 0 ? C.green : C.red }}>
+                    {inc >= 0 ? "+" : "−"}₹{inr(Math.abs(inc))}
+                  </b>{" "}
+                  <span style={{ color: C.faint }}>
+                    ({current ? `${inc >= 0 ? "+" : "−"}${Math.abs((inc / current) * 100).toFixed(1)}% increment` : ""})
+                  </span>
+                </div>
+              )}
+              <div style={{ color: C.dim }}>
+                At this gross, your indicative CTC works out to about{" "}
+                <b>₹{inWords(Math.round(ctc))} per year</b>{" "}
+                <span style={{ fontSize: 11.5, color: C.faint }}>— same calculation as the table above</span>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── attachments ── */}
@@ -225,7 +300,7 @@ export default function IdpFinal({
             className="text-xs font-bold rounded px-3 py-2" style={{ background: "#16232F", color: "#fff", opacity: uploading ? 0.6 : 1 }}>
             {uploading ? "Attaching…" : "📎 Attach document"}
           </button>
-          <span style={{ fontSize: 11.5, color: C.faint }}>PDF, Word, PowerPoint, Excel or an image · under 15 MB</span>
+          <span style={{ fontSize: 11.5, color: C.faint }}>PDF, Word, PowerPoint, Excel or an image · under 25 MB</span>
         </div>
         {err && <div style={{ fontSize: 12, color: C.red, marginTop: 4 }}>{err}</div>}
         {attachments.length > 0 && (
