@@ -3501,15 +3501,24 @@ function JobPlan({
       {/* ON A PHONE, ONLY THIS IS PINNED (Dr Raghu, 23 Aug 2026). The full
           card below wraps four rows deep on a narrow screen, and pinning it
           left a third of the viewport frozen. The phone keeps one thin line —
-          which job, whose it is — and everything else scrolls like content,
-          because on a phone it is content. */}
-      <div className="md:hidden jobplan-ministrip -mx-4 px-4 py-1.5 flex items-baseline"
-        style={{ position: "sticky", top: "var(--hdr-h, 92px)", zIndex: 22, background: "#16232F", color: "#fff", minWidth: 0 }}>
-        <span className="font-bold tnum" style={{ fontSize: 14 }}>JOB {jobNo(dj.id)}</span>
-        <span className="truncate" style={{ fontSize: 12, color: "#B7C4D0", marginLeft: 8 }} title={dj.tag}>
-          {dj.tag}
-        </span>
-      </div>
+          which job, whose it is — and everything else scrolls like content.
+
+          FIXED, NOT STICKY, and it appears only once the sentinel says the
+          card itself has scrolled away. A sticky strip here kept sliding
+          UNDER the frozen header on phones whenever the measured offset ran
+          a few pixels short — pinned exactly where nobody could see it. A
+          fixed overlay above the header cannot be hidden by it, and while
+          the real card is still on screen the strip stays away entirely, so
+          nothing is ever said twice. */}
+      {hdrGone && (
+        <div className="md:hidden flex items-baseline px-4 py-1.5"
+          style={{ position: "fixed", top: "var(--hdr-h, 92px)", left: 0, right: 0, zIndex: 46, background: "#16232F", color: "#fff", minWidth: 0, boxShadow: "0 6px 12px -8px rgba(0,0,0,.5)" }}>
+          <span className="font-bold tnum" style={{ fontSize: 14, flexShrink: 0 }}>JOB {jobNo(dj.id)}</span>
+          <span className="truncate" style={{ fontSize: 12, color: "#B7C4D0", marginLeft: 8 }} title={dj.tag}>
+            {dj.tag}
+          </span>
+        </div>
+      )}
 
       <JobTopRow
         job={dj}

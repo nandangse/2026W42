@@ -497,7 +497,12 @@ export async function POST(req: Request) {
           }
         } catch { stt = "failed:network"; }
       }
-      audio[qid] = [...(audio[qid] || []), { path, seconds, at: new Date().toISOString(), transcript }];
+      audio[qid] = [
+        ...(audio[qid] || []),
+        // stt written onto the entry: when a phone says "no words came", the
+        // row itself now says what the server actually did
+        { path, seconds, at: new Date().toISOString(), transcript, stt, polished: !!polished } as never,
+      ];
       const { error } = await admin
         .from("hrms_idp").update({ audio, updated_at: new Date().toISOString() }).eq("id", id);
       if (error) throw new Error(error.message);

@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.5.6",
+    date: "2026-08-23",
+    module: "IDP — the words the server heard always reach the box",
+    items: [
+      "PULLED THE ACTUAL RECORDING FROM STORAGE AND FOUND THE TRUTH: the phone's audio was healthy, Whisper had transcribed it, the transcript was sitting on the server — and the page was telling the person “it may have been too quiet”. The chain worked; the last yard failed, and the error blamed the microphone.",
+      "THE CLIENT NOW USES EVERYTHING THE SERVER SENDS: the polished answer when it came, the raw transcript when it did not — an imperfect transcript in the box beats a wrong claim of silence. Silence is claimed only when the server had neither.",
+      "EACH RECORDING NOW CARRIES THE SERVER'S OWN VERDICT on it — what the transcription did (ok · no-key · failed:status · empty) written onto the stored entry, so the next mystery is read out of the database instead of theorised about.",
+      "The Job Plan phone strip is FIXED rather than sticky, and appears only once the job card itself has scrolled away — a sticky strip kept sliding UNDER the frozen header whenever the measured offset ran a few pixels short, pinned exactly where nobody could see it.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.5.5",
     date: "2026-08-23",
     module: "Job Plan — a phone pins one line, not a third of the screen",

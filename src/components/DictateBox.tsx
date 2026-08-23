@@ -122,10 +122,14 @@ export default function DictateBox({
            * transcribe it, the answer comes back here and lands in the box
            * exactly as a browser transcription would have.
            */
-          if (!said && typeof j.text === "string" && j.text.trim()) {
+          const serverWords = (typeof j.text === "string" && j.text.trim()) || (typeof j.transcript === "string" && j.transcript.trim()) || "";
+          if (!said && serverWords) {
+            // the polished answer when it came, the raw words when it did not
+            // — an imperfect transcript in the box beats a wrong claim of
+            // silence, which is exactly what testing hit
             const base = valueRef.current.trim();
-            onChange(base ? `${base}\n${j.text.trim()}` : j.text.trim());
-          } else if (!said && !j.text) {
+            onChange(base ? `${base}\n${serverWords}` : serverWords);
+          } else if (!said && !serverWords) {
             const why = String(j.stt || "");
             setErr(
               why === "no-key"
