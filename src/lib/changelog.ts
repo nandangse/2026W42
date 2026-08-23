@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.1.9",
+    date: "2026-08-23",
+    module: "HRIS — one spelling per role",
+    items: [
+      "THE 23 DUPLICATE SPELLINGS ARE GONE. The Goalbook's name wins, on Dr Raghu's instruction: “Service Techician” became Service Technician, “Prod-Helper” became Prod - Helper, “Head, Purchase” became Head - Purchase, and twenty more like them. The register is 121 roles rather than 144.",
+      "90 PEOPLE MOVED, not the 33 first quoted — that figure counted only those on the roll. The correction was applied to everybody, including the 57 who have left, because a leaver's record is the one somebody reads in a dispute and it should not say “Service Techician” either.",
+      "EVERY MOVE IS ON THE PERSON'S OWN HISTORY: what their role said, what it says now, who changed it and when. Nothing was rewritten silently.",
+      "193 OF THE 201 ACTIVE EMPLOYEES ARE NOW IN A ROLE WITH A REAL DEFINITION — a job description, a deliverable and a measurement metric behind it. It was nil this morning.",
+      "SEVEN ROLES REMAIN UNDEFINED AND HELD: Prod - Electrician (2), President - Defense Biz., Head Accounts, HR Manager, Manager-Manufacturing Excellence, Senior Manager-account, Painter. These are real jobs rather than typos, so nobody guessed at them — they want either a Goalbook definition or a decision about which existing role they are.",
+      "Thirty more spellings hold nobody at all and are waiting to be deleted rather than deleted quietly.",
+      "No migration — data, and every change carries its own line in the history.",
+    ],
+  },
+  {
     v: "3.19.1.8",
     date: "2026-08-23",
     module: "HRIS — the Goalbook's role definitions are in",
