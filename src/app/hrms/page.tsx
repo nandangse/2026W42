@@ -51,5 +51,13 @@ export default async function HrmsPage() {
     );
   }
 
-  return <Hrms email={user.email} isOwner={user.isOwner} />;
+  return (
+    <Hrms
+      email={user!.email}
+      initials={user!.initials}
+      displayName={user!.displayName}
+      role={user!.role}
+      isOwner={user!.isOwner}
+    />
+  );
 }

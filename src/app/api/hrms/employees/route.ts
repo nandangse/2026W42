@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { fieldSpec, type HrmsEmployee } from "@/lib/hrms";
+import { fieldSpec, hrmsTables, type HrmsEmployee } from "@/lib/hrms";
 
 export const dynamic = "force-dynamic";
 
@@ -43,9 +43,10 @@ export async function GET() {
   try {
     await requireHrms();
     const admin = adminClient();
+    const T = await hrmsTables(admin);
 
     const { data, error } = await admin
-      .from("hrms_employees")
+      .from(T.employees)
       .select("id, name, email, dob, doj, department, designation, location, active, extra, first_seen, updated_at")
       .order("name");
     if (error) throw new Error(error.message);
@@ -56,7 +57,7 @@ export async function GET() {
     const overrides = new Map<string, Map<string, { value: string | null; by: string | null; at: string }>>();
     try {
       const { data: eds } = await admin
-        .from("hrms_employee_edits")
+        .from(T.edits)
         .select("employee_id, field, value, edited_by, edited_at");
       for (const e of eds || []) {
         const id = String(e.employee_id);
@@ -117,6 +118,7 @@ export async function POST(req: Request) {
   try {
     const me = await requireHrms();
     const admin = adminClient();
+    const T = await hrmsTables(admin);
     const body = await req.json();
     const action = String(body.action || "");
 
@@ -133,13 +135,13 @@ export async function POST(req: Request) {
 
       // what it reads as right now, for the log
       const { data: cur } = await admin
-        .from("hrms_employee_edits")
+        .from(T.edits)
         .select("value")
         .eq("employee_id", id)
         .eq("field", field)
         .maybeSingle();
       const { data: emp } = await admin
-        .from("hrms_employees")
+        .from(T.employees)
         .select("id, name, email, dob, doj, department, designation, location, active")
         .eq("id", id)
         .maybeSingle();
@@ -149,7 +151,7 @@ export async function POST(req: Request) {
       let after: string | null = null;
       if (action === "edit") {
         after = normalise(spec.kind, body.value);
-        const { error } = await admin.from("hrms_employee_edits").upsert(
+        const { error } = await admin.from(T.edits).upsert(
           { employee_id: id, field, value: after, edited_by: me.email, edited_at: new Date().toISOString() },
           { onConflict: "employee_id,field" },
         );
@@ -160,7 +162,7 @@ export async function POST(req: Request) {
         }
       } else {
         const { error } = await admin
-          .from("hrms_employee_edits")
+          .from(T.edits)
           .delete()
           .eq("employee_id", id)
           .eq("field", field);
@@ -173,7 +175,7 @@ export async function POST(req: Request) {
         // The log must not be able to fail the edit — a lost history line is
         // bad, an edit that reports failure after saving is worse.
         try {
-          await admin.from("hrms_employee_edit_log").insert({
+          await admin.from(T.log).insert({
             employee_id: id,
             field,
             old_value: before,
@@ -194,12 +196,12 @@ export async function POST(req: Request) {
       // up the next upload UPDATES this person rather than duplicating them
       const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
       let id = String(body.id || "").trim() || base;
-      const { data: clash } = await admin.from("hrms_employees").select("id").eq("id", id).maybeSingle();
+      const { data: clash } = await admin.from(T.employees).select("id").eq("id", id).maybeSingle();
       if (clash) {
         if (body.id) throw new HttpError(409, `Employee code "${id}" is already used`);
         id = id + "-2";
       }
-      const { error } = await admin.from("hrms_employees").insert({
+      const { error } = await admin.from(T.employees).insert({
         id,
         name,
         email: String(body.email || "").trim().toLowerCase() || null,
@@ -211,7 +213,7 @@ export async function POST(req: Request) {
       });
       if (error) throw new Error(error.message);
       try {
-        await admin.from("hrms_employee_edit_log").insert({
+        await admin.from(T.log).insert({
           employee_id: id,
           field: "(record)",
           old_value: null,

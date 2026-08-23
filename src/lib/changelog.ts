@@ -75,6 +75,23 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.1.0",
+    date: "2026-08-23",
+    module: "HRMS — the structure",
+    items: [
+      "HRMS NOW HAS ITS SHAPE: a collapsible LEFT NAVBAR carrying every module and sub-module, and the page opening on the right. On a phone the nav slides over the page and closes on a choice, rather than squeezing a 240px column onto a 375px screen.",
+      "THE WHOLE STRUCTURE IS THERE, and most of it is deliberately empty. Employee Master (Active · Past Employeemaster 2025-26 · Left) · Individual Report Card · IDP (Roles, JD, KRA, KPI · Individual IDP) · Appraisal (Table · Report Card & Edits · Summary Analytics · Interviews audit) · Regular Reports (Intention Statement · Daily · Weekly · Monthly · Quarterly · 1-2-1) · Employee Punch Records (Leave · Loan · Expense Claim · Suggestions · Grievance · Outdoor Attendance Mark · Regularization) · Memos · Statutory Records · Finalized Salary Sheets · Attendance Muster · Employee Handbook · Salary MIS · HR Departmental ToDos.",
+      "AN EMPTY MODULE EXPLAINS ITSELF rather than being hidden until it is finished. Each says what will go in it and exactly where that material sits today — which tab of which sheet. The structure can then be argued with before anything is built, which is the point of putting it up first.",
+      "EVERY TABLE IN HRMS IS NOW ONE COMPONENT, and it obeys three rules from here on: the header is FROZEN; any run of leading COLUMNS CAN BE FROZEN by clicking the pin on a column (the spreadsheet's own “freeze up to here”); and CLICKING A HEADER SORTS — once ascending, twice descending, a third time back to the table's own order, with blanks last whichever way round.",
+      "PDF / PRINT ON EVERY PAGE, because the printout goes in the file. The navigation, buttons and filters come off, the table header repeats on each sheet, no row is split across a page break, and the paper carries its own masthead — what it is, who printed it, when, and that it is a personnel record.",
+      "THE EMPLOYEE MASTER now sits inside that structure with three views over it. Past Employeemaster 2025-26 is DERIVED from joining dates — everybody who joined on or before 31 March 2026 — and says so; uploading the 2025-26 sheet as its own file would make it exact.",
+      "THE HEADER SHOWS GENIE'S VERSION AND YOUR RECORD — initials on the orange chip and your name, the same as Genie, instead of an email address.",
+      "THE THREE HR SHEETS HAVE BEEN READ AND CATALOGUED — the Main Salary Sheet (48 tabs), the 2026 Appraisal workbook (17 tabs) and the Annual Goalbook (11 tabs). Every tab, what it holds and which module it becomes is written down in docs/HR-SOURCE-DOCUMENTS.md. No figure, Aadhaar number or bank account is copied into it.",
+      "Worth knowing from that reading: the master carries 115 COLUMNS, of which Genie names eight and keeps the rest verbatim — so family details, statutory numbers, bank details and five years of gross salary are ALREADY in the database after an upload. Naming the ones a module needs is a per-module decision, not a re-import.",
+      "No new migration. 0048 still needs running — and until it is, the code now works with the old table names AND the new ones, resolving which exist and re-checking every minute. A migration and a deploy are two acts by two hands, and the minutes between them must not take the employee master down or fail the morning upload.",
+    ],
+  },
+  {
     v: "3.19.0.1",
     date: "2026-08-22",
     module: "HRMS isolation · nothing indexed",

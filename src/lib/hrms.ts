@@ -117,3 +117,47 @@ export function tenure(doj: string | null | undefined, today = new Date()): stri
   if (!m) return `${y} year${y === 1 ? "" : "s"}`;
   return `${y}y ${m}m`;
 }
+
+/**
+ * WHICH TABLES ARE ACTUALLY THERE — the 0048 rename, survived safely.
+ *
+ * Migration 0048 renames employees -> hrms_employees (and the two beside it).
+ * A migration and a deploy are two separate acts by two separate hands, and
+ * whichever lands second, the minutes in between must not take the employee
+ * master down or fail the morning upload. So nothing here hard-codes a name:
+ * the new name is tried, and the old one is used until the rename has
+ * happened.
+ *
+ * The answer is cached for a minute rather than for the life of the process,
+ * so an installation picks the new names up on its own shortly after the
+ * migration runs, with no redeploy and nobody having to remember.
+ *
+ * DELETE THIS once 0048 is run everywhere. It is a bridge, not a design.
+ */
+let tableCache: { at: number; names: HrmsTables } | null = null;
+const TABLE_TTL_MS = 60_000;
+
+export interface HrmsTables {
+  employees: string;
+  edits: string;
+  log: string;
+}
+
+export async function hrmsTables(admin: SupabaseClient): Promise<HrmsTables> {
+  if (tableCache && Date.now() - tableCache.at < TABLE_TTL_MS) return tableCache.names;
+  const probe = async (renamed: string, original: string) => {
+    try {
+      const { error } = await admin.from(renamed).select("*", { head: true, count: "exact" }).limit(1);
+      return error ? original : renamed;
+    } catch {
+      return original;
+    }
+  };
+  const names: HrmsTables = {
+    employees: await probe("hrms_employees", "employees"),
+    edits: await probe("hrms_employee_edits", "employee_edits"),
+    log: await probe("hrms_employee_edit_log", "employee_edit_log"),
+  };
+  tableCache = { at: Date.now(), names };
+  return names;
+}

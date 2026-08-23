@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireHrms, errJson } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { fieldSpec } from "@/lib/hrms";
+import { fieldSpec, hrmsTables } from "@/lib/hrms";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +16,10 @@ export async function GET(req: Request) {
   try {
     await requireHrms();
     const id = new URL(req.url).searchParams.get("id");
-    let q = adminClient()
-      .from("hrms_employee_edit_log")
+    const admin = adminClient();
+    const T = await hrmsTables(admin);
+    let q = admin
+      .from(T.log)
       .select("id, employee_id, field, old_value, new_value, edited_by, edited_at")
       .order("edited_at", { ascending: false })
       .limit(id ? 100 : 200);

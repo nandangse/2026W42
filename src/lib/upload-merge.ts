@@ -4,6 +4,7 @@
 // Order of the three files must not matter; re-uploading the same file is a
 // no-op (idempotent upserts).
 import * as XLSX from "xlsx";
+import { hrmsTables } from "./hrms";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseUpload, linkTasks, dateFixes } from "./parse-upload";
 import type {
@@ -401,7 +402,7 @@ export async function applyUpload(
   } else if (kind === "employees") {
     const emp = parsed.employees!;
     jobCount = emp.length;
-    const { error } = await admin.from("hrms_employees").upsert(
+    const { error } = await admin.from((await hrmsTables(admin)).employees).upsert(
       emp.map((e) => ({ ...e, updated_at: new Date().toISOString() })),
       { onConflict: "id" },
     );

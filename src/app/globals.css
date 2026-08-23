@@ -76,3 +76,54 @@ input[type="date"] {
     font-size: 16px !important;
   }
 }
+
+/* ───────────────────────────── HRMS printing ─────────────────────────────
+   "The give report as PDF feature is also important as the printout will be
+   needed to be taken for the file." (Dr Raghu, 22 Aug 2026)
+
+   There is no PDF library here and there does not need to be one: the
+   browser's own print-to-PDF produces a better document than a generated one
+   — real text, selectable and searchable, at the paper size the person
+   actually has — and it is the dialogue everybody already knows.
+
+   What these rules do is make the printed page a DOCUMENT rather than a
+   screenshot of an application: the navigation, the buttons and the filter
+   bar come off, the pane fills the paper, the table header repeats on every
+   sheet, and no row is cut in half across a page break. #hrms-print-head is
+   hidden on screen and appears only on paper, carrying the title, who
+   printed it and when — which is what makes the sheet usable in a file six
+   months later. */
+@media print {
+  @page { margin: 12mm; size: A4; }
+
+  body { background: #fff !important; }
+  .no-print { display: none !important; }
+
+  /* only the pane prints */
+  body * { visibility: hidden !important; }
+  #hrms-print, #hrms-print * { visibility: visible !important; }
+  #hrms-print {
+    position: absolute !important;
+    left: 0; top: 0; width: 100% !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* the paper-only masthead */
+  #hrms-print-head { display: block !important; }
+
+  /* a sticky column on paper is a column in the wrong place */
+  #hrms-print [style*="position: sticky"],
+  #hrms-print th, #hrms-print td { position: static !important; box-shadow: none !important; }
+
+  /* tables: let them run, repeat the header, never split a row */
+  .hrms-table-wrap {
+    max-height: none !important;
+    overflow: visible !important;
+    border: none !important;
+  }
+  #hrms-print table { width: 100% !important; min-width: 0 !important; font-size: 9pt !important; }
+  #hrms-print thead { display: table-header-group !important; }
+  #hrms-print tr { break-inside: avoid !important; page-break-inside: avoid !important; }
+  #hrms-print th { background: #EFEDE7 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

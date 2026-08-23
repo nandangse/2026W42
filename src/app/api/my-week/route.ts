@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
+import { hrmsTables } from "@/lib/hrms";
 import { adminClient } from "@/lib/supabase/admin";
 import { today, addDays } from "@/lib/schedule";
 import {
@@ -112,7 +113,7 @@ export async function GET() {
     // ---- birthdays, next seven days ----
     const birthdays = await safe(async () => {
       const { data } = await admin
-        .from("hrms_employees")
+        .from((await hrmsTables(admin)).employees)
         .select("id, name, dob, department")
         .eq("active", true)
         .not("dob", "is", null);
