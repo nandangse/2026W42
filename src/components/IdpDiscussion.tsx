@@ -15,17 +15,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
-import { IDP_SECTIONS, IDP_RATINGS, RATING_SCALE, CONSENT_TEXT, isComplete } from "@/lib/idp";
+import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, CONSENT_TEXT, isComplete } from "@/lib/idp";
+import DictateBox from "./DictateBox";
 
 const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
 
-interface Open { id: string; answers: Record<string, string>; ratings: Record<string, number>; role_summary: string | null; role_at_time: string | null }
+interface Open {
+  id: string; answers: Record<string, string>; ratings: Record<string, number>;
+  role_summary: string | null; role_at_time: string | null;
+}
 
 export default function IdpDiscussion({ name, initials }: { name: string; initials: string | null }) {
   const [state, setState] = useState<{
     open: Open | null; done: { id: string; submitted_at: string }[];
     role: string | null; roleSummary: string | null; needsMigration?: boolean;
     employee: { id: string; name: string } | null;
+    isLeader?: boolean;
   } | null>(null);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -34,7 +39,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
   const load = useCallback(async () => {
     try {
       const j = await api.get("/api/idp");
-      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, needsMigration: j.needsMigration, employee: j.employee ?? null });
+      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, needsMigration: j.needsMigration, employee: j.employee ?? null, isLeader: !!j.isLeader });
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -48,7 +53,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
   if (!state) return <Shell initials={initials}><div className="p-6 text-sm" style={{ color: C.faint }}>Loading…</div></Shell>;
 
-  if (state.open) return <Shell initials={initials}><Filling open={state.open} onDone={load} /></Shell>;
+  if (state.open) return <Shell initials={initials}><Filling open={state.open} isLeader={!!state.isLeader} onDone={load} /></Shell>;
 
   // The login is the key, and it has to reach a record. An IDP filled in by a
   // login that matches no employee has nowhere to be filed and nobody to
@@ -163,7 +168,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
 /* ─────────────────────────── the discussion ─────────────────────────── */
 
-function Filling({ open, onDone }: { open: Open; onDone: () => Promise<void> }) {
+function Filling({ open, isLeader, onDone }: { open: Open; isLeader: boolean; onDone: () => Promise<void> }) {
   const [answers, setAnswers] = useState<Record<string, string>>(open.answers || {});
   const [ratings, setRatings] = useState<Record<string, number>>(open.ratings || {});
   const [msg, setMsg] = useState("");
@@ -180,7 +185,10 @@ function Filling({ open, onDone }: { open: Open; onDone: () => Promise<void> }) 
   const setA = (id: string, v: string) => { const n = { ...answers, [id]: v }; setAnswers(n); touch(n, ratings); };
   const setR = (d: string, v: number) => { const n = { ...ratings, [d]: v }; setRatings(n); touch(answers, n); };
 
-  const check = isComplete(answers, ratings);
+  // the leaders' four are asked only of the Leaders Council, and are only
+  // required of the people they are shown to
+  const sections = IDP_SECTIONS.filter((x) => !x.leadersOnly || isLeader);
+  const check = isComplete(answers, ratings, isLeader);
 
   const submit = async () => {
     setBusy(true); setMsg("");
@@ -204,7 +212,7 @@ function Filling({ open, onDone }: { open: Open; onDone: () => Promise<void> }) 
         </div>
       )}
 
-      {IDP_SECTIONS.map((s) => (
+      {sections.map((s) => (
         <div key={s.key} className="mb-6">
           <h2 className="font-bold" style={{ fontSize: 18 }}>{s.title}</h2>
           {s.blurb && <div style={{ fontSize: 13, color: C.faint, lineHeight: 1.6, marginTop: 2 }}>{s.blurb}</div>}
@@ -213,10 +221,14 @@ function Filling({ open, onDone }: { open: Open; onDone: () => Promise<void> }) 
             const short = q.min ? v.trim().length > 0 && v.trim().length < q.min : false;
             return (
               <div key={q.id} className="mt-3 rounded-lg p-3" style={{ background: "#fff", border: `1px solid ${short ? "#F5B32B" : C.line}` }}>
-                <div className="font-semibold" style={{ fontSize: 14 }}>{q.label}</div>
-                {q.hint && <div style={{ fontSize: 12, color: C.faint, lineHeight: 1.5, marginBottom: 5 }}>{q.hint}</div>}
-                <textarea value={v} rows={q.rows} onChange={(e) => setA(q.id, e.target.value)}
-                  className="w-full rounded px-2 py-1.5" style={{ border: `1px solid ${C.line}`, fontSize: 14, lineHeight: 1.6 }} />
+                <div className="font-semibold" style={{ fontSize: 15 }}>{q.label}</div>
+                {q.hint && <div style={{ fontSize: 13, color: C.dim, lineHeight: 1.5, marginTop: 2 }}>{q.hint}</div>}
+                {q.help && (
+                  <div className="rounded p-2 mt-2 mb-2" style={{ background: "#F4F2EC", fontSize: 12.5, color: C.dim, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                    {q.help}
+                  </div>
+                )}
+                <DictateBox value={v} rows={q.rows} onChange={(nv) => setA(q.id, nv)} />
                 {short && <div style={{ fontSize: 11, color: "#8A5B00" }}>A little more — this is one of the answers that gets read.</div>}
               </div>
             );
@@ -230,16 +242,31 @@ function Filling({ open, onDone }: { open: Open; onDone: () => Promise<void> }) 
           Against what your role needs — not against the people around you.
         </div>
         <div className="rounded-lg mt-3" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
-          {IDP_RATINGS.map((d, i) => (
-            <div key={d} className="px-3 py-2 flex items-center gap-3 flex-wrap" style={{ borderTop: i ? `1px solid #EEECE6` : undefined }}>
-              <div style={{ fontSize: 14, minWidth: 210, flex: 1 }}>{d}</div>
-              <select value={ratings[d] || ""} onChange={(e) => setR(d, Number(e.target.value))}
-                className="rounded px-2 py-1 bg-white" style={{ border: `1px solid ${ratings[d] ? C.line : "#F5B32B"}`, fontSize: 13 }}>
-                <option value="">— choose —</option>
-                {RATING_SCALE.map((r) => (<option key={r.v} value={r.v}>{r.label}</option>))}
-              </select>
-            </div>
-          ))}
+          {IDP_RATINGS.map((d, i) => {
+            const val = ratings[d] || 0;
+            return (
+              <div key={d} className="px-3 py-3" style={{ borderTop: i ? `1px solid #EEECE6` : undefined }}>
+                <div className="flex items-baseline gap-3 flex-wrap">
+                  <div style={{ fontSize: 15, fontWeight: 600, minWidth: 200 }}>{d}</div>
+                  <div className="tnum" style={{ fontSize: 20, fontWeight: 700, color: val ? C.orange : "#C9C6BD", minWidth: 34 }}>
+                    {val || "—"}
+                  </div>
+                  <div style={{ fontSize: 13, color: val ? C.dim : C.faint, lineHeight: 1.5, flex: 1, minWidth: 220 }}>
+                    {val ? RATING_MEANING[val] : "Move the slider to choose, 1 to 10."}
+                  </div>
+                </div>
+                <input type="range" min={1} max={RATING_MAX} step={1} value={val || 1}
+                  onChange={(ev) => setR(d, Number(ev.target.value))}
+                  className="w-full mt-2"
+                  style={{ accentColor: val ? C.orange : "#C9C6BD" }} />
+                <div className="flex justify-between" style={{ fontSize: 10.5, color: C.faint }}>
+                  <span>1 · only starting</span>
+                  <span>5 · what the role needs</span>
+                  <span>10 · the best here</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -259,8 +286,8 @@ function Filling({ open, onDone }: { open: Open; onDone: () => Promise<void> }) 
           </div>
         ) : (
           <div style={{ fontSize: 13, color: C.green, lineHeight: 1.6 }}>
-            Everything is answered. Read it once more before you submit — after that it goes on your record and you
-            cannot change it.
+            Everything is answered. Read it once more — once you press Complete it goes on your record and
+            <b> cannot be changed</b>.
           </div>
         )}
         <button onClick={submit} disabled={!check.ok || busy}
@@ -269,7 +296,7 @@ function Filling({ open, onDone }: { open: Open; onDone: () => Promise<void> }) 
             background: check.ok ? C.green : "#E2E0DA", color: check.ok ? "#fff" : "#8A94A0",
             padding: "11px 22px", fontSize: 14, cursor: check.ok ? "pointer" : "not-allowed",
           }}>
-          {busy ? "Submitting…" : "Submit my IDP"}
+          {busy ? "Completing…" : "Complete and finish"}
         </button>
       </div>
     </div>

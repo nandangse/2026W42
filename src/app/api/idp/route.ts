@@ -45,7 +45,7 @@ async function whoAreThey(email: string) {
         emp = (e2 as typeof emp) ?? null;
       }
     }
-    if (!emp) return { employee: null, role: null, roleSummary: null };
+    if (!emp) return { employee: null, role: null, roleSummary: null, isLeader: false };
 
     const { data: roleEdit } = await admin
       .from(T.edits).select("value").eq("employee_id", emp.id).eq("field", "role").maybeSingle();
@@ -55,9 +55,13 @@ async function whoAreThey(email: string) {
       const { data: r } = await admin.from("hrms_role").select("summary").eq("role", roleName).maybeSingle();
       roleSummary = (r?.summary as string | null) ?? null;
     }
-    return { employee: emp, role: roleName, roleSummary };
+    // the Leaders Council, from the master's own "In LC" column
+    const { data: full } = await admin.from(T.employees).select("extra").eq("id", emp.id).maybeSingle();
+    const lc = String(((full?.extra || {}) as Record<string, string>)["In LC"] || "").toLowerCase();
+    const isLeader = lc.includes("leader") || lc === "yes" || lc === "y";
+    return { employee: emp, role: roleName, roleSummary, isLeader };
   } catch {
-    return { employee: null, role: null, roleSummary: null };
+    return { employee: null, role: null, roleSummary: null, isLeader: false };
   }
 }
 
@@ -98,6 +102,52 @@ export async function POST(req: Request) {
     const admin = adminClient();
     const body = await req.json();
     const action = String(body.action || "");
+
+    /**
+     * { action: "polish", text } — dictated speech into plain English.
+     *
+     * NOT SAVED HERE. The tidied text goes back to the browser and into the
+     * box, where the person reads it, changes it and decides whether it is
+     * what they meant. What is stored later is what THEY left in the box.
+     * A machine writing straight into somebody's development plan without
+     * their eyes on it is not something to build.
+     */
+    if (action === "polish") {
+      const text = String(body.text || "").trim();
+      if (!text) throw new HttpError(400, "Nothing was said.");
+      const key = process.env.ANTHROPIC_API_KEY;
+      if (!key) return NextResponse.json({ text });
+      try {
+        const r = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({
+            model: "claude-sonnet-5",
+            max_tokens: 900,
+            system:
+              "Somebody at an Indian engineering company is speaking their answer to a question in their own " +
+              "development plan. The dictation is rough and is often a MIX OF ENGLISH AND HINDI.\n\n" +
+              "Write out what they said as clear, simple English.\n\n" +
+              "Rules:\n" +
+              "1. FIRST PERSON — write as 'I', because these are their words about themselves.\n" +
+              "2. SIMPLE ENGLISH. Short sentences. Ordinary words. A person who finished class 10 must understand it.\n" +
+              "3. Translate anything said in Hindi.\n" +
+              "4. Keep EVERY point they made. Do not shorten, do not summarise, do not add anything they did not say.\n" +
+              "5. If they listed things, use one line per item starting with '- '.\n" +
+              "6. Fix the grammar and remove the ums, repetitions and false starts.\n" +
+              "7. Answer with the text only. No preamble, no heading, no comment about the task.",
+            messages: [{ role: "user", content: text.slice(0, 8000) }],
+          }),
+        });
+        if (!r.ok) return NextResponse.json({ text });
+        const j = await r.json();
+        const out = j?.content?.[0]?.text;
+        return NextResponse.json({ text: typeof out === "string" && out.trim() ? out.trim() : text });
+      } catch {
+        // the words are the person's; hand them back rather than losing them
+        return NextResponse.json({ text });
+      }
+    }
 
     if (action === "start") {
       if (body.consent !== true)
@@ -150,7 +200,8 @@ export async function POST(req: Request) {
       const patch: Record<string, unknown> = { answers, ratings, updated_at: new Date().toISOString() };
 
       if (action === "submit") {
-        const check = isComplete(answers, ratings);
+        const who = await whoAreThey(u.email);
+        const check = isComplete(answers, ratings, who.isLeader);
         if (!check.ok)
           throw new HttpError(400,
             `Not finished yet — ${check.missing.length} question${check.missing.length === 1 ? "" : "s"} and ` +

@@ -75,6 +75,24 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.1.0",
+    date: "2026-08-23",
+    module: "IDP — speak it, and a section for leaders",
+    items: [
+      "EVERY BOX CAN BE SPOKEN INTO. 🎙 Speak the answer, say it in English or Hindi or both, press stop — and Genie writes it out as plain English into the box. THE BOX, not the record: it is put where the person can read it, change it and delete it before anything is saved. What gets stored is what THEY left in the box, never what the machine heard. A model writing straight into somebody's development plan without their eyes on it is not a thing to build.",
+      "If the tidying fails, the words they actually said go into the box unedited rather than being lost.",
+      "WHY IT MATTERS MORE THAN IT LOOKS: this asks thirteen written questions of people who build machines for a living, many of whom think in Hindi and type in English. Made to type, they write three words. Allowed to speak, they say the real answer.",
+      "EVERY QUESTION NOW CARRIES A PROPER EXPLANATION IN THE SIMPLEST ENGLISH WE COULD MANAGE — what to write, how to write it, and a worked example where one helps. A person who finished class 10 must be able to read it and know what to do. Most people here did not do their schooling in English, and a question nobody understands produces an answer nobody can use.",
+      "“My tasks this month” is now MY TASKS FOR UP TO NEXT MONTH — what you are doing now that will finish this month and next.",
+      "THE KPI QUESTION SAYS WHAT A KPI IS. Key Performance Indicator: a NUMBER, three or four of them, with what that number reads today — jobs delivered on time, 8 out of 10 this month; material shortage days, 4 last month. Four examples are on the page.",
+      "THE RATINGS ARE A 1-TO-10 SLIDER, and every number says what it means as the slider moves — 5 is “I do what my role needs”, 7 is “I do more than my role needs, others ask me”, 10 is “nobody in the company does this better”. Nobody has to guess what a 6 is.",
+      "A SECTION FOR LEADERS ONLY, shown to the Leaders Council and to nobody else, read from the master's own In LC column. Four questions: the leadership they demonstrated, the hardest decision they took, the biggest impact on the company because of them, and the biggest mistake they made that hurt the company — how it was solved and what they learnt.",
+      "That last one is deliberately the hardest thing on the page, and it says so: a leader who cannot name a mistake has either not been given enough to do, or is not being straight. The answer is read as a sign of strength.",
+      "COMPLETE MEANS COMPLETE. Once pressed it goes on the record and cannot be changed, and the page says so before the button, not after.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.0.2",
     date: "2026-08-23",
     module: "HRIS — logins joined to records, and columns you choose",
