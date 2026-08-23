@@ -17,10 +17,17 @@ import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
 import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, CONSENT_TEXT, isComplete, bandIndex } from "@/lib/idp";
 import DictateBox from "./DictateBox";
+import { RichTextView } from "./hrms/RichText";
 
 const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
 
 interface Rec { url: string | null; seconds: number | null; at: string }
+export interface RoleDoc {
+  role: string; department: string | null; grade: string | null;
+  reports_to: string | null; location: string | null; stage: string;
+  job_description: string | null; deliverable: string | null; metric: string | null;
+  summary: string | null; transcript: string | null; url: string | null; voice_seconds: number | null;
+}
 interface Open {
   id: string; answers: Record<string, string>; ratings: Record<string, number>;
   role_summary: string | null; role_at_time: string | null;
@@ -31,7 +38,7 @@ interface Done extends Open { submitted_at: string }
 export default function IdpDiscussion({ name, initials }: { name: string; initials: string | null }) {
   const [state, setState] = useState<{
     open: Open | null; done: Done[];
-    role: string | null; roleSummary: string | null; needsMigration?: boolean;
+    role: string | null; roleSummary: string | null; roleDoc: RoleDoc | null; needsMigration?: boolean;
     employee: { id: string; name: string } | null;
     isLeader?: boolean;
   } | null>(null);
@@ -42,7 +49,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
   const load = useCallback(async () => {
     try {
       const j = await api.get("/api/idp");
-      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, needsMigration: j.needsMigration, employee: j.employee ?? null, isLeader: !!j.isLeader });
+      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, roleDoc: j.roleDoc ?? null, needsMigration: j.needsMigration, employee: j.employee ?? null, isLeader: !!j.isLeader });
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -56,7 +63,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
   if (!state) return <Shell initials={initials}><div className="p-6 text-sm" style={{ color: C.faint }}>Loading…</div></Shell>;
 
-  if (state.open) return <Shell initials={initials}><Filling open={state.open} isLeader={!!state.isLeader} onDone={load} /></Shell>;
+  if (state.open) return <Shell initials={initials}><Filling open={state.open} roleDoc={state.roleDoc} isLeader={!!state.isLeader} onDone={load} /></Shell>;
 
   const last = state.done[0];
   if (last) {
@@ -231,7 +238,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
 /* ─────────────────────────── the discussion ─────────────────────────── */
 
-function Filling({ open, isLeader, onDone }: { open: Open; isLeader: boolean; onDone: () => Promise<void> }) {
+function Filling({ open, roleDoc, isLeader, onDone }: { open: Open; roleDoc: RoleDoc | null; isLeader: boolean; onDone: () => Promise<void> }) {
   const [answers, setAnswers] = useState<Record<string, string>>(open.answers || {});
   const [audio, setAudio] = useState<Record<string, Rec[]>>(open.audioUrls || {});
   const [ratings, setRatings] = useState<Record<string, number>>(open.ratings || {});
@@ -265,16 +272,7 @@ function Filling({ open, isLeader, onDone }: { open: Open; isLeader: boolean; on
 
   return (
     <div className="mx-auto px-4 py-5 md:py-6" style={{ maxWidth: 800 }}>
-      {open.role_summary && (
-        <div className="rounded-lg p-3 mb-5" style={{ background: "#F4F2EC" }}>
-          <div className="text-xs font-bold" style={{ color: C.dim }}>
-            What is expected of {open.role_at_time || "your role"} — answer against this
-          </div>
-          <div style={{ fontSize: 13, color: C.dim, whiteSpace: "pre-wrap", lineHeight: 1.7, marginTop: 4 }}>
-            {open.role_summary}
-          </div>
-        </div>
-      )}
+      <RoleBrief roleDoc={roleDoc} fallbackRole={open.role_at_time} fallbackSummary={open.role_summary} />
 
       {sections.map((s) => (
         <div key={s.key} className="mb-6">
@@ -372,6 +370,97 @@ function Filling({ open, isLeader, onDone }: { open: Open; isLeader: boolean; on
           }}>
           {busy ? "Completing…" : "Complete and finish"}
         </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * YOUR ROLE, AS THE COMPANY HAS WRITTEN IT — put in front of somebody before
+ * they answer a word (Dr Raghu, 23 Aug 2026).
+ *
+ * The whole definition, not a summary of it: the job description, the
+ * deliverable and the measurement metric exactly as they are written in the
+ * register. Then the Managing Director's own recording, and its words.
+ *
+ * An IDP written without reading this is a person guessing at what is wanted.
+ * It is open when the page loads, and can be folded away once read.
+ */
+function RoleBrief({
+  roleDoc, fallbackRole, fallbackSummary,
+}: { roleDoc: RoleDoc | null; fallbackRole: string | null; fallbackSummary: string | null }) {
+  const [open, setOpen] = useState(true);
+  if (!roleDoc && !fallbackSummary) return null;
+  const d = roleDoc;
+
+  return (
+    <div className="rounded-lg mb-5" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
+      <button onClick={() => setOpen((v) => !v)} className="w-full text-left px-3 py-3">
+        <div style={{ fontSize: 12, color: C.faint, letterSpacing: 0.3, textTransform: "uppercase" }}>
+          Your role, as the company has written it — read this first
+        </div>
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <div className="font-bold" style={{ fontSize: 18 }}>{d?.role || fallbackRole || "Your role"}</div>
+          <div style={{ fontSize: 12, color: C.faint }}>
+            {[d?.department, d?.grade, d?.location].filter(Boolean).join(" · ")}
+          </div>
+          <span className="ml-auto" style={{ fontSize: 12, color: C.faint }}>{open ? "▾ hide" : "▸ show"}</span>
+        </div>
+      </button>
+
+      {open && (
+        <div className="px-3 pb-3">
+          {d?.reports_to && (
+            <div style={{ fontSize: 13, color: C.dim, marginBottom: 8 }}>
+              Reports to <b>{d.reports_to}</b>
+            </div>
+          )}
+
+          {d?.job_description && <Written label="Job Description" html={d.job_description} />}
+          {d?.deliverable && <Written label="Deliverable — what this role must produce" html={d.deliverable} />}
+          {d?.metric && <Written label="Measurement Metric — how it is measured" html={d.metric} />}
+
+          {(d?.url || d?.summary || fallbackSummary) && (
+            <div className="rounded p-3 mt-3" style={{ background: "#FFF7E6", border: "1px solid #F5D9A8" }}>
+              <div className="font-bold" style={{ fontSize: 14 }}>
+                What the Managing Director expects of this role
+              </div>
+              <div style={{ fontSize: 12, color: C.faint, marginBottom: 6 }}>
+                In his own voice. Listen to it before you write.
+              </div>
+              {d?.url && <audio controls src={d.url} style={{ width: "100%", maxWidth: 420 }} />}
+              {(d?.summary || fallbackSummary) && (
+                <div style={{ fontSize: 14, color: C.ink, whiteSpace: "pre-wrap", lineHeight: 1.7, marginTop: 8 }}>
+                  {d?.summary || fallbackSummary}
+                </div>
+              )}
+              {d?.transcript && (
+                <details className="mt-2">
+                  <summary style={{ fontSize: 12, color: C.faint, cursor: "pointer" }}>everything he said</summary>
+                  <div style={{ fontSize: 13, color: C.dim, lineHeight: 1.7, marginTop: 4 }}>{d.transcript}</div>
+                </details>
+              )}
+            </div>
+          )}
+
+          {d && d.stage !== "Final" && (
+            <div style={{ fontSize: 11.5, color: C.faint, marginTop: 8, lineHeight: 1.5 }}>
+              This role definition is still a draft — it has not been finally agreed yet. Answer against it anyway;
+              if you think it is wrong, say so in “What I am accountable for”.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Written({ label, html }: { label: string; html: string }) {
+  return (
+    <div className="mt-3">
+      <div className="font-bold" style={{ fontSize: 13.5 }}>{label}</div>
+      <div className="rounded p-2 mt-1" style={{ background: "#F8F7F3" }}>
+        <RichTextView html={html} />
       </div>
     </div>
   );

@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.1.3",
+    date: "2026-08-23",
+    module: "IDP — the role, as written, before a word is answered",
+    items: [
+      "THE PERSON NOW READS THEIR ROLE BEFORE THEY WRITE ANYTHING. Not a summary of it — the WHOLE definition as it stands in the register: Job Description, Deliverable and Measurement Metric exactly as they are written, with department, grade, location and who the role reports to.",
+      "AND THEY HEAR THE MANAGING DIRECTOR SAY IT. His own recording plays at the top of the page, with the summary underneath and everything he said folded below that. “In his own voice. Listen to it before you write.”",
+      "An IDP written without reading this is a person guessing at what is wanted. It opens expanded and folds away once read.",
+      "A DRAFT ROLE SAYS IT IS A DRAFT — and tells them to answer against it anyway, and to say so under “What I am accountable for” if they think it is wrong. Most roles are drafts today, and pretending otherwise on somebody's development plan would be the wrong kind of tidy.",
+      "The definition is read LIVE so it is always the current one, while what stays frozen on their record is the summary they were answering against.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.1.2",
     date: "2026-08-23",
     module: "IDP — dictation that does not stop, and a phone it fits on",

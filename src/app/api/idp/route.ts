@@ -47,23 +47,42 @@ async function whoAreThey(email: string) {
         emp = (e2 as typeof emp) ?? null;
       }
     }
-    if (!emp) return { employee: null, role: null, roleSummary: null, isLeader: false };
+    if (!emp) return { employee: null, role: null, roleSummary: null, roleDoc: null, isLeader: false };
 
     const { data: roleEdit } = await admin
       .from(T.edits).select("value").eq("employee_id", emp.id).eq("field", "role").maybeSingle();
     const roleName = (roleEdit?.value as string | null) || emp.designation || null;
     let roleSummary: string | null = null;
+    /**
+     * The role AS WRITTEN, and the note AS SPOKEN — both put in front of the
+     * person before they answer a word (Dr Raghu, 23 Aug 2026). It is read
+     * live rather than copied, so somebody filling this in today sees the
+     * definition as it stands today; what is FROZEN onto their record is the
+     * summary they were answering against.
+     */
+    let roleDoc: Record<string, unknown> | null = null;
     if (roleName) {
-      const { data: r } = await admin.from("hrms_role").select("summary").eq("role", roleName).maybeSingle();
+      const { data: r } = await admin
+        .from("hrms_role")
+        .select("role, department, grade, reports_to, location, job_description, deliverable, metric, stage, summary, transcript, voice_path, voice_seconds")
+        .eq("role", roleName).maybeSingle();
       roleSummary = (r?.summary as string | null) ?? null;
+      if (r) {
+        let url: string | null = null;
+        if (r.voice_path) {
+          const { data: sgn } = await admin.storage.from(BUCKET).createSignedUrl(String(r.voice_path), LINK_TTL);
+          url = sgn?.signedUrl ?? null;
+        }
+        roleDoc = { ...r, url };
+      }
     }
     // the Leaders Council, from the master's own "In LC" column
     const { data: full } = await admin.from(T.employees).select("extra").eq("id", emp.id).maybeSingle();
     const lc = String(((full?.extra || {}) as Record<string, string>)["In LC"] || "").toLowerCase();
     const isLeader = lc.includes("leader") || lc === "yes" || lc === "y";
-    return { employee: emp, role: roleName, roleSummary, isLeader };
+    return { employee: emp, role: roleName, roleSummary, roleDoc, isLeader };
   } catch {
-    return { employee: null, role: null, roleSummary: null, isLeader: false };
+    return { employee: null, role: null, roleSummary: null, roleDoc: null, isLeader: false };
   }
 }
 
