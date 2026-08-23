@@ -18,6 +18,7 @@ import { LOGO } from "@/lib/logo";
 import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, CONSENT_TEXT, isComplete, bandIndex } from "@/lib/idp";
 import DictateBox from "./DictateBox";
 import IdpMyRecord, { type MyRecord } from "./IdpMyRecord";
+import IdpFinal, { type SalaryRow, type Attachment } from "./IdpFinal";
 import { RichTextView } from "./hrms/RichText";
 
 const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
@@ -33,8 +34,10 @@ interface Open {
   id: string; answers: Record<string, string>; ratings: Record<string, number>;
   role_summary: string | null; role_at_time: string | null;
   audioUrls?: Record<string, Rec[]>;
+  attachmentUrls?: Attachment[];
 }
 interface Done extends Open { submitted_at: string }
+type Salary = { rows: SalaryRow[]; ctcLakhs: string } | null;
 
 export default function IdpDiscussion({ name, initials }: { name: string; initials: string | null }) {
   const [state, setState] = useState<{
@@ -44,6 +47,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     isLeader?: boolean;
     myRecord: MyRecord | null;
     options: Record<string, string[]>;
+    salary: Salary;
   } | null>(null);
   const [consent, setConsent] = useState(false);
   /**
@@ -64,7 +68,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
   const load = useCallback(async () => {
     try {
       const j = await api.get("/api/idp");
-      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, roleDocs: j.roleDocs ?? [], needsMigration: j.needsMigration, employee: j.employee ?? null, isLeader: !!j.isLeader, myRecord: j.myRecord ?? null, options: j.options || {} });
+      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, roleDocs: j.roleDocs ?? [], needsMigration: j.needsMigration, employee: j.employee ?? null, isLeader: !!j.isLeader, myRecord: j.myRecord ?? null, options: j.options || {}, salary: j.salary ?? null });
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -82,7 +86,8 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     return (
       <Shell initials={initials}>
         <Filling open={state.open} roleDocs={state.roleDocs} isLeader={!!state.isLeader}
-          myRecord={state.myRecord} options={state.options}
+          myRecord={state.myRecord} options={state.options} salary={state.salary}
+          name={name}
           onRecordChanged={(f, v) => setState((st) => st && st.myRecord
             ? { ...st, myRecord: { value: { ...st.myRecord.value, [f]: v }, pending: { ...st.myRecord.pending, [f]: true } } }
             : st)}
@@ -294,9 +299,10 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
 /* ─────────────────────────── the discussion ─────────────────────────── */
 
-function Filling({ open, roleDocs, isLeader, myRecord, options, onRecordChanged, onDone, onIntro }: {
+function Filling({ open, roleDocs, isLeader, myRecord, options, salary, name, onRecordChanged, onDone, onIntro }: {
   open: Open; roleDocs: RoleDoc[]; isLeader: boolean;
   myRecord: MyRecord | null; options: Record<string, string[]>;
+  salary: Salary; name: string;
   onRecordChanged: (field: string, value: string | null) => void;
   onDone: () => Promise<void>; onIntro: () => void;
 }) {
@@ -329,8 +335,10 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, onRecordChanged,
     { key: "__record__", title: "Begin with my HRIS Records" },
     ...sections.map((x) => ({ key: x.key, title: x.title })),
     { key: "__ratings__", title: "How I rate myself" },
-    { key: "__review__", title: "Read it and finish" },
+    { key: "__review__", title: "Read it back" },
+    { key: "__final__", title: "Before you finish" },
   ];
+  const [attachments, setAttachments] = useState<Attachment[]>(open.attachmentUrls || []);
   /** The role brief lives in a lightbox now, reachable from every step. */
   const [briefOpen, setBriefOpen] = useState(false);
   const at = steps[Math.min(step, steps.length - 1)];
@@ -363,6 +371,7 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, onRecordChanged,
   /** How much of THIS step is done — shown on the step, not as a scold. */
   const stepDone = (k: string) => {
     if (k === "__record__") return true; // reading it is the ask; nothing is compulsory
+    if (k === "__final__") return (audio["final_voice"] || []).length > 0;
     if (k === "__ratings__") return IDP_RATINGS.every((d) => ratings[d.key]);
     if (k === "__review__") return check.ok;
     const qs = sections.find((x) => x.key === k)?.questions || [];
@@ -505,12 +514,30 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, onRecordChanged,
         </div>
       )}
 
+      {/* ── before you finish ── */}
+      {at.key === "__final__" && (
+        <IdpFinal
+          name={name} idpId={open.id}
+          salary={salary?.rows ?? null} ctcLakhs={salary?.ctcLakhs ?? null}
+          roleName={roleDocs[0]?.role ?? open.role_at_time}
+          roleAudio={roleDocs[0]?.url ?? null}
+          roleSummary={roleDocs.length ? (roleDocs[0]?.summary ?? null) : open.role_summary}
+          answers={answers} setAnswer={setA}
+          recordings={audio["final_voice"] || []}
+          onRecorded={(r) => setAudio((a) => ({ ...a, final_voice: [...(a.final_voice || []), r] }))}
+          attachments={attachments}
+          onAttached={(a) => setAttachments((x) => [...x, a])}
+          onOpenBrief={() => setBriefOpen(true)}
+        />
+      )}
+
       {/* ── read it back ── */}
       {at.key === "__review__" && (
         <div className="mb-5">
           <h2 className="font-bold" style={{ fontSize: 19 }}>Read it once more</h2>
           <div style={{ fontSize: 13.5, color: C.faint, lineHeight: 1.6 }}>
-            This is what your HoD, HR and Management will read. Click any answer to go back and change it.
+            This is what your HoD, HR and Management will read. Click any answer to go back and change it. The
+            last step, after this, is where you finish.
           </div>
           {sections.map((sec, si) => (
             <div key={sec.key} className="mt-4">
@@ -566,31 +593,37 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, onRecordChanged,
               style={{ background: C.orange, color: "#fff", padding: "12px 22px", fontSize: 15, flex: 1, maxWidth: 300 }}>
               Next →
             </button>
-          ) : (
-            <button onClick={submit} disabled={!check.ok || busy} className="rounded font-bold"
-              style={{
-                background: check.ok ? C.green : "#E2E0DA", color: check.ok ? "#fff" : "#8A94A0",
-                padding: "14px 22px", fontSize: 15, flex: 1, maxWidth: 340,
-                cursor: check.ok ? "pointer" : "not-allowed",
-              }}>
-              {busy ? "Completing…" : "✓ Complete and finish"}
-            </button>
-          )}
+          ) : (() => {
+            const voiced = (audio["final_voice"] || []).length > 0;
+            const ready = check.ok && voiced;
+            return (
+              <button onClick={submit} disabled={!ready || busy} className="rounded font-bold"
+                style={{
+                  background: ready ? C.green : "#E2E0DA", color: ready ? "#fff" : "#8A94A0",
+                  padding: "14px 22px", fontSize: 15, flex: 1, maxWidth: 340,
+                  cursor: ready ? "pointer" : "not-allowed",
+                }}>
+                {busy ? "Submitting…" : "✓ SUBMIT FINALLY"}
+              </button>
+            );
+          })()}
         </div>
 
         <div className="mt-2" style={{ fontSize: 12, color: C.faint, lineHeight: 1.6 }}>
           {step < steps.length - 1 ? (
             <>Everything is saved as you type. You can go back and change any answer until you press Complete.</>
-          ) : !check.ok ? (
+          ) : !check.ok || !(audio["final_voice"] || []).length ? (
             <span style={{ color: "#8A5B00" }}>
               <b>Not finished yet.</b>{" "}
               {check.missing.length > 0 && <>{check.missing.length} question{check.missing.length === 1 ? "" : "s"} still to answer</>}
-              {check.missing.length > 0 && check.unrated.length > 0 && ", and "}
-              {check.unrated.length > 0 && <>{check.unrated.length} rating{check.unrated.length === 1 ? "" : "s"} to give</>}. Tap anything above to go to it.
+              {check.missing.length > 0 && (check.unrated.length > 0 || !(audio["final_voice"] || []).length) && ", "}
+              {check.unrated.length > 0 && <>{check.unrated.length} rating{check.unrated.length === 1 ? "" : "s"} to give</>}
+              {(check.missing.length > 0 || check.unrated.length > 0) && !(audio["final_voice"] || []).length && ", and "}
+              {!(audio["final_voice"] || []).length && <>the closing voice note to Raghu still to record</>}.
             </span>
           ) : (
             <span style={{ color: C.green }}>
-              Everything is answered. Once you press Complete it goes on your record.
+              Everything is done. Once you press SUBMIT FINALLY it goes on your record and becomes view-only.
             </span>
           )}
         </div>

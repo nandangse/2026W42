@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, splitMulti, FIELD_GROUPS, fieldSpec } from "@/lib/hrms";
+
+/** sheet header -> field key, for reading a pay override by its header. */
+const ALL_FIELDS_BY_HEADER = new Map(
+  FIELD_GROUPS.flatMap((g) => g.fields)
+    .filter((f) => f.sheetHeader)
+    .map((f) => [f.sheetHeader as string, f.key]),
+);
 import { CONSENT_TEXT, isComplete, IDP_RECORD_GROUPS, IDP_RECORD_HIDE } from "@/lib/idp";
 
 export const dynamic = "force-dynamic";
@@ -98,6 +105,69 @@ async function whoAreThey(email: string) {
   }
 }
 
+/**
+ * THE SALARY TABLE, worked out from the record.
+ *
+ * The layout and the arithmetic are Dr Raghu's own compensation sheet:
+ * the five gross components; PF at 12% of Basic capped at the statutory
+ * 15,000; Maharashtra professional tax at 200 a month (300 in February);
+ * then the benefits — employer PF, the 2-lakh mediclaim at 5,000 a year,
+ * shoes and uniform at 2,000, bonus at ~10% of Basic, 20 days' paid leave
+ * at a 26-day month, and 52 paid third-Saturday days on the same day rate.
+ *
+ * All of it derived, none of it stored: the record's five components are
+ * the only inputs, so a corrected Basic corrects the whole table.
+ */
+const num = (v: unknown) => {
+  const n = parseFloat(String(v ?? "").replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+};
+
+export interface SalaryRow { label: string; monthly: number | null; yearly: number | null; kind: "head" | "row" | "total" | "note" }
+
+function salaryTable(get: (k: string) => unknown): { rows: SalaryRow[]; ctcLakhs: string } | null {
+  const basic = num(get("Basic and DA")), hra = num(get("HRA")), fixed = num(get("Fixed Allowance"));
+  const conv = num(get("Conveyance")), med = num(get("Medical Allowance"));
+  const gross = basic + hra + fixed + conv + med;
+  if (!gross) return null;
+
+  const pf = basic > 0 ? Math.round(Math.min(basic, 15000) * 0.12) : 0;
+  const pt = gross >= 10000 ? 200 : 0;
+  const dedM = pf + pt, dedY = pf * 12 + (pt ? 2500 : 0);
+  const netM = gross - dedM, netY = gross * 12 - dedY;
+
+  const mediclaim = 5000 / 12, shoes = 2000 / 12;
+  const bonus = basic * 0.10;
+  const perDay = gross / 26;
+  const leaves = (perDay * 20) / 12;
+  const thirdSat = (perDay * 52) / 12;
+  const benM = pf + mediclaim + shoes + bonus + leaves + thirdSat;
+  const ctcY = netY + benM * 12;
+
+  const R = (label: string, m: number | null, kind: SalaryRow["kind"] = "row"): SalaryRow =>
+    ({ label, monthly: m === null ? null : Math.round(m), yearly: m === null ? null : Math.round(m * 12), kind });
+
+  const rows: SalaryRow[] = [
+    { label: "Gross Salary", monthly: null, yearly: null, kind: "head" },
+    R("Basic & DA", basic), R("HRA", hra), R("Fixed Allowance", fixed),
+    R("Conveyance", conv), R("Medical Allowance", med),
+    R("Total Gross Salary (A)", gross, "total"),
+    { label: "Deductions", monthly: null, yearly: null, kind: "head" },
+    R("Provident Fund", pf),
+    { label: "Professional Tax (Feb 300 will be deducted)", monthly: pt, yearly: pt ? 2500 : 0, kind: "row" },
+    { label: "Total Deductions (B)", monthly: dedM, yearly: dedY, kind: "total" },
+    { label: "Net Salary (C = A - B)", monthly: netM, yearly: netY, kind: "total" },
+    { label: "Note : TDS will be deducted if applicable on Gross Salary", monthly: null, yearly: null, kind: "note" },
+    { label: "Benefits", monthly: null, yearly: null, kind: "head" },
+    R("Provident Fund Employer", pf), R("Mediclaim of 2 lakhs", mediclaim),
+    R("Shoes & Uniform Allowance", shoes), R("Annual Bonus Approx @10%", bonus),
+    R("Annual Paid Leaves Approx 20 days", leaves), R("Third Saturday Paid 52 days", thirdSat),
+    R("Total Benefits (D)", benM, "total"),
+    { label: "Total Cost To Company (CTC) (C + D)", monthly: Math.round(netM + benM), yearly: Math.round(ctcY), kind: "total" },
+  ];
+  return { rows, ctcLakhs: (ctcY / 100000).toFixed(1) };
+}
+
 // GET /api/idp — am I part-way through one, and have I finished one?
 export async function GET() {
   try {
@@ -119,6 +189,7 @@ export async function GET() {
      * self-service.
      */
     let myRecord: { value: Record<string, string | null>; pending: Record<string, boolean> } | null = null;
+    let salary: { rows: SalaryRow[]; ctcLakhs: string } | null = null;
     const options: Record<string, string[]> = {};
     if (who.employee) {
       const admin = adminClient();
@@ -155,6 +226,14 @@ export async function GET() {
           value[f.key] = v === "" ? null : v;
         }
         myRecord = { value, pending };
+        const ovVal = (k: string) => {
+          // the pay fields live in extra; an approved-or-not override wins
+          const f = ALL_FIELDS_BY_HEADER.get(k);
+          const o = f ? ov.get(f) : undefined;
+          if (o && o.value != null && String(o.value).trim() !== "") return o.value;
+          return ((emp?.extra || {}) as Record<string, string>)[k];
+        };
+        salary = salaryTable(ovVal);
         const { data: m } = await admin.from("hrms_master").select("kind, value").order("sort_order");
         for (const r of m || []) (options[String(r.kind)] ||= []).push(String(r.value));
       } catch { /* the step simply shows nothing editable */ }
@@ -172,6 +251,11 @@ export async function GET() {
         }));
       }
       (open as Record<string, unknown>).audioUrls = withUrls;
+      const att = ((open.attachments || []) as { path: string; name: string; size: number; at: string }[]);
+      (open as Record<string, unknown>).attachmentUrls = await Promise.all(att.map(async (a) => {
+        const { data: sgn } = await adminClient().storage.from(BUCKET).createSignedUrl(a.path, LINK_TTL);
+        return { ...a, url: sgn?.signedUrl ?? null };
+      }));
     }
     const done = rows.filter((r) => r.submitted_at);
     return NextResponse.json({
@@ -180,6 +264,7 @@ export async function GET() {
       cycle: CYCLE,
       ...who,
       myRecord,
+      salary,
       options,
       open,
       done: done.map((d) => ({
@@ -216,6 +301,28 @@ export async function POST(req: Request) {
       const form = await req.formData();
       const id = String(form.get("id") || "");
       const qid = String(form.get("qid") || "");
+
+      /** A document attached on the last page. Stored, listed, never parsed. */
+      if (String(form.get("kind") || "") === "attach") {
+        const file = form.get("file");
+        if (!id) throw new HttpError(400, "id required");
+        if (!(file instanceof File) || !file.size) throw new HttpError(400, "Nothing was chosen.");
+        if (file.size > 15 * 1024 * 1024) throw new HttpError(400, "Keep an attachment under 15 MB.");
+        const { data: row } = await admin
+          .from("hrms_idp").select("id, attachments, submitted_at").eq("id", id).eq("person_email", u.email).maybeSingle();
+        if (!row) throw new HttpError(404, "That is not your IDP.");
+        if (row.submitted_at) throw new HttpError(409, "This IDP has already been completed.");
+        const safe = file.name.replace(/[^\w.\- ]+/g, "_").slice(0, 80);
+        const path = `idp/${id}/files/${Date.now()}-${safe}`;
+        const { error: up } = await admin.storage
+          .from(BUCKET).upload(path, await file.arrayBuffer(), { contentType: file.type || "application/octet-stream" });
+        if (up) throw new Error(`Could not store the file: ${up.message}`);
+        const list = [...((row.attachments || []) as { path: string }[]), { path, name: safe, size: file.size, at: new Date().toISOString() }];
+        const { error } = await admin.from("hrms_idp").update({ attachments: list, updated_at: new Date().toISOString() }).eq("id", id);
+        if (error) throw new Error(error.message);
+        const { data: sgn } = await admin.storage.from(BUCKET).createSignedUrl(path, LINK_TTL);
+        return NextResponse.json({ ok: true, path, name: safe, url: sgn?.signedUrl ?? null });
+      }
       const seconds = Number(form.get("seconds") || 0) || null;
       const file = form.get("file");
       if (!id || !qid) throw new HttpError(400, "id and qid are required");
@@ -426,6 +533,16 @@ export async function POST(req: Request) {
           throw new HttpError(400,
             `Not finished yet — ${check.missing.length} question${check.missing.length === 1 ? "" : "s"} and ` +
             `${check.unrated.length} rating${check.unrated.length === 1 ? "" : "s"} still to do.`);
+        /**
+         * THE CLOSING VOICE NOTE IS COMPULSORY (Dr Raghu, 23 Aug 2026). The
+         * questions about cost and value are answered in the person's own
+         * voice, to him — a typed line is not a substitute, so the check is
+         * for a RECORDING, enforced here where the page cannot talk it away.
+         */
+        const { data: row2 } = await admin.from("hrms_idp").select("audio").eq("id", id).maybeSingle();
+        const finalVoice = (((row2?.audio || {}) as Record<string, unknown[]>)["final_voice"] || []).length;
+        if (!finalVoice)
+          throw new HttpError(400, "The closing voice note to Dr Raghu is compulsory — record it on the last page before submitting.");
         patch.submitted_at = new Date().toISOString();
       }
 

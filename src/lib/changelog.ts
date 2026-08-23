@@ -75,6 +75,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.4.0",
+    date: "2026-08-23",
+    module: "IDP — the last page: cost, value, and a voice that answers",
+    items: [
+      "A FINAL STEP, “BEFORE YOU FINISH”, after the read-back. It opens with the thank-you in Dr Raghu's words — “thank you for this time you took to fill this up; now this is your IDP record, which will help you get better and better” — then puts the role in front of them once more, with his recording, and says plainly that any answer can still be changed.",
+      "THEIR SALARY TABLE, laid out exactly as the compensation sheet: the five gross components, PF at 12% of Basic capped at the statutory 15,000, professional tax at 200 a month (300 in February), net salary — then the benefits: employer PF, the 2-lakh mediclaim, shoes and uniform, bonus at ~10% of Basic, 20 days' paid leave and 52 paid third-Saturday days, down to CTC and “your CTC is approx Rs X lakhs”. COMPUTED FROM THE RECORD, not stored: correct somebody's Basic and the whole table corrects itself.",
+      "A placeholder holds the spot for Dr Raghu's video walking through that table, coming separately.",
+      "AND THEN THE EXCHANGE THE PAGE EXISTS FOR: the company has just shown the person exactly what they cost, and they answer IN THEIR OWN VOICE — a COMPULSORY recording, as if replying to Raghu: how do you justify your cost, what should your value be, what more will you do for efficiency and throughput, where can you actually give solutions, what do you want your CTC to be and what change are you promising that will show in results — plus one question of Claude's: who are you training to do your today's work, so you can take up bigger work tomorrow?",
+      "SUBMIT FINALLY refuses without that recording, on the server as well as the page. A typed line is not a substitute for saying it.",
+      "Room to write more after the recording, and 📎 ATTACH DOCUMENT for any presentation, note or file — under 15 MB, stored beside the recordings, never in the database.",
+      "Only after SUBMIT FINALLY does the IDP become the view-only record.",
+      "Migration 0059.",
+    ],
+  },
+  {
     v: "3.20.3.1",
     date: "2026-08-23",
     module: "IDP — the record stops at statutory, and the box gets the answer",

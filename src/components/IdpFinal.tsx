@@ -1,0 +1,222 @@
+"use client";
+/**
+ * The last page of the IDP.
+ *
+ * Everything on it is Dr Raghu's brief of 23 Aug 2026: the thank-you, the
+ * role read back once more with his recording, the salary table with the
+ * CTC in lakhs, a placeholder for his video walking through that table,
+ * and then the part that matters — a COMPULSORY voice note answering him
+ * on cost and value, with room to write more and attach anything.
+ *
+ * The voice note is the exchange at the heart of the page: the company has
+ * just shown the person exactly what they cost; the person answers, in
+ * their own voice, what they are worth and what they will change.
+ */
+import { useRef, useState } from "react";
+import DictateBox, { type Recording } from "./DictateBox";
+
+const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
+
+export interface SalaryRow { label: string; monthly: number | null; yearly: number | null; kind: "head" | "row" | "total" | "note" }
+export interface Attachment { path: string; name: string; size: number; at: string; url?: string | null }
+
+const inr = (n: number | null) => (n === null ? "" : n.toLocaleString("en-IN"));
+
+const QUESTIONS = [
+  "How do you justify your cost to company?",
+  "What should be your Value to Company?",
+  "What all would you do more in order to be more valuable to the company — so we can improve our efficiency and also improve throughput?",
+  "What are the real areas where you can give a solution?",
+  "What do you want your CTC to be? And what is the change you are promising that can be seen in results?",
+  "Who are you training to do your today's work, so that you can take up bigger work tomorrow?",
+];
+
+export default function IdpFinal({
+  name, idpId, salary, ctcLakhs, roleAudio, roleSummary, roleName,
+  answers, setAnswer, recordings, onRecorded, attachments, onAttached, onOpenBrief,
+}: {
+  name: string; idpId: string;
+  salary: SalaryRow[] | null; ctcLakhs: string | null;
+  roleAudio: string | null; roleSummary: string | null; roleName: string | null;
+  answers: Record<string, string>;
+  setAnswer: (id: string, v: string) => void;
+  recordings: Recording[];
+  onRecorded: (r: Recording) => void;
+  attachments: Attachment[];
+  onAttached: (a: Attachment) => void;
+  onOpenBrief: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const attach = async (f: File | null) => {
+    if (!f) return;
+    setUploading(true); setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("kind", "attach");
+      fd.append("id", idpId);
+      fd.append("file", f);
+      const r = await fetch("/api/idp", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not attach that");
+      onAttached({ path: j.path, name: j.name, size: f.size, at: new Date().toISOString(), url: j.url });
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setUploading(false);
+  };
+
+  return (
+    <div className="mb-5">
+      {/* ── the thank-you ── */}
+      <div className="rounded-lg p-4" style={{ background: "#E6F4EA", border: "1px solid #9AD3AE" }}>
+        <div className="font-bold" style={{ fontSize: 18 }}>
+          {name}, thank you for this time you took to fill this up.
+        </div>
+        <div style={{ fontSize: 14.5, color: C.dim, lineHeight: 1.7, marginTop: 4 }}>
+          Now this is your IDP record, which will help you get better and better.
+        </div>
+      </div>
+
+      {/* ── the role, once more ── */}
+      <div className="rounded-lg p-3 mt-4" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
+        <div className="font-bold" style={{ fontSize: 15 }}>
+          In order that I know better, do review the “Roles and Responsibilities Assigned to me” below.
+        </div>
+        <div style={{ fontSize: 13, color: C.dim, marginTop: 2 }}>
+          Also hear Raghu&apos;s voice note about your role. After you see this, if you want to change any of your
+          answers, feel free to do so — use the step numbers above.
+        </div>
+        <div className="flex items-center gap-2 flex-wrap mt-2">
+          {roleName && <span className="rounded px-2 py-0.5 font-bold" style={{ background: "#FFF3E8", fontSize: 13 }}>{roleName}</span>}
+          <button onClick={onOpenBrief} className="text-xs font-bold rounded px-2.5 py-1.5" style={{ background: "#16232F", color: "#fff" }}>
+            📋 Read the full role
+          </button>
+        </div>
+        {roleAudio && (
+          <div className="mt-2">
+            <div style={{ fontSize: 12, color: C.faint }}>Voice note from Raghu about your role</div>
+            <audio controls controlsList="nodownload" onContextMenu={(e) => e.preventDefault()} src={roleAudio} style={{ width: "100%", maxWidth: 420 }} />
+          </div>
+        )}
+        {roleSummary && (
+          <div style={{ fontSize: 13, color: C.dim, whiteSpace: "pre-wrap", lineHeight: 1.7, marginTop: 6 }}>{roleSummary}</div>
+        )}
+      </div>
+
+      {/* ── the salary table ── */}
+      {salary ? (
+        <div className="rounded-lg p-3 mt-4" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
+          <div className="font-bold" style={{ fontSize: 15 }}>Your current Salary Table</div>
+          <div className="overflow-x-auto mt-2">
+            <table className="w-full" style={{ fontSize: 13.5, minWidth: 420, borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th className="text-left px-2 py-1.5" style={{ border: `1px solid ${C.line}` }}>Components of Compensation</th>
+                  <th className="text-right px-2 py-1.5" style={{ border: `1px solid ${C.line}`, width: 120 }}>Monthly (Rs. / per month)</th>
+                  <th className="text-right px-2 py-1.5" style={{ border: `1px solid ${C.line}`, width: 130 }}>Yearly (Rs. / per annum)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {salary.map((r, i) => (
+                  <tr key={i} style={{
+                    background: r.kind === "head" || r.kind === "total" ? "#FFF9C4" : "#fff",
+                    fontWeight: r.kind === "total" ? 700 : r.kind === "head" ? 700 : 400,
+                  }}>
+                    {r.kind === "note" ? (
+                      <td colSpan={3} className="px-2 py-1" style={{ border: `1px solid ${C.line}`, fontSize: 12, color: C.dim }}>{r.label}</td>
+                    ) : (
+                      <>
+                        <td className="px-2 py-1" style={{ border: `1px solid ${C.line}` }}>{r.label}</td>
+                        <td className="px-2 py-1 text-right tnum" style={{ border: `1px solid ${C.line}` }}>{inr(r.monthly)}</td>
+                        <td className="px-2 py-1 text-right tnum" style={{ border: `1px solid ${C.line}` }}>{inr(r.yearly)}</td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {ctcLakhs && (
+            <div className="mt-2 font-bold" style={{ fontSize: 15 }}>
+              Your CTC is approx <span style={{ color: C.orange }}>Rs {ctcLakhs} Lakhs</span> per year.
+            </div>
+          )}
+          <div className="rounded p-2.5 mt-3" style={{ background: "#EDEAF6", border: "1px solid #B9AEDD" }}>
+            <div className="font-bold" style={{ fontSize: 13 }}>🎬 A video from Raghu explaining this table</div>
+            <div style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.6 }}>
+              Raghu is recording a short video walking through what each line means. It will appear here — until
+              then, ask HR if any line is unclear.
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-lg p-3 mt-4" style={{ background: "#F4F2EC", fontSize: 13, color: C.dim }}>
+          Your salary details are not on the record yet, so the table cannot be shown. HR has been building the
+          records — it will appear here once yours carries the pay components.
+        </div>
+      )}
+
+      {/* ── the compulsory reply ── */}
+      <div className="rounded-lg p-3 mt-4" style={{ background: "#fff", border: "2px solid #E8600A" }}>
+        <div className="font-bold" style={{ fontSize: 15 }}>
+          🎙 Please leave me a VOICE NOTE — <span style={{ color: C.red }}>compulsory</span>
+        </div>
+        <div style={{ fontSize: 13, color: C.dim, lineHeight: 1.6, marginTop: 2 }}>
+          As if you are replying to Raghu. Speak to these, in any order, in English or Hindi:
+        </div>
+        <ol className="mt-2" style={{ fontSize: 13.5, lineHeight: 1.8, paddingLeft: 20, listStyle: "decimal" }}>
+          {QUESTIONS.map((q) => (<li key={q}>{q}</li>))}
+        </ol>
+        <div className="mt-2">
+          <DictateBox
+            value={answers["final_voice"] || ""}
+            rows={5}
+            placeholder="Speak first — your words appear here, and you can add to them."
+            onChange={(v) => setAnswer("final_voice", v)}
+            idpId={idpId} qid="final_voice"
+            recordings={recordings}
+            onRecorded={onRecorded}
+          />
+        </div>
+        {recordings.length === 0 && (
+          <div className="mt-1" style={{ fontSize: 12, color: C.red, fontWeight: 600 }}>
+            The IDP cannot be submitted without this recording.
+          </div>
+        )}
+        <div style={{ fontSize: 12, color: C.faint, marginTop: 6 }}>
+          Feel free to write more in the box after you put in the voice note.
+        </div>
+      </div>
+
+      {/* ── attachments ── */}
+      <div className="rounded-lg p-3 mt-4" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
+        <div className="font-bold" style={{ fontSize: 14 }}>
+          If you have any document, presentation or note, please feel free to attach it
+        </div>
+        <div className="flex items-center gap-2 flex-wrap mt-2">
+          <input ref={fileRef} type="file" style={{ display: "none" }}
+            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.txt"
+            onChange={(e) => { attach(e.target.files?.[0] || null); e.target.value = ""; }} />
+          <button onClick={() => fileRef.current?.click()} disabled={uploading}
+            className="text-xs font-bold rounded px-3 py-2" style={{ background: "#16232F", color: "#fff", opacity: uploading ? 0.6 : 1 }}>
+            {uploading ? "Attaching…" : "📎 Attach document"}
+          </button>
+          <span style={{ fontSize: 11.5, color: C.faint }}>PDF, Word, PowerPoint, Excel or an image · under 15 MB</span>
+        </div>
+        {err && <div style={{ fontSize: 12, color: C.red, marginTop: 4 }}>{err}</div>}
+        {attachments.length > 0 && (
+          <div className="mt-2">
+            {attachments.map((a) => (
+              <div key={a.path} className="flex items-center gap-2 py-1" style={{ borderTop: "1px solid #EEECE6", fontSize: 13 }}>
+                <span>📄</span>
+                {a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ color: "#1B3A5C", fontWeight: 600 }}>{a.name}</a> : <span>{a.name}</span>}
+                <span style={{ fontSize: 11, color: C.faint }}>{Math.max(1, Math.round(a.size / 1024))} KB</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
