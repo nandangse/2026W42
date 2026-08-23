@@ -17,6 +17,7 @@ import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
 import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, CONSENT_TEXT, isComplete, bandIndex } from "@/lib/idp";
 import DictateBox from "./DictateBox";
+import IdpMyRecord, { type MyRecord } from "./IdpMyRecord";
 import { RichTextView } from "./hrms/RichText";
 
 const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
@@ -41,6 +42,8 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     role: string | null; roleSummary: string | null; roleDocs: RoleDoc[]; needsMigration?: boolean;
     employee: { id: string; name: string } | null;
     isLeader?: boolean;
+    myRecord: MyRecord | null;
+    options: Record<string, string[]>;
   } | null>(null);
   const [consent, setConsent] = useState(false);
   /**
@@ -61,7 +64,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
   const load = useCallback(async () => {
     try {
       const j = await api.get("/api/idp");
-      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, roleDocs: j.roleDocs ?? [], needsMigration: j.needsMigration, employee: j.employee ?? null, isLeader: !!j.isLeader });
+      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, roleDocs: j.roleDocs ?? [], needsMigration: j.needsMigration, employee: j.employee ?? null, isLeader: !!j.isLeader, myRecord: j.myRecord ?? null, options: j.options || {} });
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -79,6 +82,10 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     return (
       <Shell initials={initials}>
         <Filling open={state.open} roleDocs={state.roleDocs} isLeader={!!state.isLeader}
+          myRecord={state.myRecord} options={state.options}
+          onRecordChanged={(f, v) => setState((st) => st && st.myRecord
+            ? { ...st, myRecord: { value: { ...st.myRecord.value, [f]: v }, pending: { ...st.myRecord.pending, [f]: true } } }
+            : st)}
           onDone={load} onIntro={() => { setShowIntro(true); window.scrollTo({ top: 0 }); }} />
       </Shell>
     );
@@ -287,7 +294,12 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
 /* ─────────────────────────── the discussion ─────────────────────────── */
 
-function Filling({ open, roleDocs, isLeader, onDone, onIntro }: { open: Open; roleDocs: RoleDoc[]; isLeader: boolean; onDone: () => Promise<void>; onIntro: () => void }) {
+function Filling({ open, roleDocs, isLeader, myRecord, options, onRecordChanged, onDone, onIntro }: {
+  open: Open; roleDocs: RoleDoc[]; isLeader: boolean;
+  myRecord: MyRecord | null; options: Record<string, string[]>;
+  onRecordChanged: (field: string, value: string | null) => void;
+  onDone: () => Promise<void>; onIntro: () => void;
+}) {
   const [answers, setAnswers] = useState<Record<string, string>>(open.answers || {});
   const [audio, setAudio] = useState<Record<string, Rec[]>>(open.audioUrls || {});
   const [ratings, setRatings] = useState<Record<string, number>>(open.ratings || {});
@@ -308,11 +320,19 @@ function Filling({ open, roleDocs, isLeader, onDone, onIntro }: { open: Open; ro
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sections = IDP_SECTIONS.filter((x) => !x.leadersOnly || isLeader);
+  /**
+   * THE RECORD COMES FIRST (Dr Raghu, 23 Aug 2026): before anybody writes a
+   * word about where they are going, they read and correct what the company
+   * has on file about where they are.
+   */
   const steps: { key: string; title: string }[] = [
+    { key: "__record__", title: "Begin with my HRIS Records" },
     ...sections.map((x) => ({ key: x.key, title: x.title })),
     { key: "__ratings__", title: "How I rate myself" },
     { key: "__review__", title: "Read it and finish" },
   ];
+  /** The role brief lives in a lightbox now, reachable from every step. */
+  const [briefOpen, setBriefOpen] = useState(false);
   const at = steps[Math.min(step, steps.length - 1)];
   const section = sections.find((x) => x.key === at.key);
   const check = isComplete(answers, ratings, isLeader);
@@ -342,6 +362,7 @@ function Filling({ open, roleDocs, isLeader, onDone, onIntro }: { open: Open; ro
 
   /** How much of THIS step is done — shown on the step, not as a scold. */
   const stepDone = (k: string) => {
+    if (k === "__record__") return true; // reading it is the ask; nothing is compulsory
     if (k === "__ratings__") return IDP_RATINGS.every((d) => ratings[d.key]);
     if (k === "__review__") return check.ok;
     const qs = sections.find((x) => x.key === k)?.questions || [];
@@ -353,8 +374,10 @@ function Filling({ open, roleDocs, isLeader, onDone, onIntro }: { open: Open; ro
 
   return (
     <div className="mx-auto px-4 py-5 md:py-6" style={{ maxWidth: 800 }}>
-      {/* where you are, and every step reachable from here */}
-      <div className="flex gap-1 flex-wrap mb-3">
+      {/* where you are — FROZEN to the top so the way forward never scrolls
+          away, with the role brief one press away on the right */}
+      <div className="flex gap-1 flex-wrap items-center py-2"
+        style={{ position: "sticky", top: 46, zIndex: 30, background: "#F1EFE9" }}>
         {steps.map((x, i) => (
           <button key={x.key} onClick={() => go(i)}
             className="rounded px-2 py-1"
@@ -368,28 +391,56 @@ function Filling({ open, roleDocs, isLeader, onDone, onIntro }: { open: Open; ro
             {stepDone(x.key) && i !== step ? "✓ " : ""}{i + 1}
           </button>
         ))}
-        <span className="self-center" style={{ fontSize: 11.5, color: C.faint, marginLeft: 4 }}>
-          Step {step + 1} of {steps.length} — you can go back and forward freely
-        </span>
         <button onClick={() => { api.post("/api/idp", { action: "save", id: open.id, answers, ratings }).catch(() => {}); onIntro(); }}
-          className="rounded px-2 py-1 self-center"
-          style={{ fontSize: 11.5, background: "#fff", border: `1px solid ${C.line}`, color: C.dim, marginLeft: "auto" }}
+          className="rounded px-2 py-1"
+          style={{ fontSize: 11.5, background: "#fff", border: `1px solid ${C.line}`, color: C.dim }}
           title="The page that explains what this is. Nothing is lost.">
-          ← the instructions
+          instructions
+        </button>
+        <button onClick={() => setBriefOpen(true)}
+          className="rounded px-2 py-1"
+          style={{ fontSize: 11.5, fontWeight: 700, background: "#FFF3E8", border: "1px solid #F5C89F", color: "#8A5B00", marginLeft: "auto" }}
+          title="Your role — its job description, deliverable, metric and the MD's note">
+          📋 Role &amp; Responsibility assigned to me
         </button>
       </div>
+      <div className="mb-2" style={{ fontSize: 11.5, color: C.faint }}>
+        Step {step + 1} of {steps.length} · {steps[step].title} — you can go back and forward freely
+      </div>
 
-      {/* one brief per role — somebody with two roles is briefed on both */}
-      {roleDocs.length === 0 && open.role_summary && (
-        <RoleBrief roleDoc={null} fallbackRole={open.role_at_time} fallbackSummary={open.role_summary} startOpen={step === 0} />
+      {/* the brief, when asked for */}
+      {briefOpen && (
+        <div className="fixed inset-0" style={{ background: "rgba(13,22,31,0.45)", zIndex: 60 }} onClick={() => setBriefOpen(false)}>
+          <div className="mx-auto my-4 md:my-8 rounded-lg overflow-y-auto"
+            style={{ maxWidth: 760, maxHeight: "calc(100vh - 40px)", background: "#F1EFE9", padding: 14 }}
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="font-bold" style={{ fontSize: 16 }}>Role &amp; Responsibility assigned to me</div>
+              <button onClick={() => setBriefOpen(false)} className="ml-auto text-sm font-bold rounded px-2.5 py-1"
+                style={{ background: "#16232F", color: "#8FA1B3" }}>✕ close</button>
+            </div>
+            {roleDocs.length === 0 && open.role_summary && (
+              <RoleBrief roleDoc={null} fallbackRole={open.role_at_time} fallbackSummary={open.role_summary} startOpen />
+            )}
+            {roleDocs.map((d, i) => (
+              <RoleBrief key={d.role} roleDoc={d} fallbackRole={null} fallbackSummary={null} startOpen
+                count={roleDocs.length > 1 ? `Role ${i + 1} of ${roleDocs.length}` : undefined} />
+            ))}
+            {roleDocs.length === 0 && !open.role_summary && (
+              <div className="text-sm" style={{ color: C.faint }}>No role is written against your record yet.</div>
+            )}
+          </div>
+        </div>
       )}
-      {roleDocs.map((d, i) => (
-        <RoleBrief key={d.role} roleDoc={d} fallbackRole={null} fallbackSummary={null}
-          startOpen={step === 0 && i === 0}
-          count={roleDocs.length > 1 ? `Role ${i + 1} of ${roleDocs.length}` : undefined} />
-      ))}
 
-      {/* ── a written section ── */}
+      {/* ── their record ── */}
+      {at.key === "__record__" && (
+        myRecord
+          ? <IdpMyRecord record={myRecord} options={options} onChanged={onRecordChanged} />
+          : <div className="text-sm" style={{ color: C.faint }}>Your record could not be loaded.</div>
+      )}
+
+      {/* ── a written section ── */}      {/* ── a written section ── */}
       {section && (
         <div className="mb-5">
           <h2 className="font-bold" style={{ fontSize: 19 }}>{section.title}</h2>
@@ -468,7 +519,7 @@ function Filling({ open, roleDocs, isLeader, onDone, onIntro }: { open: Open; ro
                 const v = String(answers[q.id] || "").trim();
                 const short = !v || (q.min ? v.length < q.min : false);
                 return (
-                  <button key={q.id} onClick={() => go(si)} className="w-full text-left rounded-lg p-3 mt-2"
+                  <button key={q.id} onClick={() => go(si + 1)} className="w-full text-left rounded-lg p-3 mt-2"
                     style={{ background: "#fff", border: `1px solid ${short ? "#F5B32B" : C.line}` }}>
                     <div className="font-semibold" style={{ fontSize: 13.5 }}>{q.label}</div>
                     <div style={{ fontSize: 13.5, color: v ? C.ink : "#8A5B00", whiteSpace: "pre-wrap", lineHeight: 1.7, marginTop: 3 }}>
@@ -642,7 +693,7 @@ function Written({ label, html }: { label: string; html: string }) {
 function Shell({ children, initials }: { children: React.ReactNode; initials: string | null }) {
   return (
     <div className="min-h-screen idp" style={{ background: "#F1EFE9", color: C.ink }}>
-      <div style={{ background: "#16232F", color: "#fff" }}>
+      <div style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0, zIndex: 40 }}>
         <div className="px-3 py-2 flex items-center gap-2.5">
           <div className="rounded bg-white px-1.5 py-1 flex-shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}

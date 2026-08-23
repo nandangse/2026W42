@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { hrmsTables, splitMulti } from "@/lib/hrms";
+import { hrmsTables, splitMulti, ALL_FIELDS, fieldSpec } from "@/lib/hrms";
 import { CONSENT_TEXT, isComplete } from "@/lib/idp";
 
 export const dynamic = "force-dynamic";
@@ -107,6 +107,53 @@ export async function GET() {
     try { rows = await mine(u.email) as Record<string, unknown>[]; }
     catch { return NextResponse.json({ needsMigration: true, ...who, open: null, done: [] }); }
 
+    /**
+     * THEIR OWN HRIS RECORD, for the first step of the IDP.
+     *
+     * The IDP begins by showing somebody what the company has on file for
+     * them and letting them correct it — "any changes, please make them
+     * here." Every edit lands in the same overlay HR uses, UNAPPROVED, so it
+     * appears in RJ Approval - Records like any other change. The one field
+     * never shown is HR notes, which are not theirs to read, and Role is
+     * shown but not editable — what somebody is accountable for is not
+     * self-service.
+     */
+    let myRecord: { value: Record<string, string | null>; pending: Record<string, boolean> } | null = null;
+    const options: Record<string, string[]> = {};
+    if (who.employee) {
+      const admin = adminClient();
+      try {
+        const T2 = await hrmsTables(admin);
+        const { data: emp } = await admin
+          .from(T2.employees)
+          .select("id, name, email, dob, doj, department, designation, location, active, extra")
+          .eq("id", who.employee.id).maybeSingle();
+        const { data: eds } = await admin
+          .from(T2.edits).select("field, value, approved_at").eq("employee_id", who.employee.id);
+        const ov = new Map<string, { value: unknown; approved_at: unknown }>(
+          (eds || []).map((e) => [String(e.field), e as { value: unknown; approved_at: unknown }]),
+        );
+        const value: Record<string, string | null> = {};
+        const pending: Record<string, boolean> = {};
+        for (const f of ALL_FIELDS) {
+          if (f.key === "notes") continue; // HR's, not theirs to read
+          let v: string | null = null;
+          if (f.column) {
+            if (f.column === "active") v = emp?.active ? "yes" : "no";
+            else v = ((emp as Record<string, unknown> | null)?.[f.column] as string | null) ?? null;
+          } else if (f.sheetHeader) {
+            v = (((emp?.extra || {}) as Record<string, string>)[f.sheetHeader] ?? null) as string | null;
+          }
+          const o = ov.get(f.key);
+          if (o) { v = o.value == null ? null : String(o.value); pending[f.key] = o.approved_at == null; }
+          value[f.key] = v === "" ? null : v;
+        }
+        myRecord = { value, pending };
+        const { data: m } = await admin.from("hrms_master").select("kind, value").order("sort_order");
+        for (const r of m || []) (options[String(r.kind)] ||= []).push(String(r.value));
+      } catch { /* the step simply shows nothing editable */ }
+    }
+
     const open = rows.find((r) => !r.submitted_at) ?? null;
     if (open) {
       // signed per read; a stored URL either expires in the row or never does
@@ -126,6 +173,8 @@ export async function GET() {
       email: u.email,
       cycle: CYCLE,
       ...who,
+      myRecord,
+      options,
       open,
       done: done.map((d) => ({
         id: d.id, submitted_at: d.submitted_at,
@@ -253,6 +302,42 @@ export async function POST(req: Request) {
         // the words are the person's; hand them back rather than losing them
         return NextResponse.json({ text });
       }
+    }
+
+    /**
+     * { action: "myrecord", field, value } — correct their own record.
+     *
+     * Scoped to the caller: the employee id comes from THEIR login, never
+     * from the request. The write is the same overlay HR uses, left
+     * UNAPPROVED so it queues for Dr Raghu with everything else.
+     */
+    if (action === "myrecord") {
+      const who = await whoAreThey(u.email);
+      if (!who.employee) throw new HttpError(403, "This login is not linked to an employee record.");
+      const field = String(body.field || "");
+      const spec = fieldSpec(field);
+      if (!spec) throw new HttpError(400, "That is not a field on the record.");
+      if (spec.derived) throw new HttpError(400, `${spec.label} is worked out from another field.`);
+      if (field === "notes" || field === "role")
+        throw new HttpError(403, field === "role" ? "Your role is set by HR, not from here." : "Not yours to edit.");
+      const T2 = await hrmsTables(admin);
+      let v: string | null = String(body.value ?? "").trim() || null;
+      if (spec.kind === "bool") v = body.value === "no" || body.value === false ? "no" : "yes";
+      if (spec.kind === "email" && v) v = v.toLowerCase();
+      if (spec.kind === "date" && v && !/^\d{4}-\d{2}-\d{2}$/.test(v))
+        throw new HttpError(400, "A date must be YYYY-MM-DD");
+      const stamp = `${u.initials ? u.initials + " · " : ""}${u.email} (self, via the IDP)`;
+      const { error } = await admin.from(T2.edits).upsert(
+        { employee_id: who.employee.id, field, value: v, edited_by: stamp, edited_at: new Date().toISOString(), approved_at: null, approved_by: null },
+        { onConflict: "employee_id,field" },
+      );
+      if (error) throw new Error(error.message);
+      try {
+        await admin.from(T2.log).insert({
+          employee_id: who.employee.id, field, old_value: null, new_value: v, edited_by: stamp,
+        });
+      } catch { /* the correction matters more than the line about it */ }
+      return NextResponse.json({ ok: true, value: v });
     }
 
     if (action === "start") {

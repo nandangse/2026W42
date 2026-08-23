@@ -75,6 +75,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.3.0",
+    date: "2026-08-23",
+    module: "IDP — begin with the record, and the brief steps aside",
+    items: [
+      "“THE PAGE IS NOT GOING FORWARD” WAS THE ROLE BRIEF'S FAULT, not the buttons'. The brief sat expanded at the top of every step, so pressing Next scrolled to the top of the SAME giant panel and the page looked unmoved while the step underneath had changed. It has left the flow entirely.",
+      "ROLE & RESPONSIBILITY ASSIGNED TO ME is now the rightmost button on the step row, on every step, opening the brief in a LIGHTBOX — the whole definition, the recording, every role they hold. One press away always; in the way never.",
+      "THE HEADER AND THE STEP NUMBERS ARE FROZEN. Scroll anywhere in a long step and the way forward, the instructions and the brief button stay on screen.",
+      "STEP 1 IS NOW “BEGIN WITH MY HRIS RECORDS”. Before anybody writes a word about where they are going, they read what the company has on file about where they are — the whole record, group by group. “Read it. Any changes, please make them in this.”",
+      "AND THEY CAN CORRECT IT. A change lands in the same overlay HR uses, UNAPPROVED, so it queues in RJ Approval - Records with everything else and shows on the record after approval. The field is marked “change sent for approval” the moment they touch it — nothing they type is lost, it waits to be agreed.",
+      "Two exceptions, both deliberate: HR NOTES are not shown, because they are not theirs to read; and ROLE is shown but not editable, because what somebody is accountable for is not self-service.",
+      "Phone-first like the rest of the IDP: 16px inputs, dropdowns fed by the real masters, groups that fold.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.2.2",
     date: "2026-08-23",
     module: "IDP — nothing said is dropped, and the page stops double-spacing",
