@@ -75,6 +75,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.2.0",
+    date: "2026-08-23",
+    module: "HRIS — the register reads as a table, and the past stays put",
+    items: [
+      "ROLES, JD, KRA, KPI IS A TABLE NOW. Role · Department · Grade · Nos Active · Stage, with the header frozen, every column sortable and columns pinnable — the same table as everywhere else in HRIS.",
+      "THE FOUR WIDE COLUMNS ARE COLLAPSIBLE AND START COLLAPSED: Job Description · Deliverable · Measurement Metric · People Active. A register of 134 roles with three paragraphs of rich text in every row is not a table anybody can read. Open the ones you want, one button each.",
+      "EDITING HAS LEFT THE LIST. Clicking a role opens it in a panel — the JD, the deliverable, the metric, the voice note and Mark Final all live there. The list stays a list.",
+      "Sorting a rich-text column sorts on the WORDS rather than the markup, or every row beginning “<p>” would sort identically.",
+      "PEOPLE ACTIVE names each person on the roll in that role, and each name opens their record.",
+      "THE PEOPLE WHO HAVE LEFT HAVE BEEN PUT BACK. This morning's spelling merge moved 57 leavers along with everybody else; their records are history and should not have moved. All 57 are restored to the role their record said before, and the 13 historical spellings were re-created so those records still resolve to something. Nobody on the roll was touched — still 193 of 201 in a role with a real definition.",
+      "PAST EMPLOYEEMASTER 2025-26 IS NOW MARKED AND BEHAVES AS A FROZEN RECORD. No editing from that view, no Edit Record button, and a person opened from it says FROZEN rather than VIEW ONLY. It is there to be checked against — a payroll run, a headcount at a date, a question about who was on the roll last year.",
+      "AND IT SAYS WHAT IT IS NOT. That view is derived from joining dates against today's data, not a copy taken on 31 March 2026 — a person's department or salary reads as it is NOW, not as it was then. For payroll that difference matters, so it is on the screen rather than in a footnote. A true snapshot means storing one; the machinery is a day's work and nobody has asked for it yet.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.19.1.9",
     date: "2026-08-23",
     module: "HRIS — one spelling per role",

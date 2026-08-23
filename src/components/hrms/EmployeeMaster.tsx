@@ -222,7 +222,7 @@ export default function EmployeeMaster({
   };
   const BLURB: Record<MasterView, string> = {
     active: "Everybody on the roll today.",
-    past: `Everybody who joined on or before ${fmtFull(FY2526_END)} — the FY 2025-26 roll, including those who have since left. Derived from joining dates rather than a stored snapshot; upload the 2025-26 master as its own file and this becomes exact.`,
+    past: `FROZEN — the roll as it stood at the close of FY 2025-26: everybody who had joined on or before ${fmtFull(FY2526_END)}, whether or not they are still here. Read only. This is the record a payroll run and a timestamp are checked against, so nothing is edited from this view.`,
     left: "No longer on the roll. Records are kept, never deleted.",
   };
 
@@ -244,6 +244,23 @@ export default function EmployeeMaster({
         }
       >
         {err && <div className="rounded p-2 mb-3 text-xs font-semibold" style={{ background: "#FBEDEA", color: C.red }}>{err}</div>}
+
+        {view === "past" && (
+          <div className="rounded p-2 mb-3" style={{ background: "#EDEAF6", border: "1px solid #B9AEDD" }}>
+            <div className="text-xs font-bold" style={{ color: "#4A3B7A" }}>🔒 Frozen record — FY 2025-26</div>
+            <div className="text-xs mt-1" style={{ color: C.dim, lineHeight: 1.6 }}>
+              Nothing is edited from this view. It exists to be <b>checked against</b> — a payroll run, a headcount at a
+              date, a question about who was on the roll last year. Opening somebody here shows their record and no more;
+              to change anything, work from <b>Active Employees</b>.
+              <br />
+              <span style={{ color: C.faint }}>
+                One honest limit: this is derived from joining dates against today&apos;s data, not a copy taken on 31 March
+                2026. A person&apos;s department or salary reads as it is NOW, not as it was then. A true snapshot means
+                storing one — say the word and the close of a financial year starts writing itself into a frozen table.
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2 flex-wrap mb-3">
           <Stat n={stats.shown} l={view === "left" ? "Have left" : "On this list"} />
@@ -309,7 +326,7 @@ export default function EmployeeMaster({
         />
       </Pane>
 
-      {open && <PersonCard e={open} onClose={() => setOpenId(null)} />}
+      {open && <PersonCard e={open} frozen={view === "past"} onClose={() => setOpenId(null)} />}
     </>
   );
 }
@@ -334,7 +351,7 @@ function Stat({ n, l, hint, warn }: { n: number | string; l: string; hint?: stri
  * there when you come back, and nobody edits a personnel record by accident
  * while scrolling a list.
  */
-function PersonCard({ e, onClose }: { e: HrmsEmployee; onClose: () => void }) {
+function PersonCard({ e, frozen, onClose }: { e: HrmsEmployee; frozen?: boolean; onClose: () => void }) {
   const [tab, setTab] = useState<string>(FIELD_GROUPS[0].key);
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
 
@@ -367,13 +384,19 @@ function PersonCard({ e, onClose }: { e: HrmsEmployee; onClose: () => void }) {
             <button onClick={onClose} className="ml-auto text-sm font-bold rounded px-2 py-1" style={{ background: "#22303C", color: "#8FA1B3" }}>✕</button>
           </div>
           <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#22303C", color: "#8FA1B3" }}>
-              VIEW ONLY
+            <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: frozen ? "#4A3B7A" : "#22303C", color: frozen ? "#fff" : "#8FA1B3" }}>
+              {frozen ? "🔒 FROZEN — FY 2025-26" : "VIEW ONLY"}
             </span>
-            <button onClick={edit} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}
-              title="Opens this record in its own tab, where it can be changed. Every change is logged.">
-              ✎ Edit Record ↗
-            </button>
+            {frozen ? (
+              <span style={{ fontSize: 11, color: "#8FA1B3" }}>
+                Frozen record — edit from Active Employees, not from here.
+              </span>
+            ) : (
+              <button onClick={edit} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}
+                title="Opens this record in its own tab, where it can be changed. Every change is logged.">
+                ✎ Edit Record ↗
+              </button>
+            )}
           </div>
         </div>
 

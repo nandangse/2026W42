@@ -19,8 +19,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { Pane } from "./Pane";
+import DataTable, { type Column } from "./DataTable";
 import { C } from "./RecordFields";
-import RichText from "./RichText";
+import RichText, { RichTextView } from "./RichText";
 
 interface Role {
   id: string;
@@ -52,7 +53,13 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
   const [dept, setDept] = useState("");
   const [stage, setStage] = useState("");
   const [open, setOpen] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  /**
+   * THE TABLE COMES FIRST (Dr Raghu, 23 Aug 2026). The four wide columns are
+   * COLLAPSED to begin with — a register of 134 roles with three paragraphs of
+   * rich text in every row is not a table anybody can read. Open the ones you
+   * want; the choice is remembered while you are on the page.
+   */
+  const [cols, setCols] = useState({ jd: false, deliverable: false, metric: false, people: false });
   const [msg, setMsg] = useState("");
   const [adding, setAdding] = useState("");
 
@@ -86,6 +93,63 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
         .filter(Boolean).join(" ").toLowerCase().includes(n);
     });
   }, [roles, q, dept, stage]);
+
+  const columns: Column<Role>[] = useMemo(() => {
+    const out: Column<Role>[] = [
+      {
+        key: "role", label: "Role", width: 230, value: (r) => r.role,
+        render: (r) => (
+          <span className="font-semibold">
+            {r.role}
+            {r.summary && <span title="Has a management expectation note" style={{ marginLeft: 5 }}>🎙</span>}
+          </span>
+        ),
+      },
+      { key: "department", label: "Department", width: 150, value: (r) => r.department },
+      { key: "grade", label: "Grade", width: 160, value: (r) => r.grade },
+      {
+        key: "activeCount", label: "Nos Active", width: 100, align: "right", numeric: true,
+        value: (r) => r.activeCount,
+        render: (r) => <span className="tnum" style={{ color: r.activeCount ? C.ink : "#C9C6BD", fontWeight: r.activeCount ? 700 : 400 }}>{r.activeCount}</span>,
+        title: "Active employees holding this role",
+      },
+      {
+        key: "stage", label: "Stage", width: 90, value: (r) => r.stage,
+        render: (r) => (
+          <span className="rounded px-1.5 py-0.5 font-bold" style={{
+            fontSize: 10,
+            background: r.stage === "Final" ? "#E6F4EA" : "#FFF3E8",
+            color: r.stage === "Final" ? C.green : "#8A5B00",
+          }}>{r.stage}</span>
+        ),
+      },
+    ];
+    // Sorting on rich text sorts on the WORDS, not on the markup — otherwise
+    // every row beginning "<p>" sorts identically.
+    const words = (h: string | null) => String(h || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    if (cols.jd) out.push({ key: "job_description", label: "Job Description", width: 340, value: (r) => words(r.job_description), render: (r) => <RichTextView html={r.job_description} /> });
+    if (cols.deliverable) out.push({ key: "deliverable", label: "Deliverable", width: 300, value: (r) => words(r.deliverable), render: (r) => <RichTextView html={r.deliverable} /> });
+    if (cols.metric) out.push({ key: "metric", label: "Measurement Metric", width: 300, value: (r) => words(r.metric), render: (r) => <RichTextView html={r.metric} /> });
+    if (cols.people) out.push({
+      key: "people", label: "People Active", width: 320,
+      value: (r) => r.people.filter((p) => p.onRoll).map((p) => p.name).join(", "),
+      render: (r) => {
+        const on = r.people.filter((p) => p.onRoll);
+        if (!on.length) return <span style={{ color: "#C9C6BD" }}>nobody</span>;
+        return (
+          <span className="flex gap-1 flex-wrap">
+            {on.map((p) => (
+              <a key={p.id} href={`/hrms/employee/${encodeURIComponent(p.id)}`} target="_blank" rel="noopener noreferrer"
+                className="rounded px-1.5 py-0.5" style={{ background: "#F4F2EC", color: C.dim, fontSize: 11 }} title={p.id}>
+                {p.name}
+              </a>
+            ))}
+          </span>
+        );
+      },
+    });
+    return out;
+  }, [cols]);
 
   const run = async (body: Record<string, unknown>, ok: string) => {
     setMsg("");
@@ -137,56 +201,51 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
         <span className="text-xs" style={{ color: C.faint }}>{roles === null ? "loading…" : `${shown.length} shown`}</span>
       </div>
 
-      <div className="bg-white rounded-lg border" style={{ borderColor: C.line }}>
-        {roles !== null && shown.length === 0 && (
-          <div className="px-3 py-5 text-xs" style={{ color: C.faint }}>No role matches that.</div>
-        )}
-        {shown.map((r, i) => (
-          <div key={r.id} style={{ borderTop: i ? "1px solid #EEECE6" : undefined }}>
-            <div className="flex items-center gap-2 px-3 py-2 flex-wrap">
-              <button onClick={() => setExpanded((e) => ({ ...e, [r.id]: !e[r.id] }))}
-                className="font-bold rounded"
-                style={{ width: 20, height: 20, background: "#F4F2EC", color: C.dim, fontSize: 12, flexShrink: 0 }}
-                title={r.people.length ? "Who holds this role" : "Nobody holds this role"}>
-                {expanded[r.id] ? "−" : "+"}
-              </button>
-              <button onClick={() => setOpen(open === r.id ? null : r.id)} className="text-xs font-bold text-left" style={{ minWidth: 200, flex: 1 }}>
-                {r.role}
-              </button>
-              <span className="text-xs" style={{ color: C.dim, minWidth: 130 }}>{r.department || <span style={{ color: "#C9C6BD" }}>—</span>}</span>
-              <span className="text-xs" style={{ color: C.faint, minWidth: 70 }}>{r.grade || ""}</span>
-              <span className="text-xs tnum" style={{ color: r.activeCount ? C.ink : "#C9C6BD", minWidth: 74, textAlign: "right" }}
-                title="Active employees holding this role">
-                {r.activeCount} active
-              </span>
-              {r.summary && <span title="Has a management expectation note">🎙</span>}
-              <span className="rounded px-1.5 py-0.5 font-bold" style={{
-                fontSize: 10,
-                background: r.stage === "Final" ? "#E6F4EA" : "#FFF3E8",
-                color: r.stage === "Final" ? C.green : "#8A5B00",
-              }}>{r.stage}</span>
-            </div>
-
-            {expanded[r.id] && (
-              <div className="px-3 pb-2" style={{ paddingLeft: 44 }}>
-                {r.people.length === 0 && <div className="text-xs" style={{ color: C.faint }}>Nobody holds this role.</div>}
-                <div className="flex gap-1 flex-wrap">
-                  {r.people.map((p) => (
-                    <a key={p.id} href={`/hrms/employee/${encodeURIComponent(p.id)}`} target="_blank" rel="noopener noreferrer"
-                      className="rounded px-1.5 py-0.5 text-xs"
-                      style={{ background: p.onRoll ? "#F4F2EC" : "#FBEDEA", color: p.onRoll ? C.dim : C.red }}
-                      title={p.onRoll ? `${p.id} — on the roll` : `${p.id} — no longer on the roll`}>
-                      {p.name}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {open === r.id && <RoleEditor r={r} isOwner={isOwner} onRun={run} reload={load} />}
-          </div>
+      {/* which wide columns are open */}
+      <div className="flex gap-1.5 flex-wrap items-center mb-2 no-print">
+        <span className="text-xs" style={{ color: C.faint }}>Columns:</span>
+        {([["jd", "Job Description"], ["deliverable", "Deliverable"], ["metric", "Measurement Metric"], ["people", "People Active"]] as const).map(([k, label]) => (
+          <button key={k} onClick={() => setCols((c) => ({ ...c, [k]: !c[k] }))}
+            className="text-xs font-semibold rounded px-2 py-1"
+            style={cols[k] ? { background: "#16232F", color: "#fff" } : { background: "#fff", border: `1px solid ${C.line}`, color: C.dim }}
+            title={cols[k] ? "Collapse this column" : "Show this column"}>
+            {cols[k] ? "▾" : "▸"} {label}
+          </button>
         ))}
       </div>
+
+      <DataTable
+        columns={columns}
+        rows={shown}
+        rowKey={(r) => r.id}
+        onRowClick={(r) => setOpen(open === r.id ? null : r.id)}
+        activeKey={open}
+        initialFrozen={1}
+        empty={roles === null ? "Loading the register…" : "No role matches that."}
+      />
+
+      {current && (
+        <div className="fixed inset-0 flex justify-end no-print" style={{ background: "rgba(13,22,31,0.35)", zIndex: 60 }} onClick={() => setOpen(null)}>
+          <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(680px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 sticky top-0 flex items-start gap-2" style={{ background: "#16232F", color: "#fff", zIndex: 2 }}>
+              <div style={{ minWidth: 0 }}>
+                <div className="font-bold">{current.role}</div>
+                <div style={{ fontSize: 11, color: "#8FA1B3" }}>
+                  {[current.department, current.grade].filter(Boolean).join(" · ") || "no department set"}
+                  {" · "}{current.activeCount} active
+                </div>
+              </div>
+              <span className="rounded px-1.5 py-0.5 font-bold" style={{
+                fontSize: 10, marginLeft: "auto",
+                background: current.stage === "Final" ? "#E6F4EA" : "#FFF3E8",
+                color: current.stage === "Final" ? C.green : "#8A5B00",
+              }}>{current.stage}</span>
+              <button onClick={() => setOpen(null)} className="text-sm font-bold rounded px-2 py-1" style={{ background: "#22303C", color: "#8FA1B3" }}>✕</button>
+            </div>
+            <RoleEditor r={current} isOwner={isOwner} onRun={run} reload={load} />
+          </div>
+        </div>
+      )}
     </Pane>
   );
 }
