@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
-import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, CONSENT_TEXT, isComplete, bandIndex } from "@/lib/idp";
+import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, CONSENT_TEXT, WATCHED_TEXT, LOOM_EMBED, isComplete, bandIndex } from "@/lib/idp";
 import DictateBox from "./DictateBox";
 import IdpMyRecord, { type MyRecord } from "./IdpMyRecord";
 import IdpFinal, { type SalaryRow, type Attachment } from "./IdpFinal";
@@ -50,6 +50,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     salary: Salary;
   } | null>(null);
   const [consent, setConsent] = useState(false);
+  const [watched, setWatched] = useState(false);
   /**
    * THE INSTRUCTIONS MUST STAY REACHABLE.
    *
@@ -75,7 +76,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
   const start = async () => {
     setBusy(true); setMsg("");
-    try { await api.post("/api/idp", { action: "start", consent: true }); await load(); }
+    try { await api.post("/api/idp", { action: "start", consent: true, watched: true }); await load(); }
     catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
   };
@@ -210,6 +211,32 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
           </div>
         </div>
 
+        {/* the video, and the role in Raghu's own voice — the preparation the
+            whole document assumes, so they sit before Start, not behind it */}
+        <div className="rounded-lg p-3 mt-5" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
+          <div className="font-bold" style={{ fontSize: 15 }}>🎬 First, watch this from Raghu</div>
+          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, marginTop: 8 }}>
+            <iframe src={LOOM_EMBED} frameBorder={0} allowFullScreen
+              style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", borderRadius: 8 }} />
+          </div>
+          {state.roleDocs.length > 0 && (
+            <div className="mt-3">
+              <div className="font-bold" style={{ fontSize: 14 }}>
+                🎙 And hear what he expects of {state.roleDocs.length > 1 ? "your roles" : "your role"}
+              </div>
+              {state.roleDocs.map((d) => (
+                <div key={d.role} className="mt-2">
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{d.role}</div>
+                  {d.url
+                    ? <audio controls controlsList="nodownload" onContextMenu={(e) => e.preventDefault()} src={d.url} style={{ width: "100%", maxWidth: 420 }} />
+                    : <div style={{ fontSize: 12, color: C.faint }}>No recording on this role yet — read the written expectation below.</div>}
+                  {d.summary && <div style={{ fontSize: 13, color: C.dim, whiteSpace: "pre-wrap", lineHeight: 1.7, marginTop: 4 }}>{d.summary}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <p className="mt-5 rounded p-3" style={{ fontSize: 14, lineHeight: 1.7, color: "#8A5B00", background: "#FFF7E6", border: "1px solid #F5B32B" }}>
           Once you start it has to be completed else you will begin all over again.
         </p>
@@ -253,6 +280,11 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
         <div className="mt-6" style={{ fontSize: 17, fontWeight: 700 }}>Start?</div>
 
         <label className="flex items-start gap-2 mt-3" style={{ cursor: "pointer" }}>
+          <input type="checkbox" checked={watched} onChange={(e) => setWatched(e.target.checked)}
+            style={{ accentColor: C.orange, width: 17, height: 17, marginTop: 2, flexShrink: 0 }} />
+          <span style={{ fontSize: 14, lineHeight: 1.6, color: C.ink, fontWeight: 600 }}>{WATCHED_TEXT}</span>
+        </label>
+        <label className="flex items-start gap-2 mt-2" style={{ cursor: "pointer" }}>
           <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
             style={{ accentColor: C.orange, width: 17, height: 17, marginTop: 2, flexShrink: 0 }} />
           <span style={{ fontSize: 14, lineHeight: 1.6, color: C.ink }}>{CONSENT_TEXT}</span>
@@ -262,20 +294,20 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
           You will get a finalised document once completed.
         </p>
 
-        <button onClick={start} disabled={!consent || busy || state.needsMigration}
+        <button onClick={start} disabled={!consent || !watched || busy || state.needsMigration}
           className="mt-5 rounded font-bold"
           style={{
-            background: consent && !state.needsMigration ? C.orange : "#E2E0DA",
-            color: consent && !state.needsMigration ? "#fff" : "#8A94A0",
+            background: consent && watched && !state.needsMigration ? C.orange : "#E2E0DA",
+            color: consent && watched && !state.needsMigration ? "#fff" : "#8A94A0",
             padding: "15px 26px", fontSize: 16, width: "100%", maxWidth: 340,
-            cursor: consent && !state.needsMigration ? "pointer" : "not-allowed",
+            cursor: consent && watched && !state.needsMigration ? "pointer" : "not-allowed",
           }}>
           {busy ? "Starting…" : "Start the IDP discussions"}
         </button>
 
-        {!consent && (
+        {(!consent || !watched) && (
           <div className="mt-2" style={{ fontSize: 12, color: C.faint }}>
-            The tick above is needed before you can begin.
+            Both ticks above are needed before you can begin.
           </div>
         )}
         </>

@@ -14,6 +14,7 @@
  */
 import { useRef, useState } from "react";
 import DictateBox, { type Recording } from "./DictateBox";
+import { LOOM_EMBED } from "@/lib/idp";
 
 const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
 
@@ -143,10 +144,10 @@ export default function IdpFinal({
             </div>
           )}
           <div className="rounded p-2.5 mt-3" style={{ background: "#EDEAF6", border: "1px solid #B9AEDD" }}>
-            <div className="font-bold" style={{ fontSize: 13 }}>🎬 A video from Raghu explaining this table</div>
-            <div style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.6 }}>
-              Raghu is recording a short video walking through what each line means. It will appear here — until
-              then, ask HR if any line is unclear.
+            <div className="font-bold" style={{ fontSize: 13 }}>🎬 Raghu explaining this table — watch before you answer below</div>
+            <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, marginTop: 6 }}>
+              <iframe src={LOOM_EMBED} frameBorder={0} allowFullScreen
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", borderRadius: 8 }} />
             </div>
           </div>
         </div>

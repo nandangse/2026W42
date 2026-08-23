@@ -9,7 +9,7 @@ const ALL_FIELDS_BY_HEADER = new Map(
     .filter((f) => f.sheetHeader)
     .map((f) => [f.sheetHeader as string, f.key]),
 );
-import { CONSENT_TEXT, isComplete, IDP_RECORD_GROUPS, IDP_RECORD_HIDE } from "@/lib/idp";
+import { CONSENT_TEXT, WATCHED_TEXT, isComplete, IDP_RECORD_GROUPS, IDP_RECORD_HIDE } from "@/lib/idp";
 
 export const dynamic = "force-dynamic";
 /** Tidying ten minutes of speech takes longer than a default timeout allows. */
@@ -459,6 +459,10 @@ export async function POST(req: Request) {
     if (action === "start") {
       if (body.consent !== true)
         throw new HttpError(400, "The IDP cannot be started without consent.");
+      // watching the video and reading the role are the preparation the rest
+      // of the document assumes — the tick is required, and kept with its words
+      if (body.watched !== true)
+        throw new HttpError(400, "Watch the video and read your role first — then tick the box that says so.");
       const who = await whoAreThey(u.email);
       /**
        * NO EMPLOYEE RECORD, NO IDP (Dr Raghu, 23 Aug 2026). A development
@@ -481,7 +485,7 @@ export async function POST(req: Request) {
         person_name: u.displayName || null,
         cycle: CYCLE,
         consent_at: new Date().toISOString(),
-        consent_text: CONSENT_TEXT,
+        consent_text: `${CONSENT_TEXT} | ${WATCHED_TEXT}`,
         role_at_time: who.role,
         role_summary: who.roleSummary,
       }).select("id").maybeSingle();

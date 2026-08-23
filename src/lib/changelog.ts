@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.4.2",
+    date: "2026-08-23",
+    module: "IDP — the video is in, and nobody starts unprepared",
+    items: [
+      "DR RAGHU'S LOOM IS ON THE FIRST PAGE AND ON THE LAST. On the welcome page it plays before anybody can begin; on the last page it sits with the salary table it explains, above the questions it frames.",
+      "HIS VOICE NOTE ON THE ROLE IS ON THE FIRST PAGE TOO — every role the person holds, played before they start, with the written expectation under it. A role with no recording yet says so and points at the written words.",
+      "TWO TICKS BEFORE START, and both are compulsory: “I watched the video and I read my role”, then the consent. The button stays dead until both are on — enforced on the SERVER as well, so the page cannot be talked past — and the attestation is stored with its exact wording beside the consent, because an attestation whose wording nobody kept is not evidence of anything.",
+      "The video plays inside the page, phone-sized, on both ends.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.4.1",
     date: "2026-08-23",
     module: "HRIS — the management side of the IDP, and the salary question",

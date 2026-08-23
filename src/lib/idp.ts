@@ -412,3 +412,13 @@ export const IDP_RECORD_GROUPS = ["identity", "contact", "personal", "family", "
 
 /** Fields left out even inside the shown groups. */
 export const IDP_RECORD_HIDE = new Set(["family_updated", "whatsapp", "notes"]);
+
+/** Dr Raghu's video walking through the salary table and the IDP. */
+export const LOOM_EMBED = "https://www.loom.com/embed/5229cb82af9f42cda47e5fb9f25b3016";
+
+/**
+ * The second tick on the welcome page. Stored with the consent, wording and
+ * all, for the same reason the consent is: an attestation whose wording
+ * nobody kept is not evidence of anything.
+ */
+export const WATCHED_TEXT = "I watched the video and I read my role";
