@@ -117,7 +117,7 @@ export function salaryTable(get: (k: string) => unknown, type: string | null, ex
       ? [
           { label: "Company Investment in You", monthly: null, yearly: null, kind: "head" as const },
           ...inv.map((e) => R(e.label, e.monthly)),
-          { label: "Total Investment (E)", monthly: invM, yearly: invM * 12, kind: "total" as const },
+          { label: "Total Investment (E)", monthly: Math.round(invM), yearly: Math.round(invM * 12), kind: "total" as const },
           { label: `Total Cost To Company (CTC) (C + D + E)`, monthly: Math.round(netM + benM + invM), yearly: Math.round(ctcY), kind: "total" as const },
         ]
       : [{ label: "Total Cost To Company (CTC) (C + D)", monthly: Math.round(netM + benM), yearly: Math.round(ctcY), kind: "total" as const }]),
