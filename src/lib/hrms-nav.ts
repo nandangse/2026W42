@@ -199,7 +199,7 @@ export const NAV: NavSection[] = [
     icon: "✅",
     items: [
       { key: "approvals.commercial", label: "RJ Approval - Commercial", blurb: "Anything with money attached that needs the owner's word before it happens.", built: false },
-      { key: "approvals.records", label: "RJ Approval - Records", blurb: "Changes to a personnel record that HR may prepare but may not conclude alone.", built: false },
+      { key: "approvals.records", label: "RJ Approval - Records", blurb: "Role definitions changed since they were last seen. Nothing HR writes is taken as agreed until it has been read here.", built: true },
       { key: "approvals.salary", label: "RJ Approval - Salary Queries", blurb: "A pay question escalated past HR — raised, answered, and closed on the record.", built: false },
     ],
   },

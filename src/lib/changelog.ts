@@ -75,6 +75,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.2.1",
+    date: "2026-08-23",
+    module: "HRIS — a role reads, then opens to be written",
+    items: [
+      "CLICKING A ROLE OPENS IT READ ONLY — everything it says, the recording included, and nothing you can type into. An ✎ Edit button opens the role in ITS OWN TAB. Three rich-text boxes and a recorder do not belong in a panel hovering over a list.",
+      "THE ROLE PAGE IS TWO COLUMNS. On the left the written definition: Role · Department · Grade · Reports To · Location across the top, then Job Description, Deliverable and Measurement Metric as large rich-text boxes — bold, italic, underline, numbering, bullets, links. On the right the Management Expectation Note, beside the writing rather than buried under it, with who holds the role and the Changes history below it.",
+      "LOCATION HAS BEEN ADDED. The Goalbook defines every role against a place — Belapur, Khalapur, WFH — and the register was not carrying it.",
+      "ANY CHANGE GOES STRAIGHT TO APPROVALS → RJ APPROVAL - RECORDS, and stays there until Dr Raghu has seen it. That screen is now built: what changed, who changed it, when, with the role one click away and an Approve button that is his alone. HR may write any part of a role; nothing HR writes is silently taken as agreed.",
+      "APPROVING AND MARKING FINAL ARE DIFFERENT THINGS, and both are his. Final says the role is AGREED. Approving says the latest edit has been SEEN. A Final role reappears here the next time somebody changes a word of it.",
+      "ONE RECORDING, ONE TRANSCRIPT, ONE SUMMARY. Recording again REPLACES what is there, because the summary is what flows into the IDP and three competing summaries would mean nobody knows which counts. What it replaced is not lost — the old summary and its audio go to CHANGES, playable from there.",
+      "CHANGES is the role's own history: every field, what it used to say, who changed it and when. Append-only. A job description is what somebody is appraised against, so what it used to say is part of the record.",
+      "Migration 0051.",
+    ],
+  },
+  {
     v: "3.19.2.0",
     date: "2026-08-23",
     module: "HRIS — the register reads as a table, and the past stays put",

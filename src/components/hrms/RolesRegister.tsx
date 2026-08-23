@@ -22,27 +22,9 @@ import { Pane } from "./Pane";
 import DataTable, { type Column } from "./DataTable";
 import { C } from "./RecordFields";
 import RichText, { RichTextView } from "./RichText";
+import VoiceNote from "./RoleVoiceNote";
+import type { Role } from "./RoleRecord";
 
-interface Role {
-  id: string;
-  role: string;
-  department: string | null;
-  grade: string | null;
-  reports_to: string | null;
-  job_description: string | null;
-  deliverable: string | null;
-  metric: string | null;
-  stage: "Draft" | "Final";
-  url: string | null;
-  voice_seconds: number | null;
-  transcript: string | null;
-  summary: string | null;
-  approved_by: string | null;
-  approved_at: string | null;
-  updated_by: string | null;
-  people: { id: string; name: string; onRoll: boolean }[];
-  activeCount: number;
-}
 
 export default function RolesRegister({ who, isOwner }: { who: string; isOwner: boolean }) {
   const [roles, setRoles] = useState<Role[] | null>(null);
@@ -242,7 +224,7 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
               }}>{current.stage}</span>
               <button onClick={() => setOpen(null)} className="text-sm font-bold rounded px-2 py-1" style={{ background: "#22303C", color: "#8FA1B3" }}>✕</button>
             </div>
-            <RoleEditor r={current} isOwner={isOwner} onRun={run} reload={load} />
+            <RoleView r={current} />
           </div>
         </div>
       )}
@@ -259,217 +241,94 @@ function Stat({ n, l, hint, warn }: { n: number; l: string; hint?: string; warn?
   );
 }
 
-function RoleEditor({
-  r, isOwner, onRun, reload,
-}: {
-  r: Role; isOwner: boolean;
-  onRun: (body: Record<string, unknown>, ok: string) => Promise<void>;
-  reload: () => Promise<void>;
-}) {
-  const save = (field: string, value: string) => {
-    if ((r as unknown as Record<string, string | null>)[field] === (value || null)) return;
-    onRun({ action: "save", id: r.id, [field]: value }, "Saved");
-  };
-
-  /**
-   * Job Description, Deliverable and Measurement Metric are RICH TEXT
-   * (Dr Raghu, 23 Aug 2026) — a job description with three bullets is a
-   * different document from the same words run together in a paragraph.
-   */
-  const Rich = ({ f, label, rows = 3, hint, placeholder }: { f: keyof Role; label: string; rows?: number; hint?: string; placeholder?: string }) => (
-    <div className="mb-2">
-      <div className="text-xs font-semibold" style={{ color: C.dim }}>{label}</div>
-      {hint && <div style={{ fontSize: 10.5, color: C.faint, lineHeight: 1.5, marginBottom: 3 }}>{hint}</div>}
-      <RichText value={(r[f] as string) || ""} rows={rows} placeholder={placeholder}
-        onSave={(html) => save(f as string, html)} />
-    </div>
-  );
-
+/**
+ * The lightbox is READ ONLY (Dr Raghu, 23 Aug 2026) — everything the role
+ * says, including the recording, and nothing you can type into. Editing opens
+ * the role in its own tab, which is where a document of this weight belongs:
+ * three rich-text boxes and a recorder do not fit in a panel over a list.
+ */
+function RoleView({ r }: { r: Role }) {
+  const edit = () => window.open(`/hrms/role/${encodeURIComponent(r.id)}`, "_blank", "noopener");
   return (
-    <div className="px-3 pb-3" style={{ background: "#F8F7F3", borderTop: "1px solid #EEECE6" }}>
-      <div className="flex gap-2 flex-wrap pt-2 mb-2">
-        <Field label="Role" value={r.role} onSave={(v) => save("role", v)} width={210} />
-        <Field label="Department" value={r.department || ""} onSave={(v) => save("department", v)} />
-        <Field label="Grade" value={r.grade || ""} onSave={(v) => save("grade", v)} width={110} />
-        <Field label="Reports To" value={r.reports_to || ""} onSave={(v) => save("reports_to", v)} />
-      </div>
-
-      <Rich f="job_description" label="Job Description" rows={4} placeholder="What this role exists to do…" />
-      <Rich f="deliverable" label="Deliverable" rows={3}
-        hint="What this role must produce — an outcome, not a list of activities."
-        placeholder="One bullet per outcome…" />
-      <Rich f="metric" label="Measurement Metric" rows={3}
-        hint="How the deliverable is measured. A number, a date, or a rate."
-        placeholder="e.g. On-time delivery ≥ 90% each month…" />
-
-      <VoiceNote r={r} reload={reload} />
-
-      <div className="flex items-center gap-2 flex-wrap mt-3">
-        {r.stage === "Draft" ? (
-          <button
-            onClick={() => onRun({ action: "stage", id: r.id, stage: "Final" }, `“${r.role}” is Final`)}
-            disabled={!isOwner}
-            className="text-xs font-bold rounded px-3 py-1.5"
-            style={{ background: isOwner ? "#0D7A3F" : "#E2E0DA", color: isOwner ? "#fff" : "#8A94A0", cursor: isOwner ? "pointer" : "not-allowed" }}
-            title={isOwner ? "Mark this role agreed" : "Only Dr Raghu can make a role Final. Write it, then ask him."}>
-            ✓ Mark Final
-          </button>
-        ) : (
-          <>
-            <span className="text-xs" style={{ color: C.green, fontWeight: 700 }}>
-              Final{r.approved_by ? ` — approved by ${r.approved_by.split("·")[0].trim()}` : ""}
-              {r.approved_at ? ` on ${new Date(r.approved_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}` : ""}
-            </span>
-            {isOwner && (
-              <button onClick={() => onRun({ action: "stage", id: r.id, stage: "Draft" }, "Back to draft")}
-                className="text-xs font-bold rounded px-2 py-1" style={{ background: "#FFF3E8", color: "#8A5B00" }}>
-                ↩ Back to draft
-              </button>
-            )}
-          </>
-        )}
-        <button
-          onClick={() => { if (window.confirm(`Delete the role “${r.role}”?`)) onRun({ action: "delete", id: r.id }, "Deleted"); }}
-          className="text-xs font-bold rounded px-2 py-1 ml-auto" style={{ background: "#FBEDEA", color: C.red }}>
-          ✕ Delete role
+    <div className="p-3">
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#22303C", color: "#8FA1B3" }}>
+          VIEW ONLY
+        </span>
+        <button onClick={edit} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}
+          title="Opens this role in its own tab, where it can be changed. Any change goes to Dr Raghu for approval.">
+          ✎ Edit ↗
         </button>
-      </div>
-      <div style={{ fontSize: 10.5, color: C.faint, marginTop: 6 }}>
-        Every box saves when you click away. {r.updated_by && <>Last changed by {r.updated_by.split("·")[0].trim()}.</>}
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, value, onSave, width = 150 }: { label: string; value: string; onSave: (v: string) => void; width?: number }) {
-  return (
-    <div>
-      <div className="text-xs font-semibold" style={{ color: C.dim }}>{label}</div>
-      <input defaultValue={value} onBlur={(e) => onSave(e.target.value)}
-        className="text-xs rounded px-2 py-1 mt-1" style={{ border: `1px solid ${C.line}`, width }} />
-    </div>
-  );
-}
-
-/* ──────────────── the management expectation note ──────────────── */
-
-function VoiceNote({ r, reload }: { r: Role; reload: () => Promise<void> }) {
-  const [rec, setRec] = useState(false);
-  const [live, setLive] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const mediaRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<BlobPart[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const srRef = useRef<any>(null);
-  const startedRef = useRef(0);
-  const textRef = useRef("");
-
-  const stop = () => {
-    try { mediaRef.current?.stop(); } catch { /* already stopped */ }
-    try { srRef.current?.stop(); } catch { /* dictation may not be running */ }
-    setRec(false);
-  };
-
-  const start = async () => {
-    setErr(""); setLive(""); textRef.current = "";
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
-      chunksRef.current = [];
-      mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
-      mr.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
-        const seconds = Math.max(1, Math.round((Date.now() - startedRef.current) / 1000));
-        const transcript = textRef.current.trim();
-        if (!blob.size && !transcript) return;
-        setBusy(true);
-        try {
-          const fd = new FormData();
-          fd.append("id", r.id);
-          fd.append("transcript", transcript);
-          fd.append("seconds", String(seconds));
-          if (blob.size) fd.append("file", new File([blob], "note.webm", { type: blob.type }));
-          const res = await fetch("/api/hrms/roles", { method: "POST", body: fd });
-          const j = await res.json();
-          if (!res.ok) throw new Error(j.error || "Could not save the note");
-          await reload();
-        } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
-        setBusy(false);
-        setLive("");
-      };
-      mr.start();
-      mediaRef.current = mr;
-      startedRef.current = Date.now();
-      setRec(true);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SR) {
-        const sr = new SR();
-        sr.continuous = true; sr.interimResults = true; sr.lang = "en-IN";
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        sr.onresult = (ev: any) => {
-          let done = "", interim = "";
-          for (let i = 0; i < ev.results.length; i++) {
-            const x = ev.results[i];
-            if (x.isFinal) done += x[0].transcript + " "; else interim += x[0].transcript;
-          }
-          textRef.current = done.trim();
-          setLive((done + interim).trim());
-        };
-        sr.onerror = () => {};
-        sr.start();
-        srRef.current = sr;
-      }
-    } catch (e) {
-      const name = (e as { name?: string })?.name || "";
-      setErr(
-        name === "NotAllowedError"
-          ? "The browser blocked the microphone. Click the padlock in the address bar → Microphone → Allow, then press Record again."
-          : name === "NotFoundError" ? "No microphone is connected to this machine."
-          : name === "NotReadableError" ? "Something else is using the microphone — close it and press Record again."
-          : "Could not open the microphone on this browser.",
-      );
-    }
-  };
-
-  return (
-    <div className="rounded p-2 mt-2" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="text-xs font-semibold" style={{ color: C.dim }}>Management Expectation Note</div>
-        {!rec ? (
-          <button onClick={start} disabled={busy} className="text-xs font-bold rounded px-2.5 py-1"
-            style={{ background: "#E8600A", color: "#fff", opacity: busy ? 0.6 : 1 }}>
-            {busy ? "Saving…" : r.summary ? "🎙 Record again" : "🎙 Record"}
-          </button>
-        ) : (
-          <button onClick={stop} className="text-xs font-bold rounded px-2.5 py-1" style={{ background: "#B3261E", color: "#fff" }}>
-            ■ Stop
-          </button>
+        {r.pending_since && (
+          <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#F5B32B", color: "#4A3300" }}>
+            awaiting RJ approval
+          </span>
         )}
-        {r.url && <audio controls src={r.url} style={{ height: 28 }} />}
-        {r.voice_seconds ? <span className="text-xs tnum" style={{ color: C.faint }}>{r.voice_seconds}s</span> : null}
       </div>
-      <div style={{ fontSize: 10.5, color: C.faint, lineHeight: 1.5, marginTop: 4 }}>
-        Say what this role is really for. It is kept three ways — the recording, the words, and a summary — because tone
-        carries what a typed paragraph loses, and nobody scrubs through audio to find one sentence.
+
+      <div className="bg-white rounded-lg border mb-3" style={{ borderColor: C.line }}>
+        <Line label="Role" value={r.role} />
+        <Line label="Department" value={r.department} />
+        <Line label="Grade" value={r.grade} />
+        <Line label="Reports To" value={r.reports_to} />
+        <Line label="Location" value={r.location} />
+        <Line label="Nos Active" value={String(r.activeCount)} />
       </div>
-      {rec && <div className="text-xs mt-1" style={{ color: "#B3261E" }}>● recording… {live && <span style={{ color: C.dim }}>{live}</span>}</div>}
-      {err && <div className="text-xs mt-1" style={{ color: C.red }}>{err}</div>}
-      {r.summary && (
-        <div className="rounded p-2 mt-2" style={{ background: "#F4F2EC" }}>
-          <div className="text-xs font-bold" style={{ color: C.dim }}>What it comes to</div>
-          <div className="text-xs" style={{ color: C.ink, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{r.summary}</div>
-          {r.transcript && (
-            <details className="mt-1">
-              <summary className="text-xs cursor-pointer" style={{ color: C.faint }}>the words as spoken</summary>
-              <div className="text-xs mt-1" style={{ color: C.dim, lineHeight: 1.6 }}>{r.transcript}</div>
-            </details>
-          )}
+
+      <Read label="Job Description" html={r.job_description} />
+      <Read label="Deliverable" html={r.deliverable} />
+      <Read label="Measurement Metric" html={r.metric} />
+
+      <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: C.line }}>
+        <div className="font-bold text-xs mb-1">Management Expectation Note</div>
+        {!r.summary && !r.url && <div className="text-xs" style={{ color: C.faint }}>Not recorded yet.</div>}
+        {r.url && <audio controls src={r.url} style={{ height: 30, maxWidth: "100%" }} />}
+        {r.summary && (
+          <div className="rounded p-2 mt-2" style={{ background: "#F4F2EC" }}>
+            <div className="text-xs font-bold" style={{ color: C.dim }}>What it comes to — this is what goes into the IDP</div>
+            <div className="text-xs" style={{ color: C.ink, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{r.summary}</div>
+          </div>
+        )}
+        {r.transcript && (
+          <details className="mt-2">
+            <summary className="text-xs cursor-pointer" style={{ color: C.faint }}>the words as spoken</summary>
+            <div className="text-xs mt-1" style={{ color: C.dim, lineHeight: 1.6 }}>{r.transcript}</div>
+          </details>
+        )}
+      </div>
+
+      <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line }}>
+        <div className="font-bold text-xs mb-1">Who holds this role</div>
+        {r.people.length === 0 && <div className="text-xs" style={{ color: C.faint }}>Nobody.</div>}
+        <div className="flex gap-1 flex-wrap">
+          {r.people.map((p) => (
+            <a key={p.id} href={`/hrms/employee/${encodeURIComponent(p.id)}`} target="_blank" rel="noopener noreferrer"
+              className="rounded px-1.5 py-0.5 text-xs"
+              style={{ background: p.onRoll ? "#F4F2EC" : "#FBEDEA", color: p.onRoll ? C.dim : C.red }}
+              title={p.onRoll ? `${p.id} — on the roll` : `${p.id} — no longer on the roll`}>
+              {p.name}
+            </a>
+          ))}
         </div>
-      )}
+      </div>
+    </div>
+  );
+}
+
+function Line({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="flex gap-3 px-3 py-1.5" style={{ borderTop: "1px solid #EEECE6" }}>
+      <div className="text-xs font-semibold" style={{ color: C.faint, minWidth: 120 }}>{label}</div>
+      <div className="text-xs">{value || <span style={{ color: "#C9C6BD" }}>—</span>}</div>
+    </div>
+  );
+}
+
+function Read({ label, html }: { label: string; html: string | null }) {
+  return (
+    <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: C.line }}>
+      <div className="font-bold text-xs mb-1">{label}</div>
+      <RichTextView html={html} />
     </div>
   );
 }

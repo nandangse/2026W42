@@ -66,13 +66,34 @@ async function holders() {
 }
 
 // GET /api/hrms/roles — the register, with who holds each role.
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await requireHrms();
     const admin = adminClient();
+
+    // ?changes=<role id> — the history panel, fetched only when it is opened
+    const changesFor = new URL(req.url).searchParams.get("changes");
+    if (changesFor) {
+      const { data, error } = await admin
+        .from("hrms_role_change")
+        .select("id, field, old_value, new_value, old_audio, changed_by, changed_at")
+        .eq("role_id", changesFor)
+        .order("changed_at", { ascending: false })
+        .limit(200);
+      if (error) return NextResponse.json({ changes: [] });
+      const changes = await Promise.all((data || []).map(async (c) => {
+        let oldUrl: string | null = null;
+        if (c.old_audio) {
+          const { data: sgn } = await admin.storage.from(BUCKET).createSignedUrl(c.old_audio, LINK_TTL);
+          oldUrl = sgn?.signedUrl ?? null;
+        }
+        return { ...c, oldUrl };
+      }));
+      return NextResponse.json({ changes });
+    }
     const { data, error } = await admin
       .from("hrms_role")
-      .select("id, role, department, grade, reports_to, job_description, deliverable, metric, stage, voice_path, voice_seconds, transcript, summary, created_by, updated_by, updated_at, approved_by, approved_at")
+      .select("id, role, department, grade, reports_to, location, job_description, deliverable, metric, stage, voice_path, voice_seconds, transcript, summary, created_by, updated_by, updated_at, approved_by, approved_at, pending_since, pending_by")
       .order("role");
     if (error) {
       if (/hrms_role|does not exist|schema cache/i.test(error.message))
@@ -176,11 +197,36 @@ export async function POST(req: Request) {
         } catch { /* keep the fallback */ }
       }
 
+      /**
+       * ONE RECORDING, ONE TRANSCRIPT, ONE SUMMARY (Dr Raghu, 23 Aug 2026).
+       * The summary is what flows into the IDP, and three competing summaries
+       * would mean nobody knows which one counts. So recording again REPLACES
+       * — and what it replaced is written to the change history rather than
+       * thrown away. The audio file stays in the bucket; only the row moves.
+       */
+      const { data: prev } = await admin
+        .from("hrms_role").select("voice_path, transcript, summary").eq("id", id).maybeSingle();
+
       const { error } = await admin
         .from("hrms_role")
-        .update({ voice_path, voice_seconds: seconds, transcript, summary, updated_by: stamp, updated_at: new Date().toISOString() })
+        .update({
+          voice_path, voice_seconds: seconds, transcript, summary,
+          updated_by: stamp, updated_at: new Date().toISOString(),
+          pending_since: new Date().toISOString(), pending_by: stamp,
+        })
         .eq("id", id);
       if (error) throw new Error(error.message);
+
+      try {
+        await admin.from("hrms_role_change").insert({
+          role_id: id, field: "voice",
+          old_value: prev?.summary ? `superseded summary: ${prev.summary}` : null,
+          new_value: summary,
+          old_audio: prev?.voice_path ?? null,
+          changed_by: stamp,
+        });
+      } catch { /* the recording matters more than the line about it */ }
+
       return NextResponse.json({ ok: true, summary });
     }
 
@@ -208,8 +254,13 @@ export async function POST(req: Request) {
 
     if (action === "save") {
       if (!body.id) throw new HttpError(400, "id required");
+      // what it says now, so the change history records a from as well as a to
+      const { data: before } = await admin
+        .from("hrms_role")
+        .select("role, department, grade, reports_to, location, job_description, deliverable, metric")
+        .eq("id", body.id).maybeSingle();
       const patch: Record<string, unknown> = { updated_by: stamp, updated_at: new Date().toISOString() };
-      for (const f of ["role", "department", "grade", "reports_to", "job_description", "deliverable", "metric"]) {
+      for (const f of ["role", "department", "grade", "reports_to", "location", "job_description", "deliverable", "metric"]) {
         if (!(f in body)) continue;
         const raw = String(body[f] ?? "");
         const v = RICH.has(f) ? scrub(raw) : raw.trim();
@@ -217,11 +268,55 @@ export async function POST(req: Request) {
         patch[f] = (RICH.has(f) ? v.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() : v) ? v : null;
       }
       if (patch.role === null) throw new HttpError(400, "A role must have a name");
+      /**
+       * ANY CHANGE PUTS THE ROLE BACK IN FRONT OF DR RAGHU. It appears under
+       * Approvals -> RJ Approval - Records from this moment. Stage is a
+       * separate question and stays where it is: Draft/Final is whether the
+       * role is AGREED, pending is whether the latest edit has been SEEN.
+       */
+      const changes = Object.entries(patch)
+        .filter(([k]) => !["updated_by", "updated_at"].includes(k))
+        .filter(([k, v]) => String((before as Record<string, unknown> | null)?.[k] ?? "") !== String(v ?? ""));
+      if (changes.length) {
+        patch.pending_since = new Date().toISOString();
+        patch.pending_by = stamp;
+      }
+
       const { error } = await admin.from("hrms_role").update(patch).eq("id", body.id);
       if (error) {
         if (/unique|duplicate/i.test(error.message)) throw new HttpError(409, "Another role already has that name.");
         throw new Error(error.message);
       }
+
+      if (changes.length) {
+        try {
+          await admin.from("hrms_role_change").insert(
+            changes.map(([k, v]) => ({
+              role_id: body.id, field: k,
+              old_value: ((before as Record<string, unknown> | null)?.[k] ?? null) as string | null,
+              new_value: (v ?? null) as string | null,
+              changed_by: stamp,
+            })),
+          );
+        } catch { /* a lost history line must not fail the edit */ }
+      }
+      return NextResponse.json({ ok: true, pending: changes.length > 0 });
+    }
+
+    /** { action: "approve", id } — the owner has seen the latest change. */
+    if (action === "approve") {
+      if (me.email.toLowerCase() !== RAGHU_EMAIL)
+        throw new HttpError(403, `Only ${RAGHU_EMAIL} may approve a role change.`);
+      const { error } = await admin
+        .from("hrms_role")
+        .update({ pending_since: null, pending_by: null, approved_by: stamp, approved_at: new Date().toISOString() })
+        .eq("id", body.id);
+      if (error) throw new Error(error.message);
+      try {
+        await admin.from("hrms_role_change").insert({
+          role_id: body.id, field: "(approved)", old_value: null, new_value: "changes approved", changed_by: stamp,
+        });
+      } catch { /* as above */ }
       return NextResponse.json({ ok: true });
     }
 
