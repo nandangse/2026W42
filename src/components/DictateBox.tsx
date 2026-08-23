@@ -1,82 +1,161 @@
 "use client";
 /**
- * A text box you can speak into.
+ * A text box you can speak into, that also KEEPS what you said.
  *
  * WHY EVERY BOX HAS ONE. The IDP asks thirteen written questions of people
- * who build machines for a living. Many of them think faster than they type,
- * and several think in Hindi and type in English. Made to type, they write
- * three words. Allowed to speak, they say the real answer.
+ * who build machines for a living, many of whom think in Hindi and type in
+ * English. Made to type, they write three words. Allowed to speak, they say
+ * the real answer.
  *
- * WHAT HAPPENS: the browser turns speech into words, and the server turns
- * those words into plain English and puts it in the box. It is put IN THE
- * BOX, not stored separately — so it can be read, corrected and rewritten
- * before it goes anywhere. What is saved is what the person left in the box,
- * never what the machine heard.
+ * THE RECOGNISER STOPS BY ITSELF, CONSTANTLY, and that is the whole problem
+ * this file exists to solve. Chrome ends a session after a few seconds of
+ * quiet, on a network blip, and after roughly a minute regardless. Restarting
+ * it inside its own onend handler throws InvalidStateError as often as not,
+ * because the old session has not finished tearing down — which is exactly
+ * how dictation "stops in between". So:
+ *
+ *   · the restart is DEFERRED, not immediate, and RETRIED if it throws
+ *   · finished phrases are appended once via resultIndex and kept across
+ *     every restart, so nothing said earlier is ever lost
+ *   · the running state is a ref, so a restart cannot be triggered after Stop
+ *   · and it SAYS on screen that it is still listening, with a counter, so
+ *     nobody is left wondering whether it died
+ *
+ * THE AUDIO IS KEPT TOO. The transcript is the machine's version of what
+ * somebody said; the recording is them. Each press ADDS a recording and adds
+ * its words — nothing replaces anything, because a question is not answered
+ * in one breath.
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const C = { line: "#E2E0DA", dim: "#5A6672", faint: "#8A94A0", orange: "#E8600A", red: "#B3261E", green: "#0D7A3F" };
 
+export interface Recording { url: string | null; seconds: number | null; at: string }
+
 export default function DictateBox({
-  value, onChange, rows = 5, placeholder, disabled,
+  value, onChange, rows = 5, placeholder, disabled, idpId, qid, recordings = [], onRecorded,
 }: {
   value: string;
   onChange: (v: string) => void;
   rows?: number;
   placeholder?: string;
   disabled?: boolean;
+  /** Needed to store the audio. Without them it still dictates, just no audio. */
+  idpId?: string;
+  qid?: string;
+  recordings?: Recording[];
+  onRecorded?: (r: Recording) => void;
 }) {
   const [rec, setRec] = useState(false);
   const [live, setLive] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [secs, setSecs] = useState(0);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const srRef = useRef<any>(null);
+  const mediaRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
   const textRef = useRef("");
   const runningRef = useRef(false);
+  const startedRef = useRef(0);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const finish = async () => {
-    const said = textRef.current.trim();
-    setLive("");
-    if (!said) return;
-    setBusy(true); setErr("");
+  useEffect(() => () => { runningRef.current = false; if (tickRef.current) clearInterval(tickRef.current); }, []);
+
+  const polish = async (said: string) => {
     try {
       const res = await fetch("/api/idp", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
+        method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "polish", text: said }),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "Could not tidy that up");
-      // added to whatever is already there, never replacing it silently
-      onChange(value.trim() ? `${value.trim()}\n${j.text}` : j.text);
-    } catch (e) {
-      // the machine failed, the person's words did not — keep them
-      onChange(value.trim() ? `${value.trim()}\n${said}` : said);
-      setErr(e instanceof Error ? `${e.message}. Your words are in the box, unedited.` : String(e));
+      return j.text as string;
+    } catch {
+      // the machine failed; the person's words did not
+      setErr("Could not tidy that into English — your own words are in the box.");
+      return said;
+    }
+  };
+
+  const finish = async (blob: Blob | null, seconds: number) => {
+    const said = textRef.current.trim();
+    setLive("");
+    if (!said && !blob) return;
+    setBusy(true);
+    if (said) {
+      const text = await polish(said);
+      onChange(value.trim() ? `${value.trim()}\n\n${text}` : text);
+    }
+    if (blob && blob.size && idpId && qid) {
+      try {
+        const fd = new FormData();
+        fd.append("id", idpId);
+        fd.append("qid", qid);
+        fd.append("seconds", String(seconds));
+        fd.append("file", new File([blob], "note.webm", { type: blob.type || "audio/webm" }));
+        const r = await fetch("/api/idp", { method: "POST", body: fd });
+        const j = await r.json();
+        if (r.ok) onRecorded?.({ url: j.url, seconds: j.seconds, at: new Date().toISOString() });
+      } catch { /* the words are saved; the audio is the bonus */ }
     }
     setBusy(false);
   };
 
   const stop = () => {
     runningRef.current = false;
-    if (srRef.current) srRef.current.onend = null;
+    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
+    if (srRef.current) { srRef.current.onend = null; srRef.current.onerror = null; }
     try { srRef.current?.stop(); } catch { /* not running */ }
     setRec(false);
-    finish();
+    const mr = mediaRef.current;
+    if (mr && mr.state !== "inactive") { try { mr.stop(); } catch { /* already stopped */ } }
+    else finish(null, Math.round((Date.now() - startedRef.current) / 1000));
   };
 
-  const start = () => {
-    setErr(""); setLive(""); textRef.current = "";
+  const start = async () => {
+    setErr(""); setLive(""); textRef.current = ""; setSecs(0);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { setErr("This browser cannot listen. Chrome on a laptop or an Android phone can."); return; }
+
+    // ---- the recording ----
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      chunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        finish(new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" }),
+               Math.max(1, Math.round((Date.now() - startedRef.current) / 1000)));
+      };
+      mr.start();
+      mediaRef.current = mr;
+    } catch {
+      setErr("The microphone did not open. Allow it in the address bar and press again.");
+      return;
+    }
+
+    startedRef.current = Date.now();
+    setRec(true);
+    tickRef.current = setInterval(() => setSecs(Math.round((Date.now() - startedRef.current) / 1000)), 1000);
+
+    // ---- the dictation, restarted for as long as we are recording ----
+    if (!SR) { setErr("This browser cannot turn speech into words, but it IS recording you."); return; }
     runningRef.current = true;
-    const startOne = () => {
-      const sr = new SR();
-      sr.continuous = true; sr.interimResults = true; sr.lang = "en-IN";
+    let attempts = 0;
+
+    const spin = () => {
+      if (!runningRef.current) return;
+      let sr: { start: () => void; stop: () => void; onresult: unknown; onend: unknown; onerror: unknown };
+      try { sr = new SR(); } catch { return; }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      sr.onresult = (ev: any) => {
+      const any = sr as any;
+      any.continuous = true; any.interimResults = true; any.lang = "en-IN";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      any.onresult = (ev: any) => {
+        attempts = 0; // it is working again
         let interim = "";
         for (let i = ev.resultIndex; i < ev.results.length; i++) {
           const x = ev.results[i];
@@ -85,15 +164,30 @@ export default function DictateBox({
         }
         setLive((textRef.current + " " + interim).trim());
       };
-      sr.onerror = () => {};
-      // it stops itself after a pause; keep it going until Stop is pressed
-      sr.onend = () => { if (runningRef.current) { try { startOne(); } catch { /* give up quietly */ } } };
-      sr.start();
-      srRef.current = sr;
+      // 'no-speech' and 'aborted' are ordinary; only a refused mic is fatal
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      any.onerror = (ev: any) => {
+        if (ev?.error === "not-allowed" || ev?.error === "service-not-allowed") {
+          runningRef.current = false;
+          setErr("The browser blocked the microphone for dictation. The recording is still being kept.");
+        }
+      };
+      any.onend = () => {
+        // DEFERRED, never immediate: restarting inside onend throws
+        // InvalidStateError while the old session is still tearing down, and
+        // a swallowed throw is precisely how dictation dies mid-sentence.
+        if (!runningRef.current) return;
+        attempts++;
+        if (attempts > 40) { setErr("Dictation keeps stopping. Your recording is still being kept."); return; }
+        setTimeout(spin, 300);
+      };
+      try { any.start(); } catch { setTimeout(spin, 500); }
+      srRef.current = any;
     };
-    try { startOne(); setRec(true); }
-    catch { setErr("Could not start listening. Allow the microphone and try again."); }
+    spin();
   };
+
+  const mmss = (n: number) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
 
   return (
     <div>
@@ -101,13 +195,14 @@ export default function DictateBox({
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded px-2 py-1.5"
         style={{ border: `1px solid ${C.line}`, fontSize: 14, lineHeight: 1.6, background: disabled ? "#F4F2EC" : "#fff" }} />
+
       {!disabled && (
         <div className="flex items-center gap-2 flex-wrap mt-1">
           {!rec ? (
             <button type="button" onClick={start} disabled={busy}
               className="text-xs font-bold rounded px-2.5 py-1"
               style={{ background: busy ? "#E2E0DA" : C.orange, color: busy ? "#8A94A0" : "#fff" }}>
-              {busy ? "Writing it out…" : "🎙 Speak the answer"}
+              {busy ? "Writing it out…" : recordings.length ? "🎙 Say some more" : "🎙 Speak the answer"}
             </button>
           ) : (
             <button type="button" onClick={stop}
@@ -115,19 +210,34 @@ export default function DictateBox({
               ■ Stop and use it
             </button>
           )}
-          <span style={{ fontSize: 11, color: C.faint }}>
+          <span style={{ fontSize: 11, color: rec ? C.red : C.faint }}>
             {rec
-              ? "Listening… speak in English or Hindi, whichever comes."
-              : "Speak it and Genie writes it in plain English. You can change every word afterwards."}
+              ? `● listening ${mmss(secs)} — take your time, pauses are fine`
+              : "Speak it and Genie writes it in plain English, added under what is already there. Your recording is kept."}
           </span>
         </div>
       )}
+
       {rec && live && (
-        <div className="rounded p-2 mt-1" style={{ background: "#FFF7E6", fontSize: 12, color: C.dim, lineHeight: 1.5 }}>
+        <div className="rounded p-2 mt-1" style={{ background: "#FFF7E6", fontSize: 12, color: C.dim, lineHeight: 1.5, maxHeight: 130, overflowY: "auto" }}>
           {live}
         </div>
       )}
       {err && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{err}</div>}
+
+      {recordings.length > 0 && (
+        <div className="mt-2">
+          <div style={{ fontSize: 11, color: C.faint }}>
+            What you said {recordings.length > 1 ? `(${recordings.length} recordings)` : ""} — kept with your answer
+          </div>
+          {recordings.map((r, i) => (
+            <div key={i} className="flex items-center gap-2 mt-1">
+              {r.url ? <audio controls src={r.url} style={{ height: 28, maxWidth: 320 }} /> : <span style={{ fontSize: 11, color: C.faint }}>saved</span>}
+              {r.seconds ? <span className="tnum" style={{ fontSize: 11, color: C.faint }}>{mmss(r.seconds)}</span> : null}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

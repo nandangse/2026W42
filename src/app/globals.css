@@ -140,3 +140,38 @@ input[type="date"] {
   content: attr(data-placeholder);
   color: #C9C6BD;
 }
+
+/* ─────────────────────────────── the IDP on a phone ───────────────────────
+   Most people will meet this page on a phone, from a link, once. So: the
+   slider gets a thumb worth aiming at, the boxes never overflow the screen,
+   and nothing here is small enough to need pinching. */
+.idp input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  width: 100%;
+}
+.idp input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px; border-radius: 4px; background: #DCD9D1;
+}
+.idp input[type="range"]::-moz-range-track {
+  height: 8px; border-radius: 4px; background: #DCD9D1;
+}
+.idp input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: #E8600A; border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.3);
+  margin-top: -11px;
+}
+.idp input[type="range"]::-moz-range-thumb {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: #E8600A; border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.3);
+}
+.idp textarea { font-size: 16px; }          /* 16px or the phone zooms the page in */
+.idp audio { max-width: 100%; }
+@media (max-width: 640px) {
+  .idp h1 { font-size: 21px; }
+  .idp h2 { font-size: 17px; }
+}

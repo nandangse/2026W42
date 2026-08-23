@@ -15,19 +15,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
-import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, CONSENT_TEXT, isComplete } from "@/lib/idp";
+import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, CONSENT_TEXT, isComplete, bandIndex } from "@/lib/idp";
 import DictateBox from "./DictateBox";
 
 const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
 
+interface Rec { url: string | null; seconds: number | null; at: string }
 interface Open {
   id: string; answers: Record<string, string>; ratings: Record<string, number>;
   role_summary: string | null; role_at_time: string | null;
+  audioUrls?: Record<string, Rec[]>;
 }
+interface Done extends Open { submitted_at: string }
 
 export default function IdpDiscussion({ name, initials }: { name: string; initials: string | null }) {
   const [state, setState] = useState<{
-    open: Open | null; done: { id: string; submitted_at: string }[];
+    open: Open | null; done: Done[];
     role: string | null; roleSummary: string | null; needsMigration?: boolean;
     employee: { id: string; name: string } | null;
     isLeader?: boolean;
@@ -55,6 +58,66 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
   if (state.open) return <Shell initials={initials}><Filling open={state.open} isLeader={!!state.isLeader} onDone={load} /></Shell>;
 
+  const last = state.done[0];
+  if (last) {
+    const reopen = async () => {
+      setBusy(true);
+      try { await api.post("/api/idp", { action: "reopen", id: last.id }); await load(); }
+      catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+      setBusy(false);
+    };
+    return (
+      <Shell initials={initials}>
+        <div className="mx-auto px-4 py-6 md:py-8" style={{ maxWidth: 760 }}>
+          <div className="rounded-lg p-4" style={{ background: "#E6F4EA", border: "1px solid #9AD3AE" }}>
+            <div className="font-bold" style={{ fontSize: 18, color: C.green }}>Thank you, {name}. Your IDP is done.</div>
+            <div className="mt-2" style={{ fontSize: 14, color: C.dim, lineHeight: 1.7 }}>
+              Completed on{" "}
+              {new Date(last.submitted_at).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}.
+              It is on your record and your HoD, HR and Management can read it.
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap mt-4">
+            <button onClick={reopen} disabled={busy} className="rounded font-bold"
+              style={{ background: C.orange, color: "#fff", padding: "10px 18px", fontSize: 14 }}>
+              {busy ? "Opening…" : "✎ Go back and edit it"}
+            </button>
+            <span style={{ fontSize: 12, color: C.faint, lineHeight: 1.5 }}>
+              Allowed while this is new. Everything you wrote is still there — nothing starts again.
+            </span>
+          </div>
+          {msg && <div className="mt-3 text-sm font-semibold" style={{ color: C.red }}>{msg}</div>}
+
+          <div className="mt-6">
+            {IDP_SECTIONS.filter((sec) => !sec.leadersOnly || state.isLeader).map((sec) => (
+              <div key={sec.key} className="mb-5">
+                <h2 className="font-bold" style={{ fontSize: 17 }}>{sec.title}</h2>
+                {sec.questions.map((q) => (
+                  <div key={q.id} className="rounded-lg p-3 mt-2" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
+                    <div className="font-semibold" style={{ fontSize: 14 }}>{q.label}</div>
+                    <div style={{ fontSize: 14, color: C.dim, whiteSpace: "pre-wrap", lineHeight: 1.7, marginTop: 4 }}>
+                      {last.answers?.[q.id] || "—"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+            <h2 className="font-bold" style={{ fontSize: 17 }}>How I rated myself</h2>
+            <div className="rounded-lg mt-2" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
+              {IDP_RATINGS.map((d, i) => (
+                <div key={d.key} className="px-3 py-2 flex items-center gap-3" style={{ borderTop: i ? "1px solid #EEECE6" : undefined }}>
+                  <div style={{ fontSize: 14, flex: 1 }}>{d.key}</div>
+                  <div className="tnum" style={{ fontSize: 18, fontWeight: 700, color: C.orange }}>{last.ratings?.[d.key] || "—"}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
   // The login is the key, and it has to reach a record. An IDP filled in by a
   // login that matches no employee has nowhere to be filed and nobody to
   // review it, so this says what to do rather than offering a button that
@@ -62,7 +125,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
   if (!state.employee && !state.needsMigration) {
     return (
       <Shell initials={initials}>
-        <div className="mx-auto px-4 py-10" style={{ maxWidth: 620 }}>
+        <div className="mx-auto px-4 py-8 md:py-10" style={{ maxWidth: 620 }}>
           <h1 className="font-bold" style={{ fontSize: 24 }}>Welcome {name}</h1>
           <div className="rounded-lg p-4 mt-5" style={{ background: "#FFF7E6", border: "1px solid #F5B32B" }}>
             <div className="font-bold" style={{ fontSize: 15, color: "#8A5B00" }}>
@@ -83,7 +146,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
   return (
     <Shell initials={initials}>
-      <div className="mx-auto px-4 py-8" style={{ maxWidth: 720 }}>
+      <div className="mx-auto px-4 py-6 md:py-8" style={{ maxWidth: 720 }}>
         {msg && <div className="rounded p-2 mb-4 text-xs font-semibold" style={{ background: "#FBEDEA", color: C.red }}>{msg}</div>}
         {state.needsMigration && (
           <div className="rounded p-3 mb-4" style={{ background: "#FFF7E6", border: "1px solid #F5B32B", fontSize: 12, color: "#8A5B00" }}>
@@ -91,7 +154,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
           </div>
         )}
 
-        <h1 className="font-bold" style={{ fontSize: 26, lineHeight: 1.2 }}>Welcome {name}</h1>
+        <h1 className="font-bold" style={{ fontSize: 23, lineHeight: 1.25 }}>Welcome {name}</h1>
         <p className="mt-4" style={{ fontSize: 16, lineHeight: 1.7, color: C.ink }}>
           Would you like to fill up the IDP?
         </p>
@@ -138,7 +201,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
           style={{
             background: consent && !state.needsMigration ? C.orange : "#E2E0DA",
             color: consent && !state.needsMigration ? "#fff" : "#8A94A0",
-            padding: "13px 26px", fontSize: 15,
+            padding: "15px 26px", fontSize: 16, width: "100%", maxWidth: 340,
             cursor: consent && !state.needsMigration ? "pointer" : "not-allowed",
           }}>
           {busy ? "Starting…" : "Start the IDP discussions"}
@@ -170,6 +233,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
 function Filling({ open, isLeader, onDone }: { open: Open; isLeader: boolean; onDone: () => Promise<void> }) {
   const [answers, setAnswers] = useState<Record<string, string>>(open.answers || {});
+  const [audio, setAudio] = useState<Record<string, Rec[]>>(open.audioUrls || {});
   const [ratings, setRatings] = useState<Record<string, number>>(open.ratings || {});
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -200,7 +264,7 @@ function Filling({ open, isLeader, onDone }: { open: Open; isLeader: boolean; on
   };
 
   return (
-    <div className="mx-auto px-4 py-6" style={{ maxWidth: 800 }}>
+    <div className="mx-auto px-4 py-5 md:py-6" style={{ maxWidth: 800 }}>
       {open.role_summary && (
         <div className="rounded-lg p-3 mb-5" style={{ background: "#F4F2EC" }}>
           <div className="text-xs font-bold" style={{ color: C.dim }}>
@@ -228,7 +292,12 @@ function Filling({ open, isLeader, onDone }: { open: Open; isLeader: boolean; on
                     {q.help}
                   </div>
                 )}
-                <DictateBox value={v} rows={q.rows} onChange={(nv) => setA(q.id, nv)} />
+                <DictateBox
+                  value={v} rows={q.rows} onChange={(nv) => setA(q.id, nv)}
+                  idpId={open.id} qid={q.id}
+                  recordings={audio[q.id] || []}
+                  onRecorded={(r) => setAudio((a) => ({ ...a, [q.id]: [...(a[q.id] || []), r] }))}
+                />
                 {short && <div style={{ fontSize: 11, color: "#8A5B00" }}>A little more — this is one of the answers that gets read.</div>}
               </div>
             );
@@ -243,26 +312,30 @@ function Filling({ open, isLeader, onDone }: { open: Open; isLeader: boolean; on
         </div>
         <div className="rounded-lg mt-3" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
           {IDP_RATINGS.map((d, i) => {
-            const val = ratings[d] || 0;
+            const val = ratings[d.key] || 0;
             return (
-              <div key={d} className="px-3 py-3" style={{ borderTop: i ? `1px solid #EEECE6` : undefined }}>
-                <div className="flex items-baseline gap-3 flex-wrap">
-                  <div style={{ fontSize: 15, fontWeight: 600, minWidth: 200 }}>{d}</div>
-                  <div className="tnum" style={{ fontSize: 20, fontWeight: 700, color: val ? C.orange : "#C9C6BD", minWidth: 34 }}>
-                    {val || "—"}
+              <div key={d.key} className="px-3 py-3" style={{ borderTop: i ? `1px solid #EEECE6` : undefined }}>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>{d.key}</div>
+                {/* what the word means, because a number against a word nobody
+                    has defined is not data */}
+                <div style={{ fontSize: 13, color: C.dim, lineHeight: 1.6, marginTop: 2 }}>{d.what}</div>
+
+                <div className="flex items-center gap-2 mt-3">
+                  <div className="tnum" style={{ fontSize: 26, fontWeight: 800, color: val ? C.orange : "#C9C6BD", minWidth: 38, textAlign: "center" }}>
+                    {val || "–"}
                   </div>
-                  <div style={{ fontSize: 13, color: val ? C.dim : C.faint, lineHeight: 1.5, flex: 1, minWidth: 220 }}>
-                    {val ? RATING_MEANING[val] : "Move the slider to choose, 1 to 10."}
-                  </div>
+                  <input type="range" min={1} max={RATING_MAX} step={1} value={val || 1}
+                    onChange={(ev) => setR(d.key, Number(ev.target.value))}
+                    style={{ accentColor: val ? C.orange : "#C9C6BD", flex: 1, minWidth: 0, height: 28 }} />
                 </div>
-                <input type="range" min={1} max={RATING_MAX} step={1} value={val || 1}
-                  onChange={(ev) => setR(d, Number(ev.target.value))}
-                  className="w-full mt-2"
-                  style={{ accentColor: val ? C.orange : "#C9C6BD" }} />
-                <div className="flex justify-between" style={{ fontSize: 10.5, color: C.faint }}>
-                  <span>1 · only starting</span>
-                  <span>5 · what the role needs</span>
-                  <span>10 · the best here</span>
+
+                {/* what THIS score means for THIS dimension — a 7 in Job
+                    Knowledge is not the same sentence as a 7 in Attendance */}
+                <div className="rounded p-2 mt-1" style={{ background: val ? "#FFF7E6" : "#F4F2EC" }}>
+                  <div style={{ fontSize: 13.5, color: val ? "#8A5B00" : C.faint, lineHeight: 1.6 }}>
+                    {val ? `“${d.bands[bandIndex(val)]}”` : "Move the slider. Each number tells you what it means."}
+                  </div>
+                  {val ? <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>{RATING_MEANING[val]}</div> : null}
                 </div>
               </div>
             );
@@ -294,7 +367,8 @@ function Filling({ open, isLeader, onDone }: { open: Open; isLeader: boolean; on
           className="mt-3 rounded font-bold"
           style={{
             background: check.ok ? C.green : "#E2E0DA", color: check.ok ? "#fff" : "#8A94A0",
-            padding: "11px 22px", fontSize: 14, cursor: check.ok ? "pointer" : "not-allowed",
+            padding: "15px 22px", fontSize: 15, width: "100%", maxWidth: 340,
+            cursor: check.ok ? "pointer" : "not-allowed",
           }}>
           {busy ? "Completing…" : "Complete and finish"}
         </button>
@@ -305,16 +379,16 @@ function Filling({ open, isLeader, onDone }: { open: Open; isLeader: boolean; on
 
 function Shell({ children, initials }: { children: React.ReactNode; initials: string | null }) {
   return (
-    <div className="min-h-screen" style={{ background: "#F1EFE9", color: C.ink }}>
+    <div className="min-h-screen idp" style={{ background: "#F1EFE9", color: C.ink }}>
       <div style={{ background: "#16232F", color: "#fff" }}>
         <div className="px-3 py-2 flex items-center gap-2.5">
           <div className="rounded bg-white px-1.5 py-1 flex-shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={LOGO} alt="Nandan GSE" style={{ height: 22, display: "block" }} />
           </div>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>IDP</div>
-            <div className="font-bold text-white leading-tight" style={{ fontSize: 13 }}>
+            <div className="font-bold text-white leading-tight truncate" style={{ fontSize: 13 }}>
               IDP Discussion — Individual
             </div>
           </div>

@@ -7,6 +7,8 @@ import { CONSENT_TEXT, isComplete } from "@/lib/idp";
 export const dynamic = "force-dynamic";
 
 const CYCLE = "2026-27";
+const BUCKET = "voice-notes";
+const LINK_TTL = 60 * 60;
 
 /**
  * The IDP is the ONE HRIS-adjacent thing everybody can reach, and the gate is
@@ -75,6 +77,18 @@ export async function GET() {
     catch { return NextResponse.json({ needsMigration: true, ...who, open: null, done: [] }); }
 
     const open = rows.find((r) => !r.submitted_at) ?? null;
+    if (open) {
+      // signed per read; a stored URL either expires in the row or never does
+      const audio = (open.audio || {}) as Record<string, { path: string; seconds: number | null; at: string }[]>;
+      const withUrls: Record<string, { url: string | null; seconds: number | null; at: string }[]> = {};
+      for (const [qid, list] of Object.entries(audio)) {
+        withUrls[qid] = await Promise.all(list.map(async (a) => {
+          const { data: sgn } = await adminClient().storage.from(BUCKET).createSignedUrl(a.path, LINK_TTL);
+          return { url: sgn?.signedUrl ?? null, seconds: a.seconds, at: a.at };
+        }));
+      }
+      (open as Record<string, unknown>).audioUrls = withUrls;
+    }
     const done = rows.filter((r) => r.submitted_at);
     return NextResponse.json({
       name: u.displayName || u.email,
@@ -82,7 +96,10 @@ export async function GET() {
       cycle: CYCLE,
       ...who,
       open,
-      done: done.map((d) => ({ id: d.id, submitted_at: d.submitted_at })),
+      done: done.map((d) => ({
+        id: d.id, submitted_at: d.submitted_at,
+        answers: d.answers, ratings: d.ratings, role_at_time: d.role_at_time, role_summary: d.role_summary,
+      })),
     });
   } catch (e) {
     return errJson(e);
@@ -100,6 +117,45 @@ export async function POST(req: Request) {
   try {
     const u = await requireUser();
     const admin = adminClient();
+
+    /**
+     * A RECORDING. Stored, added to that question's list, and handed back with
+     * a link so it can be played immediately.
+     *
+     * ADDED, never replaced: a question is not answered in one breath, and
+     * somebody who thinks of a second thing should be able to say it without
+     * losing the first.
+     */
+    if ((req.headers.get("content-type") || "").includes("multipart/form-data")) {
+      const form = await req.formData();
+      const id = String(form.get("id") || "");
+      const qid = String(form.get("qid") || "");
+      const seconds = Number(form.get("seconds") || 0) || null;
+      const file = form.get("file");
+      if (!id || !qid) throw new HttpError(400, "id and qid are required");
+      if (!(file instanceof File) || !file.size) throw new HttpError(400, "Nothing was recorded.");
+
+      const { data: row } = await admin
+        .from("hrms_idp").select("id, audio, submitted_at").eq("id", id).eq("person_email", u.email).maybeSingle();
+      if (!row) throw new HttpError(404, "That is not your IDP.");
+      if (row.submitted_at) throw new HttpError(409, "This IDP has already been completed.");
+
+      const ext = (file.type.split("/")[1] || "webm").split(";")[0];
+      const path = `idp/${id}/${qid}/${Date.now()}.${ext}`;
+      const { error: up } = await admin.storage
+        .from(BUCKET).upload(path, await file.arrayBuffer(), { contentType: file.type || "audio/webm" });
+      if (up) throw new Error(`Could not store the recording: ${up.message}`);
+
+      const audio = (row.audio || {}) as Record<string, { path: string; seconds: number | null; at: string }[]>;
+      audio[qid] = [...(audio[qid] || []), { path, seconds, at: new Date().toISOString() }];
+      const { error } = await admin
+        .from("hrms_idp").update({ audio, updated_at: new Date().toISOString() }).eq("id", id);
+      if (error) throw new Error(error.message);
+
+      const { data: sgn } = await admin.storage.from(BUCKET).createSignedUrl(path, LINK_TTL);
+      return NextResponse.json({ ok: true, url: sgn?.signedUrl ?? null, seconds });
+    }
+
     const body = await req.json();
     const action = String(body.action || "");
 
@@ -184,6 +240,26 @@ export async function POST(req: Request) {
         throw new Error(error.message);
       }
       return NextResponse.json({ ok: true, id: data?.id });
+    }
+
+    /**
+     * { action: "reopen", id } — put a completed one back into edit.
+     *
+     * The rule is that Complete is final. Dr Raghu has asked for reopening
+     * WHILE THIS IS NEW (23 Aug 2026), because the first people through it
+     * will find things they want to say better, and losing that to a rule
+     * would cost more than the rule is worth in its first month. Their own
+     * only: the query is scoped to their email like every other one here.
+     */
+    if (action === "reopen") {
+      const id = String(body.id || "");
+      const { data: row } = await admin
+        .from("hrms_idp").select("id").eq("id", id).eq("person_email", u.email).maybeSingle();
+      if (!row) throw new HttpError(404, "That is not your IDP.");
+      const { error } = await admin
+        .from("hrms_idp").update({ submitted_at: null, updated_at: new Date().toISOString() }).eq("id", id);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true });
     }
 
     if (action === "save" || action === "submit") {

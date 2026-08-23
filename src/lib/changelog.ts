@@ -75,6 +75,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.1.2",
+    date: "2026-08-23",
+    module: "IDP — dictation that does not stop, and a phone it fits on",
+    items: [
+      "THE DICTATION KEPT STOPPING MID-SENTENCE, and the cause was the fix. Chrome ends a speech session after a few seconds of quiet, on a network blip, and after about a minute regardless — and RESTARTING IT INSIDE ITS OWN END HANDLER throws, because the old session has not finished tearing down. My catch swallowed the throw, so it simply died. The restart is now deferred by a moment and retried if it fails, up to forty times, and gives up loudly rather than quietly.",
+      "IT ALSO SAYS ON SCREEN THAT IT IS STILL LISTENING, with a running clock. Half of “it stopped” is not knowing whether it stopped.",
+      "THE RECORDING IS KEPT NOW. It was being thrown away once the words were extracted, which was wrong twice over: the person cannot hear back what they said, and the transcript is the machine's version of them while the audio is them. Each recording is stored and playable under the answer.",
+      "AND THEY CAN ADD MORE. Every press ADDS a recording and adds its words below what is already in the box. Nothing replaces anything, because a question is not answered in one breath and somebody who thinks of a second thing should not lose the first.",
+      "EACH RATED DIMENSION NOW SAYS WHAT IT MEANS, and what the score means FOR THAT DIMENSION. “Dependability” means five things to five people, and a number against a word nobody has defined is not data. So: Dependability is “whether the thing you said you would do actually gets done, without anybody chasing you”, and a 7 there reads “I do it, and I tell people early if it will be late” — not the same sentence as a 7 in Job Knowledge.",
+      "GO BACK AND EDIT. Complete is meant to be final, and while this is new it can be reopened — the first people through it will find things they want to say better, and losing that to a rule would cost more than the rule is worth in its first month. Everything they wrote is still there; nothing starts again.",
+      "BUILT FOR A PHONE, because it will be sent as a link and most people will open it on one. A slider thumb worth aiming at with a thumb, 16px text boxes so the phone does not zoom the page on every tap, full-width buttons, and nothing that needs pinching.",
+      "Migration 0054.",
+    ],
+  },
+  {
     v: "3.20.1.1",
     date: "2026-08-23",
     module: "HRIS — the dropdown was lying, and Role is now enforced",

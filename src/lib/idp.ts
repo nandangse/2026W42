@@ -215,51 +215,166 @@ export const IDP_SECTIONS: IdpSection[] = [
   },
 ];
 
-/** The eleven dimensions the IDP sheet rates, in its own order. */
-export const IDP_RATINGS = [
-  "Job Knowledge",
-  "Job Skills",
-  "Quality of work",
-  "Dependability",
-  "Time Management",
-  "Initiative and Creativity",
-  "Communication Skills",
-  "Listening Skills",
-  "Teamwork",
-  "Discipline and Attendance",
-  "Ownership",
-] as const;
-
 /**
- * ONE TO TEN, on a slider (Dr Raghu, 23 Aug 2026).
+ * The eleven dimensions the IDP sheet rates, in its own order — and what each
+ * one actually MEANS.
  *
- * Ten points rather than five because people rate themselves in tens without
- * being taught to, and because the meaning of each band is written down: a 7
- * is not "good", it is "does more than the role needs". Every number carries
- * its meaning under the slider as it moves, so nobody is guessing what a 6 is.
+ * A word like "Dependability" means five different things to five people, and
+ * a number against a word nobody has defined is not data. So each carries a
+ * plain description, and each band of the scale says what THAT score means
+ * for THAT dimension: a 7 in Job Knowledge is not the same sentence as a 7 in
+ * Discipline and Attendance.
  */
+export interface RatingDimension {
+  key: string;
+  /** What this is asking about, in the simplest English. */
+  what: string;
+  /** What a score means here: [1-2, 3-4, 5-6, 7-8, 9-10]. */
+  bands: [string, string, string, string, string];
+}
+
+export const IDP_RATINGS: RatingDimension[] = [
+  {
+    key: "Job Knowledge",
+    what: "How much you KNOW about the work — the machines, the drawings, the processes, the rules of your area.",
+    bands: [
+      "I am still learning the basics. I ask before most things.",
+      "I know the common work. New or unusual work needs help.",
+      "I know what my job needs me to know.",
+      "I know more than my job needs. People come to me to ask.",
+      "I know this work better than anyone here.",
+    ],
+  },
+  {
+    key: "Job Skills",
+    what: "How well you can DO the work with your hands, the machine, or the software — not what you know, what you can do.",
+    bands: [
+      "I need somebody with me to do it.",
+      "I can do the simple work alone. The difficult work needs help.",
+      "I can do my normal work alone and correctly.",
+      "I can do difficult work alone, and I can show others how.",
+      "I am the person called when nobody else can do it.",
+    ],
+  },
+  {
+    key: "Quality of work",
+    what: "How correct your work is the FIRST time. Mistakes, rework, and things sent back.",
+    bands: [
+      "My work is often sent back for correction.",
+      "My work is checked closely because mistakes happen.",
+      "My work is usually right. Rework is rare.",
+      "My work is right the first time. People trust it without checking.",
+      "My work sets the standard others are asked to follow.",
+    ],
+  },
+  {
+    key: "Dependability",
+    what: "Whether the thing you said you would do actually gets done, without anybody chasing you.",
+    bands: [
+      "I have to be reminded and followed up often.",
+      "I do it, but usually after a reminder.",
+      "I do what I said, by when I said.",
+      "I do it, and I tell people early if it will be late.",
+      "Nobody ever has to check whether I did it.",
+    ],
+  },
+  {
+    key: "Time Management",
+    what: "How you use your day — planning, priorities, and finishing on time.",
+    bands: [
+      "My day runs me. I finish late often.",
+      "I plan a little. Urgent things push everything else out.",
+      "I plan my day and finish most things on time.",
+      "I plan the week, decide what matters first, and finish on time.",
+      "I plan far ahead and still have time when something urgent comes.",
+    ],
+  },
+  {
+    key: "Initiative and Creativity",
+    what: "Whether you see a problem and act, or wait to be told. And whether you find better ways of doing things.",
+    bands: [
+      "I do what I am told and no more.",
+      "I act when the problem is clearly mine.",
+      "I see problems in my area and fix them without being told.",
+      "I bring new ideas and I try them, not only talk about them.",
+      "Things in this company work differently because of ideas I brought.",
+    ],
+  },
+  {
+    key: "Communication Skills",
+    what: "Whether people understand you — on the shop floor, on the phone, in mail, and in a meeting.",
+    bands: [
+      "People often misunderstand what I meant.",
+      "I explain simple things well. Difficult things get confused.",
+      "People understand me. I write and speak clearly enough for my work.",
+      "I explain difficult things simply, to anybody, including customers.",
+      "I can explain anything to anyone, and people repeat my words correctly.",
+    ],
+  },
+  {
+    key: "Listening Skills",
+    what: "Whether you take in what other people say — before answering, and including what you did not want to hear.",
+    bands: [
+      "I answer before the other person has finished.",
+      "I listen, but I miss the important part.",
+      "I listen properly and I understand what was asked.",
+      "I listen, I ask questions, and I check I have understood.",
+      "People feel heard when they talk to me, even when I disagree.",
+    ],
+  },
+  {
+    key: "Teamwork",
+    what: "How you work with the people around you — helping, sharing, and not leaving a problem for the next person.",
+    bands: [
+      "I keep to my own work. Others' problems are not mine.",
+      "I help when I am asked.",
+      "I work well with my team and do my share.",
+      "I help before being asked, and I make the team better.",
+      "The team works better because I am in it, and people say so.",
+    ],
+  },
+  {
+    key: "Discipline and Attendance",
+    what: "Coming on time, being where you should be, following the rules and the safety of the plant.",
+    bands: [
+      "I am often late or absent without informing.",
+      "I am mostly present, but not always on time.",
+      "I come on time and follow the rules.",
+      "I am always on time, and I follow the rules even when nobody is looking.",
+      "Others use me as the example.",
+    ],
+  },
+  {
+    key: "Ownership",
+    what: "Whether a problem in your area is YOURS until it is solved — even when it was not your mistake.",
+    bands: [
+      "If it was not my mistake, it is not my problem.",
+      "I take responsibility when it is clearly mine.",
+      "I own my work from start to finish.",
+      "I own the result, not only my part of it, and I fix what is broken.",
+      "I carry problems that are nobody's, because they need carrying.",
+    ],
+  },
+];
+
+/** Its own band of the scale for a given score. */
+export const bandIndex = (v: number) => Math.min(4, Math.max(0, Math.ceil(v / 2) - 1));
+
+/** The generic ladder, shown under the slider as the anchors. */
 export const RATING_MAX = 10;
 
 export const RATING_MEANING: Record<number, string> = {
-  1: "1 — I am only starting. I need help with most of this.",
-  2: "2 — I know a little. I need help often.",
-  3: "3 — I can do the easy part alone. The hard part needs help.",
-  4: "4 — I do most of it alone, but not always right.",
-  5: "5 — I do what my role needs. Nothing more, nothing less.",
-  6: "6 — I do what my role needs, and I make few mistakes.",
-  7: "7 — I do more than my role needs. Others ask me.",
-  8: "8 — I am strong here. I can teach it to somebody else.",
-  9: "9 — I am one of the best here at this.",
-  10: "10 — Nobody in the company does this better.",
+  1: "1 — only starting",
+  2: "2 — only starting",
+  3: "3 — learning",
+  4: "4 — learning",
+  5: "5 — does what the role needs",
+  6: "6 — does what the role needs",
+  7: "7 — does more than the role needs",
+  8: "8 — does more than the role needs",
+  9: "9 — the best here",
+  10: "10 — the best here",
 };
-
-export const RATING_BANDS = [
-  { from: 1, to: 2, label: "Only starting" },
-  { from: 3, to: 4, label: "Learning" },
-  { from: 5, to: 6, label: "Does what the role needs" },
-  { from: 7, to: 8, label: "Does more than the role needs" },
-  { from: 9, to: 10, label: "The best here" },
-];
 
 export const ALL_QUESTIONS = IDP_SECTIONS.flatMap((s) => s.questions);
 
@@ -281,6 +396,6 @@ export function isComplete(
     const v = String(answers[q.id] || "").trim();
     return !v || (q.min ? v.length < q.min : false);
   });
-  const unrated = IDP_RATINGS.filter((d) => !ratings[d]);
+  const unrated = IDP_RATINGS.filter((d) => !ratings[d.key]);
   return { ok: missing.length === 0 && unrated.length === 0, missing, unrated };
 }
