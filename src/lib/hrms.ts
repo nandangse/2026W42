@@ -40,8 +40,14 @@ export interface FieldSpec {
   sheetHeader?: string;
   /** true where the value came from the sheet — an edit is an override. */
   sheet: boolean;
-  /** For kind "select". */
+  /** For kind "select" with a fixed list. */
   options?: string[];
+  /**
+   * For kind "select" backed by a MASTER — the options come from
+   * hrms_master for this kind, and are managed in Module Masters rather than
+   * typed into a record. See migration 0049.
+   */
+  master?: string;
   /** Shown under the field once that option is chosen. */
   optionNotes?: Record<string, string>;
   /** No two employees may hold the same value. Enforced server-side. */
@@ -100,6 +106,34 @@ export function onRoll(value: Record<string, string | null>): boolean {
   if (st) return ON_ROLL.has(st);
   return value.active !== "no";
 }
+
+/* ── the masters ─────────────────────────────────────────────────────────── */
+
+/**
+ * Every dropdown in HRIS and what it is called on screen.
+ *
+ * Order is the order Dr Raghu gave them. `fixed` marks the two whose values
+ * are policy rather than history — a status or a type may be renamed, but the
+ * set of them is not something to add to casually, because payroll and the
+ * statutory filings both read it.
+ */
+export const MASTERS: { kind: string; label: string; note?: string; fixed?: boolean }[] = [
+  { kind: "role", label: "Role", note: "What somebody is accountable for. Enforceable — the Goalbook defines a JD, a deliverable and a metric against each one. Designation defaults to this." },
+  { kind: "department", label: "Department" },
+  { kind: "grade", label: "Grade", note: "Empty until the Goalbook's grades are brought in — deliberately not guessed at." },
+  { kind: "status", label: "Status", fixed: true, note: "Decides who is on the roll." },
+  { kind: "type", label: "Type", fixed: true, note: "Decides payroll: employed types carry PF/ESIC/MLWF, contract types carry 2% TDS." },
+  { kind: "location", label: "Job Location" },
+  { kind: "qualification", label: "Qualification", note: "Seeded from what the master says today. Meant to be pruned to five or six." },
+  { kind: "shirt_size", label: "Shirt Size" },
+  { kind: "pant_size", label: "Pant Size" },
+  { kind: "shoe_size", label: "Shoe Size" },
+  { kind: "blood_group", label: "Blood Group" },
+  { kind: "religion", label: "Religion" },
+  { kind: "marital_status", label: "Marital Status" },
+  { kind: "gender", label: "Gender" },
+  { kind: "shift", label: "Shift" },
+];
 
 /* ── type ───────────────────────────────────────────────────────────────── */
 
@@ -188,24 +222,26 @@ export const FIELD_GROUPS: FieldGroup[] = [
         hint: "Two or three letters, unique across everybody. The edit log signs itself with these." },
       { key: "user_email", label: "Genie user", kind: "user", sheet: true,
         hint: "The Genie login this person uses, if they have one. Chosen from the user list — it is how HRIS knows who actually uses Genie." },
-      t("legal_name", "Full name on record", "NANDAN GSE EMPLOYEEMASTER", "text",
-        "The master's own name column. Often fuller than the short name above — this is the one for a letter."),
       t("casual_name", "Known as", "Casual Name"),
       { key: "type", label: "Type", kind: "select", sheet: true, sheetHeader: "Type",
-        options: [...TYPE_OPTIONS], optionNotes: TYPE_NOTES,
+        options: [...TYPE_OPTIONS], master: "type", optionNotes: TYPE_NOTES,
         hint: "Decides how this person is paid and what is deducted. Employed types carry PF, ESIC and MLWF; contract types carry 2% TDS instead." },
       { key: "status", label: "Status", kind: "select", sheet: true, sheetHeader: "Status",
-        options: [...STATUS_OPTIONS],
+        options: [...STATUS_OPTIONS], master: "status",
         hint: "The master's own six. Active, Doubtful and Notice Period count as on the roll." },
       { key: "active", label: "On the roll", kind: "bool", column: "active", sheet: true,
         derived: (v) => (onRoll(v) ? "yes" : "no"),
         hint: "Follows the Status above — Active, Doubtful and Notice Period are on the roll." },
       { key: "doj", label: "Date of joining", kind: "date", column: "doj", sheet: true },
-      { key: "department", label: "Department", kind: "text", column: "department", sheet: true },
-      { key: "designation", label: "Designation", kind: "text", column: "designation", sheet: true },
+      { key: "department", label: "Department", kind: "select", column: "department", sheet: true, master: "department" },
+      { key: "grade", label: "Grade", kind: "select", sheet: true, master: "grade" },
+      { key: "role", label: "Role", kind: "select", sheet: true, master: "role",
+        hint: "ENFORCEABLE. What this person is accountable for — the Goalbook defines a JD, a deliverable and a measurement metric against each role." },
+      { key: "designation", label: "Designation", kind: "text", column: "designation", sheet: true,
+        hint: "What goes on the visiting card. Defaults to the Role and may be overwritten — it is vanity, and harmless as long as it is not mistaken for the role." },
       t("reporting_manager", "Reporting manager", "Reporting Manager"),
-      { key: "location", label: "Job location", kind: "text", column: "location", sheet: true },
-      t("shift", "Shift", "Shift"),
+      { key: "location", label: "Job Location", kind: "select", column: "location", sheet: true, master: "location" },
+      { key: "shift", label: "Shift", kind: "select", sheetHeader: "Shift", sheet: true, master: "shift" },
       t("skill_level", "Skill level", "Sikll Level"),
       t("in_lc", "In LC", "In LC"),
       t("coming_from", "Travels from", "Coming From"),
@@ -249,15 +285,15 @@ export const FIELD_GROUPS: FieldGroup[] = [
         derived: (v) => ageBand(v.dob) },
       { key: "birthday_month", label: "Birthday month", kind: "text", sheet: true, sheetHeader: "Month of Birthday",
         derived: (v) => { const d = v.dob; if (!d) return null; const m = Number(String(d).slice(5, 7)); return MONTHS[m - 1] ?? null; } },
-      t("gender", "Gender", "Gender"),
-      t("marital", "Marital status", "Marital Status"),
-      t("religion", "Religion", "Religion"),
-      { key: "blood_group", label: "Blood group", kind: "text", sheetHeader: "Blood Group", sheet: true },
-      t("qualification", "Qualification", "Qualification"),
+      { key: "gender", label: "Gender", kind: "select", sheetHeader: "Gender", sheet: true, master: "gender" },
+      { key: "marital", label: "Marital status", kind: "select", sheetHeader: "Marital Status", sheet: true, master: "marital_status" },
+      { key: "religion", label: "Religion", kind: "select", sheetHeader: "Religion", sheet: true, master: "religion" },
+      { key: "blood_group", label: "Blood group", kind: "select", sheetHeader: "Blood Group", sheet: true, master: "blood_group" },
+      { key: "qualification", label: "Qualification", kind: "select", sheetHeader: "Qualification", sheet: true, master: "qualification" },
       t("exp_before", "Experience before Nandan", "Experience BEFORE Nandan", "text", "Years."),
-      t("shirt_size", "Shirt size", "Shirt Size"),
-      t("pant_size", "Pant size", "Pant Size"),
-      t("shoe_size", "Shoe size", "Shoe Size"),
+      { key: "shirt_size", label: "Shirt size", kind: "select", sheetHeader: "Shirt Size", sheet: true, master: "shirt_size" },
+      { key: "pant_size", label: "Pant size", kind: "select", sheetHeader: "Pant Size", sheet: true, master: "pant_size" },
+      { key: "shoe_size", label: "Shoe size", kind: "select", sheetHeader: "Shoe Size", sheet: true, master: "shoe_size" },
       t("vaccine_1", "Vaccine 1", "Vaccine 1 Date", "date"),
       t("vaccine_2", "Vaccine 2", "Vaccine 2 Date", "date"),
     ],
@@ -350,8 +386,10 @@ export const FIELD_GROUPS: FieldGroup[] = [
     note:
       "LINKS ONLY. No document is ever stored in the database — every one of them lives in the employee's own folder on Drive, and what is kept here is the address. That way there is one copy, it is where the rest of HR's paper already is, and Genie holds nothing it would have to be trusted with.",
     fields: [
-      { key: "drive_folder", label: "Employee folder", kind: "url", sheet: false,
-        hint: "The person's own folder on Drive. Everything below should live inside it." },
+      { key: "drive_folder_name", label: "Drive Folder name", kind: "text", sheet: false,
+        hint: "What the folder is CALLED in Drive — “Active - 6001 - Jagdishchandra Kumar”. The name is how it is found at a glance; it has no bearing on the link, which never changes. When somebody leaves, this must become “Inactive - …” before their file can be closed." },
+      { key: "drive_folder", label: "Drive Folder", kind: "url", sheet: false,
+        hint: "The person's own folder on Drive — salary slips, continuity letters, IDP, contracts, everything. Named “Active - <EmployeeID> - <Name>”, or “Inactive - …” once they have left. The NAME and the LINK have nothing to do with each other: the link never changes, the name is what makes the folder findable in Drive at a glance." },
       { key: "doc_photo", label: "Passport photograph", kind: "url", sheet: true, sheetHeader: "Passport Photo" },
       { key: "doc_aadhaar", label: "Aadhaar card", kind: "url", sheet: false },
       { key: "doc_pan", label: "PAN card", kind: "url", sheet: false },

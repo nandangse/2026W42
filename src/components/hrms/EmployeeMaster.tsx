@@ -118,7 +118,7 @@ export default function EmployeeMaster({
         </span>
       ),
     },
-    { key: "id", label: "Employee ID", width: 120, value: (e) => e.id,
+    { key: "id", label: "EmployeeID", width: 120, value: (e) => e.id,
       title: "The key every HRIS record hangs off" },
     { key: "department", label: "Department", width: 150, value: (e) => val(e, "department") },
     { key: "designation", label: "Designation", width: 200, value: (e) => val(e, "designation") },

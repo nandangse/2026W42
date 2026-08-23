@@ -37,6 +37,7 @@ export default function EmployeeRecord({
 }) {
   const [e, setE] = useState<HrmsEmployee | null>(null);
   const [users, setUsers] = useState<GenieUser[]>([]);
+  const [masters, setMasters] = useState<Record<string, { value: string }[]>>({});
   const [tab, setTab] = useState<string>(FIELD_GROUPS[0].key);
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
   const [msg, setMsg] = useState("");
@@ -53,6 +54,9 @@ export default function EmployeeRecord({
     }
   }, [id]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    api.get("/api/hrms/masters").then((r) => setMasters(r.masters || {})).catch(() => setMasters({}));
+  }, []);
 
   const loadHistory = useCallback(async () => {
     const r = await api.get(`/api/hrms/history?id=${encodeURIComponent(id)}`);
@@ -131,6 +135,19 @@ export default function EmployeeRecord({
       </div>
 
       <div className="p-3 md:p-4" style={{ maxWidth: 860 }}>
+        {group?.key === "documents" && !onRoll(e.value) &&
+          /^\s*active\s*-/i.test(String(e.value.drive_folder_name || "")) && (
+          <div className="rounded p-3 mb-2" style={{ background: "#FBEDEA", border: "1px solid #B3261E" }}>
+            <div className="text-xs font-bold" style={{ color: C.red }}>
+              CHECKLIST — this file cannot be closed yet
+            </div>
+            <div className="text-xs mt-1" style={{ color: C.dim, lineHeight: 1.6 }}>
+              {e.value.name} is <b>{e.value.status || "no longer on the roll"}</b>, but the Drive folder is still called{" "}
+              <b>{e.value.drive_folder_name}</b>. Rename it in Drive to start with <b>Inactive -</b>, then correct it here.
+              The link does not change; only the name does, and the name is what makes it findable.
+            </div>
+          </div>
+        )}
         {group && (
           <>
             {group.note && (
@@ -139,7 +156,8 @@ export default function EmployeeRecord({
               </div>
             )}
             {group.fields.map((f) => (
-              <EditField key={f.key} f={f} e={e} users={users} onSave={(v) => save(f.key, v)} onClear={() => clear(f.key)} />
+              <EditField key={f.key} f={f} e={e} users={users} masters={masters}
+                onSave={(v) => save(f.key, v)} onClear={() => clear(f.key)} />
             ))}
           </>
         )}
@@ -226,9 +244,10 @@ function Shell({
 }
 
 function EditField({
-  f, e, users, onSave, onClear,
+  f, e, users, masters, onSave, onClear,
 }: {
   f: FieldSpec; e: HrmsEmployee; users: GenieUser[];
+  masters: Record<string, { value: string }[]>;
   onSave: (v: string | null) => void; onClear: () => void;
 }) {
   if (f.derived) {
@@ -256,11 +275,31 @@ function EditField({
         <div className="text-xs font-semibold" style={{ color: C.dim, minWidth: 150 }}>{f.label}</div>
 
         {f.kind === "select" ? (
-          <select value={current} onChange={(ev) => onSave(ev.target.value)}
-            className="text-xs rounded px-2 py-1 bg-white" style={{ border: `1px solid ${C.line}`, minWidth: 170 }}>
-            <option value="">— not set —</option>
-            {(f.options || []).map((o) => (<option key={o} value={o}>{o}</option>))}
-          </select>
+          (() => {
+            // The master is the list. f.options is only the fallback for the
+            // two lists that are policy (Status, Type) before 0049 is run.
+            const fromMaster = f.master ? (masters[f.master] || []).map((m) => m.value) : [];
+            const opts = fromMaster.length ? fromMaster : f.options || [];
+            const orphan = current && !opts.includes(current);
+            return (
+              <>
+                <select value={current} onChange={(ev) => onSave(ev.target.value)}
+                  className="text-xs rounded px-2 py-1 bg-white"
+                  style={{ border: `1px solid ${orphan ? "#F5B32B" : C.line}`, minWidth: 170 }}>
+                  <option value="">— not set —</option>
+                  {/* what it says today, even if the master no longer offers it */}
+                  {orphan && <option value={current}>{current} (not on the list)</option>}
+                  {opts.map((o) => (<option key={o} value={o}>{o}</option>))}
+                </select>
+                {f.master && (
+                  <a href="/hrms#masters" target="_blank" rel="noopener noreferrer"
+                     className="text-xs" style={{ color: C.faint }} title="Manage this list in Module Masters">
+                    list ↗
+                  </a>
+                )}
+              </>
+            );
+          })()
         ) : f.kind === "user" ? (
           <select value={current} onChange={(ev) => onSave(ev.target.value)}
             className="text-xs rounded px-2 py-1 bg-white" style={{ border: `1px solid ${C.line}`, minWidth: 230 }}>

@@ -60,8 +60,22 @@ export const DEFAULT_SOURCES: MorningSource[] = [
     gs: "https://docs.google.com/spreadsheets/d/18jCqt8d_sIHsYOYPkHFnavWwclfEMIsqCoOCVJsCxrY/edit",
     daily: true,
   },
-  // ---- RJ Uploads — owner only ----
-  {
+  /**
+   * ---- RJ Uploads — owner only ----
+   *
+   * THE EMPLOYEE MASTER UPLOAD IS RETIRED (Dr Raghu, 23 Aug 2026).
+   *
+   * HRIS is the master now. The sheet was imported one last time on 23 Aug
+   * 2026 -- 380 people, every name corrected off the UAN column, every status
+   * carried through -- and the card is off the Morning Update page so nobody
+   * can overwrite a maintained record with a stale download.
+   *
+   * The parser and the merge path are LEFT IN PLACE deliberately. Restoring
+   * this entry is a one-line change if a bulk correction is ever needed again,
+   * and deleting working code to express a policy is how the policy becomes
+   * irreversible by accident.
+   */
+  /* {
     key: "employees",
     nm: "Employee Master",
     desc: "Active employees from the HR sheet — drives the birthday list, and whatever else we add later",
@@ -69,7 +83,7 @@ export const DEFAULT_SOURCES: MorningSource[] = [
     gs: "https://docs.google.com/spreadsheets/d/1dp-ce1pWMMTUFqBgMCeXpWXlRE394VWxrx4Xz-PQhvE/edit",
     daily: false,
     ownerOnly: true,
-  },
+  }, */
 ];
 
 /** Google-Sheets edit URL → direct .xlsx export URL (the "Download sheet" link). */

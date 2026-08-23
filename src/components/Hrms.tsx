@@ -25,6 +25,7 @@ import type { HrmsEmployee } from "@/lib/hrms";
 import { NAV, findNav, DEFAULT_KEY } from "@/lib/hrms-nav";
 import EmployeeMaster, { type MasterView } from "./hrms/EmployeeMaster";
 import { Pane, NotBuilt } from "./hrms/Pane";
+import ModuleMasters from "./hrms/ModuleMasters";
 
 export default function Hrms({
   email, initials, displayName, role, isOwner,
@@ -209,7 +210,9 @@ export default function Hrms({
         </nav>
 
         {/* ═══════════════════ right side ═══════════════════ */}
-        {nav.key.startsWith("master.") ? (
+        {nav.key === "masters" ? (
+          <ModuleMasters who={who} />
+        ) : nav.key.startsWith("master.") ? (
           <EmployeeMaster
             view={nav.key.split(".")[1] as MasterView}
             rows={rows}

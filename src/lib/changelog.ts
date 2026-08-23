@@ -75,6 +75,23 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.1.4",
+    date: "2026-08-23",
+    module: "HRIS — the master is final, and its lists are masters too",
+    items: [
+      "THE EMPLOYEE MASTER IS COMPLETE AND FINAL: 380 people. The final import corrected 184 names that had been read off the UAN column, added 18 people who had joined since, brought every Status through — Active 200 · Resigned 143 · Terminated 36 · Notice Period 1 — and deleted the two rows that were never people (the count banner and a repeated heading).",
+      "THE MORNING UPDATE UPLOAD FOR THE EMPLOYEE MASTER IS RETIRED. HRIS is the record now, and a stale download can no longer overwrite a maintained one. The parser and the merge path are left in place — restoring the card is one line if a bulk correction is ever needed, and deleting working code to express a policy is how a policy becomes irreversible by accident.",
+      "MODULE MASTERS, at the bottom of the menu. Fifteen lists in one screen: Role · Department · Grade · Status · Type · Job Location · Qualification · Shirt, Pant and Shoe Size · Blood Group · Religion · Marital Status · Gender · Shift. A field backed by a master can only say what is on its list, which is how a report can count it — free text is how one company ends up with “B+”, “B +ve” and “B Positive” as three different blood groups.",
+      "SEEDED FROM THE DATA THAT IS ALREADY THERE, so no list starts empty. They are meant to be pruned afterwards — Qualification especially, which is why deleting is built the way it is.",
+      "DELETING A VALUE IS NEVER JUST A DELETE. Somebody holds it. HRIS says how many, and asks where they go: move them to another value on the list, or blank the field on all of them, said out loud. Either way every affected person gets a line in their own history, because “why did forty people lose their department” must have an answer.",
+      "RENAMING CARRIES THE RECORDS WITH IT — rename a department and everybody in it comes along.",
+      "ROLE IS NOW A FIELD, AND IT IS THE ENFORCEABLE ONE. It comes from the Role master, and the Goalbook defines a JD, a deliverable and a measurement metric against each. DESIGNATION defaults to it and may be overwritten — it is what goes on a visiting card, which is vanity, and harmless so long as it cannot be mistaken for the role. Grade is there too, deliberately empty until the Goalbook's grades are imported rather than guessed at.",
+      "“Code” now reads EMPLOYEEID everywhere.",
+      "THE DRIVE FOLDER HAS A NAME AS WELL AS A LINK, and they have nothing to do with each other. The link never changes; the name — “Active - 6001 - Jagdishchandra Kumar” — is what makes the folder findable in Drive at a glance. When somebody leaves, the record refuses to let their file be closed while the folder is still called “Active - …”: a checklist item on the Documents tab says so in red until it is renamed to “Inactive - …”.",
+      "Migration 0049.",
+    ],
+  },
+  {
     v: "3.19.1.3",
     date: "2026-08-23",
     module: "HRIS — the import was reading the wrong row",

@@ -214,6 +214,14 @@ export const NAV: NavSection[] = [
   },
 ];
 
+NAV.push({
+  key: "masters",
+  label: "Module Masters",
+  icon: "🗃",
+  blurb: "Every dropdown in HRIS — Role, Department, Grade, Status, Type, Job Location, Qualification, sizes, Blood Group, Religion, Marital Status, Gender and Shift.",
+  built: true,
+});
+
 /** Flattened, for the router. */
 export const NAV_ITEMS: { key: string; label: string; section: string; item?: NavItem; sec: NavSection }[] =
   NAV.flatMap((s) =>
