@@ -257,6 +257,9 @@ interface AdminUser {
   last_sign_in_at: string | null;
   /** Goals access, merged in so a person is one row rather than two tables. */
   goals_level: "none" | "view" | "edit";
+  /** HRMS — the people records at /hrms. Owner's grant, nobody by default. */
+  hrms_access: boolean;
+  hrms_implicit: boolean; // the owner — always yes, not toggleable
 }
 
 const ROLE_OPTIONS: { value: string; label: string; hint: string }[] = [
@@ -459,6 +462,13 @@ export default function PlanningSuite({
   useEffect(() => {
     if (workspace === "sales") setSalesVisited(true);
   }, [workspace]);
+
+  // HRMS is not a workspace — it is its own page at /hrms, with its own shell.
+  // All that is needed here is whether to put the door on the wall.
+  const [hrmsAccess, setHrmsAccess] = useState(false);
+  useEffect(() => {
+    api.get("/api/hrms/access").then((r) => setHrmsAccess(!!r.see)).catch(() => setHrmsAccess(false));
+  }, []);
 
   // App identity — name + theme line under the logo, admin-editable so a new
   // theme doesn't need a deploy. Defaults match the migration's, so the
@@ -950,6 +960,19 @@ export default function PlanningSuite({
               {l}
             </button>
           ))}
+          {/* HRMS is a LINK, not a workspace: it is a separate page at its own
+              URL, and the three people who hold it are meant to be able to go
+              straight there. Hidden from everyone else, like Sales Genie. */}
+          {hrmsAccess && (
+            <a
+              href="/hrms"
+              className="px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap flex-shrink-0"
+              style={{ color: "#8FA1B3" }}
+              title="HRMS — the employee master and directory. Opens its own page."
+            >
+              👤 HRMS
+            </a>
+          )}
         </div>
 
         {/* Sub-nav for the Planning Suite workspace only — Goals and Tasking
@@ -5973,6 +5996,20 @@ function Admin({
     } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
   };
 
+  /**
+   * HRMS access, from the same row. Owner only, like the group ticks.
+   *
+   * The grant is stored against the EMAIL (migration 0047), so this tick and
+   * a grant made before the account existed are the same row.
+   */
+  const setHrms = async (id: string, grant: boolean) => {
+    setGaMsg("");
+    try {
+      await api.post("/api/admin/users", { action: "hrms_access", id, grant });
+      loadUsers();
+    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
   /** Goals access from inside the Users table. Reloads both lists. */
   const setGoalsLevel = async (id: string, level: string) => {
     const who = (users ?? []).find((x) => x.id === id);
@@ -6210,6 +6247,7 @@ function Admin({
               <th className="text-left py-1 font-semibold" title="Their line manager — drives “tasks of people reporting to me” in Nandan Tasking">Reports to</th>
               <th className="text-left py-1 font-semibold" title="Sales Genie access comes with the role now: Sales team, Admins and the owner">Role</th>
               <th className="text-left py-1 font-semibold" title="Goals access is granted per person, not by role">Goals</th>
+              <th className="text-left py-1 font-semibold" title="HRMS — the employee records at /hrms. Dates of birth, contact details and next of kin. Granted per person by the owner alone.">HRMS</th>
               <th className="text-left py-1 font-semibold" title="Which room they are in. Not a role — this does not change what they may do, only what they may see. Only the owner may tick these.">Groups</th>
               <th className="text-left py-1 font-semibold" title="When this account last signed in">Last seen</th>
               <th className="text-left py-1 font-semibold">Status</th>
@@ -6325,6 +6363,16 @@ function Admin({
                     <option value="view">can view</option>
                     <option value="edit">can edit</option>
                   </select>
+                </td>
+                <td className="py-1.5">
+                  <input
+                    type="checkbox"
+                    checked={!!u.hrms_access}
+                    disabled={!isOwner || u.hrms_implicit}
+                    onChange={(e) => setHrms(u.id, e.target.checked)}
+                    style={{ accentColor: "#E8600A", width: 13, height: 13, cursor: isOwner && !u.hrms_implicit ? "pointer" : "default" }}
+                    title={u.hrms_implicit ? "The owner holds HRMS already" : isOwner ? "Open /hrms — the employee master, contact details and next of kin" : `Only ${OWNER_EMAIL} may grant HRMS`}
+                  />
                 </td>
                 <td className="py-1.5">
                   <GroupTicks u={u} isOwner={isOwner} onSet={setGroups} />

@@ -316,6 +316,18 @@ const MODULES: ModuleSpec[] = [
     ai: "None.",
   },
   {
+    name: "HRMS — Employee master & directory",
+    space: "HRMS",
+    since: "3.19.0.0",
+    purpose: "Who works here: the record, the contact details, the next of kin, and what changed on any of it.",
+    who: "The owner, Tushar Giri and HR. Nobody by default; the owner alone grants it.",
+    gate: "requireHrms() on the page and on every route; RLS denies the browser outright",
+    screens: ["Directory", "Person record", "From the sheet", "History", "Add person"],
+    data: ["employees", "employee_edits", "employee_edit_log", "hrms_access"],
+    api: ["/api/hrms/employees", "/api/hrms/history", "/api/hrms/access"],
+    ai: "None.",
+  },
+  {
     name: "Notifications",
     space: "Cross-cutting",
     since: "2.x",
@@ -348,6 +360,7 @@ const SPACES: SpaceSpec[] = [
   { icon: "📚", name: "LMS", what: "Books, lessons, progress and a generated learning plan.", who: "Everyone except the uploader.", how: "Role — any reader." },
   { icon: "🧭", name: "Consult Raghu", what: "A question, answered against today's board.", who: "Everyone except the uploader.", how: "Role — any reader." },
   { icon: "📜", name: "Principles", what: "How decisions are meant to be reached, and the documents behind that.", who: "Everyone except the uploader.", how: "Role — any reader." },
+  { icon: "👤", name: "HRMS", what: "The employee master and directory, at its own URL: records, contact details, next of kin, and the history of every change.", who: "Three named accounts — the owner, one director, HR.", how: "Explicit grant — hrms_access, ticked by the owner alone." },
   { icon: "👤", name: "Account menu", what: "The tools for the few: Morning Update, Update to ERP, Feature Request, Admin.", who: "Each gated on its own right.", how: "Role or grant, per tool." },
 ];
 

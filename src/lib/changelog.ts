@@ -18,6 +18,15 @@
  * not 2.7.0.1. Changes *inside* an existing module the same day take the
  * last digit.
  *
+ * ONE SEQUENCE, INCLUDING THE APPS AT THEIR OWN URLs (Dr Raghu, 22 Aug 2026).
+ * The CRM at /crm and HRMS at /hrms are separate PAGES, and in the CRM's case
+ * a separate database — but they are Genie, and they are numbered as Genie.
+ * Neither gets a version of its own. A "CRM v1.2" beside a Genie 3.19 would
+ * mean two answers to "what is running", and the day they disagreed nobody
+ * would know which one to trust. Work on either takes the next number in THIS
+ * list, by the same four rules above: 3.19.0.0 was HRMS, and everything after
+ * it continues 3.19.0.1, 3.19.1.0, and on.
+ *
  * ADD A NEW ENTRY AT THE TOP of UPDATES for every shipped change — the header
  * badge and Admin → Updates both read this list, so the log and the version
  * number can never drift apart.
@@ -65,6 +74,24 @@ export interface UpdateEntry {
 
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
+  {
+    v: "3.19.0.0",
+    date: "2026-08-22",
+    module: "HRMS — genie.nandan.co.in/hrms",
+    items: [
+      "NEW — HRMS, at /hrms. A space of its own rather than a tab, and for the same reason the CRM is: the boards are about jobs and are read by everybody, this is about people and is read by three. Same login, same deployment, its own page and its own door. Unlike the CRM it uses GENIE'S database, because the employee master has been sitting in it since 0024.",
+      "WHO GETS IN: Dr Raghu, Tushar Giri and HR. Granted per person and to NOBODY by default, ticked in Admin → Users by the owner alone — not by admins, because who may read a colleague's date of birth and next of kin is not an ordinary administrative decision. The check runs on the page and again on every route behind it; a hidden link is not a gate.",
+      "THE EMPLOYEE MASTER FINALLY HAS A SCREEN. 364 people have been in the database since 0024, uploaded from the HR sheet, and their only visible output was the birthday line on My Week. Now: search, filter by department and by whether somebody is still here, sort by newest joiner, headcount, department count, joiners in the last 90 days and average tenure — plus a count of active records still missing a department or a joining date, which is the list HR actually has to work through.",
+      "AN EDIT SURVIVES THE NEXT UPLOAD, and this is the part that matters. Every Employee Master upload rewrites the whole table, so anything typed into a sheet-carried column would have been gone by the next morning. Edits are kept SEPARATELY and applied when the record is read: the sheet keeps its own value, the card shows the edited one, says what the sheet still holds, and puts it back in one click.",
+      "FIELDS THE SHEET HAS NEVER CARRIED — mobile, personal email, emergency contact and number, blood group, address, HR notes. Nothing can overwrite them because nothing else writes them.",
+      "EVERY CHANGE IS RECORDED — field, from, to, who, when — on the person and across everybody. Append-only: nothing on that list can be edited or removed. A people record with no history is worth nothing the day there is an argument about it.",
+      "A person's full sheet row is on its own tab, column names and all, so a column HR adds next month is visible immediately rather than waiting for somebody to build a field for it.",
+      "ADD A PERSON who has joined but is not on the sheet yet. Give the employee code if HR has issued one, and the next upload updates that record instead of creating a second one for the same human being.",
+      "CSV export of exactly what is on screen — filters applied, edits applied.",
+      "HARDENING, INCLUDED: the employee master was readable by ANY signed-in account straight from the database — all 364 rows, dates of birth and joining included. That policy dated from the birthday list and protected nothing, because the birthday list is built on the server. It is now closed to the browser entirely. Checked first that nothing was reading it that way.",
+      "Migration 0047. hr@nandan.co.in has no Genie login yet — the grant is written anyway, and takes effect the moment the account is created.",
+    ],
+  },
   {
     v: "3.18.0.0",
     date: "2026-08-21",

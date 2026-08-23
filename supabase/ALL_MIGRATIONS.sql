@@ -3166,3 +3166,1030 @@ comment on constraint import_batches_kind_check on public.import_batches is
   'a new card is added, or that card will apply its data and then fail on the '
   'audit row.';
 
+
+-- >>>>> supabase/migrations/0034_groups_and_project_names.sql
+-- 0034_groups_and_project_names.sql
+--
+-- Two unrelated things, both small, shipped together because both are one
+-- column each and neither is worth a migration of its own.
+--
+-- 1. THE THREE GROUPS -- LC, Stratcom, Management.
+--
+--    Decided by Dr Raghu: only raghu@nandan.co.in may tick them, and EVERY
+--    STRATCOM MEMBER IS AN LC MEMBER. That second rule is enforced here as a
+--    trigger rather than left to the UI, because a rule that lives only in a
+--    React form is a rule that lapses the first time somebody writes through
+--    the API. Ticking Stratcom ticks LC; un-ticking LC un-ticks Stratcom.
+--
+--    These are NOT roles. `role` says what you may DO (write a plan, upload,
+--    administer); these say which room you are in. Delivered Jobs is gated on
+--    LC, and the two forward-looking cards on the Job Delivery Board are gated
+--    on Stratcom. Mixing the two into `role` would have meant inventing an
+--    "LC planner" and an "LC admin" and every other combination.
+--
+-- 2. PROJECT NAME AND CUSTOMER.
+--
+--    The projects table has carried id, manager, stage, dates and the sales
+--    order since 0002, but never the project's NAME or its customer -- the
+--    upload parser simply never read those two columns. Adding them here so
+--    the next Data Analysis / Open Projects upload can fill them.
+--
+--    Blank until an upload supplies them. Deliberately NOT backfilled from the
+--    jobs on the project: a name guessed from a job description is a name
+--    somebody will quote back at a customer.
+--
+-- Additive and safe to re-run.
+
+-- ---------------------------------------------------------------------------
+-- 1. groups
+-- ---------------------------------------------------------------------------
+
+alter table public.profiles add column if not exists lc         boolean not null default false;
+alter table public.profiles add column if not exists stratcom   boolean not null default false;
+alter table public.profiles add column if not exists management boolean not null default false;
+
+comment on column public.profiles.lc         is 'Leadership Circle. Gates the Delivered Jobs workspace. Every Stratcom member is one.';
+comment on column public.profiles.stratcom   is 'Strategy Committee. Gates the forward-looking cards on the Job Delivery Board. Implies lc.';
+comment on column public.profiles.management is 'Management. Independent of the other two.';
+
+-- Stratcom implies LC, in both directions, whatever wrote the row.
+create or replace function public.profiles_group_rules()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.stratcom then
+    new.lc := true;          -- every Stratcom member is an LC member
+  elsif not new.lc then
+    new.stratcom := false;   -- ...so dropping LC drops Stratcom with it
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_group_rules_trg on public.profiles;
+create trigger profiles_group_rules_trg
+  before insert or update of lc, stratcom on public.profiles
+  for each row execute function public.profiles_group_rules();
+
+-- Make anything already ticked obey the rule (a no-op on a fresh install).
+update public.profiles set lc = true where stratcom and not lc;
+
+-- Only the owner may set them.
+--
+-- Postgres cannot restrict UPDATE to named columns in a policy, so this is a
+-- trigger: existing writers pass through untouched unless one of the three
+-- flags actually changed. An admin must still be able to change somebody's
+-- role, department and reporting line, which is why the whole table is not
+-- simply locked.
+--
+-- THE auth.uid() TEST IS LOAD-BEARING, not belt-and-braces. Every /api route
+-- writes with the SERVICE KEY, where there is no JWT at all -- auth.email() is
+-- null, so is_owner() is null, so a bare is_owner() check here would reject
+-- every flag change ever made, the owner's own included, and the tick boxes
+-- would be dead on arrival.
+--
+-- So: a write carrying a JWT is a browser writing directly and must be the
+-- owner. A write with no JWT is the server, which has already established who
+-- is asking -- /api/admin/users calls requireOwner() before it touches these
+-- three columns. The rule is enforced once on each path, not half on each.
+create or replace function public.profiles_groups_owner_only()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if (new.lc, new.stratcom, new.management)
+     is distinct from (old.lc, old.stratcom, old.management)
+     and auth.uid() is not null
+     and not coalesce(public.is_owner(), false) then
+    raise exception 'Only the owner may change LC / Stratcom / Management';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_groups_owner_only_trg on public.profiles;
+create trigger profiles_groups_owner_only_trg
+  before update on public.profiles
+  for each row execute function public.profiles_groups_owner_only();
+
+-- ---------------------------------------------------------------------------
+-- 2. project name + customer
+-- ---------------------------------------------------------------------------
+
+alter table public.projects add column if not exists name text;
+alter table public.projects add column if not exists cust text;
+
+comment on column public.projects.name is 'The project name as the ERP export carries it. Blank until an upload supplies it -- never guessed from a job.';
+comment on column public.projects.cust is 'The customer as the ERP export carries it. Blank until an upload supplies it.';
+
+-- apply_projects, extended to carry them.
+--
+-- BLANK-FILL, not overwrite. An export that has no name column sends '' for
+-- every project, and a plain `set name = excluded.name` would wipe every name
+-- already stored the first time somebody uploads the older export. Same rule
+-- the job merge has always used: a value that was not supplied is not a value
+-- of blank.
+create or replace function public.apply_projects(p_projects jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_projects is null or jsonb_array_length(p_projects) = 0 then
+    return;
+  end if;
+
+  insert into public.projects (id, mgr, committed, exp_end, so, stage, name, cust, job_numbers)
+  select
+    p ->> 'id',
+    p ->> 'mgr',
+    nullif(p ->> 'committed', '')::date,
+    nullif(p ->> 'expEnd', '')::date,
+    p ->> 'so',
+    p ->> 'stage',
+    nullif(p ->> 'name', ''),
+    nullif(p ->> 'cust', ''),
+    '{}'::text[]
+  from jsonb_array_elements(p_projects) p
+  on conflict (id) do update set
+    mgr = excluded.mgr, committed = excluded.committed,
+    exp_end = excluded.exp_end, so = excluded.so, stage = excluded.stage,
+    name = coalesce(excluded.name, projects.name),
+    cust = coalesce(excluded.cust, projects.cust);
+
+  -- blank-fill only — never overwrite a non-null job value
+  update public.jobs j set
+    own = coalesce(nullif(j.own, ''), p.mgr),
+    otd = coalesce(j.otd, p.committed),
+    tdd = coalesce(j.tdd, p.exp_end)
+  from public.projects p
+  where j.proj = p.id;
+end;
+$$;
+
+
+-- >>>>> supabase/migrations/0035_group_rules_fix.sql
+-- 0035_group_rules_fix.sql
+--
+-- Fixes the Stratcom/LC trigger shipped in 0034. Half of it did not work.
+--
+-- WHAT WAS WRONG
+--
+-- 0034 wrote the rule as a test on the NEW row only:
+--
+--     if new.stratcom then new.lc := true;
+--     elsif not new.lc then new.stratcom := false;
+--     end if;
+--
+-- On a write that changes only `lc`, Postgres carries every other column into
+-- `new` unchanged -- so `new.stratcom` is still true, the first branch fires,
+-- and `lc` is forced straight back to true. The second branch is unreachable
+-- for the exact case it was written for.
+--
+-- The visible effect: un-ticking LC on somebody who is in Stratcom did
+-- nothing at all. Not an error, not a partial write -- the tick simply came
+-- back. Silently ignoring an instruction is the worst of the three.
+--
+-- It went unnoticed because the app always sends all three flags together and
+-- normaliseGroups() has already dropped Stratcom client-side by then, so
+-- through the screen the answer was right. Only a direct write -- the SQL
+-- editor, the API, a script -- took the broken path.
+--
+-- WHAT IT DOES NOW
+--
+-- Compare NEW against OLD and act on what actually changed, rather than on
+-- what the row happens to say afterwards:
+--
+--   joined Stratcom          -> join the LC
+--   left the LC              -> leave Stratcom
+--   anything else            -> hold the invariant (stratcom implies lc)
+--
+-- The third branch is what keeps an unrelated write -- someone's department,
+-- their reporting line -- from quietly breaking the pair.
+--
+-- Additive and safe to re-run.
+
+create or replace function public.profiles_group_rules()
+returns trigger
+language plpgsql
+as $$
+begin
+  -- On insert there is no OLD to compare against; only the invariant applies.
+  if tg_op = 'INSERT' then
+    if new.stratcom then
+      new.lc := true;
+    end if;
+    return new;
+  end if;
+
+  if new.stratcom and not old.stratcom then
+    new.lc := true;            -- joining Stratcom joins the LC
+  elsif old.lc and not new.lc then
+    new.stratcom := false;     -- leaving the LC leaves Stratcom with it
+  elsif new.stratcom then
+    new.lc := true;            -- any other write: the pair still has to hold
+  end if;
+
+  return new;
+end;
+$$;
+
+-- The trigger fires on lc/stratcom only. A write that changes just `lc` must
+-- reach it, and it does -- but state it explicitly rather than relying on the
+-- 0034 definition still being there.
+drop trigger if exists profiles_group_rules_trg on public.profiles;
+create trigger profiles_group_rules_trg
+  before insert or update of lc, stratcom on public.profiles
+  for each row execute function public.profiles_group_rules();
+
+-- Repair anything the broken rule left behind: a row that was meant to leave
+-- the LC and was pulled back in. There is no way to tell those apart from
+-- deliberate members now, so this only re-asserts the invariant rather than
+-- guessing at intent.
+update public.profiles set lc = true where stratcom and not lc;
+
+
+-- >>>>> supabase/migrations/0036_escalation_closeout.sql
+-- 0036_escalation_closeout.sql
+--
+-- Closing an escalated task now costs a sentence: what is being done so it
+-- does not happen again.
+--
+-- Decided by Dr Raghu, for ALL THREE LEVELS -- L1, L2 and L3 alike. The point
+-- is not the paperwork, it is that an escalation which is expensive to close
+-- is an escalation people think twice about raising. A record of causes is the
+-- second benefit, not the first.
+--
+-- WHY A TABLE RATHER THAN A COLUMN
+--
+-- A column on manual_tasks and another on erp_tasks would be two columns to
+-- keep in step, and the ERP ones are wiped and re-created by every ToDo
+-- upload -- the note would vanish with the row it lived on. This table is
+-- keyed by (task_id, task_kind) and outlives both.
+--
+-- COMPULSORY IS ENFORCED HERE, NOT ONLY IN THE FORM
+--
+-- The length check is what makes "compulsory" true. A required field in React
+-- is a suggestion the moment anything writes around it, and this is exactly
+-- the field somebody will want to skip at six o'clock. Fifteen characters is
+-- deliberately low: it stops "ok" and "done" without turning a genuine short
+-- answer -- "added to QC checklist" -- into a fight with the form.
+--
+-- Additive and safe to re-run.
+
+create table if not exists public.task_closeout (
+  id         uuid primary key default gen_random_uuid(),
+  task_id    text not null,
+  task_kind  text not null check (task_kind in ('erp', 'manual')),
+  /** The level it carried when it was closed, frozen -- the task's own esc
+      can be edited afterwards, and this has to stay the reason it was asked
+      for. */
+  esc        text,
+  body       text not null,
+  by         text,
+  at         timestamptz not null default now(),
+  constraint task_closeout_body_len check (length(btrim(body)) >= 15),
+  constraint task_closeout_once unique (task_id, task_kind)
+);
+
+comment on table public.task_closeout is
+  'Why an escalated task will not recur. Required to close one, at every level.';
+
+create index if not exists task_closeout_at_idx on public.task_closeout (at desc);
+
+alter table public.task_closeout enable row level security;
+
+-- Everyone signed in reads them: the whole value is that the answers are
+-- visible on the Escalations table, not filed somewhere.
+drop policy if exists task_closeout_read on public.task_closeout;
+create policy task_closeout_read on public.task_closeout
+  for select to authenticated
+  using (true);
+
+-- Writes go through /api/tasks with the service key, which is what checks that
+-- the task is actually escalated and actually being closed. No client-side
+-- insert policy, so nothing can write a close-out without going past that.
+
+
+-- >>>>> supabase/migrations/0037_on_floor.sql
+-- 0037_on_floor.sql
+--
+-- "On Floor" — is this job physically being worked on right now?
+--
+-- Nothing already on a job answers that. Kitting % is what has been bought,
+-- Production % is what has been built, and a job can sit at 40% built for six
+-- weeks with nobody touching it. Somebody has to say so, and only Stratcom
+-- may: it is a claim about capacity, and a board where anyone can mark
+-- anything as being worked on stops meaning anything by the second week.
+--
+-- SURVIVES UPLOADS. apply_jobs() names its columns explicitly rather than
+-- replacing the row, so a morning Jobmaster load leaves this untouched -- which
+-- it must, because the ERP has no idea and never will.
+--
+-- Additive and safe to re-run.
+
+alter table public.jobs add column if not exists on_floor    boolean not null default false;
+alter table public.jobs add column if not exists on_floor_at timestamptz;
+alter table public.jobs add column if not exists on_floor_by text;
+
+comment on column public.jobs.on_floor is
+  'Physically being worked on now. Set by Stratcom only; not from the ERP, which cannot know.';
+comment on column public.jobs.on_floor_at is
+  'When the flag was last changed -- a job "on the floor" since March is the thing worth noticing.';
+
+create index if not exists jobs_on_floor_idx on public.jobs (on_floor) where on_floor;
+
+-- Only Stratcom (or the owner) may set it.
+--
+-- Same shape as the group guard in 0034, and the auth.uid() test is
+-- load-bearing for the same reason: /api routes write with the service key,
+-- where auth.uid() is null and no is_owner()/profile lookup can succeed. A
+-- write carrying a JWT is a browser and must be Stratcom; a write without one
+-- is the server, which has already checked who is asking.
+create or replace function public.jobs_on_floor_stratcom_only()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.on_floor is distinct from old.on_floor
+     and auth.uid() is not null
+     and not coalesce(public.is_owner(), false)
+     and not exists (
+       select 1 from public.profiles p
+        where p.id = auth.uid() and coalesce(p.stratcom, false)
+     ) then
+    raise exception 'Only Stratcom may mark a job on the floor';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists jobs_on_floor_stratcom_only_trg on public.jobs;
+create trigger jobs_on_floor_stratcom_only_trg
+  before update on public.jobs
+  for each row execute function public.jobs_on_floor_stratcom_only();
+
+
+-- >>>>> supabase/migrations/0038_principles.sql
+-- 0038_principles.sql
+--
+-- The principles the company is run on, in one place everybody can open.
+--
+-- WHY A TABLE AND NOT A PAGE OF TEXT IN THE CODE
+--
+-- A principle hard-coded in a React file can only be changed by a deploy, so
+-- it never gets changed -- and a list of principles nobody has edited in a
+-- year is a list nobody is using. These are Dr Raghu's to write and rewrite
+-- from the screen.
+--
+-- Only the owner may write them, for the same reason the FY targets are his
+-- alone: a principle the board can edit is not a principle. Everybody signed
+-- in reads them.
+--
+-- Seeded with nothing. An empty page that says "none written yet" is honest;
+-- a page seeded with plausible-sounding management copy would put words in
+-- his mouth that the whole company would then read as his.
+--
+-- Additive and safe to re-run.
+
+create table if not exists public.principles (
+  id         uuid primary key default gen_random_uuid(),
+  /** Display order. Gaps are fine -- reordering rewrites these. */
+  ord        integer not null default 0,
+  title      text not null,
+  /** The explanation. A principle without one is a slogan. */
+  body       text not null default '',
+  active     boolean not null default true,
+  updated_at timestamptz not null default now(),
+  updated_by uuid references public.profiles(id),
+  constraint principles_title_len check (length(btrim(title)) >= 3)
+);
+
+comment on table public.principles is
+  'How the company is run, in Dr Raghu''s words. Owner writes, everybody reads.';
+
+create index if not exists principles_ord_idx on public.principles (active, ord);
+
+alter table public.principles enable row level security;
+
+drop policy if exists principles_read on public.principles;
+create policy principles_read on public.principles
+  for select to authenticated
+  using (true);
+
+-- Only the owner. Same helper the goals tier and the FY targets use.
+drop policy if exists principles_write on public.principles;
+create policy principles_write on public.principles
+  for all
+  using (coalesce(public.is_owner(), false))
+  with check (coalesce(public.is_owner(), false));
+
+
+-- >>>>> supabase/migrations/0039_principle_doc.sql
+-- 0039_principle_doc.sql
+--
+-- Principles, rebuilt. 0038 had this wrong.
+--
+-- 0038 gave Dr Raghu an empty list and a "+ Add a principle" button, which is
+-- not a feature -- it is homework. What he actually wants: he types the thinking
+-- roughly, in whatever order it arrives, and Genie organises it into something
+-- with a spine that everybody else can read and open up.
+--
+-- So the unit stored here is not a principle. It is a DOCUMENT: what he typed,
+-- and what Genie made of it. Two columns, both kept.
+--
+--   raw        exactly what he wrote. Never rewritten, never lost.
+--   structured what Genie organised it into, as jsonb.
+--
+-- KEEPING THE RAW TEXT IS THE POINT. The structure is a rendering of his
+-- thinking and can be regenerated -- a better model, a clearer prompt, a change
+-- of mind about the grouping. The thinking itself cannot be regenerated from
+-- the rendering, so it is stored beside it rather than thrown away once it has
+-- been tidied.
+--
+-- VERSIONED, never overwritten. One row is active; the others are what the
+-- principles used to say. A principle that was in force last year is part of
+-- how last year's decisions were made.
+--
+-- Additive and safe to re-run.
+
+-- 0038's table never held a row -- it shipped empty by design and this replaces
+-- it entirely. Dropped rather than left behind: a table nothing reads is a
+-- table somebody wires up by mistake in a year.
+drop table if exists public.principles;
+
+create table if not exists public.principle_doc (
+  id         uuid primary key default gen_random_uuid(),
+  version    integer not null default 1,
+  raw        text not null,
+  structured jsonb not null default '{}'::jsonb,
+  /** Which model organised it, so a change in the output can be explained. */
+  model      text,
+  active     boolean not null default false,
+  created_at timestamptz not null default now(),
+  created_by uuid references public.profiles(id),
+  constraint principle_doc_raw_len check (length(btrim(raw)) >= 20)
+);
+
+comment on table public.principle_doc is
+  'Dr Raghu''s principles: what he wrote, and what Genie organised it into. Versioned; one active.';
+
+create index if not exists principle_doc_active_idx on public.principle_doc (active, created_at desc);
+
+-- Exactly one active version at a time, enforced rather than remembered.
+create unique index if not exists principle_doc_one_active
+  on public.principle_doc ((true)) where active;
+
+alter table public.principle_doc enable row level security;
+
+-- Everybody signed in reads the principles. That is the entire point of them.
+drop policy if exists principle_doc_read on public.principle_doc;
+create policy principle_doc_read on public.principle_doc
+  for select to authenticated
+  using (true);
+
+-- Only the owner writes. Same rule as the FY targets: a principle the board
+-- can edit is not a principle.
+drop policy if exists principle_doc_write on public.principle_doc;
+create policy principle_doc_write on public.principle_doc
+  for all
+  using (coalesce(public.is_owner(), false))
+  with check (coalesce(public.is_owner(), false));
+
+
+-- >>>>> supabase/migrations/0040_on_floor_voice.sql
+-- 0040_on_floor_voice.sql
+--
+-- The On Floor page: who owns each job, and voice notes against it.
+--
+-- 1. QUALITY OWNER
+--
+--    jobs.own is the Planning Owner -- the person who owns the DATE. Quality is
+--    a different person with a different answer, and today the only way to know
+--    who is to ask. A second column rather than a shared "owners" text field,
+--    because two names in one box cannot be filtered, counted or notified.
+--
+-- 2. VOICE NOTES
+--
+--    Somebody standing at a machine will say what is happening. They will not
+--    type it. So: record, and keep BOTH the recording and its words -- the
+--    recording because tone carries what the transcript loses, the text because
+--    nobody scrubs through ninety seconds of audio to find out whether the
+--    part arrived.
+--
+--    THREE PER JOB, oldest dropped. Not a limitation -- the point. An unbounded
+--    log of voice notes is a thing nobody listens to; the last three are what
+--    is happening now. Enforced in the API, which knows the order.
+--
+--    THE AUDIO IS NOT IN THE DATABASE. It goes in a Storage bucket, which is
+--    object storage billed separately -- the table holds a path, a transcript
+--    and a summary, all of them text. Three notes on every one of 116 jobs is
+--    well under a hundred megabytes of objects, and not one row heavier here.
+--
+-- Additive and safe to re-run.
+
+alter table public.jobs add column if not exists quality_owner text;
+
+comment on column public.jobs.quality_owner is
+  'Who owns QUALITY on this job. jobs.own owns the date; this is a different question and usually a different person.';
+
+create table if not exists public.job_voice_note (
+  id         uuid primary key default gen_random_uuid(),
+  job_id     text not null,
+  /** Path inside the voice-notes bucket. The audio itself is never stored here. */
+  audio_path text,
+  /** Seconds. Shown before somebody commits to listening. */
+  seconds    integer,
+  /** What was said, as the browser heard it. May be empty if dictation was off. */
+  transcript text not null default '',
+  /** One line, so the table can be read without playing anything. */
+  summary    text not null default '',
+  by         text,
+  at         timestamptz not null default now()
+);
+
+comment on table public.job_voice_note is
+  'Voice notes against a job. Latest three per job are kept; the audio lives in Storage.';
+
+create index if not exists job_voice_note_job_idx on public.job_voice_note (job_id, at desc);
+
+alter table public.job_voice_note enable row level security;
+
+-- Everyone signed in reads them: a note nobody can hear is a note not worth
+-- recording. Writes go through /api/voice-note with the service key, which is
+-- what enforces the three-per-job rule -- so there is deliberately no insert
+-- policy for a browser to go around it.
+drop policy if exists job_voice_note_read on public.job_voice_note;
+create policy job_voice_note_read on public.job_voice_note
+  for select to authenticated
+  using (true);
+
+-- The bucket. Private: these are recordings of people talking about customers,
+-- so they are served through signed links rather than left open on a URL that
+-- would work for anybody who guessed it.
+insert into storage.buckets (id, name, public)
+values ('voice-notes', 'voice-notes', false)
+on conflict (id) do nothing;
+
+
+-- >>>>> supabase/migrations/0041_principle_files.sql
+-- 0041_principle_files.sql
+--
+-- Documents attached to the principles.
+--
+-- The principles page carries Dr Raghu's thinking as text. Some of it already
+-- exists as documents -- Breakthrough 2027, the manifesto, a one-pager somebody
+-- has to sign -- and asking him to retype those into the box would lose the
+-- formatting, the diagrams and the point.
+--
+-- NOT IN THE DATABASE. The files go in a Storage bucket, which is object
+-- storage billed apart from the database; this table holds a name, a path and
+-- a size, all of them small. The same split the voice notes use, for the same
+-- reason: rows stay cheap and the objects can be served straight to a browser.
+--
+-- PRIVATE BUCKET, SIGNED LINKS. These are internal documents about how the
+-- company is run. A public bucket would put them on a URL that works for
+-- anyone who has it, forever, including after somebody leaves.
+--
+-- Additive and safe to re-run.
+
+create table if not exists public.principle_file (
+  id     uuid primary key default gen_random_uuid(),
+  /** The name as uploaded, shown to readers. */
+  name   text not null,
+  /** A short line saying what it is. Optional -- a good filename often says it. */
+  note   text not null default '',
+  path   text not null,
+  mime   text,
+  bytes  bigint,
+  ord    integer not null default 0,
+  by     text,
+  at     timestamptz not null default now(),
+  constraint principle_file_name_len check (length(btrim(name)) >= 1)
+);
+
+comment on table public.principle_file is
+  'Documents shown alongside the principles. The files themselves live in the principle-docs bucket.';
+
+create index if not exists principle_file_ord_idx on public.principle_file (ord, at desc);
+
+alter table public.principle_file enable row level security;
+
+-- Everybody signed in reads the list. A document nobody can open is not a
+-- document, and the whole purpose of the page is that the company reads it.
+drop policy if exists principle_file_read on public.principle_file;
+create policy principle_file_read on public.principle_file
+  for select to authenticated
+  using (true);
+
+-- Writes go through /api/principles/files with the service key, which checks
+-- the caller is the owner. No client-side write policy, so a browser cannot go
+-- around that check.
+
+-- The bucket. Private, like the voice notes.
+insert into storage.buckets (id, name, public)
+values ('principle-docs', 'principle-docs', false)
+on conflict (id) do nothing;
+
+
+-- >>>>> supabase/migrations/0042_job_photos.sql
+-- 0042_job_photos.sql
+--
+-- Photographs of a job as it is built.
+--
+-- Production completion is a number somebody types. A photograph is not
+-- arguable: it says what the machine looked like on the day, and a row of them
+-- in date order is the build history nothing else in Genie holds.
+--
+-- Each photo carries the COMPLETION AT THE TIME IT WAS TAKEN, not a link to
+-- whatever the job says today. The percentage on a job moves; the photo does
+-- not. Storing the number beside the picture is what makes the pair mean
+-- something in six weeks -- "70% on 12 August" rather than "70%, taken at some
+-- point".
+--
+-- IN STORAGE, NOT IN THE DATABASE. Photographs are the largest thing Genie
+-- will ever hold and would dwarf every table in it. The bucket is billed apart
+-- from the database; this table holds a path, a caption and a number.
+--
+-- Dr Raghu's intention is to move these to Google Drive later. Nothing here
+-- blocks that: the row keeps a path and a bucket, so a move becomes a copy
+-- plus a rewrite of one column rather than a re-modelling.
+--
+-- Additive and safe to re-run.
+
+create table if not exists public.job_photo (
+  id      uuid primary key default gen_random_uuid(),
+  job_id  text not null,
+  path    text not null,
+  /** What it shows. Optional -- a photograph often says it. */
+  caption text not null default '',
+  /** Production completion on the day it was taken. Frozen on purpose. */
+  pct     integer,
+  mime    text,
+  bytes   bigint,
+  /** The day the photo is OF, which is not always the day it was uploaded. */
+  taken_on date not null default (now() at time zone 'Asia/Kolkata')::date,
+  by      text,
+  at      timestamptz not null default now(),
+  constraint job_photo_pct_range check (pct is null or (pct >= 0 and pct <= 100))
+);
+
+comment on table public.job_photo is
+  'The build history of a job in pictures. Files live in the job-photos bucket; pct is frozen at the moment of the photo.';
+
+create index if not exists job_photo_job_idx on public.job_photo (job_id, taken_on desc, at desc);
+
+alter table public.job_photo enable row level security;
+
+-- Everybody signed in looks at them. A photo nobody can see is not evidence.
+drop policy if exists job_photo_read on public.job_photo;
+create policy job_photo_read on public.job_photo
+  for select to authenticated
+  using (true);
+
+-- Writes go through /api/job-photo with the service key, which is what checks
+-- the caller and cleans up an object whose row failed to save.
+
+-- Private, like the voice notes: these are photographs of customer equipment.
+insert into storage.buckets (id, name, public)
+values ('job-photos', 'job-photos', false)
+on conflict (id) do nothing;
+
+
+-- >>>>> supabase/migrations/0043_floor_summary.sql
+-- 0043_floor_summary.sql
+--
+-- What the floor is saying about a job, in one paragraph.
+--
+-- Three voice notes is three separate accounts of the same job. Somebody
+-- reading the page wants the position, not a transcript each -- so Genie reads
+-- the last three together and writes the state of play, and the recordings sit
+-- underneath for anybody who wants to hear it said.
+--
+-- Written when a note is recorded, not when the page is read. A summary
+-- generated per page load would be an Anthropic call for every job on screen,
+-- every time anybody opened the tab -- slow, expensive, and different each
+-- time for no reason.
+--
+-- On `jobs` rather than its own table: there is exactly one current summary per
+-- job, it is replaced rather than accumulated, and a table with a single row
+-- per job and no history is a column.
+--
+-- Additive and safe to re-run.
+
+alter table public.jobs add column if not exists floor_summary    text;
+alter table public.jobs add column if not exists floor_summary_at timestamptz;
+
+comment on column public.jobs.floor_summary is
+  'Genie''s read of the last three voice notes. Rewritten whenever a new one is recorded.';
+comment on column public.jobs.floor_summary_at is
+  'When it was last rewritten -- so a summary older than the newest note can be spotted.';
+
+
+-- >>>>> supabase/migrations/0044_task_proposals.sql
+-- 0044_task_proposals.sql
+--
+-- Tasks Genie hears in a shop-floor voice note -- PROPOSED, never created.
+--
+-- WHY PROPOSALS AND NOT TASKS
+--
+-- A task list is only worth opening if everything on it was put there on
+-- purpose. The fastest way to make one untrustworthy is to have things appear
+-- in it that nobody asked for: within a fortnight people stop reading the list
+-- and start asking each other what is actually needed, which is the problem
+-- the list existed to solve.
+--
+-- So Genie proposes and a person accepts. Accepting creates an ordinary task,
+-- indistinguishable from a typed one, and the proposal records which task it
+-- became. Dismissing keeps the proposal with its reason -- a suggestion
+-- rejected twice for the same reason is a prompt that needs fixing, and that
+-- is only visible if the rejections are kept.
+--
+-- ONE TASK PER PROPOSAL. Dr Raghu's word: singular. "Chase the gearbox and
+-- call Monopol" is two, and two things on one line is the line nobody can
+-- close.
+--
+-- Additive and safe to re-run.
+
+create table if not exists public.task_proposal (
+  id        uuid primary key default gen_random_uuid(),
+  job_id    text not null,
+  /** Where it came from -- today always a voice note. */
+  source    text not null default 'voice',
+  source_id uuid,
+  title     text not null,
+  detail    text not null default '',
+  cat       text,
+  /** What Genie heard as the deadline, if anything was said. */
+  due       date,
+  status    text not null default 'proposed'
+            check (status in ('proposed', 'accepted', 'dismissed')),
+  /** The task it became, once somebody accepted it. */
+  task_id   uuid,
+  acted_by  text,
+  acted_at  timestamptz,
+  /** Why it was turned down. A pattern here is a prompt worth changing. */
+  reason    text,
+  at        timestamptz not null default now(),
+  constraint task_proposal_title_len check (length(btrim(title)) >= 3)
+);
+
+comment on table public.task_proposal is
+  'Tasks Genie heard in a voice note. Proposed only -- a person accepts before anything reaches a task list.';
+
+create index if not exists task_proposal_open_idx
+  on public.task_proposal (job_id, at desc) where status = 'proposed';
+
+alter table public.task_proposal enable row level security;
+
+-- Everybody signed in sees them; they are about work on the shop floor.
+drop policy if exists task_proposal_read on public.task_proposal;
+create policy task_proposal_read on public.task_proposal
+  for select to authenticated
+  using (true);
+
+-- Accept and dismiss go through /api/task-proposal with the service key, which
+-- is what creates the task and links it back. No client-side write policy.
+
+
+-- >>>>> supabase/migrations/0045_feature_requests.sql
+-- 0045_feature_requests.sql
+--
+-- Asking for something in Genie, inside Genie.
+--
+-- Requests currently arrive as a sentence in a chat, a screenshot, or a
+-- remark on a call, and the ones that are not acted on the same day are
+-- gone. This gives them somewhere to sit with what was actually meant --
+-- the words, a picture of the screen, and how badly it is wanted.
+--
+-- WANT IS A FIELD, NOT A TONE. "Must have", "Good to have" and "Future
+-- potential" are stated by the person asking rather than inferred from how
+-- forcefully they asked. Everything sounds urgent in the sentence it is
+-- written in; almost nothing is, and the person asking knows which.
+--
+-- Anyone signed in may raise one and read the rest. A backlog only the person
+-- who owns it can see is a list nobody else stops duplicating.
+--
+-- Additive and safe to re-run.
+
+create table if not exists public.feature_request (
+  id       uuid primary key default gen_random_uuid(),
+  title    text not null,
+  /** Rich text, stored as a small allow-list of HTML the API enforces. */
+  body     text not null default '',
+  want     text not null default 'good'
+           check (want in ('must', 'good', 'future')),
+  status   text not null default 'open'
+           check (status in ('open', 'planned', 'done', 'declined')),
+  /** Why it was declined, or what it shipped as. */
+  note     text not null default '',
+  by       text,
+  at       timestamptz not null default now(),
+  acted_by text,
+  acted_at timestamptz,
+  constraint feature_request_title_len check (length(btrim(title)) >= 3)
+);
+
+comment on table public.feature_request is
+  'Asks for Genie. Raised by anyone signed in; status is the owner''s to set.';
+
+create index if not exists feature_request_open_idx on public.feature_request (status, want, at desc);
+
+create table if not exists public.feature_file (
+  id      uuid primary key default gen_random_uuid(),
+  req_id  uuid not null references public.feature_request(id) on delete cascade,
+  name    text not null,
+  path    text not null,
+  mime    text,
+  bytes   bigint,
+  at      timestamptz not null default now()
+);
+
+create index if not exists feature_file_req_idx on public.feature_file (req_id);
+
+alter table public.feature_request enable row level security;
+alter table public.feature_file enable row level security;
+
+drop policy if exists feature_request_read on public.feature_request;
+create policy feature_request_read on public.feature_request
+  for select to authenticated using (true);
+
+drop policy if exists feature_file_read on public.feature_file;
+create policy feature_file_read on public.feature_file
+  for select to authenticated using (true);
+
+-- Writes go through /api/feature with the service key: it sanitises the HTML,
+-- stamps who asked, and refuses a status change from anyone but the owner.
+
+-- Screenshots. Private -- they are pictures of the company's own boards.
+insert into storage.buckets (id, name, public)
+values ('feature-files', 'feature-files', false)
+on conflict (id) do nothing;
+
+
+-- >>>>> supabase/migrations/0046_job_owners.sql
+-- 0046_job_owners.sql
+--
+-- Three more owners on a job: production, kitting and design.
+--
+-- jobs.own is the PLANNING owner -- the person who owns the DATE, and the only
+-- one the ERP knows about. Quality arrived in 0040. These three complete the
+-- set, because "who do I ring about this" has four different answers depending
+-- on what has gone wrong, and today the only way to find out is to ask.
+--
+-- SEPARATE COLUMNS, not one "owners" text field. Two names in a box cannot be
+-- filtered, counted, notified or reassigned; four names in a box is a note to
+-- self. Each of these is a person the system can eventually send something to.
+--
+-- Genie's own, like quality_owner: the ERP has no column for any of them, so
+-- /api/job-field marks them genieOnly and never queues them for export. They
+-- survive the morning upload because apply_jobs names the columns it writes.
+--
+-- Additive and safe to re-run.
+
+alter table public.jobs add column if not exists production_owner text;
+alter table public.jobs add column if not exists kitting_owner    text;
+alter table public.jobs add column if not exists design_owner     text;
+
+comment on column public.jobs.production_owner is 'Who owns building it. Genie''s own field -- not from the ERP.';
+comment on column public.jobs.kitting_owner    is 'Who owns getting the material in. Genie''s own field.';
+comment on column public.jobs.design_owner     is 'Who owns the drawings and the release. Genie''s own field.';
+
+
+-- >>>>> supabase/migrations/0047_hrms.sql
+-- 0047_hrms.sql
+--
+-- HRMS — the people side of Genie, at /hrms.
+--
+-- A SEPARATE SPACE, NOT A TAB. It has its own URL because it is a different
+-- kind of thing from the planning boards: the boards are about jobs and are
+-- read by everybody, and this is about people and is read by three.
+--
+-- Three tables and one policy change:
+--
+--   hrms_access       — who may open it. Keyed by EMAIL, not by profile id,
+--                       which is the one difference from sales_access (0013)
+--                       and it is deliberate: hr@nandan.co.in has no Genie
+--                       login yet, and a grant that cannot be written until
+--                       the account exists is a grant somebody forgets to
+--                       write. The row waits; the moment the account is
+--                       created it is already admitted.
+--
+--   employee_edits    — the OVERLAY. `employees` is fed by the HR sheet and
+--                       every upload upserts it wholesale (upload-merge.ts),
+--                       so anything typed into a sheet-carried column would be
+--                       silently overwritten the next morning. Instead an edit
+--                       is stored here, per field, and applied on READ. The
+--                       sheet keeps its value; HRMS shows the edited one and
+--                       says what the sheet still holds. Fields the sheet does
+--                       not carry at all (phone, emergency contact, blood
+--                       group) live here too, by the same mechanism.
+--
+--   employee_edit_log — append-only history: field, from, to, who, when.
+--                       "History of changes" is not a nice-to-have on a people
+--                       record; it is the whole reason anybody trusts one.
+--
+-- ASCII-safe wording in code, additive, safe to re-run.
+
+-- ---------------------------------------------------------------------------
+-- 1. Who may open HRMS
+-- ---------------------------------------------------------------------------
+create table if not exists public.hrms_access (
+  email      text primary key,
+  granted_by text,
+  granted_at timestamptz not null default now()
+);
+
+comment on table public.hrms_access is
+  'Who may open /hrms. Email-keyed so a grant can be made before the account '
+  'exists. The owner is admitted implicitly and is not stored here.';
+
+alter table public.hrms_access enable row level security;
+
+-- No select policy: the check runs server-side with the service key
+-- (requireHrms). A browser has no business enumerating who can see HR data.
+
+-- ---------------------------------------------------------------------------
+-- 2. The overlay on the employee master
+-- ---------------------------------------------------------------------------
+create table if not exists public.employee_edits (
+  employee_id text not null references public.employees (id) on delete cascade,
+  field       text not null,
+  value       text,
+  edited_by   text,
+  edited_at   timestamptz not null default now(),
+  primary key (employee_id, field)
+);
+
+comment on table public.employee_edits is
+  'Per-field overlay on public.employees. Applied on read by /api/hrms. The '
+  'HR-sheet upload never touches this table, so an edit survives the next '
+  'morning upload.';
+
+create index if not exists employee_edits_field_idx on public.employee_edits (field);
+
+alter table public.employee_edits enable row level security;
+-- Deliberately no policies. Personal telephone numbers, addresses and next of
+-- kin are in here; they are served only through the HRMS routes, which check
+-- hrms_access first.
+
+-- ---------------------------------------------------------------------------
+-- 3. History
+-- ---------------------------------------------------------------------------
+create table if not exists public.employee_edit_log (
+  id          uuid primary key default gen_random_uuid(),
+  employee_id text not null,
+  field       text not null,
+  old_value   text,
+  new_value   text,
+  edited_by   text,
+  edited_at   timestamptz not null default now()
+);
+
+comment on table public.employee_edit_log is
+  'Append-only record of every change made in HRMS. Never updated, never '
+  'deleted -- a people record with no history is worth nothing in a dispute.';
+
+create index if not exists employee_edit_log_emp_idx
+  on public.employee_edit_log (employee_id, edited_at desc);
+
+alter table public.employee_edit_log enable row level security;
+-- service role only, as above.
+
+-- ---------------------------------------------------------------------------
+-- 4. Close the employee master to the browser
+-- ---------------------------------------------------------------------------
+-- 0024 gave public.employees a read policy for every signed-in user, on the
+-- grounds that birthdays are for everyone. They are -- but the birthday list
+-- is built SERVER-SIDE in /api/my-week with the service key, and nothing in
+-- the browser has ever queried this table. The policy therefore protected
+-- nothing and permitted a signed-in person to pull all 364 rows, dates of
+-- birth and joining included, straight from PostgREST with the anon key.
+--
+-- Verified before removing: the only readers are /api/my-week (service key)
+-- and upload-merge.ts (service key). Both are unaffected.
+drop policy if exists employees_read on public.employees;
+
+comment on table public.employees is
+  'Active-employee master, uploaded from the HR sheet. Service-role reads '
+  'only (0047) -- reached through /api/my-week for birthdays and through the '
+  'HRMS routes for everything else. Edits live in public.employee_edits.';
+
+-- ---------------------------------------------------------------------------
+-- 5. Seed: the three people HRMS is for
+-- ---------------------------------------------------------------------------
+-- hr@nandan.co.in is the HR Manager's address on the employee master and has
+-- no Genie login yet. The grant is written anyway -- see the note at the top.
+insert into public.hrms_access (email, granted_by)
+values
+  ('raghu@nandan.co.in',  'migration 0047'),
+  ('tushar@nandan.co.in', 'migration 0047'),
+  ('hr@nandan.co.in',     'migration 0047')
+on conflict (email) do nothing;
+

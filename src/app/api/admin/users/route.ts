@@ -69,6 +69,15 @@ export async function GET() {
       for (const g of grants || []) salesIds.add(g.person_id as string);
     } catch { /* pre-0013 */ }
 
+    // HRMS grants. Keyed by EMAIL rather than by id (migration 0047), so a
+    // grant can be written before the account exists -- hr@nandan.co.in was
+    // granted on the day the module shipped and had no login yet.
+    const hrmsEmails = new Set<string>();
+    try {
+      const { data: hg } = await admin.from("hrms_access").select("email");
+      for (const g of hg || []) hrmsEmails.add(String(g.email || "").toLowerCase());
+    } catch { /* pre-0047 */ }
+
     // Last sign-in lives in auth.users, not profiles, so it comes from the
     // admin auth API. Failure here must not take the page down — the column
     // simply reads "—".
@@ -105,6 +114,10 @@ export async function GET() {
         sales_access: salesIds.has(u.id) || String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         sales_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         last_sign_in_at: lastSeen.get(u.id) ?? null,
+        hrms_access:
+          hrmsEmails.has(String(u.email || "").toLowerCase()) ||
+          String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        hrms_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         goals_level:
           String(u.email || "").toLowerCase() === RAGHU_EMAIL
             ? "edit"
@@ -305,6 +318,43 @@ export async function POST(req: Request) {
         }
       } else {
         const { error } = await admin.from("sales_access").delete().eq("person_id", body.id);
+        if (error) throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    /**
+     * { action: "hrms_access", id, grant } — owner only.
+     *
+     * Not routed through guardTarget() for the same reason "groups" is not:
+     * the owner check below is the stricter of the two, and the people most
+     * likely to be given HR access are admins, whom guardTarget would refuse
+     * to touch. HRMS holds dates of birth, home addresses and next of kin --
+     * who may read that is not an ordinary admin's decision.
+     */
+    if (body.action === "hrms_access") {
+      if (!caller.isOwner)
+        throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant HRMS.`);
+      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+      const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
+      const target = String(t?.email || "").toLowerCase();
+      if (!target) return NextResponse.json({ error: "no such user" }, { status: 404 });
+      if (target === RAGHU_EMAIL)
+        return NextResponse.json(
+          { error: "The owner holds HRMS implicitly — there is nothing to tick." },
+          { status: 400 },
+        );
+      if (body.grant) {
+        const { error } = await admin
+          .from("hrms_access")
+          .upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
+        if (error) {
+          if (/hrms_access|schema cache|does not exist/i.test(error.message))
+            return NextResponse.json({ error: "Run migration 0047 first — the HRMS tables don't exist yet" }, { status: 400 });
+          throw new Error(error.message);
+        }
+      } else {
+        const { error } = await admin.from("hrms_access").delete().eq("email", target);
         if (error) throw new Error(error.message);
       }
       return NextResponse.json({ ok: true });

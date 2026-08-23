@@ -129,6 +129,24 @@ export async function requireStratcom(): Promise<AuthedUser> {
   return u;
 }
 
+/**
+ * HRMS — the people records, at /hrms.
+ *
+ * Granted per person and to nobody by default (migration 0047). Not a role:
+ * the three people who hold it today are an owner, a director and an HR
+ * manager, and no role in this app describes that set.
+ *
+ * The check is here and on every /api/hrms route, not only on the page. A
+ * hidden link is not a gate.
+ */
+export async function requireHrms(): Promise<AuthedUser> {
+  const u = await requireUser();
+  const { resolveHrmsAccess } = await import("./hrms");
+  if (!(await resolveHrmsAccess(adminClient(), u.email, u.isOwner)))
+    throw new HttpError(403, "HRMS holds people records. Ask Dr Raghu for access.");
+  return u;
+}
+
 /** uploader or admin — the upload door. */
 export const requireUploader = () => requireRole("uploader", "admin");
 
