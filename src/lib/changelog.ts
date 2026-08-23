@@ -75,6 +75,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.0.0",
+    date: "2026-08-23",
+    module: "IDP Discussion — Individual, at genie.nandan.co.in/idp",
+    items: [
+      "A NEW SPACE, AND THE FIRST ONE EVERYBODY CAN REACH. HRMS is for three people; the IDP is for everybody who works here, opened with the Genie login they already have. Nobody signs into HRMS to fill in their own development plan.",
+      "THEY SEE THEIR OWN AND ONLY THEIR OWN. Every query behind the page is scoped to the caller's own email — there is no parameter that could name somebody else, so no request exists that would return a colleague's IDP. HR and the owner read them through HRIS.",
+      "THE WELCOME SCREEN IS DR RAGHU'S OWN WORDING, and it is not decoration: an hour, a quiet room, three deep breaths and a glass of water, asked for before anybody begins. The difference between an IDP worth reading and a form filled in between two meetings is entirely in how it was approached.",
+      "“Once you start it has to be completed else you will begin all over again” — so it is. Starting clears any abandoned attempt and begins afresh. Answers are still saved as they are typed, because a closed laptop should not cost ninety minutes of thinking; but an unsubmitted session is not an IDP and is never read as one.",
+      "CONSENT IS RECORDED WITH ITS WORDING, not merely as a tick. The exact sentence agreed to and the moment it was agreed are stored on the row. A consent whose wording nobody kept is not evidence of anything.",
+      "THE ROLE'S EXPECTATION SITS AT THE TOP WHILE THEY WRITE — the summary of Dr Raghu's spoken note for their role, so they are answering against what the company has actually said it wants, not against a blank page. It is COPIED onto the IDP at the moment of filling rather than looked up later: the role may be rewritten next year, and what somebody was answering against must not change afterwards.",
+      "THE QUESTIONS COME FROM NANDAN'S OWN IDP SHEET, not from a template — accountability, the KPIs that matter, this month's tasks, quarterly goals, the support needed, what is in the way, learning goals, where they want to be, what they delivered, what they under-delivered on and why, a problem solved without escalating, and the one thing they would fix. Plus the eleven rated dimensions the sheet already uses, rated against what the ROLE needs rather than against the people around them.",
+      "IT WILL NOT LET SOMEBODY SUBMIT A HALF-ANSWERED ONE, and it says exactly how many questions and ratings are left. Answers that are too short to be answers are flagged while they are typed.",
+      "Migration 0053.",
+    ],
+  },
+  {
     v: "3.19.2.3",
     date: "2026-08-23",
     module: "HRIS — HR writes, the owner agrees",
