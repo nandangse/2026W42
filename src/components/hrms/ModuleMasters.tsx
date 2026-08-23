@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { MASTERS } from "@/lib/hrms";
+import CompetencyMaster from "./CompetencyMaster";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
 
@@ -117,7 +118,7 @@ export default function ModuleMasters({ who }: { who: string }) {
               }}>
               <span className="truncate">{m.label}</span>
               <span className="ml-auto tnum" style={{ fontSize: 10, opacity: 0.7 }}>
-                {(masters[m.kind] || []).length}
+                {m.special === "competency" ? "" : (masters[m.kind] || []).length}
               </span>
             </button>
           ))}
@@ -125,6 +126,7 @@ export default function ModuleMasters({ who }: { who: string }) {
 
         {/* the list itself */}
         <div style={{ flex: 1, minWidth: 320 }}>
+          {spec.special === "competency" ? <CompetencyMaster note={spec.note} /> : (
           <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line }}>
             <div className="font-bold text-sm">{spec.label}</div>
             {spec.note && <div style={{ fontSize: 11, color: C.faint, lineHeight: 1.5, marginTop: 2 }}>{spec.note}</div>}
@@ -172,6 +174,7 @@ export default function ModuleMasters({ who }: { who: string }) {
               })}
             </div>
           </div>
+          )}
         </div>
       </div>
     </Pane>

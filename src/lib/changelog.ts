@@ -75,6 +75,23 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.2.0",
+    date: "2026-08-23",
+    module: "HRIS — Role Clarity and Competency, on the person",
+    items: [
+      "EVERY ROLE IS MAPPED. 736 competency requirements across all 91 written roles — between 6 and 10 each, none fewer, none more. A Prod - Helper gets Following Instructions, Material Handling, Tool Care and safety at level 2 to 3; a Sr Manager - Quality Control gets Quality Standards and Root Cause Analysis at 5.",
+      "COMPETENCIES ARE IN MODULE MASTERS, where somebody looks for the list of things they can choose from. All 68, by family, each with its definition editable in place. The difference from every other master is the DEFINITION: a competency is a word five people would read five ways, and written down once for the whole company it can be argued with.",
+      "Deleting one is REFUSED while anything uses it, and says how many roles and how many people. Otherwise a single delete would quietly take it off every role and every record at once.",
+      "TWO NEW TABS ON A PERSON'S RECORD.",
+      "ROLE CLARITY DOCUMENT — everything the company has written about what this person is for, on one printable page: each role they hold, its job description, its deliverable, its metric, and the Managing Director's own recording. It is the document to put on the table in a one-to-one, and until now it existed only in pieces. Somebody with two roles gets both.",
+      "COMPETENCY — what they must be able to DO. BUILT, not stored: their roles' requirements plus anything HR adds for them alone, with a hand-set level winning over the role's. The role's list is never copied onto the person, because roles change and a copy would go stale in silence.",
+      "HR CAN ADD OR REMOVE FROM EITHER END — on the role, for everybody who holds it, or on one person. A fitter who drives the forklift, a storekeeper who handles cash: real, used, and belonging on the record rather than in somebody's head.",
+      "BUT REMOVING ON A PERSON ONLY EVER REMOVES WHAT WAS ADDED THERE. A competency the role requires cannot be taken off one record — that would be disagreeing with the role definition one person at a time. Change the role, or set a different level for that person and let the record show the difference.",
+      "Where two roles ask for the same competency, the HIGHER bar is the bar.",
+      "Migration 0058.",
+    ],
+  },
+  {
     v: "3.20.1.7",
     date: "2026-08-23",
     module: "HRIS — competencies for a shop floor, not a framework",

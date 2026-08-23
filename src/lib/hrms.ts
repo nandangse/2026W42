@@ -124,7 +124,9 @@ export function onRoll(value: Record<string, string | null>): boolean {
  * set of them is not something to add to casually, because payroll and the
  * statutory filings both read it.
  */
-export const MASTERS: { kind: string; label: string; note?: string; fixed?: boolean }[] = [
+export const MASTERS: { kind: string; label: string; note?: string; fixed?: boolean; special?: "competency" }[] = [
+  { kind: "competency", label: "Competencies", special: "competency",
+    note: "What somebody must be ABLE TO DO. Each carries a definition as well as a name — the name alone is a word people would each read differently, which is the thing a master exists to prevent. Roles point at these and set the level they need." },
   { kind: "department", label: "Department" },
   { kind: "grade", label: "Grade", note: "Empty until the Goalbook's grades are brought in — deliberately not guessed at." },
   { kind: "status", label: "Status", fixed: true, note: "Decides who is on the roll." },

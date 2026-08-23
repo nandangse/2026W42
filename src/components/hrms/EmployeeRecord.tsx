@@ -23,6 +23,7 @@ import { APP_VERSION } from "@/lib/changelog";
 import { fmtFull } from "@/lib/schedule";
 import { FIELD_GROUPS, ALL_FIELDS, onRoll, tenure, splitMulti, joinMulti, type FieldSpec, type HrmsEmployee } from "@/lib/hrms";
 import { C, type GenieUser } from "./RecordFields";
+import { RoleClarity, PersonCompetency } from "./PersonRoleAndCompetency";
 
 interface HistoryRow {
   id: string; field: string; label: string;
@@ -179,6 +180,16 @@ export default function EmployeeRecord({
             {g.confidential && <span style={{ marginLeft: 4, color: tab === g.key ? "#F5B32B" : "#B3261E" }}>•</span>}
           </button>
         ))}
+        <button onClick={() => setTab("__clarity__")}
+          className="text-xs font-bold rounded px-2.5 py-1.5"
+          style={tab === "__clarity__" ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
+          Role Clarity Document
+        </button>
+        <button onClick={() => setTab("__competency__")}
+          className="text-xs font-bold rounded px-2.5 py-1.5"
+          style={tab === "__competency__" ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
+          Competency
+        </button>
         <button onClick={() => setTab("history")}
           className="text-xs font-bold rounded px-2.5 py-1.5"
           style={tab === "history" ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
@@ -216,6 +227,12 @@ export default function EmployeeRecord({
             ))}
           </>
         )}
+
+        {tab === "__clarity__" && e && (
+          <RoleClarity employeeId={id} roles={splitMulti(e.value.role)} />
+        )}
+
+        {tab === "__competency__" && <PersonCompetency employeeId={id} />}
 
         {tab === "history" && (
           <>
