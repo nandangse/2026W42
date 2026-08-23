@@ -75,6 +75,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.5.0",
+    date: "2026-08-23",
+    module: "IDP — the manager's side: read, rate, then the money, then speak",
+    items: [
+      "MY TEAM'S IDPS, at /idp. A manager sees their own IDP and everyone CASCADED below them — the same reports_to walk Team Goals uses, the whole tree and not just direct reports — with each person's state plain: not submitted yet, waiting for your review, reviewed.",
+      "AND NOBODY REVIEWS OTHERS BEFORE FINISHING THEIR OWN. The team list opens only once your own IDP is submitted — reviewing others before facing the questions yourself is not on. Dr Raghu is exempt and sees everyone at any time.",
+      "THE REVIEW RUNS ONE WAY, and the order is the design: READ what the person wrote — every answer and recording, but NEVER their self-ratings and NEVER the salary they asked for, because two independent ratings are only worth having if they are independent. Then RATE them on the same eleven dimensions, 1 to 10.",
+      "ONLY WHEN ALL ELEVEN ARE RATED does the person's CURRENT GROSS appear — the number is earned by finishing the judgement, so it cannot colour it. Then: WHAT SHOULD THEIR MONTHLY GROSS BE NOW — prefilled with today's figure, so no change is a decision somebody made, not a box somebody skipped.",
+      "The person's own asked-for salary box now starts at their current gross too, for the same reason.",
+      "THEN THE MANAGER SPEAKS — a compulsory voice note on how this person becomes more useful to the company, written out into the box like every other recording, with room to add more. Submit refuses without it.",
+      "ON SUBMIT, A GROWTH NOTE IS WRITTEN AND SHOWN — the CHRO's one page: where they stand, strengths to use more, gaps that matter (where self-view and manager-view diverge it says so, without quoting either side's numbers), what they should do in the next 90 days, what the company should do, and a line to open the one-to-one with. Kept on the review.",
+      "The self-ratings and asked-for figures are stripped from the reviewer ON THE SERVER, not hidden by the page.",
+      "Migration 0060.",
+    ],
+  },
+  {
     v: "3.20.4.2",
     date: "2026-08-23",
     module: "IDP — the video is in, and nobody starts unprepared",

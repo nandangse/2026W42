@@ -19,6 +19,7 @@ import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, CONSENT_TEXT, WA
 import DictateBox from "./DictateBox";
 import IdpMyRecord, { type MyRecord } from "./IdpMyRecord";
 import IdpFinal, { type SalaryRow, type Attachment } from "./IdpFinal";
+import { TeamList, TeamReview, type TeamRow } from "./IdpTeamReview";
 import { RichTextView } from "./hrms/RichText";
 
 const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
@@ -63,6 +64,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
    * Reaching it does NOT discard anything. Starting again does, and says so.
    */
   const [showIntro, setShowIntro] = useState(false);
+  const [reviewRow, setReviewRow] = useState<TeamRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -126,6 +128,9 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
             </span>
           </div>
           {msg && <div className="mt-3 text-sm font-semibold" style={{ color: C.red }}>{msg}</div>}
+
+          <TeamList onOpen={setReviewRow} />
+          {reviewRow && <TeamReview row={reviewRow} onClose={() => { setReviewRow(null); }} />}
 
           <div className="mt-6">
             {IDP_SECTIONS.filter((sec) => !sec.leadersOnly || state.isLeader).map((sec) => (
@@ -312,6 +317,9 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
         )}
         </>
         )}
+
+        <TeamList onOpen={setReviewRow} />
+        {reviewRow && <TeamReview row={reviewRow} onClose={() => setReviewRow(null)} />}
 
         {state.role && (
           <div className="mt-8 rounded-lg p-3" style={{ background: "#F4F2EC" }}>

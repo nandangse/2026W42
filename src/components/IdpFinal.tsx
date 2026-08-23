@@ -196,13 +196,13 @@ export default function IdpFinal({
           What Gross Monthly Salary should the company pay you? <span style={{ color: C.faint, fontWeight: 400 }}>(Optional)</span>
         </div>
         <div style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.6, marginTop: 2 }}>
-          Not a demand and not a promise — a number you believe is right, next to the value you have just described.
-          Leave it empty if you would rather not say.
+          It starts at what you are paid today — change it to the number you believe is right, next to the value
+          you have just described, or leave it as it is.
         </div>
         <div className="flex items-center gap-2 mt-2">
           <span style={{ fontSize: 15, fontWeight: 700 }}>Rs</span>
           <input
-            defaultValue={answers["ask_gross"] || ""}
+            defaultValue={answers["ask_gross"] || String(salary?.find((r) => r.label === "Total Gross Salary (A)")?.monthly ?? "")}
             inputMode="numeric"
             placeholder="per month"
             onBlur={(e) => setAnswer("ask_gross", e.target.value.replace(/[^0-9]/g, ""))}

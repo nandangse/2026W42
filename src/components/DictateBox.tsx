@@ -33,7 +33,7 @@ const C = { line: "#E2E0DA", dim: "#5A6672", faint: "#8A94A0", orange: "#E8600A"
 export interface Recording { url: string | null; seconds: number | null; at: string; transcript?: string | null }
 
 export default function DictateBox({
-  value, onChange, rows = 5, placeholder, disabled, idpId, qid, recordings = [], onRecorded,
+  value, onChange, rows = 5, placeholder, disabled, idpId, qid, recordings = [], onRecorded, uploadKind, uploadUrl,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -43,6 +43,9 @@ export default function DictateBox({
   /** Needed to store the audio. Without them it still dictates, just no audio. */
   idpId?: string;
   qid?: string;
+  /** Where the recording goes. Default: the person's own IDP. */
+  uploadKind?: string;
+  uploadUrl?: string;
   recordings?: Recording[];
   onRecorded?: (r: Recording) => void;
 }) {
@@ -91,12 +94,13 @@ export default function DictateBox({
     if (blob && blob.size && idpId && qid) {
       try {
         const fd = new FormData();
+        if (uploadKind) fd.append("kind", uploadKind);
         fd.append("id", idpId);
         fd.append("qid", qid);
         fd.append("seconds", String(seconds));
         fd.append("transcript", said);
         fd.append("file", new File([blob], "note.webm", { type: blob.type || "audio/webm" }));
-        const r = await fetch("/api/idp", { method: "POST", body: fd });
+        const r = await fetch(uploadUrl || "/api/idp", { method: "POST", body: fd });
         const j = await r.json();
         if (r.ok) onRecorded?.({ url: j.url, seconds: j.seconds, at: new Date().toISOString(), transcript: said });
       } catch { /* the words are saved; the audio is the bonus */ }
