@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.2.1",
+    date: "2026-08-23",
+    module: "IDP — the instructions stay reachable",
+    items: [
+      "ONCE AN IDP WAS OPEN THERE WAS NO WAY BACK TO THE FIRST PAGE, and that was wrong. The welcome page is not a splash screen to get past — it is the page that says take three deep breaths and a glass of water, that asks for an hour of real attention, and that carries the words somebody consented to. Anybody should be able to read it again: the next morning, or before deciding to carry on.",
+      "“← THE INSTRUCTIONS” now sits beside the step numbers and goes back to it. Nothing is discarded and nothing is lost — the page saves first, then shows.",
+      "FROM THERE, TWO WAYS ON: carry on where you left off, or start again from an empty page. Starting again says plainly that everything written is thrown away and cannot be got back, and asks once more before it does it. That is the rule as stated — “once you start it has to be completed else you will begin all over again” — but nobody should meet that rule by accident.",
+      "The welcome page also now says when something is already open, rather than pretending this is a fresh visit.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.2.0",
     date: "2026-08-23",
     module: "HRIS — Role Clarity and Competency, on the person",

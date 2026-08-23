@@ -43,6 +43,18 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     isLeader?: boolean;
   } | null>(null);
   const [consent, setConsent] = useState(false);
+  /**
+   * THE INSTRUCTIONS MUST STAY REACHABLE.
+   *
+   * Once an IDP is open, the page went straight to the questions and there
+   * was no way back to the page that says take three breaths and a glass of
+   * water — which is the page that explains what this is. Somebody who opens
+   * it, reads half, and comes back the next morning needs to see it again;
+   * so does anybody who wants to check what they agreed to.
+   *
+   * Reaching it does NOT discard anything. Starting again does, and says so.
+   */
+  const [showIntro, setShowIntro] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -63,7 +75,13 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
   if (!state) return <Shell initials={initials}><div className="p-6 text-sm" style={{ color: C.faint }}>Loading…</div></Shell>;
 
-  if (state.open) return <Shell initials={initials}><Filling open={state.open} roleDocs={state.roleDocs} isLeader={!!state.isLeader} onDone={load} /></Shell>;
+  if (state.open && !showIntro)
+    return (
+      <Shell initials={initials}>
+        <Filling open={state.open} roleDocs={state.roleDocs} isLeader={!!state.isLeader}
+          onDone={load} onIntro={() => { setShowIntro(true); window.scrollTo({ top: 0 }); }} />
+      </Shell>
+    );
 
   const last = state.done[0];
   if (last) {
@@ -191,6 +209,35 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
           </p>
         )}
 
+        {state.open ? (
+          <div className="mt-6">
+            <div className="rounded-lg p-3" style={{ background: "#E6F4EA", border: "1px solid #9AD3AE" }}>
+              <div className="font-bold" style={{ fontSize: 15, color: C.green }}>You already have one open.</div>
+              <div style={{ fontSize: 13.5, color: C.dim, lineHeight: 1.7, marginTop: 3 }}>
+                Everything you have written so far is saved. Carry on where you left off — or start again from an
+                empty page, which throws away what is there.
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap mt-3">
+              <button onClick={() => setShowIntro(false)} className="rounded font-bold"
+                style={{ background: C.orange, color: "#fff", padding: "14px 24px", fontSize: 15 }}>
+                Carry on with my IDP →
+              </button>
+              <button
+                onClick={() => {
+                  if (!window.confirm("Start again from an empty page?\n\nEverything written so far is thrown away and cannot be got back.")) return;
+                  setShowIntro(false);
+                  start();
+                }}
+                disabled={busy}
+                className="rounded font-bold"
+                style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.dim, padding: "14px 20px", fontSize: 14 }}>
+                {busy ? "Starting…" : "Start again from the beginning"}
+              </button>
+            </div>
+          </div>
+        ) : (
+        <>
         <div className="mt-6" style={{ fontSize: 17, fontWeight: 700 }}>Start?</div>
 
         <label className="flex items-start gap-2 mt-3" style={{ cursor: "pointer" }}>
@@ -219,6 +266,8 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
             The tick above is needed before you can begin.
           </div>
         )}
+        </>
+        )}
 
         {state.role && (
           <div className="mt-8 rounded-lg p-3" style={{ background: "#F4F2EC" }}>
@@ -238,7 +287,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
 /* ─────────────────────────── the discussion ─────────────────────────── */
 
-function Filling({ open, roleDocs, isLeader, onDone }: { open: Open; roleDocs: RoleDoc[]; isLeader: boolean; onDone: () => Promise<void> }) {
+function Filling({ open, roleDocs, isLeader, onDone, onIntro }: { open: Open; roleDocs: RoleDoc[]; isLeader: boolean; onDone: () => Promise<void>; onIntro: () => void }) {
   const [answers, setAnswers] = useState<Record<string, string>>(open.answers || {});
   const [audio, setAudio] = useState<Record<string, Rec[]>>(open.audioUrls || {});
   const [ratings, setRatings] = useState<Record<string, number>>(open.ratings || {});
@@ -322,6 +371,12 @@ function Filling({ open, roleDocs, isLeader, onDone }: { open: Open; roleDocs: R
         <span className="self-center" style={{ fontSize: 11.5, color: C.faint, marginLeft: 4 }}>
           Step {step + 1} of {steps.length} — you can go back and forward freely
         </span>
+        <button onClick={() => { api.post("/api/idp", { action: "save", id: open.id, answers, ratings }).catch(() => {}); onIntro(); }}
+          className="rounded px-2 py-1 self-center"
+          style={{ fontSize: 11.5, background: "#fff", border: `1px solid ${C.line}`, color: C.dim, marginLeft: "auto" }}
+          title="The page that explains what this is. Nothing is lost.">
+          ← the instructions
+        </button>
       </div>
 
       {/* one brief per role — somebody with two roles is briefed on both */}
