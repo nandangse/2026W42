@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.10.1",
+    date: "2026-08-23",
+    module: "HRMS — three defects the audit found",
+    items: [
+      "A SECOND EDIT TO AN APPROVED FIELD NOW RE-ENTERS THE QUEUE. The override row kept its old approval when its value changed, so \u201cVinay may edit but it is final only after I approve\u201d held for the first edit of a field and silently failed for every one after it. The worst kind of bug: the rule looked enforced.",
+      "ONE DEFINITION OF GROSS. The Appraisal Table summed all five pay components; the salary table drops HRA for Management and the contract types. A Management person read one previous gross on the table and a different one on their Report Card. The table now runs the same arithmetic as everything else.",
+      "THE MIGRATION FALLBACK TESTED THE WRONG BRANCH FIRST. A missing 0062 column and a missing 0063 column both report \u201cschema cache\u201d, so a pre-0062 save was falling into the 0063 branch, stripping the approval columns, and storing RJ's own decision as unapproved — leaving him waiting for himself.",
+    ],
+  },
+  {
     v: "3.20.10.0",
     date: "2026-08-23",
     module: "HRMS — the three approval desks",

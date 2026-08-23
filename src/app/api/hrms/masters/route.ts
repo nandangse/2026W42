@@ -136,7 +136,7 @@ export async function POST(req: Request) {
         for (const person of affected) {
           const next = action === "rename" ? to : to || null;
           const { error } = await admin.from(T.edits).upsert(
-            { employee_id: person.id, field: u.field.key, value: next, edited_by: stamp, edited_at: new Date().toISOString() },
+            { employee_id: person.id, field: u.field.key, value: next, edited_by: stamp, edited_at: new Date().toISOString() , approved_at: null, approved_by: null },
             { onConflict: "employee_id,field" },
           );
           if (error) throw new Error(error.message);

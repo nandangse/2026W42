@@ -238,7 +238,15 @@ export async function POST(req: Request) {
       if (action === "edit") {
         after = normalise(spec.kind, body.value);
         const { error } = await admin.from(T.edits).upsert(
-          { employee_id: id, field, value: after, edited_by: me.email, edited_at: new Date().toISOString() },
+          {
+            employee_id: id, field, value: after, edited_by: me.email, edited_at: new Date().toISOString(),
+            // A CHANGE TO AN ALREADY-APPROVED FIELD IS A NEW CHANGE. Without
+            // this the old approval stays attached to the new value and the
+            // edit never re-enters RJ's queue — "final only after I approve"
+            // would hold for the first edit of a field and silently fail for
+            // every one after it.
+            approved_at: null, approved_by: null,
+          },
           { onConflict: "employee_id,field" },
         );
         if (error) {

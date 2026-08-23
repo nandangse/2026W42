@@ -11,6 +11,12 @@ const BUCKET = "voice-notes";
 const LINK_TTL = 60 * 60;
 const CYCLE_TBL = "2026-27";
 
+/** The five pay components, sheet header → overlay field key. */
+const SHEET_TO_FIELD: Record<string, string> = {
+  "Basic and DA": "basic_da", "HRA": "hra", "Fixed Allowance": "fixed_allowance",
+  "Conveyance": "conveyance", "Medical Allowance": "medical_allowance",
+};
+
 /**
  * GET /api/hrms/idp — the management side of the IDP.
  *
@@ -107,9 +113,13 @@ export async function GET(req: Request) {
           const ex = (e.extra || {}) as Record<string, string>;
           const pick = (field: string, header: string, col?: string | null) =>
             (ov?.get(field) as string | undefined) ?? (col ?? undefined) ?? ex[header] ?? null;
-          const gross =
-            num(pick("basic_da", "Basic and DA")) + num(pick("hra", "HRA")) + num(pick("fixed_allowance", "Fixed Allowance")) +
-            num(pick("conveyance", "Conveyance")) + num(pick("medical_allowance", "Medical Allowance"));
+          // THE SAME ARITHMETIC AS EVERY OTHER SCREEN. Summing the five
+          // components here looked equivalent and is not: salaryTable drops
+          // HRA for the exempt types, so a Management person read one gross
+          // on this table and a different one on their Report Card.
+          const type = pick("type", "Type") as string | null;
+          const salaryGet = (k: string) => pick(SHEET_TO_FIELD[k] || k, k);
+          const gross = salaryTable(salaryGet, type)?.gross ?? 0;
           const idp = idpBy.get(id);
           const mgr = idp ? mgrBy.get(idp.id) : undefined;
           const ap = apprBy.get(id);
@@ -124,7 +134,7 @@ export async function GET(req: Request) {
             id, name: String(e.name || id),
             department: pick("department", "Department", e.department) as string | null,
             designation: pick("designation", "Designation", e.designation) as string | null,
-            type: pick("type", "Type") as string | null,
+            type,
             age: years(e.dob), exp: years(e.doj),
             prevGross: prev, newGross,
             inc: prev != null && newGross != null ? newGross - prev : null,
@@ -377,17 +387,19 @@ export async function POST(req: Request) {
       // the hand-tuned split and the investment lines, when the card sent them (0062)
       if (body.structure && typeof body.structure === "object") row.structure = body.structure;
       let { error } = await admin.from("hrms_appraisal").upsert(row, { onConflict: "employee_id,cycle" });
-      if (error && /pending_since|approved_at|schema cache/i.test(error.message)) {
-        // pre-0063: keep the decision, lose only the approval standing
-        for (const k of ["pending_since", "pending_by", "approved_at", "approved_by"]) delete row[k];
-        ({ error } = await admin.from("hrms_appraisal").upsert(row, { onConflict: "employee_id,cycle" }));
-        if (!error) return NR.json({ ok: true, warning: "Saved, but the approval flow needs migration 0063 — run it and save once more." });
-      }
-      if (error && row.structure && /structure|schema cache/i.test(error.message)) {
-        // pre-0062: keep the decision, drop only the tuning, and say so
+      // Narrowest missing column first. Both errors say "schema cache", so a
+      // pre-0062 failure tested against the 0063 branch would strip the
+      // approval columns and store the owner's own save as unapproved —
+      // leaving him waiting for himself.
+      if (error && row.structure && /structure/i.test(error.message)) {
         delete row.structure;
         ({ error } = await admin.from("hrms_appraisal").upsert(row, { onConflict: "employee_id,cycle" }));
-        if (!error) return NR.json({ ok: true, warning: "Saved, but the edited structure needs migration 0062 — run it and save once more." });
+        if (!error) return NR.json({ ok: true, approved: owner, warning: "Saved, but the edited structure needs migration 0062 — run it and save once more." });
+      }
+      if (error && /pending_since|approved_at|approved_by|pending_by/i.test(error.message)) {
+        for (const k of ["pending_since", "pending_by", "approved_at", "approved_by"]) delete row[k];
+        ({ error } = await admin.from("hrms_appraisal").upsert(row, { onConflict: "employee_id,cycle" }));
+        if (!error) return NR.json({ ok: true, approved: false, warning: "Saved, but the approval flow needs migration 0063 — run it and save once more." });
       }
       if (error) {
         if (/hrms_appraisal|does not exist|schema cache/i.test(error.message))
