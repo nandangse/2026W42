@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.1.4",
+    date: "2026-08-23",
+    module: "IDP — front and back",
+    items: [
+      "THE IDP IS NOW ONE PART AT A TIME, WITH BACK AND NEXT. Thirteen questions and eleven ratings on a single scroll is punishing on a laptop and impossible on a phone — and it makes people answer shorter as they go, because they can see how much is left.",
+      "MOVING BETWEEN STEPS IS FREE. Nothing is checked on the way past and every step can be returned to, forward or back, in any order. Only Complete asks for everything.",
+      "THE STEPS ARE NUMBERED ACROSS THE TOP and each is a button — jump straight to step 4 if that is what you thought of in the car. A step that is fully answered turns green with a tick, so what is left is visible without being nagged about.",
+      "A LAST STEP THAT READS IT BACK: every answer as it will be read by the HoD, HR and Management, with anything unanswered in amber. Tap any answer to go straight back to it. That is where Complete lives.",
+      "The role brief stays at the top of every step, open on the first and folded after — it is there to be re-read, not to be scrolled past eleven times.",
+      "Everything still saves as it is typed, and moving between steps saves first, so a step change can never cost a word.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.1.3",
     date: "2026-08-23",
     module: "IDP — the role, as written, before a word is answered",

@@ -244,9 +244,30 @@ function Filling({ open, roleDoc, isLeader, onDone }: { open: Open; roleDoc: Rol
   const [ratings, setRatings] = useState<Record<string, number>>(open.ratings || {});
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  /**
+   * ONE PART AT A TIME, WITH A WAY FORWARD AND A WAY BACK (Dr Raghu).
+   *
+   * Thirteen questions and eleven ratings on a single scroll is punishing on
+   * a laptop and impossible on a phone — and it makes people answer shorter
+   * as they go, because they can see how much is left. Broken into steps,
+   * each part gets the attention it deserves, and nobody loses their place.
+   *
+   * Moving between steps is FREE: nothing is checked on the way past, and
+   * every step can be returned to. Only Complete asks for everything.
+   */
+  const [step, setStep] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // saved as they type — a closed laptop should not cost an hour's thinking
+  const sections = IDP_SECTIONS.filter((x) => !x.leadersOnly || isLeader);
+  const steps: { key: string; title: string }[] = [
+    ...sections.map((x) => ({ key: x.key, title: x.title })),
+    { key: "__ratings__", title: "How I rate myself" },
+    { key: "__review__", title: "Read it and finish" },
+  ];
+  const at = steps[Math.min(step, steps.length - 1)];
+  const section = sections.find((x) => x.key === at.key);
+  const check = isComplete(answers, ratings, isLeader);
+
   const touch = (next: Record<string, string>, nextR: Record<string, number>) => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
@@ -256,29 +277,61 @@ function Filling({ open, roleDoc, isLeader, onDone }: { open: Open; roleDoc: Rol
   const setA = (id: string, v: string) => { const n = { ...answers, [id]: v }; setAnswers(n); touch(n, ratings); };
   const setR = (d: string, v: number) => { const n = { ...ratings, [d]: v }; setRatings(n); touch(answers, n); };
 
-  // the leaders' four are asked only of the Leaders Council, and are only
-  // required of the people they are shown to
-  const sections = IDP_SECTIONS.filter((x) => !x.leadersOnly || isLeader);
-  const check = isComplete(answers, ratings, isLeader);
+  const go = (n: number) => {
+    // save what is on screen before moving, so a step change never costs a word
+    api.post("/api/idp", { action: "save", id: open.id, answers, ratings }).catch(() => {});
+    setStep(Math.max(0, Math.min(steps.length - 1, n)));
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const submit = async () => {
     setBusy(true); setMsg("");
-    try {
-      await api.post("/api/idp", { action: "submit", id: open.id, answers, ratings });
-      await onDone();
-    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    try { await api.post("/api/idp", { action: "submit", id: open.id, answers, ratings }); await onDone(); }
+    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
+  };
+
+  /** How much of THIS step is done — shown on the step, not as a scold. */
+  const stepDone = (k: string) => {
+    if (k === "__ratings__") return IDP_RATINGS.every((d) => ratings[d.key]);
+    if (k === "__review__") return check.ok;
+    const qs = sections.find((x) => x.key === k)?.questions || [];
+    return qs.every((q) => {
+      const v = String(answers[q.id] || "").trim();
+      return v && (!q.min || v.length >= q.min);
+    });
   };
 
   return (
     <div className="mx-auto px-4 py-5 md:py-6" style={{ maxWidth: 800 }}>
-      <RoleBrief roleDoc={roleDoc} fallbackRole={open.role_at_time} fallbackSummary={open.role_summary} />
+      {/* where you are, and every step reachable from here */}
+      <div className="flex gap-1 flex-wrap mb-3">
+        {steps.map((x, i) => (
+          <button key={x.key} onClick={() => go(i)}
+            className="rounded px-2 py-1"
+            style={{
+              fontSize: 11.5, fontWeight: i === step ? 700 : 500,
+              background: i === step ? "#16232F" : stepDone(x.key) ? "#E6F4EA" : "#fff",
+              color: i === step ? "#fff" : stepDone(x.key) ? C.green : C.faint,
+              border: `1px solid ${i === step ? "#16232F" : C.line}`,
+            }}
+            title={x.title}>
+            {stepDone(x.key) && i !== step ? "✓ " : ""}{i + 1}
+          </button>
+        ))}
+        <span className="self-center" style={{ fontSize: 11.5, color: C.faint, marginLeft: 4 }}>
+          Step {step + 1} of {steps.length} — you can go back and forward freely
+        </span>
+      </div>
 
-      {sections.map((s) => (
-        <div key={s.key} className="mb-6">
-          <h2 className="font-bold" style={{ fontSize: 18 }}>{s.title}</h2>
-          {s.blurb && <div style={{ fontSize: 13, color: C.faint, lineHeight: 1.6, marginTop: 2 }}>{s.blurb}</div>}
-          {s.questions.map((q) => {
+      <RoleBrief roleDoc={roleDoc} fallbackRole={open.role_at_time} fallbackSummary={open.role_summary} startOpen={step === 0} />
+
+      {/* ── a written section ── */}
+      {section && (
+        <div className="mb-5">
+          <h2 className="font-bold" style={{ fontSize: 19 }}>{section.title}</h2>
+          {section.blurb && <div style={{ fontSize: 13.5, color: C.faint, lineHeight: 1.6, marginTop: 2 }}>{section.blurb}</div>}
+          {section.questions.map((q) => {
             const v = answers[q.id] || "";
             const short = q.min ? v.trim().length > 0 && v.trim().length < q.min : false;
             return (
@@ -301,75 +354,132 @@ function Filling({ open, roleDoc, isLeader, onDone }: { open: Open; roleDoc: Rol
             );
           })}
         </div>
-      ))}
+      )}
 
-      <div className="mb-6">
-        <h2 className="font-bold" style={{ fontSize: 18 }}>How I rate myself</h2>
-        <div style={{ fontSize: 13, color: C.faint, lineHeight: 1.6 }}>
-          Against what your role needs — not against the people around you.
-        </div>
-        <div className="rounded-lg mt-3" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
-          {IDP_RATINGS.map((d, i) => {
-            const val = ratings[d.key] || 0;
-            return (
-              <div key={d.key} className="px-3 py-3" style={{ borderTop: i ? `1px solid #EEECE6` : undefined }}>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>{d.key}</div>
-                {/* what the word means, because a number against a word nobody
-                    has defined is not data */}
-                <div style={{ fontSize: 13, color: C.dim, lineHeight: 1.6, marginTop: 2 }}>{d.what}</div>
-
-                <div className="flex items-center gap-2 mt-3">
-                  <div className="tnum" style={{ fontSize: 26, fontWeight: 800, color: val ? C.orange : "#C9C6BD", minWidth: 38, textAlign: "center" }}>
-                    {val || "–"}
+      {/* ── the ratings ── */}
+      {at.key === "__ratings__" && (
+        <div className="mb-5">
+          <h2 className="font-bold" style={{ fontSize: 19 }}>How I rate myself</h2>
+          <div style={{ fontSize: 13.5, color: C.faint, lineHeight: 1.6 }}>
+            Against what your role needs — not against the people around you.
+          </div>
+          <div className="rounded-lg mt-3" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
+            {IDP_RATINGS.map((d, i) => {
+              const val = ratings[d.key] || 0;
+              return (
+                <div key={d.key} className="px-3 py-3" style={{ borderTop: i ? `1px solid #EEECE6` : undefined }}>
+                  <div style={{ fontSize: 16, fontWeight: 700 }}>{d.key}</div>
+                  <div style={{ fontSize: 13, color: C.dim, lineHeight: 1.6, marginTop: 2 }}>{d.what}</div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="tnum" style={{ fontSize: 26, fontWeight: 800, color: val ? C.orange : "#C9C6BD", minWidth: 38, textAlign: "center" }}>
+                      {val || "–"}
+                    </div>
+                    <input type="range" min={1} max={RATING_MAX} step={1} value={val || 1}
+                      onChange={(ev) => setR(d.key, Number(ev.target.value))}
+                      style={{ accentColor: val ? C.orange : "#C9C6BD", flex: 1, minWidth: 0, height: 28 }} />
                   </div>
-                  <input type="range" min={1} max={RATING_MAX} step={1} value={val || 1}
-                    onChange={(ev) => setR(d.key, Number(ev.target.value))}
-                    style={{ accentColor: val ? C.orange : "#C9C6BD", flex: 1, minWidth: 0, height: 28 }} />
-                </div>
-
-                {/* what THIS score means for THIS dimension — a 7 in Job
-                    Knowledge is not the same sentence as a 7 in Attendance */}
-                <div className="rounded p-2 mt-1" style={{ background: val ? "#FFF7E6" : "#F4F2EC" }}>
-                  <div style={{ fontSize: 13.5, color: val ? "#8A5B00" : C.faint, lineHeight: 1.6 }}>
-                    {val ? `“${d.bands[bandIndex(val)]}”` : "Move the slider. Each number tells you what it means."}
+                  <div className="rounded p-2 mt-1" style={{ background: val ? "#FFF7E6" : "#F4F2EC" }}>
+                    <div style={{ fontSize: 13.5, color: val ? "#8A5B00" : C.faint, lineHeight: 1.6 }}>
+                      {val ? `“${d.bands[bandIndex(val)]}”` : "Move the slider. Each number tells you what it means."}
+                    </div>
+                    {val ? <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>{RATING_MEANING[val]}</div> : null}
                   </div>
-                  {val ? <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>{RATING_MEANING[val]}</div> : null}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ── read it back ── */}
+      {at.key === "__review__" && (
+        <div className="mb-5">
+          <h2 className="font-bold" style={{ fontSize: 19 }}>Read it once more</h2>
+          <div style={{ fontSize: 13.5, color: C.faint, lineHeight: 1.6 }}>
+            This is what your HoD, HR and Management will read. Click any answer to go back and change it.
+          </div>
+          {sections.map((sec, si) => (
+            <div key={sec.key} className="mt-4">
+              <div className="font-bold" style={{ fontSize: 15 }}>{sec.title}</div>
+              {sec.questions.map((q) => {
+                const v = String(answers[q.id] || "").trim();
+                const short = !v || (q.min ? v.length < q.min : false);
+                return (
+                  <button key={q.id} onClick={() => go(si)} className="w-full text-left rounded-lg p-3 mt-2"
+                    style={{ background: "#fff", border: `1px solid ${short ? "#F5B32B" : C.line}` }}>
+                    <div className="font-semibold" style={{ fontSize: 13.5 }}>{q.label}</div>
+                    <div style={{ fontSize: 13.5, color: v ? C.ink : "#8A5B00", whiteSpace: "pre-wrap", lineHeight: 1.7, marginTop: 3 }}>
+                      {v || "Not answered yet — tap to write it."}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+          <div className="mt-4">
+            <div className="font-bold" style={{ fontSize: 15 }}>How I rated myself</div>
+            <button onClick={() => go(steps.length - 2)} className="w-full text-left rounded-lg mt-2"
+              style={{ background: "#fff", border: `1px solid ${IDP_RATINGS.every((d) => ratings[d.key]) ? C.line : "#F5B32B"}` }}>
+              {IDP_RATINGS.map((d, i) => (
+                <div key={d.key} className="px-3 py-1.5 flex items-center gap-3" style={{ borderTop: i ? "1px solid #EEECE6" : undefined }}>
+                  <div style={{ fontSize: 13.5, flex: 1 }}>{d.key}</div>
+                  <div className="tnum" style={{ fontSize: 16, fontWeight: 700, color: ratings[d.key] ? C.orange : "#8A5B00" }}>
+                    {ratings[d.key] || "—"}
+                  </div>
+                </div>
+              ))}
+            </button>
+          </div>
+        </div>
+      )}
 
       {msg && <div className="rounded p-2 mb-3 text-sm font-semibold" style={{ background: "#FBEDEA", color: C.red }}>{msg}</div>}
 
-      <div className="rounded-lg p-4 mb-10" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
-        {!check.ok ? (
-          <div style={{ fontSize: 13, color: "#8A5B00", lineHeight: 1.6 }}>
-            <b>Not finished yet.</b>{" "}
-            {check.missing.length > 0 && <>{check.missing.length} question{check.missing.length === 1 ? "" : "s"} still to answer</>}
-            {check.missing.length > 0 && check.unrated.length > 0 && ", and "}
-            {check.unrated.length > 0 && <>{check.unrated.length} rating{check.unrated.length === 1 ? "" : "s"} to give</>}.
-            <div style={{ color: C.faint, marginTop: 4 }}>
-              Your answers are saved as you type, so nothing is lost if you have to stop — but an IDP that is not
-              submitted is not on your record.
-            </div>
-          </div>
-        ) : (
-          <div style={{ fontSize: 13, color: C.green, lineHeight: 1.6 }}>
-            Everything is answered. Read it once more — once you press Complete it goes on your record and
-            <b> cannot be changed</b>.
-          </div>
-        )}
-        <button onClick={submit} disabled={!check.ok || busy}
-          className="mt-3 rounded font-bold"
-          style={{
-            background: check.ok ? C.green : "#E2E0DA", color: check.ok ? "#fff" : "#8A94A0",
-            padding: "15px 22px", fontSize: 15, width: "100%", maxWidth: 340,
-            cursor: check.ok ? "pointer" : "not-allowed",
-          }}>
-          {busy ? "Completing…" : "Complete and finish"}
-        </button>
+      {/* ── back and forward ── */}
+      <div className="rounded-lg p-3 mb-10" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => go(step - 1)} disabled={step === 0}
+            className="rounded font-bold"
+            style={{
+              background: "#fff", border: `1px solid ${C.line}`, color: step === 0 ? "#C9C6BD" : C.dim,
+              padding: "12px 18px", fontSize: 14, cursor: step === 0 ? "not-allowed" : "pointer",
+            }}>
+            ← Back
+          </button>
+
+          {step < steps.length - 1 ? (
+            <button onClick={() => go(step + 1)} className="rounded font-bold"
+              style={{ background: C.orange, color: "#fff", padding: "12px 22px", fontSize: 15, flex: 1, maxWidth: 300 }}>
+              Next →
+            </button>
+          ) : (
+            <button onClick={submit} disabled={!check.ok || busy} className="rounded font-bold"
+              style={{
+                background: check.ok ? C.green : "#E2E0DA", color: check.ok ? "#fff" : "#8A94A0",
+                padding: "14px 22px", fontSize: 15, flex: 1, maxWidth: 340,
+                cursor: check.ok ? "pointer" : "not-allowed",
+              }}>
+              {busy ? "Completing…" : "✓ Complete and finish"}
+            </button>
+          )}
+        </div>
+
+        <div className="mt-2" style={{ fontSize: 12, color: C.faint, lineHeight: 1.6 }}>
+          {step < steps.length - 1 ? (
+            <>Everything is saved as you type. You can go back and change any answer until you press Complete.</>
+          ) : !check.ok ? (
+            <span style={{ color: "#8A5B00" }}>
+              <b>Not finished yet.</b>{" "}
+              {check.missing.length > 0 && <>{check.missing.length} question{check.missing.length === 1 ? "" : "s"} still to answer</>}
+              {check.missing.length > 0 && check.unrated.length > 0 && ", and "}
+              {check.unrated.length > 0 && <>{check.unrated.length} rating{check.unrated.length === 1 ? "" : "s"} to give</>}. Tap anything above to go to it.
+            </span>
+          ) : (
+            <span style={{ color: C.green }}>
+              Everything is answered. Once you press Complete it goes on your record.
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -387,9 +497,9 @@ function Filling({ open, roleDoc, isLeader, onDone }: { open: Open; roleDoc: Rol
  * It is open when the page loads, and can be folded away once read.
  */
 function RoleBrief({
-  roleDoc, fallbackRole, fallbackSummary,
-}: { roleDoc: RoleDoc | null; fallbackRole: string | null; fallbackSummary: string | null }) {
-  const [open, setOpen] = useState(true);
+  roleDoc, fallbackRole, fallbackSummary, startOpen = true,
+}: { roleDoc: RoleDoc | null; fallbackRole: string | null; fallbackSummary: string | null; startOpen?: boolean }) {
+  const [open, setOpen] = useState(startOpen);
   if (!roleDoc && !fallbackSummary) return null;
   const d = roleDoc;
 
