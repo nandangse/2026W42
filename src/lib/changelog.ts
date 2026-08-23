@@ -84,6 +84,7 @@ export const UPDATES: UpdateEntry[] = [
       "THE HEADLINE ON TOP — Increment per month, increment per year, and the new annual CTC sit in three tiles above the table, before any scrolling.",
       "COMPANY INVESTMENT IN YOU — LIC Policy, Training, Leader Development Investment (Rs 50,000/yr for leaders, Rs 75,000/yr for StratCom) and Leader Tools (Rs 10,000/mo) are their own block. Filled lines appear in the structure as section E and count into the CTC; empty ones stay invisible.",
       "APPROX TDS AT THE GROSS — right under Total Gross Salary (A), monthly and yearly: flat 2% for the contract types (as the company deducts), the new-regime slab estimate for employees. Marked indicative in the row itself, because a declaration or other income changes it.",
+      "The TDS estimate carries marginal relief just past the rebate line — without it ₹1.05 lakh a month shows nil and ₹1.10 lakh shows ₹69,000, a cliff nobody actually pays.",
       "Migration 0062 (run after 0061).",
     ],
   },

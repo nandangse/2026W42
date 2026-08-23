@@ -45,6 +45,10 @@ export function approxTds(grossMonthly: number, type: string | null): { monthly:
     if (taxable > lo) tax += (Math.min(taxable, hi) - lo) * rate;
     lo = hi;
   }
+  // Marginal relief: just past the rebate line the tax cannot exceed the
+  // income above it. Without this, ₹1.05L a month shows nil and ₹1.10L shows
+  // ₹69,000 — a cliff that is not what anybody would actually pay.
+  tax = Math.min(tax, taxable - 1200000);
   const y = Math.round(tax * 1.04);
   return { monthly: Math.round(y / 12), yearly: y };
 }
