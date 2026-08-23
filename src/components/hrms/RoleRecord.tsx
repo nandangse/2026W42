@@ -55,6 +55,8 @@ export default function RoleRecord({
   const [changes, setChanges] = useState<Change[] | null>(null);
   const [showChanges, setShowChanges] = useState(false);
   const [masters, setMasters] = useState<Record<string, { value: string }[]>>({});
+  /** A role reports to another ROLE, so the list is the register itself. */
+  const [roleNames, setRoleNames] = useState<string[]>([]);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
@@ -64,6 +66,8 @@ export default function RoleRecord({
       const found = (j.roles || []).find((x: Role) => x.id === id) || null;
       if (!found) setErr("That role is not in the register.");
       setR(found);
+      // every other role, so Reports To can only point at one that exists
+      setRoleNames((j.roles || []).map((x: Role) => x.role).filter((n: string) => n !== found?.role).sort());
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   }, [id]);
   useEffect(() => { load(); }, [load]);
@@ -151,7 +155,7 @@ export default function RoleRecord({
               <Box label="Role" value={r.role} onSave={(v) => save("role", v)} width={230} />
               <Pick label="Department" value={r.department || ""} options={opts("department")} onSave={(v) => save("department", v)} />
               <Pick label="Grade" value={r.grade || ""} options={opts("grade")} onSave={(v) => save("grade", v)} width={190} />
-              <Box label="Reports To" value={r.reports_to || ""} onSave={(v) => save("reports_to", v)} width={200} />
+              <Pick label="Reports To" value={r.reports_to || ""} options={roleNames} onSave={(v) => save("reports_to", v)} width={230} />
               <Pick label="Location" value={r.location || ""} options={opts("location")} onSave={(v) => save("location", v)} width={150} />
             </div>
           </div>
@@ -167,6 +171,12 @@ export default function RoleRecord({
         {/* ── right: the expectation note, and the history ── */}
         <div style={{ minWidth: 0 }}>
           <VoiceNote r={r} reload={load} onSaved={() => setChanges(null)} />
+          {r.transcript && !r.summary && (
+            <div className="rounded p-2 mt-2" style={{ background: "#FFF7E6", border: "1px solid #F5B32B", fontSize: 11, color: "#8A5B00", lineHeight: 1.5 }}>
+              The words were saved but no summary was written. Press <b>Summarise again</b> above — nothing is
+              re-recorded. If it keeps failing, ANTHROPIC_API_KEY is not set on the server.
+            </div>
+          )}
 
           <div className="bg-white rounded-lg border p-3 mt-3" style={{ borderColor: C.line }}>
             <div className="font-bold text-xs mb-1">Who holds this role</div>

@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.2.2",
+    date: "2026-08-23",
+    module: "HRIS — the note gets its words back, and a summary worth reading",
+    items: [
+      "THE DICTATION WAS LOSING THE END OF LONG NOTES, and it was a bug of mine. Two causes, both fixed. The browser's recogniser STOPS ON ITS OWN after a stretch of quiet even when told to run continuously — it is now restarted for as long as the recording is going. And every restart RESETS the results list, which the old code rebuilt the whole transcript from — so a restart did not merely stop adding, it ERASED what had already been said. Finished phrases are now appended once and kept across restarts.",
+      "THE SUMMARY WAS NEVER BEING WRITTEN AT ALL. When the language model could not be reached the code quietly used the first 200 characters of the transcript instead and presented that as the summary — which looks like a working feature and is not. That is how a broken thing survives. A summary that cannot be written now SAYS SO, in orange, and offers to try again.",
+      "↻ SUMMARISE AGAIN rewrites the summary from the words already stored. Nothing is re-recorded.",
+      "THE SUMMARY IS NOW IN ENGLISH, IN BULLETS, IN VERY SIMPLE LANGUAGE — and it translates. These notes are spoken the way people here actually speak, English and Hindi in one sentence; the summary comes back as plain English bullets, each starting with a verb, short enough for somebody reading English as their third language to act on. “Check every week”, not “conduct weekly verification”.",
+      "REPORTS TO IS A DROPDOWN of the other roles in the register. A role reports to a ROLE, and typing it by hand is how “Senior Accountant” and “Sr Accountant” become two different bosses.",
+      "THE VIEW LIGHTBOX IS WIDER AND READS IN TWO COLUMNS. Role, Department, Grade, Reports To, Location and Nos Active run along ONE line at the top rather than stacking into six rows — six facts do not need six rows, and every row spent there is a row not spent on the job description. Left: the written definition. Right: the expectation note with its recording, and who holds the role.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.19.2.1",
     date: "2026-08-23",
     module: "HRIS — a role reads, then opens to be written",

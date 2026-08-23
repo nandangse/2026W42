@@ -31,8 +31,28 @@ export default function VoiceNote({ r, reload, onSaved }: { r: RoleLike; reload:
   const startedRef = useRef(0);
   const textRef = useRef("");
 
+  /** Rewrite the summary from the transcript already stored. */
+  const resummarise = async () => {
+    setBusy(true); setErr("");
+    try {
+      const res = await fetch("/api/hrms/roles", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "resummarise", id: r.id }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Could not write the summary");
+      onSaved?.();
+      await reload();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+
   const stop = () => {
+    // the recorder first: onend checks its state to decide whether dictation
+    // stopped by itself or because somebody pressed Stop
     try { mediaRef.current?.stop(); } catch { /* already stopped */ }
+    if (srRef.current) srRef.current.onend = null;
     try { srRef.current?.stop(); } catch { /* dictation may not be running */ }
     setRec(false);
   };
@@ -71,24 +91,47 @@ export default function VoiceNote({ r, reload, onSaved }: { r: RoleLike; reload:
       startedRef.current = Date.now();
       setRec(true);
 
+      /**
+       * DICTATION, AND THE TWO THINGS THAT USED TO LOSE THE END OF IT.
+       *
+       * 1. The browser's recogniser STOPS ON ITS OWN after a stretch of quiet,
+       *    even with continuous set. On a ninety-second note that meant the
+       *    tail simply never arrived. It is restarted here for as long as the
+       *    recording is still running.
+       *
+       * 2. Every restart RESETS ev.results to an empty list. The old code
+       *    rebuilt the whole transcript from that list each time, so the
+       *    restart did not just stop adding — it erased what had been said
+       *    before it. Finished phrases are now appended once, using
+       *    ev.resultIndex to take only what is new, and kept across restarts.
+       */
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SR) {
-        const sr = new SR();
-        sr.continuous = true; sr.interimResults = true; sr.lang = "en-IN";
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        sr.onresult = (ev: any) => {
-          let done = "", interim = "";
-          for (let i = 0; i < ev.results.length; i++) {
-            const x = ev.results[i];
-            if (x.isFinal) done += x[0].transcript + " "; else interim += x[0].transcript;
-          }
-          textRef.current = done.trim();
-          setLive((done + interim).trim());
+        const startSR = () => {
+          const sr = new SR();
+          sr.continuous = true; sr.interimResults = true; sr.lang = "en-IN";
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          sr.onresult = (ev: any) => {
+            let interim = "";
+            for (let i = ev.resultIndex; i < ev.results.length; i++) {
+              const x = ev.results[i];
+              if (x.isFinal) textRef.current = (textRef.current + " " + x[0].transcript).trim();
+              else interim += x[0].transcript;
+            }
+            setLive((textRef.current + " " + interim).trim());
+          };
+          sr.onerror = () => {};
+          sr.onend = () => {
+            // still recording? then it stopped by itself — start it again
+            if (mediaRef.current && mediaRef.current.state === "recording") {
+              try { startSR(); } catch { /* the recording still stands */ }
+            }
+          };
+          sr.start();
+          srRef.current = sr;
         };
-        sr.onerror = () => {};
-        sr.start();
-        srRef.current = sr;
+        startSR();
       }
     } catch (e) {
       const name = (e as { name?: string })?.name || "";
@@ -127,7 +170,14 @@ export default function VoiceNote({ r, reload, onSaved }: { r: RoleLike; reload:
       {err && <div className="text-xs mt-1" style={{ color: C.red }}>{err}</div>}
       {r.summary && (
         <div className="rounded p-2 mt-2" style={{ background: "#F4F2EC" }}>
-          <div className="text-xs font-bold" style={{ color: C.dim }}>What it comes to</div>
+          <div className="flex items-center gap-2">
+            <div className="text-xs font-bold" style={{ color: C.dim }}>What it comes to</div>
+            <button onClick={resummarise} disabled={busy}
+              className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#DCE8F5", color: "#1B3A5C" }}
+              title="Write the summary again from the words above — nothing is re-recorded">
+              ↻ Summarise again
+            </button>
+          </div>
           <div className="text-xs" style={{ color: C.ink, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{r.summary}</div>
           {r.transcript && (
             <details className="mt-1">

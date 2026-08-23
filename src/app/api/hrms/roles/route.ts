@@ -16,6 +16,56 @@ const BUCKET = "voice-notes";
  */
 const RICH = new Set(["job_description", "deliverable", "metric"]);
 
+/**
+ * The summary of a spoken expectation note.
+ *
+ * THREE THINGS IT MUST DO, and the first is why this is not a one-liner.
+ * These notes are spoken in the way people here actually speak — English and
+ * Hindi in the same sentence ("accounts executive ko make sure karna hai ki
+ * filing correctly ho"). The summary has to come out in PLAIN ENGLISH, as
+ * BULLETS, in language simple enough for somebody whose English is their
+ * third language to act on. A summary nobody can read is not a summary.
+ *
+ * If it cannot be written, this returns null and the caller says so plainly.
+ * The old behaviour was to fall back to the first 200 characters of the
+ * transcript and present that as the summary, which looked like a working
+ * feature and was not — that is exactly how a broken thing survives.
+ */
+async function summarise(transcript: string): Promise<string | null> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key || transcript.trim().length < 40) return null;
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: "claude-sonnet-5",
+        max_tokens: 500,
+        system:
+          "You summarise a spoken note from the Managing Director of an Indian engineering company, " +
+          "saying what he expects from a ROLE in his company.\n\n" +
+          "The note is dictated speech and is usually a MIX OF ENGLISH AND HINDI. Understand both.\n\n" +
+          "Rules for your answer:\n" +
+          "1. Write ONLY IN ENGLISH. Translate anything said in Hindi.\n" +
+          "2. Write BULLET POINTS, one per line, each starting with '- '. Never a paragraph.\n" +
+          "3. Use VERY SIMPLE ENGLISH. Short words, short sentences. The reader may be a fitter or a " +
+          "storekeeper reading English as their third language. Say 'check every week', not 'conduct weekly verification'.\n" +
+          "4. Each bullet is one thing the person must DO or must ACHIEVE. Start with a verb.\n" +
+          "5. At most 6 bullets. Leave out anything that is not an expectation.\n" +
+          "6. No heading, no preamble, no closing line. Bullets only.\n\n" +
+          "If the note contains no expectations at all, answer with the single line: - Nothing specific was said about what this role must deliver.",
+        messages: [{ role: "user", content: transcript.slice(0, 8000) }],
+      }),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const text = j?.content?.[0]?.text;
+    return typeof text === "string" && text.trim() ? text.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 function scrub(html: string): string {
   return String(html || "")
     .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -174,36 +224,8 @@ export async function POST(req: Request) {
        * the transcript when there is no key configured — a worse summary is
        * better than a failed save.
        */
-      let summary = transcript.slice(0, 200);
-      const key = process.env.ANTHROPIC_API_KEY;
-      if (key && transcript.length > 60) {
-        try {
-          const r = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-            body: JSON.stringify({
-              model: "claude-sonnet-5",
-              max_tokens: 300,
-              system:
-                "You are summarising a spoken note from the Managing Director about what a ROLE in his company is expected to deliver. " +
-                "Give at most three short bullet points, in his own vocabulary, stating what the role must achieve. " +
-                "No preamble, no headings, no restating the question. If the note says nothing about expectations, say so in one line.",
-              messages: [{ role: "user", content: transcript.slice(0, 6000) }],
-            }),
-          });
-          const j = await r.json();
-          const text = j?.content?.[0]?.text;
-          if (typeof text === "string" && text.trim()) summary = text.trim();
-        } catch { /* keep the fallback */ }
-      }
+      const summary = await summarise(transcript);
 
-      /**
-       * ONE RECORDING, ONE TRANSCRIPT, ONE SUMMARY (Dr Raghu, 23 Aug 2026).
-       * The summary is what flows into the IDP, and three competing summaries
-       * would mean nobody knows which one counts. So recording again REPLACES
-       * — and what it replaced is written to the change history rather than
-       * thrown away. The audio file stays in the bucket; only the row moves.
-       */
       const { data: prev } = await admin
         .from("hrms_role").select("voice_path, transcript, summary").eq("id", id).maybeSingle();
 
@@ -227,7 +249,11 @@ export async function POST(req: Request) {
         });
       } catch { /* the recording matters more than the line about it */ }
 
-      return NextResponse.json({ ok: true, summary });
+      return NextResponse.json({
+        ok: true,
+        summary,
+        warning: summary ? null : "The recording and the words were saved, but the summary could not be written. Press “Summarise again”.",
+      });
     }
 
     // ---- the fields ----
@@ -301,6 +327,23 @@ export async function POST(req: Request) {
         } catch { /* a lost history line must not fail the edit */ }
       }
       return NextResponse.json({ ok: true, pending: changes.length > 0 });
+    }
+
+    /** { action: "resummarise", id } — rewrite the summary from the words already stored. */
+    if (action === "resummarise") {
+      const { data: row } = await admin.from("hrms_role").select("transcript").eq("id", body.id).maybeSingle();
+      const t = String(row?.transcript || "");
+      if (!t.trim()) throw new HttpError(400, "There are no words to summarise — record the note first.");
+      const summary = await summarise(t);
+      if (!summary)
+        throw new HttpError(
+          503,
+          "The summary could not be written. Either ANTHROPIC_API_KEY is not set on the server, or the model did not answer.",
+        );
+      const { error } = await admin
+        .from("hrms_role").update({ summary, updated_by: stamp, updated_at: new Date().toISOString() }).eq("id", body.id);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, summary });
     }
 
     /** { action: "approve", id } — the owner has seen the latest change. */

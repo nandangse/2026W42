@@ -208,7 +208,7 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
 
       {current && (
         <div className="fixed inset-0 flex justify-end no-print" style={{ background: "rgba(13,22,31,0.35)", zIndex: 60 }} onClick={() => setOpen(null)}>
-          <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(680px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(1180px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 sticky top-0 flex items-start gap-2" style={{ background: "#16232F", color: "#fff", zIndex: 2 }}>
               <div style={{ minWidth: 0 }}>
                 <div className="font-bold">{current.role}</div>
@@ -251,76 +251,92 @@ function RoleView({ r }: { r: Role }) {
   const edit = () => window.open(`/hrms/role/${encodeURIComponent(r.id)}`, "_blank", "noopener");
   return (
     <div className="p-3">
-      <div className="flex items-center gap-2 flex-wrap mb-3">
-        <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#22303C", color: "#8FA1B3" }}>
-          VIEW ONLY
-        </span>
-        <button onClick={edit} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}
-          title="Opens this role in its own tab, where it can be changed. Any change goes to Dr Raghu for approval.">
-          ✎ Edit ↗
-        </button>
-        {r.pending_since && (
-          <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#F5B32B", color: "#4A3300" }}>
-            awaiting RJ approval
+      {/* Identity runs along ONE line rather than a stack of labelled rows.
+          Six facts do not need six rows, and every row spent here is a row
+          not spent on the job description underneath. */}
+      <div className="bg-white rounded-lg border px-3 py-2 mb-3 flex items-center gap-x-4 gap-y-1 flex-wrap" style={{ borderColor: C.line }}>
+        <Fact label="Role" value={r.role} strong />
+        <Fact label="Department" value={r.department} />
+        <Fact label="Grade" value={r.grade} />
+        <Fact label="Reports To" value={r.reports_to} />
+        <Fact label="Location" value={r.location} />
+        <Fact label="Nos Active" value={String(r.activeCount)} />
+        <span className="ml-auto flex items-center gap-2">
+          <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#22303C", color: "#8FA1B3" }}>
+            VIEW ONLY
           </span>
-        )}
+          {r.pending_since && (
+            <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#F5B32B", color: "#4A3300" }}>
+              awaiting RJ
+            </span>
+          )}
+          <button onClick={edit} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}
+            title="Opens this role in its own tab, where it can be changed. Any change goes to Dr Raghu for approval.">
+            ✎ Edit ↗
+          </button>
+        </span>
       </div>
 
-      <div className="bg-white rounded-lg border mb-3" style={{ borderColor: C.line }}>
-        <Line label="Role" value={r.role} />
-        <Line label="Department" value={r.department} />
-        <Line label="Grade" value={r.grade} />
-        <Line label="Reports To" value={r.reports_to} />
-        <Line label="Location" value={r.location} />
-        <Line label="Nos Active" value={String(r.activeCount)} />
-      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.5fr) minmax(0,1fr)", gap: 12, alignItems: "start" }}>
+        {/* ── left: what is written ── */}
+        <div style={{ minWidth: 0 }}>
+          <Read label="Job Description" html={r.job_description} />
+          <Read label="Deliverable" html={r.deliverable} />
+          <Read label="Measurement Metric" html={r.metric} />
+        </div>
 
-      <Read label="Job Description" html={r.job_description} />
-      <Read label="Deliverable" html={r.deliverable} />
-      <Read label="Measurement Metric" html={r.metric} />
-
-      <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: C.line }}>
-        <div className="font-bold text-xs mb-1">Management Expectation Note</div>
-        {!r.summary && !r.url && <div className="text-xs" style={{ color: C.faint }}>Not recorded yet.</div>}
-        {r.url && <audio controls src={r.url} style={{ height: 30, maxWidth: "100%" }} />}
-        {r.summary && (
-          <div className="rounded p-2 mt-2" style={{ background: "#F4F2EC" }}>
-            <div className="text-xs font-bold" style={{ color: C.dim }}>What it comes to — this is what goes into the IDP</div>
-            <div className="text-xs" style={{ color: C.ink, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{r.summary}</div>
+        {/* ── right: what was said, and who holds it ── */}
+        <div style={{ minWidth: 0 }}>
+          <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: C.line }}>
+            <div className="font-bold text-xs mb-1">Management Expectation Note</div>
+            {!r.summary && !r.url && <div className="text-xs" style={{ color: C.faint }}>Not recorded yet.</div>}
+            {r.url && <audio controls src={r.url} style={{ height: 30, width: "100%" }} />}
+            {r.summary ? (
+              <div className="rounded p-2 mt-2" style={{ background: "#F4F2EC" }}>
+                <div className="text-xs font-bold" style={{ color: C.dim }}>What it comes to — this is what goes into the IDP</div>
+                <div className="text-xs" style={{ color: C.ink, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{r.summary}</div>
+              </div>
+            ) : r.transcript ? (
+              <div className="rounded p-2 mt-2" style={{ background: "#FFF7E6", border: "1px solid #F5B32B", fontSize: 11, color: "#8A5B00", lineHeight: 1.5 }}>
+                The words were saved but no summary was written. Open <b>Edit</b> and press <b>Summarise again</b>.
+              </div>
+            ) : null}
+            {r.transcript && (
+              <details className="mt-2">
+                <summary className="text-xs cursor-pointer" style={{ color: C.faint }}>the words as spoken</summary>
+                <div className="text-xs mt-1" style={{ color: C.dim, lineHeight: 1.6 }}>{r.transcript}</div>
+              </details>
+            )}
           </div>
-        )}
-        {r.transcript && (
-          <details className="mt-2">
-            <summary className="text-xs cursor-pointer" style={{ color: C.faint }}>the words as spoken</summary>
-            <div className="text-xs mt-1" style={{ color: C.dim, lineHeight: 1.6 }}>{r.transcript}</div>
-          </details>
-        )}
-      </div>
 
-      <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line }}>
-        <div className="font-bold text-xs mb-1">Who holds this role</div>
-        {r.people.length === 0 && <div className="text-xs" style={{ color: C.faint }}>Nobody.</div>}
-        <div className="flex gap-1 flex-wrap">
-          {r.people.map((p) => (
-            <a key={p.id} href={`/hrms/employee/${encodeURIComponent(p.id)}`} target="_blank" rel="noopener noreferrer"
-              className="rounded px-1.5 py-0.5 text-xs"
-              style={{ background: p.onRoll ? "#F4F2EC" : "#FBEDEA", color: p.onRoll ? C.dim : C.red }}
-              title={p.onRoll ? `${p.id} — on the roll` : `${p.id} — no longer on the roll`}>
-              {p.name}
-            </a>
-          ))}
+          <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line }}>
+            <div className="font-bold text-xs mb-1">Who holds this role</div>
+            {r.people.length === 0 && <div className="text-xs" style={{ color: C.faint }}>Nobody.</div>}
+            <div className="flex gap-1 flex-wrap">
+              {r.people.map((p) => (
+                <a key={p.id} href={`/hrms/employee/${encodeURIComponent(p.id)}`} target="_blank" rel="noopener noreferrer"
+                  className="rounded px-1.5 py-0.5 text-xs"
+                  style={{ background: p.onRoll ? "#F4F2EC" : "#FBEDEA", color: p.onRoll ? C.dim : C.red }}
+                  title={p.onRoll ? `${p.id} — on the roll` : `${p.id} — no longer on the roll`}>
+                  {p.name}
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function Line({ label, value }: { label: string; value: string | null }) {
+function Fact({ label, value, strong }: { label: string; value: string | null; strong?: boolean }) {
   return (
-    <div className="flex gap-3 px-3 py-1.5" style={{ borderTop: "1px solid #EEECE6" }}>
-      <div className="text-xs font-semibold" style={{ color: C.faint, minWidth: 120 }}>{label}</div>
-      <div className="text-xs">{value || <span style={{ color: "#C9C6BD" }}>—</span>}</div>
-    </div>
+    <span className="flex items-baseline gap-1.5" style={{ whiteSpace: "nowrap" }}>
+      <span style={{ fontSize: 10, color: C.faint, textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</span>
+      <span className="text-xs" style={{ fontWeight: strong ? 700 : 500, color: value ? C.ink : "#C9C6BD" }}>
+        {value || "—"}
+      </span>
+    </span>
   );
 }
 
