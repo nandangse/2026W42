@@ -32,6 +32,17 @@ const nextConfig = {
       {
         source: "/(.*)",
         headers: [
+          /**
+           * NOT INDEXED. Anywhere. By anything. Including /login.
+           *
+           * Sent on EVERY response, which is the point of putting it here
+           * rather than in a page's metadata: it covers the API routes, the
+           * served documents (the Sales playbook, My Sales Plan) and any
+           * future page somebody forgets to think about. A header also beats
+           * robots.txt, which merely asks a crawler not to look and cannot
+           * stop a page being indexed on the strength of a link elsewhere.
+           */
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate" },
           // never sniff content types
           { key: "X-Content-Type-Options", value: "nosniff" },
           // don't leak internal URLs to the ERP / Google Sheets when links open

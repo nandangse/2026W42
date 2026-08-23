@@ -275,7 +275,7 @@ const MODULES: ModuleSpec[] = [
     who: "The uploader account and admins.",
     gate: "requireUploader()",
     screens: ["Upload", "Batch history", "Merge result"],
-    data: ["jobs", "projects", "erp_tasks", "import_batches", "employees", "units", "departments"],
+    data: ["jobs", "projects", "erp_tasks", "import_batches", "hrms_employees", "units", "departments"],
     api: ["/api/upload", "/api/upload-status"],
     ai: "None.",
   },
@@ -311,7 +311,7 @@ const MODULES: ModuleSpec[] = [
     who: "Admins. Anything touching another admin is the owner's alone.",
     gate: "requireAdmin(); requireOwner() for admin-on-admin changes, enforced again by a DB trigger",
     screens: ["Users", "Org Chart", "Milestones", "Settings", "Report", "Updates", "Software description"],
-    data: ["profiles", "departments", "employees", "family_templates", "app_settings", "settings", "image_quote", "goal_access", "sales_access"],
+    data: ["profiles", "departments", "family_templates", "app_settings", "settings", "image_quote", "goal_access", "sales_access", "hrms_access"],
     api: ["/api/admin/users", "/api/admin/goal-access", "/api/app-settings", "/api/templates", "/api/deck", "/api/me"],
     ai: "None.",
   },
@@ -323,7 +323,7 @@ const MODULES: ModuleSpec[] = [
     who: "The owner, Tushar Giri and HR. Nobody by default; the owner alone grants it.",
     gate: "requireHrms() on the page and on every route; RLS denies the browser outright",
     screens: ["Directory", "Person record", "From the sheet", "History", "Add person"],
-    data: ["employees", "employee_edits", "employee_edit_log", "hrms_access"],
+    data: ["hrms_employees", "hrms_employee_edits", "hrms_employee_edit_log", "hrms_access"],
     api: ["/api/hrms/employees", "/api/hrms/history", "/api/hrms/access"],
     ai: "None.",
   },
@@ -367,7 +367,7 @@ const SPACES: SpaceSpec[] = [
 /* ══════════════════════════ data, grouped by domain ════════════════════════ */
 
 const DATA_DOMAINS: [string, string, string[]][] = [
-  ["Identity & access", "Who exists, what they may do, and the two grants that are not roles.", ["profiles", "goal_access", "sales_access", "departments", "employees", "units"]],
+  ["Identity & access", "Who exists, what they may do, and the grants that are not roles.", ["profiles", "goal_access", "sales_access", "hrms_access", "departments", "units"]],
   ["ERP-fed (upload only)", "Written by the morning upload and by nothing else. Archived, never deleted.", ["jobs", "projects", "erp_tasks", "import_batches"]],
   ["Planning layer (app-owned)", "Genie's own work. Must survive every upload — the zero-data-loss contract.", ["plans", "milestones", "baseline_milestones", "materials", "material_comment", "family_templates"]],
   ["Tasks", "Manual tasks, their comments, their date history and their close-outs.", ["manual_tasks", "task_comments", "task_date_log", "task_closeout", "task_proposal", "brain_dump"]],
@@ -377,6 +377,7 @@ const DATA_DOMAINS: [string, string, string[]][] = [
   ["Sales", "My Sales Plan's entity tables and the playbook content.", ["sp_companies", "sp_deals", "sp_industries", "sp_people", "sp_products", "sp_settings", "sp_support", "sp_todos", "sales_content"]],
   ["Learning", "Books, sections, lessons, progress, plans.", ["lms_book", "lms_section", "lms_lesson", "lms_lesson_book", "lms_progress", "lms_plan", "lms_extra"]],
   ["Company voice", "Principles, quotes, moods, requests and notifications.", ["principles", "principle_doc", "principle_file", "image_quote", "day_mood", "feature_request", "feature_file", "notifications"]],
+  ["HR (isolated)", "Personnel data. Every table carries the hrms_ prefix, RLS is on with NO policies and anon/authenticated hold no grants — the service role is the only way in, and only behind requireHrms(). See migration 0048.", ["hrms_employees", "hrms_employee_edits", "hrms_employee_edit_log", "hrms_access"]],
   ["Configuration", "App identity and the settings singleton.", ["app_settings", "settings"]],
 ];
 

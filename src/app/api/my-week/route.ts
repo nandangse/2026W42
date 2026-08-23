@@ -112,7 +112,7 @@ export async function GET() {
     // ---- birthdays, next seven days ----
     const birthdays = await safe(async () => {
       const { data } = await admin
-        .from("employees")
+        .from("hrms_employees")
         .select("id, name, dob, department")
         .eq("active", true)
         .not("dob", "is", null);

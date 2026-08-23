@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     await requireHrms();
     const id = new URL(req.url).searchParams.get("id");
     let q = adminClient()
-      .from("employee_edit_log")
+      .from("hrms_employee_edit_log")
       .select("id, employee_id, field, old_value, new_value, edited_by, edited_at")
       .order("edited_at", { ascending: false })
       .limit(id ? 100 : 200);
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     const { data, error } = await q;
     if (error) {
       // pre-0047 — an empty history reads better than a broken panel
-      if (/employee_edit_log|does not exist|schema cache/i.test(error.message))
+      if (/hrms_employee_edit_log|does not exist|schema cache/i.test(error.message))
         return NextResponse.json({ history: [] });
       throw new Error(error.message);
     }

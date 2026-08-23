@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { resolveHrmsAccess } from "@/lib/hrms";
@@ -9,26 +8,43 @@ export const dynamic = "force-dynamic";
 /**
  * /hrms — its own URL, and its own door.
  *
- * The check runs HERE as well as on every /api/hrms route. Somebody who is
- * refused is told so plainly rather than bounced to the home page: a silent
- * redirect reads as a broken link, and they would try it again tomorrow.
+ * The check runs HERE as well as on every /api/hrms route; the routes do not
+ * trust this page, and this page does not do the routes' job for them.
+ *
+ * Everybody who is not admitted gets the SAME page, whether they are signed
+ * out, disabled, or signed in and simply not on the list. That is deliberate:
+ * three different answers would let somebody work out which one applies to
+ * them, and the only thing an unauthorised visitor needs from this page is
+ * where to go instead.
  */
 export default async function HrmsPage() {
   const user = await currentUser();
-  if (!user || user.disabled) redirect("/login");
-
-  const allowed = await resolveHrmsAccess(adminClient(), user.email, user.isOwner);
+  // Signed out, disabled, or signed in without the grant — one answer for all
+  // three. Distinguishing them would tell an unauthorised visitor which of the
+  // three they are, which is the one thing they should not learn here.
+  const allowed =
+    !!user && !user.disabled && (await resolveHrmsAccess(adminClient(), user.email, user.isOwner));
   if (!allowed) {
+    // Dr Raghu's own wording, 22 Aug 2026. It says nothing about what is
+    // behind the door -- not what HRMS holds, not who has it, not even that
+    // the page exists for somebody else. Somebody who has arrived here by
+    // mistake is told where to go; somebody who has arrived deliberately
+    // learns nothing they did not already know.
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "#F1EFE9", color: "#22303C" }}>
-        <div className="bg-white rounded-lg border p-6" style={{ borderColor: "#E2E0DA", maxWidth: 420 }}>
-          <div className="font-bold mb-1">HRMS is not open to this account</div>
-          <div className="text-sm" style={{ color: "#5A6672", lineHeight: 1.6 }}>
-            It holds people records — dates of birth, contact details and next of kin — and is granted to
-            named accounts only. Ask Dr Raghu if you need it.
+      <div
+        className="min-h-screen flex items-center justify-center p-6"
+        style={{ background: "#F1EFE9", color: "#22303C" }}
+      >
+        <div className="text-center">
+          <div className="font-bold" style={{ fontSize: 18 }}>
+            You are not authorized to view this Page - Login at the right page
           </div>
-          <a href="/" className="inline-block mt-4 text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}>
-            ← Back to Genie
+          <a
+            href="/login"
+            className="inline-block mt-5 text-xs font-bold rounded px-4 py-2"
+            style={{ background: "#E8600A", color: "#fff" }}
+          >
+            Go to the login page
           </a>
         </div>
       </div>

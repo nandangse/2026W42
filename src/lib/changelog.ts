@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.0.1",
+    date: "2026-08-22",
+    module: "HRMS isolation · nothing indexed",
+    items: [
+      "HR DATA IS NOW ISOLATED AND NAMED AS SUCH. Every table holding it carries the hrms_ prefix — hrms_employees, hrms_employee_edits, hrms_employee_edit_log, hrms_access — so there is no reading of the schema in which a personnel record looks like an ordinary application table.",
+      "A NAME IS NOT A GATE, so the posture is now stated outright rather than inherited: RLS on for all four, NO policies on any of them, and no table privileges for the anon or signed-in roles. A browser cannot read a byte of it whatever query it sends. The only way in is the server's service key, used strictly after the access check has run.",
+      "Not a separate database schema, and that was a decision rather than an omission: a schema outside public is invisible to the API until it is added to an exposed list in the Supabase dashboard, and the moment it is exposed it is reachable by exactly the same keys — the isolation gained would have been in the name only, at the cost of a setting nobody remembers. The deny-all above is what actually keeps people out.",
+      "ANYONE NOT AUTHORISED SEES ONE PAGE: “You are not authorized to view this Page - Login at the right page”. Signed out, disabled, or signed in and not on the list — the same answer to all three, because three different answers would let somebody work out which one applies to them.",
+      "NOTHING IN GENIE IS INDEXED BY A SEARCH ENGINE, the login page included. Every response now carries X-Robots-Tag: noindex, nofollow, noarchive, nosnippet — API routes and served documents as well as pages — repeated as a meta tag in the markup for crawlers that read one and not the other.",
+      "robots.txt deliberately does NOT say “Disallow: /”. Disallow means do not FETCH, and a crawler told not to fetch never sees the noindex — Google is explicit that such a URL can still be listed as a bare address on the strength of a link elsewhere. Blocking the crawl would have disabled the one instruction that works. Crawling is allowed and every page tells the crawler plainly not to index it.",
+      "Migration 0048. RUN IT BEFORE THIS RELEASE REACHES THE SITE — the code looks for the new table names.",
+    ],
+  },
+  {
     v: "3.19.0.0",
     date: "2026-08-22",
     module: "HRMS — genie.nandan.co.in/hrms",

@@ -401,7 +401,7 @@ export async function applyUpload(
   } else if (kind === "employees") {
     const emp = parsed.employees!;
     jobCount = emp.length;
-    const { error } = await admin.from("employees").upsert(
+    const { error } = await admin.from("hrms_employees").upsert(
       emp.map((e) => ({ ...e, updated_at: new Date().toISOString() })),
       { onConflict: "id" },
     );

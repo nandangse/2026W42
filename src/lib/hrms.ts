@@ -9,7 +9,7 @@
  *   SHEET fields are columns the HR master carries. `employees` is upserted
  *   wholesale by every Employee Master upload, so an edit written there is
  *   gone the next morning. Editing one of these stores an OVERRIDE in
- *   employee_edits; the sheet value stays where it is and HRMS shows both.
+ *   hrms_employee_edits; the sheet value stays where it is and HRMS shows both.
  *
  *   GENIE fields are ours — a telephone number, next of kin, a blood group.
  *   The sheet has never carried them and no upload can overwrite them. They

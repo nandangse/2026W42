@@ -45,7 +45,7 @@ export async function GET() {
     const admin = adminClient();
 
     const { data, error } = await admin
-      .from("employees")
+      .from("hrms_employees")
       .select("id, name, email, dob, doj, department, designation, location, active, extra, first_seen, updated_at")
       .order("name");
     if (error) throw new Error(error.message);
@@ -56,7 +56,7 @@ export async function GET() {
     const overrides = new Map<string, Map<string, { value: string | null; by: string | null; at: string }>>();
     try {
       const { data: eds } = await admin
-        .from("employee_edits")
+        .from("hrms_employee_edits")
         .select("employee_id, field, value, edited_by, edited_at");
       for (const e of eds || []) {
         const id = String(e.employee_id);
@@ -110,7 +110,7 @@ export async function GET() {
  *   { action: "clear",  id, field }         — drop the override, sheet wins again
  *   { action: "create", name, ... }         — somebody the sheet has not caught up with
  *
- * Every write lands in employee_edit_log as well. One field at a time, on
+ * Every write lands in hrms_employee_edit_log as well. One field at a time, on
  * purpose: the log then reads as a list of facts rather than a list of saves.
  */
 export async function POST(req: Request) {
@@ -133,13 +133,13 @@ export async function POST(req: Request) {
 
       // what it reads as right now, for the log
       const { data: cur } = await admin
-        .from("employee_edits")
+        .from("hrms_employee_edits")
         .select("value")
         .eq("employee_id", id)
         .eq("field", field)
         .maybeSingle();
       const { data: emp } = await admin
-        .from("employees")
+        .from("hrms_employees")
         .select("id, name, email, dob, doj, department, designation, location, active")
         .eq("id", id)
         .maybeSingle();
@@ -149,18 +149,18 @@ export async function POST(req: Request) {
       let after: string | null = null;
       if (action === "edit") {
         after = normalise(spec.kind, body.value);
-        const { error } = await admin.from("employee_edits").upsert(
+        const { error } = await admin.from("hrms_employee_edits").upsert(
           { employee_id: id, field, value: after, edited_by: me.email, edited_at: new Date().toISOString() },
           { onConflict: "employee_id,field" },
         );
         if (error) {
-          if (/employee_edits|schema cache|does not exist/i.test(error.message))
+          if (/hrms_employee_edits|schema cache|does not exist/i.test(error.message))
             missing("HRMS has nowhere to save an edit yet");
           throw new Error(error.message);
         }
       } else {
         const { error } = await admin
-          .from("employee_edits")
+          .from("hrms_employee_edits")
           .delete()
           .eq("employee_id", id)
           .eq("field", field);
@@ -173,7 +173,7 @@ export async function POST(req: Request) {
         // The log must not be able to fail the edit — a lost history line is
         // bad, an edit that reports failure after saving is worse.
         try {
-          await admin.from("employee_edit_log").insert({
+          await admin.from("hrms_employee_edit_log").insert({
             employee_id: id,
             field,
             old_value: before,
@@ -194,12 +194,12 @@ export async function POST(req: Request) {
       // up the next upload UPDATES this person rather than duplicating them
       const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
       let id = String(body.id || "").trim() || base;
-      const { data: clash } = await admin.from("employees").select("id").eq("id", id).maybeSingle();
+      const { data: clash } = await admin.from("hrms_employees").select("id").eq("id", id).maybeSingle();
       if (clash) {
         if (body.id) throw new HttpError(409, `Employee code "${id}" is already used`);
         id = id + "-2";
       }
-      const { error } = await admin.from("employees").insert({
+      const { error } = await admin.from("hrms_employees").insert({
         id,
         name,
         email: String(body.email || "").trim().toLowerCase() || null,
@@ -211,7 +211,7 @@ export async function POST(req: Request) {
       });
       if (error) throw new Error(error.message);
       try {
-        await admin.from("employee_edit_log").insert({
+        await admin.from("hrms_employee_edit_log").insert({
           employee_id: id,
           field: "(record)",
           old_value: null,

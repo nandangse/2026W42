@@ -12,7 +12,7 @@
  *
  *   1. AN EDIT MUST SURVIVE THE NEXT UPLOAD. The upload upserts `employees`
  *      wholesale, so a value typed into a sheet-carried column would vanish
- *      the next morning. Edits therefore go to an overlay (employee_edits)
+ *      the next morning. Edits therefore go to an overlay (hrms_employee_edits)
  *      and are applied on read. Where an override masks a sheet value, the
  *      card says so and offers to put the sheet's value back.
  *

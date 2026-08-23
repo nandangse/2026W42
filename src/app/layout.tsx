@@ -10,6 +10,29 @@ export const metadata: Metadata = {
     icon: "/icon.svg",
     apple: "/icon.svg",
   },
+  /**
+   * Never indexed, anywhere, by anything — including the login page
+   * (Dr Raghu, 22 Aug 2026).
+   *
+   * This emits <meta name="robots" content="noindex, nofollow, ..."> on every
+   * page. It is the layer a crawler sees if it reads the markup but ignores
+   * the response headers; next.config.js sends X-Robots-Tag for the crawlers
+   * that do the reverse, and /robots.txt asks the polite ones not to come at
+   * all. Three layers because each one alone has a hole.
+   */
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+      "max-snippet": -1,
+      "max-image-preview": "none",
+      "max-video-preview": -1,
+    },
+  },
 };
 
 export const viewport: Viewport = {
