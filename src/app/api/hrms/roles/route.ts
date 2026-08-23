@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, onRoll } from "@/lib/hrms";
+import { LEVELS } from "@/lib/competency";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -15,6 +16,7 @@ const BUCKET = "voice-notes";
  * without going through the editor at all.
  */
 const RICH = new Set(["job_description", "deliverable", "metric"]);
+
 
 /**
  * The summary of a spoken expectation note.
@@ -153,6 +155,21 @@ export async function GET(req: Request) {
 
     const { byRole, unassigned, activeTotal } = await holders();
 
+    // the competency master, and what each role needs
+    let competencies: { name: string; definition: string; category: string | null }[] = [];
+    const needed = new Map<string, { competency: string; level: number }[]>();
+    try {
+      const { data: cm } = await admin
+        .from("hrms_competency").select("name, definition, category, sort_order").order("sort_order").order("name");
+      competencies = (cm || []).map((c) => ({ name: String(c.name), definition: String(c.definition), category: c.category ?? null }));
+      const { data: rc } = await admin.from("hrms_role_competency").select("role_id, competency, level");
+      for (const r of rc || []) {
+        const id = String(r.role_id);
+        if (!needed.has(id)) needed.set(id, []);
+        needed.get(id)!.push({ competency: String(r.competency), level: Number(r.level) });
+      }
+    } catch { /* pre-0056 */ }
+
     const roles = await Promise.all(
       (data || []).map(async (r) => {
         let url: string | null = null;
@@ -165,13 +182,14 @@ export async function GET(req: Request) {
         return {
           ...r,
           url,
+          competencies: (needed.get(String(r.id)) || []).sort((a, b) => b.level - a.level || a.competency.localeCompare(b.competency)),
           people: people.map((p) => ({ id: p.id, name: p.name, onRoll: p.onRoll })),
           activeCount: people.filter((p) => p.onRoll).length,
         };
       }),
     );
 
-    return NextResponse.json({ roles, unassigned, activeTotal });
+    return NextResponse.json({ roles, unassigned, activeTotal, competencies, levels: LEVELS });
   } catch (e) {
     return errJson(e);
   }
@@ -327,6 +345,50 @@ export async function POST(req: Request) {
         } catch { /* a lost history line must not fail the edit */ }
       }
       return NextResponse.json({ ok: true, pending: changes.length > 0 });
+    }
+
+    /**
+     * { action: "competency", id, competency, level }  — add or set the level
+     * { action: "competency", id, competency, remove: true }
+     *
+     * A role may need many, and the LEVEL is what makes the list useful: a Sr
+     * Design Manager and a Draughtsman both need Drawing Reading, at 5 and at
+     * 3, and that difference is the job.
+     */
+    if (action === "competency") {
+      if (!body.id || !body.competency) throw new HttpError(400, "id and competency are required");
+      const name = String(body.competency);
+      if (body.remove) {
+        const { error } = await admin
+          .from("hrms_role_competency").delete().eq("role_id", body.id).eq("competency", name);
+        if (error) throw new Error(error.message);
+      } else {
+        const level = Math.max(1, Math.min(5, Number(body.level) || 3));
+        const { error } = await admin.from("hrms_role_competency").upsert(
+          { role_id: body.id, competency: name, level, added_by: stamp },
+          { onConflict: "role_id,competency" },
+        );
+        if (error) {
+          if (/hrms_role_competency|does not exist|schema cache/i.test(error.message))
+            throw new HttpError(503, "Run migration 0056 first — competencies have nowhere to live yet.");
+          if (/foreign key|violates/i.test(error.message))
+            throw new HttpError(400, `“${name}” is not in the competency master.`);
+          throw new Error(error.message);
+        }
+      }
+      // a change to what a role needs is a change to the role
+      await admin.from("hrms_role")
+        .update({ pending_since: new Date().toISOString(), pending_by: stamp, updated_by: stamp, updated_at: new Date().toISOString() })
+        .eq("id", body.id);
+      try {
+        await admin.from("hrms_role_change").insert({
+          role_id: body.id, field: "competency",
+          old_value: body.remove ? name : null,
+          new_value: body.remove ? null : `${name} — level ${Math.max(1, Math.min(5, Number(body.level) || 3))}`,
+          changed_by: stamp,
+        });
+      } catch { /* the change matters more than the line about it */ }
+      return NextResponse.json({ ok: true });
     }
 
     /** { action: "resummarise", id } — rewrite the summary from the words already stored. */

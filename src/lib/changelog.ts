@@ -75,6 +75,23 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.1.6",
+    date: "2026-08-23",
+    module: "HRIS — the roles read cleanly, and competencies arrive",
+    items: [
+      "EVERY ROLE WAS CHECKED, not sampled. 134 in the register; the numbering is now identical across all 91 that are written — Job Description as A. B. C., Deliverable and Metric as 1. 2. 3. One role was out of step: Accounts Executive had been re-typed by hand as a numbered list nested wrongly inside a paragraph. Same words, put back into the house style.",
+      "NO SENTENCE IS LONGER THAN 28 WORDS anywhere in the register. There was one; there is none now.",
+      "SEVEN ROLES THAT PEOPLE ACTUALLY HOLD HAD NO DEFINITION AT ALL, and now do — Prod - Electrician, Painter, HR Manager, Head Accounts, Senior Manager-account, Manager-Manufacturing Excellence and President - Defense Biz. Written in the same plain style as the rest: short lines, ordinary words, a number wherever a number belongs. NO ACTIVE EMPLOYEE NOW HOLDS AN UNDEFINED ROLE.",
+      "The 43 still bare are historical spellings and duplicates with nobody in them. They are waiting on a decision to delete, not on somebody to write them.",
+      "COMPETENCIES. A role says what must be DELIVERED; a competency says what somebody must be ABLE TO DO to deliver it. Different questions, both needed — a Production Supervisor and a Quality Engineer can share the deliverable “the job leaves correct” and need entirely different abilities to get there.",
+      "38 COMPETENCIES SEEDED, each with a definition written in plain English and grouped: Technical · Quality & Safety · Delivery · Commercial · People. Drawing Reading, Welding, Hydraulics, Root Cause Analysis, Vendor Handling, Negotiation, Training Others, Ownership, and the rest. One definition for the whole company, because “Drawing Reading” has to mean the same thing in Design as it does on the shop floor or the word is worth nothing.",
+      "A ROLE PICKS AS MANY AS IT NEEDS, AND SETS THE LEVEL OUT OF 5. That level is the point: a Sr Design Manager and a Draughtsman both need Drawing Reading — at 5 and at 3 — and that difference IS the job. So the level sits on the join and not on the master, where it would have made each ability a single fixed height that either everybody clears or nobody does.",
+      "ONE LADDER FOR ALL OF THEM — Aware · Assisted · Independent · Advanced · Expert — so a 4 in Welding and a 4 in Negotiation are the same claim about somebody, and the numbers can be compared across two roles. That is the only reason to have numbers at all.",
+      "Adding or changing a competency is a change to the role, so it goes to RJ Approval like any other.",
+      "Migration 0056.",
+    ],
+  },
+  {
     v: "3.20.1.5",
     date: "2026-08-23",
     module: "HRIS — a person can hold more than one role",

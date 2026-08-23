@@ -21,6 +21,7 @@ import { fmtFull } from "@/lib/schedule";
 import RichText from "./RichText";
 import VoiceNote from "./RoleVoiceNote";
 import { C } from "./RecordFields";
+import { LEVELS, LEVEL_SHORT } from "@/lib/competency";
 
 export interface Role {
   id: string; role: string;
@@ -33,7 +34,10 @@ export interface Role {
   pending_since: string | null; pending_by: string | null;
   people: { id: string; name: string; onRoll: boolean }[];
   activeCount: number;
+  competencies: { competency: string; level: number }[];
 }
+
+export interface Competency { name: string; definition: string; category: string | null }
 
 interface Change {
   id: string; field: string; old_value: string | null; new_value: string | null;
@@ -57,6 +61,7 @@ export default function RoleRecord({
   const [masters, setMasters] = useState<Record<string, { value: string }[]>>({});
   /** A role reports to another ROLE, so the list is the register itself. */
   const [roleNames, setRoleNames] = useState<string[]>([]);
+  const [master, setMaster] = useState<Competency[]>([]);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
@@ -68,6 +73,7 @@ export default function RoleRecord({
       setR(found);
       // every other role, so Reports To can only point at one that exists
       setRoleNames((j.roles || []).map((x: Role) => x.role).filter((n: string) => n !== found?.role).sort());
+      setMaster(j.competencies || []);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   }, [id]);
   useEffect(() => { load(); }, [load]);
@@ -166,6 +172,8 @@ export default function RoleRecord({
             value={r.deliverable} rows={9} onSave={(v) => save("deliverable", v)} />
           <Written label="Measurement Metric" hint="How the deliverable is measured. A number, a date, or a rate."
             value={r.metric} rows={9} onSave={(v) => save("metric", v)} />
+
+          <Competencies r={r} master={master} onRun={act} />
         </div>
 
         {/* ── right: the expectation note, and the history ── */}
@@ -318,6 +326,87 @@ function Written({
       <div className="font-bold text-xs" style={{ color: C.ink }}>{label}</div>
       <div style={{ fontSize: 11, color: C.faint, lineHeight: 1.5, marginBottom: 6 }}>{hint}</div>
       <RichText value={value || ""} rows={rows} onSave={onSave} placeholder={`${label}…`} />
+    </div>
+  );
+}
+
+
+/**
+ * COMPETENCIES — what somebody must be ABLE TO DO to deliver this role.
+ *
+ * The role says what must be delivered; this says what it takes. They are
+ * different questions: a Production Supervisor and a Quality Engineer can
+ * share the deliverable "the job leaves correct" and need entirely different
+ * abilities to get there.
+ *
+ * THE LEVEL IS THE POINT. A Sr Design Manager and a Draughtsman both need
+ * Drawing Reading — at 5 and at 3 — and that difference IS the job. One
+ * ladder is used for every competency so a 4 here and a 4 there are the same
+ * claim about somebody.
+ */
+function Competencies({
+  r, master, onRun,
+}: {
+  r: Role; master: Competency[];
+  onRun: (body: Record<string, unknown>, ok: string) => Promise<void>;
+}) {
+  const [adding, setAdding] = useState("");
+  const chosen = r.competencies || [];
+  const taken = new Set(chosen.map((c) => c.competency));
+  const left = master.filter((m) => !taken.has(m.name));
+  const defOf = (n: string) => master.find((m) => m.name === n)?.definition || "";
+
+  const byCat = left.reduce<Record<string, Competency[]>>((a, c) => {
+    const k = c.category || "Other";
+    (a[k] ||= []).push(c);
+    return a;
+  }, {});
+
+  return (
+    <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: C.line }}>
+      <div className="font-bold text-xs" style={{ color: C.ink }}>Competencies</div>
+      <div style={{ fontSize: 11, color: C.faint, lineHeight: 1.5, marginBottom: 6 }}>
+        What somebody must be able to DO to hold this role, and to what level out of 5. A role can need several.
+      </div>
+
+      {chosen.length === 0 && (
+        <div className="text-xs" style={{ color: C.faint }}>None chosen yet.</div>
+      )}
+
+      {chosen.map((c) => (
+        <div key={c.competency} className="rounded p-2 mb-1.5" style={{ background: "#F8F7F3", border: `1px solid ${C.line}` }}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="font-semibold text-xs" style={{ flex: 1, minWidth: 150 }}>{c.competency}</div>
+            <select value={c.level}
+              onChange={(e) => onRun({ action: "competency", competency: c.competency, level: Number(e.target.value) }, `${c.competency} set to level ${e.target.value}`)}
+              className="text-xs rounded px-2 py-1 bg-white" style={{ border: `1px solid ${C.line}` }}>
+              {[1, 2, 3, 4, 5].map((n) => (<option key={n} value={n}>{n} — {LEVEL_SHORT[n]}</option>))}
+            </select>
+            <button onClick={() => onRun({ action: "competency", competency: c.competency, remove: true }, `${c.competency} removed`)}
+              className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#FBEDEA", color: C.red }}>×</button>
+          </div>
+          <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5, marginTop: 3 }}>{defOf(c.competency)}</div>
+          <div style={{ fontSize: 11, color: "#8A5B00", marginTop: 2 }}>
+            <b>Level {c.level}</b> — {LEVELS[c.level]}
+          </div>
+        </div>
+      ))}
+
+      <select value={adding}
+        onChange={(e) => { const v = e.target.value; setAdding(""); if (v) onRun({ action: "competency", competency: v, level: 3 }, `${v} added`); }}
+        className="text-xs rounded px-2 py-1 bg-white mt-1" style={{ border: `1px solid ${C.line}`, maxWidth: 340 }}>
+        <option value="">+ add a competency…</option>
+        {Object.entries(byCat).map(([cat, list]) => (
+          <optgroup key={cat} label={cat}>
+            {list.map((m) => (<option key={m.name} value={m.name}>{m.name}</option>))}
+          </optgroup>
+        ))}
+      </select>
+      {master.length === 0 && (
+        <div style={{ fontSize: 11, color: "#8A5B00", marginTop: 4 }}>
+          The competency master is empty — run migration 0056.
+        </div>
+      )}
     </div>
   );
 }

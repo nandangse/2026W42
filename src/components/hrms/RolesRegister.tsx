@@ -24,6 +24,7 @@ import { C } from "./RecordFields";
 import RichText, { RichTextView } from "./RichText";
 import VoiceNote from "./RoleVoiceNote";
 import type { Role } from "./RoleRecord";
+import { LEVEL_SHORT } from "@/lib/competency";
 
 
 export default function RolesRegister({ who, isOwner }: { who: string; isOwner: boolean }) {
@@ -41,7 +42,7 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
    * rich text in every row is not a table anybody can read. Open the ones you
    * want; the choice is remembered while you are on the page.
    */
-  const [cols, setCols] = useState({ jd: false, deliverable: false, metric: false, people: false });
+  const [cols, setCols] = useState({ jd: false, deliverable: false, metric: false, people: false, comp: false });
   const [msg, setMsg] = useState("");
   const [adding, setAdding] = useState("");
 
@@ -96,6 +97,15 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
         title: "Active employees holding this role",
       },
       {
+        key: "ncomp", label: "Competencies", width: 120, align: "right", numeric: true,
+        value: (r) => (r.competencies || []).length,
+        render: (r) => {
+          const n = (r.competencies || []).length;
+          return <span className="tnum" style={{ color: n ? C.ink : "#C9C6BD" }}>{n || "—"}</span>;
+        },
+        title: "How many competencies this role needs",
+      },
+      {
         key: "stage", label: "Stage", width: 90, value: (r) => r.stage,
         render: (r) => (
           <span className="rounded px-1.5 py-0.5 font-bold" style={{
@@ -112,6 +122,24 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
     if (cols.jd) out.push({ key: "job_description", label: "Job Description", width: 340, value: (r) => words(r.job_description), render: (r) => <RichTextView html={r.job_description} /> });
     if (cols.deliverable) out.push({ key: "deliverable", label: "Deliverable", width: 300, value: (r) => words(r.deliverable), render: (r) => <RichTextView html={r.deliverable} /> });
     if (cols.metric) out.push({ key: "metric", label: "Measurement Metric", width: 300, value: (r) => words(r.metric), render: (r) => <RichTextView html={r.metric} /> });
+    if (cols.comp) out.push({
+      key: "competencies", label: "Competencies", width: 320,
+      value: (r) => (r.competencies || []).map((c) => `${c.competency} ${c.level}`).join(", "),
+      render: (r) => {
+        const cs = r.competencies || [];
+        if (!cs.length) return <span style={{ color: "#C9C6BD" }}>none</span>;
+        return (
+          <span className="flex gap-1 flex-wrap">
+            {cs.map((c) => (
+              <span key={c.competency} className="rounded px-1.5" style={{ background: "#EDEAF6", fontSize: 11 }}
+                title={`${c.competency} — level ${c.level}, ${LEVEL_SHORT[c.level]}`}>
+                {c.competency} <b>{c.level}</b>
+              </span>
+            ))}
+          </span>
+        );
+      },
+    });
     if (cols.people) out.push({
       key: "people", label: "People Active", width: 320,
       value: (r) => r.people.filter((p) => p.onRoll).map((p) => p.name).join(", "),
@@ -186,7 +214,7 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
       {/* which wide columns are open */}
       <div className="flex gap-1.5 flex-wrap items-center mb-2 no-print">
         <span className="text-xs" style={{ color: C.faint }}>Columns:</span>
-        {([["jd", "Job Description"], ["deliverable", "Deliverable"], ["metric", "Measurement Metric"], ["people", "People Active"]] as const).map(([k, label]) => (
+        {([["jd", "Job Description"], ["deliverable", "Deliverable"], ["metric", "Measurement Metric"], ["comp", "Competencies"], ["people", "People Active"]] as const).map(([k, label]) => (
           <button key={k} onClick={() => setCols((c) => ({ ...c, [k]: !c[k] }))}
             className="text-xs font-semibold rounded px-2 py-1"
             style={cols[k] ? { background: "#16232F", color: "#fff" } : { background: "#fff", border: `1px solid ${C.line}`, color: C.dim }}
@@ -283,6 +311,18 @@ function RoleView({ r }: { r: Role }) {
           <Read label="Job Description" html={r.job_description} />
           <Read label="Deliverable" html={r.deliverable} />
           <Read label="Measurement Metric" html={r.metric} />
+          <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: C.line }}>
+            <div className="font-bold text-xs mb-1">Competencies — what it takes to hold this role</div>
+            {(r.competencies || []).length === 0 && <div className="text-xs" style={{ color: C.faint }}>None set yet.</div>}
+            {(r.competencies || []).map((c) => (
+              <div key={c.competency} className="flex items-center gap-2 py-1" style={{ borderTop: "1px solid #EEECE6" }}>
+                <div className="text-xs" style={{ flex: 1 }}>{c.competency}</div>
+                <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#EDEAF6", color: "#4A3B7A", fontSize: 11 }}>
+                  {c.level} · {LEVEL_SHORT[c.level]}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* ── right: what was said, and who holds it ── */}
