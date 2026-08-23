@@ -75,6 +75,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.1.5",
+    date: "2026-08-23",
+    module: "HRIS — 380 folders, and six more modules",
+    items: [
+      "EVERY EMPLOYEE NOW HAS A FOLDER ON DRIVE — all 380 of them, in “employee Data Uploads”, named the way they can be found at a glance: “Active - 6001 - Jagdishchandra Kumar”, “Inactive - 6011 - Rajiv Singh”. 201 Active, 179 Inactive, no duplicates.",
+      "BOTH THE NAME AND THE LINK ARE ON EACH RECORD, and they are separate things on purpose — the link never changes, the name is what makes the folder findable. Each was written with its own history line, so 380 records gained a folder and every one of them says when and by whom.",
+      "THE EXIT CHECKLIST IS THEREFORE LIVE. Open the Documents tab of anybody not on the roll whose folder still begins “Active - ” and the record says in red that their file cannot be closed until it is renamed.",
+      "This is now the repository for everything about a person — salary slips, continuity letters, IDP, contracts. Genie holds the address; Drive holds the paper.",
+      "SIX MORE MODULES in the menu, in the places Dr Raghu put them. Above Finalized Salary Sheets: HR QUERIES (a question put to HR and the answer it got) and RUN MONTHLY PAYROLL (days paid, and the deductions each Type attracts).",
+      "Below it: REGISTERS — Leave Ledger · Loan Ledger · Addition Deletion of Records, a line for every joiner and every leaver. APPROVALS — RJ Approval for Commercial, for Records, and for Salary Queries. POLICY — Employee Handbook · FAQs · HR Queries Solved.",
+      "The Employee Handbook has moved from the top level into Policy, where it belongs beside the FAQs and the answered queries.",
+      "Two of these already have their plumbing. Addition Deletion of Records is hrms_employee_edit_log read as a joiners-and-leavers list rather than a field history — the lines are already being written. And HR Queries Solved is simply HR Queries, published: a query answered privately helps one person, the same answer published helps everyone who was going to ask it next.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.19.1.4",
     date: "2026-08-23",
     module: "HRIS — the master is final, and its lists are masters too",
