@@ -78,6 +78,13 @@ export async function GET() {
       for (const g of hg || []) hrmsEmails.add(String(g.email || "").toLowerCase());
     } catch { /* pre-0047 */ }
 
+    // CRM grants, keyed by email for the same reason as HRMS (0055).
+    const crmEmails = new Set<string>();
+    try {
+      const { data: cg } = await admin.from("crm_access").select("email");
+      for (const g of cg || []) crmEmails.add(String(g.email || "").toLowerCase());
+    } catch { /* pre-0055 */ }
+
     // Last sign-in lives in auth.users, not profiles, so it comes from the
     // admin auth API. Failure here must not take the page down — the column
     // simply reads "—".
@@ -118,6 +125,10 @@ export async function GET() {
           hrmsEmails.has(String(u.email || "").toLowerCase()) ||
           String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         hrms_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        crm_access:
+          crmEmails.has(String(u.email || "").toLowerCase()) ||
+          String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        crm_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         goals_level:
           String(u.email || "").toLowerCase() === RAGHU_EMAIL
             ? "edit"
@@ -355,6 +366,30 @@ export async function POST(req: Request) {
         }
       } else {
         const { error } = await admin.from("hrms_access").delete().eq("email", target);
+        if (error) throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    /** { action: "crm_access", id, grant } — owner only, as with HRMS. */
+    if (body.action === "crm_access") {
+      if (!caller.isOwner)
+        throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant the CRM.`);
+      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+      const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
+      const target = String(t?.email || "").toLowerCase();
+      if (!target) return NextResponse.json({ error: "no such user" }, { status: 404 });
+      if (target === RAGHU_EMAIL)
+        return NextResponse.json({ error: "The owner holds the CRM implicitly." }, { status: 400 });
+      if (body.grant) {
+        const { error } = await admin.from("crm_access").upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
+        if (error) {
+          if (/crm_access|schema cache|does not exist/i.test(error.message))
+            return NextResponse.json({ error: "Run migration 0055 first — the CRM grant table doesn't exist yet" }, { status: 400 });
+          throw new Error(error.message);
+        }
+      } else {
+        const { error } = await admin.from("crm_access").delete().eq("email", target);
         if (error) throw new Error(error.message);
       }
       return NextResponse.json({ ok: true });

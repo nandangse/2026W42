@@ -10,7 +10,32 @@
  * function grows a lookup against crm_user and nothing else changes.
  */
 import { currentUser, HttpError, RAGHU_EMAIL, type AuthedUser } from "@/lib/auth";
+import { adminClient } from "@/lib/supabase/admin";
 import { crmDb, crmConfigured } from "./db";
+
+/**
+ * Who may open the CRM.
+ *
+ * The owner always; everybody else by an explicit row in crm_access (0055),
+ * keyed by email so a grant can be made before the account exists. Kept in
+ * GENIE'S database rather than the CRM's: the CRM has its own and cannot read
+ * this one, but the admin screen that grants it and the login it grants both
+ * live here.
+ *
+ * A missing table reads as "nobody but the owner", which is the right way for
+ * a gate to fail.
+ */
+async function granted(email: string): Promise<boolean> {
+  const e = String(email || "").trim().toLowerCase();
+  if (!e) return false;
+  if (e === RAGHU_EMAIL) return true;
+  try {
+    const { data } = await adminClient().from("crm_access").select("email").eq("email", e).maybeSingle();
+    return !!data;
+  } catch {
+    return false;
+  }
+}
 
 export interface CrmUser extends AuthedUser {
   crmRole: string;
@@ -27,9 +52,8 @@ export async function requireCrm(): Promise<CrmUser> {
   if (!u) throw new HttpError(401, "Not signed in");
   if (u.disabled) throw new HttpError(403, "Account disabled");
 
-  // The only door open today.
-  if (u.email.toLowerCase() !== RAGHU_EMAIL)
-    throw new HttpError(403, "The CRM is not open yet.");
+  if (!(await granted(u.email)))
+    throw new HttpError(403, "The CRM is not open to this account.");
 
   let crmRole = "sales_head";
   if (crmConfigured()) {
@@ -55,5 +79,5 @@ export async function requireCrm(): Promise<CrmUser> {
 /** True without throwing — for the page, which redirects rather than errors. */
 export async function mayUseCrm(): Promise<boolean> {
   const u = await currentUser();
-  return !!u && !u.disabled && u.email.toLowerCase() === RAGHU_EMAIL;
+  return !!u && !u.disabled && (await granted(u.email));
 }

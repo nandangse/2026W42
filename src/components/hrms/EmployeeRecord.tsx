@@ -21,7 +21,7 @@ import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
 import { APP_VERSION } from "@/lib/changelog";
 import { fmtFull } from "@/lib/schedule";
-import { FIELD_GROUPS, ALL_FIELDS, onRoll, tenure, type FieldSpec, type HrmsEmployee } from "@/lib/hrms";
+import { FIELD_GROUPS, ALL_FIELDS, onRoll, tenure, splitMulti, joinMulti, type FieldSpec, type HrmsEmployee } from "@/lib/hrms";
 import { C, type GenieUser } from "./RecordFields";
 
 interface HistoryRow {
@@ -329,7 +329,41 @@ function EditField({
       <div className="flex items-center gap-2 flex-wrap">
         <div className="text-xs font-semibold" style={{ color: C.dim, minWidth: 150 }}>{f.label}</div>
 
-        {f.kind === "select" ? (
+        {f.kind === "multi" ? (
+          (() => {
+            /**
+             * SEVERAL ROLES, because people here hold more than one — a
+             * supervisor who is also the safety officer is accountable for
+             * both, and one box could only ever record half of that. Each is
+             * added from the register and removed with its own ×; the IDP
+             * then briefs them on all of them.
+             */
+            const chosen = splitMulti(current);
+            const all = f.master ? (masters[f.master] || []).map((m) => m.value) : [];
+            const left = all.filter((o) => !chosen.includes(o));
+            return (
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <div className="flex gap-1 flex-wrap">
+                  {chosen.map((r, i) => (
+                    <span key={r} className="rounded px-2 py-0.5 flex items-center gap-1"
+                      style={{ background: "#FFF3E8", border: "1px solid #F5C89F", fontSize: 12 }}>
+                      {i === 0 && <span title="Listed first — the main one" style={{ color: C.orange, fontWeight: 700 }}>★</span>}
+                      {r}
+                      <button onClick={() => onSave(joinMulti(chosen.filter((x) => x !== r)))}
+                        style={{ color: C.red, fontWeight: 700 }} title={`Remove ${r}`}>×</button>
+                    </span>
+                  ))}
+                  {chosen.length === 0 && <span style={{ fontSize: 12, color: "#C9C6BD" }}>no role yet</span>}
+                </div>
+                <select value="" onChange={(ev) => { if (ev.target.value) onSave(joinMulti([...chosen, ev.target.value])); }}
+                  className="text-xs rounded px-2 py-1 bg-white mt-1.5" style={{ border: `1px solid ${C.line}`, maxWidth: 320 }}>
+                  <option value="">+ add a role…</option>
+                  {left.map((o) => (<option key={o} value={o}>{o}</option>))}
+                </select>
+              </div>
+            );
+          })()
+        ) : f.kind === "select" ? (
           (() => {
             // The master is the list. f.options is only the fallback for the
             // two lists that are policy (Status, Type) before 0049 is run.

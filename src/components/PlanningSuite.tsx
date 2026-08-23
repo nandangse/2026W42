@@ -260,6 +260,9 @@ interface AdminUser {
   /** HRMS — the people records at /hrms. Owner's grant, nobody by default. */
   hrms_access: boolean;
   hrms_implicit: boolean; // the owner — always yes, not toggleable
+  /** The CRM at /crm. Same arrangement. */
+  crm_access: boolean;
+  crm_implicit: boolean;
 }
 
 const ROLE_OPTIONS: { value: string; label: string; hint: string }[] = [
@@ -6010,6 +6013,15 @@ function Admin({
     } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
   };
 
+  /** The CRM grant, beside HRMS. Owner only, same as HRMS. */
+  const setCrm = async (id: string, grant: boolean) => {
+    setGaMsg("");
+    try {
+      await api.post("/api/admin/users", { action: "crm_access", id, grant });
+      loadUsers();
+    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
   /** Goals access from inside the Users table. Reloads both lists. */
   const setGoalsLevel = async (id: string, level: string) => {
     const who = (users ?? []).find((x) => x.id === id);
@@ -6420,6 +6432,58 @@ function Admin({
         )}
       </div>
       </>)}
+
+      {/* ── who can open the two apps that are not Genie ── */}
+      {adminTab === "users" && (
+        <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+          <div className="font-bold text-sm mb-1">
+            🗝 App access <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— the two applications that are not Genie</span>
+          </div>
+          <div className="text-xs mb-3 rounded p-2" style={{ background: "#F4F2EC", color: "#5A6672", lineHeight: 1.5 }}>
+            <b>CRM</b> (genie.nandan.co.in/crm) and <b>HRMS</b> (genie.nandan.co.in/hrms) are separate applications
+            reached with the same login. Both are granted per person and to <b>nobody by default</b>, and only{" "}
+            {OWNER_EMAIL} may tick them — HRMS holds dates of birth, home addresses and next of kin, and the CRM holds
+            the pipeline. Somebody with no tick simply never sees the door.
+          </div>
+          {gaMsg && <div className="text-xs font-semibold mb-2" style={{ color: gaMsg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{gaMsg}</div>}
+          <div className="overflow-x-auto">
+            <table className="text-xs w-full" style={{ minWidth: 520 }}>
+              <thead>
+                <tr style={{ color: "#8A94A0" }}>
+                  <th className="text-left py-1 font-semibold">Person</th>
+                  <th className="text-left py-1 font-semibold">Email</th>
+                  <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/crm">💼 CRM</th>
+                  <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/hrms — people records">👤 HRMS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(users ?? []).filter((u) => !u.disabled).map((u) => (
+                  <tr key={u.id} style={{ borderTop: "1px solid #EEECE6" }}>
+                    <td className="py-1.5">{u.display_name || u.email.split("@")[0]}</td>
+                    <td className="py-1.5" style={{ color: "#8A94A0" }}>{u.email}</td>
+                    <td className="py-1.5 text-center">
+                      <input type="checkbox" checked={!!u.crm_access} disabled={!isOwner || u.crm_implicit}
+                        onChange={(e) => setCrm(u.id, e.target.checked)}
+                        style={{ accentColor: "#1B3A5C", width: 14, height: 14, cursor: isOwner && !u.crm_implicit ? "pointer" : "default" }}
+                        title={u.crm_implicit ? "The owner holds it already" : isOwner ? "Open the CRM" : `Only ${OWNER_EMAIL} may grant this`} />
+                    </td>
+                    <td className="py-1.5 text-center">
+                      <input type="checkbox" checked={!!u.hrms_access} disabled={!isOwner || u.hrms_implicit}
+                        onChange={(e) => setHrms(u.id, e.target.checked)}
+                        style={{ accentColor: "#E8600A", width: 14, height: 14, cursor: isOwner && !u.hrms_implicit ? "pointer" : "default" }}
+                        title={u.hrms_implicit ? "The owner holds it already" : isOwner ? "Open HRMS — people records" : `Only ${OWNER_EMAIL} may grant this`} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="text-xs mt-2" style={{ color: "#8A94A0", lineHeight: 1.6 }}>
+            Both grants are held against the <b>email address</b>, so somebody can be granted before their Genie
+            account exists — the grant waits for the account. Anyone granted here can edit as well as read.
+          </div>
+        </div>
+      )}
 
       {adminTab === "users" && (
         <button onClick={() => setShowGoalsAccess((v) => !v)} className="text-xs font-bold rounded px-3 py-1.5"

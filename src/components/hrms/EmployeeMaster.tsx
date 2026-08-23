@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
-import { FIELD_GROUPS, ALL_FIELDS, onRoll, tenure, type HrmsEmployee } from "@/lib/hrms";
+import { FIELD_GROUPS, ALL_FIELDS, onRoll, tenure, splitMulti, type HrmsEmployee } from "@/lib/hrms";
 import { ReadField, C as CC } from "./RecordFields";
 import DataTable, { type Column } from "./DataTable";
 import { Pane } from "./Pane";
@@ -107,7 +107,7 @@ export default function EmployeeMaster({
 
   const roles = useMemo(() => {
     const s = new Set<string>();
-    for (const e of inView) if (val(e, "role")) s.add(val(e, "role"));
+    for (const e of inView) for (const r of splitMulti(val(e, "role"))) s.add(r);
     return [...s].sort();
   }, [inView]);
   const types = useMemo(() => {
@@ -120,7 +120,7 @@ export default function EmployeeMaster({
     const needle = q.trim().toLowerCase();
     return inView.filter((e) => {
       if (dept && val(e, "department") !== dept) return false;
-      if (role && val(e, "role") !== role) return false;
+      if (role && !splitMulti(val(e, "role")).includes(role)) return false;
       if (type && val(e, "type") !== type) return false;
       if (!needle) return true;
       return [e.id, val(e, "name"), val(e, "email"), val(e, "department"), val(e, "designation"), val(e, "location"), val(e, "phone")]
@@ -168,8 +168,20 @@ export default function EmployeeMaster({
       ),
     },
     { key: "department", label: "Department", width: 150, value: (e) => val(e, "department") },
-    { key: "role", label: "Role", width: 190, value: (e) => val(e, "role"),
-      title: "The enforceable one — defined in IDP → Roles, JD, KRA, KPI" },
+    { key: "role", label: "Roles", width: 220,
+      value: (e) => splitMulti(val(e, "role")).join(" · "),
+      render: (e) => {
+        const rs = splitMulti(val(e, "role"));
+        if (!rs.length) return null;
+        return (
+          <span className="flex gap-1 flex-wrap">
+            {rs.map((r) => (
+              <span key={r} className="rounded px-1.5" style={{ background: "#FFF3E8", fontSize: 11 }}>{r}</span>
+            ))}
+          </span>
+        );
+      },
+      title: "The enforceable ones — defined in IDP → Roles, JD, KRA, KPI. Somebody can hold more than one." },
     { key: "designation", label: "Designation", width: 200, value: (e) => val(e, "designation"),
       title: "What goes on the visiting card. The Role beside it is the accountable one." },
     { key: "email", label: "Work email", width: 210, value: (e) => val(e, "email") },

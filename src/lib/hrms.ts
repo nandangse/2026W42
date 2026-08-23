@@ -24,7 +24,14 @@ export type FieldKind =
   /** One of `options`. */
   | "select"
   /** Picked from Genie's own user list; writes the account's email. */
-  | "user";
+  | "user"
+  /**
+   * SEVERAL of something. Stored as one value per line, because the thing
+   * being listed is role names and two of them already contain a comma
+   * ("Head, Purchase") — a comma-separated list would have split them in
+   * half the first time anybody used it.
+   */
+  | "multi";
 
 export interface FieldSpec {
   key: string;
@@ -234,8 +241,8 @@ export const FIELD_GROUPS: FieldGroup[] = [
       { key: "doj", label: "Date of joining", kind: "date", column: "doj", sheet: true },
       { key: "department", label: "Department", kind: "select", column: "department", sheet: true, master: "department" },
       { key: "grade", label: "Grade", kind: "select", sheet: true, master: "grade" },
-      { key: "role", label: "Role", kind: "select", sheet: true, master: "__roles__",
-        hint: "ENFORCEABLE. Chosen from the role register — IDP → Roles, JD, KRA, KPI — where each role carries its job description, its deliverable and how it is measured." },
+      { key: "role", label: "Roles", kind: "multi", sheet: true, master: "__roles__",
+        hint: "ENFORCEABLE, and there can be MORE THAN ONE. Chosen from the role register — IDP → Roles, JD, KRA, KPI — where each role carries its job description, its deliverable and how it is measured. Somebody who holds two roles is accountable for both, and their IDP shows both." },
       { key: "designation", label: "Designation", kind: "text", column: "designation", sheet: true,
         hint: "What goes on the visiting card. Defaults to the Role and may be overwritten — it is vanity, and harmless as long as it is not mistaken for the role." },
       t("reporting_manager", "Reporting manager", "Reporting Manager"),
@@ -441,6 +448,13 @@ export const ALL_FIELDS: FieldSpec[] = FIELD_GROUPS.flatMap((g) => g.fields);
 export const SAFE_KEYS = new Set(
   FIELD_GROUPS.filter((g) => !g.confidential).flatMap((g) => g.fields.map((f) => f.key)),
 );
+
+/** A "multi" value is one entry per line. Empty lines are not entries. */
+export const splitMulti = (v: string | null | undefined): string[] =>
+  String(v || "").split("\n").map((x) => x.trim()).filter(Boolean);
+
+export const joinMulti = (list: string[]): string | null =>
+  list.map((x) => x.trim()).filter(Boolean).join("\n") || null;
 
 const BY_KEY = new Map(ALL_FIELDS.map((f) => [f.key, f]));
 

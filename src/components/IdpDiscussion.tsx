@@ -38,7 +38,7 @@ interface Done extends Open { submitted_at: string }
 export default function IdpDiscussion({ name, initials }: { name: string; initials: string | null }) {
   const [state, setState] = useState<{
     open: Open | null; done: Done[];
-    role: string | null; roleSummary: string | null; roleDoc: RoleDoc | null; needsMigration?: boolean;
+    role: string | null; roleSummary: string | null; roleDocs: RoleDoc[]; needsMigration?: boolean;
     employee: { id: string; name: string } | null;
     isLeader?: boolean;
   } | null>(null);
@@ -49,7 +49,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
   const load = useCallback(async () => {
     try {
       const j = await api.get("/api/idp");
-      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, roleDoc: j.roleDoc ?? null, needsMigration: j.needsMigration, employee: j.employee ?? null, isLeader: !!j.isLeader });
+      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, roleDocs: j.roleDocs ?? [], needsMigration: j.needsMigration, employee: j.employee ?? null, isLeader: !!j.isLeader });
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -63,7 +63,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
   if (!state) return <Shell initials={initials}><div className="p-6 text-sm" style={{ color: C.faint }}>Loading…</div></Shell>;
 
-  if (state.open) return <Shell initials={initials}><Filling open={state.open} roleDoc={state.roleDoc} isLeader={!!state.isLeader} onDone={load} /></Shell>;
+  if (state.open) return <Shell initials={initials}><Filling open={state.open} roleDocs={state.roleDocs} isLeader={!!state.isLeader} onDone={load} /></Shell>;
 
   const last = state.done[0];
   if (last) {
@@ -238,7 +238,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
 /* ─────────────────────────── the discussion ─────────────────────────── */
 
-function Filling({ open, roleDoc, isLeader, onDone }: { open: Open; roleDoc: RoleDoc | null; isLeader: boolean; onDone: () => Promise<void> }) {
+function Filling({ open, roleDocs, isLeader, onDone }: { open: Open; roleDocs: RoleDoc[]; isLeader: boolean; onDone: () => Promise<void> }) {
   const [answers, setAnswers] = useState<Record<string, string>>(open.answers || {});
   const [audio, setAudio] = useState<Record<string, Rec[]>>(open.audioUrls || {});
   const [ratings, setRatings] = useState<Record<string, number>>(open.ratings || {});
@@ -324,7 +324,15 @@ function Filling({ open, roleDoc, isLeader, onDone }: { open: Open; roleDoc: Rol
         </span>
       </div>
 
-      <RoleBrief roleDoc={roleDoc} fallbackRole={open.role_at_time} fallbackSummary={open.role_summary} startOpen={step === 0} />
+      {/* one brief per role — somebody with two roles is briefed on both */}
+      {roleDocs.length === 0 && open.role_summary && (
+        <RoleBrief roleDoc={null} fallbackRole={open.role_at_time} fallbackSummary={open.role_summary} startOpen={step === 0} />
+      )}
+      {roleDocs.map((d, i) => (
+        <RoleBrief key={d.role} roleDoc={d} fallbackRole={null} fallbackSummary={null}
+          startOpen={step === 0 && i === 0}
+          count={roleDocs.length > 1 ? `Role ${i + 1} of ${roleDocs.length}` : undefined} />
+      ))}
 
       {/* ── a written section ── */}
       {section && (
@@ -497,8 +505,8 @@ function Filling({ open, roleDoc, isLeader, onDone }: { open: Open; roleDoc: Rol
  * It is open when the page loads, and can be folded away once read.
  */
 function RoleBrief({
-  roleDoc, fallbackRole, fallbackSummary, startOpen = true,
-}: { roleDoc: RoleDoc | null; fallbackRole: string | null; fallbackSummary: string | null; startOpen?: boolean }) {
+  roleDoc, fallbackRole, fallbackSummary, startOpen = true, count,
+}: { roleDoc: RoleDoc | null; fallbackRole: string | null; fallbackSummary: string | null; startOpen?: boolean; count?: string }) {
   const [open, setOpen] = useState(startOpen);
   if (!roleDoc && !fallbackSummary) return null;
   const d = roleDoc;
@@ -507,7 +515,7 @@ function RoleBrief({
     <div className="rounded-lg mb-5" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
       <button onClick={() => setOpen((v) => !v)} className="w-full text-left px-3 py-3">
         <div style={{ fontSize: 12, color: C.faint, letterSpacing: 0.3, textTransform: "uppercase" }}>
-          Your role, as the company has written it — read this first
+          {count ? `${count} — you hold more than one, and you are accountable for each` : "Your role, as the company has written it — read this first"}
         </div>
         <div className="flex items-baseline gap-2 flex-wrap">
           <div className="font-bold" style={{ fontSize: 18 }}>{d?.role || fallbackRole || "Your role"}</div>

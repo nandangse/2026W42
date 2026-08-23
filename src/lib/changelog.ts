@@ -75,6 +75,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.1.5",
+    date: "2026-08-23",
+    module: "HRIS — a person can hold more than one role",
+    items: [
+      "ROLES ARE PLURAL NOW. A supervisor who is also the safety officer is accountable for BOTH, and one box could only ever record half of that. Roles are added from the register one at a time and removed with their own ×; the first in the list is marked with a star as the main one.",
+      "EVERY ONE OF THEM IS STILL ENFORCED — each has to exist in the register, and the same role cannot be listed twice.",
+      "THE DIRECTORY SHOWS THEM ALL as separate chips, and the ROLE FILTER matches anybody who holds that role among their several rather than only those for whom it is the only one.",
+      "THE IDP BRIEFS ON ALL OF THEM. Somebody with two roles reads two briefs before they answer anything — both job descriptions, both deliverables, both metrics, and both of Dr Raghu's recordings, each headed “Role 1 of 2 — you hold more than one, and you are accountable for each”. What is frozen onto their record is every role's expectation together.",
+      "Designation is untouched and stays hand-written. It is one line on a visiting card; the roles are what somebody answers for.",
+      "APP ACCESS, BELOW THE USER TABLE IN ADMIN: one row per person, a tick for CRM and a tick for HRMS. Both granted per person, to nobody by default, and only the owner may tick either — HRMS holds dates of birth, home addresses and next of kin, and the CRM holds the pipeline.",
+      "THE CRM IS NOW A GRANT RATHER THAN ONE HARD-CODED ADDRESS. It has been open to raghu@nandan.co.in alone, written into the code; it reads a table now, so somebody can be added without a deploy. Who may see something is an operating decision, not a release.",
+      "Both grants are held against the EMAIL, so somebody can be granted before their Genie account exists — the grant waits for the account. aridnani125@gmail.com is granted HRMS on exactly that basis.",
+      "Migration 0055 — and it also puts vinaym@ (Vinay Mande), tushar@ and aridnani125@gmail.com into HRMS.",
+    ],
+  },
+  {
     v: "3.20.1.4",
     date: "2026-08-23",
     module: "IDP — front and back",

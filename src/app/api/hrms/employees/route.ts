@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import {
-  fieldSpec, hrmsTables, ALL_FIELDS, CLAIMED_HEADERS, NAMED_COLUMNS,
+  fieldSpec, hrmsTables, ALL_FIELDS, CLAIMED_HEADERS, NAMED_COLUMNS, splitMulti,
   type FieldSpec, type HrmsEmployee,
 } from "@/lib/hrms";
 
@@ -171,16 +171,19 @@ export async function POST(req: Request) {
        * dropdown is a convenience and not a rule.
        */
       if (field === "role" && action === "edit") {
-        const wanted = String(body.value ?? "").trim();
-        if (wanted) {
-          const { data: known } = await admin.from("hrms_role").select("role").eq("role", wanted).maybeSingle();
+        // several roles, one per line — every one of them has to exist
+        const wanted = splitMulti(String(body.value ?? ""));
+        for (const w of wanted) {
+          const { data: known } = await admin.from("hrms_role").select("role").eq("role", w).maybeSingle();
           if (!known)
             throw new HttpError(
               400,
-              `“${wanted}” is not in the role register. Add it under IDP → Roles, JD, KRA, KPI first — a role ` +
+              `“${w}” is not in the role register. Add it under IDP → Roles, JD, KRA, KPI first — a role ` +
                 `nobody has defined cannot be one somebody is accountable for.`,
             );
         }
+        const dupes = wanted.filter((w, i) => wanted.indexOf(w) !== i);
+        if (dupes.length) throw new HttpError(400, `“${dupes[0]}” is listed twice.`);
       }
 
       /**
@@ -190,7 +193,7 @@ export async function POST(req: Request) {
        * exists" (Dr Raghu). Checked against every other employee's current
        * value, which for initials lives entirely in the overlay.
        */
-      if (spec.master && spec.master !== "__roles__" && action === "edit" && body.value) {
+      if (spec.master && spec.master !== "__roles__" && spec.kind !== "multi" && action === "edit" && body.value) {
         // the value has to be on its master's list too
         const { data: onList } = await admin
           .from("hrms_master").select("value").eq("kind", spec.master).eq("value", String(body.value).trim()).maybeSingle();

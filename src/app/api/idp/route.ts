@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { hrmsTables } from "@/lib/hrms";
+import { hrmsTables, splitMulti } from "@/lib/hrms";
 import { CONSENT_TEXT, isComplete } from "@/lib/idp";
 
 export const dynamic = "force-dynamic";
@@ -47,11 +47,19 @@ async function whoAreThey(email: string) {
         emp = (e2 as typeof emp) ?? null;
       }
     }
-    if (!emp) return { employee: null, role: null, roleSummary: null, roleDoc: null, isLeader: false };
+    if (!emp) return { employee: null, role: null, roleSummary: null, roleDocs: [], isLeader: false };
 
     const { data: roleEdit } = await admin
       .from(T.edits).select("value").eq("employee_id", emp.id).eq("field", "role").maybeSingle();
-    const roleName = (roleEdit?.value as string | null) || emp.designation || null;
+    /**
+     * SEVERAL ROLES. Somebody who is a supervisor AND the safety officer is
+     * accountable for both, so the IDP briefs them on both — every job
+     * description, every deliverable, every metric, and every recording. One
+     * role's worth of expectation would be half a brief.
+     */
+    const roleNames = splitMulti(roleEdit?.value as string | null);
+    if (!roleNames.length && emp.designation) roleNames.push(String(emp.designation));
+    const roleName = roleNames[0] || null;
     let roleSummary: string | null = null;
     /**
      * The role AS WRITTEN, and the note AS SPOKEN — both put in front of the
@@ -60,29 +68,31 @@ async function whoAreThey(email: string) {
      * definition as it stands today; what is FROZEN onto their record is the
      * summary they were answering against.
      */
-    let roleDoc: Record<string, unknown> | null = null;
-    if (roleName) {
+    const roleDocs: Record<string, unknown>[] = [];
+    for (const name of roleNames) {
       const { data: r } = await admin
         .from("hrms_role")
         .select("role, department, grade, reports_to, location, job_description, deliverable, metric, stage, summary, transcript, voice_path, voice_seconds")
-        .eq("role", roleName).maybeSingle();
-      roleSummary = (r?.summary as string | null) ?? null;
-      if (r) {
-        let url: string | null = null;
-        if (r.voice_path) {
-          const { data: sgn } = await admin.storage.from(BUCKET).createSignedUrl(String(r.voice_path), LINK_TTL);
-          url = sgn?.signedUrl ?? null;
-        }
-        roleDoc = { ...r, url };
+        .eq("role", name).maybeSingle();
+      if (!r) continue;
+      let url: string | null = null;
+      if (r.voice_path) {
+        const { data: sgn } = await admin.storage.from(BUCKET).createSignedUrl(String(r.voice_path), LINK_TTL);
+        url = sgn?.signedUrl ?? null;
       }
+      roleDocs.push({ ...r, url });
     }
+    // what is frozen onto the record: every role's expectation, together
+    roleSummary =
+      roleDocs.map((d) => (roleDocs.length > 1 ? `${d.role}:\n${d.summary || "—"}` : String(d.summary || ""))) 
+        .filter((x) => x && !x.endsWith("—")).join("\n\n") || null;
     // the Leaders Council, from the master's own "In LC" column
     const { data: full } = await admin.from(T.employees).select("extra").eq("id", emp.id).maybeSingle();
     const lc = String(((full?.extra || {}) as Record<string, string>)["In LC"] || "").toLowerCase();
     const isLeader = lc.includes("leader") || lc === "yes" || lc === "y";
-    return { employee: emp, role: roleName, roleSummary, roleDoc, isLeader };
+    return { employee: emp, role: roleNames.join(" · ") || roleName, roleSummary, roleDocs, isLeader };
   } catch {
-    return { employee: null, role: null, roleSummary: null, roleDoc: null, isLeader: false };
+    return { employee: null, role: null, roleSummary: null, roleDocs: [], isLeader: false };
   }
 }
 
