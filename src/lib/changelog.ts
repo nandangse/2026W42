@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.2.2",
+    date: "2026-08-23",
+    module: "IDP — nothing said is dropped, and the page stops double-spacing",
+    items: [
+      "YOUR TEST CAUGHT IT: a two-minute answer went in and three sentences came out. The writing-out step was told to be faithful and given room for only about 650 words — so a long answer was quietly truncated, and worse, the words on screen looked complete. The output room is now ~6,000 words and the input takes about 45 minutes of continuous speech; the tidying step is allowed 60 seconds instead of the default.",
+      "AND THE INSTRUCTION ITSELF IS NOW BLUNT: you are a typist, not an editor. If they mentioned twelve things, the answer contains twelve things — no summarising, no picking the important ones, no merging two into one. A point somebody said out loud that goes missing is a failure, because it is their development plan, not the machine's.",
+      "THE LAST SENTENCE WAS ALSO BEING LOST — the recogniser delivers the final phrase a moment AFTER Stop is pressed, and the transcript was read immediately. It now waits half a second, which is where the end of “…organising training” went.",
+      "THE BLANK LINES BETWEEN SENTENCES ARE GONE. One line per point, single-spaced — a tight answer was being turned into a sparse page, and saying more should not mean scrolling more.",
+      "While it listens it now shows the WORDS CAUGHT count beside the clock, so a dictation that stops catching is visible while you are still speaking rather than discovered afterwards.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.2.1",
     date: "2026-08-23",
     module: "IDP — the instructions stay reachable",

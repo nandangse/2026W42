@@ -86,7 +86,7 @@ export default function DictateBox({
     setBusy(true);
     if (said) {
       const text = await polish(said);
-      onChange(value.trim() ? `${value.trim()}\n\n${text}` : text);
+      onChange(value.trim() ? `${value.trim()}\n${text}` : text);
     }
     if (blob && blob.size && idpId && qid) {
       try {
@@ -109,9 +109,16 @@ export default function DictateBox({
     if (srRef.current) { srRef.current.onend = null; srRef.current.onerror = null; }
     try { srRef.current?.stop(); } catch { /* not running */ }
     setRec(false);
+    /**
+     * THE LAST SENTENCE ARRIVES AFTER STOP IS PRESSED. The recogniser
+     * delivers the final result for whatever was being said a moment later,
+     * so reading the transcript immediately loses the end of it — which is
+     * usually the point somebody was building to. Half a second is enough.
+     */
+    const secondsNow = Math.max(1, Math.round((Date.now() - startedRef.current) / 1000));
     const mr = mediaRef.current;
     if (mr && mr.state !== "inactive") { try { mr.stop(); } catch { /* already stopped */ } }
-    else finish(null, Math.round((Date.now() - startedRef.current) / 1000));
+    else setTimeout(() => finish(null, secondsNow), 600);
   };
 
   const start = async () => {
@@ -127,8 +134,10 @@ export default function DictateBox({
       mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
       mr.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
-        finish(new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" }),
-               Math.max(1, Math.round((Date.now() - startedRef.current) / 1000)));
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
+        const secs2 = Math.max(1, Math.round((Date.now() - startedRef.current) / 1000));
+        // see stop(): the recogniser's last result lands after this fires
+        setTimeout(() => finish(blob, secs2), 600);
       };
       mr.start();
       mediaRef.current = mr;
@@ -179,9 +188,9 @@ export default function DictateBox({
         if (!runningRef.current) return;
         attempts++;
         if (attempts > 40) { setErr("Dictation keeps stopping. Your recording is still being kept."); return; }
-        setTimeout(spin, 300);
+        setTimeout(spin, 80);
       };
-      try { any.start(); } catch { setTimeout(spin, 500); }
+      try { any.start(); } catch { setTimeout(spin, 250); }
       srRef.current = any;
     };
     spin();
@@ -212,14 +221,14 @@ export default function DictateBox({
           )}
           <span style={{ fontSize: 11, color: rec ? C.red : C.faint }}>
             {rec
-              ? `● listening ${mmss(secs)} — take your time, pauses are fine`
+              ? `● listening ${mmss(secs)} · ${textRef.current.trim().split(/\s+/).filter(Boolean).length} words caught — take your time, pauses are fine`
               : "Speak it and Genie writes it in plain English, added under what is already there. Your recording is kept."}
           </span>
         </div>
       )}
 
       {rec && live && (
-        <div className="rounded p-2 mt-1" style={{ background: "#FFF7E6", fontSize: 12, color: C.dim, lineHeight: 1.5, maxHeight: 130, overflowY: "auto" }}>
+        <div className="rounded p-2 mt-1" style={{ background: "#FFF7E6", fontSize: 12, color: C.dim, lineHeight: 1.5, maxHeight: 260, overflowY: "auto" }}>
           {live}
         </div>
       )}

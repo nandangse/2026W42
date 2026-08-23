@@ -5,6 +5,8 @@ import { hrmsTables, splitMulti } from "@/lib/hrms";
 import { CONSENT_TEXT, isComplete } from "@/lib/idp";
 
 export const dynamic = "force-dynamic";
+/** Tidying ten minutes of speech takes longer than a default timeout allows. */
+export const maxDuration = 60;
 
 const CYCLE = "2026-27";
 const BUCKET = "voice-notes";
@@ -208,26 +210,45 @@ export async function POST(req: Request) {
           headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
           body: JSON.stringify({
             model: "claude-sonnet-5",
-            max_tokens: 900,
+            /**
+             * ROOM FOR A LONG ANSWER.
+             *
+             * 900 tokens was about 650 words — enough for a minute of speech
+             * and not for five. Somebody asked to say what they are
+             * accountable for can talk for ten minutes, and the answer being
+             * cut off at the point they got interesting is the worst possible
+             * place to stop. 8000 is roughly six thousand words out.
+             */
+            max_tokens: 8000,
             system:
               "Somebody at an Indian engineering company is speaking their answer to a question in their own " +
               "development plan. The dictation is rough and is often a MIX OF ENGLISH AND HINDI.\n\n" +
-              "Write out what they said as clear, simple English.\n\n" +
-              "Rules:\n" +
+              "Your job is to WRITE OUT what they said in clear simple English. You are a typist, not an editor.\n\n" +
+              "THE MOST IMPORTANT RULE: KEEP EVERY SINGLE POINT THEY MADE.\n" +
+              "If they mentioned twelve things, your answer must contain twelve things. Do not summarise. Do not " +
+              "pick the important ones. Do not merge two points into one. Do not stop early. A point they made " +
+              "that is missing from your answer is a failure — it is their development plan, not yours, and " +
+              "something they said out loud has been taken away from them.\n\n" +
+              "The rest:\n" +
               "1. FIRST PERSON — write as 'I', because these are their words about themselves.\n" +
-              "2. SIMPLE ENGLISH. Short sentences. Ordinary words. A person who finished class 10 must understand it.\n" +
+              "2. SIMPLE ENGLISH. Short sentences, ordinary words. A person who finished class 10 must understand it.\n" +
               "3. Translate anything said in Hindi.\n" +
-              "4. Keep EVERY point they made. Do not shorten, do not summarise, do not add anything they did not say.\n" +
-              "5. If they listed things, use one line per item starting with '- '.\n" +
-              "6. Fix the grammar and remove the ums, repetitions and false starts.\n" +
-              "7. Answer with the text only. No preamble, no heading, no comment about the task.",
-            messages: [{ role: "user", content: text.slice(0, 8000) }],
+              "4. ONE LINE PER POINT. Put each on its own line with a single newline between them. NEVER leave a " +
+              "blank line between lines.\n" +
+              "5. If they were clearly listing things, start each line with '- '. Otherwise plain lines.\n" +
+              "6. Fix the grammar and take out the ums, the repetitions and the false starts. Nothing else.\n" +
+              "7. Answer with the text only. No preamble, no heading, no closing comment.",
+            messages: [{ role: "user", content: text.slice(0, 60000) }],
           }),
         });
         if (!r.ok) return NextResponse.json({ text });
         const j = await r.json();
         const out = j?.content?.[0]?.text;
-        return NextResponse.json({ text: typeof out === "string" && out.trim() ? out.trim() : text });
+        if (typeof out !== "string" || !out.trim()) return NextResponse.json({ text });
+        // one line per point, single-spaced: the model likes a blank line
+        // between sentences and it turns a tight answer into a sparse page
+        const tidy = out.trim().replace(/\r/g, "").replace(/\n{2,}/g, "\n");
+        return NextResponse.json({ text: tidy });
       } catch {
         // the words are the person's; hand them back rather than losing them
         return NextResponse.json({ text });
