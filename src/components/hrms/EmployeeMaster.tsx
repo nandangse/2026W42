@@ -27,6 +27,9 @@ import { Pane } from "./Pane";
 
 export type MasterView = "active" | "past" | "left";
 
+/** Always on the table, so they are not offered as something to add. */
+const ALWAYS = ["id", "name", "department", "role", "designation", "email", "location", "type", "status", "doj", "active"];
+
 /** FY 2025-26 closed on this date. */
 const FY2526_END = "2026-03-31";
 
@@ -54,6 +57,28 @@ export default function EmployeeMaster({
   const [dept, setDept] = useState("");
   const [role, setRole] = useState("");
   const [type, setType] = useState("");
+  /**
+   * ADD COLUMN. The record carries about ninety fields and a table cannot
+   * show ninety; these nine are what a directory is usually read for, and the
+   * rest are one tick away. The choice is remembered on this browser, because
+   * whoever works the payroll wants the pay columns every time and whoever
+   * works joiners never does.
+   */
+  const [extraCols, setExtraCols] = useState<string[]>([]);
+  const [colsOpen, setColsOpen] = useState(false);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("hrms.master.columns");
+      if (saved) setExtraCols(JSON.parse(saved));
+    } catch { /* a browser that refuses storage simply forgets */ }
+  }, []);
+  const toggleCol = (key: string) => {
+    setExtraCols((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+      try { window.localStorage.setItem("hrms.master.columns", JSON.stringify(next)); } catch { /* as above */ }
+      return next;
+    });
+  };
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [local, setLocal] = useState<HrmsEmployee[] | null>(null);
@@ -183,7 +208,22 @@ export default function EmployeeMaster({
       },
       title: "The master's own six: Active, Resigned, Terminated, Doubtful, Notice Period, F&F Due",
     },
-  ], []);
+    ...extraCols
+      .map((k) => ALL_FIELDS.find((f) => f.key === k))
+      .filter(Boolean)
+      .map((f) => ({
+        key: f!.key,
+        label: f!.label,
+        width: f!.kind === "long" ? 260 : f!.kind === "money" || f!.kind === "number" ? 120 : 170,
+        align: (f!.kind === "money" || f!.kind === "number" ? "right" : "left") as "left" | "right",
+        numeric: f!.kind === "money" || f!.kind === "number",
+        value: (e: HrmsEmployee) => {
+          if (f!.derived) return f!.derived(e.value);
+          return val(e, f!.key);
+        },
+        title: f!.hint,
+      })),
+  ], [extraCols]);
 
   // Editing moved to the record's own page (3.19.2.0) — the directory only reads.
 
@@ -287,10 +327,53 @@ export default function EmployeeMaster({
             <option value="">All types</option>
             {types.map((d) => (<option key={d} value={d}>{d}</option>))}
           </select>
+          <button onClick={() => setColsOpen((v) => !v)} className="text-xs font-bold rounded px-2.5 py-1.5"
+            style={{ background: extraCols.length ? "#16232F" : "#fff", color: extraCols.length ? "#fff" : C.dim, border: `1px solid ${C.line}` }}
+            title="Choose which of the record's fields appear as columns">
+            + Add column{extraCols.length ? ` (${extraCols.length})` : ""}
+          </button>
           <span className="text-xs" style={{ color: C.faint }}>
             {all === null ? "loading…" : `${filtered.length} shown`} · click a header to sort, 📌 to freeze columns
           </span>
         </div>
+
+        {colsOpen && (
+          <div className="bg-white rounded-lg border p-3 mb-2 no-print" style={{ borderColor: C.line }}>
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <div className="font-bold text-xs">Columns on this table</div>
+              <div style={{ fontSize: 11, color: C.faint }}>
+                Tick to add, untick to remove. Remembered on this browser.
+              </div>
+              {extraCols.length > 0 && (
+                <button onClick={() => { setExtraCols([]); try { window.localStorage.removeItem("hrms.master.columns"); } catch {} }}
+                  className="text-xs font-bold rounded px-2 py-0.5 ml-auto" style={{ background: "#F4F2EC", color: C.dim }}>
+                  clear all {extraCols.length}
+                </button>
+              )}
+            </div>
+            {FIELD_GROUPS.map((g) => {
+              const fields = g.fields.filter((f) => !ALWAYS.includes(f.key));
+              if (!fields.length) return null;
+              return (
+                <div key={g.key} className="mb-1.5">
+                  <div style={{ fontSize: 10.5, color: C.faint, textTransform: "uppercase", letterSpacing: 0.3 }}>
+                    {g.label}
+                    {g.confidential && <span style={{ color: C.red, marginLeft: 4 }}>confidential</span>}
+                  </div>
+                  <div className="flex gap-x-3 gap-y-0.5 flex-wrap">
+                    {fields.map((f) => (
+                      <label key={f.key} className="flex items-center gap-1 text-xs" style={{ cursor: "pointer", color: C.dim }}>
+                        <input type="checkbox" checked={extraCols.includes(f.key)} onChange={() => toggleCol(f.key)}
+                          style={{ accentColor: "#E8600A", width: 13, height: 13 }} />
+                        {f.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {exportOpen && (
           <div className="bg-white rounded-lg border p-3 mb-2 no-print" style={{ borderColor: "#F5B32B" }}>

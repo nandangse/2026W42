@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.0.2",
+    date: "2026-08-23",
+    module: "HRIS — logins joined to records, and columns you choose",
+    items: [
+      "17 OF THE 21 UNLINKED LOGINS ARE NOW JOINED TO THEIR RECORDS, so 58 of the 62 live Genie accounts resolve to somebody on the master and can reach the IDP. Vinay Mande among them — his record says hr@nandan.co.in and he signs in as vinaym@, which is exactly the case the Genie user field exists for. Also Tushar Giri, J C Kumar to the Chairman's record, and fourteen more.",
+      "WRITTEN OUT BY HAND, NOT MATCHED BY ALGORITHM, with the reason beside each one. A fuzzy matcher was tried first and wanted to make Vinay Mande into Vinay Tiwari, Ravi Rai into Ravi Rawat and J C Kumar into Kishor Kumar Shetty. Attaching somebody's login to the wrong personnel record is not a class of mistake to leave to a similarity score.",
+      "FOUR ARE DELIBERATELY LEFT ALONE. medhansh@ and dosianil@ (Anil Jain) match nobody on the master at all — they are not employees on it. ravikumar@ could be Ravindra Kumar or Ravi Hiraman Rawat; rajendra@, whose profile reads “Raju”, could be Rajendra Chorage or Raju Bhagirathi. Two plausible people each, so neither was guessed.",
+      "+ ADD COLUMN on the employee master. The record carries about ninety fields and a table cannot show ninety; eleven are always there and every other one is a tick away, grouped exactly as they are on the record and marked where they are confidential. Untick to remove.",
+      "THE CHOICE IS REMEMBERED ON THAT BROWSER, because whoever runs the payroll wants the pay columns every time and whoever handles joiners never does.",
+      "No migration.",
+    ],
+  },
+  {
     v: "3.20.0.1",
     date: "2026-08-23",
     module: "IDP — the login is the key",
