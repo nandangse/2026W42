@@ -78,10 +78,8 @@ export const NAV: NavSection[] = [
       {
         key: "idp.roles",
         label: "Roles, JD, KRA, KPI",
-        blurb: "What each role is for, what it must deliver, and how that is measured.",
-        built: false,
-        source:
-          "“2026 Definition of Roles - JD, KRA, KPI” in the Annual Goalbook — 88 roles, each with Grade, Reports To, Job Description, Deliverable and Measurement Metric. Also KRA & KPI (tab 48) in the Salary Sheet.",
+        blurb: "What each role is for, what it must deliver, and how that is measured. The employee master's Role points here.",
+        built: true,
       },
       {
         key: "idp.individual",

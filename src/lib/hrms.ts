@@ -118,7 +118,6 @@ export function onRoll(value: Record<string, string | null>): boolean {
  * statutory filings both read it.
  */
 export const MASTERS: { kind: string; label: string; note?: string; fixed?: boolean }[] = [
-  { kind: "role", label: "Role", note: "What somebody is accountable for. Enforceable — the Goalbook defines a JD, a deliverable and a metric against each one. Designation defaults to this." },
   { kind: "department", label: "Department" },
   { kind: "grade", label: "Grade", note: "Empty until the Goalbook's grades are brought in — deliberately not guessed at." },
   { kind: "status", label: "Status", fixed: true, note: "Decides who is on the roll." },
@@ -235,8 +234,8 @@ export const FIELD_GROUPS: FieldGroup[] = [
       { key: "doj", label: "Date of joining", kind: "date", column: "doj", sheet: true },
       { key: "department", label: "Department", kind: "select", column: "department", sheet: true, master: "department" },
       { key: "grade", label: "Grade", kind: "select", sheet: true, master: "grade" },
-      { key: "role", label: "Role", kind: "select", sheet: true, master: "role",
-        hint: "ENFORCEABLE. What this person is accountable for — the Goalbook defines a JD, a deliverable and a measurement metric against each role." },
+      { key: "role", label: "Role", kind: "select", sheet: true, master: "__roles__",
+        hint: "ENFORCEABLE. Chosen from the role register — IDP → Roles, JD, KRA, KPI — where each role carries its job description, its deliverable and how it is measured." },
       { key: "designation", label: "Designation", kind: "text", column: "designation", sheet: true,
         hint: "What goes on the visiting card. Defaults to the Role and may be overwritten — it is vanity, and harmless as long as it is not mistaken for the role." },
       t("reporting_manager", "Reporting manager", "Reporting Manager"),

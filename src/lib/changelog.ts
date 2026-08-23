@@ -75,6 +75,23 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.19.1.6",
+    date: "2026-08-23",
+    module: "HRIS — Roles, JD, KRA, KPI",
+    items: [
+      "THE ROLE REGISTER IS BUILT, and the employee master's Role now points at it. Each role carries Role · Department · Grade · Reports To · Job Description · Deliverable · Measurement Metric — and a Management Expectation Note, spoken.",
+      "DESIGNATION IS VANITY, ROLE IS ACCOUNTABLE — and a role is only accountable once somebody has written down what it delivers and how that is measured. That is what this register is for.",
+      "DRAFT UNTIL DR RAGHU MARKS IT FINAL, and only he can. Not ceremony: a job description nobody has agreed is a suggestion, and an appraisal run against a suggestion is not defensible. HR may write every word and may not be the one who agrees it. The stage, who approved it and when are all on the record.",
+      "THE MANAGEMENT EXPECTATION NOTE IS SPOKEN, because it is the part nobody writes. Press record and say what the role is really for. It is kept THREE ways — the audio, because tone carries what a typed paragraph loses; the transcript, because nobody scrubs ninety seconds of audio for one sentence; and a summary written by Claude in at most three lines. The recording goes to the private voice-notes bucket, never into the database.",
+      "THREE COUNTS ON TOP: roles in the register, active employees, and UNASSIGNED — people on the roll with no role set. That last one is the number that matters: a designation is not a role, and until somebody chooses one nothing defines what that person is accountable for.",
+      "SEARCH across role, JD, deliverable, metric and the note's summary; filters for Department and for Stage.",
+      "CLICK + BESIDE A ROLE TO SEE WHO HOLDS IT — each name links to that person's record, and anybody no longer on the roll shows in red.",
+      "Seeded from the 109 designations people actually hold, each with the department its holders sit in, so the register opens with the real shape of the company rather than an empty page. Every one is a DRAFT, because none of them has been agreed yet and saying so is the honest state.",
+      "Role has left Module Masters. Roles live in the register now, with their JD and their metric behind them — two lists of role names would have drifted apart inside a week.",
+      "Migration 0050.",
+    ],
+  },
+  {
     v: "3.19.1.5",
     date: "2026-08-23",
     module: "HRIS — 380 folders, and six more modules",

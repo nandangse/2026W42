@@ -56,6 +56,14 @@ export default function EmployeeRecord({
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     api.get("/api/hrms/masters").then((r) => setMasters(r.masters || {})).catch(() => setMasters({}));
+    // Roles are not a Module Master — they are a register with a JD and a
+    // metric behind each one. Same dropdown, different source of truth.
+    api.get("/api/hrms/roles")
+      .then((r) => setMasters((m) => ({
+        ...m,
+        __roles__: (r.roles || []).map((x: { role: string }) => ({ value: x.role })),
+      })))
+      .catch(() => {});
   }, []);
 
   const loadHistory = useCallback(async () => {

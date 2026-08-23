@@ -26,6 +26,7 @@ import { NAV, findNav, DEFAULT_KEY } from "@/lib/hrms-nav";
 import EmployeeMaster, { type MasterView } from "./hrms/EmployeeMaster";
 import { Pane, NotBuilt } from "./hrms/Pane";
 import ModuleMasters from "./hrms/ModuleMasters";
+import RolesRegister from "./hrms/RolesRegister";
 
 export default function Hrms({
   email, initials, displayName, role, isOwner,
@@ -210,7 +211,9 @@ export default function Hrms({
         </nav>
 
         {/* ═══════════════════ right side ═══════════════════ */}
-        {nav.key === "masters" ? (
+        {nav.key === "idp.roles" ? (
+          <RolesRegister who={who} isOwner={isOwner} />
+        ) : nav.key === "masters" ? (
           <ModuleMasters who={who} />
         ) : nav.key.startsWith("master.") ? (
           <EmployeeMaster
