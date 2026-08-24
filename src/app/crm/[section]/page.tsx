@@ -29,6 +29,8 @@ const SECTION_TO_SLUG: Record<string, string> = {
   opportunities: "opportunity",
   salesorder: "sales_order",
   salesorders: "sales_order",
+  salesinvoice: "sales_invoice",
+  salesinvoices: "sales_invoice",
   interactions: "interaction",
   interaction: "interaction",
   task: "task",

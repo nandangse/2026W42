@@ -75,6 +75,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.0.6",
+    date: "2026-08-24",
+    module: "BANTTC in one line, contacts where the quote is, and filters that know the customer",
+    items: [
+      "THE DASHBOARD IS THE FRONT DOOR: genie.nandan.co.in/crm lands there, and reload stays where you stood.",
+      "A PERSON HAS ONE NAME. Nandan does not split names into first and last — the form asks for the name as spoken.",
+      "BANTTC READS AS ONE LINE on the opportunity form: Budget ×2 · Authority · Need ×2 · Timing ×2 · Tech. Qualified · Competitiveness, each a dropdown, with the weighted SCORE computed beside them as you pick — and carried as a column on the list.",
+      "THE QUOTATION GREW ITS TABS: Lines, Contacts and Interactions. The Contacts tab lists the customer's people and can ADD one right there, born already linked to the company; a new interaction on a quote knows its quote and its company the same way.",
+      "COMPANY IS A TYPE-ALONG everywhere — the form and the filter bar search 54k names as you type instead of dropping them down. Sectors answer by their acronyms: GSE, MHE, DEF, ENT, CM, CAR.",
+      "FILTERS ON OPPORTUNITY, QUOTATION AND SALES ORDER: the customer's INDUSTRY (an inner join through the company), the SALESPERSON, and the SOURCE — and the quotation's filter bar dropped the opportunity dropdown that helped nobody. Quotation and sales order lists carry a Value column.",
+      "PRODUCT ON THE OPPORTUNITY (migration 0004): the ERP's Product Group — AGSE - Ambulift, MHE - Trollies — backfilled as the product family, with a link to the real catalogue for when it is seeded. The customer's industry rides the opportunity list as its own column.",
+      "Lost reason and Lost to appear on the form only when the chosen stage is a dead end — before that they are noise.",
+      "SALES INVOICES stand after Products (migration 0005) — the ONE source of truth of what we have accomplished. An order is a promise; the invoice is the fact. For now the module answers to Dr Raghu alone: the sidebar hides the door for everyone else, and the API refuses them even the direct URL.",
+    ],
+  },
+  {
     v: "3.23.0.5",
     date: "2026-08-24",
     module: "Dates on every analytical screen, and Analytics learns to count",

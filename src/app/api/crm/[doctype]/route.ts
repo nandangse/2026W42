@@ -31,10 +31,41 @@ import { doctypeBySlug, linkTargets, type Doctype, type Field } from "@/crm/doct
 export const dynamic = "force-dynamic";
 
 const COMPANY_SELECT = "*, opps:opportunity(count), contacts:person(count), sos:sales_order(count)";
+// The customer's industry rides along on the opportunity, by name.
+const OPP_SELECT = "*, company_join:company_id(industry:industry_id(name))";
 
-function resolve(slug: string): Doctype {
+/** BANTTC, weighted the way Dr Raghu weighs it: B×2, A, N×2, T×2, TQ, C. */
+function banttcScore(r: Record<string, unknown>): number | null {
+  const w: [string, number][] = [
+    ["budget_pct", 2], ["authority_pct", 1], ["need_pct", 2],
+    ["timing_pct", 2], ["technically_qualified_pct", 1], ["competitiveness_pct", 1],
+  ];
+  let sum = 0, den = 0;
+  for (const [k, weight] of w) {
+    const v = r[k];
+    if (v === null || v === undefined) continue;
+    sum += Number(v) * weight; den += weight;
+  }
+  return den > 0 ? Math.round(sum / den) : null;
+}
+
+function foldOpportunity(r: Record<string, unknown>): Record<string, unknown> {
+  const { company_join, ...rest } = r as Record<string, unknown> & {
+    company_join?: { industry?: { name?: unknown } | null } | null;
+  };
+  return {
+    ...rest,
+    company_industry: company_join?.industry?.name ?? null,
+    banttc_score: banttcScore(rest),
+  };
+}
+
+function resolve(slug: string, user?: CrmUser): Doctype {
   const d = doctypeBySlug(slug);
   if (!d) throw new HttpError(404, `No such doctype: ${slug}`);
+  // Some doctypes are for named eyes only. Enforced here, not just hidden.
+  if (d.onlyFor && (!user || !d.onlyFor.includes(user.email)))
+    throw new HttpError(403, `${d.plural} are not open to this account yet.`);
   return d;
 }
 
@@ -61,6 +92,14 @@ async function linkOptions(d: Doctype) {
       id: String(r.id),
       label: String(r[t.titleField] ?? r.id),
     }));
+  }
+  // Any doctype hanging off a company can be filtered by the customer's
+  // industry — the filter bar needs the industry book to offer.
+  if (!links.industry && d.fields.some((f) => f.name === "company_id")) {
+    const { data: inds } = await db.from("industry")
+      .select("id, name").order("name", { ascending: true }).limit(1000);
+    links.industry = ((inds ?? []) as unknown as Record<string, unknown>[])
+      .map((r) => ({ id: String(r.id), label: String(r.name ?? r.id) }));
   }
   return links;
 }
@@ -135,27 +174,58 @@ function friendly(d: Doctype, error: { code?: string; message: string }): never 
 
 export async function GET(req: Request, { params }: { params: { doctype: string } }) {
   try {
-    await requireCrm();
-    const d = resolve(params.doctype);
+    const user = await requireCrm();
+    const d = resolve(params.doctype, user);
     guardConfigured();
     const db = crmDb();
     const u = new URL(req.url);
     const isCompany = d.name === "company";
+    const isOpp = d.name === "opportunity";
+
+    // Filter by the CUSTOMER'S industry: an inner join through the company.
+    const indFilter = u.searchParams.get("f_company_industry");
+    const wantsInd = !!indFilter && !isCompany && d.fields.some((f) => f.name === "company_id");
+
+    const select = isCompany ? COMPANY_SELECT
+      : isOpp ? (wantsInd ? "*, company_join:company_id!inner(industry_id, industry:industry_id(name))" : OPP_SELECT)
+      : wantsInd ? "*, company_join:company_id!inner(industry_id)" : "*";
+    const fold = (r: Record<string, unknown>) => {
+      if (isCompany) return foldCompanyCounts(r);
+      if (isOpp) return foldOpportunity(r);
+      if (wantsInd) { const { company_join, ...rest } = r; void company_join; return rest; }
+      return r;
+    };
+
+    // ---- the type-along picker: a few names for what was typed -----------
+    const pick = u.searchParams.get("pick");
+    if (pick !== null) {
+      const { data, error } = await db.from(d.table)
+        .select(`id, ${d.titleField}`)
+        .ilike(d.titleField, `%${pick.trim().replace(/[%_]/g, "\\$&")}%`)
+        .order(d.titleField, { ascending: true })
+        .limit(20);
+      if (error) throw new HttpError(500, error.message);
+      const list = (data ?? []) as unknown as Record<string, unknown>[];
+      return NextResponse.json({
+        options: list.map((r) => ({ id: String(r.id), label: String(r[d.titleField] ?? r.id) })),
+      });
+    }
 
     // ---- one record, for the lightbox ------------------------------------
     const id = u.searchParams.get("id");
     if (id) {
       const { data, error } = await db.from(d.table)
-        .select(isCompany ? COMPANY_SELECT : "*").eq("id", id).maybeSingle();
+        .select(select).eq("id", id).maybeSingle();
       if (error) throw new HttpError(500, error.message);
       if (!data) throw new HttpError(404, `That ${d.label.toLowerCase()} no longer exists.`);
-      const row = isCompany ? foldCompanyCounts(data as unknown as Record<string, unknown>) : data;
+      const row = fold(data as unknown as Record<string, unknown>);
       const links = await resolveRowLabels(d, [row as Record<string, unknown>], await linkOptions(d));
       return NextResponse.json({ doctype: d, row, links });
     }
 
     // ---- the list: filters, search and sort run in Postgres --------------
-    let qy = db.from(d.table).select(isCompany ? COMPANY_SELECT : "*", { count: "exact" });
+    let qy = db.from(d.table).select(select, { count: "exact" });
+    if (wantsInd) qy = qy.eq("company_join.industry_id", indFilter);
     for (const f of d.fields) {
       if (f.virtual) continue;
       const v = u.searchParams.get(`f_${f.name}`);
@@ -177,9 +247,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       .limit(500);
     if (error) throw new HttpError(500, error.message);
 
-    const rows = isCompany
-      ? ((data ?? []) as unknown as Record<string, unknown>[]).map(foldCompanyCounts)
-      : (data ?? []);
+    const rows = ((data ?? []) as unknown as Record<string, unknown>[]).map(fold);
 
     const links = await resolveRowLabels(
       d, rows as unknown as Record<string, unknown>[], await linkOptions(d),
@@ -193,7 +261,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
 export async function POST(req: Request, { params }: { params: { doctype: string } }) {
   try {
     const user = await requireCrm();
-    const d = resolve(params.doctype);
+    const d = resolve(params.doctype, user);
     guardConfigured();
     const db = crmDb();
 
@@ -229,7 +297,7 @@ export async function POST(req: Request, { params }: { params: { doctype: string
 export async function PATCH(req: Request, { params }: { params: { doctype: string } }) {
   try {
     const user = await requireCrm();
-    const d = resolve(params.doctype);
+    const d = resolve(params.doctype, user);
     guardConfigured();
     const db = crmDb();
 

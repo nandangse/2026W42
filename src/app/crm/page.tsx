@@ -27,5 +27,13 @@ export default async function CrmPage() {
 
   // One Genie version number across every module -- the badge reads the same
   // changelog the main header does, so the two can never disagree.
-  return <CrmApp email={user.email} displayName={user.displayName} version={UPDATES[0].v} />;
+  // The Dashboard is the default landing, as Dr Raghu set it.
+  return (
+    <CrmApp
+      email={user.email}
+      displayName={user.displayName}
+      version={UPDATES[0].v}
+      initialSlug="dashboard"
+    />
+  );
 }

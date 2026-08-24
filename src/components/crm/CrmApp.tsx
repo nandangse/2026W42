@@ -57,7 +57,8 @@ const URL_OF: Record<string, string> = {
   lead: "lead", company: "company", person: "contact", quotation: "quotation",
   quotation_line: "quoteline", opportunity: "opportunity", sales_order: "salesorder",
   interaction: "interactions", task: "task", address: "address", person_phone: "phone",
-  product: "product", sector: "sector", industry: "industry", stage: "stage", profile: "users",
+  product: "product", sales_invoice: "salesinvoice",
+  sector: "sector", industry: "industry", stage: "stage", profile: "users",
 };
 
 /** The sidebar, in Dr Raghu's order (24 Aug 2026). `dt` names a doctype,
@@ -73,7 +74,7 @@ const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string } | { 
   { items: [{ sp: "deals" }] },
   {
     header: "ACCOUNTS",
-    items: [{ dt: "company" }, { dt: "person" }, { dt: "address" }, { dt: "person_phone" }, { dt: "industry" }, { dt: "product" }],
+    items: [{ dt: "company" }, { dt: "person" }, { dt: "address" }, { dt: "person_phone" }, { dt: "industry" }, { dt: "product" }, { dt: "sales_invoice" }],
   },
   { header: "MORE", items: [{ dt: "interaction" }, { dt: "task" }, { dt: "quotation_line" }, { sp: "communication" }] },
   { header: "SETTINGS", collapsible: true, items: [{ dt: "sector" }, { dt: "stage" }, { dt: "profile" }] },
@@ -176,10 +177,15 @@ export default function CrmApp({
     setSort((s) => (s?.col !== col ? { col, dir: "asc" } : s.dir === "asc" ? { col, dir: "desc" } : null));
 
   // Filters live on every select / link / bool field -- the ones with a
-  // finite set of answers. Free text already has the search box.
+  // finite set of answers. Free text already has the search box, and the
+  // company filter types along instead of dropping 54k names down.
   const filterables = (dt?.fields ?? []).filter(
-    (f) => f.type === "select" || f.type === "bool" || (f.type === "link" && f.link),
+    (f) => !f.noFilter && !f.virtual
+      && (f.type === "select" || f.type === "bool" || (f.type === "link" && f.link)),
   );
+  // Anything hanging off a company can also be filtered by the customer's industry.
+  const industryFilter = !!dt && dt.name !== "company"
+    && dt.fields.some((f) => f.name === "company_id") && (links.industry?.length ?? 0) > 0;
 
   /** A link cell is a door: open the record it points at. */
   const openLinked = async (target: string, id: string) => {
@@ -270,6 +276,9 @@ export default function CrmApp({
                   const d = "dt" in it ? DOCTYPES.find((x) => x.name === it.dt) : undefined;
                   const sp = "sp" in it ? SPECIAL_SECTIONS.find((x) => x.name === it.sp) : undefined;
                   if (!d && !sp) return null;
+                  // Some doctypes are for named eyes only — the API enforces
+                  // it; the sidebar simply doesn't show the door.
+                  if (d?.onlyFor && !d.onlyFor.includes(email)) return null;
                   return (
                     <button
                       key={name}
@@ -356,10 +365,36 @@ export default function CrmApp({
           </div>
 
           {/* ---------- filter bar ---------- */}
-          {filterables.length > 0 && (
+          {(filterables.length > 0 || industryFilter) && (
             <div className="flex items-center gap-2 mb-3 flex-wrap">
               <span className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>FILTER</span>
-              {filterables.map((f) => (
+              {filterables.filter((f) => f.link === "company").map((f) => (
+                <div key={f.name} style={{ width: 210 }}>
+                  <LinkAutocomplete
+                    target="company"
+                    value={filters[f.name] ?? ""}
+                    valueLabel={(links.company || []).find((o) => o.id === (filters[f.name] ?? ""))?.label ?? ""}
+                    onPick={(id) => setFilters((cur) => ({ ...cur, [f.name]: id }))}
+                  />
+                </div>
+              ))}
+              {industryFilter && (
+                <select
+                  value={filters.company_industry ?? ""}
+                  onChange={(e) => setFilters((cur) => ({ ...cur, company_industry: e.target.value }))}
+                  className="px-2 py-1 rounded text-xs border"
+                  style={{
+                    borderColor: filters.company_industry ? ORANGE : BORDER,
+                    background: "#fff",
+                    color: filters.company_industry ? INK : "#5A6672",
+                    maxWidth: 190,
+                  }}
+                >
+                  <option value="">Industry: all</option>
+                  {(links.industry || []).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+              )}
+              {filterables.filter((f) => f.link !== "company").map((f) => (
                 <select
                   key={f.name}
                   value={filters[f.name] ?? ""}
@@ -773,17 +808,32 @@ function RecordModal({
     return () => document.removeEventListener("keydown", h);
   }, [onClose]);
 
-  // The Company 360: everything that hangs off the account, one tab each.
-  const companyTabs: { key: string; label: string; count?: unknown }[] = [
-    { key: "details", label: "Details" },
-    { key: "person", label: "Contacts", count: row.contact_count },
-    { key: "address", label: "Addresses" },
-    { key: "interaction", label: "Interactions" },
-    { key: "communication", label: "Communication" },
-    { key: "opportunity", label: "Opportunities", count: row.opp_count },
-    { key: "quotation", label: "Quotations" },
-    { key: "sales_order", label: "Sales Orders", count: row.so_count },
-  ];
+  // The 360 tabs: everything that hangs off the record, one tab each. The
+  // company gets the full set; the quotation gets its lines, the customer's
+  // contacts (addable right there, pre-linked), and its interactions.
+  type TabDef = {
+    key: string; label: string; count?: unknown; slug?: string;
+    filterField?: string; filterValue?: string | null; addPresets?: Row;
+  };
+  const rid = String(row.id ?? "");
+  const companyId = row.company_id ? String(row.company_id) : null;
+  const recordTabs: TabDef[] =
+    dt.name === "company" ? [
+      { key: "details", label: "Details" },
+      { key: "person", label: "Contacts", count: row.contact_count, slug: "person", filterField: "company_id", filterValue: rid, addPresets: { company_id: rid } },
+      { key: "address", label: "Addresses", slug: "address", filterField: "company_id", filterValue: rid, addPresets: { company_id: rid } },
+      { key: "interaction", label: "Interactions", slug: "interaction", filterField: "company_id", filterValue: rid, addPresets: { company_id: rid } },
+      { key: "communication", label: "Communication" },
+      { key: "opportunity", label: "Opportunities", count: row.opp_count, slug: "opportunity", filterField: "company_id", filterValue: rid },
+      { key: "quotation", label: "Quotations", slug: "quotation", filterField: "company_id", filterValue: rid },
+      { key: "sales_order", label: "Sales Orders", count: row.so_count, slug: "sales_order", filterField: "company_id", filterValue: rid },
+    ] : dt.name === "quotation" ? [
+      { key: "details", label: "Details" },
+      { key: "quotation_line", label: "Lines", slug: "quotation_line", filterField: "quotation_id", filterValue: rid, addPresets: { quotation_id: rid } },
+      { key: "person", label: "Contacts", slug: "person", filterField: "company_id", filterValue: companyId, addPresets: companyId ? { company_id: companyId } : undefined },
+      { key: "interaction", label: "Interactions", slug: "interaction", filterField: "quotation_id", filterValue: rid, addPresets: { quotation_id: rid, ...(companyId ? { company_id: companyId } : {}) } },
+    ] : [];
+  const hasTabs = recordTabs.length > 0;
 
   return (
     <div
@@ -798,7 +848,7 @@ function RecordModal({
         onClick={(e) => e.stopPropagation()}
         className="rounded"
         style={{
-          background: "#fff", width: isCompany ? "min(1080px, 100%)" : "min(880px, 100%)",
+          background: "#fff", width: hasTabs ? "min(1080px, 100%)" : "min(880px, 100%)",
           boxShadow: "0 12px 40px rgba(27,45,107,.35)",
         }}
       >
@@ -832,12 +882,12 @@ function RecordModal({
           </div>
         </div>
 
-        {mode === "view" && isCompany && (
+        {mode === "view" && hasTabs && (
           <div
             className="flex flex-wrap"
             style={{ borderBottom: `2px solid ${BORDER}`, padding: "0 12px", gap: 2 }}
           >
-            {companyTabs.map((t) => (
+            {recordTabs.map((t) => (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
@@ -863,7 +913,7 @@ function RecordModal({
         )}
 
         {mode === "view" ? (
-          !isCompany || tab === "details" ? (
+          !hasTabs || tab === "details" ? (
             <div
               className="grid gap-x-6 gap-y-3 p-4"
               style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}
@@ -883,9 +933,18 @@ function RecordModal({
               channels phase connects the mailboxes. The table is ready; the
               wires are not yet in.
             </div>
-          ) : (
-            <RelatedTab slug={tab} companyId={String(row.id)} onOpenLink={onOpenLink} />
-          )
+          ) : (() => {
+            const t = recordTabs.find((x) => x.key === tab);
+            return t?.slug ? (
+              <RelatedTab
+                slug={t.slug}
+                filterField={t.filterField as string}
+                filterValue={t.filterValue ?? null}
+                addPresets={t.addPresets}
+                onOpenLink={onOpenLink}
+              />
+            ) : null;
+          })()
         ) : (
           <div className="p-4">
             <RecordForm dt={dt} links={links} initial={row} onDone={onSaved} />
@@ -897,42 +956,71 @@ function RecordModal({
 }
 
 /**
- * One tab of the Company 360: the doctype's rows filtered to this company,
+ * One tab of a record's 360: another doctype's rows filtered to this record,
  * fetched through the same route the list screens use — same columns, same
- * labels, same doors. A row click opens that record's own lightbox.
+ * labels, same doors. A row click opens that record's own lightbox, and
+ * where it makes sense the tab can add a row pre-linked to the record.
  */
 function RelatedTab({
-  slug, companyId, onOpenLink,
+  slug, filterField, filterValue, addPresets, onOpenLink,
 }: {
-  slug: string; companyId: string; onOpenLink: (target: string, id: string) => void;
+  slug: string; filterField: string; filterValue: string | null;
+  addPresets?: Row; onOpenLink: (target: string, id: string) => void;
 }) {
   const dt = doctypeBySlug(slug);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [links, setLinks] = useState<Links>({});
   const [total, setTotal] = useState(0);
   const [err, setErr] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    if (filterValue === null) return;
     setRows(null); setErr("");
-    fetch(`/api/crm/${slug}?f_company_id=${encodeURIComponent(companyId)}`, { cache: "no-store" })
+    fetch(`/api/crm/${slug}?f_${filterField}=${encodeURIComponent(filterValue)}`, { cache: "no-store" })
       .then(async (r) => {
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || "Could not load");
         setRows(j.rows); setLinks(j.links || {}); setTotal(j.total ?? j.rows.length);
       })
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
-  }, [slug, companyId]);
+  }, [slug, filterField, filterValue, tick]);
 
   if (!dt) return null;
+  if (filterValue === null)
+    return <div className="p-6 text-sm" style={{ color: MUTED }}>Link a company first — then this tab has somewhere to look.</div>;
   if (err) return <div className="p-4 text-sm" style={{ color: "#8E2C20" }}>{err}</div>;
   if (rows === null) return <div className="p-4 text-sm" style={{ color: MUTED }}>loading…</div>;
-  if (!rows.length)
-    return <div className="p-6 text-sm" style={{ color: MUTED }}>No {dt.plural.toLowerCase()} on this company yet.</div>;
 
-  const fields = dt.fields.filter((f) => f.inList && f.name !== "company_id");
+  const fields = dt.fields.filter((f) => f.inList && f.name !== filterField);
 
   return (
     <div style={{ maxHeight: "55vh", overflow: "auto" }}>
+      {addPresets && (
+        <div className="px-4 pt-3">
+          <button
+            onClick={() => setAdding((v) => !v)}
+            className="px-3 py-1 rounded text-xs font-bold"
+            style={{ background: adding ? "#6B7280" : ORANGE, color: "#fff" }}
+          >
+            {adding ? "Cancel" : `+ Add ${dt.label.toLowerCase()}`}
+          </button>
+          {adding && (
+            <div className="mt-2">
+              <RecordForm
+                dt={dt} links={links} presets={addPresets}
+                onDone={() => { setAdding(false); setTick((t) => t + 1); }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+      {!rows.length && (
+        <div className="p-6 text-sm" style={{ color: MUTED }}>No {dt.plural.toLowerCase()} here yet.</div>
+      )}
+      {rows.length > 0 && (
+      <div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
@@ -966,20 +1054,95 @@ function RelatedTab({
           Showing {rows.length.toLocaleString("en-IN")} of {total.toLocaleString("en-IN")} — the full list lives on the {dt.plural} screen.
         </div>
       )}
+      </div>
+      )}
     </div>
   );
 }
 
 /**
+ * A type-along picker for the links too heavy for a dropdown — 54k
+ * companies. Type, pick from the top matches, done.
+ */
+function LinkAutocomplete({
+  target, value, valueLabel, onPick,
+}: {
+  target: string; value: string; valueLabel: string; onPick: (id: string) => void;
+}) {
+  const [text, setText] = useState(valueLabel);
+  const [options, setOptions] = useState<{ id: string; label: string }[]>([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => setText(valueLabel), [valueLabel]);
+
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => {
+      fetch(`/api/crm/${target}?pick=${encodeURIComponent(text)}`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((j) => setOptions(j.options ?? []))
+        .catch(() => setOptions([]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [text, open, target]);
+
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        value={text}
+        placeholder="Type to search…"
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        onChange={(e) => { setText(e.target.value); setOpen(true); if (e.target.value === "") onPick(""); }}
+        className="w-full px-2 py-1.5 rounded text-sm border"
+        style={{ borderColor: value ? BORDER : BORDER }}
+      />
+      {open && options.length > 0 && (
+        <div
+          className="rounded border"
+          style={{
+            position: "absolute", top: "105%", left: 0, right: 0, zIndex: 70,
+            background: "#fff", borderColor: BORDER, maxHeight: 220, overflowY: "auto",
+            boxShadow: "0 8px 24px rgba(27,45,107,.18)",
+          }}
+        >
+          {options.map((o) => (
+            <button
+              key={o.id}
+              onMouseDown={(e) => { e.preventDefault(); onPick(o.id); setText(o.label); setOpen(false); }}
+              className="w-full text-left px-2 py-1.5 text-sm"
+              style={{ color: INK }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The six BANTTC weights, as Dr Raghu weighs them. */
+const BANTTC: { name: string; label: string; w: number }[] = [
+  { name: "budget_pct", label: "Budget", w: 2 },
+  { name: "authority_pct", label: "Authority", w: 1 },
+  { name: "need_pct", label: "Need", w: 2 },
+  { name: "timing_pct", label: "Timing", w: 2 },
+  { name: "technically_qualified_pct", label: "Tech. Qualified", w: 1 },
+  { name: "competitiveness_pct", label: "Competitiveness", w: 1 },
+];
+
+/**
  * The add/edit form. Built from the registry, so it can never miss a field.
- * With `initial` it edits (PATCH); without, it adds (POST).
+ * With `initial` it edits (PATCH); without, it adds (POST). `presets`
+ * pre-links a fresh record — a contact born on a quotation's tab already
+ * knows its company.
  */
 function RecordForm({
-  dt, links, initial, onDone,
+  dt, links, initial, presets, onDone,
 }: {
-  dt: Doctype; links: Links; initial?: Row; onDone: () => void;
+  dt: Doctype; links: Links; initial?: Row; presets?: Row; onDone: () => void;
 }) {
-  const editable = dt.fields.filter((f) => f.type !== "readonly");
+  const editable = dt.fields.filter((f) => f.type !== "readonly" && !f.virtual);
 
   const blank = useMemo(() => {
     const o: Record<string, string | boolean> = {};
@@ -990,12 +1153,15 @@ function RecordForm({
         else if (f.type === "date" && typeof v === "string") o[f.name] = v.slice(0, 10);
         else o[f.name] = v === null || v === undefined ? "" : String(v);
       } else {
-        o[f.name] = (f.default as string | boolean) ?? (f.type === "bool" ? false : "");
+        const preset = presets?.[f.name];
+        o[f.name] = preset !== undefined && preset !== null
+          ? String(preset)
+          : (f.default as string | boolean) ?? (f.type === "bool" ? false : "");
       }
     }
     return o;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dt, initial]);
+  }, [dt, initial, presets]);
 
   const [form, setForm] = useState(blank);
   const [busy, setBusy] = useState(false);
@@ -1004,6 +1170,27 @@ function RecordForm({
   useEffect(() => setForm(blank), [blank]);
 
   const set = (name: string, v: string | boolean) => setForm((f) => ({ ...f, [name]: v }));
+
+  // Lost reason and Lost to only come into the picture when the chosen stage
+  // is a dead end — before that they are noise on the form.
+  const stageOpt = (links["stage"] || []).find((o) => o.id === String(form["stage_id"] ?? ""));
+  const stageDead = !!stageOpt && ["Lost", "Not Target"].includes(stageOpt.label);
+  const hasStage = editable.some((f) => f.name === "stage_id");
+  const isDeal = dt.name === "opportunity";
+  const banttcNames = BANTTC.map((b) => b.name);
+  const gridFields = editable.filter((f) =>
+    !(isDeal && banttcNames.includes(f.name))
+    && !(hasStage && !stageDead && (f.name === "lost_reason" || f.name === "lost_to_competitor")));
+
+  const score = (() => {
+    let s = 0, d = 0;
+    for (const b of BANTTC) {
+      const v = form[b.name];
+      if (v === "" || v === null || v === undefined || v === false) continue;
+      s += Number(v) * b.w; d += b.w;
+    }
+    return d > 0 ? Math.round(s / d) : null;
+  })();
 
   const save = async () => {
     setBusy(true);
@@ -1039,7 +1226,7 @@ function RecordForm({
         className="grid gap-3 mb-3"
         style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}
       >
-        {editable.map((f) => (
+        {gridFields.map((f) => (
           <label key={f.name} className="block">
             <div className="text-xs font-semibold mb-1" style={{ color: MUTED }}>
               {f.label}
@@ -1075,6 +1262,13 @@ function RecordForm({
                   <option key={o} value={o}>{o}</option>
                 ))}
               </select>
+            ) : f.type === "link" && f.link === "company" ? (
+              <LinkAutocomplete
+                target="company"
+                value={String(form[f.name] ?? "")}
+                valueLabel={(links.company || []).find((o) => o.id === String(form[f.name] ?? ""))?.label ?? ""}
+                onPick={(id) => set(f.name, id)}
+              />
             ) : f.type === "link" ? (
               <select
                 value={String(form[f.name] ?? "")}
@@ -1103,6 +1297,60 @@ function RecordForm({
           </label>
         ))}
       </div>
+
+      {isDeal && (
+        <div className="mb-3" style={{ overflowX: "auto" }}>
+          <div className="text-xs font-bold mb-1" style={{ color: NAVY, letterSpacing: 0.8 }}>
+            BANTTC
+          </div>
+          <table style={{ borderCollapse: "collapse", minWidth: 640 }}>
+            <thead>
+              <tr>
+                {BANTTC.map((b) => (
+                  <th key={b.name} style={{
+                    textAlign: "center", padding: "4px 10px", fontSize: 11,
+                    color: MUTED, borderBottom: `2px solid ${BORDER}`, whiteSpace: "nowrap",
+                  }}>
+                    {b.label}{b.w > 1 && <span style={{ color: ORANGE }}> ×{b.w}</span>}
+                  </th>
+                ))}
+                <th style={{
+                  textAlign: "center", padding: "4px 10px", fontSize: 11,
+                  color: NAVY, borderBottom: `2px solid ${BORDER}`, fontWeight: 800,
+                }}>
+                  SCORE
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {BANTTC.map((b) => (
+                  <td key={b.name} style={{ padding: "6px 8px", textAlign: "center" }}>
+                    <select
+                      value={String(form[b.name] ?? "")}
+                      onChange={(e) => set(b.name, e.target.value)}
+                      className="px-1 py-1 rounded text-sm border"
+                      style={{ borderColor: BORDER, background: "#fff", width: 76 }}
+                    >
+                      <option value="">—</option>
+                      {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((n) => (
+                        <option key={n} value={n}>{n}%</option>
+                      ))}
+                    </select>
+                  </td>
+                ))}
+                <td className="tnum" style={{
+                  padding: "6px 10px", textAlign: "center", fontWeight: 800,
+                  color: score === null ? MUTED : score >= 60 ? "#1A7F4E" : score >= 35 ? "#B45309" : "#C0392B",
+                  fontSize: 15,
+                }}>
+                  {score === null ? "—" : `${score}%`}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {err && (
         <div className="text-sm mb-2 rounded p-2" style={{ background: "#FBEAE8", color: "#8E2C20" }}>

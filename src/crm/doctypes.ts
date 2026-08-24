@@ -40,6 +40,8 @@ export interface Field {
   /** Not a real column — the route computes it (counts). Never sorted on,
    *  never written, never filtered. */
   virtual?: boolean;
+  /** Keep this field out of the filter bar. */
+  noFilter?: boolean;
 }
 
 export interface Doctype {
@@ -60,6 +62,9 @@ export interface Doctype {
   autoNumber?: { field: string; series: string };
   /** One line, shown above the list. Say what the doctype is FOR. */
   blurb?: string;
+  /** Only these emails may see or touch this doctype. Checked by the API,
+   *  not just hidden by the sidebar. */
+  onlyFor?: string[];
 }
 
 /** The three pipelines. NEVER merged into one funnel — a ₹4 Cr hi-lift and a
@@ -85,10 +90,10 @@ export const DOCTYPES: Doctype[] = [
     blurb: "Where the funnel earns its keep. The totals fill themselves from the lines — the front end displays money, it never calculates it.",
     fields: [
       { name: "quote_no", label: "Quote No", type: "readonly", inList: true, help: "NGSE/QTN/26-27/00001, issued by the database on save." },
-      { name: "opportunity_id", label: "Opportunity", type: "link", link: "opportunity", required: true, inList: true },
+      { name: "opportunity_id", label: "Opportunity", type: "link", link: "opportunity", required: true, inList: true, noFilter: true },
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
-      { name: "contact_id", label: "Contact", type: "link", link: "person" },
-      { name: "owner_id", label: "Owner", type: "link", link: "profile", inList: true },
+      { name: "contact_id", label: "Contact", type: "link", link: "person", noFilter: true },
+      { name: "owner_id", label: "Salesperson", type: "link", link: "profile", inList: true },
       { name: "stage_id", label: "Hotness", type: "link", link: "stage", inList: true,
         linkFilter: { column: "entity", value: "quotation" },
         help: "Sent → the buckets → Order Received. This is the temperature of the quote; a Lost or Not Target move needs a reason first." },
@@ -100,8 +105,6 @@ export const DOCTYPES: Doctype[] = [
       { name: "validity_days", label: "Validity (days)", type: "number", default: 30 },
       { name: "delivery_weeks", label: "Delivery (weeks)", type: "number" },
       { name: "warranty_months", label: "Warranty (months)", type: "number", default: 12 },
-      { name: "incoterm", label: "Incoterm", type: "select", options: ["EXW", "FOB", "CIF", "CIP", "DAP", "DDP"] },
-      { name: "incoterm_place", label: "Incoterm place", type: "text" },
       { name: "payment_terms", label: "Payment terms", type: "textarea" },
       { name: "discount_pct", label: "Discount %", type: "number", help: "On the subtotal. Line discounts live on the lines." },
       { name: "freight", label: "Freight", type: "money" },
@@ -110,7 +113,7 @@ export const DOCTYPES: Doctype[] = [
       { name: "installation", label: "Installation", type: "money" },
       { name: "subtotal", label: "Subtotal", type: "readonly", format: "money", inList: true },
       { name: "tax_amount", label: "Tax", type: "readonly", format: "money" },
-      { name: "grand_total", label: "Grand total", type: "readonly", format: "money", inList: true },
+      { name: "grand_total", label: "Value", type: "readonly", format: "money", inList: true, help: "The grand total, computed from the lines. Imported shells show zero until lines exist." },
       { name: "margin_pct", label: "Margin", type: "readonly", format: "pct", inList: true, help: "Computed against line costs. A floor with sales-head approval comes with Phase 2." },
       { name: "scope_of_supply", label: "Scope of supply", type: "textarea" },
       { name: "exclusions", label: "Exclusions", type: "textarea" },
@@ -200,6 +203,10 @@ export const DOCTYPES: Doctype[] = [
         help: "New → Waiting for Data → Consultative Presentation. From there the deal lives on its quotation." },
       { name: "pipeline", label: "Pipeline", type: "select", options: [...PIPELINES], required: true, inList: true, default: "capital" },
       { name: "sector_id", label: "Sector", type: "link", link: "sector", inList: true },
+      { name: "product_family", label: "Product family", type: "text", inList: true, help: "AGSE - Ambulift, MHE - Trollies… the ERP's Product Group, as text." },
+      { name: "product_id", label: "Product", type: "link", link: "product", help: "The real catalogue SKU, once the catalogue is seeded." },
+      { name: "company_industry", label: "Industry", type: "readonly", virtual: true, inList: true, help: "The customer's industry, read from the company." },
+      { name: "banttc_score", label: "BANTTC", type: "readonly", virtual: true, inList: true, help: "Weighted: Budget ×2, Authority, Need ×2, Timing ×2, Tech. Qualified, Competitiveness." },
       { name: "owner_id", label: "Salesperson", type: "link", link: "profile", inList: true },
       { name: "amount", label: "Value", type: "money", inList: true },
       { name: "expected_close_on", label: "Expected close", type: "date", inList: true },
@@ -292,8 +299,7 @@ export const DOCTYPES: Doctype[] = [
     orderBy: { column: "updated_at", ascending: false },
     blurb: "The person. 63% of the contacts in the ERP are attached to no company at all — attach them here.",
     fields: [
-      { name: "first_name", label: "First name", type: "text", required: true, inList: true },
-      { name: "last_name", label: "Last name", type: "text", inList: true },
+      { name: "first_name", label: "Name", type: "text", required: true, inList: true, help: "The whole name, as spoken. Nandan does not split names into first and last." },
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
       { name: "job_title", label: "Designation", type: "text", inList: true },
       { name: "primary_email", label: "Email", type: "text", inList: true },
@@ -362,10 +368,31 @@ export const DOCTYPES: Doctype[] = [
     ],
   },
 
+  {
+    name: "sales_invoice", label: "Sales Invoice", plural: "Sales Invoices", table: "sales_invoice",
+    titleField: "si_no", group: "Accounts", icon: "▥",
+    orderBy: { column: "updated_at", ascending: false },
+    onlyFor: ["raghu@nandan.co.in"],
+    blurb: "The ONE source of truth of what we have accomplished. An order is a promise; the invoice is the fact. ERPNext raises them — this is the record.",
+    fields: [
+      { name: "si_no", label: "Invoice No", type: "text", required: true, inList: true, help: "As ERPNext issued it." },
+      { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
+      { name: "amount", label: "Value", type: "money", inList: true },
+      { name: "invoiced_on", label: "Invoiced", type: "date", inList: true },
+      { name: "erp_status", label: "ERP status", type: "text", inList: true },
+      { name: "owner_id", label: "Salesperson", type: "link", link: "profile", inList: true },
+      { name: "due_on", label: "Due", type: "date" },
+      { name: "sector_id", label: "Sector", type: "link", link: "sector" },
+      { name: "sales_order_id", label: "Sales Order", type: "link", link: "sales_order", noFilter: true },
+      { name: "opportunity_id", label: "Opportunity", type: "link", link: "opportunity", noFilter: true },
+      { name: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+
   // ------------------------------------------------------------ masters
   {
     name: "sector", label: "Sector", plural: "Sectors", table: "sector",
-    titleField: "name", group: "Masters", icon: "◆",
+    titleField: "code", group: "Masters", icon: "◆",
     orderBy: { column: "sort_order", ascending: true },
     blurb: "What Nandan makes. Seven codes, named by Dr Raghu on 21 Aug.",
     fields: [
