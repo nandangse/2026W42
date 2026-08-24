@@ -13,7 +13,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import { jobNo, initials, today, computeSchedule, diffDays, type PlanMilestone } from "@/lib/schedule";
+import { jobNo, initials, today, computeSchedule, diffDays, lakh, type PlanMilestone } from "@/lib/schedule";
 import { LOGO } from "@/lib/logo";
 
 interface Task { id: string; j: string; t: string; d: string; who: string; due: string | null; done: boolean }
@@ -21,7 +21,7 @@ interface Job {
   id: string; tag: string; fam: string; cust: string; val: number;
   tdd: string | null; otd: string | null; start: string | null;
   own: string; productionOwner: string | null; kit: number; pct: number; tpv: number;
-  onFloor: boolean; active: boolean; delivered?: boolean;
+  onFloor: boolean; active: boolean; delivered?: boolean; delivered_on?: string | null;
   ownerName: string | null; ownerInitials: string | null;
 }
 interface Mat { id: string; item: string; qty: string; status: string; due?: string | null; who?: string | null }
@@ -93,6 +93,17 @@ export default function FloorReport() {
   };
 
   const late = floor.filter((j) => j.tdd && j.tdd < TODAY);
+
+  /** What actually went out the gate — the walk's other half of the truth. */
+  const deliveredSince = (days: number) => {
+    const from = new Date(TODAY + "T00:00:00");
+    from.setDate(from.getDate() - days);
+    const cut = from.toISOString().slice(0, 10);
+    const js = (board?.jobs || []).filter((j) => j.delivered && j.delivered_on && j.delivered_on >= cut && j.delivered_on <= TODAY);
+    return { n: js.length, val: js.reduce((s, j) => s + (j.val || 0), 0), tp: js.reduce((s, j) => s + (j.tpv || 0), 0) };
+  };
+  const d7 = deliveredSince(7);
+  const d30 = deliveredSince(30);
   const week = floor.filter((j) => j.tdd && j.tdd <= saturday);
   const weekFams = useMemo(() => {
     const c = new Map<string, number>();
@@ -159,6 +170,8 @@ export default function FloorReport() {
             ["ON FLOOR", String(floor.length), "being worked on now", "#0D7A3F"],
             ["ALREADY LATE", String(late.length), late.length ? "past target delivery" : "none past target", late.length ? "#B3261E" : "#0D7A3F"],
             [`DELIVERY THIS WEEK · UPTO ${dmy(saturday)}`, String(week.length), week.length ? weekFams : "nothing due by Saturday", "#E8600A"],
+            ["DELIVERED · LAST 7 DAYS", String(d7.n), d7.n ? `${lakh(d7.val)} · TP ${lakh(d7.tp)}` : "nothing went out", "#1B3A5C"],
+            ["DELIVERED · LAST 30 DAYS", String(d30.n), d30.n ? `${lakh(d30.val)} · TP ${lakh(d30.tp)}` : "nothing went out", "#1B3A5C"],
           ] as const).map(([l, v, sub, c]) => (
             <div key={l} style={{ border: `1px solid #DCD8CC`, borderTop: `3px solid ${c}`, borderRadius: 6, padding: "6px 12px", minWidth: 130, maxWidth: 420 }}>
               <div style={{ fontSize: 9.5, letterSpacing: ".05em", color: "#8B8F87", fontWeight: 700 }}>{l}</div>

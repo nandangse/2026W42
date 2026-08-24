@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.4.5",
+    date: "2026-08-24",
+    module: "The walk sheet knows what went out the gate",
+    items: [
+      "TWO MORE BOXES: DELIVERED IN THE LAST 7 DAYS and THE LAST 30 — count on top, value and throughput underneath. The walk reads what is stuck and what is due; these are the other half of the truth, what actually left. Counted off the delivered date, so a job marked delivered yesterday is in both boxes and one from three weeks ago only in the second.",
+    ],
+  },
+  {
     v: "3.21.4.4",
     date: "2026-08-24",
     module: "The walk sheet, second cut",
