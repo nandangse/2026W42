@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.22.1.0",
+    date: "2026-08-24",
+    module: "Money as a permission, photos for the floor, a header that holds",
+    items: [
+      "VALUE IS A PERMISSION BEFORE IT IS A TOGGLE. User, sales and viewer accounts never see a rupee figure anywhere — every number masks to ₹ ••• and the With/Without value switch disappears for them. Planners and Stratcom keep the switch for screen-shares.",
+      "THE AUDIT FOUND THE REAL LEAK: every printed number already went through the one mask, but the SENTENCES did not — Genie's job reads, the floor summaries and the client updates carry figures inside prose (“₹15.2 L pending on delivery”). Those are now redacted by the same rule that masks the columns, wherever they render. This was the “value visible even after Without value” report.",
+      "ON FLOOR PHOTOS CAN BE ADDED BY USER ACCOUNTS. The API always allowed the floor's own hands to upload; only the screen hid the form behind the planner gate. Manpower Allocation opens to them for the same reason — the people standing at the job are the ones who know who is standing at the job.",
+      "THE MILESTONE TABLE HOLDS ITS HEADER: the Job Plan's plan table scrolls inside its own region with the dark header row pinned, the way every HRMS table already behaves.",
+      "The “Name not updated once select owner” report traces to migration 0046 not having been run when it was filed — the owner columns did not exist to save into. It has been run since; selections save and show.",
+    ],
+  },
+  {
     v: "3.22.0.1",
     date: "2026-08-24",
     module: "The walk sheet fits its paper",

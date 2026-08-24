@@ -188,6 +188,17 @@ interface Job {
  * shop floor, and it is the number that says what finishing the job releases.
  * Same arithmetic as the KITTED MATERIAL VALUE card, kept in one place.
  */
+/** Set each render by the main component; read by redactMoney below. */
+let HIDE_MONEY = false;
+/**
+ * Rupee figures inside PROSE — Genie's job reads, floor summaries, client
+ * updates. V() masks the numbers it prints, but a sentence like "₹15.2 L
+ * pending on delivery" carries its figure in the words, so the words are
+ * scrubbed by the same rule that masks the columns.
+ */
+const redactMoney = (t: string | null | undefined): string =>
+  !t ? "" : HIDE_MONEY ? String(t).replace(/(₹|\bRs\.?)\s?[\d,]+(\.\d+)?\s*(Crores?|Cr|Lakhs?|L|k)?\b/gi, "₹ •••") : String(t);
+
 const investedIn = (j: Pick<Job, "val" | "tpp" | "kit">): number =>
   j.val * (1 - (j.tpp || 0) / 100) * ((j.kit || 0) / 100);
 
@@ -609,7 +620,16 @@ export default function PlanningSuite({
     reload();
   }, []);
 
-  const V = (rupees: number) => (showVal ? "₹" + lakh(rupees) : "₹ •••");
+  /**
+   * Money is a PERMISSION before it is a toggle. Planners and Stratcom may
+   * flip "without value" for a screen-share; user, sales and viewer accounts
+   * never see a rupee figure at all — V masks every number, and the free-text
+   * fields Genie writes (which carry figures inside sentences) are redacted
+   * by redactMoney(), reading the same flag.
+   */
+  const mayValue = canEdit || canSeeForward;
+  HIDE_MONEY = !(mayValue && showVal);
+  const V = (rupees: number) => (mayValue && showVal ? "₹" + lakh(rupees) : "₹ •••");
 
   const logout = async () => {
     await supabaseBrowser().auth.signOut();
@@ -820,15 +840,17 @@ export default function PlanningSuite({
             >
               ☀ Quote
             </button>
-            <select
-              value={showVal ? "with" : "without"}
-              onChange={(e) => setShowVal(e.target.value === "with")}
-              className="text-xs rounded px-2 py-1.5 font-semibold"
-              style={{ background: "#0D161F", color: "#F5B32B", border: "1px solid #22303C" }}
-            >
-              <option value="with">With value ₹</option>
-              <option value="without">Without value</option>
-            </select>
+            {mayValue && (
+              <select
+                value={showVal ? "with" : "without"}
+                onChange={(e) => setShowVal(e.target.value === "with")}
+                className="text-xs rounded px-2 py-1.5 font-semibold"
+                style={{ background: "#0D161F", color: "#F5B32B", border: "1px solid #22303C" }}
+              >
+                <option value="with">With value ₹</option>
+                <option value="without">Without value</option>
+              </select>
+            )}
             {/* account: initials only, everything else behind the dropdown */}
             <span className="relative">
               <button
@@ -1017,7 +1039,7 @@ export default function PlanningSuite({
       </div>
       {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} canEdit={canEdit} reload={reload} />}
       {workspace === "suite" && tab === "feature" && <FeatureRequests isOwner={isRaghu} />}
-      {workspace === "suite" && tab === "floor" && <OnFloor board={board} V={V} onOpen={openJobPlan} reload={reload} canEdit={canEdit} isStrat={canSeeForward} myName={(displayName || email.split("@")[0]).split(" ")[0]} />}
+      {workspace === "suite" && tab === "floor" && <OnFloor board={board} V={V} onOpen={openJobPlan} reload={reload} canEdit={canEdit} canTask={role !== "viewer"} isStrat={canSeeForward} myName={(displayName || email.split("@")[0]).split(" ")[0]} />}
       {workspace === "suite" && tab === "material" && <PendingMaterial board={board} onOpen={openJobPlan} reload={reload} canEdit={canEdit} />}
       {workspace === "suite" && tab === "esc" && <Escalations board={board} V={V} onOpen={openJobPlan} reload={reload} isAdmin={isAdmin} />}
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
@@ -2939,7 +2961,7 @@ function JobStanding({ job, V }: { job: Job; V: (n: number) => string }) {
   const text: [string, string | null, string][] = [
     ["Current Project Escalation", job.escalation, "#B3261E"],
     ["Current Status", job.note || null, "#22303C"],
-    ["Client Update Latest", job.clientUpdate, "#22303C"],
+    ["Client Update Latest", redactMoney(job.clientUpdate) || job.clientUpdate, "#22303C"],
     ["Cash Flow Details", job.cashflow, "#22303C"],
   ];
   const shownText = text.filter(([, v]) => v && v.trim());
@@ -3099,21 +3121,21 @@ function GenieHint({ jobId, jobLabel }: { jobId: string; jobLabel: string }) {
 
       {hint && !busy && (
         <div style={{ maxHeight: 420, overflowY: "auto" }}>
-          <div className="text-sm font-bold mb-1" style={{ color: "#16232F" }}>{hint.headline}</div>
-          <div className="text-sm" style={{ color: "#5A6672" }}>{hint.story}</div>
+          <div className="text-sm font-bold mb-1" style={{ color: "#16232F" }}>{redactMoney(hint.headline)}</div>
+          <div className="text-sm" style={{ color: "#5A6672" }}>{redactMoney(hint.story)}</div>
 
           {hint.actions.length > 0 && (
             <>
               <div className="text-xs font-bold mt-2 mb-0.5" style={{ color: "#8A94A0" }}>TO DELIVER THIS JOB</div>
               <ul style={{ listStyle: "disc", paddingLeft: 18 }}>
-                {hint.actions.map((a, i) => (<li key={i} className="text-sm" style={{ color: "#16232F" }}>{a}</li>))}
+                {hint.actions.map((a, i) => (<li key={i} className="text-sm" style={{ color: "#16232F" }}>{redactMoney(a)}</li>))}
               </ul>
             </>
           )}
 
           {hint.watch && (
             <div className="rounded px-2 py-1.5 mt-2 text-xs" style={{ background: "#FFF4E0", color: "#7A4A00" }}>
-              <b>Watch:</b> {hint.watch}
+              <b>Watch:</b> {redactMoney(hint.watch)}
             </div>
           )}
 
@@ -3645,13 +3667,13 @@ function JobPlan({
 
       {planView === "plan" && (
         <>
-          <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
+          <div className="bg-white rounded-lg border" style={{ borderColor: "#E2E0DA", overflow: "auto", maxHeight: "calc(100vh - 210px)" }}>
             {/* fieldset[disabled] greys every input, select, checkbox and button
                 in the table at once for read-only roles; edit() is the actual
                 enforcement, this is the honest UI for it */}
             <fieldset disabled={!canEdit} style={{ border: "none", margin: 0, padding: 0, opacity: canEdit ? 1 : 0.75 }}>
             <table className="w-full text-sm" style={{ minWidth: 1100 }}>
-              <thead>
+              <thead style={{ position: "sticky", top: 0, zIndex: 30 }}>
                 <tr style={{ background: "#22303C", color: "#fff" }} className="text-xs">
                   <th className="px-2 py-2 text-center" title="Tick when done on the floor">✓</th>
                   <th className="px-2 py-2 text-left">#</th>
@@ -7607,6 +7629,7 @@ function OnFloor({
   onOpen,
   reload,
   canEdit,
+  canTask,
   isStrat,
   myName,
 }: {
@@ -7615,6 +7638,8 @@ function OnFloor({
   onOpen: (id: string) => void;
   reload: () => Promise<Board | null>;
   canEdit: boolean;
+  /** May add photos and record manpower — the floor's own hands, not just planners. */
+  canTask: boolean;
   isStrat: boolean;
   /** Who to thank when they leave an update. */
   myName: string;
@@ -7905,7 +7930,7 @@ function OnFloor({
                     ) : (
                       <div className="text-xs font-bold" style={{ color: "#E8600A" }}>no manpower recorded today</div>
                     )}
-                    {canEdit && (
+                    {canTask && (
                       <button onClick={() => setMpOpen(mpOpen === j.id ? null : j.id)}
                         className="text-xs font-bold rounded px-2 py-0.5 mt-1"
                         style={{ background: mpOpen === j.id ? "#22303C" : "#F4F2EC", color: mpOpen === j.id ? "#fff" : "#22303C" }}>
@@ -8000,7 +8025,7 @@ function OnFloor({
         />
       )}
 
-      {gallery && <PhotoGallery job={gallery} canEdit={canEdit} onClose={() => setGallery(null)} />}
+      {gallery && <PhotoGallery job={gallery} canEdit={canTask} onClose={() => setGallery(null)} />}
     </div>
   );
 }
@@ -8818,7 +8843,7 @@ function JobTopRow({
           {job.floorSummary ? (
             <>
               <div className="text-xs" style={{ color: "#22303C", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                {job.floorSummary}
+                {redactMoney(job.floorSummary)}
               </div>
               <button onClick={onShopUpdate} className="text-xs font-bold mt-0.5" style={{ color: "#7C3AED" }}>
                 all updates ↗
@@ -8900,7 +8925,7 @@ function ShopUpdatesBody({ job }: { job: Job }) {
           {job.floorSummary && (
             <div className="rounded p-3 mb-3" style={{ background: "#F3EEFB", border: "1px solid #C9B6EA" }}>
               <div className="text-xs font-bold" style={{ color: "#7C3AED", letterSpacing: .6 }}>✨ GENIE — THE READ ON THIS JOB</div>
-              <div className="text-sm mt-1" style={{ color: "#22303C", lineHeight: 1.6 }}>{job.floorSummary}</div>
+              <div className="text-sm mt-1" style={{ color: "#22303C", lineHeight: 1.6 }}>{redactMoney(job.floorSummary)}</div>
               {job.floorSummaryAt && (
                 <div style={{ fontSize: 10, color: "#8A94A0", marginTop: 4 }}>
                   from the latest notes · {new Date(job.floorSummaryAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
