@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.4.2",
+    date: "2026-08-24",
+    module: "The walk sheet, tightened to the walk",
+    items: [
+      "THE MONEY STAYS ON THE SCREEN. Value and Throughput are off the paper — the sheet is for the walk, not the review — leaving On Floor and Already Late, with a line under them in plain words: what the floor is building, by family (“8 Hi Lift · 3 WDL…”).",
+      "ONE CELL PER JOB'S IDENTITY: the number, the customer tag, the client — and the TDD LARGE, as DD/MM, red with a warning mark when it is already past.",
+      "OWNERS AS INITIALS, stacked in one cell — Prj and Prd — with the full name a hover away on screen; a missing production owner still shows red.",
+      "PENDING M / T in one narrow cell — milestones NOT DONE now, not the total ever planned — and K% over P% stacked beside it.",
+      "THE WORK COLUMN CARRIES BOTH LISTS: open tasks, and then the material not yet received — amber boxes, quantity, DD/MM, and QC DEFECTIVE called out — because on the floor “what is left” is one question, not two lists. Every date on the sheet reads DD/MM.",
+      "Cells align to the top, so a job with thirty tasks keeps its number at eye level instead of centred somewhere down the row.",
+    ],
+  },
+  {
     v: "3.21.4.1",
     date: "2026-08-24",
     module: "Blank printing, actually cured",

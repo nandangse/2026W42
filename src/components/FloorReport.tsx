@@ -1,25 +1,37 @@
 "use client";
 /**
- * The On Floor board, laid out for paper — see src/app/floor-report/page.tsx.
+ * The On Floor walk sheet — see src/app/floor-report/page.tsx.
  *
- * The repeating table header uses THEAD, which browsers repeat per printed
- * page; nothing here uses fixed positioning, which Chrome prints as blank
- * (learned the hard way on the offer letter).
+ * Laid out to Dr Raghu's spec of 24 Aug 2026: the money cards stay on the
+ * screen and OFF the paper (the sheet is for the walk, not the review), the
+ * job's identity and its TDD share one cell, owners are initials, and the
+ * work column carries BOTH the open tasks and the material still to arrive —
+ * because on the shop floor "what is left" is one question, not two lists.
  */
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import { jobNo, lakh, today } from "@/lib/schedule";
+import { jobNo, initials, today } from "@/lib/schedule";
 import { LOGO } from "@/lib/logo";
 
-interface Task { id: string; j: string; t: string; d: string; who: string; due: string | null; done: boolean; esc: string }
+interface Task { id: string; j: string; t: string; d: string; who: string; due: string | null; done: boolean }
 interface Job {
-  id: string; tag: string; cust: string; val: number; tdd: string | null;
-  own: string; productionOwner: string | null; kit: number; pct: number; tpv: number;
+  id: string; tag: string; fam: string; cust: string; val: number; tdd: string | null;
+  own: string; productionOwner: string | null; kit: number; pct: number;
   onFloor: boolean; ownerName: string | null; ownerInitials: string | null;
 }
-interface Board { jobs: Job[]; tasks: Task[]; plans: Record<string, { milestones?: unknown[] } | undefined> }
+interface Mat { id: string; item: string; qty: string; status: string; due?: string | null; who?: string | null }
+interface Board {
+  jobs: Job[]; tasks: Task[];
+  plans: Record<string, { milestones?: { done?: boolean }[] } | undefined>;
+  materials: Record<string, Mat[] | undefined>;
+}
 
 const TODAY = today();
+/** 2026-08-22 → 22/08 — the date as the floor says it. */
+const ddmm = (iso: string | null | undefined) => {
+  const s = String(iso || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s.slice(8, 10)}/${s.slice(5, 7)}` : "";
+};
 
 export default function FloorReport() {
   const [board, setBoard] = useState<Board | null>(null);
@@ -42,12 +54,16 @@ export default function FloorReport() {
     return m;
   }, [board]);
 
-  const totVal = jobs.reduce((s, j) => s + (j.val || 0), 0);
-  // the same throughput the On Floor tab shows: tpv, the throughput value
-  const totTp = jobs.reduce((s, j) => s + (j.tpv || 0), 0);
   const late = jobs.filter((j) => j.tdd && j.tdd < TODAY);
 
-  if (err) return <div style={{ padding: 40, fontFamily: "system-ui" }}>{err.includes("401") || /sign/i.test(err) ? "Log in to Genie first, then open this page again." : err}</div>;
+  // "8 Hi Lift, 3 WDL" — what the floor is actually building, by family
+  const famLine = useMemo(() => {
+    const c = new Map<string, number>();
+    for (const j of jobs) c.set(j.fam || "Unassigned", (c.get(j.fam || "Unassigned") || 0) + 1);
+    return [...c.entries()].sort((a, b) => b[1] - a[1]).map(([f, n]) => `${n} ${f}`).join(" · ");
+  }, [jobs]);
+
+  if (err) return <div style={{ padding: 40, fontFamily: "system-ui" }}>{/sign|401/i.test(err) ? "Log in to Genie first, then open this page again." : err}</div>;
   if (!board) return <div style={{ padding: 40, fontFamily: "system-ui", color: "#8A94A0" }}>reading the board…</div>;
 
   return (
@@ -59,6 +75,7 @@ export default function FloorReport() {
         table { width: 100%; border-collapse: collapse; }
         thead { display: table-header-group; }
         tr, td, th { page-break-inside: avoid; }
+        td { vertical-align: top; }
         @media screen { .paper { margin: 16px auto; box-shadow: 0 2px 14px rgba(20,30,40,.12); } }
         @media print {
           html, body { background: #fff; }
@@ -86,12 +103,10 @@ export default function FloorReport() {
           </div>
         </div>
 
-        {/* the cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 14 }}>
+        {/* the counts that matter on a walk; the money stays on the screen */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 4 }}>
           {[
             ["ON FLOOR", String(jobs.length), "jobs being worked on now", "#0D7A3F"],
-            ["VALUE", lakh(totVal), "", "#1B3A5C"],
-            ["THROUGHPUT", lakh(totTp), totVal ? `${Math.round((totTp / totVal) * 100)}% of value` : "", "#E8600A"],
             ["ALREADY LATE", String(late.length), late.length ? "past target delivery" : "none past target", late.length ? "#B3261E" : "#0D7A3F"],
           ].map(([l, v, sub, c]) => (
             <div key={l} style={{ border: `1px solid #DCD8CC`, borderTop: `3px solid ${c}`, borderRadius: 6, padding: "8px 10px" }}>
@@ -101,14 +116,18 @@ export default function FloorReport() {
             </div>
           ))}
         </div>
+        <div style={{ fontSize: 12, color: "#46545F", marginBottom: 12 }}>{famLine}</div>
 
         <table style={{ fontSize: 11.5 }}>
           <thead>
             <tr style={{ background: "#F4F2EC" }}>
-              {["Job No", "Customer Tag", "Project Owner", "Production Owner", "Milestones", "Tasks", "Kitting %", "Production %", "Open tasks — tick as checked"].map((h, i) => (
+              {[
+                ["Job · TDD", "left"], ["Owners", "left"], ["Pending\nM / T", "right"], ["K% · P%", "right"],
+                ["Open tasks and pending material — tick as checked", "left"],
+              ].map(([h, align]) => (
                 <th key={h} style={{
-                  border: "1px solid #DCD8CC", padding: "5px 7px", textAlign: i >= 4 && i <= 7 ? "right" : "left",
-                  fontSize: 10, letterSpacing: ".03em", whiteSpace: i < 8 ? "nowrap" : undefined,
+                  border: "1px solid #DCD8CC", padding: "5px 7px", textAlign: align as "left" | "right",
+                  fontSize: 10, letterSpacing: ".03em", whiteSpace: "pre-line",
                 }}>{h}</th>
               ))}
             </tr>
@@ -116,35 +135,55 @@ export default function FloorReport() {
           <tbody>
             {jobs.map((j) => {
               const tasks = tasksBy.get(j.id) || [];
-              const ms = board.plans?.[j.id]?.milestones?.length || 0;
+              const mats = (board.materials?.[j.id] || []).filter((m) => m.status !== "Received");
+              const allMs = board.plans?.[j.id]?.milestones || [];
+              const msPending = allMs.filter((m) => !m.done).length;
               const lateJob = j.tdd && j.tdd < TODAY;
               return (
                 <tr key={j.id}>
-                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", fontWeight: 800, whiteSpace: "nowrap" }}>
-                    {jobNo(j.id)}
-                    {lateJob && <div style={{ fontSize: 9, color: "#B3261E", fontWeight: 700 }}>late · TDD {j.tdd}</div>}
-                  </td>
-                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", minWidth: 150 }}>
-                    <b>{j.tag || "—"}</b>
+                  {/* who the job is, whole, in one cell — with the TDD large */}
+                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 8px", minWidth: 150, maxWidth: 190 }}>
+                    <div style={{ fontWeight: 800, fontSize: 14 }}>{jobNo(j.id)}</div>
+                    <div style={{ fontSize: 10.5, lineHeight: 1.3, marginTop: 1 }}>{j.tag || "—"}</div>
                     {j.cust && <div style={{ fontSize: 10, color: "#8B8F87" }}>{j.cust}</div>}
+                    {j.tdd && (
+                      <div style={{ fontSize: 17, fontWeight: 800, marginTop: 3, color: lateJob ? "#B3261E" : "#16232F", fontVariantNumeric: "tabular-nums" }}>
+                        {ddmm(j.tdd)}{lateJob ? " ⚠" : ""}
+                      </div>
+                    )}
                   </td>
-                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", whiteSpace: "nowrap" }}>{j.ownerName || j.own || "—"}</td>
-                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", whiteSpace: "nowrap", color: j.productionOwner ? "#16232F" : "#B3261E", fontWeight: j.productionOwner ? 400 : 700 }}>
-                    {j.productionOwner || "not set"}
+                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 8px", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                    <div title={j.ownerName || j.own}>Prj <b>{j.ownerInitials || initials(j.ownerName || j.own || "") || "—"}</b></div>
+                    <div title={j.productionOwner || "not set"} style={{ marginTop: 2, color: j.productionOwner ? "#16232F" : "#B3261E", fontWeight: j.productionOwner ? 400 : 700 }}>
+                      Prd {j.productionOwner ? <b>{initials(j.productionOwner)}</b> : "—"}
+                    </div>
                   </td>
-                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{ms || "—"}</td>
-                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{tasks.length}</td>
-                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{Math.round(j.kit || 0)}%</td>
-                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{Math.round(j.pct || 0)}%</td>
-                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", minWidth: 320 }}>
-                    {!tasks.length && <span style={{ color: "#8B8F87" }}>nothing open</span>}
+                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                    {msPending || "—"} / {tasks.length}
+                  </td>
+                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", width: 58 }}>
+                    <div>K: {Math.round(j.kit || 0)}%</div>
+                    <div>P: {Math.round(j.pct || 0)}%</div>
+                  </td>
+                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 8px" }}>
+                    {!tasks.length && !mats.length && <span style={{ color: "#8B8F87" }}>nothing open</span>}
                     {tasks.map((t) => (
                       <div key={t.id} style={{ display: "flex", gap: 7, alignItems: "flex-start", padding: "3px 0", borderBottom: "1px solid #F2F0EA" }}>
-                        {/* a box to tick with a pen — that is the whole point of the sheet */}
                         <span aria-hidden style={{ width: 11, height: 11, border: "1.5px solid #16232F", borderRadius: 2, marginTop: 2, flex: "none" }} />
                         <span style={{ lineHeight: 1.35 }}>
-                          <b>{t.t}</b>{t.who ? ` — ${t.who}` : ""}{t.due ? ` · due ${t.due}` : ""}
+                          <b>{t.t}</b>{t.who ? ` — ${t.who}` : ""}{t.due ? ` · ${ddmm(t.due)}` : ""}
                           {t.d && <><br /><span style={{ color: "#5A6572", fontSize: 10.5 }}>{t.d.slice(0, 160)}</span></>}
+                        </span>
+                      </div>
+                    ))}
+                    {mats.map((m) => (
+                      <div key={m.id} style={{ display: "flex", gap: 7, alignItems: "flex-start", padding: "3px 0", borderBottom: "1px solid #F2F0EA" }}>
+                        <span aria-hidden style={{ width: 11, height: 11, border: "1.5px solid #8A5B00", borderRadius: 2, marginTop: 2, flex: "none" }} />
+                        <span style={{ lineHeight: 1.35 }}>
+                          <span style={{ color: "#8A5B00", fontWeight: 700, fontSize: 10 }}>MATERIAL</span>{" "}
+                          <b>{m.item}</b>{m.qty ? ` × ${m.qty}` : ""}{m.due ? ` · ${ddmm(m.due)}` : ""}
+                          {m.status === "QC Defective" && <b style={{ color: "#B3261E" }}> · QC DEFECTIVE</b>}
+                          {m.who && <span style={{ color: "#5A6572", fontSize: 10.5 }}> — {m.who}</span>}
                         </span>
                       </div>
                     ))}
