@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.5.1",
+    date: "2026-08-24",
+    module: "The walk sheet goes portrait",
+    items: [
+      "OWNERS, PENDING AND THE PERCENTAGES ARE ONE COLUMN NOW — Prj and Prd on the first line, M/M/T counts under them, K% and P% under that — three narrow columns folded into one so the sheet PRINTS PORTRAIT, which is how a clipboard is held.",
+    ],
+  },
+  {
     v: "3.21.5.0",
     date: "2026-08-24",
     module: "The walk sheet in two editions",

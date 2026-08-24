@@ -165,9 +165,9 @@ export default function FloorReport() {
   return (
     <>
       <style>{`
-        @page { size: A4 landscape; margin: 10mm; }
+        @page { size: A4 portrait; margin: 10mm; }
         html, body { margin: 0; background: #EFEDE7; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #16232F; }
-        .paper { max-width: 1150px; margin: 0 auto; background: #fff; padding: 24px 28px; }
+        .paper { max-width: 820px; margin: 0 auto; background: #fff; padding: 24px 28px; }
         table { width: 100%; border-collapse: collapse; }
         thead { display: table-header-group; }
         tr, td, th { page-break-inside: avoid; }
@@ -229,7 +229,7 @@ export default function FloorReport() {
           <thead>
             <tr style={{ background: "#F4F2EC" }}>
               {([
-                ["Job · TDD", "left"], ["Owners", "left"], ["Pending\nMat/Mile/Task", "right"], ["K%\nP%", "right"],
+                ["Job · TDD", "left"], ["Owners · Pending · %", "left"],
                 ["Project pendencies — by date, undated on top — tick as checked", "left"],
               ] as const).map(([h, align]) => (
                 <th key={h} style={{ border: "1px solid #DCD8CC", padding: "5px 7px", textAlign: align, fontSize: 10, letterSpacing: ".03em", whiteSpace: "pre-line" }}>{h}</th>
@@ -252,18 +252,15 @@ export default function FloorReport() {
                       </div>
                     )}
                   </td>
-                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 8px", whiteSpace: "nowrap" }}>
-                    <div title={j.ownerName || j.own}>Prj <b>{j.ownerInitials || initialsOf(j.ownerName || j.own) || "—"}</b></div>
-                    <div title={j.productionOwner || "not set"} style={{ marginTop: 2, color: j.productionOwner ? "#16232F" : "#B3261E", fontWeight: j.productionOwner ? 400 : 700 }}>
-                      Prd {j.productionOwner ? <b>{initialsOf(j.productionOwner)}</b> : "—"}
+                  {/* one narrow cell: who owns it, what is pending, how far it is */}
+                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 8px", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", width: 108 }}>
+                    <div title={j.ownerName || j.own}>Prj <b>{j.ownerInitials || initialsOf(j.ownerName || j.own) || "—"}</b>
+                      <span title={j.productionOwner || "not set"} style={{ marginLeft: 6, color: j.productionOwner ? "#16232F" : "#B3261E", fontWeight: j.productionOwner ? 400 : 700 }}>
+                        Prd {j.productionOwner ? <b>{initialsOf(j.productionOwner)}</b> : "—"}
+                      </span>
                     </div>
-                  </td>
-                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", width: 64 }}>
-                    {nMat} / {nMs} / {nTask}
-                  </td>
-                  <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", width: 52 }}>
-                    <div>K {Math.round(j.kit || 0)}%</div>
-                    <div>P {Math.round(j.pct || 0)}%</div>
+                    <div style={{ marginTop: 2, fontSize: 10.5, color: "#46545F" }}>M/M/T <b>{nMat}/{nMs}/{nTask}</b></div>
+                    <div style={{ marginTop: 2, fontSize: 10.5, color: "#46545F" }}>K <b>{Math.round(j.kit || 0)}%</b> · P <b>{Math.round(j.pct || 0)}%</b></div>
                   </td>
                   <td style={{ border: "1px solid #DCD8CC", padding: "6px 8px" }}>
                     {!list.length && <span style={{ color: "#8B8F87" }}>nothing pending</span>}
