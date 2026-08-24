@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.0.1",
+    date: "2026-08-24",
+    module: "Offer Letters — the gross and the basic % drive the rest",
+    items: [
+      "TWO NUMBERS ARE TYPED, the rest adjusts: the Agreed Gross and Basic as a percentage of it. HRA then comes out at 20% of basic, Conveyance at ₹5,000, Medical at ₹1,250, and Fixed Allowance takes the balance — checked against the March 2026 letter, which it reproduces to the rupee (48,650 at 58.07% → 28,250 / 5,650 / 8,500 / 5,000 / 1,250).",
+      "ANY LINE CAN STILL BE TYPED OVER. Fixed Allowance absorbs the difference, so the five components never stop summing to the gross that was actually agreed — and if they ever do, the screen says by how much instead of quietly printing a letter that does not add up.",
+      "Exempt types get no HRA and Fixed takes it instead, so the agreed gross still holds for Management and the contract types.",
+      "The split is stored with the offer, so a letter reprints exactly as it was sent rather than being recomputed from today's defaults.",
+    ],
+  },
+  {
     v: "3.21.0.0",
     date: "2026-08-24",
     module: "HRMS — Offer Letters",

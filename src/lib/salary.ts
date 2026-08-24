@@ -137,3 +137,58 @@ export function scaledGetter(get: (k: string) => unknown, newGross: number): (k:
   const f = newGross / current;
   return (k: string) => (parts.includes(k) ? num(get(k)) * f : get(k));
 }
+
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Splitting a gross into its components.
+ *
+ * Two numbers drive it — the GROSS and the BASIC as a percentage of it —
+ * and the rest follows, exactly as the letters in use do it:
+ *
+ *   Basic & DA   = gross x basic%          (58% in the letters)
+ *   HRA          = 40% of basic            (20% for a company at a non-metro)
+ *   Conveyance   = 5,000 capped
+ *   Medical      = 1,250 flat
+ *   Fixed        = whatever is left        <- the balancer, so the five
+ *                                            components always sum to the
+ *                                            gross that was agreed
+ *
+ * Checked against the March 2026 letter: 48,650 gross at 58.07% gives basic
+ * 28,250, HRA 5,650, conveyance 5,000, medical 1,250 and fixed 8,500 —
+ * the printed letter to the rupee.
+ *
+ * Any component can then be overridden by hand; `fixed` absorbs the
+ * difference so the gross never silently changes underneath the agreement.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+export const SPLIT_DEFAULTS = { basicPct: 58, hraOfBasic: 20, conveyance: 5000, medical: 1250 };
+
+export interface Components { basic_da: number; hra: number; fixed_allowance: number; conveyance: number; medical_allowance: number }
+
+export function splitGross(gross: number, basicPct = SPLIT_DEFAULTS.basicPct, type?: string | null): Components {
+  const g = Math.max(0, Math.round(num(gross)));
+  if (!g) return { basic_da: 0, hra: 0, fixed_allowance: 0, conveyance: 0, medical_allowance: 0 };
+  const exempt = NO_STATUTORY.has(String(type || "").trim());
+  const pct = Math.min(100, Math.max(1, num(basicPct) || SPLIT_DEFAULTS.basicPct));
+
+  const basic = Math.round((g * pct) / 100);
+  // HRA is not paid to the types that do not get it — the balance goes to Fixed
+  const hra = exempt ? 0 : Math.round((basic * SPLIT_DEFAULTS.hraOfBasic) / 100);
+  const conveyance = Math.min(SPLIT_DEFAULTS.conveyance, Math.max(0, g - basic - hra));
+  const medical = Math.min(SPLIT_DEFAULTS.medical, Math.max(0, g - basic - hra - conveyance));
+  const fixed = Math.max(0, g - basic - hra - conveyance - medical);
+
+  return { basic_da: basic, hra, fixed_allowance: fixed, conveyance, medical_allowance: medical };
+}
+
+/** A getter over an explicit set of components, for salaryTable(). */
+export function getterFor(c: Components): (k: string) => number {
+  const map: Record<string, number> = {
+    "Basic and DA": c.basic_da, "HRA": c.hra, "Fixed Allowance": c.fixed_allowance,
+    "Conveyance": c.conveyance, "Medical Allowance": c.medical_allowance,
+  };
+  return (k: string) => map[k] ?? 0;
+}
+
+export const componentsTotal = (c: Components) =>
+  c.basic_da + c.hra + c.fixed_allowance + c.conveyance + c.medical_allowance;

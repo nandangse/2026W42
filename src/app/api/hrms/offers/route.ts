@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables } from "@/lib/hrms";
-import { salaryTable } from "@/lib/salary";
+import { salaryTable, splitGross, getterFor, componentsTotal, type Components } from "@/lib/salary";
 import { offerNumber, financialYear, RESUME_SCHEMA, RESUME_SYSTEM, offerLetterHtml, textToHtml, type ResumeRead } from "@/lib/offer";
 
 export const dynamic = "force-dynamic";
@@ -227,76 +227,54 @@ export async function POST(req: Request) {
           .map((c) => ({ name: clean(c.name, 200), level: Math.max(1, Math.min(5, Number(c.level) || 3)) }))
           .filter((c) => c.name);
       if ("salary" in p && p.salary && typeof p.salary === "object") patch.salary = p.salary;
+      if ("components" in p && p.components && typeof p.components === "object") patch.components = p.components;
+      if ("basic_pct" in p) patch.basic_pct = Number(p.basic_pct) || null;
 
       const { error } = await admin.from("hrms_offer").update(patch).eq("id", id);
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true });
     }
 
-    /** The structure at a gross, computed server-side so it matches every other screen. */
+    /**
+     * The structure, computed server-side so it matches every other screen.
+     *
+     * Two numbers drive it — the agreed gross and the basic percentage — and
+     * the rest adjusts. Explicit components, when sent, win over the split:
+     * the letter can be tuned line by line, and Fixed Allowance absorbs the
+     * difference so the five never stop summing to the gross that was agreed.
+     */
     if (action === "salary") {
       const gross = Number(String(body.agreed_gross ?? "").replace(/[^0-9.]/g, "")) || 0;
       const type = clean(body.type, 60);
+      const basicPct = Number(body.basic_pct) || 58;
       if (!gross) throw new HttpError(400, "What is the agreed gross?");
-      // an offer has no history to keep shares of, so the standard split is used
-      const basic = Math.round(gross * 0.58), hra = Math.round(gross * 0.116);
-      const conv = Math.min(5000, Math.round(gross * 0.1)), med = 1250;
-      const fixed = Math.max(0, gross - basic - hra - conv - med);
-      const get = (k: string) => ({ "Basic and DA": basic, "HRA": hra, "Fixed Allowance": fixed, "Conveyance": conv, "Medical Allowance": med } as Record<string, number>)[k] ?? 0;
-      const table = salaryTable(get, type);
-      return NextResponse.json({ salary: table });
-    }
 
-    /**
-     * { action: "send" } — the offer goes out.
-     *
-     * Resend when a key is configured (nandan.co.in is a verified domain
-     * there), and an honest refusal when it is not — never a silent success.
-     * Per-person mailbox connection is a later, larger piece of work; this
-     * sends from the address on the offer, which defaults to hr@.
-     */
-    if (action === "send") {
-      const key = process.env.RESEND_API_KEY;
-      const { data: o } = await admin.from("hrms_offer").select("*").eq("id", id).maybeSingle();
-      if (!o) throw new HttpError(404, "No such offer.");
-      const to = clean(body.send_to ?? o.send_to ?? o.email, 300);
-      if (!to) throw new HttpError(400, "There is no address to send it to.");
-      if (!key)
-        throw new HttpError(503,
-          "No mail account is configured on the server yet, so Genie cannot send this itself. " +
-          "Use “Open the Gmail draft” below, or add RESEND_API_KEY in Vercel and this becomes one button.");
-
-      const from = clean(body.send_from ?? o.send_from, 200) || "hr@nandan.co.in";
-      const cc = clean(body.send_cc ?? o.send_cc, 300);
-      const covering = String(body.covering_letter ?? o.covering_letter ?? "");
-      const html = `${textToHtml(covering)}<hr style="border:none;border-top:1px solid #DCD8CC;margin:26px 0">${offerLetterHtml(o)}`;
-
-      const r = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-        body: JSON.stringify({
-          from: `Nandan GSE HR <${from}>`,
-          to: to.split(/[,;]/).map((x) => x.trim()).filter(Boolean),
-          cc: cc ? cc.split(/[,;]/).map((x) => x.trim()).filter(Boolean) : undefined,
-          reply_to: from,
-          subject: `Offer of Employment — ${o.name}${o.designation ? ` · ${o.designation}` : ""} — Nandan GSE`,
-          html,
-        }),
-      });
-      if (!r.ok) {
-        const t = await r.text();
-        throw new HttpError(502,
-          r.status === 401 ? "The RESEND_API_KEY is wrong or revoked."
-          : r.status === 403 ? `Resend refused the sender ${from} — check the domain is verified there. (${t.slice(0, 140)})`
-          : `Resend answered ${r.status}: ${t.slice(0, 200)}`);
+      let comps: Components = splitGross(gross, basicPct, type);
+      if (body.components && typeof body.components === "object") {
+        const c = body.components as Record<string, unknown>;
+        const n = (k: string, fallback: number) => {
+          const v = c[k];
+          return v === undefined || v === null || v === "" ? fallback : Math.max(0, Math.round(Number(String(v).replace(/[^0-9.]/g, "")) || 0));
+        };
+        comps = {
+          basic_da: n("basic_da", comps.basic_da),
+          hra: n("hra", comps.hra),
+          conveyance: n("conveyance", comps.conveyance),
+          medical_allowance: n("medical_allowance", comps.medical_allowance),
+          fixed_allowance: n("fixed_allowance", comps.fixed_allowance),
+        };
+        // Fixed absorbs any drift, unless it is the line being edited
+        if (!("fixed_allowance" in c) || c.fixed_allowance === undefined)
+          comps.fixed_allowance = Math.max(0, gross - comps.basic_da - comps.hra - comps.conveyance - comps.medical_allowance);
       }
-      const { error } = await admin.from("hrms_offer").update({
-        status: "Sent", sent_at: now, sent_by: stamp,
-        send_to: to, send_from: from, send_cc: cc,
-        updated_by: stamp, updated_at: now,
-      }).eq("id", id);
-      if (error) throw new Error(error.message);
-      return NextResponse.json({ ok: true, sent: true });
+
+      const table = salaryTable(getterFor(comps), type);
+      return NextResponse.json({
+        salary: table,
+        components: comps,
+        componentsTotal: componentsTotal(comps),
+        basic_pct: comps.basic_da && gross ? Math.round((comps.basic_da / gross) * 10000) / 100 : basicPct,
+      });
     }
 
     /* ── the status ladder ── */

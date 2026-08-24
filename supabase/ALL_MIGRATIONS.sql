@@ -5460,6 +5460,13 @@ comment on table public.hrms_offer is
 alter table public.hrms_offer enable row level security;
 revoke all on public.hrms_offer from anon, authenticated;
 
+-- The split behind the agreed gross (Dr Raghu, 24 Aug 2026): the gross and
+-- the basic percentage are the two things typed; the rest adjusts, and any
+-- line can still be corrected by hand. Kept so a letter reprints identically.
+alter table public.hrms_offer
+  add column if not exists components jsonb,
+  add column if not exists basic_pct  numeric;
+
 
 -- >>>>> supabase/migrations/0068_hrms_text_master.sql
 -- 0068_hrms_text_master.sql

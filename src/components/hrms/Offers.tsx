@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 import { TYPE_OPTIONS, splitMulti, joinMulti } from "@/lib/hrms";
-import { type SalaryRow } from "@/lib/salary";
+import { type SalaryRow, type Components, SPLIT_DEFAULTS } from "@/lib/salary";
 import { OFFER_STEPS, STATUS_TONE, OFFER_STATUS, defaultJoining, iso, coveringLetter } from "@/lib/offer";
 import RichText, { RichTextView } from "./RichText";
 import { Pane } from "./Pane";
@@ -39,6 +39,7 @@ interface Offer extends Row {
   role_doc: { role?: string; purpose?: string; job_description?: string; deliverable?: string; metric?: string } | null;
   competencies: { name: string; level: number }[] | null;
   salary: { rows: SalaryRow[]; ctcLakhs: string; exempt: boolean; gross: number } | null;
+  components: Components | null; basic_pct: number | null;
   terms: string | null; internal_notes: string | null;
   send_to: string | null; send_from: string | null; send_cc: string | null;
   covering_letter: string | null; valid_days: number | null;
@@ -420,21 +421,35 @@ function PageRole({ d, boot, save, locked }: { d: Offer; boot: Boot | null; save
 }
 
 /* ── page 3 ── */
+const COMP_ROWS: [keyof Components, string][] = [
+  ["basic_da", "Basic & DA"], ["hra", "HRA"], ["fixed_allowance", "Fixed Allowance"],
+  ["conveyance", "Conveyance"], ["medical_allowance", "Medical Allowance"],
+];
+
 function PageSalary({ d, save, locked }: { d: Offer; save: (p: Record<string, unknown>) => void; locked: boolean }) {
   const [gross, setGross] = useState(d.agreed_gross == null ? "" : String(Math.round(d.agreed_gross)));
+  const [pct, setPct] = useState(d.basic_pct == null ? String(SPLIT_DEFAULTS.basicPct) : String(d.basic_pct));
   const [type, setType] = useState(d.type || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  const compute = useCallback(async (g: string, t: string) => {
+  /** components: undefined asks the server to derive them from gross and %. */
+  const compute = useCallback(async (g: string, t: string, p: string, components?: Partial<Components>) => {
     if (!Number(g) || !t) return;
     setBusy(true); setErr("");
     try {
-      const j = await api.post("/api/hrms/offers", { action: "salary", id: d.id, agreed_gross: g, type: t });
-      save({ agreed_gross: Number(g), type: t, salary: j.salary });
+      const j = await api.post("/api/hrms/offers", {
+        action: "salary", id: d.id, agreed_gross: g, type: t, basic_pct: p, components,
+      });
+      setPct(String(j.basic_pct));
+      save({ agreed_gross: Number(g), type: t, basic_pct: Number(j.basic_pct), salary: j.salary, components: j.components });
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
   }, [d.id, save]);
+
+  const comps = d.components;
+  const sum = comps ? COMP_ROWS.reduce((a, [k]) => a + (Number(comps[k]) || 0), 0) : 0;
+  const drift = comps && Number(gross) ? sum - Number(gross) : 0;
 
   return (
     <>
@@ -443,11 +458,17 @@ function PageSalary({ d, save, locked }: { d: Offer; save: (p: Record<string, un
           <label style={{ fontSize: 12, color: C.dim, fontWeight: 600 }}>Agreed Gross (per month)
             <input value={gross} inputMode="numeric" disabled={locked}
               onChange={(e) => setGross(e.target.value.replace(/[^0-9]/g, ""))}
-              onBlur={() => compute(gross, type)}
-              className="rounded px-2 py-2 block tnum" style={{ border: `2px solid ${C.green}`, color: C.green, fontWeight: 700, fontSize: 17, width: 160 }} />
+              onBlur={() => compute(gross, type, pct)}
+              className="rounded px-2 py-2 block tnum" style={{ border: `2px solid ${C.green}`, color: C.green, fontWeight: 700, fontSize: 17, width: 150 }} />
+          </label>
+          <label style={{ fontSize: 12, color: C.dim, fontWeight: 600 }}>Basic as % of gross
+            <input value={pct} inputMode="decimal" disabled={locked}
+              onChange={(e) => setPct(e.target.value.replace(/[^0-9.]/g, ""))}
+              onBlur={() => compute(gross, type, pct)}
+              className="rounded px-2 py-2 block tnum" style={{ border: `2px solid ${C.green}`, color: C.green, fontWeight: 700, fontSize: 17, width: 90 }} />
           </label>
           <label style={{ fontSize: 12, color: C.dim, fontWeight: 600 }}>Type
-            <select value={type} disabled={locked} onChange={(e) => { setType(e.target.value); compute(gross, e.target.value); }}
+            <select value={type} disabled={locked} onChange={(e) => { setType(e.target.value); compute(gross, e.target.value, pct); }}
               className="rounded px-2 py-2 block bg-white" style={{ border: `1px solid ${C.line}`, fontSize: 14, color: C.ink }}>
               <option value="">— choose —</option>
               {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -457,15 +478,55 @@ function PageSalary({ d, save, locked }: { d: Offer; save: (p: Record<string, un
           {busy && <span style={{ fontSize: 12, color: C.faint }}>computing…</span>}
         </div>
         <div style={{ fontSize: 11.5, color: C.faint, marginTop: 6 }}>
-          The type decides the structure — HRA, PF and PT do not apply to Management or the contract types, and benefits do not apply to Management.
+          Those two drive everything: HRA comes out at {SPLIT_DEFAULTS.hraOfBasic}% of basic, Conveyance at ₹{SPLIT_DEFAULTS.conveyance.toLocaleString("en-IN")},
+          Medical at ₹{SPLIT_DEFAULTS.medical.toLocaleString("en-IN")}, and Fixed Allowance takes the balance.
+          Any line can still be typed over below — Fixed absorbs the difference so the five always sum to the agreed gross.
+          The type decides the rest: HRA, PF and PT drop for Management and the contract types, and benefits drop for Management.
         </div>
         {err && <div className="text-xs font-semibold mt-1" style={{ color: C.red }}>{err}</div>}
       </div>
+
+      {comps && (
+        <Card title="The split" note="Type over any line to change it by hand.">
+          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))" }}>
+            {COMP_ROWS.map(([k, label]) => (
+              <CompBox key={k} label={label} value={Number(comps[k]) || 0} locked={locked}
+                onSave={(v) => compute(gross, type, pct, { [k]: v } as Partial<Components>)} />
+            ))}
+          </div>
+          <div className="mt-2 flex gap-3 items-baseline flex-wrap" style={{ fontSize: 12.5 }}>
+            <span>Components total: <b className="tnum">₹{inr(sum)}</b></span>
+            <span style={{ color: C.faint }}>Agreed gross: <b className="tnum">₹{inr(Number(gross))}</b></span>
+            {drift !== 0
+              ? <b style={{ color: C.red }}>Off by ₹{inr(Math.abs(drift))} — retype a line and Fixed will absorb it</b>
+              : <b style={{ color: C.green }}>✓ balanced</b>}
+            <button onClick={() => compute(gross, type, pct)} disabled={locked || busy}
+              className="rounded px-2.5 py-1 font-bold no-print" style={{ background: "#fff", color: C.dim, border: `1px solid ${C.line}`, fontSize: 11.5 }}>
+              ↺ Back to {pct}% of gross
+            </button>
+          </div>
+        </Card>
+      )}
 
       {d.salary
         ? <SalaryTable rows={d.salary.rows} ctc={d.salary.ctcLakhs} />
         : <div className="text-sm py-6 text-center" style={{ color: C.faint }}>Put in the agreed gross and choose the type — the structure builds itself.</div>}
     </>
+  );
+}
+
+function CompBox({ label, value, locked, onSave }: { label: string; value: number; locked: boolean; onSave: (v: number) => void }) {
+  const [v, setV] = useState(String(value));
+  useEffect(() => { setV(String(value)); }, [value]);
+  return (
+    <label style={{ fontSize: 11.5, color: C.faint }}>
+      {label}
+      <input value={v} inputMode="numeric" disabled={locked}
+        onChange={(e) => setV(e.target.value.replace(/[^0-9]/g, ""))}
+        onBlur={() => { if (Number(v) !== value) onSave(Number(v) || 0); }}
+        className="w-full rounded px-2 py-1.5 block tnum text-right"
+        style={{ border: `1px solid ${C.line}`, fontSize: 14, fontWeight: 600, color: C.ink, background: locked ? "#F7F6F2" : "#fff" }} />
+    </label>
   );
 }
 
