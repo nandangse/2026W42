@@ -7602,6 +7602,13 @@ function OnFloor({
 
   return (
     <div className="p-4">
+      <div className="flex justify-end mb-2 no-print">
+        <a href="/floor-report" target="_blank" rel="noopener noreferrer"
+          className="rounded px-3 py-1.5 font-bold text-xs"
+          style={{ background: "#16232F", color: "#fff" }}>
+          📄 PDF — the walk sheet
+        </a>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
         <StatCard label="ON FLOOR" value={String(jobs.length)} sub="jobs being worked on now" color="#0D7A3F" />
         <StatCard label="VALUE" value={V(totVal)} color="#1B3A5C" />

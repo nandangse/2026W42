@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.4.0",
+    date: "2026-08-24",
+    module: "On Floor — the walk sheet",
+    items: [
+      "A PDF OF THE FLOOR, at genie.nandan.co.in/floor-report and one button from the On Floor tab: the number cards on top, then one row per job — Job No, Customer Tag, Project Owner, Production Owner, milestones, tasks, Kitting % and Production % — and every open task listed two lines deep with A TICKBOX IN FRONT, so the walk around the shop can be ticked off with a pen.",
+      "It reads the same board the screen reads, so the sheet cannot disagree with the tab it summarises. A job with no Production Owner says “not set” in red — on paper, in front of everyone, which is how that column gets filled.",
+      "A4 landscape, the Nandan letterhead on top, and the table header repeats on every printed page.",
+      "WHY THE OWNER DROPDOWNS ERRORED: migration 0046 — production, kitting and design owners on jobs — was never run on the database. The columns the On Floor tab writes do not exist yet; the file is attached again, and the moment it runs the dropdowns save.",
+    ],
+  },
+  {
     v: "3.21.3.1",
     date: "2026-08-24",
     module: "The offer PDF actually prints",
