@@ -25,8 +25,10 @@ interface Job {
   ownerName: string | null; ownerInitials: string | null;
 }
 interface Mat { id: string; item: string; qty: string; status: string; due?: string | null; who?: string | null }
+interface Person { initials: string | null; name: string | null; erpOwner?: string | null; email?: string }
 interface Board {
   jobs: Job[]; tasks: Task[];
+  people?: Person[]; assignableUsers?: Person[];
   plans: Record<string, { start?: string; milestones?: PlanMilestone[] } | undefined>;
   materials: Record<string, Mat[] | undefined>;
 }
@@ -47,12 +49,34 @@ const saturday = (() => {
   return d.toISOString().slice(0, 10);
 })();
 
+interface DeliveredRow { id: string; delivered_on: string | null; val?: number; tpv?: number }
+
 export default function FloorReport() {
   const [board, setBoard] = useState<Board | null>(null);
   const [err, setErr] = useState("");
+  /** PRE edition — the commercials, Stratcom's print. ?full=1. */
+  const [full, setFull] = useState(false);
+  const [delivered, setDelivered] = useState<DeliveredRow[]>([]);
+  const [moneyOk, setMoneyOk] = useState(false);
 
   useEffect(() => {
+    const wantFull = new URLSearchParams(window.location.search).get("full") === "1";
+    setFull(wantFull);
     api.get("/api/board").then(setBoard).catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+    // Delivered is read from the DELIVERY record, not the live board — the
+    // live board only carries what is still being built. The recent list is
+    // open to every reader and carries no money; the full ledger is the
+    // Leadership Circle's, so the PRE edition asks for it and the quick
+    // sheet never does.
+    if (wantFull) {
+      api.get("/api/delivered")
+        .then((r: { rows?: DeliveredRow[] }) => { setDelivered(r.rows || []); setMoneyOk(true); })
+        .catch(() => {
+          api.get("/api/delivered/recent").then((r: { rows?: DeliveredRow[] }) => setDelivered(r.rows || [])).catch(() => {});
+        });
+    } else {
+      api.get("/api/delivered/recent").then((r: { rows?: DeliveredRow[] }) => setDelivered(r.rows || [])).catch(() => {});
+    }
   }, []);
 
   const floor = useMemo(
@@ -94,16 +118,30 @@ export default function FloorReport() {
 
   const late = floor.filter((j) => j.tdd && j.tdd < TODAY);
 
-  /** What actually went out the gate — the walk's other half of the truth. */
+  /** What actually went out the gate — from the delivery record. */
   const deliveredSince = (days: number) => {
     const from = new Date(TODAY + "T00:00:00");
     from.setDate(from.getDate() - days);
     const cut = from.toISOString().slice(0, 10);
-    const js = (board?.jobs || []).filter((j) => j.delivered && j.delivered_on && j.delivered_on >= cut && j.delivered_on <= TODAY);
+    const js = delivered.filter((j) => j.delivered_on && j.delivered_on >= cut && j.delivered_on <= TODAY);
     return { n: js.length, val: js.reduce((s, j) => s + (j.val || 0), 0), tp: js.reduce((s, j) => s + (j.tpv || 0), 0) };
   };
   const d7 = deliveredSince(7);
   const d30 = deliveredSince(30);
+
+  /**
+   * Initials come from the Users table, never invented from a name here —
+   * the dropdowns store the user's own two-or-three-letter handle, and where
+   * an older field carries a full name, it is matched back to the person.
+   */
+  const initialsOf = (v: string | null | undefined): string => {
+    const x = String(v || "").trim();
+    if (!x) return "";
+    const people = [...(board?.people || []), ...(board?.assignableUsers || [])];
+    if (people.some((p) => (p.initials || "").toUpperCase() === x.toUpperCase())) return x.toUpperCase();
+    const hit = people.find((p) => (p.name || "").toLowerCase() === x.toLowerCase() || (p.erpOwner || "").toLowerCase() === x.toLowerCase());
+    return hit?.initials?.toUpperCase() || initials(x);
+  };
   const week = floor.filter((j) => j.tdd && j.tdd <= saturday);
   const weekFams = useMemo(() => {
     const c = new Map<string, number>();
@@ -146,7 +184,7 @@ export default function FloorReport() {
       `}</style>
 
       <div className="no-print" style={{ background: "#16232F", color: "#fff", padding: "10px 16px", display: "flex", gap: 12, alignItems: "center", fontSize: 13, position: "sticky", top: 0, zIndex: 10 }}>
-        <b>On Floor report</b>
+        <b>On Floor report{full ? " — PRE edition" : ""}</b>
         <span style={{ opacity: .7 }}>{floor.length} jobs · {dmy(TODAY)}</span>
         <span style={{ flex: 1 }} />
         <button onClick={() => window.print()} style={{ background: "#E8600A", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>
@@ -164,22 +202,28 @@ export default function FloorReport() {
           </div>
         </div>
 
-        {/* three narrow boxes; the money stays on the screen */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        {/* five narrow boxes; the products go below them, and the money
+            appears only on the PRE edition */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
           {([
             ["ON FLOOR", String(floor.length), "being worked on now", "#0D7A3F"],
-            ["ALREADY LATE", String(late.length), late.length ? "past target delivery" : "none past target", late.length ? "#B3261E" : "#0D7A3F"],
-            [`DELIVERY THIS WEEK · UPTO ${dmy(saturday)}`, String(week.length), week.length ? weekFams : "nothing due by Saturday", "#E8600A"],
-            ["DELIVERED · LAST 7 DAYS", String(d7.n), d7.n ? `${lakh(d7.val)} · TP ${lakh(d7.tp)}` : "nothing went out", "#1B3A5C"],
-            ["DELIVERED · LAST 30 DAYS", String(d30.n), d30.n ? `${lakh(d30.val)} · TP ${lakh(d30.tp)}` : "nothing went out", "#1B3A5C"],
+            ["ALREADY LATE", String(late.length), late.length ? "past target delivery" : "none late", late.length ? "#B3261E" : "#0D7A3F"],
+            [`DELIVERY THIS WEEK · UPTO ${dmy(saturday)}`, String(week.length), week.length ? "due by Saturday" : "nothing due by Saturday", "#E8600A"],
+            ["DELIVERED · LAST 7 DAYS", String(d7.n), full && moneyOk ? (d7.n ? `${lakh(d7.val)} · TP ${lakh(d7.tp)}` : "nothing went out") : d7.n ? "went out the gate" : "nothing went out", "#1B3A5C"],
+            ["DELIVERED · LAST 30 DAYS", String(d30.n), full && moneyOk ? (d30.n ? `${lakh(d30.val)} · TP ${lakh(d30.tp)}` : "nothing went out") : d30.n ? "went out the gate" : "nothing went out", "#1B3A5C"],
           ] as const).map(([l, v, sub, c]) => (
-            <div key={l} style={{ border: `1px solid #DCD8CC`, borderTop: `3px solid ${c}`, borderRadius: 6, padding: "6px 12px", minWidth: 130, maxWidth: 420 }}>
-              <div style={{ fontSize: 9.5, letterSpacing: ".05em", color: "#8B8F87", fontWeight: 700 }}>{l}</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: c, fontVariantNumeric: "tabular-nums" }}>{v}</div>
-              {sub && <div style={{ fontSize: 12, color: "#46545F" }}>{sub}</div>}
+            <div key={l} style={{ border: `1px solid #DCD8CC`, borderTop: `3px solid ${c}`, borderRadius: 6, padding: "5px 10px", minWidth: 110, flex: "0 1 auto" }}>
+              <div style={{ fontSize: 9, letterSpacing: ".05em", color: "#8B8F87", fontWeight: 700, whiteSpace: "nowrap" }}>{l}</div>
+              <div style={{ fontSize: 19, fontWeight: 800, color: c, fontVariantNumeric: "tabular-nums" }}>{v}</div>
+              {sub && <div style={{ fontSize: 10, color: "#8B8F87", whiteSpace: "nowrap" }}>{sub}</div>}
             </div>
           ))}
         </div>
+        {week.length > 0 && (
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+            This week: {weekFams}
+          </div>
+        )}
 
         <table style={{ fontSize: 11.5 }}>
           <thead>
@@ -209,9 +253,9 @@ export default function FloorReport() {
                     )}
                   </td>
                   <td style={{ border: "1px solid #DCD8CC", padding: "6px 8px", whiteSpace: "nowrap" }}>
-                    <div title={j.ownerName || j.own}>Prj <b>{j.ownerInitials || initials(j.ownerName || j.own || "") || "—"}</b></div>
+                    <div title={j.ownerName || j.own}>Prj <b>{j.ownerInitials || initialsOf(j.ownerName || j.own) || "—"}</b></div>
                     <div title={j.productionOwner || "not set"} style={{ marginTop: 2, color: j.productionOwner ? "#16232F" : "#B3261E", fontWeight: j.productionOwner ? 400 : 700 }}>
-                      Prd {j.productionOwner ? <b>{initials(j.productionOwner)}</b> : "—"}
+                      Prd {j.productionOwner ? <b>{initialsOf(j.productionOwner)}</b> : "—"}
                     </div>
                   </td>
                   <td style={{ border: "1px solid #DCD8CC", padding: "6px 7px", textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", width: 64 }}>
@@ -248,6 +292,7 @@ export default function FloorReport() {
           </tbody>
         </table>
 
+        {full && <>
         <div className="pagebreak" />
 
         {/* ── page two: every job still to deliver, by family ── */}
@@ -282,8 +327,10 @@ export default function FloorReport() {
           </div>
         ))}
 
+        </>}
+
         <div style={{ marginTop: 10, fontSize: 9.5, color: "#8B8F87", display: "flex", justifyContent: "space-between" }}>
-          <span>Genie · On Floor · printed {dmy(TODAY)}</span>
+          <span>Genie · On Floor{full ? " · PRE edition — Stratcom" : " · quick print"} · {dmy(TODAY)}</span>
           <span>Nandan GSE Private Limited</span>
         </div>
       </div>

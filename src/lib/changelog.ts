@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.5.0",
+    date: "2026-08-24",
+    module: "The walk sheet in two editions",
+    items: [
+      "TWO PRINTS FROM TWO BUTTONS. QUICK PRINT — the boxes and the walk table, nothing else, for the morning round. PRE EDITION — Stratcom's button only — adds the commercials (value and throughput in the delivered boxes) and the PENDING JOBS pages after the page break. The footer names which edition it is.",
+      "WHY DELIVERED SHOWED ZERO: it was counted off the live board, and the live board only carries what is still being built — a delivered job leaves it. The boxes now read the DELIVERY RECORD itself, so the last 7 and 30 days show what actually went out. Counts are open to every reader; the money on them comes from the ledger and appears only on the PRE edition.",
+      "THE PRODUCT NAMES SIT BELOW THE BOXES, size 14 bold — “This week: 2 Rapid Runway Repair · 2 MHE – Truck Mounted Crane…” — and the week box itself keeps just the count, so five narrow boxes fit on one line.",
+      "INITIALS COME FROM THE USERS TABLE — the person's own two-or-three-letter handle — and an older field carrying a full name is matched back to the person rather than having initials invented from it.",
+    ],
+  },
+  {
     v: "3.21.4.5",
     date: "2026-08-24",
     module: "The walk sheet knows what went out the gate",
