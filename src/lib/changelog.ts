@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.11.0",
+    date: "2026-08-24",
+    module: "HRMS — Finalized Salary Sheets",
+    items: [
+      "ONE ROW PER MONTH, built in HRMS. April, 2026 · the file uploaded · the status · Staff (nos and value) · Labour (nos and value) · Total nos and Total salary · then from the data itself Earned Pay, Deductions, Net Payable · Paid to Bank · and the date RJ froze it.",
+      "UPLOAD AND IT READS ITSELF. CSV or Excel. The column names move between months — “Net Pay”, “Net Payable”, “NET AMOUNT” are one column in three files — so each column is matched by what it MEANS, banner rows above the header are skipped, and the foot total row is not counted as a person. It then SAYS what it understood: every column it mapped, and a warning for anything it could not place. A mapping that goes wrong is visible on the screen instead of arriving later as a wrong total nobody can trace.",
+      "STAFF AND LABOUR ARE SPLIT off the master's Type, honouring HR's corrections, with any EmployeeID not in the master named rather than quietly dropped.",
+      "THE TOTALS ARE TAKEN ONCE AND THEN STOP MOVING. April has already been paid; if its totals were recomputed from today's master, one person changing type in September would silently restate it.",
+      "PAID TO BANK is typed by HR beside the Net Payable the file gives, and any difference between the two is shown in red on the row — that gap is the whole point of writing both numbers down.",
+      "FREEZING IS RJ'S. A frozen month is read-only, refuses a new upload, and cannot be removed until it is unfrozen. Clicking the file name opens every line with a link to the original file, exactly as it was sent.",
+      "Migration 0066.",
+    ],
+  },
+  {
     v: "3.20.10.1",
     date: "2026-08-23",
     module: "HRMS — three defects the audit found",

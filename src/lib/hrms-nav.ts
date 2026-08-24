@@ -168,9 +168,8 @@ export const NAV: NavSection[] = [
     key: "salary",
     label: "Finalized Salary Sheets",
     icon: "💰",
-    blurb: "The month's sheet, once it is closed. Read-only by then, and printable.",
-    built: false,
-    source: "Salary Sheets (tab 14) — one tab per month, April 2025 through July 2026.",
+    blurb: "One row per month: the file, the Staff and Labour split, the totals, and the date RJ froze it.",
+    built: true,
   },
   {
     key: "registers",

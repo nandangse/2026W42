@@ -35,6 +35,7 @@ import AppraisalAnalytics from "./hrms/AppraisalAnalytics";
 import AppraisalInterviews from "./hrms/AppraisalInterviews";
 import ApprovalCommercial from "./hrms/ApprovalCommercial";
 import ApprovalQueries from "./hrms/ApprovalQueries";
+import SalarySheets from "./hrms/SalarySheets";
 
 export default function Hrms({
   email, initials, displayName, role, isOwner,
@@ -239,6 +240,8 @@ export default function Hrms({
           <AppraisalCard who={who} isOwner={isOwner} />
         ) : nav.key === "idp.individual" ? (
           <IdpRecords who={who} />
+        ) : nav.key === "salary" ? (
+          <SalarySheets who={who} isOwner={isOwner} />
         ) : nav.key === "approvals.commercial" ? (
           <ApprovalCommercial who={who} isOwner={isOwner} />
         ) : nav.key === "approvals.salary" ? (
