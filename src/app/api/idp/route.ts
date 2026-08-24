@@ -127,6 +127,20 @@ export async function GET(req: Request) {
         OPENAI_API_KEY: oa ? `present (${oa.slice(0, 7)}…${oa.slice(-4)}, ${oa.length} chars)` : "NOT SET on this deploy — set it in Vercel and redeploy",
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ? "present" : "NOT SET — summaries and polishing fall back to raw text",
       };
+      const rk = process.env.RESEND_API_KEY;
+      out.RESEND_API_KEY = rk ? `present (${rk.slice(0, 6)}…, ${rk.length} chars)` : "NOT SET — Genie cannot send mail yet";
+      if (rk) {
+        try {
+          const r = await fetch("https://api.resend.com/domains", { headers: { authorization: `Bearer ${rk}` } });
+          const t = await r.text();
+          out.resend =
+            r.status === 200 ? `OK — ${t.slice(0, 300)}`
+            : r.status === 401 ? "401 — the key is WRONG or revoked"
+            : `unexpected ${r.status}: ${t.slice(0, 200)}`;
+        } catch (e) {
+          out.resend = `network error reaching Resend: ${e instanceof Error ? e.message : String(e)}`;
+        }
+      }
       if (process.env.ANTHROPIC_API_KEY) {
         try {
           const r = await fetch("https://api.anthropic.com/v1/models", {
