@@ -113,8 +113,10 @@ export async function POST(req: Request, { params }: { params: { doctype: string
       if (nerr) throw new HttpError(500, `Could not issue a number: ${nerr.message}`);
       row[d.autoNumber.field] = n;
     }
-    if (d.fields.some((f) => f.name === "created_by") || ["customer", "contact", "deal"].includes(d.name))
-      row.created_by = user.id;
+    // The CRM's own profile id, never the Genie auth id -- the two look alike
+    // and point at different people (docs/DATABASE-SPLIT.md).
+    if (d.fields.some((f) => f.name === "created_by") || ["company", "person", "opportunity", "task"].includes(d.name))
+      row.created_by = user.profileId;
 
     const { data, error } = await db.from(d.table).insert(row).select().single();
     if (error) {
@@ -126,7 +128,7 @@ export async function POST(req: Request, { params }: { params: { doctype: string
 
     await db.from("crm_audit").insert({
       entity: d.table, entity_id: String(data.id), action: "insert",
-      after: data, by_user: user.id,
+      after: data, by_user: user.profileId,
     });
 
     return NextResponse.json({ row: data });

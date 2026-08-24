@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.0.0",
+    date: "2026-08-24",
+    module: "The CRM re-founded — the handover model on Dr Raghu's funnel",
+    items: [
+      "THE CRM DATABASE WAS RESET AND REBUILT on the Sales Genie handover model — company / person / lead / opportunity / quotation / installed base / unified inbox, re-implemented from the Twenty CRM object model, no Twenty code. The old foundation held no transactional data (0 customers, 0 deals), so the reset cost nothing and was taken while it still cost nothing.",
+      "WHAT THE FOUNDATION HAD THAT THE HANDOVER LACKED CAME ALONG: the fourteen-stage funnel AS ROWS with the trigger that times every move, the seven sectors and the industry book, the BANT percentages and the tender flag, crm_audit, and number_series — now financial-year aware, so the database itself issues ENQ-26-27-00001 and NGSE/QTN/26-27/00001 and two people saving at once cannot collide.",
+      "EVERY INBOUND MESSAGE BECOMES A LEAD ROW, junk included — junk is status 'spam', kept, because the denominator is what portal traffic costs. The response clock is a COLUMN (first_response_due_at), not a report.",
+      "A LOST MOVE REFUSES TO SAVE WITHOUT A REASON — enforced by the stage trigger, because optional means empty and empty teaches the AI a flattering lie. The won move stamps won_at and flips the company to is_customer by itself.",
+      "MONEY IS COMPUTED IN POSTGRES: quotation totals, tax, discount and margin come from recalc_quotation() and a generated column. The front end displays; it does not calculate.",
+      "ONE LOGIN, STILL. Genie's session is the only session — the CRM project issues none of its own, RLS is forced with no policies, and the service key after the session check is the only way in. The bridge to a person is their EMAIL; the Genie auth id is never written to a CRM table.",
+      "The doctype registry carried over untouched in spirit and rewired in fact: twelve doctypes now — Lead, Opportunity, Task; Company, Person, Address, Phone; Product; Sector, Industry, Stage, User — every one with a list, an Add form and validation from the one declaration. Migrations 0001_core and 0002_sales_settings replace the foundation; the handover brief lives in docs/CRM-*.md.",
+    ],
+  },
+  {
     v: "3.22.1.0",
     date: "2026-08-24",
     module: "Money as a permission, photos for the floor, a header that holds",

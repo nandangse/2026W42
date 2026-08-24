@@ -10,6 +10,10 @@
  * Adding a doctype is one entry in DOCTYPES. It gets a list, an Add button, a
  * form with the right controls, link dropdowns and server-side validation the
  * moment it appears.
+ *
+ * Rewired 24 Aug 2026 onto the handover model (0001_core.sql): company /
+ * person / lead / opportunity / product / task, with Dr Raghu's own sector,
+ * industry and fourteen-stage funnel carried across as rows.
  */
 
 export type FieldType =
@@ -51,13 +55,193 @@ export interface Doctype {
   blurb?: string;
 }
 
+/** The three pipelines. NEVER merged into one funnel — a ₹4 Cr hi-lift and a
+ *  ₹40,000 spares order must not share a conversion rate. */
+export const PIPELINES = ["capital", "aftermarket", "spares"] as const;
+
+/** Where a lead can come from — mirrors the lead_source enum in Postgres. */
+export const LEAD_SOURCES = [
+  "indiamart", "whatsapp", "email", "google_ads", "linkedin",
+  "phone", "exhibition", "website", "referral", "field_visit", "tender", "other",
+] as const;
+
 export const DOCTYPES: Doctype[] = [
+  // ------------------------------------------------------------- funnel
+  {
+    name: "lead", label: "Lead", plural: "Leads", table: "lead",
+    titleField: "contact_name", group: "Funnel", icon: "◉",
+    orderBy: { column: "created_at", ascending: false },
+    blurb: "Every inbound message becomes a row here — junk included, as 'spam'. The denominator is what tells you what portal traffic actually costs.",
+    fields: [
+      { name: "contact_name", label: "Name", type: "text", inList: true },
+      { name: "company_name", label: "Company (as written)", type: "text", inList: true },
+      { name: "source", label: "Source", type: "select", options: [...LEAD_SOURCES], required: true, inList: true },
+      { name: "status", label: "Status", type: "select", inList: true, default: "new",
+        options: ["new", "triaging", "mql", "sql", "converted", "nurture", "disqualified", "spam"] },
+      { name: "pipeline", label: "Pipeline", type: "select", options: [...PIPELINES], inList: true },
+      { name: "owner_id", label: "Owner", type: "link", link: "profile", inList: true },
+      { name: "contact_email", label: "Email", type: "text" },
+      { name: "contact_phone", label: "Phone", type: "text", help: "As received. Stored raw here; it becomes E.164 on the person record." },
+      { name: "city", label: "City", type: "text" },
+      { name: "country", label: "Country", type: "text" },
+      { name: "product_interest", label: "Product interest", type: "text" },
+      { name: "quantity_hint", label: "Quantity", type: "number" },
+      { name: "raw_subject", label: "Subject", type: "text" },
+      { name: "raw_body", label: "Message", type: "textarea" },
+      { name: "company_id", label: "Matched company", type: "link", link: "company" },
+      { name: "person_id", label: "Matched person", type: "link", link: "person" },
+    ],
+  },
+  {
+    name: "opportunity", label: "Opportunity", plural: "Opportunities", table: "opportunity",
+    titleField: "name", group: "Funnel", icon: "▶",
+    orderBy: { column: "created_at", ascending: false },
+    autoNumber: { field: "opportunity_no", series: "opportunity" },
+    blurb: "The thing that moves, from Suspect to Order Received. Every stage change is timed automatically, and a lost stage refuses to save without a reason.",
+    fields: [
+      { name: "name", label: "Opportunity", type: "text", required: true, inList: true, help: "What is being sold, in words." },
+      { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
+      { name: "stage_id", label: "Stage", type: "link", link: "stage", required: true, inList: true },
+      { name: "pipeline", label: "Pipeline", type: "select", options: [...PIPELINES], required: true, inList: true, default: "capital" },
+      { name: "sector_id", label: "Sector", type: "link", link: "sector", inList: true },
+      { name: "owner_id", label: "Salesperson", type: "link", link: "profile", inList: true },
+      { name: "amount", label: "Value", type: "money", inList: true },
+      { name: "expected_close_on", label: "Expected close", type: "date", inList: true },
+      { name: "point_of_contact_id", label: "Contact", type: "link", link: "person" },
+      { name: "priority", label: "Priority", type: "select", options: ["Standard", "Red Hot Lead", "Very Important", "Long Term"], default: "Standard" },
+      { name: "source", label: "Source", type: "select", options: [...LEAD_SOURCES] },
+      { name: "is_tender", label: "Tender", type: "bool" },
+      { name: "budget_pct", label: "Budget %", type: "number" },
+      { name: "authority_pct", label: "Authority %", type: "number" },
+      { name: "need_pct", label: "Need %", type: "number" },
+      { name: "timing_pct", label: "Timing %", type: "number" },
+      { name: "competitiveness_pct", label: "Competitiveness %", type: "number" },
+      { name: "technically_qualified_pct", label: "Technically qualified %", type: "number" },
+      { name: "lost_reason", label: "Lost reason", type: "textarea", help: "Required by the database before a move to Quote Lost or Not Target." },
+      { name: "lost_to_competitor", label: "Lost to", type: "text" },
+    ],
+  },
+  {
+    name: "task", label: "Task", plural: "Tasks", table: "task",
+    titleField: "title", group: "Funnel", icon: "☐",
+    orderBy: { column: "created_at", ascending: false },
+    blurb: "Follow-ups, by hand today and from call recordings and the AI later. The source column remembers which.",
+    fields: [
+      { name: "title", label: "Task", type: "text", required: true, inList: true },
+      { name: "assignee_id", label: "Assignee", type: "link", link: "profile", inList: true },
+      { name: "status", label: "Status", type: "select", inList: true, default: "todo",
+        options: ["todo", "in_progress", "blocked", "done", "cancelled"] },
+      { name: "priority", label: "Priority (1 high – 5 low)", type: "number", inList: true, default: 3 },
+      { name: "due_at", label: "Due", type: "date", inList: true },
+      { name: "body", label: "Detail", type: "textarea" },
+    ],
+  },
+
+  // ------------------------------------------------- accounts and people
+  {
+    name: "company", label: "Company", plural: "Companies", table: "company",
+    titleField: "name", group: "Accounts", icon: "■",
+    orderBy: { column: "created_at", ascending: false },
+    blurb: "The account. One row per company you sell to; is_customer flips by itself the first time an opportunity is won.",
+    fields: [
+      { name: "name", label: "Company", type: "text", required: true, inList: true },
+      { name: "industry_id", label: "Industry", type: "link", link: "industry", inList: true },
+      { name: "account_owner_id", label: "Owner", type: "link", link: "profile", inList: true },
+      { name: "gstin", label: "GSTIN", type: "text", inList: true },
+      { name: "city", label: "City", type: "text", inList: true },
+      { name: "country", label: "Country", type: "text", default: "India" },
+      { name: "state", label: "State", type: "text" },
+      { name: "is_export", label: "Export customer", type: "bool", inList: true, help: "Decides which terms and which price book a quote starts with." },
+      { name: "website", label: "Website", type: "text" },
+      { name: "domain_name", label: "Email domain", type: "text", help: "nandan.co.in, not https://. Matches inbound mail to this account." },
+      { name: "indiamart_glid", label: "IndiaMART GLID", type: "text" },
+      { name: "cin", label: "CIN", type: "text" },
+      { name: "erp_name", label: "ERP name", type: "text", help: "The ERPNext key, so the link survives a rename on either side." },
+      { name: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  {
+    name: "person", label: "Person", plural: "People", table: "person",
+    titleField: "full_name", group: "Accounts", icon: "○",
+    orderBy: { column: "created_at", ascending: false },
+    blurb: "The person. 63% of the contacts in the ERP are attached to no company at all — attach them here.",
+    fields: [
+      { name: "first_name", label: "First name", type: "text", required: true, inList: true },
+      { name: "last_name", label: "Last name", type: "text", inList: true },
+      { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
+      { name: "job_title", label: "Designation", type: "text", inList: true },
+      { name: "primary_email", label: "Email", type: "text", inList: true },
+      { name: "primary_phone", label: "Phone", type: "text", inList: true, help: "Stored as +919820012345. A number typed four ways is four numbers." },
+      { name: "whatsapp_number", label: "WhatsApp", type: "text" },
+      { name: "salutation", label: "Salutation", type: "select", options: ["Mr", "Ms", "Dr", "Capt", "Cdr", "Lt Cdr", "Col"] },
+      { name: "department", label: "Department", type: "text" },
+      { name: "owner_id", label: "Owner", type: "link", link: "profile" },
+      { name: "is_decision_maker", label: "Decision maker", type: "bool" },
+      { name: "is_primary", label: "Primary contact", type: "bool" },
+      { name: "active", label: "Active", type: "bool", default: true },
+    ],
+  },
+  {
+    name: "address", label: "Address", plural: "Addresses", table: "address",
+    titleField: "label", group: "Accounts", icon: "▫",
+    orderBy: { column: "created_at", ascending: false },
+    blurb: "Several per company. A quotation names one of these, so it has to be a row rather than free text on the quote.",
+    fields: [
+      { name: "company_id", label: "Company", type: "link", link: "company", required: true, inList: true },
+      { name: "label", label: "Label", type: "select", options: ["Billing", "Shipping", "Works", "Office"], inList: true, default: "Billing" },
+      { name: "line1", label: "Address line 1", type: "text", inList: true },
+      { name: "line2", label: "Address line 2", type: "text" },
+      { name: "city", label: "City", type: "text", inList: true },
+      { name: "state", label: "State", type: "text", inList: true },
+      { name: "state_code", label: "GST state code", type: "text", inList: true, help: "This is what decides IGST against CGST plus SGST. Every ERP address currently says 00 — Pune should be 27." },
+      { name: "pincode", label: "PIN", type: "text" },
+      { name: "country", label: "Country", type: "text", default: "India" },
+      { name: "is_primary", label: "Primary", type: "bool" },
+    ],
+  },
+  {
+    name: "person_phone", label: "Phone number", plural: "Phone numbers", table: "person_phone",
+    titleField: "number_e164", group: "Accounts", icon: "✆",
+    orderBy: { column: "created_at", ascending: false },
+    blurb: "Its own doctype because a call arrives as a NUMBER with nobody attached, so the lookup runs backwards.",
+    fields: [
+      { name: "person_id", label: "Person", type: "link", link: "person", required: true, inList: true },
+      { name: "number_e164", label: "Number", type: "text", required: true, inList: true, help: "Stored as +919820012345." },
+      { name: "kind", label: "Kind", type: "select", options: ["mobile", "landline", "whatsapp"], inList: true, default: "mobile" },
+      { name: "is_primary", label: "Primary", type: "bool", inList: true },
+    ],
+  },
+
+  // ---------------------------------------------------------- catalogue
+  {
+    name: "product", label: "Product", plural: "Products", table: "product",
+    titleField: "name", group: "Catalogue", icon: "▣",
+    orderBy: { column: "sku", ascending: true },
+    blurb: "The GSE model list — the spine of the quotation engine. Real SKUs only; a quote built on invented ones is worthless.",
+    fields: [
+      { name: "sku", label: "SKU", type: "text", required: true, inList: true },
+      { name: "name", label: "Product", type: "text", required: true, inList: true },
+      { name: "category", label: "Category", type: "select", inList: true,
+        options: ["Hi-Lift", "Bowser", "GPU", "Towbar", "ASRS", "Platform", "Conveyor", "Spare", "Service", "Other"] },
+      { name: "pipeline", label: "Pipeline", type: "select", options: [...PIPELINES], required: true, inList: true, default: "capital" },
+      { name: "sector_id", label: "Sector", type: "link", link: "sector", inList: true },
+      { name: "base_price", label: "Base price", type: "money", inList: true },
+      { name: "standard_cost", label: "Standard cost", type: "money", help: "What margin is measured against. Visible to sales_head and above only, once the quote screen exists." },
+      { name: "hsn_code", label: "HSN", type: "text" },
+      { name: "gst_rate", label: "GST %", type: "number", default: 18 },
+      { name: "lead_time_weeks", label: "Lead time (weeks)", type: "number" },
+      { name: "erpnext_item_code", label: "ERPNext item code", type: "text", help: "Plain text. ERPNext is not modified and never queried live." },
+      { name: "description", label: "Description", type: "textarea" },
+      { name: "is_active", label: "Active", type: "bool", default: true },
+    ],
+  },
+
   // ------------------------------------------------------------ masters
   {
     name: "sector", label: "Sector", plural: "Sectors", table: "sector",
     titleField: "name", group: "Masters", icon: "◆",
     orderBy: { column: "sort_order", ascending: true },
-    blurb: "What Nandan makes. Six codes, read from 2,500 live opportunity rows. The names are still the codes — they need your expansions.",
+    blurb: "What Nandan makes. Seven codes, named by Dr Raghu on 21 Aug.",
     fields: [
       { name: "code", label: "Code", type: "text", required: true, inList: true },
       { name: "name", label: "Name", type: "text", required: true, inList: true },
@@ -75,7 +259,7 @@ export const DOCTYPES: Doctype[] = [
       { name: "sector_id", label: "Sector", type: "link", link: "sector", inList: true },
       { name: "priority", label: "Priority", type: "select", options: ["Low", "Medium", "High", "Highest"], inList: true },
       { name: "goal_qualification", label: "Qualification", type: "select", options: ["FOCUS", "REGULAR", "Customer B10"], inList: true },
-      { name: "owner_user_id", label: "Owner", type: "link", link: "crm_user", inList: true },
+      { name: "owner_id", label: "Owner", type: "link", link: "profile", inList: true },
       { name: "erp_name", label: "ERP name", type: "text", help: "The ERPNext key, so the link survives a rename on either side." },
       { name: "active", label: "Active", type: "bool", default: true },
     ],
@@ -84,7 +268,7 @@ export const DOCTYPES: Doctype[] = [
     name: "stage", label: "Stage", plural: "Stages", table: "stage",
     titleField: "name", group: "Masters", icon: "▰",
     orderBy: { column: "sort_order", ascending: true },
-    blurb: "The fourteen rungs, as rows. Reordering is a change to a number here — never a migration. This order is still my guess.",
+    blurb: "The fourteen rungs, as rows. Reordering is a change to a number here — never a migration.",
     fields: [
       { name: "name", label: "Stage", type: "text", required: true, inList: true },
       { name: "code", label: "Code", type: "text", required: true },
@@ -97,110 +281,19 @@ export const DOCTYPES: Doctype[] = [
     ],
   },
   {
-    name: "crm_user", label: "User", plural: "Users", table: "crm_user",
-    titleField: "display_name", group: "Masters", icon: "●",
-    orderBy: { column: "display_name", ascending: true },
-    blurb: "A mirror of the Genie account, not a second user list. A row existing here IS access to the CRM.",
+    name: "profile", label: "User", plural: "Users", table: "profile",
+    titleField: "full_name", group: "Masters", icon: "●",
+    orderBy: { column: "full_name", ascending: true },
+    blurb: "A mirror of the Genie account, matched on EMAIL — never on id, which is a different uuid in each database. Opening the CRM at all is Genie's crm_access grant.",
     fields: [
-      { name: "display_name", label: "Name", type: "text", required: true, inList: true },
-      { name: "email", label: "Email", type: "text", required: true, inList: true },
+      { name: "full_name", label: "Name", type: "text", required: true, inList: true },
+      { name: "email", label: "Email", type: "text", required: true, inList: true, help: "Lowercase @nandan.co.in. This is the bridge to the Genie account." },
       { name: "initials", label: "Initials", type: "text", inList: true },
-      { name: "crm_role", label: "Role", type: "select", options: ["sales_head", "salesperson", "sales_admin", "viewer"], inList: true, default: "salesperson" },
-      { name: "reports_to", label: "Reports to", type: "link", link: "crm_user" },
-      { name: "active", label: "Active", type: "bool", inList: true, default: true },
-    ],
-  },
-
-  // ------------------------------------------------- accounts and people
-  {
-    name: "customer", label: "Customer", plural: "Customers", table: "customer",
-    titleField: "name", group: "Accounts", icon: "■",
-    orderBy: { column: "created_at", ascending: false },
-    blurb: "The account. One row per company you sell to.",
-    fields: [
-      { name: "name", label: "Customer", type: "text", required: true, inList: true },
-      { name: "industry_id", label: "Industry", type: "link", link: "industry", inList: true },
-      { name: "owner_user_id", label: "Owner", type: "link", link: "crm_user", inList: true },
-      { name: "gstin", label: "GSTIN", type: "text", inList: true },
-      { name: "country", label: "Country", type: "text", default: "India" },
-      { name: "is_export", label: "Export customer", type: "bool", inList: true, help: "Decides which terms and which price book a quote starts with." },
-      { name: "website", label: "Website", type: "text" },
-      { name: "erp_name", label: "ERP name", type: "text" },
-      { name: "notes", label: "Notes", type: "textarea" },
-    ],
-  },
-  {
-    name: "address", label: "Address", plural: "Addresses", table: "address",
-    titleField: "label", group: "Accounts", icon: "▫",
-    orderBy: { column: "created_at", ascending: false },
-    blurb: "Several per customer. A quotation names one of these, so it has to be a row rather than free text on the quote.",
-    fields: [
-      { name: "customer_id", label: "Customer", type: "link", link: "customer", required: true, inList: true },
-      { name: "label", label: "Label", type: "select", options: ["Billing", "Shipping", "Works", "Office"], inList: true, default: "Billing" },
-      { name: "line1", label: "Address line 1", type: "text", inList: true },
-      { name: "line2", label: "Address line 2", type: "text" },
-      { name: "city", label: "City", type: "text", inList: true },
-      { name: "state", label: "State", type: "text", inList: true },
-      { name: "state_code", label: "GST state code", type: "text", inList: true, help: "This is what decides IGST against CGST plus SGST. Every ERP address currently says 00 — Pune should be 27." },
-      { name: "pincode", label: "PIN", type: "text" },
-      { name: "country", label: "Country", type: "text", default: "India" },
-      { name: "is_primary", label: "Primary", type: "bool" },
-    ],
-  },
-  {
-    name: "contact", label: "Contact", plural: "Contacts", table: "contact",
-    titleField: "full_name", group: "Accounts", icon: "○",
-    orderBy: { column: "created_at", ascending: false },
-    blurb: "The person. 63% of the ones in your ERP are attached to no company at all.",
-    fields: [
-      { name: "first_name", label: "First name", type: "text", required: true, inList: true },
-      { name: "last_name", label: "Last name", type: "text", inList: true },
-      { name: "customer_id", label: "Customer", type: "link", link: "customer", inList: true },
-      { name: "designation", label: "Designation", type: "text", inList: true },
-      { name: "email", label: "Email", type: "text", inList: true },
-      { name: "salutation", label: "Salutation", type: "select", options: ["Mr", "Ms", "Dr", "Capt", "Cdr", "Lt Cdr", "Col"] },
-      { name: "is_primary", label: "Primary contact", type: "bool" },
-      { name: "active", label: "Active", type: "bool", default: true },
-    ],
-  },
-  {
-    name: "contact_phone", label: "Phone number", plural: "Phone numbers", table: "contact_phone",
-    titleField: "number_e164", group: "Accounts", icon: "✆",
-    orderBy: { column: "created_at", ascending: false },
-    blurb: "Its own doctype because a call arrives as a NUMBER with nobody attached, so the lookup runs backwards.",
-    fields: [
-      { name: "contact_id", label: "Contact", type: "link", link: "contact", required: true, inList: true },
-      { name: "number_e164", label: "Number", type: "text", required: true, inList: true, help: "Stored as +919820012345. A number typed four ways is four numbers." },
-      { name: "kind", label: "Kind", type: "select", options: ["mobile", "landline", "whatsapp"], inList: true, default: "mobile" },
-      { name: "is_primary", label: "Primary", type: "bool", inList: true },
-    ],
-  },
-
-  // ------------------------------------------------------------- funnel
-  {
-    name: "deal", label: "Deal", plural: "Deals", table: "deal",
-    titleField: "title", group: "Funnel", icon: "▶",
-    orderBy: { column: "created_at", ascending: false },
-    autoNumber: { field: "deal_no", series: "deal" },
-    blurb: "The thing that moves, from Suspect to Order Received. Every stage change is timed automatically.",
-    fields: [
-      { name: "title", label: "Deal", type: "text", required: true, inList: true, help: "What is being sold, in words." },
-      { name: "customer_id", label: "Customer", type: "link", link: "customer", inList: true },
-      { name: "stage_id", label: "Stage", type: "link", link: "stage", required: true, inList: true },
-      { name: "sector_id", label: "Sector", type: "link", link: "sector", inList: true },
-      { name: "owner_user_id", label: "Salesperson", type: "link", link: "crm_user", inList: true },
-      { name: "value_estimate", label: "Value", type: "money", inList: true },
-      { name: "expected_close_date", label: "Expected close", type: "date", inList: true },
-      { name: "primary_contact_id", label: "Contact", type: "link", link: "contact" },
-      { name: "priority", label: "Priority", type: "select", options: ["Standard", "Red Hot Lead", "Very Important", "Long Term"], default: "Standard" },
-      { name: "source", label: "Source", type: "select", options: ["Email", "Indiamart", "Google Ad", "Nandan Website", "GEM Tender", "Referral", "Inbound", "WhatsApp"], help: "95.6% blank in the ERP — which is why you cannot tell an automatic deal from a typed one." },
-      { name: "is_tender", label: "Tender", type: "bool" },
-      { name: "budget_pct", label: "Budget %", type: "number" },
-      { name: "authority_pct", label: "Authority %", type: "number" },
-      { name: "need_pct", label: "Need %", type: "number" },
-      { name: "timing_pct", label: "Timing %", type: "number" },
-      { name: "competitiveness_pct", label: "Competitiveness %", type: "number" },
-      { name: "technically_qualified_pct", label: "Technically qualified %", type: "number" },
+      { name: "role", label: "Role", type: "select", inList: true, default: "sales",
+        options: ["admin", "ceo", "sales_head", "sales", "service", "inside_sales", "viewer"] },
+      { name: "phone", label: "Phone", type: "text" },
+      { name: "reports_to", label: "Reports to", type: "link", link: "profile" },
+      { name: "is_active", label: "Active", type: "bool", inList: true, default: true },
     ],
   },
 ];
@@ -214,4 +307,4 @@ export function linkTargets(d: Doctype): string[] {
   return Array.from(new Set(d.fields.filter((f) => f.type === "link" && f.link).map((f) => f.link as string)));
 }
 
-export const DOCTYPE_GROUPS = ["Funnel", "Accounts", "Masters"] as const;
+export const DOCTYPE_GROUPS = ["Funnel", "Accounts", "Catalogue", "Masters"] as const;

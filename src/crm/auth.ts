@@ -39,6 +39,13 @@ async function granted(email: string): Promise<boolean> {
 
 export interface CrmUser extends AuthedUser {
   crmRole: string;
+  /**
+   * The CRM database's OWN id for this person, or null before their profile
+   * row exists. Every CRM column that names a user takes THIS id -- the Genie
+   * auth id on `id` means nothing in the CRM project and must never be
+   * written there (docs/DATABASE-SPLIT.md).
+   */
+  profileId: string | null;
 }
 
 /**
@@ -56,24 +63,27 @@ export async function requireCrm(): Promise<CrmUser> {
     throw new HttpError(403, "The CRM is not open to this account.");
 
   let crmRole = "sales_head";
+  let profileId: string | null = null;
   if (crmConfigured()) {
-    // Keep the mirror row current, and stamp the real auth id the first time
-    // he signs in -- the seed row carries a placeholder until then.
+    // Keep the mirror row current. Matched on EMAIL, never on id -- the
+    // profile's uuid is this database's own and Genie's auth id means nothing
+    // here. The two must never be conflated (docs/DATABASE-SPLIT.md).
     const db = crmDb();
     const { data } = await db
-      .from("crm_user")
-      .select("id, crm_role")
+      .from("profile")
+      .select("id, role")
       .eq("email", u.email)
       .maybeSingle();
     if (data) {
-      crmRole = data.crm_role;
+      crmRole = data.role;
+      profileId = data.id;
       await db
-        .from("crm_user")
-        .update({ id: u.id, display_name: u.displayName, initials: u.initials, last_seen_at: new Date().toISOString() })
+        .from("profile")
+        .update({ full_name: u.displayName, initials: u.initials, last_seen_at: new Date().toISOString() })
         .eq("email", u.email);
     }
   }
-  return { ...u, crmRole };
+  return { ...u, crmRole, profileId };
 }
 
 /** True without throwing — for the page, which redirects rather than errors. */

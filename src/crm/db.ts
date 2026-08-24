@@ -29,7 +29,7 @@ export class CrmNotConfigured extends Error {
   constructor() {
     super(
       "The CRM database is not connected yet. Set CRM_SUPABASE_URL and " +
-        "CRM_SUPABASE_SERVICE_KEY, then run supabase-crm/migrations/0001_crm_foundation.sql.",
+        "CRM_SUPABASE_SERVICE_KEY, then run the supabase-crm/migrations/ files in order.",
     );
   }
 }
