@@ -27,14 +27,24 @@ export async function GET() {
     if (!r.ok) return NextResponse.json({ canSend: false, why: `Resend answered ${r.status} — the key may be wrong or revoked.` });
     const j = await r.json();
     const domains = (j?.data || []) as { name: string; status: string }[];
-    const nandan = domains.find((d) => d.name === "nandan.co.in");
+    const nandan = domains.find((d) => d.name === "nandan.co.in") as { name: string; status: string; id?: string } | undefined;
     if (!nandan) return NextResponse.json({ canSend: false, why: "nandan.co.in is not on this Resend account.", domains });
-    if (nandan.status !== "verified")
+    if (nandan.status !== "verified") {
+      // the records themselves, so the fix is a list to hand to whoever holds
+      // the DNS rather than a login somebody has to go hunting through
+      let records: unknown = null;
+      try {
+        const one = await fetch(`https://api.resend.com/domains/${(nandan as { id?: string }).id}`, {
+          headers: { authorization: `Bearer ${key}` },
+        });
+        if (one.ok) records = (await one.json())?.records ?? null;
+      } catch { /* the reason above still stands without them */ }
       return NextResponse.json({
         canSend: false,
-        why: `nandan.co.in is "${nandan.status}", not verified — Resend will refuse to send from it until the DNS records it lists are added and it turns verified.`,
-        domains,
+        why: `nandan.co.in is "${nandan.status}", not verified — Resend will refuse to send from it until these DNS records are added and it turns verified.`,
+        domains, records,
       });
+    }
     return NextResponse.json({ canSend: true, domains });
   } catch (e) {
     return errJson(e);
