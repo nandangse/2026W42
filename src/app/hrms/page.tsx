@@ -1,9 +1,17 @@
+import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { resolveHrmsAccess } from "@/lib/hrms";
 import Hrms from "@/components/Hrms";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * HRMS opens in its own tabs — a record, an employee, a role — and every one of them
+ * should say which app it is. Without this they all read "Nandan Works Planning
+ * Suite" and a row of tabs becomes unnavigable.
+ */
+export const metadata: Metadata = { title: "Nandan HRMS Genie" };
 
 /**
  * /hrms — its own URL, and its own door.

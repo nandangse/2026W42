@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.20.11.1",
+    date: "2026-08-24",
+    module: "Each app names its own browser tab",
+    items: [
+      "HRMS TABS NOW READ “Nandan HRMS Genie” and the CRM reads “Nandan CRM Genie”, instead of every tab in every app saying “Nandan Works Planning Suite”. This covers the pages that open in NEW tabs too — an employee record and a role record — which is where it actually mattered: HRMS is used with several tabs open at once, and a row of identically-named tabs cannot be navigated.",
+      "Offer Letters and Full and Final Settlements added to the menu below Approvals, as structure to be checked before either is built — the letter that starts an employment and the reckoning that ends one.",
+    ],
+  },
+  {
     v: "3.20.11.0",
     date: "2026-08-24",
     module: "HRMS — Finalized Salary Sheets",

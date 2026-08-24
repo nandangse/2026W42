@@ -195,6 +195,20 @@ export const NAV: NavSection[] = [
     ],
   },
   {
+    key: "offers",
+    label: "Offer Letters",
+    icon: "📨",
+    blurb: "The letter that starts an employment. Awaiting Dr Raghu's description before it is built.",
+    built: false,
+  },
+  {
+    key: "fnf",
+    label: "Full and Final Settlements",
+    icon: "🧾",
+    blurb: "The reckoning that ends one. Awaiting Dr Raghu's description before it is built.",
+    built: false,
+  },
+  {
     key: "policy",
     label: "Policy",
     icon: "📗",

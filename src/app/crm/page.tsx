@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { mayUseCrm } from "@/crm/auth";
 import CrmApp from "@/components/crm/CrmApp";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * The CRM is its own app at its own URL, so it carries its own name in the tab
+ * rather than the planning suite's.
+ */
+export const metadata: Metadata = { title: "Nandan CRM Genie" };
 
 /**
  * genie.nandan.co.in/crm
