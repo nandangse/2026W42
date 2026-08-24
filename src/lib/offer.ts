@@ -18,7 +18,18 @@ export const STATUS_TONE: Record<string, { bg: string; fg: string }> = {
   Expired:  { bg: "#F4F2EC", fg: "#B3392E" },
 };
 
-/** The six pages, in the order they are filled. */
+/**
+ * The kinds of file that belong to a candidate. The kind matters because on
+ * joining, these flow into that person's Drive folder — and which ones go,
+ * and under what name, is decided by this label rather than by a human
+ * reading each file again.
+ */
+export const DOC_KINDS = [
+  "Resume", "Interview notes", "Offer letter", "Appointment letter",
+  "Acceptance", "ID proof", "Certificate", "Other",
+] as const;
+
+/** The seven pages, in the order they are filled. */
 export const OFFER_STEPS = [
   { key: "person", label: "The person", hint: "Their details, the role, and the dates." },
   { key: "role", label: "Role, KPI & competency", hint: "What the job is, as this offer states it." },
@@ -26,6 +37,7 @@ export const OFFER_STEPS = [
   { key: "terms", label: "Terms of engagement", hint: "From Masters. Editable for this offer." },
   { key: "notes", label: "Internal notes", hint: "Ours. Never part of the letter." },
   { key: "review", label: "Review & send", hint: "The letter, the mail, and who it goes to." },
+  { key: "docs", label: "Documents", hint: "Everything on file for this person. Goes into their Drive folder on joining." },
 ] as const;
 
 /** NGSE/HR/OL/2026-27/017 — the financial year, then a running number. */
@@ -51,6 +63,46 @@ export const iso = (d = new Date()) => d.toISOString().slice(0, 10);
 /** The covering note, with the candidate's name put in. */
 export function coveringLetter(template: string, name: string): string {
   return String(template || "").replace(/<name>/gi, name || "");
+}
+
+/**
+ * Names off a resume arrive as "VINAY MANDE", "pooja pandey" or "Nitu SHARAN".
+ * They go on a letter, so they are put into title case — but carefully:
+ * initials (JC, K.) stay upper, particles (de, van) stay lower unless they
+ * lead, and O'Brien / D'Souza / Anne-Marie keep their capital after the mark.
+ */
+const LOWER_PARTICLES = new Set(["de", "da", "di", "van", "von", "der", "den", "bin", "binte", "al", "el", "of", "and"]);
+
+export function titleCase(raw: string): string {
+  const words = String(raw || "").trim().replace(/\s+/g, " ").split(" ");
+  return words
+    .map((w, i) => {
+      if (!w) return w;
+      // an initial that was already capitals stays as it was: JC, K., BR
+      if (w.length <= 3 && w === w.toUpperCase() && /[A-Z]/.test(w)) return w;
+      const lower = w.toLowerCase();
+      if (i > 0 && i < words.length - 1 && LOWER_PARTICLES.has(lower.replace(/\./g, ""))) return lower;
+      // capitalise after a space, an apostrophe, a hyphen, or Mc
+      return lower
+        .replace(/(^|['’\-])([a-z])/g, (_m, sep, ch) => sep + ch.toUpperCase())
+        .replace(/^Mc([a-z])/, (_m, ch) => "Mc" + ch.toUpperCase());
+    })
+    .join(" ");
+}
+
+/**
+ * Indian numbers only for now, so the country code lives in its own box and
+ * the number itself is stored bare — no +91, no 0, no spaces. A number that
+ * is not ten digits is left alone rather than mangled into looking right.
+ */
+export function splitPhone(raw: string): { code: string; number: string } {
+  let d = String(raw || "").replace(/[^0-9]/g, "");
+  // strip the country code however it was written: 0091…, 091…, 91…, 0…
+  if (d.length === 14 && d.startsWith("0091")) d = d.slice(4);
+  else if (d.length === 13 && d.startsWith("091")) d = d.slice(3);
+  else if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
+  else if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
+  return { code: "+91", number: d };
 }
 
 /** What a resume is asked to give up. Kept here so the prompt and the form agree. */

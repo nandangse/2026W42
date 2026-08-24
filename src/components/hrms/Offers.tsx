@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 import { TYPE_OPTIONS, splitMulti, joinMulti } from "@/lib/hrms";
 import { type SalaryRow, type Components, SPLIT_DEFAULTS } from "@/lib/salary";
-import { OFFER_STEPS, STATUS_TONE, OFFER_STATUS, defaultJoining, iso, coveringLetter } from "@/lib/offer";
+import { OFFER_STEPS, STATUS_TONE, OFFER_STATUS, DOC_KINDS, defaultJoining, iso, coveringLetter, titleCase, splitPhone } from "@/lib/offer";
 import RichText, { RichTextView } from "./RichText";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
@@ -45,6 +45,12 @@ interface Offer extends Row {
   covering_letter: string | null; valid_days: number | null;
   resume_name: string | null; resumeUrl?: string | null;
   resume_read: Record<string, string | null> | null;
+  country_code: string | null;
+  documents: OfferDoc[] | null;
+}
+interface OfferDoc {
+  id: string; name: string; kind: string; path: string; size: number;
+  mime: string | null; at: string; by: string | null; note: string | null; url?: string | null;
 }
 
 export default function Offers({ who, isOwner }: { who: string; isOwner: boolean }) {
@@ -138,8 +144,8 @@ export default function Offers({ who, isOwner }: { who: string; isOwner: boolean
 
 /* ══════════ starting one: the resume comes first ══════════ */
 function NewOffer({ boot, onClose, onMade }: { boot: Boot | null; onClose: () => void; onMade: (id: string) => void }) {
-  const [f, setF] = useState({ name: "", email: "", mobile: "", address: "" });
-  const [resume, setResume] = useState<{ path: string; filename: string; read: Record<string, string | null> | null } | null>(null);
+  const [f, setF] = useState({ name: "", email: "", mobile: "", address: "", country_code: "+91" });
+  const [resume, setResume] = useState<{ path: string; filename: string; read: Record<string, string | null> | null; doc?: Record<string, unknown> } | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [note, setNote] = useState("");
@@ -157,9 +163,10 @@ function NewOffer({ boot, onClose, onMade }: { boot: Boot | null; onClose: () =>
       try { j = JSON.parse(text); } catch { throw new Error(`The server replied ${r.status} and not JSON — the file may be too large.`); }
       if (!r.ok) throw new Error(String(j.error || `Upload failed (${r.status})`));
       const read = (j.read || null) as Record<string, string | null> | null;
-      setResume({ path: String(j.path), filename: String(j.filename), read });
+      setResume({ path: String(j.path), filename: String(j.filename), read, doc: j.doc as Record<string, unknown> });
       if (read) {
         setF((x) => ({
+          ...x,
           name: read.name || x.name, email: read.email || x.email,
           mobile: read.mobile || x.mobile, address: read.address || x.address,
         }));
@@ -174,8 +181,9 @@ function NewOffer({ boot, onClose, onMade }: { boot: Boot | null; onClose: () =>
     setBusy(true); setErr("");
     try {
       const j = await api.post("/api/hrms/offers", {
-        action: "create", ...f,
+        action: "create", ...f, name: titleCase(f.name), mobile: splitPhone(f.mobile).number,
         resume_name: resume?.filename ?? null, resume_path: resume?.path ?? null, resume_read: resume?.read ?? null,
+        documents: resume?.doc ? [resume.doc] : [],
         offer_date: iso(), joining_date: defaultJoining(),
         terms: boot?.texts?.terms_of_engagement || "",
         covering_letter: coveringLetter(boot?.texts?.offer_covering_letter || "", f.name),
@@ -197,16 +205,32 @@ function NewOffer({ boot, onClose, onMade }: { boot: Boot | null; onClose: () =>
         {note && <div className="mt-2" style={{ fontSize: 12, color: resume?.read ? "#0D7A3F" : "#8A5B00" }}>{note}</div>}
       </div>
 
-      {(["name", "email", "mobile", "address"] as const).map((k) => (
-        <label key={k} className="block mb-2" style={{ fontSize: 11.5, color: C.faint }}>
-          {k === "name" ? "Name" : k === "email" ? "Email" : k === "mobile" ? "Mobile" : "Address"}
-          {k === "address"
-            ? <textarea value={f[k]} rows={2} onChange={(e) => setF((x) => ({ ...x, [k]: e.target.value }))}
-                className="w-full rounded px-2 py-1.5 block" style={{ border: `1px solid ${C.line}`, fontSize: 13.5, color: C.ink }} />
-            : <input value={f[k]} onChange={(e) => setF((x) => ({ ...x, [k]: e.target.value }))}
-                className="w-full rounded px-2 py-1.5 block" style={{ border: `1px solid ${C.line}`, fontSize: 13.5, color: C.ink }} />}
-        </label>
-      ))}
+      <label className="block mb-2" style={{ fontSize: 11.5, color: C.faint }}>Name
+        <input value={f.name} onChange={(e) => setF((x) => ({ ...x, name: e.target.value }))}
+          onBlur={() => setF((x) => ({ ...x, name: titleCase(x.name) }))}
+          className="w-full rounded px-2 py-1.5 block" style={{ border: `1px solid ${C.line}`, fontSize: 13.5, color: C.ink }} />
+      </label>
+      <label className="block mb-2" style={{ fontSize: 11.5, color: C.faint }}>Email
+        <input value={f.email} onChange={(e) => setF((x) => ({ ...x, email: e.target.value }))}
+          className="w-full rounded px-2 py-1.5 block" style={{ border: `1px solid ${C.line}`, fontSize: 13.5, color: C.ink }} />
+      </label>
+      <div className="mb-2" style={{ fontSize: 11.5, color: C.faint }}>Mobile
+        <div className="flex gap-1.5">
+          <input value={f.country_code} onChange={(e) => setF((x) => ({ ...x, country_code: e.target.value }))}
+            className="rounded px-2 py-1.5 tnum text-center" style={{ border: `1px solid ${C.line}`, fontSize: 13.5, color: C.ink, width: 62 }} />
+          <input value={f.mobile} inputMode="numeric"
+            onChange={(e) => setF((x) => ({ ...x, mobile: e.target.value.replace(/[^0-9]/g, "") }))}
+            onBlur={() => setF((x) => ({ ...x, mobile: splitPhone(x.mobile).number }))}
+            className="rounded px-2 py-1.5 tnum" style={{ border: `1px solid ${C.line}`, fontSize: 13.5, color: C.ink, flex: 1 }} />
+        </div>
+        {f.mobile && f.mobile.length !== 10 && (
+          <div style={{ color: "#8A5B00", marginTop: 2 }}>{f.mobile.length} digits — an Indian mobile is ten.</div>
+        )}
+      </div>
+      <label className="block mb-2" style={{ fontSize: 11.5, color: C.faint }}>Address
+        <textarea value={f.address} rows={2} onChange={(e) => setF((x) => ({ ...x, address: e.target.value }))}
+          className="w-full rounded px-2 py-1.5 block" style={{ border: `1px solid ${C.line}`, fontSize: 13.5, color: C.ink }} />
+      </label>
 
       {err && <div className="text-xs font-semibold mb-2" style={{ color: C.red }}>{err}</div>}
       <button onClick={create} disabled={busy} className="rounded px-4 py-2 font-bold" style={{ background: C.green, color: "#fff", fontSize: 13.5 }}>
@@ -275,6 +299,7 @@ function OfferBuilder({ id, boot, isOwner, onClose }: { id: string; boot: Boot |
         {step === 3 && <PageTerms d={d} boot={boot} save={save} locked={locked} />}
         {step === 4 && <PageNotes d={d} save={save} locked={locked} />}
         {step === 5 && <PageReview d={d} save={save} setStatus={setStatus} busy={busy} isOwner={isOwner} />}
+        {step === 6 && <PageDocuments d={d} reload={load} locked={locked} />}
       </div>
 
       <div className="flex gap-2 items-center mt-4 no-print" style={{ borderTop: `1px solid ${C.line}`, paddingTop: 12 }}>
@@ -300,7 +325,14 @@ function PagePerson({ d, boot, save, locked }: { d: Offer; boot: Boot | null; sa
       <Card title="The person">
         <F label="Name" v={d.name} onSave={(v) => save({ name: v })} locked={locked} />
         <F label="Email" v={d.email} onSave={(v) => save({ email: v, send_to: v })} locked={locked} />
-        <F label="Mobile" v={d.mobile} onSave={(v) => save({ mobile: v })} locked={locked} />
+        <div className="mb-2" style={{ fontSize: 11.5, color: C.faint }}>Mobile
+          <div className="flex gap-1.5">
+            <input value={d.country_code || "+91"} disabled={locked}
+              onChange={(e) => save({ country_code: e.target.value })}
+              className="rounded px-2 py-1.5 tnum text-center" style={{ border: `1px solid ${C.line}`, fontSize: 13.5, color: C.ink, width: 62, background: locked ? "#F7F6F2" : "#fff" }} />
+            <div style={{ flex: 1 }}><F label="" v={d.mobile} onSave={(v) => save({ mobile: v })} locked={locked} /></div>
+          </div>
+        </div>
         <F label="Address" v={d.address} onSave={(v) => save({ address: v })} locked={locked} area />
         {d.resume_name && (
           <div style={{ fontSize: 11.5, color: C.faint, marginTop: 6 }}>
@@ -660,6 +692,111 @@ function PageReview({ d, save, setStatus, busy, isOwner }: { d: Offer; save: (p:
         <div style={{ fontSize: 11.5, color: C.faint, marginTop: 8 }}>
           Valid for {d.valid_days || 3} days from sending, as the covering letter says.
         </div>
+      </Card>
+    </>
+  );
+}
+
+/* ── page 7 ── */
+const KIND_TONE: Record<string, string> = {
+  "Resume": "#1B3A5C", "Interview notes": "#8A5B00", "Offer letter": "#0D7A3F",
+  "Appointment letter": "#0D7A3F", "Acceptance": "#5B3FA8", "ID proof": "#46545F",
+  "Certificate": "#46545F", "Other": "#8B8F87",
+};
+const size = (n: number) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+function PageDocuments({ d, reload, locked }: { d: Offer; reload: () => void; locked: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [kind, setKind] = useState<string>("Interview notes");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const docs = d.documents || [];
+
+  const upload = async () => {
+    const files = Array.from(fileRef.current?.files || []);
+    if (!files.length) { setErr("Choose one or more files."); return; }
+    setBusy(true); setErr("");
+    try {
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append("file", file); fd.append("id", d.id); fd.append("kind", kind);
+        const r = await fetch("/api/hrms/offers", { method: "POST", body: fd });
+        const t = await r.text();
+        let j: Record<string, unknown> = {};
+        try { j = JSON.parse(t); } catch { throw new Error(`${file.name}: the server replied ${r.status} and not JSON — it may be too large.`); }
+        if (!r.ok) throw new Error(`${file.name}: ${String(j.error || r.status)}`);
+      }
+      if (fileRef.current) fileRef.current.value = "";
+      reload();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+
+  const act = async (body: Record<string, unknown>) => {
+    setBusy(true); setErr("");
+    try { await api.post("/api/hrms/offers", { ...body, id: d.id }); reload(); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+
+  return (
+    <>
+      <div className="rounded-lg border p-3 mb-3 no-print" style={{ borderColor: C.line, background: "#FBFAF7" }}>
+        <div className="font-bold mb-1" style={{ fontSize: 13 }}>Add documents</div>
+        <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 6 }}>
+          Anything at all — a photograph of handwritten interview notes, a certificate, an ID. Several at once is fine.
+        </div>
+        <div className="flex gap-2 items-center flex-wrap">
+          <select value={kind} onChange={(e) => setKind(e.target.value)} disabled={locked}
+            className="rounded px-2 py-1.5 bg-white" style={{ border: `1px solid ${C.line}`, fontSize: 12.5, color: C.ink }}>
+            {DOC_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+          </select>
+          <input ref={fileRef} type="file" multiple disabled={locked} style={{ fontSize: 12, maxWidth: 300 }} />
+          <button onClick={upload} disabled={busy || locked} className="rounded px-3 py-1.5 font-bold"
+            style={{ background: C.green, color: "#fff", fontSize: 12.5 }}>{busy ? "Uploading…" : "Upload"}</button>
+        </div>
+        {err && <div className="text-xs font-semibold mt-2" style={{ color: C.red }}>{err}</div>}
+      </div>
+
+      <Card title={`On file (${docs.length})`}
+        note="When this person joins, these flow into their Drive folder — “Active - 6001 - Name” — together with the offer and appointment letters. The kind decides what goes where, which is why it is worth labelling correctly.">
+        {!docs.length ? <div className="text-sm" style={{ color: C.faint }}>Nothing on file yet. The resume lands here automatically when an offer is started from one.</div> : (
+          <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+            <thead><tr style={{ color: C.faint, fontSize: 11 }}>
+              {["Kind", "File", "Size", "Added", "By", ""].map((h) => (
+                <th key={h} className="text-left px-1.5 py-1" style={{ borderBottom: `1px solid ${C.line}` }}>{h}</th>))}
+            </tr></thead>
+            <tbody>
+              {docs.map((doc) => (
+                <tr key={doc.id} style={{ borderBottom: "1px solid #F2F0EA" }}>
+                  <td className="px-1.5 py-1.5">
+                    <select value={doc.kind} disabled={locked}
+                      onChange={(e) => act({ action: "doc-kind", docId: doc.id, kind: e.target.value, note: doc.note })}
+                      className="rounded px-1 py-0.5 font-bold bg-white"
+                      style={{ border: `1px solid ${C.line}`, fontSize: 11, color: KIND_TONE[doc.kind] || C.dim }}>
+                      {DOC_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-1.5 py-1.5">
+                    {doc.url
+                      ? <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2 }}>{doc.name}</a>
+                      : doc.name}
+                    {doc.note && <div style={{ fontSize: 10.5, color: C.faint }}>{doc.note}</div>}
+                  </td>
+                  <td className="px-1.5 py-1.5 tnum" style={{ color: C.faint }}>{size(doc.size)}</td>
+                  <td className="px-1.5 py-1.5">{day(doc.at)}</td>
+                  <td className="px-1.5 py-1.5">{String(doc.by || "").split("·")[0].trim()}</td>
+                  <td className="px-1.5 py-1.5 no-print">
+                    {!locked && (
+                      <button onClick={() => { if (window.confirm(`Take ${doc.name} off the list? The file itself stays in storage.`)) act({ action: "doc-remove", docId: doc.id }); }}
+                        disabled={busy} style={{ color: C.red, fontSize: 11, fontWeight: 700 }}>Remove</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </Card>
     </>
   );

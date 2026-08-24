@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.1.0",
+    date: "2026-08-24",
+    module: "Offer Letters — the candidate's file",
+    items: [
+      "NAMES OFF A RESUME ARE PUT INTO TITLE CASE — “VINAY MANDE” becomes “Vinay Mande” — and carefully: initials stay upper (JC Kumar), particles stay lower (van der Berg), and O'Brien, D'Souza, Anne-Marie and McDonald keep their capital after the mark. A name typed by hand is tidied the same way.",
+      "THE MOBILE LOSES ITS +91. The country code sits in its own small box, prefilled, and the number is stored as bare ten digits however it arrived — +91, 0091, 091 or a leading zero. A number that is not ten digits says so instead of being quietly mangled into looking right. Other countries get their own handling when we hire outside India.",
+      "A SEVENTH PAGE: DOCUMENTS. Everything on file for that candidate in one list — the resume lands there automatically, and anything else can be added, several at a time: photographs of handwritten interview notes, certificates, an ID. Each carries a KIND, and the kind is what decides where the file goes when the person joins.",
+      "THE RESUME IS KEPT ON RECORD from the moment it is read, attached to the offer rather than left loose in storage.",
+      "Migration 0069.",
+    ],
+  },
+  {
     v: "3.21.0.1",
     date: "2026-08-24",
     module: "Offer Letters — the gross and the basic % drive the rest",

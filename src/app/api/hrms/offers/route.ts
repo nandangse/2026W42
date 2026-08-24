@@ -3,7 +3,7 @@ import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables } from "@/lib/hrms";
 import { salaryTable, splitGross, getterFor, componentsTotal, type Components } from "@/lib/salary";
-import { offerNumber, financialYear, RESUME_SCHEMA, RESUME_SYSTEM, offerLetterHtml, textToHtml, type ResumeRead } from "@/lib/offer";
+import { offerNumber, financialYear, RESUME_SCHEMA, RESUME_SYSTEM, offerLetterHtml, textToHtml, titleCase, splitPhone, DOC_KINDS, type ResumeRead } from "@/lib/offer";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -64,7 +64,14 @@ export async function GET(req: Request) {
         const { data: sgn } = await admin.storage.from(BUCKET).createSignedUrl(String(data.resume_path), LINK_TTL);
         resumeUrl = sgn?.signedUrl ?? null;
       }
-      return NextResponse.json({ offer: { ...data, resumeUrl } });
+      const documents = await Promise.all(
+        ((data.documents || []) as { path?: string }[]).map(async (doc) => {
+          if (!doc.path) return { ...doc, url: null };
+          const { data: sgn } = await admin.storage.from(BUCKET).createSignedUrl(String(doc.path), LINK_TTL);
+          return { ...doc, url: sgn?.signedUrl ?? null };
+        }),
+      );
+      return NextResponse.json({ offer: { ...data, resumeUrl, documents } });
     }
 
     const { data, error } = await admin
@@ -159,7 +166,28 @@ export async function POST(req: Request) {
       if (up) throw new Error(`Could not store the resume: ${up.message}`);
 
       const { read, why } = await readResume(buf, file.type || "", file.name);
-      return NextResponse.json({ ok: true, path, filename: file.name, read, why });
+      // tidied HERE rather than in the form, so every route that ever reads a
+      // resume gets the same name and the same bare ten digits
+      const tidy = read
+        ? { ...read, name: read.name ? titleCase(read.name) : null, mobile: read.mobile ? splitPhone(read.mobile).number : null }
+        : null;
+
+      const kind = String(form.get("kind") || "Resume");
+      const doc = {
+        id: `${Date.now()}-${Math.round(Math.random() * 1e6)}`,
+        name: file.name, kind: DOC_KINDS.includes(kind as never) ? kind : "Other",
+        path, size: file.size, mime: file.type || null,
+        at: now, by: stamp, note: clean(form.get("note"), 500),
+      };
+
+      // attach it to the offer when there is one; a brand-new offer carries it in
+      if (id) {
+        const { data: cur } = await admin.from("hrms_offer").select("documents").eq("id", id).maybeSingle();
+        const docs = [...((cur?.documents || []) as unknown[]), doc];
+        await admin.from("hrms_offer").update({ documents: docs, updated_by: stamp, updated_at: now }).eq("id", id);
+      }
+
+      return NextResponse.json({ ok: true, path, filename: file.name, read: tidy, why, doc });
     }
 
     const body = await req.json();
@@ -178,6 +206,8 @@ export async function POST(req: Request) {
         email: clean(body.email, 200), mobile: clean(body.mobile, 60), address: clean(body.address),
         resume_name: clean(body.resume_name, 300), resume_path: clean(body.resume_path, 500),
         resume_read: body.resume_read ?? null,
+        country_code: clean(body.country_code, 8) || "+91",
+        documents: Array.isArray(body.documents) ? body.documents.slice(0, 100) : [],
         offer_date: body.offer_date || null, joining_date: body.joining_date || null,
         send_to: clean(body.email, 200),
         terms: clean(body.terms, 200000), covering_letter: clean(body.covering_letter, 20000),
@@ -206,8 +236,11 @@ export async function POST(req: Request) {
       await guardSent();
       const p = (body.patch || {}) as Record<string, unknown>;
       const patch: Record<string, unknown> = { updated_by: stamp, updated_at: now };
-      for (const k of ["name", "email", "mobile", "address", "designation", "roles", "reporting_to", "discussion_notes", "type", "send_to", "send_from", "send_cc"])
+      for (const k of ["name", "email", "mobile", "address", "designation", "roles", "reporting_to", "discussion_notes", "type", "send_to", "send_from", "send_cc", "country_code"])
         if (k in p) patch[k] = clean(p[k], 4000);
+      // a name typed in by hand is tidied the same way a read one is
+      if (typeof patch.name === "string") patch.name = titleCase(patch.name as string);
+      if (typeof patch.mobile === "string") patch.mobile = splitPhone(patch.mobile as string).number;
       for (const k of ["offer_date", "joining_date"]) if (k in p) patch[k] = p[k] || null;
       for (const k of ["probation_months", "valid_days"]) if (k in p) patch[k] = Number(p[k]) || null;
       if ("agreed_gross" in p) patch.agreed_gross = Number(String(p.agreed_gross ?? "").replace(/[^0-9.]/g, "")) || null;
@@ -275,6 +308,28 @@ export async function POST(req: Request) {
         componentsTotal: componentsTotal(comps),
         basic_pct: comps.basic_da && gross ? Math.round((comps.basic_da / gross) * 10000) / 100 : basicPct,
       });
+    }
+
+    /** { action: "doc-remove", docId } — take a file off the list. */
+    if (action === "doc-remove") {
+      const { data: cur } = await admin.from("hrms_offer").select("documents").eq("id", id).maybeSingle();
+      const docs = ((cur?.documents || []) as { id?: string; path?: string }[]).filter((x) => x.id !== String(body.docId));
+      const { error } = await admin.from("hrms_offer").update({ documents: docs, updated_by: stamp, updated_at: now }).eq("id", id);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true });
+    }
+
+    /** { action: "doc-kind", docId, kind, note } — relabel one. */
+    if (action === "doc-kind") {
+      const { data: cur } = await admin.from("hrms_offer").select("documents").eq("id", id).maybeSingle();
+      const kind = String(body.kind || "Other");
+      const docs = ((cur?.documents || []) as Record<string, unknown>[]).map((x) =>
+        x.id === String(body.docId)
+          ? { ...x, kind: DOC_KINDS.includes(kind as never) ? kind : "Other", note: clean(body.note, 500) }
+          : x);
+      const { error } = await admin.from("hrms_offer").update({ documents: docs, updated_by: stamp, updated_at: now }).eq("id", id);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true });
     }
 
     /* ── the status ladder ── */
