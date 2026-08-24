@@ -23,12 +23,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DOCTYPES, doctypeBySlug, type Doctype, type Field } from "@/crm/doctypes";
 
-const PAPER = "#F1EFE9";
-const NAVY = "#16232F";
-const INK = "#22303C";
-const MUTED = "#8A94A0";
-const BORDER = "#E2E0DA";
-const ORANGE = "#E8600A";
+// Sales Genie's palette (src/sales-plan/styles.css), moved here on Dr Raghu's
+// word 24 Aug 2026 — one look for the whole of sales.
+const PAPER = "#F7F8FC";        // the page ground; cards sit white on it
+const NAVY = "#1B2D6B";
+const NAVY_DARK = "#14224F";
+const NAVY_SOFT = "#EEF1FA";
+const INK = "#22283A";
+const MUTED = "#6B7280";
+const BORDER = "#E5E8F0";
+const ORANGE = "#F04E23";
 const PINNED_W = 180; // pinned columns take a fixed width so sticky offsets add up
 
 type Row = Record<string, unknown>;
@@ -191,31 +195,31 @@ export default function CrmApp({
 
   return (
     <div style={{ minHeight: "100vh", background: PAPER, color: INK }}>
-      {/* ---------- header ---------- */}
+      {/* ---------- header — Sales Genie's: white, orange rule, navy title ---------- */}
       <header
-        style={{ background: NAVY, position: "sticky", top: 0, zIndex: 40 }}
+        style={{ background: "#fff", borderBottom: `3px solid ${ORANGE}`, position: "sticky", top: 0, zIndex: 40 }}
         className="px-4 py-2.5"
       >
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-baseline gap-3">
-            <div className="text-xs font-bold tracking-widest" style={{ color: ORANGE }}>
-              NANDAN CRM
+            <div className="font-extrabold tracking-wide" style={{ color: NAVY, fontSize: 16 }}>
+              NANDAN <span style={{ color: ORANGE }}>CRM</span>
               <span
                 title="One Genie version number, across every module — the CRM does not version on its own."
-                style={{ background: ORANGE, color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6 }}
+                style={{ background: ORANGE, color: "#fff", borderRadius: 4, padding: "1px 6px", marginLeft: 8, fontSize: 11, fontWeight: 700, verticalAlign: "middle" }}
               >
                 {version}
               </span>
             </div>
-            <h1 className="text-white font-bold" style={{ fontSize: 17, lineHeight: 1.2 }}>
+            <h1 className="font-bold" style={{ fontSize: 15, lineHeight: 1.2, color: INK }}>
               {special?.label ?? dt?.plural ?? "CRM"}
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <a href="/" className="text-xs font-semibold" style={{ color: "#9FB0C0" }}>
+            <a href="/" className="text-xs font-bold" style={{ color: NAVY }}>
               ← Genie
             </a>
-            <span className="text-xs" style={{ color: "#6B7C8C" }}>
+            <span className="text-xs" style={{ color: MUTED }}>
               {displayName || email}
             </span>
           </div>
@@ -228,7 +232,7 @@ export default function CrmApp({
           className="p-2"
           style={{
             width: 190, flexShrink: 0, borderRight: `1px solid ${BORDER}`,
-            background: "#fff", minHeight: "calc(100vh - 46px)", position: "sticky", top: 46,
+            background: "#fff", minHeight: "calc(100vh - 50px)", position: "sticky", top: 50,
           }}
         >
           {NAV.map((block, bi) => {
@@ -729,12 +733,27 @@ function RecordModal({
 }) {
   const { dt, row, links, mode } = view;
   const title = String(row[dt.titleField] ?? dt.label);
+  const isCompany = dt.name === "company";
+  const [tab, setTab] = useState("details");
+  useEffect(() => setTab("details"), [row.id]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", h);
     return () => document.removeEventListener("keydown", h);
   }, [onClose]);
+
+  // The Company 360: everything that hangs off the account, one tab each.
+  const companyTabs: { key: string; label: string; count?: unknown }[] = [
+    { key: "details", label: "Details" },
+    { key: "person", label: "Contacts", count: row.contact_count },
+    { key: "address", label: "Addresses" },
+    { key: "interaction", label: "Interactions" },
+    { key: "communication", label: "Communication" },
+    { key: "opportunity", label: "Opportunities", count: row.opp_count },
+    { key: "quotation", label: "Quotations" },
+    { key: "sales_order", label: "Sales Orders", count: row.so_count },
+  ];
 
   return (
     <div
@@ -748,7 +767,10 @@ function RecordModal({
       <div
         onClick={(e) => e.stopPropagation()}
         className="rounded"
-        style={{ background: "#fff", width: "min(880px, 100%)", boxShadow: "0 12px 40px rgba(22,35,47,.35)" }}
+        style={{
+          background: "#fff", width: isCompany ? "min(1080px, 100%)" : "min(880px, 100%)",
+          boxShadow: "0 12px 40px rgba(27,45,107,.35)",
+        }}
       >
         <div
           className="flex items-center justify-between px-4 py-3"
@@ -773,33 +795,147 @@ function RecordModal({
             <button
               onClick={onClose}
               className="px-2.5 py-1.5 rounded text-sm font-semibold"
-              style={{ background: "#2B3B4A", color: "#C8D2DC" }}
+              style={{ background: NAVY_DARK, color: "#C8D2DC" }}
             >
               ✕
             </button>
           </div>
         </div>
 
-        {mode === "view" ? (
+        {mode === "view" && isCompany && (
           <div
-            className="grid gap-x-6 gap-y-3 p-4"
-            style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}
+            className="flex flex-wrap"
+            style={{ borderBottom: `2px solid ${BORDER}`, padding: "0 12px", gap: 2 }}
           >
-            {dt.fields.map((f) => (
-              <div key={f.name}>
-                <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>{f.label}</div>
-                <div className="text-sm" style={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>
-                  <Cell field={f} value={row[f.name]} links={links} onOpenLink={onOpenLink} />
-                </div>
-              </div>
+            {companyTabs.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className="text-sm font-bold"
+                style={{
+                  padding: "10px 14px", color: tab === t.key ? ORANGE : MUTED,
+                  borderBottom: `3px solid ${tab === t.key ? ORANGE : "transparent"}`,
+                  marginBottom: -2,
+                }}
+              >
+                {t.label}
+                {t.count !== undefined && t.count !== null && (
+                  <span style={{
+                    background: NAVY_SOFT, color: NAVY, borderRadius: 10,
+                    padding: "1px 8px", fontSize: 11, marginLeft: 6,
+                  }}>
+                    {String(t.count)}
+                  </span>
+                )}
+              </button>
             ))}
           </div>
+        )}
+
+        {mode === "view" ? (
+          !isCompany || tab === "details" ? (
+            <div
+              className="grid gap-x-6 gap-y-3 p-4"
+              style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}
+            >
+              {dt.fields.map((f) => (
+                <div key={f.name}>
+                  <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>{f.label}</div>
+                  <div className="text-sm" style={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                    <Cell field={f} value={row[f.name]} links={links} onOpenLink={onOpenLink} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : tab === "communication" ? (
+            <div className="p-6 text-sm" style={{ color: MUTED, lineHeight: 1.6 }}>
+              Emails — automated, inbound and outbound — land here when the
+              channels phase connects the mailboxes. The table is ready; the
+              wires are not yet in.
+            </div>
+          ) : (
+            <RelatedTab slug={tab} companyId={String(row.id)} onOpenLink={onOpenLink} />
+          )
         ) : (
           <div className="p-4">
             <RecordForm dt={dt} links={links} initial={row} onDone={onSaved} />
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * One tab of the Company 360: the doctype's rows filtered to this company,
+ * fetched through the same route the list screens use — same columns, same
+ * labels, same doors. A row click opens that record's own lightbox.
+ */
+function RelatedTab({
+  slug, companyId, onOpenLink,
+}: {
+  slug: string; companyId: string; onOpenLink: (target: string, id: string) => void;
+}) {
+  const dt = doctypeBySlug(slug);
+  const [rows, setRows] = useState<Row[] | null>(null);
+  const [links, setLinks] = useState<Links>({});
+  const [total, setTotal] = useState(0);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    setRows(null); setErr("");
+    fetch(`/api/crm/${slug}?f_company_id=${encodeURIComponent(companyId)}`, { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || "Could not load");
+        setRows(j.rows); setLinks(j.links || {}); setTotal(j.total ?? j.rows.length);
+      })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [slug, companyId]);
+
+  if (!dt) return null;
+  if (err) return <div className="p-4 text-sm" style={{ color: "#8E2C20" }}>{err}</div>;
+  if (rows === null) return <div className="p-4 text-sm" style={{ color: MUTED }}>loading…</div>;
+  if (!rows.length)
+    return <div className="p-6 text-sm" style={{ color: MUTED }}>No {dt.plural.toLowerCase()} on this company yet.</div>;
+
+  const fields = dt.fields.filter((f) => f.inList && f.name !== "company_id");
+
+  return (
+    <div style={{ maxHeight: "55vh", overflow: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            {fields.map((f) => (
+              <th key={f.name} style={{
+                textAlign: "left", padding: "8px 14px", fontSize: 10, letterSpacing: 0.6,
+                color: MUTED, borderBottom: `2px solid ${BORDER}`, whiteSpace: "nowrap",
+                position: "sticky", top: 0, background: "#fff",
+              }}>{f.label.toUpperCase()}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr
+              key={String(r.id ?? i)}
+              onClick={() => onOpenLink(slug, String(r.id))}
+              style={{ cursor: "pointer" }}
+            >
+              {fields.map((f) => (
+                <td key={f.name} style={{ padding: "8px 14px", fontSize: 13, borderBottom: "1px solid #F0F1F6", verticalAlign: "top" }}>
+                  <Cell field={f} value={r[f.name]} links={links} onOpenLink={onOpenLink} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {total > rows.length && (
+        <div className="p-3 text-xs" style={{ color: MUTED }}>
+          Showing {rows.length.toLocaleString("en-IN")} of {total.toLocaleString("en-IN")} — the full list lives on the {dt.plural} screen.
+        </div>
+      )}
     </div>
   );
 }

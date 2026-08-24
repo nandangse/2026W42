@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.0.4",
+    date: "2026-08-24",
+    module: "The CRM wears Sales Genie's clothes, and the Company grows its 360",
+    items: [
+      "SALES GENIE'S LOOK MOVED IN: white ground, the navy and orange from src/sales-plan/styles.css, the white header with the orange rule and the navy wordmark. One visual language for the whole of sales — the CRM stops dressing differently from the app beside it.",
+      "THE COMPANY LIGHTBOX HAS TABS — the Company 360: Details · Contacts · Addresses · Interactions · Communication · Opportunities · Quotations · Sales Orders. Each tab reads through the same route the list screens use, so the columns, the names and the doors are the same everywhere; a row click opens that record's own lightbox. Counts ride on the tabs the company row already carries.",
+      "Communication says honestly what it is: the table is ready, the wires arrive with the channels phase.",
+    ],
+  },
+  {
     v: "3.23.0.3",
     date: "2026-08-24",
     module: "The CRM sidebar in its working order, and Deals draws the pipeline",
