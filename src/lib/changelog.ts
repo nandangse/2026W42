@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.2.0",
+    date: "2026-08-24",
+    module: "Offer Letters — the letter as a PDF",
+    items: [
+      "THE LETTER ON ITS OWN PAGE, at /hrms/offer/<id>/print — a separate page rather than a print stylesheet over the builder, because the letter that goes to a candidate should not carry a pixel of the tool that made it.",
+      "ON EVERY PAGE, not just the first: the Nandan logo at the head, the words DRAFT OFFER LETTER beside it, a large DRAFT watermark behind the text while the offer is still a draft, and at the foot the line “Valid only when responded to by e-mail within 3 days of the date above.” The watermark disappears by itself once the offer is Sent — it is drawn from the status, not from a tick somebody has to remember.",
+      "PAGE NUMBERS — “Page 2 of 4” — measured after layout, because no browser implements the CSS that would do it. The header, footer and watermark repeat per sheet the way a running header should.",
+      "Save as PDF from the same page, so the letter can be sent separately or printed and signed.",
+    ],
+  },
+  {
     v: "3.21.1.0",
     date: "2026-08-24",
     module: "Offer Letters — the candidate's file",

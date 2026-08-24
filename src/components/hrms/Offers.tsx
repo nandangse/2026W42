@@ -661,7 +661,10 @@ function PageReview({ d, save, setStatus, busy, isOwner }: { d: Offer; save: (p:
             style={{ background: d.status === "Draft" && to ? C.green : "#E2E0DA", color: d.status === "Draft" && to ? "#fff" : "#8A94A0", fontSize: 12.5 }}>
             {sending ? "Sending…" : "✉ Send it now"}
           </button>
-          <button onClick={() => window.print()} className="rounded px-3 py-1.5 font-bold" style={{ background: "#1B3A5C", color: "#fff", fontSize: 12.5 }}>🖨 Print the letter</button>
+          <a href={`/hrms/offer/${d.id}/print`} target="_blank" rel="noopener noreferrer"
+            className="rounded px-3 py-1.5 font-bold" style={{ background: "#1B3A5C", color: "#fff", fontSize: 12.5 }}>
+            📄 Open the PDF — logo, DRAFT watermark, page numbers
+          </a>
           <a href={gmail} target="_blank" rel="noopener noreferrer" className="rounded px-3 py-1.5 font-bold" style={{ background: "#fff", color: C.dim, border: `1px solid ${C.line}`, fontSize: 12.5 }}>✉ Open a Gmail draft instead</a>
         </div>
         {sendMsg && <div className="text-xs font-semibold mt-2" style={{ color: sendMsg.includes("✓") ? C.green : C.red }}>{sendMsg}</div>}
