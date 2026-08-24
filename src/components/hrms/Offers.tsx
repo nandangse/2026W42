@@ -13,6 +13,7 @@ import { TYPE_OPTIONS, splitMulti, joinMulti } from "@/lib/hrms";
 import { type SalaryRow, type Components, SPLIT_DEFAULTS } from "@/lib/salary";
 import { OFFER_STEPS, STATUS_TONE, OFFER_STATUS, DOC_KINDS, defaultJoining, iso, coveringLetter, titleCase, splitPhone } from "@/lib/offer";
 import RichText, { RichTextView } from "./RichText";
+import { LOGO } from "@/lib/logo";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
 
@@ -31,7 +32,7 @@ interface Boot {
   roles: { id: string; role: string; department: string | null; job_description: string | null; deliverable: string | null; metric: string | null; summary: string | null; reports_to: string | null }[];
   competencies: { name: string; definition: string; category: string | null }[];
   roleCompetency: { role_id: string; competency: string; level: number }[];
-  people: { id: string; name: string; designation: string | null }[];
+  people: { id: string; name: string; designation: string | null; email: string | null }[];
   texts: Record<string, string>;
 }
 interface Offer extends Row {
@@ -41,7 +42,7 @@ interface Offer extends Row {
   salary: { rows: SalaryRow[]; ctcLakhs: string; exempt: boolean; gross: number } | null;
   components: Components | null; basic_pct: number | null;
   terms: string | null; internal_notes: string | null;
-  send_to: string | null; send_from: string | null; send_cc: string | null;
+  send_to: string | null; send_from: string | null; send_cc: string | null; reporting_to_email: string | null;
   covering_letter: string | null; valid_days: number | null;
   resume_name: string | null; resumeUrl?: string | null;
   resume_read: Record<string, string | null> | null;
@@ -357,11 +358,22 @@ function PagePerson({ d, boot, save, locked }: { d: Offer; boot: Boot | null; sa
           ))}
         </div>
         <label className="block mt-2" style={{ fontSize: 11.5, color: C.faint }}>Reporting to
-          <select value={d.reporting_to || ""} disabled={locked} onChange={(e) => save({ reporting_to: e.target.value })}
+          <select value={d.reporting_to || ""} disabled={locked}
+            onChange={(e) => {
+              const who = (boot?.people || []).find((p) => `${p.name}${p.designation ? `, ${p.designation}` : ""}` === e.target.value);
+              // the address travels with the name, so the manager is copied
+              // on the letter that names them
+              save({ reporting_to: e.target.value, reporting_to_email: who?.email || "" });
+            }}
             className="w-full rounded px-2 py-1.5 block bg-white" style={{ border: `1px solid ${C.line}`, fontSize: 13.5, color: C.ink }}>
             <option value="">— choose —</option>
             {(boot?.people || []).map((p) => <option key={p.id} value={`${p.name}${p.designation ? `, ${p.designation}` : ""}`}>{p.name}{p.designation ? `, ${p.designation}` : ""}</option>)}
           </select>
+          {d.reporting_to && (
+            <div style={{ fontSize: 11, color: d.reporting_to_email ? C.faint : "#8A5B00", marginTop: 2 }}>
+              {d.reporting_to_email ? `Copied on the offer: ${d.reporting_to_email}` : "No work e-mail on their record — they cannot be copied on the offer."}
+            </div>
+          )}
         </label>
         <div className="grid gap-2 mt-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
           <F label="Offer date" v={d.offer_date} onSave={(v) => save({ offer_date: v })} locked={locked} type="date" />
@@ -643,7 +655,8 @@ function PageReview({ d, save, setStatus, busy, isOwner }: { d: Offer; save: (p:
   const [sending, setSending] = useState(false);
   const [sendMsg, setSendMsg] = useState("");
   const to = d.send_to || d.email || "";
-  const cc = d.send_cc || "raghu@nandan.co.in";
+  const ccBase = d.send_cc || "raghu@nandan.co.in";
+  const cc = [ccBase, d.reporting_to_email || ""].map((x) => x.trim()).filter(Boolean).join(", ");
   const from = d.send_from || "hr@nandan.co.in";
   const subject = `Offer of Employment — ${d.name}${d.designation ? ` · ${d.designation}` : ""} — Nandan GSE`;
   const body = d.covering_letter || "";
@@ -660,7 +673,14 @@ function PageReview({ d, save, setStatus, busy, isOwner }: { d: Offer; save: (p:
         <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))" }}>
           <F label="Send to" v={to} onSave={(v) => save({ send_to: v })} locked={false} />
           <F label="Send from" v={from} onSave={(v) => save({ send_from: v })} locked={false} />
-          <F label="CC" v={cc} onSave={(v) => save({ send_cc: v })} locked={false} />
+          <div>
+            <F label="CC" v={ccBase} onSave={(v) => save({ send_cc: v })} locked={false} />
+            {d.reporting_to_email && (
+              <div style={{ fontSize: 11, color: C.faint, marginTop: -4 }}>
+                plus <b>{d.reporting_to_email}</b> — the reporting manager, added automatically
+              </div>
+            )}
+          </div>
         </div>
         <div style={{ fontSize: 11.5, color: C.faint, marginTop: 8 }}>Covering letter</div>
         <textarea value={body} rows={13} onChange={(e) => save({ covering_letter: e.target.value })}
@@ -830,6 +850,12 @@ function PageDocuments({ d, reload, locked }: { d: Offer; reload: () => void; lo
 function LetterPreview({ d }: { d: Offer }) {
   return (
     <div id="hrms-print" style={{ background: "#fff", padding: 18, border: `1px solid ${C.line}`, fontSize: 13, lineHeight: 1.7 }}>
+      <div className="flex items-center justify-between" style={{ borderBottom: "2px solid #16232F", paddingBottom: 8, marginBottom: 12 }}>
+        <img src={LOGO} alt="Nandan GSE" style={{ height: 30 }} />
+        <div style={{ textAlign: "right", fontSize: 10.5, color: C.faint, lineHeight: 1.5 }}>
+          Nandan GSE Private Limited<br />Khalapur, Maharashtra · CBD Belapur, Navi Mumbai
+        </div>
+      </div>
       <div className="flex justify-between" style={{ fontSize: 11.5, color: C.faint }}>
         <span>Ref: {d.offer_no}</span><span>Date: {day(d.offer_date)}</span>
       </div>

@@ -1,3 +1,4 @@
+import { LOGO } from "./logo";
 /**
  * Offer letters — the vocabulary, the numbering, and the standard words.
  *
@@ -199,6 +200,12 @@ export function offerLetterHtml(d: LetterOffer, draft = false): string {
   const section = (title: string, html?: string) => (html ? `<div style="${S.h}">${esc(title)}</div>${html}` : "");
 
   return `<div style="${S.body}">
+<table width="100%" style="margin-bottom:14px;border-bottom:2px solid #16232F;padding-bottom:8px"><tr>
+  <td><img src="${LOGO}" alt="Nandan GSE" style="height:30px;display:block"></td>
+  <td align="right" style="font-family:Georgia,serif;font-size:10.5px;color:#8B8F87;line-height:1.5">
+    Nandan GSE Private Limited<br>Khalapur, Maharashtra &middot; CBD Belapur, Navi Mumbai
+  </td>
+</tr></table>
 <table width="100%" style="font-size:12px;color:#46545F;margin-bottom:8px"><tr>
   <td>Ref: ${esc(d.offer_no)}</td><td align="right">Date: ${dmy(d.offer_date)}</td>
 </tr></table>

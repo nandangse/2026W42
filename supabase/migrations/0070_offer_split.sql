@@ -18,3 +18,8 @@ alter table public.hrms_offer
 
 comment on column public.hrms_offer.components is
   'The five pay components behind the agreed gross, as tuned for this offer.';
+
+-- The reporting manager's e-mail, so the letter that names them also copies
+-- them when it goes out (Dr Raghu, 24 Aug 2026).
+alter table public.hrms_offer
+  add column if not exists reporting_to_email text;

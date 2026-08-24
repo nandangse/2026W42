@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.2.2",
+    date: "2026-08-24",
+    module: "Offer Letters — the letterhead, the manager, and why the PDF was blank",
+    items: [
+      "THE NANDAN GSE LOGO is now part of the letter itself — on the screen, in the PDF and in the e-mail — with the company's addresses beside it, above a rule. It travels with the document rather than being drawn only by the print page.",
+      "THE REPORTING MANAGER IS COPIED on the offer that names them. Choosing them on page 1 now picks up their work e-mail as well as their name, and the review page shows exactly who will be copied — or says plainly when there is no address on their record.",
+      "WHY THE PDF CAME OUT BLANK: the salary could not save at all, because two columns were appended to migration 0067 after it had already been run. The offered gross showed as “Rs. —” and Annexure 1 had no table, since there was nothing stored to draw. A save now keeps everything it can and names migration 0070 for the rest — and 0070 puts the columns in.",
+    ],
+  },
+  {
     v: "3.21.2.1",
     date: "2026-08-24",
     module: "Offer Letters — three fixes",

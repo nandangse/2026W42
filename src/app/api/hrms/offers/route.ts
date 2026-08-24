@@ -42,7 +42,7 @@ export async function GET(req: Request) {
       const [roles, comps, emps, texts] = await Promise.all([
         admin.from("hrms_role").select("id, role, department, grade, job_description, deliverable, metric, summary, reports_to").order("role"),
         admin.from("hrms_competency").select("name, definition, category").order("name"),
-        admin.from(T.employees).select("id, name, designation, active").order("name"),
+        admin.from(T.employees).select("id, name, designation, email, active").order("name"),
         admin.from("hrms_text_master").select("key, title, body").in("key", ["terms_of_engagement", "offer_covering_letter"]),
       ]);
       const roleComp = await admin.from("hrms_role_competency").select("role_id, competency, level");
@@ -50,7 +50,7 @@ export async function GET(req: Request) {
         roles: roles.data || [],
         competencies: comps.data || [],
         roleCompetency: roleComp.data || [],
-        people: (emps.data || []).filter((e) => e.active).map((e) => ({ id: e.id, name: e.name, designation: e.designation })),
+        people: (emps.data || []).filter((e) => e.active).map((e) => ({ id: e.id, name: e.name, designation: e.designation, email: e.email })),
         texts: Object.fromEntries((texts.data || []).map((t) => [t.key, t.body])),
       });
     }
@@ -236,7 +236,7 @@ export async function POST(req: Request) {
       await guardSent();
       const p = (body.patch || {}) as Record<string, unknown>;
       const patch: Record<string, unknown> = { updated_by: stamp, updated_at: now };
-      for (const k of ["name", "email", "mobile", "address", "designation", "roles", "reporting_to", "discussion_notes", "type", "send_to", "send_from", "send_cc", "country_code"])
+      for (const k of ["name", "email", "mobile", "address", "designation", "roles", "reporting_to", "reporting_to_email", "discussion_notes", "type", "send_to", "send_from", "send_cc", "country_code"])
         if (k in p) patch[k] = clean(p[k], 4000);
       // a name typed in by hand is tidied the same way a read one is
       if (typeof patch.name === "string") patch.name = titleCase(patch.name as string);
@@ -359,7 +359,12 @@ export async function POST(req: Request) {
           "Use “Open a Gmail draft instead” below.");
 
       const from = clean(body.send_from ?? o.send_from, 200) || "hr@nandan.co.in";
-      const cc = clean(body.send_cc ?? o.send_cc, 300);
+      // the reporting manager is named in the letter, so they are copied on it
+      const ccList = [
+        ...String(clean(body.send_cc ?? o.send_cc, 300) || "").split(/[,;]/),
+        String(o.reporting_to_email || ""),
+      ].map((x) => x.trim()).filter(Boolean);
+      const cc = [...new Set(ccList.map((x) => x.toLowerCase()))].join(", ");
       const covering = String(body.covering_letter ?? o.covering_letter ?? "");
       const html = `${textToHtml(covering)}<hr style="border:none;border-top:1px solid #DCD8CC;margin:26px 0">${offerLetterHtml(o, String(o.status) === "Draft")}`;
 
