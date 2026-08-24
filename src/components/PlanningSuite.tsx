@@ -7575,6 +7575,41 @@ function OnFloor({
     return m;
   }, [notes]);
 
+  /**
+   * Per FIELD, who is named most across the jobs on the floor — so the
+   * dropdown offers "the usual people first". Somebody who owns production on
+   * eleven jobs is the likely answer on the twelfth, and scrolling past forty
+   * names to reach them every time is how the column stays empty.
+   */
+  const ownerRank = useMemo(() => {
+    const fields: [string, (j: Job) => string | null | undefined][] = [
+      ["quality_owner", (j) => j.qualityOwner],
+      ["production_owner", (j) => j.productionOwner],
+      ["kitting_owner", (j) => j.kittingOwner],
+      ["design_owner", (j) => j.designOwner],
+    ];
+    const m = new Map<string, Map<string, number>>();
+    for (const [field, get] of fields) {
+      const counts = new Map<string, number>();
+      for (const j of board.jobs) {
+        const v = get(j);
+        if (v) counts.set(v, (counts.get(v) || 0) + 1);
+      }
+      m.set(field, counts);
+    }
+    return m;
+  }, [board.jobs]);
+
+  const usersFor = (field: string): Person[] => {
+    const counts = ownerRank.get(field) || new Map<string, number>();
+    return [...(board.assignableUsers || [])].sort((a, b) => {
+      const ca = counts.get(a.initials || "") || 0;
+      const cb = counts.get(b.initials || "") || 0;
+      if (cb !== ca) return cb - ca; // most-used first
+      return String(personLabel(a)).localeCompare(String(personLabel(b)));
+    });
+  };
+
   const setOwner = async (j: Job, field: string, who: string) => {
     try {
       await api.post("/api/job-field", { job_id: j.id, field, value: who });
@@ -7701,7 +7736,7 @@ function OnFloor({
                           style={{ borderColor: val ? "#E2E0DA" : "#E8600A", color: val ? "#22303C" : "#E8600A", maxWidth: 150 }}
                         >
                           <option value="">— not set —</option>
-                          {(board.assignableUsers || []).map((p) => (
+                          {usersFor(field).map((p) => (
                             <option key={p.initials || p.email} value={p.initials || ""}>{personLabel(p)}</option>
                           ))}
                         </select>

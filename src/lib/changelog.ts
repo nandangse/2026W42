@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.4.3",
+    date: "2026-08-24",
+    module: "On Floor — the usual people first",
+    items: [
+      "THE OWNER DROPDOWNS SORT BY USE, per field: whoever is named most as Production owner across the floor sits at the top of the Production list, and the same separately for Quality, Kitting and Design. Somebody who owns production on eleven jobs is the likely answer on the twelfth — and scrolling past forty names to reach them every time is how the column stays empty. Ties fall back to alphabetical.",
+    ],
+  },
+  {
     v: "3.21.4.2",
     date: "2026-08-24",
     module: "The walk sheet, tightened to the walk",
