@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.4.4",
+    date: "2026-08-24",
+    module: "The walk sheet, second cut",
+    items: [
+      "EVERY DATE READS DD/MM/YY, header included.",
+      "THREE NARROW BOXES: On Floor, Already Late, and DELIVERY THIS WEEK — UPTO this Saturday's date — with the week's deliveries broken down by product inside the box (“2 Hi Lift · 1 WDL”).",
+      "THE PENDING CELL COUNTS ALL THREE: Mat / Mile / Task, beside K% over P%.",
+      "PROJECT PENDENCIES is now one list per job — tasks, material AND milestones together — ordered by date with the undated ON TOP marked NO DATE in red, because the pendency nobody has dated is the one to ask about. Each kind keeps its own box colour: black for tasks, amber for material, blue for milestones.",
+      "AFTER THE TABLE, A PAGE BREAK, then PENDING JOBS: every undelivered job in the company, grouped by product family with the families carrying the most throughput first, three columns to the page at size 12 — Job No · Customer Tag · TDD, and where the date has slipped past the original, the date and “Delay: Nd” sit inside a red box.",
+    ],
+  },
+  {
     v: "3.21.4.3",
     date: "2026-08-24",
     module: "On Floor — the usual people first",
