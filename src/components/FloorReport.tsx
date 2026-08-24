@@ -49,7 +49,7 @@ const saturday = (() => {
   return d.toISOString().slice(0, 10);
 })();
 
-interface DeliveredRow { id: string; delivered_on: string | null; val?: number; tpv?: number }
+interface DeliveredRow { id: string; on: string | null; val: number; tpv: number }
 
 export default function FloorReport() {
   const [board, setBoard] = useState<Board | null>(null);
@@ -68,14 +68,24 @@ export default function FloorReport() {
     // open to every reader and carries no money; the full ledger is the
     // Leadership Circle's, so the PRE edition asks for it and the quick
     // sheet never does.
+    // both routes answer { jobs }, but they name the date differently:
+    // the ledger says delivered_on, the recent list says on. Normalised here
+    // once, so the boxes read one shape.
+    const norm = (r: { jobs?: Record<string, unknown>[] }): DeliveredRow[] =>
+      (r.jobs || []).map((j) => ({
+        id: String(j.id),
+        on: String(j.on ?? j.delivered_on ?? "").slice(0, 10) || null,
+        val: Number(j.val) || 0,
+        tpv: Number(j.tpv) || 0,
+      }));
     if (wantFull) {
       api.get("/api/delivered")
-        .then((r: { rows?: DeliveredRow[] }) => { setDelivered(r.rows || []); setMoneyOk(true); })
+        .then((r) => { setDelivered(norm(r)); setMoneyOk(true); })
         .catch(() => {
-          api.get("/api/delivered/recent").then((r: { rows?: DeliveredRow[] }) => setDelivered(r.rows || [])).catch(() => {});
+          api.get("/api/delivered/recent").then((r) => setDelivered(norm(r))).catch(() => {});
         });
     } else {
-      api.get("/api/delivered/recent").then((r: { rows?: DeliveredRow[] }) => setDelivered(r.rows || [])).catch(() => {});
+      api.get("/api/delivered/recent").then((r) => setDelivered(norm(r))).catch(() => {});
     }
   }, []);
 
@@ -123,7 +133,7 @@ export default function FloorReport() {
     const from = new Date(TODAY + "T00:00:00");
     from.setDate(from.getDate() - days);
     const cut = from.toISOString().slice(0, 10);
-    const js = delivered.filter((j) => j.delivered_on && j.delivered_on >= cut && j.delivered_on <= TODAY);
+    const js = delivered.filter((j) => j.on && j.on >= cut && j.on <= TODAY);
     return { n: js.length, val: js.reduce((s, j) => s + (j.val || 0), 0), tp: js.reduce((s, j) => s + (j.tpv || 0), 0) };
   };
   const d7 = deliveredSince(7);

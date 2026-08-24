@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.5.2",
+    date: "2026-08-24",
+    module: "The delivered boxes fill",
+    items: [
+      "DELIVERED · LAST 7 AND 30 DAYS were blank because the sheet read the wrong keys off the delivery record — both routes answer { jobs }, and the recent list names its date “on” where the ledger says “delivered_on”. The sheet now normalises both shapes into one, so the boxes fill from delivered jobs exactly as they should.",
+    ],
+  },
+  {
     v: "3.21.5.1",
     date: "2026-08-24",
     module: "The walk sheet goes portrait",
