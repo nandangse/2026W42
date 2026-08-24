@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.0.1",
+    date: "2026-08-24",
+    module: "The CRM fills, and its tables grow up",
+    items: [
+      "THE ERP CAME HOME: 54,654 companies, 2,500 people (871 phones E.164-normalised), 253 industries and 2,499 opportunities with their real ENQ numbers, BANT percentages and amounts, imported from the ERPNext exports. Every dead opportunity carries its reason — 'Closed' proved to mean 'Value <10 lakhs' on 492 of 493 rows, so it landed on Not Target, not on a win.",
+      "QUOTATIONS ARE THE MAIN SECTION now — Lead → Opportunity → Quotation is the road, and the road's destination sits first in the sidebar. A quotation's totals, tax and margin fill themselves from its lines the moment a line is saved: recalc_quotation() in Postgres, the screen only displays.",
+      "THE TABLES BECAME WORK TABLES: the header row is frozen; columns pin up to any column (📌 in the heading); every heading sorts (in the database, not on the loaded page); filters sit on top of every list; a Columns picker adds and removes columns per doctype and remembers the choice; the true record count shows — 'showing 500 of 54,654'.",
+      "A ROW OPENS IN A LIGHTBOX — the basics at a glance, Edit goes deeper into the full form. A link cell is a door: the company on an opportunity clicks through to the company. Every doctype can now be EDITED, with the audit row written and the database guards speaking in plain words when a lost stage lacks its reason.",
+      "COMPANIES SHOW THEIR WEIGHT: Opps, Contacts and Sales Orders counted per row (the sales-order count reads Order Received, and fills as wins are recorded). City is on the list; GSTIN stepped off it (the Columns picker brings it back).",
+      "INDUSTRIES MERGE BY RENAME: rename one onto an existing name and the companies move to the survivor, the duplicate goes away, the audit remembers. The 253-industry book can now be cleaned without losing a single link.",
+      "Dates read DD/MM/YYYY everywhere in the CRM. Sectors stand in Dr Raghu's order — GSE, MHE, DEF, ENT, CM, CAR, with SER held at the end. The version badge on the CRM header now reads THIS number — one Genie sequence, one changelog, no 'V 0.1' of its own.",
+    ],
+  },
+  {
     v: "3.23.0.0",
     date: "2026-08-24",
     module: "The CRM re-founded — the handover model on Dr Raghu's funnel",

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { mayUseCrm } from "@/crm/auth";
+import { UPDATES } from "@/lib/changelog";
 import CrmApp from "@/components/crm/CrmApp";
 
 export const dynamic = "force-dynamic";
@@ -24,5 +25,7 @@ export default async function CrmPage() {
   if (!user || user.disabled) redirect("/login");
   if (!(await mayUseCrm())) redirect("/");
 
-  return <CrmApp email={user.email} displayName={user.displayName} />;
+  // One Genie version number across every module -- the badge reads the same
+  // changelog the main header does, so the two can never disagree.
+  return <CrmApp email={user.email} displayName={user.displayName} version={UPDATES[0].v} />;
 }

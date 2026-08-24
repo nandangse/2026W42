@@ -33,6 +33,11 @@ export interface Field {
   help?: string;
   /** Sensible starting value on the add form. */
   default?: string | number | boolean;
+  /** How a readonly value renders — the database computes it, we dress it. */
+  format?: "money" | "pct";
+  /** Not a real column — the route computes it (counts). Never sorted on,
+   *  never written, never filtered. */
+  virtual?: boolean;
 }
 
 export interface Doctype {
@@ -66,11 +71,71 @@ export const LEAD_SOURCES = [
 ] as const;
 
 export const DOCTYPES: Doctype[] = [
+  // ---------------------------------------------------------- quotations
+  // The main section: everything upstream exists so that one of these can
+  // go out. Money on a quote is computed by Postgres (recalc_quotation) the
+  // moment a line is saved — the totals here are read, never typed.
+  {
+    name: "quotation", label: "Quotation", plural: "Quotations", table: "quotation",
+    titleField: "quote_no", group: "Quotations", icon: "▤",
+    orderBy: { column: "updated_at", ascending: false },
+    autoNumber: { field: "quote_no", series: "quotation" },
+    blurb: "Where the funnel earns its keep. The totals fill themselves from the lines — the front end displays money, it never calculates it.",
+    fields: [
+      { name: "quote_no", label: "Quote No", type: "readonly", inList: true, help: "NGSE/QTN/26-27/00001, issued by the database on save." },
+      { name: "opportunity_id", label: "Opportunity", type: "link", link: "opportunity", required: true, inList: true },
+      { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
+      { name: "contact_id", label: "Contact", type: "link", link: "person" },
+      { name: "owner_id", label: "Owner", type: "link", link: "profile", inList: true },
+      { name: "status", label: "Status", type: "select", inList: true, default: "draft",
+        options: ["draft", "internal_review", "approved", "sent", "revised", "accepted", "rejected", "expired"] },
+      { name: "valid_until", label: "Valid until", type: "date", inList: true },
+      { name: "validity_days", label: "Validity (days)", type: "number", default: 30 },
+      { name: "delivery_weeks", label: "Delivery (weeks)", type: "number" },
+      { name: "warranty_months", label: "Warranty (months)", type: "number", default: 12 },
+      { name: "incoterm", label: "Incoterm", type: "select", options: ["EXW", "FOB", "CIF", "CIP", "DAP", "DDP"] },
+      { name: "incoterm_place", label: "Incoterm place", type: "text" },
+      { name: "payment_terms", label: "Payment terms", type: "textarea" },
+      { name: "discount_pct", label: "Discount %", type: "number", help: "On the subtotal. Line discounts live on the lines." },
+      { name: "freight", label: "Freight", type: "money" },
+      { name: "insurance", label: "Insurance", type: "money" },
+      { name: "packing", label: "Packing", type: "money" },
+      { name: "installation", label: "Installation", type: "money" },
+      { name: "subtotal", label: "Subtotal", type: "readonly", format: "money", inList: true },
+      { name: "tax_amount", label: "Tax", type: "readonly", format: "money" },
+      { name: "grand_total", label: "Grand total", type: "readonly", format: "money", inList: true },
+      { name: "margin_pct", label: "Margin", type: "readonly", format: "pct", inList: true, help: "Computed against line costs. A floor with sales-head approval comes with Phase 2." },
+      { name: "scope_of_supply", label: "Scope of supply", type: "textarea" },
+      { name: "exclusions", label: "Exclusions", type: "textarea" },
+      { name: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  {
+    name: "quotation_line", label: "Quote line", plural: "Quote lines", table: "quotation_line",
+    titleField: "description", group: "Quotations", icon: "≡",
+    orderBy: { column: "created_at", ascending: false },
+    blurb: "One row per item on a quote. Saving a line recalculates its quotation's totals in the database, immediately.",
+    fields: [
+      { name: "quotation_id", label: "Quotation", type: "link", link: "quotation", required: true, inList: true },
+      { name: "line_no", label: "Line", type: "number", required: true, inList: true, default: 1 },
+      { name: "product_id", label: "Product", type: "link", link: "product", inList: true },
+      { name: "description", label: "Description", type: "text", required: true, inList: true },
+      { name: "quantity", label: "Qty", type: "number", inList: true, default: 1 },
+      { name: "uom", label: "UOM", type: "text", default: "Nos" },
+      { name: "unit_price", label: "Unit price", type: "money", inList: true },
+      { name: "unit_cost", label: "Unit cost", type: "money", help: "What margin is measured against." },
+      { name: "discount_pct", label: "Discount %", type: "number" },
+      { name: "gst_rate", label: "GST %", type: "number", default: 18 },
+      { name: "is_optional", label: "Optional line", type: "bool", help: "Shown on the quote, excluded from the totals." },
+      { name: "line_total", label: "Line total", type: "readonly", format: "money", inList: true },
+    ],
+  },
+
   // ------------------------------------------------------------- funnel
   {
     name: "lead", label: "Lead", plural: "Leads", table: "lead",
     titleField: "contact_name", group: "Funnel", icon: "◉",
-    orderBy: { column: "created_at", ascending: false },
+    orderBy: { column: "updated_at", ascending: false },
     blurb: "Every inbound message becomes a row here — junk included, as 'spam'. The denominator is what tells you what portal traffic actually costs.",
     fields: [
       { name: "contact_name", label: "Name", type: "text", inList: true },
@@ -95,10 +160,11 @@ export const DOCTYPES: Doctype[] = [
   {
     name: "opportunity", label: "Opportunity", plural: "Opportunities", table: "opportunity",
     titleField: "name", group: "Funnel", icon: "▶",
-    orderBy: { column: "created_at", ascending: false },
+    orderBy: { column: "updated_at", ascending: false },
     autoNumber: { field: "opportunity_no", series: "opportunity" },
     blurb: "The thing that moves, from Suspect to Order Received. Every stage change is timed automatically, and a lost stage refuses to save without a reason.",
     fields: [
+      { name: "opportunity_no", label: "ENQ No", type: "readonly", inList: true, help: "Issued by the database on save. Imported rows keep their ERP number." },
       { name: "name", label: "Opportunity", type: "text", required: true, inList: true, help: "What is being sold, in words." },
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
       { name: "stage_id", label: "Stage", type: "link", link: "stage", required: true, inList: true },
@@ -124,7 +190,7 @@ export const DOCTYPES: Doctype[] = [
   {
     name: "task", label: "Task", plural: "Tasks", table: "task",
     titleField: "title", group: "Funnel", icon: "☐",
-    orderBy: { column: "created_at", ascending: false },
+    orderBy: { column: "updated_at", ascending: false },
     blurb: "Follow-ups, by hand today and from call recordings and the AI later. The source column remembers which.",
     fields: [
       { name: "title", label: "Task", type: "text", required: true, inList: true },
@@ -141,17 +207,21 @@ export const DOCTYPES: Doctype[] = [
   {
     name: "company", label: "Company", plural: "Companies", table: "company",
     titleField: "name", group: "Accounts", icon: "■",
-    orderBy: { column: "created_at", ascending: false },
+    orderBy: { column: "updated_at", ascending: false },
     blurb: "The account. One row per company you sell to; is_customer flips by itself the first time an opportunity is won.",
     fields: [
       { name: "name", label: "Company", type: "text", required: true, inList: true },
+      { name: "opp_count", label: "Opps", type: "readonly", virtual: true, inList: true, help: "Opportunities on this company." },
+      { name: "contact_count", label: "Contacts", type: "readonly", virtual: true, inList: true },
+      { name: "so_count", label: "Sales Orders", type: "readonly", virtual: true, inList: true, help: "Opportunities that reached Order Received." },
       { name: "industry_id", label: "Industry", type: "link", link: "industry", inList: true },
       { name: "account_owner_id", label: "Owner", type: "link", link: "profile", inList: true },
-      { name: "gstin", label: "GSTIN", type: "text", inList: true },
+      { name: "gstin", label: "GSTIN", type: "text" },
       { name: "city", label: "City", type: "text", inList: true },
       { name: "country", label: "Country", type: "text", default: "India" },
       { name: "state", label: "State", type: "text" },
       { name: "is_export", label: "Export customer", type: "bool", inList: true, help: "Decides which terms and which price book a quote starts with." },
+      { name: "is_customer", label: "Customer", type: "bool", inList: true, help: "Flips itself the first time an opportunity is won. Set by hand for history." },
       { name: "website", label: "Website", type: "text" },
       { name: "domain_name", label: "Email domain", type: "text", help: "nandan.co.in, not https://. Matches inbound mail to this account." },
       { name: "indiamart_glid", label: "IndiaMART GLID", type: "text" },
@@ -163,7 +233,7 @@ export const DOCTYPES: Doctype[] = [
   {
     name: "person", label: "Person", plural: "People", table: "person",
     titleField: "full_name", group: "Accounts", icon: "○",
-    orderBy: { column: "created_at", ascending: false },
+    orderBy: { column: "updated_at", ascending: false },
     blurb: "The person. 63% of the contacts in the ERP are attached to no company at all — attach them here.",
     fields: [
       { name: "first_name", label: "First name", type: "text", required: true, inList: true },
@@ -184,7 +254,7 @@ export const DOCTYPES: Doctype[] = [
   {
     name: "address", label: "Address", plural: "Addresses", table: "address",
     titleField: "label", group: "Accounts", icon: "▫",
-    orderBy: { column: "created_at", ascending: false },
+    orderBy: { column: "updated_at", ascending: false },
     blurb: "Several per company. A quotation names one of these, so it has to be a row rather than free text on the quote.",
     fields: [
       { name: "company_id", label: "Company", type: "link", link: "company", required: true, inList: true },
@@ -307,4 +377,4 @@ export function linkTargets(d: Doctype): string[] {
   return Array.from(new Set(d.fields.filter((f) => f.type === "link" && f.link).map((f) => f.link as string)));
 }
 
-export const DOCTYPE_GROUPS = ["Funnel", "Accounts", "Catalogue", "Masters"] as const;
+export const DOCTYPE_GROUPS = ["Quotations", "Funnel", "Accounts", "Catalogue", "Masters"] as const;

@@ -1,24 +1,36 @@
 /**
  * ONE ROUTE FOR EVERY DOCTYPE.
  *
- *   GET  /api/crm/<doctype>  -- the rows, plus the options every link field needs
- *   POST /api/crm/<doctype>  -- add a record
+ *   GET   /api/crm/<doctype>            -- rows (filtered, sorted, searched
+ *                                          SERVER-side, because the tables
+ *                                          hold 54k rows and the list caps at
+ *                                          500) plus link options and the
+ *                                          true total
+ *   GET   /api/crm/<doctype>?id=<uuid>  -- one record, for the lightbox
+ *   POST  /api/crm/<doctype>            -- add a record
+ *   PATCH /api/crm/<doctype>?id=<uuid>  -- edit a record
  *
- * Written once so that adding a doctype cannot leave it without a way to add
- * records. The registry in src/crm/doctypes.ts is the only thing that changes.
+ * Written once so that adding a doctype cannot leave it without a way to add,
+ * see, filter or edit records. The registry in src/crm/doctypes.ts is the
+ * only thing that changes.
  *
- * Validation is server-side and works off the same registry the form does, so
- * the two cannot drift: a required field is required here whatever the browser
- * was persuaded to send, and a column nobody declared is dropped rather than
- * written.
+ * Two doctypes get a little more than the registry gives:
+ *   company  -- each row carries opp_count / contact_count / so_count,
+ *               embedded counts computed by PostgREST in the same query
+ *   industry -- renaming one onto an existing name MERGES them: companies
+ *               are repointed to the survivor and the duplicate goes away.
+ *               253 industries came in from the ERP with near-duplicates;
+ *               merging is how the book gets clean without losing links.
  */
 import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
-import { requireCrm } from "@/crm/auth";
+import { requireCrm, type CrmUser } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
-import { doctypeBySlug, linkTargets, type Doctype } from "@/crm/doctypes";
+import { doctypeBySlug, linkTargets, type Doctype, type Field } from "@/crm/doctypes";
 
 export const dynamic = "force-dynamic";
+
+const COMPANY_SELECT = "*, opps:opportunity(count), contacts:person(count), sos:opportunity(count)";
 
 function resolve(slug: string): Doctype {
   const d = doctypeBySlug(slug);
@@ -31,41 +43,127 @@ function guardConfigured() {
   if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
 }
 
-export async function GET(_req: Request, { params }: { params: { doctype: string } }) {
+/** Every link field needs something to choose from -- fetched once per load. */
+async function linkOptions(d: Doctype) {
+  const db = crmDb();
+  const links: Record<string, { id: string; label: string }[]> = {};
+  for (const target of linkTargets(d)) {
+    const t = doctypeBySlug(target);
+    if (!t) continue;
+    const { data: rows } = await db
+      .from(t.table)
+      .select(`id, ${t.titleField}`)
+      .order(t.titleField, { ascending: true })
+      .limit(1000);
+    const list = (rows ?? []) as unknown as Record<string, unknown>[];
+    links[target] = list.map((r) => ({
+      id: String(r.id),
+      label: String(r[t.titleField] ?? r.id),
+    }));
+  }
+  return links;
+}
+
+/** The Order Received stage id, for the company sales-order count. */
+async function wonStageId(): Promise<number | null> {
+  const { data } = await crmDb().from("stage").select("id").eq("code", "order_received").maybeSingle();
+  return data?.id ?? null;
+}
+
+/** Flatten PostgREST's embedded counts into the virtual registry columns. */
+function foldCompanyCounts(r: Record<string, unknown>): Record<string, unknown> {
+  const n = (v: unknown) => (Array.isArray(v) && v[0] ? Number((v[0] as { count?: unknown }).count) || 0 : 0);
+  const { opps, contacts, sos, ...rest } = r as Record<string, unknown> & {
+    opps?: unknown; contacts?: unknown; sos?: unknown;
+  };
+  return { ...rest, opp_count: n(opps), contact_count: n(contacts), so_count: n(sos) };
+}
+
+/**
+ * One field's value, checked and coerced the same way for POST and PATCH.
+ */
+function coerce(f: Field, v: unknown): unknown {
+  if (v === "" || v === undefined) v = null;
+  if (f.required && (v === null || v === false))
+    throw new HttpError(400, `${f.label} is required`);
+  if (v === null) return null;
+  if (f.type === "number" || f.type === "money") {
+    const n = Number(v);
+    if (Number.isNaN(n)) throw new HttpError(400, `${f.label} must be a number`);
+    return n;
+  }
+  if (f.type === "bool") return v === true || v === "true";
+  if (f.type === "select" && f.options && !f.options.includes(String(v)))
+    throw new HttpError(400, `${f.label} must be one of: ${f.options.join(", ")}`);
+  if (f.type === "link") return String(v);
+  return v;
+}
+
+/** Postgres speaks in constraint names. Say something a person can act on. */
+function friendly(d: Doctype, error: { code?: string; message: string }): never {
+  if (error.code === "23505") throw new HttpError(409, `That ${d.label.toLowerCase()} already exists.`);
+  if (error.code === "23503") throw new HttpError(400, "One of the linked records no longer exists.");
+  // P0001 is `raise exception` -- the stage trigger's lost-reason guard speaks here.
+  if (error.code === "P0001") throw new HttpError(400, error.message);
+  throw new HttpError(500, error.message);
+}
+
+export async function GET(req: Request, { params }: { params: { doctype: string } }) {
   try {
     await requireCrm();
     const d = resolve(params.doctype);
     guardConfigured();
     const db = crmDb();
+    const u = new URL(req.url);
+    const isCompany = d.name === "company";
 
-    const order = d.orderBy ?? { column: "created_at", ascending: false };
-    const { data, error } = await db
-      .from(d.table)
-      .select("*")
+    // ---- one record, for the lightbox ------------------------------------
+    const id = u.searchParams.get("id");
+    if (id) {
+      let one = db.from(d.table).select(isCompany ? COMPANY_SELECT : "*").eq("id", id);
+      if (isCompany) {
+        const won = await wonStageId();
+        if (won !== null) one = one.eq("sos.stage_id", won);
+      }
+      const { data, error } = await one.maybeSingle();
+      if (error) throw new HttpError(500, error.message);
+      if (!data) throw new HttpError(404, `That ${d.label.toLowerCase()} no longer exists.`);
+      const row = isCompany ? foldCompanyCounts(data as unknown as Record<string, unknown>) : data;
+      return NextResponse.json({ doctype: d, row, links: await linkOptions(d) });
+    }
+
+    // ---- the list: filters, search and sort run in Postgres --------------
+    let qy = db.from(d.table).select(isCompany ? COMPANY_SELECT : "*", { count: "exact" });
+    if (isCompany) {
+      const won = await wonStageId();
+      if (won !== null) qy = qy.eq("sos.stage_id", won);
+    }
+    for (const f of d.fields) {
+      if (f.virtual) continue;
+      const v = u.searchParams.get(`f_${f.name}`);
+      if (v === null || v === "") continue;
+      qy = f.type === "bool" ? qy.eq(f.name, v === "true") : qy.eq(f.name, v);
+    }
+    const q = u.searchParams.get("q")?.trim();
+    if (q) qy = qy.ilike(d.titleField, `%${q.replace(/[%_]/g, "\\$&")}%`);
+
+    const sortCol = u.searchParams.get("sort");
+    const sortOk = !!sortCol && (sortCol === "created_at"
+      || d.fields.some((f) => f.name === sortCol && !f.virtual));
+    const order = sortOk
+      ? { column: sortCol as string, ascending: u.searchParams.get("dir") !== "desc" }
+      : (d.orderBy ?? { column: "created_at", ascending: false });
+
+    const { data, error, count } = await qy
       .order(order.column, { ascending: order.ascending })
       .limit(500);
     if (error) throw new HttpError(500, error.message);
 
-    // Every link field needs something to choose from. Fetched here rather
-    // than one request per dropdown from the browser.
-    const links: Record<string, { id: string; label: string }[]> = {};
-    for (const target of linkTargets(d)) {
-      const t = doctypeBySlug(target);
-      if (!t) continue;
-      const { data: rows } = await db
-        .from(t.table)
-        .select(`id, ${t.titleField}`)
-        .limit(1000);
-      // The column list is built at runtime, so supabase-js cannot infer a row
-      // type for it. The shape is known -- an id and one title column.
-      const list = (rows ?? []) as unknown as Record<string, unknown>[];
-      links[target] = list.map((r) => ({
-        id: String(r.id),
-        label: String(r[t.titleField] ?? r.id),
-      }));
-    }
+    const rows = isCompany
+      ? ((data ?? []) as unknown as Record<string, unknown>[]).map(foldCompanyCounts)
+      : (data ?? []);
 
-    return NextResponse.json({ doctype: d, rows: data ?? [], links });
+    return NextResponse.json({ doctype: d, rows, total: count ?? rows.length, links: await linkOptions(d) });
   } catch (e) {
     return errJson(e);
   }
@@ -80,31 +178,9 @@ export async function POST(req: Request, { params }: { params: { doctype: string
 
     const body = (await req.json()) as Record<string, unknown>;
     const row: Record<string, unknown> = {};
-
     for (const f of d.fields) {
-      let v = body[f.name];
-
-      // An empty box is an absent value, not an empty string -- otherwise a
-      // blank link field becomes "" and the foreign key blows up.
-      if (v === "" || v === undefined) v = null;
-
-      if (f.required && (v === null || v === false))
-        throw new HttpError(400, `${f.label} is required`);
-
-      if (v !== null) {
-        if (f.type === "number" || f.type === "money") {
-          const n = Number(v);
-          if (Number.isNaN(n)) throw new HttpError(400, `${f.label} must be a number`);
-          v = n;
-        } else if (f.type === "bool") {
-          v = v === true || v === "true";
-        } else if (f.type === "select" && f.options && !f.options.includes(String(v))) {
-          throw new HttpError(400, `${f.label} must be one of: ${f.options.join(", ")}`);
-        } else if (f.type === "link") {
-          v = String(v);
-        }
-      }
-      row[f.name] = v;
+      if (f.type === "readonly" || f.virtual) continue;   // the database fills these
+      row[f.name] = coerce(f, body[f.name]);
     }
 
     // Human-facing numbers come from the database, never from counting rows.
@@ -113,18 +189,10 @@ export async function POST(req: Request, { params }: { params: { doctype: string
       if (nerr) throw new HttpError(500, `Could not issue a number: ${nerr.message}`);
       row[d.autoNumber.field] = n;
     }
-    // The CRM's own profile id, never the Genie auth id -- the two look alike
-    // and point at different people (docs/DATABASE-SPLIT.md).
-    if (d.fields.some((f) => f.name === "created_by") || ["company", "person", "opportunity", "task"].includes(d.name))
-      row.created_by = user.profileId;
+    stampCreatedBy(d, row, user);
 
     const { data, error } = await db.from(d.table).insert(row).select().single();
-    if (error) {
-      // Postgres speaks in constraint names. Say something a person can act on.
-      if (error.code === "23505") throw new HttpError(409, `That ${d.label.toLowerCase()} already exists.`);
-      if (error.code === "23503") throw new HttpError(400, "One of the linked records no longer exists.");
-      throw new HttpError(500, error.message);
-    }
+    if (error) friendly(d, error);
 
     await db.from("crm_audit").insert({
       entity: d.table, entity_id: String(data.id), action: "insert",
@@ -135,4 +203,72 @@ export async function POST(req: Request, { params }: { params: { doctype: string
   } catch (e) {
     return errJson(e);
   }
+}
+
+export async function PATCH(req: Request, { params }: { params: { doctype: string } }) {
+  try {
+    const user = await requireCrm();
+    const d = resolve(params.doctype);
+    guardConfigured();
+    const db = crmDb();
+
+    const id = new URL(req.url).searchParams.get("id");
+    if (!id) throw new HttpError(400, "Which record? PATCH needs ?id=");
+
+    const body = (await req.json()) as Record<string, unknown>;
+    const row: Record<string, unknown> = {};
+    // Only the fields the browser actually sent -- a partial edit must not
+    // blank the columns the form did not show.
+    for (const f of d.fields) {
+      if (f.type === "readonly" || f.virtual || !(f.name in body)) continue;
+      row[f.name] = coerce(f, body[f.name]);
+    }
+    if (!Object.keys(row).length) throw new HttpError(400, "Nothing to update.");
+
+    const { data: before, error: berr } = await db.from(d.table).select("*").eq("id", id).maybeSingle();
+    if (berr) throw new HttpError(500, berr.message);
+    if (!before) throw new HttpError(404, `That ${d.label.toLowerCase()} no longer exists.`);
+
+    // ---- industry merge-on-rename ---------------------------------------
+    // Renaming an industry onto a name that already exists is a MERGE:
+    // every company holding the old industry is repointed to the survivor,
+    // the duplicate row goes away, and the survivor is returned.
+    if (d.name === "industry" && typeof row.name === "string" && row.name !== before.name) {
+      const { data: hit } = await db.from("industry")
+        .select("*").ilike("name", row.name).neq("id", id).maybeSingle();
+      if (hit) {
+        const { error: moveErr } = await db.from("company")
+          .update({ industry_id: hit.id }).eq("industry_id", Number(id));
+        if (moveErr) throw new HttpError(500, moveErr.message);
+        const { error: delErr } = await db.from("industry").delete().eq("id", id);
+        if (delErr) throw new HttpError(500, delErr.message);
+        await db.from("crm_audit").insert({
+          entity: "industry", entity_id: String(id), action: "merge",
+          before, after: hit, by_user: user.profileId,
+        });
+        return NextResponse.json({ row: hit, merged: true });
+      }
+    }
+
+    const { data, error } = await db.from(d.table).update(row).eq("id", id).select().single();
+    if (error) friendly(d, error);
+
+    await db.from("crm_audit").insert({
+      entity: d.table, entity_id: String(id), action: "update",
+      before, after: data, by_user: user.profileId,
+    });
+
+    return NextResponse.json({ row: data });
+  } catch (e) {
+    return errJson(e);
+  }
+}
+
+/**
+ * The CRM's own profile id, never the Genie auth id -- the two look alike
+ * and point at different people (docs/DATABASE-SPLIT.md).
+ */
+function stampCreatedBy(d: Doctype, row: Record<string, unknown>, user: CrmUser) {
+  if (d.fields.some((f) => f.name === "created_by") || ["company", "person", "opportunity", "task"].includes(d.name))
+    row.created_by = user.profileId;
 }
