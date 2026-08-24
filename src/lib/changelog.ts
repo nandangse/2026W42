@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.22.0.0",
+    date: "2026-08-24",
+    module: "Manpower Allocation — the day-wise work study",
+    items: [
+      "WHO IS ACTUALLY STANDING AT EACH JOB, recorded day by day. A MANPOWER ALLOCATION button under every job on On Floor opens six boxes — F H W P E Hd — and Save writes TODAY'S row. One row per job per day, never overwritten by a later day, because “this has to match the attendance” only works if yesterday's claim is still there to check against yesterday's muster.",
+      "ON FLOOR SHOWS THE COMPANY'S HEADCOUNT ON TOP — F, H, W, P, E, Hd and the total, with how many jobs have an allocation and how many are silent — and each job's row shows its own crew or says NO MANPOWER RECORDED TODAY in orange.",
+      "THE JOB PLAN CARRIES THE SAME LINE — “WORKING TODAY … — N people” above the milestone tabs, editable there too, because a fact that can only be typed in one screen is a fact that stops being typed.",
+      "THE WALK SHEET SHOWS THE STAGE each job is standing at — its first undone milestone — with the crew the PLAN wants at that stage, and underneath it the crew actually recorded today, in bold; NO MANPOWER RECORDED in red where the floor has not said. On top: “Working today on these jobs: X Fitters, Y Helpers… — N people”, counting only what was recorded, with the number of silent jobs named beside it.",
+      "The reality has three witnesses now — the allocation, the attendance muster, and the On Floor count — and they are meant to agree. Migration 0071.",
+    ],
+  },
+  {
     v: "3.21.5.3",
     date: "2026-08-24",
     module: "The walk sheet reads like a week",

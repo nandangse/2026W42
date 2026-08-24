@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { jobNo, initials, today, computeSchedule, diffDays, lakh, type PlanMilestone } from "@/lib/schedule";
 import { LOGO } from "@/lib/logo";
+import { TRADES, type Crew } from "@/lib/templates";
 
 interface Task { id: string; j: string; t: string; d: string; who: string; due: string | null; done: boolean }
 interface Job {
@@ -59,6 +60,39 @@ const saturday = (() => {
 
 interface DeliveredRow { id: string; on: string | null; val: number; tpv: number }
 
+/**
+ * "Working today on these jobs" — the sheet's headcount. RECORDED numbers
+ * when the floor has said them; where a job has none, the plan's current
+ * stage fills in, and the line says how much of it is plan rather than fact.
+ */
+function WorkingToday({ floor, manpower }: { floor: Job[]; manpower: Record<string, Crew> }) {
+  const tot: Record<string, number> = {};
+  let people = 0, recorded = 0, planned = 0;
+  for (const j of floor) {
+    const rec = manpower[j.id];
+    const hasRec = rec && TRADES.some((t) => Number(rec[t.key]) > 0);
+    if (hasRec) recorded++;
+    for (const t of TRADES) {
+      const n = hasRec ? Number(rec![t.key]) || 0 : 0;
+      tot[t.key] = (tot[t.key] || 0) + n;
+      people += n;
+    }
+    if (!hasRec) planned++;
+  }
+  return (
+    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+      Working today on these jobs:{" "}
+      {TRADES.map((t) => `${tot[t.key] || 0} ${t.label}${(tot[t.key] || 0) === 1 ? "" : "s"}`).join(", ")}
+      {" "}— <span style={{ fontSize: 15 }}>{people} people</span>
+      {planned > 0 && (
+        <span style={{ fontWeight: 400, fontSize: 11, color: "#B3261E" }}>
+          {" "}· {planned} of {floor.length} jobs have no manpower recorded today
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function FloorReport() {
   const [board, setBoard] = useState<Board | null>(null);
   const [err, setErr] = useState("");
@@ -66,11 +100,15 @@ export default function FloorReport() {
   const [full, setFull] = useState(false);
   const [delivered, setDelivered] = useState<DeliveredRow[]>([]);
   const [moneyOk, setMoneyOk] = useState(false);
+  const [manpower, setManpower] = useState<Record<string, Crew>>({});
 
   useEffect(() => {
     const wantFull = new URLSearchParams(window.location.search).get("full") === "1";
     setFull(wantFull);
     api.get("/api/board").then(setBoard).catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+    api.get("/api/on-floor/manpower")
+      .then((r: { rows?: { job_id: string; crew: Crew }[] }) => setManpower(Object.fromEntries((r.rows || []).map((x) => [x.job_id, x.crew]))))
+      .catch(() => {});
     // Delivered is read from the DELIVERY record, not the live board — the
     // live board only carries what is still being built. The recent list is
     // open to every reader and carries no money; the full ledger is the
@@ -111,7 +149,7 @@ export default function FloorReport() {
   }, [board]);
 
   /** Everything pending on one job, as one list ordered by date — undated first. */
-  const pendenciesOf = (j: Job): { list: Pendency[]; nMat: number; nMs: number; nTask: number } => {
+  const pendenciesOf = (j: Job): { list: Pendency[]; nMat: number; nMs: number; nTask: number; stage: { name: string; crew: Crew } | null } => {
     const list: Pendency[] = [];
     const tasks = tasksBy.get(j.id) || [];
     for (const t of tasks)
@@ -121,17 +159,20 @@ export default function FloorReport() {
       list.push({ kind: "material", text: `${m.item}${m.qty ? ` × ${m.qty}` : ""}${m.who ? ` — ${m.who}` : ""}`, sub: null, date: m.due || null, defect: m.status === "QC Defective" });
     const plan = board?.plans?.[j.id];
     let nMs = 0;
+    let stage: { name: string; crew: Crew } | null = null;
     if (plan?.milestones?.length) {
       const sched = computeSchedule({ start: plan.start || j.start || TODAY, milestones: plan.milestones });
       for (const m of sched) {
         if (m.done) continue;
+        // the first undone milestone is the stage the job is standing at
+        if (!stage) stage = { name: m.name, crew: m.crew };
         nMs++;
         list.push({ kind: "milestone", text: m.name, sub: null, date: m.end || null });
       }
     }
     // undated on top — a pendency nobody has dated is the one to ask about
     list.sort((a, b) => String(a.date || "0000").localeCompare(String(b.date || "0000")));
-    return { list, nMat: mats.length, nMs, nTask: tasks.length };
+    return { list, nMat: mats.length, nMs, nTask: tasks.length, stage };
   };
 
   const late = floor.filter((j) => j.tdd && j.tdd < TODAY);
@@ -240,10 +281,11 @@ export default function FloorReport() {
           ))}
         </div>
         {week.length > 0 && (
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
             This week: {weekFams}
           </div>
         )}
+        <WorkingToday floor={floor} manpower={manpower} />
 
         <table style={{ fontSize: 11.5 }}>
           <thead>
@@ -258,7 +300,9 @@ export default function FloorReport() {
           </thead>
           <tbody>
             {floor.map((j, i) => {
-              const { list, nMat, nMs, nTask } = pendenciesOf(j);
+              const { list, nMat, nMs, nTask, stage } = pendenciesOf(j);
+              const rec = manpower[j.id];
+              const recTotal = rec ? TRADES.reduce((n, t) => n + (Number(rec[t.key]) || 0), 0) : 0;
               const lateJob = j.tdd && j.tdd < TODAY;
               // the cut of the week: a dark green rule under the last job due
               // by Saturday, so the fold between "this week" and "after" is
@@ -277,6 +321,19 @@ export default function FloorReport() {
                         {dmyd(j.tdd)}{lateJob ? " ⚠" : ""}
                       </div>
                     )}
+                    {stage && (
+                      <div style={{ marginTop: 4, fontSize: 10.5, lineHeight: 1.4 }}>
+                        <span style={{ color: "#8B8F87", fontWeight: 700, fontSize: 9 }}>STAGE</span> <b>{stage.name}</b>
+                        <div style={{ color: "#46545F" }}>
+                          plan {TRADES.filter((t) => Number(stage.crew[t.key]) > 0).map((t) => `${t.tiny}${Number(stage.crew[t.key])}`).join(" ") || "—"}
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ marginTop: 3, fontSize: 10.5 }}>
+                      {recTotal > 0
+                        ? <b>today {TRADES.filter((t) => Number(rec![t.key]) > 0).map((t) => `${t.tiny}${Number(rec![t.key])}`).join(" ")} = {recTotal}</b>
+                        : <b style={{ color: "#B3261E" }}>no manpower recorded</b>}
+                    </div>
                   </td>
                   {/* one narrow cell: who owns it, what is pending, how far it is */}
                   <td style={{ border: "1px solid #DCD8CC", padding: "6px 8px", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", width: 108 }}>

@@ -3590,6 +3590,8 @@ function JobPlan({
       <GenieHint jobId={dj.id} jobLabel={`JOB ${jobNo(dj.id)} · ${dj.tag}`} />
       </div>
 
+      <JobManpowerStrip jobId={dj.id} canEdit={canEdit} />
+
       {/* plan / materials sub-tabs */}
       <div className="flex gap-1 rounded p-1 bg-white border mb-3" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
         {(["plan", "mat", "shop", "pics"] as const).map((k) => (
@@ -7513,6 +7515,92 @@ function Principles({ isOwner }: { isOwner: boolean }) {
  * unbounded log is a thing nobody listens to, and the last three are what is
  * happening now.
  */
+/**
+ * The Job Plan's line of truth for today: who is standing at this job now,
+ * as recorded from On Floor. Editable here too — the plan is where the
+ * planner already is, and a fact that can only be typed in one screen is a
+ * fact that stops being typed.
+ */
+function JobManpowerStrip({ jobId, canEdit }: { jobId: string; canEdit: boolean }) {
+  const [crew, setCrew] = useState<Crew | null>(null);
+  const [open, setOpen] = useState(false);
+  const load = useCallback(() => {
+    api.get(`/api/on-floor/manpower?job_id=${encodeURIComponent(jobId)}&days=1`)
+      .then((r: { rows?: { day: string; crew: Crew }[] }) => {
+        const t = (r.rows || []).find((x) => String(x.day).slice(0, 10) === today());
+        setCrew(t?.crew ?? null);
+      })
+      .catch(() => {});
+  }, [jobId]);
+  useEffect(() => { load(); }, [load]);
+  const total = crew ? TRADES.reduce((n, t) => n + (Number(crew[t.key]) || 0), 0) : 0;
+  return (
+    <div className="rounded-lg border px-3 py-2 mb-3 bg-white" style={{ borderColor: "#E2E0DA" }}>
+      <div className="flex items-center gap-2.5 flex-wrap">
+        <b className="text-xs" style={{ color: "#8A94A0", letterSpacing: ".04em" }}>WORKING TODAY</b>
+        {crew && total > 0 ? (
+          <>
+            {TRADES.map((t) => (
+              <span key={t.key} className="text-sm font-bold" style={{ color: t.color, opacity: Number(crew[t.key]) ? 1 : 0.35 }}>
+                {t.tiny} {Number(crew[t.key]) || 0}
+              </span>
+            ))}
+            <b className="text-sm" style={{ color: "#22303C" }}>— {total} people</b>
+          </>
+        ) : (
+          <span className="text-xs font-bold" style={{ color: "#E8600A" }}>no manpower recorded for today</span>
+        )}
+        {canEdit && (
+          <button onClick={() => setOpen((v) => !v)} className="text-xs font-bold rounded px-2 py-0.5"
+            style={{ background: open ? "#22303C" : "#F4F2EC", color: open ? "#fff" : "#22303C" }}>
+            {open ? "✕ close" : "Manpower Allocation"}
+          </button>
+        )}
+        <span className="text-xs" style={{ color: "#8A94A0" }}>kept per day as the work study · must match attendance</span>
+      </div>
+      {open && <ManpowerEditor jobId={jobId} value={crew ?? undefined} onSaved={() => { setOpen(false); load(); }} />}
+    </div>
+  );
+}
+
+/** Six small boxes and a save — today's reality for one job. */
+function ManpowerEditor({ jobId, value, onSaved }: { jobId: string; value?: Crew; onSaved: () => void }) {
+  const [crew, setCrew] = useState<Record<string, string>>(
+    () => Object.fromEntries(TRADES.map((t) => [t.key, String(Number(value?.[t.key]) || 0)])),
+  );
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const total = TRADES.reduce((n, t) => n + (Number(crew[t.key]) || 0), 0);
+  const save = async () => {
+    setBusy(true); setErr("");
+    try {
+      await api.post("/api/on-floor/manpower", { job_id: jobId, crew: Object.fromEntries(TRADES.map((t) => [t.key, Number(crew[t.key]) || 0])) });
+      onSaved();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); setBusy(false); }
+  };
+  return (
+    <div className="mt-1 rounded p-2" style={{ background: "#F7F6F2", border: "1px solid #E2E0DA" }}>
+      <div className="flex gap-1.5 flex-wrap items-end">
+        {TRADES.map((t) => (
+          <label key={t.key} className="text-center" style={{ fontSize: 10, color: t.color, fontWeight: 700 }}>
+            {t.tiny}
+            <input value={crew[t.key]} inputMode="numeric"
+              onChange={(e) => setCrew((c) => ({ ...c, [t.key]: e.target.value.replace(/[^0-9]/g, "").slice(0, 2) }))}
+              className="block w-9 text-center rounded border px-1 py-0.5 text-sm font-bold"
+              style={{ borderColor: "#E2E0DA", color: "#22303C" }} />
+          </label>
+        ))}
+        <b className="text-sm" style={{ color: "#22303C" }}>= {total}</b>
+        <button onClick={save} disabled={busy}
+          className="rounded px-2.5 py-1 text-xs font-bold" style={{ background: "#0D7A3F", color: "#fff" }}>
+          {busy ? "…" : "Save today"}
+        </button>
+      </div>
+      {err && <div className="text-xs font-semibold mt-1" style={{ color: "#B3261E" }}>{err}</div>}
+    </div>
+  );
+}
+
 function OnFloor({
   board,
   V,
@@ -7635,6 +7723,41 @@ function OnFloor({
   const todayNotes = notes.filter((n) => String(n.at).slice(0, 10) === TODAY);
   const todayJobs = new Set(todayNotes.map((n) => n.job_id)).size;
 
+  /**
+   * The day-wise work study: who is actually standing at each job TODAY.
+   * Recorded here, shown on the Job Plan and the walk sheet, kept per day —
+   * and meant to be checked against the attendance muster, which is the
+   * whole reason it is a ledger and not a scribble.
+   */
+  const [manpower, setManpower] = useState<Record<string, Crew>>({});
+  const [mpOpen, setMpOpen] = useState<string | null>(null);
+  const loadManpower = useCallback(() => {
+    api.get("/api/on-floor/manpower")
+      .then((r: { rows?: { job_id: string; crew: Crew }[] }) => {
+        setManpower(Object.fromEntries((r.rows || []).map((x) => [x.job_id, x.crew])));
+      })
+      .catch(() => {});
+  }, []);
+  useEffect(() => { loadManpower(); }, [loadManpower]);
+
+  const mpTotals = useMemo(() => {
+    const tot: Record<string, number> = {};
+    let people = 0, jobsWith = 0;
+    for (const j of jobs) {
+      const c = manpower[j.id];
+      if (!c) continue;
+      let any = false;
+      for (const t of TRADES) {
+        const n = Number(c[t.key]) || 0;
+        tot[t.key] = (tot[t.key] || 0) + n;
+        people += n;
+        if (n) any = true;
+      }
+      if (any) jobsWith++;
+    }
+    return { tot, people, jobsWith };
+  }, [jobs, manpower]);
+
   return (
     <div className="p-4">
       <div className="flex justify-end gap-2 mb-2 no-print">
@@ -7651,6 +7774,20 @@ function OnFloor({
             📄 PRE edition — with commercials
           </a>
         )}
+      </div>
+      <div className="rounded-lg border px-3 py-2 mb-2 flex items-center gap-3 flex-wrap" style={{ borderColor: "#E2E0DA", background: "#fff" }}>
+        <b className="text-xs" style={{ color: "#8A94A0", letterSpacing: ".04em" }}>WORKING TODAY</b>
+        {TRADES.map((t) => (
+          <span key={t.key} className="text-sm font-bold" style={{ color: t.color }}>
+            {t.tiny} {mpTotals.tot[t.key] || 0}
+          </span>
+        ))}
+        <span className="text-sm font-extrabold" style={{ color: "#22303C" }}>— {mpTotals.people} people</span>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>
+          on {mpTotals.jobsWith} of {jobs.length} jobs
+          {mpTotals.jobsWith < jobs.length ? " · the rest have no allocation recorded today" : ""}
+        </span>
+        <span className="text-xs" style={{ color: "#B3261E" }}>must match the attendance muster</span>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
         <StatCard label="ON FLOOR" value={String(jobs.length)} sub="jobs being worked on now" color="#0D7A3F" />
@@ -7753,6 +7890,33 @@ function OnFloor({
                       )}
                     </div>
                   ))}
+
+                  {/* who is standing at it today — the work study's daily row */}
+                  <div className="mt-1.5 pt-1.5" style={{ borderTop: "1px dashed #E2E0DA" }}>
+                    {manpower[j.id] && Object.values(manpower[j.id]).some((n) => n) ? (
+                      <div className="text-xs flex items-center gap-1.5 flex-wrap">
+                        {TRADES.filter((t) => Number(manpower[j.id][t.key]) > 0).map((t) => (
+                          <b key={t.key} style={{ color: t.color }}>{t.tiny}{Number(manpower[j.id][t.key])}</b>
+                        ))}
+                        <span style={{ color: "#8A94A0" }}>
+                          = {TRADES.reduce((n, t) => n + (Number(manpower[j.id][t.key]) || 0), 0)} today
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-xs font-bold" style={{ color: "#E8600A" }}>no manpower recorded today</div>
+                    )}
+                    {canEdit && (
+                      <button onClick={() => setMpOpen(mpOpen === j.id ? null : j.id)}
+                        className="text-xs font-bold rounded px-2 py-0.5 mt-1"
+                        style={{ background: mpOpen === j.id ? "#22303C" : "#F4F2EC", color: mpOpen === j.id ? "#fff" : "#22303C" }}>
+                        {mpOpen === j.id ? "✕ close" : "Manpower Allocation"}
+                      </button>
+                    )}
+                    {mpOpen === j.id && (
+                      <ManpowerEditor jobId={j.id} value={manpower[j.id]}
+                        onSaved={() => { setMpOpen(null); loadManpower(); }} />
+                    )}
+                  </div>
                 </div>
 
                 {/* what is open on it */}
