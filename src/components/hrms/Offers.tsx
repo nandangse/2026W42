@@ -274,7 +274,7 @@ function OfferBuilder({ id, boot, isOwner, onClose }: { id: string; boot: Boot |
   return (
     <Modal
       title={d.name || "Offer"}
-      sub={`${d.offer_no || ""}${d.role_doc?.role || d.designation ? ` · ${d.role_doc?.role || d.designation}` : ""}`}
+      sub={`${d.offer_no || ""}${d.designation || d.role_doc?.role ? ` · ${d.designation || d.role_doc?.role}` : ""}`}
       chip={<span className="rounded px-2 py-0.5 font-bold" style={{ fontSize: 10.5, background: tone.bg, color: tone.fg }}>{d.status}</span>}
       onClose={onClose} width={980}
     >
@@ -383,7 +383,7 @@ function PageRole({ d, boot, save, locked }: { d: Offer; boot: Boot | null; save
   const comps = d.competencies || [];
   const chosenRoles = splitMulti(d.roles || "");
 
-  const pullFromRegister = () => {
+  const pullFromRegister = useCallback(() => {
     const src = (boot?.roles || []).filter((r) => chosenRoles.includes(r.role));
     if (!src.length) return;
     save({
@@ -398,7 +398,24 @@ function PageRole({ d, boot, save, locked }: { d: Offer; boot: Boot | null; save
     const ids = src.map((s) => s.id);
     const mapped = (boot?.roleCompetency || []).filter((rc) => ids.includes(rc.role_id));
     if (mapped.length) save({ competencies: mapped.map((m) => ({ name: m.competency, level: m.level })) });
-  };
+  }, [boot, chosenRoles, save]);
+
+  /**
+   * The roles were chosen on page 1, so this page should already be filled in
+   * when it is opened — pressing a button to fetch what was already decided
+   * is a step that exists only because the code was written that way. It
+   * pulls ONCE, when there is nothing here yet; after that the offer's own
+   * copy is left alone, because it may have been edited on purpose.
+   */
+  const pulled = useRef(false);
+  useEffect(() => {
+    if (pulled.current) return;
+    if (!boot || !chosenRoles.length) return;
+    const empty = !rd.role && !rd.job_description && !rd.deliverable && !rd.metric;
+    if (!empty) { pulled.current = true; return; }
+    pulled.current = true;
+    pullFromRegister();
+  }, [boot, chosenRoles, rd, pullFromRegister]);
 
   const setComp = (name: string, level: number | null) => {
     const next = level == null ? comps.filter((c) => c.name !== name)
@@ -412,9 +429,13 @@ function PageRole({ d, boot, save, locked }: { d: Offer; boot: Boot | null; save
       <div className="flex items-center gap-2 mb-2 flex-wrap no-print">
         <button onClick={pullFromRegister} disabled={locked || !chosenRoles.length}
           className="rounded px-3 py-1.5 font-bold" style={{ background: chosenRoles.length ? "#1B3A5C" : "#E2E0DA", color: chosenRoles.length ? "#fff" : "#8A94A0", fontSize: 12 }}>
-          ↓ Pull {chosenRoles.length ? chosenRoles.join(" + ") : "the role"} from the register
+          ↻ Re-pull {chosenRoles.length ? chosenRoles.join(" + ") : "the role"} from the register
         </button>
-        <span style={{ fontSize: 11.5, color: C.faint }}>Then edit freely — this offer keeps its own copy.</span>
+        <span style={{ fontSize: 11.5, color: C.faint }}>
+          {chosenRoles.length
+            ? "Filled from the roles chosen on page 1. Edit freely — this offer keeps its own copy; re-pulling overwrites your edits."
+            : "Choose one or more roles on page 1 and this page fills itself."}
+        </span>
       </div>
 
       <Card title="Role" >
@@ -812,7 +833,9 @@ function LetterPreview({ d }: { d: Offer }) {
       <div className="flex justify-between" style={{ fontSize: 11.5, color: C.faint }}>
         <span>Ref: {d.offer_no}</span><span>Date: {day(d.offer_date)}</span>
       </div>
-      <div className="font-bold text-center" style={{ fontSize: 16, margin: "10px 0" }}>OFFER OF EMPLOYMENT</div>
+      <div className="font-bold text-center" style={{ fontSize: 16, margin: "10px 0" }}>
+        {d.status === "Draft" ? "DRAFT OFFER LETTER" : "OFFER OF EMPLOYMENT"}
+      </div>
       <div style={{ fontSize: 11, textAlign: "center", color: C.faint, marginTop: -8, marginBottom: 12 }}>Private &amp; Confidential</div>
 
       <div><b>{d.name}</b></div>

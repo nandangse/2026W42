@@ -263,7 +263,14 @@ export async function POST(req: Request) {
       if ("components" in p && p.components && typeof p.components === "object") patch.components = p.components;
       if ("basic_pct" in p) patch.basic_pct = Number(p.basic_pct) || null;
 
-      const { error } = await admin.from("hrms_offer").update(patch).eq("id", id);
+      let { error } = await admin.from("hrms_offer").update(patch).eq("id", id);
+      if (error && /components|basic_pct|schema cache/i.test(error.message)) {
+        // pre-0070: keep everything else rather than losing the whole save
+        delete patch.components; delete patch.basic_pct;
+        ({ error } = await admin.from("hrms_offer").update(patch).eq("id", id));
+        if (!error)
+          return NextResponse.json({ ok: true, warning: "Saved — but the salary split needs migration 0070 before it can be kept." });
+      }
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true });
     }
@@ -330,6 +337,58 @@ export async function POST(req: Request) {
       const { error } = await admin.from("hrms_offer").update({ documents: docs, updated_by: stamp, updated_at: now }).eq("id", id);
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true });
+    }
+
+    /**
+     * { action: "send" } — the offer goes out.
+     *
+     * Resend when a key is configured and the domain has verified, and an
+     * honest refusal naming the reason when it has not. Never a silent
+     * success: a letter that quietly failed to send is worse than one that
+     * visibly refused.
+     */
+    if (action === "send") {
+      const key = process.env.RESEND_API_KEY;
+      const { data: o } = await admin.from("hrms_offer").select("*").eq("id", id).maybeSingle();
+      if (!o) throw new HttpError(404, "No such offer.");
+      const to = clean(body.send_to ?? o.send_to ?? o.email, 300);
+      if (!to) throw new HttpError(400, "There is no address to send it to.");
+      if (!key)
+        throw new HttpError(503,
+          "No mail account is configured on the server yet, so Genie cannot send this itself. " +
+          "Use “Open a Gmail draft instead” below.");
+
+      const from = clean(body.send_from ?? o.send_from, 200) || "hr@nandan.co.in";
+      const cc = clean(body.send_cc ?? o.send_cc, 300);
+      const covering = String(body.covering_letter ?? o.covering_letter ?? "");
+      const html = `${textToHtml(covering)}<hr style="border:none;border-top:1px solid #DCD8CC;margin:26px 0">${offerLetterHtml(o, String(o.status) === "Draft")}`;
+
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          from: `Nandan GSE HR <${from}>`,
+          to: to.split(/[,;]/).map((x) => x.trim()).filter(Boolean),
+          cc: cc ? cc.split(/[,;]/).map((x) => x.trim()).filter(Boolean) : undefined,
+          reply_to: from,
+          subject: `Offer of Employment — ${o.name}${o.designation ? ` · ${o.designation}` : ""} — Nandan GSE`,
+          html,
+        }),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        throw new HttpError(502,
+          r.status === 401 ? "The RESEND_API_KEY is wrong or revoked."
+          : r.status === 403 ? `Resend refused ${from}: ${t.slice(0, 300)}`
+          : `Resend answered ${r.status}: ${t.slice(0, 200)}`);
+      }
+      const { error } = await admin.from("hrms_offer").update({
+        status: "Sent", sent_at: now, sent_by: stamp,
+        send_to: to, send_from: from, send_cc: cc,
+        updated_by: stamp, updated_at: now,
+      }).eq("id", id);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, sent: true });
     }
 
     /* ── the status ladder ── */

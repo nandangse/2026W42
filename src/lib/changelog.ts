@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.2.1",
+    date: "2026-08-24",
+    module: "Offer Letters — three fixes",
+    items: [
+      "THE LETTER SAYS “DRAFT OFFER LETTER” while it is a draft, on the screen and in the PDF and in the e-mail, and becomes “OFFER OF EMPLOYMENT” only once it is sent. It reads the status rather than waiting for anybody to change a word.",
+      "PAGE 2 FILLS ITSELF from the roles chosen on page 1 — the job description, the KRAs, the KPI metrics and the competency map are all there when the page opens. Pressing a button to fetch what had already been decided was a step that existed only because of how the code was written. It pulls once, when the page is still empty; after that your edits are left alone, and the button now says re-pull and warns that it overwrites them.",
+      "“SEND IT NOW” WORKS AGAIN. The action had been deleted by an edit of mine that rewrote the salary block and took the send with it — the button answered “unknown action”. Restored, with the same honest refusal when the mail domain is not verified.",
+      "A save no longer fails wholesale when the salary-split columns are missing: everything else is kept and the message names migration 0070.",
+    ],
+  },
+  {
     v: "3.21.2.0",
     date: "2026-08-24",
     module: "Offer Letters — the letter as a PDF",

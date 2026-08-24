@@ -180,7 +180,7 @@ export interface LetterOffer {
   terms?: string | null;
 }
 
-export function offerLetterHtml(d: LetterOffer): string {
+export function offerLetterHtml(d: LetterOffer, draft = false): string {
   const S = {
     body: "font-family:Georgia,'Times New Roman',serif;font-size:14px;line-height:1.7;color:#16232F;max-width:680px",
     h: "font-weight:bold;font-size:15px;margin:22px 0 6px",
@@ -202,7 +202,7 @@ export function offerLetterHtml(d: LetterOffer): string {
 <table width="100%" style="font-size:12px;color:#46545F;margin-bottom:8px"><tr>
   <td>Ref: ${esc(d.offer_no)}</td><td align="right">Date: ${dmy(d.offer_date)}</td>
 </tr></table>
-<div style="text-align:center;font-weight:bold;font-size:18px;letter-spacing:.04em">OFFER OF EMPLOYMENT</div>
+<div style="text-align:center;font-weight:bold;font-size:18px;letter-spacing:.04em">${draft ? "DRAFT OFFER LETTER" : "OFFER OF EMPLOYMENT"}</div>
 <div style="text-align:center;font-size:12px;color:#8B8F87;margin-bottom:18px">Private &amp; Confidential</div>
 
 <div><b>${esc(d.name)}</b></div>
