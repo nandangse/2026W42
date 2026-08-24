@@ -22,6 +22,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DOCTYPES, doctypeBySlug, type Doctype, type Field } from "@/crm/doctypes";
+import AnalyticsScreen from "./Analytics";
+import { DateRangeBar, DEFAULT_RANGE, type DateRange } from "./DateRange";
 
 // Sales Genie's palette (src/sales-plan/styles.css), moved here on Dr Raghu's
 // word 24 Aug 2026 — one look for the whole of sales.
@@ -294,11 +296,10 @@ export default function CrmApp({
           <main className="p-4 flex-1" style={{ minWidth: 0 }}>
             {special.name === "deals" ? (
               <PipelineFlow />
+            ) : special.name === "analytics" ? (
+              <AnalyticsScreen />
             ) : (
-              <div className="rounded p-6" style={{ background: "#fff", border: `1px dashed ${BORDER}`, maxWidth: "70ch" }}>
-                <div className="font-bold mb-1" style={{ fontSize: 15 }}>{special.label}</div>
-                <p className="text-sm" style={{ color: "#5A6672", lineHeight: 1.6 }}>{special.blurb}</p>
-              </div>
+              <StubScreen label={special.label} blurb={special.blurb} dated={special.name !== "communication"} />
             )}
           </main>
         )}
@@ -513,38 +514,65 @@ export default function CrmApp({
   );
 }
 
+/** A named screen whose build is still ahead — it already wears the date bar
+ *  every analytical screen shares, so the pattern is set. */
+function StubScreen({ label, blurb, dated }: { label: string; blurb: string; dated: boolean }) {
+  const [range, setRange] = useState<DateRange>(DEFAULT_RANGE);
+  return (
+    <div>
+      {dated && <DateRangeBar value={range} onChange={setRange} />}
+      <div className="rounded p-6" style={{ background: "#fff", border: `1px dashed ${BORDER}`, maxWidth: "70ch" }}>
+        <div className="font-bold mb-1" style={{ fontSize: 15 }}>{label}</div>
+        <p className="text-sm" style={{ color: "#5A6672", lineHeight: 1.6 }}>{blurb}</p>
+      </div>
+    </div>
+  );
+}
+
 /**
- * The Deals screen: the pipeline, checked. Both ladders, and per rung what
- * came in, what went out, and what is sitting there now — read from the two
- * stage histories. Flow accumulates from the day the pipeline went live.
+ * The Deals screen: the pipeline, checked, for the chosen dates. Both
+ * ladders, and per rung what came in and went out of it in the range, and
+ * what is sitting there now — read from the two stage histories.
  */
 function PipelineFlow() {
   type FlowRow = {
     entity: string; stage_id: number; code: string; name: string; sort_order: number;
     came_in: number; went_out: number; sitting: number; colour: string | null;
   };
+  const [range, setRange] = useState<DateRange>(DEFAULT_RANGE);
   const [flow, setFlow] = useState<FlowRow[] | null>(null);
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    fetch("/api/crm/pipeline", { cache: "no-store" })
+    setFlow(null); setErr("");
+    fetch(`/api/crm/pipeline?from=${range.from}&to=${range.to}`, { cache: "no-store" })
       .then(async (r) => {
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || "Could not load the pipeline");
         setFlow(j.flow);
       })
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
-  }, []);
-
-  if (err) return <div className="rounded p-3 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>;
-  if (!flow) return <div className="text-sm" style={{ color: MUTED }}>loading…</div>;
+  }, [range.from, range.to]);
 
   const ladders: { key: string; title: string; note: string }[] = [
     { key: "opportunity", title: "Opportunities", note: "New enquiries being worked toward a quote." },
     { key: "quotation", title: "Quotations — hotness", note: "Sent through the buckets to Order Received." },
   ];
 
+  if (err || !flow) {
+    return (
+      <div>
+        <DateRangeBar value={range} onChange={setRange} />
+        {err
+          ? <div className="rounded p-3 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>
+          : <div className="text-sm" style={{ color: MUTED }}>loading…</div>}
+      </div>
+    );
+  }
+
   return (
+    <div>
+    <DateRangeBar value={range} onChange={setRange} />
     <div className="flex gap-4 flex-wrap" style={{ alignItems: "flex-start" }}>
       {ladders.map((l) => {
         const rows = flow.filter((r) => r.entity === l.key);
@@ -600,10 +628,12 @@ function PipelineFlow() {
         );
       })}
       <p className="text-xs" style={{ color: MUTED, flexBasis: "100%", maxWidth: "80ch", lineHeight: 1.6 }}>
-        Every stage move is written by the database the moment it happens, so this
-        table is measured, not remembered. It accumulates from 24/08/2026 — the
-        day the pipeline went live; the ERP&apos;s past sits in each row&apos;s first rung.
+        Every stage move is written by the database the moment it happens, so
+        this table is measured, not remembered. Came in and went out count the
+        moves inside the chosen dates; sitting is who stands there today. The
+        histories begin 24/08/2026 — the day the pipeline went live.
       </p>
+    </div>
     </div>
   );
 }

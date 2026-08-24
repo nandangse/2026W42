@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.0.5",
+    date: "2026-08-24",
+    module: "Dates on every analytical screen, and Analytics learns to count",
+    items: [
+      "START – END DATES WITH MTD · QTD · YTD · 12 MONTHS on Deals, Dashboard, Analytics and SalesPerson Plan — YTD is the default, and the quarters and the year run April to March, because that is when this company's year runs. Pick a preset and the dates write themselves; touch a date and the preset lets go.",
+      "ANALYTICS IS A REAL SCREEN: Opportunities → Quotations → Sales Orders for the chosen dates, the conversion on each arrow and the end-to-end at the top of every lane. A toggle lays it out as SWIMLANES ON SECTOR or as one line for the whole business; the button beside the quotes opens the hotness stages of what sits in between. This FY so far: 610 → 126 → 21.",
+      "DEALS FILTERS BY THE SAME DATES — came in and went out count the stage moves inside the range; sitting is who stands there today.",
+      "Counted by date of birth: opportunities by created, quotations by made, sales orders by ordered. A quote answering last month's enquiry shows in its own column, not the arrow — the note under each screen says so.",
+    ],
+  },
+  {
     v: "3.23.0.4",
     date: "2026-08-24",
     module: "The CRM wears Sales Genie's clothes, and the Company grows its 360",
