@@ -36,12 +36,27 @@ type Links = Record<string, { id: string; label: string }[]>;
 /** What the lightbox is showing: possibly another doctype than the page. */
 type ViewState = { dt: Doctype; row: Row; links: Links; mode: "view" | "edit" };
 
+/** Sections that are pages of their own rather than doctypes. Their screens
+ *  are coming; the URLs already answer. */
+export const SPECIAL_SECTIONS = [
+  { name: "dashboard", label: "Dashboard", icon: "◧", blurb: "The CEO cockpit — owner concentration, the funnel, the response clock. Being built next." },
+  { name: "communication", label: "Communication", icon: "✉", blurb: "Emails — automated, inbound and outbound, per user's own mailbox. Arrives with the channels phase." },
+] as const;
+
+/** The URL each doctype answers at — Dr Raghu's spellings. */
+const URL_OF: Record<string, string> = {
+  lead: "lead", company: "company", person: "contact", quotation: "quotation",
+  quotation_line: "quoteline", opportunity: "opportunity", sales_order: "salesorder",
+  interaction: "interactions", task: "task", address: "address", person_phone: "phone",
+  product: "product", sector: "sector", industry: "industry", stage: "stage", profile: "users",
+};
+
 export default function CrmApp({
-  email, displayName, version,
+  email, displayName, version, initialSlug,
 }: {
-  email: string; displayName: string | null; version: string;
+  email: string; displayName: string | null; version: string; initialSlug?: string;
 }) {
-  const [slug, setSlug] = useState(DOCTYPES[0].name);
+  const [slug, setSlug] = useState(initialSlug ?? DOCTYPES[0].name);
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [links, setLinks] = useState<Links>({});
@@ -59,9 +74,11 @@ export default function CrmApp({
   const [colsOpen, setColsOpen] = useState(false);
   const [view, setView] = useState<ViewState | null>(null);
 
-  const dt = useMemo(() => DOCTYPES.find((d) => d.name === slug) as Doctype, [slug]);
+  const special = SPECIAL_SECTIONS.find((s) => s.name === slug);
+  const dt = useMemo(() => DOCTYPES.find((d) => d.name === slug), [slug]);
 
-  // Switching doctype resets the working state and recalls its saved layout.
+  // Switching doctype resets the working state, recalls its saved layout,
+  // and keeps the address bar honest — every section has its URL.
   useEffect(() => {
     setQ(""); setQLive(""); setFilters({}); setSort(null); setAdding(false);
     setColsOpen(false); setView(null);
@@ -70,6 +87,7 @@ export default function CrmApp({
       setCols(c ? (JSON.parse(c) as string[]) : null);
       setPin(Number(localStorage.getItem(`crmPin.${slug}`)) || 0);
     } catch { setCols(null); setPin(0); }
+    try { window.history.replaceState(null, "", `/crm/${URL_OF[slug] ?? slug}`); } catch { /* SSR */ }
   }, [slug]);
 
   useEffect(() => {
@@ -78,6 +96,7 @@ export default function CrmApp({
   }, [qLive]);
 
   const load = useCallback(async () => {
+    if (!DOCTYPES.some((d) => d.name === slug)) { setLoading(false); setRows([]); return; }
     setLoading(true);
     setErr("");
     try {
@@ -103,10 +122,13 @@ export default function CrmApp({
   useEffect(() => { void load(); }, [load]);
 
   // ---- columns -----------------------------------------------------------
-  const defaultCols = useMemo(() => dt.fields.filter((f) => f.inList).map((f) => f.name), [dt]);
+  const defaultCols = useMemo(
+    () => (dt ? dt.fields.filter((f) => f.inList).map((f) => f.name) : []),
+    [dt],
+  );
   const visibleNames = cols ?? defaultCols;
   const visible = visibleNames
-    .map((n) => dt.fields.find((f) => f.name === n))
+    .map((n) => dt?.fields.find((f) => f.name === n))
     .filter((f): f is Field => !!f);
 
   const saveCols = (next: string[] | null) => {
@@ -126,7 +148,7 @@ export default function CrmApp({
 
   // Filters live on every select / link / bool field -- the ones with a
   // finite set of answers. Free text already has the search box.
-  const filterables = dt.fields.filter(
+  const filterables = (dt?.fields ?? []).filter(
     (f) => f.type === "select" || f.type === "bool" || (f.type === "link" && f.link),
   );
 
@@ -163,7 +185,7 @@ export default function CrmApp({
               </span>
             </div>
             <h1 className="text-white font-bold" style={{ fontSize: 17, lineHeight: 1.2 }}>
-              {dt.plural}
+              {special?.label ?? dt?.plural ?? "CRM"}
             </h1>
           </div>
           <div className="flex items-center gap-3">
@@ -186,6 +208,26 @@ export default function CrmApp({
             background: "#fff", minHeight: "calc(100vh - 46px)", position: "sticky", top: 46,
           }}
         >
+          <div className="mb-3">
+            <div className="text-xs font-bold px-2 mb-1" style={{ color: MUTED, letterSpacing: 1.1 }}>
+              SCREENS
+            </div>
+            {SPECIAL_SECTIONS.map((sp) => (
+              <button
+                key={sp.name}
+                onClick={() => setSlug(sp.name)}
+                className="w-full text-left px-2 py-1.5 rounded text-sm font-semibold flex items-center gap-2"
+                style={
+                  sp.name === slug
+                    ? { background: NAVY, color: "#fff" }
+                    : { color: "#5A6672", background: "transparent" }
+                }
+              >
+                <span style={{ opacity: 0.7, fontSize: 11 }}>{sp.icon}</span>
+                {sp.label}
+              </button>
+            ))}
+          </div>
           {DOCTYPE_GROUPS.map((g) => {
             const items = DOCTYPES.filter((d) => d.group === g);
             if (!items.length) return null;
@@ -217,7 +259,18 @@ export default function CrmApp({
           })}
         </nav>
 
+        {/* ---------- a screen of its own, still being built ---------- */}
+        {special && (
+          <main className="p-4 flex-1" style={{ minWidth: 0 }}>
+            <div className="rounded p-6" style={{ background: "#fff", border: `1px dashed ${BORDER}`, maxWidth: "70ch" }}>
+              <div className="font-bold mb-1" style={{ fontSize: 15 }}>{special.label}</div>
+              <p className="text-sm" style={{ color: "#5A6672", lineHeight: 1.6 }}>{special.blurb}</p>
+            </div>
+          </main>
+        )}
+
         {/* ---------- the doctype ---------- */}
+        {!special && dt && (
         <main className="p-4 flex-1" style={{ minWidth: 0 }}>
           {dt.blurb && (
             <p className="text-xs mb-3" style={{ color: "#5A6672", maxWidth: "80ch", lineHeight: 1.6 }}>
@@ -410,6 +463,7 @@ export default function CrmApp({
             </div>
           )}
         </main>
+        )}
       </div>
 
       {view && (

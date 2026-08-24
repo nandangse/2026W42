@@ -75,6 +75,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.0.2",
+    date: "2026-08-24",
+    module: "The deal pipeline — Lead → Opportunity → Quotation → Sales Order",
+    items: [
+      "THE PIPELINE HAS FOUR STATIONS NOW, as Dr Raghu drew it: the Lead dump feeds an OPPORTUNITY that moves New → Waiting for Data → Consultative Presentation; from there the deal lives on its QUOTATION, whose stage is the HOTNESS of the quote — Sent · Lost · Not Target · Budgetory · Long Term · After Two Months · Next Month · This Month · Bucket B · Bucket A · Bucket 0 · Order Received; then the SALES ORDER.",
+      "ONE STAGE TABLE, TWO LADDERS — stage.entity says whose rung a row is, and each dropdown shows only its own ladder. The quotation got the same discipline the opportunity has: every hotness move is timed in quotation_stage_history by trigger, a Lost or Not Target move refuses to save without a reason, and Order Received stamps won_at and flips the company to customer.",
+      "HISTORY FOUND ITS QUOTES: the 538 opportunities the ERP held at Quote Given and the 42 at After Two Months each got a shell quotation (numbered Q-<ENQ>, never from the live NGSE/QTN series) at that hotness, and the opportunities completed their own ladder at Consultative Presentation. Lost and Not Target stayed exactly where they died.",
+      "SALES ORDERS ARE A DOCTYPE — 2,084 imported from ERPNext with values, dates, ERP status and the Brief Story of Acquisition. ERPNext remains the system of record; the CRM holds the handle. The company row's Sales Orders count now counts these.",
+      "INTERACTIONS ARE A DOCTYPE — phone calls and visits logged against anything: lead, person, company, opportunity, quotation, sales order. 73,983 imported from the ERP with the Warmer/Colder/Status Quo read, the next action and its owner. Every @nandan.co.in responsible became a User.",
+      "WHAT CAME IN, WHAT WENT OUT, WHAT IS SITTING — v_pipeline_flow reads both stage histories per rung. The flow accumulates from today; the Pipeline screen that draws it is next.",
+      "And no cell shows a code where a name belongs: rows resolve their linked names server-side, so the company on a person or an opportunity is its name, clickable — however many thousand companies exist beyond the dropdown's horizon.",
+      "EVERY SECTION HAS ITS URL, in Dr Raghu's spellings: /crm/lead, /crm/company, /crm/contact, /crm/quotation, /crm/opportunity (also /crm/deals), /crm/salesorder, /crm/interactions, /crm/masters, /crm/users — the sidebar keeps the address bar honest as you move. /crm/salesplan doors through to the Sales Plan; /crm/dashboard and /crm/communication stand ready with their screens named and coming.",
+    ],
+  },
+  {
     v: "3.23.0.1",
     date: "2026-08-24",
     module: "The CRM fills, and its tables grow up",

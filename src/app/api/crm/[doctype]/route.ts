@@ -30,7 +30,7 @@ import { doctypeBySlug, linkTargets, type Doctype, type Field } from "@/crm/doct
 
 export const dynamic = "force-dynamic";
 
-const COMPANY_SELECT = "*, opps:opportunity(count), contacts:person(count), sos:opportunity(count)";
+const COMPANY_SELECT = "*, opps:opportunity(count), contacts:person(count), sos:sales_order(count)";
 
 function resolve(slug: string): Doctype {
   const d = doctypeBySlug(slug);
@@ -43,20 +43,21 @@ function guardConfigured() {
   if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
 }
 
-/** Every link field needs something to choose from -- fetched once per load. */
+/** Every link field needs something to choose from -- fetched once per load.
+ *  A field may narrow its dropdown (linkFilter) -- the opportunity's stage
+ *  list and the quotation's hotness list share one table. */
 async function linkOptions(d: Doctype) {
   const db = crmDb();
   const links: Record<string, { id: string; label: string }[]> = {};
-  for (const target of linkTargets(d)) {
-    const t = doctypeBySlug(target);
+  for (const f of d.fields) {
+    if (f.type !== "link" || !f.link) continue;
+    const t = doctypeBySlug(f.link);
     if (!t) continue;
-    const { data: rows } = await db
-      .from(t.table)
-      .select(`id, ${t.titleField}`)
-      .order(t.titleField, { ascending: true })
-      .limit(1000);
+    let qy = db.from(t.table).select(`id, ${t.titleField}`);
+    if (f.linkFilter) qy = qy.eq(f.linkFilter.column, f.linkFilter.value);
+    const { data: rows } = await qy.order(t.titleField, { ascending: true }).limit(1000);
     const list = (rows ?? []) as unknown as Record<string, unknown>[];
-    links[target] = list.map((r) => ({
+    links[f.link] = list.map((r) => ({
       id: String(r.id),
       label: String(r[t.titleField] ?? r.id),
     }));
@@ -64,10 +65,34 @@ async function linkOptions(d: Doctype) {
   return links;
 }
 
-/** The Order Received stage id, for the company sales-order count. */
-async function wonStageId(): Promise<number | null> {
-  const { data } = await crmDb().from("stage").select("id").eq("code", "order_received").maybeSingle();
-  return data?.id ?? null;
+/**
+ * The dropdown caps at 1000 options, but 54k companies exist -- so the rows
+ * on screen resolve their own labels: every linked id present in the result
+ * set gets its real name fetched and merged in, and no cell ever shows a
+ * bare uuid.
+ */
+async function resolveRowLabels(
+  d: Doctype,
+  rows: Record<string, unknown>[],
+  links: Record<string, { id: string; label: string }[]>,
+) {
+  const db = crmDb();
+  for (const f of d.fields) {
+    if (f.type !== "link" || !f.link) continue;
+    const t = doctypeBySlug(f.link);
+    if (!t) continue;
+    const have = new Set((links[f.link] ?? []).map((o) => o.id));
+    const missing = [...new Set(rows.map((r) => r[f.name]).filter(Boolean).map(String))]
+      .filter((id) => !have.has(id));
+    if (!missing.length) continue;
+    const { data } = await db.from(t.table).select(`id, ${t.titleField}`).in("id", missing);
+    const list = (data ?? []) as unknown as Record<string, unknown>[];
+    links[f.link] = [
+      ...(links[f.link] ?? []),
+      ...list.map((r) => ({ id: String(r.id), label: String(r[t.titleField] ?? r.id) })),
+    ];
+  }
+  return links;
 }
 
 /** Flatten PostgREST's embedded counts into the virtual registry columns. */
@@ -120,24 +145,17 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
     // ---- one record, for the lightbox ------------------------------------
     const id = u.searchParams.get("id");
     if (id) {
-      let one = db.from(d.table).select(isCompany ? COMPANY_SELECT : "*").eq("id", id);
-      if (isCompany) {
-        const won = await wonStageId();
-        if (won !== null) one = one.eq("sos.stage_id", won);
-      }
-      const { data, error } = await one.maybeSingle();
+      const { data, error } = await db.from(d.table)
+        .select(isCompany ? COMPANY_SELECT : "*").eq("id", id).maybeSingle();
       if (error) throw new HttpError(500, error.message);
       if (!data) throw new HttpError(404, `That ${d.label.toLowerCase()} no longer exists.`);
       const row = isCompany ? foldCompanyCounts(data as unknown as Record<string, unknown>) : data;
-      return NextResponse.json({ doctype: d, row, links: await linkOptions(d) });
+      const links = await resolveRowLabels(d, [row as Record<string, unknown>], await linkOptions(d));
+      return NextResponse.json({ doctype: d, row, links });
     }
 
     // ---- the list: filters, search and sort run in Postgres --------------
     let qy = db.from(d.table).select(isCompany ? COMPANY_SELECT : "*", { count: "exact" });
-    if (isCompany) {
-      const won = await wonStageId();
-      if (won !== null) qy = qy.eq("sos.stage_id", won);
-    }
     for (const f of d.fields) {
       if (f.virtual) continue;
       const v = u.searchParams.get(`f_${f.name}`);
@@ -163,7 +181,10 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       ? ((data ?? []) as unknown as Record<string, unknown>[]).map(foldCompanyCounts)
       : (data ?? []);
 
-    return NextResponse.json({ doctype: d, rows, total: count ?? rows.length, links: await linkOptions(d) });
+    const links = await resolveRowLabels(
+      d, rows as unknown as Record<string, unknown>[], await linkOptions(d),
+    );
+    return NextResponse.json({ doctype: d, rows, total: count ?? rows.length, links });
   } catch (e) {
     return errJson(e);
   }
@@ -269,6 +290,7 @@ export async function PATCH(req: Request, { params }: { params: { doctype: strin
  * and point at different people (docs/DATABASE-SPLIT.md).
  */
 function stampCreatedBy(d: Doctype, row: Record<string, unknown>, user: CrmUser) {
-  if (d.fields.some((f) => f.name === "created_by") || ["company", "person", "opportunity", "task"].includes(d.name))
+  if (d.fields.some((f) => f.name === "created_by")
+    || ["company", "person", "opportunity", "task", "quotation", "sales_order", "interaction"].includes(d.name))
     row.created_by = user.profileId;
 }

@@ -28,6 +28,8 @@ export interface Field {
   options?: string[];
   /** For link — the doctype this points at. */
   link?: string;
+  /** Narrow the link's dropdown — the two stage ladders share one table. */
+  linkFilter?: { column: string; value: string };
   /** Show in the list table. Keep it to the few columns worth scanning. */
   inList?: boolean;
   help?: string;
@@ -87,8 +89,13 @@ export const DOCTYPES: Doctype[] = [
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
       { name: "contact_id", label: "Contact", type: "link", link: "person" },
       { name: "owner_id", label: "Owner", type: "link", link: "profile", inList: true },
+      { name: "stage_id", label: "Hotness", type: "link", link: "stage", inList: true,
+        linkFilter: { column: "entity", value: "quotation" },
+        help: "Sent → the buckets → Order Received. This is the temperature of the quote; a Lost or Not Target move needs a reason first." },
       { name: "status", label: "Status", type: "select", inList: true, default: "draft",
         options: ["draft", "internal_review", "approved", "sent", "revised", "accepted", "rejected", "expired"] },
+      { name: "lost_reason", label: "Lost reason", type: "textarea", help: "Required by the database before a move to Lost or Not Target." },
+      { name: "lost_to_competitor", label: "Lost to", type: "text" },
       { name: "valid_until", label: "Valid until", type: "date", inList: true },
       { name: "validity_days", label: "Validity (days)", type: "number", default: 30 },
       { name: "delivery_weeks", label: "Delivery (weeks)", type: "number" },
@@ -131,6 +138,27 @@ export const DOCTYPES: Doctype[] = [
     ],
   },
 
+  {
+    name: "sales_order", label: "Sales Order", plural: "Sales Orders", table: "sales_order",
+    titleField: "so_no", group: "Quotations", icon: "◪",
+    orderBy: { column: "updated_at", ascending: false },
+    blurb: "The pipeline's destination. ERPNext remains the system of record for the order's life — this row is the CRM's handle on it.",
+    fields: [
+      { name: "so_no", label: "SO No", type: "text", required: true, inList: true, help: "As ERPNext issued it — NGSE/SO/202627/00951." },
+      { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
+      { name: "amount", label: "Value", type: "money", inList: true },
+      { name: "ordered_on", label: "Ordered", type: "date", inList: true },
+      { name: "owner_id", label: "Salesperson", type: "link", link: "profile", inList: true },
+      { name: "erp_status", label: "ERP status", type: "text", inList: true },
+      { name: "delivery_on", label: "Delivery", type: "date" },
+      { name: "sector_id", label: "Sector", type: "link", link: "sector" },
+      { name: "quotation_id", label: "Quotation", type: "link", link: "quotation" },
+      { name: "opportunity_id", label: "Opportunity", type: "link", link: "opportunity" },
+      { name: "acquisition_source", label: "Acquisition source", type: "text" },
+      { name: "notes", label: "Story of the acquisition", type: "textarea" },
+    ],
+  },
+
   // ------------------------------------------------------------- funnel
   {
     name: "lead", label: "Lead", plural: "Leads", table: "lead",
@@ -167,7 +195,9 @@ export const DOCTYPES: Doctype[] = [
       { name: "opportunity_no", label: "ENQ No", type: "readonly", inList: true, help: "Issued by the database on save. Imported rows keep their ERP number." },
       { name: "name", label: "Opportunity", type: "text", required: true, inList: true, help: "What is being sold, in words." },
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
-      { name: "stage_id", label: "Stage", type: "link", link: "stage", required: true, inList: true },
+      { name: "stage_id", label: "Stage", type: "link", link: "stage", required: true, inList: true,
+        linkFilter: { column: "entity", value: "opportunity" },
+        help: "New → Waiting for Data → Consultative Presentation. From there the deal lives on its quotation." },
       { name: "pipeline", label: "Pipeline", type: "select", options: [...PIPELINES], required: true, inList: true, default: "capital" },
       { name: "sector_id", label: "Sector", type: "link", link: "sector", inList: true },
       { name: "owner_id", label: "Salesperson", type: "link", link: "profile", inList: true },
@@ -200,6 +230,32 @@ export const DOCTYPES: Doctype[] = [
       { name: "priority", label: "Priority (1 high – 5 low)", type: "number", inList: true, default: 3 },
       { name: "due_at", label: "Due", type: "date", inList: true },
       { name: "body", label: "Detail", type: "textarea" },
+    ],
+  },
+
+  {
+    name: "interaction", label: "Interaction", plural: "Interactions", table: "interaction",
+    titleField: "remark", group: "Funnel", icon: "☎",
+    orderBy: { column: "happened_at", ascending: false },
+    blurb: "Phone calls and visits, logged against anything — a lead, a person, a company, a quote, a sales order. The Warmer/Colder read is the pulse of the deal.",
+    fields: [
+      { name: "kind", label: "Type", type: "select", inList: true, default: "Follow Up Call",
+        options: ["Follow Up Call", "Cold call", "Follow Up Visit", "Cold Visit", "Existing Customer Visit", "Video Call", "SMS or Whatsapp", "Mail", "Internal"] },
+      { name: "result", label: "Result", type: "select", inList: true,
+        options: ["Warmer", "Colder", "Status Quo", "Closed Lost", "Closed Won"] },
+      { name: "happened_at", label: "Date", type: "date", inList: true },
+      { name: "by_id", label: "By", type: "link", link: "profile", inList: true },
+      { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
+      { name: "person_name", label: "Spoke with", type: "text", inList: true },
+      { name: "remark", label: "Remark", type: "textarea", required: true },
+      { name: "next_action", label: "Next action", type: "text" },
+      { name: "next_action_on", label: "Next action on", type: "date" },
+      { name: "next_action_by", label: "Next action by", type: "link", link: "profile" },
+      { name: "person_id", label: "Person", type: "link", link: "person" },
+      { name: "lead_id", label: "Lead", type: "link", link: "lead" },
+      { name: "opportunity_id", label: "Opportunity", type: "link", link: "opportunity" },
+      { name: "quotation_id", label: "Quotation", type: "link", link: "quotation" },
+      { name: "sales_order_id", label: "Sales Order", type: "link", link: "sales_order" },
     ],
   },
 
@@ -341,6 +397,8 @@ export const DOCTYPES: Doctype[] = [
     blurb: "The fourteen rungs, as rows. Reordering is a change to a number here — never a migration.",
     fields: [
       { name: "name", label: "Stage", type: "text", required: true, inList: true },
+      { name: "entity", label: "Ladder", type: "select", options: ["opportunity", "quotation"], required: true, inList: true, default: "opportunity",
+        help: "Whose rung this is — the opportunity's short ladder, or the quotation's hotness." },
       { name: "code", label: "Code", type: "text", required: true },
       { name: "sort_order", label: "Order", type: "number", required: true, inList: true, default: 0 },
       { name: "weight_pct", label: "Weight %", type: "number", inList: true, help: "How likely a deal parked here is to convert. Drives the forecast." },
