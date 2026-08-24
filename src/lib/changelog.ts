@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.3.1",
+    date: "2026-08-24",
+    module: "The offer PDF actually prints",
+    items: [
+      "PRINTING CAME OUT BLANK. The repeating letterhead and footer were built with fixed positioning, which the specification allows and Chrome renders as an empty sheet. They are now a table's header and footer rows — the one mechanism browsers genuinely repeat on every printed page. Not a matter of taste: it is the approach that prints.",
+      "The letterhead is no longer drawn twice — the print page supplies its own repeating one, so the letter body leaves it out and the e-mail keeps it.",
+      "Page numbers come from the browser's own print footer now, which is the only counter that can be trusted across page breaks; the bar says to tick “Headers and footers” in the print box.",
+    ],
+  },
+  {
     v: "3.21.3.0",
     date: "2026-08-24",
     module: "The third Saturday is twelve days, not fifty-two",

@@ -181,7 +181,7 @@ export interface LetterOffer {
   terms?: string | null;
 }
 
-export function offerLetterHtml(d: LetterOffer, draft = false): string {
+export function offerLetterHtml(d: LetterOffer, draft = false, withLetterhead = true): string {
   const S = {
     body: "font-family:Georgia,'Times New Roman',serif;font-size:14px;line-height:1.7;color:#16232F;max-width:680px",
     h: "font-weight:bold;font-size:15px;margin:22px 0 6px",

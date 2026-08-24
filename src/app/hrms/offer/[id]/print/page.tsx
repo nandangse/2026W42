@@ -32,5 +32,5 @@ export default async function OfferPrintPage({ params }: { params: { id: string 
   const { data: offer } = await admin.from("hrms_offer").select("*").eq("id", params.id).maybeSingle();
   if (!offer) return <div style={{ padding: 40, fontFamily: "system-ui, sans-serif" }}>No such offer.</div>;
 
-  return <OfferPrint html={offerLetterHtml(offer, String(offer.status) === "Draft")} status={String(offer.status)} validDays={Number(offer.valid_days) || 3} name={String(offer.name || "")} offerNo={String(offer.offer_no || "")} />;
+  return <OfferPrint html={offerLetterHtml(offer, String(offer.status) === "Draft", false)} status={String(offer.status)} validDays={Number(offer.valid_days) || 3} name={String(offer.name || "")} offerNo={String(offer.offer_no || "")} />;
 }
