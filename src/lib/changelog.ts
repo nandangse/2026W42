@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.4.1",
+    date: "2026-08-24",
+    module: "Blank printing, actually cured",
+    items: [
+      "THE REAL CULPRIT WAS FOUND. A global print rule — written long ago so HRMS screens print only their pane — hid EVERY page's content on paper and revealed only the pane. The offer letter and the floor walk sheet are whole-page documents with no pane, so they printed as blank sheets, whatever their own layout did. Two rebuilds of the offer print chased the wrong cause.",
+      "The rule is now scoped to pages that actually contain a print pane, so the HRMS screens keep their behaviour and every dedicated print page — the offer letter, the walk sheet, and any built after them — prints whole.",
+    ],
+  },
+  {
     v: "3.21.4.0",
     date: "2026-08-24",
     module: "On Floor — the walk sheet",

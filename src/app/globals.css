@@ -99,8 +99,12 @@ input[type="date"] {
   body { background: #fff !important; }
   .no-print { display: none !important; }
 
-  /* only the pane prints */
-  body * { visibility: hidden !important; }
+  /* Only the pane prints — ON PAGES THAT HAVE ONE. This rule once read
+     `body *` and hid every page's content in print, which is why the offer
+     letter and the floor report printed as blank sheets: they are whole-page
+     documents with no #hrms-print pane, and this hid them wholesale. :has()
+     scopes the hack to the screens it was written for. */
+  body:has(#hrms-print) * { visibility: hidden !important; }
   #hrms-print, #hrms-print * { visibility: visible !important; }
   #hrms-print {
     position: absolute !important;
