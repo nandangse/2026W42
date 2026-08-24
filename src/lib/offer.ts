@@ -1,0 +1,185 @@
+/**
+ * Offer letters — the vocabulary, the numbering, and the standard words.
+ *
+ * Kept out of the route so the parts that decide what a letter SAYS can be
+ * read (and tested) without a database in the way.
+ */
+
+/** Where an offer has got to. Nothing is deleted; an offer that failed says so. */
+export const OFFER_STATUS = ["Draft", "Sent", "Accepted", "Joined", "Declined", "Expired"] as const;
+export type OfferStatus = (typeof OFFER_STATUS)[number];
+
+export const STATUS_TONE: Record<string, { bg: string; fg: string }> = {
+  Draft:    { bg: "#F4F2EC", fg: "#8A94A0" },
+  Sent:     { bg: "#DCE8F5", fg: "#1B3A5C" },
+  Accepted: { bg: "#FFF3E8", fg: "#8A5B00" },
+  Joined:   { bg: "#E6F4EA", fg: "#0D7A3F" },
+  Declined: { bg: "#FBEAE8", fg: "#B3392E" },
+  Expired:  { bg: "#F4F2EC", fg: "#B3392E" },
+};
+
+/** The six pages, in the order they are filled. */
+export const OFFER_STEPS = [
+  { key: "person", label: "The person", hint: "Their details, the role, and the dates." },
+  { key: "role", label: "Role, KPI & competency", hint: "What the job is, as this offer states it." },
+  { key: "salary", label: "Salary", hint: "The agreed gross, and the structure it produces." },
+  { key: "terms", label: "Terms of engagement", hint: "From Masters. Editable for this offer." },
+  { key: "notes", label: "Internal notes", hint: "Ours. Never part of the letter." },
+  { key: "review", label: "Review & send", hint: "The letter, the mail, and who it goes to." },
+] as const;
+
+/** NGSE/HR/OL/2026-27/017 — the financial year, then a running number. */
+export function financialYear(d = new Date()): string {
+  const y = d.getFullYear(), m = d.getMonth(); // April starts the year
+  const start = m >= 3 ? y : y - 1;
+  return `${start}-${String(start + 1).slice(2)}`;
+}
+
+export function offerNumber(seq: number, d = new Date()): string {
+  return `NGSE/HR/OL/${financialYear(d)}/${String(seq).padStart(3, "0")}`;
+}
+
+/** Today + 7, as the joining date usually is. */
+export function defaultJoining(from = new Date()): string {
+  const d = new Date(from);
+  d.setDate(d.getDate() + 7);
+  return d.toISOString().slice(0, 10);
+}
+
+export const iso = (d = new Date()) => d.toISOString().slice(0, 10);
+
+/** The covering note, with the candidate's name put in. */
+export function coveringLetter(template: string, name: string): string {
+  return String(template || "").replace(/<name>/gi, name || "");
+}
+
+/** What a resume is asked to give up. Kept here so the prompt and the form agree. */
+export interface ResumeRead {
+  name: string | null;
+  email: string | null;
+  mobile: string | null;
+  address: string | null;
+  current_employer: string | null;
+  notes: string | null;
+}
+
+export const RESUME_SCHEMA = {
+  type: "object",
+  properties: {
+    name: { type: ["string", "null"], description: "The candidate's full name as written" },
+    email: { type: ["string", "null"] },
+    mobile: { type: ["string", "null"], description: "Digits as written, with country code if given" },
+    address: { type: ["string", "null"], description: "Postal address, or the city and state if that is all there is" },
+    current_employer: { type: ["string", "null"] },
+    notes: { type: ["string", "null"], description: "One line on what they do today. Nothing invented." },
+  },
+  required: ["name", "email", "mobile", "address", "current_employer", "notes"],
+  additionalProperties: false,
+} as const;
+
+export const RESUME_SYSTEM =
+  "You read one resume and return only what it actually says. This fills an offer letter, so a " +
+  "wrong detail becomes a wrong letter sent to a real person.\n\n" +
+  "Rules:\n" +
+  "1. Copy values verbatim. Do not tidy, expand, translate or reformat a name or an address.\n" +
+  "2. If something is not in the document, return null for it. NEVER guess, and never infer an " +
+  "email from a name or a city from an employer.\n" +
+  "3. The address is the candidate's own, not an employer's or a college's.\n" +
+  "4. 'notes' is one plain line about what they do now, drawn from the document only.";
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * The letter as e-mail.
+ *
+ * This renders the letter a SECOND time, in a way the screen does not: mail
+ * clients strip stylesheets and classes, so every rule has to be inline and
+ * the markup has to be plain. That is the reason for a second renderer, and
+ * the only one — the CONTENT below comes from the same offer row the screen
+ * draws, so the two cannot say different things.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+const esc = (s: unknown) =>
+  String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+
+const rupees = (n: unknown) => (n == null || n === "" ? "—" : Math.round(Number(n)).toLocaleString("en-IN"));
+
+const dmy = (s: unknown) => {
+  if (!s) return "—";
+  const d = new Date(String(s).slice(0, 10) + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return String(s);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
+/** Plain text (the covering note) into paragraphs a mail client will honour. */
+export function textToHtml(t: string): string {
+  return String(t || "")
+    .split(/\n{2,}/)
+    .map((p) => `<p style="margin:0 0 12px">${esc(p).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
+export interface LetterOffer {
+  offer_no?: string | null; name?: string | null; address?: string | null;
+  offer_date?: string | null; joining_date?: string | null;
+  designation?: string | null; reporting_to?: string | null; probation_months?: number | null;
+  agreed_gross?: number | null;
+  salary?: { rows: { label: string; monthly: number | null; yearly: number | null; kind: string }[]; ctcLakhs: string } | null;
+  role_doc?: { role?: string; purpose?: string; job_description?: string; deliverable?: string; metric?: string } | null;
+  competencies?: { name: string; level: number }[] | null;
+  terms?: string | null;
+}
+
+export function offerLetterHtml(d: LetterOffer): string {
+  const S = {
+    body: "font-family:Georgia,'Times New Roman',serif;font-size:14px;line-height:1.7;color:#16232F;max-width:680px",
+    h: "font-weight:bold;font-size:15px;margin:22px 0 6px",
+    td: "border:1px solid #DCD8CC;padding:5px 7px",
+    right: "border:1px solid #DCD8CC;padding:5px 7px;text-align:right",
+  };
+  const sal = d.salary;
+  const rows = (sal?.rows || []).map((r) => {
+    const bold = r.kind === "head" || r.kind === "total";
+    const bg = bold ? "background:#FFF9C4;" : "";
+    if (r.kind === "note") return `<tr><td colspan="3" style="${S.td};font-size:12px;color:#46545F">${esc(r.label)}</td></tr>`;
+    return `<tr style="${bg}${bold ? "font-weight:bold" : ""}"><td style="${S.td}">${esc(r.label)}</td><td style="${S.right}">${rupees(r.monthly)}</td><td style="${S.right}">${rupees(r.yearly)}</td></tr>`;
+  }).join("");
+
+  const rd = d.role_doc || {};
+  const section = (title: string, html?: string) => (html ? `<div style="${S.h}">${esc(title)}</div>${html}` : "");
+
+  return `<div style="${S.body}">
+<table width="100%" style="font-size:12px;color:#46545F;margin-bottom:8px"><tr>
+  <td>Ref: ${esc(d.offer_no)}</td><td align="right">Date: ${dmy(d.offer_date)}</td>
+</tr></table>
+<div style="text-align:center;font-weight:bold;font-size:18px;letter-spacing:.04em">OFFER OF EMPLOYMENT</div>
+<div style="text-align:center;font-size:12px;color:#8B8F87;margin-bottom:18px">Private &amp; Confidential</div>
+
+<div><b>${esc(d.name)}</b></div>
+${d.address ? `<div style="color:#46545F;white-space:pre-wrap">${esc(d.address)}</div>` : ""}
+
+<p style="margin:16px 0 0">Dear ${esc(String(d.name || "").split(" ")[0])},</p>
+<p>We are happy to have you join us for the role of <b>${esc(rd.role || d.designation)}</b>. The roles and responsibility are as documented in Annexure 2. Your offered gross monthly salary shall be <b>Rs. ${rupees(d.agreed_gross)}/-</b>${sal ? ` and the annual CTC shall be <b>Rs. ${esc(sal.ctcLakhs)} Lakhs</b>` : ""} as detailed in Annexure 1.</p>
+<p>You shall join on or around <b>${dmy(d.joining_date)}</b>, reporting to <b>${esc(d.reporting_to)}</b>. Your probation period shall be <b>${esc(d.probation_months || 3)} months</b>. The terms and conditions of employment are set out below. The finalised hard copy shall be given on joining along with your roles and responsibilities.</p>
+
+<div style="${S.h}">Annexure 1 — Compensation</div>
+${sal ? `<table width="100%" style="border-collapse:collapse;font-size:13px">
+  <tr style="font-weight:bold"><td style="${S.td}">Components of Compensation</td><td style="${S.right}">Monthly (Rs.)</td><td style="${S.right}">Yearly (Rs.)</td></tr>
+  ${rows}
+</table><p style="margin-top:6px"><b>CTC ≈ Rs ${esc(sal.ctcLakhs)} Lakhs per annum</b></p>` : "<p>To be confirmed.</p>"}
+
+<div style="${S.h}">Annexure 2 — Roles and Responsibility</div>
+${section("Purpose of the role", rd.purpose)}
+${section("Job description", rd.job_description)}
+${section("Key responsibility areas", rd.deliverable)}
+${section("KPI metrics", rd.metric)}
+${(d.competencies || []).length ? `<div style="${S.h}">Competencies expected</div><p>${(d.competencies || []).map((c) => `${esc(c.name)} <b>${esc(c.level)}/5</b>`).join(" &nbsp;·&nbsp; ")}</p>` : ""}
+
+${section("Terms of Employment", d.terms || "")}
+
+<p style="margin-top:26px">For Nandan GSE Pvt. Ltd.</p>
+<p style="margin-top:24px"><b>Dr. Raghunandan Jagdish</b><br>Founder, Managing Director &amp; CEO</p>
+<div style="border-top:1px solid #DCD8CC;margin-top:20px;padding-top:12px">
+  <b>Acceptance</b><div>I, ${esc(d.name)}, accept the offer of employment on the terms set out above.</div>
+  <div style="margin-top:20px;color:#8B8F87">Signature: ______________________ &nbsp; Date: ____________</div>
+</div>
+</div>`;
+}

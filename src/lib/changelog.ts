@@ -75,6 +75,23 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.0.0",
+    date: "2026-08-24",
+    module: "HRMS — Offer Letters",
+    items: [
+      "SIX PAGES FROM THE RESUME TO THE MAIL, built in HRMS → Offer Letters. Upload the resume and CLAUDE READS IT — name, email, mobile, address — and fills the form, storing what it read beside what it filled so a wrong prefill can be traced instead of argued about. It is told to return null rather than guess, because a guessed detail becomes a wrong letter sent to a real person.",
+      "PAGE 1 — the person, the designation, one or more roles from the register, who they report to, offer date (today) and joining date (today + 7), probation, and the discussion notes from the ATS.",
+      "PAGE 2 — the role as THIS offer states it. One press pulls the job description, deliverables, KPI metrics and the competency map out of the register for the chosen roles; everything is then editable, because the offer keeps its own copy.",
+      "PAGE 3 — Agreed Gross at the top, then the Type, and the structure builds itself through the same arithmetic as every other screen: HRA, PF and PT drop for Management and the contract types, benefits drop for Management, and the CTC follows.",
+      "PAGE 4 — the terms of engagement, from the new Masters → Standard Texts, with a reset-to-master button. PAGE 5 — internal notes, ours alone, never printed and never sent.",
+      "PAGE 6 — the whole letter as it will read (Annexure 1 the compensation, Annexure 2 the roles and competencies, then the terms and the acceptance block), the mail to/from/cc, and the covering note with the candidate's name filled in.",
+      "SENDING: “Send it now” goes out through Resend from the address on the offer, with the covering note and the full letter in the body. It needs RESEND_API_KEY set in Vercel — until then it refuses in plain words and opens a prefilled Gmail draft instead. It never pretends to have sent something.",
+      "THE LADDER: Draft → Sent → Accepted → Joined, with Declined and Expired for the ones that do not land. On Joined the EmployeeID is recorded and the offer becomes the appointment letter. A sent offer is a document the candidate holds, so only RJ may change it after that.",
+      "MASTERS — STANDARD TEXTS, a new module: the terms of employment and the covering note, versioned, edited in one place. Every letter snapshots the words it used, so editing here changes the next letter and never one already sent.",
+      "Migrations 0067 and 0068.",
+    ],
+  },
+  {
     v: "3.20.11.1",
     date: "2026-08-24",
     module: "Each app names its own browser tab",

@@ -198,8 +198,8 @@ export const NAV: NavSection[] = [
     key: "offers",
     label: "Offer Letters",
     icon: "📨",
-    blurb: "The letter that starts an employment. Awaiting Dr Raghu's description before it is built.",
-    built: false,
+    blurb: "Six pages from the resume to the mail: the person, the role, the money, the terms, our notes, and the letter itself.",
+    built: true,
   },
   {
     key: "fnf",
@@ -266,6 +266,14 @@ NAV.push({
   label: "Module Masters",
   icon: "🗃",
   blurb: "Every dropdown in HRIS — Role, Department, Grade, Status, Type, Job Location, Qualification, sizes, Blood Group, Religion, Marital Status, Gender and Shift.",
+  built: true,
+});
+
+NAV.push({
+  key: "texts",
+  label: "Masters — Standard Texts",
+  icon: "📜",
+  blurb: "The paragraphs that go into letters: the terms of employment, and the covering note that carries an offer out. Written once here; each letter keeps the copy it used.",
   built: true,
 });
 
