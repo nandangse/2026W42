@@ -42,6 +42,14 @@ const dmy = (iso: string | null | undefined) => {
   const s = String(iso || "").slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(2, 4)}` : "";
 };
+const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** 24/08/26 · Mon — a date on the floor is a day of the week first. */
+const dmyd = (iso: string | null | undefined) => {
+  const base = dmy(iso);
+  if (!base) return "";
+  const d = new Date(String(iso).slice(0, 10) + "T00:00:00");
+  return Number.isNaN(d.getTime()) ? base : `${base} · ${DOW[d.getDay()]}`;
+};
 /** This Saturday — the end of the delivery week the floor is walking. */
 const saturday = (() => {
   const d = new Date(TODAY + "T00:00:00");
@@ -181,6 +189,8 @@ export default function FloorReport() {
         table { width: 100%; border-collapse: collapse; }
         thead { display: table-header-group; }
         tr, td, th { page-break-inside: avoid; }
+        /* the fold of the week — after the last job due by Saturday */
+        tr.weekcut > td { border-bottom: 4px solid #0D6E39 !important; }
         td { vertical-align: top; }
         .cols3 { column-count: 3; column-gap: 18px; }
         .cols3 > div { break-inside: avoid; }
@@ -247,18 +257,24 @@ export default function FloorReport() {
             </tr>
           </thead>
           <tbody>
-            {floor.map((j) => {
+            {floor.map((j, i) => {
               const { list, nMat, nMs, nTask } = pendenciesOf(j);
               const lateJob = j.tdd && j.tdd < TODAY;
+              // the cut of the week: a dark green rule under the last job due
+              // by Saturday, so the fold between "this week" and "after" is
+              // visible on paper without reading a single date
+              const dueThisWeek = !!(j.tdd && j.tdd <= saturday);
+              const next = floor[i + 1];
+              const weekCut = dueThisWeek && (!next || !(next.tdd && next.tdd <= saturday));
               return (
-                <tr key={j.id}>
+                <tr key={j.id} className={weekCut ? "weekcut" : undefined}>
                   <td style={{ border: "1px solid #DCD8CC", padding: "6px 8px", minWidth: 140, maxWidth: 180 }}>
                     <div style={{ fontWeight: 800, fontSize: 14 }}>{jobNo(j.id)}</div>
                     <div style={{ fontSize: 10.5, lineHeight: 1.3, marginTop: 1 }}>{j.tag || "—"}</div>
                     {j.cust && <div style={{ fontSize: 10, color: "#8B8F87" }}>{j.cust}</div>}
                     {j.tdd && (
                       <div style={{ fontSize: 16, fontWeight: 800, marginTop: 3, color: lateJob ? "#B3261E" : "#16232F", fontVariantNumeric: "tabular-nums" }}>
-                        {dmy(j.tdd)}{lateJob ? " ⚠" : ""}
+                        {dmyd(j.tdd)}{lateJob ? " ⚠" : ""}
                       </div>
                     )}
                   </td>
@@ -286,7 +302,7 @@ export default function FloorReport() {
                             color: x.kind === "material" ? "#8A5B00" : x.kind === "milestone" ? "#1B3A5C" : "#5A6572",
                           }}>{x.kind === "material" ? "MAT" : x.kind === "milestone" ? "MILE" : "TASK"}</span>{" "}
                           <b>{x.text}</b>
-                          {x.date ? ` · ${dmy(x.date)}` : <b style={{ color: "#B3261E" }}> · NO DATE</b>}
+                          {x.date ? ` · ${dmyd(x.date)}` : <b style={{ color: "#B3261E" }}> · NO DATE</b>}
                           {x.defect && <b style={{ color: "#B3261E" }}> · QC DEFECTIVE</b>}
                           {x.sub && <><br /><span style={{ color: "#5A6572", fontSize: 10.5 }}>{x.sub}</span></>}
                         </span>

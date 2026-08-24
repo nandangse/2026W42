@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.5.3",
+    date: "2026-08-24",
+    module: "The walk sheet reads like a week",
+    items: [
+      "EVERY DATE ON THE WALK CARRIES ITS DAY — “28/08/26 · Fri” on the TDD and on each pendency — because on the floor a date is a day of the week first.",
+      "A DARK GREEN RULE cuts the table after the last job due by Saturday, so the fold between this week and after is visible on paper without reading a single date.",
+    ],
+  },
+  {
     v: "3.21.5.2",
     date: "2026-08-24",
     module: "The delivered boxes fill",
