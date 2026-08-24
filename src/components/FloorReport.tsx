@@ -60,33 +60,61 @@ const saturday = (() => {
 
 interface DeliveredRow { id: string; on: string | null; val: number; tpv: number }
 
+/** The crew as a small table: F H W P E Hd | Total, one row per label. */
+function CrewTable({ rows, size = 10.5 }: { rows: { label: string; crew: Partial<Crew> | null; bold?: boolean }[]; size?: number }) {
+  const cell = (v: React.ReactNode, extra?: React.CSSProperties) => (
+    <td style={{ border: "1px solid #DCD8CC", padding: "1px 5px", textAlign: "right", fontVariantNumeric: "tabular-nums", ...extra }}>{v}</td>
+  );
+  return (
+    <table style={{ borderCollapse: "collapse", fontSize: size, width: "auto", display: "inline-table" }}>
+      <thead>
+        <tr style={{ background: "#F4F2EC" }}>
+          <th style={{ border: "1px solid #DCD8CC", padding: "1px 5px", textAlign: "left", fontSize: size - 1.5 }}></th>
+          {TRADES.map((t) => (
+            <th key={t.key} style={{ border: "1px solid #DCD8CC", padding: "1px 5px", color: t.color, fontSize: size - 1 }}>{t.tiny}</th>
+          ))}
+          <th style={{ border: "1px solid #DCD8CC", padding: "1px 5px", fontSize: size - 1 }}>Tot</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => {
+          const tot = r.crew ? TRADES.reduce((n, t) => n + (Number(r.crew?.[t.key]) || 0), 0) : 0;
+          return (
+            <tr key={r.label} style={r.bold ? { fontWeight: 700 } : undefined}>
+              <td style={{ border: "1px solid #DCD8CC", padding: "1px 5px", color: "#8B8F87", fontSize: size - 1.5 }}>{r.label}</td>
+              {TRADES.map((t) =>
+                cell(r.crew ? Number(r.crew[t.key]) || 0 : "—", { color: r.crew && Number(r.crew[t.key]) ? undefined : "#C9C6BD" }),
+              )}
+              {cell(r.crew ? <b>{tot}</b> : "—")}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 /**
- * "Working today on these jobs" — the sheet's headcount. RECORDED numbers
- * when the floor has said them; where a job has none, the plan's current
- * stage fills in, and the line says how much of it is plan rather than fact.
+ * The sheet's headcount, as a table. RECORDED numbers only — the plan never
+ * pads the total, because a headcount mixing fact with intention cannot be
+ * checked against a muster.
  */
 function WorkingToday({ floor, manpower }: { floor: Job[]; manpower: Record<string, Crew> }) {
   const tot: Record<string, number> = {};
-  let people = 0, recorded = 0, planned = 0;
+  let silent = 0;
   for (const j of floor) {
     const rec = manpower[j.id];
     const hasRec = rec && TRADES.some((t) => Number(rec[t.key]) > 0);
-    if (hasRec) recorded++;
-    for (const t of TRADES) {
-      const n = hasRec ? Number(rec![t.key]) || 0 : 0;
-      tot[t.key] = (tot[t.key] || 0) + n;
-      people += n;
-    }
-    if (!hasRec) planned++;
+    if (!hasRec) { silent++; continue; }
+    for (const t of TRADES) tot[t.key] = (tot[t.key] || 0) + (Number(rec![t.key]) || 0);
   }
   return (
-    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-      Working today on these jobs:{" "}
-      {TRADES.map((t) => `${tot[t.key] || 0} ${t.label}${(tot[t.key] || 0) === 1 ? "" : "s"}`).join(", ")}
-      {" "}— <span style={{ fontSize: 15 }}>{people} people</span>
-      {planned > 0 && (
-        <span style={{ fontWeight: 400, fontSize: 11, color: "#B3261E" }}>
-          {" "}· {planned} of {floor.length} jobs have no manpower recorded today
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+      <b style={{ fontSize: 12 }}>WORKING TODAY</b>
+      <CrewTable size={11.5} rows={[{ label: "recorded", crew: tot, bold: true }]} />
+      {silent > 0 && (
+        <span style={{ fontSize: 10.5, color: "#B3261E", fontWeight: 700 }}>
+          {silent} of {floor.length} jobs silent — no allocation recorded
         </span>
       )}
     </div>
@@ -265,18 +293,18 @@ export default function FloorReport() {
 
         {/* five narrow boxes; the products go below them, and the money
             appears only on the PRE edition */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "nowrap" }}>
           {([
             ["ON FLOOR", String(floor.length), "being worked on now", "#0D7A3F"],
             ["ALREADY LATE", String(late.length), late.length ? "past target delivery" : "none late", late.length ? "#B3261E" : "#0D7A3F"],
-            [`DELIVERY THIS WEEK · UPTO ${dmy(saturday)}`, String(week.length), week.length ? "due by Saturday" : "nothing due by Saturday", "#E8600A"],
+            [`DELIVERY UPTO ${dmy(saturday)} · Sat`, String(week.length), week.length ? "incl. every overdue job" : "nothing due by Saturday", "#E8600A"],
             ["DELIVERED · LAST 7 DAYS", String(d7.n), full && moneyOk ? (d7.n ? `${lakh(d7.val)} · TP ${lakh(d7.tp)}` : "nothing went out") : d7.n ? "went out the gate" : "nothing went out", "#1B3A5C"],
             ["DELIVERED · LAST 30 DAYS", String(d30.n), full && moneyOk ? (d30.n ? `${lakh(d30.val)} · TP ${lakh(d30.tp)}` : "nothing went out") : d30.n ? "went out the gate" : "nothing went out", "#1B3A5C"],
           ] as const).map(([l, v, sub, c]) => (
-            <div key={l} style={{ border: `1px solid #DCD8CC`, borderTop: `3px solid ${c}`, borderRadius: 6, padding: "5px 10px", minWidth: 110, flex: "0 1 auto" }}>
-              <div style={{ fontSize: 9, letterSpacing: ".05em", color: "#8B8F87", fontWeight: 700, whiteSpace: "nowrap" }}>{l}</div>
-              <div style={{ fontSize: 19, fontWeight: 800, color: c, fontVariantNumeric: "tabular-nums" }}>{v}</div>
-              {sub && <div style={{ fontSize: 10, color: "#8B8F87", whiteSpace: "nowrap" }}>{sub}</div>}
+            <div key={l} style={{ border: `1px solid #DCD8CC`, borderTop: `3px solid ${c}`, borderRadius: 6, padding: "4px 8px", flex: "1 1 0", minWidth: 0, overflow: "hidden" }}>
+              <div style={{ fontSize: 8, letterSpacing: ".04em", color: "#8B8F87", fontWeight: 700, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{l}</div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: c, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>{v}</div>
+              {sub && <div style={{ fontSize: 8.5, color: "#8B8F87", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{sub}</div>}
             </div>
           ))}
         </div>
@@ -322,17 +350,16 @@ export default function FloorReport() {
                       </div>
                     )}
                     {stage && (
-                      <div style={{ marginTop: 4, fontSize: 10.5, lineHeight: 1.4 }}>
+                      <div style={{ marginTop: 4, fontSize: 10, lineHeight: 1.35 }}>
                         <span style={{ color: "#8B8F87", fontWeight: 700, fontSize: 9 }}>STAGE</span> <b>{stage.name}</b>
-                        <div style={{ color: "#46545F" }}>
-                          plan {TRADES.filter((t) => Number(stage.crew[t.key]) > 0).map((t) => `${t.tiny}${Number(stage.crew[t.key])}`).join(" ") || "—"}
-                        </div>
                       </div>
                     )}
-                    <div style={{ marginTop: 3, fontSize: 10.5 }}>
-                      {recTotal > 0
-                        ? <b>today {TRADES.filter((t) => Number(rec![t.key]) > 0).map((t) => `${t.tiny}${Number(rec![t.key])}`).join(" ")} = {recTotal}</b>
-                        : <b style={{ color: "#B3261E" }}>no manpower recorded</b>}
+                    <div style={{ marginTop: 3 }}>
+                      <CrewTable size={9.5} rows={[
+                        { label: "plan", crew: stage?.crew ?? null },
+                        { label: "today", crew: recTotal > 0 ? rec! : null, bold: true },
+                      ]} />
+                      {recTotal === 0 && <div style={{ fontSize: 9, color: "#B3261E", fontWeight: 700 }}>no manpower recorded</div>}
                     </div>
                   </td>
                   {/* one narrow cell: who owns it, what is pending, how far it is */}
@@ -348,7 +375,7 @@ export default function FloorReport() {
                   <td style={{ border: "1px solid #DCD8CC", padding: "6px 8px" }}>
                     {!list.length && <span style={{ color: "#8B8F87" }}>nothing pending</span>}
                     {list.map((x, i) => (
-                      <div key={i} style={{ display: "flex", gap: 7, alignItems: "flex-start", padding: "3px 0", borderBottom: "1px solid #F2F0EA" }}>
+                      <div key={i} className="pend" style={{ display: "flex", gap: 7, alignItems: "flex-start", padding: "3px 0", borderBottom: "1px solid #F2F0EA" }}>
                         <span aria-hidden style={{
                           width: 11, height: 11, borderRadius: 2, marginTop: 2, flex: "none",
                           border: `1.5px solid ${x.kind === "material" ? "#8A5B00" : x.kind === "milestone" ? "#1B3A5C" : "#16232F"}`,

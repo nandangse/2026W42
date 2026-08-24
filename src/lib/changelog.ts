@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.22.0.1",
+    date: "2026-08-24",
+    module: "The walk sheet fits its paper",
+    items: [
+      "ROWS MAY SPLIT ACROSS PAGES. Keeping every job whole was pushing a job with thirty pendencies onto its own sheet and doubling the print; now only single pendency lines stay unsplit, and the page count drops to what the content actually needs.",
+      "THE WEEK BOX SAYS WHAT IT MEANS: “DELIVERY UPTO 30/08/26 · Sat — incl. every overdue job”. It always counted the delayed ones (delivery upto Saturday is delivery upto Saturday, however old the promise); now the label says so, and every TDD stays printed, passed or not.",
+      "THE FIVE BOXES HOLD ONE LINE — they shrink instead of wrapping.",
+      "THE MANPOWER IS A SMALL TABLE now, not a sentence: F H W P E Hd | Tot — inside each job as two rows, PLAN (the stage's crew) over TODAY (what was recorded, bold), and on top as the recorded company total with the silent jobs named beside it.",
+    ],
+  },
+  {
     v: "3.22.0.0",
     date: "2026-08-24",
     module: "Manpower Allocation — the day-wise work study",
