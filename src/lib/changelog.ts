@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.21.3.0",
+    date: "2026-08-24",
+    module: "The third Saturday is twelve days, not fifty-two",
+    items: [
+      "THE THIRD SATURDAY OF EVERY MONTH IS TWELVE DAYS A YEAR (Dr Raghu, 24 Aug 2026). It had been carried as 52 since the first draft of the salary table, which counted every Saturday and overstated the benefit by more than four times.",
+      "EVERY CTC IN GENIE WAS TOO HIGH because of it, everywhere the salary table is drawn — the IDP's own salary page, the appraisal Report Card, the new salary structure, the Appraisal Table, the CHRO analytics and the offer letters. All corrected at once, because there is one copy of the arithmetic.",
+      "Vinay's March letter now computes to 6.8 lakhs against the 6.6 printed — the remaining gap is only that the letter's own annexure carried no third-Saturday line at all. It read 7.6 lakhs before this fix.",
+      "The row now names its own number, so it says “Third Saturday Paid 12 days” and cannot drift from the arithmetic behind it again.",
+    ],
+  },
+  {
     v: "3.21.2.2",
     date: "2026-08-24",
     module: "Offer Letters — the letterhead, the manager, and why the PDF was blank",

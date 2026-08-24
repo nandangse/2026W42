@@ -75,7 +75,8 @@ export function salaryTable(get: (k: string) => unknown, type: string | null, ex
   const bonus = basic * 0.10;
   const perDay = gross / 26;
   const leaves = (perDay * 20) / 12;
-  const thirdSat = (perDay * 52) / 12;
+  // twelve a year — the third Saturday of each month, not every Saturday
+  const thirdSat = (perDay * THIRD_SATURDAYS_A_YEAR) / 12;
   const benM = noBenefits ? 0 : pf + mediclaim + shoes + bonus + leaves + thirdSat;
   const inv = (extras || []).filter((e) => e.monthly > 0);
   const invM = inv.reduce((a, e) => a + e.monthly, 0);
@@ -110,7 +111,7 @@ export function salaryTable(get: (k: string) => unknown, type: string | null, ex
           ...(exempt ? [] : [R("Provident Fund Employer", pf)]),
           R("Mediclaim of 2 lakhs", mediclaim),
           R("Shoes & Uniform Allowance", shoes), R("Annual Bonus Approx @10%", bonus),
-          R("Annual Paid Leaves Approx 20 days", leaves), R("Third Saturday Paid 52 days", thirdSat),
+          R("Annual Paid Leaves Approx 20 days", leaves), R(`Third Saturday Paid ${THIRD_SATURDAYS_A_YEAR} days`, thirdSat),
         ]),
     { label: "Total Benefits (D)", monthly: Math.round(benM), yearly: Math.round(benM * 12), kind: "total" },
     ...(inv.length
@@ -160,6 +161,14 @@ export function scaledGetter(get: (k: string) => unknown, newGross: number): (k:
  * Any component can then be overridden by hand; `fixed` absorbs the
  * difference so the gross never silently changes underneath the agreement.
  * ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * The third Saturday of every month is a paid holiday, and anyone who works
+ * it takes a compensatory day — so it is a real cost the company carries.
+ * TWELVE a year (Dr Raghu, 24 Aug 2026). It was carried as 52 from the first
+ * draft, which counted every Saturday and overstated every CTC in Genie.
+ */
+export const THIRD_SATURDAYS_A_YEAR = 12;
 
 export const SPLIT_DEFAULTS = { basicPct: 58, hraOfBasic: 20, conveyance: 5000, medical: 1250 };
 
