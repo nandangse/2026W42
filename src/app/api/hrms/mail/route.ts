@@ -59,6 +59,33 @@ export async function POST(req: Request) {
     if (!key) throw new HttpError(503, "RESEND_API_KEY is not set on this deploy — nothing can be sent.");
 
     const b = await req.json();
+
+    /**
+     * { action: "verify" } — ask Resend to re-read the DNS.
+     *
+     * Resend's "pending" is the result of its LAST check, not of the DNS as
+     * it stands now; records added since then do nothing until it looks
+     * again. This is that nudge, so a wait is never for nothing.
+     */
+    if (String(b.action || "") === "verify") {
+      const dom = await fetch("https://api.resend.com/domains", { headers: { authorization: `Bearer ${key}` } });
+      if (!dom.ok) throw new HttpError(502, `Resend answered ${dom.status} listing domains.`);
+      const found = ((await dom.json())?.data || []).find((d: { name: string }) => d.name === "nandan.co.in");
+      if (!found) throw new HttpError(404, "nandan.co.in is not on this Resend account.");
+      const v = await fetch(`https://api.resend.com/domains/${found.id}/verify`, {
+        method: "POST", headers: { authorization: `Bearer ${key}` },
+      });
+      const vBody = await v.text();
+      // verification is not instant — read the status back after the nudge
+      const after = await fetch(`https://api.resend.com/domains/${found.id}`, { headers: { authorization: `Bearer ${key}` } });
+      const now = after.ok ? await after.json() : null;
+      return NextResponse.json({
+        ok: v.ok, asked: vBody.slice(0, 300),
+        status: now?.status ?? found.status,
+        records: (now?.records || []).map((r: Record<string, unknown>) => ({ record: r.record, type: r.type, name: r.name, status: r.status })),
+      });
+    }
+
     const from = String(b.from || "hr@nandan.co.in").trim();
     if (!/^[^@\s]+@nandan\.co\.in$/i.test(from))
       throw new HttpError(400, "The sender must be a nandan.co.in address.");
