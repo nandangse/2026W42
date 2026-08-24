@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.0.3",
+    date: "2026-08-24",
+    module: "The CRM sidebar in its working order, and Deals draws the pipeline",
+    items: [
+      "THE SIDEBAR STANDS AS DR RAGHU ORDERED IT: Dashboard, Analytics, SalesPerson Plan and Sales Plan on top (Sales Plan doors through to the Genie app; the other screens are named and coming) — then the PIPELINE: Leads, Opportunities, Quotations, Sales Orders — then DEALS — then Accounts: Companies, Contacts, Addresses, Phone numbers, Industries, Products — then the rest — and SETTINGS collapsed at the bottom, holding Sectors, Stages and Users until asked.",
+      "DEALS IS A REAL SCREEN: both ladders side by side, and per rung what CAME IN, what WENT OUT, and what is SITTING there now — read from the stage histories the triggers write, so the table is measured, not remembered. It accumulates from today; the ERP's past sits in each row's first rung. /crm/deals.",
+      "People answer to their working name — the Contact. /crm/analytics and /crm/salespersonplan hold their doors.",
+    ],
+  },
+  {
     v: "3.23.0.2",
     date: "2026-08-24",
     module: "The deal pipeline — Lead → Opportunity → Quotation → Sales Order",

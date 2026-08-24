@@ -21,7 +21,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DOCTYPES, DOCTYPE_GROUPS, doctypeBySlug, type Doctype, type Field } from "@/crm/doctypes";
+import { DOCTYPES, doctypeBySlug, type Doctype, type Field } from "@/crm/doctypes";
 
 const PAPER = "#F1EFE9";
 const NAVY = "#16232F";
@@ -36,10 +36,13 @@ type Links = Record<string, { id: string; label: string }[]>;
 /** What the lightbox is showing: possibly another doctype than the page. */
 type ViewState = { dt: Doctype; row: Row; links: Links; mode: "view" | "edit" };
 
-/** Sections that are pages of their own rather than doctypes. Their screens
- *  are coming; the URLs already answer. */
+/** Sections that are pages of their own rather than doctypes. Deals is real —
+ *  the pipeline flow. The others' screens are coming; the URLs already answer. */
 export const SPECIAL_SECTIONS = [
   { name: "dashboard", label: "Dashboard", icon: "◧", blurb: "The CEO cockpit — owner concentration, the funnel, the response clock. Being built next." },
+  { name: "analytics", label: "Analytics", icon: "◫", blurb: "Win rates, stage velocity, source economics — read from the stage histories. Being built." },
+  { name: "salespersonplan", label: "SalesPerson Plan", icon: "◐", blurb: "Each salesperson's plan against their pipeline. Being built." },
+  { name: "deals", label: "Deals", icon: "◆", blurb: "" },
   { name: "communication", label: "Communication", icon: "✉", blurb: "Emails — automated, inbound and outbound, per user's own mailbox. Arrives with the channels phase." },
 ] as const;
 
@@ -50,6 +53,25 @@ const URL_OF: Record<string, string> = {
   interaction: "interactions", task: "task", address: "address", person_phone: "phone",
   product: "product", sector: "sector", industry: "industry", stage: "stage", profile: "users",
 };
+
+/** The sidebar, in Dr Raghu's order (24 Aug 2026). `dt` names a doctype,
+ *  `sp` a screen of its own, `href` a door to elsewhere in Genie. */
+const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string } | { sp: string } | { href: string; label: string; icon: string })[] }[] = [
+  {
+    items: [
+      { sp: "dashboard" }, { sp: "analytics" }, { sp: "salespersonplan" },
+      { href: "/sales-plan", label: "Sales Plan", icon: "◩" },
+    ],
+  },
+  { header: "PIPELINE", items: [{ dt: "lead" }, { dt: "opportunity" }, { dt: "quotation" }, { dt: "sales_order" }] },
+  { items: [{ sp: "deals" }] },
+  {
+    header: "ACCOUNTS",
+    items: [{ dt: "company" }, { dt: "person" }, { dt: "address" }, { dt: "person_phone" }, { dt: "industry" }, { dt: "product" }],
+  },
+  { header: "MORE", items: [{ dt: "interaction" }, { dt: "task" }, { dt: "quotation_line" }, { sp: "communication" }] },
+  { header: "SETTINGS", collapsible: true, items: [{ dt: "sector" }, { dt: "stage" }, { dt: "profile" }] },
+];
 
 export default function CrmApp({
   email, displayName, version, initialSlug,
@@ -73,6 +95,7 @@ export default function CrmApp({
   const [pin, setPin] = useState(0);
   const [colsOpen, setColsOpen] = useState(false);
   const [view, setView] = useState<ViewState | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const special = SPECIAL_SECTIONS.find((s) => s.name === slug);
   const dt = useMemo(() => DOCTYPES.find((d) => d.name === slug), [slug]);
@@ -208,64 +231,71 @@ export default function CrmApp({
             background: "#fff", minHeight: "calc(100vh - 46px)", position: "sticky", top: 46,
           }}
         >
-          <div className="mb-3">
-            <div className="text-xs font-bold px-2 mb-1" style={{ color: MUTED, letterSpacing: 1.1 }}>
-              SCREENS
-            </div>
-            {SPECIAL_SECTIONS.map((sp) => (
-              <button
-                key={sp.name}
-                onClick={() => setSlug(sp.name)}
-                className="w-full text-left px-2 py-1.5 rounded text-sm font-semibold flex items-center gap-2"
-                style={
-                  sp.name === slug
-                    ? { background: NAVY, color: "#fff" }
-                    : { color: "#5A6672", background: "transparent" }
-                }
-              >
-                <span style={{ opacity: 0.7, fontSize: 11 }}>{sp.icon}</span>
-                {sp.label}
-              </button>
-            ))}
-          </div>
-          {DOCTYPE_GROUPS.map((g) => {
-            const items = DOCTYPES.filter((d) => d.group === g);
-            if (!items.length) return null;
+          {NAV.map((block, bi) => {
+            const open = !block.collapsible || settingsOpen
+              || block.items.some((it) => "dt" in it ? it.dt === slug : "sp" in it ? it.sp === slug : false);
             return (
-              <div key={g} className="mb-3">
-                <div
-                  className="text-xs font-bold px-2 mb-1"
-                  style={{ color: MUTED, letterSpacing: 1.1 }}
-                >
-                  {g.toUpperCase()}
-                </div>
-                {items.map((d) => (
+              <div key={bi} className="mb-3">
+                {block.header && (
                   <button
-                    key={d.name}
-                    onClick={() => setSlug(d.name)}
-                    className="w-full text-left px-2 py-1.5 rounded text-sm font-semibold flex items-center gap-2"
-                    style={
-                      d.name === slug
-                        ? { background: NAVY, color: "#fff" }
-                        : { color: "#5A6672", background: "transparent" }
-                    }
+                    onClick={() => block.collapsible && setSettingsOpen((v) => !v)}
+                    className="w-full text-left text-xs font-bold px-2 mb-1 flex items-center justify-between"
+                    style={{ color: MUTED, letterSpacing: 1.1, cursor: block.collapsible ? "pointer" : "default" }}
                   >
-                    <span style={{ opacity: 0.7, fontSize: 11 }}>{d.icon}</span>
-                    {d.plural}
+                    {block.header}
+                    {block.collapsible && <span style={{ fontSize: 9 }}>{open ? "▾" : "▸"}</span>}
                   </button>
-                ))}
+                )}
+                {open && block.items.map((it) => {
+                  if ("href" in it) {
+                    return (
+                      <a
+                        key={it.href}
+                        href={it.href}
+                        className="w-full text-left px-2 py-1.5 rounded text-sm font-semibold flex items-center gap-2"
+                        style={{ color: "#5A6672" }}
+                      >
+                        <span style={{ opacity: 0.7, fontSize: 11 }}>{it.icon}</span>
+                        {it.label}
+                      </a>
+                    );
+                  }
+                  const name = "dt" in it ? it.dt : it.sp;
+                  const d = "dt" in it ? DOCTYPES.find((x) => x.name === it.dt) : undefined;
+                  const sp = "sp" in it ? SPECIAL_SECTIONS.find((x) => x.name === it.sp) : undefined;
+                  if (!d && !sp) return null;
+                  return (
+                    <button
+                      key={name}
+                      onClick={() => setSlug(name)}
+                      className="w-full text-left px-2 py-1.5 rounded text-sm font-semibold flex items-center gap-2"
+                      style={
+                        name === slug
+                          ? { background: NAVY, color: "#fff" }
+                          : { color: "#5A6672", background: "transparent" }
+                      }
+                    >
+                      <span style={{ opacity: 0.7, fontSize: 11 }}>{d?.icon ?? sp?.icon}</span>
+                      {d?.plural ?? sp?.label}
+                    </button>
+                  );
+                })}
               </div>
             );
           })}
         </nav>
 
-        {/* ---------- a screen of its own, still being built ---------- */}
+        {/* ---------- a screen of its own ---------- */}
         {special && (
           <main className="p-4 flex-1" style={{ minWidth: 0 }}>
-            <div className="rounded p-6" style={{ background: "#fff", border: `1px dashed ${BORDER}`, maxWidth: "70ch" }}>
-              <div className="font-bold mb-1" style={{ fontSize: 15 }}>{special.label}</div>
-              <p className="text-sm" style={{ color: "#5A6672", lineHeight: 1.6 }}>{special.blurb}</p>
-            </div>
+            {special.name === "deals" ? (
+              <PipelineFlow />
+            ) : (
+              <div className="rounded p-6" style={{ background: "#fff", border: `1px dashed ${BORDER}`, maxWidth: "70ch" }}>
+                <div className="font-bold mb-1" style={{ fontSize: 15 }}>{special.label}</div>
+                <p className="text-sm" style={{ color: "#5A6672", lineHeight: 1.6 }}>{special.blurb}</p>
+              </div>
+            )}
           </main>
         )}
 
@@ -475,6 +505,101 @@ export default function CrmApp({
           onOpenLink={openLinked}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * The Deals screen: the pipeline, checked. Both ladders, and per rung what
+ * came in, what went out, and what is sitting there now — read from the two
+ * stage histories. Flow accumulates from the day the pipeline went live.
+ */
+function PipelineFlow() {
+  type FlowRow = {
+    entity: string; stage_id: number; code: string; name: string; sort_order: number;
+    came_in: number; went_out: number; sitting: number; colour: string | null;
+  };
+  const [flow, setFlow] = useState<FlowRow[] | null>(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    fetch("/api/crm/pipeline", { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || "Could not load the pipeline");
+        setFlow(j.flow);
+      })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, []);
+
+  if (err) return <div className="rounded p-3 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>;
+  if (!flow) return <div className="text-sm" style={{ color: MUTED }}>loading…</div>;
+
+  const ladders: { key: string; title: string; note: string }[] = [
+    { key: "opportunity", title: "Opportunities", note: "New enquiries being worked toward a quote." },
+    { key: "quotation", title: "Quotations — hotness", note: "Sent through the buckets to Order Received." },
+  ];
+
+  return (
+    <div className="flex gap-4 flex-wrap" style={{ alignItems: "flex-start" }}>
+      {ladders.map((l) => {
+        const rows = flow.filter((r) => r.entity === l.key);
+        const tot = (k: "came_in" | "went_out" | "sitting") => rows.reduce((a, r) => a + Number(r[k] || 0), 0);
+        return (
+          <div key={l.key} className="rounded border" style={{ borderColor: BORDER, background: "#fff", minWidth: 360, flex: "1 1 420px", maxWidth: 620 }}>
+            <div className="px-4 pt-3 pb-1">
+              <div className="font-bold" style={{ fontSize: 15 }}>{l.title}</div>
+              <div className="text-xs" style={{ color: MUTED }}>{l.note}</div>
+            </div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  {["STAGE", "CAME IN", "WENT OUT", "SITTING"].map((h, i) => (
+                    <th key={h} style={{
+                      textAlign: i === 0 ? "left" : "right", padding: "6px 16px", fontSize: 10,
+                      letterSpacing: 0.6, color: MUTED, borderBottom: `2px solid ${BORDER}`,
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.stage_id}>
+                    <td style={{ padding: "7px 16px", fontSize: 13, borderBottom: "1px solid #F0EEE8" }}>
+                      <span style={{
+                        display: "inline-block", width: 9, height: 9, borderRadius: 2,
+                        background: r.colour || "#8A94A0", marginRight: 8, verticalAlign: "baseline",
+                      }} />
+                      {r.name}
+                    </td>
+                    {(["came_in", "went_out", "sitting"] as const).map((k) => (
+                      <td key={k} className="tnum" style={{
+                        textAlign: "right", padding: "7px 16px", fontSize: 13,
+                        borderBottom: "1px solid #F0EEE8",
+                        fontWeight: k === "sitting" && Number(r[k]) > 0 ? 700 : 400,
+                        color: Number(r[k]) === 0 ? "#C7CCD2" : undefined,
+                      }}>{Number(r[k]).toLocaleString("en-IN")}</td>
+                    ))}
+                  </tr>
+                ))}
+                <tr>
+                  <td style={{ padding: "8px 16px", fontSize: 12, fontWeight: 700 }}>Total</td>
+                  {(["came_in", "went_out", "sitting"] as const).map((k) => (
+                    <td key={k} className="tnum" style={{ textAlign: "right", padding: "8px 16px", fontSize: 12, fontWeight: 700 }}>
+                      {tot(k).toLocaleString("en-IN")}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+      <p className="text-xs" style={{ color: MUTED, flexBasis: "100%", maxWidth: "80ch", lineHeight: 1.6 }}>
+        Every stage move is written by the database the moment it happens, so this
+        table is measured, not remembered. It accumulates from 24/08/2026 — the
+        day the pipeline went live; the ERP&apos;s past sits in each row&apos;s first rung.
+      </p>
     </div>
   );
 }

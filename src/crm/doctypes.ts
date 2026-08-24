@@ -287,7 +287,7 @@ export const DOCTYPES: Doctype[] = [
     ],
   },
   {
-    name: "person", label: "Person", plural: "People", table: "person",
+    name: "person", label: "Contact", plural: "Contacts", table: "person",
     titleField: "full_name", group: "Accounts", icon: "○",
     orderBy: { column: "updated_at", ascending: false },
     blurb: "The person. 63% of the contacts in the ERP are attached to no company at all — attach them here.",
