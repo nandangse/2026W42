@@ -3,6 +3,7 @@ import { requireReader, requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { today } from "@/lib/schedule";
 import { TRADES } from "@/lib/templates";
+import { ensureManpowerRollover, istToday } from "@/lib/manpower-rollover";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ rows: data || [] });
     }
 
-    const day = url.searchParams.get("day") || today();
+    const day = url.searchParams.get("day") || istToday();
+    // Reading today's ledger is also what heals it: if the 4 AM cron slept,
+    // the missing days fill themselves in — back-dated correctly — the first
+    // time anyone looks. Cheap when there is nothing to do.
+    if (day === istToday()) {
+      try { await ensureManpowerRollover(); } catch { /* read still answers */ }
+    }
     const { data, error } = await admin
       .from("job_manpower").select("job_id, day, crew, noted_by, updated_at").eq("day", day);
     if (error) {

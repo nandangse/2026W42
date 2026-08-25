@@ -146,6 +146,21 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
     () => averagePerMonth(rows, fyStart(TODAY), TODAY, earliest, coveredMonths(fyStart(TODAY), TODAY, null)),
     [rows, earliest],
   );
+  /** What actually went out the gate in the last N days — nos, value,
+   *  throughput — shown under the averages (Dr Raghu, 25 Aug 2026). */
+  const deliveredSince = (days: number) => {
+    const cut = new Date(new Date(TODAY + "T00:00:00").getTime() - days * 86400000)
+      .toISOString().slice(0, 10);
+    const js = rows.filter((j) => j.delivered_on && j.delivered_on >= cut && j.delivered_on <= TODAY);
+    return {
+      n: js.length,
+      val: js.reduce((s, j) => s + (Number(j.val) || 0), 0),
+      tp: js.reduce((s, j) => s + throughputOf(j), 0),
+    };
+  };
+  const d7 = useMemo(() => deliveredSince(7), [rows]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const d30 = useMemo(() => deliveredSince(30), [rows]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const m12 = useMemo(() => {
     const r = rangeFor("m12", TODAY, earliest);
     return averagePerMonth(rows, r.from, r.to, earliest, 12);
@@ -274,8 +289,10 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
 
       {/* ===== averages, and the honesty about them ===== */}
       <div className="flex gap-2 flex-wrap mb-3">
-        <AverageCard title={`YTD monthly average · since 1 Apr`} avg={ytd} V={V} />
-        <AverageCard title="12-month monthly average" avg={m12} V={V} />
+        <AverageCard title={`YTD monthly average · since 1 Apr`} avg={ytd} V={V}
+          recent={{ label: "Delivered · last 7 days", ...d7 }} />
+        <AverageCard title="12-month monthly average" avg={m12} V={V}
+          recent={{ label: "Delivered · last 30 days", ...d30 }} />
         <div className="rounded-lg border bg-white p-3" style={{ borderColor: C.line, flex: "1 1 0", minWidth: 232 }} title={OTD_FORMULA}>
           <div className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>
             OTD % <span style={{ cursor: "help", color: C.navy }} title={OTD_FORMULA}>ⓘ</span>
@@ -448,9 +465,13 @@ function Headline({ label, value, note, color }: { label: string; value: string;
  * dropped at all. So when the data doesn't span the window, the number is
  * withheld and the span is stated instead.
  */
-function AverageCard({ title, avg, V }: { title: string; avg: ReturnType<typeof averagePerMonth>; V: (n: number) => string }) {
+function AverageCard({ title, avg, V, recent }: {
+  title: string; avg: ReturnType<typeof averagePerMonth>; V: (n: number) => string;
+  /** The card's lower half: what went out the gate in the last N days. */
+  recent?: { label: string; n: number; val: number; tp: number };
+}) {
   return (
-    <div className="rounded-lg border bg-white p-3" style={{ borderColor: C.line, flex: "1 1 0", minWidth: 250 }}>
+    <div className="rounded-lg border bg-white p-3" style={{ borderColor: C.line, flex: "1 1 0", minWidth: 250, display: "flex", flexDirection: "column" }}>
       <div className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1, textTransform: "uppercase" }}>{title}</div>
       {avg.insufficient || !avg.perMonth ? (
         <>
@@ -480,6 +501,20 @@ function AverageCard({ title, avg, V }: { title: string; avg: ReturnType<typeof 
           </div>
           <div className="text-xs" style={{ color: C.faint }}>over {avg.months} month{avg.months === 1 ? "" : "s"} of data</div>
         </>
+      )}
+      {recent && (
+        <div className="mt-auto pt-2" style={{ borderTop: `1px dashed ${C.line}`, marginTop: 10 }}>
+          <div className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>{recent.label.toUpperCase()}</div>
+          <div className="flex items-baseline gap-2">
+            <span className="tnum font-bold" style={{ fontSize: 22, color: recent.n ? C.navy : C.faint }}>{recent.n}</span>
+            <span className="text-xs" style={{ color: C.mute }}>job{recent.n === 1 ? "" : "s"} out the gate</span>
+          </div>
+          <div className="text-xs tnum" style={{ color: C.sub, lineHeight: 1.5 }}>
+            {recent.n
+              ? <>{V(recent.val)} value · <span style={{ color: C.green }}>{V(recent.tp)} throughput</span></>
+              : "nothing went out"}
+          </div>
+        </div>
       )}
     </div>
   );

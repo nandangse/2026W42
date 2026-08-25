@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.0",
+    date: "2026-08-25",
+    module: "The manpower rolls itself, and the floor prices its labour",
+    items: [
+      "TODAY'S MANPOWER IS YESTERDAY'S UNTIL THE FLOOR SAYS OTHERWISE. At 4 AM, with no interference from anyone, every job ticked On Floor gets today's row carried from the last working day — Monday carries Saturday, and on a third-Saturday week Monday carries Friday. Holidays (every Sunday, the third Saturday) get a ZERO row: work on a holiday is typed, never assumed. Every carried day is a REAL ROW in the ledger, marked as carried, so the study has no gaps and a floor that never spoke stays distinguishable from a floor that confirmed.",
+      "THE TICK IS THE SWITCH: ticking On Floor gives the job today's row at once; unticking zeroes today in the unticker's name and stops the rolling — as does delivery. If the 4 AM cron ever sleeps, the ledger heals itself the first time anyone opens On Floor, back-dated correctly.",
+      "THE JOB PLAN GREW A MANPOWER TAB — the day-wise ledger: date, the six trades, total, source (by whom / carried / holiday), and where the LABOUR RATES are set (Admin → Settings, one day-rate per trade) each day prices itself and the job totals its man-days and labour cost. Rates and costs are money — Stratcom's eyes, masked like every other rupee.",
+      "ON FLOOR'S CARDS GREW TO SEVEN and slimmed to fit: DELIVERED · 7 DAYS and · 30 DAYS stand beside Value and Throughput — nos, value, throughput from the delivery record, the same boxes the walk sheet prints. ALREADY LATE now measures against OTD — the promise on the order — not the board's working target.",
+      "OPEN ON IT tells the whole story: a MATERIAL PENDING count joined the tasks and escalations, and both tasks and material wear a ＋ — a task or a kitting line is born on the job where the need was noticed, without leaving the page. A row in the tasks or escalations lightbox now OPENS THE TASK — owner, date, escalation, done — through the same route as Tasking, so the drift log keeps counting.",
+      "DELIVERED JOBS' average cards each split in two: the YTD average carries DELIVERED · LAST 7 DAYS below it, the 12-month average carries LAST 30 DAYS — nos, value, throughput, filling the space that stood empty.",
+      "Migration 0072 (labour_rate) holds the rates; migration none for the rolling — the ledger the floor already had simply learned to keep itself.",
+    ],
+  },
+  {
     v: "3.23.0.6",
     date: "2026-08-24",
     module: "BANTTC in one line, contacts where the quote is, and filters that know the customer",

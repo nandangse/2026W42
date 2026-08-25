@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireStratcom, errJson } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
+import { seedJobToday, zeroJobToday } from "@/lib/manpower-rollover";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,16 @@ export async function POST(req: Request) {
         );
       throw new Error(error.message);
     }
+
+    // The tick is what makes a job roll (Dr Raghu, 25 Aug 2026): ticked, it
+    // gets today's manpower row at once and carries forward from tomorrow;
+    // unticked, today's entries go to zero in the unticker's name and the
+    // rolling stops. Neither may fail the tick itself.
+    try {
+      if (on) await seedJobToday(jobId);
+      else await zeroJobToday(jobId, user.email);
+    } catch { /* the ledger catches up on the next rollover pass */ }
+
     return NextResponse.json({ ok: true, on });
   } catch (e) {
     return errJson(e);

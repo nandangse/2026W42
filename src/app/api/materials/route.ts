@@ -34,8 +34,28 @@ const dateOrNull = (v: unknown) => (v ? String(v).slice(0, 10) : null);
  */
 export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+
+    // ?pending_counts=1 — how many lines are NOT received, per job, for the
+    // On Floor chips. Counts carry no commercial detail, so anyone who can
+    // read the board may read them.
+    if (url.searchParams.get("pending_counts") !== null) {
+      const { requireReader } = await import("@/lib/auth");
+      await requireReader();
+      const { data, error } = await adminClient()
+        .from("materials").select("job_id, status").neq("status", "Received");
+      if (error) {
+        if (/materials|does not exist|schema cache/i.test(error.message))
+          return NextResponse.json({ counts: {} });
+        throw new Error(error.message);
+      }
+      const counts: Record<string, number> = {};
+      for (const m of data || []) counts[String(m.job_id)] = (counts[String(m.job_id)] || 0) + 1;
+      return NextResponse.json({ counts });
+    }
+
     await requirePlanner();
-    const jobId = new URL(req.url).searchParams.get("job_id");
+    const jobId = url.searchParams.get("job_id");
     if (!jobId) return NextResponse.json({ error: "job_id required" }, { status: 400 });
     const admin = adminClient();
 

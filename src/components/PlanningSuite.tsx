@@ -3231,7 +3231,7 @@ function JobPlan({
     [board.jobs, board.archived, activeId],
   );
 
-  const [planView, setPlanView] = useState<"plan" | "mat" | "shop" | "pics">("plan");
+  const [planView, setPlanView] = useState<"plan" | "mat" | "shop" | "pics" | "mp">("plan");
   const [draft, setDraft] = useState<Plan | null>(null);
   const [applyTplName, setApplyTplName] = useState("");
   const templateNames = useMemo(() => Object.keys(board.templates).sort(), [board.templates]);
@@ -3616,9 +3616,9 @@ function JobPlan({
 
       {/* plan / materials sub-tabs */}
       <div className="flex gap-1 rounded p-1 bg-white border mb-3" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
-        {(["plan", "mat", "shop", "pics"] as const).map((k) => (
+        {(["plan", "mat", "shop", "pics", "mp"] as const).map((k) => (
           <button key={k} onClick={() => { if (k === "mat") ensureMats(); setPlanView(k); }} className="px-3 py-1 rounded text-sm font-semibold" style={planView === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>
-            {k === "plan" ? "Milestone Plan" : k === "mat" ? "Material Kitting" : k === "shop" ? "Shop Updates" : "Photos"}
+            {k === "plan" ? "Milestone Plan" : k === "mat" ? "Material Kitting" : k === "shop" ? "Shop Updates" : k === "pics" ? "Photos" : "Manpower"}
           </button>
         ))}
       </div>
@@ -3626,6 +3626,11 @@ function JobPlan({
       {/* Shop Updates as a page rather than a lightbox: the same content, for
           somebody who came to READ the history rather than glance at it. */}
       {planView === "shop" && <ShopUpdatesPanel job={dj} />}
+
+      {/* The day-wise work study as a ledger: every day a row, typed or
+          carried by the 4 AM rollover, with the labour cost where the rates
+          are set and the reader may see money. */}
+      {planView === "mp" && <ManpowerLedger jobId={dj.id} V={V} />}
 
       {/* The build history in pictures, as a page. Same gallery the On Floor
           row opens — one component, so the two cannot disagree about what has
@@ -6182,6 +6187,8 @@ function Admin({
   return (
     <div className="p-4 space-y-4">
       <AdminTabs tab={adminTab} setTab={setAdminTab} />
+      {adminTab === "setup" && <LabourRatesCard />}
+
       {adminTab === "setup" && <ImageQuotesPanel />}
 
       {adminTab === "setup" && (<>
@@ -6714,12 +6721,81 @@ function Admin({
 // ============================ Pending Material ============================
 
 /** The same number card the delivery board uses, shared by the new tabs. */
-function StatCard({ label, value, sub, color = "#22303C" }: { label: string; value: string; sub?: string; color?: string }) {
+/**
+ * Labour day-rates, one per trade — Admin -> Settings, keyed by Dr Raghu.
+ * With the manpower ledger rolling every day, these turn headcount into
+ * labour cost on the Job Plan's Manpower tab. Rates are money: the API
+ * answers Stratcom only, and the cost columns mask like every other rupee.
+ */
+function LabourRatesCard() {
+  const [rates, setRates] = useState<Record<string, string> | null>(null);
+  const [needsMigration, setNeedsMigration] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    api.get("/api/admin/labour-rates")
+      .then((r: { rates?: Record<string, number> | null; needsMigration?: boolean }) => {
+        if (r.needsMigration) { setNeedsMigration(true); setRates(Object.fromEntries(TRADES.map((t) => [t.key, "0"]))); return; }
+        setRates(Object.fromEntries(TRADES.map((t) => [t.key, String(r.rates?.[t.key] ?? 0)])));
+      })
+      .catch(() => setRates(Object.fromEntries(TRADES.map((t) => [t.key, "0"]))));
+  }, []);
+  const save = async () => {
+    if (!rates) return;
+    setBusy(true); setMsg("");
+    try {
+      await api.post("/api/admin/labour-rates", {
+        rates: Object.fromEntries(TRADES.map((t) => [t.key, Number(rates[t.key]) || 0])),
+      });
+      setMsg("Saved. The Manpower tab prices itself from these.");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally { setBusy(false); }
+  };
   return (
-    <div className="bg-white rounded-lg border px-3 py-2" style={{ borderColor: "#E2E0DA", borderTop: `3px solid ${color}` }}>
-      <div className="text-xs font-bold" style={{ color: "#8A94A0" }}>{label}</div>
-      <div className="text-xl font-bold tnum" style={{ color }}>{value}</div>
-      {sub && <div className="text-xs" style={{ color: "#8A94A0" }}>{sub}</div>}
+    <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: "#E2E0DA" }}>
+      <div className="flex items-baseline gap-2 flex-wrap mb-2">
+        <h3 className="font-bold" style={{ color: "#16232F" }}>Labour rates</h3>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>
+          day-rate per trade · turns the manpower ledger into labour cost · masked like every other rupee
+        </span>
+      </div>
+      {needsMigration && (
+        <div className="text-xs rounded p-2 mb-2" style={{ background: "#FFF7E6", color: "#8A5A00" }}>
+          Run migration 0072 — the rates have nowhere to live yet.
+        </div>
+      )}
+      {rates && (
+        <div className="flex gap-2 flex-wrap items-end">
+          {TRADES.map((t) => (
+            <label key={t.key} className="block">
+              <div className="text-xs font-bold mb-0.5" style={{ color: t.color }}>{t.label}</div>
+              <input
+                type="number" min={0} value={rates[t.key]}
+                onChange={(e) => setRates((r) => ({ ...(r || {}), [t.key]: e.target.value }))}
+                className="rounded border px-2 py-1 text-sm tnum" style={{ borderColor: "#E2E0DA", width: 92 }}
+              />
+            </label>
+          ))}
+          <button onClick={save} disabled={busy || needsMigration}
+            className="rounded px-3 py-1.5 text-xs font-bold"
+            style={{ background: busy ? "#B8B5AC" : "#E8600A", color: "#fff" }}>
+            {busy ? "Saving…" : "Save rates"}
+          </button>
+        </div>
+      )}
+      {msg && <div className="text-xs mt-2 font-semibold" style={{ color: msg.startsWith("Saved") ? "#0D7A3F" : "#B3261E" }}>{msg}</div>}
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub, color = "#22303C" }: { label: string; value: string; sub?: string; color?: string }) {
+  // Slimmed 25 Aug 2026 — seven of these stand in one row on On Floor now.
+  return (
+    <div className="bg-white rounded-lg border px-2.5 py-1.5" style={{ borderColor: "#E2E0DA", borderTop: `3px solid ${color}` }}>
+      <div className="font-bold" style={{ color: "#8A94A0", fontSize: 10, letterSpacing: ".03em" }}>{label}</div>
+      <div className="text-lg font-bold tnum" style={{ color, lineHeight: 1.25 }}>{value}</div>
+      {sub && <div style={{ color: "#8A94A0", fontSize: 10.5, lineHeight: 1.35 }}>{sub}</div>}
     </div>
   );
 }
@@ -7585,6 +7661,127 @@ function JobManpowerStrip({ jobId, canEdit }: { jobId: string; canEdit: boolean 
   );
 }
 
+/**
+ * The Manpower tab: the job's day-wise ledger. Every day is a row — typed by
+ * the floor, carried forward by the 4 AM rollover, or a holiday zero — and
+ * where the rates are set (Admin → Settings) and the reader may see money,
+ * each day prices itself: headcount × day-rate, summed at the bottom.
+ */
+function ManpowerLedger({ jobId, V }: { jobId: string; V: (n: number) => string }) {
+  type LedgerRow = { day: string; crew: Record<string, number>; noted_by: string | null };
+  const [rows, setRows] = useState<LedgerRow[] | null>(null);
+  const [rates, setRates] = useState<Record<string, number> | null>(null);
+
+  useEffect(() => {
+    api.get(`/api/on-floor/manpower?job_id=${encodeURIComponent(jobId)}&days=60`)
+      .then((r: { rows?: LedgerRow[] }) => setRows(r.rows || []))
+      .catch(() => setRows([]));
+    // Rates answer Stratcom only — everyone else simply gets no cost column.
+    api.get("/api/admin/labour-rates")
+      .then((r: { rates?: Record<string, number> | null }) => {
+        if (r.rates && Object.values(r.rates).some((n) => n > 0)) setRates(r.rates);
+      })
+      .catch(() => {});
+  }, [jobId]);
+
+  const isHoliday = (iso: string) => {
+    const d = new Date(iso + "T00:00:00");
+    return d.getDay() === 0 || (d.getDay() === 6 && d.getDate() >= 15 && d.getDate() <= 21);
+  };
+  const totalOf = (c: Record<string, number>) => TRADES.reduce((n, t) => n + (Number(c?.[t.key]) || 0), 0);
+  const costOf = (c: Record<string, number>) =>
+    rates ? TRADES.reduce((n, t) => n + (Number(c?.[t.key]) || 0) * (rates[t.key] || 0), 0) : 0;
+  const srcOf = (r: LedgerRow) => {
+    if (r.noted_by !== "rollover@genie") return r.noted_by ? `by ${String(r.noted_by).split("@")[0]}` : "recorded";
+    return totalOf(r.crew) === 0 && isHoliday(r.day) ? "holiday" : "carried";
+  };
+
+  if (rows === null) return <div className="text-sm" style={{ color: "#8A94A0" }}>loading…</div>;
+  if (!rows.length)
+    return (
+      <div className="bg-white rounded-lg border p-4 text-sm" style={{ borderColor: "#E2E0DA", color: "#8A94A0" }}>
+        No manpower recorded on this job yet. Tick it On Floor and the ledger starts today.
+      </div>
+    );
+
+  const manDays = rows.reduce((n, r) => n + totalOf(r.crew), 0);
+  const totalCost = rows.reduce((n, r) => n + costOf(r.crew), 0);
+
+  return (
+    <div className="bg-white rounded-lg border mb-4" style={{ borderColor: "#E2E0DA", overflowX: "auto" }}>
+      <div className="px-3 pt-2 pb-1 flex items-baseline gap-2 flex-wrap">
+        <h2 className="font-bold" style={{ color: "#16232F" }}>Manpower — the work study</h2>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>
+          one row per day · typed by the floor or carried at 4 AM · must match the attendance muster
+        </span>
+      </div>
+      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 560 }}>
+        <thead>
+          <tr>
+            {["DATE", ...TRADES.map((t) => t.tiny), "TOTAL", "SOURCE", ...(rates ? ["COST"] : [])].map((h, i) => (
+              <th key={h + i} style={{
+                textAlign: i === 0 || h === "SOURCE" ? "left" : "right", padding: "6px 10px",
+                fontSize: 10, letterSpacing: ".05em", color: "#8A94A0",
+                borderBottom: "2px solid #E2E0DA", whiteSpace: "nowrap",
+              }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const carried = r.noted_by === "rollover@genie";
+            const tot = totalOf(r.crew);
+            return (
+              <tr key={r.day} style={{ opacity: carried && tot === 0 ? 0.55 : 1 }}>
+                <td className="tnum" style={{ padding: "5px 10px", fontSize: 12.5, borderBottom: "1px solid #F0EEE8", whiteSpace: "nowrap" }}>
+                  {fmtFull(r.day)}{isHoliday(r.day) ? " ·" : ""}
+                  {isHoliday(r.day) && <span style={{ color: "#8A94A0", fontSize: 10 }}> holiday</span>}
+                </td>
+                {TRADES.map((t) => (
+                  <td key={t.key} className="tnum" style={{
+                    textAlign: "right", padding: "5px 10px", fontSize: 12.5,
+                    borderBottom: "1px solid #F0EEE8",
+                    color: Number(r.crew?.[t.key]) ? t.color : "#C9C6BD",
+                    fontWeight: Number(r.crew?.[t.key]) && !carried ? 700 : 400,
+                  }}>
+                    {Number(r.crew?.[t.key]) || 0}
+                  </td>
+                ))}
+                <td className="tnum" style={{ textAlign: "right", padding: "5px 10px", fontSize: 12.5, fontWeight: 700, borderBottom: "1px solid #F0EEE8" }}>
+                  {tot}
+                </td>
+                <td style={{ padding: "5px 10px", fontSize: 11, borderBottom: "1px solid #F0EEE8", color: carried ? "#8A94A0" : "#0D7A3F", whiteSpace: "nowrap" }}>
+                  {srcOf(r)}
+                </td>
+                {rates && (
+                  <td className="tnum" style={{ textAlign: "right", padding: "5px 10px", fontSize: 12.5, borderBottom: "1px solid #F0EEE8" }}>
+                    {tot ? V(costOf(r.crew)) : "—"}
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+          <tr>
+            <td style={{ padding: "7px 10px", fontSize: 12, fontWeight: 800 }}>TOTAL · {rows.length} days</td>
+            {TRADES.map((t) => (
+              <td key={t.key} className="tnum" style={{ textAlign: "right", padding: "7px 10px", fontSize: 12, fontWeight: 800, color: t.color }}>
+                {rows.reduce((n, r) => n + (Number(r.crew?.[t.key]) || 0), 0)}
+              </td>
+            ))}
+            <td className="tnum" style={{ textAlign: "right", padding: "7px 10px", fontSize: 12, fontWeight: 800 }}>{manDays}</td>
+            <td style={{ padding: "7px 10px", fontSize: 10.5, color: "#8A94A0" }}>man-days</td>
+            {rates && (
+              <td className="tnum" style={{ textAlign: "right", padding: "7px 10px", fontSize: 12, fontWeight: 800, color: "#16232F" }}>
+                {V(totalCost)}
+              </td>
+            )}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /** Six small boxes and a save — today's reality for one job. */
 function ManpowerEditor({ jobId, value, onSaved }: { jobId: string; value?: Crew; onSaved: () => void }) {
   const [crew, setCrew] = useState<Record<string, string>>(
@@ -7732,7 +7929,43 @@ function OnFloor({
 
   const totVal = jobs.reduce((s, j) => s + (j.val || 0), 0);
   const totTp = jobs.reduce((s, j) => s + tpOf(j), 0);
-  const late = jobs.filter((j) => j.tdd && j.tdd < TODAY);
+  // Late against OTD — the promise on the order — not the board's working
+  // target (Dr Raghu, 25 Aug 2026). A job with no OTD falls back to its
+  // target date rather than hiding from the count.
+  const late = jobs.filter((j) => (j.otd || j.tdd) && String(j.otd || j.tdd) < TODAY);
+
+  // What actually went out the gate, from the delivery record — the same
+  // 7/30-day boxes the walk sheet prints, standing beside the floor's cards.
+  const [deliv, setDeliv] = useState<{ on: string | null; val: number; tpv: number }[]>([]);
+  useEffect(() => {
+    api.get("/api/delivered/recent")
+      .then((r: { jobs?: Record<string, unknown>[] }) => {
+        setDeliv((r.jobs || []).map((j) => ({
+          on: String(j.on ?? j.delivered_on ?? "").slice(0, 10) || null,
+          val: Number(j.val) || 0,
+          tpv: Number(j.tpv) || 0,
+        })));
+      })
+      .catch(() => {});
+  }, []);
+  const deliveredSince = (days: number) => {
+    const from = new Date(new Date(TODAY + "T00:00:00").getTime() - days * 86400000)
+      .toISOString().slice(0, 10);
+    const js = deliv.filter((j) => j.on && j.on >= from && j.on <= TODAY);
+    return { n: js.length, val: js.reduce((s, j) => s + j.val, 0), tp: js.reduce((s, j) => s + j.tpv, 0) };
+  };
+  const d7 = deliveredSince(7);
+  const d30 = deliveredSince(30);
+
+  // Pending material per job, for the OPEN ON IT chip.
+  const [matCounts, setMatCounts] = useState<Record<string, number>>({});
+  const loadMatCounts = useCallback(() => {
+    api.get("/api/materials?pending_counts=1")
+      .then((r: { counts?: Record<string, number> }) => setMatCounts(r.counts || {}))
+      .catch(() => {});
+  }, []);
+  useEffect(() => { loadMatCounts(); }, [loadMatCounts]);
+  const [quickAdd, setQuickAdd] = useState<{ job: Job; kind: "task" | "material" } | null>(null);
 
   /**
    * What the floor has said TODAY.
@@ -7814,11 +8047,15 @@ function OnFloor({
         </span>
         <span className="text-xs" style={{ color: "#B3261E" }}>must match the attendance muster</span>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 mb-3">
         <StatCard label="ON FLOOR" value={String(jobs.length)} sub="jobs being worked on now" color="#0D7A3F" />
         <StatCard label="VALUE" value={V(totVal)} color="#1B3A5C" />
         <StatCard label="THROUGHPUT" value={V(totTp)} sub={totVal ? `${Math.round((totTp / totVal) * 100)}% of value` : ""} color="#E8600A" />
-        <StatCard label="ALREADY LATE" value={String(late.length)} sub={late.length ? "past target delivery" : "none past target"} color={late.length ? "#B3261E" : "#0D7A3F"} />
+        <StatCard label="DELIVERED · 7 DAYS" value={String(d7.n)}
+          sub={d7.n ? `${V(d7.val)} · TP ${V(d7.tp)}` : "nothing went out"} color="#1B3A5C" />
+        <StatCard label="DELIVERED · 30 DAYS" value={String(d30.n)}
+          sub={d30.n ? `${V(d30.val)} · TP ${V(d30.tp)}` : "nothing went out"} color="#1B3A5C" />
+        <StatCard label="ALREADY LATE" value={String(late.length)} sub={late.length ? "past OTD" : "none past OTD"} color={late.length ? "#B3261E" : "#0D7A3F"} />
         <StatCard
           label="SHOP UPDATES TODAY"
           value={String(todayNotes.length)}
@@ -7951,15 +8188,48 @@ function OnFloor({
                     const w = workByJob.get(j.id) || { tasks: [], esc: [] };
                     return (
                       <div className="flex flex-col gap-1 floor-btns">
-                        <button
-                          onClick={() => w.tasks.length && setWork({ job: j, only: "tasks" })}
-                          disabled={!w.tasks.length}
-                          className="rounded px-2 py-1 text-left"
-                          style={{ background: w.tasks.length ? "#DCE8F5" : "#F4F2EC", cursor: w.tasks.length ? "pointer" : "default" }}
-                        >
-                          <b className="tnum" style={{ color: w.tasks.length ? "#1B3A5C" : "#B8B5AC", fontSize: 15 }}>{w.tasks.length}</b>
-                          <span className="text-xs" style={{ color: "#5A6672" }}> task{w.tasks.length === 1 ? "" : "s"} pending</span>
-                        </button>
+                        <div className="flex gap-1 items-stretch">
+                          <button
+                            onClick={() => w.tasks.length && setWork({ job: j, only: "tasks" })}
+                            disabled={!w.tasks.length}
+                            className="rounded px-2 py-1 text-left flex-1"
+                            style={{ background: w.tasks.length ? "#DCE8F5" : "#F4F2EC", cursor: w.tasks.length ? "pointer" : "default" }}
+                          >
+                            <b className="tnum" style={{ color: w.tasks.length ? "#1B3A5C" : "#B8B5AC", fontSize: 15 }}>{w.tasks.length}</b>
+                            <span className="text-xs" style={{ color: "#5A6672" }}> task{w.tasks.length === 1 ? "" : "s"} pending</span>
+                          </button>
+                          {canTask && (
+                            <button
+                              onClick={() => setQuickAdd({ job: j, kind: "task" })}
+                              className="rounded px-1.5 font-bold"
+                              style={{ background: "#1B3A5C", color: "#fff" }}
+                              title="Add a task on this job"
+                            >
+                              +
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex gap-1 items-stretch">
+                          <button
+                            onClick={() => onOpen(j.id)}
+                            className="rounded px-2 py-1 text-left flex-1"
+                            style={{ background: (matCounts[j.id] || 0) ? "#FDF3E1" : "#F4F2EC", cursor: "pointer" }}
+                            title="Open the job's Material Kitting"
+                          >
+                            <b className="tnum" style={{ color: (matCounts[j.id] || 0) ? "#8A5A00" : "#B8B5AC", fontSize: 15 }}>{matCounts[j.id] || 0}</b>
+                            <span className="text-xs" style={{ color: "#5A6672" }}> material pending</span>
+                          </button>
+                          {canEdit && (
+                            <button
+                              onClick={() => setQuickAdd({ job: j, kind: "material" })}
+                              className="rounded px-1.5 font-bold"
+                              style={{ background: "#8A5A00", color: "#fff" }}
+                              title="Add a kitting line on this job"
+                            >
+                              +
+                            </button>
+                          )}
+                        </div>
                         <button
                           onClick={() => w.esc.length && setWork({ job: j, only: "esc" })}
                           disabled={!w.esc.length}
@@ -8011,7 +8281,24 @@ function OnFloor({
           job={work.job}
           tasks={(workByJob.get(work.job.id) || { tasks: [], esc: [] })[work.only]}
           only={work.only}
+          canTask={canTask}
+          people={board.assignableUsers || []}
+          onChanged={() => { void reload(); }}
           onClose={() => setWork(null)}
+        />
+      )}
+
+      {quickAdd && (
+        <QuickAddOnFloor
+          job={quickAdd.job}
+          kind={quickAdd.kind}
+          people={board.assignableUsers || []}
+          onClose={() => setQuickAdd(null)}
+          onDone={() => {
+            setQuickAdd(null);
+            if (quickAdd.kind === "material") loadMatCounts();
+            else void reload();
+          }}
         />
       )}
 
@@ -8050,9 +8337,15 @@ function toWip(j: Job): WipJob {
  * tasks with no job on it belongs to nothing.
  */
 function WorkList({
-  job, tasks, only, onClose,
-}: { job: Job; tasks: Task[]; only: "tasks" | "esc"; onClose: () => void }) {
+  job, tasks, only, canTask, people, onChanged, onClose,
+}: {
+  job: Job; tasks: Task[]; only: "tasks" | "esc"; canTask: boolean;
+  people: { initials?: string | null; name?: string | null }[];
+  onChanged: () => void; onClose: () => void;
+}) {
   const sorted = [...tasks].sort((a, b) => String(a.due || "9999").localeCompare(String(b.due || "9999")));
+  // A row opens the task itself — the count was the door, not the room.
+  const [editing, setEditing] = useState<Task | null>(null);
   return (
     <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.45)", zIndex: 60 }}>
       <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 620, maxHeight: "82vh", overflow: "auto" }}>
@@ -8070,7 +8363,16 @@ function WorkList({
         <div className="p-3">
           {sorted.length === 0 && <div className="text-sm" style={{ color: "#8A94A0" }}>Nothing open.</div>}
           {sorted.map((t) => (
-            <div key={t.kind + t.id} className="rounded border p-2 mb-1.5" style={{ borderColor: "#E2E0DA", borderLeft: `3px solid ${escalated(t.esc) ? "#B3261E" : "#1B3A5C"}` }}>
+            <div
+              key={t.kind + t.id}
+              onClick={() => canTask && setEditing(t)}
+              className="rounded border p-2 mb-1.5"
+              style={{
+                borderColor: "#E2E0DA", borderLeft: `3px solid ${escalated(t.esc) ? "#B3261E" : "#1B3A5C"}`,
+                cursor: canTask ? "pointer" : "default",
+              }}
+              title={canTask ? "Open this task" : undefined}
+            >
               <div className="flex items-start gap-2">
                 <div className="flex-1">
                   <div className="text-sm font-semibold" style={{ color: "#16232F" }}>{t.t}</div>
@@ -8090,6 +8392,176 @@ function WorkList({
               {t.esc_why && <div className="text-xs mt-1" style={{ color: "#5A6672" }}>{t.esc_why}</div>}
             </div>
           ))}
+        </div>
+      </div>
+      {editing && (
+        <TaskQuickEdit
+          task={editing}
+          people={people}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); onChanged(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * The task, opened from the pending/escalations list — title, owner, date,
+ * escalation, done — enough to act without leaving the floor. Writes through
+ * the same /api/tasks the Tasking screen uses, so the drift log (push_count,
+ * original_due) keeps working here too.
+ */
+function TaskQuickEdit({
+  task, people, onClose, onSaved,
+}: {
+  task: Task;
+  people: { initials?: string | null; name?: string | null }[];
+  onClose: () => void; onSaved: () => void;
+}) {
+  const [title, setTitle] = useState(task.t);
+  const [who, setWho] = useState(task.who || "unassigned");
+  const [due, setDue] = useState(task.due || "");
+  const [esc, setEsc] = useState(task.esc || "None");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const save = async (alsoDone: boolean) => {
+    setBusy(true); setErr("");
+    try {
+      await api.post("/api/tasks", {
+        action: "update", id: task.id, kind: task.kind,
+        title, who, due: due || null, esc,
+      });
+      if (alsoDone) await api.post("/api/tasks", { action: "toggle", id: task.id, kind: task.kind });
+      onSaved();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.5)", zIndex: 70 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 480 }}>
+        <div className="px-4 py-3 flex items-center justify-between" style={{ background: "#16232F", color: "#fff" }}>
+          <div className="text-xs font-bold" style={{ letterSpacing: 1.2, color: "#8FA1B3" }}>TASK</div>
+          <button onClick={onClose} style={{ color: "#8FA1B3", fontSize: 18 }}>✕</button>
+        </div>
+        <div className="p-3 space-y-2">
+          <input value={title} onChange={(e) => setTitle(e.target.value)}
+            className="w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: "#E2E0DA" }} />
+          <div className="flex gap-2 flex-wrap">
+            <select value={who} onChange={(e) => setWho(e.target.value)}
+              className="rounded border px-2 py-1.5 text-sm" style={{ borderColor: "#E2E0DA" }}>
+              <option value="unassigned">unassigned</option>
+              {people.filter((p) => p.initials).map((p) => (
+                <option key={p.initials as string} value={p.initials as string}>{p.initials} · {p.name}</option>
+              ))}
+            </select>
+            <input type="date" value={due} onChange={(e) => setDue(e.target.value)}
+              className="rounded border px-2 py-1.5 text-sm" style={{ borderColor: "#E2E0DA" }} />
+            <select value={esc} onChange={(e) => setEsc(e.target.value)}
+              className="rounded border px-2 py-1.5 text-sm" style={{ borderColor: "#E2E0DA" }}>
+              {["None", "L1", "L2", "L3"].map((x) => <option key={x} value={x}>{x === "None" ? "no escalation" : x}</option>)}
+            </select>
+          </div>
+          {err && <div className="text-xs font-bold rounded p-2" style={{ background: "#FBEDEA", color: "#B3261E" }}>{err}</div>}
+          <div className="flex gap-2 justify-end pt-1">
+            <button onClick={() => save(true)} disabled={busy}
+              className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: "#E6F4EA", color: "#0D7A3F" }}>
+              ✔ Save &amp; mark done
+            </button>
+            <button onClick={() => save(false)} disabled={busy}
+              className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: "#16232F", color: "#fff" }}>
+              {busy ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The + beside the On Floor chips: a task or a kitting line, born on the job
+ * where the need was noticed, without leaving the page.
+ */
+function QuickAddOnFloor({
+  job, kind, people, onClose, onDone,
+}: {
+  job: Job; kind: "task" | "material";
+  people: { initials?: string | null; name?: string | null }[];
+  onClose: () => void; onDone: () => void;
+}) {
+  const [text, setText] = useState("");
+  const [who, setWho] = useState("unassigned");
+  const [due, setDue] = useState("");
+  const [qty, setQty] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const save = async () => {
+    if (!text.trim()) { setErr(kind === "task" ? "What is the task?" : "What is the material?"); return; }
+    setBusy(true); setErr("");
+    try {
+      if (kind === "task") {
+        await api.post("/api/tasks", {
+          action: "create", job_id: job.id, title: text.trim(),
+          who, due: due || null, cat: "Production",
+        });
+      } else {
+        await api.post("/api/materials", {
+          action: "add", job_id: job.id, item: text.trim(),
+          qty, status: "Yet to receive", due: due || null,
+        });
+      }
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.5)", zIndex: 70 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 480 }}>
+        <div className="px-4 py-3" style={{ background: "#16232F", color: "#fff" }}>
+          <div className="text-xs font-bold" style={{ letterSpacing: 1.2, color: "#8FA1B3" }}>
+            {kind === "task" ? "NEW TASK" : "NEW KITTING LINE"}
+          </div>
+          <div className="font-bold" style={{ fontSize: 15 }}>JOB {jobNo(job.id)} · {job.tag}</div>
+        </div>
+        <div className="p-3 space-y-2">
+          <input
+            autoFocus value={text} onChange={(e) => setText(e.target.value)}
+            placeholder={kind === "task" ? "What needs doing?" : "What material is needed?"}
+            className="w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: "#E2E0DA" }}
+          />
+          <div className="flex gap-2 flex-wrap">
+            {kind === "task" ? (
+              <select value={who} onChange={(e) => setWho(e.target.value)}
+                className="rounded border px-2 py-1.5 text-sm" style={{ borderColor: "#E2E0DA" }}>
+                <option value="unassigned">unassigned</option>
+                {people.filter((p) => p.initials).map((p) => (
+                  <option key={p.initials as string} value={p.initials as string}>{p.initials} · {p.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input value={qty} onChange={(e) => setQty(e.target.value)} placeholder="qty"
+                className="rounded border px-2 py-1.5 text-sm" style={{ borderColor: "#E2E0DA", width: 90 }} />
+            )}
+            <input type="date" value={due} onChange={(e) => setDue(e.target.value)}
+              className="rounded border px-2 py-1.5 text-sm" style={{ borderColor: "#E2E0DA" }}
+              title={kind === "task" ? "due" : "needed by"} />
+          </div>
+          {err && <div className="text-xs font-bold rounded p-2" style={{ background: "#FBEDEA", color: "#B3261E" }}>{err}</div>}
+          <div className="flex justify-end pt-1">
+            <button onClick={save} disabled={busy}
+              className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: "#E8600A", color: "#fff" }}>
+              {busy ? "Saving…" : kind === "task" ? "Add task" : "Add line"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
