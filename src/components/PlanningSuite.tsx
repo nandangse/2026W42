@@ -6798,10 +6798,16 @@ function LabourRatesCard() {
  * Below the job number on On Floor, exactly where the print puts it.
  */
 function FloorCrewTable({ plan, today: rec }: { plan: Partial<Crew> | null; today: Crew | null }) {
-  const rows: { label: string; crew: Partial<Crew> | null; bold?: boolean }[] = [
-    { label: "plan", crew: plan },
-    { label: "today", crew: rec && Object.values(rec).some((n) => Number(n) > 0) ? rec : null, bold: true },
-  ];
+  return (
+    <CrewRowsTable rows={[
+      { label: "plan", crew: plan },
+      { label: "today", crew: rec && Object.values(rec).some((n) => Number(n) > 0) ? rec : null, bold: true },
+    ]} />
+  );
+}
+
+/** The crew table itself — any rows, walk-sheet styling. */
+function CrewRowsTable({ rows }: { rows: { label: string; crew: Partial<Crew> | null; bold?: boolean }[] }) {
   const cell: React.CSSProperties = {
     border: "1px solid #E2E0DA", padding: "1px 6px", textAlign: "right", fontVariantNumeric: "tabular-nums",
   };
@@ -8096,12 +8102,8 @@ function OnFloor({
       </div>
       <div className="rounded-lg border px-3 py-2 mb-2 flex items-center gap-3 flex-wrap" style={{ borderColor: "#E2E0DA", background: "#fff" }}>
         <b className="text-xs" style={{ color: "#8A94A0", letterSpacing: ".04em" }}>WORKING TODAY</b>
-        {TRADES.map((t) => (
-          <span key={t.key} className="text-sm font-bold" style={{ color: t.color }}>
-            {t.tiny} {mpTotals.tot[t.key] || 0}
-          </span>
-        ))}
-        <span className="text-sm font-extrabold" style={{ color: "#22303C" }}>— {mpTotals.people} people</span>
+        <CrewRowsTable rows={[{ label: "today", crew: mpTotals.tot as Partial<Crew>, bold: true }]} />
+        <span className="text-sm font-extrabold" style={{ color: "#22303C" }}>{mpTotals.people} people</span>
         <span className="text-xs" style={{ color: "#8A94A0" }}>
           on {mpTotals.jobsWith} of {jobs.length} jobs
           {mpTotals.jobsWith < jobs.length ? " · the rest have no allocation recorded today" : ""}

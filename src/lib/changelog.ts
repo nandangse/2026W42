@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.5",
+    date: "2026-08-25",
+    module: "Working Today is a table too",
+    items: [
+      "THE WORKING TODAY STRIP on On Floor reads as the same crew table the jobs carry — F H W P E Hd | Tot, the company total in one bold row — instead of a sentence of chips.",
+    ],
+  },
+  {
     v: "3.23.1.4",
     date: "2026-08-25",
     module: "The most-assigned hands sit first",
