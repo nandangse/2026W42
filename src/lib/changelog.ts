@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.3",
+    date: "2026-08-25",
+    module: "On Floor leads the row, and the button stands under its table",
+    items: [
+      "ON FLOOR IS THE FIRST BUTTON of the Planning Suite's row — it is where the day starts — and a thin | now stands between the buttons so the row reads as choices rather than a sentence.",
+      "MANPOWER ALLOCATION sits directly below the crew table it edits, with its warning; the owners column is owners again.",
+    ],
+  },
+  {
     v: "3.23.1.2",
     date: "2026-08-25",
     module: "The who is typed, not scrolled",

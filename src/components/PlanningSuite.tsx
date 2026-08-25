@@ -717,14 +717,15 @@ export default function PlanningSuite({
   // that page, so listing it again cost a slot on every screen to say the same
   // thing twice. It is still where you land on sign-in, and still one click
   // away from anywhere.
+  // On Floor first — it is where the day starts (Dr Raghu, 25 Aug 2026).
   const SUITE_TAB_DEFS: [typeof tab, string][] = [
+    ["floor", "On Floor"],
     ["wip", "Jobs in Progress"],
     ["delivery", "Job Delivery Board"],
     ["material", "Pending Material"],
     ["esc", "Escalations"],
     ["load", "Load Board"],
     ["plan", "Job Plan"],
-    ["floor", "On Floor"],
   ];
 
   return (
@@ -1007,15 +1008,17 @@ export default function PlanningSuite({
             className="flex gap-1 rounded p-1 mt-1.5"
             style={{ background: "#0D161F", overflowX: "auto", scrollbarWidth: "thin" }}
           >
-            {SUITE_TAB_DEFS.map(([k, l]) => (
-              <button
-                key={k}
-                onClick={() => setTab(k)}
-                className="px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap flex-shrink-0"
-                style={tab === k ? { background: "#1B3A5C", color: "#fff" } : { color: "#5C6B7A" }}
-              >
-                {l}
-              </button>
+            {SUITE_TAB_DEFS.map(([k, l], i) => (
+              <span key={k} className="flex items-center flex-shrink-0">
+                {i > 0 && <span aria-hidden style={{ color: "#2E3F50", padding: "0 2px" }}>|</span>}
+                <button
+                  onClick={() => setTab(k)}
+                  className="px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap"
+                  style={tab === k ? { background: "#1B3A5C", color: "#fff" } : { color: "#5C6B7A" }}
+                >
+                  {l}
+                </button>
+              </span>
             ))}
           </div>
         )}
@@ -8170,6 +8173,22 @@ function OnFloor({
                       })()}
                       today={manpower[j.id] ?? null}
                     />
+                    <div className="mt-1">
+                      {!(manpower[j.id] && Object.values(manpower[j.id]).some((n) => n)) && (
+                        <div className="text-xs font-bold" style={{ color: "#E8600A" }}>no manpower recorded today</div>
+                      )}
+                      {canTask && (
+                        <button onClick={() => setMpOpen(mpOpen === j.id ? null : j.id)}
+                          className="text-xs font-bold rounded px-2 py-0.5 mt-0.5"
+                          style={{ background: mpOpen === j.id ? "#22303C" : "#F4F2EC", color: mpOpen === j.id ? "#fff" : "#22303C" }}>
+                          {mpOpen === j.id ? "✕ close" : "Manpower Allocation"}
+                        </button>
+                      )}
+                      {mpOpen === j.id && (
+                        <ManpowerEditor jobId={j.id} value={manpower[j.id]}
+                          onSaved={() => { setMpOpen(null); loadManpower(); }} />
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -8210,24 +8229,6 @@ function OnFloor({
                     </div>
                   ))}
 
-                  {/* the crew table stands below the job number now, as on
-                      the walk sheet; here only the warning and the editor */}
-                  <div className="mt-1.5 pt-1.5" style={{ borderTop: "1px dashed #E2E0DA" }}>
-                    {!(manpower[j.id] && Object.values(manpower[j.id]).some((n) => n)) && (
-                      <div className="text-xs font-bold" style={{ color: "#E8600A" }}>no manpower recorded today</div>
-                    )}
-                    {canTask && (
-                      <button onClick={() => setMpOpen(mpOpen === j.id ? null : j.id)}
-                        className="text-xs font-bold rounded px-2 py-0.5 mt-1"
-                        style={{ background: mpOpen === j.id ? "#22303C" : "#F4F2EC", color: mpOpen === j.id ? "#fff" : "#22303C" }}>
-                        {mpOpen === j.id ? "✕ close" : "Manpower Allocation"}
-                      </button>
-                    )}
-                    {mpOpen === j.id && (
-                      <ManpowerEditor jobId={j.id} value={manpower[j.id]}
-                        onSaved={() => { setMpOpen(null); loadManpower(); }} />
-                    )}
-                  </div>
                 </div>
 
                 {/* what is open on it */}
