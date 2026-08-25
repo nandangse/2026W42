@@ -8456,6 +8456,72 @@ function WorkList({
 }
 
 /**
+ * Type-and-choose for a person — the dropdown was irritating (Dr Raghu,
+ * 25 Aug 2026). Type initials or a name, pick from what matches; whatever
+ * lands is ALWAYS CAPS, because that is how initials are written here.
+ */
+function WhoTypeAhead({
+  value, people, onPick, width = 150,
+}: {
+  value: string;
+  people: { initials?: string | null; name?: string | null }[];
+  onPick: (v: string) => void;
+  width?: number;
+}) {
+  const [text, setText] = useState(value === "unassigned" ? "" : value.toUpperCase());
+  const [open, setOpen] = useState(false);
+  useEffect(() => { setText(value === "unassigned" ? "" : value.toUpperCase()); }, [value]);
+  const needle = text.trim().toLowerCase();
+  const hits = people
+    .filter((p) => p.initials)
+    .filter((p) =>
+      !needle
+      || String(p.initials).toLowerCase().startsWith(needle)
+      || String(p.name || "").toLowerCase().includes(needle))
+    .slice(0, 8);
+  return (
+    <div style={{ position: "relative", width }}>
+      <input
+        value={text}
+        placeholder="WHO?"
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        onChange={(e) => {
+          const v = e.target.value.toUpperCase();
+          setText(v); setOpen(true);
+          onPick(v.trim() || "unassigned");
+        }}
+        className="w-full rounded border px-2 py-1.5 text-sm font-bold"
+        style={{ borderColor: "#E2E0DA", textTransform: "uppercase" }}
+      />
+      {open && hits.length > 0 && (
+        <div className="rounded border" style={{
+          position: "absolute", top: "105%", left: 0, right: 0, zIndex: 80,
+          background: "#fff", borderColor: "#E2E0DA", maxHeight: 200, overflowY: "auto",
+          boxShadow: "0 8px 24px rgba(22,35,47,.2)",
+        }}>
+          {hits.map((p) => (
+            <button
+              key={p.initials as string}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onPick(String(p.initials).toUpperCase());
+                setText(String(p.initials).toUpperCase());
+                setOpen(false);
+              }}
+              className="w-full text-left px-2 py-1.5 text-sm"
+            >
+              <b>{String(p.initials).toUpperCase()}</b>
+              <span className="text-xs" style={{ color: "#8A94A0" }}> · {p.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * The task, opened from the pending/escalations list — title, owner, date,
  * escalation, done — enough to act without leaving the floor. Writes through
  * the same /api/tasks the Tasking screen uses, so the drift log (push_count,
@@ -8501,13 +8567,7 @@ function TaskQuickEdit({
           <input value={title} onChange={(e) => setTitle(e.target.value)}
             className="w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: "#E2E0DA" }} />
           <div className="flex gap-2 flex-wrap">
-            <select value={who} onChange={(e) => setWho(e.target.value)}
-              className="rounded border px-2 py-1.5 text-sm" style={{ borderColor: "#E2E0DA" }}>
-              <option value="unassigned">unassigned</option>
-              {people.filter((p) => p.initials).map((p) => (
-                <option key={p.initials as string} value={p.initials as string}>{p.initials} · {p.name}</option>
-              ))}
-            </select>
+            <WhoTypeAhead value={who} people={people} onPick={setWho} />
             <input type="date" value={due} onChange={(e) => setDue(e.target.value)}
               className="rounded border px-2 py-1.5 text-sm" style={{ borderColor: "#E2E0DA" }} />
             <select value={esc} onChange={(e) => setEsc(e.target.value)}
@@ -8589,13 +8649,7 @@ function QuickAddOnFloor({
           />
           <div className="flex gap-2 flex-wrap">
             {kind === "task" ? (
-              <select value={who} onChange={(e) => setWho(e.target.value)}
-                className="rounded border px-2 py-1.5 text-sm" style={{ borderColor: "#E2E0DA" }}>
-                <option value="unassigned">unassigned</option>
-                {people.filter((p) => p.initials).map((p) => (
-                  <option key={p.initials as string} value={p.initials as string}>{p.initials} · {p.name}</option>
-                ))}
-              </select>
+              <WhoTypeAhead value={who} people={people} onPick={setWho} />
             ) : (
               <input value={qty} onChange={(e) => setQty(e.target.value)} placeholder="qty"
                 className="rounded border px-2 py-1.5 text-sm" style={{ borderColor: "#E2E0DA", width: 90 }} />

@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.2",
+    date: "2026-08-25",
+    module: "The who is typed, not scrolled",
+    items: [
+      "THE PERSON ON A TASK IS TYPE-AND-CHOOSE now, in the On Floor quick-add and the task lightbox both — type initials or a name, pick from what matches, ALWAYS CAPS. The dropdown was irritating, and Dr Raghu said so.",
+    ],
+  },
+  {
     v: "3.23.1.1",
     date: "2026-08-25",
     module: "The crew table stands below the job number, as the print has it",
