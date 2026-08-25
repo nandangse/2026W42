@@ -8014,6 +8014,20 @@ function OnFloor({
   useEffect(() => { loadMatCounts(); }, [loadMatCounts]);
   const [quickAdd, setQuickAdd] = useState<{ job: Job; kind: "task" | "material" } | null>(null);
 
+  // The WHO list, most-assigned first — the hands that get the work sit at
+  // the top of the type-ahead (Dr Raghu, 25 Aug 2026).
+  const rankedPeople = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const t of board.tasks) {
+      const w = String(t.who || "").toUpperCase();
+      if (w && w !== "UNASSIGNED") n.set(w, (n.get(w) || 0) + 1);
+    }
+    const of2 = (p: { initials?: string | null }) => n.get(String(p.initials || "").toUpperCase()) || 0;
+    return [...(board.assignableUsers || [])].sort(
+      (a, b) => of2(b) - of2(a) || String(a.initials || "").localeCompare(String(b.initials || "")),
+    );
+  }, [board.tasks, board.assignableUsers]);
+
   /**
    * What the floor has said TODAY.
    *
@@ -8332,7 +8346,7 @@ function OnFloor({
           tasks={(workByJob.get(work.job.id) || { tasks: [], esc: [] })[work.only]}
           only={work.only}
           canTask={canTask}
-          people={board.assignableUsers || []}
+          people={rankedPeople}
           onChanged={() => { void reload(); }}
           onClose={() => setWork(null)}
         />
@@ -8342,7 +8356,7 @@ function OnFloor({
         <QuickAddOnFloor
           job={quickAdd.job}
           kind={quickAdd.kind}
-          people={board.assignableUsers || []}
+          people={rankedPeople}
           onClose={() => setQuickAdd(null)}
           onDone={() => {
             setQuickAdd(null);

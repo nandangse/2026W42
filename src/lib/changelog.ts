@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.4",
+    date: "2026-08-25",
+    module: "The most-assigned hands sit first",
+    items: [
+      "THE WHO TYPE-AHEAD ORDERS ITSELF by who actually gets the work: the most-assigned people sit at the top of the list, the rest follow alphabetically — the same rule the owner dropdowns learned in 3.21.4.3.",
+    ],
+  },
+  {
     v: "3.23.1.3",
     date: "2026-08-25",
     module: "On Floor leads the row, and the button stands under its table",
