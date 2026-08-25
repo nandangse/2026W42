@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.1",
+    date: "2026-08-25",
+    module: "The crew table stands below the job number, as the print has it",
+    items: [
+      "ON FLOOR SHOWS THE MANPOWER AS THE WALK SHEET PRINTS IT: a small table below the job number — F H W P E Hd | Tot — PLAN (the current stage's crew from the milestone plan) over TODAY (what the floor recorded, in bold). The chips in the owners column stepped down; the 'no manpower recorded today' warning and the Manpower Allocation button stay where they were.",
+    ],
+  },
+  {
     v: "3.23.1.0",
     date: "2026-08-25",
     module: "The manpower rolls itself, and the floor prices its labour",

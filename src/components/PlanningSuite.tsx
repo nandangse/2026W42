@@ -6789,6 +6789,50 @@ function LabourRatesCard() {
   );
 }
 
+/**
+ * The walk sheet's crew table, on screen: PLAN — the current stage's crew
+ * from the milestone plan — over TODAY, what the floor recorded, in bold.
+ * Below the job number on On Floor, exactly where the print puts it.
+ */
+function FloorCrewTable({ plan, today: rec }: { plan: Partial<Crew> | null; today: Crew | null }) {
+  const rows: { label: string; crew: Partial<Crew> | null; bold?: boolean }[] = [
+    { label: "plan", crew: plan },
+    { label: "today", crew: rec && Object.values(rec).some((n) => Number(n) > 0) ? rec : null, bold: true },
+  ];
+  const cell: React.CSSProperties = {
+    border: "1px solid #E2E0DA", padding: "1px 6px", textAlign: "right", fontVariantNumeric: "tabular-nums",
+  };
+  return (
+    <table style={{ borderCollapse: "collapse", fontSize: 11, display: "inline-table", background: "#fff" }}>
+      <thead>
+        <tr style={{ background: "#F4F2EC" }}>
+          <th style={{ ...cell, textAlign: "left", fontSize: 9 }}></th>
+          {TRADES.map((t) => (
+            <th key={t.key} style={{ ...cell, color: t.color, fontSize: 10 }}>{t.tiny}</th>
+          ))}
+          <th style={{ ...cell, fontSize: 10 }}>Tot</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => {
+          const tot = r.crew ? TRADES.reduce((n, t) => n + (Number(r.crew?.[t.key]) || 0), 0) : 0;
+          return (
+            <tr key={r.label} style={r.bold ? { fontWeight: 700 } : undefined}>
+              <td style={{ ...cell, textAlign: "left", color: "#8A94A0", fontSize: 9 }}>{r.label}</td>
+              {TRADES.map((t) => (
+                <td key={t.key} style={{ ...cell, color: r.crew && Number(r.crew[t.key]) ? "#22303C" : "#C9C6BD" }}>
+                  {r.crew ? Number(r.crew[t.key]) || 0 : "—"}
+                </td>
+              ))}
+              <td style={cell}>{r.crew ? <b>{tot}</b> : "—"}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 function StatCard({ label, value, sub, color = "#22303C" }: { label: string; value: string; sub?: string; color?: string }) {
   // Slimmed 25 Aug 2026 — seven of these stand in one row on On Floor now.
   return (
@@ -8114,6 +8158,19 @@ function OnFloor({
                       <span style={{ color: "#B8B5AC" }}>no project</span>
                     )}
                   </div>
+
+                  {/* the crew as the walk sheet prints it: PLAN (the stage's
+                      crew from the milestone plan) over TODAY (recorded, bold) */}
+                  <div className="mt-1.5">
+                    <FloorCrewTable
+                      plan={(() => {
+                        const p = board.plans[j.id];
+                        const stage = (p?.milestones || []).find((m) => !m.done);
+                        return (stage as { crew?: Partial<Crew> } | undefined)?.crew ?? null;
+                      })()}
+                      today={manpower[j.id] ?? null}
+                    />
+                  </div>
                 </div>
 
                 {/* owners */}
@@ -8153,18 +8210,10 @@ function OnFloor({
                     </div>
                   ))}
 
-                  {/* who is standing at it today — the work study's daily row */}
+                  {/* the crew table stands below the job number now, as on
+                      the walk sheet; here only the warning and the editor */}
                   <div className="mt-1.5 pt-1.5" style={{ borderTop: "1px dashed #E2E0DA" }}>
-                    {manpower[j.id] && Object.values(manpower[j.id]).some((n) => n) ? (
-                      <div className="text-xs flex items-center gap-1.5 flex-wrap">
-                        {TRADES.filter((t) => Number(manpower[j.id][t.key]) > 0).map((t) => (
-                          <b key={t.key} style={{ color: t.color }}>{t.tiny}{Number(manpower[j.id][t.key])}</b>
-                        ))}
-                        <span style={{ color: "#8A94A0" }}>
-                          = {TRADES.reduce((n, t) => n + (Number(manpower[j.id][t.key]) || 0), 0)} today
-                        </span>
-                      </div>
-                    ) : (
+                    {!(manpower[j.id] && Object.values(manpower[j.id]).some((n) => n)) && (
                       <div className="text-xs font-bold" style={{ color: "#E8600A" }}>no manpower recorded today</div>
                     )}
                     {canTask && (
