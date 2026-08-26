@@ -1007,6 +1007,17 @@ export default function PlanningSuite({
               👤 HRMS
             </a>
           )}
+          {/* CRM — same shape as HRMS: its own page, its own gate at /crm. */}
+          {salesAccess && (
+            <a
+              href="/crm"
+              className="px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap flex-shrink-0"
+              style={{ color: "#8FA1B3" }}
+              title="CRM — companies, contacts, opportunities, quotations. Opens its own page."
+            >
+              🤝 CRM
+            </a>
+          )}
         </div>
 
         {/* Sub-nav for the Planning Suite workspace only — Goals and Tasking

@@ -25,6 +25,7 @@
 import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm, type CrmUser } from "@/crm/auth";
+import { advanceNewToHandled } from "@/crm/stageflow";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
 import { doctypeBySlug, linkTargets, type Doctype, type Field } from "@/crm/doctypes";
 
@@ -89,7 +90,10 @@ async function linkOptions(d: Doctype) {
     // Only ACTIVE salespeople stand in the dropdowns — Settings → Users →
     // Active is the switch. Old rows keep their names via resolveRowLabels.
     if (f.link === "profile") qy = qy.eq("is_active", true);
-    const { data: rows } = await qy.order(t.titleField, { ascending: true }).limit(1000);
+    // Stages stand in Dr Raghu's order, not the alphabet's.
+    const { data: rows } = await (f.link === "stage"
+      ? qy.order("sort_order", { ascending: true })
+      : qy.order(t.titleField, { ascending: true })).limit(1000);
     const list = (rows ?? []) as unknown as Record<string, unknown>[];
     links[f.link] = list.map((r) => ({
       id: String(r.id),
@@ -322,6 +326,12 @@ export async function POST(req: Request, { params }: { params: { doctype: string
       row[f.name] = coerce(f, body[f.name]);
     }
 
+    // An opportunity is born NEW unless the form says otherwise.
+    if (d.name === "opportunity" && !row.stage_id) {
+      const { data: st } = await db.from("stage").select("id").eq("code", "new").maybeSingle();
+      if (st) row.stage_id = st.id;
+    }
+
     // Human-facing numbers come from the database, never from counting rows.
     if (d.autoNumber) {
       const { data: n, error: nerr } = await db.rpc("next_number", { p_code: d.autoNumber.series });
@@ -337,6 +347,11 @@ export async function POST(req: Request, { params }: { params: { doctype: string
       entity: d.table, entity_id: String(data.id), action: "insert",
       after: data, by_user: user.profileId,
     });
+
+    // Speaking with the customer moves a NEW opportunity to Handled by itself.
+    if (d.name === "interaction" && data.opportunity_id) {
+      await advanceNewToHandled(db, String(data.opportunity_id));
+    }
 
     return NextResponse.json({ row: data });
   } catch (e) {

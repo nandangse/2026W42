@@ -785,7 +785,8 @@ function StubScreen({ label, blurb, dated }: { label: string; blurb: string; dat
 const isEmailish = (v: unknown): v is string =>
   typeof v === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 const isPhoneish = (v: unknown): v is string =>
-  typeof v === "string" && /^\+?[\d\s()-]{8,18}$/.test(v.trim()) && /\d{8,}/.test(v.replace(/\D/g, ""));
+  typeof v === "string" && !/^\d{4}-\d{2}-\d{2}/.test(v.trim()) &&
+  /^\+?[\d\s()-]{8,18}$/.test(v.trim()) && /\d{8,}/.test(v.replace(/\D/g, ""));
 
 /** ✉ 📞 💬 — click starts the mail, the call, the WhatsApp. */
 function ContactActions({ email, phone, compact, onCompose }: {
@@ -844,6 +845,10 @@ function Cell({
 }) {
   if (value === null || value === undefined || value === "")
     return <span style={{ color: "#C7CCD2" }}>—</span>;
+
+  // ENQ-202425-39514 reads as 39514 in a report; the whole id is the tooltip.
+  if (field.name === "opportunity_no")
+    return <span className="tnum" title={String(value)}>{String(value).split("-").pop()}</span>;
 
   if (field.type === "readonly") {
     if (field.format === "money")
@@ -1114,11 +1119,11 @@ function RecordModal({
                   <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>{f.label}</div>
                   <div className="text-sm" style={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>
                     <Cell field={f} value={row[f.name]} links={links} onOpenLink={onOpenLink} />
-                    {isEmailish(row[f.name]) && (
+                    {f.type !== "date" && isEmailish(row[f.name]) && (
                       <ContactActions email={row[f.name] as string}
                         onCompose={() => onCompose(row[f.name] as string)} />
                     )}
-                    {isPhoneish(row[f.name]) && <ContactActions phone={row[f.name] as string} />}
+                    {f.type !== "date" && isPhoneish(row[f.name]) && <ContactActions phone={row[f.name] as string} />}
                   </div>
                 </div>
               ))}
@@ -1157,6 +1162,7 @@ function RecordModal({
                 filterValue={t.filterValue ?? null}
                 addPresets={t.addPresets}
                 onOpenLink={onOpenLink}
+                onCompose={onCompose}
               />
             ) : null;
           })()
@@ -1180,10 +1186,11 @@ function RecordModal({
  * where it makes sense the tab can add a row pre-linked to the record.
  */
 function RelatedTab({
-  slug, filterField, filterValue, addPresets, onOpenLink,
+  slug, filterField, filterValue, addPresets, onOpenLink, onCompose,
 }: {
   slug: string; filterField: string; filterValue: string | null;
   addPresets?: Row; onOpenLink: (target: string, id: string) => void;
+  onCompose?: (email: string) => void;
 }) {
   const dt = doctypeBySlug(slug);
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -1266,6 +1273,11 @@ function RelatedTab({
                     maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
                   <Cell field={f} value={r[f.name]} links={links} onOpenLink={onOpenLink} />
+                  {f.type !== "date" && isEmailish(r[f.name]) && (
+                    <ContactActions email={r[f.name] as string} compact
+                      onCompose={onCompose ? () => onCompose(r[f.name] as string) : undefined} />
+                  )}
+                  {f.type !== "date" && isPhoneish(r[f.name]) && <ContactActions phone={r[f.name] as string} compact />}
                 </td>
               ))}
             </tr>

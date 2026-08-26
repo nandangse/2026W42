@@ -4,6 +4,7 @@ import { requireCrm } from "@/crm/auth";
 import { crmDb } from "@/crm/db";
 import { accessTokenFor, gmailSend, myMailbox } from "@/crm/gmail";
 import { variableValues, renderTemplate } from "@/crm/variables";
+import { advanceNewToHandled } from "@/crm/stageflow";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,9 @@ export async function POST(req: Request) {
       lead_id: b.lead_id ?? null, opportunity_id: b.opportunity_id ?? null,
       agent_profile_id: user.profileId,
     }], { onConflict: "channel,external_id", ignoreDuplicates: true });
+
+    // A mail against a NEW opportunity is its first handling.
+    if (b.opportunity_id) await advanceNewToHandled(db, String(b.opportunity_id));
 
     return NextResponse.json({ ok: true, id: gmailId, subject });
   } catch (e) {

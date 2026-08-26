@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.29",
+    date: "2026-08-26",
+    module: "Stages in order, the first touch, and small mercies",
+    items: [
+      "OPPORTUNITY STAGES STAND IN DR RAGHU'S ORDER now, not the alphabet's: Suspect · New · Handled Opportunity · Not Target · Prospect · Waiting for Data · Consultative Presentation · Quote Given · LATE HANDLING (new) · Lost. The old \"Opportunity\" stage retired — its 188 untouched enquiries read as New. Migration 0015.",
+      "AN OPPORTUNITY IS BORN NEW, and THE FIRST TOUCH HANDLES IT: logging an interaction or sending a mail against a New opportunity moves it to Handled Opportunity by itself. Every other move stays a human decision.",
+      "CONTACT ROWS IN A RECORD'S CONTACTS TAB carry their icons — ✉ opens the mail lightbox, 📞 calls, 💬 WhatsApps. Dates stopped wearing a phone icon (an ISO date read as a number), and ENQ numbers in reports show just the NUMBER — the full id lives in the tooltip.",
+      "🤝 CRM sits beside 👤 HRMS in Genie's top bar for everyone with sales access.",
+    ],
+  },
+  {
     v: "3.23.1.28",
     date: "2026-08-26",
     module: "WhatsApp Templates, and the variables legend",
