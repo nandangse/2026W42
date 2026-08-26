@@ -44,12 +44,37 @@ export default function MailComposer({ ctx, onClose, onSent }: {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  useEffect(() => {
+  const loadStatus = () => {
     fetch("/api/crm/gmail/status", { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => setGmail({ connected: !!j.connected, email: j.email ?? null, templates: j.templates ?? [] }))
       .catch(() => setGmail({ connected: false, email: null, templates: [] }));
-  }, []);
+  };
+  useEffect(loadStatus, []);
+
+  // Save what is written as a NEW template, right from here (Dr Raghu,
+  // 26 Aug 2026) — subject, cc, body and the attached Drive links, fixed.
+  const [tplSaveOpen, setTplSaveOpen] = useState(false);
+  const [tplModule, setTplModule] = useState("Enquiry");
+  const [tplName, setTplName] = useState("");
+  const [tplMsg, setTplMsg] = useState("");
+  const saveTemplate = async () => {
+    setTplMsg("");
+    try {
+      const r = await fetch("/api/crm/email_template", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          module: tplModule, name: tplName.trim(), subject, cc,
+          body: bodyText,
+          attachments: files.map((f) => `${f.name} | ${f.link}`).join("\n"),
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save the template");
+      setTplMsg("Saved ✓"); setTplSaveOpen(false); setTplName("");
+      loadStatus();
+    } catch (e) { setTplMsg(e instanceof Error ? e.message : String(e)); }
+  };
 
   // A template is the fixed set — subject, cc, body, attachments — applied
   // whole. Everything stays editable before Send.
@@ -145,7 +170,29 @@ export default function MailComposer({ ctx, onClose, onSent }: {
               <option value="">Template…</option>
               {(gmail?.templates ?? []).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
+            <button onClick={() => setTplSaveOpen((v) => !v)}
+              title="Save what is written here as a new template"
+              className="rounded px-2 py-1.5 text-xs font-bold" style={{ background: NAVY_SOFT, color: NAVY }}>
+              ＋ Tpl
+            </button>
           </div>
+          {tplSaveOpen && (
+            <div className="flex items-center gap-2 flex-wrap rounded border p-2" style={{ borderColor: BORDER, background: "#FBFAF7" }}>
+              <select value={tplModule} onChange={(e) => setTplModule(e.target.value)}
+                className="rounded border px-2 py-1 text-xs font-semibold" style={{ borderColor: BORDER, background: "#fff" }}>
+                <option>Enquiry</option><option>Quotation</option>
+              </select>
+              <input value={tplName} onChange={(e) => setTplName(e.target.value)} placeholder="Template name"
+                className="flex-1 rounded border px-2 py-1 text-xs" style={{ borderColor: BORDER, minWidth: 140 }} />
+              <button onClick={() => void saveTemplate()} disabled={!tplName.trim()}
+                className="rounded px-2.5 py-1 text-xs font-bold"
+                style={{ background: tplName.trim() ? ORANGE : "#B9BEC4", color: "#fff" }}>
+                Save as template
+              </button>
+              <span className="text-xs" style={{ color: MUTED }}>keeps this subject, cc, body & attachments</span>
+            </div>
+          )}
+          {tplMsg && <div className="text-xs font-semibold" style={{ color: tplMsg.startsWith("Saved") ? "#0D7A3F" : "#8E2C20" }}>{tplMsg}</div>}
           <textarea value={bodyText} onChange={(e) => setBodyText(e.target.value)} rows={7}
             placeholder={"Dear {{name}},\n\n… {{qtn_no}}, {{next_monday}}, {{khalapur_address}} — all variables render on send."}
             className="w-full rounded border px-2 py-1.5 text-sm" style={inputCss} />

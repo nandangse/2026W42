@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.36",
+    date: "2026-08-26",
+    module: "Templates are born in the composer",
+    items: [
+      "＋ Tpl in the mail composer SAVES WHAT IS WRITTEN AS A NEW TEMPLATE — pick Enquiry or Quotation, name it, and the subject, cc, body and attached Drive links become the fixed set. It lands in the Template dropdown at once, and in Masters → Email Templates like any other.",
+    ],
+  },
+  {
     v: "3.23.1.35",
     date: "2026-08-26",
     module: "EVA BRIEF — the company dossier",
