@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.39",
+    date: "2026-08-26",
+    module: "The stage moves from the Details view",
+    items: [
+      "STAGE IS A DROPDOWN RIGHT ON THE DETAILS VIEW of an opportunity or quotation — pick and it saves, no Edit needed. A move to Lost or Not Target asks for its reason on the spot, in your stage order, with the timing trigger stamping stage_entered_at as always.",
+    ],
+  },
+  {
     v: "3.23.1.38",
     date: "2026-08-26",
     module: "The pull sweeps every contact on the opportunity",

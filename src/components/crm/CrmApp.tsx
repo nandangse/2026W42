@@ -1058,6 +1058,71 @@ function ContactActions({ email, phone, compact, onCompose, onWa }: {
   );
 }
 
+/**
+ * The stage, editable RIGHT ON THE DETAILS VIEW (Dr Raghu, 26 Aug 2026) —
+ * pick, it saves; a move to Lost or Not Target asks for its reason first,
+ * because the database will refuse without one.
+ */
+function StageQuickEdit({ dtName, row, links, onChanged }: {
+  dtName: string; row: Row; links: Links; onChanged: (r: Row) => void;
+}) {
+  const [val, setVal] = useState(String(row.stage_id ?? ""));
+  const [pending, setPending] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  useEffect(() => setVal(String(row.stage_id ?? "")), [row.stage_id]);
+  const opts = links["stage"] ?? [];
+  const labelOf = (id: string) => opts.find((o) => o.id === id)?.label ?? "";
+
+  const save = async (stageId: string, lostReason?: string) => {
+    setBusy(true); setMsg("");
+    try {
+      const r = await fetch(`/api/crm/${dtName}?id=${encodeURIComponent(String(row.id))}`, {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ stage_id: stageId, ...(lostReason ? { lost_reason: lostReason } : {}) }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not move the stage");
+      setVal(stageId); setPending(null); setReason("");
+      onChanged((j.row ?? { ...row, stage_id: stageId }) as Row);
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  const choose = (id: string) => {
+    if (!id || id === val) return;
+    if (["Lost", "Not Target"].includes(labelOf(id))) { setPending(id); setMsg(""); return; }
+    void save(id);
+  };
+
+  return (
+    <span>
+      <select value={pending ?? val} onChange={(e) => choose(e.target.value)} disabled={busy}
+        onClick={(e) => e.stopPropagation()}
+        className="rounded border px-1.5 py-0.5 text-sm font-semibold"
+        style={{ borderColor: BORDER, background: "#fff", color: INK, maxWidth: 220 }}>
+        {opts.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+      </select>
+      {pending && (
+        <span className="block mt-1">
+          <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} autoFocus
+            placeholder={`Why ${labelOf(pending)}? The move refuses to save without a reason.`}
+            className="w-full rounded border px-2 py-1 text-xs" style={{ borderColor: reason.trim().length > 3 ? BORDER : "#E8600A" }} />
+          <span className="flex gap-1.5 mt-1">
+            <button onClick={() => void save(pending, reason.trim())} disabled={busy || reason.trim().length <= 3}
+              className="rounded px-2 py-0.5 text-xs font-bold"
+              style={{ background: reason.trim().length > 3 ? ORANGE : "#B9BEC4", color: "#fff" }}>
+              Move to {labelOf(pending)}
+            </button>
+            <button onClick={() => { setPending(null); setReason(""); }} className="rounded px-2 py-0.5 text-xs font-bold border" style={{ borderColor: BORDER, color: "#5A6672" }}>Cancel</button>
+          </span>
+        </span>
+      )}
+      {msg && <span className="block text-xs mt-0.5" style={{ color: "#8E2C20" }}>{msg}</span>}
+    </span>
+  );
+}
+
 /** The first actionable email and phone in a row, whichever fields hold them. */
 function rowContacts(dt: Doctype, r: Row): { email: string | null; phone: string | null } {
   let email: string | null = null, phone: string | null = null;
@@ -1362,7 +1427,9 @@ function RecordModal({
                 <div key={f.name}>
                   <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>{f.label}</div>
                   <div className="text-sm" style={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>
-                    <Cell field={f} value={row[f.name]} links={links} onOpenLink={onOpenLink} />
+                    {f.name === "stage_id" && (dt.name === "opportunity" || dt.name === "quotation")
+                      ? <StageQuickEdit dtName={dt.name} row={row} links={links} onChanged={(r2) => onSaved(r2)} />
+                      : <Cell field={f} value={row[f.name]} links={links} onOpenLink={onOpenLink} />}
                     {f.type !== "date" && isEmailish(row[f.name]) && (
                       <ContactActions email={row[f.name] as string}
                         onCompose={() => onCompose(row[f.name] as string)} />
