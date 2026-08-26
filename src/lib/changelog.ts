@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.43",
+    date: "2026-08-27",
+    module: "Filters pick many",
+    items: [
+      "THE FILTER DROPDOWNS BECAME CHECKBOX POPOVERS — Stage, Sector, Salesperson, Product, Source, Industry: tick one, several, or Every ✓; All clears. The chip says what is chosen (Stage: 2 ✓), the whole set rides to the server as one IN, and Group by and the ∑ aggregate the multi-filtered set the same way.",
+    ],
+  },
+  {
     v: "3.23.1.42",
     date: "2026-08-26",
     module: "The template masters get their doors",

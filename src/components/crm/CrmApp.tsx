@@ -655,47 +655,37 @@ export default function CrmApp({
                 </div>
               ))}
               {industryFilter && (
-                <select
+                <MultiFilter
+                  label="Industry"
+                  options={links.industry || []}
                   value={filters.company_industry ?? ""}
-                  onChange={(e) => setFilters((cur) => ({ ...cur, company_industry: e.target.value }))}
-                  className="px-2 py-1 rounded text-xs border"
-                  style={{
-                    borderColor: filters.company_industry ? ORANGE : BORDER,
-                    background: "#fff",
-                    color: filters.company_industry ? INK : "#5A6672",
-                    maxWidth: 190,
-                  }}
-                >
-                  <option value="">Industry: all</option>
-                  {(links.industry || []).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-                </select>
+                  onChange={(v) => setFilters((cur) => ({ ...cur, company_industry: v }))}
+                />
               )}
-              {filterables.filter((f) => f.link !== "company").map((f) => (
-                <select
-                  key={f.name}
-                  value={filters[f.name] ?? ""}
-                  onChange={(e) => setFilters((cur) => ({ ...cur, [f.name]: e.target.value }))}
-                  className="px-2 py-1 rounded text-xs border"
-                  style={{
-                    borderColor: filters[f.name] ? ORANGE : BORDER,
-                    background: "#fff",
-                    color: filters[f.name] ? INK : "#5A6672",
-                    maxWidth: 190,
-                  }}
-                >
-                  <option value="">{f.label}: all</option>
-                  {f.type === "bool" ? (
-                    <>
-                      <option value="true">{f.label}: yes</option>
-                      <option value="false">{f.label}: no</option>
-                    </>
-                  ) : f.type === "select" ? (
-                    (f.options || []).map((o) => <option key={o} value={o}>{o}</option>)
-                  ) : (
-                    (links[f.link as string] || []).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)
-                  )}
-                </select>
-              ))}
+              {filterables.filter((f) => f.link !== "company").map((f) =>
+                f.type === "bool" ? (
+                  <select
+                    key={f.name}
+                    value={filters[f.name] ?? ""}
+                    onChange={(e) => setFilters((cur) => ({ ...cur, [f.name]: e.target.value }))}
+                    className="px-2 py-1 rounded text-xs border"
+                    style={{ borderColor: filters[f.name] ? ORANGE : BORDER, background: "#fff", color: filters[f.name] ? INK : "#5A6672", maxWidth: 190 }}
+                  >
+                    <option value="">{f.label}: all</option>
+                    <option value="true">{f.label}: yes</option>
+                    <option value="false">{f.label}: no</option>
+                  </select>
+                ) : (
+                  <MultiFilter
+                    key={f.name}
+                    label={f.label}
+                    options={f.type === "select"
+                      ? (f.options || []).map((o) => ({ id: o, label: o }))
+                      : (links[f.link as string] || [])}
+                    value={filters[f.name] ?? ""}
+                    onChange={(v) => setFilters((cur) => ({ ...cur, [f.name]: v }))}
+                  />
+                ))}
               {Object.values(filters).some((v) => v !== "") && (
                 <button
                   onClick={() => setFilters({})}
@@ -1141,6 +1131,56 @@ function StageQuickEdit({ dtName, row, links, onChanged }: {
       )}
       {msg && <span className="block text-xs mt-0.5" style={{ color: "#8E2C20" }}>{msg}</span>}
     </span>
+  );
+}
+
+/**
+ * A filter that PICKS MANY (Dr Raghu, 27 Aug 2026): the dropdown becomes a
+ * checkbox popover — one, several, or All. Empty means all; the value rides
+ * as a comma list and the API answers with IN.
+ */
+function MultiFilter({ label, options, value, onChange }: {
+  label: string; options: { id: string; label: string }[];
+  value: string; onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const chosen = new Set(value ? value.split(",") : []);
+  const toggle = (id: string) => {
+    const n = new Set(chosen);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    onChange([...n].join(","));
+  };
+  const title = !chosen.size
+    ? `${label}: all`
+    : chosen.size === 1
+      ? `${label}: ${options.find((o) => o.id === [...chosen][0])?.label ?? "1"}`
+      : `${label}: ${chosen.size} ✓`;
+  return (
+    <div style={{ position: "relative" }}>
+      <button onClick={() => setOpen((v) => !v)}
+        className="px-2 py-1 rounded text-xs border"
+        style={{ borderColor: chosen.size ? ORANGE : BORDER, background: "#fff", color: chosen.size ? INK : "#5A6672", maxWidth: 190, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {title} ▾
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 39 }} />
+          <div className="rounded border" style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 40, background: "#fff", borderColor: BORDER, boxShadow: "0 8px 24px rgba(27,45,107,.18)", minWidth: 220, maxHeight: 320, overflowY: "auto", padding: 6 }}>
+            <div className="flex items-center gap-3 px-1.5 pb-1.5 mb-1 text-xs font-bold" style={{ borderBottom: `1px solid ${BORDER}` }}>
+              <button onClick={() => onChange("")} style={{ color: NAVY }}>All</button>
+              <button onClick={() => onChange(options.map((o) => o.id).join(","))} style={{ color: NAVY }}>Every ✓</button>
+              <button onClick={() => setOpen(false)} className="ml-auto" style={{ color: MUTED }}>✕</button>
+            </div>
+            {options.map((o) => (
+              <label key={o.id} className="flex items-center gap-2 px-1.5 py-1 text-sm cursor-pointer rounded hover:bg-[#F7F5F0]">
+                <input type="checkbox" checked={chosen.has(o.id)} onChange={() => toggle(o.id)} style={{ accentColor: NAVY }} />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

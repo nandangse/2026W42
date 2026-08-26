@@ -230,7 +230,9 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
         if (f.virtual) continue;
         const v = u.searchParams.get(`f_${f.name}`);
         if (v === null || v === "") continue;
-        pq = f.type === "bool" ? pq.eq(f.name, v === "true") : pq.eq(f.name, v);
+        pq = f.type === "bool" ? pq.eq(f.name, v === "true")
+          : v.includes(",") ? pq.in(f.name, v.split(","))
+          : pq.eq(f.name, v);
       }
       const { data, error } = await pq
         .ilike(d.titleField, `%${pick.trim().replace(/[%_]/g, "\\$&")}%`)
@@ -274,12 +276,14 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       const buildAgg = () => {
         let qy = db.from(d.table).select(aggSelect);
         if (["company", "person", "opportunity"].includes(d.name)) qy = qy.is("deleted_at", null);
-        if (wantsInd) qy = qy.eq("company_join.industry_id", indFilter);
+        if (wantsInd) qy = (String(indFilter).includes(",") ? qy.in("company_join.industry_id", String(indFilter).split(",")) : qy.eq("company_join.industry_id", indFilter));
         for (const f of d.fields) {
           if (f.virtual) continue;
           const v = u.searchParams.get(`f_${f.name}`);
           if (v === null || v === "") continue;
-          qy = f.type === "bool" ? qy.eq(f.name, v === "true") : qy.eq(f.name, v);
+          qy = f.type === "bool" ? qy.eq(f.name, v === "true")
+          : v.includes(",") ? qy.in(f.name, v.split(","))
+          : qy.eq(f.name, v);
         }
         const q = u.searchParams.get("q")?.trim();
         if (q) qy = qy.ilike(d.titleField, `%${q.replace(/[%_]/g, "\\$&")}%`);
@@ -337,12 +341,14 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       let qy = db.from(d.table).select(select, withCount ? { count: "exact" as const } : undefined);
       // Merged and soft-deleted rows stay in the ledger, not on the screens.
       if (["company", "person", "opportunity"].includes(d.name)) qy = qy.is("deleted_at", null);
-      if (wantsInd) qy = qy.eq("company_join.industry_id", indFilter);
+      if (wantsInd) qy = (String(indFilter).includes(",") ? qy.in("company_join.industry_id", String(indFilter).split(",")) : qy.eq("company_join.industry_id", indFilter));
       for (const f of d.fields) {
         if (f.virtual) continue;
         const v = u.searchParams.get(`f_${f.name}`);
         if (v === null || v === "") continue;
-        qy = f.type === "bool" ? qy.eq(f.name, v === "true") : qy.eq(f.name, v);
+        qy = f.type === "bool" ? qy.eq(f.name, v === "true")
+          : v.includes(",") ? qy.in(f.name, v.split(","))
+          : qy.eq(f.name, v);
       }
       const q = u.searchParams.get("q")?.trim();
       if (q) qy = qy.ilike(d.titleField, `%${q.replace(/[%_]/g, "\\$&")}%`);
