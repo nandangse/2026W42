@@ -17,7 +17,7 @@ export type ComposeCtx = {
 };
 
 type Attachment = { id: string; name: string; link: string };
-type Template = { key: string; value: string; description: string | null };
+type Template = { id: string; label: string; subject: string | null; cc: string | null; body: string; attachments: { name: string; link: string }[] };
 
 export default function MailComposer({ ctx, onClose, onSent }: {
   ctx: ComposeCtx; onClose: () => void; onSent: () => void;
@@ -42,12 +42,20 @@ export default function MailComposer({ ctx, onClose, onSent }: {
       .catch(() => setGmail({ connected: false, email: null, templates: [] }));
   }, []);
 
-  const applyTemplate = (key: string) => {
-    setTpl(key);
-    const t = gmail?.templates.find((x) => x.key === key);
-    if (t) {
-      setBodyText(t.value);
-      if (!subject && t.description) setSubject(t.description);
+  // A template is the fixed set — subject, cc, body, attachments — applied
+  // whole. Everything stays editable before Send.
+  const applyTemplate = (id: string) => {
+    setTpl(id);
+    const t = gmail?.templates.find((x) => x.id === id);
+    if (!t) return;
+    setBodyText(t.body);
+    if (t.subject) setSubject(t.subject);
+    if (t.cc) { setCc(t.cc); setShowCc(true); }
+    if (t.attachments.length) {
+      setFiles((cur) => [
+        ...cur.filter((f) => !t.attachments.some((a) => a.link === f.link)),
+        ...t.attachments.map((a) => ({ id: a.link, name: a.name, link: a.link })),
+      ]);
     }
   };
 
@@ -121,9 +129,9 @@ export default function MailComposer({ ctx, onClose, onSent }: {
               className="flex-1 rounded border px-2 py-1.5 text-sm" style={inputCss} />
             <select value={tpl} onChange={(e) => applyTemplate(e.target.value)}
               className="rounded border px-2 py-1.5 text-xs font-semibold" style={{ ...inputCss, maxWidth: 180, background: "#fff", color: tpl ? INK : MUTED }}
-              title="Templates are Message Variables whose key starts with template_">
+              title="From Settings → Email Templates — subject, cc, body and attachments come fixed">
               <option value="">Template…</option>
-              {(gmail?.templates ?? []).map((t) => <option key={t.key} value={t.key}>{t.key.replace(/^template_/, "").replace(/_/g, " ")}</option>)}
+              {(gmail?.templates ?? []).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
           </div>
           <textarea value={bodyText} onChange={(e) => setBodyText(e.target.value)} rows={7}

@@ -437,6 +437,24 @@ export const DOCTYPES: Doctype[] = [
     ],
   },
 
+  {
+    name: "email_template", label: "Email Template", plural: "Email Templates", table: "email_template",
+    titleField: "name", group: "Masters", icon: "📨",
+    orderBy: { column: "module", ascending: true },
+    onlyFor: ["raghu@nandan.co.in"],
+    blurb: "The letters the company sends, written once. Each shows in the composer as Module - Name; its subject, cc, body and attachments are fixed on the template, and {{variables}} render on send.",
+    fields: [
+      { name: "module", label: "Module", type: "select", options: ["Enquiry", "Quotation"], required: true, inList: true, default: "Enquiry",
+        help: "Where this letter belongs. It shows in the composer as Module - Name." },
+      { name: "name", label: "Template name", type: "text", required: true, inList: true },
+      { name: "subject", label: "Subject", type: "text", inList: true, help: "Fixed on the template — {{variables}} render on send." },
+      { name: "cc", label: "CC", type: "text", help: "Fixed cc for every mail sent with this template. Comma-separate for more than one." },
+      { name: "body", label: "Body", type: "textarea", big: true, help: "Dear {{name}}, … — every message variable works here." },
+      { name: "attachments", label: "Attachments", type: "textarea",
+        help: "One per line: Display Name | Drive link. Share each file anyone-with-link; only the link travels." },
+    ],
+  },
+
   // ------------------------------------------------------------ masters
   {
     name: "sector", label: "Sector", plural: "Sectors", table: "sector",

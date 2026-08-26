@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.27",
+    date: "2026-08-26",
+    module: "Email Templates become a master",
+    items: [
+      "EMAIL TEMPLATES LIVE IN MASTERS NOW — each one is Module - Name (Enquiry or Quotation), and its SUBJECT, CC, BODY and ATTACHMENTS are fixed on the template (attachments as Drive links, one per line). Migration 0013.",
+      "The composer's Template picker reads the master: pick Enquiry - Introduction and the whole fixed set lands — subject, cc unfolds pre-filled, body, attachment chips — still editable before Send, and {{variables}} render as always.",
+    ],
+  },
+  {
     v: "3.23.1.26",
     date: "2026-08-26",
     module: "Opportunity list: Date, fourth",

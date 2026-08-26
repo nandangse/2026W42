@@ -11,13 +11,29 @@ export async function GET() {
   try {
     const user = await requireCrm();
     const mb = user.profileId ? await myMailbox(user.profileId) : null;
-    // Templates are Message Variables whose key starts template_ — readable
-    // by every sender, editable only where the master is.
-    let templates: { key: string; value: string; description: string | null }[] = [];
+    // Templates come from the Email Templates master (0013): Module - Name,
+    // with subject, cc, body and attachments fixed on the template.
+    type Tpl = { id: string; label: string; subject: string | null; cc: string | null; body: string; attachments: { name: string; link: string }[] };
+    let templates: Tpl[] = [];
     if (crmConfigured()) {
-      const { data } = await crmDb().from("message_variable")
-        .select("key, value, description").like("key", "template\_%").order("key");
-      templates = (data ?? []).map((t) => ({ key: String(t.key), value: String(t.value ?? ""), description: t.description ? String(t.description) : null }));
+      const { data, error } = await crmDb().from("email_template")
+        .select("id, module, name, subject, cc, body, attachments")
+        .order("module").order("name");
+      if (!error) {
+        templates = (data ?? []).map((t) => ({
+          id: String(t.id),
+          label: `${t.module} - ${t.name}`,
+          subject: t.subject ? String(t.subject) : null,
+          cc: t.cc ? String(t.cc) : null,
+          body: String(t.body ?? ""),
+          attachments: String(t.attachments ?? "").split("\n")
+            .map((l) => {
+              const [name, link] = l.split("|").map((x) => x.trim());
+              return link ? { name: name || "attachment", link } : null;
+            })
+            .filter((x): x is { name: string; link: string } => !!x),
+        }));
+      }
     }
     return NextResponse.json({
       templates,
