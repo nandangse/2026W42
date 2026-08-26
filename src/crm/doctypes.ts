@@ -207,11 +207,11 @@ export const DOCTYPES: Doctype[] = [
     fields: [
       { name: "opportunity_no", label: "ENQ No", type: "readonly", inList: true, help: "Issued by the database on save. Imported rows keep their ERP number." },
       { name: "name", label: "Opportunity", type: "text", required: true, inList: true, help: "What is being sold, in words." },
-      { name: "opportunity_on", label: "Opportunity date", type: "date", inList: true,
-        help: "The business date the enquiry arrived — the ERP's Opportunity Date, distinct from when the row was written." },
       { name: "enquiry_info", label: "Enquiry Info", type: "textarea", big: true, tab: "enquiry",
         help: "The enquiry as it arrived — the customer's own words. 2,087 carried in from the ERP." },
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
+      { name: "opportunity_on", label: "Date", type: "date", inList: true,
+        help: "The business date the enquiry arrived — the ERP's Opportunity Date, distinct from when the row was written." },
       { name: "stage_id", label: "Stage", type: "link", link: "stage", required: true, inList: true,
         linkFilter: { column: "entity", value: "opportunity" },
         help: "New → Waiting for Data → Consultative Presentation. From there the deal lives on its quotation." },

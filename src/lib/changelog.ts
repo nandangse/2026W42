@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.26",
+    date: "2026-08-26",
+    module: "Opportunity list: Date, fourth",
+    items: [
+      "The opportunity's date is simply DATE now, and sits fourth in the list — ENQ No · Opportunity · Company · Date.",
+    ],
+  },
+  {
     v: "3.23.1.25",
     date: "2026-08-26",
     module: "The quotation, in five words",
