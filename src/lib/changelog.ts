@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.42",
+    date: "2026-08-26",
+    module: "The template masters get their doors",
+    items: [
+      "📨 Email Templates and 💬 WhatsApp Templates now sit in the sidebar under SETTINGS — they existed since 0013/0014 but had no door of their own.",
+    ],
+  },
+  {
     v: "3.23.1.41",
     date: "2026-08-26",
     module: "The admin's pen can delete a user",

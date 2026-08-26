@@ -63,6 +63,7 @@ const URL_OF: Record<string, string> = {
   quotation_line: "quoteline", opportunity: "opportunity", sales_order: "salesorder",
   interaction: "interactions", task: "task", address: "address", person_phone: "phone",
   product: "product", sales_invoice: "salesinvoice", message_variable: "variables",
+  email_template: "emailtemplates", whatsapp_template: "whatsapptemplates",
   sector: "sector", industry: "industry", stage: "stage", profile: "users",
 };
 
@@ -82,7 +83,7 @@ const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string } | { 
     items: [{ dt: "company" }, { dt: "person" }, { dt: "address" }, { dt: "person_phone" }, { dt: "industry" }, { dt: "product" }, { dt: "sales_invoice" }],
   },
   { header: "MORE", items: [{ dt: "interaction" }, { dt: "task" }, { dt: "quotation_line" }, { sp: "communication" }] },
-  { header: "SETTINGS", collapsible: true, items: [{ dt: "sector" }, { dt: "stage" }, { dt: "profile" }, { dt: "message_variable" }] },
+  { header: "SETTINGS", collapsible: true, items: [{ dt: "sector" }, { dt: "stage" }, { dt: "profile" }, { dt: "message_variable" }, { dt: "email_template" }, { dt: "whatsapp_template" }] },
 ];
 
 export default function CrmApp({
