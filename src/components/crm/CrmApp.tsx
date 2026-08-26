@@ -22,6 +22,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DOCTYPES, doctypeBySlug, type Doctype, type Field } from "@/crm/doctypes";
+import { LOGO } from "@/lib/logo";
 import AnalyticsScreen from "./Analytics";
 import { DateRangeBar, DEFAULT_RANGE, type DateRange } from "./DateRange";
 
@@ -105,7 +106,12 @@ export default function CrmApp({
   const [settingsOpen, setSettingsOpen] = useState(false);
   // The sidebar folds to an icon rail — open all the time was noise.
   const [navOpen, setNavOpen] = useState<boolean>(() => {
-    try { return localStorage.getItem("crmNavOpen") !== "0"; } catch { return true; }
+    try {
+      const saved = localStorage.getItem("crmNavOpen");
+      if (saved !== null) return saved !== "0";
+      // a phone starts folded — the rail is one tap away
+      return typeof window === "undefined" || window.innerWidth >= 768;
+    } catch { return true; }
   });
   const toggleNav = () => {
     setNavOpen((v) => {
@@ -220,8 +226,11 @@ export default function CrmApp({
       >
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-baseline gap-3">
-            <div className="font-extrabold tracking-wide" style={{ color: NAVY, fontSize: 16 }}>
-              NANDAN <span style={{ color: ORANGE }}>CRM</span>
+            <div className="font-extrabold tracking-wide flex items-center gap-2" style={{ color: NAVY, fontSize: 16 }}>
+              {/* the Genie logo, same asset the planning header wears */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={LOGO} alt="Nandan GSE" style={{ height: 30, width: "auto" }} />
+              <span style={{ color: ORANGE }}>CRM</span>
               <span
                 title="One Genie version number, across every module — the CRM does not version on its own."
                 style={{ background: ORANGE, color: "#fff", borderRadius: 4, padding: "1px 6px", marginLeft: 8, fontSize: 11, fontWeight: 700, verticalAlign: "middle" }}
@@ -262,14 +271,24 @@ export default function CrmApp({
           >
             {navOpen ? "⟨ collapse" : "⟩"}
           </button>
+          {!navOpen && (
+            <style>{`
+              .crmrail{position:relative}
+              .crmrail .railtip{position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);
+                background:${NAVY};color:#fff;font-size:12px;font-weight:700;padding:4px 10px;border-radius:6px;
+                white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .1s;z-index:60;
+                box-shadow:0 4px 14px rgba(27,45,107,.3)}
+              .crmrail:hover .railtip{opacity:1}
+            `}</style>
+          )}
           {!navOpen && NAV.map((block, bi) => (
             <div key={bi} className="mb-2 flex flex-col gap-0.5">
               {block.items.map((it) => {
                 if ("href" in it) {
                   return (
-                    <a key={it.href} href={it.href} title={it.label}
-                      className="rounded py-1.5 text-center" style={{ fontSize: 15, color: "#5A6672" }}>
-                      {it.icon}
+                    <a key={it.href} href={it.href}
+                      className="crmrail rounded py-1.5 text-center" style={{ fontSize: 16, color: "#5A6672" }}>
+                      {it.icon}<span className="railtip">{it.label}</span>
                     </a>
                   );
                 }
@@ -282,13 +301,13 @@ export default function CrmApp({
                   <button
                     key={name}
                     onClick={() => setSlug(name)}
-                    title={d?.plural ?? sp?.label}
-                    className="rounded py-1.5 text-center"
+                    className="crmrail rounded py-1.5 text-center w-full"
                     style={name === slug
-                      ? { background: NAVY, color: "#fff", fontSize: 15 }
-                      : { color: "#5A6672", fontSize: 15 }}
+                      ? { background: NAVY, fontSize: 16 }
+                      : { fontSize: 16 }}
                   >
                     {d?.icon ?? sp?.icon}
+                    <span className="railtip">{d?.plural ?? sp?.label}</span>
                   </button>
                 );
               })}
@@ -896,23 +915,44 @@ function RecordModal({
   };
   const rid = String(row.id ?? "");
   const companyId = row.company_id ? String(row.company_id) : null;
-  const recordTabs: TabDef[] =
-    dt.name === "company" ? [
-      { key: "details", label: "Details" },
-      { key: "person", label: "Contacts", count: row.contact_count, slug: "person", filterField: "company_id", filterValue: rid, addPresets: { company_id: rid } },
-      { key: "address", label: "Addresses", slug: "address", filterField: "company_id", filterValue: rid, addPresets: { company_id: rid } },
-      { key: "interaction", label: "Interactions", slug: "interaction", filterField: "company_id", filterValue: rid, addPresets: { company_id: rid } },
-      { key: "communication", label: "Communication" },
-      { key: "opportunity", label: "Opportunities", count: row.opp_count, slug: "opportunity", filterField: "company_id", filterValue: rid },
-      { key: "quotation", label: "Quotations", slug: "quotation", filterField: "company_id", filterValue: rid },
-      { key: "sales_order", label: "Sales Orders", count: row.so_count, slug: "sales_order", filterField: "company_id", filterValue: rid },
-    ] : dt.name === "quotation" ? [
-      { key: "details", label: "Details" },
-      { key: "quotation_line", label: "Lines", slug: "quotation_line", filterField: "quotation_id", filterValue: rid, addPresets: { quotation_id: rid } },
-      { key: "person", label: "Contacts", slug: "person", filterField: "company_id", filterValue: companyId, addPresets: companyId ? { company_id: companyId } : undefined },
-      { key: "interaction", label: "Interactions", slug: "interaction", filterField: "quotation_id", filterValue: rid, addPresets: { quotation_id: rid, ...(companyId ? { company_id: companyId } : {}) } },
-    ] : [];
+  const hasEnquiry = dt.fields.some((f) => f.tab === "enquiry");
+  const hasQual = dt.fields.some((f) => f.tab === "qual");
+  const TABBED = ["company", "person", "opportunity", "quotation", "sales_order"];
+  const recordTabs: TabDef[] = [];
+  if (TABBED.includes(dt.name)) {
+    recordTabs.push({ key: "details", label: "Details" });
+    if (hasEnquiry) recordTabs.push({ key: "enquiry", label: "Enquiry Info" });
+    // Contacts: the company's people, addable right there
+    if (dt.name === "company")
+      recordTabs.push({ key: "contacts", label: "Contacts", count: row.contact_count, slug: "person", filterField: "company_id", filterValue: rid, addPresets: { company_id: rid } });
+    else if (dt.name !== "person")
+      recordTabs.push({ key: "contacts", label: "Contacts", slug: "person", filterField: "company_id", filterValue: companyId, addPresets: companyId ? { company_id: companyId } : undefined });
+    if (hasQual) recordTabs.push({ key: "qual", label: "Qualification" });
+    if (dt.name === "company") {
+      recordTabs.push(
+        { key: "addresses", label: "Addresses", slug: "address", filterField: "company_id", filterValue: rid, addPresets: { company_id: rid } },
+        { key: "opps", label: "Opportunities", count: row.opp_count, slug: "opportunity", filterField: "company_id", filterValue: rid },
+        { key: "quotes", label: "Quotations", slug: "quotation", filterField: "company_id", filterValue: rid },
+        { key: "sos", label: "Sales Orders", count: row.so_count, slug: "sales_order", filterField: "company_id", filterValue: rid },
+      );
+    }
+    if (dt.name === "opportunity")
+      recordTabs.push({ key: "quotes", label: "Quotations", slug: "quotation", filterField: "opportunity_id", filterValue: rid, addPresets: { opportunity_id: rid, ...(companyId ? { company_id: companyId } : {}) } });
+    if (dt.name === "quotation")
+      recordTabs.push({ key: "lines", label: "Lines", slug: "quotation_line", filterField: "quotation_id", filterValue: rid, addPresets: { quotation_id: rid } });
+    recordTabs.push(
+      { key: "comms", label: "Communication" },
+      { key: "notes", label: "Notes" },
+      { key: "genie", label: "Genie" },
+    );
+  }
   const hasTabs = recordTabs.length > 0;
+  const EDITABLE_TABS = ["details", "enquiry", "qual"];
+  const editTabKey = (EDITABLE_TABS.includes(tab) ? tab : "details") as "details" | "enquiry" | "qual";
+  useEffect(() => {
+    if (mode === "edit" && hasTabs && !EDITABLE_TABS.includes(tab)) setTab("details");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   return (
     <div
@@ -961,7 +1001,7 @@ function RecordModal({
           </div>
         </div>
 
-        {mode === "view" && hasTabs && (
+        {hasTabs && (
           <div
             className="flex flex-wrap"
             style={{ borderBottom: `2px solid ${BORDER}`, padding: "0 12px", gap: 2 }}
@@ -969,12 +1009,14 @@ function RecordModal({
             {recordTabs.map((t) => (
               <button
                 key={t.key}
+                disabled={mode === "edit" && !EDITABLE_TABS.includes(t.key)}
                 onClick={() => setTab(t.key)}
                 className="text-sm font-bold"
                 style={{
                   padding: "10px 14px", color: tab === t.key ? ORANGE : MUTED,
                   borderBottom: `3px solid ${tab === t.key ? ORANGE : "transparent"}`,
                   marginBottom: -2,
+                  opacity: mode === "edit" && !EDITABLE_TABS.includes(t.key) ? 0.35 : 1,
                 }}
               >
                 {t.label}
@@ -997,7 +1039,7 @@ function RecordModal({
               className="grid gap-x-6 gap-y-3 p-4"
               style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}
             >
-              {dt.fields.map((f) => (
+              {dt.fields.filter((f) => !hasTabs || !f.tab).map((f) => (
                 <div key={f.name}>
                   <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>{f.label}</div>
                   <div className="text-sm" style={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>
@@ -1006,12 +1048,22 @@ function RecordModal({
                 </div>
               ))}
             </div>
-          ) : tab === "communication" ? (
-            <div className="p-6 text-sm" style={{ color: MUTED, lineHeight: 1.6 }}>
-              Emails — automated, inbound and outbound — land here when the
-              channels phase connects the mailboxes. The table is ready; the
-              wires are not yet in.
+          ) : tab === "enquiry" ? (
+            <div className="p-4">
+              <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "55vh", overflowY: "auto" }}>
+                {String(row.enquiry_info ?? "").trim() || <span style={{ color: MUTED }}>No enquiry text recorded.</span>}
+              </div>
             </div>
+          ) : tab === "qual" ? (
+            <div className="p-4">
+              <QualView dt={dt} row={row} links={links} />
+            </div>
+          ) : tab === "comms" ? (
+            <CommsFeed type={dt.name} id={rid} companyId={companyId} onOpenLink={onOpenLink} />
+          ) : tab === "notes" ? (
+            <NotesTab type={dt.name} id={rid} />
+          ) : tab === "genie" ? (
+            <GenieTab type={dt.name} id={rid} />
           ) : (() => {
             const t = recordTabs.find((x) => x.key === tab);
             return t?.slug ? (
@@ -1026,7 +1078,10 @@ function RecordModal({
           })()
         ) : (
           <div className="p-4">
-            <RecordForm dt={dt} links={links} initial={row} onDone={onSaved} />
+            <RecordForm
+              dt={dt} links={links} initial={row} onDone={onSaved}
+              tabKey={hasTabs ? editTabKey : undefined}
+            />
           </div>
         )}
       </div>
@@ -1200,6 +1255,274 @@ function LinkAutocomplete({
   );
 }
 
+/** Qualification, read-only: the BANTTC row with its weighted score, and the
+ *  loss record where the stage is a dead end. */
+function QualView({ dt, row, links }: { dt: Doctype; row: Row; links: Links }) {
+  const score = (() => {
+    let sum = 0, den = 0;
+    for (const b of BANTTC) {
+      const v = row[b.name];
+      if (v === null || v === undefined || v === "") continue;
+      sum += Number(v) * b.w; den += b.w;
+    }
+    return den > 0 ? Math.round(sum / den) : null;
+  })();
+  const lostFields = dt.fields.filter((f) => f.tab === "qual" && !BANTTC.some((b) => b.name === f.name));
+  return (
+    <div>
+      {dt.name === "opportunity" && (
+        <div className="mb-4" style={{ overflowX: "auto" }}>
+          <table style={{ borderCollapse: "collapse", minWidth: 560 }}>
+            <thead><tr>
+              {BANTTC.map((b) => (
+                <th key={b.name} style={{ textAlign: "center", padding: "4px 12px", fontSize: 11, color: MUTED, borderBottom: `2px solid ${BORDER}`, whiteSpace: "nowrap" }}>
+                  {b.label}{b.w > 1 && <span style={{ color: ORANGE }}> ×{b.w}</span>}
+                </th>
+              ))}
+              <th style={{ textAlign: "center", padding: "4px 12px", fontSize: 11, color: NAVY, borderBottom: `2px solid ${BORDER}`, fontWeight: 800 }}>SCORE</th>
+            </tr></thead>
+            <tbody><tr>
+              {BANTTC.map((b) => (
+                <td key={b.name} className="tnum" style={{ textAlign: "center", padding: "8px 12px", fontSize: 15, fontWeight: 700 }}>
+                  {row[b.name] === null || row[b.name] === undefined ? "—" : `${row[b.name]}%`}
+                </td>
+              ))}
+              <td className="tnum" style={{ textAlign: "center", padding: "8px 12px", fontWeight: 800, fontSize: 17,
+                color: score === null ? MUTED : score >= 60 ? "#1A7F4E" : score >= 35 ? "#B45309" : "#C0392B" }}>
+                {score === null ? "—" : `${score}%`}
+              </td>
+            </tr></tbody>
+          </table>
+        </div>
+      )}
+      <div className="grid gap-x-6 gap-y-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+        {lostFields.map((f) => (
+          <div key={f.name}>
+            <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>{f.label}</div>
+            <div className="text-sm" style={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>
+              <Cell field={f} value={row[f.name]} links={links} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Every communication on the record — calls, WhatsApp, email, visits, video
+ *  calls — one feed, newest first, with a ＋ to log the next one. */
+function CommsFeed({
+  type, id, companyId, onOpenLink,
+}: {
+  type: string; id: string; companyId: string | null;
+  onOpenLink: (target: string, id: string) => void;
+}) {
+  type FeedRow = {
+    kind: string; at: string; type: string; by: string | null; with: string | null;
+    result: string | null; text: string | null; next_action: string | null; next_action_on: string | null;
+  };
+  const [feed, setFeed] = useState<FeedRow[] | null>(null);
+  const [err, setErr] = useState("");
+  const [logging, setLogging] = useState(false);
+  const [tick, setTick] = useState(0);
+  const [logLinks, setLogLinks] = useState<Links | null>(null);
+  void onOpenLink;
+
+  // The log form's dropdowns (salespeople, stages…) fetched once, on first open.
+  useEffect(() => {
+    if (!logging || logLinks) return;
+    fetch("/api/crm/interaction?f_by_id=00000000-0000-0000-0000-000000000000", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setLogLinks(j.links || {}))
+      .catch(() => setLogLinks({}));
+  }, [logging, logLinks]);
+
+  useEffect(() => {
+    setFeed(null); setErr("");
+    fetch(`/api/crm/comms?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`, { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || "Could not load");
+        setFeed(j.feed);
+      })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [type, id, tick]);
+
+  const icon = (t: string) => {
+    const x = t.toLowerCase();
+    if (x.includes("visit")) return "🚶";
+    if (x.includes("video")) return "🎥";
+    if (x.includes("whatsapp") || x.includes("sms")) return "💬";
+    if (x.includes("mail")) return "✉️";
+    if (x.includes("internal")) return "🏠";
+    return "📞";
+  };
+  const resultColor = (r: string | null) =>
+    r === "Warmer" || r === "Closed Won" ? "#1A7F4E" : r === "Colder" || r === "Closed Lost" ? "#C0392B" : MUTED;
+
+  const interactionDt = doctypeBySlug("interaction");
+  const fkField = type === "company" ? "company_id" : type === "person" ? "person_id"
+    : type === "opportunity" ? "opportunity_id" : type === "quotation" ? "quotation_id" : "sales_order_id";
+
+  return (
+    <div className="p-4" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+      <button
+        onClick={() => setLogging((v) => !v)}
+        className="px-3 py-1 rounded text-xs font-bold mb-3"
+        style={{ background: logging ? MUTED : ORANGE, color: "#fff" }}
+      >
+        {logging ? "Cancel" : "＋ Log a call / visit"}
+      </button>
+      {logging && interactionDt && (
+        <RecordForm
+          dt={interactionDt} links={logLinks ?? {}}
+          presets={{ [fkField]: id, ...(companyId && fkField !== "company_id" ? { company_id: companyId } : {}) }}
+          onDone={() => { setLogging(false); setTick((t) => t + 1); }}
+        />
+      )}
+      {err && <div className="text-sm" style={{ color: "#8E2C20" }}>{err}</div>}
+      {feed === null && !err && <div className="text-sm" style={{ color: MUTED }}>loading…</div>}
+      {feed !== null && feed.length === 0 && (
+        <div className="text-sm" style={{ color: MUTED }}>Nothing said yet — the first call starts the trail.</div>
+      )}
+      {(feed ?? []).map((f, i) => (
+        <div key={i} className="rounded border p-2.5 mb-2" style={{ borderColor: BORDER, borderLeft: `3px solid ${resultColor(f.result) === MUTED ? BORDER : resultColor(f.result)}` }}>
+          <div className="flex items-baseline gap-2 flex-wrap text-xs" style={{ color: MUTED }}>
+            <span style={{ fontSize: 14 }}>{icon(f.type)}</span>
+            <b style={{ color: INK }}>{f.type}</b>
+            {f.result && <b style={{ color: resultColor(f.result) }}>{f.result}</b>}
+            <span className="tnum">{fmtDate(String(f.at))}</span>
+            {f.by && <span>by {f.by}</span>}
+            {f.with && <span>with {f.with}</span>}
+          </div>
+          {f.text && <div className="text-sm mt-1" style={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>{f.text}</div>}
+          {f.next_action && (
+            <div className="text-xs mt-1" style={{ color: "#B45309" }}>
+              → {f.next_action}{f.next_action_on ? ` · ${fmtDate(String(f.next_action_on))}` : ""}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Notes on the record — the polymorphic note + record_link the schema always had. */
+function NotesTab({ type, id }: { type: string; id: string }) {
+  type NoteRow = { id: string; title: string | null; body: string; author: string | null; created_at: string };
+  const [notes, setNotes] = useState<NoteRow[] | null>(null);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    fetch(`/api/crm/notes?target_type=${encodeURIComponent(type)}&target_id=${encodeURIComponent(id)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setNotes(j.notes ?? []))
+      .catch(() => setNotes([]));
+  }, [type, id, tick]);
+
+  const save = async () => {
+    if (!text.trim()) return;
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/crm/notes", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ target_type: type, target_id: id, body: text.trim() }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save the note");
+      setText(""); setTick((t) => t + 1);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="p-4" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+      <div className="mb-3">
+        <textarea
+          value={text} onChange={(e) => setText(e.target.value)} rows={3}
+          placeholder="Write a note — it stays on this record, signed and dated."
+          className="w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: BORDER }}
+        />
+        <div className="flex justify-end mt-1">
+          <button onClick={save} disabled={busy || !text.trim()}
+            className="px-3 py-1 rounded text-xs font-bold"
+            style={{ background: busy || !text.trim() ? "#B9BEC4" : ORANGE, color: "#fff" }}>
+            {busy ? "Saving…" : "Add note"}
+          </button>
+        </div>
+        {err && <div className="text-xs mt-1" style={{ color: "#8E2C20" }}>{err}</div>}
+      </div>
+      {notes === null && <div className="text-sm" style={{ color: MUTED }}>loading…</div>}
+      {notes !== null && notes.length === 0 && (
+        <div className="text-sm" style={{ color: MUTED }}>No notes yet.</div>
+      )}
+      {(notes ?? []).map((n) => (
+        <div key={n.id} className="rounded border p-2.5 mb-2" style={{ borderColor: BORDER }}>
+          <div className="text-xs" style={{ color: MUTED }}>
+            {n.author ?? "—"} · <span className="tnum">{fmtDate(n.created_at)}</span>
+          </div>
+          {n.title && <div className="text-sm font-bold mt-0.5">{n.title}</div>}
+          <div className="text-sm mt-0.5" style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}>{n.body}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The Genie tab: Claude's read on the record, on demand — same voice as the
+ *  Job Plan's brief, never asked to invent a number. */
+function GenieTab({ type, id }: { type: string; id: string }) {
+  const [read, setRead] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const ask = async () => {
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/crm/genie", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type, id }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Genie could not read this record");
+      if (j.missing) throw new Error(j.missing);
+      setRead(j.read);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="p-4">
+      {read === null && (
+        <div className="rounded p-4" style={{ background: NAVY_SOFT }}>
+          <div className="text-sm mb-2" style={{ color: INK, lineHeight: 1.6 }}>
+            ✨ Genie reads the record — where it stands, what the trail says, and what would
+            actually move it. From the facts on file, nothing invented.
+          </div>
+          <button onClick={ask} disabled={busy}
+            className="px-3 py-1.5 rounded text-sm font-bold"
+            style={{ background: busy ? "#B9BEC4" : NAVY, color: "#fff" }}>
+            {busy ? "Reading…" : "Ask Genie"}
+          </button>
+          {err && <div className="text-xs mt-2 font-semibold" style={{ color: "#8E2C20" }}>{err}</div>}
+        </div>
+      )}
+      {read !== null && (
+        <div className="rounded border p-4" style={{ borderColor: BORDER, borderLeft: `3px solid ${ORANGE}` }}>
+          <div className="text-xs font-bold mb-2" style={{ color: ORANGE, letterSpacing: 1 }}>✨ GENIE — THE READ ON THIS RECORD</div>
+          <div className="text-sm" style={{ whiteSpace: "pre-wrap", lineHeight: 1.65 }}>{read}</div>
+          <button onClick={ask} disabled={busy} className="text-xs font-bold mt-3" style={{ color: NAVY }}>
+            {busy ? "Reading…" : "↻ Read again"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * The contact picker: type-and-choose, narrowed to the chosen company, and a
  * name that is not there yet is one click from existing — typed once, born
@@ -1310,10 +1633,12 @@ const BANTTC: { name: string; label: string; w: number }[] = [
  * knows its company.
  */
 function RecordForm({
-  dt, links, initial, presets, onDone,
+  dt, links, initial, presets, onDone, tabKey,
 }: {
   dt: Doctype; links: Links; initial?: Row; presets?: Row;
   onDone: (saved?: Row) => void;
+  /** Edit one lightbox tab at a time; absent = the whole form (Add). */
+  tabKey?: "details" | "enquiry" | "qual";
 }) {
   const editable = dt.fields.filter((f) => f.type !== "readonly" && !f.virtual);
 
@@ -1351,8 +1676,11 @@ function RecordForm({
   const hasStage = editable.some((f) => f.name === "stage_id");
   const isDeal = dt.name === "opportunity";
   const banttcNames = BANTTC.map((b) => b.name);
+  const tabMatch = (f: Field) =>
+    tabKey === undefined ? true : tabKey === "details" ? !f.tab : f.tab === tabKey;
   const gridFields = editable.filter((f) =>
-    !(isDeal && banttcNames.includes(f.name))
+    tabMatch(f)
+    && !(isDeal && banttcNames.includes(f.name))
     && !(hasStage && !stageDead && (f.name === "lost_reason" || f.name === "lost_to_competitor")));
 
   const score = (() => {
@@ -1478,7 +1806,7 @@ function RecordForm({
         ))}
       </div>
 
-      {isDeal && (
+      {isDeal && (tabKey === undefined || tabKey === "qual") && (
         <div className="mb-3" style={{ overflowX: "auto" }}>
           <div className="text-xs font-bold mb-1" style={{ color: NAVY, letterSpacing: 0.8 }}>
             BANTTC

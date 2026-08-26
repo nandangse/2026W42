@@ -44,6 +44,8 @@ export interface Field {
   noFilter?: boolean;
   /** A textarea that deserves the whole row and real height. */
   big?: boolean;
+  /** Which lightbox tab the field lives on — absent means Details. */
+  tab?: "enquiry" | "qual";
 }
 
 export interface Doctype {
@@ -86,7 +88,7 @@ export const DOCTYPES: Doctype[] = [
   // moment a line is saved — the totals here are read, never typed.
   {
     name: "quotation", label: "Quotation", plural: "Quotations", table: "quotation",
-    titleField: "quote_no", group: "Quotations", icon: "▤",
+    titleField: "quote_no", group: "Quotations", icon: "📄",
     orderBy: { column: "updated_at", ascending: false },
     autoNumber: { field: "quote_no", series: "quotation" },
     blurb: "Where the funnel earns its keep. The totals fill themselves from the lines — the front end displays money, it never calculates it.",
@@ -101,8 +103,8 @@ export const DOCTYPES: Doctype[] = [
         help: "Sent → the buckets → Order Received. This is the temperature of the quote; a Lost or Not Target move needs a reason first." },
       { name: "status", label: "Status", type: "select", inList: true, default: "draft",
         options: ["draft", "internal_review", "approved", "sent", "revised", "accepted", "rejected", "expired"] },
-      { name: "lost_reason", label: "Lost reason", type: "textarea", help: "Required by the database before a move to Lost or Not Target." },
-      { name: "lost_to_competitor", label: "Lost to", type: "text" },
+      { name: "lost_reason", label: "Lost reason", type: "textarea", tab: "qual", help: "Required by the database before a move to Lost or Not Target." },
+      { name: "lost_to_competitor", label: "Lost to", type: "text", tab: "qual" },
       { name: "valid_until", label: "Valid until", type: "date", inList: true },
       { name: "validity_days", label: "Validity (days)", type: "number", default: 30 },
       { name: "delivery_weeks", label: "Delivery (weeks)", type: "number" },
@@ -124,7 +126,7 @@ export const DOCTYPES: Doctype[] = [
   },
   {
     name: "quotation_line", label: "Quote line", plural: "Quote lines", table: "quotation_line",
-    titleField: "description", group: "Quotations", icon: "≡",
+    titleField: "description", group: "Quotations", icon: "📃",
     orderBy: { column: "created_at", ascending: false },
     blurb: "One row per item on a quote. Saving a line recalculates its quotation's totals in the database, immediately.",
     fields: [
@@ -145,7 +147,7 @@ export const DOCTYPES: Doctype[] = [
 
   {
     name: "sales_order", label: "Sales Order", plural: "Sales Orders", table: "sales_order",
-    titleField: "so_no", group: "Quotations", icon: "◪",
+    titleField: "so_no", group: "Quotations", icon: "🧾",
     orderBy: { column: "updated_at", ascending: false },
     blurb: "The pipeline's destination. ERPNext remains the system of record for the order's life — this row is the CRM's handle on it.",
     fields: [
@@ -167,7 +169,7 @@ export const DOCTYPES: Doctype[] = [
   // ------------------------------------------------------------- funnel
   {
     name: "lead", label: "Lead", plural: "Leads", table: "lead",
-    titleField: "contact_name", group: "Funnel", icon: "◉",
+    titleField: "contact_name", group: "Funnel", icon: "📥",
     orderBy: { column: "updated_at", ascending: false },
     blurb: "Every inbound message becomes a row here — junk included, as 'spam'. The denominator is what tells you what portal traffic actually costs.",
     fields: [
@@ -192,14 +194,14 @@ export const DOCTYPES: Doctype[] = [
   },
   {
     name: "opportunity", label: "Opportunity", plural: "Opportunities", table: "opportunity",
-    titleField: "name", group: "Funnel", icon: "▶",
+    titleField: "name", group: "Funnel", icon: "🎯",
     orderBy: { column: "updated_at", ascending: false },
     autoNumber: { field: "opportunity_no", series: "opportunity" },
     blurb: "The thing that moves, from Suspect to Order Received. Every stage change is timed automatically, and a lost stage refuses to save without a reason.",
     fields: [
       { name: "opportunity_no", label: "ENQ No", type: "readonly", inList: true, help: "Issued by the database on save. Imported rows keep their ERP number." },
       { name: "name", label: "Opportunity", type: "text", required: true, inList: true, help: "What is being sold, in words." },
-      { name: "enquiry_info", label: "Enquiry Info", type: "textarea", big: true,
+      { name: "enquiry_info", label: "Enquiry Info", type: "textarea", big: true, tab: "enquiry",
         help: "The enquiry as it arrived — the customer's own words. 2,087 carried in from the ERP." },
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
       { name: "stage_id", label: "Stage", type: "link", link: "stage", required: true, inList: true,
@@ -217,19 +219,19 @@ export const DOCTYPES: Doctype[] = [
       { name: "point_of_contact_id", label: "Contact", type: "link", link: "person" },
       { name: "source", label: "Source", type: "select", options: [...LEAD_SOURCES] },
       { name: "is_tender", label: "Tender", type: "bool" },
-      { name: "budget_pct", label: "Budget %", type: "number" },
-      { name: "authority_pct", label: "Authority %", type: "number" },
-      { name: "need_pct", label: "Need %", type: "number" },
-      { name: "timing_pct", label: "Timing %", type: "number" },
-      { name: "competitiveness_pct", label: "Competitiveness %", type: "number" },
-      { name: "technically_qualified_pct", label: "Technically qualified %", type: "number" },
-      { name: "lost_reason", label: "Lost reason", type: "textarea", help: "Required by the database before a move to Quote Lost or Not Target." },
-      { name: "lost_to_competitor", label: "Lost to", type: "text" },
+      { name: "budget_pct", label: "Budget %", type: "number", tab: "qual" },
+      { name: "authority_pct", label: "Authority %", type: "number", tab: "qual" },
+      { name: "need_pct", label: "Need %", type: "number", tab: "qual" },
+      { name: "timing_pct", label: "Timing %", type: "number", tab: "qual" },
+      { name: "competitiveness_pct", label: "Competitiveness %", type: "number", tab: "qual" },
+      { name: "technically_qualified_pct", label: "Technically qualified %", type: "number", tab: "qual" },
+      { name: "lost_reason", label: "Lost reason", type: "textarea", tab: "qual", help: "Required by the database before a move to Quote Lost or Not Target." },
+      { name: "lost_to_competitor", label: "Lost to", type: "text", tab: "qual" },
     ],
   },
   {
     name: "task", label: "Task", plural: "Tasks", table: "task",
-    titleField: "title", group: "Funnel", icon: "☐",
+    titleField: "title", group: "Funnel", icon: "✅",
     orderBy: { column: "updated_at", ascending: false },
     blurb: "Follow-ups, by hand today and from call recordings and the AI later. The source column remembers which.",
     fields: [
@@ -245,7 +247,7 @@ export const DOCTYPES: Doctype[] = [
 
   {
     name: "interaction", label: "Interaction", plural: "Interactions", table: "interaction",
-    titleField: "remark", group: "Funnel", icon: "☎",
+    titleField: "remark", group: "Funnel", icon: "🤝",
     orderBy: { column: "happened_at", ascending: false },
     blurb: "Phone calls and visits, logged against anything — a lead, a person, a company, a quote, a sales order. The Warmer/Colder read is the pulse of the deal.",
     fields: [
@@ -272,7 +274,7 @@ export const DOCTYPES: Doctype[] = [
   // ------------------------------------------------- accounts and people
   {
     name: "company", label: "Company", plural: "Companies", table: "company",
-    titleField: "name", group: "Accounts", icon: "■",
+    titleField: "name", group: "Accounts", icon: "🏢",
     orderBy: { column: "updated_at", ascending: false },
     blurb: "The account. One row per company you sell to; is_customer flips by itself the first time an opportunity is won.",
     fields: [
@@ -298,7 +300,7 @@ export const DOCTYPES: Doctype[] = [
   },
   {
     name: "person", label: "Contact", plural: "Contacts", table: "person",
-    titleField: "full_name", group: "Accounts", icon: "○",
+    titleField: "full_name", group: "Accounts", icon: "👥",
     orderBy: { column: "updated_at", ascending: false },
     blurb: "The person. 63% of the contacts in the ERP are attached to no company at all — attach them here.",
     fields: [
@@ -318,7 +320,7 @@ export const DOCTYPES: Doctype[] = [
   },
   {
     name: "address", label: "Address", plural: "Addresses", table: "address",
-    titleField: "label", group: "Accounts", icon: "▫",
+    titleField: "label", group: "Accounts", icon: "📍",
     orderBy: { column: "updated_at", ascending: false },
     blurb: "Several per company. A quotation names one of these, so it has to be a row rather than free text on the quote.",
     fields: [
@@ -336,7 +338,7 @@ export const DOCTYPES: Doctype[] = [
   },
   {
     name: "person_phone", label: "Phone number", plural: "Phone numbers", table: "person_phone",
-    titleField: "number_e164", group: "Accounts", icon: "✆",
+    titleField: "number_e164", group: "Accounts", icon: "☎️",
     orderBy: { column: "created_at", ascending: false },
     blurb: "Its own doctype because a call arrives as a NUMBER with nobody attached, so the lookup runs backwards.",
     fields: [
@@ -350,7 +352,7 @@ export const DOCTYPES: Doctype[] = [
   // ---------------------------------------------------------- catalogue
   {
     name: "product", label: "Product", plural: "Products", table: "product",
-    titleField: "name", group: "Catalogue", icon: "▣",
+    titleField: "name", group: "Catalogue", icon: "📦",
     orderBy: { column: "sku", ascending: true },
     blurb: "The GSE model list — the spine of the quotation engine. Real SKUs only; a quote built on invented ones is worthless.",
     fields: [
@@ -373,7 +375,7 @@ export const DOCTYPES: Doctype[] = [
 
   {
     name: "sales_invoice", label: "Sales Invoice", plural: "Sales Invoices", table: "sales_invoice",
-    titleField: "si_no", group: "Accounts", icon: "▥",
+    titleField: "si_no", group: "Accounts", icon: "💰",
     orderBy: { column: "updated_at", ascending: false },
     onlyFor: ["raghu@nandan.co.in"],
     blurb: "The ONE source of truth of what we have accomplished. An order is a promise; the invoice is the fact. ERPNext raises them — this is the record.",
@@ -395,7 +397,7 @@ export const DOCTYPES: Doctype[] = [
   // ------------------------------------------------------------ masters
   {
     name: "sector", label: "Sector", plural: "Sectors", table: "sector",
-    titleField: "code", group: "Masters", icon: "◆",
+    titleField: "code", group: "Masters", icon: "🗂️",
     orderBy: { column: "sort_order", ascending: true },
     blurb: "What Nandan makes. Seven codes, named by Dr Raghu on 21 Aug.",
     fields: [
@@ -407,7 +409,7 @@ export const DOCTYPES: Doctype[] = [
   },
   {
     name: "industry", label: "Industry", plural: "Industries", table: "industry",
-    titleField: "name", group: "Masters", icon: "◈",
+    titleField: "name", group: "Masters", icon: "🏭",
     orderBy: { column: "name", ascending: true },
     blurb: "What the customer does — and who is going after it. Your 253 industries already carry a sector, a priority, an owner and a qualification.",
     fields: [
@@ -422,7 +424,7 @@ export const DOCTYPES: Doctype[] = [
   },
   {
     name: "stage", label: "Stage", plural: "Stages", table: "stage",
-    titleField: "name", group: "Masters", icon: "▰",
+    titleField: "name", group: "Masters", icon: "🪜",
     orderBy: { column: "sort_order", ascending: true },
     blurb: "The fourteen rungs, as rows. Reordering is a change to a number here — never a migration.",
     fields: [
@@ -440,7 +442,7 @@ export const DOCTYPES: Doctype[] = [
   },
   {
     name: "profile", label: "User", plural: "Users", table: "profile",
-    titleField: "full_name", group: "Masters", icon: "●",
+    titleField: "full_name", group: "Masters", icon: "👤",
     orderBy: { column: "full_name", ascending: true },
     blurb: "A mirror of the Genie account, matched on EMAIL — never on id, which is a different uuid in each database. Opening the CRM at all is Genie's crm_access grant.",
     fields: [

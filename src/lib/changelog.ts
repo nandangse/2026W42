@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.7",
+    date: "2026-08-25",
+    module: "Every record wears its tabs, and Genie reads the CRM",
+    items: [
+      "COMPANIES, CONTACTS, OPPORTUNITIES, QUOTATIONS AND SALES ORDERS all open with tabs under the blue bar: Details · Enquiry Info · Contacts · Qualification · Communication · Notes · Genie — plus each record's own rooms (a company's Addresses and pipeline, an opportunity's Quotations, a quotation's Lines). EDIT follows the same schema: the form shows the tab you were reading — Details, the enquiry box, or the BANTTC table — and saves without losing your place.",
+      "COMMUNICATION IS ONE FEED: calls, WhatsApp, email, visits and video calls together, newest first, with the Warmer/Colder read coloured on the edge, the next action underneath, and ＋ Log a call / visit right there — born linked to the record.",
+      "NOTES ON ANYTHING — signed, dated, kept on the record through the link table the schema carried from day one.",
+      "GENIE READS THE RECORD on demand — the same voice as the Job Plan's brief: where it stands, what the trail says, what would actually move it. From the facts on file; never asked to invent a number.",
+      "QUALIFICATION IS A ROOM of its own: the BANTTC row with its weighted score writ large, and the loss record beside it.",
+      "THE SIDEBAR'S RAIL SPEAKS: real icons in place of geometry, a navy flyout label on hover, and on a phone the CRM starts folded — the rail is one tap away. The Genie logo stands in the header where the word NANDAN was.",
+    ],
+  },
+  {
     v: "3.23.1.6",
     date: "2026-08-25",
     module: "The CRM's sidebar folds, the enquiry speaks, and a contact is typed into being",
