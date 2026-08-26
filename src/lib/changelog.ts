@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.40",
+    date: "2026-08-26",
+    module: "The Contact dropdown leaves the opportunity filters",
+    items: [
+      "The Contact filter is gone from the opportunity list — a dropdown over 1.3 lakh people filtered nobody. Search and the other filters carry it.",
+    ],
+  },
+  {
     v: "3.23.1.39",
     date: "2026-08-26",
     module: "The stage moves from the Details view",

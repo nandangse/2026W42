@@ -224,7 +224,8 @@ export const DOCTYPES: Doctype[] = [
       { name: "owner_id", label: "Salesperson", type: "link", link: "profile", inList: true },
       { name: "amount", label: "Value", type: "money", inList: true },
       { name: "expected_close_on", label: "Expected close", type: "date", inList: true },
-      { name: "point_of_contact_id", label: "Contact", type: "link", link: "person" },
+      // noFilter: a 133k-person dropdown filters nobody (Dr Raghu, 26 Aug 2026)
+      { name: "point_of_contact_id", label: "Contact", type: "link", link: "person", noFilter: true },
       { name: "source", label: "Source", type: "select", options: [...LEAD_SOURCES] },
       { name: "is_tender", label: "Tender", type: "bool", help: "Tick it and the tender's own fields unfold below." },
       { name: "tender_reference", label: "Tender Reference", type: "text", tenderOnly: true },
