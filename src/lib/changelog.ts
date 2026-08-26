@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.10",
+    date: "2026-08-26",
+    module: "The auto-chosen company shows its name",
+    items: [
+      "ADDING A CONTACT FROM AN OPPORTUNITY, QUOTATION OR SALES ORDER auto-chooses that record's company — and now SHOWS it: a preset company whose name sat beyond the dropdown's 1,000-name horizon fetched as an empty-looking box; the picker now fetches the name itself. Same cure for preset contacts.",
+    ],
+  },
+  {
     v: "3.23.1.9",
     date: "2026-08-26",
     module: "The developer's margin on every feature request",

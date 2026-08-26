@@ -1210,7 +1210,23 @@ function LinkAutocomplete({
   const [text, setText] = useState(valueLabel);
   const [options, setOptions] = useState<{ id: string; label: string }[]>([]);
   const [open, setOpen] = useState(false);
-  useEffect(() => setText(valueLabel), [valueLabel]);
+  useEffect(() => { if (valueLabel) setText(valueLabel); }, [valueLabel]);
+
+  // A preset id whose name is beyond the dropdown's horizon still shows its
+  // name — fetched once, so "auto-chosen" reads as chosen, not empty.
+  useEffect(() => {
+    if (!value || valueLabel) return;
+    let dead = false;
+    fetch(`/api/crm/${target}?id=${encodeURIComponent(value)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        if (dead || !j?.row) return;
+        const t = doctypeBySlug(target);
+        setText(String(j.row[t?.titleField ?? "id"] ?? ""));
+      })
+      .catch(() => {});
+    return () => { dead = true; };
+  }, [value, valueLabel, target]);
 
   useEffect(() => {
     if (!open) return;
@@ -1620,7 +1636,16 @@ function PersonTypeAhead({
   const [options, setOptions] = useState<{ id: string; label: string }[]>([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  useEffect(() => setText(valueLabel), [valueLabel]);
+  useEffect(() => { if (valueLabel) setText(valueLabel); }, [valueLabel]);
+  useEffect(() => {
+    if (!value || valueLabel) return;
+    let dead = false;
+    fetch(`/api/crm/person?id=${encodeURIComponent(value)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => { if (!dead && j?.row) setText(String(j.row.full_name ?? "")); })
+      .catch(() => {});
+    return () => { dead = true; };
+  }, [value, valueLabel]);
 
   useEffect(() => {
     if (!open) return;
