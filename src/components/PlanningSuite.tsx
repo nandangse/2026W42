@@ -403,7 +403,7 @@ export default function PlanningSuite({
   }, [workspace, canSeeDelivered]);
 
   // land on "My Week" within the suite, not the delivery board
-  const [tab, setTab] = useState<"home" | "wip" | "delivery" | "load" | "plan" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature">("home");
+  const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature">("home");
 
   // ---- browser back/forward navigates within the app, not out of it ----
   // Every workspace/tab change pushes a history entry; popstate restores it.
@@ -721,6 +721,7 @@ export default function PlanningSuite({
   const SUITE_TAB_DEFS: [typeof tab, string][] = [
     ["floor", "On Floor"],
     ["wip", "Jobs in Progress"],
+    ["liveproj", "Live Projects"],
     ["delivery", "Job Delivery Board"],
     ["material", "Pending Material"],
     ["esc", "Escalations"],
@@ -1041,6 +1042,7 @@ export default function PlanningSuite({
         <DeliveryBoard showForward={canSeeForward} board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
       </div>
       {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} canEdit={canEdit} reload={reload} />}
+      {workspace === "suite" && tab === "liveproj" && <LiveProjects board={board} V={V} onOpen={openJobPlan} />}
       {workspace === "suite" && tab === "feature" && <FeatureRequests isOwner={isRaghu} />}
       {workspace === "suite" && tab === "floor" && <OnFloor board={board} V={V} onOpen={openJobPlan} reload={reload} canEdit={canEdit} canTask={role !== "viewer"} isStrat={canSeeForward} myName={(displayName || email.split("@")[0]).split(" ")[0]} />}
       {workspace === "suite" && tab === "material" && <PendingMaterial board={board} onOpen={openJobPlan} reload={reload} canEdit={canEdit} />}
@@ -6820,6 +6822,167 @@ function Admin({
       </div>
       </>)}
 
+    </div>
+  );
+}
+
+
+// ============================ Live Projects ============================
+
+/**
+ * Every project that still has a live job on the board, with what is open
+ * against each job — the project-level answer to "where do we stand".
+ * Projects sort by the TDD of their first job: the one delivering soonest
+ * leads (Dr Raghu, 26 Aug 2026).
+ */
+function LiveProjects({
+  board, V, onOpen,
+}: {
+  board: Board;
+  V: (n: number) => string;
+  onOpen: (id: string) => void;
+}) {
+  const [q, setQ] = useState("");
+
+  // what is open against a job, counted the same way the other tabs count it:
+  // materials — every kitting line not yet Received (QC Defective is pending);
+  // design — open tasks in the Design category; tasks — every other open task.
+  const openByJob = useMemo(() => {
+    const m = new Map<string, { mat: number; design: number; tasks: number }>();
+    const at = (id: string) => {
+      let v = m.get(id);
+      if (!v) { v = { mat: 0, design: 0, tasks: 0 }; m.set(id, v); }
+      return v;
+    };
+    for (const [jobId, list] of Object.entries(board.materials || {})) {
+      at(jobId).mat = list.filter((x) => String(x.status || "").toLowerCase() !== "received").length;
+    }
+    for (const t of board.tasks) {
+      if (t.done) continue;
+      if (t.cat === "Design") at(t.j).design += 1;
+      else at(t.j).tasks += 1;
+    }
+    return m;
+  }, [board.materials, board.tasks]);
+
+  const projById = useMemo(
+    () => new Map((board.projects as { id: string; name?: string; mgr?: string; stage?: string; committed?: string; so?: string }[]).map((p) => [String(p.id), p])),
+    [board.projects],
+  );
+
+  const groups = useMemo(() => {
+    const byProj = new Map<string, Job[]>();
+    for (const j of board.jobs) {
+      const key = String(j.proj || "").trim();
+      if (!key) continue; // a job with no project is not a project
+      (byProj.get(key) || byProj.set(key, []).get(key)!).push(j);
+    }
+    const out = [...byProj.entries()].map(([id, js]) => {
+      const jobs = [...js].sort((a, b) => String(a.tdd || "9999").localeCompare(String(b.tdd || "9999")));
+      return { id, meta: projById.get(id), jobs, firstTdd: jobs[0].tdd || "9999" };
+    });
+    // by the TDD of the first job within each project
+    out.sort((a, b) => a.firstTdd.localeCompare(b.firstTdd));
+    const needle = q.trim().toLowerCase();
+    return needle
+      ? out.filter((g) =>
+          g.id.toLowerCase().includes(needle) ||
+          String(g.meta?.name || "").toLowerCase().includes(needle) ||
+          String(g.meta?.mgr || "").toLowerCase().includes(needle) ||
+          g.jobs.some((j) => jobNo(j.id).includes(needle) || j.tag.toLowerCase().includes(needle) || j.cust.toLowerCase().includes(needle)))
+      : out;
+  }, [board.jobs, projById, q, openByJob]);
+
+  const tot = useMemo(() => {
+    const t = { jobs: 0, mat: 0, design: 0, tasks: 0, val: 0 };
+    for (const g of groups) for (const j of g.jobs) {
+      const o = openByJob.get(j.id);
+      t.jobs += 1; t.val += j.val;
+      if (o) { t.mat += o.mat; t.design += o.design; t.tasks += o.tasks; }
+    }
+    return t;
+  }, [groups, openByJob]);
+
+  const num = (n: number, hot: string) => (
+    <b className="tnum" style={{ color: n ? hot : "#C9C6BD", fontSize: 14 }}>{n || "—"}</b>
+  );
+
+  return (
+    <div className="max-w-[1200px] mx-auto px-4 py-4">
+      <div className="flex items-baseline gap-3 flex-wrap mb-3">
+        <h2 className="text-lg font-bold" style={{ color: "#16232F" }}>Live Projects</h2>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>
+          {groups.length} project{groups.length === 1 ? "" : "s"} carrying {tot.jobs} live job{tot.jobs === 1 ? "" : "s"} · {V(tot.val)} ·
+          open against them: <b style={{ color: "#8A5A00" }}>{tot.mat}</b> material · <b style={{ color: "#7C3AED" }}>{tot.design}</b> design · <b style={{ color: "#1B3A5C" }}>{tot.tasks}</b> tasks
+        </span>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search project / job / customer…"
+          className="text-xs border rounded px-2 py-1.5 ml-auto"
+          style={{ borderColor: "#E2E0DA", background: "#fff", minWidth: 220 }}
+        />
+      </div>
+
+      {groups.length === 0 && (
+        <div className="bg-white rounded-lg border p-6 text-sm" style={{ borderColor: "#E2E0DA", color: "#8A94A0" }}>
+          No project carries a live job{q ? " matching that search" : ""}.
+        </div>
+      )}
+
+      {groups.map((g) => {
+        const late = g.jobs.filter((j) => j.tdd && j.tdd < TODAY).length;
+        return (
+          <div key={g.id} className="bg-white rounded-lg border mb-3 overflow-hidden" style={{ borderColor: "#E2E0DA" }}>
+            {/* the project band — its details lead, its jobs follow */}
+            <div className="px-3 py-2 flex items-baseline gap-x-3 gap-y-0.5 flex-wrap" style={{ background: "#16232F" }}>
+              <b className="text-sm" style={{ color: "#fff" }}>{g.meta?.name || g.id}</b>
+              <span className="text-xs font-bold" style={{ color: "#E8600A" }}>{g.id.replace(/^NGSE-PROJ-/, "PROJ ")}</span>
+              {g.meta?.mgr && <span className="text-xs" style={{ color: "#8FA1B3" }}>PM <b style={{ color: "#D7DEE6" }}>{g.meta.mgr}</b></span>}
+              {g.meta?.stage && <span className="text-xs" style={{ color: "#8FA1B3" }}>stage <b style={{ color: "#D7DEE6" }}>{g.meta.stage}</b></span>}
+              {g.meta?.committed && <span className="text-xs" style={{ color: "#8FA1B3" }}>committed <b style={{ color: "#D7DEE6" }}>{fmt(g.meta.committed)}</b></span>}
+              {g.meta?.so && <span className="text-xs" style={{ color: "#8FA1B3" }}>{g.meta.so}</span>}
+              <span className="text-xs ml-auto" style={{ color: "#8FA1B3" }}>
+                {g.jobs.length} job{g.jobs.length === 1 ? "" : "s"} · {V(g.jobs.reduce((a, j) => a + j.val, 0))}
+                {late > 0 && <b style={{ color: "#F5B32B" }}> · {late} past TDD</b>}
+              </span>
+            </div>
+            <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+              <thead>
+                <tr className="text-xs" style={{ color: "#8A94A0", background: "#F7F5F0" }}>
+                  <th className="text-left px-3 py-1.5 font-bold">JOB</th>
+                  <th className="text-left px-2 py-1.5 font-bold">OTD</th>
+                  <th className="text-left px-2 py-1.5 font-bold" title="Target Delivery Date — the date the board runs on">TDD</th>
+                  <th className="text-right px-2 py-1.5 font-bold" title="Kitting lines not yet Received">PENDING MATERIAL</th>
+                  <th className="text-right px-2 py-1.5 font-bold" title="Open tasks in the Design category">PENDING DESIGN</th>
+                  <th className="text-right px-3 py-1.5 font-bold" title="Every other open task on the job">PENDING TASKS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {g.jobs.map((j) => {
+                  const o = openByJob.get(j.id) || { mat: 0, design: 0, tasks: 0 };
+                  const lateJob = j.tdd && j.tdd < TODAY;
+                  return (
+                    <tr key={j.id} onClick={() => onOpen(j.id)} className="cursor-pointer hover:bg-[#F7F5F0]" style={{ borderTop: "1px solid #F0EEE8" }}>
+                      <td className="px-3 py-1.5">
+                        <b className="tnum" style={{ color: "#1B3A5C" }}>{jobNo(j.id)}</b>{" "}
+                        <span style={{ color: "#22303C" }}>{j.tag}</span>
+                        {j.onFloor && <span className="text-xs font-bold ml-1" title="On Floor now" style={{ color: "#0D7A3F" }}>● floor</span>}
+                        <span className="text-xs ml-1" style={{ color: "#8A94A0" }}>{j.cust}</span>
+                      </td>
+                      <td className="px-2 py-1.5 tnum text-xs" style={{ color: "#5A6672" }}>{fmt(j.otd)}</td>
+                      <td className="px-2 py-1.5 tnum text-xs font-bold" style={{ color: lateJob ? "#B3261E" : "#22303C" }}>{fmt(j.tdd)}</td>
+                      <td className="px-2 py-1.5 text-right">{num(o.mat, "#8A5A00")}</td>
+                      <td className="px-2 py-1.5 text-right">{num(o.design, "#7C3AED")}</td>
+                      <td className="px-3 py-1.5 text-right">{num(o.tasks, "#1B3A5C")}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
     </div>
   );
 }

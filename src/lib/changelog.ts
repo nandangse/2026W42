@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.20",
+    date: "2026-08-26",
+    module: "Live Projects — the project view of the live board",
+    items: [
+      "A LIVE PROJECTS tab in the Planning Suite: every project that still carries a live job, sorted by the TDD of its first job — the project delivering soonest leads.",
+      "Each project is a band with its details — name, PROJ number, PM, stage, committed date, SO, job count and value — and under it every live job with OTD, TDD (red once past today), pending material (kitting lines not yet Received), pending design (open Design tasks) and pending tasks (every other open task). Click a job to land on its Job Plan.",
+      "The strip on top totals it: projects, jobs, value, and everything open against them. One search box covers project, job, customer and PM.",
+    ],
+  },
+  {
     v: "3.23.1.19",
     date: "2026-08-26",
     module: "The envelope opens a mail lightbox, and Communication is the queue",
