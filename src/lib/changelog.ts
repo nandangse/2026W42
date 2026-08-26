@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.18",
+    date: "2026-08-26",
+    module: "The build breaks its silence",
+    items: [
+      "PRODUCTION HAD STOOD STILL AT 3.23.1.11: the deal-board route exported a constant, which a Next.js route file may not, and every Vercel build from .12 to .17 failed while the code sat green in the typechecker. The export is private now, the full production build passes locally, and everything from the Deal Board to Gmail rides this deploy. New discipline: every push is preceded by the same next build Vercel runs.",
+    ],
+  },
+  {
     v: "3.23.1.17",
     date: "2026-08-26",
     module: "The owner may tick his own OAuth",

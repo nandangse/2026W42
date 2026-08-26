@@ -26,7 +26,9 @@ const QTN_COLS: Record<string, string> = {
   next_month: "next_month", this_month: "this_month",
   bucket_b: "bucket_b", bucket_a: "bucket_a", bucket_0: "bucket_0",
 };
-export const COLUMNS = [
+// (not exported — a route file may only export handlers, and this being
+// exported is exactly what broke the Vercel build from 3.23.1.12 to .17)
+const COLUMNS = [
   { key: "opp_received", label: "Opportunity Received" },
   { key: "opp_process", label: "Opportunity In Process" },
   { key: "quote_sent", label: "Quotation Sent" },
