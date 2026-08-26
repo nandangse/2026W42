@@ -45,7 +45,7 @@ export interface Field {
   /** A textarea that deserves the whole row and real height. */
   big?: boolean;
   /** Which lightbox tab the field lives on — absent means Details. */
-  tab?: "enquiry" | "qual";
+  tab?: "enquiry" | "qual" | "eva";
   /** Shown only while Is Tender is ticked — the tender unfolds. */
   tenderOnly?: boolean;
 }
@@ -307,6 +307,8 @@ export const DOCTYPES: Doctype[] = [
     blurb: "The account. One row per company you sell to; is_customer flips by itself the first time an opportunity is won.",
     fields: [
       { name: "name", label: "Company", type: "text", required: true, inList: true },
+      { name: "eva_brief", label: "EVA Brief", type: "textarea", big: true, tab: "eva",
+        help: "The AI dossier — internet, LinkedIn, industry, news, our warmth and credibility. ✨ Generate writes it; edit freely after." },
       { name: "opp_count", label: "Opps", type: "readonly", virtual: true, inList: true, help: "Opportunities on this company." },
       { name: "contact_count", label: "Contacts", type: "readonly", virtual: true, inList: true },
       { name: "so_count", label: "Sales Orders", type: "readonly", virtual: true, inList: true, help: "Opportunities that reached Order Received." },

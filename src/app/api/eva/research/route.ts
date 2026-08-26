@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { resolveSalesAccess } from "@/lib/sales-access";
+import { NANDAN } from "@/lib/eva-nandan";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // web research can take a few minutes
@@ -16,23 +17,7 @@ export const maxDuration = 300; // web research can take a few minutes
 // Requires ANTHROPIC_API_KEY in the server env vars — degrades to a clear
 // error message when unset.
 
-const NANDAN = `You write account briefs for the sales team of NANDAN GSE (Nandan Ground
-Support Equipment Pvt Ltd), an Indian engineering and manufacturing company.
-
-What Nandan sells:
-- GSE — aviation ground support equipment for airlines, airports, MRO and aerospace:
-  step ladders, maintenance/access platforms, chair lifts, work test cells, towing and
-  servicing equipment, custom aviation ground handling rigs.
-- MHE — material handling equipment for manufacturing, warehousing, logistics and
-  process industries: aerial work platforms, lifting and access solutions, handling
-  and gas-handling systems, custom fabrication.
-- DEF — defence and aerospace programmes: ground equipment, tooling, special-purpose
-  machines built to programme specification.
-- ENT — enterprise and other industrial segments.
-
-How Nandan wins: custom-engineered equipment built to a customer's spec, Indian
-manufacturing and localisation for global OEMs, aviation-grade quality, and long-run
-key account management after delivery.`;
+// The Nandan framing lives in one place — src/lib/eva-nandan.ts.
 
 export async function POST(req: Request) {
   try {

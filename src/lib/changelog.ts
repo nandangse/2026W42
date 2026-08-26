@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.35",
+    date: "2026-08-26",
+    module: "EVA BRIEF — the company dossier",
+    items: [
+      "EVERY COMPANY GETS AN ✨ EVA BRIEF TAB: one click and EVA researches them on the web — who they are, their LINKEDIN page, an INDUSTRY BRIEF, dated NEWS — and weaves in what the CRM already knows: OUR CORRESPONDENCE and its WARMTH MARKING (hot/warm/cold by last touch), where past opportunities went, and OUR CREDIBILITY — the invoiced value and named customers in their industry, straight from the 6,835-invoice history. Migration 0016.",
+      "The brief saves onto the company, is editable by hand, and refreshes on demand. Every claim carries its source; the CRM facts are handed to EVA as fact, never re-guessed.",
+    ],
+  },
+  {
     v: "3.23.1.34",
     date: "2026-08-26",
     module: "Group by Sector and Industry",

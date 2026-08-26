@@ -1193,6 +1193,7 @@ function RecordModal({
   const recordTabs: TabDef[] = [];
   if (TABBED.includes(dt.name)) {
     recordTabs.push({ key: "details", label: "Details" });
+    if (dt.name === "company") recordTabs.push({ key: "eva", label: "✨ EVA Brief" });
     if (hasEnquiry) recordTabs.push({ key: "enquiry", label: "Enquiry Info" });
     // Contacts: the company's people, addable right there
     if (dt.name === "company")
@@ -1339,6 +1340,8 @@ function RecordModal({
             <div className="p-4">
               <QualView dt={dt} row={row} links={links} />
             </div>
+          ) : tab === "eva" ? (
+            <EvaBriefTab companyId={rid} initial={row.eva_brief ? String(row.eva_brief) : null} initialAt={row.eva_brief_at ? String(row.eva_brief_at) : null} />
           ) : tab === "comms" ? (
             <CommsFeed
               type={dt.name} id={rid} companyId={companyId} onOpenLink={onOpenLink}
@@ -1649,6 +1652,78 @@ function QualView({ dt, row, links }: { dt: Doctype; row: Row; links: Links }) {
 
 /** Every communication on the record — calls, WhatsApp, email, visits, video
  *  calls — one feed, newest first, with a ＋ to log the next one. */
+/**
+ * ✨ EVA BRIEF (Dr Raghu, 26 Aug 2026) — the company dossier: internet,
+ * LinkedIn, industry brief, dated news, our correspondence and warmth, and
+ * the similar-industry work that gives us credibility. Generated server-side
+ * by EVA with web search; editable by hand afterwards.
+ */
+function EvaBriefTab({ companyId, initial, initialAt }: { companyId: string; initial: string | null; initialAt: string | null }) {
+  const [brief, setBrief] = useState(initial ?? "");
+  const [at, setAt] = useState(initialAt);
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const generate = async () => {
+    setBusy(true); setMsg("EVA is researching — the web takes a minute or two…");
+    try {
+      const r = await fetch("/api/crm/eva-brief", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ company_id: companyId }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "EVA could not research this one");
+      setBrief(j.brief); setAt(j.at); setMsg("");
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  const saveEdit = async () => {
+    setMsg("");
+    try {
+      const r = await fetch(`/api/crm/company?id=${encodeURIComponent(companyId)}`, {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ eva_brief: brief }),
+      });
+      if (!r.ok) throw new Error((await r.json()).error || "Could not save");
+      setEditing(false);
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center gap-2 flex-wrap mb-2">
+        <button onClick={() => void generate()} disabled={busy}
+          className="px-3 py-1.5 rounded text-sm font-bold"
+          style={{ background: busy ? "#B9BEC4" : ORANGE, color: "#fff" }}>
+          {busy ? "✨ Researching…" : brief ? "✨ Refresh the brief" : "✨ Generate the brief"}
+        </button>
+        {brief && !busy && (
+          editing
+            ? <button onClick={() => void saveEdit()} className="px-3 py-1.5 rounded text-sm font-bold" style={{ background: NAVY, color: "#fff" }}>Save</button>
+            : <button onClick={() => setEditing(true)} className="px-3 py-1.5 rounded text-sm font-bold border" style={{ borderColor: BORDER, color: "#5A6672", background: "#fff" }}>✎ Edit</button>
+        )}
+        {at && <span className="text-xs" style={{ color: MUTED }}>researched {new Date(at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
+        {msg && <span className="text-xs font-semibold" style={{ color: busy ? MUTED : "#8E2C20" }}>{msg}</span>}
+      </div>
+      {editing ? (
+        <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={18}
+          className="w-full rounded border px-3 py-2 text-sm" style={{ borderColor: BORDER, lineHeight: 1.6 }} />
+      ) : brief ? (
+        <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.65, maxHeight: "58vh", overflowY: "auto", overflowWrap: "anywhere" }}>
+          {brief}
+        </div>
+      ) : !busy ? (
+        <div className="rounded p-6 text-sm" style={{ background: "#FBFAF7", border: `1px dashed ${BORDER}`, color: MUTED }}>
+          Nothing yet. ✨ Generate asks EVA to research this company — the internet, their LinkedIn,
+          the industry, dated news — and weave in our own correspondence, warmth and the
+          similar-industry work that gives us credibility.
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function CommsFeed({
   type, id, companyId, onOpenLink, contactEmail,
 }: {
