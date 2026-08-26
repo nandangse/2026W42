@@ -74,7 +74,7 @@ export async function GET(req: Request) {
 
     // Live quotations first — they claim their opportunities off the board.
     let qq = db.from("quotation")
-      .select("id, quote_no, grand_total, owner_id, company_id, opportunity_id, stage_id")
+      .select("id, quote_no, grand_total, quoted_value, owner_id, company_id, opportunity_id, stage_id")
       .in("stage_id", liveQtnStageIds);
     const quotes = await pageAll((a, b) => qq.range(a, b));
 
@@ -123,7 +123,7 @@ export async function GET(req: Request) {
       const col = QTN_COLS[stageCodeById.get(Number(q.stage_id)) ?? ""];
       if (!col) continue;
       const o = q.opportunity_id ? oppInfo.get(String(q.opportunity_id)) : undefined;
-      const amount = Number(q.grand_total) || Number(o?.amount) || 0;
+      const amount = Number(q.grand_total) || Number(q.quoted_value) || Number(o?.amount) || 0;
       cards.push({
         kind: "quotation", id: String(q.id), col,
         title: String(o?.name ?? q.quote_no ?? ""),

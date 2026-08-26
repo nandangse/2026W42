@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.25",
+    date: "2026-08-26",
+    module: "The quotation, in five words",
+    items: [
+      "THE QUOTATION NOW SPEAKS DR RAGHU'S LANGUAGE: DATE OF QUOTE and QUOTE VALUE are their own fields at the front of the list — the value is typed by the salesperson, and the computed total takes over on the boards once lines exist.",
+      "STATUS is exactly five words — Draft · Live · Hotlist · Lost · Expired (every existing sent quote became Live; migration 0012). The STAGE stays the closure ladder, relabelled CLOSURE — because importance of closure IS the stage.",
+      "The Deal Board reads the typed quote value when no lines exist yet, so a quick quote carries its money onto the board at once.",
+    ],
+  },
+  {
     v: "3.23.1.24",
     date: "2026-08-26",
     module: "The full opportunity book, dated",
