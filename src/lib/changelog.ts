@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.22",
+    date: "2026-08-26",
+    module: "Live Projects reads the money, and every job folds open",
+    items: [
+      "THE PROJECT BAND NOW CARRIES ITS MONEY LINE — Value (original, counting the project's delivered and archived jobs too), Delivered, Pending now, MATERIAL INVESTED (the kitted value across the live jobs) and WIP (kitted material + throughput earned by production), plus the project's weighted kitting %. The description shows in full beneath it.",
+      "SORT BY dropdown on top: First TDD (default), Pending value, Kitting % — least kitted first, that is the project needing the chase — and WIP.",
+      "EVERY JOB ROW FOLDS OPEN (▸) to its On Floor read: status, production %, kitting %, value, material invested, WIP, started, owner, the four owners (Quality/Production/Kitting/Design), FROM THE FLOOR and the ERP status. Clicking the row still opens the Job Lightbox.",
+      "The top row — totals, sort, collapse/expand, search — now FLOATS under the frozen header while the projects scroll beneath it.",
+    ],
+  },
+  {
     v: "3.23.1.21",
     date: "2026-08-26",
     module: "Live Projects grows up — lightboxes, description, and the Project GANTT",

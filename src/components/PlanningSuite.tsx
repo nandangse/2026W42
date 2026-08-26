@@ -168,6 +168,7 @@ interface Job {
   floorSummaryAt?: string | null;
   active: boolean;
   archived: boolean;
+  delivered?: boolean;
   updated_at: string | null;
   ownerInitials: string | null;
   ownerName: string | null;
@@ -6837,7 +6838,13 @@ function Admin({
 
 /** The projects row a job's proj id points at, plus Genie's own description. */
 type ProjMeta = { id: string; name?: string; mgr?: string; stage?: string; committed?: string; exp_end?: string; so?: string; cust?: string | null; description?: string | null };
-type ProjGroup = { id: string; meta: ProjMeta | undefined; jobs: Job[]; firstTdd: string };
+type ProjGroup = {
+  id: string; meta: ProjMeta | undefined; jobs: Job[]; firstTdd: string;
+  /** The project's money: Original counts its past jobs too; invested and
+   *  WIP are jobMoney() summed over what is still live. */
+  money: { origVal: number; delVal: number; pendVal: number; invested: number; wip: number; kitPct: number };
+  deliveredCount: number;
+};
 
 /**
  * Every project that still has a live job on the board, with what is open
@@ -6856,7 +6863,10 @@ function LiveProjects({
   reload: () => Promise<Board | null>;
 }) {
   const [q, setQ] = useState("");
+  const [sortBy, setSortBy] = useState<"tdd" | "value" | "kit" | "wip">("tdd");
   const [closed, setClosed] = useState<Set<string>>(new Set());
+  /** Job rows whose On Floor-style detail is unfolded. */
+  const [openJobs, setOpenJobs] = useState<Set<string>>(new Set());
   const [pickedJob, setPickedJob] = useState<Job | null>(null);
   const [openProj, setOpenProj] = useState<string | null>(null);
 
@@ -6894,32 +6904,62 @@ function LiveProjects({
       if (!key) continue; // a job with no project is not a project
       (byProj.get(key) || byProj.set(key, []).get(key)!).push(j);
     }
+    // the project's past — delivered and archived jobs still count in Original
+    const pastByProj = new Map<string, Job[]>();
+    for (const a of Object.values(board.archived || {})) {
+      const key = String(a.proj || "").trim();
+      if (!key || !byProj.has(key)) continue;
+      (pastByProj.get(key) || pastByProj.set(key, []).get(key)!).push(a);
+    }
     const out: ProjGroup[] = [...byProj.entries()].map(([id, js]) => {
       const jobs = [...js].sort((a, b) => String(a.tdd || "9999").localeCompare(String(b.tdd || "9999")));
-      return { id, meta: projById.get(id), jobs, firstTdd: jobs[0].tdd || "9999" };
+      const past = pastByProj.get(id) || [];
+      const delivered = past.filter((x) => x.delivered);
+      const pendVal = jobs.reduce((a, j) => a + (j.val || 0), 0);
+      const delVal = delivered.reduce((a, j) => a + (j.val || 0), 0);
+      const origVal = pendVal + past.reduce((a, j) => a + (j.val || 0), 0);
+      let matSum = 0, kitSum = 0, wip = 0;
+      for (const j of jobs) {
+        const m = jobMoney(j);
+        matSum += m.material; kitSum += m.kitted; wip += m.wip;
+      }
+      return {
+        id, meta: projById.get(id), jobs, firstTdd: jobs[0].tdd || "9999",
+        money: { origVal, delVal, pendVal, invested: kitSum, wip, kitPct: matSum > 0 ? (kitSum / matSum) * 100 : 0 },
+        deliveredCount: delivered.length,
+      };
     });
-    // by the TDD of the first job within each project
+    // by the TDD of the first job within each project — the default order
     out.sort((a, b) => a.firstTdd.localeCompare(b.firstTdd));
     return out;
-  }, [board.jobs, projById]);
+  }, [board.jobs, board.archived, projById]);
 
   const groups = useMemo(() => {
+    const base = [...groupsAll];
+    // Value and WIP: biggest first. Kitting: LEAST kitted first — that is the
+    // project needing the chase, and a sort that buries it helps nobody.
+    if (sortBy === "value") base.sort((a, b) => b.money.pendVal - a.money.pendVal);
+    else if (sortBy === "wip") base.sort((a, b) => b.money.wip - a.money.wip);
+    else if (sortBy === "kit") base.sort((a, b) => a.money.kitPct - b.money.kitPct);
     const needle = q.trim().toLowerCase();
     return needle
-      ? groupsAll.filter((g) =>
+      ? base.filter((g) =>
           g.id.toLowerCase().includes(needle) ||
           String(g.meta?.name || "").toLowerCase().includes(needle) ||
           String(g.meta?.mgr || "").toLowerCase().includes(needle) ||
           g.jobs.some((j) => jobNo(j.id).includes(needle) || j.tag.toLowerCase().includes(needle) || j.cust.toLowerCase().includes(needle)))
-      : groupsAll;
-  }, [groupsAll, q]);
+      : base;
+  }, [groupsAll, q, sortBy]);
 
   const tot = useMemo(() => {
-    const t = { jobs: 0, mat: 0, design: 0, tasks: 0, val: 0 };
-    for (const g of groups) for (const j of g.jobs) {
-      const o = openByJob.get(j.id);
-      t.jobs += 1; t.val += j.val;
-      if (o) { t.mat += o.mat; t.design += o.design; t.tasks += o.tasks; }
+    const t = { jobs: 0, mat: 0, design: 0, tasks: 0, val: 0, wip: 0 };
+    for (const g of groups) {
+      t.wip += g.money.wip;
+      for (const j of g.jobs) {
+        const o = openByJob.get(j.id);
+        t.jobs += 1; t.val += j.val;
+        if (o) { t.mat += o.mat; t.design += o.design; t.tasks += o.tasks; }
+      }
     }
     return t;
   }, [groups, openByJob]);
@@ -6932,26 +6972,41 @@ function LiveProjects({
     if (n.has(id)) n.delete(id); else n.add(id);
     return n;
   });
+  const toggleJob = (id: string) => setOpenJobs((c) => {
+    const n = new Set(c);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
 
   const openGroup = openProj ? groupsAll.find((g) => g.id === openProj) : null;
 
   return (
-    <div className="max-w-[1200px] mx-auto px-4 py-4">
-      <div className="flex items-baseline gap-3 flex-wrap mb-3">
+    <div className="max-w-[1200px] mx-auto px-4 pb-4">
+      {/* the top row floats under the frozen header, like the Job Plan's */}
+      <div className="flex items-baseline gap-x-3 gap-y-1 flex-wrap py-2.5 mb-3"
+        style={{ position: "sticky", top: "var(--hdr-h, 92px)", zIndex: 24, background: "#F1EFE9", borderBottom: "1px solid #E2E0DA" }}>
         <h2 className="text-lg font-bold" style={{ color: "#16232F" }}>Live Projects</h2>
         <span className="text-xs" style={{ color: "#8A94A0" }}>
-          {groups.length} project{groups.length === 1 ? "" : "s"} carrying {tot.jobs} live job{tot.jobs === 1 ? "" : "s"} · {V(tot.val)} ·
-          open against them: <b style={{ color: "#8A5A00" }}>{tot.mat}</b> material · <b style={{ color: "#7C3AED" }}>{tot.design}</b> design · <b style={{ color: "#1B3A5C" }}>{tot.tasks}</b> tasks
+          {groups.length} project{groups.length === 1 ? "" : "s"} · {tot.jobs} live job{tot.jobs === 1 ? "" : "s"} · {V(tot.val)} pending · {V(tot.wip)} WIP ·
+          open: <b style={{ color: "#8A5A00" }}>{tot.mat}</b> material · <b style={{ color: "#7C3AED" }}>{tot.design}</b> design · <b style={{ color: "#1B3A5C" }}>{tot.tasks}</b> tasks
         </span>
-        <span className="flex items-center gap-1.5 ml-auto">
-          <button onClick={() => setClosed(new Set(groupsAll.map((g) => g.id)))} className="text-xs font-bold rounded px-2 py-1.5 border" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#5A6672" }}>Collapse all</button>
+        <span className="flex items-center gap-1.5 ml-auto flex-wrap">
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="text-xs font-bold border rounded px-2 py-1.5" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#22303C" }}
+            title="How the projects order themselves">
+            <option value="tdd">Sort: First TDD</option>
+            <option value="value">Sort: Pending value</option>
+            <option value="kit">Sort: Kitting % (least first)</option>
+            <option value="wip">Sort: WIP</option>
+          </select>
+          <button onClick={() => { setClosed(new Set(groupsAll.map((g) => g.id))); setOpenJobs(new Set()); }} className="text-xs font-bold rounded px-2 py-1.5 border" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#5A6672" }}>Collapse all</button>
           <button onClick={() => setClosed(new Set())} className="text-xs font-bold rounded px-2 py-1.5 border" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#5A6672" }}>Expand all</button>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search project / job / customer…"
             className="text-xs border rounded px-2 py-1.5"
-            style={{ borderColor: "#E2E0DA", background: "#fff", minWidth: 220 }}
+            style={{ borderColor: "#E2E0DA", background: "#fff", minWidth: 200 }}
           />
         </span>
       </div>
@@ -6980,12 +7035,22 @@ function LiveProjects({
                 {g.meta?.committed && <span className="text-xs" style={{ color: "#8FA1B3" }}>committed <b style={{ color: "#D7DEE6" }}>{fmt(g.meta.committed)}</b></span>}
                 {g.meta?.so && <span className="text-xs" style={{ color: "#8FA1B3" }}>{g.meta.so}</span>}
                 <span className="text-xs ml-auto" style={{ color: "#8FA1B3" }}>
-                  {g.jobs.length} job{g.jobs.length === 1 ? "" : "s"} · {V(g.jobs.reduce((a, j) => a + j.val, 0))}
+                  {g.jobs.length} live job{g.jobs.length === 1 ? "" : "s"}
+                  {g.deliveredCount > 0 && <> · {g.deliveredCount} delivered</>}
                   {late > 0 && <b style={{ color: "#F5B32B" }}> · {late} past TDD</b>}
                 </span>
               </div>
+              {/* the money line: what the project was, what has landed, what remains */}
+              <div className="text-xs mt-1 flex gap-x-3.5 gap-y-0.5 flex-wrap tnum" style={{ paddingLeft: 22, color: "#8FA1B3" }}>
+                <span>Value <b style={{ color: "#D7DEE6" }}>{V(g.money.origVal)}</b></span>
+                <span>Delivered <b style={{ color: "#7BC98A" }}>{V(g.money.delVal)}</b></span>
+                <span>Pending <b style={{ color: "#F5B32B" }}>{V(g.money.pendVal)}</b></span>
+                <span title="Kitted material value across the live jobs — (1 − T%) × Kitting% × Value">Material invested <b style={{ color: "#D7DEE6" }}>{V(g.money.invested)}</b></span>
+                <span title="Kitted material + throughput earned by production">WIP <b style={{ color: "#C9A9F0" }}>{V(g.money.wip)}</b></span>
+                <span>Kitting <b style={{ color: "#D7DEE6" }}>{Math.round(g.money.kitPct)}%</b></span>
+              </div>
               {g.meta?.description && (
-                <div className="text-xs mt-0.5" style={{ color: "#8FA1B3", paddingLeft: 22, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={g.meta.description}>
+                <div className="text-xs mt-1" style={{ color: "#B9C4CF", paddingLeft: 22, whiteSpace: "pre-wrap" }}>
                   {g.meta.description}
                 </div>
               )}
@@ -7006,9 +7071,13 @@ function LiveProjects({
                 {g.jobs.map((j) => {
                   const o = openByJob.get(j.id) || { mat: 0, design: 0, tasks: 0 };
                   const lateJob = j.tdd && j.tdd < TODAY;
+                  const openJ = openJobs.has(j.id);
+                  const m = jobMoney(j);
                   return (
-                    <tr key={j.id} onClick={() => setPickedJob(j)} className="cursor-pointer hover:bg-[#F7F5F0]" style={{ borderTop: "1px solid #F0EEE8" }} title="Open the job">
+                    <React.Fragment key={j.id}>
+                    <tr onClick={() => setPickedJob(j)} className="cursor-pointer hover:bg-[#F7F5F0]" style={{ borderTop: "1px solid #F0EEE8" }} title="Open the job — ▸ unfolds its details">
                       <td className="px-3 py-1.5">
+                        <button onClick={(e) => { e.stopPropagation(); toggleJob(j.id); }} className="font-bold mr-1" title={openJ ? "Fold the details" : "Unfold the details"} style={{ color: "#B8B5AC", fontSize: 12, width: 14 }}>{openJ ? "▾" : "▸"}</button>
                         <b className="tnum" style={{ color: "#1B3A5C" }}>{jobNo(j.id)}</b>{" "}
                         <span style={{ color: "#22303C" }}>{j.tag}</span>
                         {j.onFloor && <span className="text-xs font-bold ml-1" title="On Floor now" style={{ color: "#0D7A3F" }}>● floor</span>}
@@ -7020,6 +7089,41 @@ function LiveProjects({
                       <td className="px-2 py-1.5 text-right">{num(o.design, "#7C3AED")}</td>
                       <td className="px-3 py-1.5 text-right">{num(o.tasks, "#1B3A5C")}</td>
                     </tr>
+                    {openJ && (
+                      <tr>
+                        <td colSpan={6} style={{ background: "#FBFAF7", borderTop: "1px dashed #E2E0DA", padding: "8px 14px 9px 32px" }}>
+                          {/* the On Floor read of this job, folded under its row */}
+                          <div className="flex gap-x-4 gap-y-1 flex-wrap text-xs" style={{ color: "#5A6672" }}>
+                            <span>Status <b style={{ color: "#22303C" }}>{j.stat || "—"}</b></span>
+                            <span>Production <b style={{ color: "#1B3A5C" }}>{j.pct || 0}%</b></span>
+                            <span>Kitting <b style={{ color: (j.kit || 0) >= 80 ? "#0D7A3F" : (j.kit || 0) >= 40 ? "#8A5A00" : "#B3261E" }}>{j.kit || 0}%</b></span>
+                            <span>Value <b style={{ color: "#22303C" }}>{V(j.val)}</b></span>
+                            <span title="Kitted material value — money already in steel and parts">Material invested <b style={{ color: "#22303C" }}>{V(m.kitted)}</b></span>
+                            <span title="Kitted material + throughput earned by production">WIP <b style={{ color: "#7C3AED" }}>{V(m.wip)}</b></span>
+                            {j.start && <span>Started <b style={{ color: "#22303C" }}>{fmt(j.start)}</b></span>}
+                            <span>Owner <b style={{ color: "#22303C" }}>{j.ownerInitials || j.own || "—"}</b></span>
+                          </div>
+                          <div className="flex gap-x-4 gap-y-1 flex-wrap text-xs mt-1" style={{ color: "#8A94A0" }}>
+                            <span>Quality <b style={{ color: j.qualityOwner ? "#22303C" : "#B8B5AC" }}>{j.qualityOwner || "not set"}</b></span>
+                            <span>Production <b style={{ color: j.productionOwner ? "#22303C" : "#B8B5AC" }}>{j.productionOwner || "not set"}</b></span>
+                            <span>Kitting <b style={{ color: j.kittingOwner ? "#22303C" : "#B8B5AC" }}>{j.kittingOwner || "not set"}</b></span>
+                            <span>Design <b style={{ color: j.designOwner ? "#22303C" : "#B8B5AC" }}>{j.designOwner || "not set"}</b></span>
+                          </div>
+                          {j.floorSummary && (
+                            <div className="text-xs mt-1" style={{ color: "#22303C" }}>
+                              <b style={{ color: "#8A94A0" }}>FROM THE FLOOR</b> {redactMoney(j.floorSummary)}
+                              {j.floorSummaryAt && <span style={{ color: "#B8B5AC" }}> · {fmt(String(j.floorSummaryAt).slice(0, 10))}</span>}
+                            </div>
+                          )}
+                          {j.note && (
+                            <div className="text-xs mt-1" style={{ color: "#5A6672" }}>
+                              <b style={{ color: "#8A94A0" }}>ERP STATUS</b> {redactMoney(j.note)}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
