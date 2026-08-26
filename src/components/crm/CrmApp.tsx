@@ -154,6 +154,7 @@ export default function CrmApp({
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkField, setBulkField] = useState("");
   const [bulkValue, setBulkValue] = useState("");
+  const [bulkReason, setBulkReason] = useState("");
   const [bulkBusy, setBulkBusy] = useState<string>("");
   const toggleSel = (id: string) => setSel((c) => {
     const n = new Set(c);
@@ -523,7 +524,7 @@ export default function CrmApp({
               )}
             </div>
             {sel.size > 0 && (
-              <button onClick={() => { setBulkOpen(true); setBulkField(""); setBulkValue(""); setBulkBusy(""); }}
+              <button onClick={() => { setBulkOpen(true); setBulkField(""); setBulkValue(""); setBulkReason(""); setBulkBusy(""); }}
                 className="px-3 py-1.5 rounded text-sm font-bold"
                 style={{ background: NAVY, color: "#fff" }}>
                 ✎ Edit {sel.size} selected
@@ -665,20 +666,28 @@ export default function CrmApp({
           {bulkOpen && (() => {
             const editable = dt.fields.filter((f) => !f.virtual && f.type !== "readonly" && f.name !== dt.autoNumber?.field);
             const bf = editable.find((f) => f.name === bulkField);
+            // A move to Lost or Not Target refuses without a reason — the
+            // database's rule, so the box asks for it up front.
+            const stageLabel = bf?.name === "stage_id" ? (links["stage"] ?? []).find((o) => o.id === bulkValue)?.label ?? null : null;
+            const needsReason = stageLabel === "Lost" || stageLabel === "Not Target";
             const apply = async () => {
               setBulkBusy("working");
-              let done = 0, failed = 0;
+              let done = 0, failed = 0, why = "";
               for (const rid of sel) {
                 try {
                   const r = await fetch(`/api/crm/${slug}?id=${encodeURIComponent(rid)}`, {
                     method: "PATCH", headers: { "content-type": "application/json" },
-                    body: JSON.stringify({ [bulkField]: bf?.type === "bool" ? bulkValue === "true" : bulkValue }),
+                    body: JSON.stringify({
+                      [bulkField]: bf?.type === "bool" ? bulkValue === "true" : bulkValue,
+                      ...(needsReason ? { lost_reason: bulkReason.trim() } : {}),
+                    }),
                   });
-                  if (r.ok) done++; else failed++;
+                  if (r.ok) done++;
+                  else { failed++; if (!why) why = String((await r.json()).error ?? ""); }
                 } catch { failed++; }
                 setBulkBusy(`${done + failed}/${sel.size}…`);
               }
-              setBulkBusy(`Changed ${done}${failed ? ` · ${failed} refused` : ""}`);
+              setBulkBusy(`Changed ${done}${failed ? ` · ${failed} refused${why ? ` — ${why.slice(0, 140)}` : ""}` : ""}`);
               await load();
               if (!failed) { setBulkOpen(false); setSel(new Set()); }
             };
@@ -726,10 +735,18 @@ export default function CrmApp({
                         )}
                       </label>
                     )}
+                    {needsReason && (
+                      <label className="text-xs font-bold" style={{ color: MUTED }}>
+                        REASON — a {stageLabel} move refuses to save without one
+                        <textarea value={bulkReason} onChange={(e) => setBulkReason(e.target.value)} rows={2}
+                          placeholder="Why it was lost — goes on every selected record"
+                          className="w-full mt-1 px-2 py-1.5 rounded text-sm border font-normal" style={{ borderColor: bulkReason.trim().length > 3 ? BORDER : "#E8600A", background: "#fff" }} />
+                      </label>
+                    )}
                     <div className="flex items-center gap-2">
-                      <button onClick={() => void apply()} disabled={!bulkField || bulkValue === "" || bulkBusy === "working" || /\d\//.test(bulkBusy)}
+                      <button onClick={() => void apply()} disabled={!bulkField || bulkValue === "" || (needsReason && bulkReason.trim().length <= 3) || bulkBusy === "working" || /\d\//.test(bulkBusy)}
                         className="px-4 py-1.5 rounded text-sm font-bold"
-                        style={{ background: !bulkField || bulkValue === "" ? "#B9BEC4" : ORANGE, color: "#fff" }}>
+                        style={{ background: !bulkField || bulkValue === "" || (needsReason && bulkReason.trim().length <= 3) ? "#B9BEC4" : ORANGE, color: "#fff" }}>
                         Apply to {sel.size}
                       </button>
                       {bulkBusy && <span className="text-xs font-semibold" style={{ color: bulkBusy.includes("refused") ? "#8E2C20" : MUTED }}>{bulkBusy}</span>}

@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.32",
+    date: "2026-08-26",
+    module: "Bulk edit learns the Lost rule",
+    items: [
+      "Bulk-editing the stage to LOST or NOT TARGET now asks for the REASON in the same box — the database refuses those moves without one, and the reason lands on every selected record. When anything is still refused, the message now says WHY.",
+    ],
+  },
+  {
     v: "3.23.1.31",
     date: "2026-08-26",
     module: "Mail reads like Gmail, and the list edits in bulk",
