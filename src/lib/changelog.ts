@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.15",
+    date: "2026-08-26",
+    module: "The address is a button",
+    items: [
+      "EVERY REPORT ROW ENDS IN THE TRIO — ✉️ 📞 💬 on the right, clicking straight into the mail, the call, the WhatsApp, from whatever email or number the row carries. In the LIGHTBOX VIEW the icons ride beside the value itself. Tables' cells and edit forms stay clean, as asked.",
+    ],
+  },
+  {
     v: "3.23.1.14",
     date: "2026-08-26",
     module: "One line per cell, and the width is a choice",

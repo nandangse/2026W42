@@ -635,6 +635,7 @@ export default function CrmApp({
                         </button>
                       </th>
                     ))}
+                    <th style={{ position: "sticky", top: 0, zIndex: 6, background: "#fff", boxShadow: `inset 0 -2px 0 ${BORDER}`, width: 84 }} />
                   </tr>
                 </thead>
                 <tbody>
@@ -662,6 +663,14 @@ export default function CrmApp({
                           <Cell field={f} value={r[f.name]} links={links} onOpenLink={openLinked} />
                         </td>
                       ))}
+                      {(() => {
+                        const c = rowContacts(dt, r);
+                        return (
+                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #F0EEE8", background: "#fff", textAlign: "right", whiteSpace: "nowrap" }}>
+                            <ContactActions email={c.email} phone={c.phone} compact />
+                          </td>
+                        );
+                      })()}
                     </tr>
                   ))}
                 </tbody>
@@ -735,6 +744,44 @@ function StubScreen({ label, blurb, dated }: { label: string; blurb: string; dat
       </div>
     </div>
   );
+}
+
+/** Does this value read as an address you can act on? */
+const isEmailish = (v: unknown): v is string =>
+  typeof v === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+const isPhoneish = (v: unknown): v is string =>
+  typeof v === "string" && /^\+?[\d\s()-]{8,18}$/.test(v.trim()) && /\d{8,}/.test(v.replace(/\D/g, ""));
+
+/** ✉ 📞 💬 — click starts the mail, the call, the WhatsApp. */
+function ContactActions({ email, phone, compact }: { email?: string | null; phone?: string | null; compact?: boolean }) {
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+  const digits = phone ? phone.replace(/\D/g, "") : "";
+  const size = compact ? 13 : 15;
+  if (!email && !phone) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5" style={{ marginLeft: compact ? 0 : 8, verticalAlign: "baseline" }}>
+      {email && (
+        <a href={`mailto:${email}`} onClick={stop} title={`Write to ${email}`} style={{ fontSize: size, textDecoration: "none" }}>✉️</a>
+      )}
+      {phone && (
+        <a href={`tel:${phone}`} onClick={stop} title={`Call ${phone}`} style={{ fontSize: size, textDecoration: "none" }}>📞</a>
+      )}
+      {phone && digits.length >= 10 && (
+        <a href={`https://wa.me/${digits}`} target="_blank" rel="noreferrer" onClick={stop} title={`WhatsApp ${phone}`} style={{ fontSize: size, textDecoration: "none" }}>💬</a>
+      )}
+    </span>
+  );
+}
+
+/** The first actionable email and phone in a row, whichever fields hold them. */
+function rowContacts(dt: Doctype, r: Row): { email: string | null; phone: string | null } {
+  let email: string | null = null, phone: string | null = null;
+  for (const f of dt.fields) {
+    const v = r[f.name];
+    if (!email && isEmailish(v)) email = v.trim();
+    if (!phone && isPhoneish(v)) phone = v.trim();
+  }
+  return { email, phone };
 }
 
 /** Sticky style for a pinned column: fixed width so the offsets add up. */
@@ -1024,6 +1071,8 @@ function RecordModal({
                   <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>{f.label}</div>
                   <div className="text-sm" style={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>
                     <Cell field={f} value={row[f.name]} links={links} onOpenLink={onOpenLink} />
+                    {isEmailish(row[f.name]) && <ContactActions email={row[f.name] as string} />}
+                    {isPhoneish(row[f.name]) && <ContactActions phone={row[f.name] as string} />}
                   </div>
                 </div>
               ))}
