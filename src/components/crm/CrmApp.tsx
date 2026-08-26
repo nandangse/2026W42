@@ -2133,6 +2133,17 @@ function RecordForm({
             {f.help && (
               <div className="text-xs mt-1" style={{ color: "#A6AEB6", lineHeight: 1.45 }}>{f.help}</div>
             )}
+
+            {/* Under a template's body: the variables valid for its module. */}
+            {f.name === "body" && (dt.name === "email_template" || dt.name === "whatsapp_template") && (
+              <div className="text-xs mt-1.5 rounded p-2" style={{ background: NAVY_SOFT, color: NAVY, lineHeight: 1.6 }}>
+                <b>Variables for {String(form["module"] ?? "Enquiry")}:</b>{" "}
+                {"{{name}} {{small_name}} {{company_name}} {{today}} {{next_monday}} … {{next_saturday}}"}
+                {" · "}{"{{enq_no}} {{qtn_subject}}"}
+                {String(form["module"] ?? "Enquiry") === "Quotation" && <> · <b>{"{{qtn_no}}"}</b></>}
+                {" — plus every static Message Variable ({{khalapur_address}}, …). Unknown ones stay visible as {{key}}."}
+              </div>
+            )}
           </label>
         ))}
       </div>

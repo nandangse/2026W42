@@ -455,6 +455,22 @@ export const DOCTYPES: Doctype[] = [
     ],
   },
 
+  {
+    name: "whatsapp_template", label: "WhatsApp Template", plural: "WhatsApp Templates", table: "whatsapp_template",
+    titleField: "name", group: "Masters", icon: "💬",
+    orderBy: { column: "module", ascending: true },
+    onlyFor: ["raghu@nandan.co.in"],
+    blurb: "The WhatsApp messages the company sends, written once. Each shows as Module - Name; body and attachments are fixed on the template, and {{variables}} render on send.",
+    fields: [
+      { name: "module", label: "Module", type: "select", options: ["Enquiry", "Quotation"], required: true, inList: true, default: "Enquiry",
+        help: "Where this message belongs. It shows as Module - Name." },
+      { name: "name", label: "Template name", type: "text", required: true, inList: true },
+      { name: "body", label: "Body", type: "textarea", big: true, inList: true, help: "Hi {{small_name}}, … — every message variable works here." },
+      { name: "attachments", label: "Attachments", type: "textarea",
+        help: "One per line: Display Name | Drive link. Share each file anyone-with-link; the link travels in the message." },
+    ],
+  },
+
   // ------------------------------------------------------------ masters
   {
     name: "sector", label: "Sector", plural: "Sectors", table: "sector",

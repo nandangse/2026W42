@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.28",
+    date: "2026-08-26",
+    module: "WhatsApp Templates, and the variables legend",
+    items: [
+      "WHATSAPP TEMPLATES JOIN MASTERS — Module - Name (Enquiry or Quotation) with BODY and ATTACHMENTS fixed on the template, same shape as Email Templates minus subject and cc. Migration 0014.",
+      "Under the Body of both template masters, a LEGEND OF VALID VARIABLES for the chosen module — the common set, the enquiry pair, {{qtn_no}} appearing when the module is Quotation, plus every static Message Variable.",
+    ],
+  },
+  {
     v: "3.23.1.27",
     date: "2026-08-26",
     module: "Email Templates become a master",
