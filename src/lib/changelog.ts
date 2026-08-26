@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.9",
+    date: "2026-08-26",
+    module: "The developer's margin on every feature request",
+    items: [
+      "A FEATURE REQUEST'S NOTE IS EDITABLE IN PLACE — ✎ Add/Edit note on every card, saved with the request: what was done, what was decided, what to know when it is picked up again. The audit trail a future in-house developer reads.",
+    ],
+  },
+  {
     v: "3.23.1.8",
     date: "2026-08-25",
     module: "The profile answers to its person, twins merge, and messages learn their variables",

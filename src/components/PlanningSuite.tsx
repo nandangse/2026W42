@@ -9838,6 +9838,22 @@ function FeatureRequests({ isOwner }: { isOwner: boolean }) {
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   };
 
+  // The developer's margin: a note editable in place, kept with the request —
+  // what was done, what was decided, what to know when it is picked up again.
+  const [noteEdit, setNoteEdit] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState("");
+  const saveNote = async (f: F) => {
+    try {
+      await fetch("/api/feature", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: f.id, status: f.status, note: noteText.trim() }),
+      });
+      setNoteEdit(null);
+      load();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+  };
+
   const shown = items.filter((f) =>
     (filter === "all" || f.want === filter) && (statusFilter === "all" || f.status === statusFilter));
   const count = (k: string) => items.filter((f) => f.want === k && f.status === "open").length;
@@ -9990,7 +10006,29 @@ function FeatureRequests({ isOwner }: { isOwner: boolean }) {
               </div>
             )}
 
-            {f.note && (
+            {isOwner && (
+              <div className="mt-2">
+                {noteEdit === f.id ? (
+                  <div>
+                    <textarea
+                      value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={2}
+                      placeholder="The developer's note — what was done, what to know."
+                      className="w-full text-xs border rounded px-2 py-1.5" style={{ borderColor: "#E2E0DA" }}
+                    />
+                    <div className="flex gap-2 mt-1">
+                      <button onClick={() => saveNote(f)} className="rounded px-2 py-0.5 text-xs font-bold text-white" style={{ background: "#0D7A3F" }}>Save note</button>
+                      <button onClick={() => setNoteEdit(null)} className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: "#F4F2EC", color: "#22303C" }}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => { setNoteEdit(f.id); setNoteText(f.note || ""); }}
+                    className="text-xs font-bold" style={{ color: "#1B3A5C" }}>
+                    ✎ {f.note ? "Edit note" : "Add note"}
+                  </button>
+                )}
+              </div>
+            )}
+            {f.note && noteEdit !== f.id && (
               <div className="text-xs mt-2 rounded px-2 py-1" style={{ background: "#F4F2EC", color: "#5A6672" }}>
                 <b>{whoTag(f.acted_by)}:</b> {f.note}
               </div>
