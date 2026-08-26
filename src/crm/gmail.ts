@@ -18,7 +18,13 @@ import { crmDb } from "./db";
 export const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.send",
+  // Mail attachments live in Dr Raghu's Drive folder, not in Supabase —
+  // the app writes them there and links them (26 Aug 2026).
+  "https://www.googleapis.com/auth/drive",
 ].join(" ");
+
+/** The mail-attachment home in Drive; monthly subfolders grow inside it. */
+export const DRIVE_MAIL_ROOT = process.env.DRIVE_MAIL_ROOT || "1DpDWUFqWtsLMBdD4tNXFayKoknmd3Hsj";
 
 export const REDIRECT_PATH = "/api/crm/gmail/callback";
 
@@ -118,10 +124,15 @@ export async function gmailGet(token: string, path: string): Promise<Record<stri
 }
 
 /** Send: a simple RFC822 message, UTF-8, base64url. */
-export async function gmailSend(token: string, fromEmail: string, to: string, subject: string, body: string): Promise<string> {
+export async function gmailSend(
+  token: string, fromEmail: string, to: string, subject: string, body: string,
+  cc?: string, bcc?: string,
+): Promise<string> {
   const mime = [
     `From: ${fromEmail}`,
     `To: ${to}`,
+    ...(cc ? [`Cc: ${cc}`] : []),
+    ...(bcc ? [`Bcc: ${bcc}`] : []),
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
     "MIME-Version: 1.0",
     'Content-Type: text/plain; charset="UTF-8"',
@@ -137,4 +148,54 @@ export async function gmailSend(token: string, fromEmail: string, to: string, su
   const j = await r.json();
   if (!r.ok) throw new Error((j.error as { message?: string })?.message || "Gmail refused the send");
   return String(j.id);
+}
+
+async function driveFetch(token: string, url: string, init?: RequestInit): Promise<Record<string, unknown>> {
+  const r = await fetch(url, { ...init, headers: { Authorization: `Bearer ${token}`, ...(init?.headers ?? {}) } });
+  const j = await r.json();
+  if (!r.ok) throw new Error((j.error as { message?: string })?.message || "Drive said no");
+  return j;
+}
+
+/** This month's folder inside the mail root — found or made. */
+async function monthFolder(token: string): Promise<string> {
+  const name = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 7);
+  const q = encodeURIComponent(`name='${name}' and '${DRIVE_MAIL_ROOT}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const found = await driveFetch(token, `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&supportsAllDrives=true&includeItemsFromAllDrives=true`);
+  const hit = (found.files as { id: string }[] | undefined)?.[0];
+  if (hit) return hit.id;
+  const made = await driveFetch(token, "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder", parents: [DRIVE_MAIL_ROOT] }),
+  });
+  return String(made.id);
+}
+
+/** Upload one attachment to the Drive mail folder, share it anyone-with-link,
+ *  hand back the link. The file never touches Supabase. */
+export async function driveUploadAttachment(
+  token: string, name: string, mimeType: string, data: Buffer,
+): Promise<{ id: string; name: string; link: string }> {
+  const folder = await monthFolder(token);
+  const boundary = "genie" + Date.now().toString(36);
+  const meta = JSON.stringify({ name, parents: [folder] });
+  const bodyParts = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType || "application/octet-stream"}\r\n\r\n`),
+    data,
+    Buffer.from(`\r\n--${boundary}--`),
+  ]);
+  const up = await driveFetch(token,
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink&supportsAllDrives=true", {
+      method: "POST",
+      headers: { "content-type": `multipart/related; boundary=${boundary}` },
+      body: bodyParts as unknown as BodyInit,
+    });
+  // anyone with the link may read — Dr Raghu's default for mail attachments
+  await driveFetch(token, `https://www.googleapis.com/drive/v3/files/${up.id}/permissions?supportsAllDrives=true`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ role: "reader", type: "anyone" }),
+  });
+  return { id: String(up.id), name: String(up.name), link: String(up.webViewLink) };
 }

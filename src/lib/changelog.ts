@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.19",
+    date: "2026-08-26",
+    module: "The envelope opens a mail lightbox, and Communication is the queue",
+    items: [
+      "EVERY ✉ ACROSS THE CRM OPENS THE MAIL LIGHTBOX now — compact by order: To with cc/bcc folded behind a click, Subject, a TEMPLATE picker (any Message Variable whose key starts template_), the message with {{variables}} rendering on send, and 📎 ATTACH — files go straight to Dr Raghu's Drive mail folder (monthly subfolders, anyone-with-link) and only the LINK travels; Supabase never holds a byte. Below, the chain the mail will hang on: the module it was written from and everything above it. Send goes from the connected mailbox.",
+      "COMMUNICATION IN THE SIDEBAR IS THE EMAIL QUEUE: one compact row per mail, newest first, sender filter on top — admin eyes see every sender one by one or all, everyone else sees their own sends, enforced in the API. Each row doors to its company, contact, opportunity or lead.",
+      "One reconnect needed: attachments require the Drive scope, so Profile → ✉ Connect Gmail once more.",
+    ],
+  },
+  {
     v: "3.23.1.18",
     date: "2026-08-26",
     module: "The build breaks its silence",

@@ -25,6 +25,8 @@ import { DOCTYPES, doctypeBySlug, type Doctype, type Field } from "@/crm/doctype
 import { LOGO } from "@/lib/logo";
 import AnalyticsScreen from "./Analytics";
 import DealsScreen from "./DealBoard";
+import MailComposer, { type ComposeCtx } from "./MailComposer";
+import MailQueue from "./MailQueue";
 import { DateRangeBar, DEFAULT_RANGE, type DateRange } from "./DateRange";
 
 // Sales Genie's palette (src/sales-plan/styles.css), moved here on Dr Raghu's
@@ -105,6 +107,7 @@ export default function CrmApp({
   const [colsOpen, setColsOpen] = useState(false);
   const [view, setView] = useState<ViewState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [compose, setCompose] = useState<ComposeCtx | null>(null);
   const [pageSize, setPageSize] = useState<string>("500");   // 100|500|2500|10000|50000|all
   const [colW, setColW] = useState<number>(280);             // narrow 140 · normal 280 · wide 440
   const [moreBusy, setMoreBusy] = useState(false);
@@ -241,6 +244,26 @@ export default function CrmApp({
   // Anything hanging off a company can also be filtered by the customer's industry.
   const industryFilter = !!dt && dt.name !== "company"
     && dt.fields.some((f) => f.name === "company_id") && (links.industry?.length ?? 0) > 0;
+
+  /** The mail lightbox, seeded from a record: the address, the refs the
+   *  mail will hang on — the current module and all above it. */
+  const composeFor = (d: Doctype, r: Row, email?: string | null) => {
+    const refs: ComposeCtx["refs"] = {};
+    const chain: string[] = [];
+    const put = (k: keyof ComposeCtx["refs"], v: unknown, label: string) => {
+      if (v) { refs[k] = String(v); chain.push(label); }
+    };
+    if (d.name === "person") put("person_id", r.id, `Contact ${r.full_name ?? ""}`.trim());
+    if (d.name === "lead") put("lead_id", r.id, "Lead");
+    if (d.name === "opportunity") put("opportunity_id", r.id, `Opportunity ${r.opportunity_no ?? ""}`.trim());
+    if (d.name === "quotation") { put("quotation_id", r.id, `Quotation ${r.quote_no ?? ""}`.trim()); put("opportunity_id", r.opportunity_id, "Opportunity"); }
+    if (d.name === "sales_order") put("opportunity_id", r.opportunity_id, `SO ${r.so_no ?? ""} → Opportunity`);
+    if (d.name === "company") put("company_id", r.id, `Company ${r.name ?? ""}`.trim());
+    else put("company_id", r.company_id, "Company");
+    if (d.name !== "person") put("person_id", r.point_of_contact_id ?? r.contact_id ?? r.person_id, "Contact");
+    const to = email ?? ([r.primary_email, r.contact_email].find(isEmailish) as string | undefined) ?? null;
+    setCompose({ to, refs, chain });
+  };
 
   /** A link cell is a door: open the record it points at. */
   const openLinked = async (target: string, id: string) => {
@@ -416,8 +439,10 @@ export default function CrmApp({
               <DealsScreen onOpen={openLinked} />
             ) : special.name === "analytics" ? (
               <AnalyticsScreen />
+            ) : special.name === "communication" ? (
+              <MailQueue onOpen={openLinked} />
             ) : (
-              <StubScreen label={special.label} blurb={special.blurb} dated={special.name !== "communication"} />
+              <StubScreen label={special.label} blurb={special.blurb} dated />
             )}
           </main>
         )}
@@ -667,7 +692,8 @@ export default function CrmApp({
                         const c = rowContacts(dt, r);
                         return (
                           <td style={{ padding: "8px 10px", borderBottom: "1px solid #F0EEE8", background: "#fff", textAlign: "right", whiteSpace: "nowrap" }}>
-                            <ContactActions email={c.email} phone={c.phone} compact />
+                            <ContactActions email={c.email} phone={c.phone} compact
+                              onCompose={c.email ? () => composeFor(dt, r, c.email) : undefined} />
                           </td>
                         );
                       })()}
@@ -713,10 +739,19 @@ export default function CrmApp({
         )}
       </div>
 
+      {compose && (
+        <MailComposer
+          ctx={compose}
+          onClose={() => setCompose(null)}
+          onSent={() => setCompose(null)}
+        />
+      )}
+
       {view && (
         <RecordModal
           view={view}
           onClose={() => setView(null)}
+          onCompose={(email) => composeFor(view.dt, view.row, email)}
           onEdit={() => setView({ ...view, mode: "edit" })}
           onSaved={(saved) => {
             void load();
@@ -753,14 +788,21 @@ const isPhoneish = (v: unknown): v is string =>
   typeof v === "string" && /^\+?[\d\s()-]{8,18}$/.test(v.trim()) && /\d{8,}/.test(v.replace(/\D/g, ""));
 
 /** ✉ 📞 💬 — click starts the mail, the call, the WhatsApp. */
-function ContactActions({ email, phone, compact }: { email?: string | null; phone?: string | null; compact?: boolean }) {
+function ContactActions({ email, phone, compact, onCompose }: {
+  email?: string | null; phone?: string | null; compact?: boolean;
+  /** When given, the envelope opens the mail lightbox instead of mailto. */
+  onCompose?: () => void;
+}) {
   const stop = (e: React.MouseEvent) => e.stopPropagation();
   const digits = phone ? phone.replace(/\D/g, "") : "";
   const size = compact ? 13 : 15;
   if (!email && !phone) return null;
   return (
     <span className="inline-flex items-center gap-1.5" style={{ marginLeft: compact ? 0 : 8, verticalAlign: "baseline" }}>
-      {email && (
+      {email && onCompose && (
+        <button onClick={(e) => { stop(e); onCompose(); }} title={`Write to ${email} — from your connected mailbox`} style={{ fontSize: size }}>✉️</button>
+      )}
+      {email && !onCompose && (
         <a href={`mailto:${email}`} onClick={stop} title={`Write to ${email}`} style={{ fontSize: size, textDecoration: "none" }}>✉️</a>
       )}
       {phone && (
@@ -913,11 +955,12 @@ function ColumnPicker({
  * basics at a glance -- and Edit goes deeper into the full form.
  */
 function RecordModal({
-  view, onClose, onEdit, onSaved, onOpenLink,
+  view, onClose, onEdit, onSaved, onOpenLink, onCompose,
 }: {
   view: ViewState; onClose: () => void; onEdit: () => void;
   onSaved: (saved?: Row) => void;
   onOpenLink: (target: string, id: string) => void;
+  onCompose: (email: string) => void;
 }) {
   const { dt, row, links, mode } = view;
   const title = String(row[dt.titleField] ?? dt.label);
@@ -1071,7 +1114,10 @@ function RecordModal({
                   <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>{f.label}</div>
                   <div className="text-sm" style={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>
                     <Cell field={f} value={row[f.name]} links={links} onOpenLink={onOpenLink} />
-                    {isEmailish(row[f.name]) && <ContactActions email={row[f.name] as string} />}
+                    {isEmailish(row[f.name]) && (
+                      <ContactActions email={row[f.name] as string}
+                        onCompose={() => onCompose(row[f.name] as string)} />
+                    )}
                     {isPhoneish(row[f.name]) && <ContactActions phone={row[f.name] as string} />}
                   </div>
                 </div>

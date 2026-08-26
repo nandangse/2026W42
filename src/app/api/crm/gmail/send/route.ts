@@ -23,6 +23,13 @@ export async function POST(req: Request) {
       throw new HttpError(400, "Connect your Gmail first — Profile → Gmail connection.");
     const b = await req.json();
     const to = String(b.to ?? "").trim();
+    const cc = String(b.cc ?? "").trim();
+    const bcc = String(b.bcc ?? "").trim();
+    const attachments = Array.isArray(b.attachments)
+      ? (b.attachments as { name?: unknown; link?: unknown }[])
+          .filter((a) => a && a.link)
+          .map((a) => ({ name: String(a.name ?? "attachment"), link: String(a.link) }))
+      : [];
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new HttpError(400, `${to || "(empty)"} is not an email address.`);
     const rawSubject = String(b.subject ?? "").trim();
     const rawBody = String(b.body ?? "").trim();
@@ -33,15 +40,21 @@ export async function POST(req: Request) {
       opportunityId: b.opportunity_id ?? null, quotationId: b.quotation_id ?? null,
     });
     const subject = renderTemplate(rawSubject, values);
-    const body = renderTemplate(rawBody, values);
+    let body = renderTemplate(rawBody, values);
+    if (attachments.length) {
+      body += "\n\n— Attachments (Google Drive) —\n"
+        + attachments.map((a) => `${a.name}: ${a.link}`).join("\n");
+    }
 
     const token = await accessTokenFor(String(mb.id));
-    const gmailId = await gmailSend(token, String(mb.email_address), to, subject, body);
+    const gmailId = await gmailSend(token, String(mb.email_address), to, subject, body, cc || undefined, bcc || undefined);
 
     const db = crmDb();
     await db.from("message").upsert([{
       channel: "email", direction: "outbound", external_id: gmailId,
-      subject, body_text: body, from_handle: mb.email_address, to_handles: [to],
+      subject, body_text: body, from_handle: mb.email_address,
+      to_handles: [to, ...(cc ? [cc] : []), ...(bcc ? [bcc] : [])],
+      attachments: attachments,
       occurred_at: new Date().toISOString(),
       person_id: b.person_id ?? null, company_id: b.company_id ?? null,
       lead_id: b.lead_id ?? null, opportunity_id: b.opportunity_id ?? null,
