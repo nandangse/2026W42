@@ -40,6 +40,7 @@ export async function POST(req: Request) {
       personId: b.person_id ?? null, companyId: b.company_id ?? null,
       opportunityId: b.opportunity_id ?? null, quotationId: b.quotation_id ?? null,
     });
+    values.sales_person = user.displayName || user.email;
     const subject = renderTemplate(rawSubject, values);
     let body = renderTemplate(rawBody, values);
     if (attachments.length) {

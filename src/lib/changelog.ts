@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.37",
+    date: "2026-08-26",
+    module: "WhatsApp joins the record",
+    items: [
+      "EVERY PHONE NUMBER GROWS A 💬+ — the WhatsApp icon with a plus. It opens the WHATSAPP LIGHTBOX: pick a WhatsApp Template (Masters, 0014), the message forms with {{variables}} — {{sales_person}} signs as whoever is sending — and SEND VIA WHATSAPP logs the formed message into COMMUNICATION and opens your OWN WhatsApp with the text ready.",
+      "The plain 💬 stays quick: it opens WhatsApp with \"Hello, / Regards / <you>\" — and that hello is LOGGED too. What the salesperson then types in WhatsApp is their own; what Genie formed is on the record. A WhatsApp against a New opportunity also counts as its first handling.",
+    ],
+  },
+  {
     v: "3.23.1.36",
     date: "2026-08-26",
     module: "Templates are born in the composer",

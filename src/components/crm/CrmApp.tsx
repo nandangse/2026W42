@@ -27,6 +27,7 @@ import AnalyticsScreen from "./Analytics";
 import DealsScreen from "./DealBoard";
 import MailComposer, { type ComposeCtx } from "./MailComposer";
 import MailQueue from "./MailQueue";
+import WaComposer, { type WaCtx } from "./WaComposer";
 import { DateRangeBar, DEFAULT_RANGE, type DateRange } from "./DateRange";
 
 // Sales Genie's palette (src/sales-plan/styles.css), moved here on Dr Raghu's
@@ -277,9 +278,11 @@ export default function CrmApp({
   const industryFilter = !!dt && dt.name !== "company"
     && dt.fields.some((f) => f.name === "company_id") && (links.industry?.length ?? 0) > 0;
 
-  /** The mail lightbox, seeded from a record: the address, the refs the
-   *  mail will hang on — the current module and all above it. */
-  const composeFor = (d: Doctype, r: Row, email?: string | null) => {
+  const [waCtx, setWaCtx] = useState<WaCtx | null>(null);
+
+  /** The refs + chain a message hangs on, from a record — shared by the mail
+   *  and WhatsApp doors. */
+  const refsFor = (d: Doctype, r: Row) => {
     const refs: ComposeCtx["refs"] = {};
     const chain: string[] = [];
     const put = (k: keyof ComposeCtx["refs"], v: unknown, label: string) => {
@@ -293,8 +296,29 @@ export default function CrmApp({
     if (d.name === "company") put("company_id", r.id, `Company ${r.name ?? ""}`.trim());
     else put("company_id", r.company_id, "Company");
     if (d.name !== "person") put("person_id", r.point_of_contact_id ?? r.contact_id ?? r.person_id, "Contact");
+    return { refs, chain };
+  };
+  const composeFor = (d: Doctype, r: Row, email?: string | null) => {
+    const { refs, chain } = refsFor(d, r);
     const to = email ?? ([r.primary_email, r.contact_email].find(isEmailish) as string | undefined) ?? null;
     setCompose({ to, refs, chain });
+  };
+  /** 💬 quick — the hello forms server-side, gets LOGGED, and opens the
+   *  salesperson's own WhatsApp. 💬+ opens the template lightbox instead. */
+  const waFor = (d: Doctype, r: Row, phone: string, mode: "quick" | "compose") => {
+    const { refs, chain } = refsFor(d, r);
+    if (mode === "compose") { setWaCtx({ phone, refs, chain }); return; }
+    const w = window.open("", "_blank");
+    fetch("/api/crm/wa/send", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ phone, body: "Hello,\n\nRegards\n{{sales_person}}", ...refs }),
+    })
+      .then(async (res) => {
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error || "Could not open WhatsApp");
+        if (w) w.location.href = j.url; else window.location.href = j.url;
+      })
+      .catch((e) => { if (w) w.close(); window.alert(e instanceof Error ? e.message : String(e)); });
   };
 
   /** A link cell is a door: open the record it points at. */
@@ -892,7 +916,8 @@ export default function CrmApp({
                         return (
                           <td style={{ padding: "8px 10px", borderBottom: "1px solid #F0EEE8", background: "#fff", textAlign: "right", whiteSpace: "nowrap" }}>
                             <ContactActions email={c.email} phone={c.phone} compact
-                              onCompose={c.email ? () => composeFor(dt, r, c.email) : undefined} />
+                              onCompose={c.email ? () => composeFor(dt, r, c.email) : undefined}
+                              onWa={c.phone ? (m) => waFor(dt, r, c.phone as string, m) : undefined} />
                           </td>
                         );
                       })()}
@@ -946,11 +971,20 @@ export default function CrmApp({
         />
       )}
 
+      {waCtx && (
+        <WaComposer
+          ctx={waCtx}
+          onClose={() => setWaCtx(null)}
+          onSent={() => setWaCtx(null)}
+        />
+      )}
+
       {view && (
         <RecordModal
           view={view}
           onClose={() => setView(null)}
           onCompose={(email) => composeFor(view.dt, view.row, email)}
+          onWa={(phone, m) => waFor(view.dt, view.row, phone, m)}
           onEdit={() => setView({ ...view, mode: "edit" })}
           onSaved={(saved) => {
             void load();
@@ -988,10 +1022,13 @@ const isPhoneish = (v: unknown): v is string =>
   /^\+?[\d\s()-]{8,18}$/.test(v.trim()) && /\d{8,}/.test(v.replace(/\D/g, ""));
 
 /** ✉ 📞 💬 — click starts the mail, the call, the WhatsApp. */
-function ContactActions({ email, phone, compact, onCompose }: {
+function ContactActions({ email, phone, compact, onCompose, onWa }: {
   email?: string | null; phone?: string | null; compact?: boolean;
   /** When given, the envelope opens the mail lightbox instead of mailto. */
   onCompose?: () => void;
+  /** When given: 💬 fires the quick logged hello, 💬+ opens the WhatsApp
+   *  lightbox with templates. Without it the icons stay plain wa.me links. */
+  onWa?: (mode: "quick" | "compose") => void;
 }) {
   const stop = (e: React.MouseEvent) => e.stopPropagation();
   const digits = phone ? phone.replace(/\D/g, "") : "";
@@ -1008,7 +1045,13 @@ function ContactActions({ email, phone, compact, onCompose }: {
       {phone && (
         <a href={`tel:${phone}`} onClick={stop} title={`Call ${phone}`} style={{ fontSize: size, textDecoration: "none" }}>📞</a>
       )}
-      {phone && digits.length >= 10 && (
+      {phone && digits.length >= 10 && onWa && (
+        <>
+          <button onClick={(e) => { stop(e); onWa("quick"); }} title={`WhatsApp ${phone} — opens with the hello, and logs it`} style={{ fontSize: size }}>💬</button>
+          <button onClick={(e) => { stop(e); onWa("compose"); }} title={`WhatsApp ${phone} with a template — logged in Communication`} style={{ fontSize: size - 2, fontWeight: 800, color: "#1FA855" }}>💬+</button>
+        </>
+      )}
+      {phone && digits.length >= 10 && !onWa && (
         <a href={`https://wa.me/${digits}`} target="_blank" rel="noreferrer" onClick={stop} title={`WhatsApp ${phone}`} style={{ fontSize: size, textDecoration: "none" }}>💬</a>
       )}
     </span>
@@ -1159,12 +1202,13 @@ function ColumnPicker({
  * basics at a glance -- and Edit goes deeper into the full form.
  */
 function RecordModal({
-  view, onClose, onEdit, onSaved, onOpenLink, onCompose,
+  view, onClose, onEdit, onSaved, onOpenLink, onCompose, onWa,
 }: {
   view: ViewState; onClose: () => void; onEdit: () => void;
   onSaved: (saved?: Row) => void;
   onOpenLink: (target: string, id: string) => void;
   onCompose: (email: string) => void;
+  onWa: (phone: string, mode: "quick" | "compose") => void;
 }) {
   const { dt, row, links, mode } = view;
   const title = String(row[dt.titleField] ?? dt.label);
@@ -1323,7 +1367,10 @@ function RecordModal({
                       <ContactActions email={row[f.name] as string}
                         onCompose={() => onCompose(row[f.name] as string)} />
                     )}
-                    {f.type !== "date" && isPhoneish(row[f.name]) && <ContactActions phone={row[f.name] as string} />}
+                    {f.type !== "date" && isPhoneish(row[f.name]) && (
+                      <ContactActions phone={row[f.name] as string}
+                        onWa={(m) => onWa(row[f.name] as string, m)} />
+                    )}
                   </div>
                 </div>
               ))}
@@ -1365,6 +1412,7 @@ function RecordModal({
                 addPresets={t.addPresets}
                 onOpenLink={onOpenLink}
                 onCompose={onCompose}
+                onWa={onWa}
               />
             ) : null;
           })()
@@ -1388,11 +1436,12 @@ function RecordModal({
  * where it makes sense the tab can add a row pre-linked to the record.
  */
 function RelatedTab({
-  slug, filterField, filterValue, addPresets, onOpenLink, onCompose,
+  slug, filterField, filterValue, addPresets, onOpenLink, onCompose, onWa,
 }: {
   slug: string; filterField: string; filterValue: string | null;
   addPresets?: Row; onOpenLink: (target: string, id: string) => void;
   onCompose?: (email: string) => void;
+  onWa?: (phone: string, mode: "quick" | "compose") => void;
 }) {
   const dt = doctypeBySlug(slug);
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -1479,7 +1528,10 @@ function RelatedTab({
                     <ContactActions email={r[f.name] as string} compact
                       onCompose={onCompose ? () => onCompose(r[f.name] as string) : undefined} />
                   )}
-                  {f.type !== "date" && isPhoneish(r[f.name]) && <ContactActions phone={r[f.name] as string} compact />}
+                  {f.type !== "date" && isPhoneish(r[f.name]) && (
+                    <ContactActions phone={r[f.name] as string} compact
+                      onWa={onWa ? (m) => onWa(r[f.name] as string, m) : undefined} />
+                  )}
                 </td>
               ))}
             </tr>
