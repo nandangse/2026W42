@@ -2254,11 +2254,15 @@ function RecordForm({
   const tabMatch = (f: Field) =>
     tabKey === undefined ? true : tabKey === "details" ? !f.tab : f.tab === tabKey;
   const tenderOn = form["is_tender"] === true;
+  // A dead stage DRAGS the reason fields into whichever form chose it —
+  // they normally live on the Qualification tab, but a Lost move from the
+  // Details form must be able to say why right there.
+  const isLostField = (f: Field) => f.name === "lost_reason" || f.name === "lost_to_competitor";
   const gridFields = editable.filter((f) =>
-    tabMatch(f)
+    (tabMatch(f) || (stageDead && isLostField(f)))
     && !(f.tenderOnly && !tenderOn)
     && !(isDeal && banttcNames.includes(f.name))
-    && !(hasStage && !stageDead && (f.name === "lost_reason" || f.name === "lost_to_competitor")));
+    && !(hasStage && !stageDead && isLostField(f)));
 
   const score = (() => {
     let s = 0, d = 0;

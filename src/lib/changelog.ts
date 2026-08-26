@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.33",
+    date: "2026-08-26",
+    module: "The Lost reason shows up where Lost is chosen",
+    items: [
+      "Choosing LOST or NOT TARGET in ANY edit form now pulls the LOST REASON and LOST TO fields into that form on the spot — they lived on the Qualification tab, so the Details form could demand a reason it gave you nowhere to write.",
+    ],
+  },
+  {
     v: "3.23.1.32",
     date: "2026-08-26",
     module: "Bulk edit learns the Lost rule",
