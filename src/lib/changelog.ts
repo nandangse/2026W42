@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.24",
+    date: "2026-08-26",
+    module: "The full opportunity book, dated",
+    items: [
+      "ALL 22,772 ERP OPPORTUNITIES ARE IN — six exports upserted on ENQ number: 20,272 new, 2,499 enriched, 33 companies created from Party names, 16,982 wired to their contact by email, 13,413 to their salesperson, 1,541 tenders with the full tender field set, 20,854 with the enquiry as it arrived.",
+      "OPPORTUNITY DATE is now its own field near the top — the business date the enquiry arrived (the ERP's Opportunity Date), distinct from when the row was written. Migration 0011; backfilled for the whole book.",
+    ],
+  },
+  {
     v: "3.23.1.23",
     date: "2026-08-26",
     module: "Mail signs with the sender's name",
