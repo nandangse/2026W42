@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.14",
+    date: "2026-08-26",
+    module: "One line per cell, and the width is a choice",
+    items: [
+      "EVERY CELL HOLDS ONE LINE — the row is a scan, the lightbox is the read; the full text waits on hover. The Columns ▾ popover (which already adds and removes columns on every table) now also sets the COLUMN WIDTH — Narrow · Normal · Wide — remembered per table. The lightbox tab tables clamp the same way.",
+    ],
+  },
+  {
     v: "3.23.1.13",
     date: "2026-08-26",
     module: "The tables measure their appetite",

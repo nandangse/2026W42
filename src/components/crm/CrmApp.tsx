@@ -106,6 +106,7 @@ export default function CrmApp({
   const [view, setView] = useState<ViewState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pageSize, setPageSize] = useState<string>("500");   // 100|500|2500|10000|50000|all
+  const [colW, setColW] = useState<number>(280);             // narrow 140 · normal 280 · wide 440
   const [moreBusy, setMoreBusy] = useState(false);
   // The sidebar folds to an icon rail — open all the time was noise.
   const [navOpen, setNavOpen] = useState<boolean>(() => {
@@ -135,7 +136,8 @@ export default function CrmApp({
       const c = localStorage.getItem(`crmCols.${slug}`);
       setCols(c ? (JSON.parse(c) as string[]) : null);
       setPin(Number(localStorage.getItem(`crmPin.${slug}`)) || 0);
-    } catch { setCols(null); setPin(0); }
+      setColW(Number(localStorage.getItem(`crmW.${slug}`)) || 280);
+    } catch { setCols(null); setPin(0); setColW(280); }
     try { window.history.replaceState(null, "", `/crm/${URL_OF[slug] ?? slug}`); } catch { /* SSR */ }
   }, [slug]);
 
@@ -216,6 +218,10 @@ export default function CrmApp({
       if (next) localStorage.setItem(`crmCols.${slug}`, JSON.stringify(next));
       else localStorage.removeItem(`crmCols.${slug}`);
     } catch { /* private mode -- layout just won't stick */ }
+  };
+  const saveColW = (n: number) => {
+    setColW(n);
+    try { localStorage.setItem(`crmW.${slug}`, String(n)); } catch { /* fine */ }
   };
   const savePin = (n: number) => {
     setPin(n);
@@ -455,6 +461,8 @@ export default function CrmApp({
                   visibleNames={visibleNames}
                   onChange={saveCols}
                   onClose={() => setColsOpen(false)}
+                  colWidth={colW}
+                  onWidth={saveColW}
                 />
               )}
             </div>
@@ -640,12 +648,15 @@ export default function CrmApp({
                       {visible.map((f, ci) => (
                         <td
                           key={f.name}
+                          title={typeof r[f.name] === "string" && (r[f.name] as string).length > 40 ? (r[f.name] as string) : undefined}
                           style={{
+                            // one line per cell — the row is a scan, the
+                            // lightbox is the read (Dr Raghu, 26 Aug 2026)
                             padding: "8px 12px", fontSize: 13, borderBottom: "1px solid #F0EEE8",
                             verticalAlign: "top", background: "#fff",
-                            ...(ci < pin
-                              ? { ...stickyCell(ci, 5), maxWidth: PINNED_W, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
-                              : null),
+                            maxWidth: ci < pin ? PINNED_W : colW,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            ...(ci < pin ? stickyCell(ci, 5) : null),
                           }}
                         >
                           <Cell field={f} value={r[f.name]} links={links} onOpenLink={openLinked} />
@@ -789,10 +800,11 @@ function fmtDate(v: string): string {
 
 /** Pick which columns show, per doctype. Kept in localStorage. */
 function ColumnPicker({
-  dt, visibleNames, onChange, onClose,
+  dt, visibleNames, onChange, onClose, colWidth, onWidth,
 }: {
   dt: Doctype; visibleNames: string[];
   onChange: (next: string[] | null) => void; onClose: () => void;
+  colWidth: number; onWidth: (w: number) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -824,6 +836,16 @@ function ColumnPicker({
         <button className="text-xs font-semibold" style={{ color: ORANGE }} onClick={() => onChange(null)}>
           reset
         </button>
+      </div>
+      <div className="flex items-center gap-1 px-1 pb-1 mb-1" style={{ borderBottom: `1px solid ${BORDER}` }}>
+        <span className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>WIDTH</span>
+        {([["Narrow", 140], ["Normal", 280], ["Wide", 440]] as const).map(([l, w]) => (
+          <button key={w} onClick={() => onWidth(w)}
+            className="px-2 py-0.5 rounded-full text-xs font-bold border"
+            style={colWidth === w ? { background: NAVY, borderColor: NAVY, color: "#fff" } : { background: "#fff", borderColor: BORDER, color: MUTED }}>
+            {l}
+          </button>
+        ))}
       </div>
       {dt.fields.map((f) => (
         <label key={f.name} className="flex items-center gap-2 px-1 py-0.5 text-sm" style={{ cursor: "pointer" }}>
@@ -1137,7 +1159,12 @@ function RelatedTab({
               style={{ cursor: "pointer" }}
             >
               {fields.map((f) => (
-                <td key={f.name} style={{ padding: "8px 14px", fontSize: 13, borderBottom: "1px solid #F0F1F6", verticalAlign: "top" }}>
+                <td key={f.name}
+                  title={typeof r[f.name] === "string" && (r[f.name] as string).length > 40 ? (r[f.name] as string) : undefined}
+                  style={{
+                    padding: "8px 14px", fontSize: 13, borderBottom: "1px solid #F0F1F6", verticalAlign: "top",
+                    maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
                   <Cell field={f} value={r[f.name]} links={links} onOpenLink={onOpenLink} />
                 </td>
               ))}
