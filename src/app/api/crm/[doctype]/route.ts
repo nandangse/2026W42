@@ -262,11 +262,15 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
     const groupby = u.searchParams.get("groupby");
     if (groupby) {
       const gf = d.fields.find((f) => f.name === groupby && !f.virtual && f.type !== "readonly");
-      if (!gf) throw new HttpError(400, "Cannot group by that field.");
+      // Industry on an opportunity is the COMPANY's industry — grouped
+      // through the join, like the filter does it.
+      const viaCompany = !gf && groupby === "company_industry" && d.fields.some((f) => f.name === "company_id");
+      if (!gf && !viaCompany) throw new HttpError(400, "Cannot group by that field.");
       const moneyField = d.fields.find((f) => f.type === "money")?.name
         ?? d.fields.find((f) => f.type === "readonly" && f.format === "money")?.name ?? null;
-      const aggSelect = [groupby, moneyField].filter(Boolean).join(", ")
-        + (wantsInd ? ", company_join:company_id!inner(industry_id)" : "");
+      const joinNeeded = wantsInd || viaCompany;
+      const aggSelect = [viaCompany ? null : groupby, moneyField].filter(Boolean).join(", ")
+        + (joinNeeded ? `${moneyField || !viaCompany ? ", " : ""}company_join:company_id!inner(industry_id)` : "");
       const buildAgg = () => {
         let qy = db.from(d.table).select(aggSelect);
         if (["company", "person", "opportunity"].includes(d.name)) qy = qy.is("deleted_at", null);
@@ -288,7 +292,10 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
         if (error) throw new HttpError(500, error.message);
         const chunk = (data ?? []) as unknown as Record<string, unknown>[];
         for (const r of chunk) {
-          const key = r[groupby] === null || r[groupby] === undefined || r[groupby] === "" ? "" : String(r[groupby]);
+          const raw = viaCompany
+            ? (r.company_join as { industry_id?: unknown } | null)?.industry_id
+            : r[groupby];
+          const key = raw === null || raw === undefined || raw === "" ? "" : String(raw);
           const cur = agg.get(key) ?? { count: 0, sum: 0 };
           cur.count += 1;
           if (moneyField) cur.sum += Number(r[moneyField]) || 0;
@@ -299,8 +306,8 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       }
       // names for link keys — fetched by id, so inactive owners keep theirs
       const labels = new Map<string, string>();
-      if (gf.type === "link" && gf.link) {
-        const t = doctypeBySlug(gf.link);
+      if (viaCompany || (gf?.type === "link" && gf.link)) {
+        const t = doctypeBySlug(viaCompany ? "industry" : (gf!.link as string));
         const ids = [...agg.keys()].filter(Boolean);
         if (t) for (let i = 0; i < ids.length; i += 150) {
           const { data: ls } = await db.from(t.table).select(`id, ${t.titleField}`).in("id", ids.slice(i, i + 150));
@@ -311,7 +318,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
         .map(([key, v]) => ({ key, label: key === "" ? "Not set" : labels.get(key) ?? key, count: v.count, sum: v.sum }))
         .sort((a, b) => b.count - a.count);
       return NextResponse.json({
-        field: gf.label, hasMoney: !!moneyField, total: scanned,
+        field: viaCompany ? "Industry" : gf!.label, hasMoney: !!moneyField, total: scanned,
         sumTotal: groups.reduce((a, g) => a + g.sum, 0), groups,
       });
     }

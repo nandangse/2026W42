@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.34",
+    date: "2026-08-26",
+    module: "Group by Sector and Industry",
+    items: [
+      "SECTOR and INDUSTRY join the Group by menu. Industry on an opportunity is the customer's industry, so the aggregator reads it through the company join — the same way the Industry filter does.",
+    ],
+  },
+  {
     v: "3.23.1.33",
     date: "2026-08-26",
     module: "The Lost reason shows up where Lost is chosen",

@@ -540,7 +540,7 @@ export default function CrmApp({
             {(() => {
               // Group by lives top right: Salesperson / Product family / Source,
               // whichever this doctype carries.
-              const CANDIDATES: [string, string][] = [["owner_id", "Sales Person"], ["product_family", "Product Family"], ["source", "Source"]];
+              const CANDIDATES: [string, string][] = [["owner_id", "Sales Person"], ["product_family", "Product Family"], ["source", "Source"], ["sector_id", "Sector"], ["industry_id", "Industry"], ["company_industry", "Industry"]];
               const opts = CANDIDATES.filter(([n]) => dt.fields.some((f) => f.name === n && !f.virtual));
               if (!opts.length) return null;
               return (
