@@ -6538,7 +6538,10 @@ function Admin({
                           try {
                             await api.post("/api/admin/users", { action: "profile", id: u.id, oauth_available: e.target.checked });
                             await loadUsers();
-                          } catch { /* the tick springs back on reload */ }
+                          } catch (err) {
+                            window.alert(err instanceof Error ? err.message : String(err));
+                            await loadUsers();
+                          }
                         }}
                       />
                       ✉ OAuth

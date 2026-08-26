@@ -167,8 +167,14 @@ export async function POST(req: Request) {
       const { data: t } = await admin.from("profiles").select("email, role").eq("id", id).maybeSingle();
       if (!t) return;
       const targetIsOwner = String(t.email || "").toLowerCase() === RAGHU_EMAIL;
-      if (targetIsOwner)
-        throw new HttpError(403, "The owner account cannot be changed here.");
+      if (targetIsOwner) {
+        // The owner's PROFILE fields (initials, ERP owner, the OAuth tick)
+        // are the owner's own to set — it was exactly Dr Raghu who could not
+        // tick OAuth on himself (26 Aug 2026). Role, disable, password and
+        // delete stay locked for the owner row, always.
+        if (!(caller.isOwner && body.action === "profile"))
+          throw new HttpError(403, "The owner account cannot be changed here.");
+      }
       if (t.role === "admin" && !caller.isOwner)
         throw new HttpError(
           403,

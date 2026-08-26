@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.17",
+    date: "2026-08-26",
+    module: "The owner may tick his own OAuth",
+    items: [
+      "THE ✉ OAUTH TICK REFUSED THE OWNER'S OWN ROW — the owner-protection guard blocked every profile change on it, and the checkbox swallowed the refusal silently. The owner now edits the owner's PROFILE fields (initials, ERP owner, the OAuth tick); role, disable, password and delete stay locked on that row forever. And a refused tick now says why instead of springing back mutely.",
+    ],
+  },
+  {
     v: "3.23.1.16",
     date: "2026-08-26",
     module: "Gmail walks in through the front door",
