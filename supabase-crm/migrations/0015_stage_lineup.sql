@@ -1,4 +1,6 @@
 -- 0015: the opportunity stages, in Dr Raghu's order (Genie 3.23.1.29)
+-- v2 — the first run rolled back: stage.entity carries a check constraint
+-- allowing only opportunity/quotation, so 'retired' must be admitted first.
 --
 -- The picker reads exactly:
 --   Suspect · New · Handled Opportunity · Not Target · Prospect ·
@@ -7,6 +9,10 @@
 -- LATE HANDLING is new. The old "Opportunity" stage retires: its 188 rows
 -- (ERP status "Open" — untouched enquiries) read as NEW, which is what they
 -- are, and the stage leaves the picker.
+
+alter table stage drop constraint if exists stage_entity_check;
+alter table stage add constraint stage_entity_check
+  check (entity in ('opportunity', 'quotation', 'retired'));
 
 insert into stage (name, code, entity, sort_order)
 select 'Late Handling', 'late_handling', 'opportunity', 9
