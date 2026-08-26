@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.8",
+    date: "2026-08-25",
+    module: "The profile answers to its person, twins merge, and messages learn their variables",
+    items: [
+      "PROFILE IS A PAGE A PERSON CAN ACT ON: the WhatsApp number is theirs to keep current (E.164, checked), while name, initials, role and ERP owner stay admin-set. A Gmail connection section stands ready — it opens only where the admin has ticked ✉ OAuth on the account (Admin → Users), and the connect itself happens with an administrator in tow when the comms build lands. Migration 0073.",
+      "MERGE LIVES ON COMPANIES AND CONTACTS — a tab where Genie suggests the likely twins (identical names first, then same email or phone, then names that start the same) and one click absorbs the duplicate: every reference — contacts, opportunities, quotations, orders, interactions, notes — moves to the keeper, everywhere, and the duplicate retires into the audit. Merged rows leave every screen but never the ledger.",
+      "MESSAGES LEARNED THEIR VARIABLES (migration 0008): {{name}}, {{small_name}}, {{company_name}}, {{enq_no}}, {{qtn_no}}, {{qtn_subject}}, {{today}}, {{next_monday}} through {{next_saturday}}, {{khalapur_address}}, {{belapur_address}}, {{outstanding_amount}} — one master, keys unique by constraint, builtins computed live from the record and the calendar, statics typed by the admin under Settings → Message Variables. One resolver renders them all; every messaging surface the comms build brings will speak through it.",
+      "FEATURE REQUESTS COUNT BOTH DIRECTIONS: pending split as Must Have / Good to Have / Future, and DONE in the last 7 · 15 · 30 days beside them — with a status filter of its own next to the category one.",
+      "Quotations stand untouched until after the weekend, as agreed.",
+    ],
+  },
+  {
     v: "3.23.1.7",
     date: "2026-08-25",
     module: "Every record wears its tabs, and Genie reads the CRM",

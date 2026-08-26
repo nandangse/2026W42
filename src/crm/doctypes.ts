@@ -394,6 +394,21 @@ export const DOCTYPES: Doctype[] = [
     ],
   },
 
+  {
+    name: "message_variable", label: "Message Variable", plural: "Message Variables", table: "message_variable",
+    titleField: "key", group: "Masters", icon: "🔤",
+    orderBy: { column: "key", ascending: true },
+    onlyFor: ["raghu@nandan.co.in"],
+    blurb: "The {{variables}} every message can carry. Builtins compute themselves from the record and the calendar; statics say what the admin types here. A key can exist only once.",
+    fields: [
+      { name: "key", label: "Key", type: "text", required: true, inList: true, help: "Lowercase letters, digits, underscores — used as {{key}}." },
+      { name: "kind", label: "Kind", type: "select", options: ["static", "builtin"], inList: true, default: "static",
+        help: "Builtins compute live (name, dates, numbers). Statics hold the text below." },
+      { name: "value", label: "Value", type: "textarea", big: true, inList: true, help: "For statics — the address, the terms, the line as it should read." },
+      { name: "description", label: "What it is", type: "text", inList: true },
+    ],
+  },
+
   // ------------------------------------------------------------ masters
   {
     name: "sector", label: "Sector", plural: "Sectors", table: "sector",

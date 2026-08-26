@@ -1165,6 +1165,7 @@ function ProfileModal({
           />
           <ProfileRow label="ERP owner name" value={me.erpOwner || "—"} hint={me.erpOwner ? undefined : "used to match ERP-owned jobs"} />
         </div>
+        <ProfileSelf />
         <div className="text-xs px-5 pt-3" style={{ color: "#8A94A0" }}>
           Name, initials, role and ERP owner are set by an admin in Admin → User management.
         </div>
@@ -1176,6 +1177,81 @@ function ProfileModal({
             Close
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The part of the profile a person keeps current themselves: their WhatsApp
+ * number — and, where the admin has marked OAuth Available, the door to the
+ * Gmail connection (opened together with an administrator, in the comms
+ * build). Everything else on the card stays admin-set.
+ */
+function ProfileSelf() {
+  const [wa, setWa] = useState("");
+  const [oauthOk, setOauthOk] = useState(false);
+  const [connectedAt, setConnectedAt] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    api.get("/api/me/profile")
+      .then((r: { whatsapp_no?: string | null; oauth_available?: boolean; oauth_connected_at?: string | null }) => {
+        setWa(r.whatsapp_no || "");
+        setOauthOk(!!r.oauth_available);
+        setConnectedAt(r.oauth_connected_at || null);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, []);
+
+  const save = async () => {
+    setBusy(true); setMsg("");
+    try {
+      const r = await api.post("/api/me/profile", { whatsapp_no: wa });
+      setWa((r as { whatsapp_no?: string | null }).whatsapp_no || "");
+      setMsg("Saved.");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally { setBusy(false); }
+  };
+
+  if (!loaded) return null;
+  return (
+    <div className="px-5 pt-3">
+      <div className="text-xs font-bold mb-1" style={{ color: "#8A94A0", letterSpacing: ".04em" }}>WHATSAPP NUMBER</div>
+      <div className="flex gap-2">
+        <input
+          value={wa}
+          onChange={(e) => setWa(e.target.value)}
+          placeholder="+91 98200 12345"
+          className="flex-1 rounded border px-2 py-1.5 text-sm tnum"
+          style={{ borderColor: "#E2E0DA" }}
+        />
+        <button onClick={save} disabled={busy}
+          className="rounded px-3 py-1.5 text-xs font-bold"
+          style={{ background: busy ? "#B8B5AC" : "#E8600A", color: "#fff" }}>
+          {busy ? "Saving…" : "Save"}
+        </button>
+      </div>
+      {msg && <div className="text-xs mt-1 font-semibold" style={{ color: msg === "Saved." ? "#0D7A3F" : "#B3261E" }}>{msg}</div>}
+
+      <div className="mt-3 rounded p-2.5" style={{ background: "#F4F2EC" }}>
+        <div className="text-xs font-bold" style={{ color: "#16232F" }}>✉ Gmail connection</div>
+        {connectedAt ? (
+          <div className="text-xs mt-0.5" style={{ color: "#0D7A3F", fontWeight: 700 }}>Connected · {fmtFull(String(connectedAt).slice(0, 10))}</div>
+        ) : oauthOk ? (
+          <div className="text-xs mt-0.5" style={{ color: "#5A6672", lineHeight: 1.5 }}>
+            Your administrator has marked you ready. The connection is made together with the
+            administrator — it arrives with the communications build.
+          </div>
+        ) : (
+          <div className="text-xs mt-0.5" style={{ color: "#8A94A0", lineHeight: 1.5 }}>
+            Not enabled for you yet — an admin marks <b>OAuth Available</b> on your account first.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -6443,7 +6519,24 @@ function Admin({
                   />
                 </td>
                 <td className="py-1.5">
-                  <GroupTicks u={u} isOwner={isOwner} onSet={setGroups} />
+                  <div className="flex items-center gap-2">
+                    <GroupTicks u={u} isOwner={isOwner} onSet={setGroups} />
+                    <label className="flex items-center gap-1 whitespace-nowrap text-xs"
+                      title="Marks this person ready to connect Gmail — the connect itself happens with an administrator in tow"
+                      style={{ cursor: "pointer", color: "#5A6672" }}>
+                      <input
+                        type="checkbox"
+                        checked={!!(u as { oauth_available?: boolean }).oauth_available}
+                        onChange={async (e) => {
+                          try {
+                            await api.post("/api/admin/users", { action: "profile", id: u.id, oauth_available: e.target.checked });
+                            await loadUsers();
+                          } catch { /* the tick springs back on reload */ }
+                        }}
+                      />
+                      ✉ OAuth
+                    </label>
+                  </div>
                 </td>
                 <td className="py-1.5 tnum" style={{ color: "#8A94A0" }}>
                   {u.last_sign_in_at ? fmtFull(String(u.last_sign_in_at).slice(0, 10)) : "never"}
@@ -9686,7 +9779,7 @@ const FR_STATUSES: [string, string, string][] = [
 function FeatureRequests({ isOwner }: { isOwner: boolean }) {
   interface F {
     id: string; title: string; body: string; want: string; status: string; note: string;
-    by: string | null; at: string; acted_by: string | null;
+    by: string | null; at: string; acted_by: string | null; acted_at: string | null;
     files: { id: string; name: string; mime: string | null; url: string | null }[];
   }
   const [items, setItems] = useState<F[]>([]);
@@ -9695,6 +9788,7 @@ function FeatureRequests({ isOwner }: { isOwner: boolean }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [filter, setFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [title, setTitle] = useState("");
   const [want, setWant] = useState("good");
   const [files, setFiles] = useState<File[]>([]);
@@ -9744,8 +9838,14 @@ function FeatureRequests({ isOwner }: { isOwner: boolean }) {
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   };
 
-  const shown = items.filter((f) => filter === "all" || f.want === filter || f.status === filter);
+  const shown = items.filter((f) =>
+    (filter === "all" || f.want === filter) && (statusFilter === "all" || f.status === statusFilter));
   const count = (k: string) => items.filter((f) => f.want === k && f.status === "open").length;
+  // What actually got done, recently — acted_at is stamped when the status moves.
+  const doneSince = (days: number) => {
+    const cut = new Date(Date.now() - days * 86400000).toISOString();
+    return items.filter((f) => f.status === "done" && f.acted_at && f.acted_at >= cut).length;
+  };
 
   return (
     <div className="p-4" style={{ maxWidth: 980 }}>
@@ -9763,10 +9863,13 @@ function FeatureRequests({ isOwner }: { isOwner: boolean }) {
       )}
       {err && <div className="text-xs font-bold rounded p-2 mb-2" style={{ background: "#FBEDEA", color: "#B3261E" }}>{err}</div>}
 
-      <div className="grid grid-cols-3 gap-2 mb-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 mb-3">
         {WANTS.map(([k, label, c]) => (
-          <StatCard key={k} label={label.toUpperCase()} value={String(count(k))} sub="still open" color={c} />
+          <StatCard key={k} label={`PENDING · ${label.toUpperCase()}`} value={String(count(k))} sub="still open" color={c} />
         ))}
+        <StatCard label="DONE · 7 DAYS" value={String(doneSince(7))} sub="completed this week" color="#0D7A3F" />
+        <StatCard label="DONE · 15 DAYS" value={String(doneSince(15))} sub="completed this fortnight" color="#0D7A3F" />
+        <StatCard label="DONE · 30 DAYS" value={String(doneSince(30))} sub="completed this month" color="#0D7A3F" />
       </div>
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
@@ -9779,6 +9882,10 @@ function FeatureRequests({ isOwner }: { isOwner: boolean }) {
           className="px-2 py-1 rounded border text-sm font-semibold" style={{ borderColor: "#D9D6CD" }}>
           <option value="all">Everything</option>
           {WANTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </select>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-2 py-1 rounded border text-sm font-semibold" style={{ borderColor: "#D9D6CD" }}>
+          <option value="all">Any status</option>
           {FR_STATUSES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
         <span className="text-xs" style={{ color: "#8A94A0" }}>{shown.length} shown</span>

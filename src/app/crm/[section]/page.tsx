@@ -40,6 +40,7 @@ const SECTION_TO_SLUG: Record<string, string> = {
   product: "product",
   products: "product",
   masters: "sector",
+  variables: "message_variable",
   sector: "sector",
   industry: "industry",
   stage: "stage",

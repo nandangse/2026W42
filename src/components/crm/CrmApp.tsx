@@ -58,7 +58,7 @@ const URL_OF: Record<string, string> = {
   lead: "lead", company: "company", person: "contact", quotation: "quotation",
   quotation_line: "quoteline", opportunity: "opportunity", sales_order: "salesorder",
   interaction: "interactions", task: "task", address: "address", person_phone: "phone",
-  product: "product", sales_invoice: "salesinvoice",
+  product: "product", sales_invoice: "salesinvoice", message_variable: "variables",
   sector: "sector", industry: "industry", stage: "stage", profile: "users",
 };
 
@@ -78,7 +78,7 @@ const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string } | { 
     items: [{ dt: "company" }, { dt: "person" }, { dt: "address" }, { dt: "person_phone" }, { dt: "industry" }, { dt: "product" }, { dt: "sales_invoice" }],
   },
   { header: "MORE", items: [{ dt: "interaction" }, { dt: "task" }, { dt: "quotation_line" }, { sp: "communication" }] },
-  { header: "SETTINGS", collapsible: true, items: [{ dt: "sector" }, { dt: "stage" }, { dt: "profile" }] },
+  { header: "SETTINGS", collapsible: true, items: [{ dt: "sector" }, { dt: "stage" }, { dt: "profile" }, { dt: "message_variable" }] },
 ];
 
 export default function CrmApp({
@@ -943,8 +943,10 @@ function RecordModal({
     recordTabs.push(
       { key: "comms", label: "Communication" },
       { key: "notes", label: "Notes" },
-      { key: "genie", label: "Genie" },
     );
+    if (dt.name === "company" || dt.name === "person")
+      recordTabs.push({ key: "merge", label: "Merge" });
+    recordTabs.push({ key: "genie", label: "Genie" });
   }
   const hasTabs = recordTabs.length > 0;
   const EDITABLE_TABS = ["details", "enquiry", "qual"];
@@ -1062,6 +1064,8 @@ function RecordModal({
             <CommsFeed type={dt.name} id={rid} companyId={companyId} onOpenLink={onOpenLink} />
           ) : tab === "notes" ? (
             <NotesTab type={dt.name} id={rid} />
+          ) : tab === "merge" ? (
+            <MergeTab type={dt.name} id={rid} title={title} onMerged={() => onSaved({ id: rid })} />
           ) : tab === "genie" ? (
             <GenieTab type={dt.name} id={rid} />
           ) : (() => {
@@ -1519,6 +1523,85 @@ function GenieTab({ type, id }: { type: string; id: string }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Merge: Genie suggests the likely twins — identical names first, then same
+ * email or phone, then names that start the same — and one click absorbs the
+ * duplicate: every reference on it moves to this record, everywhere.
+ */
+function MergeTab({
+  type, id, title, onMerged,
+}: {
+  type: string; id: string; title: string; onMerged: () => void;
+}) {
+  type Sug = { id: string; label: string; detail: string; why: string };
+  const [sugs, setSugs] = useState<Sug[] | null>(null);
+  const [err, setErr] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSugs(null); setErr("");
+    fetch(`/api/crm/merge?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`, { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || "Could not look for twins");
+        setSugs(j.suggestions);
+      })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [type, id]);
+
+  const doMerge = async (s: Sug) => {
+    if (!window.confirm(`Merge "${s.label}" into "${title}"?
+
+Everything on it — ${type === "company" ? "contacts, opportunities, quotations, orders, interactions" : "interactions, quotes, leads, phones"} — moves here. This is kept in the audit and the duplicate is retired.`))
+      return;
+    setBusyId(s.id); setErr("");
+    try {
+      const r = await fetch("/api/crm/merge", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type, keep_id: id, drop_id: s.id }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "The merge did not go through");
+      setDone(`Merged. ${j.moved} linked record${j.moved === 1 ? "" : "s"} moved across.`);
+      setSugs((cur) => (cur ?? []).filter((x) => x.id !== s.id));
+      onMerged();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusyId(null); }
+  };
+
+  return (
+    <div className="p-4" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+      <p className="text-xs mb-3" style={{ color: MUTED, maxWidth: "70ch", lineHeight: 1.6 }}>
+        Genie&apos;s suggested twins of <b style={{ color: INK }}>{title}</b>. Merging keeps THIS record
+        and moves everything from the duplicate onto it — the duplicate retires into the audit.
+      </p>
+      {done && <div className="rounded p-2 mb-2 text-sm font-semibold" style={{ background: "#E6F4EB", color: "#1A7F4E" }}>{done}</div>}
+      {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
+      {sugs === null && !err && <div className="text-sm" style={{ color: MUTED }}>looking for twins…</div>}
+      {sugs !== null && sugs.length === 0 && (
+        <div className="text-sm" style={{ color: MUTED }}>No likely duplicates found. Clean as it stands.</div>
+      )}
+      {(sugs ?? []).map((s) => (
+        <div key={s.id} className="rounded border p-2.5 mb-2 flex items-center gap-3 flex-wrap" style={{ borderColor: BORDER }}>
+          <div className="flex-1" style={{ minWidth: 200 }}>
+            <div className="text-sm font-bold">{s.label}</div>
+            <div className="text-xs" style={{ color: MUTED }}>{s.detail || "—"} · <i>{s.why}</i></div>
+          </div>
+          <button
+            onClick={() => doMerge(s)}
+            disabled={busyId !== null}
+            className="rounded px-3 py-1.5 text-xs font-bold"
+            style={{ background: busyId === s.id ? "#B9BEC4" : ORANGE, color: "#fff" }}
+          >
+            {busyId === s.id ? "Merging…" : "⇤ Merge into this record"}
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

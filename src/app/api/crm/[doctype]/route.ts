@@ -202,6 +202,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       // The picker honours the same f_ filters as the list — a contact
       // picker on an opportunity searches only that company's people.
       let pq = db.from(d.table).select(`id, ${d.titleField}`);
+      if (["company", "person", "opportunity"].includes(d.name)) pq = pq.is("deleted_at", null);
       for (const f of d.fields) {
         if (f.virtual) continue;
         const v = u.searchParams.get(`f_${f.name}`);
@@ -233,6 +234,8 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
 
     // ---- the list: filters, search and sort run in Postgres --------------
     let qy = db.from(d.table).select(select, { count: "exact" });
+    // Merged and soft-deleted rows stay in the ledger, not on the screens.
+    if (["company", "person", "opportunity"].includes(d.name)) qy = qy.is("deleted_at", null);
     if (wantsInd) qy = qy.eq("company_join.industry_id", indFilter);
     for (const f of d.fields) {
       if (f.virtual) continue;

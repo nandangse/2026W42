@@ -57,7 +57,7 @@ export async function GET() {
     const admin = adminClient();
     const { data, error } = await admin
       .from("profiles")
-      .select("id, email, role, disabled, initials, display_name, erp_owner, reports_to, designation, department_id, lc, stratcom, management, created_at")
+      .select("id, email, role, disabled, initials, display_name, erp_owner, reports_to, designation, department_id, lc, stratcom, management, oauth_available, created_at")
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
 
@@ -295,6 +295,9 @@ export async function POST(req: Request) {
       if ("display_name" in body) patch.display_name = String(body.display_name || "").trim() || null;
       if ("erp_owner" in body) patch.erp_owner = String(body.erp_owner || "").trim() || null;
       if ("designation" in body) patch.designation = String(body.designation || "").trim() || null;
+      // The admin's mark that this person may connect Gmail — the connect
+      // itself happens with an administrator in tow (comms build).
+      if ("oauth_available" in body) patch.oauth_available = !!body.oauth_available;
       if ("department_id" in body) patch.department_id = body.department_id || null;
       if ("reports_to" in body) {
         // the line manager, which Tasking's "people reporting to me" reads.
