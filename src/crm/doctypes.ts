@@ -42,6 +42,8 @@ export interface Field {
   virtual?: boolean;
   /** Keep this field out of the filter bar. */
   noFilter?: boolean;
+  /** A textarea that deserves the whole row and real height. */
+  big?: boolean;
 }
 
 export interface Doctype {
@@ -197,6 +199,8 @@ export const DOCTYPES: Doctype[] = [
     fields: [
       { name: "opportunity_no", label: "ENQ No", type: "readonly", inList: true, help: "Issued by the database on save. Imported rows keep their ERP number." },
       { name: "name", label: "Opportunity", type: "text", required: true, inList: true, help: "What is being sold, in words." },
+      { name: "enquiry_info", label: "Enquiry Info", type: "textarea", big: true,
+        help: "The enquiry as it arrived — the customer's own words. 2,087 carried in from the ERP." },
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
       { name: "stage_id", label: "Stage", type: "link", link: "stage", required: true, inList: true,
         linkFilter: { column: "entity", value: "opportunity" },
@@ -211,7 +215,6 @@ export const DOCTYPES: Doctype[] = [
       { name: "amount", label: "Value", type: "money", inList: true },
       { name: "expected_close_on", label: "Expected close", type: "date", inList: true },
       { name: "point_of_contact_id", label: "Contact", type: "link", link: "person" },
-      { name: "priority", label: "Priority", type: "select", options: ["Standard", "Red Hot Lead", "Very Important", "Long Term"], default: "Standard" },
       { name: "source", label: "Source", type: "select", options: [...LEAD_SOURCES] },
       { name: "is_tender", label: "Tender", type: "bool" },
       { name: "budget_pct", label: "Budget %", type: "number" },

@@ -103,6 +103,16 @@ export default function CrmApp({
   const [colsOpen, setColsOpen] = useState(false);
   const [view, setView] = useState<ViewState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // The sidebar folds to an icon rail — open all the time was noise.
+  const [navOpen, setNavOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem("crmNavOpen") !== "0"; } catch { return true; }
+  });
+  const toggleNav = () => {
+    setNavOpen((v) => {
+      try { localStorage.setItem("crmNavOpen", v ? "0" : "1"); } catch { /* fine */ }
+      return !v;
+    });
+  };
 
   const special = SPECIAL_SECTIONS.find((s) => s.name === slug);
   const dt = useMemo(() => DOCTYPES.find((d) => d.name === slug), [slug]);
@@ -239,11 +249,52 @@ export default function CrmApp({
         <nav
           className="p-2"
           style={{
-            width: 190, flexShrink: 0, borderRight: `1px solid ${BORDER}`,
+            width: navOpen ? 190 : 54, flexShrink: 0, borderRight: `1px solid ${BORDER}`,
             background: "#fff", minHeight: "calc(100vh - 50px)", position: "sticky", top: 50,
+            transition: "width .15s ease",
           }}
         >
-          {NAV.map((block, bi) => {
+          <button
+            onClick={toggleNav}
+            title={navOpen ? "Collapse the sidebar" : "Expand the sidebar"}
+            className="w-full rounded px-2 py-1.5 mb-2 text-left font-bold"
+            style={{ color: MUTED, background: NAVY_SOFT, fontSize: 13, textAlign: navOpen ? "left" : "center" }}
+          >
+            {navOpen ? "⟨ collapse" : "⟩"}
+          </button>
+          {!navOpen && NAV.map((block, bi) => (
+            <div key={bi} className="mb-2 flex flex-col gap-0.5">
+              {block.items.map((it) => {
+                if ("href" in it) {
+                  return (
+                    <a key={it.href} href={it.href} title={it.label}
+                      className="rounded py-1.5 text-center" style={{ fontSize: 15, color: "#5A6672" }}>
+                      {it.icon}
+                    </a>
+                  );
+                }
+                const name = "dt" in it ? it.dt : it.sp;
+                const d = "dt" in it ? DOCTYPES.find((x) => x.name === it.dt) : undefined;
+                const sp = "sp" in it ? SPECIAL_SECTIONS.find((x) => x.name === it.sp) : undefined;
+                if (!d && !sp) return null;
+                if (d?.onlyFor && !d.onlyFor.includes(email)) return null;
+                return (
+                  <button
+                    key={name}
+                    onClick={() => setSlug(name)}
+                    title={d?.plural ?? sp?.label}
+                    className="rounded py-1.5 text-center"
+                    style={name === slug
+                      ? { background: NAVY, color: "#fff", fontSize: 15 }
+                      : { color: "#5A6672", fontSize: 15 }}
+                  >
+                    {d?.icon ?? sp?.icon}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+          {navOpen && NAV.map((block, bi) => {
             const open = !block.collapsible || settingsOpen
               || block.items.some((it) => "dt" in it ? it.dt === slug : "sp" in it ? it.sp === slug : false);
             return (
@@ -433,11 +484,33 @@ export default function CrmApp({
           )}
 
           {adding && (
-            <RecordForm
-              dt={dt}
-              links={links}
-              onDone={() => { setAdding(false); void load(); }}
-            />
+            <div
+              onClick={() => setAdding(false)}
+              style={{
+                position: "fixed", inset: 0, zIndex: 60, background: "rgba(27,45,107,.45)",
+                display: "flex", alignItems: "flex-start", justifyContent: "center",
+                padding: "48px 16px", overflowY: "auto",
+              }}
+            >
+              <div onClick={(e) => e.stopPropagation()} className="rounded" style={{ background: "#fff", width: "min(880px, 100%)", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
+                <div className="flex items-center justify-between px-4 py-3" style={{ background: NAVY, borderRadius: "6px 6px 0 0" }}>
+                  <div className="text-white font-bold" style={{ fontSize: 15 }}>New {dt.label.toLowerCase()}</div>
+                  <button onClick={() => setAdding(false)} className="px-2.5 py-1 rounded text-sm font-semibold" style={{ background: NAVY_DARK, color: "#C8D2DC" }}>✕</button>
+                </div>
+                <div className="p-4">
+                  <RecordForm
+                    dt={dt}
+                    links={links}
+                    onDone={(saved) => {
+                      setAdding(false);
+                      void load();
+                      // the record stays open — straight into its lightbox
+                      if (saved?.id) void openLinked(dt.name, String(saved.id));
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
           )}
 
           {err && (
@@ -541,7 +614,12 @@ export default function CrmApp({
           view={view}
           onClose={() => setView(null)}
           onEdit={() => setView({ ...view, mode: "edit" })}
-          onSaved={() => { setView(null); void load(); }}
+          onSaved={(saved) => {
+            void load();
+            // stay on the record after saving — view mode, fresh from the server
+            if (saved?.id && view) void openLinked(view.dt.name, String(saved.id));
+            else setView(null);
+          }}
           onOpenLink={openLinked}
         />
       )}
@@ -793,7 +871,8 @@ function ColumnPicker({
 function RecordModal({
   view, onClose, onEdit, onSaved, onOpenLink,
 }: {
-  view: ViewState; onClose: () => void; onEdit: () => void; onSaved: () => void;
+  view: ViewState; onClose: () => void; onEdit: () => void;
+  onSaved: (saved?: Row) => void;
   onOpenLink: (target: string, id: string) => void;
 }) {
   const { dt, row, links, mode } = view;
@@ -1121,6 +1200,99 @@ function LinkAutocomplete({
   );
 }
 
+/**
+ * The contact picker: type-and-choose, narrowed to the chosen company, and a
+ * name that is not there yet is one click from existing — typed once, born
+ * linked to the company (Dr Raghu, 25 Aug 2026).
+ */
+function PersonTypeAhead({
+  value, valueLabel, companyId, onPick,
+}: {
+  value: string; valueLabel: string; companyId?: string; onPick: (id: string) => void;
+}) {
+  const [text, setText] = useState(valueLabel);
+  const [options, setOptions] = useState<{ id: string; label: string }[]>([]);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setText(valueLabel), [valueLabel]);
+
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => {
+      const f = companyId ? `&f_company_id=${encodeURIComponent(companyId)}` : "";
+      fetch(`/api/crm/person?pick=${encodeURIComponent(text)}${f}`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((j) => setOptions(j.options ?? []))
+        .catch(() => setOptions([]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [text, open, companyId]);
+
+  const createNew = async () => {
+    const name = text.trim();
+    if (!name || busy) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/crm/person", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ first_name: name, ...(companyId ? { company_id: companyId } : {}) }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not add the contact");
+      onPick(String(j.row.id));
+      setOpen(false);
+    } catch { /* the field keeps the typed text; picking again retries */ }
+    finally { setBusy(false); }
+  };
+
+  const exact = options.some((o) => o.label.trim().toLowerCase() === text.trim().toLowerCase());
+
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        value={text}
+        placeholder={companyId ? "Type to search this company's people…" : "Pick the company first, or type any name…"}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        onChange={(e) => { setText(e.target.value); setOpen(true); if (e.target.value === "") onPick(""); }}
+        className="w-full px-2 py-1.5 rounded text-sm border"
+        style={{ borderColor: BORDER }}
+      />
+      {open && (options.length > 0 || text.trim()) && (
+        <div
+          className="rounded border"
+          style={{
+            position: "absolute", top: "105%", left: 0, right: 0, zIndex: 70,
+            background: "#fff", borderColor: BORDER, maxHeight: 220, overflowY: "auto",
+            boxShadow: "0 8px 24px rgba(27,45,107,.18)",
+          }}
+        >
+          {options.map((o) => (
+            <button
+              key={o.id}
+              onMouseDown={(e) => { e.preventDefault(); onPick(o.id); setText(o.label); setOpen(false); }}
+              className="w-full text-left px-2 py-1.5 text-sm"
+              style={{ color: INK }}
+            >
+              {o.label}
+            </button>
+          ))}
+          {text.trim() && !exact && (
+            <button
+              onMouseDown={(e) => { e.preventDefault(); void createNew(); }}
+              className="w-full text-left px-2 py-1.5 text-sm font-bold"
+              style={{ color: ORANGE, borderTop: `1px solid ${BORDER}` }}
+            >
+              {busy ? "Adding…" : `＋ Add "${text.trim()}" as a new contact${companyId ? " of this company" : ""}`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The six BANTTC weights, as Dr Raghu weighs them. */
 const BANTTC: { name: string; label: string; w: number }[] = [
   { name: "budget_pct", label: "Budget", w: 2 },
@@ -1140,7 +1312,8 @@ const BANTTC: { name: string; label: string; w: number }[] = [
 function RecordForm({
   dt, links, initial, presets, onDone,
 }: {
-  dt: Doctype; links: Links; initial?: Row; presets?: Row; onDone: () => void;
+  dt: Doctype; links: Links; initial?: Row; presets?: Row;
+  onDone: (saved?: Row) => void;
 }) {
   const editable = dt.fields.filter((f) => f.type !== "readonly" && !f.virtual);
 
@@ -1206,7 +1379,7 @@ function RecordForm({
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Could not save");
-      onDone();
+      onDone(j.row as Row);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1227,7 +1400,7 @@ function RecordForm({
         style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}
       >
         {gridFields.map((f) => (
-          <label key={f.name} className="block">
+          <label key={f.name} className="block" style={f.big ? { gridColumn: "1 / -1" } : undefined}>
             <div className="text-xs font-semibold mb-1" style={{ color: MUTED }}>
               {f.label}
               {f.required && <span style={{ color: ORANGE }}> *</span>}
@@ -1246,7 +1419,7 @@ function RecordForm({
               <textarea
                 value={String(form[f.name] ?? "")}
                 onChange={(e) => set(f.name, e.target.value)}
-                rows={3}
+                rows={f.big ? 8 : 3}
                 className="w-full px-2 py-1.5 rounded text-sm border"
                 style={{ borderColor: BORDER }}
               />
@@ -1262,6 +1435,13 @@ function RecordForm({
                   <option key={o} value={o}>{o}</option>
                 ))}
               </select>
+            ) : f.type === "link" && f.link === "person" ? (
+              <PersonTypeAhead
+                value={String(form[f.name] ?? "")}
+                valueLabel={(links.person || []).find((o) => o.id === String(form[f.name] ?? ""))?.label ?? ""}
+                companyId={String(form["company_id"] ?? "") || undefined}
+                onPick={(id) => set(f.name, id)}
+              />
             ) : f.type === "link" && f.link === "company" ? (
               <LinkAutocomplete
                 target="company"

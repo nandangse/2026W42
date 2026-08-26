@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.6",
+    date: "2026-08-25",
+    module: "The CRM's sidebar folds, the enquiry speaks, and a contact is typed into being",
+    items: [
+      "THE SIDEBAR COLLAPSES to an icon rail — one click folds it, the icons keep every door, and it remembers your choice. Open all the time was noise.",
+      "ENQUIRY INFO IS ON THE OPPORTUNITY as a big box — the customer's own words, full width and eight lines deep, with the 2,087 texts carried from the ERP already inside.",
+      "THE CONTACT PICKER TYPES AND CHOOSES, narrowed to the chosen company — and a name that is not there yet is one click from existing: ＋ Add as a new contact, born already linked to the company. Everywhere a person is picked: the opportunity, the quotation, the lead.",
+      "NEW OPPORTUNITY OPENS IN A LIGHTBOX — every + Add does — and SAVING KEEPS THE RECORD OPEN: the new record lands straight in its own lightbox, an edit returns to the view, fresh from the server. Priority left the opportunity; the stage ladder and BANTTC say what priority tried to.",
+    ],
+  },
+  {
     v: "3.23.1.5",
     date: "2026-08-25",
     module: "Working Today is a table too",

@@ -199,8 +199,16 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
     // ---- the type-along picker: a few names for what was typed -----------
     const pick = u.searchParams.get("pick");
     if (pick !== null) {
-      const { data, error } = await db.from(d.table)
-        .select(`id, ${d.titleField}`)
+      // The picker honours the same f_ filters as the list — a contact
+      // picker on an opportunity searches only that company's people.
+      let pq = db.from(d.table).select(`id, ${d.titleField}`);
+      for (const f of d.fields) {
+        if (f.virtual) continue;
+        const v = u.searchParams.get(`f_${f.name}`);
+        if (v === null || v === "") continue;
+        pq = f.type === "bool" ? pq.eq(f.name, v === "true") : pq.eq(f.name, v);
+      }
+      const { data, error } = await pq
         .ilike(d.titleField, `%${pick.trim().replace(/[%_]/g, "\\$&")}%`)
         .order(d.titleField, { ascending: true })
         .limit(20);
