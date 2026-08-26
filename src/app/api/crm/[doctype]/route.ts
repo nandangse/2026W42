@@ -427,6 +427,40 @@ export async function POST(req: Request, { params }: { params: { doctype: string
   }
 }
 
+// DELETE /api/crm/profile?id= — Users only, the admin's pen only. Everything
+// else in the CRM retires (deleted_at) rather than vanishing; a user who
+// owns records is refused with the honest alternative: deactivate.
+export async function DELETE(req: Request, { params }: { params: { doctype: string } }) {
+  try {
+    const user = await requireCrm();
+    const d = resolve(params.doctype, user);
+    guardConfigured();
+    if (d.name !== "profile")
+      throw new HttpError(400, "Delete is only for Users — other records retire, they do not vanish.");
+    if (!(["admin", "ceo"].includes(user.crmRole) || user.email === "raghu@nandan.co.in"))
+      throw new HttpError(403, "Deleting users is the admin's pen.");
+    const id = new URL(req.url).searchParams.get("id");
+    if (!id) throw new HttpError(400, "Which user? DELETE needs ?id=");
+    if (user.profileId === id) throw new HttpError(400, "You cannot delete yourself.");
+    const db = crmDb();
+    const { data: before } = await db.from("profile").select("*").eq("id", id).maybeSingle();
+    if (!before) throw new HttpError(404, "That user no longer exists.");
+    const { error } = await db.from("profile").delete().eq("id", id);
+    if (error) {
+      throw new HttpError(409, /foreign key|violates/i.test(error.message)
+        ? `${before.full_name} owns records — opportunities, mails or interactions point at them. Deactivate instead of deleting.`
+        : error.message);
+    }
+    await db.from("crm_audit").insert({
+      entity: "profile", entity_id: id, action: "delete",
+      before, by_user: user.profileId,
+    });
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return errJson(e);
+  }
+}
+
 export async function PATCH(req: Request, { params }: { params: { doctype: string } }) {
   try {
     const user = await requireCrm();

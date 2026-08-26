@@ -554,6 +554,26 @@ export default function CrmApp({
                 ✎ Edit {sel.size} selected
               </button>
             )}
+            {sel.size > 0 && slug === "profile" && (
+              <button
+                onClick={async () => {
+                  if (!window.confirm(`Delete ${sel.size} user${sel.size === 1 ? "" : "s"}? A user who owns records will be refused — deactivate those instead.`)) return;
+                  let done = 0, refused = 0, why = "";
+                  for (const rid of sel) {
+                    const r = await fetch(`/api/crm/profile?id=${encodeURIComponent(rid)}`, { method: "DELETE" });
+                    if (r.ok) done++;
+                    else { refused++; if (!why) why = String((await r.json()).error ?? ""); }
+                  }
+                  window.alert(`Deleted ${done}.${refused ? ` ${refused} refused${why ? ` — ${why}` : ""}` : ""}`);
+                  setSel(new Set());
+                  void load();
+                }}
+                className="px-3 py-1.5 rounded text-sm font-bold"
+                style={{ background: "#B3261E", color: "#fff" }}
+                title="Admin only — a user who owns records is refused; deactivate those instead">
+                🗑 Delete {sel.size}
+              </button>
+            )}
             <span className="text-xs tnum" style={{ color: MUTED }}>
               {loading
                 ? "loading…"

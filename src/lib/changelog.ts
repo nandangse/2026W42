@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.41",
+    date: "2026-08-26",
+    module: "The admin's pen can delete a user",
+    items: [
+      "Select users in Settings → Users and 🗑 DELETE appears — admin only, enforced in the API. You cannot delete yourself, and a user who owns records (opportunities, mails, interactions) is refused with the honest alternative: deactivate. Every deletion lands in the audit with the full row it removed.",
+    ],
+  },
+  {
     v: "3.23.1.40",
     date: "2026-08-26",
     module: "The Contact dropdown leaves the opportunity filters",
