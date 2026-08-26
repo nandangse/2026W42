@@ -1090,7 +1090,12 @@ function RecordModal({
               <QualView dt={dt} row={row} links={links} />
             </div>
           ) : tab === "comms" ? (
-            <CommsFeed type={dt.name} id={rid} companyId={companyId} onOpenLink={onOpenLink} />
+            <CommsFeed
+              type={dt.name} id={rid} companyId={companyId} onOpenLink={onOpenLink}
+              contactEmail={
+                [row.primary_email, row.contact_email].find(isEmailish) as string | undefined ?? null
+              }
+            />
           ) : tab === "notes" ? (
             <NotesTab type={dt.name} id={rid} />
           ) : tab === "merge" ? (
@@ -1388,10 +1393,11 @@ function QualView({ dt, row, links }: { dt: Doctype; row: Row; links: Links }) {
 /** Every communication on the record — calls, WhatsApp, email, visits, video
  *  calls — one feed, newest first, with a ＋ to log the next one. */
 function CommsFeed({
-  type, id, companyId, onOpenLink,
+  type, id, companyId, onOpenLink, contactEmail,
 }: {
   type: string; id: string; companyId: string | null;
   onOpenLink: (target: string, id: string) => void;
+  contactEmail?: string | null;
 }) {
   type FeedRow = {
     kind: string; at: string; type: string; by: string | null; with: string | null;
@@ -1402,7 +1408,60 @@ function CommsFeed({
   const [logging, setLogging] = useState(false);
   const [tick, setTick] = useState(0);
   const [logLinks, setLogLinks] = useState<Links | null>(null);
+  const [gmail, setGmail] = useState<{ connected: boolean; email: string | null } | null>(null);
+  const [composing, setComposing] = useState(false);
+  const [mailTo, setMailTo] = useState("");
+  const [mailSub, setMailSub] = useState("");
+  const [mailBody, setMailBody] = useState("");
+  const [mailBusy, setMailBusy] = useState(false);
+  const [mailMsg, setMailMsg] = useState("");
   void onOpenLink;
+
+  useEffect(() => {
+    fetch("/api/crm/gmail/status", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setGmail({ connected: !!j.connected, email: j.email ?? null }))
+      .catch(() => setGmail({ connected: false, email: null }));
+  }, []);
+  useEffect(() => { if (contactEmail) setMailTo(contactEmail); }, [contactEmail]);
+
+  const refs = () => ({
+    ...(type === "person" ? { person_id: id } : {}),
+    ...(type === "company" ? { company_id: id } : companyId ? { company_id: companyId } : {}),
+    ...(type === "opportunity" ? { opportunity_id: id } : {}),
+    ...(type === "quotation" ? { quotation_id: id } : {}),
+  });
+
+  const sendMail = async () => {
+    setMailBusy(true); setMailMsg("");
+    try {
+      const r = await fetch("/api/crm/gmail/send", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ to: mailTo, subject: mailSub, body: mailBody, ...refs() }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not send");
+      setMailMsg("Sent."); setComposing(false); setMailSub(""); setMailBody("");
+      setTick((t) => t + 1);
+    } catch (e) { setMailMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setMailBusy(false); }
+  };
+
+  const pullMail = async () => {
+    if (!contactEmail) return;
+    setMailBusy(true); setMailMsg("");
+    try {
+      const r = await fetch("/api/crm/gmail/pull", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: contactEmail, ...refs() }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not pull");
+      setMailMsg(`Pulled ${j.found} mail${j.found === 1 ? "" : "s"} with ${contactEmail}.`);
+      setTick((t) => t + 1);
+    } catch (e) { setMailMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setMailBusy(false); }
+  };
 
   // The log form's dropdowns (salespeople, stages…) fetched once, on first open.
   useEffect(() => {
@@ -1442,13 +1501,67 @@ function CommsFeed({
 
   return (
     <div className="p-4" style={{ maxHeight: "60vh", overflowY: "auto" }}>
-      <button
-        onClick={() => setLogging((v) => !v)}
-        className="px-3 py-1 rounded text-xs font-bold mb-3"
-        style={{ background: logging ? MUTED : ORANGE, color: "#fff" }}
-      >
-        {logging ? "Cancel" : "＋ Log a call / visit"}
-      </button>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <button
+          onClick={() => setLogging((v) => !v)}
+          className="px-3 py-1 rounded text-xs font-bold"
+          style={{ background: logging ? MUTED : ORANGE, color: "#fff" }}
+        >
+          {logging ? "Cancel" : "＋ Log a call / visit"}
+        </button>
+        {gmail?.connected ? (
+          <>
+            <button
+              onClick={() => setComposing((v) => !v)}
+              className="px-3 py-1 rounded text-xs font-bold"
+              style={{ background: composing ? MUTED : NAVY, color: "#fff" }}
+            >
+              {composing ? "Cancel" : "✉ Send email"}
+            </button>
+            {contactEmail && (
+              <button
+                onClick={() => void pullMail()}
+                disabled={mailBusy}
+                className="px-3 py-1 rounded text-xs font-bold border"
+                style={{ borderColor: BORDER, background: "#fff", color: NAVY }}
+                title={`Fetch your recent Gmail with ${contactEmail} onto this record`}
+              >
+                {mailBusy ? "Working…" : `⟳ Pull Gmail with ${contactEmail}`}
+              </button>
+            )}
+            <span className="text-xs" style={{ color: MUTED }}>as {gmail.email}</span>
+          </>
+        ) : gmail && (
+          <span className="text-xs" style={{ color: MUTED }}>
+            ✉ Mail from here once Gmail is connected — Profile → Gmail connection.
+          </span>
+        )}
+      </div>
+      {mailMsg && (
+        <div className="rounded p-2 mb-2 text-xs font-semibold"
+          style={mailMsg === "Sent." || mailMsg.startsWith("Pulled")
+            ? { background: "#E6F4EB", color: "#1A7F4E" } : { background: "#FBEAE8", color: "#8E2C20" }}>
+          {mailMsg}
+        </div>
+      )}
+      {composing && (
+        <div className="rounded border p-3 mb-3" style={{ borderColor: NAVY, background: "#fff" }}>
+          <input value={mailTo} onChange={(e) => setMailTo(e.target.value)} placeholder="to@company.com"
+            className="w-full rounded border px-2 py-1.5 text-sm mb-2" style={{ borderColor: BORDER }} />
+          <input value={mailSub} onChange={(e) => setMailSub(e.target.value)} placeholder="Subject — {{variables}} work here"
+            className="w-full rounded border px-2 py-1.5 text-sm mb-2" style={{ borderColor: BORDER }} />
+          <textarea value={mailBody} onChange={(e) => setMailBody(e.target.value)} rows={6}
+            placeholder={"Dear {{name}},\n\n…\n\n{{qtn_no}}, {{next_monday}}, {{khalapur_address}} — all the variables render on send."}
+            className="w-full rounded border px-2 py-1.5 text-sm mb-2" style={{ borderColor: BORDER }} />
+          <div className="flex justify-end">
+            <button onClick={() => void sendMail()} disabled={mailBusy}
+              className="px-4 py-1.5 rounded text-sm font-bold"
+              style={{ background: mailBusy ? "#B9BEC4" : NAVY, color: "#fff" }}>
+              {mailBusy ? "Sending…" : "Send"}
+            </button>
+          </div>
+        </div>
+      )}
       {logging && interactionDt && (
         <RecordForm
           dt={interactionDt} links={logLinks ?? {}}

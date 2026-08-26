@@ -1243,9 +1243,16 @@ function ProfileSelf() {
         {connectedAt ? (
           <div className="text-xs mt-0.5" style={{ color: "#0D7A3F", fontWeight: 700 }}>Connected · {fmtFull(String(connectedAt).slice(0, 10))}</div>
         ) : oauthOk ? (
-          <div className="text-xs mt-0.5" style={{ color: "#5A6672", lineHeight: 1.5 }}>
-            Your administrator has marked you ready. The connection is made together with the
-            administrator — it arrives with the communications build.
+          <div className="mt-1">
+            <a href="/api/crm/gmail/connect"
+              className="inline-block rounded px-3 py-1.5 text-xs font-bold"
+              style={{ background: "#E8600A", color: "#fff", textDecoration: "none" }}>
+              ✉ Connect Gmail
+            </a>
+            <div className="text-xs mt-1" style={{ color: "#8A94A0", lineHeight: 1.45 }}>
+              Google will ask you to allow reading and sending your @nandan.co.in mail.
+              The token lives in the Vault; the CRM never sees your password.
+            </div>
           </div>
         ) : (
           <div className="text-xs mt-0.5" style={{ color: "#8A94A0", lineHeight: 1.5 }}>

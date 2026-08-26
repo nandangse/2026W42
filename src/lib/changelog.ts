@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.16",
+    date: "2026-08-26",
+    module: "Gmail walks in through the front door",
+    items: [
+      "THE OAUTH CONNECTION IS BUILT: Profile → ✉ Connect Gmail (only where the admin ticked OAuth Available) → Google asks for read+send on the person's own @nandan.co.in mail → the refresh token goes STRAIGHT INTO THE VAULT (migration 0010's service-role-only reader is the single door), the mailbox row keeps a uuid, and the profile remembers when.",
+      "EVERY COMMUNICATION TAB CAN NOW MAIL: ✉ Send email composes as the signed-in person, renders {{name}}, {{qtn_no}}, {{next_monday}} and every other variable against the record on send, and logs into the unified feed at once. ⟳ Pull Gmail fetches the rep's last six months with that contact onto the record — on demand, idempotent on the Gmail id, no silent inbox scraping.",
+      "Dr Raghu's ten-minute side is written down in docs/CRM-GMAIL-SETUP.md: Internal consent screen (no Google audit), one OAuth client, two Vercel env vars, migration 0010.",
+    ],
+  },
+  {
     v: "3.23.1.15",
     date: "2026-08-26",
     module: "The address is a button",
