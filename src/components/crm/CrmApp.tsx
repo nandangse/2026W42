@@ -105,6 +105,8 @@ export default function CrmApp({
   const [colsOpen, setColsOpen] = useState(false);
   const [view, setView] = useState<ViewState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pageSize, setPageSize] = useState<string>("500");   // 100|500|2500|10000|50000|all
+  const [moreBusy, setMoreBusy] = useState(false);
   // The sidebar folds to an icon rail — open all the time was noise.
   const [navOpen, setNavOpen] = useState<boolean>(() => {
     try {
@@ -142,16 +144,21 @@ export default function CrmApp({
     return () => clearTimeout(t);
   }, [qLive]);
 
+  const listParams = useCallback(() => {
+    const p = new URLSearchParams();
+    if (q.trim()) p.set("q", q.trim());
+    for (const [k, v] of Object.entries(filters)) if (v !== "") p.set(`f_${k}`, v);
+    if (sort) { p.set("sort", sort.col); p.set("dir", sort.dir); }
+    p.set("limit", pageSize);
+    return p;
+  }, [q, filters, sort, pageSize]);
+
   const load = useCallback(async () => {
     if (!DOCTYPES.some((d) => d.name === slug)) { setLoading(false); setRows([]); return; }
     setLoading(true);
     setErr("");
     try {
-      const p = new URLSearchParams();
-      if (q.trim()) p.set("q", q.trim());
-      for (const [k, v] of Object.entries(filters)) if (v !== "") p.set(`f_${k}`, v);
-      if (sort) { p.set("sort", sort.col); p.set("dir", sort.dir); }
-      const r = await fetch(`/api/crm/${slug}?${p}`, { cache: "no-store" });
+      const r = await fetch(`/api/crm/${slug}?${listParams()}`, { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Could not load");
       setRows(j.rows);
@@ -164,7 +171,32 @@ export default function CrmApp({
     } finally {
       setLoading(false);
     }
-  }, [slug, q, filters, sort]);
+  }, [slug, listParams]);
+
+  // Show More: the next helping of the same size, appended in place.
+  const showMore = useCallback(async () => {
+    setMoreBusy(true);
+    try {
+      const p = listParams();
+      p.set("offset", String(rows.length));
+      const r = await fetch(`/api/crm/${slug}?${p}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not load more");
+      setRows((cur) => [...cur, ...j.rows]);
+      setLinks((cur) => {
+        const merged: Links = { ...cur };
+        for (const [t, list] of Object.entries((j.links || {}) as Links)) {
+          const have = new Set((merged[t] ?? []).map((o) => o.id));
+          merged[t] = [...(merged[t] ?? []), ...list.filter((o) => !have.has(o.id))];
+        }
+        return merged;
+      });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setMoreBusy(false);
+    }
+  }, [slug, listParams, rows.length]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -623,6 +655,38 @@ export default function CrmApp({
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* ---------- the footer: how much of the book to hold ---------- */}
+          {rows.length > 0 && (
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <span className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.6 }}>SHOW</span>
+              {["100", "500", "2500", "10000", "50000", "all"].map((sz) => (
+                <button
+                  key={sz}
+                  onClick={() => setPageSize(sz)}
+                  className="px-2.5 py-0.5 rounded-full text-xs font-bold border"
+                  style={pageSize === sz
+                    ? { background: NAVY, borderColor: NAVY, color: "#fff" }
+                    : { background: "#fff", borderColor: BORDER, color: MUTED }}
+                >
+                  {sz === "all" ? "All" : Number(sz).toLocaleString("en-IN")}
+                </button>
+              ))}
+              {total !== null && rows.length < total && (
+                <button
+                  onClick={() => void showMore()}
+                  disabled={moreBusy}
+                  className="px-3 py-1 rounded text-xs font-bold"
+                  style={{ background: moreBusy ? "#B9BEC4" : ORANGE, color: "#fff" }}
+                >
+                  {moreBusy ? "Loading…" : "Show more ↓"}
+                </button>
+              )}
+              <span className="text-xs tnum" style={{ color: MUTED }}>
+                showing {rows.length.toLocaleString("en-IN")}{total !== null ? ` of ${total.toLocaleString("en-IN")}` : ""}
+              </span>
             </div>
           )}
         </main>

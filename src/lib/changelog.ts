@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.13",
+    date: "2026-08-26",
+    module: "The tables measure their appetite",
+    items: [
+      "EVERY CRM TABLE CARRIES ITS FOOTER: 100 · 500 · 2,500 · 10,000 · 50,000 · All, with SHOW MORE appending the next helping in place and 'showing X of Y' keeping count. The route pages past PostgREST's thousand-row ceiling, so 50,000 and All really deliver — built for the 133,010-contact book that landed today.",
+    ],
+  },
+  {
     v: "3.23.1.12",
     date: "2026-08-26",
     module: "The Deal Board — one live view from enquiry to order",

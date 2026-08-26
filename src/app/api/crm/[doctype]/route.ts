@@ -127,8 +127,24 @@ async function resolveRowLabels(
     const missing = [...new Set(rows.map((r) => r[f.name]).filter(Boolean).map(String))]
       .filter((id) => !have.has(id));
     if (!missing.length) continue;
-    const { data } = await db.from(t.table).select(`id, ${t.titleField}`).in("id", missing);
-    const list = (data ?? []) as unknown as Record<string, unknown>[];
+    let list: Record<string, unknown>[] = [];
+    if (missing.length > 3000) {
+      // A big pull (10k/50k/All rows) — sweeping the whole target table in
+      // pages beats thousands of IN() calls.
+      for (let a = 0; ; a += 1000) {
+        const { data } = await db.from(t.table).select(`id, ${t.titleField}`).range(a, a + 999);
+        const chunk = (data ?? []) as unknown as Record<string, unknown>[];
+        list.push(...chunk);
+        if (chunk.length < 1000) break;
+      }
+      const want = new Set(missing);
+      list = list.filter((r) => want.has(String(r.id)));
+    } else {
+      for (let i = 0; i < missing.length; i += 150) {
+        const { data } = await db.from(t.table).select(`id, ${t.titleField}`).in("id", missing.slice(i, i + 150));
+        list.push(...(data ?? []) as unknown as Record<string, unknown>[]);
+      }
+    }
     links[f.link] = [
       ...(links[f.link] ?? []),
       ...list.map((r) => ({ id: String(r.id), label: String(r[t.titleField] ?? r.id) })),
@@ -236,32 +252,52 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
     }
 
     // ---- the list: filters, search and sort run in Postgres --------------
-    let qy = db.from(d.table).select(select, { count: "exact" });
-    // Merged and soft-deleted rows stay in the ledger, not on the screens.
-    if (["company", "person", "opportunity"].includes(d.name)) qy = qy.is("deleted_at", null);
-    if (wantsInd) qy = qy.eq("company_join.industry_id", indFilter);
-    for (const f of d.fields) {
-      if (f.virtual) continue;
-      const v = u.searchParams.get(`f_${f.name}`);
-      if (v === null || v === "") continue;
-      qy = f.type === "bool" ? qy.eq(f.name, v === "true") : qy.eq(f.name, v);
+    // 100 | 500 | 2500 | 10000 | 50000 | all — the footer's choices; the
+    // route pages internally past PostgREST's 1000-row ceiling, and offset
+    // powers Show More.
+    const SIZES = [100, 500, 2500, 10000, 50000];
+    const limitRaw = u.searchParams.get("limit");
+    const limit = limitRaw === "all" ? Number.MAX_SAFE_INTEGER
+      : SIZES.includes(Number(limitRaw)) ? Number(limitRaw) : 500;
+    const offset = Math.max(0, Number(u.searchParams.get("offset")) || 0);
+
+    const buildList = (withCount: boolean) => {
+      let qy = db.from(d.table).select(select, withCount ? { count: "exact" as const } : undefined);
+      // Merged and soft-deleted rows stay in the ledger, not on the screens.
+      if (["company", "person", "opportunity"].includes(d.name)) qy = qy.is("deleted_at", null);
+      if (wantsInd) qy = qy.eq("company_join.industry_id", indFilter);
+      for (const f of d.fields) {
+        if (f.virtual) continue;
+        const v = u.searchParams.get(`f_${f.name}`);
+        if (v === null || v === "") continue;
+        qy = f.type === "bool" ? qy.eq(f.name, v === "true") : qy.eq(f.name, v);
+      }
+      const q = u.searchParams.get("q")?.trim();
+      if (q) qy = qy.ilike(d.titleField, `%${q.replace(/[%_]/g, "\\$&")}%`);
+
+      const sortCol = u.searchParams.get("sort");
+      const sortOk = !!sortCol && (sortCol === "created_at"
+        || d.fields.some((f) => f.name === sortCol && !f.virtual));
+      const order = sortOk
+        ? { column: sortCol as string, ascending: u.searchParams.get("dir") !== "desc" }
+        : (d.orderBy ?? { column: "created_at", ascending: false });
+      return qy.order(order.column, { ascending: order.ascending });
+    };
+
+    const collected: Record<string, unknown>[] = [];
+    let count: number | null = null;
+    for (let a = offset; collected.length < limit; a += 1000) {
+      const want = Math.min(1000, limit - collected.length);
+      const { data, error, count: c } = await buildList(a === offset)
+        .range(a, a + want - 1);
+      if (error) throw new HttpError(500, error.message);
+      if (a === offset) count = c ?? null;
+      const chunk = (data ?? []) as unknown as Record<string, unknown>[];
+      collected.push(...chunk);
+      if (chunk.length < want) break;
     }
-    const q = u.searchParams.get("q")?.trim();
-    if (q) qy = qy.ilike(d.titleField, `%${q.replace(/[%_]/g, "\\$&")}%`);
 
-    const sortCol = u.searchParams.get("sort");
-    const sortOk = !!sortCol && (sortCol === "created_at"
-      || d.fields.some((f) => f.name === sortCol && !f.virtual));
-    const order = sortOk
-      ? { column: sortCol as string, ascending: u.searchParams.get("dir") !== "desc" }
-      : (d.orderBy ?? { column: "created_at", ascending: false });
-
-    const { data, error, count } = await qy
-      .order(order.column, { ascending: order.ascending })
-      .limit(500);
-    if (error) throw new HttpError(500, error.message);
-
-    const rows = ((data ?? []) as unknown as Record<string, unknown>[]).map(fold);
+    const rows = collected.map(fold);
 
     const links = await resolveRowLabels(
       d, rows as unknown as Record<string, unknown>[], await linkOptions(d),
