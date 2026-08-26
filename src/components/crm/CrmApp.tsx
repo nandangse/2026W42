@@ -1845,7 +1845,7 @@ function CommsFeed({
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Could not pull");
-      setMailMsg(`Pulled ${j.found} mail${j.found === 1 ? "" : "s"} with ${contactEmail}.`);
+      setMailMsg(`Pulled ${j.found} mail${j.found === 1 ? "" : "s"}${contactEmail ? ` with ${contactEmail}` : " with the contacts"}.`);
       setTick((t) => t + 1);
     } catch (e) { setMailMsg(e instanceof Error ? e.message : String(e)); }
     finally { setMailBusy(false); }
@@ -1906,15 +1906,17 @@ function CommsFeed({
             >
               {composing ? "Cancel" : "✉ Send email"}
             </button>
-            {contactEmail && (
+            {(contactEmail || type === "opportunity") && (
               <button
                 onClick={() => void pullMail()}
                 disabled={mailBusy}
                 className="px-3 py-1 rounded text-xs font-bold border"
                 style={{ borderColor: BORDER, background: "#fff", color: NAVY }}
-                title={`Fetch your recent Gmail with ${contactEmail} onto this record`}
+                title={type === "opportunity"
+                  ? "Search your mailbox for mail with ALL this opportunity's contacts, from 7 days before the enquiry onward, and land it here"
+                  : `Fetch your recent Gmail with ${contactEmail} onto this record`}
               >
-                {mailBusy ? "Working…" : `⟳ Pull Gmail with ${contactEmail}`}
+                {mailBusy ? "Working…" : type === "opportunity" ? "⟳ Pull Gmail with the contacts" : `⟳ Pull Gmail with ${contactEmail}`}
               </button>
             )}
             <span className="text-xs" style={{ color: MUTED }}>as {gmail.email}</span>

@@ -23,18 +23,30 @@ export async function POST(req: Request) {
       throw new HttpError(400, "Connect your Gmail first — Profile → Gmail connection.");
     const b = await req.json();
     const db = crmDb();
-    let email = String(b.email ?? "").trim().toLowerCase();
-    // The record's own window: from seven days BEFORE the enquiry arrived,
-    // then everything since (Dr Raghu, 26 Aug 2026). Without an enquiry
-    // date, the last six months.
+    // EVERY contact on the record is searched, not just the point of
+    // contact (Dr Raghu, 26 Aug 2026): the opportunity's people are its
+    // company's people, and each pulled mail lands linked to whichever of
+    // them it was actually with. Window: from seven days BEFORE the
+    // enquiry arrived, then everything since; six months when undated.
+    const perByEmail = new Map<string, string>();  // email -> person_id
+    const addPer = (em: unknown, id: unknown) => {
+      const e = String(em ?? "").trim().toLowerCase();
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && !perByEmail.has(e)) perByEmail.set(e, String(id));
+    };
     let after = "newer_than:180d";
     if (b.opportunity_id) {
       const { data: o } = await db.from("opportunity")
         .select("opportunity_on, point_of_contact_id, company_id").eq("id", b.opportunity_id).maybeSingle();
       if (o) {
-        if (!email && o.point_of_contact_id) {
-          const { data: per } = await db.from("person").select("primary_email").eq("id", o.point_of_contact_id).maybeSingle();
-          if (per?.primary_email) email = String(per.primary_email).toLowerCase();
+        if (o.point_of_contact_id) {
+          const { data: per } = await db.from("person").select("id, primary_email").eq("id", o.point_of_contact_id).maybeSingle();
+          if (per) addPer(per.primary_email, per.id);
+        }
+        if (o.company_id) {
+          const { data: pers } = await db.from("person")
+            .select("id, primary_email").eq("company_id", o.company_id)
+            .not("primary_email", "is", null).is("deleted_at", null).limit(10);
+          for (const per of pers ?? []) addPer(per.primary_email, per.id);
         }
         if (o.opportunity_on) {
           const d0 = new Date(String(o.opportunity_on) + "T00:00:00Z");
@@ -44,11 +56,15 @@ export async function POST(req: Request) {
         if (!b.company_id && o.company_id) b.company_id = o.company_id;
       }
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, "Which address? The record carries no email.");
+    const explicit = String(b.email ?? "").trim().toLowerCase();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(explicit) && !perByEmail.has(explicit))
+      perByEmail.set(explicit, String(b.person_id ?? ""));
+    const emails = [...perByEmail.keys()].slice(0, 8); // Gmail query stays sane
+    if (!emails.length) throw new HttpError(400, "No contact on this record carries an email address.");
 
     const token = await accessTokenFor(String(mb.id));
-    const q = encodeURIComponent(`(from:${email} OR to:${email}) ${after}`);
-    const list = await gmailGet(token, `messages?q=${q}&maxResults=50`);
+    const q = encodeURIComponent(`(${emails.map((e) => `from:${e} OR to:${e}`).join(" OR ")}) ${after}`);
+    const list = await gmailGet(token, `messages?q=${q}&maxResults=60`);
     const ids = ((list.messages as { id: string }[] | undefined) ?? []).map((m) => m.id);
     // the actual words, not the snippet — a reply quotes them
     type Part = { mimeType?: string; body?: { data?: string }; parts?: Part[] };
@@ -65,16 +81,22 @@ export async function POST(req: Request) {
       const headers = ((m.payload as { headers?: { name: string; value: string }[] })?.headers) ?? [];
       const h = (n: string) => headers.find((x) => x.name.toLowerCase() === n.toLowerCase())?.value ?? null;
       const from = h("From") ?? "";
-      const inbound = from.toLowerCase().includes(email);
+      const toHdr = h("To") ?? "";
+      const fromLower = from.toLowerCase();
+      const inbound = emails.some((e) => fromLower.includes(e));
+      // the mail links to WHICHEVER contact it was actually with
+      const matched = emails.find((e) => (inbound ? fromLower : toHdr.toLowerCase()).includes(e))
+        ?? emails.find((e) => (fromLower + " " + toHdr.toLowerCase()).includes(e));
+      const personId = (matched && perByEmail.get(matched)) || b.person_id || null;
       const bodyText = textOf(m.payload as Part).trim() || String(m.snippet ?? "");
       const { error } = await db.from("message").upsert([{
         channel: "email", direction: inbound ? "inbound" : "outbound",
         external_id: String(m.id), thread_key: String(m.threadId ?? ""),
         raw_payload: { rfc_message_id: h("Message-ID") },
         subject: h("Subject"), body_text: bodyText.slice(0, 20000),
-        from_handle: from, to_handles: h("To") ? [h("To") as string] : [],
+        from_handle: from, to_handles: toHdr ? [toHdr] : [],
         occurred_at: m.internalDate ? new Date(Number(m.internalDate)).toISOString() : new Date().toISOString(),
-        person_id: b.person_id ?? null, company_id: b.company_id ?? null,
+        person_id: personId || null, company_id: b.company_id ?? null,
         opportunity_id: b.opportunity_id ?? null, agent_profile_id: user.profileId,
       }], { onConflict: "channel,external_id", ignoreDuplicates: true });
       if (!error) pulled++;

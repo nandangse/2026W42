@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.38",
+    date: "2026-08-26",
+    module: "The pull sweeps every contact on the opportunity",
+    items: [
+      "⟳ PULL ON AN OPPORTUNITY NOW SEARCHES YOUR MAILBOX FOR ALL ITS CONTACTS — the company's people from the Contacts tab (up to eight with emails), not just the point of contact — from seven days before the enquiry date onward. Each pulled mail lands in COMMUNICATION linked to whichever contact it was actually with.",
+    ],
+  },
+  {
     v: "3.23.1.37",
     date: "2026-08-26",
     module: "WhatsApp joins the record",
