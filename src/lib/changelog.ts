@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.11",
+    date: "2026-08-26",
+    module: "The tender unfolds, and the dropdowns learn who is active",
+    items: [
+      "TICK IS TENDER AND THE TENDER'S OWN FIELDS UNFOLD (migration 0009): reference, source and link, issued/due dates, submission, the Drive doors to the documents and the prep folder, product suitability (default 50%), the ERP's own lists for Type of the Project, Value of the Project, Time Frame and Deliver Period, involvement, support for closing, and the details box. Untick and they fold away — on the form and on the record.",
+      "SALESPERSON DROPDOWNS SHOW ACTIVE PEOPLE ONLY. The switch is Settings → Users → the Active tick — untick the imported names that are not salespeople and every dropdown cleans itself. Old records keep showing their historical names.",
+      "EXPECTED CLOSE DEFAULTS TO THE LAST DATE OF NEXT MONTH on a new opportunity — the house rhythm, typed for you.",
+      "ENQUIRY INFO READS AS RICH TEXT: markdown links and images are clickable, bare URLs link themselves, bold is bold — rendered safely, never injected. The TeleCRM-era enquiries read like messages again.",
+      "0009 also carries the fix for 0007's person key — Bernie built it partial, Postgres refused it for upserts; replaced with the full unique index.",
+    ],
+  },
+  {
     v: "3.23.1.10",
     date: "2026-08-26",
     module: "The auto-chosen company shows its name",

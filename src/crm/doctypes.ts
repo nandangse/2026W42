@@ -46,6 +46,8 @@ export interface Field {
   big?: boolean;
   /** Which lightbox tab the field lives on — absent means Details. */
   tab?: "enquiry" | "qual";
+  /** Shown only while Is Tender is ticked — the tender unfolds. */
+  tenderOnly?: boolean;
 }
 
 export interface Doctype {
@@ -218,7 +220,27 @@ export const DOCTYPES: Doctype[] = [
       { name: "expected_close_on", label: "Expected close", type: "date", inList: true },
       { name: "point_of_contact_id", label: "Contact", type: "link", link: "person" },
       { name: "source", label: "Source", type: "select", options: [...LEAD_SOURCES] },
-      { name: "is_tender", label: "Tender", type: "bool" },
+      { name: "is_tender", label: "Tender", type: "bool", help: "Tick it and the tender's own fields unfold below." },
+      { name: "tender_reference", label: "Tender Reference", type: "text", tenderOnly: true },
+      { name: "tender_source", label: "Tender source", type: "text", tenderOnly: true, noFilter: true },
+      { name: "tender_source_link", label: "Tender Source Link", type: "text", tenderOnly: true },
+      { name: "tender_issued_on", label: "Date issued", type: "date", tenderOnly: true },
+      { name: "tender_due_on", label: "Due date of tender", type: "date", tenderOnly: true },
+      { name: "tender_submission", label: "Tender submission", type: "text", tenderOnly: true },
+      { name: "tender_doc_url", label: "Tender Doc (Drive)", type: "text", tenderOnly: true, help: "Paste the Drive link." },
+      { name: "tender_prep_folder", label: "Tender Prep Folder (Drive)", type: "text", tenderOnly: true, help: "Paste the Drive folder link." },
+      { name: "product_suitability_pct", label: "Product suitable to be made by us %", type: "number", default: 50, tenderOnly: true },
+      { name: "tender_timeframe", label: "Time Frame of Tender Submission", type: "select", tenderOnly: true, noFilter: true,
+        options: ["One Month", "Two Months", "Three Months", "Four Months", "Five Months", "Six Months", "Seven Months", "Eight Months", "Nine Months", "Ten Months", "Twelve Months", "More than Twelve Months"] },
+      { name: "project_type", label: "Type of the Project", type: "select", tenderOnly: true, noFilter: true,
+        options: ["Design Development", "Standard Project Tender", "Standard Product Tender", "Standard GSE Tender", "Build to Print", "Export", "Plain RFI or Budgetory", "Contract Manufacturing", "Sample Project with Volumens in Future"] },
+      { name: "tender_involvement", label: "Tender Involvement", type: "text", tenderOnly: true, noFilter: true },
+      { name: "project_value_band", label: "Value of the Project", type: "select", tenderOnly: true, noFilter: true,
+        options: ["Less than 5 lakhs", "5 to 10 Lakhs", "10 to 50 Lakhs", "Above 50 lakhs"] },
+      { name: "delivery_period", label: "Deliver Period", type: "select", tenderOnly: true, noFilter: true,
+        options: ["One Month", "Two Months", "Three Months", "Four Months", "Five Months", "Six Months", "Seven Months", "Eight Months", "Nine Months", "Ten Months", "Twelve Months", "More than Twelve Months"] },
+      { name: "tender_support", label: "Type of Support for Closing", type: "text", tenderOnly: true, noFilter: true },
+      { name: "tender_details", label: "Tender details", type: "textarea", big: true, tenderOnly: true },
       { name: "budget_pct", label: "Budget %", type: "number", tab: "qual" },
       { name: "authority_pct", label: "Authority %", type: "number", tab: "qual" },
       { name: "need_pct", label: "Need %", type: "number", tab: "qual" },

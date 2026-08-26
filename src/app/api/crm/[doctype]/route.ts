@@ -86,6 +86,9 @@ async function linkOptions(d: Doctype) {
     if (!t) continue;
     let qy = db.from(t.table).select(`id, ${t.titleField}`);
     if (f.linkFilter) qy = qy.eq(f.linkFilter.column, f.linkFilter.value);
+    // Only ACTIVE salespeople stand in the dropdowns — Settings → Users →
+    // Active is the switch. Old rows keep their names via resolveRowLabels.
+    if (f.link === "profile") qy = qy.eq("is_active", true);
     const { data: rows } = await qy.order(t.titleField, { ascending: true }).limit(1000);
     const list = (rows ?? []) as unknown as Record<string, unknown>[];
     links[f.link] = list.map((r) => ({

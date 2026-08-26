@@ -1041,7 +1041,7 @@ function RecordModal({
               className="grid gap-x-6 gap-y-3 p-4"
               style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}
             >
-              {dt.fields.filter((f) => !hasTabs || !f.tab).map((f) => (
+              {dt.fields.filter((f) => (!hasTabs || !f.tab) && !(f.tenderOnly && row.is_tender !== true)).map((f) => (
                 <div key={f.name}>
                   <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>{f.label}</div>
                   <div className="text-sm" style={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>
@@ -1052,8 +1052,10 @@ function RecordModal({
             </div>
           ) : tab === "enquiry" ? (
             <div className="p-4">
-              <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "55vh", overflowY: "auto" }}>
-                {String(row.enquiry_info ?? "").trim() || <span style={{ color: MUTED }}>No enquiry text recorded.</span>}
+              <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "55vh", overflowY: "auto", overflowWrap: "anywhere" }}>
+                {String(row.enquiry_info ?? "").trim()
+                  ? <RichText text={String(row.enquiry_info)} />
+                  : <span style={{ color: MUTED }}>No enquiry text recorded.</span>}
               </div>
             </div>
           ) : tab === "qual" ? (
@@ -1273,6 +1275,28 @@ function LinkAutocomplete({
       )}
     </div>
   );
+}
+
+/**
+ * The enquiry as it arrived, readable: markdown links and images become
+ * clickable links, bare URLs link themselves, bold reads bold. Rendered as
+ * React nodes — never injected HTML, so a pasted enquiry cannot run code.
+ */
+function RichText({ text }: { text: string }) {
+  const parts: React.ReactNode[] = [];
+  // ![alt](url) · [label](url) · bare http(s) URLs · **bold**
+  const re = /!\[([^\]]*)\]\(([^)\s]+)\)|\[([^\]]+)\]\(([^)\s]+)\)|(https?:\/\/[^\s)]+)|\*\*([^*]+)\*\*/g;
+  let last = 0; let m: RegExpExecArray | null; let k = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    if (m[2]) parts.push(<a key={k++} href={m[2]} target="_blank" rel="noreferrer" style={{ color: "#2C5B82", fontWeight: 600, textDecoration: "underline" }}>🖼 {m[1] || "image"}</a>);
+    else if (m[4]) parts.push(<a key={k++} href={m[4]} target="_blank" rel="noreferrer" style={{ color: "#2C5B82", fontWeight: 600, textDecoration: "underline" }}>{m[3]}</a>);
+    else if (m[5]) parts.push(<a key={k++} href={m[5]} target="_blank" rel="noreferrer" style={{ color: "#2C5B82", textDecoration: "underline" }}>{m[5].length > 60 ? m[5].slice(0, 57) + "…" : m[5]}</a>);
+    else if (m[6]) parts.push(<b key={k++}>{m[6]}</b>);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return <>{parts}</>;
 }
 
 /** Qualification, read-only: the BANTTC row with its weighted score, and the
@@ -1760,9 +1784,15 @@ function RecordForm({
         else o[f.name] = v === null || v === undefined ? "" : String(v);
       } else {
         const preset = presets?.[f.name];
-        o[f.name] = preset !== undefined && preset !== null
-          ? String(preset)
-          : (f.default as string | boolean) ?? (f.type === "bool" ? false : "");
+        let dv: string | boolean = (f.default as string | boolean) ?? (f.type === "bool" ? false : "");
+        // The close is expected by the LAST DATE OF NEXT MONTH unless said
+        // otherwise (Dr Raghu, 26 Aug 2026).
+        if (dt.name === "opportunity" && f.name === "expected_close_on") {
+          const n = new Date();
+          const last = new Date(n.getFullYear(), n.getMonth() + 2, 0);
+          dv = `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, "0")}-${String(last.getDate()).padStart(2, "0")}`;
+        }
+        o[f.name] = preset !== undefined && preset !== null ? String(preset) : dv;
       }
     }
     return o;
@@ -1786,8 +1816,10 @@ function RecordForm({
   const banttcNames = BANTTC.map((b) => b.name);
   const tabMatch = (f: Field) =>
     tabKey === undefined ? true : tabKey === "details" ? !f.tab : f.tab === tabKey;
+  const tenderOn = form["is_tender"] === true;
   const gridFields = editable.filter((f) =>
     tabMatch(f)
+    && !(f.tenderOnly && !tenderOn)
     && !(isDeal && banttcNames.includes(f.name))
     && !(hasStage && !stageDead && (f.name === "lost_reason" || f.name === "lost_to_competitor")));
 
