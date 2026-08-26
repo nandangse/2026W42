@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.12",
+    date: "2026-08-26",
+    module: "The Deal Board — one live view from enquiry to order",
+    items: [
+      "DEALS IS A BOARD NOW, drawn the way Dr Raghu drew it: ten chevron columns — Opportunity Received · In Process · Quotation Sent · Long Term · Next Month · This Month · Bucket B · A · 0 · Order Received — each carrying its weight, its money and its count. One LIVE view across the three stations: an opportunity whose quotation is out shows as its quote; Order Received shows the sales orders of the chosen dates. This is the velocity instrument.",
+      "DEAL AMOUNT / WEIGHTED toggles the money — weighted is each deal times its own stage weight. FILTER by Salesperson and Sector; SWIMLANE by either (none by default) and every lane carries its own totals. A card opens its record.",
+      "The came-in / went-out / sitting table lives on as the board's second tab, Stage Flow.",
+    ],
+  },
+  {
     v: "3.23.1.11",
     date: "2026-08-26",
     module: "The tender unfolds, and the dropdowns learn who is active",

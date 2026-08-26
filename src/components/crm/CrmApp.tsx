@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DOCTYPES, doctypeBySlug, type Doctype, type Field } from "@/crm/doctypes";
 import { LOGO } from "@/lib/logo";
 import AnalyticsScreen from "./Analytics";
+import DealsScreen from "./DealBoard";
 import { DateRangeBar, DEFAULT_RANGE, type DateRange } from "./DateRange";
 
 // Sales Genie's palette (src/sales-plan/styles.css), moved here on Dr Raghu's
@@ -374,7 +375,7 @@ export default function CrmApp({
         {special && (
           <main className="p-4 flex-1" style={{ minWidth: 0 }}>
             {special.name === "deals" ? (
-              <PipelineFlow />
+              <DealsScreen onOpen={openLinked} />
             ) : special.name === "analytics" ? (
               <AnalyticsScreen />
             ) : (
@@ -657,115 +658,6 @@ function StubScreen({ label, blurb, dated }: { label: string; blurb: string; dat
         <div className="font-bold mb-1" style={{ fontSize: 15 }}>{label}</div>
         <p className="text-sm" style={{ color: "#5A6672", lineHeight: 1.6 }}>{blurb}</p>
       </div>
-    </div>
-  );
-}
-
-/**
- * The Deals screen: the pipeline, checked, for the chosen dates. Both
- * ladders, and per rung what came in and went out of it in the range, and
- * what is sitting there now — read from the two stage histories.
- */
-function PipelineFlow() {
-  type FlowRow = {
-    entity: string; stage_id: number; code: string; name: string; sort_order: number;
-    came_in: number; went_out: number; sitting: number; colour: string | null;
-  };
-  const [range, setRange] = useState<DateRange>(DEFAULT_RANGE);
-  const [flow, setFlow] = useState<FlowRow[] | null>(null);
-  const [err, setErr] = useState("");
-
-  useEffect(() => {
-    setFlow(null); setErr("");
-    fetch(`/api/crm/pipeline?from=${range.from}&to=${range.to}`, { cache: "no-store" })
-      .then(async (r) => {
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || "Could not load the pipeline");
-        setFlow(j.flow);
-      })
-      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
-  }, [range.from, range.to]);
-
-  const ladders: { key: string; title: string; note: string }[] = [
-    { key: "opportunity", title: "Opportunities", note: "New enquiries being worked toward a quote." },
-    { key: "quotation", title: "Quotations — hotness", note: "Sent through the buckets to Order Received." },
-  ];
-
-  if (err || !flow) {
-    return (
-      <div>
-        <DateRangeBar value={range} onChange={setRange} />
-        {err
-          ? <div className="rounded p-3 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>
-          : <div className="text-sm" style={{ color: MUTED }}>loading…</div>}
-      </div>
-    );
-  }
-
-  return (
-    <div>
-    <DateRangeBar value={range} onChange={setRange} />
-    <div className="flex gap-4 flex-wrap" style={{ alignItems: "flex-start" }}>
-      {ladders.map((l) => {
-        const rows = flow.filter((r) => r.entity === l.key);
-        const tot = (k: "came_in" | "went_out" | "sitting") => rows.reduce((a, r) => a + Number(r[k] || 0), 0);
-        return (
-          <div key={l.key} className="rounded border" style={{ borderColor: BORDER, background: "#fff", minWidth: 360, flex: "1 1 420px", maxWidth: 620 }}>
-            <div className="px-4 pt-3 pb-1">
-              <div className="font-bold" style={{ fontSize: 15 }}>{l.title}</div>
-              <div className="text-xs" style={{ color: MUTED }}>{l.note}</div>
-            </div>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  {["STAGE", "CAME IN", "WENT OUT", "SITTING"].map((h, i) => (
-                    <th key={h} style={{
-                      textAlign: i === 0 ? "left" : "right", padding: "6px 16px", fontSize: 10,
-                      letterSpacing: 0.6, color: MUTED, borderBottom: `2px solid ${BORDER}`,
-                    }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.stage_id}>
-                    <td style={{ padding: "7px 16px", fontSize: 13, borderBottom: "1px solid #F0EEE8" }}>
-                      <span style={{
-                        display: "inline-block", width: 9, height: 9, borderRadius: 2,
-                        background: r.colour || "#8A94A0", marginRight: 8, verticalAlign: "baseline",
-                      }} />
-                      {r.name}
-                    </td>
-                    {(["came_in", "went_out", "sitting"] as const).map((k) => (
-                      <td key={k} className="tnum" style={{
-                        textAlign: "right", padding: "7px 16px", fontSize: 13,
-                        borderBottom: "1px solid #F0EEE8",
-                        fontWeight: k === "sitting" && Number(r[k]) > 0 ? 700 : 400,
-                        color: Number(r[k]) === 0 ? "#C7CCD2" : undefined,
-                      }}>{Number(r[k]).toLocaleString("en-IN")}</td>
-                    ))}
-                  </tr>
-                ))}
-                <tr>
-                  <td style={{ padding: "8px 16px", fontSize: 12, fontWeight: 700 }}>Total</td>
-                  {(["came_in", "went_out", "sitting"] as const).map((k) => (
-                    <td key={k} className="tnum" style={{ textAlign: "right", padding: "8px 16px", fontSize: 12, fontWeight: 700 }}>
-                      {tot(k).toLocaleString("en-IN")}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        );
-      })}
-      <p className="text-xs" style={{ color: MUTED, flexBasis: "100%", maxWidth: "80ch", lineHeight: 1.6 }}>
-        Every stage move is written by the database the moment it happens, so
-        this table is measured, not remembered. Came in and went out count the
-        moves inside the chosen dates; sitting is who stands there today. The
-        histories begin 24/08/2026 — the day the pipeline went live.
-      </p>
-    </div>
     </div>
   );
 }
