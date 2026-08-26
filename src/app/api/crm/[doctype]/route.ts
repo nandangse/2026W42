@@ -255,6 +255,67 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       return NextResponse.json({ doctype: d, row, links });
     }
 
+    // ---- group-by: aggregate the WHOLE filtered set ----------------------
+    // ?groupby=owner_id — same f_ filters and search as the list, but the
+    // route walks every matching row and hands back counts (and the money
+    // sum) per group, biggest first. The screen never holds the rows.
+    const groupby = u.searchParams.get("groupby");
+    if (groupby) {
+      const gf = d.fields.find((f) => f.name === groupby && !f.virtual && f.type !== "readonly");
+      if (!gf) throw new HttpError(400, "Cannot group by that field.");
+      const moneyField = d.fields.find((f) => f.type === "money")?.name
+        ?? d.fields.find((f) => f.type === "readonly" && f.format === "money")?.name ?? null;
+      const aggSelect = [groupby, moneyField].filter(Boolean).join(", ")
+        + (wantsInd ? ", company_join:company_id!inner(industry_id)" : "");
+      const buildAgg = () => {
+        let qy = db.from(d.table).select(aggSelect);
+        if (["company", "person", "opportunity"].includes(d.name)) qy = qy.is("deleted_at", null);
+        if (wantsInd) qy = qy.eq("company_join.industry_id", indFilter);
+        for (const f of d.fields) {
+          if (f.virtual) continue;
+          const v = u.searchParams.get(`f_${f.name}`);
+          if (v === null || v === "") continue;
+          qy = f.type === "bool" ? qy.eq(f.name, v === "true") : qy.eq(f.name, v);
+        }
+        const q = u.searchParams.get("q")?.trim();
+        if (q) qy = qy.ilike(d.titleField, `%${q.replace(/[%_]/g, "\\$&")}%`);
+        return qy;
+      };
+      const agg = new Map<string, { count: number; sum: number }>();
+      let scanned = 0;
+      for (let a = 0; a < 200000; a += 1000) {
+        const { data, error } = await buildAgg().range(a, a + 999);
+        if (error) throw new HttpError(500, error.message);
+        const chunk = (data ?? []) as unknown as Record<string, unknown>[];
+        for (const r of chunk) {
+          const key = r[groupby] === null || r[groupby] === undefined || r[groupby] === "" ? "" : String(r[groupby]);
+          const cur = agg.get(key) ?? { count: 0, sum: 0 };
+          cur.count += 1;
+          if (moneyField) cur.sum += Number(r[moneyField]) || 0;
+          agg.set(key, cur);
+        }
+        scanned += chunk.length;
+        if (chunk.length < 1000) break;
+      }
+      // names for link keys — fetched by id, so inactive owners keep theirs
+      const labels = new Map<string, string>();
+      if (gf.type === "link" && gf.link) {
+        const t = doctypeBySlug(gf.link);
+        const ids = [...agg.keys()].filter(Boolean);
+        if (t) for (let i = 0; i < ids.length; i += 150) {
+          const { data: ls } = await db.from(t.table).select(`id, ${t.titleField}`).in("id", ids.slice(i, i + 150));
+          for (const r of (ls ?? []) as unknown as Record<string, unknown>[]) labels.set(String(r.id), String(r[t.titleField] ?? r.id));
+        }
+      }
+      const groups = [...agg.entries()]
+        .map(([key, v]) => ({ key, label: key === "" ? "Not set" : labels.get(key) ?? key, count: v.count, sum: v.sum }))
+        .sort((a, b) => b.count - a.count);
+      return NextResponse.json({
+        field: gf.label, hasMoney: !!moneyField, total: scanned,
+        sumTotal: groups.reduce((a, g) => a + g.sum, 0), groups,
+      });
+    }
+
     // ---- the list: filters, search and sort run in Postgres --------------
     // 100 | 500 | 2500 | 10000 | 50000 | all — the footer's choices; the
     // route pages internally past PostgREST's 1000-row ceiling, and offset

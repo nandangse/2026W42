@@ -149,6 +149,11 @@ export default function CrmApp({
     return () => clearTimeout(t);
   }, [qLive]);
 
+  /** Group-by: aggregate the filtered set, shown in a right-side drawer. */
+  const [groupBy, setGroupBy] = useState("");
+  const [sumOn, setSumOn] = useState(false);
+  const [groups, setGroups] = useState<{ field: string; hasMoney: boolean; total: number; sumTotal: number; groups: { key: string; label: string; count: number; sum: number }[] } | null>(null);
+
   const listParams = useCallback(() => {
     const p = new URLSearchParams();
     if (q.trim()) p.set("q", q.trim());
@@ -157,6 +162,18 @@ export default function CrmApp({
     p.set("limit", pageSize);
     return p;
   }, [q, filters, sort, pageSize]);
+
+  useEffect(() => {
+    if (!groupBy) { setGroups(null); return; }
+    const p = listParams();
+    p.delete("limit"); p.delete("offset");
+    p.set("groupby", groupBy);
+    setGroups(null);
+    fetch(`/api/crm/${slug}?${p}`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); if (r.ok) setGroups(j); })
+      .catch(() => {});
+  }, [groupBy, slug, listParams]);
+  useEffect(() => { setGroupBy(""); }, [slug]);
 
   const load = useCallback(async () => {
     if (!DOCTYPES.some((d) => d.name === slug)) { setLoading(false); setRows([]); return; }
@@ -498,7 +515,63 @@ export default function CrmApp({
                   ? `showing ${rows.length.toLocaleString("en-IN")} of ${total.toLocaleString("en-IN")} records — narrow with search or filters`
                   : `${(total ?? rows.length).toLocaleString("en-IN")} record${(total ?? rows.length) === 1 ? "" : "s"}`}
             </span>
+            {(() => {
+              // Group by lives top right: Salesperson / Product family / Source,
+              // whichever this doctype carries.
+              const CANDIDATES: [string, string][] = [["owner_id", "Sales Person"], ["product_family", "Product Family"], ["source", "Source"]];
+              const opts = CANDIDATES.filter(([n]) => dt.fields.some((f) => f.name === n && !f.virtual));
+              if (!opts.length) return null;
+              return (
+                <span className="flex items-center gap-1 ml-auto">
+                  <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}
+                    className="px-2 py-1.5 rounded text-sm font-semibold border"
+                    style={{ borderColor: groupBy ? NAVY : BORDER, background: "#fff", color: groupBy ? INK : "#5A6672" }}>
+                    <option value="">Group by…</option>
+                    {opts.map(([n, l]) => <option key={n} value={n}>{l}</option>)}
+                  </select>
+                  <button onClick={() => setSumOn((v) => !v)} title="Also show the value summation per group"
+                    className="px-2 py-1.5 rounded text-sm font-bold border"
+                    style={{ borderColor: sumOn ? NAVY : BORDER, background: sumOn ? NAVY_SOFT : "#fff", color: sumOn ? NAVY : "#5A6672" }}>
+                    ∑
+                  </button>
+                </span>
+              );
+            })()}
           </div>
+
+          {/* the aggregate, docked right — biggest group first */}
+          {groupBy && (
+            <div style={{ position: "fixed", top: 110, right: 12, bottom: 24, width: 320, zIndex: 60,
+              background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, boxShadow: "0 10px 32px rgba(27,45,107,.22)",
+              display: "flex", flexDirection: "column" }}>
+              <div className="flex items-center justify-between px-3 py-2" style={{ background: NAVY, borderRadius: "8px 8px 0 0" }}>
+                <b className="text-sm" style={{ color: "#fff" }}>By {groups?.field ?? "…"}</b>
+                <span className="text-xs" style={{ color: "#C8D2EC" }}>
+                  {groups ? `${groups.total.toLocaleString("en-IN")} records` : "counting…"}
+                </span>
+                <button onClick={() => setGroupBy("")} className="font-bold" style={{ color: "#C8D2EC" }}>✕</button>
+              </div>
+              <div style={{ overflowY: "auto", flex: 1 }}>
+                {!groups && <div className="p-4 text-sm" style={{ color: MUTED }}>aggregating the filtered set…</div>}
+                {groups?.groups.map((g) => (
+                  <div key={g.key || "∅"} className="flex items-baseline gap-2 px-3 py-1.5" style={{ borderBottom: "1px solid #F0F1F6" }}>
+                    <span className="text-sm" style={{ flex: 1, color: g.key ? INK : MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={g.label}>{g.label}</span>
+                    <b className="text-sm tnum" style={{ color: NAVY }}>{g.count.toLocaleString("en-IN")}</b>
+                    {sumOn && groups.hasMoney && (
+                      <span className="text-xs tnum" style={{ color: "#7C3AED", minWidth: 76, textAlign: "right" }}>₹ {Math.round(g.sum).toLocaleString("en-IN")}</span>
+                    )}
+                  </div>
+                ))}
+                {groups && sumOn && groups.hasMoney && (
+                  <div className="flex items-baseline gap-2 px-3 py-2" style={{ background: "#F7F5F0" }}>
+                    <b className="text-sm" style={{ flex: 1 }}>Total</b>
+                    <b className="text-sm tnum" style={{ color: NAVY }}>{groups.total.toLocaleString("en-IN")}</b>
+                    <b className="text-xs tnum" style={{ color: "#7C3AED", minWidth: 76, textAlign: "right" }}>₹ {Math.round(groups.sumTotal).toLocaleString("en-IN")}</b>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ---------- filter bar ---------- */}
           {(filterables.length > 0 || industryFilter) && (

@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.30",
+    date: "2026-08-26",
+    module: "Group by, with the summation beside it",
+    items: [
+      "GROUP BY sits top right of every list that carries the fields — Sales Person, Product Family, Source. Pick one and a drawer docks on the right with the WHOLE FILTERED SET aggregated, biggest group first — the server walks every matching row, not just the page on screen.",
+      "The ∑ beside it adds the VALUE SUMMATION per group, with the grand total at the foot. Filters, search and Group by compose: filter to a sector, group by Sales Person, and the drawer answers who owns it.",
+    ],
+  },
+  {
     v: "3.23.1.29",
     date: "2026-08-26",
     module: "Stages in order, the first touch, and small mercies",
