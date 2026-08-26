@@ -264,6 +264,37 @@ export async function buildBoard(supabase: SupabaseClient) {
     };
   }
 
+  // ---- the project planning layer (0074) ----
+  // Projects plan for themselves on the same schema as jobs; their plans ride
+  // in the same `plans` record keyed by project id (ids never collide with
+  // jobs). Tolerant read: before 0074 runs these tables do not exist, and the
+  // board must not fall over for that.
+  const [ppRes, pmRes] = await Promise.all([
+    supabase.from("project_plans").select("*"),
+    supabase.from("project_milestones").select("*").order("idx", { ascending: true }),
+  ]);
+  if (!ppRes.error && !pmRes.error) {
+    const pmByProj: Record<string, any[]> = {};
+    for (const m of pmRes.data || []) (pmByProj[m.project_id] ||= []).push(m);
+    for (const p of ppRes.data || []) {
+      plans[p.project_id] = {
+        start: p.start_date,
+        baseline_on: p.baseline_on,
+        baseline_end: p.baseline_end,
+        milestones: (pmByProj[p.project_id] || []).map((m) => ({
+          name: m.title,
+          days: m.days,
+          preds: m.preds || [],
+          crew: m.crew || {},
+          shift: m.shift || "D",
+          offset: m.offset_days || 0,
+          done: !!m.done,
+          done_on: m.done_on,
+        })),
+      };
+    }
+  }
+
   // baselines keyed by job_id
   const baselines: Record<string, any[]> = {};
   for (const b of baselineRes.data || []) {

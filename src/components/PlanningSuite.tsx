@@ -583,6 +583,12 @@ export default function PlanningSuite({
     setWorkspace("suite");
     setTab("plan");
   };
+  // /?job=<id> lands straight on that job's plan — the door the Live Projects
+  // lightbox opens in a NEW TAB, so the board someone was reading stays put.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("job");
+    if (id) { setActiveId(id); setWorkspace("suite"); setTab("plan"); }
+  }, []);
 
   // Admin users live here, not inside <Admin>, so switching tabs doesn't unmount
   // the list and refetch it — that empty-then-populate cycle was the flicker.
@@ -1042,7 +1048,7 @@ export default function PlanningSuite({
         <DeliveryBoard showForward={canSeeForward} board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
       </div>
       {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} canEdit={canEdit} reload={reload} />}
-      {workspace === "suite" && tab === "liveproj" && <LiveProjects board={board} V={V} onOpen={openJobPlan} />}
+      {workspace === "suite" && tab === "liveproj" && <LiveProjects board={board} V={V} canEdit={canEdit} reload={reload} />}
       {workspace === "suite" && tab === "feature" && <FeatureRequests isOwner={isRaghu} />}
       {workspace === "suite" && tab === "floor" && <OnFloor board={board} V={V} onOpen={openJobPlan} reload={reload} canEdit={canEdit} canTask={role !== "viewer"} isStrat={canSeeForward} myName={(displayName || email.split("@")[0]).split(" ")[0]} />}
       {workspace === "suite" && tab === "material" && <PendingMaterial board={board} onOpen={openJobPlan} reload={reload} canEdit={canEdit} />}
@@ -6829,20 +6835,30 @@ function Admin({
 
 // ============================ Live Projects ============================
 
+/** The projects row a job's proj id points at, plus Genie's own description. */
+type ProjMeta = { id: string; name?: string; mgr?: string; stage?: string; committed?: string; exp_end?: string; so?: string; cust?: string | null; description?: string | null };
+type ProjGroup = { id: string; meta: ProjMeta | undefined; jobs: Job[]; firstTdd: string };
+
 /**
  * Every project that still has a live job on the board, with what is open
  * against each job — the project-level answer to "where do we stand".
- * Projects sort by the TDD of their first job: the one delivering soonest
- * leads (Dr Raghu, 26 Aug 2026).
+ * Projects sort by the TDD of their first job; a job opens its lightbox, the
+ * PROJ number opens the project's own — description, combined GANTT, and the
+ * project plan the planner keeps (Dr Raghu, 26 Aug 2026: planning moves up
+ * to project level, so the plan uses the job schema exactly).
  */
 function LiveProjects({
-  board, V, onOpen,
+  board, V, canEdit, reload,
 }: {
   board: Board;
   V: (n: number) => string;
-  onOpen: (id: string) => void;
+  canEdit: boolean;
+  reload: () => Promise<Board | null>;
 }) {
   const [q, setQ] = useState("");
+  const [closed, setClosed] = useState<Set<string>>(new Set());
+  const [pickedJob, setPickedJob] = useState<Job | null>(null);
+  const [openProj, setOpenProj] = useState<string | null>(null);
 
   // what is open against a job, counted the same way the other tabs count it:
   // materials — every kitting line not yet Received (QC Defective is pending);
@@ -6866,32 +6882,37 @@ function LiveProjects({
   }, [board.materials, board.tasks]);
 
   const projById = useMemo(
-    () => new Map((board.projects as { id: string; name?: string; mgr?: string; stage?: string; committed?: string; so?: string }[]).map((p) => [String(p.id), p])),
+    () => new Map((board.projects as ProjMeta[]).map((p) => [String(p.id), p])),
     [board.projects],
   );
 
-  const groups = useMemo(() => {
+  // every project carrying a live job, soonest first — before any search
+  const groupsAll = useMemo(() => {
     const byProj = new Map<string, Job[]>();
     for (const j of board.jobs) {
       const key = String(j.proj || "").trim();
       if (!key) continue; // a job with no project is not a project
       (byProj.get(key) || byProj.set(key, []).get(key)!).push(j);
     }
-    const out = [...byProj.entries()].map(([id, js]) => {
+    const out: ProjGroup[] = [...byProj.entries()].map(([id, js]) => {
       const jobs = [...js].sort((a, b) => String(a.tdd || "9999").localeCompare(String(b.tdd || "9999")));
       return { id, meta: projById.get(id), jobs, firstTdd: jobs[0].tdd || "9999" };
     });
     // by the TDD of the first job within each project
     out.sort((a, b) => a.firstTdd.localeCompare(b.firstTdd));
+    return out;
+  }, [board.jobs, projById]);
+
+  const groups = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return needle
-      ? out.filter((g) =>
+      ? groupsAll.filter((g) =>
           g.id.toLowerCase().includes(needle) ||
           String(g.meta?.name || "").toLowerCase().includes(needle) ||
           String(g.meta?.mgr || "").toLowerCase().includes(needle) ||
           g.jobs.some((j) => jobNo(j.id).includes(needle) || j.tag.toLowerCase().includes(needle) || j.cust.toLowerCase().includes(needle)))
-      : out;
-  }, [board.jobs, projById, q, openByJob]);
+      : groupsAll;
+  }, [groupsAll, q]);
 
   const tot = useMemo(() => {
     const t = { jobs: 0, mat: 0, design: 0, tasks: 0, val: 0 };
@@ -6906,6 +6927,13 @@ function LiveProjects({
   const num = (n: number, hot: string) => (
     <b className="tnum" style={{ color: n ? hot : "#C9C6BD", fontSize: 14 }}>{n || "—"}</b>
   );
+  const toggle = (id: string) => setClosed((c) => {
+    const n = new Set(c);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+
+  const openGroup = openProj ? groupsAll.find((g) => g.id === openProj) : null;
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 py-4">
@@ -6915,13 +6943,17 @@ function LiveProjects({
           {groups.length} project{groups.length === 1 ? "" : "s"} carrying {tot.jobs} live job{tot.jobs === 1 ? "" : "s"} · {V(tot.val)} ·
           open against them: <b style={{ color: "#8A5A00" }}>{tot.mat}</b> material · <b style={{ color: "#7C3AED" }}>{tot.design}</b> design · <b style={{ color: "#1B3A5C" }}>{tot.tasks}</b> tasks
         </span>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search project / job / customer…"
-          className="text-xs border rounded px-2 py-1.5 ml-auto"
-          style={{ borderColor: "#E2E0DA", background: "#fff", minWidth: 220 }}
-        />
+        <span className="flex items-center gap-1.5 ml-auto">
+          <button onClick={() => setClosed(new Set(groupsAll.map((g) => g.id)))} className="text-xs font-bold rounded px-2 py-1.5 border" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#5A6672" }}>Collapse all</button>
+          <button onClick={() => setClosed(new Set())} className="text-xs font-bold rounded px-2 py-1.5 border" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#5A6672" }}>Expand all</button>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search project / job / customer…"
+            className="text-xs border rounded px-2 py-1.5"
+            style={{ borderColor: "#E2E0DA", background: "#fff", minWidth: 220 }}
+          />
+        </span>
       </div>
 
       {groups.length === 0 && (
@@ -6932,21 +6964,33 @@ function LiveProjects({
 
       {groups.map((g) => {
         const late = g.jobs.filter((j) => j.tdd && j.tdd < TODAY).length;
+        const shut = closed.has(g.id);
         return (
           <div key={g.id} className="bg-white rounded-lg border mb-3 overflow-hidden" style={{ borderColor: "#E2E0DA" }}>
-            {/* the project band — its details lead, its jobs follow */}
-            <div className="px-3 py-2 flex items-baseline gap-x-3 gap-y-0.5 flex-wrap" style={{ background: "#16232F" }}>
-              <b className="text-sm" style={{ color: "#fff" }}>{g.meta?.name || g.id}</b>
-              <span className="text-xs font-bold" style={{ color: "#E8600A" }}>{g.id.replace(/^NGSE-PROJ-/, "PROJ ")}</span>
-              {g.meta?.mgr && <span className="text-xs" style={{ color: "#8FA1B3" }}>PM <b style={{ color: "#D7DEE6" }}>{g.meta.mgr}</b></span>}
-              {g.meta?.stage && <span className="text-xs" style={{ color: "#8FA1B3" }}>stage <b style={{ color: "#D7DEE6" }}>{g.meta.stage}</b></span>}
-              {g.meta?.committed && <span className="text-xs" style={{ color: "#8FA1B3" }}>committed <b style={{ color: "#D7DEE6" }}>{fmt(g.meta.committed)}</b></span>}
-              {g.meta?.so && <span className="text-xs" style={{ color: "#8FA1B3" }}>{g.meta.so}</span>}
-              <span className="text-xs ml-auto" style={{ color: "#8FA1B3" }}>
-                {g.jobs.length} job{g.jobs.length === 1 ? "" : "s"} · {V(g.jobs.reduce((a, j) => a + j.val, 0))}
-                {late > 0 && <b style={{ color: "#F5B32B" }}> · {late} past TDD</b>}
-              </span>
+            {/* the project band — its details lead, its jobs fold beneath */}
+            <div className="px-3 py-2" style={{ background: "#16232F" }}>
+              <div className="flex items-baseline gap-x-3 gap-y-0.5 flex-wrap">
+                <button onClick={() => toggle(g.id)} className="font-bold" title={shut ? "Expand the jobs" : "Collapse the jobs"} style={{ color: "#8FA1B3", fontSize: 13, width: 16 }}>{shut ? "▸" : "▾"}</button>
+                <b className="text-sm cursor-pointer" style={{ color: "#fff" }} onClick={() => toggle(g.id)}>{g.meta?.name || g.id}</b>
+                <button onClick={() => setOpenProj(g.id)} className="text-xs font-bold rounded px-1.5 py-0.5" title="Open the project — description, combined GANTT, project plan" style={{ background: "#E8600A", color: "#fff" }}>
+                  {g.id.replace(/^NGSE-PROJ-/, "PROJ ")}
+                </button>
+                {g.meta?.mgr && <span className="text-xs" style={{ color: "#8FA1B3" }}>PM <b style={{ color: "#D7DEE6" }}>{g.meta.mgr}</b></span>}
+                {g.meta?.stage && <span className="text-xs" style={{ color: "#8FA1B3" }}>stage <b style={{ color: "#D7DEE6" }}>{g.meta.stage}</b></span>}
+                {g.meta?.committed && <span className="text-xs" style={{ color: "#8FA1B3" }}>committed <b style={{ color: "#D7DEE6" }}>{fmt(g.meta.committed)}</b></span>}
+                {g.meta?.so && <span className="text-xs" style={{ color: "#8FA1B3" }}>{g.meta.so}</span>}
+                <span className="text-xs ml-auto" style={{ color: "#8FA1B3" }}>
+                  {g.jobs.length} job{g.jobs.length === 1 ? "" : "s"} · {V(g.jobs.reduce((a, j) => a + j.val, 0))}
+                  {late > 0 && <b style={{ color: "#F5B32B" }}> · {late} past TDD</b>}
+                </span>
+              </div>
+              {g.meta?.description && (
+                <div className="text-xs mt-0.5" style={{ color: "#8FA1B3", paddingLeft: 22, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={g.meta.description}>
+                  {g.meta.description}
+                </div>
+              )}
             </div>
+            {!shut && (
             <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
               <thead>
                 <tr className="text-xs" style={{ color: "#8A94A0", background: "#F7F5F0" }}>
@@ -6963,7 +7007,7 @@ function LiveProjects({
                   const o = openByJob.get(j.id) || { mat: 0, design: 0, tasks: 0 };
                   const lateJob = j.tdd && j.tdd < TODAY;
                   return (
-                    <tr key={j.id} onClick={() => onOpen(j.id)} className="cursor-pointer hover:bg-[#F7F5F0]" style={{ borderTop: "1px solid #F0EEE8" }}>
+                    <tr key={j.id} onClick={() => setPickedJob(j)} className="cursor-pointer hover:bg-[#F7F5F0]" style={{ borderTop: "1px solid #F0EEE8" }} title="Open the job">
                       <td className="px-3 py-1.5">
                         <b className="tnum" style={{ color: "#1B3A5C" }}>{jobNo(j.id)}</b>{" "}
                         <span style={{ color: "#22303C" }}>{j.tag}</span>
@@ -6980,9 +7024,324 @@ function LiveProjects({
                 })}
               </tbody>
             </table>
+            )}
           </div>
         );
       })}
+
+      {pickedJob && (
+        <JobLightbox
+          job={toWip(pickedJob)}
+          V={V}
+          colour="#1B3A5C"
+          onClose={() => setPickedJob(null)}
+          // Edit opens the plan in a NEW TAB — the project view stays put.
+          onOpenPlan={() => window.open(`/?job=${encodeURIComponent(pickedJob.id)}`, "_blank")}
+          canEdit={canEdit}
+          onSaved={reload}
+        />
+      )}
+
+      {openGroup && (
+        <ProjectLightbox
+          g={openGroup}
+          board={board}
+          V={V}
+          canEdit={canEdit}
+          reload={reload}
+          onClose={() => setOpenProj(null)}
+          onOpenJob={(j) => setPickedJob(j)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * The project's own lightbox: description, the details the band shows, the
+ * COMBINED GANTT across its jobs, and the project plan — same schema as a
+ * job plan, kept in project_plans/project_milestones (0074).
+ */
+function ProjectLightbox({
+  g, board, V, canEdit, reload, onClose, onOpenJob,
+}: {
+  g: ProjGroup; board: Board; V: (n: number) => string; canEdit: boolean;
+  reload: () => Promise<Board | null>; onClose: () => void; onOpenJob: (j: Job) => void;
+}) {
+  const plan = board.plans[g.id];
+  const [desc, setDesc] = useState(String(g.meta?.description || ""));
+  const [descOpen, setDescOpen] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [editingPlan, setEditingPlan] = useState(false);
+
+  const saveDesc = async () => {
+    setMsg("");
+    try {
+      await api.post("/api/project-field", { id: g.id, description: desc });
+      await reload();
+      setMsg("Saved ✓"); setDescOpen(false);
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,0.55)", zIndex: 70, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "32px 16px", overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg" style={{ width: "min(1020px, 100%)", maxHeight: "90vh", overflowY: "auto" }}>
+        <div className="px-4 py-3 flex items-start gap-3" style={{ background: "#16232F", position: "sticky", top: 0, zIndex: 2 }}>
+          <div style={{ flex: 1 }}>
+            <div className="text-xs font-bold" style={{ color: "#E8600A", letterSpacing: 1.2 }}>{g.id.replace(/^NGSE-PROJ-/, "PROJ ")}</div>
+            <div className="font-bold text-white" style={{ fontSize: 16, lineHeight: 1.25 }}>{g.meta?.name || g.id}</div>
+            <div className="text-xs" style={{ color: "#8FA1B3" }}>
+              {g.meta?.mgr && <>PM <b style={{ color: "#D7DEE6" }}>{g.meta.mgr}</b> · </>}
+              {g.meta?.stage && <>stage <b style={{ color: "#D7DEE6" }}>{g.meta.stage}</b> · </>}
+              committed <b style={{ color: "#D7DEE6" }}>{fmtFull(g.meta?.committed || null)}</b> ·
+              expected <b style={{ color: "#D7DEE6" }}>{fmtFull(g.meta?.exp_end || null)}</b>
+              {g.meta?.so && <> · {g.meta.so}</>}
+              {" · "}{g.jobs.length} job{g.jobs.length === 1 ? "" : "s"} · {V(g.jobs.reduce((a, j) => a + j.val, 0))}
+            </div>
+          </div>
+          <button onClick={onClose} className="font-bold" style={{ color: "#8FA1B3", fontSize: 20, lineHeight: 1 }}>✕</button>
+        </div>
+
+        <div className="p-4">
+          {/* description — the written read on what this project is */}
+          <div className="rounded border p-2.5 mb-3" style={{ borderColor: "#E2E0DA", background: "#FBFAF7" }}>
+            <div className="text-xs font-bold mb-1 flex items-center gap-2" style={{ color: "#8A94A0" }}>
+              DESCRIPTION
+              {canEdit && !descOpen && <button onClick={() => setDescOpen(true)} className="font-bold" style={{ color: "#1B3A5C" }}>✎ edit</button>}
+              {msg && <span style={{ color: msg.startsWith("Saved") ? "#0D7A3F" : "#B3261E" }}>{msg}</span>}
+            </div>
+            {descOpen ? (
+              <div>
+                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} autoFocus
+                  placeholder="What this project is, in the words the next person needs…"
+                  className="w-full text-sm border rounded px-2 py-1.5" style={{ borderColor: "#E2E0DA", background: "#fff" }} />
+                <div className="flex gap-2 mt-1">
+                  <button onClick={() => void saveDesc()} className="text-xs font-bold rounded px-3 py-1" style={{ background: "#E8600A", color: "#fff" }}>Save</button>
+                  <button onClick={() => { setDescOpen(false); setDesc(String(g.meta?.description || "")); }} className="text-xs font-bold rounded px-3 py-1 border" style={{ borderColor: "#E2E0DA", color: "#5A6672" }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm" style={{ color: g.meta?.description ? "#22303C" : "#B8B5AC", whiteSpace: "pre-wrap" }}>
+                {g.meta?.description || "No description yet" + (canEdit ? " — write the read on this project." : ".")}
+              </div>
+            )}
+          </div>
+
+          {/* the combined GANTT — the project plan on top, every job beneath */}
+          <div className="flex items-baseline gap-2 mb-1">
+            <div className="text-xs font-bold" style={{ color: "#8A94A0" }}>PROJECT GANTT — combined across the jobs</div>
+            {canEdit && (
+              <button onClick={() => setEditingPlan((v) => !v)} className="text-xs font-bold rounded px-2 py-0.5" style={{ background: editingPlan ? "#F4F2EC" : "#DCE8F5", color: "#1B3A5C" }}>
+                {editingPlan ? "✕ close the editor" : plan?.milestones?.length ? "✎ Edit the project plan" : "＋ Start the project plan"}
+              </button>
+            )}
+          </div>
+          {editingPlan && (
+            <ProjectPlanEditor
+              id={g.id}
+              plan={plan}
+              onDone={async () => { setEditingPlan(false); await reload(); }}
+            />
+          )}
+          <ProjectGantt g={g} board={board} onOpenJob={onOpenJob} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One timeline for the whole project: the project's own milestones lead in
+ * orange, then each job's scheduled milestones from its Job Plan. A job with
+ * no plan yet shows as a single quiet span from its start to its TDD.
+ */
+function ProjectGantt({ g, board, onOpenJob }: { g: ProjGroup; board: Board; onOpenJob: (j: Job) => void }) {
+  type BarRow = { label: string; start: string; end: string; colour: string; hollow?: boolean; header?: false } | { header: true; label: string; tdd: string | null; job: Job };
+  const rows: BarRow[] = [];
+  const dates: string[] = [];
+
+  const projPlan = board.plans[g.id];
+  if (projPlan?.milestones?.length) {
+    for (const m of computeSchedule({ start: projPlan.start || TODAY, milestones: projPlan.milestones })) {
+      rows.push({ label: `P · ${m.name}`, start: m.start, end: m.end, colour: m.done ? "#0D7A3F" : "#E8600A" });
+      dates.push(m.start, m.end);
+    }
+  }
+  for (const j of g.jobs) {
+    rows.push({ header: true, label: `${jobNo(j.id)} · ${j.tag}`, tdd: j.tdd, job: j });
+    if (j.tdd) dates.push(j.tdd);
+    const jp = board.plans[j.id];
+    if (jp?.milestones?.length) {
+      for (const m of computeSchedule({ start: jp.start || j.start || TODAY, milestones: jp.milestones })) {
+        rows.push({ label: m.name, start: m.start, end: m.end, colour: m.done ? "#0D7A3F" : "#1B3A5C" });
+        dates.push(m.start, m.end);
+      }
+    } else {
+      const a = j.start || TODAY;
+      const b = j.tdd && j.tdd > a ? j.tdd : addDays(a, 7);
+      rows.push({ label: "no plan yet — span to TDD", start: a, end: b, colour: "#8FA1B3", hollow: true });
+      dates.push(a, b);
+    }
+  }
+
+  if (!dates.length) return null;
+  dates.push(TODAY);
+  const min = addDays(dates.reduce((a, b) => (a < b ? a : b)), -3);
+  const max = addDays(dates.reduce((a, b) => (a > b ? a : b)), 3);
+  const span = Math.max(1, diffDays(min, max));
+  const pct = (d: string) => (diffDays(min, d) / span) * 100;
+
+  // month lines: every first-of-month inside the range
+  const months: { at: string; label: string }[] = [];
+  for (let d = min.slice(0, 7) + "-01"; d <= max; ) {
+    if (d >= min) months.push({ at: d, label: new Date(d + "T00:00:00Z").toLocaleString("en-IN", { month: "short" }) });
+    const [y, m] = d.split("-").map(Number);
+    d = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`;
+  }
+
+  return (
+    <div className="rounded border overflow-x-auto" style={{ borderColor: "#E2E0DA", background: "#fff" }}>
+      <div style={{ minWidth: 640, padding: "8px 10px" }}>
+        {/* month ruler */}
+        <div className="relative" style={{ height: 16, marginLeft: 200 }}>
+          {months.map((m) => (
+            <span key={m.at} className="absolute text-xs font-bold" style={{ left: pct(m.at) + "%", color: "#B8B5AC" }}>{m.label}</span>
+          ))}
+        </div>
+        {rows.map((r, i) =>
+          "header" in r && r.header ? (
+            <div key={i} className="flex items-center" style={{ height: 22, borderTop: "1px solid #F0EEE8" }}>
+              <button onClick={() => onOpenJob(r.job)} className="text-left text-xs font-bold" title="Open the job" style={{ width: 200, flexShrink: 0, color: "#1B3A5C", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                {r.label}
+              </button>
+              <div className="relative" style={{ flex: 1, height: "100%" }}>
+                {months.map((m) => <span key={m.at} className="absolute" style={{ left: m.at >= min ? pct(m.at) + "%" : 0, top: 0, bottom: 0, borderLeft: "1px solid #F0EEE8" }} />)}
+                {TODAY >= min && TODAY <= max && <span className="absolute" style={{ left: pct(TODAY) + "%", top: 0, bottom: 0, borderLeft: "2px solid #B3261E" }} />}
+                {r.tdd && r.tdd >= min && r.tdd <= max && (
+                  <span className="absolute text-xs" title={`TDD ${fmtFull(r.tdd)}`} style={{ left: `calc(${pct(r.tdd)}% - 5px)`, top: 3, color: r.tdd < TODAY ? "#B3261E" : "#E8600A" }}>◆</span>
+                )}
+              </div>
+            </div>
+          ) : "header" in r ? null : (
+            <div key={i} className="flex items-center" style={{ height: 20 }}>
+              <span className="text-xs" title={`${r.label} · ${fmtFull(r.start)} → ${fmtFull(r.end)}`} style={{ width: 200, flexShrink: 0, paddingLeft: 10, color: "#5A6672", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                {r.label}
+              </span>
+              <div className="relative" style={{ flex: 1, height: "100%" }}>
+                {months.map((m) => <span key={m.at} className="absolute" style={{ left: pct(m.at) + "%", top: 0, bottom: 0, borderLeft: "1px solid #F0EEE8" }} />)}
+                {TODAY >= min && TODAY <= max && <span className="absolute" style={{ left: pct(TODAY) + "%", top: 0, bottom: 0, borderLeft: "2px solid #B3261E" }} />}
+                <span
+                  className="absolute rounded"
+                  title={`${r.label} · ${fmtFull(r.start)} → ${fmtFull(r.end)}`}
+                  style={{
+                    left: pct(r.start) + "%",
+                    width: Math.max(0.7, pct(addDays(r.end, 1)) - pct(r.start)) + "%",
+                    top: 4, height: 11,
+                    background: r.hollow ? "transparent" : r.colour,
+                    border: r.hollow ? `1.5px dashed ${r.colour}` : "none",
+                  }}
+                />
+              </div>
+            </div>
+          ),
+        )}
+        <div className="text-xs mt-1.5" style={{ color: "#B8B5AC" }}>
+          <span style={{ color: "#E8600A" }}>■</span> project plan · <span style={{ color: "#1B3A5C" }}>■</span> job milestones · <span style={{ color: "#0D7A3F" }}>■</span> done · ◆ TDD · <span style={{ color: "#B3261E" }}>│</span> today
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The project plan, edited in place — the main items till delivery. The exact
+ * job-plan payload goes to the exact same API; only the tables beneath differ.
+ */
+function ProjectPlanEditor({
+  id, plan, onDone,
+}: {
+  id: string;
+  plan?: (Plan & { baseline_on?: string | null; baseline_end?: string | null }) | undefined;
+  onDone: () => Promise<void>;
+}) {
+  const seed: PlanMilestone[] = plan?.milestones?.length
+    ? plan.milestones.map((m) => ({ ...m }))
+    : [
+        { name: "Design & GA approval", days: 7, preds: [], crew: {} as PlanMilestone["crew"], shift: "D", offset: 0 },
+        { name: "Procurement & kitting", days: 14, preds: [1], crew: {} as PlanMilestone["crew"], shift: "D", offset: 0 },
+        { name: "Fabrication", days: 21, preds: [2], crew: {} as PlanMilestone["crew"], shift: "D", offset: 0 },
+        { name: "Assembly & trials", days: 10, preds: [3], crew: {} as PlanMilestone["crew"], shift: "D", offset: 0 },
+        { name: "Dispatch & delivery", days: 3, preds: [4], crew: {} as PlanMilestone["crew"], shift: "D", offset: 0 },
+      ];
+  const [start, setStart] = useState(plan?.start || TODAY);
+  const [rows, setRows] = useState<PlanMilestone[]>(seed);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const upd = (i: number, patch: Partial<PlanMilestone>) =>
+    setRows((r) => r.map((m, x) => (x === i ? { ...m, ...patch } : m)));
+  const sched = computeSchedule({ start, milestones: rows });
+  const delivery = sched.length ? sched.reduce((a, m) => (m.end > a ? m.end : a), sched[0].end) : null;
+
+  const save = async () => {
+    setBusy(true); setMsg("");
+    try {
+      await api.post("/api/plan", { job_id: id, start, milestones: rows });
+      await onDone();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); setBusy(false); }
+  };
+
+  return (
+    <div className="rounded border p-2.5 mb-2" style={{ borderColor: "#E2E0DA", background: "#FBFAF7" }}>
+      <div className="flex items-center gap-2 flex-wrap mb-1.5 text-xs">
+        <span className="font-bold" style={{ color: "#8A94A0" }}>Start</span>
+        <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="border rounded px-1.5 py-0.5" style={{ borderColor: "#E2E0DA", background: "#fff" }} />
+        {delivery && <span style={{ color: "#5A6672" }}>→ delivery by <b style={{ color: "#0D7A3F" }}>{fmtFull(delivery)}</b></span>}
+        {msg && <span style={{ color: "#B3261E" }}>{msg}</span>}
+      </div>
+      <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+        <thead>
+          <tr style={{ color: "#8A94A0" }}>
+            <th className="text-left px-1 py-0.5">#</th>
+            <th className="text-left px-1 py-0.5">MAIN ITEM</th>
+            <th className="text-left px-1 py-0.5" title="Working days">DAYS</th>
+            <th className="text-left px-1 py-0.5" title="Runs after milestone number(s), e.g. 1,2">AFTER</th>
+            <th className="text-left px-1 py-0.5">RUNS</th>
+            <th className="text-left px-1 py-0.5" title="Done">✓</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((m, i) => {
+            const sm = sched[i];
+            return (
+              <tr key={i} style={{ borderTop: "1px solid #F0EEE8" }}>
+                <td className="px-1 py-0.5 tnum" style={{ color: "#8A94A0" }}>{i + 1}</td>
+                <td className="px-1 py-0.5" style={{ minWidth: 180 }}>
+                  <input value={m.name} onChange={(e) => upd(i, { name: e.target.value })} className="w-full border rounded px-1.5 py-0.5" style={{ borderColor: "#E2E0DA", background: "#fff" }} />
+                </td>
+                <td className="px-1 py-0.5">
+                  <input type="number" min={1} value={m.days} onChange={(e) => upd(i, { days: Number(e.target.value) || 1 })} className="border rounded px-1.5 py-0.5 tnum" style={{ borderColor: "#E2E0DA", background: "#fff", width: 52 }} />
+                </td>
+                <td className="px-1 py-0.5">
+                  <input value={(m.preds || []).join(",")} onChange={(e) => upd(i, { preds: e.target.value.split(",").map((x) => parseInt(x.trim(), 10)).filter((n) => n > 0) })} placeholder="—" className="border rounded px-1.5 py-0.5 tnum" style={{ borderColor: "#E2E0DA", background: "#fff", width: 56 }} />
+                </td>
+                <td className="px-1 py-0.5 tnum" style={{ color: "#5A6672", whiteSpace: "nowrap" }}>{sm ? `${fmt(sm.start)} → ${fmt(sm.end)}` : "—"}</td>
+                <td className="px-1 py-0.5">
+                  <input type="checkbox" checked={!!m.done} onChange={() => upd(i, { done: !m.done, done_on: !m.done ? TODAY : null })} style={{ accentColor: "#0D7A3F" }} />
+                </td>
+                <td className="px-1 py-0.5">
+                  <button onClick={() => setRows((r) => r.filter((_, x) => x !== i))} title="Remove" style={{ color: "#B8B5AC" }}>✕</button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="flex gap-2 mt-1.5">
+        <button onClick={() => setRows((r) => [...r, { name: "", days: 5, preds: r.length ? [r.length] : [], crew: {} as PlanMilestone["crew"], shift: "D", offset: 0 }])} className="text-xs font-bold rounded px-2 py-1 border" style={{ borderColor: "#E2E0DA", color: "#1B3A5C", background: "#fff" }}>＋ main item</button>
+        <button onClick={() => void save()} disabled={busy} className="text-xs font-bold rounded px-3 py-1" style={{ background: busy ? "#B9BEC4" : "#E8600A", color: "#fff" }}>{busy ? "Saving…" : "Save the project plan"}</button>
+      </div>
     </div>
   );
 }

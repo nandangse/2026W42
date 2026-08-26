@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.21",
+    date: "2026-08-26",
+    module: "Live Projects grows up — lightboxes, description, and the Project GANTT",
+    items: [
+      "LIVE PROJECTS IS NOW COLLAPSIBLE — jobs fold under their project band (Collapse all / Expand all on top), a job row opens the JOB LIGHTBOX, and Edit there opens the Job Plan in a NEW TAB so the project view stays put (/?job=… now deep-links straight to a plan).",
+      "THE PROJ NUMBER OPENS THE PROJECT'S OWN LIGHTBOX: description (written in Genie, survives every morning import), the full details, and the COMBINED GANTT — the project plan in orange on top, every job's milestones beneath, TDD diamonds, today line, month ruler. A job with no plan yet shows as a dashed span to its TDD.",
+      "THE PROJECT PLANNER CAN NOW PLAN THE PROJECT ITSELF — main items till delivery, seeded Design → Procurement → Fabrication → Assembly → Dispatch, same schema and same API as job plans, kept in project_plans/project_milestones (migration 0074). Direction noted: planning moves up to project level over time, so the shapes are identical on purpose.",
+    ],
+  },
+  {
     v: "3.23.1.20",
     date: "2026-08-26",
     module: "Live Projects — the project view of the live board",
