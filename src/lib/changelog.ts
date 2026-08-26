@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.23",
+    date: "2026-08-26",
+    module: "Mail signs with the sender's name",
+    items: [
+      "A MAIL FROM THE CRM NOW ARRIVES AS THE PERSON, not the bare address — the From header carries the sender's Genie display name (UTF-8 safe), so the inbox reads \"Raghunandan Jagdish\" rather than raghu@…",
+    ],
+  },
+  {
     v: "3.23.1.22",
     date: "2026-08-26",
     module: "Live Projects reads the money, and every job folds open",

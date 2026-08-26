@@ -126,10 +126,15 @@ export async function gmailGet(token: string, path: string): Promise<Record<stri
 /** Send: a simple RFC822 message, UTF-8, base64url. */
 export async function gmailSend(
   token: string, fromEmail: string, to: string, subject: string, body: string,
-  cc?: string, bcc?: string,
+  cc?: string, bcc?: string, fromName?: string,
 ): Promise<string> {
+  // The sender reads as the PERSON, not the address — RFC 2047-encoded so
+  // any script in the name survives the wire.
+  const from = fromName
+    ? `=?UTF-8?B?${Buffer.from(fromName).toString("base64")}?= <${fromEmail}>`
+    : fromEmail;
   const mime = [
-    `From: ${fromEmail}`,
+    `From: ${from}`,
     `To: ${to}`,
     ...(cc ? [`Cc: ${cc}`] : []),
     ...(bcc ? [`Bcc: ${bcc}`] : []),

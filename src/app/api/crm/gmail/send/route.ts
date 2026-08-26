@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     }
 
     const token = await accessTokenFor(String(mb.id));
-    const gmailId = await gmailSend(token, String(mb.email_address), to, subject, body, cc || undefined, bcc || undefined);
+    const gmailId = await gmailSend(token, String(mb.email_address), to, subject, body, cc || undefined, bcc || undefined, user.displayName || undefined);
 
     const db = crmDb();
     await db.from("message").upsert([{
