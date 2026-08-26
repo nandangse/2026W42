@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.31",
+    date: "2026-08-26",
+    module: "Mail reads like Gmail, and the list edits in bulk",
+    items: [
+      "COMMUNICATION PULLS THE REAL CORRESPONDENCE: on an opportunity, ⟳ Pull searches the connected mailbox for mail with the contact from SEVEN DAYS BEFORE THE ENQUIRY onward — full bodies now, not snippets — and lands it on the record.",
+      "EVERY MAIL IN THE FEED CAN BE REPLIED TO — ↩ Reply opens the composer with Re: on the subject, the original quoted below, and the reply THREADS in Gmail under the same conversation. Inbound replies go to the sender; your own outbound replies chase the recipient.",
+      "SELECT ROWS WITH THE NEW CHECKBOXES and ✎ EDIT n SELECTED appears — pick one field, one value, and it lands on every selected record; a link, select, date, number or yes/no keeps its proper input.",
+      "Group-by sums now read in LAKHS AND CRORES — ₹18.28 Cr, not a ten-digit number.",
+    ],
+  },
+  {
     v: "3.23.1.30",
     date: "2026-08-26",
     module: "Group by, with the summation beside it",

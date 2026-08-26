@@ -149,10 +149,24 @@ export default function CrmApp({
     return () => clearTimeout(t);
   }, [qLive]);
 
+  /** Multi-select for the bulk Edit — checked row ids. */
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkField, setBulkField] = useState("");
+  const [bulkValue, setBulkValue] = useState("");
+  const [bulkBusy, setBulkBusy] = useState<string>("");
+  const toggleSel = (id: string) => setSel((c) => {
+    const n = new Set(c);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+
   /** Group-by: aggregate the filtered set, shown in a right-side drawer. */
   const [groupBy, setGroupBy] = useState("");
   const [sumOn, setSumOn] = useState(false);
   const [groups, setGroups] = useState<{ field: string; hasMoney: boolean; total: number; sumTotal: number; groups: { key: string; label: string; count: number; sum: number }[] } | null>(null);
+  /** Such records total in lakhs and crores (Dr Raghu, 26 Aug 2026). */
+  const lakhCr = (n: number) => n >= 1e7 ? `₹ ${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹ ${(n / 1e5).toFixed(1)} L` : `₹ ${Math.round(n).toLocaleString("en-IN")}`;
 
   const listParams = useCallback(() => {
     const p = new URLSearchParams();
@@ -173,7 +187,7 @@ export default function CrmApp({
       .then(async (r) => { const j = await r.json(); if (r.ok) setGroups(j); })
       .catch(() => {});
   }, [groupBy, slug, listParams]);
-  useEffect(() => { setGroupBy(""); }, [slug]);
+  useEffect(() => { setGroupBy(""); setSel(new Set()); setBulkOpen(false); }, [slug]);
 
   const load = useCallback(async () => {
     if (!DOCTYPES.some((d) => d.name === slug)) { setLoading(false); setRows([]); return; }
@@ -508,6 +522,13 @@ export default function CrmApp({
                 />
               )}
             </div>
+            {sel.size > 0 && (
+              <button onClick={() => { setBulkOpen(true); setBulkField(""); setBulkValue(""); setBulkBusy(""); }}
+                className="px-3 py-1.5 rounded text-sm font-bold"
+                style={{ background: NAVY, color: "#fff" }}>
+                ✎ Edit {sel.size} selected
+              </button>
+            )}
             <span className="text-xs tnum" style={{ color: MUTED }}>
               {loading
                 ? "loading…"
@@ -558,7 +579,7 @@ export default function CrmApp({
                     <span className="text-sm" style={{ flex: 1, color: g.key ? INK : MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={g.label}>{g.label}</span>
                     <b className="text-sm tnum" style={{ color: NAVY }}>{g.count.toLocaleString("en-IN")}</b>
                     {sumOn && groups.hasMoney && (
-                      <span className="text-xs tnum" style={{ color: "#7C3AED", minWidth: 76, textAlign: "right" }}>₹ {Math.round(g.sum).toLocaleString("en-IN")}</span>
+                      <span className="text-xs tnum" style={{ color: "#7C3AED", minWidth: 76, textAlign: "right" }}>{lakhCr(g.sum)}</span>
                     )}
                   </div>
                 ))}
@@ -566,7 +587,7 @@ export default function CrmApp({
                   <div className="flex items-baseline gap-2 px-3 py-2" style={{ background: "#F7F5F0" }}>
                     <b className="text-sm" style={{ flex: 1 }}>Total</b>
                     <b className="text-sm tnum" style={{ color: NAVY }}>{groups.total.toLocaleString("en-IN")}</b>
-                    <b className="text-xs tnum" style={{ color: "#7C3AED", minWidth: 76, textAlign: "right" }}>₹ {Math.round(groups.sumTotal).toLocaleString("en-IN")}</b>
+                    <b className="text-xs tnum" style={{ color: "#7C3AED", minWidth: 76, textAlign: "right" }}>{lakhCr(groups.sumTotal)}</b>
                   </div>
                 )}
               </div>
@@ -641,6 +662,84 @@ export default function CrmApp({
             </div>
           )}
 
+          {bulkOpen && (() => {
+            const editable = dt.fields.filter((f) => !f.virtual && f.type !== "readonly" && f.name !== dt.autoNumber?.field);
+            const bf = editable.find((f) => f.name === bulkField);
+            const apply = async () => {
+              setBulkBusy("working");
+              let done = 0, failed = 0;
+              for (const rid of sel) {
+                try {
+                  const r = await fetch(`/api/crm/${slug}?id=${encodeURIComponent(rid)}`, {
+                    method: "PATCH", headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ [bulkField]: bf?.type === "bool" ? bulkValue === "true" : bulkValue }),
+                  });
+                  if (r.ok) done++; else failed++;
+                } catch { failed++; }
+                setBulkBusy(`${done + failed}/${sel.size}…`);
+              }
+              setBulkBusy(`Changed ${done}${failed ? ` · ${failed} refused` : ""}`);
+              await load();
+              if (!failed) { setBulkOpen(false); setSel(new Set()); }
+            };
+            return (
+              <div onClick={() => bulkBusy === "" || bulkBusy.startsWith("Changed") ? setBulkOpen(false) : null}
+                style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(27,45,107,.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "80px 16px" }}>
+                <div onClick={(e) => e.stopPropagation()} className="rounded" style={{ background: "#fff", width: "min(440px,100%)", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
+                  <div className="flex items-center justify-between px-4 py-2.5" style={{ background: NAVY, borderRadius: "6px 6px 0 0" }}>
+                    <b className="text-white text-sm">✎ Edit {sel.size} selected {sel.size === 1 ? dt.label.toLowerCase() : dt.plural.toLowerCase()}</b>
+                    <button onClick={() => setBulkOpen(false)} className="font-bold" style={{ color: "#C8D2DC" }}>✕</button>
+                  </div>
+                  <div className="p-4" style={{ display: "grid", gap: 10 }}>
+                    <label className="text-xs font-bold" style={{ color: MUTED }}>
+                      FIELD
+                      <select value={bulkField} onChange={(e) => { setBulkField(e.target.value); setBulkValue(""); }}
+                        className="w-full mt-1 px-2 py-1.5 rounded text-sm border font-normal" style={{ borderColor: BORDER, background: "#fff" }}>
+                        <option value="">— choose —</option>
+                        {editable.map((f) => <option key={f.name} value={f.name}>{f.label}</option>)}
+                      </select>
+                    </label>
+                    {bf && (
+                      <label className="text-xs font-bold" style={{ color: MUTED }}>
+                        NEW VALUE — set on every selected record
+                        {bf.type === "select" ? (
+                          <select value={bulkValue} onChange={(e) => setBulkValue(e.target.value)}
+                            className="w-full mt-1 px-2 py-1.5 rounded text-sm border font-normal" style={{ borderColor: BORDER, background: "#fff" }}>
+                            <option value="">—</option>
+                            {(bf.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        ) : bf.type === "link" ? (
+                          <select value={bulkValue} onChange={(e) => setBulkValue(e.target.value)}
+                            className="w-full mt-1 px-2 py-1.5 rounded text-sm border font-normal" style={{ borderColor: BORDER, background: "#fff" }}>
+                            <option value="">—</option>
+                            {(links[bf.link as string] ?? []).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                          </select>
+                        ) : bf.type === "bool" ? (
+                          <select value={bulkValue} onChange={(e) => setBulkValue(e.target.value)}
+                            className="w-full mt-1 px-2 py-1.5 rounded text-sm border font-normal" style={{ borderColor: BORDER, background: "#fff" }}>
+                            <option value="">—</option><option value="true">Yes</option><option value="false">No</option>
+                          </select>
+                        ) : (
+                          <input type={bf.type === "date" ? "date" : bf.type === "number" || bf.type === "money" ? "number" : "text"}
+                            value={bulkValue} onChange={(e) => setBulkValue(e.target.value)}
+                            className="w-full mt-1 px-2 py-1.5 rounded text-sm border font-normal" style={{ borderColor: BORDER, background: "#fff" }} />
+                        )}
+                      </label>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => void apply()} disabled={!bulkField || bulkValue === "" || bulkBusy === "working" || /\d\//.test(bulkBusy)}
+                        className="px-4 py-1.5 rounded text-sm font-bold"
+                        style={{ background: !bulkField || bulkValue === "" ? "#B9BEC4" : ORANGE, color: "#fff" }}>
+                        Apply to {sel.size}
+                      </button>
+                      {bulkBusy && <span className="text-xs font-semibold" style={{ color: bulkBusy.includes("refused") ? "#8E2C20" : MUTED }}>{bulkBusy}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {adding && (
             <div
               onClick={() => setAdding(false)}
@@ -705,6 +804,12 @@ export default function CrmApp({
               <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, minWidth: 520 }}>
                 <thead>
                   <tr>
+                    <th style={{ position: "sticky", top: 0, zIndex: 8, background: "#fff", boxShadow: `inset 0 -2px 0 ${BORDER}`, width: 30, padding: "8px 4px 8px 10px" }}>
+                      <input type="checkbox"
+                        checked={rows.length > 0 && rows.every((r) => sel.has(String(r.id)))}
+                        onChange={(e) => setSel(e.target.checked ? new Set(rows.map((r) => String(r.id))) : new Set())}
+                        title="Select everything on screen" style={{ accentColor: NAVY }} />
+                    </th>
                     {visible.map((f, ci) => (
                       <th
                         key={f.name}
@@ -744,6 +849,10 @@ export default function CrmApp({
                       style={{ cursor: "pointer" }}
                       className="crm-row"
                     >
+                      <td onClick={(e) => { e.stopPropagation(); toggleSel(String(r.id)); }}
+                        style={{ padding: "8px 4px 8px 10px", borderBottom: "1px solid #F0EEE8", background: "#fff", width: 30 }}>
+                        <input type="checkbox" checked={sel.has(String(r.id))} readOnly style={{ accentColor: NAVY, pointerEvents: "none" }} />
+                      </td>
                       {visible.map((f, ci) => (
                         <td
                           key={f.name}
@@ -1533,10 +1642,14 @@ function CommsFeed({
   type FeedRow = {
     kind: string; at: string; type: string; by: string | null; with: string | null;
     result: string | null; text: string | null; next_action: string | null; next_action_on: string | null;
+    channel?: string | null; direction?: string | null; subject?: string | null;
+    from_handle?: string | null; to_handles?: string[] | null;
+    thread_key?: string | null; rfc_message_id?: string | null;
   };
   const [feed, setFeed] = useState<FeedRow[] | null>(null);
   const [err, setErr] = useState("");
   const [logging, setLogging] = useState(false);
+  const [replyCtx, setReplyCtx] = useState<ComposeCtx | null>(null);
   const [tick, setTick] = useState(0);
   const [logLinks, setLogLinks] = useState<Links | null>(null);
   const [gmail, setGmail] = useState<{ connected: boolean; email: string | null } | null>(null);
@@ -1579,12 +1692,12 @@ function CommsFeed({
   };
 
   const pullMail = async () => {
-    if (!contactEmail) return;
+    if (!contactEmail && type !== "opportunity") return;
     setMailBusy(true); setMailMsg("");
     try {
       const r = await fetch("/api/crm/gmail/pull", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: contactEmail, ...refs() }),
+        body: JSON.stringify({ email: contactEmail ?? "", ...refs() }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Could not pull");
@@ -1705,17 +1818,48 @@ function CommsFeed({
       {feed !== null && feed.length === 0 && (
         <div className="text-sm" style={{ color: MUTED }}>Nothing said yet — the first call starts the trail.</div>
       )}
+      {replyCtx && (
+        <MailComposer ctx={replyCtx} onClose={() => setReplyCtx(null)}
+          onSent={() => { setReplyCtx(null); setTick((t) => t + 1); }} />
+      )}
       {(feed ?? []).map((f, i) => (
         <div key={i} className="rounded border p-2.5 mb-2" style={{ borderColor: BORDER, borderLeft: `3px solid ${resultColor(f.result) === MUTED ? BORDER : resultColor(f.result)}` }}>
           <div className="flex items-baseline gap-2 flex-wrap text-xs" style={{ color: MUTED }}>
             <span style={{ fontSize: 14 }}>{icon(f.type)}</span>
-            <b style={{ color: INK }}>{f.type}</b>
+            {f.channel === "email" && f.subject
+              ? <b style={{ color: INK }}>{f.direction === "inbound" ? "⬇" : "⬆"} {f.subject}</b>
+              : <b style={{ color: INK }}>{f.type}</b>}
             {f.result && <b style={{ color: resultColor(f.result) }}>{f.result}</b>}
             <span className="tnum">{fmtDate(String(f.at))}</span>
-            {f.by && <span>by {f.by}</span>}
+            {f.by && <span>{f.channel === "email" ? "from" : "by"} {f.by}</span>}
             {f.with && <span>with {f.with}</span>}
+            {f.channel === "email" && (
+              <button
+                onClick={() => {
+                  // reply to whoever ISN'T us: the sender of an inbound, the
+                  // recipient of our own outbound
+                  const pick = (h: string | null | undefined) => (h?.match(/[^\s<>,;"']+@[^\s<>,;"']+/) ?? [null])[0];
+                  const to = f.direction === "inbound" ? pick(f.from_handle) : pick(f.to_handles?.[0]);
+                  setReplyCtx({
+                    to, refs: refs() as ComposeCtx["refs"], chain: [],
+                    reply: {
+                      subject: f.subject ?? null, threadKey: f.thread_key ?? null,
+                      rfcMessageId: f.rfc_message_id ?? null,
+                      quoted: f.text ?? null, quotedFrom: f.from_handle ?? null,
+                      quotedAt: fmtDate(String(f.at)),
+                    },
+                  });
+                }}
+                className="rounded px-1.5 font-bold" style={{ background: NAVY_SOFT, color: NAVY }}>
+                ↩ Reply
+              </button>
+            )}
           </div>
-          {f.text && <div className="text-sm mt-1" style={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>{f.text}</div>}
+          {f.text && (
+            <div className="text-sm mt-1" style={{ lineHeight: 1.5, overflowWrap: "anywhere", whiteSpace: f.channel === "email" ? "pre-wrap" : undefined, maxHeight: 220, overflowY: "auto" }}>
+              {f.text}
+            </div>
+          )}
           {f.next_action && (
             <div className="text-xs mt-1" style={{ color: "#B45309" }}>
               → {f.next_action}{f.next_action_on ? ` · ${fmtDate(String(f.next_action_on))}` : ""}

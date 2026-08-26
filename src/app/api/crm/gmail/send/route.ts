@@ -48,11 +48,13 @@ export async function POST(req: Request) {
     }
 
     const token = await accessTokenFor(String(mb.id));
-    const gmailId = await gmailSend(token, String(mb.email_address), to, subject, body, cc || undefined, bcc || undefined, user.displayName || undefined);
+    const gmailId = await gmailSend(token, String(mb.email_address), to, subject, body, cc || undefined, bcc || undefined, user.displayName || undefined,
+      { threadId: b.thread_key ? String(b.thread_key) : null, inReplyTo: b.in_reply_to ? String(b.in_reply_to) : null });
 
     const db = crmDb();
     await db.from("message").upsert([{
       channel: "email", direction: "outbound", external_id: gmailId,
+      thread_key: b.thread_key ? String(b.thread_key) : null,
       subject, body_text: body, from_handle: mb.email_address,
       to_handles: [to, ...(cc ? [cc] : []), ...(bcc ? [bcc] : [])],
       attachments: attachments,

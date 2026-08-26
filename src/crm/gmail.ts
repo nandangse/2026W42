@@ -127,6 +127,7 @@ export async function gmailGet(token: string, path: string): Promise<Record<stri
 export async function gmailSend(
   token: string, fromEmail: string, to: string, subject: string, body: string,
   cc?: string, bcc?: string, fromName?: string,
+  reply?: { threadId?: string | null; inReplyTo?: string | null },
 ): Promise<string> {
   // The sender reads as the PERSON, not the address — RFC 2047-encoded so
   // any script in the name survives the wire.
@@ -139,6 +140,7 @@ export async function gmailSend(
     ...(cc ? [`Cc: ${cc}`] : []),
     ...(bcc ? [`Bcc: ${bcc}`] : []),
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
+    ...(reply?.inReplyTo ? [`In-Reply-To: ${reply.inReplyTo}`, `References: ${reply.inReplyTo}`] : []),
     "MIME-Version: 1.0",
     'Content-Type: text/plain; charset="UTF-8"',
     "Content-Transfer-Encoding: base64",
@@ -148,7 +150,7 @@ export async function gmailSend(
   const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({ raw: Buffer.from(mime).toString("base64url") }),
+    body: JSON.stringify({ raw: Buffer.from(mime).toString("base64url"), ...(reply?.threadId ? { threadId: reply.threadId } : {}) }),
   });
   const j = await r.json();
   if (!r.ok) throw new Error((j.error as { message?: string })?.message || "Gmail refused the send");

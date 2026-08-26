@@ -43,7 +43,7 @@ export async function GET(req: Request) {
     let msgs: Record<string, unknown>[] = [];
     if (fk.message) {
       const { data } = await db.from("message")
-        .select("id, channel, direction, subject, body_text, from_handle, occurred_at")
+        .select("id, channel, direction, subject, body_text, from_handle, to_handles, occurred_at, thread_key, raw_payload")
         .eq(fk.message, id)
         .order("occurred_at", { ascending: false })
         .limit(300);
@@ -78,7 +78,13 @@ export async function GET(req: Request) {
         by: m.from_handle ? String(m.from_handle) : null,
         with: null,
         result: null,
-        text: m.subject ? `${m.subject}${m.body_text ? " — " + String(m.body_text).slice(0, 300) : ""}` : String(m.body_text ?? "").slice(0, 300),
+        text: String(m.body_text ?? "").slice(0, 4000),
+        // everything a Reply needs to thread like Gmail does
+        subject: m.subject ? String(m.subject) : null,
+        from_handle: m.from_handle ? String(m.from_handle) : null,
+        to_handles: (m.to_handles as string[] | null) ?? null,
+        thread_key: m.thread_key ? String(m.thread_key) : null,
+        rfc_message_id: (m.raw_payload as { rfc_message_id?: string } | null)?.rfc_message_id ?? null,
         next_action: null,
         next_action_on: null,
       })),

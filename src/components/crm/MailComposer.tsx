@@ -14,6 +14,9 @@ export type ComposeCtx = {
   to?: string | null;
   refs: { person_id?: string; company_id?: string; opportunity_id?: string; quotation_id?: string; lead_id?: string };
   chain: string[];             // "Opportunity ENQ-…", "Company X", "Contact Y"
+  /** Replying: the subject gains its Re:, the original is quoted below, and
+   *  Gmail threads it under the same conversation. */
+  reply?: { subject: string | null; threadKey: string | null; rfcMessageId: string | null; quoted: string | null; quotedFrom: string | null; quotedAt: string | null };
 };
 
 type Attachment = { id: string; name: string; link: string };
@@ -27,8 +30,14 @@ export default function MailComposer({ ctx, onClose, onSent }: {
   const [cc, setCc] = useState("");
   const [bcc, setBcc] = useState("");
   const [showCc, setShowCc] = useState(false);
-  const [subject, setSubject] = useState("");
-  const [bodyText, setBodyText] = useState("");
+  const [subject, setSubject] = useState(() => {
+    const s0 = ctx.reply?.subject ?? "";
+    return ctx.reply ? (/^re:/i.test(s0) ? s0 : `Re: ${s0}`) : "";
+  });
+  const [bodyText, setBodyText] = useState(() => ctx.reply?.quoted
+    ? `\n\nOn ${ctx.reply.quotedAt ?? ""}, ${ctx.reply.quotedFrom ?? ""} wrote:\n` +
+      ctx.reply.quoted.split("\n").map((l) => "> " + l).join("\n")
+    : "");
   const [tpl, setTpl] = useState("");
   const [files, setFiles] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -80,7 +89,10 @@ export default function MailComposer({ ctx, onClose, onSent }: {
     try {
       const r = await fetch("/api/crm/gmail/send", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ to, cc, bcc, subject, body: bodyText, attachments: files, ...ctx.refs }),
+        body: JSON.stringify({
+          to, cc, bcc, subject, body: bodyText, attachments: files, ...ctx.refs,
+          thread_key: ctx.reply?.threadKey ?? null, in_reply_to: ctx.reply?.rfcMessageId ?? null,
+        }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Could not send");
@@ -98,7 +110,7 @@ export default function MailComposer({ ctx, onClose, onSent }: {
       <div onClick={(e) => e.stopPropagation()} className="rounded" style={{ background: "#fff", width: "min(640px,100%)", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
         <div className="flex items-center justify-between px-4 py-2.5" style={{ background: NAVY, borderRadius: "6px 6px 0 0" }}>
           <div className="text-white font-bold" style={{ fontSize: 14 }}>
-            ✉ New mail {gmail?.email && <span style={{ fontWeight: 400, color: "#C8D2EC", fontSize: 12 }}>· as {gmail.email}</span>}
+            {ctx.reply ? "↩ Reply" : "✉ New mail"} {gmail?.email && <span style={{ fontWeight: 400, color: "#C8D2EC", fontSize: 12 }}>· as {gmail.email}</span>}
           </div>
           <button onClick={onClose} className="px-2 py-0.5 rounded text-sm font-semibold" style={{ background: NAVY_DARK, color: "#C8D2DC" }}>✕</button>
         </div>
