@@ -28,18 +28,24 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
   return (
     <>
       <style>{`
-        @page { size: A5 portrait; margin: 7mm; }
+        /* A5 LANDSCAPE, EXACT (Dr Raghu, 27 Aug 2026): the sheet is
+           210 × 148 mm and the slip box IS the sheet — zero page margin,
+           the breathing room lives inside the box as padding, and the
+           height is fixed with overflow hidden so no slip can ever push
+           onto a second sheet and shift every slip after it. */
+        @page { size: 210mm 148mm; margin: 0; }
         html, body { margin: 0; background: #EFEDE7; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #16232F; }
-        .slip { width: 148mm; box-sizing: border-box; margin: 0 auto 14px; background: #fff; padding: 7mm;
-                font-size: 9.5px; line-height: 1.45; }
+        .slip { width: 210mm; height: 148mm; box-sizing: border-box; margin: 0 auto 14px; background: #fff;
+                padding: 6mm 7mm; font-size: 9.5px; line-height: 1.4; overflow: hidden; }
         .slip table { width: 100%; border-collapse: collapse; }
         .slip td, .slip th { border: 1px solid #C9C6BD; padding: 2px 5px; }
-        .bandbar { width: 148mm; margin: 18px auto 4px; font-weight: 800; font-size: 13px; color: #1B3A5C; }
+        .bandbar { width: 210mm; margin: 18px auto 4px; font-weight: 800; font-size: 13px; color: #1B3A5C; }
         @media screen { .slip { box-shadow: 0 2px 12px rgba(20,30,40,.12); } }
         @media print {
           html, body { background: #fff; }
           .no-print, .bandbar { display: none !important; }
-          .slip { box-shadow: none; margin: 0; page-break-after: always; break-after: page; width: auto; padding: 0; }
+          .slip { box-shadow: none; margin: 0; page-break-after: always; break-after: page; }
+          .slip:last-child { page-break-after: auto; }
         }
       `}</style>
 

@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.25.0.1",
+    date: "2026-08-27",
+    module: "The slip is A5 landscape, exactly",
+    items: [
+      "THE SLIP PAGE IS THE SHEET: 210 × 148 mm with zero page margin — the breathing room lives inside the slip as padding, so what prints is exactly A5 landscape, edge for edge. The height is fixed with overflow hidden, so no slip can spill onto a second sheet and shift every slip after it out of step.",
+    ],
+  },
+  {
     v: "3.25.0.0",
     date: "2026-08-27",
     module: "Finalized Salary Sheets grows into a section",
