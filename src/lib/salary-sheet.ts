@@ -17,7 +17,15 @@ export const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ] as const;
 
-/** A parsed line: one person, one month. */
+/**
+ * A parsed line: one person, one month.
+ *
+ * The register columns are OPTIONAL AND NULLABLE on purpose: null means the
+ * uploaded sheet had no such column, which is different from 0 (the column
+ * was there and said nothing was deducted). The register prints a dash for
+ * null — for the past months the sheet is the only truth, and a figure the
+ * sheet never carried must not be invented (Dr Raghu, 24 Aug 2026).
+ */
 export interface SheetRow {
   employee_id: string | null;
   name: string | null;
@@ -25,7 +33,45 @@ export interface SheetRow {
   earned: number;
   deductions: number;
   net: number;
+  /* ── the register's own columns, as the sheet gives them ── */
+  attendance?: number | null;
+  paid_days?: number | null;
+  gross?: number | null;
+  basic_da?: number | null;
+  hra?: number | null;
+  fixed_allowance?: number | null;
+  conveyance?: number | null;
+  site_allowance?: number | null;
+  pf?: number | null;
+  pt?: number | null;
+  other_ded?: number | null;
+  loan?: number | null;
+  advance?: number | null;
+  tds?: number | null;
+  arrears?: number | null;
 }
+
+/** The register's printable columns, in the order the page shows them. */
+export const REGISTER_COLUMNS: { key: keyof SheetRow; label: string }[] = [
+  { key: "gross", label: "Gross Salary" },
+  { key: "attendance", label: "Attend." },
+  { key: "paid_days", label: "Paid Days" },
+  { key: "basic_da", label: "Earned Basic & DA" },
+  { key: "hra", label: "HRA" },
+  { key: "fixed_allowance", label: "Fixed Allow." },
+  { key: "conveyance", label: "Conveyance" },
+  { key: "site_allowance", label: "Site Allow." },
+  { key: "earned", label: "Earned Salary" },
+  { key: "pf", label: "PF" },
+  { key: "pt", label: "PT" },
+  { key: "other_ded", label: "Other Ded." },
+  { key: "loan", label: "Loan" },
+  { key: "advance", label: "Advance" },
+  { key: "tds", label: "TDS" },
+  { key: "deductions", label: "Total Ded." },
+  { key: "arrears", label: "Arrears" },
+  { key: "net", label: "Net Pay" },
+];
 
 export interface SheetTotals {
   staff_count: number; staff_value: number;
@@ -67,9 +113,33 @@ const COLUMN_RULES: { key: keyof SheetRow | "skip"; test: (h: string) => boolean
   { key: "employee_id", test: (h) => /^(employeeid|empid|empcode|code|employeecode|ecode|id)$/.test(h) },
   { key: "name", test: (h) => /^(name|employeename|empname|nameofemployee)$/.test(h) },
   { key: "type", test: (h) => /^(type|category|employeetype|emptype|cadre)$/.test(h) },
+  // ── the register columns, SPECIFIC BEFORE GENERIC: "earnedbasicda" must
+  //    land on basic_da before the generic /earned/ rule can eat it, and
+  //    "otherdeductions" on other_ded before /deduction/ does ──
+  { key: "attendance", test: (h) => /^(attendance|attendancedays|presentdays|dayspresent|daysworked|present)$/.test(h) },
+  { key: "paid_days", test: (h) => /(paiddays|payabledays|paydays|totalpaiddays)/.test(h) },
+  { key: "basic_da", test: (h) => /basic/.test(h) && !/pf|arrear/.test(h) },
+  { key: "hra", test: (h) => /^hra(earned)?$|houserent/.test(h) },
+  { key: "fixed_allowance", test: (h) => /fixedallow|fixedall/.test(h) },
+  { key: "conveyance", test: (h) => /convey/.test(h) },
+  { key: "site_allowance", test: (h) => /siteallow|sitepay|siteall/.test(h) },
+  { key: "pf", test: (h) => /^(pf|epf|providentfund|pfamount|pfdeduction|pfemployee)$/.test(h) },
+  { key: "pt", test: (h) => /^(pt|proftax|professionaltax|ptax)$/.test(h) },
+  { key: "tds", test: (h) => /^tds|taxdeducted/.test(h) },
+  { key: "loan", test: (h) => /^loan/.test(h) },
+  { key: "advance", test: (h) => /advance/.test(h) },
+  { key: "other_ded", test: (h) => /otherded|othded|misc(ellaneous)?ded/.test(h) },
+  { key: "arrears", test: (h) => /arrear/.test(h) },
+  { key: "gross", test: (h) => /^(gross|grosssalary|grosspay|monthlygross|fixedgross)$/.test(h) },
   { key: "net", test: (h) => /(netpayable|netsalary|netpay|netamount|amountpayable|takehome)/.test(h) || h === "net" },
   { key: "deductions", test: (h) => /(totaldeduction|deduction|lessdeduction|recovery)/.test(h) },
-  { key: "earned", test: (h) => /(earnedgross|grossearned|earnedsalary|totalearning|earning|earnedpay|earned|grosssalary|grosspay|gross)/.test(h) },
+  { key: "earned", test: (h) => /(earnedgross|grossearned|earnedsalary|totalearning|earning|earnedpay|earned|grosspay)/.test(h) },
+];
+
+/** The register fields read per line when their column exists. */
+const REGISTER_KEYS: (keyof SheetRow)[] = [
+  "attendance", "paid_days", "gross", "basic_da", "hra", "fixed_allowance", "conveyance",
+  "site_allowance", "pf", "pt", "other_ded", "loan", "advance", "tds", "arrears",
 ];
 
 /** Rows near the top of a hand-built sheet are banners; find the real header. */
@@ -130,12 +200,17 @@ export function parseSheet(grid: unknown[][]): { rows: SheetRow[]; mapping: Mapp
     if (!id && !name) continue;
     if (!earned && !deductions && !net) continue;
 
-    rows.push({
+    const row: SheetRow = {
       employee_id: id || null,
       name: name || null,
       type: String(at("type") ?? "").trim() || null,
       earned, deductions, net,
-    });
+    };
+    // null when the sheet has no such column — the register prints a dash,
+    // never a zero the sheet did not say
+    for (const k of REGISTER_KEYS)
+      (row as unknown as Record<string, unknown>)[k] = colOf[k] === undefined ? null : money(at(k));
+    rows.push(row);
   }
 
   if (!rows.length) warnings.push("No pay lines were read from the file.");

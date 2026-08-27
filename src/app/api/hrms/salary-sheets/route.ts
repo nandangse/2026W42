@@ -149,6 +149,56 @@ export async function POST(req: Request) {
     const id = String(body.id || "");
     if (!id) throw new HttpError(400, "Which sheet?");
 
+    /**
+     * { action: "reparse" } — read the SAME stored file again with the
+     * current parser. Exists because the parser learns columns over time
+     * (the register set arrived after July was uploaded); the data still
+     * comes from the sheet alone — this changes what we UNDERSTOOD of the
+     * file, never the file. A frozen month is a record: owner only.
+     */
+    if (action === "reparse") {
+      const { data: sheet } = await admin.from("hrms_salary_sheet").select("*").eq("id", String(body.id || "")).maybeSingle();
+      if (!sheet) throw new HttpError(404, "No such sheet.");
+      if (sheet.status === "Frozen" && !owner)
+        throw new HttpError(409, "That month is frozen — only Dr Raghu may re-read it.");
+      if (!sheet.file_path) throw new HttpError(400, "There is no stored file to read.");
+
+      const { data: blob, error: dl } = await admin.storage.from(BUCKET).download(String(sheet.file_path));
+      if (dl || !blob) throw new HttpError(502, `Could not fetch the stored file: ${dl?.message || "empty"}`);
+      const buf = Buffer.from(await blob.arrayBuffer());
+      let grid: unknown[][];
+      try {
+        const wb = XLSX.read(buf, { type: "buffer", raw: false });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        if (!ws) throw new Error("the file has no sheet in it");
+        grid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false }) as unknown[][];
+      } catch (e) {
+        throw new HttpError(400, `The stored file could not be read: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      const { rows, mapping } = parseSheet(grid);
+
+      const T2 = await hrmsTables(admin);
+      const typeById2 = new Map<string, string>();
+      const ids2 = [...new Set(rows.map((r) => r.employee_id).filter(Boolean))] as string[];
+      if (ids2.length) {
+        const [{ data: emps2 }, { data: eds2 }] = await Promise.all([
+          admin.from(T2.employees).select("id, extra").in("id", ids2),
+          admin.from(T2.edits).select("employee_id, value").eq("field", "type").in("employee_id", ids2),
+        ]);
+        for (const e of emps2 || []) {
+          const t = ((e.extra || {}) as Record<string, string>)["Type"];
+          if (t) typeById2.set(String(e.id), String(t));
+        }
+        for (const e of eds2 || []) if (e.value) typeById2.set(String(e.employee_id), String(e.value));
+      }
+      const totals2 = totalsFor(rows as SheetRow[], (i) => (i ? typeById2.get(i) ?? null : null));
+
+      const { error } = await admin.from("hrms_salary_sheet")
+        .update({ rows, mapping, ...totals2, updated_at: now }).eq("id", String(body.id));
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, lines: rows.length, mapping });
+    }
+
     /** What actually left the bank — HR's reconciliation figure. */
     if (action === "paid") {
       const paid = String(body.paid_to_bank ?? "").trim();

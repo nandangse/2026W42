@@ -153,6 +153,12 @@ export default function SalarySheets({ who: me, isOwner }: { who: string; isOwne
                     {s.frozen_at ? <><b style={{ color: C.green }}>{day(s.frozen_at)}</b><div style={{ fontSize: 10, color: C.faint }}>{who(s.frozen_by)}</div></> : <span style={{ color: C.faint }}>—</span>}
                   </td>
                   <td className="px-2 py-1.5 whitespace-nowrap no-print">
+                    <a href={`/hrms/salary-register/${s.id}/print`} target="_blank" rel="noopener noreferrer"
+                      className="rounded px-2 py-1 font-bold mr-1 inline-block"
+                      style={{ background: "#1B3A5C", color: "#fff", fontSize: 10.5 }}
+                      title="The month's salary register — MIS summary first, then every line, landscape">
+                      📄 Register
+                    </a>
                     {isOwner && (s.status === "Frozen"
                       ? <button onClick={() => { if (window.confirm(`Unfreeze ${MONTHS[s.month - 1]} ${s.year}? It stops being a closed record until you freeze it again.`)) act({ action: "unfreeze", id: s.id }, "Unfrozen"); }} disabled={busy}
                           className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: "#8A5B00", border: `1px solid ${C.line}`, fontSize: 10.5 }}>Unfreeze</button>
@@ -264,6 +270,9 @@ function SheetBox({ id, onClose }: { id: string; onClose: () => void }) {
             <div style={{ fontSize: 11.5, color: C.faint }}>{d?.file_name} · {d?.rows?.length || 0} lines</div>
           </div>
           <div className="flex gap-2 items-center">
+            <a href={`/hrms/salary-register/${id}/print`} target="_blank" rel="noopener noreferrer"
+              className="rounded px-2 py-1 font-bold" style={{ background: "#1B3A5C", color: "#fff", fontSize: 11.5 }}>📄 Register PDF</a>
+            <ReRead id={id} onDone={() => { setD(null); setErr(""); api.get(`/api/hrms/salary-sheets?id=${encodeURIComponent(id)}`).then((j) => setD(j.sheet)).catch((e) => setErr(e instanceof Error ? e.message : String(e))); }} />
             {d?.fileUrl && <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" className="rounded px-2 py-1 font-bold" style={{ background: "#F4F2EC", color: C.dim, fontSize: 11.5 }}>Open the original file</a>}
             <button onClick={onClose} className="text-sm font-bold px-2 py-1" style={{ color: C.faint }}>✕ Close</button>
           </div>
@@ -305,6 +314,33 @@ function SheetBox({ id, onClose }: { id: string; onClose: () => void }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Re-read the SAME stored file with the current parser. The parser learns
+ * columns over time — the register set arrived after July was uploaded — and
+ * this brings an old month's stored lines up to what the file always said.
+ */
+function ReRead({ id, onDone }: { id: string; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  return (
+    <>
+      <button
+        onClick={async () => {
+          setBusy(true); setMsg("");
+          try { const j = await api.post("/api/hrms/salary-sheets", { action: "reparse", id }); setMsg(`re-read ✓ ${j.lines} lines`); onDone(); }
+          catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+          setBusy(false);
+        }}
+        disabled={busy}
+        className="rounded px-2 py-1 font-bold" style={{ background: "#F4F2EC", color: C.dim, fontSize: 11.5 }}
+        title="Parse the stored file again with the current column set — the data still comes from the sheet alone">
+        {busy ? "reading…" : "↻ Re-read the file"}
+      </button>
+      {msg && <span className="text-xs font-semibold" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</span>}
+    </>
   );
 }
 

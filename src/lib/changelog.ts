@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.22.2.0",
+    date: "2026-08-24",
+    module: "HRMS — the Salary Register PDF",
+    items: [
+      "THE MONTH'S REGISTER ON PAPER, one button from Finalized Salary Sheets: landscape, because nineteen columns is a ledger and a ledger lies on its side. Employee ID, Name, Gross, Attendance, Paid Days, Earned Basic & DA, HRA, Fixed Allowance, Conveyance, Site Allowance, Earned Salary, PF, PT, Other Deductions, Loan, Advance, TDS, Total Deductions, Arrears, Net Pay — with the totals row at the foot and the header repeating on every page.",
+      "PAGE 1 IS THE MIS: the headline totals (employees, earned, deductions, net, paid to bank with its gap), WHERE THE EARNINGS SIT and WHERE THE DEDUCTIONS GO drawn as proportional bars, and the NET PAY SPREAD as a histogram — every figure summed from the sheet's own lines.",
+      "FOR THE PAST MONTHS THE SHEET IS THE ONLY TRUTH. A column the sheet never carried prints as a dash and is named on page 1 — never a zero that would read as “nothing was deducted”, and never a computed guess. The format changes from August; this page prints whatever the file said.",
+      "THE PARSER NOW READS THE FULL REGISTER — attendance, paid days, every earning component, every deduction head, arrears — matching each column by meaning, specific before generic, so “Earned Basic & DA” cannot be eaten by the generic earned rule.",
+      "↻ RE-READ THE FILE, inside a month's drawer: parses the SAME stored file again with the current column set, for months uploaded before the parser knew these columns. It changes what we understood of the file, never the file — and a frozen month re-reads only on RJ's say-so.",
+    ],
+  },
+  {
     v: "3.23.1.44",
     date: "2026-08-27",
     module: "The software description learns the CRM",
