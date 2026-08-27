@@ -141,14 +141,6 @@ export const NAV: NavSection[] = [
     built: false,
   },
   {
-    key: "statutory",
-    label: "Statutory Records",
-    icon: "⚖️",
-    blurb: "PF, ESIC, MLWF, PoSH and the compliance calendar.",
-    built: false,
-    source: "EPF & ESI (43), MLWF (44), PoSH (45) and Compliance Calendar (27) in the Salary Sheet.",
-  },
-  {
     key: "queries",
     label: "HR Queries",
     icon: "❓",
@@ -168,8 +160,23 @@ export const NAV: NavSection[] = [
     key: "salary",
     label: "Finalized Salary Sheets",
     icon: "💰",
-    blurb: "One row per month: the file, the Staff and Labour split, the totals, and the date RJ froze it.",
-    built: true,
+    items: [
+      {
+        key: "salary.sheets", label: "Salary Sheets",
+        blurb: "One row per month: the file, the split, the totals, and the date RJ froze it. The register, the slips and the returns all start here.",
+        built: true,
+      },
+      {
+        key: "salary.slips", label: "Salary Slips",
+        blurb: "Every slip of every frozen month — who earned what, who was paid what, and the date each person first opened their own slip.",
+        built: true,
+      },
+      {
+        key: "salary.statutory", label: "Statutory Records",
+        blurb: "PF, PT, MLWF, ESIC and TDS returns, month by month — available once the month is frozen, read from the sheet alone.",
+        built: true,
+      },
+    ],
   },
   {
     key: "registers",

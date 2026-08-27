@@ -120,12 +120,16 @@ export default function SalarySheets({ who: me, isOwner }: { who: string; isOwne
                 <tr key={s.id} style={{ borderBottom: "1px solid #F2F0EA" }}>
                   <td className="px-2 py-1.5 font-bold">{MONTHS[s.month - 1]}</td>
                   <td className="px-2 py-1.5 tnum">{s.year}</td>
-                  <td className="px-2 py-1.5" style={{ maxWidth: 200 }}>
-                    <button onClick={() => setOpen(s.id)} className="text-left" style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2 }}>
+                  <td className="px-2 py-1.5" style={{ maxWidth: 190 }}>
+                    <button onClick={() => setOpen(s.id)} className="text-left block w-full"
+                      title={s.file_name || ""}
+                      style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {s.file_name || "(no file)"}
                     </button>
-                    {warn > 0 && <span className="ml-1 rounded px-1 font-bold" style={{ fontSize: 9.5, background: "#FFF3E8", color: "#8A5B00" }} title="the parser had something to say">!{warn}</span>}
-                    <div style={{ fontSize: 10, color: C.faint }}>{who(s.uploaded_by)} · {day(s.uploaded_at)}</div>
+                    <div style={{ fontSize: 10, color: C.faint, whiteSpace: "nowrap" }}>
+                      {who(s.uploaded_by)} · {day(s.uploaded_at)}
+                      {warn > 0 && <span className="ml-1 rounded px-1 font-bold" style={{ fontSize: 9, background: "#FFF3E8", color: "#8A5B00" }} title="the parser had something to say">!{warn}</span>}
+                    </div>
                   </td>
                   <td className="px-2 py-1.5">
                     <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: s.status === "Frozen" ? "#E6F4EA" : "#FFF3E8", color: s.status === "Frozen" ? "#0D7A3F" : "#8A5B00" }}>
@@ -152,18 +156,43 @@ export default function SalarySheets({ who: me, isOwner }: { who: string; isOwne
                   <td className="px-2 py-1.5">
                     {s.frozen_at ? <><b style={{ color: C.green }}>{day(s.frozen_at)}</b><div style={{ fontSize: 10, color: C.faint }}>{who(s.frozen_by)}</div></> : <span style={{ color: C.faint }}>—</span>}
                   </td>
-                  <td className="px-2 py-1.5 whitespace-nowrap no-print">
+                  <td className="px-2 py-1.5 no-print" style={{ minWidth: 210 }}>
+                    <div className="flex gap-1 flex-wrap items-center">
                     <a href={`/hrms/salary-register/${s.id}/print`} target="_blank" rel="noopener noreferrer"
-                      className="rounded px-2 py-1 font-bold mr-1 inline-block"
+                      className="rounded px-2 py-1 font-bold inline-block"
                       style={{ background: "#1B3A5C", color: "#fff", fontSize: 10.5 }}
                       title="The month's salary register — MIS summary first, then every line, landscape">
                       📄 Register
                     </a>
+                    {s.status === "Frozen" ? (
+                      <a href={`/hrms/salary-slips/${s.id}/print`} target="_blank" rel="noopener noreferrer"
+                        className="rounded px-2 py-1 font-bold inline-block" style={{ background: "#0D7A3F", color: "#fff", fontSize: 10.5 }}
+                        title="Every slip, one A5 page each — the single file that goes to the Drive folders">
+                        🧾 Slips
+                      </a>
+                    ) : (
+                      <a href={`/hrms/salary-slips/${s.id}/print?samples=1`} target="_blank" rel="noopener noreferrer"
+                        className="rounded px-2 py-1 font-bold inline-block" style={{ background: "#fff", color: "#8A5B00", border: `1px solid ${C.line}`, fontSize: 10.5 }}
+                        title="Nine DRAFT samples across the pay bands — eyeball a few before freezing">
+                        🧾 Draft samples
+                      </a>
+                    )}
                     {isOwner && (s.status === "Frozen"
                       ? <button onClick={() => { if (window.confirm(`Unfreeze ${MONTHS[s.month - 1]} ${s.year}? It stops being a closed record until you freeze it again.`)) act({ action: "unfreeze", id: s.id }, "Unfrozen"); }} disabled={busy}
                           className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: "#8A5B00", border: `1px solid ${C.line}`, fontSize: 10.5 }}>Unfreeze</button>
                       : <button onClick={() => { if (window.confirm(`Freeze ${MONTHS[s.month - 1]} ${s.year} at ₹${inr(s.net_payable)} net? It becomes read-only.`)) act({ action: "freeze", id: s.id }, "Frozen"); }} disabled={busy}
                           className="rounded px-2 py-1 font-bold" style={{ background: C.green, color: "#fff", fontSize: 10.5 }}>❄ Freeze</button>)}
+                    </div>
+                    {s.status === "Frozen" && (
+                      <div className="flex gap-1 flex-wrap mt-1" style={{ fontSize: 10 }}>
+                        {(["pf", "pt", "mlwf", "esic", "tds"] as const).map((k) => (
+                          <a key={k} href={`/hrms/statutory/${s.id}/print?kind=${k}`} target="_blank" rel="noopener noreferrer"
+                            className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#F4F2EC", color: "#1B3A5C" }}>
+                            {k.toUpperCase()}
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </td>
                 </tr>
               );
@@ -274,10 +303,12 @@ function SheetBox({ id, onClose }: { id: string; onClose: () => void }) {
               className="rounded px-2 py-1 font-bold" style={{ background: "#1B3A5C", color: "#fff", fontSize: 11.5 }}>📄 Register PDF</a>
             <a href={`/hrms/salary-slips/${id}/print?samples=1`} target="_blank" rel="noopener noreferrer"
               className="rounded px-2 py-1 font-bold" style={{ background: "#0D7A3F", color: "#fff", fontSize: 11.5 }}
-              title="Nine A5 samples across the pay bands — check the format before the full run">🧾 Slip samples (A5)</a>
-            <a href={`/hrms/salary-slips/${id}/print`} target="_blank" rel="noopener noreferrer"
-              className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: C.dim, border: `1px solid ${C.line}`, fontSize: 11.5 }}
-              title="Every employee's slip, one A5 page each">All slips</a>
+              title="Nine A5 samples across the pay bands — eyeball a few each month">🧾 Slip samples (A5)</a>
+            {d?.status === "Frozen" && (
+              <a href={`/hrms/salary-slips/${id}/print`} target="_blank" rel="noopener noreferrer"
+                className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: C.dim, border: `1px solid ${C.line}`, fontSize: 11.5 }}
+                title="Every employee's slip, one A5 page each — the single file for the Drive folders">All slips</a>
+            )}
             <ReRead id={id} onDone={() => { setD(null); setErr(""); api.get(`/api/hrms/salary-sheets?id=${encodeURIComponent(id)}`).then((j) => setD(j.sheet)).catch((e) => setErr(e instanceof Error ? e.message : String(e))); }} />
             {d?.fileUrl && <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" className="rounded px-2 py-1 font-bold" style={{ background: "#F4F2EC", color: C.dim, fontSize: 11.5 }}>Open the original file</a>}
             <button onClick={onClose} className="text-sm font-bold px-2 py-1" style={{ color: C.faint }}>✕ Close</button>

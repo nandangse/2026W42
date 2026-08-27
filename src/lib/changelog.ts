@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.25.0.0",
+    date: "2026-08-27",
+    module: "Finalized Salary Sheets grows into a section",
+    items: [
+      "THREE SCREENS UNDER ONE ROOF now: Salary Sheets, SALARY SLIPS and STATUTORY RECORDS — the statutory module moved inside, because the returns are born from the frozen sheet and nowhere else.",
+      "THE FREEZE IS THE GATE. Before it: the register, and DRAFT SAMPLES only — nine slips across the pay bands, each stamped DRAFT SALARY SLIP across its face, to eyeball every month. After it: the full A5 run (the single file for the Drive folders), and the five returns — PF, PT, MLWF, ESIC, TDS — as one-click registers off the sheet alone, each listing only the people it concerns.",
+      "SALARY SLIPS is a table: Month, Year · Name · Employee ID · Earned · Paid · the slip · and ACK DATE — the day the person first opened their own slip.",
+      "SELF-SERVICE at /my/salary-slips: each person sees their own frozen slips and nothing else, matched to their login lowercase-exact, never by pattern. Opening one writes the acknowledgement — first_at once and never again, last_at every visit — and the write happens before the render, so “I opened it but it did not count” is not possible.",
+      "The month's row on Salary Sheets fits three lines — the filename ellipsizes instead of wrapping thirteen deep — and a frozen row carries its slips and returns right there.",
+      "Migration 0072. The push of each slip into the person's Drive folder (as “Month Year - Emp ID - Name”) is the next piece — the filename convention is already on every slip.",
+    ],
+  },
+  {
     v: "3.24.1.0",
     date: "2026-08-27",
     module: "HRMS — A5 salary slips",

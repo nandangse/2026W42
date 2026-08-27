@@ -36,6 +36,8 @@ import AppraisalInterviews from "./hrms/AppraisalInterviews";
 import ApprovalCommercial from "./hrms/ApprovalCommercial";
 import ApprovalQueries from "./hrms/ApprovalQueries";
 import SalarySheets from "./hrms/SalarySheets";
+import SalarySlipsTable from "./hrms/SalarySlipsTable";
+import StatutoryRecords from "./hrms/StatutoryRecords";
 import Offers from "./hrms/Offers";
 import StandardTexts from "./hrms/StandardTexts";
 
@@ -246,8 +248,12 @@ export default function Hrms({
           <Offers who={who} isOwner={isOwner} />
         ) : nav.key === "texts" ? (
           <StandardTexts who={who} />
-        ) : nav.key === "salary" ? (
+        ) : nav.key === "salary.sheets" || nav.key === "salary" ? (
           <SalarySheets who={who} isOwner={isOwner} />
+        ) : nav.key === "salary.slips" ? (
+          <SalarySlipsTable who={who} />
+        ) : nav.key === "salary.statutory" ? (
+          <StatutoryRecords who={who} />
         ) : nav.key === "approvals.commercial" ? (
           <ApprovalCommercial who={who} isOwner={isOwner} />
         ) : nav.key === "approvals.salary" ? (

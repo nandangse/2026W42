@@ -5624,3 +5624,132 @@ comment on table public.job_manpower is
   'Actual manpower standing at each job, one row per job per day. The day-wise '
   'work study: checked against attendance and against the On Floor count.';
 
+
+-- >>>>> supabase/migrations/0072_labour_rate.sql
+-- 0072_labour_rate.sql
+--
+-- LABOUR RATES (Dr Raghu, 25 Aug 2026): one day-rate per trade, set in
+-- Admin -> Settings. With the manpower ledger now rolling every day, cost
+-- falls out: headcount x rate per day, summable per job, per week, per
+-- delivery. Rates are money, so every screen that shows the cost masks it
+-- under the value permission like every other rupee figure.
+--
+-- ASCII only, additive, safe to re-run.
+
+create table if not exists public.labour_rate (
+  trade      text primary key,
+  day_rate   numeric(10,2) not null default 0,
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
+
+insert into public.labour_rate (trade) values
+  ('fitter'), ('helper'), ('welder'), ('painter'), ('electrician'), ('hydraulic')
+on conflict (trade) do nothing;
+
+comment on table public.labour_rate is
+  'Day rate per trade, set in Admin. Multiplied with job_manpower to give '
+  'labour cost per job per day.';
+
+
+-- >>>>> supabase/migrations/0072_slip_ack.sql
+-- 0072_slip_ack.sql
+--
+-- WHEN THE PERSON SAW THEIR SLIP (Dr Raghu, 27 Aug 2026): the self-service
+-- page shows each person their own salary slip, and the FIRST time they open
+-- it is the acknowledgement -- the datestamp HR later points to. The last
+-- access is kept beside it, and the count between them.
+--
+-- One row per person per month's sheet. The first_at is written once and
+-- never updated; a repeat visit touches last_at and opens alone. Nothing
+-- here is deletable from the app -- an acknowledgement that can be unsaid
+-- is not an acknowledgement.
+--
+-- ASCII only, additive, safe to re-run.
+
+create table if not exists public.hrms_slip_ack (
+  sheet_id    uuid not null,
+  employee_id text not null,
+  email       text,
+  first_at    timestamptz not null default now(),
+  last_at     timestamptz not null default now(),
+  opens       integer not null default 1,
+  primary key (sheet_id, employee_id)
+);
+
+comment on table public.hrms_slip_ack is
+  'First and last time each employee opened their own salary slip. '
+  'first_at is the acknowledgement date shown in HRMS.';
+
+alter table public.hrms_slip_ack enable row level security;
+revoke all on public.hrms_slip_ack from anon, authenticated;
+
+
+-- >>>>> supabase/migrations/0073_profile_self.sql
+-- 0073_profile_self.sql
+--
+-- PROFILE, SELF-SERVICE (Dr Raghu, 25 Aug 2026): a person may keep their own
+-- WhatsApp number current from the Profile card; name, initials, role and
+-- ERP owner stay admin-set. oauth_available is the admin's mark that this
+-- person may connect Gmail -- the connect itself happens with an
+-- administrator in tow, in the comms build.
+--
+-- ASCII only, additive, safe to re-run.
+
+alter table public.profiles add column if not exists whatsapp_no text;
+alter table public.profiles add column if not exists oauth_available boolean not null default false;
+alter table public.profiles add column if not exists oauth_connected_at timestamptz;
+
+
+-- >>>>> supabase/migrations/0074_project_plan.sql
+-- 0074: the project layer starts planning for itself (Genie 3.23.1.21)
+--
+-- · projects.description — the written read on what the project is.
+--   apply_projects (the morning import) never touches it, so it survives
+--   every upload.
+-- · project_plans / project_milestones — LITERAL TWINS of plans/milestones,
+--   keyed by project id. Twins rather than shared tables only because
+--   plans.job_id carries a foreign key to jobs. Direction (Dr Raghu,
+--   26 Aug 2026): planning moves progressively UP to project level, so the
+--   shapes stay identical on purpose — same columns, same RLS, same API.
+
+alter table public.projects add column if not exists description text;
+
+create table if not exists public.project_plans (
+  project_id   text primary key references public.projects (id) on delete cascade,
+  start_date   date,
+  baseline_on  date,
+  baseline_end date
+);
+
+create table if not exists public.project_milestones (
+  id          uuid primary key default gen_random_uuid(),
+  project_id  text not null references public.projects (id) on delete cascade,
+  idx         integer not null,
+  title       text,
+  days        integer default 1,
+  preds       integer[] default '{}',
+  crew        jsonb default '{}'::jsonb,
+  shift       text default 'D',
+  offset_days integer default 0,
+  done        boolean not null default false,
+  done_on     date,
+  unique (project_id, idx)
+);
+
+create index if not exists project_milestones_proj on public.project_milestones (project_id);
+
+alter table public.project_plans      enable row level security;
+alter table public.project_milestones enable row level security;
+
+-- read by readers, write by planner+admin — same rule as the job layer
+drop policy if exists project_plans_rw on public.project_plans;
+create policy project_plans_rw on public.project_plans
+  for all using (public.is_reader())
+  with check (public.is_planner_or_admin());
+
+drop policy if exists project_milestones_rw on public.project_milestones;
+create policy project_milestones_rw on public.project_milestones
+  for all using (public.is_reader())
+  with check (public.is_planner_or_admin());
+

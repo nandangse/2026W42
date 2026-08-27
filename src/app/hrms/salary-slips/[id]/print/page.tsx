@@ -49,6 +49,23 @@ export default async function SalarySlipsPage({ params, searchParams }: {
   const grid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false }) as unknown[][];
   const slips = extractSlips(grid);
 
+  // THE SINGLE FILE HAPPENS AFTER THE FREEZE (Dr Raghu, 27 Aug 2026): the
+  // full run is the document that goes into 205 Drive folders, and a draft
+  // month can still change under it. Samples and single slips stay open in
+  // draft — watermarked — so a few can be eyeballed each month.
+  if (!searchParams.samples && !searchParams.emp && sheet.status !== "Frozen") {
+    return (
+      <div style={{ padding: 40, fontFamily: "system-ui, sans-serif", maxWidth: 560 }}>
+        <h2 style={{ fontSize: 18 }}>This month is not frozen yet.</h2>
+        <p style={{ color: "#5A6672", lineHeight: 1.6 }}>
+          The full slip run is printed only after RJ freezes the month — it is the file that goes into every
+          employee&apos;s folder, and a draft can still change under it. Use <b>Draft samples</b> to eyeball
+          a few slips meanwhile.
+        </p>
+      </div>
+    );
+  }
+
   let picked: { label: string | null; slip: NonNullable<ReturnType<typeof extractSlips>>[number] }[];
   if (searchParams.samples) {
     picked = pickSamples(slips)
@@ -60,5 +77,5 @@ export default async function SalarySlipsPage({ params, searchParams }: {
     picked = slips.map((s) => ({ label: null, slip: s }));
   }
 
-  return <SalarySlipsPrint month={sheet.month} year={sheet.year} picked={picked} total={slips.length} />;
+  return <SalarySlipsPrint month={sheet.month} year={sheet.year} picked={picked} total={slips.length} draft={sheet.status !== "Frozen"} />;
 }

@@ -17,10 +17,12 @@ import type { Slip } from "@/lib/salary-slip";
 const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
 const dashless = (v: string | null) => (v && v !== "N/A" ? v : "—");
 
-export default function SalarySlipsPrint({ month, year, picked, total }: {
+export default function SalarySlipsPrint({ month, year, picked, total, draft = false }: {
   month: number; year: number;
   picked: { label: string | null; slip: Slip }[];
   total: number;
+  /** Before the freeze every slip says so, across its face. */
+  draft?: boolean;
 }) {
   const period = `${MONTHS[month - 1]} ${year}`;
   return (
@@ -43,6 +45,7 @@ export default function SalarySlipsPrint({ month, year, picked, total }: {
 
       <div className="no-print" style={{ background: "#16232F", color: "#fff", padding: "10px 16px", display: "flex", gap: 12, alignItems: "center", fontSize: 13, position: "sticky", top: 0, zIndex: 10 }}>
         <b>Salary Slips — {period}</b>
+        {draft && <span style={{ background: "#8A5B00", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>DRAFT — month not frozen</span>}
         <span style={{ opacity: .7 }}>{picked.length} of {total} · A5, one per page</span>
         <span style={{ flex: 1 }} />
         <button onClick={() => window.print()} style={{ background: "#E8600A", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>
@@ -55,7 +58,19 @@ export default function SalarySlipsPrint({ month, year, picked, total }: {
           <div className="bandbar">
             {label ? `${label} — ` : ""}filed as: {period} - {s.id} - {s.name}
           </div>
-          <div className="slip">
+          <div className="slip" style={{ position: "relative", overflow: "hidden" }}>
+            {draft && (
+              <div aria-hidden style={{
+                position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                pointerEvents: "none", zIndex: 0,
+              }}>
+                <div style={{
+                  transform: "rotate(-32deg)", fontFamily: "Georgia, serif", fontSize: 34, fontWeight: "bold",
+                  letterSpacing: ".06em", color: "#B3392E", opacity: 0.12, whiteSpace: "nowrap",
+                  WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
+                }}>DRAFT SALARY SLIP</div>
+              </div>
+            )}
             {/* head */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "2px solid #16232F", paddingBottom: 4, marginBottom: 6 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
