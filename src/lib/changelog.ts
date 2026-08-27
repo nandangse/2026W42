@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.24.1.0",
+    date: "2026-08-27",
+    module: "HRMS — A5 salary slips",
+    items: [
+      "THE SLIP, OFF THE SHEET: A5, one page per person, following the July Word slip line for line — identity with UAN/PF/PAN/ESIC/MLWF/Aadhaar, pay days beside gross and per-day, Earnings with Rate and Earned against Deductions, Net Pay with the amount in words and the round-off, leave and loan balances as OB + added − used = closing, and the payment mode. Checked against the Word slip for 6972 to the rupee.",
+      "THE OT / COMP OFF / LATE MARK / LATE DEDUCTION LINE IS GONE, as ordered — inputs to the computation, not statements a payslip should make.",
+      "SLIP SAMPLES (A5), one button in the month's drawer: nine real people across the bands — workers at 10–15, 15–20, 20–25 and 25–30 thousand; staff at 20–35, 35–50, 50–100, 100–150 and 150+ — picked from the middle of each band, holds excluded, so the format can be judged before the full run. ALL SLIPS prints every employee, one A5 page each.",
+      "Each slip's screen bar shows the exact name its PDF files under — “July 2026 - 6972 - Name” — matching the Drive convention, so the print and the filing share one name. The push into each person's Drive folder is the next piece.",
+    ],
+  },
+  {
     v: "3.24.0.2",
     date: "2026-08-27",
     module: "Salary Register — the sign-off block",

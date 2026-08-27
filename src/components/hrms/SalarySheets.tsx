@@ -272,6 +272,12 @@ function SheetBox({ id, onClose }: { id: string; onClose: () => void }) {
           <div className="flex gap-2 items-center">
             <a href={`/hrms/salary-register/${id}/print`} target="_blank" rel="noopener noreferrer"
               className="rounded px-2 py-1 font-bold" style={{ background: "#1B3A5C", color: "#fff", fontSize: 11.5 }}>📄 Register PDF</a>
+            <a href={`/hrms/salary-slips/${id}/print?samples=1`} target="_blank" rel="noopener noreferrer"
+              className="rounded px-2 py-1 font-bold" style={{ background: "#0D7A3F", color: "#fff", fontSize: 11.5 }}
+              title="Nine A5 samples across the pay bands — check the format before the full run">🧾 Slip samples (A5)</a>
+            <a href={`/hrms/salary-slips/${id}/print`} target="_blank" rel="noopener noreferrer"
+              className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: C.dim, border: `1px solid ${C.line}`, fontSize: 11.5 }}
+              title="Every employee's slip, one A5 page each">All slips</a>
             <ReRead id={id} onDone={() => { setD(null); setErr(""); api.get(`/api/hrms/salary-sheets?id=${encodeURIComponent(id)}`).then((j) => setD(j.sheet)).catch((e) => setErr(e instanceof Error ? e.message : String(e))); }} />
             {d?.fileUrl && <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" className="rounded px-2 py-1 font-bold" style={{ background: "#F4F2EC", color: C.dim, fontSize: 11.5 }}>Open the original file</a>}
             <button onClick={onClose} className="text-sm font-bold px-2 py-1" style={{ color: C.faint }}>✕ Close</button>
