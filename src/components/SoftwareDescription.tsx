@@ -32,7 +32,7 @@
 import { APP_VERSION, UPDATES, EFFORT } from "@/lib/changelog";
 
 /** Last hand-revision of the prose on this page. Bump it when you edit. */
-const DOC_REVISED = "21 August 2026";
+const DOC_REVISED = "27 August 2026";
 
 const NAVY = "#16232F";
 const INK = "#22303C";
@@ -316,6 +316,18 @@ const MODULES: ModuleSpec[] = [
     ai: "None.",
   },
   {
+    name: "CRM — the funnel, at /crm",
+    space: "CRM",
+    since: "3.22.0.0",
+    purpose: "Suspect to Order Received: companies, contacts (1.3 lakh), the full opportunity book since 2015 (22k+), quotations in five statuses, the invoice history (₹354 Cr), the Deal Board, mail and WhatsApp sent from each person's OWN accounts and logged, templates, and EVA's company briefs.",
+    who: "Everyone Genie's crm_access grant admits. Money masks by the same rule as Genie.",
+    gate: "requireCrm() — the Genie session crosses on EMAIL, never id. The CRM is a SECOND Supabase project; RLS is enabled AND forced with NO policies, so the service key behind requireCrm() is the only way in. Gmail refresh tokens live in Supabase Vault.",
+    screens: ["Leads", "Opportunities", "Quotations", "Sales Orders", "Deal Board", "Companies", "Contacts", "Sales Invoices", "Communication (the mail queue)", "Settings — Users, Stages, Sectors, Message Variables, Email Templates, WhatsApp Templates"],
+    data: ["company", "person", "person_phone", "address", "lead", "opportunity", "quotation", "quotation_line", "sales_order", "sales_invoice", "interaction", "message", "mailbox", "stage", "sector", "industry", "product", "profile", "email_template", "whatsapp_template", "message_variable", "crm_audit — all in the CRM's own project"],
+    api: ["/api/crm/[doctype]", "/api/crm/board", "/api/crm/comms", "/api/crm/gmail/*", "/api/crm/wa/*", "/api/crm/mailq", "/api/crm/eva-brief", "/api/crm/project-field"],
+    ai: "EVA writes the company brief — web research woven with the CRM's own warmth and industry track record. {{variables}} render on every mail and WhatsApp send.",
+  },
+  {
     name: "HRMS — Employee master & directory",
     space: "HRMS",
     since: "3.19.0.0",
@@ -352,7 +364,7 @@ interface SpaceSpec {
 }
 
 const SPACES: SpaceSpec[] = [
-  { icon: "🧭", name: "Planning Suite", what: "The day's work: My Week, Jobs in Progress, Job Delivery Board, Pending Material, Escalations, Load Board, Job Plan, On Floor.", who: "Everyone except the uploader.", how: "Role — any reader." },
+  { icon: "🧭", name: "Planning Suite", what: "The day's work: My Week, On Floor, Jobs in Progress, Live Projects (with the project GANTT), Job Delivery Board, Pending Material, Escalations, Load Board, Job Plan.", who: "Everyone except the uploader.", how: "Role — any reader." },
   { icon: "✅", name: "Delivered Jobs", what: "What has gone out, and what it was worth. Value, throughput and on-time delivery.", who: "The Leadership Circle.", how: "Group flag — lc or stratcom, owner implicit." },
   { icon: "🎯", name: "Goals", what: "The OPSP cascade and its swimlane kanban.", who: "Granted individuals only.", how: "Explicit grant — goal_access." },
   { icon: "📋", name: "Nandan Tasking", what: "Tasks by job and by person, board and calendar, plus a private pad.", who: "Everyone except the uploader.", how: "Role — any reader." },
@@ -361,6 +373,7 @@ const SPACES: SpaceSpec[] = [
   { icon: "🧭", name: "Consult Raghu", what: "A question, answered against today's board.", who: "Everyone except the uploader.", how: "Role — any reader." },
   { icon: "📜", name: "Principles", what: "How decisions are meant to be reached, and the documents behind that.", who: "Everyone except the uploader.", how: "Role — any reader." },
   { icon: "👤", name: "HRMS", what: "The employee master and directory, at its own URL: records, contact details, next of kin, and the history of every change.", who: "Three named accounts — the owner, one director, HR.", how: "Explicit grant — hrms_access, ticked by the owner alone." },
+  { icon: "🤝", name: "CRM", what: "The funnel at its own URL: the whole opportunity book since 2015, quotations, the Deal Board, mail and WhatsApp from each person's own accounts, EVA company briefs. A second database entirely.", who: "Everyone the grant admits.", how: "Explicit grant — crm_access; one Genie login, bridged on email." },
   { icon: "👤", name: "Account menu", what: "The tools for the few: Morning Update, Update to ERP, Feature Request, Admin.", who: "Each gated on its own right.", how: "Role or grant, per tool." },
 ];
 
@@ -369,7 +382,7 @@ const SPACES: SpaceSpec[] = [
 const DATA_DOMAINS: [string, string, string[]][] = [
   ["Identity & access", "Who exists, what they may do, and the grants that are not roles.", ["profiles", "goal_access", "sales_access", "hrms_access", "departments", "units"]],
   ["ERP-fed (upload only)", "Written by the morning upload and by nothing else. Archived, never deleted.", ["jobs", "projects", "erp_tasks", "import_batches"]],
-  ["Planning layer (app-owned)", "Genie's own work. Must survive every upload — the zero-data-loss contract.", ["plans", "milestones", "baseline_milestones", "materials", "material_comment", "family_templates"]],
+  ["Planning layer (app-owned)", "Genie's own work. Must survive every upload — the zero-data-loss contract. project_plans/project_milestones are literal twins of plans/milestones: planning is moving up to project level, so the shapes match on purpose.", ["plans", "milestones", "baseline_milestones", "materials", "material_comment", "family_templates", "project_plans", "project_milestones", "job_manpower", "labour_rate"]],
   ["Tasks", "Manual tasks, their comments, their date history and their close-outs.", ["manual_tasks", "task_comments", "task_date_log", "task_closeout", "task_proposal", "brain_dump"]],
   ["Shop floor", "What was said and photographed at the machine.", ["job_voice_note", "job_photo", "job_hint"]],
   ["Goals / OPSP", "The cascade, its bands, its links and its comments.", ["goal_node", "goal_item", "goal_band", "goal_csf_link", "goal_node_comment", "goal_item_comment", "csf", "kra", "kpi", "kpi_watcher", "rock_project", "opsp_section", "person_band", "swimlanes"]],
@@ -378,6 +391,7 @@ const DATA_DOMAINS: [string, string, string[]][] = [
   ["Learning", "Books, sections, lessons, progress, plans.", ["lms_book", "lms_section", "lms_lesson", "lms_lesson_book", "lms_progress", "lms_plan", "lms_extra"]],
   ["Company voice", "Principles, quotes, moods, requests and notifications.", ["principles", "principle_doc", "principle_file", "image_quote", "day_mood", "feature_request", "feature_file", "notifications"]],
   ["HR (isolated)", "Personnel data. Every table carries the hrms_ prefix, RLS is on with NO policies and anon/authenticated hold no grants — the service role is the only way in, and only behind requireHrms(). See migration 0048.", ["hrms_employees", "hrms_employee_edits", "hrms_employee_edit_log", "hrms_access"]],
+  ["CRM (a second database)", "The funnel lives in its OWN Supabase project — not these tables at all. RLS enabled and forced with no policies; the service key behind requireCrm() is the only door; Gmail credentials sit in Vault; sixteen migrations of its own under supabase-crm/. One profile row per Genie account, bridged on email.", ["company", "person", "opportunity (22k+)", "quotation", "sales_order", "sales_invoice (6.8k)", "interaction (74k)", "message", "mailbox", "email_template", "whatsapp_template", "stage", "crm_audit", "…"]],
   ["Configuration", "App identity and the settings singleton.", ["app_settings", "settings"]],
 ];
 

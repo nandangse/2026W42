@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.23.1.44",
+    date: "2026-08-27",
+    module: "The software description learns the CRM",
+    items: [
+      "ADMIN → SOFTWARE DESCRIPTION now tells the whole truth: a CRM chapter (its own Supabase project, the email bridge, Vault-held Gmail credentials, the doctype registry's screens and APIs, EVA), Live Projects and the project-planning twins in the Planning Suite's story, and a CRM block in the data map beside HRMS. Prose revised 27 August.",
+    ],
+  },
+  {
     v: "3.23.1.43",
     date: "2026-08-27",
     module: "Filters pick many",
