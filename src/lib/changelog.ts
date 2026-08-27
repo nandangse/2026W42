@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.24.0.2",
+    date: "2026-08-27",
+    module: "Salary Register — the sign-off block",
+    items: [
+      "APPROVED BY at the foot of the register: COO, CEO, Accounts Head, HR and Operations Head, each with a signing line and space for a pen — the page is printed, signed and kept. The block never splits across a page break, and it restates the month, the headcount and the net payable beside the signatures, so what was approved is written on the same paper as who approved it.",
+    ],
+  },
+  {
     v: "3.24.0.1",
     date: "2026-08-27",
     module: "Salary Register — the July file, read whole",

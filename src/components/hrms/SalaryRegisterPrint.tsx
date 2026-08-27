@@ -306,7 +306,27 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
           </tfoot>
         </table>
 
-        <div style={{ marginTop: 8, fontSize: 9, color: "#8B8F87", display: "flex", justifyContent: "space-between" }}>
+        {/* the sign-off block — this page is printed, signed and kept, so the
+            space above each name is for a pen, and the block never splits
+            across a page break */}
+        <div style={{ marginTop: 26, pageBreakInside: "avoid", breakInside: "avoid" }}>
+          <div style={{ fontWeight: 800, fontSize: 12, letterSpacing: ".04em", borderTop: "2px solid #16232F", paddingTop: 10, marginBottom: 34 }}>
+            APPROVED BY
+          </div>
+          <div style={{ display: "flex", gap: 24, justifyContent: "space-between" }}>
+            {["COO", "CEO", "Accounts Head", "HR", "Operations Head"].map((who2) => (
+              <div key={who2} style={{ flex: "1 1 0", textAlign: "center" }}>
+                <div style={{ borderTop: "1px solid #16232F", paddingTop: 6, fontSize: 11, fontWeight: 700 }}>{who2}</div>
+                <div style={{ fontSize: 9, color: "#8B8F87", marginTop: 2 }}>Signature &amp; date</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 9.5, color: "#8B8F87", marginTop: 14 }}>
+            Salary Register — {title} · {rows.length} employees · Net payable ₹{inr(sheet.net_payable)} · verified against the register above.
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12, fontSize: 9, color: "#8B8F87", display: "flex", justifyContent: "space-between" }}>
           <span>Every figure from the uploaded sheet itself · dash = column not in that sheet</span>
           <span>Nandan GSE Private Limited</span>
         </div>
