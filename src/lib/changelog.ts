@@ -75,8 +75,8 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
-    v: "3.22.2.0",
-    date: "2026-08-24",
+    v: "3.24.0.0",
+    date: "2026-08-27",
     module: "HRMS — the Salary Register PDF",
     items: [
       "THE MONTH'S REGISTER ON PAPER, one button from Finalized Salary Sheets: landscape, because nineteen columns is a ledger and a ledger lies on its side. Employee ID, Name, Gross, Attendance, Paid Days, Earned Basic & DA, HRA, Fixed Allowance, Conveyance, Site Allowance, Earned Salary, PF, PT, Other Deductions, Loan, Advance, TDS, Total Deductions, Arrears, Net Pay — with the totals row at the foot and the header repeating on every page.",
