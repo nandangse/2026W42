@@ -11,7 +11,7 @@
  */
 import { useMemo } from "react";
 import { LOGO } from "@/lib/logo";
-import { MONTHS, REGISTER_COLUMNS, type SheetRow } from "@/lib/salary-sheet";
+import { MONTHS, REGISTER_COLUMNS, otOf, type SheetRow } from "@/lib/salary-sheet";
 
 interface Sheet {
   id: string; month: number; year: number; status: string;
@@ -50,6 +50,22 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
     [rows],
   );
   const absent = REGISTER_COLUMNS.filter((c) => !present.includes(c));
+
+  const held = rows.filter((r) => r.hold);
+  const ot = otOf(rows);
+
+  /** The month by type, straight off the sheet's own Category column. */
+  const byType = useMemo(() => {
+    const m = new Map<string, { n: number; hold: number; earned: number; ded: number; net: number }>();
+    for (const r of rows) {
+      const t = r.type || "(no type)";
+      const c = m.get(t) || { n: 0, hold: 0, earned: 0, ded: 0, net: 0 };
+      c.n++; if (r.hold) c.hold++;
+      c.earned += r.earned; c.ded += r.deductions; c.net += r.net;
+      m.set(t, c);
+    }
+    return [...m.entries()].sort((a, b) => b[1].net - a[1].net);
+  }, [rows]);
 
   const sums = useMemo(() => {
     const m = new Map<string, number | null>();
@@ -156,6 +172,8 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
             ["EARNED PAY", lakh(sheet.earned_pay || 0), "as the sheet gives it", "#0D6E39"],
             ["TOTAL DEDUCTIONS", lakh(sheet.deductions || 0), "", "#B3392E"],
             ["NET PAYABLE", lakh(sheet.net_payable || 0), "", "#16232F"],
+            ["SALARIES ON HOLD", String(held.length),
+              held.length ? `${lakh(held.reduce((a, r) => a + (r.net || r.earned || 0), 0))} withheld` : "none held", held.length ? "#B3261E" : "#0D6E39"],
             ["PAID TO BANK", sheet.paid_to_bank == null ? "—" : lakh(sheet.paid_to_bank),
               sheet.paid_to_bank != null && sheet.net_payable != null && Math.abs(sheet.paid_to_bank - sheet.net_payable) >= 1
                 ? `${sheet.paid_to_bank > sheet.net_payable ? "+" : "−"}₹${inr(Math.abs(sheet.paid_to_bank - sheet.net_payable))} vs net`
@@ -178,6 +196,41 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
             <b style={{ fontSize: 12 }}>WHERE THE DEDUCTIONS GO</b>
             <div style={{ marginTop: 6 }}><Bars parts={DED_PARTS} colors={DED_COLORS} total={sums.get("deductions") ?? sheet.deductions} /></div>
           </div>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <b style={{ fontSize: 12 }}>BY TYPE — nos, earned, deductions, net paid</b>
+          <table style={{ borderCollapse: "collapse", fontSize: 10.5, marginTop: 5, minWidth: 560 }}>
+            <thead><tr style={{ background: "#F4F2EC" }}>
+              {["Type", "Nos", "On hold", "Earned", "Deductions", "Net Paid"].map((h, i) => (
+                <th key={h} style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: i ? "right" : "left" }}>{h}</th>))}
+            </tr></thead>
+            <tbody>
+              {byType.map(([t, c]) => (
+                <tr key={t}>
+                  <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", fontWeight: 600 }}>{t}</td>
+                  <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{c.n}</td>
+                  <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: c.hold ? "#B3261E" : "#C9C6BD", fontWeight: c.hold ? 700 : 400 }}>{c.hold || "—"}</td>
+                  <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{inr(c.earned)}</td>
+                  <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{inr(c.ded)}</td>
+                  <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{inr(c.net)}</td>
+                </tr>
+              ))}
+              <tr style={{ background: "#FFF9C4", fontWeight: 700 }}>
+                <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px" }}>TOTAL</td>
+                <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right" }}>{rows.length}</td>
+                <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", color: held.length ? "#B3261E" : undefined }}>{held.length || "—"}</td>
+                <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right" }}>{inr(byType.reduce((a, [, c]) => a + c.earned, 0))}</td>
+                <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right" }}>{inr(byType.reduce((a, [, c]) => a + c.ded, 0))}</td>
+                <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right" }}>{inr(byType.reduce((a, [, c]) => a + c.net, 0))}</td>
+              </tr>
+            </tbody>
+          </table>
+          {ot > 0 && (
+            <div style={{ fontSize: 11, marginTop: 6 }}>
+              <b>OT — booked as Site Allowance + HRA of Labour and Labour-Contract: {lakh(ot)}</b>
+            </div>
+          )}
         </div>
 
         {!Array.isArray(buckets) && buckets.list.length > 1 && (
@@ -227,9 +280,9 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i} style={{ background: i % 2 ? "#FBFAF6" : "#fff" }}>
-                <td style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{r.employee_id || "—"}</td>
-                <td>{r.name || "—"}</td>
+              <tr key={i} style={{ background: r.hold ? "#FBEAE8" : i % 2 ? "#FBFAF6" : "#fff" }}>
+                <td style={{ fontWeight: 700, whiteSpace: "nowrap", color: r.hold ? "#B3261E" : undefined }}>{r.employee_id || "—"}</td>
+                <td style={{ color: r.hold ? "#B3261E" : undefined }}>{r.name || "—"}{r.hold ? <b style={{ fontSize: 7.5 }}> · HOLD</b> : ""}</td>
                 {REGISTER_COLUMNS.map((c) => {
                   const v = r[c.key];
                   return (

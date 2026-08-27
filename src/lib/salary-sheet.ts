@@ -49,6 +49,8 @@ export interface SheetRow {
   advance?: number | null;
   tds?: number | null;
   arrears?: number | null;
+  /** The sheet's own HOLD flag — a salary marked held, not paid this run. */
+  hold?: boolean;
 }
 
 /** The register's printable columns, in the order the page shows them. */
@@ -113,27 +115,30 @@ const COLUMN_RULES: { key: keyof SheetRow | "skip"; test: (h: string) => boolean
   { key: "employee_id", test: (h) => /^(employeeid|empid|empcode|code|employeecode|ecode|id)$/.test(h) },
   { key: "name", test: (h) => /^(name|employeename|empname|nameofemployee)$/.test(h) },
   { key: "type", test: (h) => /^(type|category|employeetype|emptype|cadre)$/.test(h) },
-  // ── the register columns, SPECIFIC BEFORE GENERIC: "earnedbasicda" must
-  //    land on basic_da before the generic /earned/ rule can eat it, and
-  //    "otherdeductions" on other_ded before /deduction/ does ──
+  // ── the register columns. The payroll export carries RATE and EARNED
+  //    pairs ("Basic & DA Rate" beside "Earned Basic And DA") and INPUT and
+  //    DEDUCTED pairs ("Loan taken_m" beside "Loan Deducted"), so nearly
+  //    every rule here is anchored: a loose /basic/ or /^loan/ was landing
+  //    on the rate or the input, which is the wrong half of the pair ──
+  { key: "hold", test: (h) => /^(status|hold|holdstatus|holdsalary)$/.test(h) },
   { key: "attendance", test: (h) => /^(attendance|attendancedays|presentdays|dayspresent|daysworked|present)$/.test(h) },
-  { key: "paid_days", test: (h) => /(paiddays|payabledays|paydays|totalpaiddays)/.test(h) },
-  { key: "basic_da", test: (h) => /basic/.test(h) && !/pf|arrear/.test(h) },
-  { key: "hra", test: (h) => /^hra(earned)?$|houserent/.test(h) },
-  { key: "fixed_allowance", test: (h) => /fixedallow|fixedall/.test(h) },
-  { key: "conveyance", test: (h) => /convey/.test(h) },
-  { key: "site_allowance", test: (h) => /siteallow|sitepay|siteall/.test(h) },
-  { key: "pf", test: (h) => /^(pf|epf|providentfund|pfamount|pfdeduction|pfemployee)$/.test(h) },
+  { key: "paid_days", test: (h) => /^(paymentdays|paiddays|payabledays|totalpaiddays)$/.test(h) },
+  { key: "basic_da", test: (h) => /^earned(final)?basic(and|&)?da$|^basic(and|&)?daearned$/.test(h) },
+  { key: "hra", test: (h) => /^(hra|hraearned|earnedhra|houserentallowance)$/.test(h) },
+  { key: "fixed_allowance", test: (h) => /^(fixedallowance|earnedfixedallowance|fixallowance)$/.test(h) },
+  { key: "conveyance", test: (h) => /^(conveyance|earnedconveyance)$/.test(h) },
+  { key: "site_allowance", test: (h) => /^(siteallowance|earnedsiteallowance)$/.test(h) },
+  { key: "pf", test: (h) => /^(pf|epf|providentfund|pfamount|pfemployee)$/.test(h) },
   { key: "pt", test: (h) => /^(pt|proftax|professionaltax|ptax)$/.test(h) },
-  { key: "tds", test: (h) => /^tds|taxdeducted/.test(h) },
-  { key: "loan", test: (h) => /^loan/.test(h) },
-  { key: "advance", test: (h) => /advance/.test(h) },
+  { key: "tds", test: (h) => /^tds(deduction)?$|^taxdeducted/.test(h) },
+  { key: "loan", test: (h) => /^loandeduct(ion|ed)?$|^loanrecovery$|^loanemi$/.test(h) },
+  { key: "advance", test: (h) => /^advance(deduction|recovered|deducted)?$/.test(h) },
   { key: "other_ded", test: (h) => /otherded|othded|misc(ellaneous)?ded/.test(h) },
-  { key: "arrears", test: (h) => /arrear/.test(h) },
-  { key: "gross", test: (h) => /^(gross|grosssalary|grosspay|monthlygross|fixedgross)$/.test(h) },
-  { key: "net", test: (h) => /(netpayable|netsalary|netpay|netamount|amountpayable|takehome)/.test(h) || h === "net" },
-  { key: "deductions", test: (h) => /(totaldeduction|deduction|lessdeduction|recovery)/.test(h) },
-  { key: "earned", test: (h) => /(earnedgross|grossearned|earnedsalary|totalearning|earning|earnedpay|earned|grosspay)/.test(h) },
+  { key: "arrears", test: (h) => /^arrears?(payable)?$/.test(h) },
+  { key: "gross", test: (h) => /^(gross|grosssalary|grosssalaryrate|grosspay|monthlygross|fixedgross)$/.test(h) },
+  { key: "net", test: (h) => /(netpayable|netsalary|netpayment|netpay|netamount|amountpayable|takehome)/.test(h) || h === "net" },
+  { key: "deductions", test: (h) => /^(totaldeductions?|deductions?|lessdeductions?|recovery)$/.test(h) },
+  { key: "earned", test: (h) => /^(totalearnings?|earnedgross|grossearned|earnedsalary|earnedpay|earnings?)$/.test(h) },
 ];
 
 /** The register fields read per line when their column exists. */
@@ -141,6 +146,11 @@ const REGISTER_KEYS: (keyof SheetRow)[] = [
   "attendance", "paid_days", "gross", "basic_da", "hra", "fixed_allowance", "conveyance",
   "site_allowance", "pf", "pt", "other_ded", "loan", "advance", "tds", "arrears",
 ];
+
+/** OT, as the company books it: Site Allowance + HRA of the labour types. */
+export const otOf = (rows: SheetRow[]): number =>
+  Math.round(rows.filter((r) => /labour/i.test(String(r.type || "")))
+    .reduce((s, r) => s + (Number(r.site_allowance) || 0) + (Number(r.hra) || 0), 0));
 
 /** Rows near the top of a hand-built sheet are banners; find the real header. */
 export function findHeaderRow(grid: unknown[][]): number {
@@ -184,6 +194,7 @@ export function parseSheet(grid: unknown[][]): { rows: SheetRow[]; mapping: Mapp
     warnings.push("No EmployeeID column was found, so lines cannot be matched to the master; Staff and Labour cannot be split.");
 
   const rows: SheetRow[] = [];
+  let dropped = 0;
   for (let r = headerRow + 1; r < grid.length; r++) {
     const line = grid[r] || [];
     const at = (k: keyof SheetRow) => (colOf[k] === undefined ? null : line[colOf[k] as number]);
@@ -198,7 +209,14 @@ export function parseSheet(grid: unknown[][]): { rows: SheetRow[]; mapping: Mapp
     const looksTotal = /^(total|grand ?total|sum)/i.test(name) || /^(total|grand)/i.test(id);
     if (looksTotal) continue;
     if (!id && !name) continue;
-    if (!earned && !deductions && !net) continue;
+    // a HELD salary often carries no computed money at all — it is still a
+    // line in the register, and the hold count must match the sheet's
+    const held = colOf.hold !== undefined && /hold|^yes$|^y$/i.test(String(at("hold") ?? "").trim());
+    if (!earned && !deductions && !net && !held) continue;
+    // EMPLOYEES ARE ALL FOUR-DIGIT IDS (Dr Raghu, 27 Aug 2026). The payroll
+    // export carries a company total row and a repeated header mid-file, and
+    // both fail this test — a real person never does.
+    if (!/^\d{4}$/.test(id)) { dropped++; continue; }
 
     const row: SheetRow = {
       employee_id: id || null,
@@ -210,10 +228,12 @@ export function parseSheet(grid: unknown[][]): { rows: SheetRow[]; mapping: Mapp
     // never a zero the sheet did not say
     for (const k of REGISTER_KEYS)
       (row as unknown as Record<string, unknown>)[k] = colOf[k] === undefined ? null : money(at(k));
+    if (colOf.hold !== undefined) row.hold = held;
     rows.push(row);
   }
 
   if (!rows.length) warnings.push("No pay lines were read from the file.");
+  if (dropped) warnings.push(`${dropped} line${dropped === 1 ? "" : "s"} without a four-digit EmployeeID left out (totals, repeated headers).`);
   return { rows, mapping: { headerRow: headerRow + 1, columns, unmapped, warnings } };
 }
 

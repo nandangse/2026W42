@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.24.0.1",
+    date: "2026-08-27",
+    module: "Salary Register — the July file, read whole",
+    items: [
+      "THE REGISTER FILLS. The payroll export carries RATE and EARNED pairs (“Basic & DA Rate” beside “Earned Basic And DA”) and INPUT and DEDUCTED pairs (“Loan taken_m” beside “Loan Deducted”), and the loose matching was landing on the wrong half — so every rule is now anchored to the earned side. Verified to the rupee against a real line: gross 2,31,030 · basic 1,23,207 · HRA 24,641 · loan 35,000 · TDS 10,000 · net 1,71,379.",
+      "EMPLOYEES ARE ALL FOUR-DIGIT IDS, so the company total row and the repeated mid-file header can no longer masquerade as a person — the “205 · July 2026” line is gone, and what was left out is counted in the warnings.",
+      "SALARIES ON HOLD, IN RED: the sheet's own Status column is read (19 in July), a red card on page 1 carries the count and the value withheld, the by-type table shows holds per type, and every held line prints red in the register itself — including the twelve holds that carry no money at all, which are still lines in a register.",
+      "PAGE 1 GAINS BY TYPE — nos, on hold, earned, deductions, net paid, one row per Category as the sheet gives it, with the totals row — and OT, booked the way the company books it: Site Allowance + HRA of Labour and Labour-Contract (₹9.63 L in July).",
+      "July has been re-read into the register already — opening it now shows every column filled from the sheet.",
+    ],
+  },
+  {
     v: "3.24.0.0",
     date: "2026-08-27",
     module: "HRMS — the Salary Register PDF",
