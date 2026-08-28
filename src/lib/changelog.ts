@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.30.0.3",
+    date: "2026-08-28",
+    module: "Kuber — P&L and Balance Sheet, a quieter sidebar, commas as you type",
+    items: [
+      "P&L AND BS, above Correspondence as asked: a PROFIT & LOSS for any period and a BALANCE SHEET as of any date, both COMPUTED FROM FIRST PRINCIPLES — the group tree, every ledger's opening, every voucher line; Tally's own arithmetic, nothing typed twice. Gross and net profit stand at the top; every head opens to its groups and every group to its ledgers. An honest GAP card appears only when the two sides disagree.",
+      "The sidebar's groups now FOLD, and start folded — the group holding the open screen opens itself, and what you open stays open on this machine.",
+      "AMOUNTS WEAR THEIR COMMAS AS YOU TYPE: 460800 reads 4,60,800 the moment it is entered — lakhs-and-crores grouping, switching to thousands-and-millions when the row says USD. The saved number stays bare.",
+      "BG STATUS in Dr Raghu's words: in effect · live · expired · closed. The expiry warnings and the green-for-standing colouring follow the new words.",
+    ],
+  },
+  {
     v: "3.30.0.2",
     date: "2026-08-28",
     module: "Vishwakarma — Design Plans becomes the project grid",

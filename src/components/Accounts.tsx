@@ -17,7 +17,7 @@ import ModuleMenu from "@/components/ModuleMenu";
 import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
 import KuberTasking from "@/components/kuber/Tasking";
-import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser } from "@/components/kuber/Books";
+import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen } from "@/components/kuber/Books";
 import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 
 const NAV: { header?: string; items: { key: string; label: string; icon: string }[] }[] = [
@@ -45,6 +45,13 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
       { key: "bg", label: "Bank Guarantees", icon: "🏦" },
       { key: "fd", label: "Fixed Deposits", icon: "▤" },
       { key: "insurance", label: "Insurance", icon: "☂" },
+    ],
+  },
+  {
+    header: "P&L AND BS",
+    items: [
+      { key: "pnl", label: "Profit & Loss", icon: "∑" },
+      { key: "bs", label: "Balance Sheet", icon: "⚖" },
     ],
   },
   {
@@ -85,9 +92,18 @@ export default function Accounts({
   const [openKey, setOpenKey] = useState("dashboard");
   // The sidebar folds to an icon rail (Dr Raghu, 28 Aug 2026) — remembered.
   const [navOpen, setNavOpen] = useState(true);
+  // And the groups fold too, CLOSED BY DEFAULT (same day) — the group
+  // holding the open screen opens itself; choices are remembered.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   useEffect(() => {
     try { setNavOpen(localStorage.getItem("kuber.nav") !== "0"); } catch { /* fine */ }
+    try { setOpenGroups(JSON.parse(localStorage.getItem("kuber.nav.groups") || "{}")); } catch { /* fine */ }
   }, []);
+  const toggleGroup = (h: string) => setOpenGroups((g) => {
+    const next = { ...g, [h]: !g[h] };
+    try { localStorage.setItem("kuber.nav.groups", JSON.stringify(next)); } catch { /* fine */ }
+    return next;
+  });
   const toggleNav = () => setNavOpen((v) => {
     try { localStorage.setItem("kuber.nav", v ? "0" : "1"); } catch { /* fine */ }
     return !v;
@@ -142,12 +158,19 @@ export default function Accounts({
             title={navOpen ? "Fold the sidebar to icons" : "Open the sidebar"}>
             {navOpen ? "« fold" : "»"}
           </button>
-          {NAV.map((g, gi) => (
+          {NAV.map((g, gi) => {
+            const holdsOpen = g.items.some((s) => s.key === openKey);
+            const folded = navOpen && !!g.header && !openGroups[g.header] && !holdsOpen;
+            return (
             <div key={gi} className="mb-1">
               {g.header && navOpen && (
-                <div className="px-2.5 pt-2 pb-1 text-xs font-bold" style={{ color: "#8A94A0", letterSpacing: 1 }}>{g.header}</div>
+                <button onClick={() => toggleGroup(g.header!)}
+                  className="w-full text-left px-2.5 pt-2 pb-1 text-xs font-bold"
+                  style={{ color: "#8A94A0", letterSpacing: 1 }}>
+                  {folded ? "▸ " : "▾ "}{g.header}
+                </button>
               )}
-              {g.items.map((s) => (
+              {!folded && g.items.map((s) => (
                 <button key={s.key} onClick={() => go(s.key)}
                   className="w-full text-left rounded px-2 py-1.5 text-sm font-semibold flex items-center gap-2 mb-0.5"
                   title={navOpen ? undefined : s.label}
@@ -157,7 +180,8 @@ export default function Accounts({
                 </button>
               ))}
             </div>
-          ))}
+            );
+          })}
         </nav>
 
         {/* ═══════════════════ pane ═══════════════════ */}
@@ -171,6 +195,8 @@ export default function Accounts({
           {openKey === "upload" && <UploadFiles email={email} />}
           {openKey === "ledgers" && <LedgerBrowser />}
           {openKey === "vouchers" && <VoucherBrowser />}
+          {openKey === "pnl" && <PnLScreen />}
+          {openKey === "bs" && <BalanceSheetScreen />}
           {["bg", "fd", "insurance", "payplan", "cashitem"].includes(openKey) && <RegisterScreen kind={openKey} key={openKey} />}
           {openKey in STUBS && (
             <div className="bg-white rounded-lg border p-6" style={{ borderColor: "#E2E0DA", maxWidth: 720 }}>

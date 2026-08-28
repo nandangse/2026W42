@@ -380,6 +380,136 @@ export async function GET(req: Request) {
       return NextResponse.json({ start, weeks, flows, net, cumulative, today });
     }
 
+    // ---- financials: P&L and Balance Sheet, computed from first principles
+    // (Dr Raghu, 28 Aug 2026: "Add above Correspondence P&L and BS").
+    // Tally's own arithmetic: each ledger walks its group chain to a PRIMARY
+    // group; income/expense roots make the P&L over the period, the rest make
+    // the balance sheet as-of (opening + every line to date). Debit is
+    // negative throughout — the parser's convention, kept.
+    if (view === "financials") {
+      const fyStartF = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+      const from = url.searchParams.get("from") || fyStartF;
+      const to = url.searchParams.get("to") || today;
+      const asof = url.searchParams.get("asof") || today;
+
+      const pageAllF = async (build: (a: number, b: number) => PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>) => {
+        const out: Record<string, unknown>[] = [];
+        for (let a = 0; ; a += 1000) {
+          const { data, error } = await build(a, a + 999);
+          if (error) {
+            if (/does not exist|schema cache/i.test(error.message)) return out;
+            throw new Error(error.message);
+          }
+          out.push(...(data || []));
+          if ((data || []).length < 1000) break;
+        }
+        return out;
+      };
+
+      const [groups, ledgers, vouchers, lines] = await Promise.all([
+        pageAllF((a, b) => admin.from("kuber_group").select("name, parent").order("name").range(a, b)),
+        pageAllF((a, b) => admin.from("kuber_ledger").select("name, parent, opening").order("name").range(a, b)),
+        pageAllF((a, b) => admin.from("kuber_voucher").select("id, date").order("id").range(a, b)),
+        pageAllF((a, b) => admin.from("kuber_voucher_line").select("voucher_id, ledger, amount").order("id").range(a, b)),
+      ]);
+      if (!ledgers.length) return NextResponse.json({ empty: true });
+
+      const parentOf = new Map(groups.map((g) => [String(g.name).toLowerCase(), String(g.parent || "")]));
+      const properOf = new Map(groups.map((g) => [String(g.name).toLowerCase(), String(g.name)]));
+      const rootCache = new Map<string, string>();
+      const rootOf = (g: string): string => {
+        const k = g.toLowerCase();
+        if (rootCache.has(k)) return rootCache.get(k)!;
+        let cur = k;
+        for (let i = 0; i < 25; i++) {
+          const p = (parentOf.get(cur) || "").toLowerCase();
+          if (!p || p === cur) break;
+          cur = p;
+        }
+        const r = properOf.get(cur) || g;
+        rootCache.set(k, r);
+        return r;
+      };
+      // P&L roots: incomes, expenses, sales, purchases — but Tally's
+      // "Misc. Expenses (ASSET)" is a balance-sheet head despite its name.
+      const isPnl = (root: string) => /income|expense|^sales|^purchase/i.test(root) && !/asset/i.test(root);
+      const assetSide = (root: string) => /^fixed assets|^investments|^current assets|^misc/i.test(root) || /\(asset\)/i.test(root);
+
+      const dateOf = new Map(vouchers.map((v) => [String(v.id), String(v.date || "")]));
+      // Per ledger: activity in [from, to] (the P&L period) and every line
+      // up to `asof` (the balance sheet's closing).
+      const period = new Map<string, number>();
+      const toAsof = new Map<string, number>();
+      for (const l of lines) {
+        const d = dateOf.get(String(l.voucher_id)) || "";
+        if (!d) continue;
+        const amt = Number(l.amount) || 0;
+        const name = String(l.ledger);
+        if (d >= from && d <= to) period.set(name, (period.get(name) || 0) + amt);
+        if (d <= asof) toAsof.set(name, (toAsof.get(name) || 0) + amt);
+      }
+
+      type Sec = { root: string; total: number; groups: Map<string, { total: number; ledgers: { name: string; amount: number }[] }> };
+      const pnlSecs = new Map<string, Sec>();
+      const bsSecs = new Map<string, Sec>();
+      let profitToAsof = 0;
+      const put = (map: Map<string, Sec>, root: string, grp: string, name: string, amount: number) => {
+        if (!amount) return;
+        const s = map.get(root) ?? map.set(root, { root, total: 0, groups: new Map() }).get(root)!;
+        s.total += amount;
+        const g = s.groups.get(grp) ?? s.groups.set(grp, { total: 0, ledgers: [] }).get(grp)!;
+        g.total += amount;
+        g.ledgers.push({ name, amount });
+      };
+      for (const l of ledgers) {
+        const name = String(l.name);
+        const parent = String(l.parent || "");
+        const root = parent ? rootOf(parent) : "(primary)";
+        const grp = parent || "(primary)";
+        if (parent && isPnl(root)) {
+          put(pnlSecs, root, grp, name, period.get(name) || 0);
+          profitToAsof += toAsof.get(name) || 0;
+        } else {
+          // Closing = opening + everything to date. A primary "Profit & Loss"
+          // ledger (Tally's opening-difference carrier) sits here too.
+          put(bsSecs, root, grp, name, (Number(l.opening) || 0) + (toAsof.get(name) || 0));
+        }
+      }
+
+      const dress = (map: Map<string, Sec>) =>
+        [...map.values()]
+          .map((s) => ({
+            root: s.root,
+            total: s.total,
+            groups: [...s.groups.entries()]
+              .map(([g, v]) => ({ name: g, total: v.total, ledgers: v.ledgers.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 300) }))
+              .filter((g) => g.total !== 0)
+              .sort((a, b) => Math.abs(b.total) - Math.abs(a.total)),
+          }))
+          .filter((s) => s.total !== 0)
+          .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+
+      const pnl = dress(pnlSecs);
+      // Tally's two tiers: trading first (sales, purchases, direct), then the
+      // indirect heads. Credit positive: income +, expense −.
+      const trading = pnl.filter((s) => /^sales|^purchase|direct/i.test(s.root));
+      const indirect = pnl.filter((s) => !/^sales|^purchase|direct/i.test(s.root));
+      const grossProfit = trading.reduce((a, s) => a + s.total, 0);
+      const netProfit = pnl.reduce((a, s) => a + s.total, 0);
+
+      const bs = dress(bsSecs);
+      const liabilities = bs.filter((s) => !assetSide(s.root));
+      const assets = bs.filter((s) => assetSide(s.root));
+      const totalL = liabilities.reduce((a, s) => a + s.total, 0) + profitToAsof;
+      const totalA = assets.reduce((a, s) => a + s.total, 0);
+
+      return NextResponse.json({
+        from, to, asof,
+        pnl: { trading, indirect, grossProfit, netProfit },
+        bs: { liabilities, assets, profit: profitToAsof, totalL, totalA, gap: totalL + totalA },
+      });
+    }
+
     if (view === "ledgers") {
       const q = (url.searchParams.get("q") || "").trim();
       let query = admin.from("kuber_ledger").select("name, parent, opening, closing, loaded_at").order("name").limit(500);

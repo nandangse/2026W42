@@ -819,3 +819,136 @@ export function VoucherBrowser() {
     </div>
   );
 }
+
+// ---------------- P&L and Balance Sheet ----------------
+// (Dr Raghu, 28 Aug 2026: "Add above Correspondence P&L and BS.") Both are
+// computed from first principles — group tree, ledger openings, every voucher
+// line — never typed. Totals stand at the top; sections open on click.
+
+interface FinSec { root: string; total: number; groups: { name: string; total: number; ledgers: { name: string; amount: number }[] }[] }
+interface Financials {
+  empty?: boolean; from: string; to: string; asof: string;
+  pnl: { trading: FinSec[]; indirect: FinSec[]; grossProfit: number; netProfit: number };
+  bs: { liabilities: FinSec[]; assets: FinSec[]; profit: number; totalL: number; totalA: number; gap: number };
+}
+
+function FinSection({ s, flip, fmtMoney }: { s: FinSec; flip: boolean; fmtMoney: (n: number) => string }) {
+  const [open, setOpen] = useState(false);
+  const [openGrp, setOpenGrp] = useState<string | null>(null);
+  const v = (n: number) => fmtMoney(flip ? -n : n);
+  return (
+    <div className="border-t" style={{ borderColor: "#EFEDE7" }}>
+      <div onClick={() => setOpen(!open)} className="flex items-center justify-between px-3 py-2" style={{ cursor: "pointer" }}>
+        <span className="font-bold text-sm" style={{ color: INK }}>{open ? "▾" : "▸"} {s.root}</span>
+        <span className="font-bold tnum text-sm">{v(s.total)}</span>
+      </div>
+      {open && s.groups.map((g) => (
+        <div key={g.name}>
+          <div onClick={() => setOpenGrp(openGrp === g.name ? null : g.name)}
+            className="flex items-center justify-between px-3 py-1 text-xs" style={{ cursor: "pointer", paddingLeft: 26 }}>
+            <span className="font-semibold" style={{ color: "#5A6672" }}>{g.name}</span>
+            <span className="tnum font-semibold">{v(g.total)}</span>
+          </div>
+          {openGrp === g.name && g.ledgers.map((l) => (
+            <div key={l.name} className="flex items-center justify-between px-3 py-0.5 text-xs" style={{ paddingLeft: 42, color: MUTED }}>
+              <span>{l.name}</span><span className="tnum">{v(l.amount)}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function PnLScreen() {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+  const [from, setFrom] = useState(fyStart);
+  const [to, setTo] = useState(today);
+  const [data] = useBooks<Financials>("financials", `&from=${from}&to=${to}`);
+  const { fmt: fmtMoney } = useMoneyFmt();
+  if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
+  return (
+    <div style={{ maxWidth: 860 }}>
+      <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <div className="text-lg font-bold" style={{ color: INK }}>Profit &amp; Loss</div>
+          <div className="text-sm" style={{ color: "#5A6672" }}>Computed from every voucher line in the period — Tally&apos;s own arithmetic, nothing typed.</div>
+        </div>
+        <div className="flex gap-2 items-center text-xs font-semibold" style={{ color: MUTED }}>
+          from <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
+          to <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
+        </div>
+      </div>
+      {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : (
+        <>
+          <div className="grid gap-3 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+            <Card label="GROSS PROFIT" value={fmtMoney(data.pnl.grossProfit)} sub="sales + direct incomes − purchases − direct expenses" color={data.pnl.grossProfit >= 0 ? GREEN : RED} />
+            <Card label="NET PROFIT" value={fmtMoney(data.pnl.netProfit)} sub="after the indirect heads" color={data.pnl.netProfit >= 0 ? GREEN : RED} />
+          </div>
+          <div className="bg-white rounded-lg border mb-3" style={{ borderColor: BORDER }}>
+            <div className="px-3 py-2 text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>TRADING — TO GROSS PROFIT</div>
+            {data.pnl.trading.map((s) => (<FinSection key={s.root} s={s} flip={/expense|purchase/i.test(s.root)} fmtMoney={fmtMoney} />))}
+          </div>
+          <div className="bg-white rounded-lg border" style={{ borderColor: BORDER }}>
+            <div className="px-3 py-2 text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>INDIRECT — TO NET PROFIT</div>
+            {data.pnl.indirect.map((s) => (<FinSection key={s.root} s={s} flip={/expense/i.test(s.root)} fmtMoney={fmtMoney} />))}
+          </div>
+          <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "80ch", lineHeight: 1.6 }}>
+            Incomes read positive, expenses read positive under their own heads and subtract in the totals. A head opens
+            to its groups, a group to its ledgers. The books are only as current as the last Tally upload.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function BalanceSheetScreen() {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const [asof, setAsof] = useState(today);
+  const [data] = useBooks<Financials>("financials", `&asof=${asof}`);
+  const { fmt: fmtMoney } = useMoneyFmt();
+  if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
+  return (
+    <div style={{ maxWidth: 980 }}>
+      <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <div className="text-lg font-bold" style={{ color: INK }}>Balance Sheet</div>
+          <div className="text-sm" style={{ color: "#5A6672" }}>Every ledger&apos;s opening plus every line to the date — as-of, not a snapshot typed in.</div>
+        </div>
+        <div className="flex gap-2 items-center text-xs font-semibold" style={{ color: MUTED }}>
+          as of <input type="date" value={asof} onChange={(e) => setAsof(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
+        </div>
+      </div>
+      {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : (
+        <>
+          <div className="grid gap-3 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+            <Card label="LIABILITIES + P&L" value={fmtMoney(data.bs.totalL)} sub={`incl. profit to date ${fmtMoney(data.bs.profit)}`} />
+            <Card label="ASSETS" value={fmtMoney(-data.bs.totalA)} />
+            {Math.round(Math.abs(data.bs.gap)) > 1 && (
+              <Card label="GAP" value={fmtMoney(data.bs.gap)} sub="the two sides disagree by this — usually an opening-balance difference in Tally" color={RED} />
+            )}
+          </div>
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))" }}>
+            <div className="bg-white rounded-lg border" style={{ borderColor: BORDER }}>
+              <div className="px-3 py-2 text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>LIABILITIES</div>
+              {data.bs.liabilities.map((s) => (<FinSection key={s.root} s={s} flip={false} fmtMoney={fmtMoney} />))}
+              <div className="flex items-center justify-between px-3 py-2 border-t text-sm font-bold" style={{ borderColor: "#22303C" }}>
+                <span>Profit &amp; Loss (to date)</span><span className="tnum" style={{ color: data.bs.profit >= 0 ? GREEN : RED }}>{fmtMoney(data.bs.profit)}</span>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg border" style={{ borderColor: BORDER }}>
+              <div className="px-3 py-2 text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>ASSETS</div>
+              {data.bs.assets.map((s) => (<FinSection key={s.root} s={s} flip fmtMoney={fmtMoney} />))}
+            </div>
+          </div>
+          <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "84ch", lineHeight: 1.6 }}>
+            Credit balances carry the liabilities side, debit balances the assets side — Tally&apos;s own convention. The
+            profit line is the P&amp;L heads&apos; whole movement to the date, so the sheet balances the way the books do.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}

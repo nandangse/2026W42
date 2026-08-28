@@ -22,12 +22,35 @@ const TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kol
 
 type Field = { key: string; label: string; type: "text" | "money" | "date" | "select" | "number" | "tick"; options?: string[]; hint?: string };
 
+/**
+ * An amount typed WITH its commas (Dr Raghu, 28 Aug 2026): 460800 reads as
+ * 4,60,800 while you type — lakhs-and-crores grouping, or thousands-and-
+ * millions when the row says USD. The commas are clothing; the saved value
+ * is the bare number.
+ */
+export function MoneyEntry({ value, onChange, usd }: { value: string; onChange: (v: string) => void; usd?: boolean }) {
+  const dress = (raw: string) => {
+    const neg = raw.trim().startsWith("-");
+    const [i, dec] = raw.replace(/[^0-9.]/g, "").split(".");
+    if (!i) return raw.trim() === "-" ? "-" : dec !== undefined ? `0.${dec}` : "";
+    const grouped = Number(i).toLocaleString(usd ? "en-US" : "en-IN");
+    return (neg ? "-" : "") + grouped + (dec !== undefined ? `.${dec}` : "");
+  };
+  return (
+    <input
+      inputMode="decimal"
+      value={dress(String(value))}
+      onChange={(e) => onChange(e.target.value.replace(/,/g, ""))}
+      className="w-full border rounded px-2 py-1 text-sm tnum" style={{ borderColor: BORDER }}
+    />
+  );
+}
+
 const CONFIGS: Record<string, { title: string; blurb: string; fields: Field[]; dateKey: string; amountKey: string; warnDays?: number; statusWords?: Record<string, string> }> = {
   bg: {
     title: "Bank Guarantees",
     blurb: "Every BG with its expiry and claim date — the register the bank's own list never shows this clearly.",
     dateKey: "expiry_date", amountKey: "amount", warnDays: 60,
-    statusWords: { live: "in force" },
     fields: [
       { key: "bg_no", label: "BG No", type: "text" },
       { key: "bank", label: "Bank", type: "text" },
@@ -38,7 +61,7 @@ const CONFIGS: Record<string, { title: string; blurb: string; fields: Field[]; d
       { key: "issue_date", label: "Issued", type: "date" },
       { key: "expiry_date", label: "Valid Till", type: "date" },
       { key: "claim_expiry", label: "Claim Date", type: "date" },
-      { key: "status", label: "Status", type: "select", options: ["live", "released", "expired", "invoked"] },
+      { key: "status", label: "Status", type: "select", options: ["in effect", "live", "expired", "closed"] },
       { key: "note", label: "Note", type: "text" },
     ],
   },
@@ -210,7 +233,7 @@ export default function RegisterScreen({ kind }: { kind: string }) {
                   <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>
                     TOTAL {amountLabel.toUpperCase()} — {word(t.st).toUpperCase()}
                   </div>
-                  <div className="text-lg font-bold tnum" style={{ color: t.st === "live" ? "#0D7A3F" : t.st === "expired" ? "#B3261E" : INK }}>{fmtMoney(t.v)}</div>
+                  <div className="text-lg font-bold tnum" style={{ color: t.st === "live" || t.st === "in effect" ? "#0D7A3F" : t.st === "expired" ? "#B3261E" : INK }}>{fmtMoney(t.v)}</div>
                   <div className="text-xs" style={{ color: MUTED }}>{t.n} entries</div>
                 </div>
               ))}
@@ -276,9 +299,9 @@ export default function RegisterScreen({ kind }: { kind: string }) {
             )}
             {sorted.map((r, i) => {
               const d = String(r[cfg.dateKey] || "");
-              const soon = cfg.warnDays != null && d && String(r.status ?? "live") === "live" &&
+              const soon = cfg.warnDays != null && d && /^(live|in effect)?$/.test(String(r.status ?? "")) &&
                 d <= new Date(new Date(today).getTime() + cfg.warnDays * 86400000).toISOString().slice(0, 10);
-              const past = d && d < today && String(r.status ?? "live") === "live";
+              const past = d && d < today && /^(live|in effect)?$/.test(String(r.status ?? ""));
               return (
                 <tr key={r.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   {cols.map((f) => (
@@ -365,9 +388,15 @@ function EditBox({ cfg, row, kind, onClose, onSaved, onError }: {
                 </select>
               ) : fd.type === "tick" ? (
                 <div><input type="checkbox" checked={!!f[fd.key]} onChange={(e) => setF({ ...f, [fd.key]: e.target.checked })} style={{ accentColor: ORANGE }} /></div>
+              ) : fd.type === "money" ? (
+                <MoneyEntry
+                  value={String(f[fd.key] ?? "")}
+                  usd={String(f.currency ?? "").toUpperCase() === "USD"}
+                  onChange={(v) => setF({ ...f, [fd.key]: v })}
+                />
               ) : (
                 <input
-                  type={fd.type === "date" ? "date" : fd.type === "money" || fd.type === "number" ? "number" : "text"}
+                  type={fd.type === "date" ? "date" : fd.type === "number" ? "number" : "text"}
                   value={String(f[fd.key] ?? "")}
                   onChange={(e) => setF({ ...f, [fd.key]: e.target.value })}
                   className="w-full border rounded px-2 py-1 text-sm" style={{ borderColor: BORDER }}
