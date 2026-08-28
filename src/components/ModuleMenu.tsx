@@ -24,7 +24,7 @@ const MODULES: { key: ModuleKey; label: string; icon: string; href: string }[] =
   { key: "main", label: "Main Genie", icon: "🧞", href: "/" },
   { key: "crm", label: "CRM", icon: "🤝", href: "/crm" },
   { key: "hrms", label: "HRMS", icon: "👤", href: "/hrms" },
-  { key: "accounts", label: "Kuber (Accounts)", icon: "💰", href: "/kuber" },
+  { key: "accounts", label: "Kuber", icon: "💰", href: "/kuber" },
 ];
 
 /** The rows alone — dropped into the main app's existing account dropdown. */

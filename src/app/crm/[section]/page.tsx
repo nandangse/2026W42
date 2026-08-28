@@ -3,8 +3,21 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { mayUseCrm } from "@/crm/auth";
 import { UPDATES } from "@/lib/changelog";
-import CrmApp, { SPECIAL_SECTIONS } from "@/components/crm/CrmApp";
+import CrmApp from "@/components/crm/CrmApp";
 import { doctypeBySlug } from "@/crm/doctypes";
+
+/**
+ * The screens that are pages of their own, NAMED HERE rather than imported
+ * from CrmApp: that file is "use client", so on the server its exports are
+ * client references — calling .find on one is the server-side exception that
+ * met every hard reload of /crm/dashboard (caught by Dr Raghu, 28 Aug 2026).
+ * In-app navigation only rewrites the address bar, which is why it never hit.
+ * Keep in step with SPECIAL_SECTIONS in src/components/crm/CrmApp.tsx.
+ */
+const SPECIAL_NAMES = [
+  "dashboard", "analytics", "salespersonplan", "salesplan", "deals",
+  "visitingcard", "integrations", "emailqueue", "waqueue", "communication",
+];
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Nandan CRM Genie" };
@@ -58,7 +71,7 @@ export default async function CrmSectionPage({ params }: { params: { section: st
   // The sales plan already lives in Genie — the CRM url is a doorway to it.
   if (section === "salesplan") redirect("/sales-plan");
 
-  const special = SPECIAL_SECTIONS.find((s) => s.name === section)?.name;
+  const special = SPECIAL_NAMES.find((n) => n === section);
   const slug = special ?? SECTION_TO_SLUG[section] ?? doctypeBySlug(section)?.name;
   if (!slug) redirect("/crm");
 
@@ -68,6 +81,8 @@ export default async function CrmSectionPage({ params }: { params: { section: st
       displayName={user.displayName}
       version={UPDATES[0].v}
       initialSlug={slug}
+      initials={user.initials ?? null}
+      role={user.role ?? "user"}
     />
   );
 }

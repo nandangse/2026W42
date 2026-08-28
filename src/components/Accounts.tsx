@@ -45,6 +45,13 @@ function UploadFiles() {
 
   const up = async (kind: "masters" | "transactions", f: File | null) => {
     if (!f) return;
+    // Vercel accepts ~4.5 MB of request. A real Tally export runs to hundreds
+    // — those walk in through the background door, not this one.
+    if (f.size > 4 * 1024 * 1024) {
+      setMsg(`That file is ${(f.size / 1024 / 1024).toFixed(0)} MB — the browser door carries ~4 MB. ` +
+        "Big exports go in from the Mac: node scripts/kuber-upload.mjs --" + kind + ' "<path to the xml>"');
+      return;
+    }
     setBusy(kind); setMsg("");
     try {
       const fd = new FormData();
@@ -52,7 +59,14 @@ function UploadFiles() {
       fd.append("kind", kind);
       fd.append("for_date", forDate);
       const r = await fetch("/api/kuber/upload", { method: "POST", body: fd });
-      if (!r.ok) throw new Error((await r.json()).error || "The upload failed");
+      if (!r.ok) {
+        // The platform answers over-size and gateway errors in plain text,
+        // not JSON — read it as text and say something human either way.
+        const t = await r.text();
+        let word = t;
+        try { word = JSON.parse(t).error || t; } catch { /* plain text stays */ }
+        throw new Error(word.slice(0, 200) || "The upload failed");
+      }
       load();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     setBusy("");

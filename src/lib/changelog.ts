@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.28.0.2",
+    date: "2026-08-28",
+    module: "The reload crash, and the background door for big Tally files",
+    items: [
+      "HARD-RELOADING /crm/dashboard MET AN APPLICATION ERROR: the section page, a server page, was reading SPECIAL_SECTIONS out of CrmApp — a client module, whose exports the server only holds as references. In-app navigation never touched it (it only rewrites the address bar), so the crash waited for the first true reload. The server page now carries its own list.",
+      "THE TALLY XMLS ARE TOO BIG FOR THE BROWSER DOOR — the platform accepts ~4.5 MB a request and the real exports run 94 and 407 MB. The screen now says so plainly BEFORE uploading (no more 'Request En… is not valid JSON'), and scripts/kuber-upload.mjs is the background door: it files the XML straight into the Drive audit folder (date – initials) from the Mac and writes the ledger row, so Kuber's screen shows it the same as a browser upload.",
+      "Kuber wears just its name in the module menu. Its visibility was already the grant itself: the owner implicitly, everyone else only with the tick.",
+    ],
+  },
+  {
     v: "3.28.0.1",
     date: "2026-08-28",
     module: "Kuber — the Tally XMLs walk in",
