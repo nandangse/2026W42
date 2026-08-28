@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.17",
+    date: "2026-08-28",
+    module: "Kuber — every invoice tells its whole arithmetic",
+    items: [
+      "Open a customer and every bill now says the three numbers that matter — ORIGINAL amount, how much is RECEIVED against it, how much is PENDING (paid/pending on the supplier side) — rebuilt bill by bill from the opening balances and the settlement records.",
+      "And no more 'due on a date' arithmetic done in the head: each bill says WHEN IT WAS BILLED and HOW MANY DAYS OVERDUE it is — red when the answer stings; 'due in N days' when it does not yet.",
+    ],
+  },
+  {
     v: "3.29.0.16",
     date: "2026-08-28",
     module: "Kuber — Tasking shows only its own, and looks the part",

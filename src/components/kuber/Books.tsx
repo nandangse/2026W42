@@ -92,7 +92,7 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
 }
 
 // ---------------- Ageing ----------------
-interface AgeingParty { party: string; group: string | null; total: number; gross: number; unadjusted: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: { bill: string; bill_date: string | null; due_date: string | null; amount: number }[] }
+interface AgeingParty { party: string; group: string | null; total: number; gross: number; unadjusted: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: { bill: string; bill_date: string | null; due_date: string | null; amount: number; original: number; received: number }[] }
 
 export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
   const [data] = useBooks<{ rows: AgeingParty[]; total: number; gross: number; overdue: number; unadjusted: number; count: number; today: string }>("ageing", `&kind=${kind}`);
@@ -182,16 +182,33 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
                   <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: RED }}>{r.d180p ? fmtMoney(r.d180p) : "·"}</td>
                   <td className="px-2 py-1.5 text-right" style={{ color: MUTED }}>{r.bills.length}</td>
                 </tr>
-                {open === r.party && r.bills.map((b, j) => (
-                  <tr key={r.party + j} style={{ background: "#F4F6F9" }}>
-                    <td className="px-2 py-1 pl-7" style={{ color: "#5A6672" }}>{b.bill}</td>
-                    <td className="px-2 py-1 text-right tnum" style={{ color: b.amount < 0 ? "#1B6B93" : INK }}>{b.amount < 0 ? "−" + fmtMoney(-b.amount) : fmtMoney(b.amount)}</td>
-                    <td colSpan={7} className="px-2 py-1 text-right tnum" style={{ color: b.due_date && b.due_date < data.today ? RED : MUTED }}>
-                      billed {fmtD(b.bill_date)} · due {fmtD(b.due_date)}
-                    </td>
-                    <td />
-                  </tr>
-                ))}
+                {open === r.party && r.bills.map((b, j) => {
+                  const overdueDays = b.due_date
+                    ? Math.round((new Date(data.today + "T00:00:00Z").getTime() - new Date(b.due_date + "T00:00:00Z").getTime()) / 86400000)
+                    : null;
+                  return (
+                    <tr key={r.party + j} style={{ background: "#F4F6F9" }}>
+                      <td className="px-2 py-1 pl-7" style={{ color: "#5A6672" }}>{b.bill}</td>
+                      <td className="px-2 py-1 text-right tnum" style={{ color: MUTED }} title={kind === "receivable" ? "Original bill amount" : "Original invoice amount"}>
+                        {b.original ? fmtMoney(b.original) : "·"}
+                      </td>
+                      <td className="px-2 py-1 text-right tnum" style={{ color: GREEN }} title={kind === "receivable" ? "Received against this bill" : "Paid against this bill"}>
+                        {b.received ? fmtMoney(b.received) : "·"}
+                      </td>
+                      <td className="px-2 py-1 text-right tnum font-bold" style={{ color: b.amount < 0 ? "#1B6B93" : INK }} title="Pending">
+                        {b.amount < 0 ? "−" + fmtMoney(-b.amount) : fmtMoney(b.amount)}
+                      </td>
+                      <td colSpan={5} className="px-2 py-1 text-right tnum" style={{ color: overdueDays !== null && overdueDays > 0 ? RED : MUTED }}>
+                        billed {fmtD(b.bill_date)}
+                        {overdueDays === null ? " · no due date"
+                          : overdueDays > 0 ? ` · ${overdueDays} days overdue`
+                          : overdueDays === 0 ? " · due today"
+                          : ` · due in ${-overdueDays} days`}
+                      </td>
+                      <td />
+                    </tr>
+                  );
+                })}
               </>
             ))}
           </tbody>

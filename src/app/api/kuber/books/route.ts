@@ -79,7 +79,35 @@ export async function GET(req: Request) {
       // negative = an unadjusted opposite entry. The party total is the NET —
       // the sheet's own number — with the unadjusted lump shown, not hidden.
       const bills = (await allBills(admin)).filter((b) => b.kind === kind);
-      const parties = new Map<string, { party: string; group: string | null; total: number; gross: number; unadjusted: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: Bill[] }>();
+      // each bill's own arithmetic — ORIGINAL billed, RECEIVED against it,
+      // PENDING — rebuilt from the opening bills and the settlement records
+      // (Dr Raghu, 28 Aug 2026). Tally signs: debit negative; a receivable
+      // bill's original is its debit side, its receipts the credit side.
+      const hist = new Map<string, { neg: number; pos: number }>();
+      const feed = async (table: string, amountCol: string) => {
+        for (let f = 0; ; f += 1000) {
+          const { data, error } = await admin.from(table).select(`ledger, bill, ${amountCol}`).range(f, f + 999);
+          if (error) return;
+          for (const r of (data || []) as unknown as Record<string, unknown>[]) {
+            const k = String(r.ledger) + "||" + String(r.bill);
+            const h = hist.get(k) || { neg: 0, pos: 0 };
+            const v = Number(r[amountCol]) || 0;
+            if (v < 0) h.neg += v; else h.pos += v;
+            hist.set(k, h);
+          }
+          if (!data || data.length < 1000) break;
+        }
+      };
+      await feed("kuber_opening_bill", "amount");
+      await feed("kuber_bill_alloc", "amount");
+      type BillOut = Bill & { original: number; received: number };
+      const dress = (b: Bill): BillOut => {
+        const h = hist.get(b.party + "||" + b.bill) || { neg: 0, pos: 0 };
+        const original = kind === "receivable" ? -h.neg : h.pos;
+        const received = kind === "receivable" ? h.pos : -h.neg;
+        return { ...b, original, received };
+      };
+      const parties = new Map<string, { party: string; group: string | null; total: number; gross: number; unadjusted: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: BillOut[] }>();
       for (const b of bills) {
         const p = parties.get(b.party) || { party: b.party, group: b.party_group, total: 0, gross: 0, unadjusted: 0, not_due: 0, d0_30: 0, d31_90: 0, d91_180: 0, d180p: 0, bills: [] };
         p.total += b.amount;
@@ -87,7 +115,7 @@ export async function GET(req: Request) {
           p.gross += b.amount;
           (p as unknown as Record<string, number>)[bucketOf(b.due_date, today)] += b.amount;
         } else p.unadjusted += b.amount;
-        p.bills.push(b);
+        p.bills.push(dress(b));
         parties.set(b.party, p);
       }
       const rows = [...parties.values()]
