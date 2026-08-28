@@ -59,6 +59,7 @@ const PROBES = [
   ["genie", "0089 design grid v2", "vishwa_week_work?select=id"],
   ["genie", "0090 stage spans", "vishwa_design_plan?select=days"],
   ["genie", "0090 week work project tie", "vishwa_week_work?select=project_id"],
+  ["genie", "0091 loan register", "kuber_loan?select=id"],
   ["crm", "0024 numbering + deal contacts", "opportunity_contact?select=id"],
   ["crm", "0017 prospect_queue", "prospect_queue?select=id"],
   ["crm", "0018 visiting_card", "visiting_card?select=id"],

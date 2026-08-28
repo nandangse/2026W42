@@ -823,6 +823,116 @@ export function VoucherBrowser() {
   );
 }
 
+// ---------------- the drill (ledger → its vouchers) ----------------
+// (Dr Raghu, 28 Aug 2026: "make it drill downable") — every statement's
+// bottom rung: click a ledger anywhere and its vouchers open.
+
+interface DrillRow { date: string; vtype: string; vno: string; party: string; narration: string; amount: number }
+function DrillModal({ ledger, from, to, onClose }: { ledger: string; from: string; to: string; onClose: () => void }) {
+  const [rows, setRows] = useState<DrillRow[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const { fmt: fmtMoney } = useMoneyFmt();
+  useEffect(() => {
+    fetch(`/api/kuber/books?view=drill&ledger=${encodeURIComponent(ledger)}&from=${from}&to=${to}`, { cache: "no-store" })
+      .then((r) => r.json()).then((j) => { setRows(j.rows || []); setTotal(j.total || 0); })
+      .catch(() => setRows([]));
+  }, [ledger, from, to]);
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)", zIndex: 70 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg p-4 w-full" style={{ maxWidth: 760, maxHeight: "86vh", overflow: "auto" }}>
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-bold text-sm" style={{ color: INK }}>{ledger}</div>
+          <button onClick={onClose} style={{ color: MUTED }}>✕</button>
+        </div>
+        <div className="text-xs mb-2" style={{ color: MUTED }}>
+          {fmtD(from)} → {fmtD(to)} · net movement <b className="tnum" style={{ color: INK }}>{fmtMoney(total)}</b> · credit positive, debit negative — Tally&apos;s own signs
+        </div>
+        {!rows ? <div className="text-sm" style={{ color: MUTED }}>reading the vouchers…</div> : (
+          <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+            <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+              {["Date", "Type", "No", "Party / narration", "Amount"].map((h, i) => (
+                <th key={h} className={`px-2 py-1.5 text-${i === 4 ? "right" : "left"} whitespace-nowrap`} style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {rows.length === 0 && (<tr><td colSpan={5} className="px-3 py-4 text-center" style={{ color: MUTED }}>No vouchers in the period.</td></tr>)}
+              {rows.map((r, i) => (
+                <tr key={i} className="border-t align-top" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <td className="px-2 py-1 tnum whitespace-nowrap">{fmtD(r.date)}</td>
+                  <td className="px-2 py-1 whitespace-nowrap">{r.vtype}</td>
+                  <td className="px-2 py-1 whitespace-nowrap">{r.vno}</td>
+                  <td className="px-2 py-1">{r.party || r.narration || "—"}{r.party && r.narration ? <span style={{ color: MUTED }}> · {r.narration}</span> : ""}</td>
+                  <td className="px-2 py-1 text-right tnum font-bold" style={{ color: r.amount >= 0 ? GREEN : RED }}>{fmtMoney(r.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** root → group → ledger, each rung opening on click, the ledger opening
+ *  its vouchers. Every statement wears the same tree. */
+interface TreeSec { root: string; total: number; groups: { name: string; total: number; ledgers: { name: string; amount: number }[] }[] }
+function DrillTree({ secs, abs, fmtMoney, onLedger }: { secs: TreeSec[]; abs?: boolean; fmtMoney: (n: number) => string; onLedger: (l: string) => void }) {
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const v = (n: number) => fmtMoney(abs ? Math.abs(n) : n);
+  return (
+    <>
+      {secs.map((s2) => (
+        <div key={s2.root} className="border-t" style={{ borderColor: "#EFEDE7" }}>
+          <div onClick={() => setOpen((o) => ({ ...o, [s2.root]: !o[s2.root] }))} className="flex items-center justify-between px-3 py-1.5" style={{ cursor: "pointer" }}>
+            <span className="font-bold text-sm" style={{ color: INK }}>{open[s2.root] ? "▾" : "▸"} {s2.root}</span>
+            <span className="font-bold tnum text-sm">{v(s2.total)}</span>
+          </div>
+          {open[s2.root] && s2.groups.map((g) => (
+            <div key={g.name}>
+              <div onClick={() => setOpen((o) => ({ ...o, [s2.root + "|" + g.name]: !o[s2.root + "|" + g.name] }))}
+                className="flex items-center justify-between px-3 py-1 text-xs" style={{ cursor: "pointer", paddingLeft: 26 }}>
+                <span className="font-semibold" style={{ color: "#5A6672" }}>{open[s2.root + "|" + g.name] ? "▾" : "▸"} {g.name}</span>
+                <span className="tnum font-semibold">{v(g.total)}</span>
+              </div>
+              {open[s2.root + "|" + g.name] && g.ledgers.map((l) => (
+                <div key={l.name} onClick={() => onLedger(l.name)}
+                  className="flex items-center justify-between px-3 py-0.5 text-xs" style={{ paddingLeft: 42, cursor: "pointer" }}>
+                  <span style={{ color: "#2C5B82", textDecoration: "underline" }}>{l.name}</span>
+                  <span className="tnum" style={{ color: MUTED }}>{v(l.amount)}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** The YTD · QTD · MTD chips with free dates — every statement's head. */
+function PeriodBar({ from, to, setFrom, setTo }: { from: string; to: string; setFrom: (v: string) => void; setTo: (v: string) => void }) {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+  const mtdStart = today.slice(0, 8) + "01";
+  const qm = Math.floor(((Number(today.slice(5, 7)) + 8) % 12) / 3) * 3;
+  const qMonth = ((3 + qm) % 12) + 1;
+  const qYear = qMonth > Number(today.slice(5, 7)) ? Number(today.slice(0, 4)) - 1 : Number(today.slice(0, 4));
+  const qtdStart = `${qYear}-${String(qMonth).padStart(2, "0")}-01`;
+  return (
+    <div className="flex gap-2 items-center text-xs font-semibold flex-wrap" style={{ color: MUTED }}>
+      {([["YTD", fyStart], ["QTD", qtdStart], ["MTD", mtdStart]] as [string, string][]).map(([lbl, start]) => (
+        <button key={lbl} onClick={() => { setFrom(start); setTo(today); }}
+          className="rounded-full border px-2.5 py-0.5 font-bold"
+          style={from === start && to === today ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
+          {lbl}
+        </button>
+      ))}
+      from <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
+      to <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
+    </div>
+  );
+}
+
 // ---------------- P&L and Balance Sheet ----------------
 // (Dr Raghu, 28 Aug 2026: "Add above Correspondence P&L and BS.") Both are
 // computed from first principles — group tree, ledger openings, every voucher
@@ -870,53 +980,72 @@ export function PnLScreen() {
   const [to, setTo] = useState(today);
   const [data] = useBooks<Financials>("financials", `&from=${from}&to=${to}`);
   const { fmt: fmtMoney } = useMoneyFmt();
-  // the three the eye wants first (Dr Raghu, 28 Aug 2026): YTD · QTD · MTD
-  const mtdStart = today.slice(0, 8) + "01";
-  const qm = Math.floor(((Number(today.slice(5, 7)) + 8) % 12) / 3) * 3;
-  const qMonth = ((3 + qm) % 12) + 1;
-  const qYear = qMonth > Number(today.slice(5, 7)) ? Number(today.slice(0, 4)) - 1 : Number(today.slice(0, 4));
-  const qtdStart = `${qYear}-${String(qMonth).padStart(2, "0")}-01`;
-  const CHIPS: [string, string][] = [["YTD", fyStart], ["QTD", qtdStart], ["MTD", mtdStart]];
+  const [drill, setDrill] = useState<string | null>(null);
   if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
+
+  // Tally's own two-sided reading: debits stand left, credits right; the
+  // gross profit carries over and the nett profit closes the account.
+  const left1 = data ? data.pnl.trading.filter((x) => x.total < 0) : [];
+  const right1 = data ? data.pnl.trading.filter((x) => x.total > 0) : [];
+  const left2 = data ? data.pnl.indirect.filter((x) => x.total < 0) : [];
+  const right2 = data ? data.pnl.indirect.filter((x) => x.total > 0) : [];
+  const gp = data?.pnl.grossProfit ?? 0;
+  const np = data?.pnl.netProfit ?? 0;
+
+  const Side = ({ secs, extra }: { secs: FinSec[]; extra?: { label: string; value: number; colour: string } }) => (
+    <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, flex: 1, minWidth: 320 }}>
+      <DrillTree secs={secs} abs fmtMoney={fmtMoney} onLedger={setDrill} />
+      {extra && (
+        <div className="flex items-center justify-between px-3 py-2 border-t font-bold text-sm" style={{ borderColor: "#22303C" }}>
+          <span style={{ color: extra.colour }}>{extra.label}</span>
+          <span className="tnum" style={{ color: extra.colour }}>{fmtMoney(Math.abs(extra.value))}</span>
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div style={{ maxWidth: 860 }}>
+    <div style={{ maxWidth: 1000 }}>
       <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>Profit &amp; Loss</div>
-          <div className="text-sm" style={{ color: "#5A6672" }}>Computed from every voucher line in the period — Tally&apos;s own arithmetic, nothing typed.</div>
+          <div className="text-sm" style={{ color: "#5A6672" }}>Tally&apos;s own two-sided account, computed from every voucher line — a head opens to its groups, a group to its ledgers, a ledger to its vouchers.</div>
         </div>
-        <div className="flex gap-2 items-center text-xs font-semibold flex-wrap" style={{ color: MUTED }}>
-          {CHIPS.map(([lbl, start]) => (
-            <button key={lbl} onClick={() => { setFrom(start); setTo(today); }}
-              className="rounded-full border px-2.5 py-0.5 font-bold"
-              style={from === start && to === today ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
-              {lbl}
-            </button>
-          ))}
-          from <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
-          to <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
-        </div>
+        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
       </div>
       {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : (
         <>
-          <div className="grid gap-3 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
-            <Card label="GROSS PROFIT" value={fmtMoney(data.pnl.grossProfit)} sub="sales + direct incomes − purchases − direct expenses" color={data.pnl.grossProfit >= 0 ? GREEN : RED} />
-            <Card label="NET PROFIT" value={fmtMoney(data.pnl.netProfit)} sub="after the indirect heads" color={data.pnl.netProfit >= 0 ? GREEN : RED} />
+          <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>TRADING ACCOUNT</div>
+          <div className="flex gap-3 flex-wrap mb-3">
+            <Side secs={left1} extra={gp >= 0 ? { label: "Gross Profit c/o", value: gp, colour: GREEN } : undefined} />
+            <Side secs={right1} extra={gp < 0 ? { label: "Gross Loss c/o", value: gp, colour: RED } : undefined} />
           </div>
-          <div className="bg-white rounded-lg border mb-3" style={{ borderColor: BORDER }}>
-            <div className="px-3 py-2 text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>TRADING — TO GROSS PROFIT</div>
-            {data.pnl.trading.map((s) => (<FinSection key={s.root} s={s} flip={/expense|purchase/i.test(s.root)} fmtMoney={fmtMoney} />))}
+          <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>PROFIT &amp; LOSS ACCOUNT</div>
+          <div className="flex gap-3 flex-wrap">
+            <div style={{ flex: 1, minWidth: 320 }}>
+              <Side secs={left2} extra={np >= 0 ? { label: "Nett Profit", value: np, colour: GREEN } : undefined} />
+            </div>
+            <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, flex: 1, minWidth: 320 }}>
+              <div className="flex items-center justify-between px-3 py-1.5 border-b font-bold text-sm" style={{ borderColor: "#EFEDE7" }}>
+                <span style={{ color: gp >= 0 ? GREEN : RED }}>{gp >= 0 ? "Gross Profit b/f" : "Gross Loss b/f"}</span>
+                <span className="tnum">{fmtMoney(Math.abs(gp))}</span>
+              </div>
+              <DrillTree secs={right2} abs fmtMoney={fmtMoney} onLedger={setDrill} />
+              {np < 0 && (
+                <div className="flex items-center justify-between px-3 py-2 border-t font-bold text-sm" style={{ borderColor: "#22303C" }}>
+                  <span style={{ color: RED }}>Nett Loss</span><span className="tnum" style={{ color: RED }}>{fmtMoney(Math.abs(np))}</span>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="bg-white rounded-lg border" style={{ borderColor: BORDER }}>
-            <div className="px-3 py-2 text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>INDIRECT — TO NET PROFIT</div>
-            {data.pnl.indirect.map((s) => (<FinSection key={s.root} s={s} flip={/expense/i.test(s.root)} fmtMoney={fmtMoney} />))}
-          </div>
-          <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "80ch", lineHeight: 1.6 }}>
-            Incomes read positive, expenses read positive under their own heads and subtract in the totals. A head opens
-            to its groups, a group to its ledgers. The books are only as current as the last Tally upload.
+          <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "84ch", lineHeight: 1.6 }}>
+            Debit heads stand left, credit heads right — purchases and direct expenses against sales and direct incomes,
+            then the indirect heads against the gross profit brought forward. Stock movements are not in the XML this
+            pipeline reads, so this is the P&amp;L of the vouchers alone. The books are as current as the last upload.
           </p>
         </>
       )}
+      {drill && <DrillModal ledger={drill} from={from} to={to} onClose={() => setDrill(null)} />}
     </div>
   );
 }
@@ -993,6 +1122,7 @@ export function ExpensesScreen({ mode }: { mode: "all" | "tvc" | "oe" }) {
   const { fmt: fmtMoney } = useMoneyFmt();
   const [sortK, setSortK] = useState<"amount" | "ledger" | "group">("amount");
   const [dir, setDir] = useState<1 | -1>(-1);
+  const [drill, setDrill] = useState<string | null>(null);
 
   const TITLES = {
     all: ["Expenses Register", "Every expense ledger for the period, with its TOC class — flip a wrong one and every register follows."],
@@ -1068,7 +1198,7 @@ export function ExpensesScreen({ mode }: { mode: "all" | "tvc" | "oe" }) {
                 {rows.length === 0 && (<tr><td colSpan={4} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing in the period.</td></tr>)}
                 {rows.map((r, i) => (
                   <tr key={r.ledger} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
-                    <td className="px-2 py-1.5 font-semibold">{r.ledger}</td>
+                    <td className="px-2 py-1.5 font-semibold" onClick={() => setDrill(r.ledger)} style={{ cursor: "pointer", color: "#2C5B82", textDecoration: "underline" }} title="Open this ledger's vouchers">{r.ledger}</td>
                     <td className="px-2 py-1.5" style={{ color: MUTED }}>{r.group}</td>
                     <td className="px-2 py-1.5">
                       <select value={r.cls} onChange={(e) => void flip(r.ledger, e.target.value)}
@@ -1086,10 +1216,117 @@ export function ExpensesScreen({ mode }: { mode: "all" | "tvc" | "oe" }) {
           </div>
           <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "84ch", lineHeight: 1.6 }}>
             Genie seeds the class — purchase heads and process-like direct expenses as TVC, the rest as OE. A purple
-            border marks a class set by hand; the flip is remembered and every register and total follows it.
+            border marks a class set by hand; the flip is remembered and every register and total follows it. A ledger&apos;s
+            name opens its vouchers.
           </p>
         </>
       )}
+      {drill && <DrillModal ledger={drill} from={from} to={to} onClose={() => setDrill(null)} />}
+    </div>
+  );
+}
+
+// ---------------- Actual Cash Flow & Fund Flow ----------------
+// (Dr Raghu, 28 Aug 2026: "build the Cash Flow and Fund Flow from the XML,
+// make it drill downable.")
+
+interface CashActual { empty?: boolean; from: string; to: string; inflows: TreeSec[]; outflows: TreeSec[]; totalIn: number; totalOut: number; net: number; bankMove: number; contra: number }
+export function ActualCashFlowScreen() {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+  const [from, setFrom] = useState(fyStart);
+  const [to, setTo] = useState(today);
+  const [data] = useBooks<CashActual>("cashflow_actual", `&from=${from}&to=${to}`);
+  const { fmt: fmtMoney } = useMoneyFmt();
+  const [drill, setDrill] = useState<string | null>(null);
+  if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
+  return (
+    <div style={{ maxWidth: 1000 }}>
+      <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <div className="text-lg font-bold" style={{ color: INK }}>Actual Cash Flow</div>
+          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 640 }}>What actually moved through bank and cash in the period, head by head — every voucher touching a bank or cash ledger, read from its other side.</div>
+        </div>
+        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+      </div>
+      {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : (
+        <>
+          <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
+            <Card label="INFLOWS" value={fmtMoney(data.totalIn)} color={GREEN} />
+            <Card label="OUTFLOWS" value={fmtMoney(data.totalOut)} color={RED} />
+            <Card label="NET MOVEMENT" value={fmtMoney(data.net)} color={data.net >= 0 ? GREEN : RED} sub={`bank & cash actually moved ${fmtMoney(data.bankMove)}`} />
+            {data.contra > 0 && <Card label="CONTRA (BANK ↔ BANK)" value={fmtMoney(data.contra)} sub="internal transfers — not a flow" />}
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, flex: 1, minWidth: 340 }}>
+              <div className="px-3 py-2 text-xs font-bold" style={{ color: GREEN, letterSpacing: 0.8 }}>INFLOWS — MONEY CAME FROM</div>
+              <DrillTree secs={data.inflows} fmtMoney={fmtMoney} onLedger={setDrill} />
+            </div>
+            <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, flex: 1, minWidth: 340 }}>
+              <div className="px-3 py-2 text-xs font-bold" style={{ color: RED, letterSpacing: 0.8 }}>OUTFLOWS — MONEY WENT TO</div>
+              <DrillTree secs={data.outflows} fmtMoney={fmtMoney} onLedger={setDrill} />
+            </div>
+          </div>
+          <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "84ch", lineHeight: 1.6 }}>
+            A head opens to its groups, a group to its ledgers, a ledger to its vouchers. If NET MOVEMENT and the bank&apos;s
+            own movement disagree, a voucher mixes several heads unevenly — the drill finds it.
+          </p>
+        </>
+      )}
+      {drill && <DrillModal ledger={drill} from={from} to={to} onClose={() => setDrill(null)} />}
+    </div>
+  );
+}
+
+interface FundFlow { empty?: boolean; from: string; to: string; sources: TreeSec[]; applications: TreeSec[]; operations: number; totalSources: number; totalApplications: number; gap: number }
+export function FundFlowScreen() {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+  const [from, setFrom] = useState(fyStart);
+  const [to, setTo] = useState(today);
+  const [data] = useBooks<FundFlow>("fundflow", `&from=${from}&to=${to}`);
+  const { fmt: fmtMoney } = useMoneyFmt();
+  const [drill, setDrill] = useState<string | null>(null);
+  if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
+  return (
+    <div style={{ maxWidth: 1000 }}>
+      <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <div className="text-lg font-bold" style={{ color: INK }}>Fund Flow</div>
+          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 640 }}>Where the money CAME FROM and WHERE IT WENT between the two dates — every balance-sheet head&apos;s change, sources against applications, with operations&apos; own funds on top.</div>
+        </div>
+        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+      </div>
+      {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : (
+        <>
+          <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
+            <Card label="FUNDS FROM OPERATIONS" value={fmtMoney(data.operations)} color={data.operations >= 0 ? GREEN : RED} sub="the P&L heads' own movement" />
+            <Card label="TOTAL SOURCES" value={fmtMoney(data.totalSources)} color={GREEN} />
+            <Card label="TOTAL APPLICATIONS" value={fmtMoney(data.totalApplications)} color={RED} />
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, flex: 1, minWidth: 340 }}>
+              <div className="px-3 py-2 text-xs font-bold" style={{ color: GREEN, letterSpacing: 0.8 }}>SOURCES — LIABILITIES RAISED · ASSETS RELEASED</div>
+              {data.operations > 0 && (
+                <div className="flex items-center justify-between px-3 py-1.5 border-t text-sm font-bold" style={{ borderColor: "#EFEDE7" }}>
+                  <span>Funds from operations</span><span className="tnum" style={{ color: GREEN }}>{fmtMoney(data.operations)}</span>
+                </div>
+              )}
+              <DrillTree secs={data.sources} fmtMoney={fmtMoney} onLedger={setDrill} />
+            </div>
+            <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, flex: 1, minWidth: 340 }}>
+              <div className="px-3 py-2 text-xs font-bold" style={{ color: RED, letterSpacing: 0.8 }}>APPLICATIONS — ASSETS BUILT · LIABILITIES REPAID</div>
+              {data.operations < 0 && (
+                <div className="flex items-center justify-between px-3 py-1.5 border-t text-sm font-bold" style={{ borderColor: "#EFEDE7" }}>
+                  <span>Operations consumed</span><span className="tnum" style={{ color: RED }}>{fmtMoney(-data.operations)}</span>
+                </div>
+              )}
+              <DrillTree secs={data.applications} fmtMoney={fmtMoney} onLedger={setDrill} />
+            </div>
+          </div>
+        </>
+      )}
+      {drill && <DrillModal ledger={drill} from={from} to={to} onClose={() => setDrill(null)} />}
     </div>
   );
 }

@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.5",
+    date: "2026-08-28",
+    module: "Kuber — the statements from the XML: cash flow, fund flow, drill everywhere, the loan book",
+    items: [
+      "ACTUAL CASH FLOW, from the vouchers themselves: every voucher touching a bank or cash ledger is read from its OTHER side — inflows head-by-head against outflows, contra transfers named apart, and the net checked honestly against what bank-and-cash actually moved. FUND FLOW beside it: every balance-sheet head's change between two dates — sources (liabilities raised, assets released) against applications (assets built, liabilities repaid), with FUNDS FROM OPERATIONS on top.",
+      "DRILL DOWN EVERYWHERE (Dr Raghu, 28 Aug 2026: 'make it drill downable'): on both new statements and the Expenses / OE / TVC registers, a head opens to its groups, a group to its ledgers, and A LEDGER OPENS ITS VOUCHERS — date, type, number, party, narration, amount — right there in a lightbox.",
+      "THE P&L NOW STANDS IN TALLY'S OWN FORMAT: two-sided — purchases and direct expenses against sales and direct incomes to the GROSS PROFIT carried over, then the indirect heads against it to the NETT PROFIT — every side drillable to the voucher. YTD · QTD · MTD atop every statement.",
+      "BANKING — LOAN STATUS joins the P&L-and-BS section (migration 0091): every borrowing with sanction, outstanding, EMI, ROI, EMI date, tenor and security — cut exactly as the Indebtedness sheet cuts it: Secured–Banks (A), Secured–Others (B), Non-fund/BG (C), Unsecured (D); the category totals ARE the A/B/C/D lines and ALL is Total Debts, with the EMI column totalled in the pinned row.",
+    ],
+  },
+  {
     v: "3.31.0.4",
     date: "2026-08-28",
     module: "Vishwakarma — stages that plan themselves, escalations you cannot miss",

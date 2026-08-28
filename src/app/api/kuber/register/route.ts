@@ -12,6 +12,10 @@ export const dynamic = "force-dynamic";
  * every row carrying its time frame.
  */
 const KINDS: Record<string, { table: string; fields: string[]; order: string }> = {
+  loan: {
+    table: "kuber_loan", order: "bank",
+    fields: ["bank", "loan_ac_no", "ltype", "drawn_on", "sanctioned", "outstanding", "emi", "roi", "emi_date", "tenor_months", "upto", "security", "status", "note"],
+  },
   bg: {
     table: "kuber_bg", order: "expiry_date",
     fields: ["bg_no", "bank", "favouring", "purpose", "amount", "margin_amount", "issue_date", "expiry_date", "claim_expiry", "status", "note"],

@@ -17,7 +17,7 @@ import ModuleMenu from "@/components/ModuleMenu";
 import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
 import KuberTasking from "@/components/kuber/Tasking";
-import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen } from "@/components/kuber/Books";
+import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen } from "@/components/kuber/Books";
 import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 import PlaybookScreen from "@/components/Playbook";
 
@@ -59,6 +59,7 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
       { key: "expreg", label: "Expenses Register", icon: "▙" },
       { key: "oereg", label: "OE Register", icon: "▚" },
       { key: "tvcreg", label: "TVC Register", icon: "▞" },
+      { key: "loan", label: "Banking — Loan Status", icon: "◨" },
     ],
   },
   {
@@ -91,8 +92,6 @@ const ALL_KEYS = NAV.flatMap((g) => g.items.map((i) => i.key));
 
 const STUBS: Record<string, string> = {
   targets: "Targets — the JSA business-dashboard parameters, PLAN against ACTUAL: GP%, NP%, ROI, inventory turn, current and quick ratios, debtor/inventory/creditor days, CCC, working capital, cash & bank, net worth. The ACTUAL side computes from the books; the PLAN side is typed once. Being built next — the plan figures come from Dr Raghu.",
-  acf: "Actual Cash Flow statement — receipts and payments as they actually moved through bank and cash, period by period, from the vouchers. Being built next.",
-  fundflow: "Fund Flow statement — where the money CAME FROM and WHERE IT WENT between two balance-sheet dates: sources and applications. Being built next.",
 
   bank: "Bank & Cash — the balances, the BRS and the PDC register (the sheet's Bank Reco tab), feeding the cash flow's opening balance. Being built next.",
   gst: "GST & Statutory — the compliance calendar with its due dates, shown the sheet's own way: verified, late-and-risk, not done. Being built.",
@@ -216,7 +215,9 @@ export default function Accounts({
           {openKey === "expreg" && <ExpensesScreen mode="all" />}
           {openKey === "tvcreg" && <ExpensesScreen mode="tvc" />}
           {openKey === "oereg" && <ExpensesScreen mode="oe" />}
-          {["bg", "fd", "insurance", "payplan", "cashitem"].includes(openKey) && <RegisterScreen kind={openKey} key={openKey} />}
+          {openKey === "acf" && <ActualCashFlowScreen />}
+          {openKey === "fundflow" && <FundFlowScreen />}
+          {["bg", "fd", "insurance", "payplan", "cashitem", "loan"].includes(openKey) && <RegisterScreen kind={openKey} key={openKey} />}
           {openKey in STUBS && (
             <div className="bg-white rounded-lg border p-6" style={{ borderColor: "#E2E0DA", maxWidth: 720 }}>
               <div className="text-sm" style={{ color: "#5A6672", lineHeight: 1.6 }}>{STUBS[openKey]}</div>

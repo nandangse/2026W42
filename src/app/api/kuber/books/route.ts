@@ -64,6 +64,81 @@ const bucketOf = (due: string | null, today: string) => {
   return d < 30 ? "d0_30" : d <= 90 ? "d31_90" : d <= 180 ? "d91_180" : "d180p";
 };
 
+type RR = Record<string, unknown>;
+
+/** The whole parsed book, paged past the cap — groups, ledgers, vouchers,
+ *  lines — with the group tree ready to walk. One load, many statements. */
+async function loadWorld(admin: ReturnType<typeof adminClient>) {
+  const pageAllW = async (build: (a: number, b: number) => PromiseLike<{ data: RR[] | null; error: { message: string } | null }>) => {
+    const out: RR[] = [];
+    for (let a = 0; ; a += 1000) {
+      const { data, error } = await build(a, a + 999);
+      if (error) {
+        if (/does not exist|schema cache/i.test(error.message)) return out;
+        throw new Error(error.message);
+      }
+      out.push(...(data || []));
+      if ((data || []).length < 1000) break;
+    }
+    return out;
+  };
+  const [groups, ledgers, vouchers, lines] = await Promise.all([
+    pageAllW((a, b) => admin.from("kuber_group").select("name, parent").order("name").range(a, b)),
+    pageAllW((a, b) => admin.from("kuber_ledger").select("name, parent, opening").order("name").range(a, b)),
+    pageAllW((a, b) => admin.from("kuber_voucher").select("id, date, vtype").order("id").range(a, b)),
+    pageAllW((a, b) => admin.from("kuber_voucher_line").select("voucher_id, ledger, amount").order("id").range(a, b)),
+  ]);
+  const parentOf = new Map(groups.map((g) => [String(g.name).toLowerCase(), String(g.parent || "")]));
+  const properOf = new Map(groups.map((g) => [String(g.name).toLowerCase(), String(g.name)]));
+  const rootCache = new Map<string, string>();
+  const rootOf = (g: string): string => {
+    const k = g.toLowerCase();
+    if (rootCache.has(k)) return rootCache.get(k)!;
+    let cur = k;
+    for (let i = 0; i < 25; i++) {
+      const pr = (parentOf.get(cur) || "").toLowerCase();
+      if (!pr || pr === cur) break;
+      cur = pr;
+    }
+    const r = properOf.get(cur) || g;
+    rootCache.set(k, r);
+    return r;
+  };
+  const ledgerByName = new Map(ledgers.map((l) => [String(l.name), l]));
+  const dateOf = new Map(vouchers.map((v) => [String(v.id), String(v.date || "")]));
+  return { groups, ledgers, vouchers, lines, rootOf, ledgerByName, dateOf };
+}
+
+/** root → group → ledger tree with amounts; every statement wears it. */
+function treeOf(entries: { ledger: string; group: string; root: string; amount: number }[]) {
+  const roots = new Map<string, { root: string; total: number; groups: Map<string, { total: number; ledgers: Map<string, number> }> }>();
+  for (const e of entries) {
+    if (!e.amount) continue;
+    const r = roots.get(e.root) ?? roots.set(e.root, { root: e.root, total: 0, groups: new Map() }).get(e.root)!;
+    r.total += e.amount;
+    const g = r.groups.get(e.group) ?? r.groups.set(e.group, { total: 0, ledgers: new Map() }).get(e.group)!;
+    g.total += e.amount;
+    g.ledgers.set(e.ledger, (g.ledgers.get(e.ledger) || 0) + e.amount);
+  }
+  return [...roots.values()]
+    .map((r) => ({
+      root: r.root, total: r.total,
+      groups: [...r.groups.entries()]
+        .map(([name, g]) => ({
+          name, total: g.total,
+          ledgers: [...g.ledgers.entries()].map(([ledger, amount]) => ({ name: ledger, amount }))
+            .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 300),
+        }))
+        .filter((g) => g.total !== 0)
+        .sort((a, b) => Math.abs(b.total) - Math.abs(a.total)),
+    }))
+    .filter((r) => r.total !== 0)
+    .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+}
+
+const isBankChain = (rootOf: (g: string) => string, parent: string) =>
+  /^bank accounts$|^bank od|^cash-in-hand$/i.test(rootOf(parent)) || /^bank|^cash-in-hand$/i.test(parent);
+
 export async function GET(req: Request) {
   try {
     await requireKuber();
@@ -465,6 +540,129 @@ export async function GET(req: Request) {
       const tvc = rows.filter((r) => r.cls === "tvc").reduce((s2, r) => s2 + r.amount, 0);
       const oe = rows.filter((r) => r.cls === "oe").reduce((s2, r) => s2 + r.amount, 0);
       return NextResponse.json({ from, to, rows, totals: { sales, tvc, oe, throughput: sales - tvc, net: sales - tvc - oe } });
+    }
+
+    // ---- drill: one ledger's vouchers in the period — every statement's
+    // bottom rung (Dr Raghu, 28 Aug 2026: "make it drill downable").
+    if (view === "drill") {
+      const ledger = String(url.searchParams.get("ledger") || "");
+      if (!ledger) throw new HttpError(400, "ledger required");
+      const from = url.searchParams.get("from") || "0000-01-01";
+      const to = url.searchParams.get("to") || "9999-12-31";
+      const lns: RR[] = [];
+      for (let a = 0; ; a += 1000) {
+        const { data, error } = await admin.from("kuber_voucher_line")
+          .select("voucher_id, amount").eq("ledger", ledger).order("id").range(a, a + 999);
+        if (error) break;
+        lns.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
+      const ids = [...new Set(lns.map((l) => String(l.voucher_id)))];
+      const vmap = new Map<string, RR>();
+      for (let i = 0; i < ids.length; i += 150) {
+        const { data } = await admin.from("kuber_voucher")
+          .select("id, date, vtype, vno, party, narration").in("id", ids.slice(i, i + 150));
+        for (const v of data || []) vmap.set(String(v.id), v);
+      }
+      const rows = lns
+        .map((l) => ({ v: vmap.get(String(l.voucher_id)), amount: Number(l.amount) || 0 }))
+        .filter((x) => x.v && String(x.v.date || "") >= from && String(x.v.date || "") <= to)
+        .map((x) => ({
+          date: String(x.v!.date || ""), vtype: String(x.v!.vtype || ""), vno: String(x.v!.vno || ""),
+          party: String(x.v!.party || ""), narration: String(x.v!.narration || "").slice(0, 160), amount: x.amount,
+        }))
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, 800);
+      return NextResponse.json({ ledger, rows, total: rows.reduce((s2, r) => s2 + r.amount, 0) });
+    }
+
+    // ---- Actual Cash Flow (Dr Raghu, 28 Aug 2026): what actually moved
+    // through bank and cash, group-wise — Tally's own reading. For every
+    // voucher touching a bank/cash ledger, the OTHER side names the flow:
+    // a credit there is money COMING FROM it (inflow), a debit is money
+    // GOING TO it (outflow). Contra (bank↔bank) stands apart as transfers.
+    if (view === "cashflow_actual") {
+      const fyStartA = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+      const from = url.searchParams.get("from") || fyStartA;
+      const to = url.searchParams.get("to") || today;
+      const w = await loadWorld(admin);
+      if (!w.ledgers.length) return NextResponse.json({ empty: true });
+
+      const byVoucher = new Map<string, RR[]>();
+      for (const l of w.lines) {
+        const k = String(l.voucher_id);
+        (byVoucher.get(k) ?? byVoucher.set(k, []).get(k)!).push(l);
+      }
+      const inflows: { ledger: string; group: string; root: string; amount: number }[] = [];
+      const outflows: typeof inflows = [];
+      let bankMove = 0, contra = 0;
+      for (const [vid, lns] of byVoucher) {
+        const d = w.dateOf.get(vid) || "";
+        if (d < from || d > to || !d) continue;
+        const isBank = (name: string) => {
+          const led = w.ledgerByName.get(name);
+          return led ? isBankChain(w.rootOf, String(led.parent || "")) : false;
+        };
+        const bankLines = lns.filter((l) => isBank(String(l.ledger)));
+        if (!bankLines.length) continue;
+        const others = lns.filter((l) => !isBank(String(l.ledger)));
+        bankMove += bankLines.reduce((s2, l) => s2 + (Number(l.amount) || 0), 0);
+        if (!others.length) { contra += bankLines.filter((l) => (Number(l.amount) || 0) < 0).reduce((s2, l) => s2 - (Number(l.amount) || 0), 0); continue; }
+        for (const l of others) {
+          const amt = Number(l.amount) || 0;
+          if (!amt) continue;
+          const led = w.ledgerByName.get(String(l.ledger));
+          const grp = String(led?.parent || "(unknown)");
+          const root = grp === "(unknown)" ? grp : w.rootOf(grp);
+          const e = { ledger: String(l.ledger), group: grp, root, amount: Math.abs(amt) };
+          if (amt > 0) inflows.push(e); else outflows.push(e);
+        }
+      }
+      const inn = treeOf(inflows), out = treeOf(outflows);
+      const tin = inn.reduce((s2, r) => s2 + r.total, 0), tout = out.reduce((s2, r) => s2 + r.total, 0);
+      return NextResponse.json({ from, to, inflows: inn, outflows: out, totalIn: tin, totalOut: tout, net: tin - tout, bankMove: -bankMove, contra });
+    }
+
+    // ---- Fund Flow (same ask): where the money CAME FROM and WENT between
+    // two balance-sheet dates — each head's closing on date B less date A.
+    // Liabilities rising and assets falling are SOURCES; the mirror is
+    // APPLICATIONS. The P&L heads' own movement is funds from operations.
+    if (view === "fundflow") {
+      const fyStartF2 = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+      const from = url.searchParams.get("from") || fyStartF2;
+      const to = url.searchParams.get("to") || today;
+      const w = await loadWorld(admin);
+      if (!w.ledgers.length) return NextResponse.json({ empty: true });
+
+      const isPnlF = (root: string) => /income|expense|^sales|^purchase/i.test(root) && !/asset/i.test(root);
+      const upToA = new Map<string, number>(), upToB = new Map<string, number>();
+      for (const l of w.lines) {
+        const d = w.dateOf.get(String(l.voucher_id)) || "";
+        if (!d) continue;
+        const amt = Number(l.amount) || 0;
+        const name = String(l.ledger);
+        if (d < from) upToA.set(name, (upToA.get(name) || 0) + amt);
+        if (d <= to) upToB.set(name, (upToB.get(name) || 0) + amt);
+      }
+      const sources: { ledger: string; group: string; root: string; amount: number }[] = [];
+      const applications: typeof sources = [];
+      let operations = 0;
+      for (const l of w.ledgers) {
+        const name = String(l.name), grp = String(l.parent || "");
+        if (!grp) continue;
+        const root = w.rootOf(grp);
+        const delta = (upToB.get(name) || 0) - (upToA.get(name) || 0);
+        if (!delta) continue;
+        if (isPnlF(root)) { operations += delta; continue; }
+        // credit positive: a rising credit (liability up) or a falling debit
+        // (asset released) is money MADE AVAILABLE — a source.
+        const e = { ledger: name, group: grp, root, amount: Math.abs(delta) };
+        if (delta > 0) sources.push(e); else applications.push(e);
+      }
+      const src = treeOf(sources), app = treeOf(applications);
+      const tsrc = src.reduce((s2, r) => s2 + r.total, 0) + Math.max(0, operations);
+      const tapp = app.reduce((s2, r) => s2 + r.total, 0) + Math.max(0, -operations);
+      return NextResponse.json({ from, to, sources: src, applications: app, operations, totalSources: tsrc, totalApplications: tapp, gap: tsrc - tapp });
     }
 
     if (view === "financials") {

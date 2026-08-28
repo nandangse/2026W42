@@ -47,6 +47,27 @@ export function MoneyEntry({ value, onChange, usd }: { value: string; onChange: 
 }
 
 const CONFIGS: Record<string, { title: string; blurb: string; fields: Field[]; dateKey: string; amountKey: string; warnDays?: number; statusWords?: Record<string, string> }> = {
+  loan: {
+    title: "Banking — Loan Status",
+    blurb: "Every borrowing with its sanction, outstanding, EMI and ROI — cut Dr Raghu's way: Secured–Banks (A), Secured–Others (B), Non-fund/BG (C), Unsecured (D). The status totals ARE the A/B/C/D lines; ALL is Total Debts.",
+    dateKey: "upto", amountKey: "outstanding", warnDays: 60,
+    fields: [
+      { key: "bank", label: "Bank / NBFC", type: "text" },
+      { key: "loan_ac_no", label: "Loan A/c No", type: "text" },
+      { key: "ltype", label: "Type", type: "text", hint: "Working Capital CC, ECGL, UGCL, Term Loan…" },
+      { key: "drawn_on", label: "Drawn on", type: "date" },
+      { key: "sanctioned", label: "Sanctioned", type: "money" },
+      { key: "outstanding", label: "Outstanding", type: "money" },
+      { key: "emi", label: "EMI", type: "money", hint: "monthly, interest + principal" },
+      { key: "roi", label: "ROI %", type: "number" },
+      { key: "emi_date", label: "EMI Date", type: "text" },
+      { key: "tenor_months", label: "Tenor (months)", type: "number" },
+      { key: "upto", label: "Upto", type: "date" },
+      { key: "security", label: "Security", type: "text", hint: "Property, FD, Buffer…" },
+      { key: "status", label: "Category", type: "select", options: ["secured - bank", "secured - others", "non-fund (BG)", "unsecured", "closed"] },
+      { key: "note", label: "Note", type: "text" },
+    ],
+  },
   bg: {
     title: "Bank Guarantees",
     blurb: "Every BG with its expiry and claim date — the register the bank's own list never shows this clearly.",
