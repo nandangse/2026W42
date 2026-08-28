@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.25.1.0",
+    date: "2026-08-27",
+    module: "CRM — the board moves, and the queue dials",
+    items: [
+      "THE DEAL BOARD'S CARDS DRAG. Drop a card on another column and the stage is written — optimistically, so the card lands where the hand put it, and honestly: the rules live on the server, not in the mouse, and a refused move snaps back with the refusal in its own words. An opportunity moves between the two opportunity columns; a quotation along the quotation rungs; nothing drags into Order Received — an order is recorded from the quotation, not conjured by a gesture. The stage-history triggers keep their own books on every move.",
+      "A ☎ ICON IN EVERY CARD'S BOTTOM-RIGHT CORNER, with its purpose on hover: one click saves the deal into YOUR prospecting queue. Queueing it twice just finds it again.",
+      "THE HOME SCREEN LEADS WITH THE PROSPECTING QUEUE: your own list, oldest first — a queue that reorders itself is a queue nobody finishes — the next call highlighted, a green DIAL button on each (the number resolved live from the person record, so a corrected phone corrects every queue it sits in), ✓ Done keeping the row as the record of the call, and a plain “no number on record” where the company has no person with a phone.",
+      "CRM migration 0017.",
+    ],
+  },
+  {
     v: "3.25.0.1",
     date: "2026-08-27",
     module: "The slip is A5 landscape, exactly",

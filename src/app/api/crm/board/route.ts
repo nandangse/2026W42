@@ -171,3 +171,55 @@ export async function GET(req: Request) {
     return errJson(e);
   }
 }
+
+
+/**
+ * POST /api/crm/board — { kind, id, toCol }: a card dragged to another column.
+ *
+ * The drop writes the STAGE, nothing else — the stage-history triggers do
+ * their own bookkeeping. The rules live here, not in the mouse: an
+ * opportunity moves only between the two opportunity columns, a quotation
+ * only along the quotation rungs, and nothing drags into Order Received —
+ * an order is recorded from the quotation, not conjured by a gesture.
+ */
+const DROP_STAGE: Record<string, Record<string, string>> = {
+  opportunity: { opp_received: "new", opp_process: "waiting_for_data" },
+  quotation: {
+    quote_sent: "sent", long_term: "long_term", next_month: "next_month",
+    this_month: "this_month", bucket_b: "bucket_b", bucket_a: "bucket_a", bucket_0: "bucket_0",
+  },
+};
+
+export async function POST(req: Request) {
+  try {
+    await requireCrm();
+    if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
+    const db = crmDb();
+    const body = await req.json();
+    const kind = String(body.kind || "");
+    const id = String(body.id || "");
+    const toCol = String(body.toCol || "");
+    if (!id) throw new HttpError(400, "Which card?");
+
+    if (kind === "sales_order") throw new HttpError(409, "An order does not move — it has arrived.");
+    if (toCol === "order_received")
+      throw new HttpError(409, "Order Received is written from the quotation, not by dragging.");
+    const code = DROP_STAGE[kind]?.[toCol];
+    if (!code) {
+      throw new HttpError(409,
+        kind === "opportunity"
+          ? "An opportunity moves between the two opportunity columns. Send a quotation to put it on the quotation rungs."
+          : "A quotation moves along the quotation rungs only.");
+    }
+
+    const { data: stage } = await db.from("stage").select("id").eq("code", code).maybeSingle();
+    if (!stage) throw new HttpError(500, `No stage with code ${code} — check the stage master.`);
+
+    const { error } = await db.from(kind === "opportunity" ? "opportunity" : "quotation")
+      .update({ stage_id: stage.id }).eq("id", id);
+    if (error) throw new HttpError(500, error.message);
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return errJson(e);
+  }
+}
