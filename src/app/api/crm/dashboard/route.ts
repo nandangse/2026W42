@@ -126,8 +126,56 @@ export async function GET(req: Request) {
       }
     }
 
+    /**
+     * The year the run-rate races against: April to March. Achieved-FYTD is
+     * measured fresh here (not from the chosen range), and the weeks left
+     * are to 31 March — the target does not care which filter is on screen.
+     */
+    const now = new Date();
+    const fyStartYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    const fyStart = `${fyStartYear}-04-01`;
+    const fyEnd = `${fyStartYear + 1}-03-31`;
+    const today = now.toISOString().slice(0, 10);
+    const weeksLeft = Math.max(1, (new Date(fyEnd + "T00:00:00").getTime() - now.getTime()) / 6048e5);
+    const weeksGone = Math.max(0.1, (now.getTime() - new Date(fyStart + "T00:00:00").getTime()) / 6048e5);
+
+    let soF = db.from("sales_order").select("amount").gte("ordered_on", fyStart).lte("ordered_on", today);
+    if (mine) soF = soF.eq("owner_id", mine);
+    let invF = db.from("sales_invoice").select("amount, erp_status").gte("invoiced_on", fyStart).lte("invoiced_on", today);
+    if (mine) invF = invF.eq("owner_id", mine);
+    let intF = db.from("interaction").select("kind").gte("happened_at", fyStart).lte("happened_at", today);
+    if (mine) intF = intF.eq("by_id", mine);
+    let qF = db.from("quotation").select("grand_total, quoted_value").gte("created_at", fyStart).lte("created_at", today + "T23:59:59");
+    if (mine) qF = qF.eq("owner_id", mine);
+    const [soY, invY, intY, qY] = await Promise.all([soF, invF, intF, qF]);
+    const yr = {
+      booking: ((soY.data || []) as Row[]).reduce((a, r) => a + num(r.amount), 0),
+      billing: ((invY.data || []) as Row[]).reduce((a, r) => a + num(r.amount), 0),
+      collections: ((invY.data || []) as Row[]).filter((r) => /paid/i.test(String(r.erp_status || ""))).reduce((a, r) => a + num(r.amount), 0),
+      calls: ((intY.data || []) as Row[]).filter((r) => CALL_KINDS.includes(String(r.kind))).length,
+      visits: ((intY.data || []) as Row[]).filter((r) => VISIT_KINDS.includes(String(r.kind))).length,
+      video_calls: ((intY.data || []) as Row[]).filter((r) => String(r.kind) === "Video Call").length,
+      quotations_value: ((qY.data || []) as Row[]).reduce((a, r) => a + (num(r.grand_total) || num(r.quoted_value)), 0),
+      quotations_nos: ((qY.data || []) as Row[]).length,
+    };
+
+    // the plan: mine, or every salesperson's summed for the team view
+    const fy = `${fyStartYear}-${String(fyStartYear + 1).slice(2)}`;
+    let targets: Record<string, number> = {};
+    try {
+      let pq = db.from("salesperson_plan").select("profile_id, targets").eq("fy", fy);
+      if (mine) pq = pq.eq("profile_id", mine);
+      const { data: plans } = await pq;
+      for (const pRow of plans || []) {
+        const t = (pRow.targets || {}) as Record<string, number>;
+        for (const [k, v] of Object.entries(t)) targets[k] = (targets[k] || 0) + (Number(v) || 0);
+      }
+    } catch { /* pre-0020 */ }
+
     return NextResponse.json({
       scope, allowedTeam, weeks: Math.round(weeks * 10) / 10, metrics,
+      fy, fyEnd, weeksLeft: Math.round(weeksLeft * 10) / 10, weeksGone: Math.round(weeksGone * 10) / 10,
+      fytd: yr, targets,
       openOpportunities: ((openOpps.data || []) as Row[]).map((o) => ({
         id: String(o.id), title: String(o.name ?? ""),
         company: o.company_id ? companyName.get(String(o.company_id)) ?? null : null,

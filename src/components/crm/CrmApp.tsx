@@ -30,6 +30,8 @@ import MailQueue from "./MailQueue";
 import Dashboard from "./Dashboard";
 import VisitingCard, { PersonCardPanel } from "./VisitingCard";
 import Integrations from "./Integrations";
+import SalesPersonPlan from "./SalesPersonPlan";
+import SalesPlan from "./SalesPlan";
 import WaComposer, { type WaCtx } from "./WaComposer";
 import { DateRangeBar, DEFAULT_RANGE, type DateRange } from "./DateRange";
 
@@ -55,7 +57,8 @@ type ViewState = { dt: Doctype; row: Row; links: Links; mode: "view" | "edit" };
 export const SPECIAL_SECTIONS = [
   { name: "dashboard", label: "Dashboard", icon: "◧", blurb: "The CEO cockpit — owner concentration, the funnel, the response clock. Being built next." },
   { name: "analytics", label: "Analytics", icon: "◫", blurb: "Win rates, stage velocity, source economics — read from the stage histories. Being built." },
-  { name: "salespersonplan", label: "SalesPerson Plan", icon: "◐", blurb: "Each salesperson's plan against their pipeline. Being built." },
+  { name: "salespersonplan", label: "SalesPerson Plan", icon: "◐", blurb: "" },
+  { name: "salesplan", label: "Sales Plan", icon: "◩", blurb: "" },
   { name: "deals", label: "Deals", icon: "◆", blurb: "" },
   { name: "visitingcard", label: "Add Visiting Card", icon: "🪪", blurb: "" },
   { name: "integrations", label: "Integrations", icon: "🔌", blurb: "" },
@@ -77,8 +80,7 @@ const URL_OF: Record<string, string> = {
 const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string } | { sp: string } | { href: string; label: string; icon: string })[] }[] = [
   {
     items: [
-      { sp: "dashboard" }, { sp: "analytics" }, { sp: "salespersonplan" },
-      { href: "/sales-plan", label: "Sales Plan", icon: "◩" },
+      { sp: "dashboard" }, { sp: "analytics" }, { sp: "salespersonplan" }, { sp: "salesplan" },
     ],
   },
   { header: "TOOLS", collapsible: true, items: [{ sp: "visitingcard" }] },
@@ -511,8 +513,10 @@ export default function CrmApp({
               <VisitingCard onOpen={openLinked} />
             ) : special.name === "integrations" ? (
               <Integrations />
+            ) : special.name === "salespersonplan" ? (
+              <SalesPersonPlan />
             ) : (
-              <StubScreen label={special.label} blurb={special.blurb} dated />
+              <SalesPlan />
             )}
           </main>
         )}

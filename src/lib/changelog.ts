@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.26.0.0",
+    date: "2026-08-28",
+    module: "CRM — the plan, the run rate, and Sales Genie comes home",
+    items: [
+      "SALESPERSON PLAN IS REAL: targets per person per financial year — money for the YEAR (booking, billing, collections, quotation value), activity PER WEEK (calls, visits, video calls, opportunities) — because that is how each is actually promised. The CEO, Sales Head and admin type; everyone else reads their own row, as agreed in review.",
+      "EVERY DASHBOARD BOX NOW ANSWERS THREE QUESTIONS: what happened (the number), what was promised (TARGET …/wk in light green), and what it takes from here (REQ …/wk — the balance to 31 March divided by the weeks left, red the moment the required pace exceeds the planned one). Achieved-to-date is measured fresh from 1 April regardless of the filter on screen — the year does not care which range is showing.",
+      "SALES GENIE FOLDED INTO THE CRM: its two panes — My Sales Plan and the Playbook — live at CRM → Sales Plan now, byte-for-byte from the same authed routes. The 💼 icon left the main app, sales-team logins land in the CRM, and there is ONE door. Collapsing the pane's own data into the CRM's tables is the next, larger step — nothing is lost meanwhile.",
+      "CRM migration 0020.",
+    ],
+  },
+  {
     v: "3.25.4.0",
     date: "2026-08-28",
     module: "CRM — cards front and back, Apollo, and Integrations",

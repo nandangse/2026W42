@@ -42,7 +42,6 @@ import QuoteOfDay, { QuoteCard } from "./QuoteOfDay";
 import GoalsWorkspace from "./GoalsWorkspace";
 import DeliveredJobs from "./DeliveredJobs";
 import MorningUpload from "./MorningUpload";
-import SalesGenie from "./SalesGenie";
 import DeliveryOutlook from "./DeliveryOutlook";
 import LMS from "./LMS";
 import JobsInProgress, { JobLightbox, type WipJob } from "./JobsInProgress";
@@ -393,9 +392,12 @@ export default function PlanningSuite({
   // sticky sub-nav. "tab" is only meaningful inside the Planning Suite
   // workspace now — Goals and Tasking are whole workspaces, not sub-tabs.
   // Sales-team members live in Sales Genie — land them there directly.
-  const [workspace, setWorkspace] = useState<"lms" | "suite" | "delivered" | "goals" | "tasking" | "sales" | "consult" | "principles">(
-    role === "sales" ? "sales" : "suite",
-  );
+  const [workspace, setWorkspace] = useState<"lms" | "suite" | "delivered" | "goals" | "tasking" | "sales" | "consult" | "principles">("suite");
+  // Sales-team members' home is the CRM now — Sales Genie's panes moved there.
+  useEffect(() => {
+    if (role === "sales") window.location.replace("/crm");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Back/forward can restore a workspace this account cannot open -- the tab
   // is hidden, but the history entry outlives the permission. Bounce rather
   // than render an empty board.
@@ -707,7 +709,8 @@ export default function PlanningSuite({
     ...(canSeeDelivered ? ([["delivered", "✅ Delivered Jobs"]] as [typeof workspace, string][]) : []),
     ...(goalsAccess ? ([["goals", "🎯 Goals"]] as [typeof workspace, string][]) : []),
     ["tasking", "📋 Nandan Tasking"],
-    ...(salesAccess ? ([["sales", "💼 Sales Genie"]] as [typeof workspace, string][]) : []),
+    // Sales Genie folded into the CRM (28 Aug 2026): its two panes live at
+    // /crm → Sales Plan now, and the workspace icon is gone. One door.
     // Learning sits last: it is the section somebody goes to deliberately,
     // not one they pass through on the way to the day's work.
     ["lms", "📚 LMS"],
@@ -1096,11 +1099,7 @@ export default function PlanningSuite({
       {workspace === "principles" && <Principles isOwner={isRaghu} />}
       {workspace === "tasking" && <Tasking board={board} onOpen={openJobPlan} reload={reload} me={me} people={board.people || []} />}
       {/* same keep-alive pattern as Goals — the playbook iframe loads once */}
-      {salesVisited && salesAccess && (
-        <div style={{ display: workspace === "sales" ? undefined : "none" }}>
-          <SalesGenie email={email} isAdmin={isAdmin} />
-        </div>
-      )}
+
 
       {profileOpen && (
         <ProfileModal me={{ email, initials, displayName, erpOwner, role }} onClose={() => setProfileOpen(false)} onChangePassword={() => { setProfileOpen(false); setPwOpen(true); }} />

@@ -25,18 +25,27 @@ interface Data {
   scope: string; allowedTeam: boolean; weeks: number;
   metrics: Record<string, Metric>;
   openOpportunities: Chip[]; targetQuotations: Chip[];
+  fy: string; fyEnd: string; weeksLeft: number; weeksGone: number;
+  fytd: Record<string, number>; targets: Record<string, number>;
 }
 interface GoalTask { id: string; title: string; detail: string | null; due: string | null; esc: string; job: string | null }
 
-const METRIC_DEFS: { key: string; label: string; money?: boolean; sub?: string }[] = [
-  { key: "booking", label: "Booking", money: true },
-  { key: "billing", label: "Billing", money: true },
-  { key: "collections", label: "Collections", money: true, sub: "invoices marked Paid in ERP" },
-  { key: "calls", label: "Calls" },
-  { key: "visits", label: "Visits" },
-  { key: "video_calls", label: "Video Calls" },
-  { key: "quotations", label: "Quotations", money: true },
-  { key: "opportunities_handled", label: "Opps Handled" },
+/**
+ * Each box knows where its target and its year-to-date live: money targets
+ * are annual (÷52 for the week), activity targets are already per week.
+ */
+const METRIC_DEFS: {
+  key: string; label: string; money?: boolean; sub?: string;
+  targetKey?: string; targetWeekly?: boolean; fytdKey?: string;
+}[] = [
+  { key: "booking", label: "Booking", money: true, targetKey: "booking", fytdKey: "booking" },
+  { key: "billing", label: "Billing", money: true, targetKey: "billing", fytdKey: "billing" },
+  { key: "collections", label: "Collections", money: true, sub: "invoices marked Paid in ERP", targetKey: "collections", fytdKey: "collections" },
+  { key: "calls", label: "Calls", targetKey: "calls_wk", targetWeekly: true, fytdKey: "calls" },
+  { key: "visits", label: "Visits", targetKey: "visits_wk", targetWeekly: true, fytdKey: "visits" },
+  { key: "video_calls", label: "Video Calls", targetKey: "video_calls_wk", targetWeekly: true, fytdKey: "video_calls" },
+  { key: "quotations", label: "Quotations", money: true, targetKey: "quotation_value", fytdKey: "quotations_value" },
+  { key: "opportunities_handled", label: "Opps Handled", targetKey: "opps_wk", targetWeekly: true },
   { key: "tasks_open", label: "Tasks Open" },
 ];
 
@@ -88,6 +97,14 @@ export default function Dashboard({ onOpen }: { onOpen: (target: string, id: str
           const main = v == null ? "…" : m.money ? fmtMoney(v.value || 0) : String(v.n);
           const weekly = v == null || !data ? null
             : m.money ? `${fmtMoney((v.value || 0) / data.weeks)}/wk` : `${((v.n || 0) / data.weeks).toFixed(1)}/wk`;
+          // target/week (light green) and the run rate still owed per week to
+          // land the year by 31 March — red when it exceeds the target pace
+          const tRaw = m.targetKey && data ? data.targets?.[m.targetKey] : undefined;
+          const tWk = tRaw == null ? null : m.targetWeekly ? tRaw : tRaw / 52;
+          const annualT = tRaw == null ? null : m.targetWeekly ? tRaw * 52 : tRaw;
+          const done = m.fytdKey && data ? data.fytd?.[m.fytdKey] ?? 0 : null;
+          const req = annualT != null && done != null && data ? Math.max(0, annualT - done) / data.weeksLeft : null;
+          const fmt = (n: number) => (m.money ? fmtMoney(n) : n >= 10 ? String(Math.round(n)) : n.toFixed(1));
           return (
             <div key={m.key} title={m.sub || m.label}
               style={{ border: `1px solid ${BORDER}`, borderTop: `3px solid ${m.key === "booking" ? GREEN : m.key === "tasks_open" ? ORANGE : NAVY}`, borderRadius: 8, padding: "7px 12px", background: "#fff", flex: "1 1 0", minWidth: 108 }}>
@@ -96,6 +113,21 @@ export default function Dashboard({ onOpen }: { onOpen: (target: string, id: str
               <div className="tnum" style={{ fontSize: 10, color: MUTED, whiteSpace: "nowrap" }}>
                 {m.money && v ? `${v.n} nos · ` : ""}{weekly ? `≈ ${weekly}` : ""}
               </div>
+              {tWk != null && (
+                <div className="tnum" style={{ fontSize: 10, fontWeight: 700, color: "#4CAF7D", whiteSpace: "nowrap" }}
+                  title={`The plan for FY ${data?.fy}`}>
+                  Target {fmt(tWk)}/wk
+                </div>
+              )}
+              {req != null && tWk != null && (
+                <div className="tnum" style={{ fontSize: 10, fontWeight: 800, whiteSpace: "nowrap", color: req > tWk * 1.05 ? "#B3261E" : GREEN }}
+                  title={`Still owed ÷ the ${data?.weeksLeft} weeks to ${data?.fyEnd} — red when the pace needed now exceeds the planned pace`}>
+                  Req {fmt(req)}/wk
+                </div>
+              )}
+              {tRaw == null && m.targetKey && (
+                <div style={{ fontSize: 9, color: "#C9CDD6", whiteSpace: "nowrap" }}>no target set</div>
+              )}
             </div>
           );
         })}
