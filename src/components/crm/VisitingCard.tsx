@@ -27,6 +27,30 @@ interface CardRow {
 
 const EMPTY_FORM = { person_name: "", salutation: "", designation: "", company: "", company_id: "", email: "", phone: "", website: "" };
 
+/**
+ * A phone photographs a card at 4000px and 8MB; the model's ceiling is 5MB
+ * and nothing on a card needs that many pixels. Shrunk HERE, in the browser
+ * — the upload gets fast on mobile data, HEIC becomes plain JPEG, and the
+ * reader never sees an image it must refuse. Falls back to the original if
+ * the canvas cannot cope.
+ */
+async function shrinkImage(file: File, maxEdge = 1600): Promise<{ blob: Blob; name: string }> {
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return { blob: file, name: file.name };
+    ctx.drawImage(bmp, 0, 0, w, h);
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.85));
+    return blob ? { blob, name: file.name.replace(/\.[^.]+$/, "") + ".jpg" } : { blob: file, name: file.name };
+  } catch {
+    return { blob: file, name: file.name };
+  }
+}
+
 export default function VisitingCard({ onOpen }: { onOpen: (target: string, id: string) => void }) {
   const [cards, setCards] = useState<CardRow[] | null>(null);
   const [needs, setNeeds] = useState(false);
@@ -105,8 +129,9 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
     setPreviews((p) => ({ ...p, [side]: URL.createObjectURL(file) }));
     setBusy(side); setErr("");
     try {
+      const small = await shrinkImage(file);
       const fd = new FormData();
-      fd.append("file", file); fd.append("side", side);
+      fd.append("file", small.blob, small.name); fd.append("side", side);
       const r = await fetch("/api/crm/visiting-card", { method: "POST", body: fd });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(String(j.error || r.status));

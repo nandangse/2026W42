@@ -65,13 +65,15 @@ async function readCard(buf: Buffer, mime: string): Promise<{ read: Record<strin
         }],
       }),
     });
-    if (!r.ok)
+    if (!r.ok) {
+      const t = await r.text();
       return {
         read: null,
         why: r.status === 401 ? "the ANTHROPIC_API_KEY is wrong or revoked"
           : r.status === 429 || r.status === 529 ? "the model was busy — try again in a minute"
-          : `the model answered ${r.status}`,
+          : `the model answered ${r.status}: ${t.slice(0, 180)}`,
       };
+    }
     const j = await r.json();
     const use = (j?.content || []).find((c: { type?: string }) => c?.type === "tool_use");
     return use?.input ? { read: use.input as Record<string, unknown>, why: null } : { read: null, why: "the model returned nothing usable" };

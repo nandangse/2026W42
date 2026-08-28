@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.26.0.2",
+    date: "2026-08-28",
+    module: "The card reader survives phone photographs",
+    items: [
+      "“THE MODEL ANSWERED 400” on a phone photo was the image itself: a phone shoots a card at 4000px and 8MB, the reader's ceiling is 5MB, and nothing on a card needs that many pixels. The photo is SHRUNK IN THE BROWSER before upload — 1600px JPEG — so the upload is fast on mobile data, HEIC becomes plain JPEG, and the reader never sees an image it must refuse. And when the model does refuse, its own words now reach the screen instead of a bare status code.",
+    ],
+  },
+  {
     v: "3.26.0.1",
     date: "2026-08-28",
     module: "The queue icon tells its own story",
