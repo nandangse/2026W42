@@ -17,7 +17,7 @@ import ModuleMenu from "@/components/ModuleMenu";
 import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
 import KuberTasking from "@/components/kuber/Tasking";
-import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen } from "@/components/kuber/Books";
+import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen } from "@/components/kuber/Books";
 import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 import PlaybookScreen from "@/components/Playbook";
 
@@ -93,9 +93,7 @@ const STUBS: Record<string, string> = {
   targets: "Targets — the JSA business-dashboard parameters, PLAN against ACTUAL: GP%, NP%, ROI, inventory turn, current and quick ratios, debtor/inventory/creditor days, CCC, working capital, cash & bank, net worth. The ACTUAL side computes from the books; the PLAN side is typed once. Being built next — the plan figures come from Dr Raghu.",
   acf: "Actual Cash Flow statement — receipts and payments as they actually moved through bank and cash, period by period, from the vouchers. Being built next.",
   fundflow: "Fund Flow statement — where the money CAME FROM and WHERE IT WENT between two balance-sheet dates: sources and applications. Being built next.",
-  expreg: "Expenses Register — every expense ledger's story for the period, grouped and sortable. Being built next; until then the P&L's expense heads open to the same ledgers.",
-  oereg: "OE Register — awaiting Dr Raghu's definition of the OE cut before it is built (so it lands right the first time).",
-  tvcreg: "TVC Register — awaiting Dr Raghu's definition of the TVC cut (total variable cost?) before it is built.",
+
   bank: "Bank & Cash — the balances, the BRS and the PDC register (the sheet's Bank Reco tab), feeding the cash flow's opening balance. Being built next.",
   gst: "GST & Statutory — the compliance calendar with its due dates, shown the sheet's own way: verified, late-and-risk, not done. Being built.",
   reports: "Reports — the MIS P&L against budget, break-even and the working-capital day ratios, printed the Genie way. Being built.",
@@ -215,6 +213,9 @@ export default function Accounts({
           {openKey === "pnl" && <PnLScreen />}
           {openKey === "bs" && <BalanceSheetScreen />}
           {openKey === "playbook" && <PlaybookScreen kind="finance" email={email} />}
+          {openKey === "expreg" && <ExpensesScreen mode="all" />}
+          {openKey === "tvcreg" && <ExpensesScreen mode="tvc" />}
+          {openKey === "oereg" && <ExpensesScreen mode="oe" />}
           {["bg", "fd", "insurance", "payplan", "cashitem"].includes(openKey) && <RegisterScreen kind={openKey} key={openKey} />}
           {openKey in STUBS && (
             <div className="bg-white rounded-lg border p-6" style={{ borderColor: "#E2E0DA", maxWidth: 720 }}>

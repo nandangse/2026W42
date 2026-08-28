@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.1",
+    date: "2026-08-28",
+    module: "Kuber — the TOC registers: TVC, OE, and the throughput arithmetic",
+    items: [
+      "TVC AND OE, by Dr Raghu's own TOC definition (28 Aug 2026): TVC = TRULY VARIABLE COST — RM, process, what rises with every unit; OE = OPERATING EXPENSES — any cost that is NOT variable. Three registers stand where the doors were: the EXPENSES REGISTER (every expense ledger with its class), the TVC REGISTER (with THROUGHPUT = Sales − TVC and its % of sales on top), and the OE REGISTER (with NET = Throughput − OE, tying back to the P&L).",
+      "GENIE SEEDS THE CLASS — purchase heads and process-like direct expenses (job work, freight, consumables, RM) read as TVC, everything else as OE — and THE CFO'S FLIP OUTRANKS THE SEED: change a ledger's class on any register and every register and total follows it from then on (migration 0087 holds your word).",
+      "YTD · QTD · MTD stand atop all three, with free from/to dates beside them; columns sort on click; the totals row is pinned under the header.",
+    ],
+  },
+  {
     v: "3.31.0.0",
     date: "2026-08-28",
     module: "The Playbooks — documents in, one living wiki out",

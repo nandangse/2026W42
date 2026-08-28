@@ -54,6 +54,7 @@ const PROBES = [
   ["genie", "0085 design project grid", "vishwa_project?select=project_id"],
   ["genie", "0086 playbooks", "playbook?select=kind"],
   ["genie", "0086 playbook intelligence", "playbook_doc?select=id"],
+  ["genie", "0087 TVC/OE classification", "kuber_expense_class?select=ledger"],
   ["crm", "0024 numbering + deal contacts", "opportunity_contact?select=id"],
   ["crm", "0017 prospect_queue", "prospect_queue?select=id"],
   ["crm", "0018 visiting_card", "visiting_card?select=id"],

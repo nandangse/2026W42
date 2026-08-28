@@ -386,6 +386,87 @@ export async function GET(req: Request) {
     // group; income/expense roots make the P&L over the period, the rest make
     // the balance sheet as-of (opening + every line to date). Debit is
     // negative throughout — the parser's convention, kept.
+    // ---- expenses: the TVC / OE / Expenses registers (Dr Raghu, 28 Aug
+    // 2026, the TOC cut): TVC = Truly Variable Cost — RM, process, freight —
+    // what rises with every unit; OE = Operating Expenses — every cost that
+    // is NOT variable. THROUGHPUT = Sales − TVC; NET ties back to the P&L.
+    // Genie seeds the classification; the CFO's flip (kuber_expense_class)
+    // always outranks the seed.
+    if (view === "expenses") {
+      const fyStartE = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+      const from = url.searchParams.get("from") || fyStartE;
+      const to = url.searchParams.get("to") || today;
+
+      const pageAllE = async (build: (a: number, b: number) => PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>) => {
+        const out: Record<string, unknown>[] = [];
+        for (let a = 0; ; a += 1000) {
+          const { data, error } = await build(a, a + 999);
+          if (error) {
+            if (/does not exist|schema cache/i.test(error.message)) return out;
+            throw new Error(error.message);
+          }
+          out.push(...(data || []));
+          if ((data || []).length < 1000) break;
+        }
+        return out;
+      };
+      const [groups, ledgers, vouchers, lines, clsRows] = await Promise.all([
+        pageAllE((a, b) => admin.from("kuber_group").select("name, parent").order("name").range(a, b)),
+        pageAllE((a, b) => admin.from("kuber_ledger").select("name, parent").order("name").range(a, b)),
+        pageAllE((a, b) => admin.from("kuber_voucher").select("id, date").order("id").range(a, b)),
+        pageAllE((a, b) => admin.from("kuber_voucher_line").select("voucher_id, ledger, amount").order("id").range(a, b)),
+        pageAllE((a, b) => admin.from("kuber_expense_class").select("ledger, cls").order("ledger").range(a, b)),
+      ]);
+      if (!ledgers.length) return NextResponse.json({ empty: true });
+
+      const parentOf = new Map(groups.map((g) => [String(g.name).toLowerCase(), String(g.parent || "")]));
+      const properOf = new Map(groups.map((g) => [String(g.name).toLowerCase(), String(g.name)]));
+      const rootOf = (g: string): string => {
+        let cur = g.toLowerCase();
+        for (let i = 0; i < 25; i++) {
+          const p = (parentOf.get(cur) || "").toLowerCase();
+          if (!p || p === cur) break;
+          cur = p;
+        }
+        return properOf.get(cur) || g;
+      };
+      const isExpense = (root: string) => /expense|^purchase/i.test(root) && !/asset/i.test(root);
+      const isIncome = (root: string) => /income|^sales/i.test(root);
+
+      const dateOf = new Map(vouchers.map((v) => [String(v.id), String(v.date || "")]));
+      const period = new Map<string, number>();
+      for (const l of lines) {
+        const d = dateOf.get(String(l.voucher_id)) || "";
+        if (d >= from && d <= to && d) period.set(String(l.ledger), (period.get(String(l.ledger)) || 0) + (Number(l.amount) || 0));
+      }
+
+      const flip = new Map(clsRows.map((c) => [String(c.ledger), String(c.cls)]));
+      // The TOC seed: purchase heads and the process-like direct expenses
+      // rise with the unit — everything else stands whether we build or not.
+      const seedCls = (name: string, grp: string, root: string) =>
+        /^purchase/i.test(root)
+          || (/direct expense/i.test(root) && /job ?work|process|freight|carriage|cartage|consum|raw ?material|\brm\b|packing|loading|octroi|customs|import/i.test(name + " " + grp))
+          ? "tvc" : "oe";
+
+      let sales = 0;
+      const rows: { ledger: string; group: string; root: string; cls: string; seeded: boolean; amount: number }[] = [];
+      for (const l of ledgers) {
+        const name = String(l.name);
+        const grp = String(l.parent || "");
+        if (!grp) continue;
+        const root = rootOf(grp);
+        const amt = period.get(name) || 0;
+        if (isIncome(root)) { sales += amt; continue; }
+        if (!isExpense(root) || !amt) continue;
+        const cls = flip.get(name) || seedCls(name, grp, root);
+        rows.push({ ledger: name, group: grp, root, cls, seeded: !flip.has(name), amount: -amt });
+      }
+      rows.sort((a, b) => b.amount - a.amount);
+      const tvc = rows.filter((r) => r.cls === "tvc").reduce((s2, r) => s2 + r.amount, 0);
+      const oe = rows.filter((r) => r.cls === "oe").reduce((s2, r) => s2 + r.amount, 0);
+      return NextResponse.json({ from, to, rows, totals: { sales, tvc, oe, throughput: sales - tvc, net: sales - tvc - oe } });
+    }
+
     if (view === "financials") {
       const fyStartF = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
       const from = url.searchParams.get("from") || fyStartF;
@@ -624,6 +705,29 @@ export async function GET(req: Request) {
       payable: { total: sum(pay), gross: sum(pos(pay)), overdue: sum(overdue(pay)), due30: sum(dueSoon(pay, 30)), parties: new Set(pay.map((b) => b.party)).size, unadjusted: sum(pay.filter((b) => b.amount < 0)) },
       bg, fd, insurance: ins,
     });
+  } catch (e) {
+    return errJson(e);
+  }
+}
+
+/** POST { action: "classify", ledger, cls: "tvc" | "oe" } — the CFO's flip;
+ *  it outranks the seed from then on. */
+export async function POST(req: Request) {
+  try {
+    const user = await requireKuber();
+    const body = await req.json();
+    if (String(body.action) !== "classify") throw new HttpError(400, "Unknown action.");
+    const ledger = String(body.ledger || "").trim();
+    const cls = String(body.cls || "");
+    if (!ledger || !["tvc", "oe"].includes(cls)) throw new HttpError(400, "ledger and cls (tvc|oe) required");
+    const { error } = await adminClient().from("kuber_expense_class")
+      .upsert({ ledger, cls, by: user.email, at: new Date().toISOString() }, { onConflict: "ledger" });
+    if (error) {
+      if (/does not exist|schema cache/i.test(error.message))
+        throw new HttpError(503, "Run migration 0087 first — the classification has nowhere to live yet.");
+      throw new Error(error.message);
+    }
+    return NextResponse.json({ ok: true });
   } catch (e) {
     return errJson(e);
   }

@@ -969,3 +969,127 @@ export function BalanceSheetScreen() {
     </div>
   );
 }
+
+// ---------------- TVC / OE / Expenses registers ----------------
+// (Dr Raghu, 28 Aug 2026, the TOC cut): TVC = Truly Variable Cost — RM,
+// process, what rises with every unit. OE = Operating Expenses — any cost
+// that is NOT variable. THROUGHPUT = Sales − TVC; NET = Throughput − OE.
+// Genie seeds the classification; the CFO's flip outranks the seed.
+
+interface ExpRow { ledger: string; group: string; root: string; cls: string; seeded: boolean; amount: number }
+interface ExpData { empty?: boolean; from: string; to: string; rows: ExpRow[]; totals: { sales: number; tvc: number; oe: number; throughput: number; net: number } }
+
+export function ExpensesScreen({ mode }: { mode: "all" | "tvc" | "oe" }) {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+  const mtdStart = today.slice(0, 8) + "01";
+  const qm = Math.floor(((Number(today.slice(5, 7)) + 8) % 12) / 3) * 3;
+  const qMonth = ((3 + qm) % 12) + 1;
+  const qYear = qMonth > Number(today.slice(5, 7)) ? Number(today.slice(0, 4)) - 1 : Number(today.slice(0, 4));
+  const qtdStart = `${qYear}-${String(qMonth).padStart(2, "0")}-01`;
+  const [from, setFrom] = useState(fyStart);
+  const [to, setTo] = useState(today);
+  const [data, reload] = useBooks<ExpData>("expenses", `&from=${from}&to=${to}`);
+  const { fmt: fmtMoney } = useMoneyFmt();
+  const [sortK, setSortK] = useState<"amount" | "ledger" | "group">("amount");
+  const [dir, setDir] = useState<1 | -1>(-1);
+
+  const TITLES = {
+    all: ["Expenses Register", "Every expense ledger for the period, with its TOC class — flip a wrong one and every register follows."],
+    tvc: ["TVC Register", "Truly Variable Cost — RM, process, freight: what rises with every unit. Throughput = Sales − TVC."],
+    oe: ["OE Register", "Operating Expenses — by the TOC definition, every cost that is NOT variable. Net = Throughput − OE."],
+  } as const;
+  const [title, blurb] = TITLES[mode];
+
+  if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
+
+  const rows = (data?.rows || [])
+    .filter((r) => mode === "all" || r.cls === mode)
+    .sort((a, b) => (sortK === "amount" ? a.amount - b.amount : String(a[sortK]).localeCompare(String(b[sortK]))) * dir);
+  const shown = rows.reduce((s2, r) => s2 + r.amount, 0);
+  const t = data?.totals;
+  const flip = async (ledger: string, cls: string) => {
+    await fetch("/api/kuber/books", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "classify", ledger, cls }),
+    });
+    reload();
+  };
+  const Hd = ({ k, children, right }: { k: typeof sortK; children: React.ReactNode; right?: boolean }) => (
+    <th className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap`}
+      onClick={() => { if (sortK === k) setDir((d) => (d === 1 ? -1 : 1)); else { setSortK(k); setDir(k === "amount" ? -1 : 1); } }}
+      style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}>
+      {children}{sortK === k ? (dir === 1 ? " ▲" : " ▼") : ""}
+    </th>
+  );
+
+  return (
+    <div style={{ maxWidth: 900 }}>
+      <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <div className="text-lg font-bold" style={{ color: INK }}>{title}</div>
+          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 640, lineHeight: 1.5 }}>{blurb}</div>
+        </div>
+        <div className="flex gap-2 items-center text-xs font-semibold flex-wrap" style={{ color: MUTED }}>
+          {([["YTD", fyStart], ["QTD", qtdStart], ["MTD", mtdStart]] as [string, string][]).map(([lbl, start]) => (
+            <button key={lbl} onClick={() => { setFrom(start); setTo(today); }}
+              className="rounded-full border px-2.5 py-0.5 font-bold"
+              style={from === start && to === today ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
+              {lbl}
+            </button>
+          ))}
+          from <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
+          to <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
+        </div>
+      </div>
+      {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : (
+        <>
+          <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+            {mode !== "oe" && <Card label="SALES" value={fmtMoney(t!.sales)} />}
+            <Card label="TVC" value={fmtMoney(t!.tvc)} color="#1B6B93" />
+            {mode !== "oe" && <Card label="THROUGHPUT" value={fmtMoney(t!.throughput)} sub={t!.sales ? `${Math.round((t!.throughput / t!.sales) * 100)}% of sales` : undefined} color={t!.throughput >= 0 ? GREEN : RED} />}
+            <Card label="OE" value={fmtMoney(t!.oe)} color="#1B6B93" />
+            <Card label="NET (T − OE)" value={fmtMoney(t!.net)} sub="ties to the P&L" color={t!.net >= 0 ? GREEN : RED} />
+          </div>
+          <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "62vh" }}>
+            <table className="w-full text-xs" style={{ minWidth: 680, borderCollapse: "separate", borderSpacing: 0 }}>
+              <thead>
+                <tr style={{ background: "#22303C", color: "#fff" }}>
+                  <Hd k="ledger">Ledger</Hd><Hd k="group">Group</Hd>
+                  <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>Class</th>
+                  <Hd k="amount" right>Amount</Hd>
+                </tr>
+                <tr style={{ background: "#F3F1EB" }}>
+                  <td className="px-2 py-1.5 font-bold" colSpan={3} style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>TOTAL — {rows.length} shown</td>
+                  <td className="px-2 py-1.5 text-right tnum font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>{fmtMoney(shown)}</td>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length === 0 && (<tr><td colSpan={4} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing in the period.</td></tr>)}
+                {rows.map((r, i) => (
+                  <tr key={r.ledger} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                    <td className="px-2 py-1.5 font-semibold">{r.ledger}</td>
+                    <td className="px-2 py-1.5" style={{ color: MUTED }}>{r.group}</td>
+                    <td className="px-2 py-1.5">
+                      <select value={r.cls} onChange={(e) => void flip(r.ledger, e.target.value)}
+                        className="border rounded px-1 py-0.5 text-xs bg-white font-bold"
+                        style={{ borderColor: r.seeded ? BORDER : "#7C3AED", color: r.cls === "tvc" ? "#1B6B93" : INK }}
+                        title={r.seeded ? "Genie's seed — flip it and your word sticks" : "Set by hand — outranks the seed"}>
+                        <option value="tvc">TVC</option><option value="oe">OE</option>
+                      </select>
+                    </td>
+                    <td className="px-2 py-1.5 text-right tnum font-bold">{fmtMoney(r.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "84ch", lineHeight: 1.6 }}>
+            Genie seeds the class — purchase heads and process-like direct expenses as TVC, the rest as OE. A purple
+            border marks a class set by hand; the flip is remembered and every register and total follows it.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
