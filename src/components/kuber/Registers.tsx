@@ -252,6 +252,22 @@ export default function RegisterScreen({ kind }: { kind: string }) {
             </tr>
           </thead>
           <tbody>
+            {/* each money column's total, pinned under its heading */}
+            {sorted.length > 0 && cols.some((f) => f.type === "money") && (
+              <tr className="font-bold text-xs">
+                {cols.map((f, i) => {
+                  const cellCss = { position: "sticky" as const, top: 33, background: "#F7F5EF", zIndex: 3, borderBottom: "2px solid #22303C" };
+                  if (i === 0) return <td key={f.key} className="px-2 py-1.5" style={cellCss}>TOTAL — {sorted.length} shown</td>;
+                  if (f.type !== "money") return <td key={f.key} style={cellCss} />;
+                  return (
+                    <td key={f.key} className="px-2 py-1.5 tnum" style={cellCss}>
+                      {fmtMoney(sorted.reduce((s2, r) => s2 + (Number(r[f.key]) || 0), 0))}
+                    </td>
+                  );
+                })}
+                <td style={{ position: "sticky", top: 33, background: "#F7F5EF", zIndex: 3, borderBottom: "2px solid #22303C" }} />
+              </tr>
+            )}
             {rows?.length === 0 && (
               <tr><td colSpan={cols.length + 1} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing here yet — the first entry starts the register.</td></tr>
             )}

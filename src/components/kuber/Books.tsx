@@ -164,6 +164,25 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
             </tr>
           </thead>
           <tbody>
+            {/* each column's own total, pinned under the heading (28 Aug 2026) */}
+            {rows.length > 0 && (() => {
+              const sum = (pick: (r: AgeingParty) => number) => rows.reduce((s2, r) => s2 + pick(r), 0);
+              const cellCss = { position: "sticky" as const, top: 33, background: "#F7F5EF", zIndex: 3, borderBottom: "2px solid #22303C" };
+              return (
+                <tr className="font-bold text-xs">
+                  <td className="px-2 py-1.5" style={cellCss}>TOTAL — {rows.length} shown</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={{ ...cellCss, color: "#1B6B93" }}>{fmtMoney(sum((r) => -r.unadjusted))}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={cellCss}>{fmtMoney(sum((r) => r.gross))}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={cellCss}>{fmtMoney(sum((r) => r.total))}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={{ ...cellCss, color: MUTED }}>{fmtMoney(sum((r) => r.not_due))}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={cellCss}>{fmtMoney(sum((r) => r.d0_30))}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={{ ...cellCss, color: "#D97706" }}>{fmtMoney(sum((r) => r.d31_90))}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={{ ...cellCss, color: RED }}>{fmtMoney(sum((r) => r.d91_180))}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={{ ...cellCss, color: RED }}>{fmtMoney(sum((r) => r.d180p))}</td>
+                  <td className="px-2 py-1.5 text-right" style={{ ...cellCss, color: MUTED }}>{rows.reduce((s2, r) => s2 + r.bills.length, 0)}</td>
+                </tr>
+              );
+            })()}
             {rows.length === 0 && (<tr><td colSpan={10} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing here — upload the Tally files first.</td></tr>)}
             {rows.map((r, i) => (
               <>
@@ -228,8 +247,26 @@ export function ReportCardScreen() {
   const { fmt: fmtMoney } = useMoneyFmt();
   const [q, setQ] = useState("");
   const [openParty, setOpenParty] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState("");
+  const [dir, setDir] = useState<1 | -1>(-1);
   if (!data) return <div className="text-sm" style={{ color: MUTED }}>Reading the books…</div>;
-  const rows = data.rows.filter((r) => !q || r.party.toLowerCase().includes(q.toLowerCase()));
+  const PICK: Record<string, (r: CardRow) => string | number> = {
+    grade: (r) => r.grade, party: (r) => r.party.toLowerCase(), outstanding: (r) => r.outstanding,
+    overdue: (r) => r.overdue, pct: (r) => r.overdue_pct, delay: (r) => r.avg_delay_days,
+    oldest: (r) => r.oldest || "9999", nbills: (r) => r.nbills, vouchers: (r) => r.vouchers,
+  };
+  let rows = data.rows.filter((r) => !q || r.party.toLowerCase().includes(q.toLowerCase()));
+  if (PICK[sortKey]) {
+    const pk = PICK[sortKey];
+    rows = [...rows].sort((a, b2) => {
+      const x = pk(a), y = pk(b2);
+      return dir * (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y)));
+    });
+  }
+  const clickSort = (k: string) => {
+    if (sortKey === k) { if (dir === -1) setDir(1); else { setSortKey(""); setDir(-1); } }
+    else { setSortKey(k); setDir(k === "party" || k === "grade" ? 1 : -1); }
+  };
   const st = data.stats;
   return (
     <div style={{ maxWidth: 1100 }}>
@@ -253,12 +290,31 @@ export function ReportCardScreen() {
         <table className="w-full text-xs" style={{ minWidth: 860, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
             <tr style={{ background: "#22303C", color: "#fff" }}>
-              {["Grade", "Supplier", "Outstanding", "Overdue", "Overdue %", "Weighted delay", "Oldest due", "Open bills", "Vouchers FY"].map((h, i) => (
-                <th key={h} className={`px-2 py-2 ${i <= 1 ? "text-left" : "text-right"} whitespace-nowrap`} style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
+              {([["grade", "Grade"], ["party", "Supplier"], ["outstanding", "Outstanding"], ["overdue", "Overdue"], ["pct", "Overdue %"], ["delay", "Weighted delay"], ["oldest", "Oldest due"], ["nbills", "Open bills"], ["vouchers", "Vouchers FY"]] as const).map(([k, h], i) => (
+                <th key={k} className={`px-2 py-2 ${i <= 1 ? "text-left" : "text-right"} whitespace-nowrap`}
+                  style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}
+                  onClick={() => clickSort(k)}
+                  title="Click to sort — again to flip, a third time to clear">
+                  {h}{sortKey === k ? (dir === -1 ? " ▼" : " ▲") : ""}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
+            {rows.length > 0 && (() => {
+              const cellCss = { position: "sticky" as const, top: 33, background: "#F7F5EF", zIndex: 3, borderBottom: "2px solid #22303C" };
+              return (
+                <tr className="font-bold text-xs">
+                  <td className="px-2 py-1.5" style={cellCss} />
+                  <td className="px-2 py-1.5" style={cellCss}>TOTAL — {rows.length} shown</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={cellCss}>{fmtMoney(rows.reduce((s2, r) => s2 + r.outstanding, 0))}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={{ ...cellCss, color: RED }}>{fmtMoney(rows.reduce((s2, r) => s2 + r.overdue, 0))}</td>
+                  <td className="px-2 py-1.5" style={cellCss} colSpan={3} />
+                  <td className="px-2 py-1.5 text-right tnum" style={cellCss}>{rows.reduce((s2, r) => s2 + r.nbills, 0)}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={{ ...cellCss, color: MUTED }}>{rows.reduce((s2, r) => s2 + r.vouchers, 0)}</td>
+                </tr>
+              );
+            })()}
             {rows.map((r, i) => (
               <tr key={r.party} className="border-t" onClick={() => setOpenParty(r.party)}
                 style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}
@@ -612,6 +668,8 @@ export function LedgerBrowser() {
   const [q, setQ] = useState("");
   const { fmt: fmtMoney } = useMoneyFmt();
   const [data] = useBooks<{ rows: { name: string; parent: string; opening: number; closing: number }[] }>("ledgers", q ? `&q=${encodeURIComponent(q)}` : "");
+  const [sortKey, setSortKey] = useState("");
+  const [dir, setDir] = useState<1 | -1>(1);
   return (
     <div style={{ maxWidth: 950 }}>
       <div className="flex items-baseline gap-3 mb-2">
@@ -622,10 +680,20 @@ export function LedgerBrowser() {
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "72vh" }}>
         <table className="w-full text-xs" style={{ minWidth: 700, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead><tr style={{ background: "#22303C", color: "#fff" }}>
-            {["Ledger", "Group", "Opening", "Closing"].map((h, i) => (<th key={h} className={`px-2 py-2 ${i <= 1 ? "text-left" : "text-right"}`} style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>))}
+            {(["name", "parent", "opening", "closing"] as const).map((k, i) => (
+              <th key={k} className={`px-2 py-2 ${i <= 1 ? "text-left" : "text-right"}`}
+                style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}
+                onClick={() => { if (sortKey === k) { if (dir === 1) setDir(-1); else { setSortKey(""); setDir(1); } } else { setSortKey(k); setDir(1); } }}>
+                {["Ledger", "Group", "Opening", "Closing"][i]}{sortKey === k ? (dir === 1 ? " ▲" : " ▼") : ""}
+              </th>
+            ))}
           </tr></thead>
           <tbody>
-            {(data?.rows || []).map((l, i) => (
+            {[...(data?.rows || [])].sort((a, b) => {
+              if (!sortKey) return 0;
+              const x = a[sortKey as "name"], y = b[sortKey as "name"];
+              return dir * (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y)));
+            }).map((l, i) => (
               <tr key={l.name + i} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                 <td className="px-2 py-1.5">{l.name}</td>
                 <td className="px-2 py-1.5" style={{ color: MUTED }}>{l.parent}</td>

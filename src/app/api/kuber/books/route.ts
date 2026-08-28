@@ -122,11 +122,14 @@ export async function GET(req: Request) {
         .filter((p) => Math.abs(p.total) > 0.5)
         .map((p) => ({ ...p, bills: p.bills.sort((a, b2) => String(a.due_date || "9999").localeCompare(String(b2.due_date || "9999"))) }))
         .sort((a, b2) => b2.total - a.total);
-      const tot = rows.reduce((s, p) => s + p.total, 0);
-      const gross = rows.reduce((s, p) => s + p.gross, 0);
-      const overdue = rows.reduce((s, p) => s + p.d0_30 + p.d31_90 + p.d91_180 + p.d180p, 0);
-      const unadjusted = rows.reduce((s, p) => s + p.unadjusted, 0);
-      return NextResponse.json({ rows, total: tot, gross, overdue, unadjusted, count: bills.length, today });
+      // ONE arithmetic with the report card (Dr Raghu caught the two screens
+      // disagreeing, 28 Aug 2026): totals over ALL bills, count = the open
+      // bills proper (positives) — an untied advance is not a bill.
+      const pos = bills.filter((b) => b.amount > 0);
+      const gross = pos.reduce((s2, b) => s2 + b.amount, 0);
+      const unadjusted = bills.filter((b) => b.amount < 0).reduce((s2, b) => s2 + b.amount, 0);
+      const overdue = pos.filter((b) => b.due_date && b.due_date < today).reduce((s2, b) => s2 + b.amount, 0);
+      return NextResponse.json({ rows, total: gross + unadjusted, gross, overdue, unadjusted, count: pos.length, today });
     }
 
     if (view === "reportcard") {

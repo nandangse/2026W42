@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.18",
+    date: "2026-08-28",
+    module: "Kuber — every table sorts, every column totals, both screens agree",
+    items: [
+      "EVERY Kuber table now sorts on its headers — the Supplier Report Card, both ageings, every register, the ledger browser — and a TOTAL ROW sits pinned under the headings, each column summing what is shown, filters and search respected.",
+      "Dr Raghu caught Supplier Payables and the Report Card disagreeing (₹13.98 vs ₹14.02 Cr, 2,536 vs 2,254 bills): two screens, two arithmetics. Now ONE — totals over all bills, and 'open bills' counts bills proper, never the untied advances.",
+      "Two shields under the hood: the upload pipeline PROBES every table before wiping anything, so a missing migration can never again leave the books half-empty (today's ₹4.45 Cr scare); and the parser de-duplicates Tally's re-emitted LEDGERS the way it already does groups, so opening bills cannot double.",
+    ],
+  },
+  {
     v: "3.29.0.17",
     date: "2026-08-28",
     module: "Kuber — every invoice tells its whole arithmetic",

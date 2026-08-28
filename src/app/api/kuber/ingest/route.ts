@@ -57,6 +57,16 @@ export async function POST(req: Request) {
     if (body.action === "begin") {
       const tables = SIDE[String(body.kind)];
       if (!tables) throw new HttpError(400, "kind must be masters or transactions");
+      // PROBE FIRST, WIPE AFTER: on 28 Aug a missing migration was discovered
+      // one batch AFTER the wipe, leaving the books half-empty. Never again —
+      // if any table is absent, refuse before touching anything.
+      for (const t of tables) {
+        const { error } = await admin.from(t).select(t === "kuber_group" ? "name" : "id").limit(1);
+        if (error) {
+          const mig = t === "kuber_group" ? "0079" : t === "kuber_voucher_item" ? "0081" : "0076";
+          throw new HttpError(503, `Run migration ${mig} first — ${t} does not exist yet. Nothing was touched.`);
+        }
+      }
       for (const t of tables) {
         const { error } = await admin.from(t).delete().not(t === "kuber_group" ? "name" : "id", "is", null);
         if (error && !/does not exist|schema cache/i.test(error.message)) throw new Error(error.message);

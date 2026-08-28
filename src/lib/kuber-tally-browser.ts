@@ -73,8 +73,9 @@ export async function parseMastersInBrowser(file: File, sink: BatchSink, onProgr
   const b = batcher(sink);
   let led: { id: string; name: string; parent: string; opening: number; closing: number } | null = null;
   let grp: { name: string; parent: string } | null = null;
-  // Tally re-emits an altered GROUP as a second record — one name, once
+  // Tally re-emits an altered GROUP or LEDGER as a second record — one name, once
   const seenGroups = new Set<string>();
+  const seenLedgers = new Set<string>();
   let inBill = false;
   let bill: Row | null = null;
   let ledgers = 0, bills = 0, groups = 0;
@@ -104,12 +105,17 @@ export async function parseMastersInBrowser(file: File, sink: BatchSink, onProgr
     }
     if (!led) return;
     if (line.startsWith("</LEDGER>")) {
-      b.push("kuber_ledger", { ...led, loaded_at: stamp });
-      ledgers++; led = null; inBill = false;
+      if (led.name && !seenLedgers.has(led.name)) {
+        seenLedgers.add(led.name);
+        b.push("kuber_ledger", { ...led, loaded_at: stamp });
+        ledgers++;
+      }
+      led = null; inBill = false;
       return;
     }
     if (line.startsWith("<BILLALLOCATIONS.LIST>")) {
       if (line.includes("</BILLALLOCATIONS.LIST>")) return; // empty, one line
+      if (seenLedgers.has(led.name)) return; // a re-emitted ledger's bills would double
       inBill = true;
       bill = { ledger: led.name, bill: "", bill_date: null, amount: 0, credit_days: null };
       return;
