@@ -91,6 +91,9 @@ async function driveUpload(token: string, folderName: string, file: File, kindLa
 export default function UploadFiles() {
   const [forDate, setForDate] = useState(TODAY_IST);
   const [rows, setRows] = useState<KuberUpload[] | null>(null);
+  const [reviewLink, setReviewLink] = useState<string | null>(null);
+  const [linkEdit, setLinkEdit] = useState<string | null>(null); // null = not editing
+  const [linkMsg, setLinkMsg] = useState("");
   const [running, setRunning] = useState<"" | "masters" | "transactions">("");
   const [stages, setStages] = useState<Stage[]>([]);
   const [elapsed, setElapsed] = useState(0);
@@ -99,7 +102,9 @@ export default function UploadFiles() {
 
   const load = useCallback(() => {
     fetch("/api/kuber/upload", { cache: "no-store" })
-      .then((r) => r.json()).then((j) => setRows(j.uploads || [])).catch(() => setRows([]));
+      .then((r) => r.json())
+      .then((j) => { setRows(j.uploads || []); setReviewLink(j.reviewLink ?? null); })
+      .catch(() => setRows([]));
   }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
@@ -238,6 +243,42 @@ export default function UploadFiles() {
             {finished && <div className="text-xs font-bold mt-1" style={{ color: GREEN }}>{finished}</div>}
           </div>
         )}
+      </div>
+
+      {/* the Management Review file — the sheet these books mirror */}
+      <div className="bg-white rounded-lg border p-3 mb-3 flex items-center gap-3 flex-wrap" style={{ borderColor: BORDER, maxWidth: 780 }}>
+        <span className="text-sm font-bold" style={{ color: INK }}>📊 Management Review file</span>
+        {linkEdit === null ? (
+          <>
+            {reviewLink ? (
+              <a href={reviewLink} target="_blank" rel="noreferrer" className="text-sm font-bold" style={{ color: "#1B3A5C" }}>
+                Open the sheet ↗
+              </a>
+            ) : (
+              <span className="text-sm" style={{ color: MUTED }}>no link kept yet</span>
+            )}
+            <button onClick={() => setLinkEdit(reviewLink ?? "")} className="text-xs font-bold ml-auto" style={{ color: ORANGE }}>
+              ✎ {reviewLink ? "Change" : "Add the link"}
+            </button>
+          </>
+        ) : (
+          <>
+            <input value={linkEdit} onChange={(e) => setLinkEdit(e.target.value)}
+              placeholder="https://docs.google.com/spreadsheets/…"
+              className="flex-1 border rounded px-2 py-1 text-sm" style={{ borderColor: BORDER, minWidth: 260 }} />
+            <button onClick={async () => {
+              setLinkMsg("");
+              const r = await fetch("/api/kuber/upload", {
+                method: "PATCH", headers: { "content-type": "application/json" },
+                body: JSON.stringify({ review_link: linkEdit }),
+              });
+              if (!r.ok) { setLinkMsg((await r.json()).error || "Could not save"); return; }
+              setReviewLink(linkEdit.trim() || null); setLinkEdit(null);
+            }} className="text-xs font-bold rounded px-3 py-1 text-white" style={{ background: ORANGE }}>Save</button>
+            <button onClick={() => { setLinkEdit(null); setLinkMsg(""); }} className="text-xs" style={{ color: MUTED }}>Cancel</button>
+          </>
+        )}
+        {linkMsg && <span className="text-xs font-bold" style={{ color: "#B3261E" }}>{linkMsg}</span>}
       </div>
 
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxWidth: 950, maxHeight: "46vh" }}>

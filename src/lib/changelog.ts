@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.2",
+    date: "2026-08-28",
+    module: "Kuber — the Management Review file, one click from the books",
+    items: [
+      "Upload Files now keeps the LINK OF THE MANAGEMENT REVIEW FILE — the Google Sheet these books mirror — shown as 'Open the sheet ↗' beside the upload ledger, changeable by anyone holding Kuber. One tiny migration (0077) gives it a home.",
+    ],
+  },
+  {
     v: "3.29.0.1",
     date: "2026-08-28",
     module: "CRM — the OnePage mail, the forecast, and the ratios per person",

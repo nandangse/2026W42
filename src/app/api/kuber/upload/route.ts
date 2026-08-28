@@ -35,6 +35,13 @@ export async function GET() {
         return NextResponse.json({ installed: false, uploads: [] });
       throw new Error(error.message);
     }
+    // the Management Review file's link (0077) — the sheet this module
+    // mirrors, one click from the ledger that replaces it
+    let reviewLink: string | null = null;
+    try {
+      const { data: st } = await admin.from("app_settings").select("kuber_review_link").eq("id", true).maybeSingle();
+      reviewLink = (st?.kuber_review_link as string) ?? null;
+    } catch { /* pre-0077 */ }
     const uploads = await Promise.all(
       (data || []).map(async (u) => {
         const { data: s } = await admin.storage.from(BUCKET).createSignedUrl(u.path, LINK_TTL);
@@ -42,7 +49,26 @@ export async function GET() {
         return { ...rest, url: s?.signedUrl ?? null };
       }),
     );
-    return NextResponse.json({ installed: true, uploads });
+    return NextResponse.json({ installed: true, uploads, reviewLink });
+  } catch (e) {
+    return errJson(e);
+  }
+}
+
+/** PATCH { review_link } — where the Management Review file lives. */
+export async function PATCH(req: Request) {
+  try {
+    await requireKuber();
+    const body = await req.json();
+    const link = String(body.review_link ?? "").trim().slice(0, 500);
+    if (link && !/^https:\/\//.test(link)) throw new HttpError(400, "Paste the full https:// link.");
+    const { error } = await adminClient().from("app_settings").update({ kuber_review_link: link || null }).eq("id", true);
+    if (error) {
+      if (/kuber_review_link|schema cache|does not exist/i.test(error.message))
+        throw new HttpError(503, "Run migration 0077 first — the link has nowhere to live yet.");
+      throw new Error(error.message);
+    }
+    return NextResponse.json({ ok: true });
   } catch (e) {
     return errJson(e);
   }
