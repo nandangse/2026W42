@@ -207,8 +207,18 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState("");
   const [note, setNote] = useState("");
-  /** The courtesy: a thank-you due tomorrow morning, on the ticked channels. */
-  const [thanks, setThanks] = useState<{ email: boolean; whatsapp: boolean }>({ email: true, whatsapp: true });
+  /** The courtesy: a thank-you at 6 AM tomorrow, on the ticked channels. */
+  const [thanks, setThanks] = useState<{ email: boolean; whatsapp: boolean; auto: boolean }>({ email: true, whatsapp: true, auto: true });
+  const [tpl, setTpl] = useState<{ email: string; wa: string }>({ email: "", wa: "" });
+  const [tplOptions, setTplOptions] = useState<{ email: string[]; wa: string[] }>({ email: [], wa: [] });
+  useEffect(() => {
+    fetch("/api/crm/outbound?bootstrap=1").then(async (r) => {
+      const j = await r.json();
+      const pickDefault = (list: string[]) => list.find((n) => /card thank you/i.test(n)) || "";
+      setTplOptions({ email: j.emailTemplates || [], wa: j.waTemplates || [] });
+      setTpl({ email: pickDefault(j.emailTemplates || []), wa: pickDefault(j.waTemplates || []) });
+    }).catch(() => {});
+  }, []);
 
   const upload = async (side: "front" | "back", file: File | null) => {
     if (!file) return;
@@ -273,12 +283,17 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
       if (mode === "save") { await saveOnly(); onChanged(); onClose(); return; }
       const cardId = await saveOnly();
       const made = await addToCrm(cardId);
-      // queue the thank-you for tomorrow — the forgetting is what dies here
+      // queue the thank-you for 6 AM — the forgetting is what dies here
       const channels = [thanks.email && f.email.trim() ? "email" : null, thanks.whatsapp && f.phone.trim() ? "whatsapp" : null].filter(Boolean);
       if (made.person_id && channels.length) {
-        await fetch("/api/crm/followups", {
+        await fetch("/api/crm/outbound", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ action: "add", person_id: made.person_id, company_id: made.company_id, card_id: cardId, channels }),
+          body: JSON.stringify({
+            action: "add", person_id: made.person_id, company_id: made.company_id, card_id: cardId,
+            channels, auto: thanks.auto,
+            email_template: tpl.email, wa_template: tpl.wa,
+            to_email: f.email.trim(), to_phone: f.phone.trim(),
+          }),
         }).catch(() => {});
       }
       onChanged();
@@ -363,17 +378,37 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
           )}
         </div>
 
-        <div className="px-4 pt-2 flex gap-4 items-center" style={{ borderTop: `1px solid ${BORDER}`, flexShrink: 0, fontSize: 12 }}>
-          <b style={{ color: MUTED, fontSize: 10.5, letterSpacing: ".04em" }}>THANK-YOU, DUE TOMORROW:</b>
+        <div className="px-4 pt-2 flex gap-x-4 gap-y-1 items-center flex-wrap" style={{ borderTop: `1px solid ${BORDER}`, flexShrink: 0, fontSize: 12 }}>
+          <b style={{ color: MUTED, fontSize: 10.5, letterSpacing: ".04em" }}>THANK-YOU AT 6 AM:</b>
           <label className="flex items-center gap-1" style={{ color: f.email.trim() ? INK : "#C9CDD6" }}>
             <input type="checkbox" checked={thanks.email} disabled={!f.email.trim()}
               onChange={(e) => setThanks((t) => ({ ...t, email: e.target.checked }))} /> ✉ Email
           </label>
+          {thanks.email && f.email.trim() && (
+            <>
+              <select value={tpl.email} onChange={(e) => setTpl((t) => ({ ...t, email: e.target.value }))}
+                className="rounded border px-1 py-0.5" style={{ borderColor: BORDER, fontSize: 11 }}>
+                <option value="">built-in words</option>
+                {tplOptions.email.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <label className="flex items-center gap-1" style={{ color: INK }} title="Off = it waits in the Email Queue for your hand">
+                <input type="checkbox" checked={thanks.auto} onChange={(e) => setThanks((t) => ({ ...t, auto: e.target.checked }))} />
+                auto-send 6 AM
+              </label>
+            </>
+          )}
           <label className="flex items-center gap-1" style={{ color: f.phone.trim() ? INK : "#C9CDD6" }}>
             <input type="checkbox" checked={thanks.whatsapp} disabled={!f.phone.trim()}
               onChange={(e) => setThanks((t) => ({ ...t, whatsapp: e.target.checked }))} /> 🟢 WhatsApp
           </label>
-          <span style={{ fontSize: 10.5, color: MUTED }}>lands on your Dashboard, written and ready — one tap sends</span>
+          {thanks.whatsapp && f.phone.trim() && (
+            <select value={tpl.wa} onChange={(e) => setTpl((t) => ({ ...t, wa: e.target.value }))}
+              className="rounded border px-1 py-0.5" style={{ borderColor: BORDER, fontSize: 11 }}>
+              <option value="">built-in words</option>
+              {tplOptions.wa.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          )}
+          <span style={{ fontSize: 10.5, color: MUTED }}>mail sends itself at 6 · WhatsApp waits in its queue, written</span>
         </div>
         <div className="flex gap-2 flex-wrap px-4 py-3" style={{ flexShrink: 0 }}>
           <button onClick={() => go("save")} disabled={busy !== null}

@@ -32,6 +32,7 @@ import VisitingCard, { PersonCardPanel } from "./VisitingCard";
 import Integrations from "./Integrations";
 import SalesPersonPlan from "./SalesPersonPlan";
 import SalesPlan from "./SalesPlan";
+import { EmailQueue, WhatsAppQueue } from "./OutboundQueues";
 import WaComposer, { type WaCtx } from "./WaComposer";
 import { DateRangeBar, DEFAULT_RANGE, type DateRange } from "./DateRange";
 
@@ -62,6 +63,8 @@ export const SPECIAL_SECTIONS = [
   { name: "deals", label: "Deals", icon: "◆", blurb: "" },
   { name: "visitingcard", label: "Add Visiting Card", icon: "🪪", blurb: "" },
   { name: "integrations", label: "Integrations", icon: "🔌", blurb: "" },
+  { name: "emailqueue", label: "Email Queue", icon: "📮", blurb: "" },
+  { name: "waqueue", label: "WhatsApp Queue", icon: "💬", blurb: "" },
   { name: "communication", label: "Communication", icon: "✉", blurb: "Emails — automated, inbound and outbound, per user's own mailbox. Arrives with the channels phase." },
 ] as const;
 
@@ -83,7 +86,7 @@ const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string } | { 
       { sp: "dashboard" }, { sp: "analytics" }, { sp: "salespersonplan" }, { sp: "salesplan" },
     ],
   },
-  { header: "TOOLS", collapsible: true, items: [{ sp: "visitingcard" }] },
+  { header: "TOOLS", collapsible: true, items: [{ sp: "visitingcard" }, { sp: "emailqueue" }, { sp: "waqueue" }] },
   { header: "PIPELINE", items: [{ dt: "lead" }, { dt: "opportunity" }, { dt: "quotation" }, { dt: "sales_order" }] },
   { items: [{ sp: "deals" }] },
   {
@@ -513,6 +516,10 @@ export default function CrmApp({
               <VisitingCard onOpen={openLinked} />
             ) : special.name === "integrations" ? (
               <Integrations />
+            ) : special.name === "emailqueue" ? (
+              <EmailQueue />
+            ) : special.name === "waqueue" ? (
+              <WhatsAppQueue />
             ) : special.name === "salespersonplan" ? (
               <SalesPersonPlan />
             ) : (

@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.27.0.0",
+    date: "2026-08-28",
+    module: "CRM — the outbound queues, and the 6 AM thank-you",
+    items: [
+      "TOOLS GROWS TWO QUEUES. EMAIL QUEUE: placed till sent, three tabs — Queue, SENT (every mail Genie sent, off the Communication log) and AUTOMATED SEND. WHATSAPP QUEUE: the message is composed and KEPT, edited in a lightbox, and SEND opens WhatsApp with the words ready — that click is the moment it enters Communication, so what the system wrote is what the record holds.",
+      "THE CARD SCAN SETS THE AUTOMATION ITSELF: pick the template (defaulting to one named “Card Thank You” in the masters), and the mail SENDS ITSELF AT 6 AM through the salesperson's own Gmail — a new cron, so the thank-you queued at last night's exhibition greets the person before their day starts. Untick auto and it waits in the Email Queue for a hand. WhatsApp is never auto-sent: it goes from the salesperson's own phone, written and one tap away.",
+      "Messages are rendered WHOLE at queue time — name, company and sender filled in — and the Dashboard's due panel now serves the same queue: send now, or let it go on purpose. A failed auto-send records its reason on the row and tries again tomorrow.",
+      "CRM migration 0022; the 6 AM cron rides vercel.json.",
+    ],
+  },
+  {
     v: "3.26.1.0",
     date: "2026-08-28",
     module: "The card crops itself, and the thank-you never gets forgotten",
