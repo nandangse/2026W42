@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.6",
+    date: "2026-08-28",
+    module: "Kuber dashboard — the day ratios",
+    items: [
+      "CUSTOMER RECEIVABLE DAYS, SUPPLIER PAYABLE DAYS and WORKING CAPITAL DAYS stand on the dashboard (Dr Raghu, 28 Aug 2026) — and each card STATES ITS OWN ARITHMETIC so nothing is an assumption: net receivables against the chosen period's per-day billing, net payables against its per-day purchases, and their difference as working-capital days. The cards follow the period slider — YTD, MTD, QTD or any span. Inventory days join the working-capital line the day stock reaches the books.",
+    ],
+  },
+  {
     v: "3.31.0.5",
     date: "2026-08-28",
     module: "Kuber — the statements from the XML: cash flow, fund flow, drill everywhere, the loan book",

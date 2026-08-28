@@ -99,6 +99,29 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
         <Card label="BANK & CASH" value={fmtMoney(s.bankCash || 0)} sub="every bank, OD and cash ledger — as of the last upload" color={(s.bankCash || 0) >= 0 ? GREEN : RED} />
       </div>
 
+      {/* the day ratios (Dr Raghu, 28 Aug 2026) — each card SAYS its own
+          arithmetic, so nothing here is an assumption */}
+      {(() => {
+        const perDaySales = (s.flows?.billing?.value || 0) / days;
+        const perDayPurch = (s.flows?.purchases?.value || 0) / days;
+        const dso = perDaySales > 0 ? s.receivable.total / perDaySales : null;
+        const dpo = perDayPurch > 0 ? s.payable.total / perDayPurch : null;
+        const wcd = dso != null && dpo != null ? dso - dpo : null;
+        const dd = (n: number | null) => (n == null ? "—" : `${Math.round(n)} days`);
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+            <Card label="CUSTOMER RECEIVABLE DAYS" value={dd(dso)}
+              sub={`net receivables ÷ per-day billing of the chosen period (${fmtMoney(perDaySales)}/day)`}
+              color={dso != null && dso > 90 ? "#D97706" : INK} />
+            <Card label="SUPPLIER PAYABLE DAYS" value={dd(dpo)}
+              sub={`net payables ÷ per-day purchases of the chosen period (${fmtMoney(perDayPurch)}/day)`} />
+            <Card label="WORKING CAPITAL DAYS" value={dd(wcd)}
+              sub="receivable days − payable days; inventory days join when stock reaches the books"
+              color={wcd != null && wcd > 0 ? "#D97706" : GREEN} />
+          </div>
+        );
+      })()}
+
       {/* the period flows — the review sheet's own rows, on a slider */}
       <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: BORDER }}>
         <div className="flex items-center gap-2 mb-2 flex-wrap">
