@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.25.2.0",
+    date: "2026-08-28",
+    module: "CRM — the Dashboard is a salesperson's morning",
+    items: [
+      "THE TOP STRIP, under the date filter, each box with its weekly average: Booking · Billing · Collections · Calls · Visits · Video Calls · Quotations (nos and value) · Opportunities Handled (distinct deals whose stage moved in the range) · Tasks Open. Collections is the page's one named compromise: the CRM has no receipts ledger yet, so it reads the invoices ERP marks Paid — and the box says so.",
+      "ME AND SALES TEAM: everyone sees their own numbers; the whole desk opens only to the CEO, the Sales Head and admin — a salesperson's dashboard is a mirror, not a leaderboard.",
+      "THE SPACE SPLITS 50 / 25 / 25. Left: OPEN OPPORTUNITIES (New and In Process) and TARGET QUOTATIONS (Bucket 0 · A · B · This Month · Next Month) as wrapping chips, richest first — capped at four lines, and the +/− control lets each salesperson keep the cap that suits them, remembered per screen. Right: the PROSPECTING QUEUE, and beside it GOAL TASKS.",
+      "GOAL TASKS COME FROM MAIN GENIE TASKING — no second task list. The dashboard shows the manual tasks assigned to the person (matched by initials, ERP owner and display name, the three spellings a who-field is written in), flagged red when escalated or late, and done where they live: in Genie.",
+    ],
+  },
+  {
     v: "3.25.1.0",
     date: "2026-08-27",
     module: "CRM — the board moves, and the queue dials",

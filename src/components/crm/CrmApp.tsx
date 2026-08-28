@@ -27,7 +27,7 @@ import AnalyticsScreen from "./Analytics";
 import DealsScreen from "./DealBoard";
 import MailComposer, { type ComposeCtx } from "./MailComposer";
 import MailQueue from "./MailQueue";
-import ProspectQueue from "./ProspectQueue";
+import Dashboard from "./Dashboard";
 import WaComposer, { type WaCtx } from "./WaComposer";
 import { DateRangeBar, DEFAULT_RANGE, type DateRange } from "./DateRange";
 
@@ -500,12 +500,7 @@ export default function CrmApp({
             ) : special.name === "communication" ? (
               <MailQueue onOpen={openLinked} />
             ) : special.name === "dashboard" ? (
-              <>
-                {/* the home screen leads with the call list — the rest of the
-                    cockpit arrives around it */}
-                <ProspectQueue onOpen={openLinked} />
-                <StubScreen label={special.label} blurb={special.blurb} dated />
-              </>
+              <Dashboard onOpen={openLinked} />
             ) : (
               <StubScreen label={special.label} blurb={special.blurb} dated />
             )}

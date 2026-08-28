@@ -22,7 +22,7 @@ const KIND_LABEL: Record<string, string> = {
   opportunity: "Opportunity", quotation: "Quotation", sales_order: "Sales Order", lead: "Lead",
 };
 
-export default function ProspectQueue({ onOpen }: { onOpen: (target: string, id: string) => void }) {
+export default function ProspectQueue({ onOpen, compact = false }: { onOpen: (target: string, id: string) => void; compact?: boolean }) {
   const [items, setItems] = useState<Item[] | null>(null);
   const [doneToday, setDoneToday] = useState(0);
   const [err, setErr] = useState("");
@@ -61,7 +61,7 @@ export default function ProspectQueue({ onOpen }: { onOpen: (target: string, id:
         </span>
         {doneToday > 0 && <span style={{ fontSize: 11.5, color: GREEN, fontWeight: 700 }}>✓ {doneToday} done today</span>}
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, color: MUTED }}>fed by the ☎ icon on the Deal Board · oldest first · dial one by one</span>
+        {!compact && <span style={{ fontSize: 11, color: MUTED }}>fed by the ☎ icon on the Deal Board · oldest first · dial one by one</span>}
       </div>
 
       {needs && <div className="px-3 py-2 text-xs" style={{ color: "#8A5B00", background: "#FFF7E6" }}>Run CRM migration 0017 — the queue has nowhere to live yet.</div>}
