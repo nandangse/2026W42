@@ -33,6 +33,9 @@ export async function POST(req: Request) {
           esc_why: String(body.esc_why || "").trim() || null,
           done: false,
           created_by: user.email,
+          // the swimlane it belongs to — Kuber's Tasking and the main one
+          // share it (0082); an unknown value is dropped, never guessed
+          ...(["job", "goal", "rock", "audit", "strategic"].includes(String(body.related_to)) ? { related_to: String(body.related_to) } : {}),
         })
         .select("id")
         .single();

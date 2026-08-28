@@ -16,6 +16,7 @@ import { APP_VERSION } from "@/lib/changelog";
 import ModuleMenu from "@/components/ModuleMenu";
 import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
+import KuberTasking from "@/components/kuber/Tasking";
 import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser } from "@/components/kuber/Books";
 import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 
@@ -45,6 +46,10 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
       { key: "fd", label: "Fixed Deposits", icon: "▤" },
       { key: "insurance", label: "Insurance", icon: "☂" },
     ],
+  },
+  {
+    header: "CORRESPONDENCE",
+    items: [{ key: "tasking", label: "Tasking", icon: "☑" }],
   },
   {
     header: "BOOKS",
@@ -162,6 +167,7 @@ export default function Accounts({
           {openKey === "receivables" && <AgeingScreen kind="receivable" />}
           {openKey === "payables" && <AgeingScreen kind="payable" />}
           {openKey === "reportcard" && <ReportCardScreen />}
+          {openKey === "tasking" && <KuberTasking />}
           {openKey === "upload" && <UploadFiles />}
           {openKey === "ledgers" && <LedgerBrowser />}
           {openKey === "vouchers" && <VoucherBrowser />}

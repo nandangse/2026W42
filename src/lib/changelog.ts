@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.11",
+    date: "2026-08-28",
+    module: "Kuber — Correspondence · Tasking: the week in swimlanes",
+    items: [
+      "CORRESPONDENCE joins the sidebar after Instruments, opening with TASKING: the main Genie's tasks served to the people authorised to Kuber, laid out as a WEEK CALENDAR — Monday to Sunday, today's column lit, an OVERDUE column carrying what slipped, and SWIMLANES for Jobs · Goals · Quarterly Rocks · Audit · Strategic Actions (all shown by default; the untagged sit honestly in Other).",
+      "RELATED TO rides the task itself (migration 0082), so a Strategic Action tagged in Kuber tracks in the main Tasking too. + Add New raises one here — Strategic Action by default, Rock / Audit / Goal choosable. The ASSIGNED-TO filter is checkboxes, everyone ticked until you untick.",
+      "Click a task to peek and mark it ✓ Done or reopen; the full edit stays in the main Tasking, one truth, two windows.",
+    ],
+  },
+  {
     v: "3.29.0.10",
     date: "2026-08-28",
     module: "Kuber — the registers arrive seeded, and the sides fold",
