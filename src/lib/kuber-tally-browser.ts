@@ -72,10 +72,26 @@ export async function parseMastersInBrowser(file: File, sink: BatchSink, onProgr
   const stamp = new Date().toISOString();
   const b = batcher(sink);
   let led: { id: string; name: string; parent: string; opening: number; closing: number } | null = null;
+  let grp: { name: string; parent: string } | null = null;
   let inBill = false;
   let bill: Row | null = null;
-  let ledgers = 0, bills = 0;
+  let ledgers = 0, bills = 0, groups = 0;
   await eachLine(file, (line) => {
+    // the GROUP TREE — receivable/payable classification walks it (0079)
+    if (line.startsWith("<GROUP ")) {
+      grp = { name: attr(line, "NAME") || "", parent: "" };
+      return;
+    }
+    if (grp) {
+      if (line.startsWith("</GROUP>")) {
+        if (grp.name) { b.push("kuber_group", grp as unknown as Row); groups++; }
+        grp = null;
+        return;
+      }
+      const gp = tagText(line, "PARENT");
+      if (gp !== null) grp.parent = gp;
+      return;
+    }
     if (line.startsWith("<LEDGER ")) {
       led = { id: uuid(), name: attr(line, "NAME") || "", parent: "", opening: 0, closing: 0 };
       return;
@@ -109,7 +125,7 @@ export async function parseMastersInBrowser(file: File, sink: BatchSink, onProgr
     const cb = tagText(line, "CLOSINGBALANCE"); if (cb !== null) { led.closing = num(cb); return; }
   }, onProgress);
   await b.drain();
-  return { ledgers, bills };
+  return { ledgers, bills, groups };
 }
 
 export async function parseTransactionsInBrowser(file: File, sink: BatchSink, onProgress: (frac: number) => void) {

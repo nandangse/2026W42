@@ -36,8 +36,8 @@ const Card = ({ label, value, sub, color = INK }: { label: string; value: string
 // ---------------- Dashboard ----------------
 interface Summary {
   today: string; loadedAt: string | null;
-  receivable: { total: number; overdue: number; due30: number; parties: number };
-  payable: { total: number; overdue: number; due30: number; parties: number };
+  receivable: { total: number; overdue: number; due30: number; parties: number; unadjusted: number };
+  payable: { total: number; overdue: number; due30: number; parties: number; unadjusted: number };
   bg: { count: number; amount: number; expiring: number };
   fd: { count: number; amount: number; expiring: number };
   insurance: { count: number; amount: number; expiring: number };
@@ -61,9 +61,9 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
         </div>
       )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-        <Card label="RECEIVABLES" value={fmtMoney(s.receivable.total)} sub={`${s.receivable.parties} parties`} color="#1B3A5C" />
+        <Card label="RECEIVABLES (NET)" value={fmtMoney(s.receivable.total)} sub={`${s.receivable.parties} parties · Sundry Debtors only${s.receivable.unadjusted ? ` · ${fmtMoney(-s.receivable.unadjusted)} unadjusted inside` : ""}`} color="#1B3A5C" />
         <Card label="OF WHICH OVERDUE" value={fmtMoney(s.receivable.overdue)} color={s.receivable.overdue ? RED : GREEN} />
-        <Card label="PAYABLES" value={fmtMoney(s.payable.total)} sub={`${s.payable.parties} parties`} color="#1B3A5C" />
+        <Card label="PAYABLES (NET)" value={fmtMoney(s.payable.total)} sub={`${s.payable.parties} parties · Sundry Creditors only${s.payable.unadjusted ? ` · ${fmtMoney(-s.payable.unadjusted)} unadjusted inside` : ""}`} color="#1B3A5C" />
         <Card label="OF WHICH OVERDUE" value={fmtMoney(s.payable.overdue)} color={s.payable.overdue ? "#D97706" : GREEN} />
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
@@ -92,9 +92,9 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
 }
 
 // ---------------- Ageing ----------------
-interface AgeingParty { party: string; group: string | null; total: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: { bill: string; bill_date: string | null; due_date: string | null; amount: number }[] }
+interface AgeingParty { party: string; group: string | null; total: number; unadjusted: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: { bill: string; bill_date: string | null; due_date: string | null; amount: number }[] }
 export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
-  const [data] = useBooks<{ rows: AgeingParty[]; total: number; overdue: number; today: string }>("ageing", `&kind=${kind}`);
+  const [data] = useBooks<{ rows: AgeingParty[]; total: number; overdue: number; unadjusted: number; today: string }>("ageing", `&kind=${kind}`);
   const { fmt: fmtMoney } = useMoneyFmt();
   const [open, setOpen] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -105,8 +105,13 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
     <div style={{ maxWidth: 1150 }}>
       <div className="flex items-baseline gap-3 mb-2 flex-wrap">
         <div className="text-lg font-bold" style={{ color: INK }}>{title}</div>
-        <span className="text-sm tnum" style={{ color: "#1B3A5C" }}>{fmtMoney(data.total)} total</span>
+        <span className="text-sm tnum" style={{ color: "#1B3A5C" }}>{fmtMoney(data.total)} net</span>
         <span className="text-sm tnum font-bold" style={{ color: data.overdue ? RED : GREEN }}>{fmtMoney(data.overdue)} overdue</span>
+        {data.unadjusted !== 0 && (
+          <span className="text-sm tnum" style={{ color: MUTED }} title="Receipts and settlements Tally could not tie to a bill — they reduce the net but age nothing">
+            {fmtMoney(data.unadjusted)} unadjusted
+          </span>
+        )}
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 party"
           className="px-2 py-1 rounded border text-sm ml-auto" style={{ borderColor: BORDER }} />
       </div>
@@ -114,13 +119,13 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
         <table className="w-full text-xs" style={{ minWidth: 900, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
             <tr style={{ background: "#22303C", color: "#fff" }}>
-              {["Party", "Total", "Not due", "<30 days", "31–90", "91–180", ">180 days", ""].map((h, i) => (
+              {["Party", "Net", "Not due", "<30 days", "31–90", "91–180", ">180 days", "Unadjusted", ""].map((h, i) => (
                 <th key={i} className={`px-2 py-2 ${i === 0 ? "text-left" : "text-right"} whitespace-nowrap`} style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && (<tr><td colSpan={8} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing here — upload the Tally files first.</td></tr>)}
+            {rows.length === 0 && (<tr><td colSpan={9} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing here — upload the Tally files first.</td></tr>)}
             {rows.map((r, i) => (
               <>
                 <tr key={r.party} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}
@@ -134,13 +139,14 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
                   <td className="px-2 py-1.5 text-right tnum" style={{ color: "#D97706" }}>{r.d31_90 ? fmtMoney(r.d31_90) : "·"}</td>
                   <td className="px-2 py-1.5 text-right tnum" style={{ color: RED }}>{r.d91_180 ? fmtMoney(r.d91_180) : "·"}</td>
                   <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: RED }}>{r.d180p ? fmtMoney(r.d180p) : "·"}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={{ color: "#1B6B93" }} title="Receipts/settlements not tied to a bill — they reduce the net">{r.unadjusted ? "−" + fmtMoney(-r.unadjusted) : "·"}</td>
                   <td className="px-2 py-1.5 text-right" style={{ color: MUTED }}>{r.bills.length}</td>
                 </tr>
                 {open === r.party && r.bills.map((b, j) => (
                   <tr key={r.party + j} style={{ background: "#F4F6F9" }}>
                     <td className="px-2 py-1 pl-7" style={{ color: "#5A6672" }}>{b.bill}</td>
-                    <td className="px-2 py-1 text-right tnum">{fmtMoney(b.amount)}</td>
-                    <td colSpan={5} className="px-2 py-1 text-right tnum" style={{ color: b.due_date && b.due_date < data.today ? RED : MUTED }}>
+                    <td className="px-2 py-1 text-right tnum" style={{ color: b.amount < 0 ? "#1B6B93" : INK }}>{b.amount < 0 ? "−" + fmtMoney(-b.amount) : fmtMoney(b.amount)}</td>
+                    <td colSpan={6} className="px-2 py-1 text-right tnum" style={{ color: b.due_date && b.due_date < data.today ? RED : MUTED }}>
                       billed {fmtD(b.bill_date)} · due {fmtD(b.due_date)}
                     </td>
                     <td />

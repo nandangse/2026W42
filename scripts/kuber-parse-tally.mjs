@@ -63,9 +63,16 @@ const attr = (line, name) => {
 // ---------------- masters ----------------
 const ledgers = [];           // {id,name,parent,opening,closing}
 const openingBills = [];      // {ledger,bill,date,amount,credit_days}
+const groups = [];            // {name,parent} — the tree that classifies
 if (MASTERS) {
-  let led = null, inBill = false, bill = null, depthBill = 0;
+  let led = null, inBill = false, bill = null, depthBill = 0, grp = null;
   await eachLine(MASTERS, (line) => {
+    if (line.startsWith("<GROUP ")) { grp = { name: attr(line, "NAME") || "", parent: "" }; return; }
+    if (grp) {
+      if (line.startsWith("</GROUP>")) { if (grp.name) groups.push(grp); grp = null; return; }
+      const gp = tagText(line, "PARENT"); if (gp !== null) grp.parent = gp;
+      return;
+    }
     if (line.startsWith("<LEDGER ")) {
       led = { id: randomUUID(), name: attr(line, "NAME") || "", parent: "", opening: 0, closing: 0 };
       return;
@@ -91,7 +98,7 @@ if (MASTERS) {
     const ob = tagText(line, "OPENINGBALANCE"); if (ob !== null) { led.opening = num(ob); return; }
     const cb = tagText(line, "CLOSINGBALANCE"); if (cb !== null) { led.closing = num(cb); return; }
   });
-  console.log(`masters: ${ledgers.length} ledgers, ${openingBills.length} opening bills`);
+  console.log(`masters: ${groups.length} groups, ${ledgers.length} ledgers, ${openingBills.length} opening bills`);
 }
 
 // ---------------- transactions ----------------
@@ -200,22 +207,36 @@ for (const a of allocs) {
   }
 }
 const groupOf = new Map(ledgers.map((l) => [l.name, l.parent]));
+// The tree decides who is a party: receivable only under Sundry Debtors,
+// payable only under Sundry Creditors. Amounts stay SIGNED — positive is
+// owed in the party's own direction, negative is an unadjusted entry.
+const parentOf = new Map(groups.map((g) => [g.name, g.parent]));
+const chainHas = (g, word) => { const seen = new Set(); while (g && !seen.has(g)) { if (g.toLowerCase().includes(word)) return true; seen.add(g); g = parentOf.get(g) || ""; } return false; };
+const classOf = (led) => {
+  const p = groupOf.get(led) || "";
+  if (chainHas(p, "sundry debtor")) return "receivable";
+  if (chainHas(p, "sundry creditor")) return "payable";
+  return null;
+};
 const open = [...bills.values()]
   .filter((b) => Math.abs(b.outstanding) > 0.5)
-  .map((b) => ({
-    id: randomUUID(),
-    party: b.ledger,
-    party_group: groupOf.get(b.ledger) || null,
-    bill: b.bill,
-    bill_date: b.bill_date,
-    due_date: b.bill_date && b.credit_days != null ? addDays(b.bill_date, b.credit_days) : b.bill_date,
-    // Tally XML: debit = negative. A debit balance on a party is money owed TO us.
-    kind: b.outstanding < 0 ? "receivable" : "payable",
-    amount: Math.abs(b.outstanding),
-  }));
+  .flatMap((b) => {
+    const kind = classOf(b.ledger);
+    if (!kind) return [];
+    return [{
+      id: randomUUID(),
+      party: b.ledger,
+      party_group: groupOf.get(b.ledger) || null,
+      bill: b.bill,
+      bill_date: b.bill_date,
+      due_date: b.bill_date && b.credit_days != null ? addDays(b.bill_date, b.credit_days) : b.bill_date,
+      kind,
+      amount: kind === "receivable" ? -b.outstanding : b.outstanding,
+    }];
+  });
 const rec = open.filter((b) => b.kind === "receivable").reduce((s, b) => s + b.amount, 0);
 const pay = open.filter((b) => b.kind === "payable").reduce((s, b) => s + b.amount, 0);
-console.log(`open bills: ${open.length}  receivable ₹${(rec / 1e7).toFixed(2)} Cr  payable ₹${(pay / 1e7).toFixed(2)} Cr`);
+console.log(`open bills: ${open.length}  receivable NET ₹${(rec / 1e7).toFixed(2)} Cr  payable NET ₹${(pay / 1e7).toFixed(2)} Cr`);
 
 if (DRY) {
   const out = join(repo, "scripts", "tally-parse-summary.json");
@@ -256,6 +277,8 @@ const stamp = new Date().toISOString();
 if (MASTERS) {
   await wipe("kuber_ledger");
   await insert("kuber_ledger", ledgers.map((l) => ({ id: l.id, name: l.name, parent: l.parent, opening: l.opening, closing: l.closing, loaded_at: stamp })));
+  const rg = await fetch(`${URL0}/rest/v1/kuber_group?name=not.is.null`, { method: "DELETE", headers: H });
+  if (rg.ok) await insert("kuber_group", groups);
 }
 if (TRANS) {
   await wipe("kuber_voucher_line"); await wipe("kuber_voucher");

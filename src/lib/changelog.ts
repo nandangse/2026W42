@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.5",
+    date: "2026-08-28",
+    module: "Kuber — the receivables tell the truth",
+    items: [
+      "Dr Raghu caught it in one look: ₹54 Cr was NOT the customer receivables. The first cut called any debit-balance bill a receivable — sweeping in ₹13.8 Cr of supplier-side debits, ₹2.3 Cr of loan-company entries and ₹1.1 Cr of staff advances. Now TALLY'S OWN GROUP TREE decides (migration 0079): a receivable party sits under Sundry Debtors, a payable under Sundry Creditors, and a lender is neither, whatever its sign.",
+      "Bills keep their SIGN and every party shows its NET — the sheet's own Tally OS — with an UNADJUSTED column for the receipts and settlements Tally could not tie to a bill (₹23 Cr of them exist; hiding them is how a book lies). Verified against the sheet: net receivables ₹13.94 Cr beside its ₹12.07 Cr of 8 Aug; payables net ₹8.43 Cr.",
+      "The dashboard, both ageings, the report card and the cash flow all read the netted truth. After running 0079, re-run just the Masters file through Upload Files — the tree loads and every screen corrects itself.",
+    ],
+  },
+  {
     v: "3.29.0.4",
     date: "2026-08-28",
     module: "Kuber — one money voice, and the Drive popup asked in time",

@@ -75,21 +75,27 @@ export async function GET(req: Request) {
     if (view === "ageing") {
       const kind = url.searchParams.get("kind");
       if (kind !== "receivable" && kind !== "payable") throw new HttpError(400, "kind must be receivable or payable");
+      // amounts are SIGNED (0079): positive = owed in the party's direction,
+      // negative = an unadjusted opposite entry. The party total is the NET —
+      // the sheet's own number — with the unadjusted lump shown, not hidden.
       const bills = (await allBills(admin)).filter((b) => b.kind === kind);
-      const parties = new Map<string, { party: string; group: string | null; total: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: Bill[] }>();
+      const parties = new Map<string, { party: string; group: string | null; total: number; unadjusted: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: Bill[] }>();
       for (const b of bills) {
-        const p = parties.get(b.party) || { party: b.party, group: b.party_group, total: 0, not_due: 0, d0_30: 0, d31_90: 0, d91_180: 0, d180p: 0, bills: [] };
+        const p = parties.get(b.party) || { party: b.party, group: b.party_group, total: 0, unadjusted: 0, not_due: 0, d0_30: 0, d31_90: 0, d91_180: 0, d180p: 0, bills: [] };
         p.total += b.amount;
-        (p as unknown as Record<string, number>)[bucketOf(b.due_date, today)] += b.amount;
+        if (b.amount > 0) (p as unknown as Record<string, number>)[bucketOf(b.due_date, today)] += b.amount;
+        else p.unadjusted += b.amount;
         p.bills.push(b);
         parties.set(b.party, p);
       }
       const rows = [...parties.values()]
+        .filter((p) => Math.abs(p.total) > 0.5)
         .map((p) => ({ ...p, bills: p.bills.sort((a, b2) => String(a.due_date || "9999").localeCompare(String(b2.due_date || "9999"))) }))
         .sort((a, b2) => b2.total - a.total);
       const tot = rows.reduce((s, p) => s + p.total, 0);
       const overdue = rows.reduce((s, p) => s + p.d0_30 + p.d31_90 + p.d91_180 + p.d180p, 0);
-      return NextResponse.json({ rows, total: tot, overdue, count: bills.length, today });
+      const unadjusted = rows.reduce((s, p) => s + p.unadjusted, 0);
+      return NextResponse.json({ rows, total: tot, overdue, unadjusted, count: bills.length, today });
     }
 
     if (view === "reportcard") {
@@ -99,12 +105,14 @@ export async function GET(req: Request) {
       const byParty = new Map<string, { party: string; group: string | null; outstanding: number; overdue: number; oldest: string | null; nbills: number; wsum: number }>();
       for (const b of bills) {
         const p = byParty.get(b.party) || { party: b.party, group: b.party_group, outstanding: 0, overdue: 0, oldest: null, nbills: 0, wsum: 0 };
-        p.outstanding += b.amount;
-        p.nbills += 1;
-        if (b.due_date && b.due_date < today) {
-          p.overdue += b.amount;
-          p.wsum += daysBetween(b.due_date, today) * b.amount;
-          if (!p.oldest || b.due_date < p.oldest) p.oldest = b.due_date;
+        p.outstanding += b.amount; // net — the sheet's own Tally OS
+        if (b.amount > 0) {
+          p.nbills += 1;
+          if (b.due_date && b.due_date < today) {
+            p.overdue += b.amount;
+            p.wsum += daysBetween(b.due_date, today) * b.amount;
+            if (!p.oldest || b.due_date < p.oldest) p.oldest = b.due_date;
+          }
         }
         byParty.set(b.party, p);
       }
@@ -120,7 +128,7 @@ export async function GET(req: Request) {
           vol.set(v.party, r);
         }
       } catch { /* vouchers not loaded yet */ }
-      const rows = [...byParty.values()].map((p) => {
+      const rows = [...byParty.values()].filter((p) => Math.abs(p.outstanding) > 0.5).map((p) => {
         const avgDelay = p.overdue > 0 ? Math.round(p.wsum / p.overdue) : 0;
         const overduePct = p.outstanding > 0 ? p.overdue / p.outstanding : 0;
         // Our grade of the RELATIONSHIP's health, not of the supplier's soul:
@@ -151,7 +159,7 @@ export async function GET(req: Request) {
         planned_payments: zero(), unplanned_bills: zero(), other_out: zero(),
       };
       const bills = await allBills(admin);
-      for (const b of bills.filter((x) => x.kind === "receivable")) {
+      for (const b of bills.filter((x) => x.kind === "receivable" && x.amount > 0)) {
         const i = weekIdx(b.due_date);
         if (i >= 0) flows.collections[i] += b.amount;
       }
@@ -165,7 +173,7 @@ export async function GET(req: Request) {
         const i = weekIdx(p.plan_date);
         if (i >= 0) flows.planned_payments[i] += p.amount;
       }
-      for (const b of bills.filter((x) => x.kind === "payable")) {
+      for (const b of bills.filter((x) => x.kind === "payable" && x.amount > 0)) {
         if (plannedParties.has(b.party)) continue; // the plan overrides the bill
         const i = weekIdx(b.due_date);
         if (i >= 0) flows.unplanned_bills[i] += b.amount;
@@ -220,8 +228,9 @@ export async function GET(req: Request) {
     const rec = bills.filter((b) => b.kind === "receivable");
     const pay = bills.filter((b) => b.kind === "payable");
     const sum = (xs: Bill[]) => xs.reduce((s, b) => s + b.amount, 0);
-    const overdue = (xs: Bill[]) => xs.filter((b) => b.due_date && b.due_date < today);
-    const dueSoon = (xs: Bill[], days: number) => xs.filter((b) => b.due_date && b.due_date >= today && b.due_date <= addDays(today, days));
+    const pos = (xs: Bill[]) => xs.filter((b) => b.amount > 0);
+    const overdue = (xs: Bill[]) => pos(xs).filter((b) => b.due_date && b.due_date < today);
+    const dueSoon = (xs: Bill[], days: number) => pos(xs).filter((b) => b.due_date && b.due_date >= today && b.due_date <= addDays(today, days));
     let loadedAt: string | null = null;
     try {
       const { data } = await admin.from("kuber_bill").select("loaded_at").limit(1);
@@ -245,8 +254,8 @@ export async function GET(req: Request) {
     ]);
     return NextResponse.json({
       today, loadedAt,
-      receivable: { total: sum(rec), overdue: sum(overdue(rec)), due30: sum(dueSoon(rec, 30)), parties: new Set(rec.map((b) => b.party)).size },
-      payable: { total: sum(pay), overdue: sum(overdue(pay)), due30: sum(dueSoon(pay, 30)), parties: new Set(pay.map((b) => b.party)).size },
+      receivable: { total: sum(rec), overdue: sum(overdue(rec)), due30: sum(dueSoon(rec, 30)), parties: new Set(rec.map((b) => b.party)).size, unadjusted: sum(rec.filter((b) => b.amount < 0)) },
+      payable: { total: sum(pay), overdue: sum(overdue(pay)), due30: sum(dueSoon(pay, 30)), parties: new Set(pay.map((b) => b.party)).size, unadjusted: sum(pay.filter((b) => b.amount < 0)) },
       bg, fd, insurance: ins,
     });
   } catch (e) {
