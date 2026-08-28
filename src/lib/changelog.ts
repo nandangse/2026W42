@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.19",
+    date: "2026-08-28",
+    module: "Kuber — the dashboard becomes the management review",
+    items: [
+      "The dashboard now opens the way the review sheet's top block does: RECEIVABLES as the GROSS truly due to come, the ADVANCES RECEIVED beside them named for what they are — a liability, work owed against money held; PAYABLES with the ADVANCES PAID next to them; net beside each. The overdue and due-in-30 tiles are gone — the ageing already tracks that.",
+      "THE FLOWS table follows — Billing (GST Sales) · Collections (Receipts) · Purchases · Payments to suppliers — for any period on a SLIDER: 7 / 30 / 90 days, YTD since 1 April, or any day-count you drag to; value, voucher count and per-day pace for each. The values ride the vouchers' own credit side (migration 0083); re-upload Transactions once and they fill.",
+      "The ageing screens shed their overdue tile too and lead with the gross, the advances labelled honestly beside it.",
+    ],
+  },
+  {
     v: "3.29.0.18",
     date: "2026-08-28",
     module: "Kuber — every table sorts, every column totals, both screens agree",

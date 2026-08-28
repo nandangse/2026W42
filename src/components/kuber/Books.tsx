@@ -35,20 +35,43 @@ const Card = ({ label, value, sub, color = INK }: { label: string; value: string
 
 // ---------------- Dashboard ----------------
 interface Summary {
-  today: string; loadedAt: string | null;
-  receivable: { total: number; overdue: number; due30: number; parties: number; unadjusted: number };
-  payable: { total: number; overdue: number; due30: number; parties: number; unadjusted: number };
+  today: string; loadedAt: string | null; since: string; period: string;
+  flows: Record<string, { value: number; count: number }>;
+  receivable: { total: number; gross: number; overdue: number; due30: number; parties: number; unadjusted: number };
+  payable: { total: number; gross: number; overdue: number; due30: number; parties: number; unadjusted: number };
   bg: { count: number; amount: number; expiring: number };
   fd: { count: number; amount: number; expiring: number };
   insurance: { count: number; amount: number; expiring: number };
 }
+
+/**
+ * The dashboard, shaped like the management review's own top block
+ * (Dr Raghu, 28 Aug 2026): receivables as the GROSS truly due to come, the
+ * advances beside it named for what they are — a liability; payables with
+ * the advances PAID next to them; no overdue tiles (the ageing tracks that);
+ * and the period flows — Billing · Collections · Purchases · Payments — on
+ * a YTD / days slider.
+ */
 export function KuberDashboard({ go }: { go: (key: string) => void }) {
-  const [s] = useBooks<Summary>("summary");
+  const [period, setPeriod] = useState("ytd");
+  const [s, setS] = useState<Summary | null>(null);
   const { fmt: fmtMoney } = useMoneyFmt();
+  useEffect(() => {
+    setS(null);
+    fetch(`/api/kuber/books?view=summary&period=${period}`, { cache: "no-store" })
+      .then((r) => r.json()).then(setS).catch(() => setS(null));
+  }, [period]);
   if (!s) return <div className="text-sm" style={{ color: MUTED }}>Reading the books…</div>;
   const stale = !s.loadedAt;
+  const days = Math.max(1, Math.round((new Date(s.today).getTime() - new Date(s.since).getTime()) / 86400000));
+  const FLOW_ROWS: [string, string, string][] = [
+    ["billing", "Billing", "GST Sales vouchers"],
+    ["collections", "Collections", "Receipt vouchers"],
+    ["purchases", "Purchases", "Purchase · Cap-Ex · Import"],
+    ["supplier_payments", "Payments to suppliers", "Payment vouchers"],
+  ];
   return (
-    <div style={{ maxWidth: 1050 }}>
+    <div style={{ maxWidth: 1100 }}>
       {stale && (
         <div className="rounded p-3 text-sm font-semibold mb-3" style={{ background: "#FCF6E8", color: "#8A6D1A" }}>
           No Tally snapshot is loaded yet — Upload Files brings the books in, and every number below lights up.
@@ -60,20 +83,77 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
           {" · "}the registers are live always.
         </div>
       )}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-        <Card label="RECEIVABLES (NET)" value={fmtMoney(s.receivable.total)} sub={`${s.receivable.parties} parties · Sundry Debtors only${s.receivable.unadjusted ? ` · ${fmtMoney(-s.receivable.unadjusted)} unadjusted inside` : ""}`} color="#1B3A5C" />
-        <Card label="OF WHICH OVERDUE" value={fmtMoney(s.receivable.overdue)} color={s.receivable.overdue ? RED : GREEN} />
-        <Card label="PAYABLES (NET)" value={fmtMoney(s.payable.total)} sub={`${s.payable.parties} parties · Sundry Creditors only${s.payable.unadjusted ? ` · ${fmtMoney(-s.payable.unadjusted)} unadjusted inside` : ""}`} color="#1B3A5C" />
-        <Card label="OF WHICH OVERDUE" value={fmtMoney(s.payable.overdue)} color={s.payable.overdue ? "#D97706" : GREEN} />
+
+      {/* money owed and owing — gross first, advances named as what they are */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
+        <Card label="RECEIVABLES — DUE TO COME" value={fmtMoney(s.receivable.gross)} sub={`${s.receivable.parties} customers · gross bills`} color="#1B3A5C" />
+        <Card label="ADVANCES RECEIVED" value={fmtMoney(-s.receivable.unadjusted)} sub="a liability — work owed against money held" color="#1B6B93" />
+        <Card label="NET RECEIVABLE" value={fmtMoney(s.receivable.total)} sub="bills less advances" />
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-        <Card label="DUE IN 30 DAYS — IN" value={fmtMoney(s.receivable.due30)} color={GREEN} />
-        <Card label="DUE IN 30 DAYS — OUT" value={fmtMoney(s.payable.due30)} color={RED} />
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+        <Card label="PAYABLES — TO PAY" value={fmtMoney(s.payable.gross)} sub={`${s.payable.parties} suppliers · gross bills`} color="#1B3A5C" />
+        <Card label="ADVANCES PAID TO SUPPLIERS" value={fmtMoney(-s.payable.unadjusted)} sub="money out, goods awaited" color="#1B6B93" />
+        <Card label="NET PAYABLE" value={fmtMoney(s.payable.total)} sub="bills less advances" />
+      </div>
+
+      {/* the period flows — the review sheet's own rows, on a slider */}
+      <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: BORDER }}>
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <span className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>THE FLOWS</span>
+          {(["7", "30", "90", "ytd"] as const).map((k) => (
+            <button key={k} onClick={() => setPeriod(k)}
+              className="rounded-full border px-2.5 py-0.5 text-xs font-bold"
+              style={period === k ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
+              {k === "ytd" ? "YTD" : `${k} days`}
+            </button>
+          ))}
+          <input type="range" min={1} max={365} value={period === "ytd" ? days : Number(period)}
+            onChange={(e) => setPeriod(e.target.value)}
+            style={{ width: 160, accentColor: "#E8600A" }}
+            title="Slide for any number of days" />
+          <span className="text-xs tnum font-bold" style={{ color: INK }}>
+            {period === "ytd" ? `since 1 April (${days} days)` : `last ${period} days`}
+          </span>
+        </div>
+        <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead>
+            <tr style={{ background: "#22303C", color: "#fff" }}>
+              <th className="px-2 py-2 text-left">Flow</th>
+              <th className="px-2 py-2 text-right">Value</th>
+              <th className="px-2 py-2 text-right">Vouchers</th>
+              <th className="px-2 py-2 text-right">Per day</th>
+              <th className="px-2 py-2 text-left" style={{ color: "#8FA1B3" }}>from</th>
+            </tr>
+          </thead>
+          <tbody>
+            {FLOW_ROWS.map(([k, label, src], i) => {
+              const f = s.flows?.[k] ?? { value: 0, count: 0 };
+              return (
+                <tr key={k} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <td className="px-2 py-1.5 font-bold" style={{ color: k === "collections" ? GREEN : k === "supplier_payments" ? RED : INK }}>{label}</td>
+                  <td className="px-2 py-1.5 text-right tnum font-bold">{f.value ? fmtMoney(f.value) : "·"}</td>
+                  <td className="px-2 py-1.5 text-right tnum">{f.count || "·"}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{f.value ? fmtMoney(f.value / days) : "·"}</td>
+                  <td className="px-2 py-1.5" style={{ color: MUTED }}>{src}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {(!s.flows || Object.values(s.flows).every((f) => !f.count)) && (
+          <div className="text-xs mt-2" style={{ color: "#8A6D1A" }}>
+            The flows read the vouchers&apos; own values — run migration 0083 and re-upload Transactions once, and they fill.
+          </div>
+        )}
+      </div>
+
+      {/* the instruments, verified right today */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
         <Card label="BGs LIVE" value={`${s.bg.count} · ${fmtMoney(s.bg.amount)}`} sub={s.bg.expiring ? `${s.bg.expiring} expiring in 60 days` : "none expiring soon"} color={s.bg.expiring ? "#D97706" : INK} />
         <Card label="FDs LIVE" value={`${s.fd.count} · ${fmtMoney(s.fd.amount)}`} sub={s.fd.expiring ? `${s.fd.expiring} maturing in 60 days` : "none maturing soon"} />
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <Card label="INSURANCE LIVE" value={`${s.insurance.count} policies`} sub={s.insurance.expiring ? `${s.insurance.expiring} expiring in 60 days` : "none expiring soon"} color={s.insurance.expiring ? "#D97706" : INK} />
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <button onClick={() => go("cashflow")} className="bg-white rounded-lg border p-3 text-left hover:shadow" style={{ borderColor: BORDER }}>
           <div className="text-xs font-bold mb-1" style={{ color: MUTED }}>13-WEEK CASH FLOW</div>
           <div className="text-sm font-bold" style={{ color: "#1B3A5C" }}>Open the plan →</div>
@@ -140,12 +220,12 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 party"
           className="px-2 py-1 rounded border text-sm ml-auto" style={{ borderColor: BORDER }} />
       </div>
-      {/* the three numbers he reads first, plus what is overdue among them */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-        <Card label={words.adv.toUpperCase()} value={fmtMoney(-data.unadjusted)} sub="credits not tied to a bill" color="#1B6B93" />
-        <Card label={words.bills.toUpperCase()} value={fmtMoney(data.gross)} sub={`${data.count} open bills`} color="#1B3A5C" />
+      {/* gross first — the money truly due; advances named as what they are.
+          No overdue tile: the buckets below already track it (28 Aug 2026). */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+        <Card label={words.bills.toUpperCase() + (rec ? " — DUE TO COME" : " — TO PAY")} value={fmtMoney(data.gross)} sub={`${data.count} open bills`} color="#1B3A5C" />
+        <Card label={words.adv.toUpperCase()} value={fmtMoney(-data.unadjusted)} sub={rec ? "a liability — work owed against money held" : "money out, goods awaited"} color="#1B6B93" />
         <Card label={words.net.toUpperCase()} value={fmtMoney(data.total)} sub="bills less advances" color={INK} />
-        <Card label="OF WHICH OVERDUE" value={fmtMoney(data.overdue)} color={data.overdue ? RED : GREEN} />
       </div>
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "70vh" }}>
         <table className="w-full text-xs" style={{ minWidth: 1100, borderCollapse: "separate", borderSpacing: 0 }}>

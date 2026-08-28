@@ -21,7 +21,7 @@ const TABLES: Record<string, string[]> = {
   kuber_group: ["name", "parent"],
   kuber_ledger: ["id", "name", "parent", "opening", "closing", "loaded_at"],
   kuber_opening_bill: ["ledger", "bill", "bill_date", "amount", "credit_days"],
-  kuber_voucher: ["id", "date", "vtype", "vno", "party", "narration", "loaded_at"],
+  kuber_voucher: ["id", "date", "vtype", "vno", "party", "narration", "amount", "loaded_at"],
   kuber_voucher_line: ["id", "voucher_id", "ledger", "amount"],
   kuber_bill_alloc: ["voucher_id", "ledger", "bill", "billtype", "amount", "credit_days", "date"],
   kuber_voucher_item: ["voucher_id", "item", "qty", "amount"],
@@ -61,10 +61,14 @@ export async function POST(req: Request) {
       // one batch AFTER the wipe, leaving the books half-empty. Never again —
       // if any table is absent, refuse before touching anything.
       for (const t of tables) {
-        const { error } = await admin.from(t).select(t === "kuber_group" ? "name" : "id").limit(1);
+        const sel = t === "kuber_group" ? "name" : t === "kuber_voucher" ? "id, amount" : "id";
+        const { error } = await admin.from(t).select(sel).limit(1);
         if (error) {
-          const mig = t === "kuber_group" ? "0079" : t === "kuber_voucher_item" ? "0081" : "0076";
-          throw new HttpError(503, `Run migration ${mig} first — ${t} does not exist yet. Nothing was touched.`);
+          const mig = t === "kuber_group" ? "0079"
+            : t === "kuber_voucher_item" ? "0081"
+            : t === "kuber_voucher" && /amount/i.test(error.message) ? "0083"
+            : "0076";
+          throw new HttpError(503, `Run migration ${mig} first — ${t} is not ready. Nothing was touched.`);
         }
       }
       for (const t of tables) {

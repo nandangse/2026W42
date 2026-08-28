@@ -145,7 +145,7 @@ export async function parseTransactionsInBrowser(file: File, sink: BatchSink, on
   const b = batcher(sink);
   const LEDGER_SETS = new Set(["ALLLEDGERENTRIES", "LEDGERENTRIES", "ACCOUNTINGALLOCATIONS"]);
   const ITEM_SETS = new Set(["ALLINVENTORYENTRIES", "INVENTORYENTRIES", "INVENTORYENTRIESIN", "INVENTORYENTRIESOUT"]);
-  let v: { id: string; date: string | null; vtype: string; vno: string; party: string; narration: string } | null = null;
+  let v: { id: string; date: string | null; vtype: string; vno: string; party: string; narration: string; amount: number } | null = null;
   let inAlloc = false, otherDepth = 0;
   let alloc: Row | null = null;
   const stack: { id: string; voucher_id: string; ledger: string; amount: number }[] = [];
@@ -159,7 +159,7 @@ export async function parseTransactionsInBrowser(file: File, sink: BatchSink, on
   };
   await eachLine(file, (line) => {
     if (line.startsWith("<VOUCHER ")) {
-      v = { id: uuid(), date: null, vtype: attr(line, "VCHTYPE") || "", vno: "", party: "", narration: "" };
+      v = { id: uuid(), date: null, vtype: attr(line, "VCHTYPE") || "", vno: "", party: "", narration: "", amount: 0 };
       return;
     }
     if (!v) return;
@@ -191,7 +191,12 @@ export async function parseTransactionsInBrowser(file: File, sink: BatchSink, on
       if (LEDGER_SETS.has(lt.name)) {
         if (lt.close) {
           const e = stack.pop();
-          if (e && e.ledger) { b.push("kuber_voucher_line", e as unknown as Row); lines++; }
+          if (e && e.ledger) {
+            b.push("kuber_voucher_line", e as unknown as Row);
+            lines++;
+            // the voucher's value = its credit side (balanced books: one side is enough)
+            if (e.amount > 0) v.amount += e.amount;
+          }
         } else {
           stack.push({ id: uuid(), voucher_id: v.id, ledger: "", amount: 0 });
         }

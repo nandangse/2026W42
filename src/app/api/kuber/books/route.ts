@@ -399,6 +399,34 @@ export async function GET(req: Request) {
     }
 
     // ---- summary: the dashboard ----
+    // the flows of a chosen period, from the vouchers' own values (0083):
+    // Billing = GST Sales · Collections = Receipt · Purchases = Purchase
+    // family · Payments to suppliers = Payment. YTD = since 1 April.
+    const period = url.searchParams.get("period") || "ytd";
+    const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+    const since = period === "ytd" ? fyStart : addDays(today, -Math.max(1, Math.min(365, Number(period) || 30)));
+    const FLOW_TYPES: Record<string, string[]> = {
+      billing: ["GST Sales"],
+      collections: ["Receipt"],
+      purchases: ["Purchase", "Cap-Ex Purchase", "Excise Purchase Import"],
+      supplier_payments: ["Payment"],
+    };
+    const flows: Record<string, { value: number; count: number }> = Object.fromEntries(Object.keys(FLOW_TYPES).map((k) => [k, { value: 0, count: 0 }]));
+    try {
+      for (let f = 0; ; f += 1000) {
+        const { data, error } = await admin.from("kuber_voucher").select("vtype, amount, date").gte("date", since).range(f, f + 999);
+        if (error) break;
+        for (const vch of data || []) {
+          for (const [k, types] of Object.entries(FLOW_TYPES)) {
+            if (types.includes(String(vch.vtype))) {
+              flows[k].value += Number(vch.amount) || 0;
+              flows[k].count += 1;
+            }
+          }
+        }
+        if (!data || data.length < 1000) break;
+      }
+    } catch { /* pre-0083 — the table just stays empty */ }
     const bills = await allBills(admin);
     const rec = bills.filter((b) => b.kind === "receivable");
     const pay = bills.filter((b) => b.kind === "payable");
@@ -428,9 +456,10 @@ export async function GET(req: Request) {
       reg("kuber_insurance", "expiry_date", "sum_insured", 60),
     ]);
     return NextResponse.json({
-      today, loadedAt,
-      receivable: { total: sum(rec), overdue: sum(overdue(rec)), due30: sum(dueSoon(rec, 30)), parties: new Set(rec.map((b) => b.party)).size, unadjusted: sum(rec.filter((b) => b.amount < 0)) },
-      payable: { total: sum(pay), overdue: sum(overdue(pay)), due30: sum(dueSoon(pay, 30)), parties: new Set(pay.map((b) => b.party)).size, unadjusted: sum(pay.filter((b) => b.amount < 0)) },
+      today, loadedAt, since, period,
+      flows,
+      receivable: { total: sum(rec), gross: sum(pos(rec)), overdue: sum(overdue(rec)), due30: sum(dueSoon(rec, 30)), parties: new Set(rec.map((b) => b.party)).size, unadjusted: sum(rec.filter((b) => b.amount < 0)) },
+      payable: { total: sum(pay), gross: sum(pos(pay)), overdue: sum(overdue(pay)), due30: sum(dueSoon(pay, 30)), parties: new Set(pay.map((b) => b.party)).size, unadjusted: sum(pay.filter((b) => b.amount < 0)) },
       bg, fd, insurance: ins,
     });
   } catch (e) {
