@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.8",
+    date: "2026-08-28",
+    module: "Kuber — the report card gets its headlines, and every supplier his own page",
+    items: [
+      "Four stat cards crown the Supplier Report Card: TOTAL O/S in numbers and value, GROSS open bills, the rupee-weighted AVERAGE AGE of what is open, and how much stands BEYOND ITS CREDIT PERIOD — the numbers a CFO reads before any row.",
+      "CLICK A SUPPLIER and his own report card opens — the sheet's one-vendor drilldown reborn: net, beyond-credit-period, weighted delay, credit period as his bills wear it, oldest due, the unadjusted lump, PAID in the last 30/90 days from the settlement records, his ageing chips, and every open bill beneath.",
+    ],
+  },
+  {
     v: "3.29.0.7",
     date: "2026-08-28",
     module: "The Genie table standard is declared",

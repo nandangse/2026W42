@@ -163,15 +163,27 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
 
 // ---------------- Supplier report card ----------------
 interface CardRow { party: string; outstanding: number; overdue: number; oldest: string | null; nbills: number; vouchers: number; avg_delay_days: number; overdue_pct: number; grade: string }
+interface CardStats { net: number; gross: number; nbills: number; parties: number; avg_age_days: number; overdue: number; overdue_pct: number }
+const gradeColor: Record<string, string> = { A: GREEN, B: "#7A8A1E", C: "#D97706", D: RED };
+
 export function ReportCardScreen() {
-  const [data] = useBooks<{ rows: CardRow[]; today: string }>("reportcard");
+  const [data] = useBooks<{ rows: CardRow[]; stats: CardStats; today: string }>("reportcard");
   const { fmt: fmtMoney } = useMoneyFmt();
   const [q, setQ] = useState("");
+  const [openParty, setOpenParty] = useState<string | null>(null);
   if (!data) return <div className="text-sm" style={{ color: MUTED }}>Reading the books…</div>;
   const rows = data.rows.filter((r) => !q || r.party.toLowerCase().includes(q.toLowerCase()));
-  const gradeColor: Record<string, string> = { A: GREEN, B: "#7A8A1E", C: "#D97706", D: RED };
+  const st = data.stats;
   return (
     <div style={{ maxWidth: 1100 }}>
+      {st && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+          <Card label="TOTAL O/S — NET" value={fmtMoney(st.net)} sub={`${st.nbills} open bills · ${st.parties} suppliers`} color="#1B3A5C" />
+          <Card label="GROSS OPEN BILLS" value={fmtMoney(st.gross)} sub="before unadjusted credits" />
+          <Card label="AVERAGE AGE OF O/S" value={`${st.avg_age_days} days`} sub="rupee-weighted, since bill date" color={st.avg_age_days > 90 ? RED : INK} />
+          <Card label="BEYOND CREDIT PERIOD" value={fmtMoney(st.overdue)} sub={`${st.overdue_pct}% of gross`} color={st.overdue ? RED : GREEN} />
+        </div>
+      )}
       <div className="flex items-baseline gap-3 mb-2 flex-wrap">
         <div className="text-lg font-bold" style={{ color: INK }}>Supplier Report Card</div>
         <span className="text-xs" style={{ color: MUTED }}>
@@ -191,9 +203,11 @@ export function ReportCardScreen() {
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={r.party} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+              <tr key={r.party} className="border-t" onClick={() => setOpenParty(r.party)}
+                style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}
+                title="Open this supplier's report card">
                 <td className="px-2 py-1.5"><span className="rounded px-2 py-0.5 font-bold text-white" style={{ background: gradeColor[r.grade] }}>{r.grade}</span></td>
-                <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.party}>{r.party}</td>
+                <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#1B3A5C" }} title={r.party}>{r.party}</td>
                 <td className="px-2 py-1.5 text-right tnum font-bold">{fmtMoney(r.outstanding)}</td>
                 <td className="px-2 py-1.5 text-right tnum" style={{ color: r.overdue ? RED : GREEN }}>{fmtMoney(r.overdue)}</td>
                 <td className="px-2 py-1.5 text-right tnum">{r.overdue_pct}%</td>
@@ -205,6 +219,81 @@ export function ReportCardScreen() {
             ))}
           </tbody>
         </table>
+      </div>
+      {openParty && <SupplierCard party={openParty} grade={rows.find((r) => r.party === openParty)?.grade ?? "—"} onClose={() => setOpenParty(null)} />}
+    </div>
+  );
+}
+
+/**
+ * One supplier's own report card — the sheet's tab-B3 drilldown reborn:
+ * the headline facts, the ageing, what was PAID in the last 7/30/45/90
+ * days, and every open bill beneath.
+ */
+function SupplierCard({ party, grade, onClose }: { party: string; grade: string; onClose: () => void }) {
+  const { fmt: fmtMoney } = useMoneyFmt();
+  const [d, setD] = useState<{
+    net: number; gross: number; unadjusted: number; overdue: number; overdue_pct: number;
+    weighted_delay: number; oldest_due: string | null; credit_days: number | null;
+    buckets: Record<string, number>; paid: { d7: number; d30: number; d45: number; d90: number };
+    vouchers: number; today: string;
+    bills: { bill: string; bill_date: string | null; due_date: string | null; amount: number }[];
+  } | null>(null);
+  useEffect(() => {
+    fetch(`/api/kuber/books?view=supplier&party=${encodeURIComponent(party)}`, { cache: "no-store" })
+      .then((r) => r.json()).then(setD).catch(() => setD(null));
+  }, [party]);
+  const Fact = ({ k, v, c }: { k: string; v: string; c?: string }) => (
+    <div><div className="text-xs font-bold" style={{ color: MUTED }}>{k}</div><div className="text-sm font-bold tnum" style={{ color: c || INK }}>{v}</div></div>
+  );
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)", zIndex: 60 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 760, maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+        <div className="flex items-center gap-3 px-4 py-3" style={{ background: "#22303C", borderRadius: "8px 8px 0 0" }}>
+          <span className="rounded px-2 py-0.5 font-bold text-white" style={{ background: gradeColor[grade] ?? MUTED }}>{grade}</span>
+          <div className="font-bold text-white" style={{ fontSize: 15 }}>{party}</div>
+          <button onClick={onClose} className="ml-auto" style={{ color: "#8FA1B3" }}>✕</button>
+        </div>
+        <div className="p-4 overflow-auto">
+          {!d ? <div className="text-sm" style={{ color: MUTED }}>Reading this supplier…</div> : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                <Fact k="NET OUTSTANDING" v={fmtMoney(d.net)} c="#1B3A5C" />
+                <Fact k="BEYOND CREDIT PERIOD" v={`${fmtMoney(d.overdue)} · ${d.overdue_pct}%`} c={d.overdue ? RED : GREEN} />
+                <Fact k="WEIGHTED DELAY" v={d.weighted_delay ? `${d.weighted_delay} days` : "—"} />
+                <Fact k="CREDIT PERIOD (BILLS)" v={d.credit_days != null ? `${d.credit_days} days` : "—"} />
+                <Fact k="OLDEST DUE" v={fmtD(d.oldest_due)} c={d.oldest_due ? RED : INK} />
+                <Fact k="UNADJUSTED" v={d.unadjusted ? "−" + fmtMoney(-d.unadjusted) : "—"} c="#1B6B93" />
+                <Fact k="PAID — 30 / 90 DAYS" v={`${fmtMoney(d.paid.d30)} / ${fmtMoney(d.paid.d90)}`} c={GREEN} />
+                <Fact k="VOUCHERS THIS BOOK" v={String(d.vouchers)} />
+              </div>
+              <div className="flex gap-2 mb-3 flex-wrap">
+                {([["not_due", "Not due", MUTED], ["d0_30", "<30", INK], ["d31_90", "31–90", "#D97706"], ["d91_180", "91–180", RED], ["d180p", ">180", RED]] as const).map(([k, l, c]) => (
+                  <span key={k} className="rounded border px-2 py-1 text-xs font-semibold" style={{ borderColor: BORDER, color: c }}>
+                    {l}: <b className="tnum">{d.buckets[k] ? fmtMoney(d.buckets[k]) : "·"}</b>
+                  </span>
+                ))}
+              </div>
+              <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+                <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+                  {["Bill", "Billed", "Due", "Amount"].map((h, i2) => (<th key={h} className={`px-2 py-1.5 text-${i2 === 3 ? "right" : "left"}`}>{h}</th>))}
+                </tr></thead>
+                <tbody>
+                  {d.bills.map((b, i2) => (
+                    <tr key={i2} className="border-t" style={{ borderColor: "#EFEDE7", background: i2 % 2 ? "#FAF9F5" : "#fff" }}>
+                      <td className="px-2 py-1">{b.bill}</td>
+                      <td className="px-2 py-1 tnum">{fmtD(b.bill_date)}</td>
+                      <td className="px-2 py-1 tnum" style={{ color: b.due_date && b.due_date < d.today ? RED : MUTED }}>{fmtD(b.due_date)}</td>
+                      <td className="px-2 py-1 text-right tnum" style={{ color: b.amount < 0 ? "#1B6B93" : INK }}>
+                        {b.amount < 0 ? "−" + fmtMoney(-b.amount) : fmtMoney(b.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

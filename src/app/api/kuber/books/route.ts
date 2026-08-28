@@ -129,6 +129,27 @@ export async function GET(req: Request) {
           vol.set(v.party, r);
         }
       } catch { /* vouchers not loaded yet */ }
+      // the headline stats Dr Raghu asked for (28 Aug 2026): total O/S in
+      // numbers and value, the rupee-weighted average AGE of what is open,
+      // and how much stands beyond its credit period (= overdue, since the
+      // due date IS bill date + credit period).
+      let ageWsum = 0, grossAll = 0, nbillsAll = 0, overdueAll = 0, netAll = 0;
+      for (const b of bills) {
+        netAll += b.amount;
+        if (b.amount > 0) {
+          grossAll += b.amount;
+          nbillsAll += 1;
+          if (b.bill_date) ageWsum += daysBetween(b.bill_date, today) * b.amount;
+          if (b.due_date && b.due_date < today) overdueAll += b.amount;
+        }
+      }
+      const stats = {
+        net: netAll, gross: grossAll, nbills: nbillsAll,
+        parties: byParty.size,
+        avg_age_days: grossAll > 0 ? Math.round(ageWsum / grossAll) : 0,
+        overdue: overdueAll,
+        overdue_pct: grossAll > 0 ? Math.round((overdueAll / grossAll) * 100) : 0,
+      };
       const rows = [...byParty.values()].filter((p) => Math.abs(p.outstanding) > 0.5).map((p) => {
         const avgDelay = p.overdue > 0 ? Math.round(p.wsum / p.overdue) : 0;
         // % of GROSS open bills, so unadjusted credits can never push it past 100
@@ -138,7 +159,55 @@ export async function GET(req: Request) {
         const grade = overduePct < 0.1 ? "A" : overduePct < 0.35 ? "B" : avgDelay <= 60 ? "C" : "D";
         return { ...p, vouchers: vol.get(p.party)?.n || 0, avg_delay_days: avgDelay, overdue_pct: Math.round(overduePct * 100), grade };
       }).sort((a, b2) => b2.outstanding - a.outstanding);
-      return NextResponse.json({ rows, today });
+      return NextResponse.json({ rows, stats, today });
+    }
+
+    if (view === "supplier") {
+      // one supplier's own report card (the sheet's tab-B3 drilldown):
+      // the open bills, the ageing, and what was actually PAID in the last
+      // 7 / 30 / 45 / 90 days from the settlement allocations.
+      const party = url.searchParams.get("party") || "";
+      if (!party) throw new HttpError(400, "party required");
+      const bills = (await allBills(admin)).filter((b) => b.kind === "payable" && b.party === party);
+      const posB = bills.filter((b) => b.amount > 0);
+      const net = bills.reduce((s, b) => s + b.amount, 0);
+      const gross = posB.reduce((s, b) => s + b.amount, 0);
+      const unadjusted = bills.filter((b) => b.amount < 0).reduce((s, b) => s + b.amount, 0);
+      const overdueB = posB.filter((b) => b.due_date && b.due_date < today);
+      const overdue = overdueB.reduce((s, b) => s + b.amount, 0);
+      const wsum = overdueB.reduce((s, b) => s + daysBetween(b.due_date as string, today) * b.amount, 0);
+      const buckets = { not_due: 0, d0_30: 0, d31_90: 0, d91_180: 0, d180p: 0 } as Record<string, number>;
+      for (const b of posB) buckets[bucketOf(b.due_date, today)] += b.amount;
+      // credit period as the bills themselves wear it (due − bill date)
+      const periods = posB.filter((b) => b.bill_date && b.due_date).map((b) => daysBetween(b.bill_date as string, b.due_date as string));
+      const creditDays = periods.length ? Math.round(periods.reduce((a, b) => a + b, 0) / periods.length) : null;
+      // payments: negative allocations on this ledger, by recency window
+      const paid = { d7: 0, d30: 0, d45: 0, d90: 0 };
+      try {
+        const { data: al } = await admin.from("kuber_bill_alloc").select("amount, date").eq("ledger", party).limit(5000);
+        for (const a of al || []) {
+          const amt = Number(a.amount) || 0;
+          if (amt >= 0 || !a.date) continue; // negative = money going out to the supplier
+          const d = daysBetween(String(a.date), today);
+          if (d <= 7) paid.d7 -= amt;
+          if (d <= 30) paid.d30 -= amt;
+          if (d <= 45) paid.d45 -= amt;
+          if (d <= 90) paid.d90 -= amt;
+        }
+      } catch { /* allocs absent — the card stands without them */ }
+      let vouchers = 0;
+      try {
+        const { count } = await admin.from("kuber_voucher").select("id", { count: "exact", head: true }).eq("party", party);
+        vouchers = count ?? 0;
+      } catch { /* fine */ }
+      const oldest = overdueB.reduce<string | null>((s, b) => (!s || (b.due_date as string) < s ? (b.due_date as string) : s), null);
+      return NextResponse.json({
+        party, today, net, gross, unadjusted, overdue,
+        overdue_pct: gross > 0 ? Math.round((overdue / gross) * 100) : 0,
+        weighted_delay: overdue > 0 ? Math.round(wsum / overdue) : 0,
+        oldest_due: oldest, credit_days: creditDays, buckets, paid, vouchers,
+        bills: bills.sort((a, b2) => String(a.due_date || "9999").localeCompare(String(b2.due_date || "9999"))),
+      });
     }
 
     if (view === "cashflow") {
