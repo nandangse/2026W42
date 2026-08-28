@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fmtD } from "./Registers";
 import { useMoneyFmt } from "./money";
 
-const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", RED = "#B3261E", GREEN = "#0D7A3F";
+const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", RED = "#B3261E", GREEN = "#0D7A3F", ORANGE = "#E8600A";
 
 function useBooks<T>(view: string, extra = ""): [T | null, () => void] {
   const [data, setData] = useState<T | null>(null);
@@ -1478,6 +1478,130 @@ export function FundFlowScreen() {
         </>
       )}
       {drill && <DrillModal ledger={drill} from={from} to={to} onClose={() => setDrill(null)} />}
+    </div>
+  );
+}
+
+// ---------------- The CFO Note ----------------
+// (Dr Raghu, 28 Aug 2026: "a very compact note that I should review every
+// Saturday about the things I should do to take control of finances. The
+// graphs should also be in this.") Computed fresh from the books each open.
+
+interface CfoData {
+  today: string; months: string[];
+  series: Record<string, number[]>;
+  actions: {
+    topOverdueCustomers: { party: string; amount: number }[];
+    topOverdueSuppliers: { party: string; amount: number }[];
+    overdueReceivable: number; unadjRec: number; unadjPay: number;
+    collGapThisMonth: number;
+    bgSoon: { count: number; amount: number }; fdSoon: { count: number; amount: number };
+    compRed: number; compAmber: number; emiMonthly: number;
+  };
+}
+
+/** Two series over six months — a small honest SVG, no library. */
+function TrendChart({ months, a, b, la, lb, ca, cb }: { months: string[]; a: number[]; b: number[]; la: string; lb: string; ca: string; cb: string }) {
+  const W = 460, H = 150, PAD = 28;
+  const max = Math.max(...a, ...b, 1);
+  const x = (i: number) => PAD + (i * (W - PAD * 2)) / Math.max(1, months.length - 1);
+  const y = (v: number) => H - 22 - (v / max) * (H - 44);
+  const path = (s2: number[]) => s2.map((v, i) => `${i ? "L" : "M"}${x(i)},${y(v)}`).join(" ");
+  const mmm = (m: string) => new Date(m + "-01T00:00:00Z").toLocaleDateString("en-IN", { month: "short", timeZone: "UTC" });
+  const cr = (n: number) => (n / 1e7).toFixed(1);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: 520 }}>
+      <line x1={PAD} y1={H - 22} x2={W - PAD} y2={H - 22} stroke={BORDER} />
+      <path d={path(a)} fill="none" stroke={ca} strokeWidth={2.2} />
+      <path d={path(b)} fill="none" stroke={cb} strokeWidth={2.2} strokeDasharray="5 3" />
+      {a.map((v, i) => (<circle key={`a${i}`} cx={x(i)} cy={y(v)} r={2.6} fill={ca} />))}
+      {b.map((v, i) => (<circle key={`b${i}`} cx={x(i)} cy={y(v)} r={2.6} fill={cb} />))}
+      {months.map((m, i) => (<text key={m} x={x(i)} y={H - 8} textAnchor="middle" fontSize={9} fill={MUTED}>{mmm(m)}</text>))}
+      {a.map((v, i) => (v ? <text key={`ta${i}`} x={x(i)} y={y(v) - 6} textAnchor="middle" fontSize={8.5} fill={ca}>{cr(v)}</text> : null))}
+      {b.map((v, i) => (v ? <text key={`tb${i}`} x={x(i)} y={y(v) + 13} textAnchor="middle" fontSize={8.5} fill={cb}>{cr(v)}</text> : null))}
+      <text x={PAD} y={12} fontSize={10} fontWeight={700} fill={ca}>— {la}</text>
+      <text x={PAD + 150} y={12} fontSize={10} fontWeight={700} fill={cb}>-- {lb}</text>
+      <text x={W - PAD} y={12} fontSize={9} textAnchor="end" fill={MUTED}>₹ Cr / month</text>
+    </svg>
+  );
+}
+
+export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
+  const [d, setD] = useState<CfoData | null>(null);
+  const [s, setS] = useState<Summary | null>(null);
+  const { fmt: fmtMoney } = useMoneyFmt();
+  useEffect(() => {
+    fetch("/api/kuber/books?view=cfonote", { cache: "no-store" }).then((r) => r.json()).then(setD).catch(() => setD(null));
+    fetch("/api/kuber/books?view=summary&period=30", { cache: "no-store" }).then((r) => r.json()).then(setS).catch(() => setS(null));
+  }, []);
+  if (!d) return <div className="text-sm" style={{ color: MUTED }}>reading the books…</div>;
+  const a = d.actions;
+  const last = d.months.length - 1;
+  const dir = (arr: number[]) => (arr[last] > arr[last - 1] ? "rising" : arr[last] < arr[last - 1] ? "falling" : "flat");
+
+  // THE SATURDAY LIST — each line stands only when the books say so
+  const todo: { title: string; detail: string; goKey?: string }[] = [];
+  if (a.collGapThisMonth > 0) todo.push({ title: `Collect ${fmtMoney(a.collGapThisMonth)} more this month`, detail: "billing has outrun collections this month — the gap becomes borrowing if it stands", goKey: "receivables" });
+  if (a.topOverdueCustomers.length) todo.push({ title: `Call these ${a.topOverdueCustomers.length}: ${a.topOverdueCustomers.map((x) => `${x.party.split(" ").slice(0, 2).join(" ")} (${fmtMoney(x.amount)})`).join(" · ")}`, detail: `they hold ${fmtMoney(a.topOverdueCustomers.reduce((s2, x) => s2 + x.amount, 0))} of the ${fmtMoney(a.overdueReceivable)} overdue`, goKey: "receivables" });
+  if (a.unadjRec > 1e5) todo.push({ title: `Tie ${fmtMoney(a.unadjRec)} of receipts to their invoices`, detail: "money received but not set against bills — the gross receivable reads inflated until the refs are tied in Tally", goKey: "receivables" });
+  if (a.unadjPay > 1e5) todo.push({ title: `Tie ${fmtMoney(a.unadjPay)} of payments to supplier bills`, detail: "the same untied problem on the payable side", goKey: "payables" });
+  if (a.compRed > 0) todo.push({ title: `${a.compRed} compliance${a.compRed > 1 ? "s" : ""} stand NOT DONE for last month`, detail: "red on the calendar — penalty interest runs on these", goKey: "compliance" });
+  if (a.compAmber > 0) todo.push({ title: `${a.compAmber} compliance${a.compAmber > 1 ? "s were" : " was"} filed late last month`, detail: "amber — worth a word with the filer before it becomes habit", goKey: "compliance" });
+  if (a.bgSoon.count) todo.push({ title: `${a.bgSoon.count} BG${a.bgSoon.count > 1 ? "s" : ""} (${fmtMoney(a.bgSoon.amount)}) expire within 60 days`, detail: "renew or release — an expired BG discovered by the beneficiary is the expensive kind", goKey: "bg" });
+  if (a.fdSoon.count) todo.push({ title: `${a.fdSoon.count} FD${a.fdSoon.count > 1 ? "s" : ""} (${fmtMoney(a.fdSoon.amount)}) mature within 60 days`, detail: "decide the rollover before the bank decides it for you", goKey: "fd" });
+  if (a.emiMonthly > 0) todo.push({ title: `${fmtMoney(a.emiMonthly)} leaves every month as EMI`, detail: "hold it against this month's collections when planning the week's payments", goKey: "loan" });
+
+  return (
+    <div style={{ maxWidth: 980 }}>
+      <div className="mb-3">
+        <div className="text-lg font-bold" style={{ color: INK }}>The CFO Note</div>
+        <div className="text-sm" style={{ color: "#5A6672", maxWidth: 700 }}>
+          The Saturday read — computed fresh from the books each time it opens, nothing typed.
+          Trends first, then the things to do. It will grow sharper as the books grow cleaner.
+        </div>
+      </div>
+
+      {s && (
+        <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+          <Card label="NET RECEIVABLE" value={fmtMoney(s.receivable.total)} sub={`${s.receivable.parties} customers`} />
+          <Card label="NET PAYABLE" value={fmtMoney(s.payable.total)} sub={`${s.payable.parties} suppliers`} />
+          <Card label="BANK & CASH" value={fmtMoney(s.bankCash || 0)} color={(s.bankCash || 0) >= 0 ? GREEN : RED} />
+          <Card label="OVERDUE TO COLLECT" value={fmtMoney(a.overdueReceivable)} color={a.overdueReceivable > 0 ? "#D97706" : GREEN} />
+        </div>
+      )}
+
+      <div className="flex gap-3 flex-wrap mb-3">
+        <div className="bg-white rounded-lg border p-3" style={{ borderColor: BORDER, flex: 1, minWidth: 340 }}>
+          <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>
+            MONEY IN — billing vs collections · billing {dir(d.series.billing)}, collections {dir(d.series.collections)}
+          </div>
+          <TrendChart months={d.months} a={d.series.billing} b={d.series.collections} la="Billing" lb="Collections" ca="#1B3A5C" cb={GREEN} />
+        </div>
+        <div className="bg-white rounded-lg border p-3" style={{ borderColor: BORDER, flex: 1, minWidth: 340 }}>
+          <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>
+            MONEY OUT — purchases vs payments · purchases {dir(d.series.purchases)}, payments {dir(d.series.payments)}
+          </div>
+          <TrendChart months={d.months} a={d.series.purchases} b={d.series.payments} la="Purchases" lb="Payments" ca="#7C3AED" cb={RED} />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg border p-3" style={{ borderColor: BORDER }}>
+        <div className="text-xs font-bold mb-2" style={{ color: "#1B3A5C", letterSpacing: 0.8 }}>THE SATURDAY LIST — DO THESE, IN THIS ORDER</div>
+        {todo.length === 0 && <div className="text-sm" style={{ color: GREEN, fontWeight: 700 }}>Nothing stands against you this week — the books are clean. Rare; enjoy it.</div>}
+        {todo.map((t, i) => (
+          <div key={i} className="flex gap-2 border-t py-2" style={{ borderColor: "#EFEDE7" }}>
+            <b className="tnum" style={{ color: "#1B3A5C", width: 20, flexShrink: 0 }}>{i + 1}.</b>
+            <div style={{ minWidth: 0 }}>
+              <div className="text-sm font-bold" style={{ color: INK }}>{t.title}</div>
+              <div className="text-xs" style={{ color: MUTED, lineHeight: 1.5 }}>{t.detail}{t.goKey && <> · <button onClick={() => go(t.goKey!)} style={{ color: ORANGE, fontWeight: 700 }}>open →</button></>}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "84ch", lineHeight: 1.6 }}>
+        Every line above is computed — a rule firing on the books, never an opinion. As the registers fill (loans,
+        compliance, payment plans) the list sharpens by itself. Tell Bernie what Saturday should also ask, and it grows.
+      </p>
     </div>
   );
 }

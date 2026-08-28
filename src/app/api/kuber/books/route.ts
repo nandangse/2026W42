@@ -976,6 +976,97 @@ export async function GET(req: Request) {
       });
     }
 
+    // ---- the CFO NOTE (Dr Raghu, 28 Aug 2026): "a very compact note that I
+    // should review every Saturday about the things I should do to take
+    // control of finances" — the trends and the to-do list, computed fresh
+    // from the books every time it opens. No model call; the books speak.
+    if (view === "cfonote") {
+      // six months of the four flows, month by month
+      const mkey = (d: string) => d.slice(0, 7);
+      const monthsList: string[] = [];
+      {
+        let y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7));
+        for (let i = 5; i >= 0; i--) {
+          let mm = m - i, yy = y;
+          while (mm <= 0) { mm += 12; yy -= 1; }
+          monthsList.push(`${yy}-${String(mm).padStart(2, "0")}`);
+        }
+      }
+      const FLOWT: Record<string, string> = { "GST Sales": "billing", Receipt: "collections", Purchase: "purchases", "Cap-Ex Purchase": "purchases", "Excise Purchase Import": "purchases", Payment: "payments" };
+      const series: Record<string, number[]> = { billing: monthsList.map(() => 0), collections: monthsList.map(() => 0), purchases: monthsList.map(() => 0), payments: monthsList.map(() => 0) };
+      const since6 = monthsList[0] + "-01";
+      for (let f = 0; ; f += 1000) {
+        const { data, error } = await admin.from("kuber_voucher").select("vtype, amount, date").gte("date", since6).order("id").range(f, f + 999);
+        if (error) break;
+        for (const v of data || []) {
+          const k = FLOWT[String(v.vtype)];
+          if (!k) continue;
+          const idx = monthsList.indexOf(mkey(String(v.date || "")));
+          if (idx >= 0) series[k][idx] += Number(v.amount) || 0;
+        }
+        if (!data || data.length < 1000) break;
+      }
+
+      // the bills: who to chase, what hangs untied
+      const bills = await allBills(admin);
+      const topOver = (kind: string) => {
+        const by = new Map<string, number>();
+        for (const b of bills) if (b.kind === kind && b.amount > 0 && b.due_date && b.due_date < today)
+          by.set(b.party, (by.get(b.party) || 0) + b.amount);
+        return [...by.entries()].map(([party, amount]) => ({ party, amount }))
+          .sort((a, b) => b.amount - a.amount).slice(0, 5);
+      };
+      const unadjRec = -bills.filter((b) => b.kind === "receivable" && b.amount < 0).reduce((s2, b) => s2 + b.amount, 0);
+      const unadjPay = -bills.filter((b) => b.kind === "payable" && b.amount < 0).reduce((s2, b) => s2 + b.amount, 0);
+      const overRec = bills.filter((b) => b.kind === "receivable" && b.amount > 0 && b.due_date && b.due_date < today).reduce((s2, b) => s2 + b.amount, 0);
+
+      // instruments on the clock
+      const in60 = addDays(today, 60);
+      const { data: bgs } = await admin.from("kuber_bg").select("amount, expiry_date, status").limit(1000);
+      const bgSoon = (bgs || []).filter((b) => /^(live|in force|in effect)?$/.test(String(b.status ?? "")) && b.expiry_date && String(b.expiry_date) >= today && String(b.expiry_date) <= in60);
+      const { data: fds } = await admin.from("kuber_fd").select("principal, maturity_date, status").limit(1000);
+      const fdSoon = (fds || []).filter((b) => String(b.status ?? "live") === "live" && b.maturity_date && String(b.maturity_date) >= today && String(b.maturity_date) <= in60);
+
+      // compliance standing this moment
+      let compRed = 0, compAmber = 0;
+      try {
+        const lastM = mkey(addDays(today.slice(0, 8) + "01", -1));
+        const { data: comps } = await admin.from("kuber_compliance").select("id, due_day, frequency").eq("active", true).limit(500);
+        const { data: ents } = await admin.from("kuber_compliance_entry").select("compliance_id, month, done_on").eq("month", lastM).limit(1000);
+        const eMap = new Map((ents || []).map((e) => [String(e.compliance_id), e]));
+        for (const c of (comps || []).filter((c2) => String(c2.frequency) === "Monthly")) {
+          const e = eMap.get(String(c.id));
+          if (!e?.done_on) { compRed++; continue; }
+          if (c.due_day) {
+            const [y2, m2] = lastM.split("-").map(Number);
+            const ny = m2 === 12 ? y2 + 1 : y2, nm = m2 === 12 ? 1 : m2 + 1;
+            const due = `${ny}-${String(nm).padStart(2, "0")}-${String(c.due_day).padStart(2, "0")}`;
+            if (String(e.done_on) > due) compAmber++;
+          }
+        }
+      } catch { /* calendar not installed yet */ }
+
+      // the loan clock
+      const { data: loans } = await admin.from("kuber_loan").select("outstanding, emi, status").limit(500).then((r) => ({ data: r.error ? [] : r.data }));
+      const emiMonthly = (loans || []).filter((x) => String(x.status) !== "closed").reduce((s2, x) => s2 + (Number(x.emi) || 0), 0);
+
+      const last = monthsList.length - 1;
+      const collGapThisMonth = series.billing[last] - series.collections[last];
+      return NextResponse.json({
+        today, months: monthsList, series,
+        actions: {
+          topOverdueCustomers: topOver("receivable"),
+          topOverdueSuppliers: topOver("payable"),
+          overdueReceivable: overRec,
+          unadjRec, unadjPay,
+          collGapThisMonth,
+          bgSoon: { count: bgSoon.length, amount: bgSoon.reduce((s2, b) => s2 + (Number(b.amount) || 0), 0) },
+          fdSoon: { count: fdSoon.length, amount: fdSoon.reduce((s2, b) => s2 + (Number(b.principal) || 0), 0) },
+          compRed, compAmber, emiMonthly,
+        },
+      });
+    }
+
     if (view === "ledgers") {
       const q = (url.searchParams.get("q") || "").trim();
       let query = admin.from("kuber_ledger").select("name, parent, opening, closing, loaded_at").order("name").limit(500);
@@ -1038,7 +1129,10 @@ export async function GET(req: Request) {
     const bills = await allBills(admin);
 
     // BANK & CASH — every ledger whose group chain reaches Bank Accounts,
-    // Bank OD or Cash-in-hand, at its Tally closing (as of the last upload).
+    // Bank OD or Cash-in-hand, COMPUTED as opening + every voucher line
+    // (28 Aug 2026: an evening masters export arrived with every closing
+    // zeroed — so the closing column is never trusted again; the books
+    // compute their own).
     let bankCash = 0;
     try {
       const { data: gs } = await admin.from("kuber_group").select("name, parent").limit(2000);
@@ -1053,10 +1147,22 @@ export async function GET(req: Request) {
         }
         return false;
       };
+      const bankNames: string[] = [];
       for (let f2 = 0; ; f2 += 1000) {
-        const { data } = await admin.from("kuber_ledger").select("parent, closing").order("name").range(f2, f2 + 999);
-        for (const l of data || []) if (isBankRoot(String(l.parent || ""))) bankCash += Number(l.closing) || 0;
+        const { data } = await admin.from("kuber_ledger").select("name, parent, opening").order("name").range(f2, f2 + 999);
+        for (const l of data || []) if (isBankRoot(String(l.parent || ""))) {
+          bankCash += Number(l.opening) || 0;
+          bankNames.push(String(l.name));
+        }
         if (!data || data.length < 1000) break;
+      }
+      for (let i = 0; i < bankNames.length; i += 80) {
+        const chunk = bankNames.slice(i, i + 80);
+        for (let f3 = 0; ; f3 += 1000) {
+          const { data } = await admin.from("kuber_voucher_line").select("amount").in("ledger", chunk).order("id").range(f3, f3 + 999);
+          for (const l of data || []) bankCash += Number(l.amount) || 0;
+          if (!data || data.length < 1000) break;
+        }
       }
     } catch { /* books not loaded yet */ }
     const rec = bills.filter((b) => b.kind === "receivable");

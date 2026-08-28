@@ -17,7 +17,7 @@ import ModuleMenu from "@/components/ModuleMenu";
 import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
 import KuberTasking from "@/components/kuber/Tasking";
-import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen, RatioScreen } from "@/components/kuber/Books";
+import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen, RatioScreen, CfoNoteScreen } from "@/components/kuber/Books";
 import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 import PlaybookScreen from "@/components/Playbook";
 import ComplianceCalendar from "@/components/kuber/Compliance";
@@ -53,6 +53,7 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
   {
     header: "STATEMENTS",
     items: [
+      { key: "cfonote", label: "CFO Note", icon: "✎" },
       { key: "pnl", label: "Profit & Loss", icon: "∑" },
       { key: "bs", label: "Balance Sheet", icon: "⚖" },
       { key: "ratios", label: "Ratio Analysis", icon: "∿" },
@@ -189,7 +190,7 @@ export default function Accounts({
               {g.header && navOpen && (
                 <button onClick={() => toggleGroup(g.header!)}
                   className="w-full text-left px-2.5 pt-2 pb-1 text-xs font-bold"
-                  style={{ color: "#8A94A0", letterSpacing: 1 }}>
+                  style={{ color: "#1B3A5C", letterSpacing: 1 }}>
                   {folded ? "▸ " : "▾ "}{g.header}
                 </button>
               )}
@@ -228,6 +229,7 @@ export default function Accounts({
           {openKey === "fundflow" && <FundFlowScreen />}
           {openKey === "ratios" && <RatioScreen />}
           {openKey === "compliance" && <ComplianceCalendar />}
+          {openKey === "cfonote" && <CfoNoteScreen go={go} />}
           {["bg", "fd", "insurance", "payplan", "cashitem", "loan"].includes(openKey) && <RegisterScreen kind={openKey} key={openKey} />}
           {openKey in STUBS && (
             <div className="bg-white rounded-lg border p-6" style={{ borderColor: "#E2E0DA", maxWidth: 720 }}>

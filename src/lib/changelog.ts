@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.9",
+    date: "2026-08-28",
+    module: "Kuber — the CFO Note, an honest bank balance, navy headings",
+    items: [
+      "THE CFO NOTE stands first under Statements (Dr Raghu, 28 Aug 2026): the Saturday read — computed fresh from the books each time it opens. Six months of BILLING vs COLLECTIONS and PURCHASES vs PAYMENTS drawn as trends with their directions named, the headline positions on top, and THE SATURDAY LIST beneath: numbered, ordered things to do — collect the month's gap, call the five biggest overdue names, tie the untied receipts, the red compliances, the BGs and FDs on the 60-day clock, the month's EMI load — every line a RULE FIRING ON THE BOOKS, never an opinion, each with its open→ door.",
+      "BANK & CASH is now COMPUTED — opening plus every voucher line — after tonight's masters export arrived with every closing zeroed. The closing column is never trusted again; the books compute their own. (The zeroed export is also why Bank & Cash read ₹0.00 — refresh and it stands.)",
+      "The sidebar's group headings wear DARK NAVY — clearly the handles they are.",
+    ],
+  },
+  {
     v: "3.31.0.8",
     date: "2026-08-28",
     module: "Kuber wears the company's mark",
