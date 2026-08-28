@@ -17,11 +17,26 @@ type Row = Record<string, unknown>;
  * POST — { action: "add", kind, id } · { action: "done", id } ·
  *        { action: "remove", id }. All against MY rows alone.
  */
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const me = await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
+
+    /**
+     * ?marks=1 — the light path for the deal board's icons: which deals sit
+     * in MY queue (red) and which I have already handled (green). Pairs
+     * only, no enrichment — the board asks on every load.
+     */
+    if (new URL(req.url).searchParams.get("marks")) {
+      const { data, error } = await db.from("prospect_queue")
+        .select("kind, ref_id, done_at").eq("added_by", me.email.toLowerCase()).limit(2000);
+      if (error) return NextResponse.json({ open: [], done: [] });
+      return NextResponse.json({
+        open: (data || []).filter((r) => !r.done_at).map((r) => `${r.kind}:${r.ref_id}`),
+        done: (data || []).filter((r) => r.done_at).map((r) => `${r.kind}:${r.ref_id}`),
+      });
+    }
 
     const { data: items, error } = await db
       .from("prospect_queue").select("id, kind, ref_id, added_at, done_at, note")

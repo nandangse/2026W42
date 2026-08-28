@@ -56,6 +56,15 @@ function Board({ onOpen }: { onOpen: (target: string, id: string) => void }) {
   const [data, setData] = useState<{ columns: Col[]; cards: Card[]; owners: Owner[]; sectors: Sector[] } | null>(null);
   const [err, setErr] = useState("");
   const [toast, setToast] = useState("");
+  /** deal → its place in MY queue: waiting lights the icon red, handled green. */
+  const [marks, setMarks] = useState<{ open: Set<string>; done: Set<string> }>({ open: new Set(), done: new Set() });
+  const loadMarks = () => {
+    fetch("/api/crm/prospect?marks=1").then(async (r) => {
+      const j = await r.json();
+      setMarks({ open: new Set(j.open || []), done: new Set(j.done || []) });
+    }).catch(() => {});
+  };
+  useEffect(() => { loadMarks(); }, []);
   const [overCol, setOverCol] = useState<string | null>(null);
   const drag = useRef<{ kind: Card["kind"]; id: string; from: string } | null>(null);
   const toastTimer = useRef<number | null>(null);
@@ -99,6 +108,7 @@ function Board({ onOpen }: { onOpen: (target: string, id: string) => void }) {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(String(j.error || r.status));
       say(j.already ? "Already in your prospecting queue" : "Added to your prospecting queue ✓");
+      loadMarks();
     } catch (e) {
       say(e instanceof Error ? e.message : String(e));
     }
@@ -244,19 +254,30 @@ function Board({ onOpen }: { onOpen: (target: string, id: string) => void }) {
                             <span style={{ fontSize: 9.5, color: MUTED }}>{sectorName.get(c.sector_id)?.code}</span>
                           )}
                         </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); queueCard(c); }}
-                          title="Save to my Prospecting Queue — it appears on the home screen, to dial one by one"
-                          aria-label="Save to my prospecting queue"
-                          style={{
-                            position: "absolute", right: 4, bottom: 3, width: 20, height: 20,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            borderRadius: 5, border: `1px solid ${BORDER}`, background: "#F7F8FB",
-                            color: NAVY, fontSize: 11, lineHeight: 1, cursor: "pointer",
-                          }}
-                        >
-                          ☎
-                        </button>
+                        {(() => {
+                          const mk = `${c.kind}:${c.id}`;
+                          const inQueue = marks.open.has(mk);
+                          const handled = !inQueue && marks.done.has(mk);
+                          return (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); queueCard(c); }}
+                              title={inQueue ? "In your Prospecting Queue — waiting for the call"
+                                : handled ? "Handled — this one was called from the queue"
+                                : "Save to my Prospecting Queue — it appears on the Dashboard, to dial one by one"}
+                              aria-label="Prospecting queue"
+                              style={{
+                                position: "absolute", right: 4, bottom: 3, width: 20, height: 20,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                borderRadius: 5, lineHeight: 1, cursor: "pointer", fontSize: 11,
+                                border: `1px solid ${inQueue ? "#B3261E" : handled ? GREEN : BORDER}`,
+                                background: inQueue ? "#B3261E" : handled ? GREEN : "#F7F8FB",
+                                color: inQueue || handled ? "#fff" : NAVY,
+                              }}
+                            >
+                              ☎
+                            </button>
+                          );
+                        })()}
                       </div>
                     ))}
                     {cs.length > cap && (

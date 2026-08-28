@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.26.0.1",
+    date: "2026-08-28",
+    module: "The queue icon tells its own story",
+    items: [
+      "THE ☎ ON EVERY DEAL CARD LIGHTS UP: RED while the deal waits in your prospecting queue, GREEN once you marked the call done — so a glance down the board says what is queued and what was handled, without opening anything. The hover text says which state it is in.",
+    ],
+  },
+  {
     v: "3.26.0.0",
     date: "2026-08-28",
     module: "CRM — the plan, the run rate, and Sales Genie comes home",
