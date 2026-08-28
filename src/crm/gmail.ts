@@ -123,18 +123,23 @@ export async function gmailGet(token: string, path: string): Promise<Record<stri
   return j;
 }
 
-/** Send: a simple RFC822 message, UTF-8, base64url. */
+/**
+ * Send: a simple RFC822 message, UTF-8, base64url. With `pixelUrl` set the
+ * mail becomes multipart/alternative — the same words as text and as HTML,
+ * the HTML carrying the 1x1 open-tracking pixel (Dr Raghu, 28 Aug 2026).
+ */
 export async function gmailSend(
   token: string, fromEmail: string, to: string, subject: string, body: string,
   cc?: string, bcc?: string, fromName?: string,
   reply?: { threadId?: string | null; inReplyTo?: string | null },
+  pixelUrl?: string | null,
 ): Promise<string> {
   // The sender reads as the PERSON, not the address — RFC 2047-encoded so
   // any script in the name survives the wire.
   const from = fromName
     ? `=?UTF-8?B?${Buffer.from(fromName).toString("base64")}?= <${fromEmail}>`
     : fromEmail;
-  const mime = [
+  const headers = [
     `From: ${from}`,
     `To: ${to}`,
     ...(cc ? [`Cc: ${cc}`] : []),
@@ -142,11 +147,40 @@ export async function gmailSend(
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
     ...(reply?.inReplyTo ? [`In-Reply-To: ${reply.inReplyTo}`, `References: ${reply.inReplyTo}`] : []),
     "MIME-Version: 1.0",
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
-    "",
-    Buffer.from(body).toString("base64"),
-  ].join("\r\n");
+  ];
+  let mime: string;
+  if (pixelUrl) {
+    const esc = body
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/\n/g, "<br>\n");
+    const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5">${esc}</div>` +
+      `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none">`;
+    const bd = "genie" + Date.now().toString(36);
+    mime = [
+      ...headers,
+      `Content-Type: multipart/alternative; boundary="${bd}"`,
+      "",
+      `--${bd}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      Buffer.from(body).toString("base64"),
+      `--${bd}`,
+      'Content-Type: text/html; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      Buffer.from(html).toString("base64"),
+      `--${bd}--`,
+    ].join("\r\n");
+  } else {
+    mime = [
+      ...headers,
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      Buffer.from(body).toString("base64"),
+    ].join("\r\n");
+  }
   const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },

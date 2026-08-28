@@ -64,7 +64,7 @@ export const SPECIAL_SECTIONS = [
   { name: "deals", label: "Deals", icon: "◆", blurb: "" },
   { name: "visitingcard", label: "Add Visiting Card", icon: "🪪", blurb: "" },
   { name: "integrations", label: "Integrations", icon: "🔌", blurb: "" },
-  { name: "emailqueue", label: "Email Queue", icon: "📮", blurb: "" },
+  { name: "emailqueue", label: "Email", icon: "📮", blurb: "" },
   { name: "waqueue", label: "WhatsApp Queue", icon: "💬", blurb: "" },
   { name: "communication", label: "Communication", icon: "✉", blurb: "Emails — automated, inbound and outbound, per user's own mailbox. Arrives with the channels phase." },
 ] as const;

@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.1",
+    date: "2026-08-28",
+    module: "CRM — the OnePage mail, the forecast, and the ratios per person",
+    items: [
+      "THE MAIL COMPOSER wears the OnePageCRM face: a New Message header, labelled To / From / Subject rows, the To searching the CRM's own contacts as you type, a VARIABLE picker dropping {{…}} at the cursor, the Template picker on the bottom bar beside the orange Send — and a TRACKING toggle: a pixel stamps the message when it is opened (CRM migration 0023). Everything the old box did — reply threading, Drive attachments, save-as-template — still works.",
+      "TOOLS → EMAIL is now the mail's home: ✉ New Email opens the composer from nowhere in particular, and an OPEN TRACKING tab shows every tracked send with when it was first opened and how many times — said plainly to be a signal, not a court record.",
+      "DEALS GROWS A FORECAST — the OnePage view: stage rows carrying an editable probability %, month columns from the expected close date, EXPECTED TOTAL (weighted) read against an editable monthly TARGET, red when short, a team-member filter, and slipped deals honestly in the current month. Weights and targets are the Sales Head's to set; everyone reads the same forecast.",
+      "ANALYTICS CUTS THE CONVERSIONS PER SALESPERSON — Opportunity→Quote, Quote→Order and end-to-end, the same three-station arithmetic now also as a swimlane per person, on the same date filters.",
+    ],
+  },
+  {
     v: "3.29.0.0",
     date: "2026-08-28",
     module: "Vishwakarma is born, and Kuber becomes a CFO's cockpit",

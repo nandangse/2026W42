@@ -48,9 +48,16 @@ export async function POST(req: Request) {
         + attachments.map((a) => `${a.name}: ${a.link}`).join("\n");
     }
 
+    // open tracking (0023): a random token becomes the pixel's name; the
+    // pixel rides an HTML alternative of the same words.
+    const track = !!b.track;
+    const trackToken = track ? crypto.randomUUID().replace(/-/g, "") : null;
+    const pixelUrl = trackToken ? `https://genie.nandan.co.in/api/crm/track/${trackToken}` : null;
+
     const token = await accessTokenFor(String(mb.id));
     const gmailId = await gmailSend(token, String(mb.email_address), to, subject, body, cc || undefined, bcc || undefined, user.displayName || undefined,
-      { threadId: b.thread_key ? String(b.thread_key) : null, inReplyTo: b.in_reply_to ? String(b.in_reply_to) : null });
+      { threadId: b.thread_key ? String(b.thread_key) : null, inReplyTo: b.in_reply_to ? String(b.in_reply_to) : null },
+      pixelUrl);
 
     const db = crmDb();
     await db.from("message").upsert([{
@@ -63,6 +70,7 @@ export async function POST(req: Request) {
       person_id: b.person_id ?? null, company_id: b.company_id ?? null,
       lead_id: b.lead_id ?? null, opportunity_id: b.opportunity_id ?? null,
       agent_profile_id: user.profileId,
+      ...(trackToken ? { track_token: trackToken } : {}),
     }], { onConflict: "channel,external_id", ignoreDuplicates: true });
 
     // A mail against a NEW opportunity is its first handling.

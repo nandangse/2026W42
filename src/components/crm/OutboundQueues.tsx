@@ -10,6 +10,7 @@
  * the words ready — that click is the moment it enters Communication.
  */
 import { useCallback, useEffect, useState } from "react";
+import MailComposer from "./MailComposer";
 import { NAVY, NAVY_SOFT, INK, MUTED, BORDER, ORANGE, GREEN } from "./palette";
 
 interface QItem {
@@ -23,13 +24,17 @@ interface SentMail { id: string; subject: string | null; body_text: string | nul
 
 const d10 = (s: unknown) => String(s || "").slice(0, 10);
 
+type TrackedMail = { id: string; subject: string; to_handles: string[]; occurred_at: string; opened_at: string | null; open_count: number };
+
 export function EmailQueue() { return <QueueScreen channel="email" />; }
 export function WhatsAppQueue() { return <QueueScreen channel="whatsapp" />; }
 
 function QueueScreen({ channel }: { channel: "email" | "whatsapp" }) {
-  const [tab, setTab] = useState<"queue" | "sent" | "auto">("queue");
+  const [tab, setTab] = useState<"queue" | "sent" | "auto" | "tracking">("queue");
   const [items, setItems] = useState<QItem[] | null>(null);
   const [sentMail, setSentMail] = useState<SentMail[] | null>(null);
+  const [tracked, setTracked] = useState<TrackedMail[] | null>(null);
+  const [compose, setCompose] = useState(false);
   const [needs, setNeeds] = useState(false);
   const [err, setErr] = useState("");
   const [edit, setEdit] = useState<QItem | null>(null);
@@ -40,21 +45,28 @@ function QueueScreen({ channel }: { channel: "email" | "whatsapp" }) {
       const j = await r.json();
       if (!r.ok) throw new Error(String(j.error || r.status));
       if (tab === "sent" && channel === "email") setSentMail(j.rows || []);
+      else if (tab === "tracking") { setTracked(j.rows || []); setNeeds(!!j.needsMigration); }
       else { setItems(j.items || []); setNeeds(!!j.needsMigration); }
     }).catch((e) => { setErr(e instanceof Error ? e.message : String(e)); setItems([]); setSentMail([]); });
   }, [channel, tab]);
   useEffect(() => { load(); }, [load]);
 
   const TABS: [typeof tab, string][] = channel === "email"
-    ? [["queue", "Queue"], ["sent", "Sent"], ["auto", "Automated send"]]
+    ? [["queue", "Queue"], ["sent", "Sent"], ["tracking", "Open tracking"], ["auto", "Automated send"]]
     : [["queue", "Queue"], ["sent", "Sent"]];
 
   return (
     <div style={{ maxWidth: 900 }}>
       <div className="flex items-center gap-2 mb-1">
         <h2 className="font-bold" style={{ fontSize: 17, color: INK }}>
-          {channel === "email" ? "✉ Email Queue" : "🟢 WhatsApp Queue"}
+          {channel === "email" ? "✉ Email" : "🟢 WhatsApp Queue"}
         </h2>
+        {channel === "email" && (
+          <button onClick={() => setCompose(true)}
+            className="rounded-full px-4 py-1.5 font-bold text-white" style={{ fontSize: 13, background: ORANGE }}>
+            ✉ New Email
+          </button>
+        )}
         {TABS.map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} className="rounded px-3 py-1 font-bold"
             style={{ fontSize: 12.5, background: tab === k ? NAVY : "#fff", color: tab === k ? "#fff" : MUTED, border: `1px solid ${tab === k ? NAVY : BORDER}` }}>
@@ -70,7 +82,48 @@ function QueueScreen({ channel }: { channel: "email" | "whatsapp" }) {
       {needs && <div className="text-xs rounded border p-2 mb-3" style={{ borderColor: "#F5D9A8", background: "#FFF7E6", color: "#8A5B00" }}>Run CRM migration 0022 — the queues have nowhere to live yet.</div>}
       {err && <div className="text-xs font-semibold mb-2" style={{ color: "#B3261E" }}>{err}</div>}
 
-      {tab === "sent" && channel === "email" ? (
+      {compose && (
+        <MailComposer
+          ctx={{ refs: {}, chain: [] }}
+          onClose={() => setCompose(false)}
+          onSent={() => { setCompose(false); load(); }}
+        />
+      )}
+      {tab === "tracking" && channel === "email" ? (
+        <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "68vh" }}>
+          <table className="w-full text-xs" style={{ minWidth: 640, borderCollapse: "separate", borderSpacing: 0 }}>
+            <thead>
+              <tr style={{ background: "#22303C", color: "#fff" }}>
+                {["Sent", "To", "Subject", "Opened", "Times"].map((h) => (
+                  <th key={h} className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {needs && (<tr><td colSpan={5} className="px-3 py-4" style={{ color: "#8A6D1A" }}>Run CRM migration 0023 first — the pixel has nowhere to write yet.</td></tr>)}
+              {tracked?.length === 0 && !needs && (<tr><td colSpan={5} className="px-3 py-4" style={{ color: MUTED }}>No tracked mail yet — the Tracking toggle in the composer starts this ledger.</td></tr>)}
+              {(tracked || []).map((m, i) => (
+                <tr key={m.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <td className="px-2 py-1.5 whitespace-nowrap" style={{ color: MUTED }}>
+                    {new Date(m.occurred_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  </td>
+                  <td className="px-2 py-1.5">{(m.to_handles || []).join(", ")}</td>
+                  <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.subject}</td>
+                  <td className="px-2 py-1.5 whitespace-nowrap">
+                    {m.opened_at
+                      ? <span className="font-bold" style={{ color: "#0D7A3F" }}>✓ {new Date(m.opened_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                      : <span style={{ color: MUTED }}>not yet</span>}
+                  </td>
+                  <td className="px-2 py-1.5 tnum">{m.open_count || 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="text-xs p-2" style={{ color: MUTED }}>
+            A signal, not a court record: Gmail&apos;s image proxy can open the pixel without a human, and text-only readers never do.
+          </div>
+        </div>
+      ) : tab === "sent" && channel === "email" ? (
         <div className="rounded-lg border" style={{ borderColor: BORDER, background: "#fff" }}>
           {(sentMail || []).map((m) => (
             <div key={m.id} className="px-3 py-2" style={{ borderBottom: "1px solid #F2F4F8" }}>

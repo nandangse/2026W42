@@ -224,7 +224,8 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
     if (pick !== null) {
       // The picker honours the same f_ filters as the list — a contact
       // picker on an opportunity searches only that company's people.
-      let pq = db.from(d.table).select(`id, ${d.titleField}`);
+      // the mail composer's To-picker needs the address beside the name
+      let pq = db.from(d.table).select(d.name === "person" ? `id, ${d.titleField}, primary_email` : `id, ${d.titleField}`);
       if (["company", "person", "opportunity"].includes(d.name)) pq = pq.is("deleted_at", null);
       for (const f of d.fields) {
         if (f.virtual) continue;
@@ -241,7 +242,11 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       if (error) throw new HttpError(500, error.message);
       const list = (data ?? []) as unknown as Record<string, unknown>[];
       return NextResponse.json({
-        options: list.map((r) => ({ id: String(r.id), label: String(r[d.titleField] ?? r.id) })),
+        options: list.map((r) => ({
+          id: String(r.id),
+          label: String(r[d.titleField] ?? r.id),
+          ...(r.primary_email ? { email: String(r.primary_email) } : {}),
+        })),
       });
     }
 

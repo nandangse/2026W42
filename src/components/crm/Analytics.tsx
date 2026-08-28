@@ -27,7 +27,9 @@ const pct = (num: number, den: number) =>
 
 export default function AnalyticsScreen() {
   const [range, setRange] = useState<DateRange>(DEFAULT_RANGE);
-  const [swim, setSwim] = useState(true);
+  // sector · person · all — the same three-station arithmetic, cut three ways
+  const [mode, setMode] = useState<"sector" | "person" | "all">("sector");
+  const swim = mode !== "all";
   const [showStages, setShowStages] = useState(false);
   const [lanes, setLanes] = useState<Lane[] | null>(null);
   const [all, setAll] = useState<Lane | null>(null);
@@ -35,14 +37,14 @@ export default function AnalyticsScreen() {
 
   useEffect(() => {
     setLanes(null); setErr("");
-    fetch(`/api/crm/analytics?from=${range.from}&to=${range.to}`, { cache: "no-store" })
+    fetch(`/api/crm/analytics?from=${range.from}&to=${range.to}${mode === "person" ? "&by=person" : ""}`, { cache: "no-store" })
       .then(async (r) => {
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || "Could not load analytics");
         setLanes(j.lanes); setAll(j.all);
       })
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
-  }, [range.from, range.to]);
+  }, [range.from, range.to, mode]);
 
   const shown: Lane[] = swim ? (lanes ?? []).filter((l) => l.opps + l.quotes + l.sos > 0) : all ? [all] : [];
 
@@ -52,16 +54,24 @@ export default function AnalyticsScreen() {
 
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <button
-          onClick={() => setSwim(true)}
+          onClick={() => setMode("sector")}
           className="px-3 py-1 rounded-full text-xs font-bold border"
-          style={swim ? { background: NAVY, borderColor: NAVY, color: "#fff" } : { background: "#fff", borderColor: BORDER, color: MUTED }}
+          style={mode === "sector" ? { background: NAVY, borderColor: NAVY, color: "#fff" } : { background: "#fff", borderColor: BORDER, color: MUTED }}
         >
           Swimlanes · Sector
         </button>
         <button
-          onClick={() => setSwim(false)}
+          onClick={() => setMode("person")}
           className="px-3 py-1 rounded-full text-xs font-bold border"
-          style={!swim ? { background: NAVY, borderColor: NAVY, color: "#fff" } : { background: "#fff", borderColor: BORDER, color: MUTED }}
+          title="The same conversions per salesperson — opportunity to quote, quote to order, end to end"
+          style={mode === "person" ? { background: NAVY, borderColor: NAVY, color: "#fff" } : { background: "#fff", borderColor: BORDER, color: MUTED }}
+        >
+          Swimlanes · Salesperson
+        </button>
+        <button
+          onClick={() => setMode("all")}
+          className="px-3 py-1 rounded-full text-xs font-bold border"
+          style={mode === "all" ? { background: NAVY, borderColor: NAVY, color: "#fff" } : { background: "#fff", borderColor: BORDER, color: MUTED }}
         >
           Show all
         </button>

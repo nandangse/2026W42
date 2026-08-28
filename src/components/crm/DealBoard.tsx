@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import ForecastView from "./Forecast";
 import { NAVY, NAVY_SOFT, INK, MUTED, BORDER, ORANGE, GREEN } from "./palette";
 import { DateRangeBar, DEFAULT_RANGE, type DateRange } from "./DateRange";
 
@@ -29,11 +30,11 @@ const fmtMoney = (n: number): string =>
   : `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 export default function DealsScreen({ onOpen }: { onOpen: (target: string, id: string) => void }) {
-  const [view, setView] = useState<"board" | "flow">("board");
+  const [view, setView] = useState<"board" | "flow" | "forecast">("board");
   return (
     <div>
       <div className="flex gap-1 rounded p-1 mb-3" style={{ background: "#fff", border: `1px solid ${BORDER}`, width: "fit-content" }}>
-        {([["board", "The Board"], ["flow", "Stage Flow"]] as const).map(([k, l]) => (
+        {([["board", "The Board"], ["forecast", "Forecast"], ["flow", "Stage Flow"]] as const).map(([k, l]) => (
           <button key={k} onClick={() => setView(k)}
             className="px-3 py-1 rounded text-sm font-bold"
             style={view === k ? { background: NAVY, color: "#fff" } : { color: MUTED }}>
@@ -41,7 +42,7 @@ export default function DealsScreen({ onOpen }: { onOpen: (target: string, id: s
           </button>
         ))}
       </div>
-      {view === "board" ? <Board onOpen={onOpen} /> : <FlowTable />}
+      {view === "board" ? <Board onOpen={onOpen} /> : view === "forecast" ? <ForecastView /> : <FlowTable />}
     </div>
   );
 }

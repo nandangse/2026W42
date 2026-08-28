@@ -61,6 +61,22 @@ export async function GET(req: Request) {
     const channel = u.searchParams.get("channel") === "whatsapp" ? "whatsapp" : "email";
     const tab = String(u.searchParams.get("tab") || "queue");
 
+    if (tab === "tracking" && channel === "email") {
+      // the tracked sends and what the pixel heard (0023)
+      let q = db.from("message")
+        .select("id, subject, to_handles, occurred_at, opened_at, open_count, agent_profile_id")
+        .eq("channel", "email").eq("direction", "outbound").not("track_token", "is", null)
+        .order("occurred_at", { ascending: false }).limit(150);
+      if (mineOnly && me.profileId) q = q.eq("agent_profile_id", me.profileId);
+      const { data, error } = await q;
+      if (error) {
+        if (/track_token|schema cache|does not exist/i.test(error.message))
+          return NextResponse.json({ rows: [], needsMigration: true });
+        throw new HttpError(500, error.message);
+      }
+      return NextResponse.json({ rows: data || [] });
+    }
+
     if (tab === "sent" && channel === "email") {
       // every mail Genie sent — the message log is the truth of what went
       let q = db.from("message")
