@@ -79,4 +79,31 @@ for (const p of await rows("job_photo", "id,job_id,path,caption,taken_on,mime"))
   } catch (e) { console.log("!! job_photo", p.id, String(e.message || e)); }
 }
 
+/**
+ * Kuber's Tally XML uploads (0075) — filed as "<date> - <INITIALS>/<kind>.xml"
+ * so the Drive folder alone answers who uploaded what and when.
+ *
+ * The destination: set KUBER_TALLY_DIR to the mounted path of the Drive
+ * folder Dr Raghu linked; until then they land in
+ * "Uploaded Files/Tally XML from Genie", which syncs to Drive all the same
+ * and can be moved or re-pointed without touching the rows.
+ */
+const TALLY = process.env.KUBER_TALLY_DIR || join(DRIVE, "Tally XML from Genie");
+let tallyCarried = 0;
+for (const u of await rows("kuber_upload", "id,kind,for_date,name,path,initials")) {
+  try {
+    if (!existsSync(TALLY)) mkdirSync(TALLY, { recursive: true });
+    const sub = join(TALLY, `${u.for_date} - ${u.initials || "??"}`);
+    if (!existsSync(sub)) mkdirSync(sub, { recursive: true });
+    const buf = await download("kuber-uploads", u.path);
+    const label = u.kind === "masters" ? "Tally XML Masters" : "Tally XML Transactions";
+    const dest = join(sub, `${label} - ${u.name}`);
+    writeFileSync(dest, buf);
+    await stamp("kuber_upload", u.id);
+    console.log("→", dest.replace(dirname(TALLY) + "/", ""));
+    carried++; tallyCarried++;
+  } catch (e) { console.log("!! kuber_upload", u.id, String(e.message || e)); }
+}
+if (tallyCarried) console.log(`Tally folder: ${TALLY}`);
+
 console.log(carried ? `${carried} carried to Drive.` : "Nothing new to carry.");

@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.28.0.1",
+    date: "2026-08-28",
+    module: "Kuber — the Tally XMLs walk in",
+    items: [
+      "UPLOAD FILES joins Kuber's sidebar, the way the other modules carry theirs: a DATE, two tiles — TALLY XML MASTERS and TALLY XML TRANSACTIONS — and beneath them the ledger of every upload: date, kind, file, WHO (initials), when, and whether it has reached Drive.",
+      "Every upload lands in Genie at once (kuber-uploads bucket, migration 0075) and the Drive sync files it on Google Drive inside a \"date – initials\" folder — 2026-08-28 - RJ — so the Drive alone answers who loaded what, forever. The audit is the folder name.",
+      "The door is the Kuber grant itself: whoever is ticked for Kuber may upload. Reading the XMLs into ledgers and vouchers is the next step, once the first pair arrives.",
+    ],
+  },
+  {
     v: "3.28.0.0",
     date: "2026-08-28",
     module: "Kuber is born, and the four doors go on one menu",
