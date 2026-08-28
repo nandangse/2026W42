@@ -132,11 +132,13 @@ export async function parseTransactionsInBrowser(file: File, sink: BatchSink, on
   const stamp = new Date().toISOString();
   const b = batcher(sink);
   const LEDGER_SETS = new Set(["ALLLEDGERENTRIES", "LEDGERENTRIES", "ACCOUNTINGALLOCATIONS"]);
+  const ITEM_SETS = new Set(["ALLINVENTORYENTRIES", "INVENTORYENTRIES", "INVENTORYENTRIESIN", "INVENTORYENTRIESOUT"]);
   let v: { id: string; date: string | null; vtype: string; vno: string; party: string; narration: string } | null = null;
   let inAlloc = false, otherDepth = 0;
   let alloc: Row | null = null;
   const stack: { id: string; voucher_id: string; ledger: string; amount: number }[] = [];
-  let vouchers = 0, lines = 0, allocs = 0;
+  let item: { voucher_id: string; item: string; qty: string; amount: number } | null = null;
+  let vouchers = 0, lines = 0, allocs = 0, items = 0;
   const listTag = (line: string) => {
     const m = line.match(/^<(\/?)([A-Z.]+)\.LIST[ >]/);
     if (!m) return null;
@@ -151,7 +153,7 @@ export async function parseTransactionsInBrowser(file: File, sink: BatchSink, on
     if (!v) return;
     if (line.startsWith("</VOUCHER>")) {
       b.push("kuber_voucher", { ...v, loaded_at: stamp });
-      vouchers++; v = null; stack.length = 0; inAlloc = false; otherDepth = 0;
+      vouchers++; v = null; stack.length = 0; inAlloc = false; otherDepth = 0; item = null;
       return;
     }
     if (inAlloc && alloc) {
@@ -183,6 +185,16 @@ export async function parseTransactionsInBrowser(file: File, sink: BatchSink, on
         }
         return;
       }
+      // the goods on the voucher — stock item, quantity, amount (0081)
+      if (ITEM_SETS.has(lt.name)) {
+        if (lt.close) {
+          if (item && item.item) { b.push("kuber_voucher_item", item as unknown as Row); items++; }
+          item = null;
+        } else {
+          item = { voucher_id: v.id, item: "", qty: "", amount: 0 };
+        }
+        return;
+      }
       if (stack.length) otherDepth += lt.close ? -1 : 1;
       if (otherDepth < 0) otherDepth = 0;
       return;
@@ -194,11 +206,17 @@ export async function parseTransactionsInBrowser(file: File, sink: BatchSink, on
       return;
     }
     if (stack.length) return;
+    if (item) {
+      const si = tagText(line, "STOCKITEMNAME"); if (si !== null) { item.item = si; return; }
+      const qy = tagText(line, "ACTUALQTY"); if (qy !== null) { item.qty = qy.trim(); return; }
+      const am = tagText(line, "AMOUNT"); if (am !== null && !item.amount) { item.amount = num(am); return; }
+      return;
+    }
     const d = tagText(line, "DATE"); if (d !== null && !v.date) { v.date = tallyDate(d); return; }
     const pn = tagText(line, "PARTYLEDGERNAME"); if (pn !== null) { v.party = pn; return; }
     const vn = tagText(line, "VOUCHERNUMBER"); if (vn !== null) { v.vno = vn; return; }
     const na = tagText(line, "NARRATION"); if (na !== null) { v.narration = na.slice(0, 500); return; }
   }, onProgress);
   await b.drain();
-  return { vouchers, lines, allocs };
+  return { vouchers, lines, allocs, items };
 }

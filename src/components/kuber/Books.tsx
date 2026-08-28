@@ -226,76 +226,251 @@ export function ReportCardScreen() {
 }
 
 /**
- * One supplier's own report card — the sheet's tab-B3 drilldown reborn:
- * the headline facts, the ageing, what was PAID in the last 7/30/45/90
- * days, and every open bill beneath.
+ * One supplier's FULL dossier (Dr Raghu, 28 Aug 2026) — tabs: the overview
+ * with TO PAY NOW and his fine ageing (0-15 … 360+), the outstanding bills,
+ * the invoices and payments as lists, the planned payments from the cash
+ * flow, the RECO STATUS grid (our Tally vs his ledger, FY by FY), and the
+ * ITEMS he supplies, read off his own vouchers.
  */
+const FY_LIST = ["2025-26", "2024-25", "2023-24", "2022-23", "2021-22", "2020-21", "2019-20", "2018-19", "2017-18", "2016-17"];
+const FINE_LABELS: [string, string][] = [
+  ["d0_15", "0–15"], ["d16_30", "16–30"], ["d31_60", "31–60"], ["d61_90", "61–90"],
+  ["d91_120", "91–120"], ["d121_180", "121–180"], ["d181_240", "181–240"],
+  ["d241_360", "241–360"], ["d360p", "360+"],
+];
+
+interface Dossier {
+  net: number; gross: number; unadjusted: number; overdue: number; overdue_pct: number;
+  weighted_delay: number; oldest_due: string | null; credit_days: number | null;
+  buckets: Record<string, number>;
+  paid: { d7: number; d30: number; d45: number; d90: number };
+  invoiced: { d7: number; d30: number; d45: number; d90: number };
+  vouchers: number; today: string;
+  payments: { date: string | null; amount: number; bill: string; vtype: string; vno: string }[];
+  invoices: { date: string | null; amount: number; bill: string; vtype: string; vno: string }[];
+  plans: { plan_date: string; amount: number; status: string; purpose: string; bill_ref: string }[];
+  items: { item: string; times: number; total: number; qty: string; last: string | null }[];
+  bills: { bill: string; bill_date: string | null; due_date: string | null; amount: number }[];
+}
+type RecoRow = { id?: string; party: string; fy: string; our_closing: number | null; their_closing: number | null; status: string; upto: string | null; note: string };
+
 function SupplierCard({ party, grade, onClose }: { party: string; grade: string; onClose: () => void }) {
   const { fmt: fmtMoney } = useMoneyFmt();
-  const [d, setD] = useState<{
-    net: number; gross: number; unadjusted: number; overdue: number; overdue_pct: number;
-    weighted_delay: number; oldest_due: string | null; credit_days: number | null;
-    buckets: Record<string, number>; paid: { d7: number; d30: number; d45: number; d90: number };
-    vouchers: number; today: string;
-    bills: { bill: string; bill_date: string | null; due_date: string | null; amount: number }[];
-  } | null>(null);
+  const [d, setD] = useState<Dossier | null>(null);
+  const [tab, setTab] = useState<"overview" | "bills" | "invoices" | "payments" | "plan" | "reco" | "items">("overview");
+  const [reco, setReco] = useState<RecoRow[] | null>(null);
+  const [recoMsg, setRecoMsg] = useState("");
+
   useEffect(() => {
     fetch(`/api/kuber/books?view=supplier&party=${encodeURIComponent(party)}`, { cache: "no-store" })
       .then((r) => r.json()).then(setD).catch(() => setD(null));
   }, [party]);
+  const loadReco = useCallback(() => {
+    fetch("/api/kuber/register?kind=reco", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setReco(((j.rows || []) as RecoRow[]).filter((r) => r.party === party)))
+      .catch(() => setReco([]));
+  }, [party]);
+  useEffect(() => { if (tab === "reco" && reco === null) loadReco(); }, [tab, reco, loadReco]);
+
+  const saveReco = async (row: RecoRow) => {
+    setRecoMsg("");
+    const r = await fetch("/api/kuber/register", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "reco", action: row.id ? "update" : "add", id: row.id, row }),
+    });
+    if (!r.ok) { setRecoMsg((await r.json()).error || "Could not save"); return; }
+    loadReco();
+  };
+
   const Fact = ({ k, v, c }: { k: string; v: string; c?: string }) => (
     <div><div className="text-xs font-bold" style={{ color: MUTED }}>{k}</div><div className="text-sm font-bold tnum" style={{ color: c || INK }}>{v}</div></div>
   );
+  const MiniTable = ({ head, children }: { head: string[]; children: React.ReactNode }) => (
+    <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+      <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+        {head.map((h, i) => (<th key={h} className={`px-2 py-1.5 text-${i === head.length - 1 ? "right" : "left"}`} style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>))}
+      </tr></thead>
+      <tbody>{children}</tbody>
+    </table>
+  );
+  const TABS: [typeof tab, string][] = [
+    ["overview", "Overview"], ["bills", "Outstanding"], ["invoices", "Invoices"],
+    ["payments", "Payments"], ["plan", "Payment Plan"], ["reco", "Reco Status"], ["items", "Items Supplied"],
+  ];
+
   return (
-    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)", zIndex: 60 }}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 760, maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-3" style={{ background: "rgba(0,0,0,0.45)", zIndex: 60 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 920, height: "calc(100vh - 40px)", display: "flex", flexDirection: "column" }}>
         <div className="flex items-center gap-3 px-4 py-3" style={{ background: "#22303C", borderRadius: "8px 8px 0 0" }}>
           <span className="rounded px-2 py-0.5 font-bold text-white" style={{ background: gradeColor[grade] ?? MUTED }}>{grade}</span>
           <div className="font-bold text-white" style={{ fontSize: 15 }}>{party}</div>
           <button onClick={onClose} className="ml-auto" style={{ color: "#8FA1B3" }}>✕</button>
         </div>
-        <div className="p-4 overflow-auto">
+        <div className="flex gap-1 px-3 pt-2 flex-wrap" style={{ borderBottom: `1px solid ${BORDER}` }}>
+          {TABS.map(([k, l]) => (
+            <button key={k} onClick={() => setTab(k)} className="px-3 py-1.5 text-xs font-bold rounded-t"
+              style={tab === k ? { background: "#22303C", color: "#fff" } : { color: MUTED }}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <div className="p-4 overflow-auto" style={{ flex: 1 }}>
           {!d ? <div className="text-sm" style={{ color: MUTED }}>Reading this supplier…</div> : (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                <Fact k="NET OUTSTANDING" v={fmtMoney(d.net)} c="#1B3A5C" />
-                <Fact k="BEYOND CREDIT PERIOD" v={`${fmtMoney(d.overdue)} · ${d.overdue_pct}%`} c={d.overdue ? RED : GREEN} />
-                <Fact k="WEIGHTED DELAY" v={d.weighted_delay ? `${d.weighted_delay} days` : "—"} />
-                <Fact k="CREDIT PERIOD (BILLS)" v={d.credit_days != null ? `${d.credit_days} days` : "—"} />
-                <Fact k="OLDEST DUE" v={fmtD(d.oldest_due)} c={d.oldest_due ? RED : INK} />
-                <Fact k="UNADJUSTED" v={d.unadjusted ? "−" + fmtMoney(-d.unadjusted) : "—"} c="#1B6B93" />
-                <Fact k="PAID — 30 / 90 DAYS" v={`${fmtMoney(d.paid.d30)} / ${fmtMoney(d.paid.d90)}`} c={GREEN} />
-                <Fact k="VOUCHERS THIS BOOK" v={String(d.vouchers)} />
-              </div>
-              <div className="flex gap-2 mb-3 flex-wrap">
-                {([["not_due", "Not due", MUTED], ["d0_30", "<30", INK], ["d31_90", "31–90", "#D97706"], ["d91_180", "91–180", RED], ["d180p", ">180", RED]] as const).map(([k, l, c]) => (
-                  <span key={k} className="rounded border px-2 py-1 text-xs font-semibold" style={{ borderColor: BORDER, color: c }}>
-                    {l}: <b className="tnum">{d.buckets[k] ? fmtMoney(d.buckets[k]) : "·"}</b>
-                  </span>
-                ))}
-              </div>
-              <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
-                <thead><tr style={{ background: "#22303C", color: "#fff" }}>
-                  {["Bill", "Billed", "Due", "Amount"].map((h, i2) => (<th key={h} className={`px-2 py-1.5 text-${i2 === 3 ? "right" : "left"}`}>{h}</th>))}
-                </tr></thead>
-                <tbody>
-                  {d.bills.map((b, i2) => (
-                    <tr key={i2} className="border-t" style={{ borderColor: "#EFEDE7", background: i2 % 2 ? "#FAF9F5" : "#fff" }}>
+              {tab === "overview" && (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <Fact k="O/S — NET" v={fmtMoney(d.net)} c="#1B3A5C" />
+                    <Fact k="TO PAY NOW (BEYOND CREDIT)" v={`${fmtMoney(d.overdue)} · ${d.overdue_pct}%`} c={d.overdue ? RED : GREEN} />
+                    <Fact k="WEIGHTED DELAY" v={d.weighted_delay ? `${d.weighted_delay} days` : "—"} />
+                    <Fact k="CREDIT PERIOD (HIS BILLS)" v={d.credit_days != null ? `${d.credit_days} days` : "—"} />
+                    <Fact k="OLDEST DUE" v={fmtD(d.oldest_due)} c={d.oldest_due ? RED : INK} />
+                    <Fact k="UNADJUSTED" v={d.unadjusted ? "−" + fmtMoney(-d.unadjusted) : "—"} c="#1B6B93" />
+                    <Fact k="PAID — 7/30/45/90 DAYS" v={`${fmtMoney(d.paid.d7)} · ${fmtMoney(d.paid.d30)} · ${fmtMoney(d.paid.d45)} · ${fmtMoney(d.paid.d90)}`} c={GREEN} />
+                    <Fact k="INVOICED — 7/30/45/90 DAYS" v={`${fmtMoney(d.invoiced.d7)} · ${fmtMoney(d.invoiced.d30)} · ${fmtMoney(d.invoiced.d45)} · ${fmtMoney(d.invoiced.d90)}`} />
+                  </div>
+                  <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>AGEING OF OUTSTANDING — DAYS SINCE BILL</div>
+                  <div className="flex gap-2 flex-wrap mb-3">
+                    {FINE_LABELS.map(([k, l]) => (
+                      <span key={k} className="rounded border px-2 py-1 text-xs font-semibold"
+                        style={{ borderColor: BORDER, color: ["d91_120", "d121_180"].includes(k) ? "#D97706" : ["d181_240", "d241_360", "d360p"].includes(k) ? RED : INK }}>
+                        {l}: <b className="tnum">{d.buckets[k] ? fmtMoney(d.buckets[k]) : "·"}</b>
+                      </span>
+                    ))}
+                    {d.buckets.undated > 0 && (
+                      <span className="rounded border px-2 py-1 text-xs font-semibold" style={{ borderColor: BORDER, color: MUTED }}>
+                        undated: <b className="tnum">{fmtMoney(d.buckets.undated)}</b>
+                      </span>
+                    )}
+                  </div>
+                  {d.plans.length > 0 && (
+                    <div className="rounded p-2 text-xs font-semibold" style={{ background: "#E9F5EC", color: "#0D7A3F" }}>
+                      Planned in the cash flow: {d.plans.map((pl) => `${fmtD(pl.plan_date)} — ${fmtMoney(pl.amount)} (${pl.status})`).join(" · ")}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {tab === "bills" && (
+                <MiniTable head={["Bill", "Billed", "Due", "Amount"]}>
+                  {d.bills.map((b, i) => (
+                    <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                       <td className="px-2 py-1">{b.bill}</td>
                       <td className="px-2 py-1 tnum">{fmtD(b.bill_date)}</td>
                       <td className="px-2 py-1 tnum" style={{ color: b.due_date && b.due_date < d.today ? RED : MUTED }}>{fmtD(b.due_date)}</td>
-                      <td className="px-2 py-1 text-right tnum" style={{ color: b.amount < 0 ? "#1B6B93" : INK }}>
-                        {b.amount < 0 ? "−" + fmtMoney(-b.amount) : fmtMoney(b.amount)}
-                      </td>
+                      <td className="px-2 py-1 text-right tnum" style={{ color: b.amount < 0 ? "#1B6B93" : INK }}>{b.amount < 0 ? "−" + fmtMoney(-b.amount) : fmtMoney(b.amount)}</td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
+                </MiniTable>
+              )}
+
+              {tab === "invoices" && (
+                <MiniTable head={["Date", "Bill / Ref", "Voucher", "Amount"]}>
+                  {d.invoices.length === 0 && (<tr><td colSpan={4} className="px-3 py-4" style={{ color: MUTED }}>No invoices inside this book&apos;s window.</td></tr>)}
+                  {d.invoices.map((x, i) => (
+                    <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                      <td className="px-2 py-1 tnum">{fmtD(x.date)}</td>
+                      <td className="px-2 py-1">{x.bill}</td>
+                      <td className="px-2 py-1" style={{ color: MUTED }}>{x.vtype} {x.vno}</td>
+                      <td className="px-2 py-1 text-right tnum">{fmtMoney(x.amount)}</td>
+                    </tr>
+                  ))}
+                </MiniTable>
+              )}
+
+              {tab === "payments" && (
+                <MiniTable head={["Date", "Against bill", "Voucher", "Amount"]}>
+                  {d.payments.length === 0 && (<tr><td colSpan={4} className="px-3 py-4" style={{ color: MUTED }}>No payments inside this book&apos;s window.</td></tr>)}
+                  {d.payments.map((x, i) => (
+                    <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                      <td className="px-2 py-1 tnum">{fmtD(x.date)}</td>
+                      <td className="px-2 py-1">{x.bill}</td>
+                      <td className="px-2 py-1" style={{ color: MUTED }}>{x.vtype} {x.vno}</td>
+                      <td className="px-2 py-1 text-right tnum" style={{ color: GREEN }}>{fmtMoney(x.amount)}</td>
+                    </tr>
+                  ))}
+                </MiniTable>
+              )}
+
+              {tab === "plan" && (
+                <>
+                  <div className="text-xs mb-2" style={{ color: MUTED }}>
+                    His rows from Payment Planning — the cash flow obeys these over his raw bills. Add and edit them on Kuber → Payment Planning with the party exactly as spelled here.
+                  </div>
+                  <MiniTable head={["Pay on", "Purpose", "Bill ref", "Status", "Amount"]}>
+                    {d.plans.length === 0 && (<tr><td colSpan={5} className="px-3 py-4" style={{ color: MUTED }}>Nothing planned for this supplier yet.</td></tr>)}
+                    {d.plans.map((x, i) => (
+                      <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                        <td className="px-2 py-1 tnum">{fmtD(x.plan_date)}</td>
+                        <td className="px-2 py-1">{x.purpose || "—"}</td>
+                        <td className="px-2 py-1" style={{ color: MUTED }}>{x.bill_ref || "—"}</td>
+                        <td className="px-2 py-1 font-semibold">{x.status}</td>
+                        <td className="px-2 py-1 text-right tnum">{fmtMoney(x.amount)}</td>
+                      </tr>
+                    ))}
+                  </MiniTable>
+                </>
+              )}
+
+              {tab === "reco" && (
+                <>
+                  <div className="text-xs mb-2" style={{ color: MUTED }}>
+                    Our Tally closing against the ledger THE SUPPLIER sent, year by year — his side is typed here, never guessed. Positive difference = books disagree.
+                  </div>
+                  {recoMsg && <div className="text-xs font-bold mb-1" style={{ color: RED }}>{recoMsg}</div>}
+                  <MiniTable head={["FY", "Ours (Tally)", "His ledger", "Difference", "Status", "Upto", ""]}>
+                    {FY_LIST.map((fy, i) => {
+                      const row = reco?.find((r) => r.fy === fy) ?? { party, fy, our_closing: null, their_closing: null, status: "", upto: null, note: "" };
+                      return <RecoLine key={fy} row={row} zebra={i % 2 === 1} onSave={saveReco} fmtMoney={fmtMoney} />;
+                    })}
+                  </MiniTable>
+                </>
+              )}
+
+              {tab === "items" && (
+                <MiniTable head={["Item", "Times", "Last supplied", "Last qty", "Total value"]}>
+                  {d.items.length === 0 && (<tr><td colSpan={5} className="px-3 py-4" style={{ color: MUTED }}>No item lines on his vouchers in this book — service and expense suppliers show nothing here (run migration 0081 and re-upload Transactions once, if not done).</td></tr>)}
+                  {d.items.map((x, i) => (
+                    <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                      <td className="px-2 py-1 font-semibold">{x.item}</td>
+                      <td className="px-2 py-1 tnum">{x.times}</td>
+                      <td className="px-2 py-1 tnum">{fmtD(x.last)}</td>
+                      <td className="px-2 py-1" style={{ color: MUTED }}>{x.qty || "—"}</td>
+                      <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(x.total)}</td>
+                    </tr>
+                  ))}
+                </MiniTable>
+              )}
             </>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+/** One FY row of the reco grid — editable in place, saved per line. */
+function RecoLine({ row, zebra, onSave, fmtMoney }: {
+  row: RecoRow; zebra: boolean; onSave: (r: RecoRow) => void; fmtMoney: (v: number | null | undefined) => string;
+}) {
+  const [f, setF] = useState(row);
+  useEffect(() => { setF(row); }, [row]);
+  const dirty = JSON.stringify(f) !== JSON.stringify(row);
+  const diff = (Number(f.our_closing) || 0) - (Number(f.their_closing) || 0);
+  const has = f.our_closing != null || f.their_closing != null || f.status;
+  return (
+    <tr className="border-t" style={{ borderColor: "#EFEDE7", background: zebra ? "#FAF9F5" : "#fff" }}>
+      <td className="px-2 py-1 font-bold">{f.fy}</td>
+      <td className="px-2 py-1"><input type="number" value={f.our_closing ?? ""} onChange={(e) => setF({ ...f, our_closing: e.target.value === "" ? null : Number(e.target.value) })} className="border rounded px-1 py-0.5 text-right tnum w-28" style={{ borderColor: BORDER }} /></td>
+      <td className="px-2 py-1"><input type="number" value={f.their_closing ?? ""} onChange={(e) => setF({ ...f, their_closing: e.target.value === "" ? null : Number(e.target.value) })} className="border rounded px-1 py-0.5 text-right tnum w-28" style={{ borderColor: BORDER }} /></td>
+      <td className="px-2 py-1 text-right tnum font-bold" style={{ color: has && Math.abs(diff) > 0.5 ? RED : GREEN }}>{has ? fmtMoney(diff) : "·"}</td>
+      <td className="px-2 py-1"><input value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })} placeholder="Reco till… / Mismatch / Not received" className="border rounded px-1 py-0.5 w-44" style={{ borderColor: BORDER }} /></td>
+      <td className="px-2 py-1"><input type="date" value={f.upto ?? ""} onChange={(e) => setF({ ...f, upto: e.target.value || null })} className="border rounded px-1 py-0.5" style={{ borderColor: BORDER }} /></td>
+      <td className="px-2 py-1 text-right">
+        {dirty && <button onClick={() => onSave(f)} className="text-xs font-bold rounded px-2 py-0.5 text-white" style={{ background: "#E8600A" }}>💾</button>}
+      </td>
+    </tr>
   );
 }
 

@@ -28,6 +28,10 @@ const KINDS: Record<string, { table: string; fields: string[]; order: string }> 
     table: "kuber_payment_plan", order: "plan_date",
     fields: ["plan_date", "party", "amount", "purpose", "bill_ref", "status", "paid_on", "note"],
   },
+  reco: {
+    table: "kuber_supplier_reco", order: "fy",
+    fields: ["party", "fy", "our_closing", "their_closing", "status", "upto", "note"],
+  },
   cashitem: {
     table: "kuber_cash_item", order: "date",
     fields: ["date", "direction", "label", "amount", "weekly", "note"],
@@ -85,7 +89,7 @@ export async function POST(req: Request) {
     }
     // text columns are not-null-default-'' — put the empties back
     for (const [key, v] of Object.entries(row))
-      if (v === null && !/date|amount|premium|principal|rate|margin|sum_insured|paid_on|weekly/.test(key)) row[key] = "";
+      if (v === null && !/date|amount|premium|principal|rate|margin|sum_insured|paid_on|weekly|closing|upto/.test(key)) row[key] = "";
 
     if (body.action === "add") {
       const { error } = await admin.from(k.table).insert({ ...row, by: user.email });

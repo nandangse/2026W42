@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.9",
+    date: "2026-08-28",
+    module: "Kuber — the supplier dossier, complete",
+    items: [
+      "The supplier card became the FULL dossier Dr Raghu specified, in tabs: OVERVIEW with To-Pay-Now, paid-in and invoiced-in 7/30/45/90 windows and his fine ageing (0-15 · 16-30 · 31-60 · 61-90 · 91-120 · 121-180 · 181-240 · 241-360 · 360+ days since bill); OUTSTANDING bills; INVOICES and PAYMENTS as dated lists off the settlement records; PAYMENT PLAN — his rows from the cash flow's own decisions.",
+      "RECO STATUS — the vendor-reconciliation grid reborn from the sheet: our Tally closing against the ledger THE SUPPLIER sent, FY by FY from 2016-17 to 2025-26, difference computed and red when the books disagree, status and reconciled-upto typed in place and saved per line (migration 0081 — the supplier's side lives outside Tally and is never touched by an upload).",
+      "ITEMS SUPPLIED — the parser now reads the goods off every voucher's inventory entries (stock item, quantity, amount; migration 0081), and the tab ranks what this supplier actually sells us: times, last supplied, last quantity, total value. Re-upload Transactions once to fill it.",
+    ],
+  },
+  {
     v: "3.29.0.8",
     date: "2026-08-28",
     module: "Kuber — the report card gets its headlines, and every supplier his own page",

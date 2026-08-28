@@ -176,25 +176,94 @@ export async function GET(req: Request) {
       const overdueB = posB.filter((b) => b.due_date && b.due_date < today);
       const overdue = overdueB.reduce((s, b) => s + b.amount, 0);
       const wsum = overdueB.reduce((s, b) => s + daysBetween(b.due_date as string, today) * b.amount, 0);
-      const buckets = { not_due: 0, d0_30: 0, d31_90: 0, d91_180: 0, d180p: 0 } as Record<string, number>;
-      for (const b of posB) buckets[bucketOf(b.due_date, today)] += b.amount;
+      // the fine ageing HE specified: 0-15 · 16-30 · 31-60 · 61-90 · 91-120 ·
+      // 121-180 · 181-240 · 241-360 · 360+ — days since the BILL date.
+      const FINE: [string, number, number][] = [
+        ["d0_15", 0, 15], ["d16_30", 16, 30], ["d31_60", 31, 60], ["d61_90", 61, 90],
+        ["d91_120", 91, 120], ["d121_180", 121, 180], ["d181_240", 181, 240],
+        ["d241_360", 241, 360], ["d360p", 361, 1e9],
+      ];
+      const buckets: Record<string, number> = Object.fromEntries(FINE.map(([k]) => [k, 0]));
+      buckets.undated = 0;
+      for (const b of posB) {
+        if (!b.bill_date) { buckets.undated += b.amount; continue; }
+        const d = daysBetween(b.bill_date, today);
+        const f = FINE.find(([, lo, hi]) => d >= lo && d <= hi);
+        buckets[f ? f[0] : "d360p"] += b.amount;
+      }
       // credit period as the bills themselves wear it (due − bill date)
       const periods = posB.filter((b) => b.bill_date && b.due_date).map((b) => daysBetween(b.bill_date as string, b.due_date as string));
       const creditDays = periods.length ? Math.round(periods.reduce((a, b) => a + b, 0) / periods.length) : null;
-      // payments: negative allocations on this ledger, by recency window
+      // the movement ledgers: negative allocations = payments OUT to the
+      // supplier; positive New Refs = invoices booked IN from him.
       const paid = { d7: 0, d30: 0, d45: 0, d90: 0 };
+      const invoiced = { d7: 0, d30: 0, d45: 0, d90: 0 };
+      const payments: { date: string | null; amount: number; bill: string; vtype: string; vno: string }[] = [];
+      const invoices: { date: string | null; amount: number; bill: string; vtype: string; vno: string }[] = [];
       try {
-        const { data: al } = await admin.from("kuber_bill_alloc").select("amount, date").eq("ledger", party).limit(5000);
+        const { data: al } = await admin.from("kuber_bill_alloc").select("amount, date, bill, billtype, voucher_id").eq("ledger", party).limit(5000);
+        const vids = [...new Set((al || []).map((a) => String(a.voucher_id)).filter(Boolean))];
+        const vinfo = new Map<string, { vtype: string; vno: string }>();
+        for (let i = 0; i < vids.length; i += 200) {
+          const { data: vs } = await admin.from("kuber_voucher").select("id, vtype, vno").in("id", vids.slice(i, i + 200));
+          for (const vv of vs || []) vinfo.set(String(vv.id), { vtype: String(vv.vtype), vno: String(vv.vno) });
+        }
         for (const a of al || []) {
           const amt = Number(a.amount) || 0;
-          if (amt >= 0 || !a.date) continue; // negative = money going out to the supplier
-          const d = daysBetween(String(a.date), today);
-          if (d <= 7) paid.d7 -= amt;
-          if (d <= 30) paid.d30 -= amt;
-          if (d <= 45) paid.d45 -= amt;
-          if (d <= 90) paid.d90 -= amt;
+          const vi = vinfo.get(String(a.voucher_id)) || { vtype: "", vno: "" };
+          const rec = { date: (a.date as string) ?? null, bill: String(a.bill || ""), vtype: vi.vtype, vno: vi.vno };
+          if (amt < 0) {
+            payments.push({ ...rec, amount: -amt });
+            if (a.date) {
+              const d = daysBetween(String(a.date), today);
+              if (d <= 7) paid.d7 -= amt;
+              if (d <= 30) paid.d30 -= amt;
+              if (d <= 45) paid.d45 -= amt;
+              if (d <= 90) paid.d90 -= amt;
+            }
+          } else if (amt > 0 && /new ref/i.test(String(a.billtype))) {
+            invoices.push({ ...rec, amount: amt });
+            if (a.date) {
+              const d = daysBetween(String(a.date), today);
+              if (d <= 7) invoiced.d7 += amt;
+              if (d <= 30) invoiced.d30 += amt;
+              if (d <= 45) invoiced.d45 += amt;
+              if (d <= 90) invoiced.d90 += amt;
+            }
+          }
         }
+        payments.sort((x, y) => String(y.date || "").localeCompare(String(x.date || "")));
+        invoices.sort((x, y) => String(y.date || "").localeCompare(String(x.date || "")));
       } catch { /* allocs absent — the card stands without them */ }
+      // planned payments for this party — the cash flow's own decisions
+      let plans: { plan_date: string; amount: number; status: string; purpose: string; bill_ref: string }[] = [];
+      try {
+        const { data: pl } = await admin.from("kuber_payment_plan").select("plan_date, amount, status, purpose, bill_ref").eq("party", party).neq("status", "dropped").order("plan_date");
+        plans = (pl || []) as typeof plans;
+      } catch { /* pre-0076 */ }
+      // items supplied — the goods on this party's vouchers (0081)
+      let items: { item: string; times: number; total: number; qty: string; last: string | null }[] = [];
+      try {
+        const { data: pv } = await admin.from("kuber_voucher").select("id, date").eq("party", party).limit(2000);
+        const vdate = new Map((pv || []).map((x) => [String(x.id), (x.date as string) ?? null]));
+        const ids = [...vdate.keys()];
+        const byItem = new Map<string, { times: number; total: number; qtys: string[]; last: string | null }>();
+        for (let i = 0; i < ids.length; i += 200) {
+          const { data: it } = await admin.from("kuber_voucher_item").select("voucher_id, item, qty, amount").in("voucher_id", ids.slice(i, i + 200));
+          for (const x of it || []) {
+            const r = byItem.get(String(x.item)) || { times: 0, total: 0, qtys: [], last: null };
+            r.times += 1;
+            r.total += Math.abs(Number(x.amount) || 0);
+            if (x.qty) r.qtys.push(String(x.qty));
+            const dte = vdate.get(String(x.voucher_id)) ?? null;
+            if (dte && (!r.last || dte > r.last)) r.last = dte;
+            byItem.set(String(x.item), r);
+          }
+        }
+        items = [...byItem.entries()]
+          .map(([item, r]) => ({ item, times: r.times, total: r.total, qty: r.qtys.slice(-1)[0] || "", last: r.last }))
+          .sort((a, b2) => b2.total - a.total);
+      } catch { /* pre-0081 or masters-only */ }
       let vouchers = 0;
       try {
         const { count } = await admin.from("kuber_voucher").select("id", { count: "exact", head: true }).eq("party", party);
@@ -205,7 +274,8 @@ export async function GET(req: Request) {
         party, today, net, gross, unadjusted, overdue,
         overdue_pct: gross > 0 ? Math.round((overdue / gross) * 100) : 0,
         weighted_delay: overdue > 0 ? Math.round(wsum / overdue) : 0,
-        oldest_due: oldest, credit_days: creditDays, buckets, paid, vouchers,
+        oldest_due: oldest, credit_days: creditDays, buckets, paid, invoiced, vouchers,
+        payments: payments.slice(0, 200), invoices: invoices.slice(0, 200), plans, items: items.slice(0, 100),
         bills: bills.sort((a, b2) => String(a.due_date || "9999").localeCompare(String(b2.due_date || "9999"))),
       });
     }

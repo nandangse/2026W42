@@ -24,10 +24,11 @@ const TABLES: Record<string, string[]> = {
   kuber_voucher: ["id", "date", "vtype", "vno", "party", "narration", "loaded_at"],
   kuber_voucher_line: ["id", "voucher_id", "ledger", "amount"],
   kuber_bill_alloc: ["voucher_id", "ledger", "bill", "billtype", "amount", "credit_days", "date"],
+  kuber_voucher_item: ["voucher_id", "item", "qty", "amount"],
 };
 const SIDE: Record<string, string[]> = {
   masters: ["kuber_group", "kuber_ledger", "kuber_opening_bill"],
-  transactions: ["kuber_voucher", "kuber_voucher_line", "kuber_bill_alloc"],
+  transactions: ["kuber_voucher", "kuber_voucher_line", "kuber_bill_alloc", "kuber_voucher_item"],
 };
 
 const addDays = (iso: string, d: number) => {
@@ -61,6 +62,8 @@ export async function POST(req: Request) {
         if (error && !/does not exist|schema cache/i.test(error.message)) throw new Error(error.message);
         if (error && t === "kuber_group")
           throw new HttpError(503, "Run migration 0079 first — the group tree has nowhere to live yet.");
+        if (error && t === "kuber_voucher_item")
+          throw new HttpError(503, "Run migration 0081 first — the voucher items have nowhere to live yet.");
         if (error) throw new HttpError(503, "Run migration 0076 first — Kuber's book tables don't exist yet.");
       }
       return NextResponse.json({ ok: true });
@@ -171,7 +174,7 @@ export async function POST(req: Request) {
       const fmtN = (n: unknown) => Number(n ?? 0).toLocaleString("en-IN");
       const takenIn = String(body.kind) === "masters"
         ? `${fmtN(c.groups)} groups · ${fmtN(c.ledgers)} ledgers · ${fmtN(c.bills)} opening bills`
-        : `${fmtN(c.vouchers)} vouchers · ${fmtN(c.lines)} lines · ${fmtN(c.allocs)} bill refs`;
+        : `${fmtN(c.vouchers)} vouchers · ${fmtN(c.lines)} lines · ${fmtN(c.allocs)} bill refs · ${fmtN(c.items)} item lines`;
       const row = {
         kind: String(body.kind), for_date: String(body.for_date || "").slice(0, 10) || new Date().toISOString().slice(0, 10),
         name: String(body.name || "browser upload").slice(0, 120),
