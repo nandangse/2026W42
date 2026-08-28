@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.8",
+    date: "2026-08-28",
+    module: "Kuber wears the company's mark",
+    items: [
+      "The header leads with the NANDAN LOGO in its white tile — the HRMS way — with KUBER GENIE beside it (Dr Raghu, 28 Aug 2026). The moneybag emoji retires.",
+    ],
+  },
+  {
     v: "3.31.0.7",
     date: "2026-08-28",
     module: "Kuber — the MIS statement, the Ratio sheet, the Compliance Calendar",
