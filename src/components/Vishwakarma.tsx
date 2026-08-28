@@ -373,35 +373,218 @@ function RefBox({ row, onClose, onSaved }: { row: Row | null; onClose: () => voi
 
 // ============================ DESIGN PLANS ============================
 const PLAN_STATUS = { pending: MUTED, in_progress: "#1B6B93", done: GREEN };
+/**
+ * The Design Plans PROJECT grid (Dr Raghu, 28 Aug 2026): "Project (Design
+ * Stage on next line as a drop down) — Jobs (all jobs one per line) — Design
+ * Owner — Project Plan (lightbox popup) — Next Milestone — No of Issues to
+ * Design — Issues — Design Support needed."
+ */
+interface ProjRow {
+  id: string; mgr: string; erp_stage: string; description: string;
+  design_stage: string; design_owner: string; support_needed: string;
+  jobs: { id: string; tag: string }[];
+  next: { title: string; job: string | null } | null; done: number; total: number;
+  issues: { id: string; title: string; status: string; open: boolean }[];
+  deliverables: Row[];
+}
 function PlansScreen() {
-  const [rows, jobs, installed, load] = useReg("plan");
-  const [open, setOpen] = useState<Row | "new" | null>(null);
+  const [data, setData] = useState<{ installed: boolean; stages: string[]; owners: string[]; rows: ProjRow[] } | null>(null);
+  const [planFor, setPlanFor] = useState<ProjRow | null>(null);
+  const [addDeliv, setAddDeliv] = useState<Row | "new" | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [sort, setSort] = useState<{ k: "id" | "design_owner" | "nIssues" | "jobs"; d: 1 | -1 }>({ k: "id", d: 1 });
+  const [, jobsList, , reloadReg] = useReg("plan");
+
+  const load = useCallback(() => {
+    fetch("/api/vishwakarma/projects", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setData(j.rows ? j : { installed: j.installed !== false, stages: [], owners: [], rows: [] }))
+      .catch(() => setData({ installed: true, stages: [], owners: [], rows: [] }));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const save = async (pid: string, patch: Record<string, string>) => {
+    await fetch("/api/vishwakarma/projects", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project_id: pid, patch }),
+    });
+    load();
+  };
+
+  const rows = [...(data?.rows || [])].sort((a, b) => {
+    const v = sort.k === "nIssues" ? a.issues.filter((x) => x.open).length - b.issues.filter((x) => x.open).length
+      : sort.k === "jobs" ? a.jobs.length - b.jobs.length
+      : String(a[sort.k]).localeCompare(String(b[sort.k]));
+    return v * sort.d;
+  });
+  const Hd = ({ k, children }: { k: typeof sort.k; children: React.ReactNode }) => (
+    <th className="px-2 py-2 text-left whitespace-nowrap" onClick={() => setSort((s2) => ({ k, d: s2.k === k ? (s2.d === 1 ? -1 : 1) : 1 }))}
+      style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}>
+      {children}{sort.k === k ? (sort.d === 1 ? " ▲" : " ▼") : ""}
+    </th>
+  );
+
+  return (
+    <Shell installed={data?.installed !== false} title="Design Plans" onAdd={() => setAddDeliv("new")} addLabel="+ Add a deliverable"
+      blurb="One row per live project: design's stage and owner on it, its jobs, the plan and next milestone, and what the problems register holds against it. Stage, owner and support save as you set them.">
+      {data?.installed === false && (
+        <div className="rounded p-3 text-sm font-semibold mb-2" style={{ background: "#FCF6E8", color: "#8A6D1A" }}>
+          Run migration 0085 too — the project grid saves its stage, owner and support there.
+        </div>
+      )}
+      <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "72vh" }}>
+        <table className="w-full text-xs" style={{ minWidth: 1180, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+            <Hd k="id">Project · design stage</Hd>
+            <Hd k="jobs">Jobs</Hd>
+            <Hd k="design_owner">Design Owner</Hd>
+            <Th>Project Plan</Th>
+            <Th>Next Milestone</Th>
+            <Hd k="nIssues">Issues to Design</Hd>
+            <Th>Issues</Th>
+            <Th>Design Support needed</Th>
+          </tr></thead>
+          <tbody>
+            {data && rows.length === 0 && (
+              <tr><td colSpan={8} className="px-3 py-5 text-center" style={{ color: MUTED }}>
+                No live projects — a project appears here the moment an active job stands on it.
+              </td></tr>
+            )}
+            {!data && (<tr><td colSpan={8} className="px-3 py-5 text-center" style={{ color: MUTED }}>loading…</td></tr>)}
+            {rows.map((p, i) => {
+              const openIssues = p.issues.filter((x) => x.open);
+              return (
+                <tr key={p.id} className="border-t align-top" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <td className="px-2 py-2" style={{ minWidth: 170 }}>
+                    <div className="font-bold" style={{ color: INK }}>{p.id}</div>
+                    {p.mgr && <div style={{ color: MUTED, fontSize: 10 }}>PM: {p.mgr}</div>}
+                    <select value={p.design_stage} onChange={(e) => void save(p.id, { design_stage: e.target.value })}
+                      className="mt-1 border rounded px-1 py-0.5 text-xs bg-white w-full"
+                      style={{ borderColor: p.design_stage ? BORDER : ORANGE, fontWeight: 700, color: p.design_stage ? INK : MUTED }}>
+                      <option value="">design stage…</option>
+                      {(data?.stages || []).map((st) => (<option key={st}>{st}</option>))}
+                    </select>
+                  </td>
+                  <td className="px-2 py-2 whitespace-nowrap" style={{ lineHeight: 1.7 }}>
+                    {p.jobs.map((j) => (<div key={j.id}><b>{j.id.slice(-4)}</b> <span style={{ color: "#5A6672" }}>{j.tag}</span></div>))}
+                  </td>
+                  <td className="px-2 py-2" style={{ minWidth: 120 }}>
+                    <select value={p.design_owner} onChange={(e) => void save(p.id, { design_owner: e.target.value })}
+                      className="border rounded px-1 py-0.5 text-xs bg-white w-full" style={{ borderColor: BORDER }}>
+                      <option value="">—</option>
+                      {(data?.owners || []).map((o) => (<option key={o}>{o}</option>))}
+                      {p.design_owner && !(data?.owners || []).includes(p.design_owner) && <option>{p.design_owner}</option>}
+                    </select>
+                  </td>
+                  <td className="px-2 py-2 whitespace-nowrap">
+                    <button onClick={() => setPlanFor(p)} className="rounded border px-2 py-1 font-bold" style={{ borderColor: BORDER, color: "#1B6B93" }}>
+                      ▤ Plan{p.total > 0 && <span style={{ color: MUTED, fontWeight: 400 }}> · {p.done}/{p.total}</span>}
+                    </button>
+                  </td>
+                  <td className="px-2 py-2" style={{ maxWidth: 170 }}>
+                    {p.next ? (<span><b>{p.next.title}</b>{p.next.job && <span style={{ color: MUTED }}> — job {p.next.job}</span>}</span>)
+                      : p.total > 0 ? <span style={{ color: GREEN, fontWeight: 700 }}>all milestones done</span>
+                      : <span style={{ color: MUTED }}>no plan yet</span>}
+                  </td>
+                  <td className="px-2 py-2 text-center font-bold tnum" style={{ color: openIssues.length ? RED : GREEN, fontSize: 14 }}>
+                    {openIssues.length}
+                  </td>
+                  <td className="px-2 py-2" style={{ maxWidth: 200, lineHeight: 1.6 }}>
+                    {openIssues.length === 0 && <span style={{ color: MUTED }}>—</span>}
+                    {openIssues.slice(0, 3).map((x) => (
+                      <div key={x.id} style={{ cursor: "pointer" }} title={`${x.status} — open in Problems`}
+                        onClick={() => { window.location.hash = "problems"; }}>
+                        • {x.title}
+                      </div>
+                    ))}
+                    {openIssues.length > 3 && <div style={{ color: MUTED }}>… {openIssues.length - 3} more</div>}
+                  </td>
+                  <td className="px-2 py-2" style={{ minWidth: 160 }}>
+                    <input
+                      value={drafts[p.id] ?? p.support_needed}
+                      placeholder="what design needs…"
+                      onChange={(e) => setDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
+                      onBlur={(e) => { if (e.target.value !== p.support_needed) void save(p.id, { support_needed: e.target.value }); }}
+                      className="w-full border rounded px-1.5 py-1 text-xs" style={{ borderColor: (drafts[p.id] ?? p.support_needed) ? ORANGE : BORDER }}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {planFor && <ProjectPlanBox p={planFor} onClose={() => setPlanFor(null)} onEditDeliv={(r) => { setPlanFor(null); setAddDeliv(r); }} />}
+      {addDeliv && <PlanBox row={addDeliv === "new" ? null : addDeliv} jobs={jobsList} onClose={() => setAddDeliv(null)} onSaved={() => { setAddDeliv(null); reloadReg(); load(); }} />}
+    </Shell>
+  );
+}
+
+/** The Project Plan, worn as a lightbox: the planning layer's milestones
+ *  (project-level when planned there, else its jobs' plans), then design's
+ *  own deliverables on the project. */
+function ProjectPlanBox({ p, onClose, onEditDeliv }: { p: ProjRow; onClose: () => void; onEditDeliv: (r: Row) => void }) {
   const today = TODAY();
   return (
-    <Shell installed={installed} title="Design Plans" onAdd={() => setOpen("new")} addLabel="+ Add a deliverable"
-      blurb="What design owes each job, by when — drawings, BOMs, calculations, approvals. The date is a promise; late turns red by itself.">
-      <Box>
-        <thead><tr style={{ background: "#22303C", color: "#fff" }}>
-          <Th>Status</Th><Th>Job</Th><Th>Deliverable</Th><Th>Owner</Th><Th>Target</Th>
-        </tr></thead>
-        <tbody>
-          {rows?.length === 0 && (<tr><td colSpan={5} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing planned — the first deliverable starts the promise-keeping.</td></tr>)}
-          {(rows || []).map((r, i) => {
-            const late = r.target && String(r.target) < today && r.status !== "done";
-            return (
-              <tr key={r.id} className="border-t" onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
-                <td className="px-2 py-1.5"><StatusChip s={String(r.status)} palette={PLAN_STATUS} /></td>
-                <td className="px-2 py-1.5 font-semibold whitespace-nowrap">{String(r.job || "—")}</td>
-                <td className="px-2 py-1.5">{String(r.deliverable)}</td>
-                <td className="px-2 py-1.5">{String(r.owner || "—")}</td>
-                <td className="px-2 py-1.5 tnum whitespace-nowrap font-bold" style={{ color: late ? RED : INK }}>{fmtD(r.target)}{late ? " · late" : ""}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </Box>
-      {open && <PlanBox row={open === "new" ? null : open} jobs={jobs} onClose={() => setOpen(null)} onSaved={() => { setOpen(null); load(); }} />}
-    </Shell>
+    <Modal onClose={onClose} width={720}>
+      <div className="flex items-center justify-between mb-1">
+        <div className="font-bold text-sm" style={{ color: INK }}>{p.id} — the plan</div>
+        <button onClick={onClose} style={{ color: MUTED }}>✕</button>
+      </div>
+      {p.description && <div className="text-xs mb-2" style={{ color: "#5A6672", lineHeight: 1.5 }}>{p.description}</div>}
+      <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>
+        MILESTONES · {p.done}/{p.total} done
+      </div>
+      {p.total === 0 && <div className="text-sm mb-2" style={{ color: MUTED }}>Nothing planned yet — the plan lives with Planning; it shows here the moment it exists.</div>}
+      <PlanMilestones projectId={p.id} jobs={p.jobs} />
+      <div className="text-xs font-bold mb-1 mt-3" style={{ color: MUTED, letterSpacing: 0.8 }}>DESIGN DELIVERABLES ON THIS PROJECT</div>
+      {p.deliverables.length === 0 && <div className="text-sm" style={{ color: MUTED }}>None yet — ＋ Add a deliverable on the grid, named to one of this project&apos;s jobs.</div>}
+      {p.deliverables.map((r) => {
+        const late = r.target && String(r.target) < today && r.status !== "done";
+        return (
+          <div key={String(r.id)} onClick={() => onEditDeliv(r)} className="flex items-center gap-2 border-t py-1.5 text-sm" style={{ borderColor: "#EFEDE7", cursor: "pointer" }}>
+            <StatusChip s={String(r.status)} palette={PLAN_STATUS} />
+            <span className="font-semibold">{String(r.job || "")}</span>
+            <span style={{ flex: 1 }}>{String(r.deliverable)}</span>
+            <span style={{ color: MUTED }}>{String(r.owner || "")}</span>
+            <b className="tnum" style={{ color: late ? RED : INK }}>{fmtD(r.target)}{late ? " · late" : ""}</b>
+          </div>
+        );
+      })}
+    </Modal>
+  );
+}
+
+/** The milestone list itself, fetched on open — ticks come from the planning
+ *  tables, read-only here: design reads the promise, planning keeps it. */
+function PlanMilestones({ projectId, jobs }: { projectId: string; jobs: { id: string; tag: string }[] }) {
+  const [ms, setMs] = useState<{ scope: string; title: string; done: boolean }[] | null>(null);
+  useEffect(() => {
+    fetch(`/api/vishwakarma/projects?milestones=${encodeURIComponent(projectId)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setMs(j.milestones || []))
+      .catch(() => setMs([]));
+  }, [projectId]);
+  if (ms === null) return <div className="text-sm" style={{ color: MUTED }}>loading…</div>;
+  if (!ms.length) return null;
+  const tagOf = (scope: string) => jobs.find((j) => j.id === scope)?.tag || "";
+  let lastScope = "";
+  return (
+    <div className="mb-1">
+      {ms.map((m, i) => {
+        const head = m.scope !== lastScope && m.scope !== "";
+        lastScope = m.scope;
+        return (
+          <div key={i}>
+            {head && <div className="text-xs font-bold mt-1" style={{ color: "#1B6B93" }}>Job {m.scope.slice(-4)} <span style={{ color: MUTED, fontWeight: 400 }}>{tagOf(m.scope)}</span></div>}
+            <div className="flex items-center gap-2 text-sm py-0.5">
+              <span style={{ color: m.done ? GREEN : MUTED }}>{m.done ? "✓" : "○"}</span>
+              <span style={{ color: m.done ? MUTED : INK, textDecoration: m.done ? "line-through" : "none" }}>{m.title}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 function PlanBox({ row, jobs, onClose, onSaved }: { row: Row | null; jobs: { id: string; tag: string }[]; onClose: () => void; onSaved: () => void }) {

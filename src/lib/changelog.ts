@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.30.0.2",
+    date: "2026-08-28",
+    module: "Vishwakarma — Design Plans becomes the project grid",
+    items: [
+      "DESIGN PLANS RESTRUCTURED to Dr Raghu's row: one line per LIVE PROJECT — the project with its DESIGN STAGE as a dropdown beneath it (Concept → Basic Design → Detail Design → Drawings Released → Production Support → Design Complete), its JOBS one per line, the DESIGN OWNER picked from the team, the PROJECT PLAN as a lightbox, the NEXT MILESTONE, the NUMBER OF ISSUES standing against design with the issues themselves, and DESIGN SUPPORT NEEDED written in place. Stage, owner and support save as you set them (migration 0085).",
+      "The PROJECT PLAN lightbox reads the planning layer's own milestones — the project's plan where planning has moved up, else its jobs' plans job by job, ticks and all — read-only here: design reads the promise, planning keeps it. Design's own deliverables on the project sit beneath, click-to-edit, and ＋ Add a deliverable stays on the grid.",
+      "ISSUES TO DESIGN come from the Problems register by themselves — a problem raised on any of the project's jobs counts here until it closes, and clicking one walks you to Problems & Root Causes.",
+      "Columns sort on click — project, jobs, owner, issue count.",
+    ],
+  },
+  {
     v: "3.30.0.1",
     date: "2026-08-28",
     module: "CRM — numbers that continue, dates that assume today, a forecast in Dr Raghu's rows",

@@ -51,6 +51,7 @@ const PROBES = [
   ["genie", "0083 voucher amount", "kuber_voucher?select=amount&limit=1"],
   ["genie", "0084 Vishwakarma workroom", "vishwa_problem?select=id"],
   ["genie", "0084 review bench", "vishwa_review?select=id"],
+  ["genie", "0085 design project grid", "vishwa_project?select=project_id"],
   ["crm", "0017 prospect_queue", "prospect_queue?select=id"],
   ["crm", "0018 visiting_card", "visiting_card?select=id"],
   ["crm", "0019 integrations + card back", "integration_setting?select=key"],
