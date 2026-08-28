@@ -75,6 +75,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.28.0.0",
+    date: "2026-08-28",
+    module: "Kuber is born, and the four doors go on one menu",
+    items: [
+      "KUBER — the accounts module — takes its place at /kuber: the shell, the door and the grant went up first (Dashboard, Receivables, Payables, Bank & Cash, Ledgers, GST & Statutory, Reports — each pane named, each honestly saying the books arrive next). Access is a TICK on Admin → module access, exactly like CRM and HRMS; granular roles inside come later, as roles. Migration 0073.",
+      "THE ACCOUNT MENU NOW CARRIES ALL FOUR DOORS — Main Genie · CRM · HRMS · Kuber — in every module, showing each person exactly the modules ticked for them. The CRM and HRMS headers, which had only an identity chip, gain the full menu: modules, Reload, Logout.",
+      "RELOAD, IN THE MENU, COMES BACK TO THE SAME SCREEN — and so does the browser's own refresh. The main app now remembers its workspace and tab; the CRM already kept its section in the address, HRMS in the hash. No more being thrown to the front page by F5.",
+      "THE TASK LIGHTBOX SAYS ITS PROVENANCE FIRST: created by whom and when (migration 0074 adds the clock), and what it hangs off — the PROJECT and JOB as chips with 'Open the job ↗', or plainly 'Standalone — no job attached (Brain Dump style)'. In edit, the created-by line sits below Save changes.",
+      "A TASK NOW CARRIES PHOTOS AND FILES — '+ Add photo or file' in the lightbox, listed with 📷/📄 chips. Stored in Genie (task-files bucket, 0074) and MIRRORED TO THE DRIVE FOLDERS by scripts/drive-sync.mjs on the Mac that mounts the Drive: photos into 'Photos from Genie', files into 'Files from Genie' — and job photos ride the same sync, as their migration promised.",
+      "ON FLOOR IS NOW PLANNERS' TO TICK — Stratcom, planners and admins may tick or untick it, on the button and on the API both.",
+      "PENDING MATERIAL GROWS FILTERS — project, job, assigned-to and status, the status defaulting to what is still short (Yet to receive + QC Defective) — and its header now FLOATS while the rows scroll and SORTS on click: Job, TDD, Material, Receivable, Status.",
+      "TWO WRONGS PUT RIGHT: whoTag no longer spells raghu@nandan.co.in as 'RCI' out of nandan.co.in — an email is tagged by its local part alone; and the Jobs-in-Progress month table no longer shows Value and Throughput after 'Without value' is chosen — the one table that bypassed the mask now wears it.",
+    ],
+  },
+  {
     v: "3.27.0.1",
     date: "2026-08-28",
     module: "Genie paused — every read now waits for a hand",

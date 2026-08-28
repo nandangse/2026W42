@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireStratcom, errJson } from "@/lib/auth";
+import { requireUser, HttpError, errJson } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { seedJobToday, zeroJobToday } from "@/lib/manpower-rollover";
 
@@ -13,12 +13,16 @@ export const dynamic = "force-dynamic";
  * is a Genie fact the ERP has no field for and never will, so pushing it would
  * put a line in Pankaj's export that nothing can receive.
  *
- * Stratcom only. It is a claim about capacity, and a board where anybody can
- * mark anything as being worked on stops meaning anything by the second week.
+ * Stratcom, planners and admins (Dr Raghu widened it to planners, 28 Aug
+ * 2026). Still not everybody: it is a claim about capacity, and a board where
+ * anybody can mark anything as being worked on stops meaning anything by the
+ * second week.
  */
 export async function POST(req: Request) {
   try {
-    const user = await requireStratcom();
+    const user = await requireUser();
+    if (!(user.isOwner || user.stratcom || user.role === "planner" || user.role === "admin"))
+      throw new HttpError(403, "Only Stratcom, planners and admins may tick On Floor.");
     const body = await req.json();
     const jobId = String(body.job_id || "");
     if (!jobId) return NextResponse.json({ error: "job_id required" }, { status: 400 });

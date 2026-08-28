@@ -361,6 +361,8 @@ export async function buildBoard(supabase: SupabaseClient) {
       done: !!t.done,
       // who raised it — the key behind Tasking's "tasks I assigned" filter
       by: (t.created_by ?? null) as string | null,
+      // when it was raised (0074) — rows older than the column stay blank
+      created_at: (t.created_at ?? null) as string | null,
       original_due: t.original_due ?? t.due ?? null,
       push_count: t.push_count ?? 0,
       comments: commentCounts["manual:" + t.id] || 0,

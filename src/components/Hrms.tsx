@@ -17,6 +17,7 @@
  * Every module in the list keys off a person, so a fetch per pane would mean
  * pulling the same few hundred records again on every click.
  */
+import ModuleMenu from "@/components/ModuleMenu";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
@@ -125,17 +126,9 @@ export default function Hrms({
             </div>
           </div>
 
-          <a href="/" className="ml-auto text-xs font-semibold rounded px-2.5 py-1.5 flex-shrink-0"
-            style={{ background: "#22303C", color: "#8FA1B3" }} title="Back to Genie">← Genie</a>
-
-          {/* the same identity chip Genie shows — initials, not an email address */}
-          <div className="flex items-center gap-2 flex-shrink-0" title={`${who} · ${role.replace("_", " ")}`}>
-            <span className="rounded-full font-bold flex items-center justify-center"
-              style={{ width: 26, height: 26, fontSize: 11, letterSpacing: 0.3, background: initials ? "#E8600A" : "#B3261E", color: "#fff" }}>
-              {initials || "??"}
-            </span>
-            <span className="hidden sm:block" style={{ fontSize: 11, color: "#8FA1B3" }}>{who}</span>
-          </div>
+          <span className="ml-auto hidden sm:block flex-shrink-0" style={{ fontSize: 11, color: "#8FA1B3" }}>{who}</span>
+          {/* the account menu — modules, Reload, Logout — same as the main header's */}
+          <ModuleMenu current="hrms" email={email} displayName={displayName} initials={initials} role={role} />
         </div>
       </div>
 

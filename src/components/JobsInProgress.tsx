@@ -312,6 +312,11 @@ function PlannedDeliveries({
   } | null;
 }) {
   const rows = months.rows;
+  // "Without value" must hide THESE numbers too — cr() was painting the month
+  // table and the axis raw while every other figure went through V (the leak
+  // Dr Raghu caught, 28 Aug 2026).
+  const masked = V(0).includes("•");
+  const crV = (v: number) => (masked ? "•••" : cr(v));
   const W = 560, H = 250, L = 44, R = 34, T = 16, B = 34;
   const maxMoney = Math.max(1, ...rows.map((r) => Math.max(r.val, r.tp)));
   const maxNos = Math.max(1, ...rows.map((r) => r.nos));
@@ -334,8 +339,8 @@ function PlannedDeliveries({
       style={{ borderBottom: `1px solid ${C.line}`, cursor: r.nos ? "pointer" : "default", background: tone }}>
       <td className="px-2 py-1" style={{ color: tone ? C.red : C.body, fontWeight: tone ? 700 : 500 }}>{r.label}</td>
       <td className="px-2 py-1 text-right tnum" style={{ color: r.nos ? C.body : C.faint }}>{r.nos || "—"}</td>
-      <td className="px-2 py-1 text-right tnum" style={{ color: r.nos ? C.accent : C.faint }}>{r.nos ? cr(r.val) : "—"}</td>
-      <td className="px-2 py-1 text-right tnum" style={{ color: r.nos ? C.green : C.faint }}>{r.nos ? cr(r.tp) : "—"}</td>
+      <td className="px-2 py-1 text-right tnum" style={{ color: r.nos ? C.accent : C.faint }}>{r.nos ? crV(r.val) : "—"}</td>
+      <td className="px-2 py-1 text-right tnum" style={{ color: r.nos ? C.green : C.faint }}>{r.nos ? crV(r.tp) : "—"}</td>
     </tr>
   );
 
@@ -360,7 +365,7 @@ function PlannedDeliveries({
             {[0, 0.5, 1].map((f) => (
               <g key={f}>
                 <line x1={L} y1={yM(maxMoney * f)} x2={W - R} y2={yM(maxMoney * f)} stroke={C.line} strokeWidth={1} />
-                <text x={L - 5} y={yM(maxMoney * f) + 3} textAnchor="end" fontSize={9} fill={C.faint}>{cr(maxMoney * f)}</text>
+                <text x={L - 5} y={yM(maxMoney * f) + 3} textAnchor="end" fontSize={9} fill={C.faint}>{crV(maxMoney * f)}</text>
                 <text x={W - R + 4} y={yN(maxNos * f) + 3} fontSize={9} fill={C.navy} opacity={0.7}>{Math.round(maxNos * f)}</text>
               </g>
             ))}
@@ -413,8 +418,8 @@ function PlannedDeliveries({
                 style={{ background: C.ink, cursor: "pointer" }} title="Every pending job">
                 <td className="px-2 py-1.5 font-bold" style={{ color: "#fff" }}>TOTAL</td>
                 <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: "#fff" }}>{months.totals.nos}</td>
-                <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: "#F5B32B" }}>{cr(months.totals.val)}</td>
-                <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: "#7BC67E" }}>{cr(months.totals.tp)}</td>
+                <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: "#F5B32B" }}>{crV(months.totals.val)}</td>
+                <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: "#7BC67E" }}>{crV(months.totals.tp)}</td>
               </tr>
               {months.late.nos > 0 && <Row r={months.late} tone="#FBEDEA" />}
               {rows.map((r) => <Row key={r.key} r={r} />)}

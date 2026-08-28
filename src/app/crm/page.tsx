@@ -32,6 +32,8 @@ export default async function CrmPage() {
     <CrmApp
       email={user.email}
       displayName={user.displayName}
+      initials={user.initials ?? null}
+      role={user.role ?? "user"}
       version={UPDATES[0].v}
       initialSlug="dashboard"
     />

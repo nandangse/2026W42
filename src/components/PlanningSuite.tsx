@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { ModuleLinks, ReloadRow } from "@/components/ModuleMenu";
 import { LOGO } from "@/lib/logo";
 import { APP_VERSION, UPDATES, EFFORT } from "@/lib/changelog";
 import SoftwareDescription from "./SoftwareDescription";
@@ -217,6 +218,8 @@ interface Task {
   done: boolean;
   /** Email of whoever raised it. null for ERP ToDos — they have no Genie author. */
   by: string | null;
+  /** When it was raised (migration 0074). Blank for rows older than the column. */
+  created_at?: string | null;
   comments: number;
   /**
    * The date FIRST promised, and how many times it has been moved since.
@@ -226,6 +229,18 @@ interface Task {
   original_due?: string | null;
   push_count?: number;
 }
+
+/**
+ * What a task hangs off, said plainly — the lightbox was not saying it
+ * (Dr Raghu, 28 Aug 2026). A task tied to a job names the job, and the
+ * project when the job carries one; a task tied to nothing says so.
+ */
+const taskJobRef = (board: Board, t: Task): { id: string; label: string; project: string } | null => {
+  if (!t.j) return null;
+  const j = board.jobs.find((x) => x.id === t.j) || board.archived[t.j];
+  if (!j) return { id: t.j, label: `Job ${jobNo(t.j)}`, project: "" };
+  return { id: j.id, label: `${jobNo(j.id)} · ${j.tag}`, project: (j.proj || "").trim() };
+};
 
 /** Late against the date first committed, not the one on screen. */
 const taskLate = (t: Pick<Task, "due" | "original_due" | "done">, on: string): boolean =>
@@ -274,6 +289,9 @@ interface AdminUser {
   /** The CRM at /crm. Same arrangement. */
   crm_access: boolean;
   crm_implicit: boolean;
+  /** Accounts at /accounts — the fourth module (0073). Same arrangement. */
+  accounts_access: boolean;
+  accounts_implicit: boolean;
 }
 
 const ROLE_OPTIONS: { value: string; label: string; hint: string }[] = [
@@ -392,7 +410,18 @@ export default function PlanningSuite({
   // sticky sub-nav. "tab" is only meaningful inside the Planning Suite
   // workspace now — Goals and Tasking are whole workspaces, not sub-tabs.
   // Sales-team members live in Sales Genie — land them there directly.
-  const [workspace, setWorkspace] = useState<"lms" | "suite" | "delivered" | "goals" | "tasking" | "sales" | "consult" | "principles">("suite");
+  // The screen survives a reload: workspace and tab are remembered locally,
+  // so Reload (and the browser's own refresh) come back HERE, not to the
+  // front door (Dr Raghu, 28 Aug 2026).
+  const [workspace, setWorkspace] = useState<"lms" | "suite" | "delivered" | "goals" | "tasking" | "sales" | "consult" | "principles">(() => {
+    if (typeof window === "undefined") return "suite";
+    try {
+      const v = localStorage.getItem("genie.workspace");
+      if (v && ["lms", "suite", "delivered", "goals", "tasking", "sales", "consult", "principles"].includes(v))
+        return v as "suite";
+    } catch { /* fine */ }
+    return "suite";
+  });
   // Sales-team members' home is the CRM now — Sales Genie's panes moved there.
   useEffect(() => {
     if (role === "sales") window.location.replace("/crm");
@@ -406,7 +435,21 @@ export default function PlanningSuite({
   }, [workspace, canSeeDelivered]);
 
   // land on "My Week" within the suite, not the delivery board
-  const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature">("home");
+  const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature">(() => {
+    if (typeof window === "undefined") return "home";
+    try {
+      const v = localStorage.getItem("genie.tab");
+      if (v && ["home", "wip", "liveproj", "delivery", "load", "plan", "floor", "material", "esc", "erp", "upload", "admin", "feature"].includes(v))
+        return v as "home";
+    } catch { /* fine */ }
+    return "home";
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("genie.workspace", workspace);
+      localStorage.setItem("genie.tab", tab);
+    } catch { /* fine */ }
+  }, [workspace, tab]);
 
   // ---- browser back/forward navigates within the app, not out of it ----
   // Every workspace/tab change pushes a history entry; popstate restores it.
@@ -903,6 +946,8 @@ export default function PlanningSuite({
                         {!initials && <span style={{ color: "#B3261E" }}> · no initials set</span>}
                       </div>
                     </div>
+                    <ModuleLinks current="main" />
+                    <ReloadRow />
                     {canEdit && (
                       <button
                         onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("erp"); }}
@@ -1060,7 +1105,7 @@ export default function PlanningSuite({
       {/* Kept MOUNTED and merely hidden, so its filters, search, sort and view
           survive a round-trip through Job Plan — unmounting was wiping them. */}
       <div style={{ display: workspace === "suite" && tab === "delivery" ? undefined : "none" }}>
-        <DeliveryBoard showForward={canSeeForward} board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
+        <DeliveryBoard showForward={canSeeForward} canFloor={canSeeForward || role === "planner" || role === "admin"} board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
       </div>
       {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} canEdit={canEdit} reload={reload} />}
       {workspace === "suite" && tab === "liveproj" && <LiveProjects board={board} V={V} canEdit={canEdit} reload={reload} />}
@@ -1112,6 +1157,8 @@ export default function PlanningSuite({
         <TaskModal
           canDelete={isAdmin}
           task={notifTask}
+          jobRef={taskJobRef(board, notifTask)}
+          onOpenJob={(id) => { setNotifTask(null); openJobPlan(id); }}
           owners={assignees(board)}
           onClose={() => setNotifTask(null)}
           onToggle={async (prevention) => {
@@ -1719,7 +1766,7 @@ function MyWeek({
       </div>
 
 
-      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async (prevention) => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done, prevention }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} jobRef={taskJobRef(board, lightbox)} onOpenJob={onOpen} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async (prevention) => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done, prevention }); setLightbox(null); await reload(); }} reload={reload} />}
     </div>
   );
 }
@@ -1968,6 +2015,7 @@ function DeliveryBoard({
   reload,
   pushERP,
   showForward,
+  canFloor,
 }: {
   board: Board;
   V: (v: number) => string;
@@ -1976,6 +2024,8 @@ function DeliveryBoard({
   pushERP: (dt: string, id: string, f: string, v: string) => void;
   /** Stratcom. The two forward-looking cards are theirs. */
   showForward: boolean;
+  /** The On Floor tick — Stratcom, planners and admins (28 Aug 2026). */
+  canFloor: boolean;
 }) {
   /**
    * The year's targets and what is already on the books against them.
@@ -2538,7 +2588,7 @@ function DeliveryBoard({
                   <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, zIndex: 3, background: "#22303C" }}>Pri</th>
                   <SortTh k="job" label="Job" />
                   <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, zIndex: 3, background: "#22303C" }}
-                      title={showForward ? "Tick the jobs actually being worked on right now. Stratcom only." : "The jobs actually being worked on right now. Stratcom set this."}>
+                      title={canFloor ? "Tick the jobs actually being worked on right now. Stratcom and planners." : "The jobs actually being worked on right now. Stratcom and planners set this."}>
                     On Floor
                   </th>
                   <SortTh k="tag" label="Customer Tag" />
@@ -2569,11 +2619,11 @@ function DeliveryBoard({
                       <input
                         type="checkbox"
                         checked={!!j.onFloor}
-                        disabled={!showForward || floorBusy === j.id}
+                        disabled={!canFloor || floorBusy === j.id}
                         onChange={(e) => setOnFloor(j, e.target.checked)}
-                        style={{ accentColor: "#0D7A3F", width: 14, height: 14, cursor: showForward ? "pointer" : "default" }}
+                        style={{ accentColor: "#0D7A3F", width: 14, height: 14, cursor: canFloor ? "pointer" : "default" }}
                         title={
-                          showForward
+                          canFloor
                             ? j.onFloor ? "On the floor — untick when it comes off" : "Tick when work actually starts on it"
                             : j.onFloor ? "On the floor" : "Not on the floor"
                         }
@@ -3974,7 +4024,7 @@ function JobPlan({
         </>
       )}
 
-      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async (prevention) => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done, prevention }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} jobRef={taskJobRef(board, lightbox)} onOpenJob={setActiveId} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async (prevention) => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done, prevention }); setLightbox(null); await reload(); }} reload={reload} />}
 
       {shopOpen && <ShopUpdates job={dj} onClose={() => setShopOpen(false)} />}
 
@@ -4466,7 +4516,7 @@ function Tasking({
           reload={reload}
         />
       )}
-      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async (prevention) => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done, prevention }); setLightbox(null); await reload(); }} reload={reload} />}
+      {lightbox && <TaskModal canDelete={isAdminHere} task={lightbox} jobRef={taskJobRef(board, lightbox)} onOpenJob={onOpen} owners={assignees(board)} onClose={() => setLightbox(null)} onToggle={async (prevention) => { await api.post("/api/tasks", { action: "toggle", id: lightbox.id, kind: lightbox.kind, done: !lightbox.done, prevention }); setLightbox(null); await reload(); }} reload={reload} />}
     </div>
   );
 }
@@ -5229,7 +5279,7 @@ function AddTaskForm({ form, setForm, owners, onSubmit, onCancel, hideActions }:
   );
 }
 
-function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = false }: { task: Task; owners?: Assignee[]; onClose: () => void; onToggle: (prevention?: string) => Promise<void> | void; reload: () => Promise<Board | null>; canDelete?: boolean }) {
+function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = false, jobRef = null, onOpenJob }: { task: Task; owners?: Assignee[]; onClose: () => void; onToggle: (prevention?: string) => Promise<void> | void; reload: () => Promise<Board | null>; canDelete?: boolean; jobRef?: { id: string; label: string; project: string } | null; onOpenJob?: (jobId: string) => void }) {
   const [comments, setComments] = useState<{ by: string; at: string; body: string }[]>([]);
   // every time this task's due date has moved
   const [dateLog, setDateLog] = useState<{ id: string; old_due: string | null; new_due: string | null; by: string | null; at: string }[]>([]);
@@ -5244,14 +5294,40 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = f
   const [prevent, setPrevent] = useState("");
   const [closeErr, setCloseErr] = useState("");
   const [ef, setEf] = useState({ t: task.t || "", d: task.d || "", who: task.who || "", due: task.due || "", cat: task.cat || "Production", esc: task.esc || "None" });
+  /** Photos and files on the task (0074) — stored in Genie, mirrored to Drive. */
+  const [files, setFiles] = useState<{ id: string; name: string; url: string | null; is_photo: boolean; by: string | null; at: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
   const isMs = String(task.id).startsWith("ms"); // milestone pseudo-card from the Job Plan kanban
+  const loadFiles = useCallback(() => {
+    api.get(`/api/task-file?task_id=${task.id}&kind=${task.kind}`).then((r) => setFiles(r.files || [])).catch(() => {});
+  }, [task.id, task.kind]);
   useEffect(() => {
     if (isMs) return;
     api.get(`/api/comments?task_id=${task.id}&task_kind=${task.kind}`).then((r) => setComments(r.comments)).catch(() => {});
     api.get(`/api/task-dates?task_id=${task.id}&task_kind=${task.kind}`)
       .then((r) => setDateLog(r.moves || []))
       .catch(() => setDateLog([]));
-  }, [task, isMs]);
+    loadFiles();
+  }, [task, isMs, loadFiles]);
+  const attach = async (f: File | null) => {
+    if (!f) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      fd.append("task_id", task.id);
+      fd.append("kind", task.kind);
+      const res = await fetch("/api/task-file", { method: "POST", body: fd });
+      if (!res.ok) throw new Error((await res.json()).error || "The upload failed");
+      loadFiles();
+    } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+    setUploading(false);
+  };
+  /** "raghu@nandan.co.in · 28 Aug, 07:04 am" without the address when a name would do. */
+  const whoMade = task.by ? task.by.split("@")[0] : task.kind === "erp" ? "the ERP ToDo upload" : null;
+  const madeAt = task.created_at
+    ? new Date(task.created_at).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : null;
   const add = async () => {
     if (!cmt.trim()) return;
     await api.post("/api/comments", { task_id: task.id, task_kind: task.kind, body: cmt.trim() });
@@ -5302,6 +5378,41 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = f
           <button onClick={onClose} style={{ color: "#8A94A0" }}>✕</button>
         </div>
 
+        {/* Who raised it, and what it hangs off — first, before anything else
+            (Dr Raghu, 28 Aug 2026: neither was clear from the box). */}
+        {!isMs && (
+          <div className="mt-1.5 space-y-1">
+            <div className="text-xs" style={{ color: "#8A94A0" }}>
+              Created by <b style={{ color: "#5A6672" }}>{whoMade ?? "—"}</b>
+              {madeAt && <> on <span className="tnum">{madeAt}</span></>}
+            </div>
+            <div className="text-xs flex items-center gap-1.5 flex-wrap">
+              {jobRef ? (
+                <>
+                  {jobRef.project && (
+                    <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#DDE6EE", color: "#1B3A5C" }}>
+                      Project · {jobRef.project}
+                    </span>
+                  )}
+                  <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#F4EFE4", color: "#7A5E1E" }}>
+                    Job · {jobRef.label}
+                  </span>
+                  {onOpenJob && (
+                    <button onClick={() => { onClose(); onOpenJob(jobRef.id); }} className="font-bold" style={{ color: "#E8600A" }}>
+                      Open the job ↗
+                    </button>
+                  )}
+                </>
+              ) : (
+                <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#EDE7F9", color: "#5B21B6" }}
+                  title="Raised straight in Tasking — it hangs off no job, the Brain Dump way">
+                  🧠 Standalone — no job attached (Brain Dump style)
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {isMs ? (
           <>
             {task.d && <div className="text-xs mt-2" style={{ color: "#5A6672" }}>{task.d}</div>}
@@ -5329,6 +5440,9 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = f
             <div className="flex gap-2 pt-1">
               <button onClick={saveEdit} className="flex-1 text-xs font-bold rounded py-1.5" style={{ background: "#E8600A", color: "#fff" }}>💾 Save changes</button>
               <button onClick={() => setEditing(false)} className="text-xs rounded px-3" style={{ color: "#8A94A0" }}>Cancel</button>
+            </div>
+            <div className="text-xs pt-0.5" style={{ color: "#8A94A0" }}>
+              Created by <b>{whoMade ?? "—"}</b>{madeAt ? ` on ${madeAt.split(",")[0]} at${madeAt.split(",")[1] ?? ""}` : ""}
             </div>
           </div>
         ) : (
@@ -5362,6 +5476,28 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = f
 
         {!isMs && (
           <div className="mt-3 border-t pt-2" style={{ borderColor: "#EEECE6" }}>
+            {/* Photos and files — kept in Genie, mirrored to the Drive folders
+                ("Photos from Genie" / "Files from Genie") by the Mac sync. */}
+            <div className="flex items-center gap-2 mb-1">
+              <div className="text-xs font-bold" style={{ color: "#5A6672" }}>📎 Photos & files</div>
+              <label className="text-xs font-bold rounded px-2 py-0.5 cursor-pointer" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>
+                {uploading ? "Uploading…" : "+ Add photo or file"}
+                <input type="file" className="hidden" disabled={uploading}
+                  onChange={(e) => { attach(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+              </label>
+            </div>
+            {files.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {files.map((f) => (
+                  <a key={f.id} href={f.url ?? "#"} target="_blank" rel="noreferrer"
+                    className="text-xs rounded px-2 py-1 font-semibold border"
+                    style={{ borderColor: "#E2E0DA", color: "#1B3A5C", textDecoration: "none", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    title={`${f.name} — ${f.by ?? ""}`}>
+                    {f.is_photo ? "📷" : "📄"} {f.name}
+                  </a>
+                ))}
+              </div>
+            )}
             {/* The date history sits ABOVE the comments and reads like one.
                 A due date that has moved four times IS the story of the task,
                 and burying it in a field somebody has to compare by memory is
@@ -6180,6 +6316,15 @@ function Admin({
     } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
   };
 
+  /** Accounts, the fourth tick. Owner only, same as the other two. */
+  const setAccounts = async (id: string, grant: boolean) => {
+    setGaMsg("");
+    try {
+      await api.post("/api/admin/users", { action: "accounts_access", id, grant });
+      loadUsers();
+    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
   /** Goals access from inside the Users table. Reloads both lists. */
   const setGoalsLevel = async (id: string, level: string) => {
     const who = (users ?? []).find((x) => x.id === id);
@@ -6634,6 +6779,7 @@ function Admin({
                   <th className="text-left py-1 font-semibold">Email</th>
                   <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/crm">💼 CRM</th>
                   <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/hrms — people records">👤 HRMS</th>
+                  <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/kuber — Kuber, the accounts module">💰 Kuber</th>
                 </tr>
               </thead>
               <tbody>
@@ -6653,13 +6799,19 @@ function Admin({
                         style={{ accentColor: "#E8600A", width: 14, height: 14, cursor: isOwner && !u.hrms_implicit ? "pointer" : "default" }}
                         title={u.hrms_implicit ? "The owner holds it already" : isOwner ? "Open HRMS — people records" : `Only ${OWNER_EMAIL} may grant this`} />
                     </td>
+                    <td className="py-1.5 text-center">
+                      <input type="checkbox" checked={!!u.accounts_access} disabled={!isOwner || u.accounts_implicit}
+                        onChange={(e) => setAccounts(u.id, e.target.checked)}
+                        style={{ accentColor: "#0D7A3F", width: 14, height: 14, cursor: isOwner && !u.accounts_implicit ? "pointer" : "default" }}
+                        title={u.accounts_implicit ? "The owner holds it already" : isOwner ? "Open Kuber — the accounts module" : `Only ${OWNER_EMAIL} may grant this`} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <div className="text-xs mt-2" style={{ color: "#8A94A0", lineHeight: 1.6 }}>
-            Both grants are held against the <b>email address</b>, so somebody can be granted before their Genie
+            The grants are held against the <b>email address</b>, so somebody can be granted before their Genie
             account exists — the grant waits for the account. Anyone granted here can edit as well as read.
           </div>
         </div>
@@ -7624,6 +7776,18 @@ function PendingMaterial({
   ];
   const [horizon, setHorizon] = useState("30");
   const [q, setQ] = useState("");
+  /**
+   * The filters Dr Raghu asked for (28 Aug 2026): project, job, assigned-to
+   * and status. Status defaults to the two states that mean "still short" —
+   * Yet to receive and QC Defective — which is what this board has always
+   * shown; the filter just makes the default visible and changeable.
+   */
+  const [fProj, setFProj] = useState("all");
+  const [fJob, setFJob] = useState("all");
+  const [fWho, setFWho] = useState("all");
+  const [fStatus, setFStatus] = useState("open"); // open = Yet to receive + QC Defective
+  const [sortKey, setSortKey] = useState<"" | "job" | "tdd" | "item" | "due" | "status" | "who">("");
+  const [sortDir, setSortDir] = useState<1 | -1>(1);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   /** The line whose own box is open. Same box the job page uses. */
@@ -7631,29 +7795,72 @@ function PendingMaterial({
 
   const jobById = useMemo(() => new Map(board.jobs.map((j) => [j.id, j])), [board.jobs]);
 
-  const rows = useMemo(() => {
+  /** Every line in the horizon BEFORE the narrower filters — the option lists
+      come off this so a filter never hides its own choices. */
+  const pool = useMemo(() => {
     const cutoff = horizon === "all" ? null : addDays(TODAY, Number(horizon));
     const out: { job: Job; m: Board["materials"][string][number] }[] = [];
     for (const [jobId, list] of Object.entries(board.materials || {})) {
       const job = jobById.get(jobId);
       if (!job) continue;                       // delivered or archived
       if (cutoff && (!job.tdd || job.tdd > cutoff)) continue;
-      for (const m of list) {
-        // Received is not pending. QC Defective very much is.
-        if (String(m.status || "").toLowerCase() === "received") continue;
-        out.push({ job, m });
-      }
+      for (const m of list) out.push({ job, m });
     }
+    return out;
+  }, [board.materials, jobById, horizon]);
+
+  const projOptions = useMemo(() => [...new Set(pool.map((r) => (r.job.proj || "").trim()).filter(Boolean))].sort(), [pool]);
+  const jobOptions = useMemo(() => [...new Map(pool.map((r) => [r.job.id, r.job])).values()].sort((a, b) => a.id.localeCompare(b.id)), [pool]);
+  const whoOptions = useMemo(() => [...new Set(pool.map((r) => String(r.m.who || "").trim()).filter(Boolean))].sort(), [pool]);
+
+  const rows = useMemo(() => {
+    const st = (m: { status?: string | null }) => String(m.status || "Yet to receive").toLowerCase();
+    let out = pool.filter(({ job, m }) => {
+      if (fStatus === "open") { if (st(m) === "received") return false; }
+      else if (fStatus === "yet" && st(m) !== "yet to receive") return false;
+      else if (fStatus === "defect" && !st(m).includes("defect")) return false;
+      else if (fStatus === "received" && st(m) !== "received") return false;
+      if (fProj !== "all" && (job.proj || "").trim() !== fProj) return false;
+      if (fJob !== "all" && job.id !== fJob) return false;
+      if (fWho !== "all" && String(m.who || "").trim() !== fWho) return false;
+      return true;
+    });
     const needle = q.trim().toLowerCase();
-    const hit = needle
-      ? out.filter((r) =>
-          jobNo(r.job.id).includes(needle) ||
-          r.job.tag.toLowerCase().includes(needle) ||
-          String(r.m.item || "").toLowerCase().includes(needle))
-      : out;
-    // Soonest delivery first — this is a list you work down.
-    return hit.sort((a, b) => String(a.job.tdd || "9999").localeCompare(String(b.job.tdd || "9999")));
-  }, [board.materials, jobById, horizon, q]);
+    if (needle)
+      out = out.filter((r) =>
+        jobNo(r.job.id).includes(needle) ||
+        r.job.tag.toLowerCase().includes(needle) ||
+        String(r.m.item || "").toLowerCase().includes(needle));
+    // Soonest delivery first is the resting order — this is a list you work
+    // down. A clicked header re-orders it until cleared.
+    const base = (a: (typeof out)[number], b: (typeof out)[number]) =>
+      String(a.job.tdd || "9999").localeCompare(String(b.job.tdd || "9999"));
+    if (!sortKey) return out.sort(base);
+    const key = (r: (typeof out)[number]): string => {
+      switch (sortKey) {
+        case "job": return jobNo(r.job.id);
+        case "tdd": return r.job.tdd || "9999";
+        case "item": return String(r.m.item || "").toLowerCase();
+        case "due": return r.m.due || "9999";
+        case "status": return String(r.m.status || "Yet to receive").toLowerCase();
+        case "who": return String(r.m.who || "").toLowerCase();
+        default: return "";
+      }
+    };
+    return out.sort((a, b) => sortDir * key(a).localeCompare(key(b)) || base(a, b));
+  }, [pool, fProj, fJob, fWho, fStatus, q, sortKey, sortDir]);
+
+  const clickSort = (k: typeof sortKey) => {
+    if (sortKey === k) { if (sortDir === 1) setSortDir(-1); else { setSortKey(""); setSortDir(1); } }
+    else { setSortKey(k); setSortDir(1); }
+  };
+  const MTh = ({ k, label, align = "left" }: { k: typeof sortKey; label: string; align?: string }) => (
+    <th className={`px-2 py-2 text-${align}`} style={{ position: "sticky", top: 0, zIndex: 3, background: "#22303C", cursor: k ? "pointer" : "default", whiteSpace: "nowrap" }}
+      onClick={k ? () => clickSort(k) : undefined}
+      title={k ? "Click to sort — again to flip, a third time to clear" : undefined}>
+      {label}{sortKey === k && k ? (sortDir === 1 ? " ▲" : " ▼") : ""}
+    </th>
+  );
 
   const save = async (m: { id: string }, patch: Record<string, unknown>) => {
     setBusy(m.id); setMsg("");
@@ -7694,25 +7901,44 @@ function PendingMaterial({
           className="px-2 py-1 rounded border text-sm"
           style={{ borderColor: "#D9D6CD", minWidth: 260 }}
         />
+        <select value={fProj} onChange={(e) => setFProj(e.target.value)} className="px-2 py-1 rounded border text-sm" style={{ borderColor: fProj === "all" ? "#D9D6CD" : "#E8600A" }} title="Only lines on jobs of this project">
+          <option value="all">All projects</option>
+          {projOptions.map((pj) => (<option key={pj} value={pj}>{pj}</option>))}
+        </select>
+        <select value={fJob} onChange={(e) => setFJob(e.target.value)} className="px-2 py-1 rounded border text-sm" style={{ borderColor: fJob === "all" ? "#D9D6CD" : "#E8600A" }} title="Only this job's lines">
+          <option value="all">All jobs</option>
+          {jobOptions.map((jb) => (<option key={jb.id} value={jb.id}>{jobNo(jb.id)} · {jb.tag.slice(0, 28)}</option>))}
+        </select>
+        <select value={fWho} onChange={(e) => setFWho(e.target.value)} className="px-2 py-1 rounded border text-sm" style={{ borderColor: fWho === "all" ? "#D9D6CD" : "#E8600A" }} title="Only lines assigned to this person">
+          <option value="all">Anyone</option>
+          {whoOptions.map((w) => (<option key={w} value={w}>{w}</option>))}
+        </select>
+        <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} className="px-2 py-1 rounded border text-sm font-semibold" style={{ borderColor: fStatus === "open" ? "#D9D6CD" : "#E8600A" }} title="Which statuses to show — the default is everything still short">
+          <option value="open">Yet to receive + QC Defective</option>
+          <option value="yet">Yet to receive only</option>
+          <option value="defect">QC Defective only</option>
+          <option value="received">Received</option>
+          <option value="all">Every status</option>
+        </select>
         <span className="text-xs" style={{ color: "#8A94A0" }}>
-          Received lines are not shown — this is what is still short.
+          {fStatus === "open" ? "Received lines are not shown — this is what is still short." : ""}
         </span>
         {msg && <span className="text-xs font-bold" style={{ color: "#B3261E" }}>{msg}</span>}
       </div>
 
-      <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
-        <table className="w-full text-xs" style={{ minWidth: 1040 }}>
+      <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: "#E2E0DA", maxHeight: "70vh" }}>
+        <table className="w-full text-xs" style={{ minWidth: 1040, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
             <tr style={{ background: "#22303C", color: "#fff" }}>
-              <th className="px-2 py-2 text-left">Job</th>
-              <th className="px-2 py-2 text-center">TDD</th>
-              <th className="px-2 py-2 text-left">Material / kit item</th>
-              <th className="px-2 py-2 text-center">Qty</th>
-              <th className="px-2 py-2 text-center">Receivable</th>
-              <th className="px-2 py-2 text-center">Task</th>
-              <th className="px-2 py-2 text-left">Update</th>
-              <th className="px-2 py-2 text-center">Status</th>
-              <th className="px-2 py-2 text-center">Open</th>
+              <MTh k="job" label="Job" />
+              <MTh k="tdd" label="TDD" align="center" />
+              <MTh k="item" label="Material / kit item" />
+              <MTh k="" label="Qty" align="center" />
+              <MTh k="due" label="Receivable" align="center" />
+              <MTh k="" label="Task" align="center" />
+              <MTh k="" label="Update" />
+              <MTh k="status" label="Status" align="center" />
+              <MTh k="" label="Open" align="center" />
             </tr>
           </thead>
           <tbody>
@@ -8042,6 +8268,7 @@ function Escalations({
         <TaskModal
           canDelete={isAdmin}
           task={lightbox}
+          jobRef={taskJobRef(board, lightbox)}
           owners={assignees(board)}
           onClose={() => setLightbox(null)}
           onToggle={async (prevention) => {
@@ -8883,7 +9110,7 @@ function OnFloor({
 
       {jobs.length === 0 && (
         <div className="text-sm rounded-lg border p-4" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#8A94A0" }}>
-          No job is ticked as being on the floor. {isStrat ? "Tick them on the Priority List." : "Stratcom tick these on the Priority List."}
+          No job is ticked as being on the floor. {isStrat ? "Tick them on the Priority List." : "Stratcom and planners tick these on the Priority List."}
         </div>
       )}
 

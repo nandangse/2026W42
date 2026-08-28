@@ -21,6 +21,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ModuleMenu from "@/components/ModuleMenu";
 import { DOCTYPES, doctypeBySlug, type Doctype, type Field } from "@/crm/doctypes";
 import { LOGO } from "@/lib/logo";
 import AnalyticsScreen from "./Analytics";
@@ -98,9 +99,10 @@ const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string } | { 
 ];
 
 export default function CrmApp({
-  email, displayName, version, initialSlug,
+  email, displayName, version, initialSlug, initials = null, role = "user",
 }: {
   email: string; displayName: string | null; version: string; initialSlug?: string;
+  initials?: string | null; role?: string;
 }) {
   const [slug, setSlug] = useState(initialSlug ?? DOCTYPES[0].name);
   const [rows, setRows] = useState<Row[]>([]);
@@ -374,12 +376,11 @@ export default function CrmApp({
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <a href="/" className="text-xs font-bold" style={{ color: NAVY }}>
-              ← Genie
-            </a>
             <span className="text-xs" style={{ color: MUTED }}>
               {displayName || email}
             </span>
+            {/* the account menu — modules, Reload, Logout — same as the main header's */}
+            <ModuleMenu current="crm" email={email} displayName={displayName} initials={initials} role={role} />
           </div>
         </div>
       </header>
