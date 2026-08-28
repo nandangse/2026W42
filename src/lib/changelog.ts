@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.10",
+    date: "2026-08-28",
+    module: "The numbered groups — one law across every statement",
+    items: [
+      "Tonight's Tally export arrived with the MIS mapping's NUMBERED group names — '07.Sales Accounts', '05.Investments', '09.Manufacturing Expenses' — and the statement classifiers, anchored on the bare names, missed them: the Balance Sheet's ASSETS side stood empty, sales heads strayed, Bank & Cash read zero. THE LAW NOW: a numbered prefix never changes what a group IS — every classifier (P&L, Balance Sheet, MIS, cash flow, fund flow, TVC/OE seed, bank walk) strips the number before judging. Manufacturing Expenses also joins the P&L side by name, matching the renamed books.",
+    ],
+  },
+  {
     v: "3.31.0.9",
     date: "2026-08-28",
     module: "Kuber — the CFO Note, an honest bank balance, navy headings",

@@ -136,8 +136,13 @@ function treeOf(entries: { ledger: string; group: string; root: string; amount: 
     .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
 }
 
+/** Tonight's Tally arrived with NUMBERED group names ("07.Sales Accounts",
+ *  "05.Investments") — the MIS mapping's prefixes. A number never changes
+ *  what a group IS, so every classifier strips it before judging. */
+const stripNo = (r: string) => r.replace(/^\s*\d+\s*[.)-]*\s*/, "");
+
 const isBankChain = (rootOf: (g: string) => string, parent: string) =>
-  /^bank accounts$|^bank od|^cash-in-hand$/i.test(rootOf(parent)) || /^bank|^cash-in-hand$/i.test(parent);
+  /^bank accounts$|^bank od|^cash-in-hand$/i.test(stripNo(rootOf(parent))) || /^bank|^cash-in-hand$/i.test(stripNo(parent));
 
 export async function GET(req: Request) {
   try {
@@ -505,8 +510,8 @@ export async function GET(req: Request) {
         }
         return properOf.get(cur) || g;
       };
-      const isExpense = (root: string) => /expense|^purchase/i.test(root) && !/asset/i.test(root);
-      const isIncome = (root: string) => /income|^sales/i.test(root);
+      const isExpense = (root: string) => /expense|^purchase|^manufacturing/i.test(stripNo(root)) && !/asset/i.test(root);
+      const isIncome = (root: string) => /income|^sales/i.test(stripNo(root));
 
       const dateOf = new Map(vouchers.map((v) => [String(v.id), String(v.date || "")]));
       const period = new Map<string, number>();
@@ -519,8 +524,8 @@ export async function GET(req: Request) {
       // The TOC seed: purchase heads and the process-like direct expenses
       // rise with the unit — everything else stands whether we build or not.
       const seedCls = (name: string, grp: string, root: string) =>
-        /^purchase/i.test(root)
-          || (/direct expense/i.test(root) && /job ?work|process|freight|carriage|cartage|consum|raw ?material|\brm\b|packing|loading|octroi|customs|import/i.test(name + " " + grp))
+        /^purchase/i.test(stripNo(root))
+          || (/direct expense|manufacturing/i.test(stripNo(root)) && /job ?work|process|freight|carriage|cartage|consum|raw ?material|\brm\b|packing|loading|octroi|customs|import/i.test(name + " " + grp))
           ? "tvc" : "oe";
 
       let sales = 0;
@@ -634,7 +639,7 @@ export async function GET(req: Request) {
       const w = await loadWorld(admin);
       if (!w.ledgers.length) return NextResponse.json({ empty: true });
 
-      const isPnlF = (root: string) => /income|expense|^sales|^purchase/i.test(root) && !/asset/i.test(root);
+      const isPnlF = (root: string) => /income|expense|^sales|^purchase|^manufacturing/i.test(stripNo(root)) && !/asset/i.test(root);
       const upToA = new Map<string, number>(), upToB = new Map<string, number>();
       for (const l of w.lines) {
         const d = w.dateOf.get(String(l.voucher_id)) || "";
@@ -719,11 +724,12 @@ export async function GET(req: Request) {
           profitToDate += toDate.get(name) || 0;
           if (!amt) continue;
           const e = { ledger: name, group: grp, root, amount: amt };
-          if (/sales|direct income/i.test(root) && !/purchase/i.test(root)) ents.sales.push(e);
-          else if (/purchase/i.test(root)) ents.purchases.push({ ...e, amount: -amt });
-          else if (/manufacturing|direct expense/i.test(root)) ents.manuf.push({ ...e, amount: -amt });
-          else if (/indirect income/i.test(root)) ents.otherIncome.push(e);
-          else if (/indirect expense|expense/i.test(root)) {
+          const rootN = stripNo(root);
+          if (/sales|direct income/i.test(rootN) && !/purchase/i.test(rootN)) ents.sales.push(e);
+          else if (/purchase/i.test(rootN)) ents.purchases.push({ ...e, amount: -amt });
+          else if (/manufacturing|direct expense/i.test(rootN)) ents.manuf.push({ ...e, amount: -amt });
+          else if (/indirect income/i.test(rootN)) ents.otherIncome.push(e);
+          else if (/indirect expense|expense/i.test(rootN)) {
             // finance, depreciation and tax step out of the indirect lump
             const hay = (grp + " " + name).toLowerCase();
             if (/deprecia/.test(hay)) ents.depreciation.push({ ...e, amount: -amt });
@@ -779,14 +785,14 @@ export async function GET(req: Request) {
       // is honestly absent, never a guess ----
       const rootVal = (re: RegExp) => {
         let t2 = 0;
-        for (const [r, v] of closingOfRoot) if (re.test(r)) t2 += v;
+        for (const [r, v] of closingOfRoot) if (re.test(stripNo(r))) t2 += v;
         return t2;
       };
       const equity = rootVal(/capital/i) + profitToDate;
       const loans = ((loanRes.data as RR[]) || []).filter((x) => String(x.status) !== "closed");
       const loanOut = loans.reduce((s2, x) => s2 + (Number(x.outstanding) || 0), 0);
       const emiMonthly = loans.reduce((s2, x) => s2 + (Number(x.emi) || 0), 0);
-      const debtBooks = rootVal(/loans? \(liability\)|^\S*\.?\s*loans|bank od/i);
+      const debtBooks = rootVal(/loans? \(liability\)|^loans|bank od/i);
       const debt = loanOut > 0 ? loanOut : Math.max(0, debtBooks);
       const curLiab = rootVal(/current liabilit/i);
       const curAssets = -rootVal(/current asset/i);
@@ -898,8 +904,8 @@ export async function GET(req: Request) {
       };
       // P&L roots: incomes, expenses, sales, purchases — but Tally's
       // "Misc. Expenses (ASSET)" is a balance-sheet head despite its name.
-      const isPnl = (root: string) => /income|expense|^sales|^purchase/i.test(root) && !/asset/i.test(root);
-      const assetSide = (root: string) => /^fixed assets|^investments|^current assets|^misc/i.test(root) || /\(asset\)/i.test(root);
+      const isPnl = (root: string) => /income|expense|^sales|^purchase|^manufacturing/i.test(stripNo(root)) && !/asset/i.test(root);
+      const assetSide = (root: string) => /^fixed assets|^investments|^current assets|^misc|^loans & advances \(asset|^deposits \(asset/i.test(stripNo(root)) || /\(asset\)/i.test(root);
 
       const dateOf = new Map(vouchers.map((v) => [String(v.id), String(v.date || "")]));
       // Per ledger: activity in [from, to] (the P&L period) and every line
@@ -1140,7 +1146,7 @@ export async function GET(req: Request) {
       const isBankRoot = (g: string) => {
         let cur = g.toLowerCase();
         for (let i = 0; i < 25; i++) {
-          if (/^bank accounts$|^bank od|^cash-in-hand$/.test(cur)) return true;
+          if (/^bank accounts$|^bank od|^cash-in-hand$/.test(stripNo(cur))) return true;
           const nxt = par.get(cur) || "";
           if (!nxt || nxt === cur) return false;
           cur = nxt;
