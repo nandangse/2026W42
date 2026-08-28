@@ -3131,6 +3131,7 @@ function GenieHint({ jobId, jobLabel }: { jobId: string; jobLabel: string }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [meta, setMeta] = useState<{ builtBy: string | null; builtAt: string | null; stale: boolean } | null>(null);
+  const [may, setMay] = useState(false);
 
   const ask = useCallback(async (refresh = false) => {
     setBusy(true);
@@ -3144,37 +3145,32 @@ function GenieHint({ jobId, jobLabel }: { jobId: string; jobLabel: string }) {
   }, [jobId]);
 
   /**
-   * Opening a job now fills this panel by itself.
-   *
-   * The GET is a single row read of the SHARED cache and generates nothing, so
-   * it can run for everyone on every job: whoever paid for the brief first,
-   * everybody else reads it free. Only the owner and those reporting directly
-   * to him have one BUILT automatically when none exists — that costs a model
-   * call, and it is the people who open twenty jobs before lunch who need it
-   * without a button.
+   * PAUSED (28 Aug 2026): opening a job reads the SHARED cache and nothing
+   * more — a single free row. Genie never writes a brief on its own any more;
+   * only MC and Stratcom see the Generate button, and only their click spends
+   * a model call. Whoever generated last, everybody else reads free.
    */
   useEffect(() => {
     let live = true;
     setHint(null);
     setErr("");
     setMeta(null);
+    setMay(false);
     (async () => {
       try {
         const r = await api.get(`/api/genie-hint?job_id=${encodeURIComponent(jobId)}`);
         if (!live) return;
+        setMay(!!r.may);
         if (r.hint) {
           setHint(r.hint);
           setMeta({ builtBy: r.builtBy ?? null, builtAt: r.builtAt ?? null, stale: !!r.stale });
         }
-        // nothing cached (or what is cached is out of date) and this caller may
-        // have one built — do it without being asked
-        if (r.auto && r.stale && r.configured !== false) ask(!!r.hint);
       } catch {
         /* silent: the brief is a companion to the page, never a gate on it */
       }
     })();
     return () => { live = false; };
-  }, [jobId, ask]);
+  }, [jobId]);
 
   const st = hint ? HINT_STATUS[hint.status] ?? HINT_STATUS.unknown : null;
 
@@ -3187,7 +3183,7 @@ function GenieHint({ jobId, jobLabel }: { jobId: string; jobLabel: string }) {
         <div className="text-xs font-bold tracking-widest" style={{ color: "#7C3AED" }}>✨ GENIE HINT</div>
         <div className="flex items-center gap-2">
           {st && <span className="text-xs font-bold rounded px-1.5 py-0.5" style={{ background: st.bg, color: st.fg }}>{st.label}</span>}
-          {hint && (
+          {hint && may && (
             <button onClick={() => ask(true)} disabled={busy} className="text-xs font-bold" style={{ color: "#7C3AED", opacity: busy ? 0.5 : 1 }}
               title={
                 (meta?.builtBy ? `Read built by ${meta.builtBy}${meta.builtAt ? " on " + fmtFull(String(meta.builtAt).slice(0, 10)) : ""}. ` : "") +
@@ -3204,9 +3200,15 @@ function GenieHint({ jobId, jobLabel }: { jobId: string; jobLabel: string }) {
           <div className="text-xs mb-2" style={{ color: "#5A6672" }}>
             A written read on <b>{jobLabel}</b> — how it has been handled, what would move the delivery date, and who is on it. Built from this job&apos;s own plan, materials and tasks.
           </div>
-          <button onClick={() => ask()} className="rounded px-3 py-1.5 font-bold text-sm" style={{ background: "#7C3AED", color: "#fff" }}>
-            Brief me on this job
-          </button>
+          {may ? (
+            <button onClick={() => ask()} className="rounded px-3 py-1.5 font-bold text-sm" style={{ background: "#7C3AED", color: "#fff" }}>
+              Generate with Genie
+            </button>
+          ) : (
+            <div className="text-xs" style={{ color: "#8A94A0" }}>
+              Genie is paused — a read appears here once MC or Stratcom generates one.
+            </div>
+          )}
         </>
       )}
 
@@ -3220,7 +3222,7 @@ function GenieHint({ jobId, jobLabel }: { jobId: string; jobLabel: string }) {
       {err && !busy && (
         <div className="text-xs" style={{ color: "#B3261E" }}>
           {err}
-          <button onClick={() => ask()} className="ml-2 font-bold" style={{ color: "#7C3AED" }}>try again</button>
+          {may && <button onClick={() => ask()} className="ml-2 font-bold" style={{ color: "#7C3AED" }}>try again</button>}
         </div>
       )}
 

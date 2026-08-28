@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.27.0.1",
+    date: "2026-08-28",
+    module: "Genie paused — every read now waits for a hand",
+    items: [
+      "GENIE IN EVERY JOB IS PAUSED. The Genie Hint panel no longer writes itself when a job opens — the old auto-brief for the owner's direct reports is switched off in one place. Opening a job still shows the last brief free from the shared cache; nothing is spent by looking.",
+      "GENERATE WITH GENIE is now a button only MC and STRATCOM see (the owner too), and only that click costs a model call. Everyone else reads what they generated, with a plain note that Genie is paused. The same rule is enforced on the server, not just the button.",
+      "In the CRM, the salesman's Genie was already behind a click — ASK GENIE on the record, and EVA's research button — and stays that way: nothing runs until he presses it.",
+    ],
+  },
+  {
     v: "3.27.0.0",
     date: "2026-08-28",
     module: "CRM — the outbound queues, and the 6 AM thank-you",

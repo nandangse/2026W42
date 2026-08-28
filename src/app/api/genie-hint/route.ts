@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { requireReader, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
+import { requireReader, errJson, HttpError } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { computeSchedule, planEnd, today as todayISO, manDays } from "@/lib/schedule";
@@ -115,21 +115,23 @@ function isStale(builtAt: string | null, jobUpdatedAt: string | null): boolean {
  *
  * Everyone else still gets any brief that already exists, free and instantly.
  */
-async function mayAutoBrief(userId: string, isOwner: boolean): Promise<boolean> {
+/**
+ * PAUSED (Dr Raghu, 28 Aug 2026): Genie never writes a job read on its own —
+ * the API credits are spent only when a named hand presses Generate. The
+ * old auto-brief for the owner's direct reports is kept here as history,
+ * switched off in one place.
+ */
+async function mayAutoBrief(): Promise<boolean> {
+  return false;
+}
+
+/** Who may press Generate at all: the owner, Stratcom and MC (Management). */
+async function mayGenerate(userId: string, isOwner: boolean): Promise<boolean> {
   if (isOwner) return true;
   const admin = adminClient();
-  const { data: boss } = await admin
-    .from("profiles")
-    .select("id")
-    .ilike("email", RAGHU_EMAIL)
-    .maybeSingle();
-  if (!boss?.id) return false;
   const { data: me } = await admin
-    .from("profiles")
-    .select("reports_to")
-    .eq("id", userId)
-    .maybeSingle();
-  return me?.reports_to === boss.id;
+    .from("profiles").select("stratcom, management").eq("id", userId).maybeSingle();
+  return !!me?.stratcom || !!me?.management;
 }
 
 const fmtINR = (n: number) =>
@@ -175,7 +177,7 @@ export async function GET(req: Request) {
 
     const row = hintRes.data;
     const stale = !row || isStale(row.built_at, jobRes.data?.updated_at ?? null) || row.model !== MODEL;
-    const auto = await mayAutoBrief(user.id, user.isOwner);
+    const auto = await mayAutoBrief();
 
     return NextResponse.json({
       hint: row?.hint ?? null,
@@ -183,6 +185,7 @@ export async function GET(req: Request) {
       builtBy: row?.built_by ?? null,
       stale,
       auto,
+      may: await mayGenerate(user.id, user.isOwner),
       configured: !!process.env.ANTHROPIC_API_KEY,
     });
   } catch (e) {
@@ -198,6 +201,10 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await requireReader();
+    // The cache below is free to read for anyone; GENERATING is what costs,
+    // and generating is MC and Stratcom's alone while Genie is paused.
+    if (!(await mayGenerate(user.id, user.isOwner)))
+      throw new HttpError(403, "Genie is paused — MC and Stratcom generate the job reads for now.");
     const body = await req.json();
     const jobId = String(body.job_id || "");
     if (!jobId) throw new HttpError(400, "job_id is required");
