@@ -162,6 +162,23 @@ function resolveOwners(jobs: BoardJob[], people: Person[]): string[] {
   return [...unmatched].sort();
 }
 
+/**
+ * Supabase caps every select at 1,000 rows — SILENTLY. On 28 Aug 2026 the
+ * milestones table crossed 1,000 and the rows past the cap vanished from the
+ * board; a Save-now from that truncated screen would have DELETED them
+ * (delete-then-insert). Pankaj caught it within the hour. Every growing
+ * table is paged from now on; the cap must never truncate silently again.
+ */
+async function pageAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<{ data: T[]; error: { message: string } | null }> {
+  const out: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await build(from, from + 999);
+    if (error) return { data: out, error };
+    out.push(...(data ?? []));
+    if (!data || data.length < 1000) return { data: out, error: null };
+  }
+}
+
 export async function buildBoard(supabase: SupabaseClient) {
   const [
     jobsRes,
@@ -178,15 +195,17 @@ export async function buildBoard(supabase: SupabaseClient) {
     batchesRes,
     peopleRes,
   ] = await Promise.all([
-    supabase.from("jobs").select("*"),
-    supabase.from("projects").select("*"),
-    supabase.from("erp_tasks").select("*"),
-    supabase.from("manual_tasks").select("*"),
-    supabase.from("task_comments").select("task_id, task_kind"),
-    supabase.from("plans").select("*"),
-    supabase.from("milestones").select("*").order("idx", { ascending: true }),
-    supabase.from("baseline_milestones").select("*").order("idx", { ascending: true }),
-    supabase.from("materials").select("*"),
+    // every page walks a FIXED order — pages of an unordered select can skip
+    // or repeat rows, which is the same corruption wearing a new hat
+    pageAll((a, b) => supabase.from("jobs").select("*").order("id").range(a, b)),
+    pageAll((a, b) => supabase.from("projects").select("*").order("job_id").range(a, b)),
+    pageAll((a, b) => supabase.from("erp_tasks").select("*").order("id").range(a, b)),
+    pageAll((a, b) => supabase.from("manual_tasks").select("*").order("id").range(a, b)),
+    pageAll((a, b) => supabase.from("task_comments").select("id, task_id, task_kind").order("id").range(a, b)),
+    pageAll((a, b) => supabase.from("plans").select("*").order("job_id").range(a, b)),
+    pageAll((a, b) => supabase.from("milestones").select("*").order("job_id").order("idx", { ascending: true }).range(a, b)),
+    pageAll((a, b) => supabase.from("baseline_milestones").select("*").order("job_id").order("idx", { ascending: true }).range(a, b)),
+    pageAll((a, b) => supabase.from("materials").select("*").order("id").range(a, b)),
     supabase.from("settings").select("priority_order").eq("id", 1).maybeSingle(),
     supabase.from("family_templates").select("*"),
     // only recent batches — the header just needs the latest per kind, and this

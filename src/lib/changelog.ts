@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.21",
+    date: "2026-08-28",
+    module: "CRITICAL — the 1,000-row cliff, found by Pankaj, fixed within the hour",
+    items: [
+      "Milestones looked deleted beyond No. 15. The truth: the company's milestones crossed 1,000 rows today, and Supabase silently CAPS every read at 1,000 — the board simply stopped seeing the tail, and a Save-now from that truncated screen would have deleted it for real (the plan save replaces the whole set). NOTHING WAS ACTUALLY LOST — all 1,138 rows verified present, Pankaj's 16 included; the missing ones were invisible, not gone.",
+      "Fixed at the root: every growing table the board reads — jobs, tasks, plans, milestones, baselines, materials, comments — is now PAGED past the cap, each page walking a fixed order so nothing can be skipped or doubled.",
+      "And a SHRINK GUARD on the plan save: a payload carrying less than half a job's milestones is refused in words ('that smells like a stale page — reload first'), so even a browser tab from before this fix cannot destroy a plan.",
+    ],
+  },
+  {
     v: "3.29.0.20",
     date: "2026-08-28",
     module: "Kuber Tasking — day, week or month",

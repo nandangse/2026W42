@@ -83,6 +83,21 @@ export async function POST(req: Request) {
       done_on: m.done_on ?? null,
     }));
 
+    // THE SHRINK GUARD (28 Aug 2026): a save that silently drops a large
+    // slice of the plan is far more likely a truncated screen than an
+    // intention — the day the milestones table crossed Supabase's 1,000-row
+    // cap, saves from stale tabs would have deleted whole tails of plans.
+    // A big shrink is refused in words; deleting a few rows stays free.
+    const { count: existing } = await supabase
+      .from("milestones").select("id", { count: "exact", head: true }).eq("job_id", jobId);
+    if ((existing ?? 0) > 5 && rows.length < (existing ?? 0) / 2 && !body.confirm_shrink) {
+      return NextResponse.json({
+        error: `This save carries ${rows.length} milestones but the job holds ${existing}. ` +
+          "That smells like a stale page, not a decision — RELOAD the Job Plan first. " +
+          "If you truly mean to remove that many, delete them after reloading and save again.",
+      }, { status: 409 });
+    }
+
     // replace the milestone set for this job (delete then insert)
     const { error: de } = await supabase.from("milestones").delete().eq("job_id", jobId);
     if (de) throw new Error(de.message);
