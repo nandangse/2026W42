@@ -78,6 +78,15 @@ export default function Accounts({
   email: string; displayName: string | null; initials: string | null; role: string;
 }) {
   const [openKey, setOpenKey] = useState("dashboard");
+  // The sidebar folds to an icon rail (Dr Raghu, 28 Aug 2026) — remembered.
+  const [navOpen, setNavOpen] = useState(true);
+  useEffect(() => {
+    try { setNavOpen(localStorage.getItem("kuber.nav") !== "0"); } catch { /* fine */ }
+  }, []);
+  const toggleNav = () => setNavOpen((v) => {
+    try { localStorage.setItem("kuber.nav", v ? "0" : "1"); } catch { /* fine */ }
+    return !v;
+  });
 
   // Deep-linkable, the HRMS way: /kuber#cashflow opens the cash flow.
   useEffect(() => {
@@ -120,18 +129,26 @@ export default function Accounts({
       </div>
 
       <div style={{ display: "flex", alignItems: "stretch", minHeight: "calc(100vh - 46px)" }}>
-        {/* ═══════════════════ left navbar ═══════════════════ */}
-        <nav style={{ width: 220, flexShrink: 0, background: "#fff", borderRight: "1px solid #E2E0DA", padding: "10px 8px" }}>
+        {/* ═══════════════════ left navbar — folds to an icon rail ═══════════════════ */}
+        <nav style={{ width: navOpen ? 220 : 54, flexShrink: 0, background: "#fff", borderRight: "1px solid #E2E0DA", padding: "10px 6px", transition: "width .15s ease" }}>
+          <button onClick={toggleNav}
+            className="w-full rounded px-2 py-1.5 text-xs font-bold mb-1 text-left"
+            style={{ color: "#8A94A0" }}
+            title={navOpen ? "Fold the sidebar to icons" : "Open the sidebar"}>
+            {navOpen ? "« fold" : "»"}
+          </button>
           {NAV.map((g, gi) => (
             <div key={gi} className="mb-1">
-              {g.header && (
+              {g.header && navOpen && (
                 <div className="px-2.5 pt-2 pb-1 text-xs font-bold" style={{ color: "#8A94A0", letterSpacing: 1 }}>{g.header}</div>
               )}
               {g.items.map((s) => (
                 <button key={s.key} onClick={() => go(s.key)}
-                  className="w-full text-left rounded px-2.5 py-1.5 text-sm font-semibold flex items-center gap-2 mb-0.5"
+                  className="w-full text-left rounded px-2 py-1.5 text-sm font-semibold flex items-center gap-2 mb-0.5"
+                  title={navOpen ? undefined : s.label}
                   style={openKey === s.key ? { background: "#16232F", color: "#fff" } : { color: "#5A6672" }}>
-                  <span style={{ width: 18, textAlign: "center" }}>{s.icon}</span> {s.label}
+                  <span style={{ width: 18, textAlign: "center", flexShrink: 0 }}>{s.icon}</span>
+                  {navOpen && s.label}
                 </button>
               ))}
             </div>

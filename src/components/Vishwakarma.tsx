@@ -9,7 +9,7 @@
  * names what it will hold so the shape is agreed before the screens fill.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { APP_VERSION } from "@/lib/changelog";
 import ModuleMenu from "@/components/ModuleMenu";
 
@@ -29,6 +29,14 @@ export default function Vishwakarma({
 }) {
   const [openKey, setOpenKey] = useState("dashboard");
   const sec = SECTIONS.find((s) => s.key === openKey) ?? SECTIONS[0];
+  const [navOpen, setNavOpen] = useState(true);
+  useEffect(() => {
+    try { setNavOpen(localStorage.getItem("vishwakarma.nav") !== "0"); } catch { /* fine */ }
+  }, []);
+  const toggleNav = () => setNavOpen((v) => {
+    try { localStorage.setItem("vishwakarma.nav", v ? "0" : "1"); } catch { /* fine */ }
+    return !v;
+  });
 
   return (
     <div className="min-h-screen" style={{ background: "#F1EFE9", color: "#22303C" }}>
@@ -53,12 +61,18 @@ export default function Vishwakarma({
       </div>
 
       <div style={{ display: "flex", alignItems: "stretch", minHeight: "calc(100vh - 46px)" }}>
-        <nav style={{ width: 236, flexShrink: 0, background: "#fff", borderRight: "1px solid #E2E0DA", padding: "10px 8px" }}>
+        <nav style={{ width: navOpen ? 236 : 54, flexShrink: 0, background: "#fff", borderRight: "1px solid #E2E0DA", padding: "10px 6px", transition: "width .15s ease" }}>
+          <button onClick={toggleNav} className="w-full rounded px-2 py-1.5 text-xs font-bold mb-1 text-left" style={{ color: "#8A94A0" }}
+            title={navOpen ? "Fold the sidebar to icons" : "Open the sidebar"}>
+            {navOpen ? "« fold" : "»"}
+          </button>
           {SECTIONS.map((s) => (
             <button key={s.key} onClick={() => setOpenKey(s.key)}
-              className="w-full text-left rounded px-2.5 py-2 text-sm font-semibold flex items-center gap-2 mb-0.5"
+              className="w-full text-left rounded px-2 py-2 text-sm font-semibold flex items-center gap-2 mb-0.5"
+              title={navOpen ? undefined : s.label}
               style={openKey === s.key ? { background: "#16232F", color: "#fff" } : { color: "#5A6672" }}>
-              <span style={{ width: 18, textAlign: "center" }}>{s.icon}</span> {s.label}
+              <span style={{ width: 18, textAlign: "center", flexShrink: 0 }}>{s.icon}</span>
+              {navOpen && s.label}
             </button>
           ))}
         </nav>

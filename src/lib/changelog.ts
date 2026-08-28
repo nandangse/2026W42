@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.10",
+    date: "2026-08-28",
+    module: "Kuber — the registers arrive seeded, and the sides fold",
+    items: [
+      "The BG, FD and INSURANCE registers were SEEDED from the management-review sheet itself: 123 bank guarantees (47 live, ₹1.89 Cr — the sheet's own tile says ₹1.88 Cr), 82 fixed deposits (38 live, ₹7.14 Cr principal against the sheet's ₹7.25 Cr) and 18 policies (16 live, ₹60.6 Cr sum insured). Statuses mapped, dates normalised from the sheet's six formats, FD–BG liens and agents kept in the notes. The team now corrects and maintains them HERE — the sheet's registers are retired.",
+      "The SIDEBARS FOLD — Kuber's and Vishwakarma's both collapse to an icon rail on «, remembered per browser, hover telling each icon's name.",
+    ],
+  },
+  {
     v: "3.29.0.9",
     date: "2026-08-28",
     module: "Kuber — the supplier dossier, complete",
