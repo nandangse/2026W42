@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.6",
+    date: "2026-08-28",
+    module: "Kuber — the review link signs itself",
+    items: [
+      "The Management Review link now says WHO set it and WHEN — 'updated by Raghunandan Jagdish · 28 Aug, 10:15' beside Open the sheet — because a link nobody signs is a link nobody trusts. Migration 0080, two columns.",
+    ],
+  },
+  {
     v: "3.29.0.5",
     date: "2026-08-28",
     module: "Kuber — the receivables tell the truth",

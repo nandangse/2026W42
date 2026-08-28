@@ -93,6 +93,7 @@ export default function UploadFiles() {
   const [forDate, setForDate] = useState(TODAY_IST);
   const [rows, setRows] = useState<KuberUpload[] | null>(null);
   const [reviewLink, setReviewLink] = useState<string | null>(null);
+  const [reviewWho, setReviewWho] = useState<string>("");
   const [linkEdit, setLinkEdit] = useState<string | null>(null); // null = not editing
   const [linkMsg, setLinkMsg] = useState("");
   const [running, setRunning] = useState<"" | "masters" | "transactions">("");
@@ -105,7 +106,12 @@ export default function UploadFiles() {
   const load = useCallback(() => {
     fetch("/api/kuber/upload", { cache: "no-store" })
       .then((r) => r.json())
-      .then((j) => { setRows(j.uploads || []); setReviewLink(j.reviewLink ?? null); })
+      .then((j) => {
+        setRows(j.uploads || []); setReviewLink(j.reviewLink ?? null);
+        setReviewWho(j.reviewLinkBy
+          ? `updated by ${j.reviewLinkBy}${j.reviewLinkAt ? " · " + new Date(j.reviewLinkAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}`
+          : "");
+      })
       .catch(() => setRows([]));
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -274,9 +280,12 @@ export default function UploadFiles() {
         {linkEdit === null ? (
           <>
             {reviewLink ? (
-              <a href={reviewLink} target="_blank" rel="noreferrer" className="text-sm font-bold" style={{ color: "#1B3A5C" }}>
-                Open the sheet ↗
-              </a>
+              <>
+                <a href={reviewLink} target="_blank" rel="noreferrer" className="text-sm font-bold" style={{ color: "#1B3A5C" }}>
+                  Open the sheet ↗
+                </a>
+                {reviewWho && <span className="text-xs" style={{ color: MUTED }}>{reviewWho}</span>}
+              </>
             ) : (
               <span className="text-sm" style={{ color: MUTED }}>no link kept yet</span>
             )}
@@ -296,7 +305,7 @@ export default function UploadFiles() {
                 body: JSON.stringify({ review_link: linkEdit }),
               });
               if (!r.ok) { setLinkMsg((await r.json()).error || "Could not save"); return; }
-              setReviewLink(linkEdit.trim() || null); setLinkEdit(null);
+              setReviewLink(linkEdit.trim() || null); setLinkEdit(null); load();
             }} className="text-xs font-bold rounded px-3 py-1 text-white" style={{ background: ORANGE }}>Save</button>
             <button onClick={() => { setLinkEdit(null); setLinkMsg(""); }} className="text-xs" style={{ color: MUTED }}>Cancel</button>
           </>
