@@ -27,12 +27,12 @@ create table if not exists public.task_file (
   path      text not null,
   mime      text,
   bytes     bigint,
-  /** True when the mime says image/* — the Drive sync routes photos and files
-      to their two different folders on this flag. */
+  -- True when the mime says it is an image — the Drive sync routes photos
+  -- and files to their two different folders on this flag.
   is_photo  boolean not null default false,
   by        text,
   at        timestamptz not null default now(),
-  /** Stamped by the Drive sync script once the copy is in the Drive folder. */
+  -- Stamped by the Drive sync script once the copy is in the Drive folder.
   drive_synced_at timestamptz
 );
 
