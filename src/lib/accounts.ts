@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { currentUser, HttpError, type AuthedUser } from "@/lib/auth";
+import { adminClient } from "@/lib/supabase/admin";
 
 /**
  * The Accounts module's door — the same shape as HRMS's (resolveHrmsAccess)
@@ -25,4 +27,13 @@ export async function resolveAccountsAccess(
   } catch {
     return false;
   }
+}
+
+/** The one door check every /api/kuber route uses. */
+export async function requireKuber(): Promise<AuthedUser> {
+  const u = await currentUser();
+  if (!u || u.disabled) throw new HttpError(401, "Sign in first.");
+  if (!(await resolveAccountsAccess(adminClient(), u.email, u.isOwner)))
+    throw new HttpError(403, "Kuber is granted per person — the tick on Admin → module access.");
+  return u;
 }

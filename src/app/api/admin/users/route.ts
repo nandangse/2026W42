@@ -92,6 +92,13 @@ export async function GET() {
       for (const g of ag || []) accEmails.add(String(g.email || "").toLowerCase());
     } catch { /* pre-0073 */ }
 
+    // Vishwakarma grants — the fifth, design (0076).
+    const vishEmails = new Set<string>();
+    try {
+      const { data: vg } = await admin.from("vishwakarma_access").select("email");
+      for (const g of vg || []) vishEmails.add(String(g.email || "").toLowerCase());
+    } catch { /* pre-0076 */ }
+
     // Last sign-in lives in auth.users, not profiles, so it comes from the
     // admin auth API. Failure here must not take the page down — the column
     // simply reads "—".
@@ -140,6 +147,10 @@ export async function GET() {
           accEmails.has(String(u.email || "").toLowerCase()) ||
           String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         accounts_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        vishwakarma_access:
+          vishEmails.has(String(u.email || "").toLowerCase()) ||
+          String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        vishwakarma_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         goals_level:
           String(u.email || "").toLowerCase() === RAGHU_EMAIL
             ? "edit"
@@ -386,6 +397,30 @@ export async function POST(req: Request) {
         }
       } else {
         const { error } = await admin.from("hrms_access").delete().eq("email", target);
+        if (error) throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    /** { action: "vishwakarma_access", id, grant } — owner only, as with HRMS. */
+    if (body.action === "vishwakarma_access") {
+      if (!caller.isOwner)
+        throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant Vishwakarma.`);
+      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+      const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
+      const target = String(t?.email || "").toLowerCase();
+      if (!target) return NextResponse.json({ error: "no such user" }, { status: 404 });
+      if (target === RAGHU_EMAIL)
+        return NextResponse.json({ error: "The owner holds Vishwakarma implicitly." }, { status: 400 });
+      if (body.grant) {
+        const { error } = await admin.from("vishwakarma_access").upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
+        if (error) {
+          if (/vishwakarma_access|schema cache|does not exist/i.test(error.message))
+            return NextResponse.json({ error: "Run migration 0076 first — the Vishwakarma grant table doesn't exist yet" }, { status: 400 });
+          throw new Error(error.message);
+        }
+      } else {
+        const { error } = await admin.from("vishwakarma_access").delete().eq("email", target);
         if (error) throw new Error(error.message);
       }
       return NextResponse.json({ ok: true });

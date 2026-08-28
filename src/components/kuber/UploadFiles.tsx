@@ -1,0 +1,281 @@
+"use client";
+
+/**
+ * Kuber's Upload Files — the pipeline version (Dr Raghu, 28 Aug 2026):
+ * the file goes to the BROWSER first, then straight to GOOGLE DRIVE
+ * (bypassing Vercel and Supabase entirely — a 407 MB export never touches
+ * them), and then the browser itself READS it into Kuber's tables, sending
+ * only parsed rows. A timer and a % ride every stage; one file at a time.
+ *
+ * The Drive leg signs in with the user's own Google account (the same OAuth
+ * app Gmail uses) and files the XML under "<date> - <initials>" inside the
+ * Tally folder Dr Raghu linked. If Drive says no — origin not yet allowed on
+ * the OAuth app, popup blocked — the stage is skipped in plain words and the
+ * books still load; the Mac script can file the copy later.
+ */
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { parseMastersInBrowser, parseTransactionsInBrowser, type Row } from "@/lib/kuber-tally-browser";
+
+const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A", GREEN = "#0D7A3F";
+const TODAY_IST = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+/** The Drive folder Dr Raghu linked for the Tally XMLs. */
+const DRIVE_FOLDER = "1V3zIjPvz9DSHGlJCAuSSWk-iG5Tfnnev";
+
+interface KuberUpload {
+  id: string; kind: string; for_date: string; name: string; bytes: number | null;
+  by: string | null; initials: string | null; at: string; drive_synced_at: string | null; url: string | null;
+}
+type Stage = { name: string; state: "wait" | "run" | "done" | "skip" | "fail"; pct: number; note?: string };
+
+declare global {
+  // Google Identity Services, loaded on demand for the Drive leg.
+  interface Window { google?: { accounts: { oauth2: { initTokenClient: (c: object) => { requestAccessToken: () => void } } } } }
+}
+
+async function driveToken(clientId: string): Promise<string> {
+  await new Promise<void>((res, rej) => {
+    if (window.google?.accounts) return res();
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.onload = () => res();
+    s.onerror = () => rej(new Error("Google sign-in script would not load"));
+    document.head.appendChild(s);
+  });
+  return new Promise((res, rej) => {
+    const tc = window.google!.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: "https://www.googleapis.com/auth/drive",
+      callback: (t: { access_token?: string; error?: string }) =>
+        t.access_token ? res(t.access_token) : rej(new Error(t.error || "Google did not grant access")),
+      error_callback: (e: { message?: string }) => rej(new Error(e.message || "Google sign-in was closed")),
+    } as object);
+    tc.requestAccessToken();
+  });
+}
+
+async function driveUpload(token: string, folderName: string, file: File, kindLabel: string, onPct: (p: number) => void): Promise<void> {
+  const H = { authorization: `Bearer ${token}` };
+  // the "<date> - <initials>" subfolder, found or made
+  const q = encodeURIComponent(`name = '${folderName.replace(/'/g, "\\'")}' and '${DRIVE_FOLDER}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
+  const found = await (await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&supportsAllDrives=true&includeItemsFromAllDrives=true`, { headers: H })).json();
+  let sub = found.files?.[0]?.id as string | undefined;
+  if (!sub) {
+    const mk = await (await fetch("https://www.googleapis.com/drive/v3/files?supportsAllDrives=true", {
+      method: "POST", headers: { ...H, "content-type": "application/json" },
+      body: JSON.stringify({ name: folderName, mimeType: "application/vnd.google-apps.folder", parents: [DRIVE_FOLDER] }),
+    })).json();
+    if (!mk.id) throw new Error(mk.error?.message || "Could not make the Drive subfolder");
+    sub = mk.id;
+  }
+  // resumable session, then 16 MB slices with honest progress
+  const init = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true", {
+    method: "POST", headers: { ...H, "content-type": "application/json", "x-upload-content-type": "text/xml" },
+    body: JSON.stringify({ name: `${kindLabel} - ${file.name}`, parents: [sub] }),
+  });
+  const session = init.headers.get("location");
+  if (!session) throw new Error((await init.json().catch(() => null))?.error?.message || "Drive refused the upload session");
+  const CHUNK = 16 * 1024 * 1024;
+  for (let off = 0; off < file.size; off += CHUNK) {
+    const end = Math.min(off + CHUNK, file.size);
+    const r = await fetch(session, {
+      method: "PUT",
+      headers: { "content-range": `bytes ${off}-${end - 1}/${file.size}` },
+      body: file.slice(off, end),
+    });
+    if (r.status !== 308 && !r.ok) throw new Error(`Drive stopped at ${Math.round((off / file.size) * 100)}% (${r.status})`);
+    onPct(end / file.size);
+  }
+}
+
+export default function UploadFiles() {
+  const [forDate, setForDate] = useState(TODAY_IST);
+  const [rows, setRows] = useState<KuberUpload[] | null>(null);
+  const [running, setRunning] = useState<"" | "masters" | "transactions">("");
+  const [stages, setStages] = useState<Stage[]>([]);
+  const [elapsed, setElapsed] = useState(0);
+  const [finished, setFinished] = useState("");
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const load = useCallback(() => {
+    fetch("/api/kuber/upload", { cache: "no-store" })
+      .then((r) => r.json()).then((j) => setRows(j.uploads || [])).catch(() => setRows([]));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
+
+  const setStage = (i: number, patch: Partial<Stage>) =>
+    setStages((s) => s.map((st, j) => (j === i ? { ...st, ...patch } : st)));
+
+  const run = async (kind: "masters" | "transactions", file: File | null) => {
+    if (!file || running) return;
+    setRunning(kind); setFinished("");
+    setStages([
+      { name: "In the browser", state: "run", pct: 0 },
+      { name: "To Google Drive", state: "wait", pct: 0 },
+      { name: "Read into Kuber", state: "wait", pct: 0 },
+    ]);
+    const t0 = Date.now();
+    setElapsed(0);
+    timer.current = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 1000);
+    const label = kind === "masters" ? "Tally XML Masters" : "Tally XML Transactions";
+    let onDrive = false;
+    try {
+      // 1 — the browser holds the File itself; a quick read proves it is real
+      await file.slice(0, 1024).arrayBuffer();
+      setStage(0, { state: "done", pct: 1, note: `${(file.size / 1024 / 1024).toFixed(0)} MB held` });
+
+      // 2 — straight to Drive, Vercel and Supabase never see the bytes
+      setStage(1, { state: "run" });
+      try {
+        const cfg = await (await fetch("/api/kuber/ingest?config=1", { cache: "no-store" })).json();
+        if (!cfg.googleClientId) throw new Error("no Google client configured");
+        const token = await driveToken(cfg.googleClientId);
+        const me = rows?.find(() => true);
+        const initials = (me?.initials || "RJ").toUpperCase();
+        await driveUpload(token, `${forDate} - ${initials}`, file, label, (p) => setStage(1, { pct: p }));
+        onDrive = true;
+        setStage(1, { state: "done", pct: 1, note: "filed in the Tally folder" });
+      } catch (e) {
+        setStage(1, { state: "skip", note: `${e instanceof Error ? e.message : String(e)} — the Mac script can file it later` });
+      }
+
+      // 3 — the browser parses; only rows travel, 500 at a time
+      setStage(2, { state: "run" });
+      const begin = await fetch("/api/kuber/ingest", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "begin", kind }),
+      });
+      if (!begin.ok) throw new Error((await begin.json()).error || "Kuber refused the load");
+      const sink = async (table: string, batch: Row[]) => {
+        const r = await fetch("/api/kuber/ingest", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "batch", table, rows: batch }),
+        });
+        if (!r.ok) throw new Error((await r.json()).error || `a ${table} batch was refused`);
+      };
+      const onPct = (p: number) => setStage(2, { pct: p });
+      const counts = kind === "masters"
+        ? await parseMastersInBrowser(file, sink, onPct)
+        : await parseTransactionsInBrowser(file, sink, onPct);
+      const done = await fetch("/api/kuber/ingest", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "done", kind, for_date: forDate, name: file.name, bytes: file.size, drive: onDrive }),
+      });
+      if (!done.ok) throw new Error((await done.json()).error || "the final step was refused");
+      const j = await done.json();
+      const what = "ledgers" in counts
+        ? `${counts.ledgers.toLocaleString()} ledgers, ${counts.bills.toLocaleString()} opening bills`
+        : `${counts.vouchers.toLocaleString()} vouchers, ${counts.lines.toLocaleString()} lines`;
+      setStage(2, { state: "done", pct: 1, note: what });
+      setFinished(`Done in ${Math.floor((Date.now() - t0) / 60000)}m ${Math.floor(((Date.now() - t0) / 1000) % 60)}s — ${what}; ${j.bills.toLocaleString()} open bills stand rebuilt.`);
+      load();
+    } catch (e) {
+      setStages((s) => s.map((st) => (st.state === "run" ? { ...st, state: "fail", note: e instanceof Error ? e.message : String(e) } : st)));
+    } finally {
+      if (timer.current) clearInterval(timer.current);
+      setRunning("");
+    }
+  };
+
+  const mmss = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
+  const Tile = ({ kind, label }: { kind: "masters" | "transactions"; label: string }) => (
+    <label className="rounded-lg border p-4 flex-1 text-center"
+      style={{ borderColor: BORDER, background: running === kind ? "#F4F2EC" : "#fff", minWidth: 220, cursor: running ? "default" : "pointer", opacity: running && running !== kind ? 0.45 : 1 }}
+      title={running && running !== kind ? "One file at a time — this one waits its turn" : undefined}>
+      <div className="text-2xl mb-1">⬆</div>
+      <div className="text-sm font-bold" style={{ color: INK }}>{label}</div>
+      <div className="text-xs mt-1" style={{ color: MUTED }}>
+        {running === kind ? `working… ${mmss}` : "Click to choose the XML — any size"}
+      </div>
+      <input type="file" accept=".xml,text/xml,application/xml" className="hidden" disabled={!!running}
+        onChange={(e) => { run(kind, e.target.files?.[0] ?? null); e.target.value = ""; }} />
+    </label>
+  );
+
+  return (
+    <div>
+      <div className="bg-white rounded-lg border p-4 mb-3" style={{ borderColor: BORDER, maxWidth: 780 }}>
+        <div className="text-lg font-bold mb-1" style={{ color: INK }}>⬆ Upload Files</div>
+        <div className="text-sm mb-3" style={{ color: "#5A6672", lineHeight: 1.6 }}>
+          The file stays with the browser, goes straight to <b>Google Drive</b> under a <b>date – initials</b> folder,
+          and is then read into Kuber's books right here — the 400&nbsp;MB never touches the app's servers, only the rows do.
+          One file at a time.
+        </div>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs font-bold" style={{ color: MUTED }}>DATE</span>
+          <input type="date" value={forDate} onChange={(e) => setForDate(e.target.value)} disabled={!!running}
+            className="border rounded px-2 py-1 text-sm" style={{ borderColor: BORDER }}
+            title="The date the export is OF — not necessarily today" />
+        </div>
+        <div className="flex gap-3 flex-wrap mb-2">
+          <Tile kind="masters" label="Tally XML Masters" />
+          <Tile kind="transactions" label="Tally XML Transactions" />
+        </div>
+        {stages.length > 0 && (
+          <div className="rounded border p-3 mt-1" style={{ borderColor: BORDER, background: "#FAF9F5" }}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>THE PIPELINE</span>
+              <span className="text-xs tnum font-bold" style={{ color: running ? ORANGE : GREEN }}>⏱ {mmss}</span>
+            </div>
+            {stages.map((st, i) => (
+              <div key={i} className="mb-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <span style={{ width: 16 }}>
+                    {st.state === "done" ? "✅" : st.state === "run" ? "▶" : st.state === "skip" ? "↷" : st.state === "fail" ? "✕" : "·"}
+                  </span>
+                  <span className="font-semibold" style={{ color: st.state === "fail" ? "#B3261E" : INK }}>{st.name}</span>
+                  {st.state === "run" && <span className="tnum font-bold" style={{ color: ORANGE }}>{Math.round(st.pct * 100)}%</span>}
+                  {st.note && <span style={{ color: st.state === "fail" ? "#B3261E" : MUTED }}>— {st.note}</span>}
+                </div>
+                {(st.state === "run" || st.state === "done") && (
+                  <div className="rounded mt-1" style={{ height: 5, background: "#EAE7DF", overflow: "hidden" }}>
+                    <div style={{ width: `${Math.round(st.pct * 100)}%`, height: "100%", background: st.state === "done" ? GREEN : ORANGE, transition: "width .3s" }} />
+                  </div>
+                )}
+              </div>
+            ))}
+            {finished && <div className="text-xs font-bold mt-1" style={{ color: GREEN }}>{finished}</div>}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxWidth: 950, maxHeight: "46vh" }}>
+        <table className="w-full text-xs" style={{ minWidth: 640, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead>
+            <tr style={{ background: "#22303C", color: "#fff" }}>
+              {["Date", "Kind", "File", "By", "Uploaded", "On Drive"].map((h) => (
+                <th key={h} className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows === null && (<tr><td colSpan={6} className="px-3 py-4" style={{ color: MUTED }}>Loading…</td></tr>)}
+            {rows?.length === 0 && (<tr><td colSpan={6} className="px-3 py-4" style={{ color: MUTED }}>Nothing uploaded yet — the first pair starts the ledger.</td></tr>)}
+            {(rows || []).map((r, i) => (
+              <tr key={r.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                <td className="px-2 py-1.5 tnum whitespace-nowrap">{r.for_date}</td>
+                <td className="px-2 py-1.5 font-bold" style={{ color: r.kind === "masters" ? "#1B3A5C" : GREEN }}>
+                  {r.kind === "masters" ? "Masters" : "Transactions"}
+                </td>
+                <td className="px-2 py-1.5">
+                  {r.url ? <a href={r.url} target="_blank" rel="noreferrer" style={{ color: "#1B3A5C", textDecoration: "underline" }}>{r.name}</a> : r.name}
+                  {r.bytes != null && <span style={{ color: MUTED }}> · {(r.bytes / 1024 / 1024).toFixed(1)} MB</span>}
+                </td>
+                <td className="px-2 py-1.5 font-semibold">{r.initials || r.by || "—"}</td>
+                <td className="px-2 py-1.5 tnum whitespace-nowrap" style={{ color: MUTED }}>
+                  {new Date(r.at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </td>
+                <td className="px-2 py-1.5">
+                  {r.drive_synced_at
+                    ? <span className="font-bold" style={{ color: GREEN }}>✓ filed</span>
+                    : <span style={{ color: MUTED }} title="the Mac sync carries it over on its next run">pending sync</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

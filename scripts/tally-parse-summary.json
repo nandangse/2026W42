@@ -1,0 +1,353 @@
+{
+  "ledgers": 3632,
+  "openingBills": 3433,
+  "vouchers": 9495,
+  "lines": 26878,
+  "allocs": 5999,
+  "openBills": 4785,
+  "receivableCr": 54.65,
+  "payableCr": 52.43,
+  "sampleLedgers": [
+    {
+      "id": "6124d8ea-0884-46fb-a972-44a030a8b50f",
+      "name": "Profit & Loss A/c",
+      "parent": "",
+      "opening": 240600930.84,
+      "closing": 0
+    },
+    {
+      "id": "14d30fa2-eb2d-4ddc-9dc1-b7d08f93210d",
+      "name": "01 Basic and D.A. - Direct",
+      "parent": "B01 Wages & Bonus",
+      "opening": 0,
+      "closing": 0
+    },
+    {
+      "id": "f9488a6a-4f4b-46c1-a348-d6e315c2e8ef",
+      "name": "01 Basic and D A-Indirect",
+      "parent": "A01 Salaries and Allowances",
+      "opening": 0,
+      "closing": 0
+    },
+    {
+      "id": "72002f2e-234b-4b35-b9ff-8e65dd2534a9",
+      "name": "02 HRA - Direct",
+      "parent": "B01 Wages & Bonus",
+      "opening": 0,
+      "closing": 0
+    },
+    {
+      "id": "c2dd6604-24ad-43ca-8501-9ec4b7a98696",
+      "name": "02 HRA - Indirect",
+      "parent": "A01 Salaries and Allowances",
+      "opening": 0,
+      "closing": 0
+    }
+  ],
+  "sampleBills": [
+    {
+      "id": "41edde68-937c-4a05-89a3-3468fa654251",
+      "party": "6050 - Neeraj Kumar Yadav",
+      "party_group": "Staff and Worker Dues(Advances)",
+      "bill": "1652",
+      "bill_date": "2026-04-20",
+      "due_date": "2026-04-20",
+      "kind": "receivable",
+      "amount": 10418
+    },
+    {
+      "id": "cc2fe415-4f5e-4ea5-8e36-5c2a14062f91",
+      "party": "6050 - Neeraj Kumar Yadav",
+      "party_group": "Staff and Worker Dues(Advances)",
+      "bill": "72",
+      "bill_date": "2026-04-21",
+      "due_date": "2026-04-21",
+      "kind": "payable",
+      "amount": 4268
+    },
+    {
+      "id": "b8bd1652-f31c-41b6-9dcc-bac6c198ec22",
+      "party": "6050 - Neeraj Kumar Yadav",
+      "party_group": "Staff and Worker Dues(Advances)",
+      "bill": "9431807",
+      "bill_date": "2026-04-22",
+      "due_date": "2026-04-22",
+      "kind": "receivable",
+      "amount": 13000
+    },
+    {
+      "id": "b913a319-ad49-4b2e-a970-0c363e285518",
+      "party": "6050 - Neeraj Kumar Yadav",
+      "party_group": "Staff and Worker Dues(Advances)",
+      "bill": "81",
+      "bill_date": "2026-04-23",
+      "due_date": "2026-04-23",
+      "kind": "payable",
+      "amount": 13000
+    },
+    {
+      "id": "f6f72de3-665f-4891-b7b1-1a9bfc9282da",
+      "party": "6050 - Neeraj Kumar Yadav",
+      "party_group": "Staff and Worker Dues(Advances)",
+      "bill": "9433407",
+      "bill_date": "2026-05-26",
+      "due_date": "2026-05-26",
+      "kind": "receivable",
+      "amount": 6600
+    },
+    {
+      "id": "bd7ccf87-2c7b-4edd-b252-66f921303366",
+      "party": "6050 - Neeraj Kumar Yadav",
+      "party_group": "Staff and Worker Dues(Advances)",
+      "bill": "328",
+      "bill_date": "2026-06-01",
+      "due_date": "2026-06-01",
+      "kind": "payable",
+      "amount": 6600
+    },
+    {
+      "id": "2150714c-d844-4932-8a91-0bd8bd3bcae3",
+      "party": "6050 - Neeraj Kumar Yadav",
+      "party_group": "Staff and Worker Dues(Advances)",
+      "bill": "9433583",
+      "bill_date": "2026-06-03",
+      "due_date": "2026-06-03",
+      "kind": "receivable",
+      "amount": 8400
+    },
+    {
+      "id": "453eaa17-e9e6-4dc7-9787-73dc919f184e",
+      "party": "6050 - Neeraj Kumar Yadav",
+      "party_group": "Staff and Worker Dues(Advances)",
+      "bill": "9433584",
+      "bill_date": "2026-06-06",
+      "due_date": "2026-06-06",
+      "kind": "receivable",
+      "amount": 5000
+    },
+    {
+      "id": "23252981-397d-4526-a39b-bc3baf8dee0a",
+      "party": "6050 - Neeraj Kumar Yadav",
+      "party_group": "Staff and Worker Dues(Advances)",
+      "bill": "323",
+      "bill_date": "2026-06-06",
+      "due_date": "2026-06-06",
+      "kind": "payable",
+      "amount": 5000
+    },
+    {
+      "id": "ac72f121-dbc8-4f14-9d0e-cf832b7453ad",
+      "party": "6050 - Neeraj Kumar Yadav",
+      "party_group": "Staff and Worker Dues(Advances)",
+      "bill": "327",
+      "bill_date": "2026-06-11",
+      "due_date": "2026-06-11",
+      "kind": "payable",
+      "amount": 8400
+    }
+  ],
+  "topReceivables": [
+    {
+      "id": "cc9fc012-bef2-4fb7-bae7-f4e80356bf45",
+      "party": "Faze Three Limited (Panipat)",
+      "party_group": "Sundry Debtors",
+      "bill": "INV/26-27/0175",
+      "bill_date": "2026-06-19",
+      "due_date": "2026-06-19",
+      "kind": "receivable",
+      "amount": 36499924
+    },
+    {
+      "id": "e65fcee7-b9b2-42fc-ae24-d575c9f7ee77",
+      "party": "Faze Three Limited",
+      "party_group": "Sundry Debtors",
+      "bill": "PI-0031",
+      "bill_date": "2026-06-19",
+      "due_date": "2026-06-19",
+      "kind": "receivable",
+      "amount": 31919921
+    },
+    {
+      "id": "c1da0f57-d8c5-41d7-b7ef-7170ff360c07",
+      "party": "Airbus Defence and Space, S.A.U.",
+      "party_group": "Sundry Debtors",
+      "bill": "INV/25-26/1220",
+      "bill_date": "2026-03-28",
+      "due_date": "2026-03-28",
+      "kind": "receivable",
+      "amount": 19595475
+    },
+    {
+      "id": "85d3cedf-fda2-43e1-997b-f4e8be49b484",
+      "party": "EIH Limited, Delhi",
+      "party_group": "EIH Group",
+      "bill": "PI-0085",
+      "bill_date": "2026-06-11",
+      "due_date": "2026-06-11",
+      "kind": "receivable",
+      "amount": 18417440
+    },
+    {
+      "id": "69ee73c4-10e1-42b0-b6e4-3ffe14dd5bbe",
+      "party": "Taj Sats Air Catering Ltd, Mumbai",
+      "party_group": "Taj Group",
+      "bill": "INV/25-26/1035",
+      "bill_date": "2026-04-10",
+      "due_date": "2026-04-10",
+      "kind": "receivable",
+      "amount": 12744000
+    },
+    {
+      "id": "af643455-a3dd-4b61-b6b3-bd82ee0bed4d",
+      "party": "Encalm Sky Plates (Delhi) Ifk Private Limited",
+      "party_group": "Sundry Debtors",
+      "bill": "9431666",
+      "bill_date": "2026-05-30",
+      "due_date": "2026-05-30",
+      "kind": "receivable",
+      "amount": 10927500
+    },
+    {
+      "id": "4262c810-e905-4da4-83a3-059bec789379",
+      "party": "Airbus Defence and Space, S.A.U.",
+      "party_group": "Sundry Debtors",
+      "bill": "INV/25-26/1219",
+      "bill_date": "2026-03-28",
+      "due_date": "2026-03-28",
+      "kind": "receivable",
+      "amount": 10818250
+    },
+    {
+      "id": "2d70b0dd-97e9-40f8-8b17-c716dd40ca1b",
+      "party": "Taj Sats Air Catering Limited, Bengaluru",
+      "party_group": "Taj Group",
+      "bill": "PI-0113",
+      "bill_date": "2026-04-27",
+      "due_date": "2026-04-27",
+      "kind": "receivable",
+      "amount": 10451850
+    },
+    {
+      "id": "51777c24-bba1-4ccf-a7c6-885b58d27983",
+      "party": "Fixotec Pipe Supports Pvt. Ltd.",
+      "party_group": "Sundry Debtors",
+      "bill": "PI-014",
+      "bill_date": "2026-06-04",
+      "due_date": "2026-06-04",
+      "kind": "receivable",
+      "amount": 9735000
+    },
+    {
+      "id": "6fe8e00f-c2d0-4bd5-ac34-cf5dde3bfade",
+      "party": "Karnavati Aviation P Ltd",
+      "party_group": "Sundry Debtors",
+      "bill": "PI-0023",
+      "bill_date": "2026-06-04",
+      "due_date": "2026-06-04",
+      "kind": "receivable",
+      "amount": 8772960
+    }
+  ],
+  "topPayables": [
+    {
+      "id": "b5f43e74-ce60-4f5d-b07f-92d91afa58ce",
+      "party": "Hero Fincorp Ltd HCF0HOLBT00015606789",
+      "party_group": "Secured Loan - Others",
+      "bill": "206",
+      "bill_date": "2024-05-04",
+      "due_date": "2024-05-04",
+      "kind": "payable",
+      "amount": 29650733
+    },
+    {
+      "id": "f29e7268-b571-4c5e-83d4-eedb7e31b672",
+      "party": "Malawi Catering Services Limited",
+      "party_group": "Sundry Debtors",
+      "bill": "PI-0178",
+      "bill_date": null,
+      "due_date": null,
+      "kind": "payable",
+      "amount": 22223400
+    },
+    {
+      "id": "20f0bc54-a134-4459-8624-4ac11c121946",
+      "party": "Spruce Engineering Co,",
+      "party_group": "Sundry Debtors",
+      "bill": "920977",
+      "bill_date": "2025-01-13",
+      "due_date": "2025-01-13",
+      "kind": "payable",
+      "amount": 11799200
+    },
+    {
+      "id": "eefa4734-801d-4ec6-84f7-b887b971ebe7",
+      "party": "Malawi Catering Services Limited",
+      "party_group": "Sundry Debtors",
+      "bill": "9432433",
+      "bill_date": "2026-06-11",
+      "due_date": "2026-06-11",
+      "kind": "payable",
+      "amount": 11455323.94
+    },
+    {
+      "id": "22f49cb0-4d51-42b2-a9b6-5b0245b304c5",
+      "party": "Encalm Sky Plates (Delhi) Ifk Private Limited",
+      "party_group": "Sundry Debtors",
+      "bill": "9432368",
+      "bill_date": "2026-05-15",
+      "due_date": "2026-05-15",
+      "kind": "payable",
+      "amount": 10927500
+    },
+    {
+      "id": "f9364265-1a20-4caa-af36-89d5490c8f3f",
+      "party": "Capsave Finance Private Limited",
+      "party_group": "Secured Loan - Others",
+      "bill": "341",
+      "bill_date": "2025-07-17",
+      "due_date": "2025-07-17",
+      "kind": "payable",
+      "amount": 10359821.04
+    },
+    {
+      "id": "4695b946-c74b-4016-b611-b2269eac63de",
+      "party": "Hero Fincorp Ltd HCF0HOLBT00015606789",
+      "party_group": "Secured Loan - Others",
+      "bill": "2333",
+      "bill_date": "2024-06-21",
+      "due_date": "2024-06-21",
+      "kind": "payable",
+      "amount": 10275415
+    },
+    {
+      "id": "00a2d2ec-502a-4c7d-a8ee-1fafa4768f18",
+      "party": "Veda Aeronautics (P) Ltd",
+      "party_group": "Sundry Debtors",
+      "bill": "9434394",
+      "bill_date": "2026-07-04",
+      "due_date": "2026-07-04",
+      "kind": "payable",
+      "amount": 10000000
+    },
+    {
+      "id": "7d6b0055-38bb-4fe2-b966-2a9ee5071a51",
+      "party": "Veda Aeronautics (P) Ltd",
+      "party_group": "Sundry Debtors",
+      "bill": "9434395",
+      "bill_date": "2026-07-31",
+      "due_date": "2026-07-31",
+      "kind": "payable",
+      "amount": 10000000
+    },
+    {
+      "id": "df13ff19-0c1c-47f1-84f6-08a8d4b38689",
+      "party": "Veda Aeronautics (P) Ltd",
+      "party_group": "Sundry Debtors",
+      "bill": "9434490",
+      "bill_date": "2026-08-01",
+      "due_date": "2026-08-01",
+      "kind": "payable",
+      "amount": 10000000
+    }
+  ]
+}

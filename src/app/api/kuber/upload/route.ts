@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { currentUser, errJson, HttpError } from "@/lib/auth";
+import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { resolveAccountsAccess } from "@/lib/accounts";
+import { requireKuber } from "@/lib/accounts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,14 +19,6 @@ export const maxDuration = 60;
 const BUCKET = "kuber-uploads";
 const LINK_TTL = 60 * 60 * 4;
 const MAX_BYTES = 50 * 1024 * 1024; // Tally transaction exports run big
-
-async function requireKuber() {
-  const u = await currentUser();
-  if (!u || u.disabled) throw new HttpError(401, "Sign in first.");
-  if (!(await resolveAccountsAccess(adminClient(), u.email, u.isOwner)))
-    throw new HttpError(403, "Kuber is granted per person — the tick on Admin → module access.");
-  return u;
-}
 
 /** GET — the ledger, newest first. */
 export async function GET() {

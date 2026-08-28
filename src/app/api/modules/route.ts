@@ -4,6 +4,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { resolveHrmsAccess } from "@/lib/hrms";
 import { mayUseCrm } from "@/crm/auth";
 import { resolveAccountsAccess } from "@/lib/accounts";
+import { resolveVishwakarmaAccess } from "@/lib/vishwakarma";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +20,14 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const u = await currentUser();
   if (!u || u.disabled)
-    return NextResponse.json({ main: false, crm: false, hrms: false, accounts: false });
+    return NextResponse.json({ main: false, crm: false, hrms: false, accounts: false, vishwakarma: false });
 
   const admin = adminClient();
-  const [crm, hrms, accounts] = await Promise.all([
+  const [crm, hrms, accounts, vishwakarma] = await Promise.all([
     mayUseCrm(),
     resolveHrmsAccess(admin, u.email, u.isOwner),
     resolveAccountsAccess(admin, u.email, u.isOwner),
+    resolveVishwakarmaAccess(admin, u.email, u.isOwner),
   ]);
-  return NextResponse.json({ main: true, crm, hrms, accounts });
+  return NextResponse.json({ main: true, crm, hrms, accounts, vishwakarma });
 }

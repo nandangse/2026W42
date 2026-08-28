@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.0",
+    date: "2026-08-28",
+    module: "Vishwakarma is born, and Kuber becomes a CFO's cockpit",
+    items: [
+      "VISHWAKARMA — the design module — takes the fifth door at /vishwakarma, named for the divine engineer who built the city Kuber ruled. Shell first: Drawing Register, BOMs, Revisions & ECN, Design Requests, Standards. Access is a 🛠 tick on Admin → module access, like every door (migration 0076).",
+      "KUBER IS REBUILT AS THE CFO SEES IT, tab for tab from the management-review sheet it replaces: CUSTOMER RECEIVABLES and SUPPLIER PAYABLES as party-wise ageing in the review's own buckets (<30 · 31-90 · 91-180 · >180 days), every party opening into its bills with due dates.",
+      "THE 13-WEEK CASH FLOW stands — collections falling due, FD maturities and other inflows against planned supplier payments, unplanned bills and the salaries-EMI-statutory lines, net and cumulative per week. A party planned in PAYMENT PLANNING replaces its raw bills: the plan is the decision. The sheet's own words watch over it: sales is vanity, profit is sanity, cash flow is king.",
+      "THE SUPPLIER REPORT CARD grades every payable relationship — outstanding, overdue share, rupee-weighted delay, oldest due — A to D at a glance.",
+      "FOUR REGISTERS with their time frames: BANK GUARANTEES (valid-till, claim date, margin), FIXED DEPOSITS (maturity, rate, the BG each backs — maturities feed the cash flow), INSURANCE (valid-till, sum insured), and CASH FLOW ITEMS for the flows bills never show. Expiries colour amber at 60 days, red past due.",
+      "UPLOAD FILES IS NOW A PIPELINE: the XML stays with the browser, goes STRAIGHT to Google Drive under its date–initials folder, and is parsed RIGHT THERE — only rows travel to Kuber, so the 407 MB Master walks in without touching Vercel or Supabase. A timer and a per-stage % watch it; one file at a time. Proven against the real exports: 3,632 ledgers, 9,495 vouchers, ₹54.65 Cr receivable, ₹52.43 Cr payable.",
+      "Ledgers and Vouchers are browsable and searchable; the Dashboard reads the whole book at a glance and says plainly when no snapshot is loaded. Bank & Cash, GST & Statutory and Reports are named and waiting.",
+    ],
+  },
+  {
     v: "3.28.0.2",
     date: "2026-08-28",
     module: "The reload crash, and the background door for big Tally files",

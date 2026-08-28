@@ -18,13 +18,14 @@
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
-export type ModuleKey = "main" | "crm" | "hrms" | "accounts";
+export type ModuleKey = "main" | "crm" | "hrms" | "accounts" | "vishwakarma";
 
 const MODULES: { key: ModuleKey; label: string; icon: string; href: string }[] = [
   { key: "main", label: "Main Genie", icon: "🧞", href: "/" },
   { key: "crm", label: "CRM", icon: "🤝", href: "/crm" },
   { key: "hrms", label: "HRMS", icon: "👤", href: "/hrms" },
   { key: "accounts", label: "Kuber", icon: "💰", href: "/kuber" },
+  { key: "vishwakarma", label: "Vishwakarma", icon: "🛠", href: "/vishwakarma" },
 ];
 
 /** The rows alone — dropped into the main app's existing account dropdown. */
