@@ -391,7 +391,8 @@ interface ProjRow {
   issues: { id: string; title: string; who: string; due: string | null; esc: string; open: boolean }[];
   deliverables: Row[];
 }
-interface WeekRow { id: string; on_date: string; designer: string; work: string; by: string | null }
+interface WeekRow { id: string; on_date: string; designer: string; work: string; project_id: string | null; stage: string | null; by: string | null }
+const WORK_STAGES = ["GAD", "BOM", "Manuf", "As Built", "Other"];
 
 /** His summary buckets (28 Aug 2026): GAD — BOM — Manuf — As Built. */
 const STAGE_BUCKETS: [string, RegExp][] = [
@@ -404,6 +405,10 @@ function PlansScreen() {
   const [supportFor, setSupportFor] = useState<ProjRow | null>(null);
   const [addDeliv, setAddDeliv] = useState<Row | "new" | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [stripOpen, setStripOpen] = useState(true);
+  const [calOpen, setCalOpen] = useState(false);
+  const [ownerFilter, setOwnerFilter] = useState("all");
+  const [q, setQ] = useState("");
   const [, jobsList, , reloadReg] = useReg("plan");
 
   const load = useCallback(() => {
@@ -429,12 +434,20 @@ function PlansScreen() {
     load();
   };
 
-  const rows = data?.rows || [];
+  const allRows = data?.rows || [];
+  const needle = q.trim().toLowerCase();
+  const rows = allRows.filter((r) =>
+    (ownerFilter === "all" || (ownerFilter === "—" ? !r.design_owner : r.design_owner === ownerFilter))
+    && (!needle
+      || r.id.toLowerCase().includes(needle)
+      || r.description.toLowerCase().includes(needle)
+      || r.jobs.some((j) => j.id.includes(needle) || j.tag.toLowerCase().includes(needle))));
+  const filtered = ownerFilter !== "all" || needle !== "";
 
   // Design Engineer — GAD · BOM · Manuf · As Built, totals below (his strip).
   const strip = (() => {
     const by = new Map<string, number[]>();
-    for (const r of rows) {
+    for (const r of allRows) {
       const eng = r.design_owner || "— unassigned";
       const arr = by.get(eng) || [0, 0, 0, 0];
       STAGE_BUCKETS.forEach(([, re], i) => { if (re.test(r.design_stage)) arr[i] += 1; });
@@ -462,9 +475,32 @@ function PlansScreen() {
         </div>
       )}
 
+      {/* filters (Dr Raghu, 28 Aug 2026): the designer, and a search that
+          reads project number, the one-sentence name, and the jobs */}
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)}
+          className="border rounded px-2 py-1 text-sm bg-white font-semibold"
+          style={{ borderColor: ownerFilter === "all" ? BORDER : ORANGE }}>
+          <option value="all">All design owners</option>
+          <option value="—">— unassigned</option>
+          {(data?.owners || []).map((o) => (<option key={o}>{o}</option>))}
+        </select>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search project, name, job…"
+          className="border rounded px-2 py-1 text-sm" style={{ borderColor: needle ? ORANGE : BORDER, width: 240 }} />
+        {filtered && (
+          <span className="text-xs" style={{ color: MUTED }}>
+            {rows.length} of {allRows.length} · <button onClick={() => { setOwnerFilter("all"); setQ(""); }} style={{ color: ORANGE, fontWeight: 700 }}>clear</button> · ordering arrows sleep while filtered
+          </span>
+        )}
+      </div>
+
       {/* the engineer strip — GAD · BOM · Manuf · As Built, totals below */}
-      {rows.length > 0 && (
+      {allRows.length > 0 && (
         <div className="bg-white rounded-lg border mb-2 overflow-auto" style={{ borderColor: BORDER, maxWidth: 560 }}>
+          <button onClick={() => setStripOpen((v) => !v)} className="w-full text-left px-2 py-1.5 text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>
+            {stripOpen ? "▾" : "▸"} DESIGN ENGINEER — GAD · BOM · MANUF · AS BUILT
+          </button>
+          {stripOpen && (
           <table className="text-xs" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 420 }}>
             <thead><tr style={{ background: "#22303C", color: "#fff" }}>
               <th className="px-2 py-1.5 text-left">Design Engineer</th>
@@ -483,6 +519,7 @@ function PlansScreen() {
               </tr>
             </tbody>
           </table>
+          )}
         </div>
       )}
 
@@ -491,28 +528,42 @@ function PlansScreen() {
         <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "70vh", flex: "1 1 720px", minWidth: 0 }}>
           <table className="w-full text-xs" style={{ minWidth: 1200, borderCollapse: "separate", borderSpacing: 0 }}>
             <thead><tr style={{ background: "#22303C", color: "#fff" }}>
-              {["Project · design stage", "Jobs", "Design Owner", "Design Plan", "Next Milestone", "Issues to Design", "Design Support", "BOM %", "Manuf Drg %", "Order"].map((h) => (
-                <th key={h} className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
+              <th className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, left: 0, background: "#22303C", zIndex: 3, minWidth: 260 }}>Project</th>
+              {["Jobs", "Design Plan", "Next Milestone", "Issues to Design", "Design Support", "BOM %", "Manuf Drg %", "Order"].map((h) => (
+                <th key={h} className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, background: "#22303C", zIndex: 2 }}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
               {data && rows.length === 0 && (
-                <tr><td colSpan={10} className="px-3 py-5 text-center" style={{ color: MUTED }}>No live projects — a project appears here the moment an active job stands on it.</td></tr>
+                <tr><td colSpan={9} className="px-3 py-5 text-center" style={{ color: MUTED }}>{filtered ? "Nothing matches the filter." : "No live projects — a project appears here the moment an active job stands on it."}</td></tr>
               )}
-              {!data && (<tr><td colSpan={10} className="px-3 py-5 text-center" style={{ color: MUTED }}>loading…</td></tr>)}
+              {!data && (<tr><td colSpan={9} className="px-3 py-5 text-center" style={{ color: MUTED }}>loading…</td></tr>)}
               {rows.map((p, i) => {
                 const openIssues = p.issues.filter((x) => x.open);
                 return (
                   <tr key={p.id} className="border-t align-top" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
-                    <td className="px-2 py-2" style={{ minWidth: 240 }}>
+                    {/* FROZEN (Dr Raghu, 28 Aug 2026): the project always in
+                        sight — number, PM, designer, stage, and the ONE
+                        SENTENCE that says what it is and where it goes. */}
+                    <td className="px-2 py-2" style={{ position: "sticky", left: 0, zIndex: 1, background: i % 2 ? "#FAF9F5" : "#fff", minWidth: 260, maxWidth: 280, boxShadow: "2px 0 4px rgba(22,35,47,0.06)" }}>
                       <div className="font-bold" style={{ color: INK, fontSize: 13 }}>{p.id}</div>
                       {p.mgr && <div style={{ color: MUTED, fontSize: 10 }}>PM: {p.mgr}</div>}
+                      <input list="vw-owners" value={drafts[`o:${p.id}`] ?? p.design_owner}
+                        placeholder="designer — type or pick…"
+                        onChange={(e) => setDrafts((d) => ({ ...d, [`o:${p.id}`]: e.target.value }))}
+                        onBlur={(e) => { if (e.target.value !== p.design_owner) void save(p.id, { design_owner: e.target.value }); }}
+                        className="w-full border rounded px-1.5 py-0.5 text-xs mt-1" style={{ borderColor: BORDER }} />
                       <select value={p.design_stage} onChange={(e) => void save(p.id, { design_stage: e.target.value })}
                         className="mt-1 border rounded px-1 py-0.5 text-xs bg-white w-full"
                         style={{ borderColor: p.design_stage ? BORDER : ORANGE, fontWeight: 700, color: p.design_stage ? INK : MUTED }}>
                         <option value="">design stage…</option>
                         {(data?.stages || []).map((st) => (<option key={st}>{st}</option>))}
                       </select>
+                      <input value={drafts[`d:${p.id}`] ?? p.description}
+                        placeholder="one sentence — what, which product, going where…"
+                        onChange={(e) => setDrafts((d) => ({ ...d, [`d:${p.id}`]: e.target.value }))}
+                        onBlur={(e) => { if (e.target.value !== p.description) void save(p.id, { description: e.target.value }); }}
+                        className="w-full border rounded px-1.5 py-0.5 text-xs mt-1" style={{ borderColor: (drafts[`d:${p.id}`] ?? p.description) ? BORDER : ORANGE, fontStyle: "italic" }} />
                     </td>
                     <td className="px-2 py-2 whitespace-nowrap" style={{ lineHeight: 1.8 }}>
                       {p.jobs.map((j) => (
@@ -521,13 +572,6 @@ function PlansScreen() {
                             style={{ color: "#2C5B82", fontWeight: 700, textDecoration: "underline" }}>{j.id.slice(-4)}</a>
                         </div>
                       ))}
-                    </td>
-                    <td className="px-2 py-2" style={{ minWidth: 130 }}>
-                      <input list="vw-owners" value={drafts[`o:${p.id}`] ?? p.design_owner}
-                        placeholder="type or pick…"
-                        onChange={(e) => setDrafts((d) => ({ ...d, [`o:${p.id}`]: e.target.value }))}
-                        onBlur={(e) => { if (e.target.value !== p.design_owner) void save(p.id, { design_owner: e.target.value }); }}
-                        className="w-full border rounded px-1.5 py-1 text-xs" style={{ borderColor: BORDER }} />
                     </td>
                     <td className="px-2 py-2 whitespace-nowrap">
                       <button onClick={() => setPlanFor(p)} className="rounded border px-2 py-1 font-bold" style={{ borderColor: BORDER, color: VIOLET }}>
@@ -540,14 +584,18 @@ function PlansScreen() {
                         : <span style={{ color: MUTED }}>no plan yet</span>}
                       {p.total > 0 && <div style={{ color: MUTED, fontSize: 10 }}>{p.done}/{p.total} done</div>}
                     </td>
-                    <td className="px-2 py-2" style={{ maxWidth: 210, lineHeight: 1.6 }}>
-                      <b style={{ color: openIssues.length ? RED : GREEN }}>{openIssues.length}</b>
-                      {openIssues.slice(0, 3).map((x) => (
-                        <div key={x.id} title={`${x.who}${x.due ? ` · due ${fmtD(x.due)}` : ""}${x.esc !== "None" ? ` · ${x.esc}` : ""}`}>
-                          • {x.title.length > 46 ? x.title.slice(0, 44) + "…" : x.title}
-                        </div>
-                      ))}
-                      {openIssues.length > 3 && <div style={{ color: MUTED }}>… {openIssues.length - 3} more</div>}
+                    <td className="px-2 py-2" style={{ minWidth: 220, maxWidth: 320 }}>
+                      {openIssues.length === 0 && <span style={{ color: GREEN, fontWeight: 700 }}>clear</span>}
+                      <div className="flex flex-wrap gap-1">
+                        {openIssues.map((x) => (
+                          <div key={x.id} className="rounded border px-1.5 py-1"
+                            style={{ borderColor: RED, background: "#FBEAE8", maxWidth: 150, lineHeight: 1.35 }}
+                            title={`${x.who}${x.due ? ` · due ${fmtD(x.due)}` : ""}${x.esc !== "None" ? ` · ${x.esc}` : ""}`}>
+                            <div className="font-bold" style={{ color: "#8E2C20", fontSize: 10.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{x.title}</div>
+                            <div style={{ color: "#8E2C20", fontSize: 9.5 }}>{x.who || "—"}{x.due ? ` · ${fmtD(x.due)}` : ""}{x.esc !== "None" ? ` · ${x.esc}` : ""}</div>
+                          </div>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-2 py-2 whitespace-nowrap">
                       <button onClick={() => setSupportFor(p)} className="rounded border px-2 py-1 font-bold" style={{ borderColor: ORANGE, color: ORANGE }}
@@ -562,8 +610,8 @@ function PlansScreen() {
                       <PctBox value={p.manuf_pct} onSave={(v) => void save(p.id, { manuf_pct: v })} />
                     </td>
                     <td className="px-2 py-2 whitespace-nowrap">
-                      <button onClick={() => void move(p.id, -1)} disabled={i === 0} title="Move up" style={{ color: i === 0 ? "#D5D2C8" : INK, fontWeight: 700 }}>↑</button>
-                      <button onClick={() => void move(p.id, 1)} disabled={i === rows.length - 1} title="Move down" className="ml-1" style={{ color: i === rows.length - 1 ? "#D5D2C8" : INK, fontWeight: 700 }}>↓</button>
+                      <button onClick={() => void move(p.id, -1)} disabled={filtered || i === 0} title={filtered ? "Clear the filter to reorder" : "Move up"} style={{ color: filtered || i === 0 ? "#D5D2C8" : INK, fontWeight: 700 }}>↑</button>
+                      <button onClick={() => void move(p.id, 1)} disabled={filtered || i === rows.length - 1} title={filtered ? "Clear the filter to reorder" : "Move down"} className="ml-1" style={{ color: filtered || i === rows.length - 1 ? "#D5D2C8" : INK, fontWeight: 700 }}>↓</button>
                     </td>
                   </tr>
                 );
@@ -574,8 +622,13 @@ function PlansScreen() {
         </div>
 
         {/* ------------ this week's working ------------ */}
-        <WeekPanel week={data?.week || []} owners={data?.owners || []} onChanged={load} />
+        <WeekPanel week={data?.week || []} owners={data?.owners || []} projects={allRows.map((r) => r.id)} onChanged={load}
+          calOpen={calOpen} onToggleCal={() => setCalOpen((v) => !v)} />
       </div>
+
+      {/* the LOAD CALENDAR (Dr Raghu, 28 Aug 2026): Designer × Date, a ＋ in
+          every cell — project and stage per day, the week's load in one look */}
+      {calOpen && <LoadCalendar week={data?.week || []} owners={data?.owners || []} projects={allRows.map((r) => r.id)} onChanged={load} />}
 
       {planFor && <ProjectPlanBox p={planFor} onClose={() => setPlanFor(null)} onSaved={() => { setPlanFor(null); load(); }} />}
       {supportFor && <SupportBox p={supportFor} onClose={() => setSupportFor(null)} onSaved={() => { setSupportFor(null); load(); }} />}
@@ -642,15 +695,23 @@ function SupportBox({ p, onClose, onSaved }: { p: ProjRow; onClose: () => void; 
   );
 }
 
-/** THIS WEEK'S WORKING — date, designer, work to be done. The room's list. */
-function WeekPanel({ week, owners, onChanged }: { week: WeekRow[]; owners: string[]; onChanged: () => void }) {
-  const [f, setF] = useState({ on_date: TODAY(), designer: "", work: "" });
+/** THIS WEEK'S WORKING — date, designer, work — each tied to its project. */
+function WeekPanel({ week, owners, projects, onChanged, calOpen, onToggleCal }: {
+  week: WeekRow[]; owners: string[]; projects: string[]; onChanged: () => void;
+  calOpen: boolean; onToggleCal: () => void;
+}) {
+  const [f, setF] = useState({ on_date: TODAY(), designer: "", work: "", project_id: "", stage: "" });
   const [busy, setBusy] = useState(false);
   const monday = (() => { const d = new Date(); const dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dow); return d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); })();
   const shown = week.filter((w) => w.on_date >= monday);
   return (
     <div className="bg-white rounded-lg border p-3" style={{ borderColor: BORDER, flex: "0 1 300px", minWidth: 260 }}>
-      <div className="text-xs font-bold mb-1" style={{ color: VIOLET, letterSpacing: 0.8 }}>THIS WEEK&apos;S WORKING</div>
+      <div className="flex items-center mb-1">
+        <span className="text-xs font-bold" style={{ color: VIOLET, letterSpacing: 0.8 }}>THIS WEEK&apos;S WORKING</span>
+        <button onClick={onToggleCal} className="ml-auto rounded border px-2 py-0.5 text-xs font-bold"
+          style={calOpen ? { background: VIOLET, color: "#fff", borderColor: VIOLET } : { color: VIOLET, borderColor: BORDER }}
+          title="Designer × date — the week's load in one look">▦ Load view</button>
+      </div>
       {shown.length === 0 && <div className="text-sm mb-1" style={{ color: MUTED }}>Nothing yet — the first record starts the week.</div>}
       {shown.map((w) => (
         <div key={w.id} className="border-t py-1.5 text-sm" style={{ borderColor: "#EFEDE7" }}>
@@ -664,6 +725,11 @@ function WeekPanel({ week, owners, onChanged }: { week: WeekRow[]; owners: strin
                 onChanged();
               }}>✕</button>
           </div>
+          {(w.project_id || w.stage) && (
+            <div style={{ fontSize: 10.5 }}>
+              <b style={{ color: VIOLET }}>{w.project_id || ""}</b>{w.project_id && w.stage ? " · " : ""}<b>{w.stage || ""}</b>
+            </div>
+          )}
           <div style={{ lineHeight: 1.5 }}>{w.work}</div>
         </div>
       ))}
@@ -672,13 +738,116 @@ function WeekPanel({ week, owners, onChanged }: { week: WeekRow[]; owners: strin
           <input type="date" value={f.on_date} onChange={(e) => setF({ ...f, on_date: e.target.value })} className="border rounded px-1.5 py-1 text-xs tnum" style={{ borderColor: BORDER, width: 118 }} />
           <input list="vw-owners" value={f.designer} onChange={(e) => setF({ ...f, designer: e.target.value })} placeholder="designer" className="flex-1 border rounded px-1.5 py-1 text-xs" style={{ borderColor: BORDER, minWidth: 0 }} />
         </div>
+        <div className="flex gap-1">
+          <select value={f.project_id} onChange={(e) => setF({ ...f, project_id: e.target.value })} className="flex-1 border rounded px-1 py-1 text-xs bg-white" style={{ borderColor: BORDER, minWidth: 0 }}>
+            <option value="">project…</option>
+            {projects.map((pj) => (<option key={pj}>{pj}</option>))}
+          </select>
+          <select value={f.stage} onChange={(e) => setF({ ...f, stage: e.target.value })} className="border rounded px-1 py-1 text-xs bg-white" style={{ borderColor: BORDER, width: 86 }}>
+            <option value="">stage…</option>
+            {WORK_STAGES.map((st) => (<option key={st}>{st}</option>))}
+          </select>
+        </div>
         <textarea value={f.work} onChange={(e) => setF({ ...f, work: e.target.value })} placeholder="work to be done…" rows={2} className="w-full border rounded px-1.5 py-1 text-xs" style={{ borderColor: BORDER }} />
         <button disabled={busy || !f.work.trim()} onClick={async () => {
           setBusy(true);
           await fetch("/api/vishwakarma/projects", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "week_add", ...f }) });
-          setBusy(false); setF({ on_date: TODAY(), designer: f.designer, work: "" }); onChanged();
+          setBusy(false); setF({ on_date: TODAY(), designer: f.designer, work: "", project_id: f.project_id, stage: "" }); onChanged();
         }} className="w-full rounded py-1 text-xs font-bold text-white" style={{ background: busy || !f.work.trim() ? "#B9BEC4" : ORANGE }}>＋ Add a record</button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * THE LOAD CALENDAR (Dr Raghu, 28 Aug 2026): Designer down the side, the
+ * week's dates across, a ＋ in every cell — each entry names the project and
+ * the stage (GAD · BOM · Manuf · As Built). "This will give the load
+ * visibility."
+ */
+function LoadCalendar({ week, owners, projects, onChanged }: { week: WeekRow[]; owners: string[]; projects: string[]; onChanged: () => void }) {
+  const addD = (iso: string, n: number) => { const t = new Date(iso + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+  const today = TODAY();
+  const monday = (() => { const d = new Date(today + "T00:00:00Z"); const dow = (d.getUTCDay() + 6) % 7; return addD(today, -dow); })();
+  const [weekStart, setWeekStart] = useState(monday);
+  const days = Array.from({ length: 7 }, (_, i) => addD(weekStart, i));
+  const [adding, setAdding] = useState<{ designer: string; on_date: string } | null>(null);
+  const [f, setF] = useState({ project_id: "", stage: "", work: "" });
+  const [busy, setBusy] = useState(false);
+
+  const designers = [...new Set([...owners, ...week.map((w) => w.designer).filter(Boolean)])].sort();
+  const cell = (eng: string, d: string) => week.filter((w) => w.designer === eng && w.on_date === d);
+  const dayLabel = (d: string) => new Date(d + "T00:00:00Z").toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", timeZone: "UTC" });
+
+  return (
+    <div className="bg-white rounded-lg border mt-3 overflow-auto" style={{ borderColor: BORDER }}>
+      <div className="flex items-center gap-2 px-3 py-2">
+        <span className="text-xs font-bold" style={{ color: VIOLET, letterSpacing: 0.8 }}>LOAD — DESIGNER × DATE</span>
+        <button onClick={() => setWeekStart(addD(weekStart, -7))} className="rounded border px-2 py-0.5 text-xs font-bold" style={{ borderColor: BORDER, color: INK }}>‹ prev</button>
+        <button onClick={() => setWeekStart(monday)} className="rounded border px-2 py-0.5 text-xs font-bold" style={{ borderColor: weekStart === monday ? VIOLET : BORDER, color: weekStart === monday ? VIOLET : INK }}>this week</button>
+        <button onClick={() => setWeekStart(addD(weekStart, 7))} className="rounded border px-2 py-0.5 text-xs font-bold" style={{ borderColor: BORDER, color: INK }}>next ›</button>
+      </div>
+      <table className="text-xs" style={{ minWidth: 980, borderCollapse: "separate", borderSpacing: 0, width: "100%" }}>
+        <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+          <th className="px-2 py-2 text-left" style={{ position: "sticky", left: 0, background: "#22303C", minWidth: 120 }}>Designer</th>
+          {days.map((d) => (
+            <th key={d} className="px-2 py-2 text-left whitespace-nowrap" style={{ minWidth: 118, opacity: d === today ? 1 : 0.85, borderBottom: d === today ? `2px solid ${ORANGE}` : undefined }}>{dayLabel(d)}</th>
+          ))}
+        </tr></thead>
+        <tbody>
+          {designers.length === 0 && (<tr><td colSpan={8} className="px-3 py-4 text-center" style={{ color: MUTED }}>No designers yet.</td></tr>)}
+          {designers.map((eng, i) => (
+            <tr key={eng} className="border-t align-top" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+              <td className="px-2 py-1.5 font-bold" style={{ position: "sticky", left: 0, background: i % 2 ? "#FAF9F5" : "#fff", color: INK }}>{eng}</td>
+              {days.map((d) => (
+                <td key={d} className="px-1.5 py-1.5" style={{ verticalAlign: "top" }}>
+                  {cell(eng, d).map((w) => (
+                    <div key={w.id} className="rounded border px-1.5 py-1 mb-1" style={{ borderColor: VIOLET, background: "#F5F0FE", lineHeight: 1.3 }} title={w.work}>
+                      <div className="font-bold" style={{ color: VIOLET, fontSize: 10 }}>{w.project_id ? w.project_id.replace("NGSE-PROJ-", "P-") : "—"}{w.stage ? ` · ${w.stage}` : ""}</div>
+                      {w.work && <div style={{ fontSize: 9.5, color: "#5A6672", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{w.work}</div>}
+                    </div>
+                  ))}
+                  <button onClick={() => { setAdding({ designer: eng, on_date: d }); setF({ project_id: "", stage: "", work: "" }); }}
+                    className="rounded border w-full py-0.5 font-bold" style={{ borderColor: "#E5E2DA", color: MUTED }} title={`Add for ${eng}, ${dayLabel(d)}`}>＋</button>
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {adding && (
+        <Modal onClose={() => setAdding(null)} width={420}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="font-bold text-sm" style={{ color: INK }}>{adding.designer} — {dayLabel(adding.on_date)}</div>
+            <button onClick={() => setAdding(null)} style={{ color: MUTED }}>✕</button>
+          </div>
+          <div className="space-y-2 text-sm">
+            <div><L>Project</L>
+              <select value={f.project_id} onChange={(e) => setF({ ...f, project_id: e.target.value })} className="w-full border rounded px-2 py-1.5 bg-white" style={inputCss}>
+                <option value="">—</option>
+                {projects.map((pj) => (<option key={pj}>{pj}</option>))}
+              </select></div>
+            <div><L>Stage</L>
+              <div className="flex gap-1">
+                {WORK_STAGES.map((st) => (
+                  <button key={st} onClick={() => setF({ ...f, stage: st })}
+                    className="rounded-full border px-2.5 py-1 text-xs font-bold"
+                    style={f.stage === st ? { background: VIOLET, color: "#fff", borderColor: VIOLET } : { color: MUTED, borderColor: BORDER }}>{st}</button>
+                ))}
+              </div></div>
+            <div><L>Note (optional)</L>
+              <input value={f.work} onChange={(e) => setF({ ...f, work: e.target.value })} className="w-full border rounded px-2 py-1.5" style={inputCss} /></div>
+            <button disabled={busy} onClick={async () => {
+              setBusy(true);
+              await fetch("/api/vishwakarma/projects", {
+                method: "POST", headers: { "content-type": "application/json" },
+                body: JSON.stringify({ action: "week_add", on_date: adding.on_date, designer: adding.designer, ...f }),
+              });
+              setBusy(false); setAdding(null); onChanged();
+            }} className="w-full rounded py-1.5 text-sm font-bold text-white" style={{ background: busy ? "#B9BEC4" : ORANGE }}>💾 Add</button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -695,8 +864,9 @@ function WeekPanel({ week, owners, onChanged }: { week: WeekRow[]; owners: strin
 const DESIGN_LADDER = ["Design Kickoff", "Design GAD", "Design TBOM", "Design Manuf Drawings", "Design Full BOM", "As Built Checks"];
 
 function ProjectPlanBox({ p, onClose, onSaved }: { p: ProjRow; onClose: () => void; onSaved: () => void }) {
+  // (width raised for the start · end · days row)
   const [data, setData] = useState<{ installed: boolean; start: string | null; completion: string | null } | null>(null);
-  const [stages, setStages] = useState<{ title: string; on_date: string; done: boolean }[] | null>(null);
+  const [stages, setStages] = useState<{ title: string; start_date: string; end_date: string; days: string; done: boolean }[] | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -705,14 +875,37 @@ function ProjectPlanBox({ p, onClose, onSaved }: { p: ProjRow; onClose: () => vo
       .then((r) => r.json())
       .then((j) => {
         setData({ installed: j.installed !== false, start: j.start ?? null, completion: j.completion ?? null });
-        const got = (j.stages || []) as { title: string; on_date: string; done: boolean }[];
-        setStages(got.length ? got : DESIGN_LADDER.map((t) => ({ title: t, on_date: "", done: false })));
+        const got = (j.stages || []) as { title: string; start_date: string; end_date: string; days: string; done: boolean }[];
+        setStages(got.length ? got : DESIGN_LADDER.map((t) => ({ title: t, start_date: "", end_date: "", days: "", done: false })));
       })
       .catch(() => { setData({ installed: true, start: null, completion: null }); setStages([]); });
   }, [p.id]);
 
-  const set = (i: number, patch: Partial<{ title: string; on_date: string; done: boolean }>) =>
-    setStages((st) => st!.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  // The triangle (Dr Raghu, 28 Aug 2026): start + end tells the days;
+  // change the days and the end moves; days are INCLUSIVE — start on the
+  // 1st, 5 days, end on the 5th.
+  const addD = (iso: string, n: number) => {
+    const t = new Date(iso + "T00:00:00Z");
+    t.setUTCDate(t.getUTCDate() + n);
+    return t.toISOString().slice(0, 10);
+  };
+  const diffD = (a: string, b: string) => Math.round((new Date(b + "T00:00:00Z").getTime() - new Date(a + "T00:00:00Z").getTime()) / 86400000);
+  const set = (i: number, patch: Partial<{ title: string; start_date: string; end_date: string; days: string; done: boolean }>) =>
+    setStages((st) => st!.map((x, j) => {
+      if (j !== i) return x;
+      const n = { ...x, ...patch };
+      if ("start_date" in patch && n.start_date) {
+        if (n.days) n.end_date = addD(n.start_date, Math.max(1, Number(n.days)) - 1);
+        else if (n.end_date) n.days = String(Math.max(1, diffD(n.start_date, n.end_date) + 1));
+      } else if ("end_date" in patch && n.end_date) {
+        if (n.start_date) n.days = String(Math.max(1, diffD(n.start_date, n.end_date) + 1));
+      } else if ("days" in patch && n.days) {
+        const d = Math.max(1, Number(n.days) || 1);
+        if (n.start_date) n.end_date = addD(n.start_date, d - 1);
+        else if (n.end_date) n.start_date = addD(n.end_date, -(d - 1));
+      }
+      return n;
+    }));
 
   const save = async () => {
     setBusy(true); setErr("");
@@ -735,7 +928,7 @@ function ProjectPlanBox({ p, onClose, onSaved }: { p: ProjRow; onClose: () => vo
   );
 
   return (
-    <Modal onClose={onClose} width={620}>
+    <Modal onClose={onClose} width={780}>
       <div className="flex items-center justify-between mb-2">
         <div className="font-bold text-sm" style={{ color: INK }}>{p.id} — the design plan</div>
         <button onClick={onClose} style={{ color: MUTED }}>✕</button>
@@ -751,19 +944,28 @@ function ProjectPlanBox({ p, onClose, onSaved }: { p: ProjRow; onClose: () => vo
             <DateChip label="PROJECT START" value={data.start} />
             <DateChip label="PROJECT COMPLETION" value={data.completion} />
           </div>
-          <div className="text-xs font-bold mb-1" style={{ color: VIOLET, letterSpacing: 0.8 }}>DESIGN STAGES — design&apos;s own dates, as many as needed</div>
+          <div className="text-xs font-bold mb-1" style={{ color: VIOLET, letterSpacing: 0.8 }}>DESIGN STAGES — start · end · days keep each other honest; change any one</div>
+          <div className="flex items-center gap-2 py-0.5 text-xs font-bold" style={{ color: MUTED }}>
+            <span style={{ width: 13 }} /><span className="flex-1">Stage</span>
+            <span style={{ width: 128 }}>Start</span><span style={{ width: 128 }}>End</span><span style={{ width: 52, textAlign: "right" }}>Days</span><span style={{ width: 14 }} />
+          </div>
           {stages.map((st, i) => (
             <div key={i} className="flex items-center gap-2 py-1 border-t" style={{ borderColor: "#EFEDE7" }}>
               <input type="checkbox" checked={st.done} onChange={(e) => set(i, { done: e.target.checked })} style={{ accentColor: GREEN }} title="Done" />
               <input value={st.title} onChange={(e) => set(i, { title: e.target.value })}
-                className="flex-1 border rounded px-2 py-1 text-sm" style={{ borderColor: BORDER, textDecoration: st.done ? "line-through" : "none", color: st.done ? MUTED : INK }} />
-              <input type="date" value={st.on_date} onChange={(e) => set(i, { on_date: e.target.value })}
+                className="flex-1 border rounded px-2 py-1 text-sm" style={{ borderColor: BORDER, textDecoration: st.done ? "line-through" : "none", color: st.done ? MUTED : INK, minWidth: 0 }} />
+              <input type="date" value={st.start_date} onChange={(e) => set(i, { start_date: e.target.value })}
                 min={data.start || undefined} max={data.completion || undefined}
-                className="border rounded px-2 py-1 text-sm tnum" style={{ borderColor: st.on_date ? BORDER : ORANGE }} />
+                className="border rounded px-1.5 py-1 text-sm tnum" style={{ borderColor: st.start_date ? BORDER : ORANGE, width: 128 }} />
+              <input type="date" value={st.end_date} onChange={(e) => set(i, { end_date: e.target.value })}
+                min={st.start_date || data.start || undefined} max={data.completion || undefined}
+                className="border rounded px-1.5 py-1 text-sm tnum" style={{ borderColor: st.end_date ? BORDER : ORANGE, width: 128 }} />
+              <input value={st.days} onChange={(e) => set(i, { days: e.target.value.replace(/[^0-9]/g, "") })}
+                className="border rounded px-1.5 py-1 text-sm tnum text-right" style={{ borderColor: BORDER, width: 52 }} title="Inclusive — start on the 1st, 5 days, end on the 5th" />
               <button onClick={() => setStages((x) => x!.filter((_, j) => j !== i))} title="Remove this stage" style={{ color: MUTED }}>✕</button>
             </div>
           ))}
-          <button onClick={() => setStages((x) => [...x!, { title: "", on_date: "", done: false }])}
+          <button onClick={() => setStages((x) => [...x!, { title: "", start_date: "", end_date: "", days: "", done: false }])}
             className="mt-1 rounded border px-2 py-1 text-xs font-bold" style={{ borderColor: BORDER, color: VIOLET }}>
             ＋ Add a stage
           </button>

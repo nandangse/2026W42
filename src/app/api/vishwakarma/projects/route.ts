@@ -41,7 +41,7 @@ export async function GET(req: Request) {
         admin.from("projects").select("id, exp_end, committed").eq("id", want).maybeSingle(),
         admin.from("project_plans").select("start_date").eq("project_id", want).maybeSingle(),
         admin.from("jobs").select("start_date").eq("active", true).eq("proj", want).order("start_date").limit(1),
-        admin.from("vishwa_design_plan").select("idx, title, on_date, done").eq("project_id", want).order("idx").limit(500),
+        admin.from("vishwa_design_plan").select("idx, title, on_date, start_date, end_date, days, done").eq("project_id", want).order("idx").limit(500),
       ]);
       if (dpRes.error && /does not exist|schema cache/i.test(dpRes.error.message))
         return NextResponse.json({ installed: false });
@@ -49,7 +49,13 @@ export async function GET(req: Request) {
         installed: true,
         start: pp?.start_date ?? js?.[0]?.start_date ?? null,
         completion: proj?.exp_end ?? proj?.committed ?? null,
-        stages: (dpRes.data || []).map((m) => ({ title: String(m.title), on_date: m.on_date ? String(m.on_date).slice(0, 10) : "", done: !!m.done })),
+        stages: (dpRes.data || []).map((m) => ({
+          title: String(m.title),
+          start_date: m.start_date ? String(m.start_date).slice(0, 10) : "",
+          end_date: (m.end_date ?? m.on_date) ? String(m.end_date ?? m.on_date).slice(0, 10) : "",
+          days: m.days == null ? "" : String(m.days),
+          done: !!m.done,
+        })),
       });
     }
 
@@ -76,7 +82,7 @@ export async function GET(req: Request) {
       admin.from("vishwa_problem").select("id, title, job, status").limit(1000),
       admin.from("manual_tasks").select("id, job_id, title, who, due, esc, cat").eq("done", false).ilike("cat", "%design%").limit(1000),
       admin.from("erp_tasks").select("id, job_id, title, who, due, esc, cat").eq("done", false).ilike("cat", "%design%").limit(1000),
-      admin.from("vishwa_week_work").select("id, on_date, designer, work, by").order("on_date").limit(500).then((r) => ({ data: r.error ? null : r.data, error: null })),
+      admin.from("vishwa_week_work").select("id, on_date, designer, work, project_id, stage, by").order("on_date").limit(500).then((r) => ({ data: r.error ? null : r.data, error: null })),
       admin.from("vishwa_plan").select("id, job, deliverable, owner, target, status").limit(1000),
       admin.from("profiles").select("display_name, email, disabled").order("display_name"),
     ]);
@@ -208,6 +214,8 @@ export async function POST(req: Request) {
         on_date: String(body.on_date || "").slice(0, 10) || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }),
         designer: String(body.designer || "").trim(),
         work: String(body.work || "").trim(),
+        project_id: String(body.project_id || "").trim() || null,
+        stage: String(body.stage || "").trim() || null,
         by: user.email,
       });
       if (error) {
@@ -274,7 +282,10 @@ export async function POST(req: Request) {
         .map((x: R, i: number) => ({
           project_id: pid, idx: i,
           title: String(x.title || "").trim(),
-          on_date: String(x.on_date || "").slice(0, 10) || null,
+          start_date: String(x.start_date || "").slice(0, 10) || null,
+          end_date: String(x.end_date || "").slice(0, 10) || null,
+          on_date: String(x.end_date || "").slice(0, 10) || null,
+          days: x.days === "" || x.days == null ? null : Math.max(1, Math.round(Number(x.days) || 1)),
           done: !!x.done, by: user.email,
         }))
         .filter((x: { title: string }) => x.title);
@@ -289,6 +300,15 @@ export async function POST(req: Request) {
         if (ins.error) throw new Error(ins.error.message);
       }
       return NextResponse.json({ ok: true });
+    }
+
+    // The one-sentence project description lives on the projects table
+    // itself (0074) — what the project is, the product, where it is going.
+    if (body.patch && "description" in body.patch) {
+      const { error } = await admin.from("projects")
+        .update({ description: String(body.patch.description ?? "") }).eq("id", pid);
+      if (error) throw new Error(error.message);
+      if (Object.keys(body.patch).length === 1) return NextResponse.json({ ok: true });
     }
 
     const patch: R = {};

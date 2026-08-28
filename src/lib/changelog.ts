@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.4",
+    date: "2026-08-28",
+    module: "Vishwakarma — stages that plan themselves, escalations you cannot miss",
+    items: [
+      "DESIGN STAGES BECOME SPANS (Dr Raghu, 28 Aug 2026): every stage carries a START, an END and the DAYS it takes — and the three keep each other honest. Type start and end, the days compute; CHANGE 5 TO 6 AND THE END MOVES BY ITSELF; give an end and the days, and the start walks back. Days are inclusive — start on the 1st, five days, end on the 5th. Migration 0090; the old single dates carried over as end dates, losing nothing. On the project timeline in Main Genie the stages now draw as violet SPANS, not dots.",
+      "ESCALATIONS AS BOXES: every open design issue on the grid is its own red box — title, who holds it, due date, escalation — as many boxes as there are issues, none hidden behind a count. 'I want this visibility to be maximum.'",
+      "THE PROJECT COLUMN FREEZES: scroll anywhere and the left edge holds the PROJECT NUMBER, the PM, the DESIGNER (typable, now living in the same cell), the DESIGN STAGE, and the ONE-SENTENCE NAME — what the project is, which product, going where — typed right there and saved onto the project itself.",
+      "The engineer strip folds on its triangle; on top stand a DESIGN-OWNER FILTER and a SEARCH that reads the project number, the one-sentence name and the jobs. The ordering arrows sleep while a filter narrows the view — the order belongs to the whole list.",
+      "THIS WEEK'S WORKING ties each record to its PROJECT and STAGE, and grows the ▦ LOAD VIEW: a calendar of DESIGNER × DATE, a ＋ in every cell, each entry naming the project and its stage (GAD · BOM · Manuf · As Built) — the week's load in one look, walkable to any week.",
+    ],
+  },
+  {
     v: "3.31.0.3",
     date: "2026-08-28",
     module: "Vishwakarma — the grid in Dr Raghu's order, support as a task, the week on the right",
