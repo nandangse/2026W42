@@ -25,6 +25,7 @@ const DRIVE_FOLDER = "1V3zIjPvz9DSHGlJCAuSSWk-iG5Tfnnev";
 interface KuberUpload {
   id: string; kind: string; for_date: string; name: string; bytes: number | null;
   by: string | null; initials: string | null; at: string; drive_synced_at: string | null; url: string | null;
+  taken_in: string | null;
 }
 type Stage = { name: string; state: "wait" | "run" | "done" | "skip" | "fail"; pct: number; note?: string };
 
@@ -165,7 +166,7 @@ export default function UploadFiles() {
         : await parseTransactionsInBrowser(file, sink, onPct);
       const done = await fetch("/api/kuber/ingest", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "done", kind, for_date: forDate, name: file.name, bytes: file.size, drive: onDrive }),
+        body: JSON.stringify({ action: "done", kind, for_date: forDate, name: file.name, bytes: file.size, drive: onDrive, counts }),
       });
       if (!done.ok) throw new Error((await done.json()).error || "the final step was refused");
       const j = await done.json();
@@ -285,14 +286,14 @@ export default function UploadFiles() {
         <table className="w-full text-xs" style={{ minWidth: 640, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
             <tr style={{ background: "#22303C", color: "#fff" }}>
-              {["Date", "Kind", "File", "By", "Uploaded", "On Drive"].map((h) => (
+              {["Date", "Kind", "File", "Data taken in", "By", "Uploaded", "On Drive"].map((h) => (
                 <th key={h} className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows === null && (<tr><td colSpan={6} className="px-3 py-4" style={{ color: MUTED }}>Loading…</td></tr>)}
-            {rows?.length === 0 && (<tr><td colSpan={6} className="px-3 py-4" style={{ color: MUTED }}>Nothing uploaded yet — the first pair starts the ledger.</td></tr>)}
+            {rows === null && (<tr><td colSpan={7} className="px-3 py-4" style={{ color: MUTED }}>Loading…</td></tr>)}
+            {rows?.length === 0 && (<tr><td colSpan={7} className="px-3 py-4" style={{ color: MUTED }}>Nothing uploaded yet — the first pair starts the ledger.</td></tr>)}
             {(rows || []).map((r, i) => (
               <tr key={r.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                 <td className="px-2 py-1.5 tnum whitespace-nowrap">{r.for_date}</td>
@@ -302,6 +303,9 @@ export default function UploadFiles() {
                 <td className="px-2 py-1.5">
                   {r.url ? <a href={r.url} target="_blank" rel="noreferrer" style={{ color: "#1B3A5C", textDecoration: "underline" }}>{r.name}</a> : r.name}
                   {r.bytes != null && <span style={{ color: MUTED }}> · {(r.bytes / 1024 / 1024).toFixed(1)} MB</span>}
+                </td>
+                <td className="px-2 py-1.5 font-semibold" style={{ color: r.taken_in ? GREEN : MUTED, maxWidth: 240 }}>
+                  {r.taken_in ?? "—"}
                 </td>
                 <td className="px-2 py-1.5 font-semibold">{r.initials || r.by || "—"}</td>
                 <td className="px-2 py-1.5 tnum whitespace-nowrap" style={{ color: MUTED }}>

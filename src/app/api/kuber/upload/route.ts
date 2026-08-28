@@ -27,7 +27,7 @@ export async function GET() {
     const admin = adminClient();
     const { data, error } = await admin
       .from("kuber_upload")
-      .select("id, kind, for_date, name, bytes, by, initials, at, drive_synced_at, path")
+      .select("id, kind, for_date, name, bytes, by, initials, at, drive_synced_at, path, taken_in")
       .order("at", { ascending: false })
       .limit(200);
     if (error) {

@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.3",
+    date: "2026-08-28",
+    module: "Kuber — the upload ledger says what was taken in",
+    items: [
+      "Each row of Upload Files now carries DATA TAKEN IN — '3,632 ledgers · 3,433 opening bills → 4,785 open bills stand' beside the file — so the ledger proves not just that a file arrived but that the books actually drank it. Migration 0078 adds the column and backfills today's two rows from the live tables themselves.",
+    ],
+  },
+  {
     v: "3.29.0.2",
     date: "2026-08-28",
     module: "Kuber — the Management Review file, one click from the books",

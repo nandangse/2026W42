@@ -133,16 +133,24 @@ export async function POST(req: Request) {
         const { error } = await admin.from("kuber_bill").insert(open.slice(i, i + 500));
         if (error) throw new Error(error.message);
       }
-      // the audit ledger row — the browser door counts like every other door
+      // the audit ledger row — the browser door counts like every other door,
+      // and says what was TAKEN IN (0078), not just what arrived
       const initials = (user.initials || user.email.split("@")[0].slice(0, 3)).toUpperCase();
+      const c = (body.counts ?? {}) as Record<string, number>;
+      const fmtN = (n: unknown) => Number(n ?? 0).toLocaleString("en-IN");
+      const takenIn = String(body.kind) === "masters"
+        ? `${fmtN(c.ledgers)} ledgers · ${fmtN(c.bills)} opening bills`
+        : `${fmtN(c.vouchers)} vouchers · ${fmtN(c.lines)} lines · ${fmtN(c.allocs)} bill refs`;
+      const row = {
+        kind: String(body.kind), for_date: String(body.for_date || "").slice(0, 10) || new Date().toISOString().slice(0, 10),
+        name: String(body.name || "browser upload").slice(0, 120),
+        path: `browser/${Date.now()}`, bytes: Number(body.bytes) || null,
+        by: user.email, initials,
+        ...(body.drive ? { drive_synced_at: new Date().toISOString() } : {}),
+      };
       try {
-        await admin.from("kuber_upload").insert({
-          kind: String(body.kind), for_date: String(body.for_date || "").slice(0, 10) || new Date().toISOString().slice(0, 10),
-          name: String(body.name || "browser upload").slice(0, 120),
-          path: `browser/${Date.now()}`, bytes: Number(body.bytes) || null,
-          by: user.email, initials,
-          ...(body.drive ? { drive_synced_at: new Date().toISOString() } : {}),
-        });
+        const { error } = await admin.from("kuber_upload").insert({ ...row, taken_in: `${takenIn} → ${open.length.toLocaleString("en-IN")} open bills stand` });
+        if (error) await admin.from("kuber_upload").insert(row); // pre-0078: the row still lands
       } catch { /* pre-0075 — the parse still stands */ }
       return NextResponse.json({ ok: true, bills: open.length });
     }
