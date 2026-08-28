@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { currentUser, HttpError, type AuthedUser } from "@/lib/auth";
+import { adminClient } from "@/lib/supabase/admin";
 
 /**
  * Vishwakarma — the design module's door. The divine engineer who built the
@@ -24,4 +26,13 @@ export async function resolveVishwakarmaAccess(
   } catch {
     return false;
   }
+}
+
+/** The one door check every /api/vishwakarma route uses. */
+export async function requireVishwakarma(): Promise<AuthedUser> {
+  const u = await currentUser();
+  if (!u || u.disabled) throw new HttpError(401, "Sign in first.");
+  if (!(await resolveVishwakarmaAccess(adminClient(), u.email, u.isOwner)))
+    throw new HttpError(403, "Vishwakarma is granted per person — the tick on Admin → module access.");
+  return u;
 }

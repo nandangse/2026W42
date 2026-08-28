@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.30.0.0",
+    date: "2026-08-28",
+    module: "Vishwakarma opens for work — the design team's room",
+    items: [
+      "The shell becomes the workroom Dr Raghu described: references, ideas, problem solving to ROOT CAUSE, project planning — Genie for solutions, Consult Raghu for reviews. Migration 0084 lays the five tables.",
+      "PROBLEMS & ROOT CAUSES: a problem is raised in one line and walked down the FIVE WHYS, each why indenting under the last; root cause and countermeasure are named, status runs open → analysing → countermeasure → verified → closed. ✨ ASK GENIE works the problem as a senior design engineer — ranked root-cause hypotheses with the measurement that confirms each, containment and permanent fix — and the answer stays on the problem.",
+      "IDEAS: caught raw in two lines, then ✨ GROWN by Genie — worth, the two biggest risks, and the cheapest one-week experiment that proves or kills it. DESIGN PLANS: what design owes each job, by when — late turns red by itself. REFERENCES: the library the drawings lean on, searchable, a link and two honest lines each.",
+      "🪷 CONSULT RAGHU — THE REVIEW BENCH: any problem, idea or plan is sent up and arrives with Consult Raghu's read already written, in Dr Raghu's own review style — verdict first, safety before cost before elegance, the one unanswered question named. THE VERDICT IS SIGNED BY A HUMAN; the AI advises, it never decides.",
+      "Every model call is click-only, behind the Vishwakarma tick — the pause discipline holds in the new room too.",
+    ],
+  },
+  {
     v: "3.29.0.21",
     date: "2026-08-28",
     module: "CRITICAL — the 1,000-row cliff, found by Pankaj, fixed within the hour",
