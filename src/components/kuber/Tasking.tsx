@@ -1,11 +1,12 @@
 "use client";
 
 /**
- * Kuber's Tasking — the main Genie's tasks in a WEEK CALENDAR with swimlanes
- * (Dr Raghu, 28 Aug 2026): Jobs · Goals · Quarterly Rocks · Audit ·
- * Strategic Actions, all lanes shown by default, an Assigned-to filter of
- * checkboxes, and Add New for Strategic Actions — RELATED TO rides the task
- * so the same tag tracks in the main Tasking too.
+ * Kuber's Tasking — ONLY what is tagged for Kuber, in a week calendar of
+ * swimlanes (Dr Raghu, 28 Aug 2026, view rebuilt on his word the same day):
+ * Jobs · Goals · Quarterly Rocks · Audit · Strategic Actions. People are a
+ * DROPDOWN, nobody shown by default beyond Suresh, Sandeep and RJ; the
+ * choice is remembered. The general task flood stays in the main Tasking —
+ * "this is not the place to see this."
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -41,7 +42,8 @@ export default function KuberTasking() {
   const [monday, setMonday] = useState(mondayOf(today));
   const [tasks, setTasks] = useState<KTask[] | null>(null);
   const [assignees, setAssignees] = useState<string[]>([]);
-  const [checked, setChecked] = useState<Set<string> | null>(null); // null = everyone
+  const [people, setPeople] = useState<Set<string> | null>(null); // the chosen few
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [needs, setNeeds] = useState(false);
   const [adding, setAdding] = useState(false);
   const [open, setOpen] = useState<KTask | null>(null);
@@ -55,49 +57,95 @@ export default function KuberTasking() {
   }, [monday]);
   useEffect(() => { load(); }, [load]);
 
-  const isChecked = (w: string) => checked === null || checked.has(w);
-  const toggleWho = (w: string) => {
-    setChecked((c) => {
-      const base = c === null ? new Set(assignees) : new Set(c);
-      if (base.has(w)) base.delete(w); else base.add(w);
-      return base.size === assignees.length ? null : base;
+  // WHO SHOWS: nobody by default except the named few — Suresh (SL),
+  // Sandeep (SU) and RJ (Dr Raghu, 28 Aug 2026) — then remembered as chosen.
+  useEffect(() => {
+    if (people !== null || assignees.length === 0) return;
+    try {
+      const saved = localStorage.getItem("kuber.tasking.people");
+      if (saved) {
+        const arr = (JSON.parse(saved) as string[]).filter((w) => assignees.includes(w));
+        setPeople(new Set(arr));
+        return;
+      }
+    } catch { /* fine */ }
+    const DEFAULTS = /suresh|sandeep|raghu|^s\.?l\.?$|^s\.?u\.?$|^r\.?j\.?$/i;
+    setPeople(new Set(assignees.filter((a) => DEFAULTS.test(a) || DEFAULTS.test(a.split(" ")[0] || ""))));
+  }, [assignees, people]);
+  const chosen = people ?? new Set<string>();
+  const togglePerson = (w: string) => {
+    setPeople((c) => {
+      const next = new Set(c ?? []);
+      if (next.has(w)) next.delete(w); else next.add(w);
+      try { localStorage.setItem("kuber.tasking.people", JSON.stringify([...next])); } catch { /* fine */ }
+      return next;
     });
   };
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
   const isCurrentWeek = monday === mondayOf(today);
-  const shown = (tasks || []).filter((t) => isChecked(t.who));
-  const cell = (lane: string, day: string) =>
-    shown.filter((t) => t.lane === lane && t.due === day);
+  const shown = (tasks || []).filter((t) => chosen.has(t.who));
+  const cell = (lane: string, day: string) => shown.filter((t) => t.lane === lane && t.due === day);
   const overdue = (lane: string) =>
     isCurrentWeek ? shown.filter((t) => t.lane === lane && !t.done && t.due && t.due < monday) : [];
-  const undated = (lane: string) =>
-    isCurrentWeek ? shown.filter((t) => t.lane === lane && !t.done && !t.due) : [];
+  const undated = (lane: string) => shown.filter((t) => t.lane === lane && !t.done && !t.due);
+  const laneCount = (lane: string) => shown.filter((t) => t.lane === lane && !t.done).length;
 
-  const Chip = ({ t }: { t: KTask }) => (
+  const Chip = ({ t, colour }: { t: KTask; colour: string }) => (
     <button onClick={() => setOpen(t)}
-      className="block w-full text-left rounded px-1.5 py-1 mb-1 text-xs"
+      className="block w-full text-left rounded mb-1 px-2 py-1.5"
       style={{
-        background: t.done ? "#EFEDE7" : t.esc !== "None" ? "#FBEDEA" : "#fff",
-        border: `1px solid ${t.done ? "#E2E0DA" : t.esc !== "None" ? "#F0C9C4" : BORDER}`,
-        color: t.done ? MUTED : INK, textDecoration: t.done ? "line-through" : "none",
+        background: t.done ? "#F4F2EC" : "#fff",
+        borderLeft: `3px solid ${t.done ? "#C9C5BA" : colour}`,
+        boxShadow: t.done ? "none" : "0 1px 3px rgba(22,35,47,.08)",
       }}
       title={`${t.title}${t.job ? `\n${t.job}` : ""}\n${t.who}`}>
-      <b>{t.who ? t.who.split(" ")[0] : "—"}</b> · {t.title.length > 40 ? t.title.slice(0, 40) + "…" : t.title}
+      <span className="block text-xs font-semibold" style={{
+        color: t.done ? MUTED : INK, textDecoration: t.done ? "line-through" : "none",
+        overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+      }}>
+        {t.esc !== "None" && <span style={{ color: RED }}>⚠ </span>}{t.title}
+      </span>
+      <span className="block" style={{ color: MUTED, fontSize: 10, marginTop: 2 }}>{t.who.split(" ")[0]}</span>
     </button>
   );
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-2 flex-wrap">
+      {/* ── the toolbar ─────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
         <div className="text-lg font-bold" style={{ color: INK }}>Tasking</div>
-        <span className="text-xs" style={{ color: MUTED }}>the main Genie&apos;s tasks, the week at a glance</span>
+        <span className="text-xs" style={{ color: MUTED }}>only what is tagged for Kuber — the rest lives in the main Tasking</span>
         <span className="ml-auto" />
-        <button onClick={() => setMonday(addDays(monday, -7))} className="rounded border px-2 py-1 text-sm font-bold" style={{ borderColor: BORDER, color: "#1B3A5C" }}>‹</button>
-        <span className="text-sm font-bold tnum" style={{ color: INK }}>{dmy(monday)} – {dmy(addDays(monday, 6))}{isCurrentWeek ? " · this week" : ""}</span>
-        <button onClick={() => setMonday(addDays(monday, 7))} className="rounded border px-2 py-1 text-sm font-bold" style={{ borderColor: BORDER, color: "#1B3A5C" }}>›</button>
-        {!isCurrentWeek && <button onClick={() => setMonday(mondayOf(today))} className="text-xs font-bold" style={{ color: ORANGE }}>today</button>}
-        <button onClick={() => setAdding(true)} className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: ORANGE }}>+ Add New</button>
+
+        {/* the people, as a dropdown — nobody extra by default */}
+        <div className="relative">
+          <button onClick={() => setPickerOpen((v) => !v)}
+            className="rounded border px-3 py-1.5 text-sm font-bold bg-white"
+            style={{ borderColor: chosen.size ? "#1B3A5C" : BORDER, color: "#1B3A5C" }}>
+            👤 People ({chosen.size}) ▾
+          </button>
+          {pickerOpen && (
+            <>
+              <div className="fixed inset-0" style={{ zIndex: 48 }} onClick={() => setPickerOpen(false)} />
+              <div className="absolute rounded-lg border bg-white p-1" style={{ top: "calc(100% + 4px)", right: 0, zIndex: 49, borderColor: BORDER, boxShadow: "0 10px 28px rgba(0,0,0,.18)", minWidth: 220, maxHeight: 300, overflow: "auto" }}>
+                {assignees.length === 0 && <div className="px-3 py-2 text-xs" style={{ color: MUTED }}>Nobody holds a tagged task yet.</div>}
+                {assignees.map((w) => (
+                  <label key={w} className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 rounded" style={{ cursor: "pointer", color: INK }}>
+                    <input type="checkbox" checked={chosen.has(w)} onChange={() => togglePerson(w)} style={{ accentColor: "#1B3A5C" }} />
+                    {w}
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        <button onClick={() => setMonday(addDays(monday, -7))} className="rounded border px-2.5 py-1.5 text-sm font-bold bg-white" style={{ borderColor: BORDER, color: "#1B3A5C" }}>‹</button>
+        <span className="text-sm font-bold tnum" style={{ color: INK }}>{dmy(monday)} – {dmy(addDays(monday, 6))}</span>
+        <button onClick={() => setMonday(addDays(monday, 7))} className="rounded border px-2.5 py-1.5 text-sm font-bold bg-white" style={{ borderColor: BORDER, color: "#1B3A5C" }}>›</button>
+        {!isCurrentWeek && <button onClick={() => setMonday(mondayOf(today))} className="text-xs font-bold" style={{ color: ORANGE }}>this week</button>}
+        <button onClick={() => setAdding(true)} className="rounded px-3.5 py-1.5 text-sm font-bold text-white" style={{ background: ORANGE }}>+ Add New</button>
       </div>
 
       {needs && (
@@ -105,64 +153,63 @@ export default function KuberTasking() {
           Run migration 0082 first — the Related To tag has nowhere to live yet.
         </div>
       )}
-
-      {/* assigned-to: checkboxes, everyone ticked by default */}
-      {assignees.length > 0 && (
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <span className="text-xs font-bold" style={{ color: MUTED }}>ASSIGNED TO</span>
-          {assignees.map((w) => (
-            <label key={w} className="flex items-center gap-1 text-xs font-semibold rounded border px-2 py-0.5"
-              style={{ borderColor: isChecked(w) ? "#1B3A5C" : BORDER, color: isChecked(w) ? "#1B3A5C" : MUTED, cursor: "pointer", background: "#fff" }}>
-              <input type="checkbox" checked={isChecked(w)} onChange={() => toggleWho(w)} style={{ accentColor: "#1B3A5C" }} />
-              {w}
-            </label>
-          ))}
-          {checked !== null && (
-            <button onClick={() => setChecked(null)} className="text-xs font-bold" style={{ color: ORANGE }}>everyone</button>
-          )}
+      {chosen.size === 0 && tasks !== null && (
+        <div className="rounded p-3 text-sm mb-2" style={{ background: "#EEF1FA", color: "#1B3A5C" }}>
+          Nobody is selected — open 👤 People and tick who to watch.
         </div>
       )}
 
-      <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "72vh" }}>
-        <table style={{ minWidth: 1150, borderCollapse: "separate", borderSpacing: 0, width: "100%" }}>
+      {/* ── the week, lane by lane ──────────────────────────────────── */}
+      <div className="rounded-lg overflow-auto" style={{ border: `1px solid ${BORDER}`, background: "#fff", maxHeight: "74vh" }}>
+        <table style={{ minWidth: 1200, borderCollapse: "separate", borderSpacing: 0, width: "100%" }}>
           <thead>
-            <tr style={{ background: "#22303C", color: "#fff" }}>
-              <th className="px-2 py-2 text-left text-xs" style={{ position: "sticky", left: 0, top: 0, background: "#22303C", minWidth: 150, zIndex: 4 }}>Swimlane</th>
-              {isCurrentWeek && <th className="px-2 py-2 text-left text-xs" style={{ position: "sticky", top: 0, background: "#3A1F1C", minWidth: 130 }}>Overdue</th>}
+            <tr>
+              <th className="px-3 py-2.5 text-left text-xs font-bold" style={{ position: "sticky", left: 0, top: 0, background: "#16232F", color: "#fff", minWidth: 170, zIndex: 4, letterSpacing: 0.6 }}>SWIMLANE</th>
+              {isCurrentWeek && (
+                <th className="px-2 py-2.5 text-left text-xs font-bold" style={{ position: "sticky", top: 0, background: "#5B2320", color: "#F5C9C4", minWidth: 140 }}>OVERDUE</th>
+              )}
               {days.map((d, i) => (
-                <th key={d} className="px-2 py-2 text-left text-xs" style={{ position: "sticky", top: 0, background: d === today ? "#1B3A5C" : "#22303C", minWidth: 130 }}>
-                  {DAYS[i]} <span style={{ color: "#8FA1B3", fontWeight: 400 }}>{dmy(d)}</span>
+                <th key={d} className="px-2 py-2.5 text-left text-xs" style={{
+                  position: "sticky", top: 0, minWidth: 140,
+                  background: d === today ? "#1B3A5C" : "#16232F",
+                  color: d === today ? "#fff" : i >= 5 ? "#6E7B88" : "#C7D0DA",
+                }}>
+                  <b>{DAYS[i]}</b> <span style={{ fontWeight: 400, opacity: 0.75 }}>{dmy(d)}</span>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {tasks === null && (<tr><td colSpan={9} className="px-3 py-4 text-xs" style={{ color: MUTED }}>Loading the week…</td></tr>)}
-            {tasks !== null && LANES.map((l) => (
-              <tr key={l.key} className="border-t align-top" style={{ borderColor: "#EFEDE7" }}>
-                <td className="px-2 py-2" style={{ position: "sticky", left: 0, background: "#fff", zIndex: 2, borderRight: `1px solid #EFEDE7` }}>
-                  <span className="text-xs font-bold" style={{ color: l.colour }}>{l.label}</span>
+            {tasks === null && (<tr><td colSpan={9} className="px-3 py-5 text-sm" style={{ color: MUTED }}>Loading the week…</td></tr>)}
+            {tasks !== null && LANES.filter((l) => l.key !== "other").map((l, li) => (
+              <tr key={l.key} className="align-top" style={{ background: li % 2 ? "#FAF9F5" : "#fff" }}>
+                <td className="px-3 py-3" style={{ position: "sticky", left: 0, background: li % 2 ? "#FAF9F5" : "#fff", zIndex: 2, borderTop: `1px solid #EFEDE7`, borderLeft: `4px solid ${l.colour}` }}>
+                  <div className="text-sm font-bold" style={{ color: l.colour }}>{l.label}</div>
+                  <div className="text-xs" style={{ color: MUTED }}>{laneCount(l.key)} open</div>
                   {undated(l.key).length > 0 && (
-                    <div className="mt-1">{undated(l.key).map((t) => (<Chip key={t.kind + t.id} t={t} />))}</div>
+                    <div className="mt-2">
+                      <div className="text-xs font-bold mb-1" style={{ color: MUTED }}>undated</div>
+                      {undated(l.key).map((t) => (<Chip key={t.kind + t.id} t={t} colour={l.colour} />))}
+                    </div>
                   )}
                 </td>
                 {isCurrentWeek && (
-                  <td className="px-1.5 py-2" style={{ background: "#FDF7F6" }}>
-                    {overdue(l.key).map((t) => (<Chip key={t.kind + t.id} t={t} />))}
+                  <td className="px-1.5 py-2" style={{ background: "#FBF3F2", borderTop: "1px solid #EFEDE7", minHeight: 74 }}>
+                    {overdue(l.key).map((t) => (<Chip key={t.kind + t.id} t={t} colour={l.colour} />))}
                   </td>
                 )}
                 {days.map((d) => (
-                  <td key={d} className="px-1.5 py-2" style={{ background: d === today ? "#F4F7FB" : undefined, borderLeft: "1px solid #F4F2EC" }}>
-                    {cell(l.key, d).map((t) => (<Chip key={t.kind + t.id} t={t} />))}
+                  <td key={d} className="px-1.5 py-2" style={{
+                    borderTop: "1px solid #EFEDE7", borderLeft: "1px solid #F4F2EC",
+                    background: d === today ? "#F0F5FB" : undefined, height: 74,
+                  }}>
+                    {cell(l.key, d).map((t) => (<Chip key={t.kind + t.id} t={t} colour={l.colour} />))}
                   </td>
                 ))}
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-      <div className="text-xs mt-1" style={{ color: MUTED }}>
-        A task with a job sits in Jobs; the rest follow their Related To tag. Undated tasks wait under their lane&apos;s name; done tasks stay struck through for the week they closed.
       </div>
 
       {adding && <AddTask onClose={() => setAdding(false)} onSaved={() => { setAdding(false); load(); }} assignees={assignees} />}

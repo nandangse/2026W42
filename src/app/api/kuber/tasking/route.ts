@@ -6,13 +6,12 @@ import { requireKuber } from "@/lib/accounts";
 export const dynamic = "force-dynamic";
 
 /**
- * Kuber's Tasking week (Dr Raghu, 28 Aug 2026): the MAIN GENIE's tasks,
- * served to the people authorised to Kuber, cut into his five swimlanes —
- * Jobs · Goals · Quarterly Rocks · Audit · Strategic Actions — for the week
- * calendar. A task with a job lands in Jobs; the rest follow their
- * RELATED TO tag (0082); the untagged sit honestly in Other.
+ * Kuber's Tasking week (Dr Raghu, 28 Aug 2026, refined the same day):
+ * ONLY tasks tagged with a RELATED TO (0082) — job · goal · rock · audit ·
+ * strategic — belong here. The general flood of job and ERP tasks stays in
+ * the main Tasking; "this is not the place to see this."
  *
- * GET ?from=<monday> — that week's tasks plus everything already overdue.
+ * GET ?from=<monday> — that week's tagged tasks plus what is already overdue.
  */
 export async function GET(req: Request) {
   try {
@@ -25,9 +24,10 @@ export async function GET(req: Request) {
     to.setUTCDate(to.getUTCDate() + 6);
     const end = to.toISOString().slice(0, 10);
 
-    const [manual, erp, jobs] = await Promise.all([
-      admin.from("manual_tasks").select("id, job_id, title, who, due, cat, esc, done, related_to, created_by").or(`due.lte.${end},due.is.null`),
-      admin.from("erp_tasks").select("id, job_id, title, who, due, cat, esc, done").or(`due.lte.${end},due.is.null`),
+    const [manual, jobs] = await Promise.all([
+      admin.from("manual_tasks").select("id, job_id, title, who, due, cat, esc, done, related_to, created_by")
+        .not("related_to", "is", null)
+        .or(`due.lte.${end},due.is.null`),
       admin.from("jobs").select("id, tag").eq("active", true),
     ]);
     if (manual.error) {
@@ -38,27 +38,15 @@ export async function GET(req: Request) {
     const tagOf = new Map((jobs.data || []).map((j) => [String(j.id), String(j.tag || "")]));
 
     type T = { id: string; kind: string; title: string; who: string; due: string | null; cat: string; esc: string; done: boolean; lane: string; job: string | null };
-    const laneOf = (job_id: unknown, related: unknown) => {
-      const r = String(related || "");
-      if (["goal", "rock", "audit", "strategic"].includes(r)) return r;
-      if (job_id || r === "job") return "job";
-      return "other";
-    };
     const tasks: T[] = [];
     for (const t of manual.data || []) {
       if (t.done && (!t.due || String(t.due) < from)) continue; // done and out of the week — gone
+      const lane = String(t.related_to);
+      if (!["job", "goal", "rock", "audit", "strategic"].includes(lane)) continue;
       tasks.push({
         id: String(t.id), kind: "manual", title: String(t.title || ""), who: String(t.who || ""),
         due: (t.due as string) ?? null, cat: String(t.cat || ""), esc: String(t.esc || "None"), done: !!t.done,
-        lane: laneOf(t.job_id, t.related_to), job: t.job_id ? `${String(t.job_id).slice(-4)} · ${tagOf.get(String(t.job_id)) || ""}` : null,
-      });
-    }
-    for (const t of erp.data || []) {
-      if (t.done && (!t.due || String(t.due) < from)) continue;
-      tasks.push({
-        id: String(t.id), kind: "erp", title: String(t.title || ""), who: String(t.who || ""),
-        due: (t.due as string) ?? null, cat: String(t.cat || ""), esc: String(t.esc || "None"), done: !!t.done,
-        lane: "job", job: t.job_id ? `${String(t.job_id).slice(-4)} · ${tagOf.get(String(t.job_id)) || ""}` : null,
+        lane, job: t.job_id ? `${String(t.job_id).slice(-4)} · ${tagOf.get(String(t.job_id)) || ""}` : null,
       });
     }
     const assignees = [...new Set(tasks.map((t) => t.who).filter(Boolean))].sort();

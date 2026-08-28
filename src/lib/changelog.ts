@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.16",
+    date: "2026-08-28",
+    module: "Kuber — Tasking shows only its own, and looks the part",
+    items: [
+      "Dr Raghu's verdict on the first cut: it looked poor and showed too much. Rebuilt: ONLY tasks tagged with a Related To appear — the general flood of job and ERP tasks stays in the main Tasking, because this is not the place to see it. The Other lane is gone; five lanes, each with its colour, its open count and its undated parked under the lane name.",
+      "PEOPLE became a dropdown — nobody shown by default beyond Suresh (SL), Sandeep (SU) and RJ; tick who to watch and the choice is remembered. The grid itself grew up: carded task chips with lane-coloured edges, ⚠ on escalations, weekend columns dimmed, today's column lit, the overdue column in its own dark red.",
+    ],
+  },
+  {
     v: "3.29.0.15",
     date: "2026-08-28",
     module: "Kuber — totals on top, said in words, everywhere",
