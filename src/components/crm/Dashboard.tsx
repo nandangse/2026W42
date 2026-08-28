@@ -51,6 +51,7 @@ export default function Dashboard({ onOpen }: { onOpen: (target: string, id: str
   const [scope, setScope] = useState<"me" | "team">("me");
   const [data, setData] = useState<Data | null>(null);
   const [tasks, setTasks] = useState<GoalTask[] | null>(null);
+  const [openTask, setOpenTask] = useState<GoalTask | null>(null);
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -139,14 +140,15 @@ export default function Dashboard({ onOpen }: { onOpen: (target: string, id: str
             {(tasks || []).map((t) => {
               const late = t.due && t.due < new Date().toISOString().slice(0, 10);
               return (
-                <div key={t.id} className="px-3 py-2" style={{ borderBottom: "1px solid #F2F4F8" }}>
+                <button key={t.id} onClick={() => setOpenTask(t)} className="w-full text-left px-3 py-2"
+                  title="Open the detail" style={{ borderBottom: "1px solid #F2F4F8", display: "block" }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: INK, lineHeight: 1.35 }}>
                     {t.esc !== "None" && <span style={{ color: "#B3261E" }}>⚑ </span>}{t.title}
                   </div>
                   <div style={{ fontSize: 10.5, color: late ? "#B3261E" : MUTED }}>
                     {t.job ? `JOB ${t.job} · ` : ""}{t.due ? `due ${t.due}${late ? " · late" : ""}` : "no date"}
                   </div>
-                </div>
+                </button>
               );
             })}
             <div className="px-3 py-2 text-xs" style={{ color: MUTED }}>
@@ -155,6 +157,31 @@ export default function Dashboard({ onOpen }: { onOpen: (target: string, id: str
           </div>
         </div>
       </div>
+
+      {openTask && (
+        <div onClick={() => setOpenTask(null)} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(22,35,47,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} className="rounded" style={{ background: "#fff", width: "min(520px,100%)", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
+            <div className="flex items-center justify-between px-4 py-3" style={{ background: NAVY, borderRadius: "6px 6px 0 0" }}>
+              <b className="text-white" style={{ fontSize: 14 }}>◎ Goal Task</b>
+              <button onClick={() => setOpenTask(null)} className="px-2 py-1 rounded text-sm" style={{ background: "rgba(255,255,255,.12)", color: "#C8D2DC" }}>✕</button>
+            </div>
+            <div className="p-4">
+              <div style={{ fontSize: 15, fontWeight: 800, color: INK, lineHeight: 1.4 }}>
+                {openTask.esc !== "None" && <span style={{ color: "#B3261E" }}>⚑ {openTask.esc} · </span>}{openTask.title}
+              </div>
+              <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>
+                {openTask.job ? `JOB ${openTask.job} · ` : ""}{openTask.due ? `due ${openTask.due}` : "no date"}
+              </div>
+              {openTask.detail && (
+                <div style={{ fontSize: 13, color: INK, lineHeight: 1.6, marginTop: 10, whiteSpace: "pre-wrap" }}>{openTask.detail}</div>
+              )}
+              <div style={{ fontSize: 12, color: MUTED, marginTop: 12 }}>
+                Done where it lives — <a href="/" style={{ color: NAVY, fontWeight: 700 }}>open Genie Tasking ↗</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

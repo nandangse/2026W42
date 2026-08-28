@@ -28,7 +28,8 @@ import DealsScreen from "./DealBoard";
 import MailComposer, { type ComposeCtx } from "./MailComposer";
 import MailQueue from "./MailQueue";
 import Dashboard from "./Dashboard";
-import VisitingCard from "./VisitingCard";
+import VisitingCard, { PersonCardPanel } from "./VisitingCard";
+import Integrations from "./Integrations";
 import WaComposer, { type WaCtx } from "./WaComposer";
 import { DateRangeBar, DEFAULT_RANGE, type DateRange } from "./DateRange";
 
@@ -57,6 +58,7 @@ export const SPECIAL_SECTIONS = [
   { name: "salespersonplan", label: "SalesPerson Plan", icon: "◐", blurb: "Each salesperson's plan against their pipeline. Being built." },
   { name: "deals", label: "Deals", icon: "◆", blurb: "" },
   { name: "visitingcard", label: "Add Visiting Card", icon: "🪪", blurb: "" },
+  { name: "integrations", label: "Integrations", icon: "🔌", blurb: "" },
   { name: "communication", label: "Communication", icon: "✉", blurb: "Emails — automated, inbound and outbound, per user's own mailbox. Arrives with the channels phase." },
 ] as const;
 
@@ -79,7 +81,7 @@ const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string } | { 
       { href: "/sales-plan", label: "Sales Plan", icon: "◩" },
     ],
   },
-  { header: "TOOLS", items: [{ sp: "visitingcard" }] },
+  { header: "TOOLS", collapsible: true, items: [{ sp: "visitingcard" }] },
   { header: "PIPELINE", items: [{ dt: "lead" }, { dt: "opportunity" }, { dt: "quotation" }, { dt: "sales_order" }] },
   { items: [{ sp: "deals" }] },
   {
@@ -87,7 +89,7 @@ const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string } | { 
     items: [{ dt: "company" }, { dt: "person" }, { dt: "address" }, { dt: "person_phone" }, { dt: "industry" }, { dt: "product" }, { dt: "sales_invoice" }],
   },
   { header: "MORE", items: [{ dt: "interaction" }, { dt: "task" }, { dt: "quotation_line" }, { sp: "communication" }] },
-  { header: "SETTINGS", collapsible: true, items: [{ dt: "sector" }, { dt: "stage" }, { dt: "profile" }, { dt: "message_variable" }, { dt: "email_template" }, { dt: "whatsapp_template" }] },
+  { header: "SETTINGS", collapsible: true, items: [{ sp: "integrations" }, { dt: "sector" }, { dt: "stage" }, { dt: "profile" }, { dt: "message_variable" }, { dt: "email_template" }, { dt: "whatsapp_template" }] },
 ];
 
 export default function CrmApp({
@@ -112,7 +114,8 @@ export default function CrmApp({
   const [pin, setPin] = useState(0);
   const [colsOpen, setColsOpen] = useState(false);
   const [view, setView] = useState<ViewState | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  // one open-flag per collapsible header — Tools and Settings fold independently
+  const [openBlocks, setOpenBlocks] = useState<Record<string, boolean>>({});
   const [compose, setCompose] = useState<ComposeCtx | null>(null);
   const [pageSize, setPageSize] = useState<string>("500");   // 100|500|2500|10000|50000|all
   const [colW, setColW] = useState<number>(280);             // narrow 140 · normal 280 · wide 440
@@ -437,13 +440,13 @@ export default function CrmApp({
             </div>
           ))}
           {navOpen && NAV.map((block, bi) => {
-            const open = !block.collapsible || settingsOpen
+            const open = !block.collapsible || !!openBlocks[block.header || ""]
               || block.items.some((it) => "dt" in it ? it.dt === slug : "sp" in it ? it.sp === slug : false);
             return (
               <div key={bi} className="mb-3">
                 {block.header && (
                   <button
-                    onClick={() => block.collapsible && setSettingsOpen((v) => !v)}
+                    onClick={() => block.collapsible && setOpenBlocks((m) => ({ ...m, [block.header || ""]: !m[block.header || ""] }))}
                     className="w-full text-left text-xs font-bold px-2 mb-1 flex items-center justify-between"
                     style={{ color: MUTED, letterSpacing: 1.1, cursor: block.collapsible ? "pointer" : "default" }}
                   >
@@ -506,6 +509,8 @@ export default function CrmApp({
               <Dashboard onOpen={openLinked} />
             ) : special.name === "visitingcard" ? (
               <VisitingCard onOpen={openLinked} />
+            ) : special.name === "integrations" ? (
+              <Integrations />
             ) : (
               <StubScreen label={special.label} blurb={special.blurb} dated />
             )}
@@ -1420,6 +1425,7 @@ function RecordModal({
       recordTabs.push({ key: "quotes", label: "Quotations", slug: "quotation", filterField: "opportunity_id", filterValue: rid, addPresets: { opportunity_id: rid, ...(companyId ? { company_id: companyId } : {}) } });
     if (dt.name === "quotation")
       recordTabs.push({ key: "lines", label: "Lines", slug: "quotation_line", filterField: "quotation_id", filterValue: rid, addPresets: { quotation_id: rid } });
+    if (dt.name === "person") recordTabs.push({ key: "card", label: "Visiting Card" });
     recordTabs.push(
       { key: "comms", label: "Communication" },
       { key: "notes", label: "Notes" },
@@ -1581,6 +1587,8 @@ function RecordModal({
             </div>
           ) : tab === "eva" ? (
             <EvaBriefTab companyId={rid} initial={row.eva_brief ? String(row.eva_brief) : null} initialAt={row.eva_brief_at ? String(row.eva_brief_at) : null} />
+          ) : tab === "card" ? (
+            <PersonCardPanel personId={rid} personRow={row} onSaved={() => onSaved()} />
           ) : tab === "comms" ? (
             <CommsFeed
               type={dt.name} id={rid} companyId={companyId} onOpenLink={onOpenLink}

@@ -30,8 +30,9 @@ const CARD_SCHEMA = {
     address: { type: ["string", "null"] },
     city: { type: ["string", "null"] },
     notes: { type: ["string", "null"], description: "Anything else printed that matters — divisions, taglines with product hints. Nothing invented." },
+    transcript: { type: ["string", "null"], description: "EVERY line printed on the card, verbatim, one per line, in reading order." },
   },
-  required: ["person_name", "salutation", "designation", "company", "phones", "emails", "website", "address", "city", "notes"],
+  required: ["person_name", "salutation", "designation", "company", "phones", "emails", "website", "address", "city", "notes", "transcript"],
   additionalProperties: false,
 } as const;
 
@@ -89,6 +90,37 @@ function e164(raw: string): string {
   return d.length === 10 ? `+91${d}` : raw.trim();
 }
 
+export async function GET(req: Request) {
+  try {
+    const me = await requireCrm();
+    if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
+    const db = crmDb();
+    const u = new URL(req.url);
+    const personId = u.searchParams.get("person_id");
+
+    let q = db.from("visiting_card").select("id, image_path, image_back_path, transcript, extracted, status, person_id, company_id, added_by, added_at")
+      .order("added_at", { ascending: false }).limit(personId ? 20 : 100);
+    q = personId ? q.eq("person_id", personId) : q.eq("added_by", me.email.toLowerCase());
+    const { data, error } = await q;
+    if (error) {
+      if (/visiting_card|schema cache|does not exist/i.test(error.message))
+        return NextResponse.json({ cards: [], needsMigration: true });
+      throw new HttpError(500, error.message);
+    }
+    const cards = await Promise.all((data || []).map(async (c) => {
+      const sign = async (path: unknown) => {
+        if (!path) return null;
+        const { data: sgn } = await db.storage.from("cards").createSignedUrl(String(path), 3600);
+        return sgn?.signedUrl ?? null;
+      };
+      return { ...c, front_url: await sign(c.image_path), back_url: await sign(c.image_back_path) };
+    }));
+    return NextResponse.json({ cards });
+  } catch (e) {
+    return errJson(e);
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const me = await requireCrm();
@@ -111,6 +143,10 @@ export async function POST(req: Request) {
           throw new HttpError(503, "Run CRM migration 0018 first — the cards bucket does not exist yet.");
         throw new HttpError(502, `Could not store the card: ${up.message}`);
       }
+      // the back is stored, not read — the front carries the identity, and a
+      // second model call for a works list is money spent on decoration
+      if (String(form.get("side") || "front") === "back")
+        return NextResponse.json({ ok: true, path, side: "back" });
       const { read, why } = await readCard(buf, file.type || "");
       // matching companies, so the human decides "existing or new" with names in front of them
       let matches: { id: string; name: string }[] = [];
@@ -124,6 +160,25 @@ export async function POST(req: Request) {
 
     /* ── the records, as checked by the human ── */
     const body = await req.json();
+
+    /** { action: "save" } — the scan on file, no CRM records yet. */
+    if (String(body.action) === "save") {
+      const { data: c, error } = await db.from("visiting_card").insert({
+        image_path: String(body.path || ""),
+        image_back_path: String(body.back_path || "").trim() || null,
+        transcript: String(body.transcript || "").trim() || null,
+        extracted: body.extracted ?? null,
+        status: "saved",
+        added_by: me.email.toLowerCase(),
+      }).select("id").maybeSingle();
+      if (error) {
+        if (/visiting_card|schema cache|does not exist/i.test(error.message))
+          throw new HttpError(503, "Run CRM migrations 0018 and 0019 first.");
+        throw new HttpError(500, error.message);
+      }
+      return NextResponse.json({ ok: true, card_id: c ? String(c.id) : null });
+    }
+
     if (String(body.action) !== "create") throw new HttpError(400, "unknown action");
     const personName = String(body.person_name || "").trim();
     if (!personName) throw new HttpError(400, "The contact needs a name.");
@@ -147,12 +202,19 @@ export async function POST(req: Request) {
     }).select("id").maybeSingle();
     if (pe) throw new HttpError(500, `Could not create the contact: ${pe.message}`);
 
-    const { error: ve } = await db.from("visiting_card").insert({
+    const cardRow = {
       image_path: String(body.path || ""),
+      image_back_path: String(body.back_path || "").trim() || null,
+      transcript: String(body.transcript || "").trim() || null,
       extracted: body.extracted ?? null,
       company_id: companyId, person_id: p ? String(p.id) : null,
+      status: "added",
       added_by: me.email.toLowerCase(),
-    });
+    };
+    const cardId = String(body.card_id || "").trim();
+    const { error: ve } = cardId
+      ? await db.from("visiting_card").update(cardRow).eq("id", cardId)
+      : await db.from("visiting_card").insert(cardRow);
     if (ve && !/visiting_card|schema cache/i.test(ve.message)) throw new HttpError(500, ve.message);
 
     return NextResponse.json({ ok: true, person_id: p ? String(p.id) : null, company_id: companyId });

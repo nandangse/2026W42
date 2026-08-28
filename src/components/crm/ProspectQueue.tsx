@@ -73,7 +73,30 @@ export default function ProspectQueue({ onOpen, compact = false }: { onOpen: (ta
         </div>
       )}
 
-      {(items || []).map((it, i) => (
+      {(items || []).map((it, i) => compact ? (
+        <div key={it.id} className="px-2.5 py-1.5" style={{ borderBottom: "1px solid #F2F4F8", background: i === 0 ? "#FCF8F2" : "#fff" }}>
+          <div className="flex items-center gap-1.5" style={{ minWidth: 0 }}>
+            <span className="tnum" style={{ width: 14, textAlign: "right", color: i === 0 ? ORANGE : "#C9CDD6", fontWeight: 800, fontSize: 10.5, flexShrink: 0 }}>{i + 1}</span>
+            <button onClick={() => onOpen(it.kind, it.ref_id)} className="text-left font-bold" title={`${it.title}`}
+              style={{ color: NAVY, fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, flex: 1 }}>
+              {it.company || it.title}
+            </button>
+            <button onClick={() => act(it.id, "done")} disabled={busy === it.id} title="Called — records it and moves on"
+              className="rounded px-1.5 font-bold" style={{ background: NAVY_SOFT, color: NAVY, fontSize: 10, flexShrink: 0 }}>✓</button>
+            <button onClick={() => act(it.id, "remove")} disabled={busy === it.id} title="Off the list, no call recorded"
+              style={{ color: MUTED, fontSize: 10, flexShrink: 0 }}>✕</button>
+          </div>
+          <div className="flex items-center gap-1.5" style={{ paddingLeft: 20 }}>
+            {it.phone ? (
+              <a href={`tel:${it.phone.replace(/[^+0-9]/g, "")}`} className="font-bold tnum" title={it.phone_person ? `Rings ${it.phone_person}` : "Dial"}
+                style={{ color: GREEN, fontSize: 11, textDecoration: "none" }}>📞 {it.phone}</a>
+            ) : (
+              <span style={{ fontSize: 10, color: "#B3261E", fontWeight: 700 }} title="Add a phone on the contact record">no number</span>
+            )}
+            {it.phone_person && <span style={{ fontSize: 10, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.phone_person}</span>}
+          </div>
+        </div>
+      ) : (
         <div key={it.id} className="flex items-center gap-3 px-3 py-2 flex-wrap" style={{ borderBottom: `1px solid #F2F4F8`, background: i === 0 ? "#FCF8F2" : "#fff" }}>
           <span className="tnum" style={{ width: 20, textAlign: "right", color: i === 0 ? ORANGE : "#C9CDD6", fontWeight: 800, fontSize: 12 }}>{i + 1}</span>
           <div style={{ minWidth: 0, flex: "1 1 240px" }}>

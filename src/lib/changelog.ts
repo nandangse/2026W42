@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.25.4.0",
+    date: "2026-08-28",
+    module: "CRM — cards front and back, Apollo, and Integrations",
+    items: [
+      "TOOLS FOLDS CLOSED by default — and every collapsible section now folds on its own, instead of one switch opening them all.",
+      "ADD VISITING CARD is a ledger and a lightbox now: the screen shows every scan and what it became; ADD NEW opens the box — FRONT and BACK tiles (a tap opens the camera; the front is read, the back is kept), the VERBATIM TRANSCRIPT under them, correctable, and four buttons that say how far to go: Save · Save and Add to CRM · Save, Add to CRM & Add Another · Cancel.",
+      "THE CONTACT GAINS A VISITING CARD TAB: the images that made the record, and ENRICH FROM APOLLO.IO — which shows what Apollo claims and writes only the fields you tick, because enrichment is a claim by an outside service and goes through the same hands as a card. Fields already filled are never silently overwritten; the current value sits beside the claim.",
+      "SETTINGS → INTEGRATIONS, a new section for every outside service's keys — Apollo first — kept in the CRM's own database, changeable without a redeploy, shown only as a last-four tail. Managed by the CEO, the Sales Head and admin.",
+      "The Dashboard's Goal Tasks open a detail lightbox on click, and the Prospecting Queue's panel is compact — one dense line per call.",
+      "CRM migration 0019.",
+    ],
+  },
+  {
     v: "3.25.3.0",
     date: "2026-08-28",
     module: "CRM — the lightbox grows up, and cards walk in",

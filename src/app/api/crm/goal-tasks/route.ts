@@ -37,7 +37,7 @@ export async function GET() {
       .filter((t) => handles.includes(String(t.who || "").trim().toLowerCase()))
       .slice(0, 60)
       .map((t) => ({
-        id: String(t.id), title: String(t.title || ""), detail: t.detail ? String(t.detail).slice(0, 140) : null,
+        id: String(t.id), title: String(t.title || ""), detail: t.detail ? String(t.detail).slice(0, 800) : null,
         due: t.due ?? null, esc: String(t.esc || "None"), job: t.job_id ? String(t.job_id).slice(-4) : null,
       }));
     return NextResponse.json({ tasks });
