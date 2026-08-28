@@ -384,141 +384,302 @@ const PLAN_STATUS = { pending: MUTED, in_progress: "#1B6B93", done: GREEN };
 interface ProjRow {
   id: string; mgr: string; erp_stage: string; description: string;
   design_stage: string; design_owner: string; support_needed: string;
+  bom_pct: number | null; manuf_pct: number | null; sort_order: number | null;
+  design_total: number; design_done: number;
   jobs: { id: string; tag: string }[];
   next: { title: string; job: string | null } | null; done: number; total: number;
-  issues: { id: string; title: string; status: string; open: boolean }[];
+  issues: { id: string; title: string; who: string; due: string | null; esc: string; open: boolean }[];
   deliverables: Row[];
 }
+interface WeekRow { id: string; on_date: string; designer: string; work: string; by: string | null }
+
+/** His summary buckets (28 Aug 2026): GAD — BOM — Manuf — As Built. */
+const STAGE_BUCKETS: [string, RegExp][] = [
+  ["GAD", /kickoff|gad/i], ["BOM", /tbom|full bom/i], ["Manuf", /manuf/i], ["As Built", /as built/i],
+];
+
 function PlansScreen() {
-  const [data, setData] = useState<{ installed: boolean; stages: string[]; owners: string[]; rows: ProjRow[] } | null>(null);
+  const [data, setData] = useState<{ installed: boolean; stages: string[]; owners: string[]; rows: ProjRow[]; week: WeekRow[] } | null>(null);
   const [planFor, setPlanFor] = useState<ProjRow | null>(null);
+  const [supportFor, setSupportFor] = useState<ProjRow | null>(null);
   const [addDeliv, setAddDeliv] = useState<Row | "new" | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [sort, setSort] = useState<{ k: "id" | "design_owner" | "nIssues" | "jobs"; d: 1 | -1 }>({ k: "id", d: 1 });
   const [, jobsList, , reloadReg] = useReg("plan");
 
   const load = useCallback(() => {
     fetch("/api/vishwakarma/projects", { cache: "no-store" })
       .then((r) => r.json())
-      .then((j) => setData(j.rows ? j : { installed: j.installed !== false, stages: [], owners: [], rows: [] }))
-      .catch(() => setData({ installed: true, stages: [], owners: [], rows: [] }));
+      .then((j) => setData(j.rows ? j : { installed: j.installed !== false, stages: [], owners: [], rows: [], week: [] }))
+      .catch(() => setData({ installed: true, stages: [], owners: [], rows: [], week: [] }));
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const save = async (pid: string, patch: Record<string, string>) => {
+  const save = async (pid: string, patch: Record<string, unknown>) => {
     await fetch("/api/vishwakarma/projects", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ project_id: pid, patch }),
     });
     load();
   };
+  const move = async (pid: string, dir: -1 | 1) => {
+    await fetch("/api/vishwakarma/projects", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "move", project_id: pid, dir, order: (data?.rows || []).map((r) => r.id) }),
+    });
+    load();
+  };
 
-  const rows = [...(data?.rows || [])].sort((a, b) => {
-    const v = sort.k === "nIssues" ? a.issues.filter((x) => x.open).length - b.issues.filter((x) => x.open).length
-      : sort.k === "jobs" ? a.jobs.length - b.jobs.length
-      : String(a[sort.k]).localeCompare(String(b[sort.k]));
-    return v * sort.d;
-  });
-  const Hd = ({ k, children }: { k: typeof sort.k; children: React.ReactNode }) => (
-    <th className="px-2 py-2 text-left whitespace-nowrap" onClick={() => setSort((s2) => ({ k, d: s2.k === k ? (s2.d === 1 ? -1 : 1) : 1 }))}
-      style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}>
-      {children}{sort.k === k ? (sort.d === 1 ? " ▲" : " ▼") : ""}
-    </th>
-  );
+  const rows = data?.rows || [];
+
+  // Design Engineer — GAD · BOM · Manuf · As Built, totals below (his strip).
+  const strip = (() => {
+    const by = new Map<string, number[]>();
+    for (const r of rows) {
+      const eng = r.design_owner || "— unassigned";
+      const arr = by.get(eng) || [0, 0, 0, 0];
+      STAGE_BUCKETS.forEach(([, re], i) => { if (re.test(r.design_stage)) arr[i] += 1; });
+      by.set(eng, arr);
+    }
+    return [...by.entries()].sort((x, y) => x[0].localeCompare(y[0]));
+  })();
+  const stripTotals = STAGE_BUCKETS.map((_, i) => strip.reduce((s2, [, arr]) => s2 + arr[i], 0));
 
   return (
-    <Shell installed={data?.installed !== false} title="Design Plans" onAdd={() => setAddDeliv("new")} addLabel="+ Add a deliverable"
-      blurb="One row per live project: design's stage and owner on it, its jobs, the plan and next milestone, and what the problems register holds against it. Stage, owner and support save as you set them.">
+    <div>
+      <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
+        <div>
+          <div className="text-lg font-bold" style={{ color: INK }}>Design Plans</div>
+          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 720, lineHeight: 1.5 }}>
+            One row per live project. The order is YOURS — the arrows move a row, nothing else sorts it.
+            Issues come from the Tasking where the project&apos;s jobs carry a design point.
+          </div>
+        </div>
+        <button onClick={() => setAddDeliv("new")} className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: ORANGE }}>+ Add a deliverable</button>
+      </div>
       {data?.installed === false && (
         <div className="rounded p-3 text-sm font-semibold mb-2" style={{ background: "#FCF6E8", color: "#8A6D1A" }}>
-          Run migration 0085 too — the project grid saves its stage, owner and support there.
+          Run migrations 0085 and 0089 — the grid saves its words there.
         </div>
       )}
-      <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "72vh" }}>
-        <table className="w-full text-xs" style={{ minWidth: 1180, borderCollapse: "separate", borderSpacing: 0 }}>
-          <thead><tr style={{ background: "#22303C", color: "#fff" }}>
-            <Hd k="id">Project · design stage</Hd>
-            <Hd k="jobs">Jobs</Hd>
-            <Hd k="design_owner">Design Owner</Hd>
-            <Th>Project Plan</Th>
-            <Th>Next Milestone</Th>
-            <Hd k="nIssues">Issues to Design</Hd>
-            <Th>Issues</Th>
-            <Th>Design Support needed</Th>
-          </tr></thead>
-          <tbody>
-            {data && rows.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-5 text-center" style={{ color: MUTED }}>
-                No live projects — a project appears here the moment an active job stands on it.
-              </td></tr>
-            )}
-            {!data && (<tr><td colSpan={8} className="px-3 py-5 text-center" style={{ color: MUTED }}>loading…</td></tr>)}
-            {rows.map((p, i) => {
-              const openIssues = p.issues.filter((x) => x.open);
-              return (
-                <tr key={p.id} className="border-t align-top" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
-                  <td className="px-2 py-2" style={{ minWidth: 170 }}>
-                    <div className="font-bold" style={{ color: INK }}>{p.id}</div>
-                    {p.mgr && <div style={{ color: MUTED, fontSize: 10 }}>PM: {p.mgr}</div>}
-                    <select value={p.design_stage} onChange={(e) => void save(p.id, { design_stage: e.target.value })}
-                      className="mt-1 border rounded px-1 py-0.5 text-xs bg-white w-full"
-                      style={{ borderColor: p.design_stage ? BORDER : ORANGE, fontWeight: 700, color: p.design_stage ? INK : MUTED }}>
-                      <option value="">design stage…</option>
-                      {(data?.stages || []).map((st) => (<option key={st}>{st}</option>))}
-                    </select>
-                  </td>
-                  <td className="px-2 py-2 whitespace-nowrap" style={{ lineHeight: 1.7 }}>
-                    {p.jobs.map((j) => (<div key={j.id}><b>{j.id.slice(-4)}</b> <span style={{ color: "#5A6672" }}>{j.tag}</span></div>))}
-                  </td>
-                  <td className="px-2 py-2" style={{ minWidth: 120 }}>
-                    <select value={p.design_owner} onChange={(e) => void save(p.id, { design_owner: e.target.value })}
-                      className="border rounded px-1 py-0.5 text-xs bg-white w-full" style={{ borderColor: BORDER }}>
-                      <option value="">—</option>
-                      {(data?.owners || []).map((o) => (<option key={o}>{o}</option>))}
-                      {p.design_owner && !(data?.owners || []).includes(p.design_owner) && <option>{p.design_owner}</option>}
-                    </select>
-                  </td>
-                  <td className="px-2 py-2 whitespace-nowrap">
-                    <button onClick={() => setPlanFor(p)} className="rounded border px-2 py-1 font-bold" style={{ borderColor: BORDER, color: "#1B6B93" }}>
-                      ▤ Plan{p.total > 0 && <span style={{ color: MUTED, fontWeight: 400 }}> · {p.done}/{p.total}</span>}
-                    </button>
-                  </td>
-                  <td className="px-2 py-2" style={{ maxWidth: 170 }}>
-                    {p.next ? (<span><b>{p.next.title}</b>{p.next.job && <span style={{ color: MUTED }}> — job {p.next.job}</span>}</span>)
-                      : p.total > 0 ? <span style={{ color: GREEN, fontWeight: 700 }}>all milestones done</span>
-                      : <span style={{ color: MUTED }}>no plan yet</span>}
-                  </td>
-                  <td className="px-2 py-2 text-center font-bold tnum" style={{ color: openIssues.length ? RED : GREEN, fontSize: 14 }}>
-                    {openIssues.length}
-                  </td>
-                  <td className="px-2 py-2" style={{ maxWidth: 200, lineHeight: 1.6 }}>
-                    {openIssues.length === 0 && <span style={{ color: MUTED }}>—</span>}
-                    {openIssues.slice(0, 3).map((x) => (
-                      <div key={x.id} style={{ cursor: "pointer" }} title={`${x.status} — open in Problems`}
-                        onClick={() => { window.location.hash = "problems"; }}>
-                        • {x.title}
-                      </div>
-                    ))}
-                    {openIssues.length > 3 && <div style={{ color: MUTED }}>… {openIssues.length - 3} more</div>}
-                  </td>
-                  <td className="px-2 py-2" style={{ minWidth: 160 }}>
-                    <input
-                      value={drafts[p.id] ?? p.support_needed}
-                      placeholder="what design needs…"
-                      onChange={(e) => setDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
-                      onBlur={(e) => { if (e.target.value !== p.support_needed) void save(p.id, { support_needed: e.target.value }); }}
-                      className="w-full border rounded px-1.5 py-1 text-xs" style={{ borderColor: (drafts[p.id] ?? p.support_needed) ? ORANGE : BORDER }}
-                    />
-                  </td>
+
+      {/* the engineer strip — GAD · BOM · Manuf · As Built, totals below */}
+      {rows.length > 0 && (
+        <div className="bg-white rounded-lg border mb-2 overflow-auto" style={{ borderColor: BORDER, maxWidth: 560 }}>
+          <table className="text-xs" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 420 }}>
+            <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+              <th className="px-2 py-1.5 text-left">Design Engineer</th>
+              {STAGE_BUCKETS.map(([lbl]) => (<th key={lbl} className="px-2 py-1.5 text-right">{lbl}</th>))}
+            </tr></thead>
+            <tbody>
+              {strip.map(([eng, arr], i) => (
+                <tr key={eng} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <td className="px-2 py-1 font-semibold">{eng}</td>
+                  {arr.map((n, j) => (<td key={j} className="px-2 py-1 text-right tnum">{n || "·"}</td>))}
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ))}
+              <tr className="border-t font-bold" style={{ borderColor: "#22303C", background: "#F3F1EB" }}>
+                <td className="px-2 py-1">TOTAL</td>
+                {stripTotals.map((n, j) => (<td key={j} className="px-2 py-1 text-right tnum">{n || "·"}</td>))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="flex gap-3 items-start flex-wrap">
+        {/* ------------ the grid ------------ */}
+        <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "70vh", flex: "1 1 720px", minWidth: 0 }}>
+          <table className="w-full text-xs" style={{ minWidth: 1200, borderCollapse: "separate", borderSpacing: 0 }}>
+            <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+              {["Project · design stage", "Jobs", "Design Owner", "Design Plan", "Next Milestone", "Issues to Design", "Design Support", "BOM %", "Manuf Drg %", "Order"].map((h) => (
+                <th key={h} className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {data && rows.length === 0 && (
+                <tr><td colSpan={10} className="px-3 py-5 text-center" style={{ color: MUTED }}>No live projects — a project appears here the moment an active job stands on it.</td></tr>
+              )}
+              {!data && (<tr><td colSpan={10} className="px-3 py-5 text-center" style={{ color: MUTED }}>loading…</td></tr>)}
+              {rows.map((p, i) => {
+                const openIssues = p.issues.filter((x) => x.open);
+                return (
+                  <tr key={p.id} className="border-t align-top" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                    <td className="px-2 py-2" style={{ minWidth: 240 }}>
+                      <div className="font-bold" style={{ color: INK, fontSize: 13 }}>{p.id}</div>
+                      {p.mgr && <div style={{ color: MUTED, fontSize: 10 }}>PM: {p.mgr}</div>}
+                      <select value={p.design_stage} onChange={(e) => void save(p.id, { design_stage: e.target.value })}
+                        className="mt-1 border rounded px-1 py-0.5 text-xs bg-white w-full"
+                        style={{ borderColor: p.design_stage ? BORDER : ORANGE, fontWeight: 700, color: p.design_stage ? INK : MUTED }}>
+                        <option value="">design stage…</option>
+                        {(data?.stages || []).map((st) => (<option key={st}>{st}</option>))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap" style={{ lineHeight: 1.8 }}>
+                      {p.jobs.map((j) => (
+                        <div key={j.id}>
+                          <a href="/" target="_blank" rel="noreferrer" title={j.tag}
+                            style={{ color: "#2C5B82", fontWeight: 700, textDecoration: "underline" }}>{j.id.slice(-4)}</a>
+                        </div>
+                      ))}
+                    </td>
+                    <td className="px-2 py-2" style={{ minWidth: 130 }}>
+                      <input list="vw-owners" value={drafts[`o:${p.id}`] ?? p.design_owner}
+                        placeholder="type or pick…"
+                        onChange={(e) => setDrafts((d) => ({ ...d, [`o:${p.id}`]: e.target.value }))}
+                        onBlur={(e) => { if (e.target.value !== p.design_owner) void save(p.id, { design_owner: e.target.value }); }}
+                        className="w-full border rounded px-1.5 py-1 text-xs" style={{ borderColor: BORDER }} />
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <button onClick={() => setPlanFor(p)} className="rounded border px-2 py-1 font-bold" style={{ borderColor: BORDER, color: VIOLET }}>
+                        ▤ Plan{p.design_total > 0 && <span style={{ color: MUTED, fontWeight: 400 }}> · {p.design_done}/{p.design_total}</span>}
+                      </button>
+                    </td>
+                    <td className="px-2 py-2" style={{ maxWidth: 160 }}>
+                      {p.next ? (<span><b>{p.next.title}</b>{p.next.job && <span style={{ color: MUTED }}> — job {p.next.job}</span>}</span>)
+                        : p.total > 0 ? <span style={{ color: GREEN, fontWeight: 700 }}>all milestones done</span>
+                        : <span style={{ color: MUTED }}>no plan yet</span>}
+                      {p.total > 0 && <div style={{ color: MUTED, fontSize: 10 }}>{p.done}/{p.total} done</div>}
+                    </td>
+                    <td className="px-2 py-2" style={{ maxWidth: 210, lineHeight: 1.6 }}>
+                      <b style={{ color: openIssues.length ? RED : GREEN }}>{openIssues.length}</b>
+                      {openIssues.slice(0, 3).map((x) => (
+                        <div key={x.id} title={`${x.who}${x.due ? ` · due ${fmtD(x.due)}` : ""}${x.esc !== "None" ? ` · ${x.esc}` : ""}`}>
+                          • {x.title.length > 46 ? x.title.slice(0, 44) + "…" : x.title}
+                        </div>
+                      ))}
+                      {openIssues.length > 3 && <div style={{ color: MUTED }}>… {openIssues.length - 3} more</div>}
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <button onClick={() => setSupportFor(p)} className="rounded border px-2 py-1 font-bold" style={{ borderColor: ORANGE, color: ORANGE }}
+                        title="Files a task — to RJ, escalation L2, due in 3 days">
+                        ＋ Task to RJ
+                      </button>
+                    </td>
+                    <td className="px-2 py-2">
+                      <PctBox value={p.bom_pct} onSave={(v) => void save(p.id, { bom_pct: v })} />
+                    </td>
+                    <td className="px-2 py-2">
+                      <PctBox value={p.manuf_pct} onSave={(v) => void save(p.id, { manuf_pct: v })} />
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <button onClick={() => void move(p.id, -1)} disabled={i === 0} title="Move up" style={{ color: i === 0 ? "#D5D2C8" : INK, fontWeight: 700 }}>↑</button>
+                      <button onClick={() => void move(p.id, 1)} disabled={i === rows.length - 1} title="Move down" className="ml-1" style={{ color: i === rows.length - 1 ? "#D5D2C8" : INK, fontWeight: 700 }}>↓</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <datalist id="vw-owners">{(data?.owners || []).map((o) => (<option key={o} value={o} />))}</datalist>
+        </div>
+
+        {/* ------------ this week's working ------------ */}
+        <WeekPanel week={data?.week || []} owners={data?.owners || []} onChanged={load} />
       </div>
+
       {planFor && <ProjectPlanBox p={planFor} onClose={() => setPlanFor(null)} onSaved={() => { setPlanFor(null); load(); }} />}
+      {supportFor && <SupportBox p={supportFor} onClose={() => setSupportFor(null)} onSaved={() => { setSupportFor(null); load(); }} />}
       {addDeliv && <PlanBox row={addDeliv === "new" ? null : addDeliv} jobs={jobsList} onClose={() => setAddDeliv(null)} onSaved={() => { setAddDeliv(null); reloadReg(); load(); }} />}
-    </Shell>
+    </div>
+  );
+}
+
+/** A percentage, typed plainly, saved on blur. */
+function PctBox({ value, onSave }: { value: number | null; onSave: (v: string) => void }) {
+  const [t, setT] = useState(value == null ? "" : String(value));
+  useEffect(() => { setT(value == null ? "" : String(value)); }, [value]);
+  return (
+    <div className="flex items-center gap-1">
+      <input value={t} onChange={(e) => setT(e.target.value.replace(/[^0-9.]/g, ""))}
+        onBlur={() => { if (t !== (value == null ? "" : String(value))) onSave(t); }}
+        className="border rounded px-1.5 py-1 text-xs text-right tnum" style={{ borderColor: BORDER, width: 52 }} />
+      <span style={{ color: MUTED }}>%</span>
+    </div>
+  );
+}
+
+/** DESIGN SUPPORT NEEDED, filed as a real task — his defaults: RJ, L2,
+ *  due in three days. It lands in the main Tasking, where he correlates. */
+function SupportBox({ p, onClose, onSaved }: { p: ProjRow; onClose: () => void; onSaved: () => void }) {
+  const plus3 = new Date(Date.now() + 3 * 86400000).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const [f, setF] = useState({ title: "", detail: "", job_id: p.jobs[0]?.id || "", due: plus3 });
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <Modal onClose={onClose} width={520}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-bold text-sm" style={{ color: INK }}>Design support needed — {p.id}</div>
+        <button onClick={onClose} style={{ color: MUTED }}>✕</button>
+      </div>
+      <div className="space-y-2 text-sm">
+        <div><L>What support is needed</L>
+          <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} className="w-full border rounded px-2 py-1.5" style={inputCss} /></div>
+        <div><L>Details</L>
+          <textarea value={f.detail} onChange={(e) => setF({ ...f, detail: e.target.value })} rows={3} className="w-full border rounded px-2 py-1.5" style={inputCss} /></div>
+        <div className="flex gap-2">
+          <div><L>Job</L>
+            <select value={f.job_id} onChange={(e) => setF({ ...f, job_id: e.target.value })} className="border rounded px-2 py-1.5 bg-white" style={inputCss}>
+              {p.jobs.map((j) => (<option key={j.id} value={j.id}>{j.id.slice(-4)} · {j.tag}</option>))}
+            </select></div>
+          <div><L>Due</L>
+            <input type="date" value={f.due} onChange={(e) => setF({ ...f, due: e.target.value })} className="border rounded px-2 py-1.5 tnum" style={inputCss} /></div>
+        </div>
+        <div className="text-xs" style={{ color: MUTED }}>Files as a task: assigned to <b>RJ</b>, escalation <b>L2</b>, category Design — it shows in the main Tasking and back here under Issues.</div>
+        {err && <div className="text-xs font-bold" style={{ color: RED }}>{err}</div>}
+        <div className="flex gap-2 pt-1">
+          <button disabled={busy} onClick={async () => {
+            setBusy(true); setErr("");
+            const r = await fetch("/api/vishwakarma/projects", {
+              method: "POST", headers: { "content-type": "application/json" },
+              body: JSON.stringify({ action: "support_task", project_id: p.id, ...f }),
+            });
+            setBusy(false);
+            if (!r.ok) setErr((await r.json()).error || "Could not file it"); else onSaved();
+          }} className="rounded px-4 py-1.5 text-sm font-bold text-white" style={{ background: busy ? "#B9BEC4" : ORANGE }}>💾 File the task</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/** THIS WEEK'S WORKING — date, designer, work to be done. The room's list. */
+function WeekPanel({ week, owners, onChanged }: { week: WeekRow[]; owners: string[]; onChanged: () => void }) {
+  const [f, setF] = useState({ on_date: TODAY(), designer: "", work: "" });
+  const [busy, setBusy] = useState(false);
+  const monday = (() => { const d = new Date(); const dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dow); return d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); })();
+  const shown = week.filter((w) => w.on_date >= monday);
+  return (
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: BORDER, flex: "0 1 300px", minWidth: 260 }}>
+      <div className="text-xs font-bold mb-1" style={{ color: VIOLET, letterSpacing: 0.8 }}>THIS WEEK&apos;S WORKING</div>
+      {shown.length === 0 && <div className="text-sm mb-1" style={{ color: MUTED }}>Nothing yet — the first record starts the week.</div>}
+      {shown.map((w) => (
+        <div key={w.id} className="border-t py-1.5 text-sm" style={{ borderColor: "#EFEDE7" }}>
+          <div className="flex items-center gap-2">
+            <b className="tnum" style={{ fontSize: 11 }}>{fmtD(w.on_date)}</b>
+            <span className="font-semibold" style={{ color: "#1B6B93" }}>{w.designer || "—"}</span>
+            <button className="ml-auto" title="Remove" style={{ color: MUTED }}
+              onClick={async () => {
+                if (!window.confirm("Remove this record?")) return;
+                await fetch("/api/vishwakarma/projects", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "week_delete", id: w.id }) });
+                onChanged();
+              }}>✕</button>
+          </div>
+          <div style={{ lineHeight: 1.5 }}>{w.work}</div>
+        </div>
+      ))}
+      <div className="border-t mt-1 pt-2 space-y-1.5" style={{ borderColor: BORDER }}>
+        <div className="flex gap-1">
+          <input type="date" value={f.on_date} onChange={(e) => setF({ ...f, on_date: e.target.value })} className="border rounded px-1.5 py-1 text-xs tnum" style={{ borderColor: BORDER, width: 118 }} />
+          <input list="vw-owners" value={f.designer} onChange={(e) => setF({ ...f, designer: e.target.value })} placeholder="designer" className="flex-1 border rounded px-1.5 py-1 text-xs" style={{ borderColor: BORDER, minWidth: 0 }} />
+        </div>
+        <textarea value={f.work} onChange={(e) => setF({ ...f, work: e.target.value })} placeholder="work to be done…" rows={2} className="w-full border rounded px-1.5 py-1 text-xs" style={{ borderColor: BORDER }} />
+        <button disabled={busy || !f.work.trim()} onClick={async () => {
+          setBusy(true);
+          await fetch("/api/vishwakarma/projects", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "week_add", ...f }) });
+          setBusy(false); setF({ on_date: TODAY(), designer: f.designer, work: "" }); onChanged();
+        }} className="w-full rounded py-1 text-xs font-bold text-white" style={{ background: busy || !f.work.trim() ? "#B9BEC4" : ORANGE }}>＋ Add a record</button>
+      </div>
+    </div>
   );
 }
 

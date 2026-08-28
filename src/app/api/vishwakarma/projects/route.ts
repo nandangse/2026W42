@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  *
  * A project is "live" here when at least one active job stands on it.
  */
-const DESIGN_STAGES = ["Concept", "Basic Design", "Detail Design", "Drawings Released", "Production Support", "Design Complete"];
+const DESIGN_STAGES = ["Design Kickoff", "Design GAD", "Design TBOM", "Design Manuf Drawings", "Design Full BOM", "As Built Checks", "Design Complete"];
 
 type R = Record<string, unknown>;
 
@@ -66,7 +66,7 @@ export async function GET(req: Request) {
       return out;
     };
 
-    const [projects, jobs, pms, jms, dps, metaRes, problems, plans, profiles] = await Promise.all([
+    const [projects, jobs, pms, jms, dps, metaRes, problems, mtasks, etasks, weekRes, plans, profiles] = await Promise.all([
       pageAll((a, b) => admin.from("projects").select("id, mgr, stage, exp_end, job_numbers, description").order("id").range(a, b)),
       pageAll((a, b) => admin.from("jobs").select("id, tag, proj, active").eq("active", true).order("id").range(a, b)),
       pageAll((a, b) => admin.from("project_milestones").select("project_id, idx, title, done, done_on").order("project_id").order("idx").range(a, b)),
@@ -74,6 +74,9 @@ export async function GET(req: Request) {
       admin.from("vishwa_design_plan").select("project_id, idx, title, on_date, done").order("project_id").order("idx").limit(1000).then((r) => ({ data: r.error ? [] : r.data, error: null })),
       admin.from("vishwa_project").select("*"),
       admin.from("vishwa_problem").select("id, title, job, status").limit(1000),
+      admin.from("manual_tasks").select("id, job_id, title, who, due, esc, cat").eq("done", false).ilike("cat", "%design%").limit(1000),
+      admin.from("erp_tasks").select("id, job_id, title, who, due, esc, cat").eq("done", false).ilike("cat", "%design%").limit(1000),
+      admin.from("vishwa_week_work").select("id, on_date, designer, work, by").order("on_date").limit(500).then((r) => ({ data: r.error ? null : r.data, error: null })),
       admin.from("vishwa_plan").select("id, job, deliverable, owner, target, status").limit(1000),
       admin.from("profiles").select("display_name, email, disabled").order("display_name"),
     ]);
@@ -121,17 +124,14 @@ export async function GET(req: Request) {
       const pjobs = [...set.values()].sort((a, b) => a.id.localeCompare(b.id));
       if (!pjobs.length) return null;
 
-      // Next milestone: DESIGN's own ladder first (it is design's screen),
-      // then the project's plan, then its jobs' plans.
+      // Next milestone: the MAIN plan's view (Dr Raghu, 28 Aug 2026 — "from
+      // the main Project/job") — design's own ladder lives in the lightbox.
       const pm = pmByProj.get(pid) || [];
       const dp = dpByProj.get(pid) || [];
+      const designDone = dp.filter((m) => m.done).length;
       let next: { title: string; job: string | null } | null = null;
       let done = 0, total = 0;
-      if (dp.length) {
-        total = dp.length; done = dp.filter((m) => m.done).length;
-        const n = dp.find((m) => !m.done);
-        if (n) next = { title: String(n.title), job: null };
-      } else if (pm.length) {
+      if (pm.length) {
         total = pm.length; done = pm.filter((m) => m.done).length;
         const n = pm.find((m) => !m.done);
         if (n) next = { title: String(n.title || `Milestone ${n.idx}`), job: null };
@@ -147,7 +147,18 @@ export async function GET(req: Request) {
       }
 
       const mine = matcher(pjobs);
-      const issues = problems.data ? problems.data.filter((x) => mine(x.job)).map((x) => ({ id: String(x.id), title: String(x.title), status: String(x.status), open: openish(x.status) })) : [];
+      const jobSet = new Set(pjobs.map((j) => j.id));
+      // Issues to Design (his words, 28 Aug 2026): from the TASKING — every
+      // open task on this project's jobs whose category carries design.
+      const issues = ([
+        ...((mtasks.data as R[]) || []),
+        ...((etasks.data as R[]) || []),
+      ] as R[])
+        .filter((t) => jobSet.has(String(t.job_id || "")))
+        .map((t) => ({ id: String(t.id), title: String(t.title || ""), who: String(t.who || ""), due: t.due ? String(t.due).slice(0, 10) : null, esc: String(t.esc || "None"), open: true }));
+      // problems-register hits still count against design, quietly appended
+      for (const x of (problems.data || []).filter((x2) => mine(x2.job) && openish(x2.status)))
+        issues.push({ id: String(x.id), title: String(x.title) + " (problem register)", who: "", due: null, esc: "None", open: true });
       const deliverables = plans.data ? plans.data.filter((x) => mine(x.job)) : [];
       const m = meta.get(pid);
 
@@ -158,6 +169,10 @@ export async function GET(req: Request) {
         exp_end: p.exp_end ?? null,
         description: String(p.description || ""),
         design_stage: String(m?.design_stage || ""),
+        bom_pct: m?.bom_pct == null ? null : Number(m.bom_pct),
+        manuf_pct: m?.manuf_pct == null ? null : Number(m.manuf_pct),
+        sort_order: m?.sort_order == null ? null : Number(m.sort_order),
+        design_total: dp.length, design_done: designDone,
         design_owner: String(m?.design_owner || ""),
         support_needed: String(m?.support_needed || ""),
         jobs: pjobs,
@@ -168,7 +183,10 @@ export async function GET(req: Request) {
     }).filter(Boolean);
 
     const owners = (profiles.data || []).filter((x) => !x.disabled && x.display_name).map((x) => String(x.display_name));
-    return NextResponse.json({ installed: true, stages: DESIGN_STAGES, owners, rows });
+    type GridRow = { id: string; sort_order: number | null };
+    (rows as GridRow[]).sort((a, b) =>
+      (a.sort_order ?? 1e9) - (b.sort_order ?? 1e9) || a.id.localeCompare(b.id));
+    return NextResponse.json({ installed: true, stages: DESIGN_STAGES, owners, rows, week: weekRes.data || [] });
   } catch (e) {
     return errJson(e);
   }
@@ -182,10 +200,76 @@ export async function POST(req: Request) {
     const user = await requireVishwakarma();
     const admin = adminClient();
     const body = await req.json();
+    const action = String(body.action || "");
+
+    // THIS WEEK'S WORKING — the design room's own week list.
+    if (action === "week_add") {
+      const { error } = await admin.from("vishwa_week_work").insert({
+        on_date: String(body.on_date || "").slice(0, 10) || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }),
+        designer: String(body.designer || "").trim(),
+        work: String(body.work || "").trim(),
+        by: user.email,
+      });
+      if (error) {
+        if (/does not exist|schema cache/i.test(error.message))
+          throw new HttpError(503, "Run migration 0089 first — the week list has nowhere to live yet.");
+        throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
+    if (action === "week_delete") {
+      if (!body.id) throw new HttpError(400, "id required");
+      const { error } = await admin.from("vishwa_week_work").delete().eq("id", body.id);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true });
+    }
+
     const pid = String(body.project_id || "");
     if (!pid) throw new HttpError(400, "project_id required");
 
-    if (String(body.action || "") === "design_plan") {
+    // Manual order only (his rule): the arrows swap neighbours; nothing
+    // else reorders this grid.
+    if (action === "move") {
+      const dir = Number(body.dir) === -1 ? -1 : 1;
+      const order: string[] = Array.isArray(body.order) ? body.order.map(String) : [];
+      const i = order.indexOf(pid);
+      if (i < 0 || i + dir < 0 || i + dir >= order.length) return NextResponse.json({ ok: true });
+      [order[i], order[i + dir]] = [order[i + dir], order[i]];
+      for (let k = 0; k < order.length; k++) {
+        const { error } = await admin.from("vishwa_project")
+          .upsert({ project_id: order[k], sort_order: k, by: user.email }, { onConflict: "project_id" });
+        if (error) {
+          if (/sort_order/.test(error.message))
+            throw new HttpError(503, "Run migration 0089 first — the manual order has nowhere to live yet.");
+          throw new Error(error.message);
+        }
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    // DESIGN SUPPORT NEEDED becomes a real task (his defaults, 28 Aug 2026):
+    // to RJ, escalation L2, due in three days — filed into the main Tasking
+    // so it lands where he correlates.
+    if (action === "support_task") {
+      const title = String(body.title || "").trim();
+      if (!title) throw new HttpError(400, "Say what support is needed.");
+      const due = String(body.due || "").slice(0, 10)
+        || new Date(Date.now() + 3 * 86400000).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+      const { error } = await admin.from("manual_tasks").insert({
+        job_id: String(body.job_id || "") || null,
+        title: `[${pid}] ${title}`,
+        detail: String(body.detail || ""),
+        who: "RJ",
+        due,
+        cat: "Design",
+        esc: "L2",
+        created_by: user.email,
+      });
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, due });
+    }
+
+    if (action === "design_plan") {
       const stages = (Array.isArray(body.stages) ? body.stages : [])
         .map((x: R, i: number) => ({
           project_id: pid, idx: i,
@@ -210,6 +294,9 @@ export async function POST(req: Request) {
     const patch: R = {};
     for (const k of ["design_stage", "design_owner", "support_needed"])
       if (body.patch && k in body.patch) patch[k] = String(body.patch[k] ?? "");
+    for (const k of ["bom_pct", "manuf_pct"])
+      if (body.patch && k in body.patch)
+        patch[k] = body.patch[k] === "" || body.patch[k] == null ? null : Math.max(0, Math.min(100, Number(body.patch[k]) || 0));
     if (!Object.keys(patch).length) throw new HttpError(400, "Nothing to save.");
     const { error } = await admin.from("vishwa_project")
       .upsert({ project_id: pid, ...patch, by: user.email, at: new Date().toISOString() }, { onConflict: "project_id" });

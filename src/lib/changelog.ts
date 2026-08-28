@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.3",
+    date: "2026-08-28",
+    module: "Vishwakarma — the grid in Dr Raghu's order, support as a task, the week on the right",
+    items: [
+      "THE ORDER IS YOURS ALONE: column sorting is gone from the Design Plans grid — arrows move a row up or down and the order is remembered. On top, THE ENGINEER STRIP: Design Engineer × GAD · BOM · Manuf · As Built with the totals beneath — who carries what, at a glance. The design-stage dropdown speaks the same ladder now (Kickoff → GAD → TBOM → Manuf Drawings → Full BOM → As Built Checks).",
+      "DESIGN SUPPORT NEEDED became a REAL TASK: the button files it into the main Tasking — assigned to RJ, escalation L2, due in three days, category Design — with the details box the designer writes. 'This makes it easier for me to correlate' — and it shows back on the grid under Issues.",
+      "ISSUES TO DESIGN now come FROM THE TASKING: every open task on the project's jobs whose category carries design — who holds it and its due date on hover. NEXT MILESTONE reads the MAIN project/job plan as a view, as corrected — design's own ladder stays in the ▤ Plan lightbox.",
+      "New columns: COMPLETION OF BOM % and MANUF DRG % — typed plainly, saved on blur. The project column is wider; jobs show as bare numbers that read their full name on mouseover. The DESIGN OWNER types as well as picks.",
+      "THIS WEEK'S WORKING stands on the right: date · designer · work to be done, added in two clicks, this week's records only. Migration 0089 lays the columns and the week table.",
+    ],
+  },
+  {
     v: "3.31.0.2",
     date: "2026-08-28",
     module: "Vishwakarma — the Design Plan: made here, shown in the project there",
