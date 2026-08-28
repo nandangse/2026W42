@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.7",
+    date: "2026-08-28",
+    module: "The Genie table standard is declared",
+    items: [
+      "Dr Raghu pointed at the Supplier Report Card: MAKE THIS THE STANDARD GENIE TABLE FORMAT. So it is law now — docs/GENIE-TABLE-STANDARD.md writes the rules (dark sticky header, zebra rows, right-aligned tnum numbers, click-to-sort, top-right search, a quiet · for nothing, one honest sentence when empty), and src/components/GenieTable.tsx IS the rules for every new table. Existing tables adopt it as they are next touched.",
+      "And the Report Card itself got straighter: Overdue % now reads against a supplier's GROSS open bills, so unadjusted credits can never push it past 100%.",
+    ],
+  },
+  {
     v: "3.29.0.6",
     date: "2026-08-28",
     module: "Kuber — the review link signs itself",

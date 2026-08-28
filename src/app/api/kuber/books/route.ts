@@ -102,11 +102,12 @@ export async function GET(req: Request) {
       // The supplier's story: what they carry, how late we are with them, and
       // how late THEY leave us to run — the card reads both directions.
       const bills = (await allBills(admin)).filter((b) => b.kind === "payable");
-      const byParty = new Map<string, { party: string; group: string | null; outstanding: number; overdue: number; oldest: string | null; nbills: number; wsum: number }>();
+      const byParty = new Map<string, { party: string; group: string | null; outstanding: number; gross: number; overdue: number; oldest: string | null; nbills: number; wsum: number }>();
       for (const b of bills) {
-        const p = byParty.get(b.party) || { party: b.party, group: b.party_group, outstanding: 0, overdue: 0, oldest: null, nbills: 0, wsum: 0 };
+        const p = byParty.get(b.party) || { party: b.party, group: b.party_group, outstanding: 0, gross: 0, overdue: 0, oldest: null, nbills: 0, wsum: 0 };
         p.outstanding += b.amount; // net — the sheet's own Tally OS
         if (b.amount > 0) {
+          p.gross += b.amount;
           p.nbills += 1;
           if (b.due_date && b.due_date < today) {
             p.overdue += b.amount;
@@ -130,7 +131,8 @@ export async function GET(req: Request) {
       } catch { /* vouchers not loaded yet */ }
       const rows = [...byParty.values()].filter((p) => Math.abs(p.outstanding) > 0.5).map((p) => {
         const avgDelay = p.overdue > 0 ? Math.round(p.wsum / p.overdue) : 0;
-        const overduePct = p.outstanding > 0 ? p.overdue / p.outstanding : 0;
+        // % of GROSS open bills, so unadjusted credits can never push it past 100
+        const overduePct = p.gross > 0 ? p.overdue / p.gross : 0;
         // Our grade of the RELATIONSHIP's health, not of the supplier's soul:
         // A = current, D = mostly overdue and old.
         const grade = overduePct < 0.1 ? "A" : overduePct < 0.35 ? "B" : avgDelay <= 60 ? "C" : "D";
