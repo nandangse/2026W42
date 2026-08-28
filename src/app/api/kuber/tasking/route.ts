@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
  * strategic — belong here. The general flood of job and ERP tasks stays in
  * the main Tasking; "this is not the place to see this."
  *
- * GET ?from=<monday> — that week's tagged tasks plus what is already overdue.
+ * GET ?from=<date>&to=<date> — the span's tagged tasks plus what is already
+ * overdue (day, week or month — the screen chooses the span).
  */
 export async function GET(req: Request) {
   try {
@@ -19,10 +20,9 @@ export async function GET(req: Request) {
     const admin = adminClient();
     const u = new URL(req.url);
     const from = String(u.searchParams.get("from") || "").slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) throw new HttpError(400, "from must be the week's Monday");
-    const to = new Date(from + "T00:00:00Z");
-    to.setUTCDate(to.getUTCDate() + 6);
-    const end = to.toISOString().slice(0, 10);
+    const end = String(u.searchParams.get("to") || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || end < from)
+      throw new HttpError(400, "from and to must be dates, from first");
 
     const [manual, jobs] = await Promise.all([
       admin.from("manual_tasks").select("id, job_id, title, who, due, cat, esc, done, related_to, created_by")

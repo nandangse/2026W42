@@ -37,9 +37,43 @@ const dmy = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 interface KTask { id: string; kind: string; title: string; who: string; due: string | null; cat: string; esc: string; done: boolean; lane: string; job: string | null }
 
+type Range = "day" | "week" | "month";
+type Col = { key: string; label: string; sub: string; from: string; to: string };
+
 export default function KuberTasking() {
   const today = istToday();
-  const [monday, setMonday] = useState(mondayOf(today));
+  const [range, setRange] = useState<Range>("week");
+  const [anchor, setAnchor] = useState(today);
+  // the span and its columns, by range: a day is one box, a week is seven,
+  // a month is its weeks (Dr Raghu, 28 Aug 2026)
+  const span = (() => {
+    if (range === "day") return { from: anchor, to: anchor };
+    if (range === "week") { const m = mondayOf(anchor); return { from: m, to: addDays(m, 6) }; }
+    const first = anchor.slice(0, 8) + "01";
+    const nm = new Date(first + "T00:00:00Z"); nm.setUTCMonth(nm.getUTCMonth() + 1); nm.setUTCDate(0);
+    return { from: first, to: nm.toISOString().slice(0, 10) };
+  })();
+  const cols: Col[] = (() => {
+    if (range === "day") return [{ key: anchor, label: DAYS[(new Date(anchor + "T00:00:00Z").getUTCDay() + 6) % 7], sub: dmy(anchor), from: anchor, to: anchor }];
+    if (range === "week") {
+      const m = mondayOf(anchor);
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = addDays(m, i);
+        return { key: d, label: DAYS[i], sub: dmy(d), from: d, to: d };
+      });
+    }
+    const out: Col[] = [];
+    let wstart = mondayOf(span.from) < span.from ? span.from : mondayOf(span.from);
+    let w = 1;
+    while (wstart <= span.to) {
+      const wend0 = addDays(mondayOf(wstart), 6);
+      const wend = wend0 > span.to ? span.to : wend0;
+      out.push({ key: wstart, label: `Week ${w}`, sub: `${dmy(wstart)}–${dmy(wend)}`, from: wstart, to: wend });
+      wstart = addDays(wend, 1); w++;
+    }
+    return out;
+  })();
+  const monday = span.from;
   const [tasks, setTasks] = useState<KTask[] | null>(null);
   const [assignees, setAssignees] = useState<string[]>([]);
   const [people, setPeople] = useState<Set<string> | null>(null); // the chosen few
@@ -50,11 +84,11 @@ export default function KuberTasking() {
 
   const load = useCallback(() => {
     setTasks(null);
-    fetch(`/api/kuber/tasking?from=${monday}`, { cache: "no-store" })
+    fetch(`/api/kuber/tasking?from=${span.from}&to=${span.to}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => { setTasks(j.tasks || []); setAssignees(j.assignees || []); setNeeds(!!j.needsMigration); })
       .catch(() => setTasks([]));
-  }, [monday]);
+  }, [span.from, span.to]);
   useEffect(() => { load(); }, [load]);
 
   // WHO SHOWS: nobody by default except the named few — Suresh (SL),
@@ -82,14 +116,21 @@ export default function KuberTasking() {
     });
   };
 
-  const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
-  const isCurrentWeek = monday === mondayOf(today);
+  const spanHasToday = span.from <= today && today <= span.to;
   const shown = (tasks || []).filter((t) => chosen.has(t.who));
-  const cell = (lane: string, day: string) => shown.filter((t) => t.lane === lane && t.due === day);
+  const cell = (lane: string, c: Col) => shown.filter((t) => t.lane === lane && t.due && t.due >= c.from && t.due <= c.to);
   const overdue = (lane: string) =>
-    isCurrentWeek ? shown.filter((t) => t.lane === lane && !t.done && t.due && t.due < monday) : [];
+    spanHasToday ? shown.filter((t) => t.lane === lane && !t.done && t.due && t.due < span.from) : [];
   const undated = (lane: string) => shown.filter((t) => t.lane === lane && !t.done && !t.due);
   const laneCount = (lane: string) => shown.filter((t) => t.lane === lane && !t.done).length;
+  const step = (dirn: 1 | -1) => {
+    if (range === "day") setAnchor(addDays(anchor, dirn));
+    else if (range === "week") setAnchor(addDays(anchor, 7 * dirn));
+    else { const d = new Date(anchor.slice(0, 8) + "01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + dirn); setAnchor(d.toISOString().slice(0, 10)); }
+  };
+  const spanLabel = range === "day" ? dmy(anchor)
+    : range === "week" ? `${dmy(span.from)} – ${dmy(span.to)}`
+    : new Date(span.from + "T00:00:00Z").toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
 
   const Chip = ({ t, colour }: { t: KTask; colour: string }) => (
     <button onClick={() => setOpen(t)}
@@ -141,10 +182,18 @@ export default function KuberTasking() {
           )}
         </div>
 
-        <button onClick={() => setMonday(addDays(monday, -7))} className="rounded border px-2.5 py-1.5 text-sm font-bold bg-white" style={{ borderColor: BORDER, color: "#1B3A5C" }}>‹</button>
-        <span className="text-sm font-bold tnum" style={{ color: INK }}>{dmy(monday)} – {dmy(addDays(monday, 6))}</span>
-        <button onClick={() => setMonday(addDays(monday, 7))} className="rounded border px-2.5 py-1.5 text-sm font-bold bg-white" style={{ borderColor: BORDER, color: "#1B3A5C" }}>›</button>
-        {!isCurrentWeek && <button onClick={() => setMonday(mondayOf(today))} className="text-xs font-bold" style={{ color: ORANGE }}>this week</button>}
+        <div className="flex gap-0.5 rounded p-0.5" style={{ background: "#fff", border: `1px solid ${BORDER}` }}>
+          {(["day", "week", "month"] as Range[]).map((r) => (
+            <button key={r} onClick={() => setRange(r)} className="rounded px-2.5 py-1 text-xs font-bold"
+              style={range === r ? { background: "#22303C", color: "#fff" } : { color: MUTED }}>
+              {r[0].toUpperCase() + r.slice(1)}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => step(-1)} className="rounded border px-2.5 py-1.5 text-sm font-bold bg-white" style={{ borderColor: BORDER, color: "#1B3A5C" }}>‹</button>
+        <span className="text-sm font-bold tnum" style={{ color: INK }}>{spanLabel}</span>
+        <button onClick={() => step(1)} className="rounded border px-2.5 py-1.5 text-sm font-bold bg-white" style={{ borderColor: BORDER, color: "#1B3A5C" }}>›</button>
+        {!spanHasToday && <button onClick={() => setAnchor(today)} className="text-xs font-bold" style={{ color: ORANGE }}>today</button>}
         <button onClick={() => setAdding(true)} className="rounded px-3.5 py-1.5 text-sm font-bold text-white" style={{ background: ORANGE }}>+ Add New</button>
       </div>
 
@@ -165,18 +214,21 @@ export default function KuberTasking() {
           <thead>
             <tr>
               <th className="px-3 py-2.5 text-left text-xs font-bold" style={{ position: "sticky", left: 0, top: 0, background: "#16232F", color: "#fff", minWidth: 170, zIndex: 4, letterSpacing: 0.6 }}>SWIMLANE</th>
-              {isCurrentWeek && (
+              {spanHasToday && (
                 <th className="px-2 py-2.5 text-left text-xs font-bold" style={{ position: "sticky", top: 0, background: "#5B2320", color: "#F5C9C4", minWidth: 140 }}>OVERDUE</th>
               )}
-              {days.map((d, i) => (
-                <th key={d} className="px-2 py-2.5 text-left text-xs" style={{
-                  position: "sticky", top: 0, minWidth: 140,
-                  background: d === today ? "#1B3A5C" : "#16232F",
-                  color: d === today ? "#fff" : i >= 5 ? "#6E7B88" : "#C7D0DA",
-                }}>
-                  <b>{DAYS[i]}</b> <span style={{ fontWeight: 400, opacity: 0.75 }}>{dmy(d)}</span>
-                </th>
-              ))}
+              {cols.map((c) => {
+                const isNow = c.from <= today && today <= c.to;
+                return (
+                  <th key={c.key} className="px-2 py-2.5 text-left text-xs" style={{
+                    position: "sticky", top: 0, minWidth: range === "day" ? 320 : 140,
+                    background: isNow ? "#1B3A5C" : "#16232F",
+                    color: isNow ? "#fff" : "#C7D0DA",
+                  }}>
+                    <b>{c.label}</b> <span style={{ fontWeight: 400, opacity: 0.75 }}>{c.sub}</span>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -193,17 +245,17 @@ export default function KuberTasking() {
                     </div>
                   )}
                 </td>
-                {isCurrentWeek && (
+                {spanHasToday && (
                   <td className="px-1.5 py-2" style={{ background: "#FBF3F2", borderTop: "1px solid #EFEDE7", minHeight: 74 }}>
                     {overdue(l.key).map((t) => (<Chip key={t.kind + t.id} t={t} colour={l.colour} />))}
                   </td>
                 )}
-                {days.map((d) => (
-                  <td key={d} className="px-1.5 py-2" style={{
+                {cols.map((c) => (
+                  <td key={c.key} className="px-1.5 py-2" style={{
                     borderTop: "1px solid #EFEDE7", borderLeft: "1px solid #F4F2EC",
-                    background: d === today ? "#F0F5FB" : undefined, height: 74,
+                    background: c.from <= today && today <= c.to ? "#F0F5FB" : undefined, height: 74,
                   }}>
-                    {cell(l.key, d).map((t) => (<Chip key={t.kind + t.id} t={t} colour={l.colour} />))}
+                    {cell(l.key, c).map((t) => (<Chip key={t.kind + t.id} t={t} colour={l.colour} />))}
                   </td>
                 ))}
               </tr>

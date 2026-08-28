@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.20",
+    date: "2026-08-28",
+    module: "Kuber Tasking — day, week or month",
+    items: [
+      "Tasking gains a RANGE: Day (one wide column), Week (the seven), or Month (its weeks as columns), with ‹ › walking whichever span is chosen and the overdue column riding along whenever today is in view. Tasks stay three-line boxes that expand on click.",
+    ],
+  },
+  {
     v: "3.29.0.19",
     date: "2026-08-28",
     module: "Kuber — the dashboard becomes the management review",
