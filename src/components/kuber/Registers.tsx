@@ -61,7 +61,7 @@ const CONFIGS: Record<string, { title: string; blurb: string; fields: Field[]; d
       { key: "issue_date", label: "Issued", type: "date" },
       { key: "expiry_date", label: "Valid Till", type: "date" },
       { key: "claim_expiry", label: "Claim Date", type: "date" },
-      { key: "status", label: "Status", type: "select", options: ["in effect", "live", "expired", "closed"] },
+      { key: "status", label: "Status", type: "select", options: ["in force", "live", "expired", "closed"] },
       { key: "note", label: "Note", type: "text" },
     ],
   },
@@ -145,7 +145,7 @@ export default function RegisterScreen({ kind }: { kind: string }) {
   const [sortKey, setSortKey] = useState("");
   const [dir, setDir] = useState<1 | -1>(1);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [totalsOpen, setTotalsOpen] = useState(true);
+  const [totalsOpen, setTotalsOpen] = useState(false);
   useEffect(() => {
     try { setTotalsOpen(localStorage.getItem(`kuber.totals.${kind}`) !== "0"); } catch { /* fine */ }
   }, [kind]);
@@ -233,7 +233,7 @@ export default function RegisterScreen({ kind }: { kind: string }) {
                   <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>
                     TOTAL {amountLabel.toUpperCase()} — {word(t.st).toUpperCase()}
                   </div>
-                  <div className="text-lg font-bold tnum" style={{ color: t.st === "live" || t.st === "in effect" ? "#0D7A3F" : t.st === "expired" ? "#B3261E" : INK }}>{fmtMoney(t.v)}</div>
+                  <div className="text-lg font-bold tnum" style={{ color: t.st === "live" || t.st === "in force" || t.st === "in effect" ? "#0D7A3F" : t.st === "expired" ? "#B3261E" : INK }}>{fmtMoney(t.v)}</div>
                   <div className="text-xs" style={{ color: MUTED }}>{t.n} entries</div>
                 </div>
               ))}
@@ -299,9 +299,9 @@ export default function RegisterScreen({ kind }: { kind: string }) {
             )}
             {sorted.map((r, i) => {
               const d = String(r[cfg.dateKey] || "");
-              const soon = cfg.warnDays != null && d && /^(live|in effect)?$/.test(String(r.status ?? "")) &&
+              const soon = cfg.warnDays != null && d && /^(live|in force|in effect)?$/.test(String(r.status ?? "")) &&
                 d <= new Date(new Date(today).getTime() + cfg.warnDays * 86400000).toISOString().slice(0, 10);
-              const past = d && d < today && /^(live|in effect)?$/.test(String(r.status ?? ""));
+              const past = d && d < today && /^(live|in force|in effect)?$/.test(String(r.status ?? ""));
               return (
                 <tr key={r.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   {cols.map((f) => (

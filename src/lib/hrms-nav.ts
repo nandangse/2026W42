@@ -36,6 +36,13 @@ export interface NavSection {
 
 export const NAV: NavSection[] = [
   {
+    key: "playbook",
+    label: "HR Playbook",
+    icon: "📖",
+    built: true,
+    blurb: "Documents in, one living wiki out — Claude the categoriser, compiled at midnight or on the button.",
+  },
+  {
     key: "master",
     label: "HRIS · Employee Master",
     icon: "👥",

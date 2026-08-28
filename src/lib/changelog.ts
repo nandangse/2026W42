@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.0",
+    date: "2026-08-28",
+    module: "The Playbooks — documents in, one living wiki out",
+    items: [
+      "FIVE PLAYBOOKS, one per module, each under its module's Tools (Dr Raghu, 28 Aug 2026): the Nandan DESIGN Playbook in Vishwakarma, SALES in the CRM, OPERATIONS in Main Genie's account menu, FINANCE in Kuber, HR in HRMS. Each is ONE living wiki with a version of its own — 'Nandan Design Playbook v 1.1.1' — stepping the Genie way. Migration 0086 lays the two tables.",
+      "＋ ADD INTELLIGENCE takes a document: it lands in the book's own Drive folder (the Kuber upload pattern — Google asked once, inside the click), its text is TAKEN — read directly for .txt/.md, read by Claude for PDFs up to 3 MB, or written as a gist by the person — and it waits in the register as PENDING. Nothing is retyped.",
+      "CLAUDE THE CATEGORISER compiles: everything pending is woven into the one book BY TOPIC, never by date of arrival — duplicates merged, sources cited in place, a Source Library at the end. The MIDNIGHT CRON (12:00 AM IST) compiles every book holding new intelligence; a book with nothing new is not touched and costs nothing. The ⚙ Compile-now button does the same without waiting.",
+      "The Design, Sales and Operations folders Dr Raghu linked are seeded; Finance and HR take their folder link right on the screen the first time.",
+      "KUBER, same day: BANK & CASH on the dashboard (every bank, OD and cash ledger, as of the last upload); MTD and QTD join the flows chips and stand atop the P&L with YTD; the P&L-and-BS section grows honest doors for Targets (plan vs actual, the JSA parameters), Actual Cash Flow, Fund Flow, and the Expenses / OE / TVC registers — each saying exactly what it will hold and what it awaits.",
+      "BG status gains IN FORCE as the standing word; the register totals cards start folded — the table is the point, the totals are there on one click.",
+    ],
+  },
+  {
     v: "3.30.0.3",
     date: "2026-08-28",
     module: "Kuber — P&L and Balance Sheet, a quieter sidebar, commas as you type",

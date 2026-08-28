@@ -22,6 +22,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ModuleMenu from "@/components/ModuleMenu";
+import PlaybookScreen from "@/components/Playbook";
 import { DOCTYPES, doctypeBySlug, type Doctype, type Field } from "@/crm/doctypes";
 import { LOGO } from "@/lib/logo";
 import AnalyticsScreen from "./Analytics";
@@ -65,6 +66,7 @@ export const SPECIAL_SECTIONS = [
   { name: "visitingcard", label: "Add Visiting Card", icon: "🪪", blurb: "" },
   { name: "integrations", label: "Integrations", icon: "🔌", blurb: "" },
   { name: "emailqueue", label: "Email", icon: "📮", blurb: "" },
+  { name: "playbook", label: "Sales Playbook", icon: "📖", blurb: "" },
   { name: "waqueue", label: "WhatsApp Queue", icon: "💬", blurb: "" },
   { name: "communication", label: "Communication", icon: "✉", blurb: "Emails — automated, inbound and outbound, per user's own mailbox. Arrives with the channels phase." },
 ] as const;
@@ -87,7 +89,7 @@ const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string } | { 
       { sp: "dashboard" }, { sp: "analytics" }, { sp: "salespersonplan" }, { sp: "salesplan" },
     ],
   },
-  { header: "TOOLS", collapsible: true, items: [{ sp: "visitingcard" }, { sp: "emailqueue" }, { sp: "waqueue" }] },
+  { header: "TOOLS", collapsible: true, items: [{ sp: "visitingcard" }, { sp: "emailqueue" }, { sp: "waqueue" }, { sp: "playbook" }] },
   { header: "PIPELINE", items: [{ dt: "lead" }, { dt: "opportunity" }, { dt: "quotation" }, { dt: "sales_order" }] },
   { items: [{ sp: "deals" }] },
   {
@@ -519,6 +521,8 @@ export default function CrmApp({
               <Integrations />
             ) : special.name === "emailqueue" ? (
               <EmailQueue />
+            ) : special.name === "playbook" ? (
+              <PlaybookScreen kind="sales" email={email} />
             ) : special.name === "waqueue" ? (
               <WhatsAppQueue />
             ) : special.name === "salespersonplan" ? (

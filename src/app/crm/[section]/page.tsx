@@ -16,7 +16,7 @@ import { doctypeBySlug } from "@/crm/doctypes";
  */
 const SPECIAL_NAMES = [
   "dashboard", "analytics", "salespersonplan", "salesplan", "deals",
-  "visitingcard", "integrations", "emailqueue", "waqueue", "communication",
+  "visitingcard", "integrations", "emailqueue", "waqueue", "communication", "playbook",
 ];
 
 export const dynamic = "force-dynamic";

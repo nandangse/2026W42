@@ -35,7 +35,7 @@ const Card = ({ label, value, sub, color = INK }: { label: string; value: string
 
 // ---------------- Dashboard ----------------
 interface Summary {
-  today: string; loadedAt: string | null; since: string; period: string;
+  today: string; loadedAt: string | null; since: string; period: string; bankCash?: number;
   flows: Record<string, { value: number; count: number }>;
   receivable: { total: number; gross: number; overdue: number; due30: number; parties: number; unadjusted: number };
   payable: { total: number; gross: number; overdue: number; due30: number; parties: number; unadjusted: number };
@@ -90,29 +90,32 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
         <Card label="ADVANCES RECEIVED" value={fmtMoney(-s.receivable.unadjusted)} sub="a liability — work owed against money held" color="#1B6B93" />
         <Card label="NET RECEIVABLE" value={fmtMoney(s.receivable.total)} sub="bills less advances" />
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
         <Card label="PAYABLES — TO PAY" value={fmtMoney(s.payable.gross)} sub={`${s.payable.parties} suppliers · gross bills`} color="#1B3A5C" />
         <Card label="ADVANCES PAID TO SUPPLIERS" value={fmtMoney(-s.payable.unadjusted)} sub="money out, goods awaited" color="#1B6B93" />
         <Card label="NET PAYABLE" value={fmtMoney(s.payable.total)} sub="bills less advances" />
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+        <Card label="BANK & CASH" value={fmtMoney(s.bankCash || 0)} sub="every bank, OD and cash ledger — as of the last upload" color={(s.bankCash || 0) >= 0 ? GREEN : RED} />
       </div>
 
       {/* the period flows — the review sheet's own rows, on a slider */}
       <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: BORDER }}>
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           <span className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>THE FLOWS</span>
-          {(["7", "30", "90", "ytd"] as const).map((k) => (
+          {(["7", "30", "90", "mtd", "qtd", "ytd"] as const).map((k) => (
             <button key={k} onClick={() => setPeriod(k)}
               className="rounded-full border px-2.5 py-0.5 text-xs font-bold"
               style={period === k ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
-              {k === "ytd" ? "YTD" : `${k} days`}
+              {k === "ytd" ? "YTD" : k === "mtd" ? "MTD" : k === "qtd" ? "QTD" : `${k} days`}
             </button>
           ))}
-          <input type="range" min={1} max={365} value={period === "ytd" ? days : Number(period)}
+          <input type="range" min={1} max={365} value={/^\d+$/.test(period) ? Number(period) : days}
             onChange={(e) => setPeriod(e.target.value)}
             style={{ width: 160, accentColor: "#E8600A" }}
             title="Slide for any number of days" />
           <span className="text-xs tnum font-bold" style={{ color: INK }}>
-            {period === "ytd" ? `since 1 April (${days} days)` : `last ${period} days`}
+            {period === "ytd" ? `since 1 April (${days} days)` : period === "mtd" ? `this month (${days} days)` : period === "qtd" ? `this quarter (${days} days)` : `last ${period} days`}
           </span>
         </div>
         <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
@@ -867,6 +870,13 @@ export function PnLScreen() {
   const [to, setTo] = useState(today);
   const [data] = useBooks<Financials>("financials", `&from=${from}&to=${to}`);
   const { fmt: fmtMoney } = useMoneyFmt();
+  // the three the eye wants first (Dr Raghu, 28 Aug 2026): YTD · QTD · MTD
+  const mtdStart = today.slice(0, 8) + "01";
+  const qm = Math.floor(((Number(today.slice(5, 7)) + 8) % 12) / 3) * 3;
+  const qMonth = ((3 + qm) % 12) + 1;
+  const qYear = qMonth > Number(today.slice(5, 7)) ? Number(today.slice(0, 4)) - 1 : Number(today.slice(0, 4));
+  const qtdStart = `${qYear}-${String(qMonth).padStart(2, "0")}-01`;
+  const CHIPS: [string, string][] = [["YTD", fyStart], ["QTD", qtdStart], ["MTD", mtdStart]];
   if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
   return (
     <div style={{ maxWidth: 860 }}>
@@ -875,7 +885,14 @@ export function PnLScreen() {
           <div className="text-lg font-bold" style={{ color: INK }}>Profit &amp; Loss</div>
           <div className="text-sm" style={{ color: "#5A6672" }}>Computed from every voucher line in the period — Tally&apos;s own arithmetic, nothing typed.</div>
         </div>
-        <div className="flex gap-2 items-center text-xs font-semibold" style={{ color: MUTED }}>
+        <div className="flex gap-2 items-center text-xs font-semibold flex-wrap" style={{ color: MUTED }}>
+          {CHIPS.map(([lbl, start]) => (
+            <button key={lbl} onClick={() => { setFrom(start); setTo(today); }}
+              className="rounded-full border px-2.5 py-0.5 font-bold"
+              style={from === start && to === today ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
+              {lbl}
+            </button>
+          ))}
           from <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
           to <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
         </div>

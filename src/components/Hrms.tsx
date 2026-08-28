@@ -18,6 +18,7 @@
  * pulling the same few hundred records again on every click.
  */
 import ModuleMenu from "@/components/ModuleMenu";
+import PlaybookScreen from "@/components/Playbook";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
@@ -217,7 +218,11 @@ export default function Hrms({
         </nav>
 
         {/* ═══════════════════ right side ═══════════════════ */}
-        {nav.key === "appraisal.summary" ? (
+        {nav.key === "playbook" ? (
+          <div className="flex-1 p-5" style={{ minWidth: 0 }}>
+            <PlaybookScreen kind="hr" email={email} />
+          </div>
+        ) : nav.key === "appraisal.summary" ? (
           <AppraisalAnalytics who={who}
             onOpenPerson={(id) => {
               try { window.sessionStorage.setItem("hrms.appraisal.person", id); } catch { /* fine */ }

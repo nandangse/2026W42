@@ -534,7 +534,16 @@ export async function GET(req: Request) {
     // family · Payments to suppliers = Payment. YTD = since 1 April.
     const period = url.searchParams.get("period") || "ytd";
     const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
-    const since = period === "ytd" ? fyStart : addDays(today, -Math.max(1, Math.min(365, Number(period) || 30)));
+    // MTD from the 1st; QTD from the FY quarter's own 1st (Apr/Jul/Oct/Jan)
+    const mtdStart = today.slice(0, 8) + "01";
+    const qm = Math.floor(((Number(today.slice(5, 7)) + 8) % 12) / 3) * 3; // months since April, floored to the quarter
+    const qMonth = ((3 + qm) % 12) + 1;
+    const qYear = qMonth > Number(today.slice(5, 7)) ? Number(today.slice(0, 4)) - 1 : Number(today.slice(0, 4));
+    const qtdStart = `${qYear}-${String(qMonth).padStart(2, "0")}-01`;
+    const since = period === "ytd" ? fyStart
+      : period === "mtd" ? mtdStart
+      : period === "qtd" ? qtdStart
+      : addDays(today, -Math.max(1, Math.min(365, Number(period) || 30)));
     const FLOW_TYPES: Record<string, string[]> = {
       billing: ["GST Sales"],
       collections: ["Receipt"],
@@ -558,6 +567,29 @@ export async function GET(req: Request) {
       }
     } catch { /* pre-0083 — the table just stays empty */ }
     const bills = await allBills(admin);
+
+    // BANK & CASH — every ledger whose group chain reaches Bank Accounts,
+    // Bank OD or Cash-in-hand, at its Tally closing (as of the last upload).
+    let bankCash = 0;
+    try {
+      const { data: gs } = await admin.from("kuber_group").select("name, parent").limit(2000);
+      const par = new Map((gs || []).map((g) => [String(g.name).toLowerCase(), String(g.parent || "").toLowerCase()]));
+      const isBankRoot = (g: string) => {
+        let cur = g.toLowerCase();
+        for (let i = 0; i < 25; i++) {
+          if (/^bank accounts$|^bank od|^cash-in-hand$/.test(cur)) return true;
+          const nxt = par.get(cur) || "";
+          if (!nxt || nxt === cur) return false;
+          cur = nxt;
+        }
+        return false;
+      };
+      for (let f2 = 0; ; f2 += 1000) {
+        const { data } = await admin.from("kuber_ledger").select("parent, closing").order("name").range(f2, f2 + 999);
+        for (const l of data || []) if (isBankRoot(String(l.parent || ""))) bankCash += Number(l.closing) || 0;
+        if (!data || data.length < 1000) break;
+      }
+    } catch { /* books not loaded yet */ }
     const rec = bills.filter((b) => b.kind === "receivable");
     const pay = bills.filter((b) => b.kind === "payable");
     const sum = (xs: Bill[]) => xs.reduce((s, b) => s + b.amount, 0);

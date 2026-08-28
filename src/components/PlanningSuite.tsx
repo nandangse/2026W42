@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { ModuleLinks, ReloadRow } from "@/components/ModuleMenu";
+import PlaybookScreen from "@/components/Playbook";
 import { LOGO } from "@/lib/logo";
 import { APP_VERSION, UPDATES, EFFORT } from "@/lib/changelog";
 import SoftwareDescription from "./SoftwareDescription";
@@ -438,11 +439,11 @@ export default function PlanningSuite({
   }, [workspace, canSeeDelivered]);
 
   // land on "My Week" within the suite, not the delivery board
-  const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature">(() => {
+  const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature" | "opsbook">(() => {
     if (typeof window === "undefined") return "home";
     try {
       const v = localStorage.getItem("genie.tab");
-      if (v && ["home", "wip", "liveproj", "delivery", "load", "plan", "floor", "material", "esc", "erp", "upload", "admin", "feature"].includes(v))
+      if (v && ["home", "wip", "liveproj", "delivery", "load", "plan", "floor", "material", "esc", "erp", "upload", "admin", "feature", "opsbook"].includes(v))
         return v as "home";
     } catch { /* fine */ }
     return "home";
@@ -979,6 +980,14 @@ export default function PlanningSuite({
                     >
                       💡 Feature Request
                     </button>
+                    <button
+                      onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("opsbook"); }}
+                      className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
+                      style={{ color: "#16232F", borderBottom: "1px solid #EEECE6" }}
+                      title="Documents in, one living wiki out — compiled at midnight or on the button"
+                    >
+                      📖 Operations Playbook
+                    </button>
                     {isAdmin && (
                       <button
                         onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("admin"); }}
@@ -1113,6 +1122,9 @@ export default function PlanningSuite({
       {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} canEdit={canEdit} reload={reload} />}
       {workspace === "suite" && tab === "liveproj" && <LiveProjects board={board} V={V} canEdit={canEdit} reload={reload} />}
       {workspace === "suite" && tab === "feature" && <FeatureRequests isOwner={isRaghu} />}
+      {workspace === "suite" && tab === "opsbook" && (
+        <div className="p-5"><PlaybookScreen kind="operations" email={me?.email || undefined} /></div>
+      )}
       {workspace === "suite" && tab === "floor" && <OnFloor board={board} V={V} onOpen={openJobPlan} reload={reload} canEdit={canEdit} canTask={role !== "viewer"} isStrat={canSeeForward} myName={(displayName || email.split("@")[0]).split(" ")[0]} />}
       {workspace === "suite" && tab === "material" && <PendingMaterial board={board} onOpen={openJobPlan} reload={reload} canEdit={canEdit} />}
       {workspace === "suite" && tab === "esc" && <Escalations board={board} V={V} onOpen={openJobPlan} reload={reload} isAdmin={isAdmin} />}

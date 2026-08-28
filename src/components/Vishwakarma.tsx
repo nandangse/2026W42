@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { APP_VERSION } from "@/lib/changelog";
 import ModuleMenu from "@/components/ModuleMenu";
+import PlaybookScreen from "@/components/Playbook";
 
 const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A", RED = "#B3261E", GREEN = "#0D7A3F", VIOLET = "#7C3AED";
 
@@ -24,6 +25,7 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "problems", label: "Problems & Root Causes", icon: "⚙" },
   { key: "ideas", label: "Ideas", icon: "💡" },
   { key: "references", label: "References", icon: "▨" },
+  { key: "playbook", label: "Design Playbook", icon: "📖" },
   { key: "reviews", label: "Consult Raghu — Reviews", icon: "🪷" },
 ];
 
@@ -795,6 +797,7 @@ export default function Vishwakarma({
           {openKey === "problems" && <ProblemsScreen />}
           {openKey === "ideas" && <IdeasScreen />}
           {openKey === "references" && <ReferencesScreen />}
+          {openKey === "playbook" && <PlaybookScreen kind="design" email={email} />}
           {openKey === "reviews" && <ReviewsScreen me={displayName || email} />}
         </main>
       </div>
