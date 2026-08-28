@@ -22,11 +22,12 @@ const TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kol
 
 type Field = { key: string; label: string; type: "text" | "money" | "date" | "select" | "number" | "tick"; options?: string[]; hint?: string };
 
-const CONFIGS: Record<string, { title: string; blurb: string; fields: Field[]; dateKey: string; amountKey: string; warnDays?: number }> = {
+const CONFIGS: Record<string, { title: string; blurb: string; fields: Field[]; dateKey: string; amountKey: string; warnDays?: number; statusWords?: Record<string, string> }> = {
   bg: {
     title: "Bank Guarantees",
     blurb: "Every BG with its expiry and claim date — the register the bank's own list never shows this clearly.",
     dateKey: "expiry_date", amountKey: "amount", warnDays: 60,
+    statusWords: { live: "in force" },
     fields: [
       { key: "bg_no", label: "BG No", type: "text" },
       { key: "bank", label: "Bank", type: "text" },
@@ -114,6 +115,21 @@ export default function RegisterScreen({ kind }: { kind: string }) {
   const [installed, setInstalled] = useState(true);
   const [editing, setEditing] = useState<Row | "new" | null>(null);
   const [msg, setMsg] = useState("");
+  // sort on any column; filter by status; totals ON TOP (Dr Raghu, 28 Aug
+  // 2026: "I would ideally prefer all totals at the top in the Kuber
+  // Module") — the strip says exactly WHICH field it totals, no assumptions,
+  // and it folds away when not wanted.
+  const [sortKey, setSortKey] = useState("");
+  const [dir, setDir] = useState<1 | -1>(1);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [totalsOpen, setTotalsOpen] = useState(true);
+  useEffect(() => {
+    try { setTotalsOpen(localStorage.getItem(`kuber.totals.${kind}`) !== "0"); } catch { /* fine */ }
+  }, [kind]);
+  const toggleTotals = () => setTotalsOpen((v) => {
+    try { localStorage.setItem(`kuber.totals.${kind}`, v ? "0" : "1"); } catch { /* fine */ }
+    return !v;
+  });
 
   const load = useCallback(() => {
     fetch(`/api/kuber/register?kind=${kind}`, { cache: "no-store" })
@@ -125,6 +141,38 @@ export default function RegisterScreen({ kind }: { kind: string }) {
 
   const today = TODAY();
   const cols = cfg.fields.filter((f) => f.key !== "note").slice(0, 8);
+  const statusField = cfg.fields.find((f) => f.key === "status");
+  const word = (st: string) => cfg.statusWords?.[st] ?? st;
+  const amountLabel = cfg.fields.find((f) => f.key === cfg.amountKey)?.label ?? cfg.amountKey;
+
+  const shown = (rows || [])
+    .filter((r) => statusFilter === "all" || String(r.status ?? "") === statusFilter);
+  const sorted = (() => {
+    const c = cols.find((x) => x.key === sortKey);
+    if (!c) return shown;
+    return [...shown].sort((a, b) => {
+      const x = a[c.key], y = b[c.key];
+      if (c.type === "money" || c.type === "number") return dir * ((Number(x) || 0) - (Number(y) || 0));
+      return dir * String(x ?? "").localeCompare(String(y ?? ""));
+    });
+  })();
+  const clickSort = (k: string) => {
+    if (sortKey === k) { if (dir === 1) setDir(-1); else { setSortKey(""); setDir(1); } }
+    else { setSortKey(k); setDir(1); }
+  };
+  // one total per status, of the register's own amount field — said in words
+  const totals = (() => {
+    if (!statusField) return [];
+    const by = new Map<string, { n: number; v: number }>();
+    for (const r of rows || []) {
+      const st = String(r.status ?? "");
+      const t = by.get(st) || { n: 0, v: 0 };
+      t.n += 1; t.v += Number(r[cfg.amountKey]) || 0;
+      by.set(st, t);
+    }
+    return (statusField.options || []).filter((st) => by.has(st)).map((st) => ({ st, ...by.get(st)! }));
+  })();
+  const allTotal = (rows || []).reduce((s2, r) => s2 + (Number(r[cfg.amountKey]) || 0), 0);
 
   return (
     <div>
@@ -144,12 +192,61 @@ export default function RegisterScreen({ kind }: { kind: string }) {
       )}
       {msg && <div className="text-xs font-bold mb-2" style={{ color: "#B3261E" }}>{msg}</div>}
 
+      {/* ---- totals, ON TOP, in words — and foldable ---- */}
+      {statusField && (
+        <div className="mb-2" style={{ maxWidth: 1100 }}>
+          <button onClick={toggleTotals} className="text-xs font-bold mb-1" style={{ color: MUTED }}>
+            {totalsOpen ? "▾ totals" : "▸ totals"} — {amountLabel.toLowerCase()}, by status
+          </button>
+          {totalsOpen && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="bg-white rounded-lg border p-3" style={{ borderColor: BORDER }}>
+                <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>TOTAL {amountLabel.toUpperCase()} — ALL</div>
+                <div className="text-lg font-bold tnum" style={{ color: INK }}>{fmtMoney(allTotal)}</div>
+                <div className="text-xs" style={{ color: MUTED }}>{(rows || []).length} entries</div>
+              </div>
+              {totals.map((t) => (
+                <div key={t.st} className="bg-white rounded-lg border p-3" style={{ borderColor: BORDER }}>
+                  <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>
+                    TOTAL {amountLabel.toUpperCase()} — {word(t.st).toUpperCase()}
+                  </div>
+                  <div className="text-lg font-bold tnum" style={{ color: t.st === "live" ? "#0D7A3F" : t.st === "expired" ? "#B3261E" : INK }}>{fmtMoney(t.v)}</div>
+                  <div className="text-xs" style={{ color: MUTED }}>{t.n} entries</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---- status filter ---- */}
+      {statusField && (
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+          <span className="text-xs font-bold" style={{ color: MUTED }}>SHOW</span>
+          <button onClick={() => setStatusFilter("all")} className="rounded-full border px-2.5 py-0.5 text-xs font-bold"
+            style={statusFilter === "all" ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
+            all
+          </button>
+          {(statusField.options || []).map((st) => (
+            <button key={st} onClick={() => setStatusFilter(st)} className="rounded-full border px-2.5 py-0.5 text-xs font-bold"
+              style={statusFilter === st ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
+              {word(st)}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxWidth: 1100, maxHeight: "68vh" }}>
         <table className="w-full text-xs" style={{ minWidth: 760, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
             <tr style={{ background: "#22303C", color: "#fff" }}>
               {cols.map((f) => (
-                <th key={f.key} className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, background: "#22303C" }}>{f.label}</th>
+                <th key={f.key} className="px-2 py-2 text-left whitespace-nowrap"
+                  style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}
+                  onClick={() => clickSort(f.key)}
+                  title="Click to sort — again to flip, a third time to clear">
+                  {f.label}{sortKey === f.key ? (dir === 1 ? " ▲" : " ▼") : ""}
+                </th>
               ))}
               <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "#22303C" }} />
             </tr>
@@ -158,7 +255,10 @@ export default function RegisterScreen({ kind }: { kind: string }) {
             {rows?.length === 0 && (
               <tr><td colSpan={cols.length + 1} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing here yet — the first entry starts the register.</td></tr>
             )}
-            {(rows || []).map((r, i) => {
+            {rows && rows.length > 0 && sorted.length === 0 && (
+              <tr><td colSpan={cols.length + 1} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing carries the status &quot;{word(statusFilter)}&quot;.</td></tr>
+            )}
+            {sorted.map((r, i) => {
               const d = String(r[cfg.dateKey] || "");
               const soon = cfg.warnDays != null && d && String(r.status ?? "live") === "live" &&
                 d <= new Date(new Date(today).getTime() + cfg.warnDays * 86400000).toISOString().slice(0, 10);

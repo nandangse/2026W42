@@ -25,6 +25,11 @@ module follows this; existing tables adopt it as they are next touched.
   a third time to clear (the Pending Material pattern); the resting order is
   the one you'd work down.
 - **Empty state** is one honest sentence in the table body, not a blank.
+- **Totals sit ON TOP, never after the scroll** (Dr Raghu, 28 Aug 2026, on
+  the BG register — "I would ideally prefer all totals at the top in the
+  Kuber Module"). Each total SAYS which field and which slice it sums —
+  "Total Contract Amount — in force" — no unlabelled numbers, no assumptions.
+  The totals strip is collapsible and its fold is remembered.
 
 ## The code
 

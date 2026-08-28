@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.15",
+    date: "2026-08-28",
+    module: "Kuber — totals on top, said in words, everywhere",
+    items: [
+      "Dr Raghu's rule, now written into the standard: TOTALS SIT ON TOP in Kuber, never after the scroll, and every total SAYS what it sums — 'Total Contract Amount — in force', 'Total Contract Amount — expired' — no unlabelled numbers, no assumptions. The strip folds away on a click and remembers its fold.",
+      "Bank Guarantees leads the way: separate top totals for IN FORCE and EXPIRED (and released/invoked when present) beside the all-in total, a SHOW filter of status chips, and every column header click-sorts. The same landed at once on Fixed Deposits, Insurance, Payment Planning and the rest — one register screen, one law.",
+    ],
+  },
+  {
     v: "3.29.0.14",
     date: "2026-08-28",
     module: "Kuber — receivables in three honest columns",
