@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.12",
+    date: "2026-08-28",
+    module: "Kuber — Tally's twice-told groups no longer kill the load",
+    items: [
+      "The Masters upload died on 'duplicate key … kuber_group_pkey': Tally re-emits an altered GROUP as a second record, and the tree keys on the name. The parser now sends each group once and the server treats a repeat as old news — re-run Masters and the books rebuild whole. (The same screenshot proved the Drive leg working: filed in the Tally folder, popup asked in time.)",
+    ],
+  },
+  {
     v: "3.29.0.11",
     date: "2026-08-28",
     module: "Kuber — Correspondence · Tasking: the week in swimlanes",

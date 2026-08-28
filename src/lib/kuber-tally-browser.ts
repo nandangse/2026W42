@@ -73,6 +73,8 @@ export async function parseMastersInBrowser(file: File, sink: BatchSink, onProgr
   const b = batcher(sink);
   let led: { id: string; name: string; parent: string; opening: number; closing: number } | null = null;
   let grp: { name: string; parent: string } | null = null;
+  // Tally re-emits an altered GROUP as a second record — one name, once
+  const seenGroups = new Set<string>();
   let inBill = false;
   let bill: Row | null = null;
   let ledgers = 0, bills = 0, groups = 0;
@@ -84,7 +86,11 @@ export async function parseMastersInBrowser(file: File, sink: BatchSink, onProgr
     }
     if (grp) {
       if (line.startsWith("</GROUP>")) {
-        if (grp.name) { b.push("kuber_group", grp as unknown as Row); groups++; }
+        if (grp.name && !seenGroups.has(grp.name)) {
+          seenGroups.add(grp.name);
+          b.push("kuber_group", grp as unknown as Row);
+          groups++;
+        }
         grp = null;
         return;
       }

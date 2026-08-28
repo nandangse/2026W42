@@ -79,7 +79,11 @@ export async function POST(req: Request) {
         return o;
       });
       if (!clean.length) return NextResponse.json({ ok: true });
-      const { error } = await admin.from(String(body.table)).insert(clean);
+      // kuber_group keys on the name and Tally repeats altered groups —
+      // a duplicate is old news, never an error
+      const { error } = body.table === "kuber_group"
+        ? await admin.from("kuber_group").upsert(clean, { onConflict: "name", ignoreDuplicates: true })
+        : await admin.from(String(body.table)).insert(clean);
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true });
     }
