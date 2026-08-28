@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.13",
+    date: "2026-08-28",
+    module: "Kuber — Google asked once, not every file",
+    items: [
+      "The account chooser was greeting every upload. The Drive token is now remembered for its hour and Google is told WHO is signing (login_hint + silent prompt) — so the chooser shows the first time and then stays away while the session lives.",
+    ],
+  },
+  {
     v: "3.29.0.12",
     date: "2026-08-28",
     module: "Kuber — Tally's twice-told groups no longer kill the load",

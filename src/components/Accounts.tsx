@@ -168,7 +168,7 @@ export default function Accounts({
           {openKey === "payables" && <AgeingScreen kind="payable" />}
           {openKey === "reportcard" && <ReportCardScreen />}
           {openKey === "tasking" && <KuberTasking />}
-          {openKey === "upload" && <UploadFiles />}
+          {openKey === "upload" && <UploadFiles email={email} />}
           {openKey === "ledgers" && <LedgerBrowser />}
           {openKey === "vouchers" && <VoucherBrowser />}
           {["bg", "fd", "insurance", "payplan", "cashitem"].includes(openKey) && <RegisterScreen kind={openKey} key={openKey} />}

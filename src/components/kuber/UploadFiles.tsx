@@ -34,7 +34,17 @@ declare global {
   interface Window { google?: { accounts: { oauth2: { initTokenClient: (c: object) => { requestAccessToken: () => void } } } } }
 }
 
-async function driveToken(clientId: string): Promise<string> {
+/**
+ * Google's token, remembered for its hour so the account chooser does not
+ * greet every file (Dr Raghu, 28 Aug 2026: "its asking this everytime!!").
+ * The login_hint plus prompt:"" lets Google answer SILENTLY once consent
+ * exists — the popup shows only the first time, or when the hour runs out
+ * with no live Google session.
+ */
+let cachedTok: { t: string; exp: number } | null = null;
+
+async function driveToken(clientId: string, hint?: string): Promise<string> {
+  if (cachedTok && Date.now() < cachedTok.exp) return cachedTok.t;
   await new Promise<void>((res, rej) => {
     if (window.google?.accounts) return res();
     const s = document.createElement("script");
@@ -47,8 +57,14 @@ async function driveToken(clientId: string): Promise<string> {
     const tc = window.google!.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: "https://www.googleapis.com/auth/drive",
-      callback: (t: { access_token?: string; error?: string }) =>
-        t.access_token ? res(t.access_token) : rej(new Error(t.error || "Google did not grant access")),
+      ...(hint ? { login_hint: hint } : {}),
+      prompt: "",
+      callback: (t: { access_token?: string; error?: string; expires_in?: number }) => {
+        if (t.access_token) {
+          cachedTok = { t: t.access_token, exp: Date.now() + (Number(t.expires_in ?? 3300) - 120) * 1000 };
+          res(t.access_token);
+        } else rej(new Error(t.error || "Google did not grant access"));
+      },
       error_callback: (e: { message?: string }) => rej(new Error(e.message || "Google sign-in was closed")),
     } as object);
     tc.requestAccessToken();
@@ -89,7 +105,7 @@ async function driveUpload(token: string, folderName: string, file: File, kindLa
   }
 }
 
-export default function UploadFiles() {
+export default function UploadFiles({ email }: { email?: string }) {
   const [forDate, setForDate] = useState(TODAY_IST);
   const [rows, setRows] = useState<KuberUpload[] | null>(null);
   const [reviewLink, setReviewLink] = useState<string | null>(null);
@@ -146,7 +162,7 @@ export default function UploadFiles() {
       let driveTok: string | null = null;
       let driveSkip = "";
       if (googleClientId) {
-        try { driveTok = await driveToken(googleClientId); }
+        try { driveTok = await driveToken(googleClientId, email); }
         catch (e) {
           const w = e instanceof Error ? e.message : String(e);
           driveSkip = /popup/i.test(w)
