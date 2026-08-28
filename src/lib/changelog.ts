@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.25.3.0",
+    date: "2026-08-28",
+    module: "CRM — the lightbox grows up, and cards walk in",
+    items: [
+      "THE RECORD LIGHTBOX IS FULL HEIGHT — the box is the viewport and the body scrolls inside it, so a communication thread shows a screenful instead of a letterbox. The header carries the identity line: enquiry · customer · salesperson · and the AGE in days, red past two — because an enquiry that sat three days is already an apology. The ☎ prospecting symbol sits in the header's corner: one press queues the deal from wherever you are reading it.",
+      "TOOLS, a new section above the pipeline, opens with ADD VISITING CARD: photograph the card and Claude reads what is PRINTED — told to return null rather than guess, because a guessed digit gets dialled — you check every field, and one press makes the Contact and the Company. Companies with a similar name are offered by name first, so “existing or new” is decided with names in front of you, not found as a duplicate in next month's merge. The image is kept in the CRM's own store as the evidence the record was typed from, and every number lands as +91 and ten digits, the person record's own convention.",
+      "CRM migration 0018 (the cards bucket and the scan ledger).",
+    ],
+  },
+  {
     v: "3.25.2.0",
     date: "2026-08-28",
     module: "CRM — the Dashboard is a salesperson's morning",

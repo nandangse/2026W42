@@ -28,6 +28,7 @@ import DealsScreen from "./DealBoard";
 import MailComposer, { type ComposeCtx } from "./MailComposer";
 import MailQueue from "./MailQueue";
 import Dashboard from "./Dashboard";
+import VisitingCard from "./VisitingCard";
 import WaComposer, { type WaCtx } from "./WaComposer";
 import { DateRangeBar, DEFAULT_RANGE, type DateRange } from "./DateRange";
 
@@ -55,6 +56,7 @@ export const SPECIAL_SECTIONS = [
   { name: "analytics", label: "Analytics", icon: "◫", blurb: "Win rates, stage velocity, source economics — read from the stage histories. Being built." },
   { name: "salespersonplan", label: "SalesPerson Plan", icon: "◐", blurb: "Each salesperson's plan against their pipeline. Being built." },
   { name: "deals", label: "Deals", icon: "◆", blurb: "" },
+  { name: "visitingcard", label: "Add Visiting Card", icon: "🪪", blurb: "" },
   { name: "communication", label: "Communication", icon: "✉", blurb: "Emails — automated, inbound and outbound, per user's own mailbox. Arrives with the channels phase." },
 ] as const;
 
@@ -77,6 +79,7 @@ const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string } | { 
       { href: "/sales-plan", label: "Sales Plan", icon: "◩" },
     ],
   },
+  { header: "TOOLS", items: [{ sp: "visitingcard" }] },
   { header: "PIPELINE", items: [{ dt: "lead" }, { dt: "opportunity" }, { dt: "quotation" }, { dt: "sales_order" }] },
   { items: [{ sp: "deals" }] },
   {
@@ -501,6 +504,8 @@ export default function CrmApp({
               <MailQueue onOpen={openLinked} />
             ) : special.name === "dashboard" ? (
               <Dashboard onOpen={openLinked} />
+            ) : special.name === "visitingcard" ? (
+              <VisitingCard onOpen={openLinked} />
             ) : (
               <StubScreen label={special.label} blurb={special.blurb} dated />
             )}
@@ -1342,6 +1347,35 @@ function RecordModal({
   const { dt, row, links, mode } = view;
   const title = String(row[dt.titleField] ?? dt.label);
   const isCompany = dt.name === "company";
+  const [queueMsg, setQueueMsg] = useState("");
+
+  /** A linked row's label, off the options already fetched for the form. */
+  const linkLabel = (target: string, id: unknown): string | null => {
+    if (!id) return null;
+    return (links[target] || []).find((o) => String(o.id) === String(id))?.label ?? null;
+  };
+  /**
+   * The header strip (Dr Raghu, 28 Aug 2026): enquiry · customer ·
+   * salesperson · and the AGE — red past two days, because an enquiry that
+   * sat three days is already an apology.
+   */
+  const oppDate = String(row.opportunity_on ?? row.created_at ?? "").slice(0, 10);
+  const ageDays = /^\d{4}-\d{2}-\d{2}$/.test(oppDate)
+    ? Math.floor((Date.now() - new Date(oppDate + "T00:00:00").getTime()) / 864e5)
+    : null;
+  const QUEUEABLE = ["opportunity", "quotation", "sales_order", "lead"];
+  const queueThis = async () => {
+    try {
+      const r = await fetch("/api/crm/prospect", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "add", kind: dt.name, id: String(row.id) }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(String(j.error || r.status));
+      setQueueMsg(j.already ? "already in your queue" : "queued ✓");
+      window.setTimeout(() => setQueueMsg(""), 2400);
+    } catch (e) { setQueueMsg(e instanceof Error ? e.message : String(e)); }
+  };
   const [tab, setTab] = useState("details");
   useEffect(() => setTab("details"), [row.id]);
 
@@ -1407,8 +1441,8 @@ function RecordModal({
       onClick={onClose}
       style={{
         position: "fixed", inset: 0, zIndex: 60, background: "rgba(22,35,47,.45)",
-        display: "flex", alignItems: "flex-start", justifyContent: "center",
-        padding: "48px 16px", overflowY: "auto",
+        display: "flex", alignItems: "stretch", justifyContent: "center",
+        padding: "10px 16px",
       }}
     >
       <div
@@ -1417,17 +1451,43 @@ function RecordModal({
         style={{
           background: "#fff", width: hasTabs ? "min(1080px, 100%)" : "min(880px, 100%)",
           boxShadow: "0 12px 40px rgba(27,45,107,.35)",
+          height: "calc(100vh - 20px)", display: "flex", flexDirection: "column", minHeight: 0,
         }}
       >
         <div
           className="flex items-center justify-between px-4 py-3"
-          style={{ background: NAVY, borderRadius: "6px 6px 0 0" }}
+          style={{ background: NAVY, borderRadius: "6px 6px 0 0", position: "relative", flexShrink: 0 }}
         >
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div className="text-xs font-bold" style={{ color: ORANGE, letterSpacing: 1 }}>
               {dt.label.toUpperCase()}
             </div>
-            <div className="text-white font-bold" style={{ fontSize: 16 }}>{title}</div>
+            <div className="text-white font-bold" style={{ fontSize: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>
+            <div style={{ fontSize: 12, color: "#C8D2DC", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "baseline", marginTop: 2 }}>
+              {row.company_id != null && <span><b style={{ color: "#fff" }}>{linkLabel("company", row.company_id) ?? "—"}</b></span>}
+              {row.owner_id != null && <span>: {linkLabel("profile", row.owner_id) ?? "—"}</span>}
+              {ageDays !== null && (
+                <span style={{ fontWeight: 800, color: ageDays > 2 ? "#FF6B5E" : "#8FD5A6" }}>
+                  : {ageDays} day{ageDays === 1 ? "" : "s"}
+                </span>
+              )}
+              {queueMsg && <span style={{ color: "#F5B32B", fontWeight: 700 }}>{queueMsg}</span>}
+            </div>
+            {QUEUEABLE.includes(dt.name) && (
+              <button
+                onClick={queueThis}
+                title="Save to my Prospecting Queue — it appears on the Dashboard, to dial one by one"
+                aria-label="Save to my prospecting queue"
+                style={{
+                  position: "absolute", right: 10, bottom: 6, width: 24, height: 24,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  borderRadius: 6, border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.08)",
+                  color: "#fff", fontSize: 12, cursor: "pointer",
+                }}
+              >
+                ☎
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {mode === "view" && (
@@ -1481,6 +1541,7 @@ function RecordModal({
           </div>
         )}
 
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {mode === "view" ? (
           !hasTabs || tab === "details" ? (
             <div
@@ -1508,7 +1569,7 @@ function RecordModal({
             </div>
           ) : tab === "enquiry" ? (
             <div className="p-4">
-              <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "55vh", overflowY: "auto", overflowWrap: "anywhere" }}>
+              <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "calc(100vh - 260px)", overflowY: "auto", overflowWrap: "anywhere" }}>
                 {String(row.enquiry_info ?? "").trim()
                   ? <RichText text={String(row.enquiry_info)} />
                   : <span style={{ color: MUTED }}>No enquiry text recorded.</span>}
@@ -1555,6 +1616,7 @@ function RecordModal({
             />
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -1603,7 +1665,7 @@ function RelatedTab({
   const fields = dt.fields.filter((f) => f.inList && f.name !== filterField);
 
   return (
-    <div style={{ maxHeight: "55vh", overflow: "auto" }}>
+    <div style={{ maxHeight: "calc(100vh - 260px)", overflow: "auto" }}>
       {addPresets && (
         <div className="px-4 pt-3">
           <button
@@ -1893,7 +1955,7 @@ function EvaBriefTab({ companyId, initial, initialAt }: { companyId: string; ini
         <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={18}
           className="w-full rounded border px-3 py-2 text-sm" style={{ borderColor: BORDER, lineHeight: 1.6 }} />
       ) : brief ? (
-        <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.65, maxHeight: "58vh", overflowY: "auto", overflowWrap: "anywhere" }}>
+        <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.65, maxHeight: "calc(100vh - 250px)", overflowY: "auto", overflowWrap: "anywhere" }}>
           {brief}
         </div>
       ) : !busy ? (
@@ -2019,7 +2081,7 @@ function CommsFeed({
     : type === "opportunity" ? "opportunity_id" : type === "quotation" ? "quotation_id" : "sales_order_id";
 
   return (
-    <div className="p-4" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+    <div className="p-4" style={{ maxHeight: "calc(100vh - 240px)", overflowY: "auto" }}>
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <button
           onClick={() => setLogging((v) => !v)}
@@ -2180,7 +2242,7 @@ function NotesTab({ type, id }: { type: string; id: string }) {
   };
 
   return (
-    <div className="p-4" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+    <div className="p-4" style={{ maxHeight: "calc(100vh - 240px)", overflowY: "auto" }}>
       <div className="mb-3">
         <textarea
           value={text} onChange={(e) => setText(e.target.value)} rows={3}
@@ -2312,7 +2374,7 @@ Everything on it — ${type === "company" ? "contacts, opportunities, quotations
   };
 
   return (
-    <div className="p-4" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+    <div className="p-4" style={{ maxHeight: "calc(100vh - 240px)", overflowY: "auto" }}>
       <p className="text-xs mb-3" style={{ color: MUTED, maxWidth: "70ch", lineHeight: 1.6 }}>
         Genie&apos;s suggested twins of <b style={{ color: INK }}>{title}</b>. Merging keeps THIS record
         and moves everything from the duplicate onto it — the duplicate retires into the audit.
