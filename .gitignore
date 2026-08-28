@@ -37,3 +37,4 @@ scratchpad/paste/
 scratchpad/deck/node_modules/
 scratchpad/deck/*.pptx
 /*.pptx
+scripts/tally-parse-summary.json
