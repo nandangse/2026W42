@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.26.1.0",
+    date: "2026-08-28",
+    module: "The card crops itself, and the thank-you never gets forgotten",
+    items: [
+      "THE CARD IS CUT OUT OF THE PHOTOGRAPH — no library, a built-in heuristic: the photo's border is read as the background, the tight run of rows and columns that differ from it is the card, and the crop lies LANDSCAPE the way a card is read. An implausible find — the whole frame, or a sliver — leaves the photo alone rather than mis-cropping it.",
+      "SCAN → COURTESY, WITHIN A DAY: the card lightbox carries two ticks — ✉ Email and 🟢 WhatsApp thank-you, on by default where the card gave an address or a number. Saving to CRM queues them for tomorrow morning, and the Dashboard's THANK-YOUS DUE panel serves each one with the message ALREADY WRITTEN ({name} and {company} filled in — from the template masters when one is named “Card Thank You”, built-in words otherwise). One tap opens WhatsApp or the mail draft; ✓ records that it went. The sending hand stays human — what died is the forgetting.",
+      "CRM migration 0021.",
+    ],
+  },
+  {
     v: "3.26.0.2",
     date: "2026-08-28",
     module: "The card reader survives phone photographs",

@@ -158,6 +158,7 @@ export default function Dashboard({ onOpen }: { onOpen: (target: string, id: str
 
         <div style={{ minWidth: 0 }}>
           <ProspectQueue onOpen={onOpen} compact />
+          <FollowUps onOpen={onOpen} />
         </div>
 
         <div style={{ minWidth: 0 }}>
@@ -214,6 +215,72 @@ export default function Dashboard({ onOpen }: { onOpen: (target: string, id: str
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The courtesy queue — thank-yous a card scan promised, due tomorrow
+ * morning, each with the message already written. One tap opens the
+ * WhatsApp or mail draft; ✓ records that the courtesy went. The sending
+ * hand stays human — the automation killed the forgetting, not the
+ * judgement.
+ */
+function FollowUps({ onOpen }: { onOpen: (target: string, id: string) => void }) {
+  interface Fu { id: string; channel: string; due_at: string; person_id: string; person: string; company: string | null; email: string | null; phone: string | null; subject: string; body: string; overdue: boolean }
+  const [items, setItems] = useState<Fu[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const load = useCallback(() => {
+    fetch("/api/crm/followups").then(async (r) => setItems(((await r.json()).items || []) as Fu[])).catch(() => setItems([]));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const done = async (id: string, status: "done" | "skip") => {
+    setBusy(id);
+    await fetch("/api/crm/followups", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: status, id }) }).catch(() => {});
+    setBusy(null); load();
+  };
+  if (items !== null && !items.length) return null;
+  return (
+    <div className="rounded-lg border mt-3" style={{ borderColor: BORDER, background: "#fff" }}>
+      <div className="px-2.5 py-2 flex items-baseline gap-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
+        <b style={{ fontSize: 12.5, color: INK }}>🤝 Thank-yous due</b>
+        <span style={{ fontSize: 10, color: MUTED }}>{items?.length ?? "…"} · from card scans</span>
+      </div>
+      {(items || []).map((f) => (
+        <div key={f.id} className="px-2.5 py-1.5" style={{ borderBottom: "1px solid #F2F4F8", background: f.overdue ? "#FDF6F5" : "#fff" }}>
+          <div className="flex items-center gap-1.5">
+            <span style={{ fontSize: 11 }}>{f.channel === "email" ? "✉" : "🟢"}</span>
+            <button onClick={() => onOpen("person", f.person_id)} className="text-left font-bold"
+              style={{ color: NAVY, fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, flex: 1 }}>
+              {f.person}{f.company ? ` · ${f.company}` : ""}
+            </button>
+            {f.overdue && <span style={{ fontSize: 9, color: "#B3261E", fontWeight: 800 }}>DUE</span>}
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5" style={{ paddingLeft: 18 }}>
+            {f.channel === "whatsapp" && f.phone && (
+              <a href={`https://wa.me/${f.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(f.body)}`}
+                target="_blank" rel="noopener noreferrer" className="rounded px-2 py-0.5 font-bold"
+                style={{ background: "#E6F4EB", color: GREEN, fontSize: 10.5, textDecoration: "none" }}>
+                open WhatsApp, written
+              </a>
+            )}
+            {f.channel === "email" && f.email && (
+              <a href={`mailto:${f.email}?subject=${encodeURIComponent(f.subject)}&body=${encodeURIComponent(f.body)}`}
+                className="rounded px-2 py-0.5 font-bold"
+                style={{ background: NAVY_SOFT, color: NAVY, fontSize: 10.5, textDecoration: "none" }}>
+                open the draft
+              </a>
+            )}
+            {((f.channel === "email" && !f.email) || (f.channel === "whatsapp" && !f.phone)) && (
+              <span style={{ fontSize: 10, color: "#B3261E", fontWeight: 700 }}>no {f.channel === "email" ? "email" : "number"} on the contact</span>
+            )}
+            <button onClick={() => done(f.id, "done")} disabled={busy === f.id} title="Sent — record it"
+              className="rounded px-1.5 font-bold" style={{ background: "#E6F4EB", color: GREEN, fontSize: 10 }}>✓</button>
+            <button onClick={() => done(f.id, "skip")} disabled={busy === f.id} title="Let it go, on purpose"
+              style={{ color: MUTED, fontSize: 10 }}>✕</button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

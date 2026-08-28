@@ -37,17 +37,101 @@ const EMPTY_FORM = { person_name: "", salutation: "", designation: "", company: 
 async function shrinkImage(file: File, maxEdge = 1600): Promise<{ blob: Blob; name: string }> {
   try {
     const bmp = await createImageBitmap(file);
-    const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
-    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+    const cropped = autoCropCard(bmp);
+    const src = cropped ?? bmp;
+    const sw = cropped ? cropped.width : bmp.width;
+    const sh = cropped ? cropped.height : bmp.height;
+    const scale = Math.min(1, maxEdge / Math.max(sw, sh));
     const canvas = document.createElement("canvas");
-    canvas.width = w; canvas.height = h;
+    canvas.width = Math.round(sw * scale); canvas.height = Math.round(sh * scale);
     const ctx = canvas.getContext("2d");
     if (!ctx) return { blob: file, name: file.name };
-    ctx.drawImage(bmp, 0, 0, w, h);
+    ctx.drawImage(src as CanvasImageSource, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.85));
     return blob ? { blob, name: file.name.replace(/\.[^.]+$/, "") + ".jpg" } : { blob: file, name: file.name };
   } catch {
     return { blob: file, name: file.name };
+  }
+}
+
+/**
+ * Find the card in the frame and cut to it, landscape.
+ *
+ * No library — a heuristic that earns its keep on the common shot (a card
+ * on a desk, roughly straight): the border of the photo is sampled as "the
+ * background", every pixel is scored by how far it sits from that colour,
+ * and the tight run of rows and columns where the difference lives is the
+ * card. If the run is implausible — the whole frame, or a sliver — the
+ * photo is left alone rather than mis-cropped; and a portrait result is
+ * rotated 90° so the card always lies the way a card is read.
+ */
+function autoCropCard(bmp: ImageBitmap): HTMLCanvasElement | null {
+  try {
+    const W = 320;
+    const scale = W / bmp.width;
+    const H = Math.max(1, Math.round(bmp.height * scale));
+    const work = document.createElement("canvas");
+    work.width = W; work.height = H;
+    const wctx = work.getContext("2d", { willReadFrequently: true });
+    if (!wctx) return null;
+    wctx.drawImage(bmp, 0, 0, W, H);
+    const { data } = wctx.getImageData(0, 0, W, H);
+
+    // the frame's border is the background
+    const border: number[][] = [];
+    const pad = Math.max(2, Math.round(Math.min(W, H) * 0.04));
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (x > pad && x < W - pad && y > pad && y < H - pad) continue;
+      const i = (y * W + x) * 4;
+      border.push([data[i], data[i + 1], data[i + 2]]);
+    }
+    const med = (k: number) => border.map((b) => b[k]).sort((a, b) => a - b)[Math.floor(border.length / 2)];
+    const bg = [med(0), med(1), med(2)];
+
+    // where the not-background lives, by row and by column
+    const TH = 46;
+    const colHits = new Array(W).fill(0);
+    const rowHits = new Array(H).fill(0);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      const d = Math.abs(data[i] - bg[0]) + Math.abs(data[i + 1] - bg[1]) + Math.abs(data[i + 2] - bg[2]);
+      if (d > TH) { colHits[x]++; rowHits[y]++; }
+    }
+    const span = (hits: number[], total: number, need: number) => {
+      let lo = -1, hi = -1;
+      for (let i = 0; i < hits.length; i++) if (hits[i] > total * need) { if (lo < 0) lo = i; hi = i; }
+      return lo < 0 ? null : [lo, hi] as const;
+    };
+    const xs = span(colHits, H, 0.12);
+    const ys = span(rowHits, W, 0.12);
+    if (!xs || !ys) return null;
+
+    // implausible finds are not finds
+    const fw = (xs[1] - xs[0]) / W, fh = (ys[1] - ys[0]) / H;
+    if (fw > 0.96 && fh > 0.96) return null;      // the whole frame — nothing to crop
+    if (fw < 0.25 || fh < 0.12) return null;       // a sliver — probably noise
+
+    const margin = 0.02;
+    const sx = Math.max(0, (xs[0] / W - margin)) * bmp.width;
+    const sy = Math.max(0, (ys[0] / H - margin)) * bmp.height;
+    const sw = Math.min(1, (xs[1] - xs[0]) / W + 2 * margin) * bmp.width;
+    const sh = Math.min(1, (ys[1] - ys[0]) / H + 2 * margin) * bmp.height;
+
+    const portrait = sh > sw;
+    const out = document.createElement("canvas");
+    out.width = portrait ? sh : sw;
+    out.height = portrait ? sw : sh;
+    const octx = out.getContext("2d");
+    if (!octx) return null;
+    if (portrait) {
+      // a card is read lying down — rotate the upright shot 90°
+      octx.translate(out.width, 0);
+      octx.rotate(Math.PI / 2);
+    }
+    octx.drawImage(bmp, sx, sy, sw, sh, 0, 0, sw, sh);
+    return out;
+  } catch {
+    return null;
   }
 }
 
@@ -123,6 +207,8 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState("");
   const [note, setNote] = useState("");
+  /** The courtesy: a thank-you due tomorrow morning, on the ticked channels. */
+  const [thanks, setThanks] = useState<{ email: boolean; whatsapp: boolean }>({ email: true, whatsapp: true });
 
   const upload = async (side: "front" | "back", file: File | null) => {
     if (!file) return;
@@ -187,6 +273,14 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
       if (mode === "save") { await saveOnly(); onChanged(); onClose(); return; }
       const cardId = await saveOnly();
       const made = await addToCrm(cardId);
+      // queue the thank-you for tomorrow — the forgetting is what dies here
+      const channels = [thanks.email && f.email.trim() ? "email" : null, thanks.whatsapp && f.phone.trim() ? "whatsapp" : null].filter(Boolean);
+      if (made.person_id && channels.length) {
+        await fetch("/api/crm/followups", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "add", person_id: made.person_id, company_id: made.company_id, card_id: cardId, channels }),
+        }).catch(() => {});
+      }
       onChanged();
       if (mode === "crm") {
         if (made.person_id) onOpen("person", made.person_id);
@@ -269,7 +363,19 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
           )}
         </div>
 
-        <div className="flex gap-2 flex-wrap px-4 py-3" style={{ borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
+        <div className="px-4 pt-2 flex gap-4 items-center" style={{ borderTop: `1px solid ${BORDER}`, flexShrink: 0, fontSize: 12 }}>
+          <b style={{ color: MUTED, fontSize: 10.5, letterSpacing: ".04em" }}>THANK-YOU, DUE TOMORROW:</b>
+          <label className="flex items-center gap-1" style={{ color: f.email.trim() ? INK : "#C9CDD6" }}>
+            <input type="checkbox" checked={thanks.email} disabled={!f.email.trim()}
+              onChange={(e) => setThanks((t) => ({ ...t, email: e.target.checked }))} /> ✉ Email
+          </label>
+          <label className="flex items-center gap-1" style={{ color: f.phone.trim() ? INK : "#C9CDD6" }}>
+            <input type="checkbox" checked={thanks.whatsapp} disabled={!f.phone.trim()}
+              onChange={(e) => setThanks((t) => ({ ...t, whatsapp: e.target.checked }))} /> 🟢 WhatsApp
+          </label>
+          <span style={{ fontSize: 10.5, color: MUTED }}>lands on your Dashboard, written and ready — one tap sends</span>
+        </div>
+        <div className="flex gap-2 flex-wrap px-4 py-3" style={{ flexShrink: 0 }}>
           <button onClick={() => go("save")} disabled={busy !== null}
             className="rounded px-3 py-2 font-bold" style={{ background: NAVY_SOFT, color: NAVY, fontSize: 13 }}
             title="Keep the scan on file — no CRM records yet">
