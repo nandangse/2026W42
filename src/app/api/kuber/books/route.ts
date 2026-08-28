@@ -665,6 +665,193 @@ export async function GET(req: Request) {
       return NextResponse.json({ from, to, sources: src, applications: app, operations, totalSources: tsrc, totalApplications: tapp, gap: tsrc - tapp });
     }
 
+    // ---- the MIS statement (Dr Raghu, 28 Aug 2026, his own sheet's shape):
+    // Sales → Revenue → Purchases ± stock → TVC → THROUGHPUT → Manufacturing
+    // → GROSS PROFIT → Indirect (operating) → EBITDA → Finance → Depreciation
+    // → Net Operating → Other Income → NPBT → Tax → NPAT, each with % of
+    // sales and average monthly, every head drillable. Opening/closing stock
+    // are TYPED (0092) — the XML carries no stock. The ratio pack rides
+    // beside it, every ratio stating its own formula.
+    if (view === "mis") {
+      const fyStartM = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+      // his preference: the period ends on LAST MONTH'S LAST DAY
+      const lastMonthEnd = (() => {
+        const t = new Date(today + "T00:00:00Z");
+        t.setUTCDate(0);
+        return t.toISOString().slice(0, 10);
+      })();
+      const from = url.searchParams.get("from") || fyStartM;
+      const to = url.searchParams.get("to") || (lastMonthEnd >= fyStartM ? lastMonthEnd : today);
+      const w = await loadWorld(admin);
+      if (!w.ledgers.length) return NextResponse.json({ empty: true });
+
+      const [inpRes, tgtRes, loanRes] = await Promise.all([
+        admin.from("kuber_mis_input").select("key, value"),
+        admin.from("kuber_ratio_target").select("key, target"),
+        admin.from("kuber_loan").select("outstanding, emi, status").then((r) => ({ data: r.error ? [] : r.data })),
+      ]);
+      const inputs = new Map(((inpRes.data as RR[]) || []).map((x) => [String(x.key), Number(x.value) || 0]));
+      const targets = Object.fromEntries(((tgtRes.data as RR[]) || []).map((x) => [String(x.key), String(x.target)]));
+
+      // period movement and closing-to-date per ledger
+      const period = new Map<string, number>();
+      const toDate = new Map<string, number>();
+      for (const l of w.lines) {
+        const d = w.dateOf.get(String(l.voucher_id)) || "";
+        if (!d) continue;
+        const amt = Number(l.amount) || 0;
+        const name = String(l.ledger);
+        if (d >= from && d <= to) period.set(name, (period.get(name) || 0) + amt);
+        if (d <= to) toDate.set(name, (toDate.get(name) || 0) + amt);
+      }
+
+      type Ent = { ledger: string; group: string; root: string; amount: number };
+      const ents: Record<string, Ent[]> = { sales: [], purchases: [], manuf: [], indirect: [], finance: [], depreciation: [], tax: [], otherIncome: [] };
+      let profitToDate = 0;
+      const closingOfRoot = new Map<string, number>();
+      for (const l of w.ledgers) {
+        const name = String(l.name), grp = String(l.parent || "");
+        if (!grp) { profitToDate += 0; continue; }
+        const root = w.rootOf(grp);
+        const amt = period.get(name) || 0;
+        const isPnlM = /income|expense|^\S*\.?\s*sales|purchase|manufacturing/i.test(root) && !/asset/i.test(root);
+        if (isPnlM) {
+          profitToDate += toDate.get(name) || 0;
+          if (!amt) continue;
+          const e = { ledger: name, group: grp, root, amount: amt };
+          if (/sales|direct income/i.test(root) && !/purchase/i.test(root)) ents.sales.push(e);
+          else if (/purchase/i.test(root)) ents.purchases.push({ ...e, amount: -amt });
+          else if (/manufacturing|direct expense/i.test(root)) ents.manuf.push({ ...e, amount: -amt });
+          else if (/indirect income/i.test(root)) ents.otherIncome.push(e);
+          else if (/indirect expense|expense/i.test(root)) {
+            // finance, depreciation and tax step out of the indirect lump
+            const hay = (grp + " " + name).toLowerCase();
+            if (/deprecia/.test(hay)) ents.depreciation.push({ ...e, amount: -amt });
+            else if (/finance|interest|bank charg/.test(hay)) ents.finance.push({ ...e, amount: -amt });
+            else if (/current tax|deferred tax|income tax/.test(hay)) ents.tax.push({ ...e, amount: -amt });
+            else ents.indirect.push({ ...e, amount: -amt });
+          }
+        } else {
+          // balance-sheet closing per root, for the ratio pack
+          const closing = (Number(l.opening) || 0) + (toDate.get(name) || 0);
+          closingOfRoot.set(root, (closingOfRoot.get(root) || 0) + closing);
+          // the debtor/creditor chains, held separately
+          const chainHas = (want: RegExp) => {
+            let cur = grp.toLowerCase();
+            for (let i = 0; i < 25; i++) {
+              if (want.test(cur)) return true;
+              const nx = (w.groups.find((g) => String(g.name).toLowerCase() === cur) ? String(w.groups.find((g) => String(g.name).toLowerCase() === cur)!.parent || "").toLowerCase() : "");
+              if (!nx || nx === cur) return false;
+              cur = nx;
+            }
+            return false;
+          };
+          if (chainHas(/sundry debtor/)) closingOfRoot.set("__debtors", (closingOfRoot.get("__debtors") || 0) + closing);
+          if (chainHas(/sundry creditor/)) closingOfRoot.set("__creditors", (closingOfRoot.get("__creditors") || 0) + closing);
+        }
+      }
+
+      const sum = (a: Ent[]) => a.reduce((s2, e) => s2 + e.amount, 0);
+      const sales = sum(ents.sales);
+      const otherIncome = sum(ents.otherIncome);
+      const revenue = sales;
+      const purchases = sum(ents.purchases);
+      const openingStock = inputs.get("opening_stock") ?? 0;
+      const closingStock = inputs.get("closing_stock") ?? 0;
+      const stocksTyped = inputs.has("opening_stock") || inputs.has("closing_stock");
+      const tvc = purchases + openingStock - closingStock;
+      const throughput = revenue - tvc;
+      const manuf = sum(ents.manuf);
+      const grossProfit = throughput - manuf;
+      const indirect = sum(ents.indirect);
+      const ebitda = grossProfit - indirect;
+      const finance = sum(ents.finance);
+      const depreciation = sum(ents.depreciation);
+      const netOperating = ebitda - finance - depreciation;
+      const npbt = netOperating + otherIncome;
+      const tax = sum(ents.tax);
+      const npat = npbt - tax;
+
+      const months = Math.max(1, (Number(to.slice(0, 4)) - Number(from.slice(0, 4))) * 12 + (Number(to.slice(5, 7)) - Number(from.slice(5, 7))) + 1);
+      const days = Math.max(1, daysBetween(from, to) + 1);
+
+      // ---- the ratio pack — each states its formula; "—" where an input
+      // is honestly absent, never a guess ----
+      const rootVal = (re: RegExp) => {
+        let t2 = 0;
+        for (const [r, v] of closingOfRoot) if (re.test(r)) t2 += v;
+        return t2;
+      };
+      const equity = rootVal(/capital/i) + profitToDate;
+      const loans = ((loanRes.data as RR[]) || []).filter((x) => String(x.status) !== "closed");
+      const loanOut = loans.reduce((s2, x) => s2 + (Number(x.outstanding) || 0), 0);
+      const emiMonthly = loans.reduce((s2, x) => s2 + (Number(x.emi) || 0), 0);
+      const debtBooks = rootVal(/loans? \(liability\)|^\S*\.?\s*loans|bank od/i);
+      const debt = loanOut > 0 ? loanOut : Math.max(0, debtBooks);
+      const curLiab = rootVal(/current liabilit/i);
+      const curAssets = -rootVal(/current asset/i);
+      const debtors = -(closingOfRoot.get("__debtors") || 0);
+      const creditors = closingOfRoot.get("__creditors") || 0;
+      const ann = 365 / days;
+      const R = (key: string, label: string, value: number | null, unit: string, formula: string) =>
+        ({ key, label, value: value != null && isFinite(value) ? value : null, unit, formula, target: targets[key] || "" });
+      const ratios = [
+        R("ebitda_sales", "EBITDA to Sales %", revenue ? (ebitda / revenue) * 100 : null, "%", "EBITDA ÷ revenue"),
+        R("pbt_sales", "PBT to Sales %", revenue ? (npbt / revenue) * 100 : null, "%", "net profit before tax ÷ revenue"),
+        R("pat_sales", "PAT to Sales %", revenue ? (npat / revenue) * 100 : null, "%", "net profit after tax ÷ revenue"),
+        R("int_cover", "Interest Coverage (times)", finance ? ebitda / finance : null, "x", "EBITDA ÷ finance charges"),
+        R("debt_equity", "Debt / Equity", equity ? debt / equity : null, "x", loanOut > 0 ? "loan-register outstanding ÷ (capital + P&L to date)" : "loan roots in the books ÷ (capital + P&L to date)"),
+        R("current_ratio", "Current Ratio", curLiab ? curAssets / curLiab : null, "x", "current assets ÷ current liabilities, at their book closings"),
+        R("quick_ratio", "Quick Ratio", curLiab && stocksTyped ? (curAssets - closingStock) / curLiab : null, "x", stocksTyped ? "(current assets − closing stock) ÷ current liabilities" : "needs the closing stock typed on the P&L"),
+        R("debt_service", "Debt Service (period)", emiMonthly ? emiMonthly * months : null, "₹", "loan-register monthly EMI × months in the period"),
+        R("dscr", "DSCR", emiMonthly ? ebitda / (emiMonthly * months) : null, "x", "EBITDA ÷ (EMI × months); the loan register is the source"),
+        R("gp_cr", "Gross Profit", grossProfit, "₹", "throughput − manufacturing expenses"),
+        R("expenses_cr", "Direct + Indirect + Interest", manuf + indirect + finance, "₹", "manufacturing + indirect + finance charges"),
+        R("productivity", "Business Productivity (GP ÷ Expenses)", manuf + indirect + finance ? grossProfit / (manuf + indirect + finance) : null, "x", "gross profit ÷ (manufacturing + indirect + finance)"),
+        R("tol_tnw", "TOL / TNW", equity ? (debt + curLiab) / equity : null, "x", "(debt + current liabilities) ÷ (capital + P&L to date)"),
+        R("roce", "RoCE %", equity + debt ? ((ebitda - depreciation) * ann / (equity + debt)) * 100 : null, "%", "EBIT annualised ÷ (equity + debt)"),
+        R("roi", "ROI %", equity ? (npat * ann / equity) * 100 : null, "%", "PAT annualised ÷ equity"),
+        R("debtor_days", "Debtors — days to Sales", revenue ? debtors / (revenue / days) : null, "days", "sundry debtors (books) ÷ per-day revenue"),
+        R("inventory_days", "Inventory — days to COGS", stocksTyped && tvc ? ((openingStock + closingStock) / 2) / (tvc / days) : null, "days", stocksTyped ? "average stock ÷ per-day TVC" : "needs opening and closing stock typed on the P&L"),
+        R("creditor_days", "Creditors — days to Purchases", purchases ? creditors / (purchases / days) : null, "days", "sundry creditors (books) ÷ per-day purchases"),
+      ];
+      const dD = ratios.find((r) => r.key === "debtor_days")?.value;
+      const iD = ratios.find((r) => r.key === "inventory_days")?.value;
+      const cD = ratios.find((r) => r.key === "creditor_days")?.value;
+      ratios.push(R("ccc", "Cash Conversion Cycle (days)", dD != null && iD != null && cD != null ? dD + iD - cD : null, "days", "debtor days + inventory days − creditor days"));
+
+      const line = (key: string, label: string, amount: number, treeEnts?: Ent[]) => ({
+        key, label, amount,
+        pct: revenue ? (amount / revenue) * 100 : null,
+        avg: amount / months,
+        tree: treeEnts ? treeOf(treeEnts) : undefined,
+      });
+      return NextResponse.json({
+        from, to, months, stocksTyped,
+        lines: [
+          line("sales", "Sales", sales, ents.sales),
+          line("revenue", "Revenue", revenue),
+          line("purchases", "Purchases during the Period", purchases, ents.purchases),
+          line("opening_stock", "Opening Stock (typed)", openingStock),
+          line("closing_stock", "Closing Stock (typed)", closingStock),
+          line("tvc", "TVC (COGS)", tvc),
+          line("throughput", "THROUGHPUT", throughput),
+          line("manuf", "Manufacturing Expenses", manuf, ents.manuf),
+          line("gross_profit", "GROSS PROFIT for the Period", grossProfit),
+          line("indirect", "Indirect Expenses", indirect, ents.indirect),
+          line("ebitda", "EBITDA — Operating Profit before Interest, Depreciation & Tax", ebitda),
+          line("finance", "Finance Charges", finance, ents.finance),
+          line("depreciation", "Depreciation", depreciation, ents.depreciation),
+          line("net_operating", "Net Operating Profit", netOperating),
+          line("other_income", "Other Income", otherIncome, ents.otherIncome),
+          line("npbt", "Net Profit Before Tax", npbt),
+          line("tax", "Tax Expense", tax, ents.tax),
+          line("npat", "NET PROFIT AFTER TAX", npat),
+        ],
+        ratios,
+      });
+    }
+
     if (view === "financials") {
       const fyStartF = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
       const from = url.searchParams.get("from") || fyStartF;
@@ -819,10 +1006,13 @@ export async function GET(req: Request) {
     const qMonth = ((3 + qm) % 12) + 1;
     const qYear = qMonth > Number(today.slice(5, 7)) ? Number(today.slice(0, 4)) - 1 : Number(today.slice(0, 4));
     const qtdStart = `${qYear}-${String(qMonth).padStart(2, "0")}-01`;
+    // `until` caps the flow window — the dashboard's day ratios prefer LAST
+    // MONTH'S LAST DAY (Dr Raghu, 28 Aug 2026) over a moving mid-month cut.
+    const until = url.searchParams.get("until") || today;
     const since = period === "ytd" ? fyStart
       : period === "mtd" ? mtdStart
       : period === "qtd" ? qtdStart
-      : addDays(today, -Math.max(1, Math.min(365, Number(period) || 30)));
+      : addDays(until, -Math.max(1, Math.min(365, Number(period) || 30)));
     const FLOW_TYPES: Record<string, string[]> = {
       billing: ["GST Sales"],
       collections: ["Receipt"],
@@ -832,7 +1022,7 @@ export async function GET(req: Request) {
     const flows: Record<string, { value: number; count: number }> = Object.fromEntries(Object.keys(FLOW_TYPES).map((k) => [k, { value: 0, count: 0 }]));
     try {
       for (let f = 0; ; f += 1000) {
-        const { data, error } = await admin.from("kuber_voucher").select("vtype, amount, date").gte("date", since).range(f, f + 999);
+        const { data, error } = await admin.from("kuber_voucher").select("vtype, amount, date").gte("date", since).lte("date", until).range(f, f + 999);
         if (error) break;
         for (const vch of data || []) {
           for (const [k, types] of Object.entries(FLOW_TYPES)) {
@@ -914,6 +1104,28 @@ export async function POST(req: Request) {
   try {
     const user = await requireKuber();
     const body = await req.json();
+    if (String(body.action) === "set_mis_input") {
+      const key = String(body.key || "");
+      if (!["opening_stock", "closing_stock"].includes(key)) throw new HttpError(400, "key must be opening_stock or closing_stock");
+      const { error } = await adminClient().from("kuber_mis_input")
+        .upsert({ key, value: Number(body.value) || 0, by: user.email, at: new Date().toISOString() }, { onConflict: "key" });
+      if (error) {
+        if (/does not exist|schema cache/i.test(error.message))
+          throw new HttpError(503, "Run migration 0092 first — the typed inputs have nowhere to live yet.");
+        throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
+    if (String(body.action) === "set_ratio_target") {
+      const { error } = await adminClient().from("kuber_ratio_target")
+        .upsert({ key: String(body.key || ""), target: String(body.target || ""), by: user.email, at: new Date().toISOString() }, { onConflict: "key" });
+      if (error) {
+        if (/does not exist|schema cache/i.test(error.message))
+          throw new HttpError(503, "Run migration 0092 first — the targets have nowhere to live yet.");
+        throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
     if (String(body.action) !== "classify") throw new HttpError(400, "Unknown action.");
     const ledger = String(body.ledger || "").trim();
     const cls = String(body.cls || "");

@@ -100,27 +100,10 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
       </div>
 
       {/* the day ratios (Dr Raghu, 28 Aug 2026) — each card SAYS its own
-          arithmetic, so nothing here is an assumption */}
-      {(() => {
-        const perDaySales = (s.flows?.billing?.value || 0) / days;
-        const perDayPurch = (s.flows?.purchases?.value || 0) / days;
-        const dso = perDaySales > 0 ? s.receivable.total / perDaySales : null;
-        const dpo = perDayPurch > 0 ? s.payable.total / perDayPurch : null;
-        const wcd = dso != null && dpo != null ? dso - dpo : null;
-        const dd = (n: number | null) => (n == null ? "—" : `${Math.round(n)} days`);
-        return (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
-            <Card label="CUSTOMER RECEIVABLE DAYS" value={dd(dso)}
-              sub={`net receivables ÷ per-day billing of the chosen period (${fmtMoney(perDaySales)}/day)`}
-              color={dso != null && dso > 90 ? "#D97706" : INK} />
-            <Card label="SUPPLIER PAYABLE DAYS" value={dd(dpo)}
-              sub={`net payables ÷ per-day purchases of the chosen period (${fmtMoney(perDayPurch)}/day)`} />
-            <Card label="WORKING CAPITAL DAYS" value={dd(wcd)}
-              sub="receivable days − payable days; inventory days join when stock reaches the books"
-              color={wcd != null && wcd > 0 ? "#D97706" : GREEN} />
-          </div>
-        );
-      })()}
+          arithmetic AND its upto date: last month's last day, a settled cut,
+          never a moving mid-month figure */}
+      <DayRatios receivableNet={s.receivable.total} payableNet={s.payable.total} />
+
 
       {/* the period flows — the review sheet's own rows, on a slider */}
       <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: BORDER }}>
@@ -193,6 +176,39 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
           <div className="text-sm font-bold" style={{ color: "#1B3A5C" }}>Read the grades →</div>
         </button>
       </div>
+    </div>
+  );
+}
+
+/** The dashboard's day ratios, computed on the flows UPTO LAST MONTH'S LAST
+ *  DAY (Dr Raghu, 28 Aug 2026: "mention this upto when — pref last month's
+ *  last day") — the upto date stands on every card. */
+function DayRatios({ receivableNet, payableNet }: { receivableNet: number; payableNet: number }) {
+  const [f, setF] = useState<Summary | null>(null);
+  const { fmt: fmtMoney } = useMoneyFmt();
+  const upto = lastMonthEndIso();
+  useEffect(() => {
+    fetch(`/api/kuber/books?view=summary&period=ytd&until=${upto}`, { cache: "no-store" })
+      .then((r) => r.json()).then(setF).catch(() => setF(null));
+  }, [upto]);
+  if (!f) return null;
+  const days = Math.max(1, Math.round((new Date(upto).getTime() - new Date(f.since).getTime()) / 86400000) + 1);
+  const perDaySales = (f.flows?.billing?.value || 0) / days;
+  const perDayPurch = (f.flows?.purchases?.value || 0) / days;
+  const dso = perDaySales > 0 ? receivableNet / perDaySales : null;
+  const dpo = perDayPurch > 0 ? payableNet / perDayPurch : null;
+  const wcd = dso != null && dpo != null ? dso - dpo : null;
+  const dd = (n: number | null) => (n == null ? "—" : `${Math.round(n)} days`);
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+      <Card label={`CUSTOMER RECEIVABLE DAYS — UPTO ${fmtD(upto)}`} value={dd(dso)}
+        sub={`net receivables ÷ per-day billing, 1 Apr → ${fmtD(upto)} (${fmtMoney(perDaySales)}/day)`}
+        color={dso != null && dso > 90 ? "#D97706" : INK} />
+      <Card label={`SUPPLIER PAYABLE DAYS — UPTO ${fmtD(upto)}`} value={dd(dpo)}
+        sub={`net payables ÷ per-day purchases, 1 Apr → ${fmtD(upto)} (${fmtMoney(perDayPurch)}/day)`} />
+      <Card label={`WORKING CAPITAL DAYS — UPTO ${fmtD(upto)}`} value={dd(wcd)}
+        sub="receivable days − payable days; inventory days join when stock is typed on the P&L"
+        color={wcd != null && wcd > 0 ? "#D97706" : GREEN} />
     </div>
   );
 }
@@ -996,79 +1012,191 @@ function FinSection({ s, flip, fmtMoney }: { s: FinSec; flip: boolean; fmtMoney:
   );
 }
 
+interface MisLine { key: string; label: string; amount: number; pct: number | null; avg: number; tree?: TreeSec[] }
+interface MisRatio { key: string; label: string; value: number | null; unit: string; formula: string; target: string }
+interface MisData { empty?: boolean; from: string; to: string; months: number; stocksTyped: boolean; lines: MisLine[]; ratios: MisRatio[] }
+
+const lastMonthEndIso = () => {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const t = new Date(today + "T00:00:00Z");
+  t.setUTCDate(0);
+  return t.toISOString().slice(0, 10);
+};
+
+/** The P&L in Dr Raghu's OWN sheet's shape (28 Aug 2026): Sales → Revenue →
+ *  TVC via typed stocks → THROUGHPUT → Manufacturing → GROSS PROFIT →
+ *  Indirect → EBITDA → Finance → Depreciation → NPBT → Tax → NPAT, with
+ *  % of sales and average monthly, every head drillable to the voucher. */
 export function PnLScreen() {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+  const lme = lastMonthEndIso();
   const [from, setFrom] = useState(fyStart);
-  const [to, setTo] = useState(today);
-  const [data] = useBooks<Financials>("financials", `&from=${from}&to=${to}`);
+  const [to, setTo] = useState(lme >= fyStart ? lme : today);
+  const [data, reload] = useBooks<MisData>("mis", `&from=${from}&to=${to}`);
   const { fmt: fmtMoney } = useMoneyFmt();
   const [drill, setDrill] = useState<string | null>(null);
+  const [openLine, setOpenLine] = useState<string | null>(null);
+  const [stockDraft, setStockDraft] = useState<Record<string, string>>({});
   if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
 
-  // Tally's own two-sided reading: debits stand left, credits right; the
-  // gross profit carries over and the nett profit closes the account.
-  const left1 = data ? data.pnl.trading.filter((x) => x.total < 0) : [];
-  const right1 = data ? data.pnl.trading.filter((x) => x.total > 0) : [];
-  const left2 = data ? data.pnl.indirect.filter((x) => x.total < 0) : [];
-  const right2 = data ? data.pnl.indirect.filter((x) => x.total > 0) : [];
-  const gp = data?.pnl.grossProfit ?? 0;
-  const np = data?.pnl.netProfit ?? 0;
-
-  const Side = ({ secs, extra }: { secs: FinSec[]; extra?: { label: string; value: number; colour: string } }) => (
-    <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, flex: 1, minWidth: 320 }}>
-      <DrillTree secs={secs} abs fmtMoney={fmtMoney} onLedger={setDrill} />
-      {extra && (
-        <div className="flex items-center justify-between px-3 py-2 border-t font-bold text-sm" style={{ borderColor: "#22303C" }}>
-          <span style={{ color: extra.colour }}>{extra.label}</span>
-          <span className="tnum" style={{ color: extra.colour }}>{fmtMoney(Math.abs(extra.value))}</span>
-        </div>
-      )}
-    </div>
-  );
+  const BOLD = new Set(["revenue", "tvc", "throughput", "gross_profit", "ebitda", "net_operating", "npbt", "npat"]);
+  const TINT: Record<string, string> = { throughput: "#EEF1FA", gross_profit: "#FBF3E4", ebitda: "#E7F5EC", npat: "#E7F5EC" };
+  const saveStock = async (key: string, v: string) => {
+    await fetch("/api/kuber/books", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "set_mis_input", key, value: Number(v.replace(/,/g, "")) || 0 }),
+    });
+    reload();
+  };
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 940 }}>
       <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
         <div>
-          <div className="text-lg font-bold" style={{ color: INK }}>Profit &amp; Loss</div>
-          <div className="text-sm" style={{ color: "#5A6672" }}>Tally&apos;s own two-sided account, computed from every voucher line — a head opens to its groups, a group to its ledgers, a ledger to its vouchers.</div>
+          <div className="text-lg font-bold" style={{ color: INK }}>Statement of Profit &amp; Loss</div>
+          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 640 }}>
+            The MIS shape — upto <b>{data ? fmtD(data.to) : "…"}</b> (last month&apos;s last day by default), {data?.months ?? "…"} months.
+            Every head opens to its ledgers and their vouchers.
+          </div>
         </div>
         <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
       </div>
       {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : (
         <>
-          <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>TRADING ACCOUNT</div>
-          <div className="flex gap-3 flex-wrap mb-3">
-            <Side secs={left1} extra={gp >= 0 ? { label: "Gross Profit c/o", value: gp, colour: GREEN } : undefined} />
-            <Side secs={right1} extra={gp < 0 ? { label: "Gross Loss c/o", value: gp, colour: RED } : undefined} />
-          </div>
-          <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>PROFIT &amp; LOSS ACCOUNT</div>
-          <div className="flex gap-3 flex-wrap">
-            <div style={{ flex: 1, minWidth: 320 }}>
-              <Side secs={left2} extra={np >= 0 ? { label: "Nett Profit", value: np, colour: GREEN } : undefined} />
-            </div>
-            <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, flex: 1, minWidth: 320 }}>
-              <div className="flex items-center justify-between px-3 py-1.5 border-b font-bold text-sm" style={{ borderColor: "#EFEDE7" }}>
-                <span style={{ color: gp >= 0 ? GREEN : RED }}>{gp >= 0 ? "Gross Profit b/f" : "Gross Loss b/f"}</span>
-                <span className="tnum">{fmtMoney(Math.abs(gp))}</span>
-              </div>
-              <DrillTree secs={right2} abs fmtMoney={fmtMoney} onLedger={setDrill} />
-              {np < 0 && (
-                <div className="flex items-center justify-between px-3 py-2 border-t font-bold text-sm" style={{ borderColor: "#22303C" }}>
-                  <span style={{ color: RED }}>Nett Loss</span><span className="tnum" style={{ color: RED }}>{fmtMoney(Math.abs(np))}</span>
-                </div>
-              )}
-            </div>
+          <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER }}>
+            <table className="w-full text-xs" style={{ minWidth: 760, borderCollapse: "separate", borderSpacing: 0 }}>
+              <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+                <th className="px-3 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>Particulars</th>
+                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }}>Period</th>
+                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }}>% of Sales</th>
+                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }}>Avg Monthly</th>
+              </tr></thead>
+              <tbody>
+                {data.lines.map((l) => {
+                  const stock = l.key === "opening_stock" || l.key === "closing_stock";
+                  const openable = !!l.tree?.length;
+                  return (
+                    <FragRow key={l.key}>
+                      <tr className="border-t" onClick={() => openable && setOpenLine(openLine === l.key ? null : l.key)}
+                        style={{ borderColor: "#EFEDE7", background: TINT[l.key] || "#fff", cursor: openable ? "pointer" : "default" }}>
+                        <td className="px-3 py-1.5" style={{ fontWeight: BOLD.has(l.key) ? 800 : 500, color: INK }}>
+                          {openable && <span style={{ display: "inline-block", width: 14 }}>{openLine === l.key ? "▾" : "▸"}</span>}
+                          {l.label}
+                          {stock && !data.stocksTyped && <span style={{ color: "#B45309", fontWeight: 400 }}> — type it; the XML carries no stock</span>}
+                        </td>
+                        <td className="px-2 py-1.5 text-right tnum" style={{ fontWeight: BOLD.has(l.key) ? 800 : 500, color: /profit|throughput|ebitda|npat/.test(l.key) && l.amount < 0 ? RED : INK }}>
+                          {stock ? (
+                            <input
+                              value={stockDraft[l.key] ?? String(l.amount || "")}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => setStockDraft((d) => ({ ...d, [l.key]: e.target.value.replace(/[^0-9.]/g, "") }))}
+                              onBlur={(e) => { if (Number(e.target.value) !== l.amount) void saveStock(l.key, e.target.value); }}
+                              className="border rounded px-1.5 py-0.5 text-right tnum" style={{ borderColor: data.stocksTyped ? BORDER : "#E8600A", width: 120 }} />
+                          ) : fmtMoney(l.amount)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{l.pct == null ? "—" : `${l.pct.toFixed(2)}%`}</td>
+                        <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{stock ? "—" : fmtMoney(l.avg)}</td>
+                      </tr>
+                      {openLine === l.key && l.tree && (
+                        <tr><td colSpan={4} style={{ background: "#FAF9F5", padding: "0 0 0 20px" }}>
+                          <DrillTree secs={l.tree} abs fmtMoney={fmtMoney} onLedger={setDrill} />
+                        </td></tr>
+                      )}
+                    </FragRow>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
           <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "84ch", lineHeight: 1.6 }}>
-            Debit heads stand left, credit heads right — purchases and direct expenses against sales and direct incomes,
-            then the indirect heads against the gross profit brought forward. Stock movements are not in the XML this
-            pipeline reads, so this is the P&amp;L of the vouchers alone. The books are as current as the last upload.
+            Computed from every voucher line by the group tree — finance charges, depreciation and tax step out of the
+            indirect lump by their group names. Opening and closing stock are typed (the sheet types them too); TVC =
+            purchases + opening − closing. The books are as current as the last upload.
           </p>
         </>
       )}
       {drill && <DrillModal ledger={drill} from={from} to={to} onClose={() => setDrill(null)} />}
+    </div>
+  );
+}
+const FragRow = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+
+/** RATIO ANALYSIS — its own sheet (Dr Raghu, 28 Aug 2026): every ratio with
+ *  its value, HIS target beside it, and the formula it stands on. */
+export function RatioScreen() {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+  const lme = lastMonthEndIso();
+  const [from, setFrom] = useState(fyStart);
+  const [to, setTo] = useState(lme >= fyStart ? lme : today);
+  const [data, reload] = useBooks<MisData>("mis", `&from=${from}&to=${to}`);
+  const { fmt: fmtMoney } = useMoneyFmt();
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
+
+  const GROUPS: [string, string[]][] = [
+    ["PROFIT AND LOSS STATEMENT RATIOS", ["ebitda_sales", "pbt_sales", "pat_sales", "int_cover", "gp_cr", "expenses_cr", "productivity"]],
+    ["BALANCE SHEET RATIOS", ["debt_equity", "current_ratio", "quick_ratio", "debt_service", "dscr", "tol_tnw", "roce", "roi"]],
+    ["THE DAYS", ["debtor_days", "inventory_days", "creditor_days", "ccc"]],
+  ];
+  const show = (r: MisRatio) => r.value == null ? "—"
+    : r.unit === "%" ? `${r.value.toFixed(2)}%`
+    : r.unit === "x" ? r.value.toFixed(2)
+    : r.unit === "days" ? `${Math.round(r.value)} days`
+    : fmtMoney(r.value);
+  const saveTarget = async (key: string, target: string) => {
+    await fetch("/api/kuber/books", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "set_ratio_target", key, target }),
+    });
+    reload();
+  };
+
+  return (
+    <div style={{ maxWidth: 860 }}>
+      <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <div className="text-lg font-bold" style={{ color: INK }}>Ratio Analysis</div>
+          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 640 }}>
+            Trial balance {data ? `${fmtD(data.from)} → ${fmtD(data.to)}` : "…"} — upto last month&apos;s last day by default.
+            Every ratio states its own formula; targets are yours to type. A dash is an honest &quot;the input isn&apos;t in yet&quot;, never a guess.
+          </div>
+        </div>
+        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+      </div>
+      {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : GROUPS.map(([title, keys]) => (
+        <div key={title} className="bg-white rounded-lg border mb-3 overflow-auto" style={{ borderColor: BORDER }}>
+          <div className="px-3 py-2 text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>{title}</div>
+          <table className="w-full text-xs" style={{ minWidth: 640, borderCollapse: "separate", borderSpacing: 0 }}>
+            <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+              <th className="px-3 py-1.5 text-left">Particulars</th>
+              <th className="px-2 py-1.5 text-right">Reporting</th>
+              <th className="px-2 py-1.5 text-right">Target</th>
+              <th className="px-3 py-1.5 text-left" style={{ color: "#8FA1B3" }}>The arithmetic</th>
+            </tr></thead>
+            <tbody>
+              {keys.map((k, i) => {
+                const r = data.ratios.find((x) => x.key === k);
+                if (!r) return null;
+                return (
+                  <tr key={k} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                    <td className="px-3 py-1.5 font-semibold">{r.label}</td>
+                    <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: r.value == null ? MUTED : INK }}>{show(r)}</td>
+                    <td className="px-2 py-1.5 text-right">
+                      <input value={drafts[k] ?? r.target} placeholder="—"
+                        onChange={(e) => setDrafts((d) => ({ ...d, [k]: e.target.value }))}
+                        onBlur={(e) => { if (e.target.value !== r.target) void saveTarget(k, e.target.value); }}
+                        className="border rounded px-1.5 py-0.5 text-right tnum" style={{ borderColor: (drafts[k] ?? r.target) ? BORDER : "#EFEDE7", width: 76 }} />
+                    </td>
+                    <td className="px-3 py-1.5" style={{ color: MUTED }}>{r.formula}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </div>
   );
 }

@@ -17,9 +17,10 @@ import ModuleMenu from "@/components/ModuleMenu";
 import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
 import KuberTasking from "@/components/kuber/Tasking";
-import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen } from "@/components/kuber/Books";
+import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen, RatioScreen } from "@/components/kuber/Books";
 import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 import PlaybookScreen from "@/components/Playbook";
+import ComplianceCalendar from "@/components/kuber/Compliance";
 
 const NAV: { header?: string; items: { key: string; label: string; icon: string }[] }[] = [
   {
@@ -49,10 +50,11 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
     ],
   },
   {
-    header: "P&L AND BS",
+    header: "STATEMENTS",
     items: [
       { key: "pnl", label: "Profit & Loss", icon: "∑" },
       { key: "bs", label: "Balance Sheet", icon: "⚖" },
+      { key: "ratios", label: "Ratio Analysis", icon: "∿" },
       { key: "targets", label: "Targets — Plan vs Actual", icon: "◎" },
       { key: "acf", label: "Actual Cash Flow", icon: "≋" },
       { key: "fundflow", label: "Fund Flow", icon: "⇄" },
@@ -60,6 +62,7 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
       { key: "oereg", label: "OE Register", icon: "▚" },
       { key: "tvcreg", label: "TVC Register", icon: "▞" },
       { key: "loan", label: "Banking — Loan Status", icon: "◨" },
+      { key: "compliance", label: "Compliance Calendar", icon: "▦" },
     ],
   },
   {
@@ -94,7 +97,7 @@ const STUBS: Record<string, string> = {
   targets: "Targets — the JSA business-dashboard parameters, PLAN against ACTUAL: GP%, NP%, ROI, inventory turn, current and quick ratios, debtor/inventory/creditor days, CCC, working capital, cash & bank, net worth. The ACTUAL side computes from the books; the PLAN side is typed once. Being built next — the plan figures come from Dr Raghu.",
 
   bank: "Bank & Cash — the balances, the BRS and the PDC register (the sheet's Bank Reco tab), feeding the cash flow's opening balance. Being built next.",
-  gst: "GST & Statutory — the compliance calendar with its due dates, shown the sheet's own way: verified, late-and-risk, not done. Being built.",
+  gst: "GST & Statutory returns detail — the Compliance Calendar under Statements now carries the due-date discipline; deeper GST workings land here later.",
   reports: "Reports — the MIS P&L against budget, break-even and the working-capital day ratios, printed the Genie way. Being built.",
 };
 
@@ -217,6 +220,8 @@ export default function Accounts({
           {openKey === "oereg" && <ExpensesScreen mode="oe" />}
           {openKey === "acf" && <ActualCashFlowScreen />}
           {openKey === "fundflow" && <FundFlowScreen />}
+          {openKey === "ratios" && <RatioScreen />}
+          {openKey === "compliance" && <ComplianceCalendar />}
           {["bg", "fd", "insurance", "payplan", "cashitem", "loan"].includes(openKey) && <RegisterScreen kind={openKey} key={openKey} />}
           {openKey in STUBS && (
             <div className="bg-white rounded-lg border p-6" style={{ borderColor: "#E2E0DA", maxWidth: 720 }}>

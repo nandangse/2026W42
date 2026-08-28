@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.7",
+    date: "2026-08-28",
+    module: "Kuber — the MIS statement, the Ratio sheet, the Compliance Calendar",
+    items: [
+      "THE P&L NOW STANDS IN DR RAGHU'S OWN SHEET'S SHAPE: Sales → Revenue → Purchases with TYPED opening and closing stock → TVC → THROUGHPUT → Manufacturing → GROSS PROFIT → Indirect → EBITDA → Finance Charges → Depreciation → Net Operating → Other Income → NPBT → Tax → NPAT — with % OF SALES and AVERAGE MONTHLY beside every line, every head drillable to its ledgers and their vouchers. Finance, depreciation and tax step out of the indirect lump by their group names. The period ends on LAST MONTH'S LAST DAY by default — a settled cut (migration 0092 holds the typed stocks).",
+      "RATIO ANALYSIS is its own sheet under Statements: EBITDA/PBT/PAT to sales, interest coverage, debt-equity, current and quick ratios, DSCR off the loan register's EMIs, TOL/TNW, RoCE, ROI, business productivity, and the days — debtors, inventory, creditors, CCC. Every ratio SAYS ITS OWN ARITHMETIC, a dash is an honest missing input, and the TARGET column is yours to type.",
+      "The dashboard's day ratios now SAY THEIR UPTO DATE and compute to last month's last day — a settled figure, not a moving mid-month one.",
+      "THE COMPLIANCE CALENDAR (migration 0093): compliances × the FY's months, seeded from the sheet's own rows — TDS heads, PF, ESIC, GST, PT. Each cell holds the done-date and THE LINK to the proof, editable in a click and openable from the cell; THE COLOUR IS JUDGED FROM THE DATE, never typed — green done by the due day, amber late, red when a past month stands empty. Compliances are addable, editable and retirable; history stays.",
+      "The section is renamed STATEMENTS.",
+    ],
+  },
+  {
     v: "3.31.0.6",
     date: "2026-08-28",
     module: "Kuber dashboard — the day ratios",
