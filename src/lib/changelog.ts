@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.2",
+    date: "2026-08-28",
+    module: "Vishwakarma — the Design Plan: made here, shown in the project there",
+    items: [
+      "THE PROJECT-PLAN LIGHTBOX BECOMES THE DESIGN PLAN (Dr Raghu, 28 Aug 2026): only three things stand on it — the PROJECT START DATE, DESIGN'S OWN DATED STAGES, and the PROJECT COMPLETION DATE. Start and completion are the planning layer's dates, readable here and CHANGEABLE ONLY THERE — the designer's dates must land between two walls that are not his to move.",
+      "The ladder seeds itself the first time: Design Kickoff → Design GAD → Design TBOM → Design Manuf Drawings → Design Full BOM → As Built Checks — and the designer ADDS AS MANY DATED STAGES AS NEEDED, renames, ticks done, removes. Migration 0088 holds the ladder.",
+      "AND IT COMES IN THE PROJECT THERE: every dated design stage appears on the project's timeline in Main Genie as a violet mark (green once done), beside the project's own milestones and its jobs' plans — one timeline, both truths.",
+      "The grid's Next Milestone column now reads DESIGN'S OWN ladder first — the design screen answers with design's next promise, falling back to the planning milestones only where design has not planned yet.",
+    ],
+  },
+  {
     v: "3.31.0.1",
     date: "2026-08-28",
     module: "Kuber — the TOC registers: TVC, OE, and the throughput arithmetic",

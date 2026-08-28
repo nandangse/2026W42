@@ -516,79 +516,109 @@ function PlansScreen() {
           </tbody>
         </table>
       </div>
-      {planFor && <ProjectPlanBox p={planFor} onClose={() => setPlanFor(null)} onEditDeliv={(r) => { setPlanFor(null); setAddDeliv(r); }} />}
+      {planFor && <ProjectPlanBox p={planFor} onClose={() => setPlanFor(null)} onSaved={() => { setPlanFor(null); load(); }} />}
       {addDeliv && <PlanBox row={addDeliv === "new" ? null : addDeliv} jobs={jobsList} onClose={() => setAddDeliv(null)} onSaved={() => { setAddDeliv(null); reloadReg(); load(); }} />}
     </Shell>
   );
 }
 
-/** The Project Plan, worn as a lightbox: the planning layer's milestones
- *  (project-level when planned there, else its jobs' plans), then design's
- *  own deliverables on the project. */
-function ProjectPlanBox({ p, onClose, onEditDeliv }: { p: ProjRow; onClose: () => void; onEditDeliv: (r: Row) => void }) {
-  const today = TODAY();
+/**
+ * The DESIGN PLAN, worn as a lightbox (Dr Raghu, 28 Aug 2026): "similar like
+ * the main plan but only related to Design — design makes it HERE, and it
+ * shows in the project THERE." Only three things stand on it: the project's
+ * START date, design's own dated stages (Kickoff → GAD → TBOM → Manuf
+ * Drawings → Full BOM → As-Built Checks, plus whatever the designer adds),
+ * and the project's COMPLETION date. Start and completion are the planning
+ * layer's dates — read here, never changed here.
+ */
+const DESIGN_LADDER = ["Design Kickoff", "Design GAD", "Design TBOM", "Design Manuf Drawings", "Design Full BOM", "As Built Checks"];
+
+function ProjectPlanBox({ p, onClose, onSaved }: { p: ProjRow; onClose: () => void; onSaved: () => void }) {
+  const [data, setData] = useState<{ installed: boolean; start: string | null; completion: string | null } | null>(null);
+  const [stages, setStages] = useState<{ title: string; on_date: string; done: boolean }[] | null>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/vishwakarma/projects?plan=${encodeURIComponent(p.id)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        setData({ installed: j.installed !== false, start: j.start ?? null, completion: j.completion ?? null });
+        const got = (j.stages || []) as { title: string; on_date: string; done: boolean }[];
+        setStages(got.length ? got : DESIGN_LADDER.map((t) => ({ title: t, on_date: "", done: false })));
+      })
+      .catch(() => { setData({ installed: true, start: null, completion: null }); setStages([]); });
+  }, [p.id]);
+
+  const set = (i: number, patch: Partial<{ title: string; on_date: string; done: boolean }>) =>
+    setStages((st) => st!.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+
+  const save = async () => {
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/vishwakarma/projects", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "design_plan", project_id: p.id, stages }),
+      });
+      if (!r.ok) throw new Error((await r.json()).error || "Could not save the plan");
+      onSaved();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+
+  const DateChip = ({ label, value }: { label: string; value: string | null }) => (
+    <div className="rounded border px-3 py-2" style={{ borderColor: BORDER, background: "#FAF9F5" }}>
+      <div className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>{label}</div>
+      <div className="text-sm font-bold tnum" style={{ color: value ? INK : MUTED }}>{value ? fmtD(value) : "not set by Planning"}</div>
+    </div>
+  );
+
   return (
-    <Modal onClose={onClose} width={720}>
-      <div className="flex items-center justify-between mb-1">
-        <div className="font-bold text-sm" style={{ color: INK }}>{p.id} — the plan</div>
+    <Modal onClose={onClose} width={620}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-bold text-sm" style={{ color: INK }}>{p.id} — the design plan</div>
         <button onClick={onClose} style={{ color: MUTED }}>✕</button>
       </div>
-      {p.description && <div className="text-xs mb-2" style={{ color: "#5A6672", lineHeight: 1.5 }}>{p.description}</div>}
-      <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>
-        MILESTONES · {p.done}/{p.total} done
-      </div>
-      {p.total === 0 && <div className="text-sm mb-2" style={{ color: MUTED }}>Nothing planned yet — the plan lives with Planning; it shows here the moment it exists.</div>}
-      <PlanMilestones projectId={p.id} jobs={p.jobs} />
-      <div className="text-xs font-bold mb-1 mt-3" style={{ color: MUTED, letterSpacing: 0.8 }}>DESIGN DELIVERABLES ON THIS PROJECT</div>
-      {p.deliverables.length === 0 && <div className="text-sm" style={{ color: MUTED }}>None yet — ＋ Add a deliverable on the grid, named to one of this project&apos;s jobs.</div>}
-      {p.deliverables.map((r) => {
-        const late = r.target && String(r.target) < today && r.status !== "done";
-        return (
-          <div key={String(r.id)} onClick={() => onEditDeliv(r)} className="flex items-center gap-2 border-t py-1.5 text-sm" style={{ borderColor: "#EFEDE7", cursor: "pointer" }}>
-            <StatusChip s={String(r.status)} palette={PLAN_STATUS} />
-            <span className="font-semibold">{String(r.job || "")}</span>
-            <span style={{ flex: 1 }}>{String(r.deliverable)}</span>
-            <span style={{ color: MUTED }}>{String(r.owner || "")}</span>
-            <b className="tnum" style={{ color: late ? RED : INK }}>{fmtD(r.target)}{late ? " · late" : ""}</b>
+      {data?.installed === false && (
+        <div className="rounded p-2 mb-2 text-xs font-semibold" style={{ background: "#FCF6E8", color: "#8A6D1A" }}>
+          Run migration 0088 first — the design plan has nowhere to live yet.
+        </div>
+      )}
+      {!data || !stages ? <div className="text-sm" style={{ color: MUTED }}>loading…</div> : (
+        <>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <DateChip label="PROJECT START" value={data.start} />
+            <DateChip label="PROJECT COMPLETION" value={data.completion} />
           </div>
-        );
-      })}
+          <div className="text-xs font-bold mb-1" style={{ color: VIOLET, letterSpacing: 0.8 }}>DESIGN STAGES — design&apos;s own dates, as many as needed</div>
+          {stages.map((st, i) => (
+            <div key={i} className="flex items-center gap-2 py-1 border-t" style={{ borderColor: "#EFEDE7" }}>
+              <input type="checkbox" checked={st.done} onChange={(e) => set(i, { done: e.target.checked })} style={{ accentColor: GREEN }} title="Done" />
+              <input value={st.title} onChange={(e) => set(i, { title: e.target.value })}
+                className="flex-1 border rounded px-2 py-1 text-sm" style={{ borderColor: BORDER, textDecoration: st.done ? "line-through" : "none", color: st.done ? MUTED : INK }} />
+              <input type="date" value={st.on_date} onChange={(e) => set(i, { on_date: e.target.value })}
+                min={data.start || undefined} max={data.completion || undefined}
+                className="border rounded px-2 py-1 text-sm tnum" style={{ borderColor: st.on_date ? BORDER : ORANGE }} />
+              <button onClick={() => setStages((x) => x!.filter((_, j) => j !== i))} title="Remove this stage" style={{ color: MUTED }}>✕</button>
+            </div>
+          ))}
+          <button onClick={() => setStages((x) => [...x!, { title: "", on_date: "", done: false }])}
+            className="mt-1 rounded border px-2 py-1 text-xs font-bold" style={{ borderColor: BORDER, color: VIOLET }}>
+            ＋ Add a stage
+          </button>
+          {err && <div className="text-xs font-bold mt-1" style={{ color: RED }}>{err}</div>}
+          <div className="flex items-center gap-2 mt-3">
+            <button onClick={save} disabled={busy} className="rounded px-4 py-1.5 text-sm font-bold text-white" style={{ background: busy ? "#B9BEC4" : ORANGE }}>
+              {busy ? "Saving…" : "💾 Save the design plan"}
+            </button>
+            <span className="text-xs" style={{ color: MUTED }}>Start and completion are Planning&apos;s dates — not changeable here. The stages show on the project&apos;s timeline in Main Genie.</span>
+          </div>
+        </>
+      )}
     </Modal>
   );
 }
 
-/** The milestone list itself, fetched on open — ticks come from the planning
- *  tables, read-only here: design reads the promise, planning keeps it. */
-function PlanMilestones({ projectId, jobs }: { projectId: string; jobs: { id: string; tag: string }[] }) {
-  const [ms, setMs] = useState<{ scope: string; title: string; done: boolean }[] | null>(null);
-  useEffect(() => {
-    fetch(`/api/vishwakarma/projects?milestones=${encodeURIComponent(projectId)}`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then((j) => setMs(j.milestones || []))
-      .catch(() => setMs([]));
-  }, [projectId]);
-  if (ms === null) return <div className="text-sm" style={{ color: MUTED }}>loading…</div>;
-  if (!ms.length) return null;
-  const tagOf = (scope: string) => jobs.find((j) => j.id === scope)?.tag || "";
-  let lastScope = "";
-  return (
-    <div className="mb-1">
-      {ms.map((m, i) => {
-        const head = m.scope !== lastScope && m.scope !== "";
-        lastScope = m.scope;
-        return (
-          <div key={i}>
-            {head && <div className="text-xs font-bold mt-1" style={{ color: "#1B6B93" }}>Job {m.scope.slice(-4)} <span style={{ color: MUTED, fontWeight: 400 }}>{tagOf(m.scope)}</span></div>}
-            <div className="flex items-center gap-2 text-sm py-0.5">
-              <span style={{ color: m.done ? GREEN : MUTED }}>{m.done ? "✓" : "○"}</span>
-              <span style={{ color: m.done ? MUTED : INK, textDecoration: m.done ? "line-through" : "none" }}>{m.title}</span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 function PlanBox({ row, jobs, onClose, onSaved }: { row: Row | null; jobs: { id: string; tag: string }[]; onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState(() => ({
     job: String(row?.job ?? ""), deliverable: String(row?.deliverable ?? ""), owner: String(row?.owner ?? ""),

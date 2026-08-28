@@ -32,24 +32,25 @@ export async function GET(req: Request) {
     await requireVishwakarma();
     const admin = adminClient();
 
-    // ?milestones=<project id> — the lightbox's list: the project's own plan
-    // when planning has moved up, else its jobs' plans, job by job.
-    const want = new URL(req.url).searchParams.get("milestones");
+    // ?plan=<project id> — the DESIGN plan (Dr Raghu, 28 Aug 2026): design's
+    // own dated stages, bracketed by the project's start and completion —
+    // which are the planning layer's dates and NOT design's to change.
+    const want = new URL(req.url).searchParams.get("plan");
     if (want) {
-      const { data: pm } = await admin.from("project_milestones")
-        .select("idx, title, done").eq("project_id", want).order("idx").limit(1000);
-      if (pm && pm.length)
-        return NextResponse.json({ milestones: pm.map((m) => ({ scope: "", title: String(m.title || `Milestone ${m.idx}`), done: !!m.done })) });
-      const { data: proj } = await admin.from("projects").select("id, job_numbers").eq("id", want).maybeSingle();
-      const { data: js } = await admin.from("jobs").select("id").eq("active", true).eq("proj", want).order("id");
-      const ids = [...new Set([...(js || []).map((j) => String(j.id)), ...((proj?.job_numbers as string[]) || [])])];
-      const out: { scope: string; title: string; done: boolean }[] = [];
-      for (const jid of ids.sort()) {
-        const { data: jm } = await admin.from("milestones")
-          .select("idx, title, done").eq("job_id", jid).order("idx").limit(1000);
-        for (const m of jm || []) out.push({ scope: jid, title: String(m.title || `Milestone ${m.idx}`), done: !!m.done });
-      }
-      return NextResponse.json({ milestones: out });
+      const [{ data: proj }, { data: pp }, { data: js }, dpRes] = await Promise.all([
+        admin.from("projects").select("id, exp_end, committed").eq("id", want).maybeSingle(),
+        admin.from("project_plans").select("start_date").eq("project_id", want).maybeSingle(),
+        admin.from("jobs").select("start_date").eq("active", true).eq("proj", want).order("start_date").limit(1),
+        admin.from("vishwa_design_plan").select("idx, title, on_date, done").eq("project_id", want).order("idx").limit(500),
+      ]);
+      if (dpRes.error && /does not exist|schema cache/i.test(dpRes.error.message))
+        return NextResponse.json({ installed: false });
+      return NextResponse.json({
+        installed: true,
+        start: pp?.start_date ?? js?.[0]?.start_date ?? null,
+        completion: proj?.exp_end ?? proj?.committed ?? null,
+        stages: (dpRes.data || []).map((m) => ({ title: String(m.title), on_date: m.on_date ? String(m.on_date).slice(0, 10) : "", done: !!m.done })),
+      });
     }
 
     // Everything the grid reads, in one round of pages. Growing tables walk
@@ -65,11 +66,12 @@ export async function GET(req: Request) {
       return out;
     };
 
-    const [projects, jobs, pms, jms, metaRes, problems, plans, profiles] = await Promise.all([
+    const [projects, jobs, pms, jms, dps, metaRes, problems, plans, profiles] = await Promise.all([
       pageAll((a, b) => admin.from("projects").select("id, mgr, stage, exp_end, job_numbers, description").order("id").range(a, b)),
       pageAll((a, b) => admin.from("jobs").select("id, tag, proj, active").eq("active", true).order("id").range(a, b)),
       pageAll((a, b) => admin.from("project_milestones").select("project_id, idx, title, done, done_on").order("project_id").order("idx").range(a, b)),
       pageAll((a, b) => admin.from("milestones").select("job_id, idx, title, done").order("job_id").order("idx").range(a, b)),
+      admin.from("vishwa_design_plan").select("project_id, idx, title, on_date, done").order("project_id").order("idx").limit(1000).then((r) => ({ data: r.error ? [] : r.data, error: null })),
       admin.from("vishwa_project").select("*"),
       admin.from("vishwa_problem").select("id, title, job, status").limit(1000),
       admin.from("vishwa_plan").select("id, job, deliverable, owner, target, status").limit(1000),
@@ -93,6 +95,11 @@ export async function GET(req: Request) {
       const k = String(m.project_id);
       (pmByProj.get(k) ?? pmByProj.set(k, []).get(k)!).push(m);
     }
+    const dpByProj = new Map<string, R[]>();
+    for (const m of (dps.data as R[]) || []) {
+      const k = String(m.project_id);
+      (dpByProj.get(k) ?? dpByProj.set(k, []).get(k)!).push(m);
+    }
     const jmByJob = new Map<string, R[]>();
     for (const m of jms) {
       const k = String(m.job_id);
@@ -114,12 +121,17 @@ export async function GET(req: Request) {
       const pjobs = [...set.values()].sort((a, b) => a.id.localeCompare(b.id));
       if (!pjobs.length) return null;
 
-      // Next milestone: the project's own plan first; a project not yet
-      // planned at its level answers from its jobs' plans.
+      // Next milestone: DESIGN's own ladder first (it is design's screen),
+      // then the project's plan, then its jobs' plans.
       const pm = pmByProj.get(pid) || [];
+      const dp = dpByProj.get(pid) || [];
       let next: { title: string; job: string | null } | null = null;
       let done = 0, total = 0;
-      if (pm.length) {
+      if (dp.length) {
+        total = dp.length; done = dp.filter((m) => m.done).length;
+        const n = dp.find((m) => !m.done);
+        if (n) next = { title: String(n.title), job: null };
+      } else if (pm.length) {
         total = pm.length; done = pm.filter((m) => m.done).length;
         const n = pm.find((m) => !m.done);
         if (n) next = { title: String(n.title || `Milestone ${n.idx}`), job: null };
@@ -162,7 +174,9 @@ export async function GET(req: Request) {
   }
 }
 
-/** POST { project_id, patch: { design_stage? | design_owner? | support_needed? } } */
+/** POST { project_id, patch } saves the grid's three words; POST
+ *  { action: "design_plan", project_id, stages: [{title, on_date, done}] }
+ *  saves design's ladder — start and completion stay the planning layer's. */
 export async function POST(req: Request) {
   try {
     const user = await requireVishwakarma();
@@ -170,6 +184,29 @@ export async function POST(req: Request) {
     const body = await req.json();
     const pid = String(body.project_id || "");
     if (!pid) throw new HttpError(400, "project_id required");
+
+    if (String(body.action || "") === "design_plan") {
+      const stages = (Array.isArray(body.stages) ? body.stages : [])
+        .map((x: R, i: number) => ({
+          project_id: pid, idx: i,
+          title: String(x.title || "").trim(),
+          on_date: String(x.on_date || "").slice(0, 10) || null,
+          done: !!x.done, by: user.email,
+        }))
+        .filter((x: { title: string }) => x.title);
+      const del = await admin.from("vishwa_design_plan").delete().eq("project_id", pid);
+      if (del.error) {
+        if (/does not exist|schema cache/i.test(del.error.message))
+          throw new HttpError(503, "Run migration 0088 first — the design plan has nowhere to live yet.");
+        throw new Error(del.error.message);
+      }
+      if (stages.length) {
+        const ins = await admin.from("vishwa_design_plan").insert(stages);
+        if (ins.error) throw new Error(ins.error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
     const patch: R = {};
     for (const k of ["design_stage", "design_owner", "support_needed"])
       if (body.patch && k in body.patch) patch[k] = String(body.patch[k] ?? "");

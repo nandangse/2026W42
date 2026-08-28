@@ -252,6 +252,7 @@ interface Board {
   projects: any[];
   tasks: Task[];
   plans: Record<string, Plan & { baseline_on?: string | null; baseline_end?: string | null }>;
+  designPlans?: Record<string, { title: string; on: string | null; done: boolean }[]>;
   baselines: Record<string, { idx: number; title: string; start: string; end: string }[]>;
   materials: Record<string, { id: string; item: string; qty: string; status: string; custom: boolean; due?: string | null; who?: string | null; note?: string | null; task_id?: string | null }[]>;
   priority: string[] | null;
@@ -7465,6 +7466,13 @@ function ProjectGantt({ g, board, onOpenJob }: { g: ProjGroup; board: Board; onO
       rows.push({ label: `P · ${m.name}`, start: m.start, end: m.end, colour: m.done ? "#0D7A3F" : "#E8600A" });
       dates.push(m.start, m.end);
     }
+  }
+  // Design's ladder from Vishwakarma (0088) — dated stages as violet marks:
+  // made THERE by design, shown HERE with the project, as asked.
+  for (const d of board.designPlans?.[g.id] || []) {
+    if (!d.on) continue;
+    rows.push({ label: `D · ${d.title}`, start: d.on, end: d.on, colour: d.done ? "#0D7A3F" : "#7C3AED" });
+    dates.push(d.on);
   }
   for (const j of g.jobs) {
     rows.push({ header: true, label: `${jobNo(j.id)} · ${j.tag}`, tdd: j.tdd, job: j });

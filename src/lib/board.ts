@@ -314,6 +314,20 @@ export async function buildBoard(supabase: SupabaseClient) {
     }
   }
 
+  // Design's own dated stages per project (0088) — drawn on the project
+  // timeline in violet. The table may not exist yet; the board must not
+  // fall over for that.
+  const designPlans: Record<string, { title: string; on: string | null; done: boolean }[]> = {};
+  {
+    const dpRes = await supabase.from("vishwa_design_plan")
+      .select("project_id, idx, title, on_date, done").order("project_id").order("idx").limit(1000);
+    if (!dpRes.error) {
+      for (const m of dpRes.data || []) {
+        (designPlans[m.project_id] ||= []).push({ title: m.title, on: m.on_date ?? null, done: !!m.done });
+      }
+    }
+  }
+
   // baselines keyed by job_id
   const baselines: Record<string, any[]> = {};
   for (const b of baselineRes.data || []) {
@@ -445,6 +459,7 @@ export async function buildBoard(supabase: SupabaseClient) {
     projects: projectsRes.data || [],
     tasks,
     plans,
+    designPlans,
     baselines,
     materials,
     priority: settingsRes.data?.priority_order?.length
