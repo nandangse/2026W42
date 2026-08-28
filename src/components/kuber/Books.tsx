@@ -8,7 +8,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { fmtMoney, fmtD } from "./Registers";
+import { fmtD } from "./Registers";
+import { useMoneyFmt } from "./money";
 
 const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", RED = "#B3261E", GREEN = "#0D7A3F";
 
@@ -43,6 +44,7 @@ interface Summary {
 }
 export function KuberDashboard({ go }: { go: (key: string) => void }) {
   const [s] = useBooks<Summary>("summary");
+  const { fmt: fmtMoney } = useMoneyFmt();
   if (!s) return <div className="text-sm" style={{ color: MUTED }}>Reading the books…</div>;
   const stale = !s.loadedAt;
   return (
@@ -93,6 +95,7 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
 interface AgeingParty { party: string; group: string | null; total: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: { bill: string; bill_date: string | null; due_date: string | null; amount: number }[] }
 export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
   const [data] = useBooks<{ rows: AgeingParty[]; total: number; overdue: number; today: string }>("ageing", `&kind=${kind}`);
+  const { fmt: fmtMoney } = useMoneyFmt();
   const [open, setOpen] = useState<string | null>(null);
   const [q, setQ] = useState("");
   if (!data) return <div className="text-sm" style={{ color: MUTED }}>Reading the books…</div>;
@@ -156,6 +159,7 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
 interface CardRow { party: string; outstanding: number; overdue: number; oldest: string | null; nbills: number; vouchers: number; avg_delay_days: number; overdue_pct: number; grade: string }
 export function ReportCardScreen() {
   const [data] = useBooks<{ rows: CardRow[]; today: string }>("reportcard");
+  const { fmt: fmtMoney } = useMoneyFmt();
   const [q, setQ] = useState("");
   if (!data) return <div className="text-sm" style={{ color: MUTED }}>Reading the books…</div>;
   const rows = data.rows.filter((r) => !q || r.party.toLowerCase().includes(q.toLowerCase()));
@@ -204,6 +208,7 @@ export function ReportCardScreen() {
 interface Flow { start: string; weeks: string[]; flows: Record<string, number[]>; net: number[]; cumulative: number[]; today: string }
 export function CashFlowScreen({ go }: { go: (key: string) => void }) {
   const [data] = useBooks<Flow>("cashflow");
+  const { num, label } = useMoneyFmt();
   if (!data) return <div className="text-sm" style={{ color: MUTED }}>Reading the books…</div>;
   const F = data.flows;
   const ROWS: { key: string; label: string; dir: 1 | -1 }[] = [
@@ -219,7 +224,7 @@ export function CashFlowScreen({ go }: { go: (key: string) => void }) {
     return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
   };
   const cell = (v: number, neg = false) =>
-    v ? <span className="tnum" style={{ color: neg ? RED : INK }}>{(v / 1e5).toFixed(1)}</span> : <span style={{ color: "#D5D2C8" }}>·</span>;
+    v ? <span className="tnum" style={{ color: neg ? RED : INK }}>{num(v)}</span> : <span style={{ color: "#D5D2C8" }}>·</span>;
   return (
     <div style={{ maxWidth: 1200 }}>
       <div className="flex items-baseline gap-3 mb-1 flex-wrap">
@@ -227,7 +232,7 @@ export function CashFlowScreen({ go }: { go: (key: string) => void }) {
         <span className="text-xs font-bold" style={{ color: "#7A5E1E", letterSpacing: 0.5 }}>SALES IS VANITY · PROFIT IS SANITY · CASH FLOW IS KING</span>
       </div>
       <div className="text-xs mb-2" style={{ color: MUTED, lineHeight: 1.5 }}>
-        Figures in ₹ lakhs. Overdue money sits in week 1. A party planned in{" "}
+        Figures in {label}. Overdue money sits in week 1. A party planned in{" "}
         <button onClick={() => go("payplan")} className="font-bold" style={{ color: "#1B3A5C" }}>Payment Planning</button> replaces its raw bills —
         the plan is the decision. Salaries, EMIs and statutory ride{" "}
         <button onClick={() => go("cashitem")} className="font-bold" style={{ color: "#1B3A5C" }}>Cash Flow Items</button>.
@@ -236,7 +241,7 @@ export function CashFlowScreen({ go }: { go: (key: string) => void }) {
         <table className="text-xs" style={{ minWidth: 1150, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
             <tr style={{ background: "#22303C", color: "#fff" }}>
-              <th className="px-2 py-2 text-left" style={{ position: "sticky", left: 0, background: "#22303C", minWidth: 230 }}>₹ lakhs</th>
+              <th className="px-2 py-2 text-left" style={{ position: "sticky", left: 0, background: "#22303C", minWidth: 230 }}>{label}</th>
               {data.weeks.map((w, i) => (
                 <th key={w} className="px-2 py-2 text-right whitespace-nowrap">
                   W{i + 1}<div style={{ fontWeight: 400, fontSize: 10, color: "#8FA1B3" }}>{wk(w)}</div>
@@ -256,13 +261,13 @@ export function CashFlowScreen({ go }: { go: (key: string) => void }) {
             <tr className="border-t" style={{ borderColor: "#22303C", background: "#F7F5EF" }}>
               <td className="px-2 py-1.5 font-bold" style={{ position: "sticky", left: 0, background: "#F7F5EF", color: INK }}>Net cash generation</td>
               {data.net.map((v, i) => (
-                <td key={i} className="px-2 py-1.5 text-right tnum font-bold" style={{ color: v < 0 ? RED : GREEN }}>{(v / 1e5).toFixed(1)}</td>
+                <td key={i} className="px-2 py-1.5 text-right tnum font-bold" style={{ color: v < 0 ? RED : GREEN }}>{num(v)}</td>
               ))}
             </tr>
             <tr style={{ background: "#F7F5EF" }}>
               <td className="px-2 py-1.5 font-bold" style={{ position: "sticky", left: 0, background: "#F7F5EF", color: INK }}>Cumulative</td>
               {data.cumulative.map((v, i) => (
-                <td key={i} className="px-2 py-1.5 text-right tnum font-bold" style={{ color: v < 0 ? RED : "#1B3A5C" }}>{(v / 1e5).toFixed(1)}</td>
+                <td key={i} className="px-2 py-1.5 text-right tnum font-bold" style={{ color: v < 0 ? RED : "#1B3A5C" }}>{num(v)}</td>
               ))}
             </tr>
           </tbody>
@@ -278,6 +283,7 @@ export function CashFlowScreen({ go }: { go: (key: string) => void }) {
 // ---------------- ledger & voucher browsers ----------------
 export function LedgerBrowser() {
   const [q, setQ] = useState("");
+  const { fmt: fmtMoney } = useMoneyFmt();
   const [data] = useBooks<{ rows: { name: string; parent: string; opening: number; closing: number }[] }>("ledgers", q ? `&q=${encodeURIComponent(q)}` : "");
   return (
     <div style={{ maxWidth: 950 }}>

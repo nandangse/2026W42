@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.4",
+    date: "2026-08-28",
+    module: "Kuber — one money voice, and the Drive popup asked in time",
+    items: [
+      "₹ / LAKHS / CRORES sits on Kuber's header — chosen once, remembered, and EVERY dashboard and record in the module speaks it: the dashboard cards, both ageings, the report card, the registers, and the 13-week cash flow's whole grid. The management-review sheet mixed all three notations in adjacent cells; this is the cure.",
+      "The Drive leg's popup was being asked for seconds after the click — which is exactly the popup browsers block ('Failed to open popup window'). Google is now asked FIRST, inside the click itself; if the browser still refuses, the skip note says in plain words how to allow popups for genie.nandan.co.in and try again.",
+    ],
+  },
+  {
     v: "3.29.0.3",
     date: "2026-08-28",
     module: "Kuber — the upload ledger says what was taken in",

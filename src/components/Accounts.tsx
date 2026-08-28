@@ -17,6 +17,7 @@ import ModuleMenu from "@/components/ModuleMenu";
 import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
 import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser } from "@/components/kuber/Books";
+import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 
 const NAV: { header?: string; items: { key: string; label: string; icon: string }[] }[] = [
   {
@@ -94,6 +95,7 @@ export default function Accounts({
   };
 
   return (
+    <MoneyProvider>
     <div className="min-h-screen" style={{ background: "#F1EFE9", color: "#22303C" }}>
       {/* ═══════════════════ header ═══════════════════ */}
       <div style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0, zIndex: 40 }}>
@@ -112,6 +114,7 @@ export default function Accounts({
             </div>
           </div>
           <span className="ml-auto" />
+          <UnitPicker />
           <ModuleMenu current="accounts" email={email} displayName={displayName} initials={initials} role={role} />
         </div>
       </div>
@@ -154,5 +157,6 @@ export default function Accounts({
         </main>
       </div>
     </div>
+    </MoneyProvider>
   );
 }

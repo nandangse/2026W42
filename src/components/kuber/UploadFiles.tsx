@@ -96,6 +96,7 @@ export default function UploadFiles() {
   const [linkEdit, setLinkEdit] = useState<string | null>(null); // null = not editing
   const [linkMsg, setLinkMsg] = useState("");
   const [running, setRunning] = useState<"" | "masters" | "transactions">("");
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
   const [stages, setStages] = useState<Stage[]>([]);
   const [elapsed, setElapsed] = useState(0);
   const [finished, setFinished] = useState("");
@@ -109,6 +110,13 @@ export default function UploadFiles() {
   }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
+  // fetched at mount so the CLICK itself can open Google's popup — a popup
+  // asked for seconds after the click is a popup the browser blocks
+  useEffect(() => {
+    fetch("/api/kuber/ingest?config=1", { cache: "no-store" })
+      .then((r) => r.json()).then((j) => setGoogleClientId(j.googleClientId ?? null))
+      .catch(() => setGoogleClientId(null));
+  }, []);
 
   const setStage = (i: number, patch: Partial<Stage>) =>
     setStages((s) => s.map((st, j) => (j === i ? { ...st, ...patch } : st)));
@@ -127,6 +135,22 @@ export default function UploadFiles() {
     const label = kind === "masters" ? "Tally XML Masters" : "Tally XML Transactions";
     let onDrive = false;
     try {
+      // Google FIRST, inside the click itself — the popup opens while the
+      // browser still trusts the gesture. Everything else waits its turn.
+      let driveTok: string | null = null;
+      let driveSkip = "";
+      if (googleClientId) {
+        try { driveTok = await driveToken(googleClientId); }
+        catch (e) {
+          const w = e instanceof Error ? e.message : String(e);
+          driveSkip = /popup/i.test(w)
+            ? "the browser blocked Google's window — click the popup icon in the address bar, allow genie.nandan.co.in, and run this file again"
+            : `${w} — the Mac script can file it later`;
+        }
+      } else {
+        driveSkip = "no Google client configured — the Mac script can file it later";
+      }
+
       // 1 — the browser holds the File itself; a quick read proves it is real
       await file.slice(0, 1024).arrayBuffer();
       setStage(0, { state: "done", pct: 1, note: `${(file.size / 1024 / 1024).toFixed(0)} MB held` });
@@ -134,16 +158,14 @@ export default function UploadFiles() {
       // 2 — straight to Drive, Vercel and Supabase never see the bytes
       setStage(1, { state: "run" });
       try {
-        const cfg = await (await fetch("/api/kuber/ingest?config=1", { cache: "no-store" })).json();
-        if (!cfg.googleClientId) throw new Error("no Google client configured");
-        const token = await driveToken(cfg.googleClientId);
+        if (!driveTok) throw new Error(driveSkip);
         const me = rows?.find(() => true);
         const initials = (me?.initials || "RJ").toUpperCase();
-        await driveUpload(token, `${forDate} - ${initials}`, file, label, (p) => setStage(1, { pct: p }));
+        await driveUpload(driveTok, `${forDate} - ${initials}`, file, label, (p) => setStage(1, { pct: p }));
         onDrive = true;
         setStage(1, { state: "done", pct: 1, note: "filed in the Tally folder" });
       } catch (e) {
-        setStage(1, { state: "skip", note: `${e instanceof Error ? e.message : String(e)} — the Mac script can file it later` });
+        setStage(1, { state: "skip", note: e instanceof Error ? e.message : String(e) });
       }
 
       // 3 — the browser parses; only rows travel, 500 at a time

@@ -9,15 +9,10 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useMoneyFmt } from "./money";
 
 const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A";
 
-export const fmtMoney = (v: number | null | undefined) => {
-  const n = Number(v) || 0;
-  if (Math.abs(n) >= 1e7) return `₹${(n / 1e7).toFixed(2)} Cr`;
-  if (Math.abs(n) >= 1e5) return `₹${(n / 1e5).toFixed(1)} L`;
-  return `₹${Math.round(n).toLocaleString("en-IN")}`;
-};
 export const fmtD = (d: string | null | undefined) => {
   if (!d) return "—";
   const [y, m, dd] = String(d).slice(0, 10).split("-");
@@ -114,6 +109,7 @@ type Row = Record<string, unknown> & { id: string };
 
 export default function RegisterScreen({ kind }: { kind: string }) {
   const cfg = CONFIGS[kind];
+  const { fmt: fmtMoney } = useMoneyFmt();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [installed, setInstalled] = useState(true);
   const [editing, setEditing] = useState<Row | "new" | null>(null);
