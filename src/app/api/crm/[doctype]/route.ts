@@ -411,8 +411,9 @@ export async function POST(req: Request, { params }: { params: { doctype: string
       if (st) row.stage_id = st.id;
     }
 
-    // Human-facing numbers come from the database, never from counting rows.
-    if (d.autoNumber) {
+    // Human-facing numbers come from the database, never from counting rows —
+    // unless the form carries one already (an ERP import keeps its number).
+    if (d.autoNumber && !String(row[d.autoNumber.field] ?? "").trim()) {
       const { data: n, error: nerr } = await db.rpc("next_number", { p_code: d.autoNumber.series });
       if (nerr) throw new HttpError(500, `Could not issue a number: ${nerr.message}`);
       row[d.autoNumber.field] = n;

@@ -96,7 +96,7 @@ export const DOCTYPES: Doctype[] = [
     blurb: "Where the funnel earns its keep. The totals fill themselves from the lines — the front end displays money, it never calculates it.",
     fields: [
       { name: "quote_no", label: "Quote No", type: "readonly", inList: true, help: "NGSE/QTN/26-27/00001, issued by the database on save." },
-      { name: "quoted_on", label: "Date of quote", type: "date", inList: true, help: "The business date the quote went out." },
+      { name: "quoted_on", label: "Date of quote", type: "date", inList: true, default: "today", help: "The business date the quote went out." },
       { name: "quoted_value", label: "Quote value", type: "money", inList: true,
         help: "Typed by the salesperson. Once lines exist the computed total takes over on the boards." },
       { name: "opportunity_id", label: "Opportunity", type: "link", link: "opportunity", required: true, inList: true, noFilter: true },
@@ -154,10 +154,11 @@ export const DOCTYPES: Doctype[] = [
   {
     name: "sales_order", label: "Sales Order", plural: "Sales Orders", table: "sales_order",
     titleField: "so_no", group: "Quotations", icon: "🧾",
+    autoNumber: { field: "so_no", series: "sales_order" },
     orderBy: { column: "updated_at", ascending: false },
     blurb: "The pipeline's destination. ERPNext remains the system of record for the order's life — this row is the CRM's handle on it.",
     fields: [
-      { name: "so_no", label: "SO No", type: "text", required: true, inList: true, help: "As ERPNext issued it — NGSE/SO/202627/00951." },
+      { name: "so_no", label: "SO No", type: "text", inList: true, help: "Issued by Genie on save (continues past the ERP's largest); imported rows keep their ERP number." },
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
       { name: "amount", label: "Value", type: "money", inList: true },
       { name: "ordered_on", label: "Ordered", type: "date", inList: true },
@@ -210,7 +211,7 @@ export const DOCTYPES: Doctype[] = [
       { name: "enquiry_info", label: "Enquiry Info", type: "textarea", big: true, tab: "enquiry",
         help: "The enquiry as it arrived — the customer's own words. 2,087 carried in from the ERP." },
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
-      { name: "opportunity_on", label: "Date", type: "date", inList: true,
+      { name: "opportunity_on", label: "Date", type: "date", inList: true, default: "today",
         help: "The business date the enquiry arrived — the ERP's Opportunity Date, distinct from when the row was written." },
       { name: "stage_id", label: "Stage", type: "link", link: "stage", required: true, inList: true,
         linkFilter: { column: "entity", value: "opportunity" },
@@ -327,6 +328,21 @@ export const DOCTYPES: Doctype[] = [
       { name: "cin", label: "CIN", type: "text" },
       { name: "erp_name", label: "ERP name", type: "text", help: "The ERPNext key, so the link survives a rename on either side." },
       { name: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  // Hidden from the sidebar (NAV lists doctypes by name): lives only as the
+  // opportunity's "Deal contacts" tab — a person from ANY organization tied
+  // to THIS deal (Dr Raghu, 28 Aug 2026: "if a contact is added which is
+  // from other organization also its ok").
+  {
+    name: "opportunity_contact", label: "Deal Contact", plural: "Deal Contacts", table: "opportunity_contact",
+    titleField: "note", group: "Funnel", icon: "🔗",
+    blurb: "A person on this deal — from the customer, a consultant, a PMC, anyone. The person keeps their own company; this row records their part here.",
+    fields: [
+      { name: "opportunity_id", label: "Opportunity", type: "link", link: "opportunity", required: true },
+      { name: "person_id", label: "Contact", type: "link", link: "person", required: true, inList: true, help: "Any organization's person. Type a name; if they don't exist yet, add them right there." },
+      { name: "role", label: "Role in this deal", type: "select", inList: true, options: ["Decision maker", "Influencer", "User", "Consultant", "PMC", "Purchase", "Finance", "Other"] },
+      { name: "note", label: "Note", type: "text", inList: true },
     ],
   },
   {

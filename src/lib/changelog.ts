@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.30.0.1",
+    date: "2026-08-28",
+    module: "CRM — numbers that continue, dates that assume today, a forecast in Dr Raghu's rows",
+    items: [
+      "THE FORECAST RESTRUCTURED to the rows Dr Raghu named: OPPORTUNITY is now one collapsible group (folded to a single weighted summary row by default), and QUOTATIONS opens into the real ladder — Quoted, After two months, Next Month, This Month, Bucket B, Bucket A, Bucket 0, Order in Progress. One deal, one row: an opportunity leaves the top group the moment a live quotation exists on it and lives on its quotation's rung instead — no more 20,000-deal forecasts swollen by Not Target and Regretted.",
+      "NUMBERS CONTINUE: Enquiry, Quotation and Sales Order numbers now carry on from the last largest and start at the next hundred (34567 → 34600) — migration 0024 seeds the series from what already exists, ERP imports included, and the yearly reset is off so the stream never restarts. The Sales Order joins the numbered: Genie issues NGSE/SO/… on save, while an imported SO keeps the number it arrived with.",
+      "ADD-NEW IS BUILT IN: typing a company that doesn't exist offers ＋ Add as a new company right in the picker — the same one-click the contact picker already had. DEAL CONTACTS: an opportunity gets a tab for people from ANY organization — a consultant, a PMC, an airline's buyer on an operator's deal — each with their role in this deal; the person keeps their own company. Migration 0024 lays the table.",
+      "ENQUIRY INFO WRITES RICH: bold, links, and 📎 ATTACH — the file lands in Drive through your Gmail connection and its link drops at the cursor, with a live preview of exactly what the reader will see.",
+      "Dates assume TODAY: a new opportunity's date and a new quotation's date arrive filled with today, and a quotation added from an opportunity arrives with that opportunity already chosen — visible in the box, not silently attached.",
+    ],
+  },
+  {
     v: "3.30.0.0",
     date: "2026-08-28",
     module: "Vishwakarma opens for work — the design team's room",

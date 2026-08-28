@@ -1408,6 +1408,7 @@ function RecordModal({
   type TabDef = {
     key: string; label: string; count?: unknown; slug?: string;
     filterField?: string; filterValue?: string | null; addPresets?: Row;
+    presetOptions?: Links;
   };
   const rid = String(row.id ?? "");
   const companyId = row.company_id ? String(row.company_id) : null;
@@ -1434,7 +1435,9 @@ function RecordModal({
       );
     }
     if (dt.name === "opportunity")
-      recordTabs.push({ key: "quotes", label: "Quotations", slug: "quotation", filterField: "opportunity_id", filterValue: rid, addPresets: { opportunity_id: rid, ...(companyId ? { company_id: companyId } : {}) } });
+      recordTabs.push({ key: "dealppl", label: "Deal contacts", slug: "opportunity_contact", filterField: "opportunity_id", filterValue: rid, addPresets: { opportunity_id: rid }, presetOptions: { opportunity: [{ id: rid, label: String(row.name || "this opportunity") }] } });
+    if (dt.name === "opportunity")
+      recordTabs.push({ key: "quotes", label: "Quotations", slug: "quotation", filterField: "opportunity_id", filterValue: rid, addPresets: { opportunity_id: rid, ...(companyId ? { company_id: companyId } : {}) }, presetOptions: { opportunity: [{ id: rid, label: String(row.name || "this opportunity") }] } });
     if (dt.name === "quotation")
       recordTabs.push({ key: "lines", label: "Lines", slug: "quotation_line", filterField: "quotation_id", filterValue: rid, addPresets: { quotation_id: rid } });
     if (dt.name === "person") recordTabs.push({ key: "card", label: "Visiting Card" });
@@ -1622,6 +1625,7 @@ function RecordModal({
                 filterField={t.filterField as string}
                 filterValue={t.filterValue ?? null}
                 addPresets={t.addPresets}
+                presetOptions={t.presetOptions}
                 onOpenLink={onOpenLink}
                 onCompose={onCompose}
                 onWa={onWa}
@@ -1649,10 +1653,15 @@ function RecordModal({
  * where it makes sense the tab can add a row pre-linked to the record.
  */
 function RelatedTab({
-  slug, filterField, filterValue, addPresets, onOpenLink, onCompose, onWa,
+  slug, filterField, filterValue, addPresets, presetOptions, onOpenLink, onCompose, onWa,
 }: {
   slug: string; filterField: string; filterValue: string | null;
-  addPresets?: Row; onOpenLink: (target: string, id: string) => void;
+  addPresets?: Row;
+  /** Options injected into the add-form's link dropdowns so a PRESET link
+   *  reads as chosen — a quotation raised from an opportunity arrives with
+   *  that opportunity already picked (Dr Raghu, 28 Aug 2026). */
+  presetOptions?: Links;
+  onOpenLink: (target: string, id: string) => void;
   onCompose?: (email: string) => void;
   onWa?: (phone: string, mode: "quick" | "compose") => void;
 }) {
@@ -1671,7 +1680,12 @@ function RelatedTab({
       .then(async (r) => {
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || "Could not load");
-        setRows(j.rows); setLinks(j.links || {}); setTotal(j.total ?? j.rows.length);
+        const merged: Links = { ...(j.links || {}) };
+        for (const [k, opts] of Object.entries(presetOptions || {})) {
+          const have = new Set((merged[k] || []).map((o) => o.id));
+          merged[k] = [...(merged[k] || []), ...opts.filter((o) => !have.has(o.id))];
+        }
+        setRows(j.rows); setLinks(merged); setTotal(j.total ?? j.rows.length);
       })
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
   }, [slug, filterField, filterValue, tick]);
@@ -1774,7 +1788,29 @@ function LinkAutocomplete({
   const [text, setText] = useState(valueLabel);
   const [options, setOptions] = useState<{ id: string; label: string }[]>([]);
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   useEffect(() => { if (valueLabel) setText(valueLabel); }, [valueLabel]);
+
+  // "add new should be there" (Dr Raghu, 28 Aug 2026): a company typed but
+  // not found is one click from existing — same move the contact picker has.
+  const creatable = target === "company";
+  const createNew = async () => {
+    const name = text.trim();
+    if (!name || busy) return;
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/crm/${target}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not add it");
+      onPick(String(j.row.id));
+      setOpen(false);
+    } catch { /* the typed text stays; picking again retries */ }
+    finally { setBusy(false); }
+  };
 
   // A preset id whose name is beyond the dropdown's horizon still shows its
   // name — fetched once, so "auto-chosen" reads as chosen, not empty.
@@ -1814,7 +1850,7 @@ function LinkAutocomplete({
         className="w-full px-2 py-1.5 rounded text-sm border"
         style={{ borderColor: value ? BORDER : BORDER }}
       />
-      {open && options.length > 0 && (
+      {open && (options.length > 0 || (creatable && text.trim())) && (
         <div
           className="rounded border"
           style={{
@@ -1833,6 +1869,83 @@ function LinkAutocomplete({
               {o.label}
             </button>
           ))}
+          {creatable && text.trim() && !options.some((o) => o.label.trim().toLowerCase() === text.trim().toLowerCase()) && (
+            <button
+              onMouseDown={(e) => { e.preventDefault(); void createNew(); }}
+              className="w-full text-left px-2 py-1.5 text-sm font-bold"
+              style={{ color: ORANGE, borderTop: `1px solid ${BORDER}` }}
+            >
+              {busy ? "Adding…" : `＋ Add "${text.trim()}" as a new company`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The enquiry, writable rich (Dr Raghu, 28 Aug 2026: "enquiry info make rich
+ * text as well as keep attachments possible to add"): the same markdown the
+ * RichText reader renders — **bold**, [label](link) — plus a 📎 that puts
+ * the file in Drive (through the Gmail connection's door, ~4 MB) and drops
+ * its link at the cursor. Live preview below, so what you type is what the
+ * reader sees.
+ */
+function RichTextArea({ value, onChange, rows }: { value: string; onChange: (v: string) => void; rows: number }) {
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uerr, setUerr] = useState("");
+
+  const insert = (snippet: string, wrap?: boolean) => {
+    const ta = taRef.current;
+    if (!ta) { onChange(value + snippet); return; }
+    const a = ta.selectionStart ?? value.length, b = ta.selectionEnd ?? a;
+    const next = wrap
+      ? value.slice(0, a) + "**" + (value.slice(a, b) || "bold") + "**" + value.slice(b)
+      : value.slice(0, a) + snippet + value.slice(b);
+    onChange(next);
+    requestAnimationFrame(() => { ta.focus(); const at = a + (wrap ? 2 : snippet.length); ta.setSelectionRange(at, wrap ? at + Math.max(4, b - a) : at); });
+  };
+
+  const attach = async (file: File) => {
+    setUploading(true); setUerr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch("/api/crm/gmail/attach", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "The upload failed");
+      const isImg = /^image\//.test(file.type);
+      insert(`${value && !value.endsWith("\n") ? "\n" : ""}${isImg ? "!" : ""}[📎 ${j.name || file.name}](${j.link})\n`);
+    } catch (e) { setUerr(e instanceof Error ? e.message : String(e)); }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-1 mb-1">
+        <button type="button" onClick={() => insert("", true)}
+          className="rounded border px-2 py-0.5 text-xs font-extrabold" style={{ borderColor: BORDER, color: INK }} title="**bold** around the selection">B</button>
+        <button type="button" onClick={() => insert("[label](https://)")}
+          className="rounded border px-2 py-0.5 text-xs font-bold" style={{ borderColor: BORDER, color: "#2C5B82" }} title="A markdown link">🔗 Link</button>
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+          className="rounded border px-2 py-0.5 text-xs font-bold" style={{ borderColor: BORDER, color: ORANGE }}
+          title="Up to ~4 MB — lands in Drive via your Gmail connection, links here">
+          {uploading ? "Uploading…" : "📎 Attach"}
+        </button>
+        <span className="text-xs" style={{ color: MUTED }}>**bold** and [label](link) read rich</span>
+        <input ref={fileRef} type="file" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void attach(f); }} />
+      </div>
+      {uerr && <div className="text-xs mb-1" style={{ color: "#8E2C20" }}>{uerr}</div>}
+      <textarea
+        ref={taRef} value={value} onChange={(e) => onChange(e.target.value)} rows={rows}
+        className="w-full px-2 py-1.5 rounded text-sm border" style={{ borderColor: BORDER }}
+      />
+      {value.trim() !== "" && (
+        <div className="rounded border px-2 py-1.5 text-sm mt-1" style={{ borderColor: BORDER, background: "#FAF9F5", whiteSpace: "pre-wrap", lineHeight: 1.6, overflowWrap: "anywhere", maxHeight: 160, overflowY: "auto" }}>
+          <RichText text={value} />
         </div>
       )}
     </div>
@@ -2564,6 +2677,9 @@ function RecordForm({
       } else {
         const preset = presets?.[f.name];
         let dv: string | boolean = (f.default as string | boolean) ?? (f.type === "bool" ? false : "");
+        // default: "today" on a date field means exactly that (28 Aug 2026)
+        if (f.type === "date" && f.default === "today")
+          dv = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
         // The close is expected by the LAST DATE OF NEXT MONTH unless said
         // otherwise (Dr Raghu, 26 Aug 2026).
         if (dt.name === "opportunity" && f.name === "expected_close_on") {
@@ -2666,6 +2782,8 @@ function RecordForm({
                 />
                 <span style={{ color: "#5A6672" }}>{f.label}</span>
               </label>
+            ) : f.type === "textarea" && f.name === "enquiry_info" ? (
+              <RichTextArea value={String(form[f.name] ?? "")} onChange={(v) => set(f.name, v)} rows={f.big ? 8 : 3} />
             ) : f.type === "textarea" ? (
               <textarea
                 value={String(form[f.name] ?? "")}

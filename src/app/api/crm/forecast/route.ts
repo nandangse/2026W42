@@ -55,9 +55,9 @@ export async function GET(req: Request) {
     const monthsN = Math.min(12, Math.max(3, Number(u.searchParams.get("months")) || 6));
 
     const [stages, opps, quotes, sos, people, cfg] = await Promise.all([
-      pageAll((a, b) => db.from("stage").select("id, name, colour, sort_order, entity").eq("entity", "opportunity").order("sort_order").range(a, b)),
+      pageAll((a, b) => db.from("stage").select("id, name, colour, sort_order, entity").in("entity", ["opportunity", "quotation"]).order("sort_order").range(a, b)),
       pageAll((a, b) => db.from("opportunity").select("id, name, amount, expected_close_on, stage_id, owner_id, company_id").range(a, b)),
-      pageAll((a, b) => db.from("quotation").select("opportunity_id, grand_total, quoted_value, created_at").range(a, b)),
+      pageAll((a, b) => db.from("quotation").select("id, opportunity_id, stage_id, owner_id, grand_total, quoted_value, quoted_on, status, created_at").range(a, b)),
       pageAll((a, b) => db.from("sales_order").select("opportunity_id").range(a, b)),
       pageAll((a, b) => db.from("profile").select("id, full_name, email").range(a, b)),
       readConfig(db),
@@ -85,33 +85,58 @@ export async function GET(req: Request) {
       return months.includes(s) ? s : "later";
     };
 
-    const laneStages = stages.filter((s) => !/lost|drop|cancel/i.test(String(s.name)));
-    const defaultWeight = (i: number, n: number) => Math.round((10 + (70 * i) / Math.max(1, n - 1)) / 5) * 5;
+    // TWO GROUPS (Dr Raghu, 28 Aug 2026): OPPORTUNITY, collapsible, holds
+    // only deals not yet quoted; QUOTATIONS carries his ladder — Quoted ·
+    // After two months · Next Month · This Month · Bucket B · Bucket A ·
+    // Bucket 0 · Order in Progress. Once quoted, a deal lives on the quote
+    // rung — one deal, one row, never both.
+    const oppStages = stages.filter((s) => s.entity === "opportunity" && !/lost|drop|cancel/i.test(String(s.name)));
+    const quoteStages = stages.filter((s) => s.entity === "quotation" && !/lost|expired|cancel/i.test(String(s.name)));
+    const defaultWeight = (i: number, n: number, base: number, span: number) =>
+      Math.round((base + (span * i) / Math.max(1, n - 1)) / 5) * 5;
+
+    const liveQuotes = quotes.filter((q) => !/lost|expired/i.test(String(q.status || "")));
+    const quotedOpps = new Set(liveQuotes.map((q) => String(q.opportunity_id)).filter((x) => x && x !== "null"));
+    const oppById = new Map(opps.map((o) => [String(o.id), o]));
 
     const cells: Record<string, Record<string, { value: number; n: number }>> = {};
-    const deals: { id: string; name: string; value: number; month: string; stage_id: string; owner_id: string | null }[] = [];
-    for (const o of opps) {
-      const id = String(o.id);
-      if (won.has(id)) continue;
-      const sid = String(o.stage_id ?? "");
-      if (!laneStages.some((s) => String(s.id) === sid)) continue;
-      if (owner !== "all" && String(o.owner_id ?? "") !== owner) continue;
-      const value = Number(o.amount) || quoteVal.get(id) || 0;
-      const m = monthOf(o.expected_close_on);
+    let dealsCount = 0;
+    const put = (sid: string, m: string, value: number) => {
       (cells[sid] ??= {});
       (cells[sid][m] ??= { value: 0, n: 0 });
       cells[sid][m].value += value;
       cells[sid][m].n += 1;
-      deals.push({ id, name: String(o.name || ""), value, month: m, stage_id: sid, owner_id: (o.owner_id as string) ?? null });
+      dealsCount++;
+    };
+    for (const o of opps) {
+      const id = String(o.id);
+      if (won.has(id) || quotedOpps.has(id)) continue; // billing, or living on a quote rung
+      const sid = String(o.stage_id ?? "");
+      if (!oppStages.some((s) => String(s.id) === sid)) continue;
+      if (owner !== "all" && String(o.owner_id ?? "") !== owner) continue;
+      put(sid, monthOf(o.expected_close_on), Number(o.amount) || quoteVal.get(id) || 0);
+    }
+    for (const q of liveQuotes) {
+      const sid = String(q.stage_id ?? "");
+      if (!quoteStages.some((s) => String(s.id) === sid)) continue;
+      const opp = oppById.get(String(q.opportunity_id));
+      const qOwner = String(q.owner_id ?? opp?.owner_id ?? "");
+      if (owner !== "all" && qOwner !== owner) continue;
+      put(sid, monthOf(opp?.expected_close_on ?? q.quoted_on), Number(q.grand_total) || Number(q.quoted_value) || 0);
     }
 
-    const lanes = laneStages.map((s, i) => ({
+    const mkLane = (s: Row, i: number, n: number, group: string, base: number, span: number) => ({
       id: String(s.id),
       name: String(s.name),
       colour: (s.colour as string) ?? null,
-      weight: cfg.weights[String(s.id)] ?? defaultWeight(i, laneStages.length),
+      group,
+      weight: cfg.weights[String(s.id)] ?? defaultWeight(i, n, base, span),
       months: Object.fromEntries([...months, "later", "none"].map((m) => [m, cells[String(s.id)]?.[m] ?? { value: 0, n: 0 }])),
-    }));
+    });
+    const lanes = [
+      ...oppStages.map((s, i) => mkLane(s, i, oppStages.length, "opportunity", 10, 40)),
+      ...quoteStages.map((s, i) => mkLane(s, i, quoteStages.length, "quotation", 50, 45)),
+    ];
 
     const expected = Object.fromEntries([...months, "later", "none"].map((m) => [
       m,
@@ -131,7 +156,7 @@ export async function GET(req: Request) {
       targets: cfg.targets,
       owners,
       mayEdit: MANAGE.has(me.crmRole),
-      dealsCount: deals.length,
+      dealsCount,
     });
   } catch (e) {
     return errJson(e);

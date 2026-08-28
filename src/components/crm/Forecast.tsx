@@ -8,14 +8,14 @@
  * current month — a forecast that hides the overdue is a bedtime story.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { NAVY, MUTED, BORDER, ORANGE, GREEN, INK } from "./palette";
 
 const RED = "#C43025";
 const lakhCr = (n: number) =>
   n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹${(n / 1e5).toFixed(1)} L` : n > 0 ? `₹${Math.round(n).toLocaleString("en-IN")}` : "·";
 
-interface Lane { id: string; name: string; colour: string | null; weight: number; months: Record<string, { value: number; n: number }> }
+interface Lane { id: string; name: string; colour: string | null; group?: string; weight: number; months: Record<string, { value: number; n: number }> }
 interface Data {
   months: string[]; lanes: Lane[];
   expected: Record<string, number>; raw: Record<string, number>;
@@ -36,6 +36,10 @@ export default function ForecastView() {
   const [err, setErr] = useState("");
   const [editTargets, setEditTargets] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  // His structure (28 Aug 2026): "Opportunity — Collapsible; Quotations —
+  // show the ladder". Opportunity starts folded to one summary row; the
+  // quotation rungs stand open.
+  const [folded, setFolded] = useState<Record<string, boolean>>({ opportunity: true });
 
   const load = useCallback(() => {
     setErr("");
@@ -143,10 +147,33 @@ export default function ForecastView() {
               ))}
             </tr>
 
-            {data.lanes.map((l) => (
+            {(["opportunity", "quotation"] as const).map((g) => {
+              const lanes = data.lanes.filter((l) => (l.group || "opportunity") === g);
+              if (!lanes.length) return null;
+              const isFolded = !!folded[g];
+              return (
+                <Fragment key={g}>
+                  <tr style={{ background: "#F3F1EB", borderTop: `2px solid ${BORDER}`, cursor: "pointer" }}
+                    onClick={() => setFolded((f) => ({ ...f, [g]: !f[g] }))}>
+                    <td className="px-3 py-2 font-bold" style={{ position: "sticky", left: 0, background: "#F3F1EB", color: NAVY }}>
+                      <span style={{ display: "inline-block", width: 14 }}>{isFolded ? "▸" : "▾"}</span>
+                      {g === "opportunity" ? "OPPORTUNITY" : "QUOTATIONS"}
+                      <span style={{ fontWeight: 400, color: MUTED }}> · {lanes.length} stages · weighted</span>
+                    </td>
+                    {cols.map((m) => {
+                      const v = lanes.reduce((a, l) => a + (l.months[m]?.value || 0) * l.weight / 100, 0);
+                      const n = lanes.reduce((a, l) => a + (l.months[m]?.n || 0), 0);
+                      return (
+                        <td key={m} className="px-2 py-2 text-right tnum font-bold" style={{ color: v ? NAVY : "#D5D2C8" }}>
+                          {v ? <>{lakhCr(v)} <span style={{ color: MUTED, fontWeight: 400 }}>({n})</span></> : "·"}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {!isFolded && lanes.map((l) => (
               <tr key={l.id} className="border-t" style={{ borderColor: "#EFEDE7" }}>
                 <td className="px-3 py-1.5" style={{ position: "sticky", left: 0, background: "#fff" }}>
-                  <span className="font-semibold" style={{ color: INK }}>
+                  <span className="font-semibold" style={{ color: INK, paddingLeft: 14 }}>
                     <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: l.colour || MUTED, marginRight: 6 }} />
                     {l.name}
                   </span>
@@ -154,6 +181,7 @@ export default function ForecastView() {
                     <input
                       type="number" defaultValue={l.weight} key={`${l.id}-${l.weight}`}
                       onBlur={(e) => { const v = Number(e.target.value); if (v !== l.weight) saveWeight(l.id, v); }}
+                      onClick={(e) => e.stopPropagation()}
                       className="border rounded px-1 py-0 text-right tnum ml-2" style={{ borderColor: BORDER, width: 46, fontSize: 11 }}
                       title="This stage's probability % — the Expected row multiplies by it"
                     />
@@ -171,7 +199,10 @@ export default function ForecastView() {
                   );
                 })}
               </tr>
-            ))}
+                  ))}
+                </Fragment>
+              );
+            })}
 
             <tr className="border-t" style={{ borderColor: "#22303C", background: "#FAF9F5" }}>
               <td className="px-3 py-2 font-bold" style={{ position: "sticky", left: 0, background: "#FAF9F5", color: INK }}>Total pending (unweighted)</td>
@@ -185,9 +216,11 @@ export default function ForecastView() {
         </table>
       </div>
       <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "84ch", lineHeight: 1.6 }}>
-        A deal is here until a sales order exists on it or its stage says lost. Its value is the opportunity&apos;s own,
-        falling back to its newest quotation; its month is the expected close date. Stage probabilities and monthly
-        targets are the Sales Head&apos;s to set — everyone reads the same forecast.
+        One deal, one row: an opportunity sits in the OPPORTUNITY group only until a quotation exists on it — from then
+        on it lives on its quotation&apos;s rung (Quoted → the month buckets → Order in Progress). Lost and expired fall out;
+        a sales order takes the opportunity off the top group. Value is the quotation&apos;s grand total (the opportunity&apos;s
+        own amount before a quote exists); the month is the expected close date. Probabilities and targets are the
+        Sales Head&apos;s to set — everyone reads the same forecast.
       </p>
     </div>
   );
