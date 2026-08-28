@@ -92,40 +92,79 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
 }
 
 // ---------------- Ageing ----------------
-interface AgeingParty { party: string; group: string | null; total: number; unadjusted: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: { bill: string; bill_date: string | null; due_date: string | null; amount: number }[] }
+interface AgeingParty { party: string; group: string | null; total: number; gross: number; unadjusted: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: { bill: string; bill_date: string | null; due_date: string | null; amount: number }[] }
+
 export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
-  const [data] = useBooks<{ rows: AgeingParty[]; total: number; overdue: number; unadjusted: number; today: string }>("ageing", `&kind=${kind}`);
+  const [data] = useBooks<{ rows: AgeingParty[]; total: number; gross: number; overdue: number; unadjusted: number; count: number; today: string }>("ageing", `&kind=${kind}`);
   const { fmt: fmtMoney } = useMoneyFmt();
   const [open, setOpen] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [sortKey, setSortKey] = useState<string>("");
+  const [dir, setDir] = useState<1 | -1>(-1);
   if (!data) return <div className="text-sm" style={{ color: MUTED }}>Reading the books…</div>;
-  const rows = data.rows.filter((r) => !q || r.party.toLowerCase().includes(q.toLowerCase()));
-  const title = kind === "receivable" ? "Customer Receivables" : "Supplier Payables";
+
+  const rec = kind === "receivable";
+  const words = rec
+    ? { title: "Customer Receivables", adv: "Advance received", bills: "Bills receivable", net: "Net receivable" }
+    : { title: "Supplier Payables", adv: "Advance paid", bills: "Bills payable", net: "Net payable" };
+
+  // the sortable columns — amount or any other way (Dr Raghu, 28 Aug 2026)
+  const COLS: { key: string; label: string; pick: (r: AgeingParty) => string | number }[] = [
+    { key: "party", label: "Party", pick: (r) => r.party.toLowerCase() },
+    { key: "adv", label: words.adv, pick: (r) => -r.unadjusted },
+    { key: "gross", label: words.bills, pick: (r) => r.gross },
+    { key: "total", label: words.net, pick: (r) => r.total },
+    { key: "not_due", label: "Not due", pick: (r) => r.not_due },
+    { key: "d0_30", label: "<30 days", pick: (r) => r.d0_30 },
+    { key: "d31_90", label: "31–90", pick: (r) => r.d31_90 },
+    { key: "d91_180", label: "91–180", pick: (r) => r.d91_180 },
+    { key: "d180p", label: ">180 days", pick: (r) => r.d180p },
+  ];
+  let rows = data.rows.filter((r) => !q || r.party.toLowerCase().includes(q.toLowerCase()));
+  const col = COLS.find((c) => c.key === sortKey);
+  if (col) {
+    rows = [...rows].sort((a, b) => {
+      const x = col.pick(a), y = col.pick(b);
+      return dir * (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y)));
+    });
+  }
+  const clickSort = (k: string) => {
+    if (sortKey === k) { if (dir === -1) setDir(1); else { setSortKey(""); setDir(-1); } }
+    else { setSortKey(k); setDir(k === "party" ? 1 : -1); }
+  };
+
   return (
-    <div style={{ maxWidth: 1150 }}>
+    <div style={{ maxWidth: 1250 }}>
       <div className="flex items-baseline gap-3 mb-2 flex-wrap">
-        <div className="text-lg font-bold" style={{ color: INK }}>{title}</div>
-        <span className="text-sm tnum" style={{ color: "#1B3A5C" }}>{fmtMoney(data.total)} net</span>
-        <span className="text-sm tnum font-bold" style={{ color: data.overdue ? RED : GREEN }}>{fmtMoney(data.overdue)} overdue</span>
-        {data.unadjusted !== 0 && (
-          <span className="text-sm tnum" style={{ color: MUTED }} title="Receipts and settlements Tally could not tie to a bill — they reduce the net but age nothing">
-            {fmtMoney(data.unadjusted)} unadjusted
-          </span>
-        )}
+        <div className="text-lg font-bold" style={{ color: INK }}>{words.title}</div>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 party"
           className="px-2 py-1 rounded border text-sm ml-auto" style={{ borderColor: BORDER }} />
       </div>
-      <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "72vh" }}>
-        <table className="w-full text-xs" style={{ minWidth: 900, borderCollapse: "separate", borderSpacing: 0 }}>
+      {/* the three numbers he reads first, plus what is overdue among them */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+        <Card label={words.adv.toUpperCase()} value={fmtMoney(-data.unadjusted)} sub="credits not tied to a bill" color="#1B6B93" />
+        <Card label={words.bills.toUpperCase()} value={fmtMoney(data.gross)} sub={`${data.count} open bills`} color="#1B3A5C" />
+        <Card label={words.net.toUpperCase()} value={fmtMoney(data.total)} sub="bills less advances" color={INK} />
+        <Card label="OF WHICH OVERDUE" value={fmtMoney(data.overdue)} color={data.overdue ? RED : GREEN} />
+      </div>
+      <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "70vh" }}>
+        <table className="w-full text-xs" style={{ minWidth: 1100, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
             <tr style={{ background: "#22303C", color: "#fff" }}>
-              {["Party", "Net", "Not due", "<30 days", "31–90", "91–180", ">180 days", "Unadjusted", ""].map((h, i) => (
-                <th key={i} className={`px-2 py-2 ${i === 0 ? "text-left" : "text-right"} whitespace-nowrap`} style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
+              {COLS.map((c, i) => (
+                <th key={c.key}
+                  className={`px-2 py-2 ${i === 0 ? "text-left" : "text-right"} whitespace-nowrap`}
+                  style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}
+                  onClick={() => clickSort(c.key)}
+                  title="Click to sort — again to flip, a third time to clear">
+                  {c.label}{sortKey === c.key ? (dir === -1 ? " ▼" : " ▲") : ""}
+                </th>
               ))}
+              <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "#22303C" }} />
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && (<tr><td colSpan={9} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing here — upload the Tally files first.</td></tr>)}
+            {rows.length === 0 && (<tr><td colSpan={10} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing here — upload the Tally files first.</td></tr>)}
             {rows.map((r, i) => (
               <>
                 <tr key={r.party} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}
@@ -133,20 +172,21 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
                   <td className="px-2 py-1.5 font-semibold" style={{ color: INK, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.party}>
                     {open === r.party ? "▾ " : "▸ "}{r.party}
                   </td>
+                  <td className="px-2 py-1.5 text-right tnum" style={{ color: "#1B6B93" }}>{r.unadjusted ? fmtMoney(-r.unadjusted) : "·"}</td>
+                  <td className="px-2 py-1.5 text-right tnum">{r.gross ? fmtMoney(r.gross) : "·"}</td>
                   <td className="px-2 py-1.5 text-right tnum font-bold">{fmtMoney(r.total)}</td>
                   <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{r.not_due ? fmtMoney(r.not_due) : "·"}</td>
                   <td className="px-2 py-1.5 text-right tnum">{r.d0_30 ? fmtMoney(r.d0_30) : "·"}</td>
                   <td className="px-2 py-1.5 text-right tnum" style={{ color: "#D97706" }}>{r.d31_90 ? fmtMoney(r.d31_90) : "·"}</td>
                   <td className="px-2 py-1.5 text-right tnum" style={{ color: RED }}>{r.d91_180 ? fmtMoney(r.d91_180) : "·"}</td>
                   <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: RED }}>{r.d180p ? fmtMoney(r.d180p) : "·"}</td>
-                  <td className="px-2 py-1.5 text-right tnum" style={{ color: "#1B6B93" }} title="Receipts/settlements not tied to a bill — they reduce the net">{r.unadjusted ? "−" + fmtMoney(-r.unadjusted) : "·"}</td>
                   <td className="px-2 py-1.5 text-right" style={{ color: MUTED }}>{r.bills.length}</td>
                 </tr>
                 {open === r.party && r.bills.map((b, j) => (
                   <tr key={r.party + j} style={{ background: "#F4F6F9" }}>
                     <td className="px-2 py-1 pl-7" style={{ color: "#5A6672" }}>{b.bill}</td>
                     <td className="px-2 py-1 text-right tnum" style={{ color: b.amount < 0 ? "#1B6B93" : INK }}>{b.amount < 0 ? "−" + fmtMoney(-b.amount) : fmtMoney(b.amount)}</td>
-                    <td colSpan={6} className="px-2 py-1 text-right tnum" style={{ color: b.due_date && b.due_date < data.today ? RED : MUTED }}>
+                    <td colSpan={7} className="px-2 py-1 text-right tnum" style={{ color: b.due_date && b.due_date < data.today ? RED : MUTED }}>
                       billed {fmtD(b.bill_date)} · due {fmtD(b.due_date)}
                     </td>
                     <td />

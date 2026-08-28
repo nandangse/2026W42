@@ -79,12 +79,14 @@ export async function GET(req: Request) {
       // negative = an unadjusted opposite entry. The party total is the NET —
       // the sheet's own number — with the unadjusted lump shown, not hidden.
       const bills = (await allBills(admin)).filter((b) => b.kind === kind);
-      const parties = new Map<string, { party: string; group: string | null; total: number; unadjusted: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: Bill[] }>();
+      const parties = new Map<string, { party: string; group: string | null; total: number; gross: number; unadjusted: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: Bill[] }>();
       for (const b of bills) {
-        const p = parties.get(b.party) || { party: b.party, group: b.party_group, total: 0, unadjusted: 0, not_due: 0, d0_30: 0, d31_90: 0, d91_180: 0, d180p: 0, bills: [] };
+        const p = parties.get(b.party) || { party: b.party, group: b.party_group, total: 0, gross: 0, unadjusted: 0, not_due: 0, d0_30: 0, d31_90: 0, d91_180: 0, d180p: 0, bills: [] };
         p.total += b.amount;
-        if (b.amount > 0) (p as unknown as Record<string, number>)[bucketOf(b.due_date, today)] += b.amount;
-        else p.unadjusted += b.amount;
+        if (b.amount > 0) {
+          p.gross += b.amount;
+          (p as unknown as Record<string, number>)[bucketOf(b.due_date, today)] += b.amount;
+        } else p.unadjusted += b.amount;
         p.bills.push(b);
         parties.set(b.party, p);
       }
@@ -93,9 +95,10 @@ export async function GET(req: Request) {
         .map((p) => ({ ...p, bills: p.bills.sort((a, b2) => String(a.due_date || "9999").localeCompare(String(b2.due_date || "9999"))) }))
         .sort((a, b2) => b2.total - a.total);
       const tot = rows.reduce((s, p) => s + p.total, 0);
+      const gross = rows.reduce((s, p) => s + p.gross, 0);
       const overdue = rows.reduce((s, p) => s + p.d0_30 + p.d31_90 + p.d91_180 + p.d180p, 0);
       const unadjusted = rows.reduce((s, p) => s + p.unadjusted, 0);
-      return NextResponse.json({ rows, total: tot, overdue, unadjusted, count: bills.length, today });
+      return NextResponse.json({ rows, total: tot, gross, overdue, unadjusted, count: bills.length, today });
     }
 
     if (view === "reportcard") {

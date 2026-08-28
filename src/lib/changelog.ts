@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.29.0.14",
+    date: "2026-08-28",
+    module: "Kuber — receivables in three honest columns",
+    items: [
+      "Customer Receivables (and Supplier Payables, mirrored) now shows the three numbers Dr Raghu asked to see per party: ADVANCE RECEIVED (credits not tied to a bill), BILLS RECEIVABLE (the gross open bills) and NET RECEIVABLE — with all three TOTALS on top beside the overdue figure.",
+      "The header stays fixed while rows scroll, and EVERY column sorts on click — party, advance, bills, net, or any ageing bucket — again to flip, a third time to return to biggest-net-first.",
+    ],
+  },
+  {
     v: "3.29.0.13",
     date: "2026-08-28",
     module: "Kuber — Google asked once, not every file",
