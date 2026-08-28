@@ -198,7 +198,7 @@ export async function buildBoard(supabase: SupabaseClient) {
     // every page walks a FIXED order — pages of an unordered select can skip
     // or repeat rows, which is the same corruption wearing a new hat
     pageAll((a, b) => supabase.from("jobs").select("*").order("id").range(a, b)),
-    pageAll((a, b) => supabase.from("projects").select("*").order("job_id").range(a, b)),
+    pageAll((a, b) => supabase.from("projects").select("*").order("id").range(a, b)),
     pageAll((a, b) => supabase.from("erp_tasks").select("*").order("id").range(a, b)),
     pageAll((a, b) => supabase.from("manual_tasks").select("*").order("id").range(a, b)),
     pageAll((a, b) => supabase.from("task_comments").select("id, task_id, task_kind").order("id").range(a, b)),
