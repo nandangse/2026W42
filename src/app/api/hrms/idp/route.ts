@@ -290,6 +290,8 @@ export async function GET(req: Request) {
         years: yearsBetween(emp.doj as string | null),
         doj: emp.doj ?? null,
         manager: extra["Reporting Manager"] || null,
+        personal_mobile: extra["PERSONAL Mobile No"] && !/^n\/?a$/i.test(String(extra["PERSONAL Mobile No"]).trim()) ? String(extra["PERSONAL Mobile No"]).trim() : null,
+        personal_email: extra["Personal Mail ID"] && /@/.test(String(extra["Personal Mail ID"])) ? String(extra["Personal Mail ID"]).trim() : null,
       };
       let role: Record<string, unknown> | null = null;
       const roleName = String((idp && (idp as Record<string, unknown>).role_at_time) || emp.designation || "").split(" · ")[0].trim();
@@ -408,6 +410,32 @@ export async function POST(req: Request) {
     const me = await requireHrms();
     const admin = adminClient();
     const body = await req.json();
+    // the FINALISED DISCUSSION (29 Aug 2026): date · attendees · link · MoM ·
+    // Note from Raghu — kept on the cycle row; the note rides into the IDP
+    // letter later.
+    if (String(body.action || "") === "appraisal-discussion") {
+      const employee_id = String(body.employee_id || "");
+      if (!employee_id) throw new HttpError(400, "employee_id required");
+      const d2 = (body.discussion || {}) as Record<string, string>;
+      const discussion = {
+        date: String(d2.date || "").slice(0, 10) || null,
+        attendees: String(d2.attendees || "").slice(0, 500),
+        link: String(d2.link || "").slice(0, 500),
+        mom: String(d2.mom || "").slice(0, 8000),
+        note_raghu: String(d2.note_raghu || "").slice(0, 4000),
+        by: me.initials || me.email, at: new Date().toISOString(),
+      };
+      const { error } = await admin.from("hrms_appraisal").upsert(
+        { employee_id, cycle: "2026-27", discussion, updated_at: new Date().toISOString() },
+        { onConflict: "employee_id,cycle" });
+      if (error) {
+        if (/discussion|schema cache/i.test(error.message))
+          throw new HttpError(503, "Run migration 0096 first — the discussion has nowhere to live yet.");
+        throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
     if (String(body.action || "") === "appraisal") {
       const employee_id = String(body.employee_id || "");
       if (!employee_id) throw new HttpError(400, "employee_id required");

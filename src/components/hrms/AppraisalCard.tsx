@@ -26,7 +26,7 @@ const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n)
 interface ListRow { idpId: string; employee_id: string | null; name: string; submitted_at: string | null }
 interface Rec { url: string | null; seconds: number | null; transcript: string | null }
 interface PersonData {
-  employee: { id: string; name: string; department: string | null; designation: string | null; type: string | null; age?: number | null; years?: number | null; doj?: string | null; manager?: string | null };
+  employee: { id: string; name: string; department: string | null; designation: string | null; type: string | null; age?: number | null; years?: number | null; doj?: string | null; manager?: string | null; personal_mobile?: string | null; personal_email?: string | null };
   role?: { role: string; department: string | null; grade: string | null; reports_to: string | null; job_description: string | null; deliverable: string | null; metric: string | null; summary: string | null } | null;
   salaryYears?: { year: number; gross: number | null; note: string }[];
   salary: { rows: SalaryRow[]; ctcLakhs: string; exempt: boolean; gross: number } | null;
@@ -48,7 +48,7 @@ interface PersonData {
   } | null;
 }
 
-const TABS = ["Self IDP", "Manager IDP comment", "Finalised IDP for Employee", "Appraisal Final"] as const;
+const TABS = ["Self IDP", "Manager IDP comment", "Finalised IDP for Employee", "Finalised discussion", "Appraisal Final"] as const;
 
 export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: boolean }) {
   const [people, setPeople] = useState<ListRow[] | null>(null);
@@ -114,6 +114,8 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
             {d.employee.department && <span>Dept <b style={{ color: C.ink }}>{d.employee.department}</b></span>}
             {d.employee.designation && <span>Designation <b style={{ color: C.ink }}>{d.employee.designation}</b></span>}
             {d.employee.manager && <span>Reports to <b style={{ color: C.ink }}>{d.employee.manager}</b></span>}
+            {d.employee.personal_mobile && <span>📱 <b style={{ color: C.ink }}>{d.employee.personal_mobile}</b></span>}
+            {d.employee.personal_email && <span title="The finalised IDP letter goes to this address">✉ <b style={{ color: C.ink }}>{d.employee.personal_email}</b></span>}
           </div>
 
           <div className="flex gap-1 flex-wrap mb-3 no-print">
@@ -128,6 +130,7 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
           {tab === "Self IDP" && <SelfTab d={d} />}
           {tab === "Manager IDP comment" && <ManagerTab d={d} />}
           {tab === "Finalised IDP for Employee" && <FinalisedTab d={d} />}
+          {tab === "Finalised discussion" && <DiscussionTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
           {tab === "Appraisal Final" && <AppraisalTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
         </>
       )}
@@ -240,6 +243,61 @@ function GrossGraph({ years }: { years: { year: number; gross: number | null; no
         ))}
         {known.length <= 1 && <text x={W / 2} y={40} textAnchor="middle" fontSize={10} fill={C.faint}>history fills as each appraisal cycle lands — earlier years join when the old sheets are given</text>}
       </svg>
+    </div>
+  );
+}
+
+/** The FINALISED DISCUSSION (Dr Raghu, 29 Aug 2026): date · attendees ·
+ *  link · MoM · Note from Raghu. Kept on record with the cycle; the Note
+ *  rides into the IDP letter when that is built. Raghu's pen; others read. */
+function DiscussionTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean; onSaved: () => void }) {
+  const saved = ((d.appraisal as Record<string, unknown> | null)?.discussion || {}) as Record<string, string>;
+  const [f, setF] = useState({
+    date: String(saved.date || "").slice(0, 10), attendees: String(saved.attendees || ""),
+    link: String(saved.link || ""), mom: String(saved.mom || ""), note_raghu: String(saved.note_raghu || ""),
+  });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const save = async () => {
+    setBusy(true); setMsg("");
+    try {
+      await api.post("/api/hrms/idp", { action: "appraisal-discussion", employee_id: d.employee.id, discussion: f });
+      setMsg("Saved — on the record ✓"); onSaved();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+  const ro = !isOwner;
+  return (
+    <div className="bg-white rounded-lg border p-4" style={{ borderColor: C.line, maxWidth: 720 }}>
+      <div className="font-bold mb-1" style={{ fontSize: 15 }}>Finalised discussion</div>
+      <p className="text-xs mb-3" style={{ color: C.dim, lineHeight: 1.5 }}>
+        The record of the sit-down. Once this is filled, RJ finalises and sends — the Note from Raghu also travels
+        into the IDP letter{ro ? ". RJ's pen; you are reading the record." : "."}
+      </p>
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+        <label className="text-xs font-bold" style={{ color: C.dim }}>DATE
+          <input type="date" disabled={ro} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })}
+            className="w-full mt-1 px-2 py-1.5 rounded border font-normal tnum" style={{ borderColor: C.line }} /></label>
+        <label className="text-xs font-bold" style={{ color: C.dim }}>ATTENDEES
+          <input disabled={ro} value={f.attendees} onChange={(e) => setF({ ...f, attendees: e.target.value })} placeholder="RJ, HR, the manager…"
+            className="w-full mt-1 px-2 py-1.5 rounded border font-normal" style={{ borderColor: C.line }} /></label>
+        <label className="text-xs font-bold" style={{ color: C.dim, gridColumn: "1 / -1" }}>LINK — recording / document
+          <input disabled={ro} value={f.link} onChange={(e) => setF({ ...f, link: e.target.value })} placeholder="https://…"
+            className="w-full mt-1 px-2 py-1.5 rounded border font-normal" style={{ borderColor: C.line }} /></label>
+        <label className="text-xs font-bold" style={{ color: C.dim, gridColumn: "1 / -1" }}>MINUTES OF THE MEETING
+          <textarea disabled={ro} value={f.mom} onChange={(e) => setF({ ...f, mom: e.target.value })} rows={5}
+            className="w-full mt-1 px-2 py-1.5 rounded border font-normal" style={{ borderColor: C.line, lineHeight: 1.5 }} /></label>
+        <label className="text-xs font-bold" style={{ color: "#7C3AED", gridColumn: "1 / -1" }}>NOTE FROM RAGHU — goes into the IDP letter
+          <textarea disabled={ro} value={f.note_raghu} onChange={(e) => setF({ ...f, note_raghu: e.target.value })} rows={4}
+            className="w-full mt-1 px-2 py-1.5 rounded border font-normal" style={{ borderColor: "#D9CBF5", lineHeight: 1.5 }} /></label>
+      </div>
+      {saved.at && <div className="text-xs mt-2" style={{ color: C.faint }}>last saved by {saved.by} · {String(saved.at).slice(0, 16).replace("T", " ")} UTC</div>}
+      {msg && <div className="text-xs font-bold mt-2" style={{ color: /✓/.test(msg) ? C.green : "#B3261E" }}>{msg}</div>}
+      {!ro && (
+        <button onClick={save} disabled={busy} className="rounded px-4 py-1.5 text-sm font-bold text-white mt-3" style={{ background: busy ? "#B9BEC4" : C.orange }}>
+          💾 Save the record
+        </button>
+      )}
     </div>
   );
 }

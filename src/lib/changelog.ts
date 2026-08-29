@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.26",
+    date: "2026-08-29",
+    module: "HRMS — the discussion on record, the letter's address on the card",
+    items: [
+      "PERSONAL MOBILE AND PERSONAL EMAIL stand on the appraisal card's strip (Dr Raghu, 29 Aug 2026) — the personal email marked as WHERE THE FINALISED IDP LETTER WILL GO; the letter itself and its send (bulk for the team, in-app for leaders) come next.",
+      "A NEW TAB — FINALISED DISCUSSION: date, attendees, the recording/document link, the minutes, and the NOTE FROM RAGHU, which will also travel into the IDP letter. RJ's pen; everyone else reads the record. Kept on the cycle row forever (migration 0096).",
+      "And /idp now OPENS ON THE INSTRUCTIONS every time — one click continues, nothing is ever lost by reading them again.",
+    ],
+  },
+  {
     v: "3.31.0.25",
     date: "2026-08-29",
     module: "HRMS — the person's frame around the appraisal",

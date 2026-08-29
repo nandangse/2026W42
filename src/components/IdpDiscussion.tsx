@@ -64,7 +64,9 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
    *
    * Reaching it does NOT discard anything. Starting again does, and says so.
    */
-  const [showIntro, setShowIntro] = useState(false);
+  // the instructions stand OPEN by default at /idp (Dr Raghu, 29 Aug 2026) —
+  // one click continues; nothing is ever lost by reading them again.
+  const [showIntro, setShowIntro] = useState(true);
   const [reviewRow, setReviewRow] = useState<TeamRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
