@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.25",
+    date: "2026-08-29",
+    module: "HRMS — the person's frame around the appraisal",
+    items: [
+      "THE APPRAISAL CARD WEARS THE PERSON'S FRAME (Dr Raghu, 29 Aug 2026): AGE, YEARS IN THE COMPANY (with the joining date), DEPARTMENT, DESIGNATION and REPORTING MANAGER stand under the name — read from the employee master and the HR sheet's own columns.",
+      "THE FINALISED IDP CARRIES THE ROLE from the roles register: the ROLE itself, the KRA (what the role delivers) and the KPIs (how it is measured) — the same words the register holds, so the person reads their charter beside their plan.",
+      "GROSS SALARY — THE CLIMB: a small line over 2020→2027, points standing only where a year's gross is truly known (today's sheet, each appraisal cycle as it lands) — the empty years say so by their absence, and the history deepens when the old sheets are given.",
+    ],
+  },
+  {
     v: "3.31.0.24",
     date: "2026-08-29",
     module: "CRM — the opportunity knows its person; sales-side stays pull-only",

@@ -26,7 +26,9 @@ const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n)
 interface ListRow { idpId: string; employee_id: string | null; name: string; submitted_at: string | null }
 interface Rec { url: string | null; seconds: number | null; transcript: string | null }
 interface PersonData {
-  employee: { id: string; name: string; department: string | null; designation: string | null; type: string | null };
+  employee: { id: string; name: string; department: string | null; designation: string | null; type: string | null; age?: number | null; years?: number | null; doj?: string | null; manager?: string | null };
+  role?: { role: string; department: string | null; grade: string | null; reports_to: string | null; job_description: string | null; deliverable: string | null; metric: string | null; summary: string | null } | null;
+  salaryYears?: { year: number; gross: number | null; note: string }[];
   salary: { rows: SalaryRow[]; ctcLakhs: string; exempt: boolean; gross: number } | null;
   idp: {
     id: string; submitted_at: string | null; role_at_time: string | null; role_summary: string | null;
@@ -105,6 +107,13 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
             {d.idp?.submitted_at
               ? <span style={{ fontSize: 11, color: "#9AD3AE" }}>IDP submitted {fmtFull(String(d.idp.submitted_at).slice(0, 10))}</span>
               : <span style={{ fontSize: 11, color: "#F5B32B" }}>IDP not submitted — read with that in mind</span>}
+          </div>
+          <div className="flex gap-x-4 gap-y-1 flex-wrap mb-2 px-1" style={{ fontSize: 12, color: C.dim }}>
+            {d.employee.age != null && <span>Age <b style={{ color: C.ink }}>{d.employee.age}</b></span>}
+            {d.employee.years != null && <span>In company <b style={{ color: C.ink }}>{d.employee.years} yrs</b>{d.employee.doj ? ` (since ${fmtFull(String(d.employee.doj).slice(0, 10))})` : ""}</span>}
+            {d.employee.department && <span>Dept <b style={{ color: C.ink }}>{d.employee.department}</b></span>}
+            {d.employee.designation && <span>Designation <b style={{ color: C.ink }}>{d.employee.designation}</b></span>}
+            {d.employee.manager && <span>Reports to <b style={{ color: C.ink }}>{d.employee.manager}</b></span>}
           </div>
 
           <div className="flex gap-1 flex-wrap mb-3 no-print">
@@ -203,6 +212,38 @@ function ManagerTab({ d }: { d: PersonData }) {
 }
 
 /* ── 3 · exactly what the employee will later see, and nothing more ── */
+/** Gross salary, 2020 → 2027 (Dr Raghu, 29 Aug 2026) — a small honest line:
+ *  points only where a year's gross is actually known (today's sheet, each
+ *  appraisal cycle as it lands); the empty years say so with their absence. */
+function GrossGraph({ years }: { years: { year: number; gross: number | null; note: string }[] }) {
+  const W = 460, Hh = 130, PAD = 34;
+  const known = years.filter((y) => y.gross != null);
+  const max = Math.max(...known.map((y) => y.gross || 0), 1);
+  const x = (yr: number) => PAD + ((yr - 2020) * (W - PAD * 2)) / 7;
+  const yy = (v: number) => Hh - 26 - (v / max) * (Hh - 52);
+  return (
+    <div className="bg-white rounded-lg border p-3 mb-2" style={{ borderColor: C.line }}>
+      <div className="font-bold mb-1" style={{ fontSize: 13 }}>Gross Salary — the climb</div>
+      <svg viewBox={`0 0 ${W} ${Hh}`} style={{ width: "100%", maxWidth: 520 }}>
+        <line x1={PAD} y1={Hh - 26} x2={W - PAD} y2={Hh - 26} stroke={C.line} />
+        {years.map((y) => (
+          <text key={y.year} x={x(y.year)} y={Hh - 10} textAnchor="middle" fontSize={9.5} fill={y.gross != null ? C.ink : C.faint}>{String(y.year).slice(2)}</text>
+        ))}
+        {known.length > 1 && (
+          <path d={known.map((y, i) => `${i ? "L" : "M"}${x(y.year)},${yy(y.gross!)}`).join(" ")} fill="none" stroke="#0D7A3F" strokeWidth={2.2} />
+        )}
+        {known.map((y) => (
+          <g key={y.year}>
+            <circle cx={x(y.year)} cy={yy(y.gross!)} r={3.2} fill="#0D7A3F" />
+            <text x={x(y.year)} y={yy(y.gross!) - 7} textAnchor="middle" fontSize={9.5} fontWeight={700} fill="#0D7A3F">₹{Math.round((y.gross || 0) / 1000)}k</text>
+          </g>
+        ))}
+        {known.length <= 1 && <text x={W / 2} y={40} textAnchor="middle" fontSize={10} fill={C.faint}>history fills as each appraisal cycle lands — earlier years join when the old sheets are given</text>}
+      </svg>
+    </div>
+  );
+}
+
 function FinalisedTab({ d }: { d: PersonData }) {
   if (!d.idp) return <None what="No IDP" />;
   const analysis = d.reviews.find((r) => r.analysis)?.analysis;
@@ -212,6 +253,16 @@ function FinalisedTab({ d }: { d: PersonData }) {
         This is the document {d.employee.name.split(" ")[0]} will see — their own words, their role, and the growth
         note. No ratings of either side, no salaries. What is on this tab is safe to put in front of them.
       </div>
+      {d.role && (d.role.job_description || d.role.deliverable || d.role.metric) && (
+        <div className="bg-white rounded-lg border p-4 mb-2" style={{ borderColor: C.line, borderLeft: "4px solid #7C3AED" }}>
+          <div className="font-bold mb-1" style={{ fontSize: 14 }}>The Role — from the roles register</div>
+          <div className="text-sm font-semibold" style={{ color: "#4A3B7A" }}>{d.role.role}{d.role.grade ? ` · ${d.role.grade}` : ""}{d.role.reports_to ? ` · reports to ${d.role.reports_to}` : ""}</div>
+          {d.role.job_description && (<div className="mt-2"><div className="text-xs font-bold" style={{ color: C.dim }}>ROLE</div><div className="text-sm" style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}>{d.role.job_description}</div></div>)}
+          {d.role.deliverable && (<div className="mt-2"><div className="text-xs font-bold" style={{ color: C.dim }}>KRA — WHAT THE ROLE DELIVERS</div><div className="text-sm" style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}>{d.role.deliverable}</div></div>)}
+          {d.role.metric && (<div className="mt-2"><div className="text-xs font-bold" style={{ color: C.dim }}>KPIs — HOW IT IS MEASURED</div><div className="text-sm" style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}>{d.role.metric}</div></div>)}
+        </div>
+      )}
+      {(d.salaryYears || []).some((y) => y.gross != null) && <GrossGraph years={d.salaryYears!} />}
       <div className="bg-white rounded-lg border p-4" style={{ borderColor: C.line }}>
         <div className="font-bold" style={{ fontSize: 17 }}>Individual Development Plan — {d.employee.name}</div>
         <div style={{ fontSize: 12, color: C.faint }}>{d.idp.role_at_time || "—"} · cycle 2026-27</div>

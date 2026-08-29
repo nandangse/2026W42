@@ -225,7 +225,7 @@ export async function GET(req: Request) {
     if (person) {
       const T = await hrmsTables(admin);
       const { data: emp } = await admin
-        .from(T.employees).select("id, name, department, designation, extra").eq("id", person).maybeSingle();
+        .from(T.employees).select("id, name, department, designation, dob, doj, extra").eq("id", person).maybeSingle();
       if (!emp) return NextResponse.json({ error: "No such employee" }, { status: 404 });
       const { data: eds } = await admin
         .from(T.edits).select("field, value").eq("employee_id", person);
@@ -275,8 +275,51 @@ export async function GET(req: Request) {
         appraisal = ap ?? null;
       } catch { /* pre-0061 */ }
 
+      // the person's frame (Dr Raghu, 29 Aug 2026): age, years in the
+      // company, who they report to — and their ROLE from the register,
+      // KRA (deliverable) and KPIs (metric) beside the finalised IDP.
+      const extra = (emp.extra || {}) as Record<string, string>;
+      const todayI = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+      const yearsBetween = (from: string | null) => {
+        if (!from || !/^\d{4}/.test(String(from))) return null;
+        const y = (new Date(todayI).getTime() - new Date(String(from)).getTime()) / (365.25 * 86400000);
+        return Math.round(y * 10) / 10;
+      };
+      const meta = {
+        age: extra["Age"] ? Math.round(Number(String(extra["Age"]).replace(/[^0-9.]/g, "")) * 10) / 10 : yearsBetween(emp.dob as string | null),
+        years: yearsBetween(emp.doj as string | null),
+        doj: emp.doj ?? null,
+        manager: extra["Reporting Manager"] || null,
+      };
+      let role: Record<string, unknown> | null = null;
+      const roleName = String((idp && (idp as Record<string, unknown>).role_at_time) || emp.designation || "").split(" · ")[0].trim();
+      if (roleName) {
+        const { data: rr } = await admin.from("hrms_role")
+          .select("role, department, grade, reports_to, job_description, deliverable, metric, summary")
+          .ilike("role", roleName).maybeSingle();
+        role = rr ?? null;
+      }
+      // the gross by year, 2020→2027 (his frame): today's gross stands on the
+      // current year, each appraisal cycle adds its decided gross, and the
+      // years the sheets never covered stand honestly empty.
+      const salaryYears: { year: number; gross: number | null; note: string }[] = [];
+      const grossNow = salary?.gross ?? null;
+      let cycles: { cycle: string; new_gross: number | null; prev_gross: number | null }[] = [];
+      try {
+        const { data: aps } = await admin.from("hrms_appraisal")
+          .select("cycle, new_gross, prev_gross").eq("employee_id", person);
+        cycles = (aps || []) as typeof cycles;
+      } catch { /* pre-0061 */ }
+      for (let y = 2020; y <= 2027; y++) {
+        const cy = cycles.find((c) => String(c.cycle).startsWith(String(y)));
+        if (cy?.new_gross) salaryYears.push({ year: y, gross: Number(cy.new_gross), note: `appraisal ${cy.cycle}` });
+        else if (y === 2026 && grossNow) salaryYears.push({ year: y, gross: grossNow, note: "current sheet" });
+        else salaryYears.push({ year: y, gross: null, note: "" });
+      }
+
       return NextResponse.json({
-        employee: { id: emp.id, name: emp.name, department: emp.department, designation: emp.designation, type },
+        employee: { id: emp.id, name: emp.name, department: emp.department, designation: emp.designation, type, ...meta },
+        role, salaryYears,
         salary, idp: idpFull, reviews, appraisal,
       });
     }
