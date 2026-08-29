@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
  *   GET ?records=NAME&entity= — record ids carrying that EXACT name (all owners)
  *   POST { action: "add" | "remove", ... }
  */
-const ENTITIES = new Set(["company", "person", "opportunity"]);
+const ENTITIES = new Set(["company", "person", "opportunity", "quotation", "sales_order", "lead"]);
 const MANAGE = new Set(["admin", "ceo", "sales_head"]);
 
 export async function GET(req: Request) {

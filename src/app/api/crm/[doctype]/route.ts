@@ -346,7 +346,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
     // name opens every record carrying it, whoever owns the tag.
     let tagIds: string[] | null = null;
     const tagQ = u.searchParams.get("tag")?.trim();
-    if (tagQ && ["company", "person", "opportunity"].includes(d.name)) {
+    if (tagQ && ["company", "person", "opportunity", "quotation", "sales_order", "lead"].includes(d.name)) {
       const { data: tags } = await db.from("crm_tag").select("id").ilike("name", tagQ);
       const ids: string[] = [];
       if (tags?.length) {

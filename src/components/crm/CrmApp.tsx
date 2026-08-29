@@ -584,7 +584,7 @@ export default function CrmApp({
               className="px-2 py-1.5 rounded text-sm border"
               style={{ borderColor: BORDER, minWidth: 210 }}
             />
-            {["company", "person", "opportunity"].includes(dt.name) && (
+            {TAGGABLE.includes(dt.name) && (
               <TagFilterBox value={tagQ} onSet={setTagQ} />
             )}
             {dateView && <DateViewBar dt={dt} value={dateView} onChange={applyDateView} />}
@@ -760,6 +760,7 @@ export default function CrmApp({
           {bulkOpen && (() => {
             const editable = dt.fields.filter((f) => !f.virtual && f.type !== "readonly" && f.name !== dt.autoNumber?.field);
             const bf = editable.find((f) => f.name === bulkField);
+            const isTagAdd = bulkField === "__tag";
             // A move to Lost or Not Target refuses without a reason — the
             // database's rule, so the box asks for it up front.
             const stageLabel = bf?.name === "stage_id" ? (links["stage"] ?? []).find((o) => o.id === bulkValue)?.label ?? null : null;
@@ -769,7 +770,12 @@ export default function CrmApp({
               let done = 0, failed = 0, why = "";
               for (const rid of sel) {
                 try {
-                  const r = await fetch(`/api/crm/${slug}?id=${encodeURIComponent(rid)}`, {
+                  const r = isTagAdd
+                    ? await fetch("/api/crm/tags", {
+                        method: "POST", headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ action: "add", entity: dt.name, id: rid, name: bulkValue }),
+                      })
+                    : await fetch(`/api/crm/${slug}?id=${encodeURIComponent(rid)}`, {
                     method: "PATCH", headers: { "content-type": "application/json" },
                     body: JSON.stringify({
                       [bulkField]: bf?.type === "bool" ? bulkValue === "true" : bulkValue,
@@ -799,9 +805,17 @@ export default function CrmApp({
                       <select value={bulkField} onChange={(e) => { setBulkField(e.target.value); setBulkValue(""); }}
                         className="w-full mt-1 px-2 py-1.5 rounded text-sm border font-normal" style={{ borderColor: BORDER, background: "#fff" }}>
                         <option value="">— choose —</option>
+                        {TAGGABLE.includes(dt.name) && <option value="__tag">🏷 Add a tag (yours)</option>}
                         {editable.map((f) => <option key={f.name} value={f.name}>{f.label}</option>)}
                       </select>
                     </label>
+                    {isTagAdd && (
+                      <label className="text-xs font-bold" style={{ color: MUTED }}>
+                        THE TAG — added to every selected record (a new name becomes yours)
+                        <input value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} list="tagfilter-names"
+                          className="w-full mt-1 px-2 py-1.5 rounded text-sm border font-normal" style={{ borderColor: BORDER }} placeholder="type or pick…" />
+                      </label>
+                    )}
                     {bf && (
                       <label className="text-xs font-bold" style={{ color: MUTED }}>
                         NEW VALUE — set on every selected record
@@ -978,7 +992,7 @@ export default function CrmApp({
                             ...(ci < pin ? stickyCell(ci, 5) : null),
                           }}
                         >
-                          <Cell field={f} value={r[f.name]} links={links} onOpenLink={openLinked} />
+                          <Cell field={f} value={r[f.name]} links={links} onOpenLink={openLinked} short />
                         </td>
                       ))}
                       {(() => {
@@ -1265,17 +1279,23 @@ function stickyCell(ci: number, z: number): React.CSSProperties {
 
 /** Render one value the way its field type deserves. */
 function Cell({
-  field, value, links, onOpenLink,
+  field, value, links, onOpenLink, short,
 }: {
   field: Field; value: unknown; links: Links;
   onOpenLink?: (target: string, id: string) => void;
+  /** list views show just the number; the record inside shows the full
+   *  string (Dr Raghu, 28 Aug 2026: "In the view only show number.
+   *  Inside show full!"). */
+  short?: boolean;
 }) {
   if (value === null || value === undefined || value === "")
     return <span style={{ color: "#C7CCD2" }}>—</span>;
 
-  // ENQ-202425-39514 reads as 39514 in a report; the whole id is the tooltip.
-  if (field.name === "opportunity_no")
-    return <span className="tnum" title={String(value)}>{String(value).split("-").pop()}</span>;
+  // NGSE/QTN/26-27/39514 reads as 39514 in a list; the whole id is the tooltip.
+  if (short && ["opportunity_no", "quote_no", "so_no"].includes(field.name)) {
+    const m = String(value).match(/(\d+)\s*$/);
+    return <span className="tnum" title={String(value)}>{m ? m[1] : String(value)}</span>;
+  }
 
   if (field.type === "readonly") {
     if (field.format === "money")
@@ -1675,7 +1695,7 @@ function RecordModal({
           </div>
         )}
         </div>
-        {["company", "person", "opportunity"].includes(dt.name) && mode === "view" && (
+        {TAGGABLE.includes(dt.name) && mode === "view" && (
           <TagStrip entity={dt.name} id={rid} />
         )}
       </div>
@@ -1787,7 +1807,7 @@ function RelatedTab({
                     padding: "8px 14px", fontSize: 13, borderBottom: "1px solid #F0F1F6", verticalAlign: "top",
                     maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
-                  <Cell field={f} value={r[f.name]} links={links} onOpenLink={onOpenLink} />
+                  <Cell field={f} value={r[f.name]} links={links} onOpenLink={onOpenLink} short />
                   {f.type !== "date" && isEmailish(r[f.name]) && (
                     <ContactActions email={r[f.name] as string} compact
                       onCompose={onCompose ? () => onCompose(r[f.name] as string) : undefined} />
@@ -2510,6 +2530,9 @@ function GenieTab({ type, id }: { type: string; id: string }) {
  */
 interface DateView { field: string; preset: string; from: string; to: string }
 
+/** Where tags live (28 Aug 2026: "this will have the tags" — a quotation). */
+const TAGGABLE = ["company", "person", "opportunity", "quotation", "sales_order", "lead"];
+
 const DATE_PRESETS: [string, string][] = [
   ["all", "All time"],
   ["last7", "Last 7 Days"], ["last15", "Last 15 Days"], ["last30", "Last 30 Days"],
@@ -2631,12 +2654,12 @@ function TagStrip({ entity, id }: { entity: string; id: string }) {
     </div>
   );
   return (
-    <div className="px-4 py-2 flex items-center gap-1.5 flex-wrap border-t" style={{ borderColor: BORDER, background: "#FAF9F5" }}>
-      <span className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.6 }}>TAGS</span>
+    <div className="px-4 py-2 flex items-center gap-1.5 flex-wrap border-t" style={{ borderColor: BORDER, background: "#FAF9F5", justifyContent: "flex-end" }}>
+      <span className="text-xs font-bold mr-auto" style={{ color: MUTED, letterSpacing: 0.6 }}>TAGS</span>
       {tags.map((t) => (
         <span key={t.link_id} className="rounded-full border px-2 py-0.5 text-xs font-semibold flex items-center gap-1"
           style={{ borderColor: "#C9D6E4", background: "#EEF1FA", color: "#1B2D6B" }}>
-          {t.name}{t.owner ? <i style={{ color: MUTED, fontStyle: "normal", fontWeight: 400 }}> · {t.owner.split(" ")[0]}</i> : null}
+          {t.name}{t.owner ? <i style={{ color: MUTED, fontStyle: "normal", fontWeight: 400 }} title={t.owner}> · {t.owner.split(/\s+/).map((w) => w[0]).join("").toUpperCase()}</i> : null}
           <button onClick={async () => {
             await fetch("/api/crm/tags", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "remove", entity, id, link_id: t.link_id }) });
             load();

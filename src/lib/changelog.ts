@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.14",
+    date: "2026-08-28",
+    module: "CRM — tags everywhere and en masse; the number wears its year",
+    items: [
+      "TAGS WIDEN to quotations, sales orders and leads (CRM migration 0026) and the strip sits BOTTOM-RIGHT of the record — addable in view, NO EDIT NEEDED, and the 🏷 filter stands on all six lists. Manager chips show the owner's INITIALS, the full name on hover.",
+      "TAGS EN MASSE: the bulk-edit box gains '🏷 Add a tag' — select any number of rows, name the tag once, it lands on all of them (a new name becomes yours, the privacy rules unchanged).",
+      "THE NUMBER WEARS ITS YEAR AGAIN (CRM migration 0027): new quotations issue as NGSE/QTN/26-27/34601 — the year in the string, the counter one unbroken stream that never resets. LISTS SHOW JUST THE NUMBER (full string on hover), the record inside shows the full — for quotation, sales order and enquiry numbers alike.",
+    ],
+  },
+  {
     v: "3.31.0.13",
     date: "2026-08-28",
     module: "CRM — the date views: YTD by default, your last view remembered",
