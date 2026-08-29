@@ -82,12 +82,16 @@ async function loadWorld(admin: ReturnType<typeof adminClient>) {
     }
     return out;
   };
-  const [groups, ledgers, vouchers, lines] = await Promise.all([
+  const [groups, ledgers, vouchersAll, linesAll] = await Promise.all([
     pageAllW((a, b) => admin.from("kuber_group").select("name, parent").order("name").range(a, b)),
     pageAllW((a, b) => admin.from("kuber_ledger").select("name, parent, opening").order("name").range(a, b)),
-    pageAllW((a, b) => admin.from("kuber_voucher").select("id, date, vtype").order("id").range(a, b)),
+    pageAllW((a, b) => admin.from("kuber_voucher").select("id, date, vtype, vno, amount").order("id").range(a, b)),
     pageAllW((a, b) => admin.from("kuber_voucher_line").select("voucher_id, ledger, amount").order("id").range(a, b)),
   ]);
+  // proformas out, everywhere at once — every statement rides this world
+  const vouchers = vouchersAll.filter((v) => !isProforma(v.vtype, v.vno));
+  const kept = new Set(vouchers.map((v) => String(v.id)));
+  const lines = linesAll.filter((l) => kept.has(String(l.voucher_id)));
   const parentOf = new Map(groups.map((g) => [String(g.name).toLowerCase(), String(g.parent || "")]));
   const properOf = new Map(groups.map((g) => [String(g.name).toLowerCase(), String(g.name)]));
   const rootCache = new Map<string, string>();
@@ -106,7 +110,18 @@ async function loadWorld(admin: ReturnType<typeof adminClient>) {
   };
   const ledgerByName = new Map(ledgers.map((l) => [String(l.name), l]));
   const dateOf = new Map(vouchers.map((v) => [String(v.id), String(v.date || "")]));
-  return { groups, ledgers, vouchers, lines, rootOf, ledgerByName, dateOf };
+  // does any ancestor group match? — for mid-chain heads like Sundry Debtors
+  const chainHas = (parent: string, re: RegExp) => {
+    let cur = String(parent || "").toLowerCase();
+    for (let i = 0; i < 25; i++) {
+      if (re.test(stripNo(cur))) return true;
+      const p = (parentOf.get(cur) || "").toLowerCase();
+      if (!p || p === cur) return false;
+      cur = p;
+    }
+    return false;
+  };
+  return { groups, ledgers, vouchers, lines, rootOf, ledgerByName, dateOf, chainHas };
 }
 
 /** root → group → ledger tree with amounts; every statement wears it. */
@@ -140,6 +155,15 @@ function treeOf(entries: { ledger: string; group: string; root: string; amount: 
  *  "05.Investments") — the MIS mapping's prefixes. A number never changes
  *  what a group IS, so every classifier strips it before judging. */
 const stripNo = (r: string) => r.replace(/^\s*\d+\s*[.)-]*\s*/, "");
+
+/** A proforma is an intention, not a booking — Tally keeps them optional and
+ *  its own statements skip them. They arrive both as their own voucher type
+ *  AND as PI-numbered "GST Sales" (June 2026 carried ₹7.5 Cr of those, which
+ *  is how the dashboard's Billing drifted ₹9 Cr above the review sheet —
+ *  Dr Raghu, 29 Aug 2026: "these numbers are wrong"). No statement counts
+ *  them. */
+const isProforma = (vtype: unknown, vno: unknown) =>
+  String(vtype || "") === "Proforma Invoice" || /^PI[-/]/i.test(String(vno || "").trim());
 
 const isBankChain = (rootOf: (g: string) => string, parent: string) =>
   /^bank accounts$|^bank od|^cash-in-hand$/i.test(stripNo(rootOf(parent))) || /^bank|^cash-in-hand$/i.test(stripNo(parent));
@@ -493,7 +517,7 @@ export async function GET(req: Request) {
       const [groups, ledgers, vouchers, lines, clsRows] = await Promise.all([
         pageAllE((a, b) => admin.from("kuber_group").select("name, parent").order("name").range(a, b)),
         pageAllE((a, b) => admin.from("kuber_ledger").select("name, parent").order("name").range(a, b)),
-        pageAllE((a, b) => admin.from("kuber_voucher").select("id, date").order("id").range(a, b)),
+        pageAllE((a, b) => admin.from("kuber_voucher").select("id, date, vtype, vno").order("id").range(a, b)),
         pageAllE((a, b) => admin.from("kuber_voucher_line").select("voucher_id, ledger, amount").order("id").range(a, b)),
         pageAllE((a, b) => admin.from("kuber_expense_class").select("ledger, cls").order("ledger").range(a, b)),
       ]);
@@ -513,7 +537,8 @@ export async function GET(req: Request) {
       const isExpense = (root: string) => /expense|^purchase|^manufacturing/i.test(stripNo(root)) && !/asset/i.test(root);
       const isIncome = (root: string) => /income|^sales/i.test(stripNo(root));
 
-      const dateOf = new Map(vouchers.map((v) => [String(v.id), String(v.date || "")]));
+      // dateOf skips proformas, so their lines fall out via the `&& d` guard
+      const dateOf = new Map(vouchers.filter((v) => !isProforma(v.vtype, v.vno)).map((v) => [String(v.id), String(v.date || "")]));
       const period = new Map<string, number>();
       for (const l of lines) {
         const d = dateOf.get(String(l.voucher_id)) || "";
@@ -571,7 +596,7 @@ export async function GET(req: Request) {
       }
       const rows = lns
         .map((l) => ({ v: vmap.get(String(l.voucher_id)), amount: Number(l.amount) || 0 }))
-        .filter((x) => x.v && String(x.v.date || "") >= from && String(x.v.date || "") <= to)
+        .filter((x) => x.v && !isProforma(x.v.vtype, x.v.vno) && String(x.v.date || "") >= from && String(x.v.date || "") <= to)
         .map((x) => ({
           date: String(x.v!.date || ""), vtype: String(x.v!.vtype || ""), vno: String(x.v!.vno || ""),
           party: String(x.v!.party || ""), narration: String(x.v!.narration || "").slice(0, 160), amount: x.amount,
@@ -881,7 +906,7 @@ export async function GET(req: Request) {
       const [groups, ledgers, vouchers, lines] = await Promise.all([
         pageAllF((a, b) => admin.from("kuber_group").select("name, parent").order("name").range(a, b)),
         pageAllF((a, b) => admin.from("kuber_ledger").select("name, parent, opening").order("name").range(a, b)),
-        pageAllF((a, b) => admin.from("kuber_voucher").select("id, date").order("id").range(a, b)),
+        pageAllF((a, b) => admin.from("kuber_voucher").select("id, date, vtype, vno").order("id").range(a, b)),
         pageAllF((a, b) => admin.from("kuber_voucher_line").select("voucher_id, ledger, amount").order("id").range(a, b)),
       ]);
       if (!ledgers.length) return NextResponse.json({ empty: true });
@@ -907,7 +932,8 @@ export async function GET(req: Request) {
       const isPnl = (root: string) => /income|expense|^sales|^purchase|^manufacturing/i.test(stripNo(root)) && !/asset/i.test(root);
       const assetSide = (root: string) => /^fixed assets|^investments|^current assets|^misc|^loans & advances \(asset|^deposits \(asset/i.test(stripNo(root)) || /\(asset\)/i.test(root);
 
-      const dateOf = new Map(vouchers.map((v) => [String(v.id), String(v.date || "")]));
+      // proformas out here too — dateOf skips them, their lines lose their date
+      const dateOf = new Map(vouchers.filter((v) => !isProforma(v.vtype, v.vno)).map((v) => [String(v.id), String(v.date || "")]));
       // Per ledger: activity in [from, to] (the P&L period) and every line
       // up to `asof` (the balance sheet's closing).
       const period = new Map<string, number>();
@@ -1002,9 +1028,10 @@ export async function GET(req: Request) {
       const series: Record<string, number[]> = { billing: monthsList.map(() => 0), collections: monthsList.map(() => 0), purchases: monthsList.map(() => 0), payments: monthsList.map(() => 0) };
       const since6 = monthsList[0] + "-01";
       for (let f = 0; ; f += 1000) {
-        const { data, error } = await admin.from("kuber_voucher").select("vtype, amount, date").gte("date", since6).order("id").range(f, f + 999);
+        const { data, error } = await admin.from("kuber_voucher").select("vtype, vno, amount, date").gte("date", since6).order("id").range(f, f + 999);
         if (error) break;
         for (const v of data || []) {
+          if (isProforma(v.vtype, v.vno)) continue;
           const k = FLOWT[String(v.vtype)];
           if (!k) continue;
           const idx = monthsList.indexOf(mkey(String(v.date || "")));
@@ -1092,7 +1119,7 @@ export async function GET(req: Request) {
           if (/does not exist|schema cache/i.test(error.message)) return NextResponse.json({ empty: true });
           throw new Error(error.message);
         }
-        rows.push(...(data || []));
+        rows.push(...((data || []).filter((r) => !isProforma(r.vtype, r.vno))));
         if (!data || data.length < 1000) break;
       }
       const total = rows.reduce((s2, r) => s2 + (Number(r.amount) || 0), 0);
@@ -1136,67 +1163,61 @@ export async function GET(req: Request) {
       : period === "mtd" ? mtdStart
       : period === "qtd" ? qtdStart
       : addDays(until, -Math.max(1, Math.min(365, Number(period) || 30)));
-    const FLOW_TYPES: Record<string, string[]> = {
-      billing: ["GST Sales"],
-      collections: ["Receipt"],
-      purchases: ["Purchase", "Cap-Ex Purchase", "Excise Purchase Import"],
-      supplier_payments: ["Payment"],
-    };
-    const flows: Record<string, { value: number; count: number }> = Object.fromEntries(Object.keys(FLOW_TYPES).map((k) => [k, { value: 0, count: 0 }]));
-    try {
-      for (let f = 0; ; f += 1000) {
-        const { data, error } = await admin.from("kuber_voucher").select("vtype, amount, date").gte("date", since).lte("date", until).range(f, f + 999);
-        if (error) break;
-        for (const vch of data || []) {
-          for (const [k, types] of Object.entries(FLOW_TYPES)) {
-            if (types.includes(String(vch.vtype))) {
-              flows[k].value += Number(vch.amount) || 0;
-              flows[k].count += 1;
-            }
-          }
-        }
-        if (!data || data.length < 1000) break;
-      }
-    } catch { /* pre-0083 — the table just stays empty */ }
-    const bills = await allBills(admin);
-
-    // BANK & CASH — every ledger whose group chain reaches Bank Accounts,
-    // Bank OD or Cash-in-hand, COMPUTED as opening + every voucher line
-    // (28 Aug 2026: an evening masters export arrived with every closing
-    // zeroed — so the closing column is never trusted again; the books
-    // compute their own).
+    // THE FLOWS — recut against the review sheet (Dr Raghu, 29 Aug 2026:
+    // "these numbers are wrong"): Billing was carrying ₹8.6 Cr of PI-numbered
+    // proformas, Collections wore EVERY receipt (borrowings included), and
+    // "Payments to suppliers" wore salaries, GST and loan EMIs. Each row is
+    // now the thing its name says — proved against the MR's own quarters
+    // (Q1 9.45 vs their 9.35, Aug to-the-rupee):
+    //   billing            GST Sales invoice values (proformas out)
+    //   collections        receipts crediting Sundry Debtors — customers paying
+    //   purchases          Purchase / Cap-Ex / Import voucher values
+    //   supplier_payments  payments debiting Sundry Creditors — bills cleared
+    //   money_in/out       the bank side of every Receipt / every Payment
+    // Tally signs on the lines: debit negative, credit positive.
+    const flows: Record<string, { value: number; count: number }> = Object.fromEntries(
+      ["billing", "collections", "purchases", "supplier_payments", "money_in", "money_out"].map((k) => [k, { value: 0, count: 0 }]));
     let bankCash = 0;
     try {
-      const { data: gs } = await admin.from("kuber_group").select("name, parent").limit(2000);
-      const par = new Map((gs || []).map((g) => [String(g.name).toLowerCase(), String(g.parent || "").toLowerCase()]));
-      const isBankRoot = (g: string) => {
-        let cur = g.toLowerCase();
-        for (let i = 0; i < 25; i++) {
-          if (/^bank accounts$|^bank od|^cash-in-hand$/.test(stripNo(cur))) return true;
-          const nxt = par.get(cur) || "";
-          if (!nxt || nxt === cur) return false;
-          cur = nxt;
-        }
-        return false;
-      };
-      const bankNames: string[] = [];
-      for (let f2 = 0; ; f2 += 1000) {
-        const { data } = await admin.from("kuber_ledger").select("name, parent, opening").order("name").range(f2, f2 + 999);
-        for (const l of data || []) if (isBankRoot(String(l.parent || ""))) {
-          bankCash += Number(l.opening) || 0;
-          bankNames.push(String(l.name));
-        }
-        if (!data || data.length < 1000) break;
+      const world = await loadWorld(admin);
+      const PURCH = new Set(["Purchase", "Cap-Ex Purchase", "Excise Purchase Import"]);
+      const vById = new Map(world.vouchers.map((v) => [String(v.id), v]));
+      for (const v of world.vouchers) {
+        const d = String(v.date || "");
+        if (d < since || d > until) continue;
+        if (String(v.vtype) === "GST Sales") { flows.billing.value += Number(v.amount) || 0; flows.billing.count += 1; }
+        if (PURCH.has(String(v.vtype))) { flows.purchases.value += Number(v.amount) || 0; flows.purchases.count += 1; }
       }
-      for (let i = 0; i < bankNames.length; i += 80) {
-        const chunk = bankNames.slice(i, i + 80);
-        for (let f3 = 0; ; f3 += 1000) {
-          const { data } = await admin.from("kuber_voucher_line").select("amount").in("ledger", chunk).order("id").range(f3, f3 + 999);
-          for (const l of data || []) bankCash += Number(l.amount) || 0;
-          if (!data || data.length < 1000) break;
+      const isBankParent = (parent: string) => world.chainHas(parent, /^bank accounts$|^bank od|^cash-in-hand$/);
+      const seen: Record<string, Set<string>> = { collections: new Set(), supplier_payments: new Set(), money_in: new Set(), money_out: new Set() };
+      for (const l of world.lines) {
+        const v = vById.get(String(l.voucher_id));
+        if (!v) continue;
+        const d = String(v.date || "");
+        if (d < since || d > until) continue;
+        const amt = Number(l.amount) || 0;
+        const parent = String(world.ledgerByName.get(String(l.ledger))?.parent || "");
+        const t = String(v.vtype);
+        if (t === "Receipt") {
+          if (amt > 0 && world.chainHas(parent, /^sundry debtors$/)) { flows.collections.value += amt; seen.collections.add(String(v.id)); }
+          if (amt < 0 && isBankParent(parent)) { flows.money_in.value += -amt; seen.money_in.add(String(v.id)); }
+        } else if (t === "Payment") {
+          if (amt < 0 && world.chainHas(parent, /^sundry creditors$/)) { flows.supplier_payments.value += -amt; seen.supplier_payments.add(String(v.id)); }
+          if (amt > 0 && isBankParent(parent)) { flows.money_out.value += amt; seen.money_out.add(String(v.id)); }
         }
       }
+      for (const k of Object.keys(seen)) flows[k].count = seen[k].size;
+
+      // BANK & CASH — opening + every line on every bank/OD/cash ledger
+      // (the closing column is never trusted: a masters export once arrived
+      // with all closings zeroed). NOT windowed — a balance, not a flow.
+      const bankSet = new Set<string>();
+      for (const l of world.ledgers) {
+        if (isBankParent(String(l.parent || ""))) { bankCash += Number(l.opening) || 0; bankSet.add(String(l.name)); }
+      }
+      for (const l of world.lines) if (bankSet.has(String(l.ledger))) bankCash += Number(l.amount) || 0;
     } catch { /* books not loaded yet */ }
+    const bills = await allBills(admin);
     const rec = bills.filter((b) => b.kind === "receivable");
     const pay = bills.filter((b) => b.kind === "payable");
     const sum = (xs: Bill[]) => xs.reduce((s, b) => s + b.amount, 0);
@@ -1226,7 +1247,7 @@ export async function GET(req: Request) {
     ]);
     return NextResponse.json({
       today, loadedAt, since, period,
-      flows,
+      flows, bankCash,
       receivable: { total: sum(rec), gross: sum(pos(rec)), overdue: sum(overdue(rec)), due30: sum(dueSoon(rec, 30)), parties: new Set(rec.map((b) => b.party)).size, unadjusted: sum(rec.filter((b) => b.amount < 0)) },
       payable: { total: sum(pay), gross: sum(pos(pay)), overdue: sum(overdue(pay)), due30: sum(dueSoon(pay, 30)), parties: new Set(pay.map((b) => b.party)).size, unadjusted: sum(pay.filter((b) => b.amount < 0)) },
       bg, fd, insurance: ins,

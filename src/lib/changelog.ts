@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.34",
+    date: "2026-08-29",
+    module: "Kuber — the dashboard tells the truth",
+    items: [
+      "PROFORMAS ARE OUT OF EVERY STATEMENT (Dr Raghu, 29 Aug 2026: \"these numbers are wrong\"): ₹8.6 Cr of PI-numbered proforma invoices were riding inside the GST Sales voucher type — June alone carried ₹7.5 Cr of them — inflating Billing, the P&L's Sales, the MIS and the sales register. A proforma is an intention, not a booking: the books now skip them everywhere, and the quarters land beside the Management Review's own (Q1 9.45 vs 9.35, August to the rupee).",
+      "THE FLOWS RECUT to mean what they say: COLLECTIONS counts only receipts landing on customer accounts (₹28.0 Cr, not every receipt's ₹33.1); PAYMENTS TO SUPPLIERS counts only payments clearing supplier bills (₹19.8 Cr — salaries, GST and EMIs no longer masquerade); and two honest new rows, MONEY IN and MONEY OUT, carry the bank side of every receipt and payment — the Actual Cash Flow lines of the review sheet.",
+      "BANK & CASH LIVES: the dashboard computed it all along and then forgot to send it — the response now carries it (₹2.26 Cr, opening plus every line on every bank, OD and cash ledger).",
+    ],
+  },
+  {
     v: "3.31.0.33",
     date: "2026-08-29",
     module: "Appraisal — the % lever, the fixed conveyance, the new designation",

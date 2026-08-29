@@ -65,10 +65,12 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
   const stale = !s.loadedAt;
   const days = Math.max(1, Math.round((new Date(s.today).getTime() - new Date(s.since).getTime()) / 86400000));
   const FLOW_ROWS: [string, string, string][] = [
-    ["billing", "Billing", "GST Sales vouchers"],
-    ["collections", "Collections", "Receipt vouchers"],
-    ["purchases", "Purchases", "Purchase · Cap-Ex · Import"],
-    ["supplier_payments", "Payments to suppliers", "Payment vouchers"],
+    ["billing", "Billing", "GST Sales invoices — proformas excluded"],
+    ["collections", "Collections", "receipts landing on customer accounts"],
+    ["purchases", "Purchases", "Purchase · Cap-Ex · Import vouchers"],
+    ["supplier_payments", "Payments to suppliers", "payments clearing supplier bills"],
+    ["money_in", "Money in — everything", "the bank side of every Receipt"],
+    ["money_out", "Money out — everything", "the bank side of every Payment"],
   ];
   return (
     <div style={{ maxWidth: 1100 }}>
@@ -139,7 +141,7 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
               const f = s.flows?.[k] ?? { value: 0, count: 0 };
               return (
                 <tr key={k} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
-                  <td className="px-2 py-1.5 font-bold" style={{ color: k === "collections" ? GREEN : k === "supplier_payments" ? RED : INK }}>{label}</td>
+                  <td className="px-2 py-1.5 font-bold" style={{ color: k === "collections" || k === "money_in" ? GREEN : k === "supplier_payments" || k === "money_out" ? RED : INK }}>{label}</td>
                   <td className="px-2 py-1.5 text-right tnum font-bold">{f.value ? fmtMoney(f.value) : "·"}</td>
                   <td className="px-2 py-1.5 text-right tnum">{f.count || "·"}</td>
                   <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{f.value ? fmtMoney(f.value / days) : "·"}</td>
