@@ -88,9 +88,9 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
 
       {/* money owed and owing — gross first, advances named as what they are */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
-        <Card label="RECEIVABLES — DUE TO COME" value={fmtMoney(s.receivable.gross)} sub={`${s.receivable.parties} customers · gross bills`} color="#1B3A5C" />
-        <Card label="ADVANCES RECEIVED" value={fmtMoney(-s.receivable.unadjusted)} sub="a liability — work owed against money held" color="#1B6B93" />
-        <Card label="NET RECEIVABLE" value={fmtMoney(s.receivable.total)} sub="bills less advances" />
+        <Card label="RECEIVABLES — DUE TO COME" value={fmtMoney(s.receivable.gross)} sub={`${s.receivable.parties} customers · real invoices only — proformas are not considered`} color="#1B3A5C" />
+        <Card label="MONEY HELD FROM CUSTOMERS" value={fmtMoney(-s.receivable.unadjusted)} sub="advances + receipts not yet tied to bills in Tally (Agst Ref)" color="#1B6B93" />
+        <Card label="NET RECEIVABLE" value={fmtMoney(s.receivable.total)} sub="bills less every rupee held — small while receipts sit untied" />
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
         <Card label="PAYABLES — TO PAY" value={fmtMoney(s.payable.gross)} sub={`${s.payable.parties} suppliers · gross bills`} color="#1B3A5C" />

@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.36",
+    date: "2026-08-29",
+    module: "Kuber — a proforma is not an invoice",
+    items: [
+      "PROFORMAS ARE OUT OF THE BILLS TOO (Dr Raghu, 29 Aug 2026: \"you are using proforma as the invoice — it is not, don't consider it at all\"): ₹11.6 Cr of PI-numbered 'bills' were standing inside Receivables as if invoices had been raised. Filtered at the source, so the dashboard cards, the ageing, the 13-week cash flow and the CFO note are all clean at once.",
+      "THE CARDS SAY WHAT THEY HOLD: 'Money held from customers' is named for what it mostly is — advances plus receipts that Tally data entry never tied to bills (the Agst Ref backlog the CFO Note already chases); the net receivable card says why it runs small until those receipts are tied.",
+    ],
+  },
+  {
     v: "3.31.0.35",
     date: "2026-08-29",
     module: "Appraisal — the gross holds, the designation stays",

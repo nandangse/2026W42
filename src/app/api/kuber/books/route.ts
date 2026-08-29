@@ -50,7 +50,11 @@ async function allBills(admin: ReturnType<typeof adminClient>): Promise<Bill[]> 
     out.push(...((data || []) as Bill[]));
     if (!data || data.length < 1000) break;
   }
-  return out;
+  // A PROFORMA IS NOT AN INVOICE (Dr Raghu, 29 Aug 2026: "don't consider it
+  // at all") — PI-numbered bills are intentions, filtered at the source so
+  // every screen that rides the bills is clean at once: the dashboard cards,
+  // the ageing, the 13-week cash flow, the CFO note.
+  return out.filter((b) => !/^PI[-/]/i.test(String(b.bill || "").trim()) && !/proforma/i.test(String(b.bill || "")));
 }
 
 /**
