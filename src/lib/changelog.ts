@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.28",
+    date: "2026-08-29",
+    module: "IDP — the manager's scoreboard, and roles that read clean",
+    items: [
+      "AFTER SUBMITTING, A MANAGER SEES THE SCOREBOARD (Dr Raghu, 29 Aug 2026): '👥 You are the reporting manager for these people — please give your feedback for all of them', every name with its status — PENDING after pending after pending until each turns green — a progress bar counting the feedbacks given, 🎉 when all are done, and beneath it: after your interview, the summary result will be available here. Thank you once again for your service.",
+      "ALL 134 ROLES READ CLEAN: every Job Description, Deliverable and Measurement Metric across the roles register converted to neat bullets — the A. B. C. and 1. 2. 3. prefixes stripped, the HTML-wrapped ones unwrapped properly (a first pass mangled those; the backup restored them and the second pass got it right). The registers are ready for Dr Raghu's role-by-role rewrite.",
+    ],
+  },
+  {
     v: "3.31.0.27",
     date: "2026-08-29",
     module: "IDP — Tushar's exemption",

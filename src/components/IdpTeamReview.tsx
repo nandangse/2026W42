@@ -44,13 +44,27 @@ export function TeamList({ onOpen }: { onOpen: (r: TeamRow) => void }) {
     );
   if (rows === null || noTeam || rows.length === 0) return null;
 
+  // the scoreboard (Dr Raghu, 29 Aug 2026): pending after pending after
+  // pending, until they are all green — that is the game.
+  const reviewable = rows.filter((r) => r.submitted_at);
+  const doneCount = reviewable.filter((r) => r.review?.submitted_at).length;
   return (
     <div className="mt-8">
-      <h2 className="font-bold" style={{ fontSize: 18 }}>My team&apos;s IDPs</h2>
+      <h2 className="font-bold" style={{ fontSize: 18 }}>👥 You are the reporting manager for these people</h2>
       <div style={{ fontSize: 13, color: C.faint, lineHeight: 1.6 }}>
-        Everyone cascaded below you. You read what they wrote, rate them on the same eleven dimensions, and say what
-        their pay should now be. You are never shown their self-ratings, or what they asked for.
+        Please give your feedback for all of them. You read what they wrote, rate them on the same eleven dimensions,
+        and say what their pay should now be. You are never shown their self-ratings, or what they asked for.
       </div>
+      {reviewable.length > 0 && (
+        <div className="mt-2 flex items-center gap-2">
+          <div className="rounded-full" style={{ flex: 1, maxWidth: 260, height: 8, background: "#EEECE6", overflow: "hidden" }}>
+            <div style={{ width: `${Math.round((doneCount / reviewable.length) * 100)}%`, height: "100%", background: doneCount === reviewable.length ? C.green : C.orange, transition: "width .3s" }} />
+          </div>
+          <span className="font-bold tnum" style={{ fontSize: 12, color: doneCount === reviewable.length ? C.green : "#8A5B00" }}>
+            {doneCount} of {reviewable.length} feedbacks given{doneCount === reviewable.length ? " — all done 🎉" : ""}
+          </span>
+        </div>
+      )}
       <div className="rounded-lg mt-2" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
         {rows.map((r, i) => (
           <div key={r.idpId} className="px-3 py-2 flex items-center gap-2 flex-wrap" style={{ borderTop: i ? "1px solid #EEECE6" : undefined }}>
@@ -64,7 +78,7 @@ export function TeamList({ onOpen }: { onOpen: (r: TeamRow) => void }) {
             ) : r.review?.submitted_at ? (
               <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#E6F4EA", color: C.green }}>reviewed ✓</span>
             ) : (
-              <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#FFF3E8", color: "#8A5B00" }}>waiting for your review</span>
+              <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#FFF3E8", color: "#8A5B00" }}>pending</span>
             )}
             {r.submitted_at && (
               <button onClick={() => onOpen(r)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#16232F", color: "#fff" }}>
@@ -73,6 +87,10 @@ export function TeamList({ onOpen }: { onOpen: (r: TeamRow) => void }) {
             )}
           </div>
         ))}
+      </div>
+      <div className="rounded-lg p-3 mt-2" style={{ background: "#F3EEFB", border: "1px solid #D9CBF5", fontSize: 12.5, color: "#4A3B7A", lineHeight: 1.6 }}>
+        After your interview, the summary result will be available here for you to see. Thank you once again for your
+        service.
       </div>
     </div>
   );
