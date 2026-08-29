@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.21",
+    date: "2026-08-29",
+    module: "Update-to-ERP becomes the push console",
+    items: [
+      "THE BUTTON (Dr Raghu, 29 Aug 2026: 'me or Pankaj'): ⬆ PUSH TO ERP on the Update-to-ERP screen — planner and admin hands — writes every waiting correction into the Jobmaster through the API, one write per job carrying all its fields together. ALL SEVEN correction fields travel: TDD, kitting %, production %, job status, current status, escalation and amount-needed — each mapped to the ERP's own field, read from the ERP itself.",
+      "EVERY LINE RECORDS ITS FATE: pushed (green, who and when on hover), rejected (red, THE ERP'S OWN WORDS on hover), or not-in-ERP. The FATE chips filter the screen — Waiting · Pushed · Rejected · All. The CSV road stays for the day the API cannot travel. Migration 0095 adds the fate columns.",
+    ],
+  },
+  {
     v: "3.31.0.20",
     date: "2026-08-29",
     module: "The change log speaks IST",

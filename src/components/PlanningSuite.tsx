@@ -1131,7 +1131,7 @@ export default function PlanningSuite({
       {workspace === "suite" && tab === "esc" && <Escalations board={board} V={V} onOpen={openJobPlan} reload={reload} isAdmin={isAdmin} />}
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
       {workspace === "suite" && tab === "plan" && <JobPlan isAdmin={isAdmin} board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
-      {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} />}
+      {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} canPush={role === "admin" || role === "planner"} />}
       {workspace === "suite" && tab === "upload" && canUpload && <MorningUpload email={email} embedded />}
       {workspace === "suite" && tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} departments={departments} isOwner={isRaghu} appSettings={appSettings} loadAppSettings={loadAppSettings} />}
       {/* Mounted on first visit and then kept (hidden) — the tree is a slow
@@ -5605,17 +5605,31 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = f
  * The JOB ID leads every line, because the job of this page is to be pasted
  * over a spreadsheet and uploaded, not read.
  */
-function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
-  const [rows, setRows] = useState<{ id: string; job_id: string; field: string; label: string; old_value: string | null; new_value: string | null; changed_by: string | null; changed_at: string }[] | null>(null);
+function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPush?: boolean }) {
+  const [rows, setRows] = useState<{ id: string; job_id: string; field: string; label: string; old_value: string | null; new_value: string | null; changed_by: string | null; changed_at: string; push_status?: string | null; push_error?: string | null; pushed_by?: string | null; pushed_at?: string | null }[] | null>(null);
   const [installed, setInstalled] = useState(true);
   const [busy, setBusy] = useState(false);
+  // the fate filter (Dr Raghu, 29 Aug 2026): waiting · pushed · rejected · all
+  const [scope, setScope] = useState<"waiting" | "pushed" | "rejected" | "all">("waiting");
+  const [pushMsg, setPushMsg] = useState("");
 
   const load = useCallback(() => {
-    api.get("/api/erp-update")
+    api.get(`/api/erp-update?scope=${scope}`)
       .then((r) => { setInstalled(r.installed !== false); setRows(r.rows || []); })
       .catch(() => setRows([]));
-  }, []);
+  }, [scope]);
   useEffect(() => { load(); }, [load]);
+
+  const pushNow = async () => {
+    if (!window.confirm(`Push all waiting corrections to the ERP now?\n\nOne write per job; each line records its fate.`)) return;
+    setBusy(true); setPushMsg("Pushing to the ERP…");
+    try {
+      const r = await api.post("/api/erp-update", { action: "push" });
+      setPushMsg(`Pushed ${r.pushed ?? 0} · rejected ${r.rejected ?? 0} · not in ERP ${r.notInErp ?? 0}${r.note ? ` — ${r.note}` : ""}`);
+      load();
+    } catch (e) { setPushMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
 
   /** One line per correction, job id first. Excel opens it, the ERP takes it. */
   const download = () => {
@@ -5653,7 +5667,14 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
           </div>
         </div>
         <div className="flex-1" style={{ minWidth: 10 }} />
-        {!!rows?.length && (
+        {canPush && scope === "waiting" && !!rows?.length && (
+          <button onClick={pushNow} disabled={busy} className="text-xs font-bold rounded px-3 py-1.5 text-white"
+            style={{ background: busy ? "#B9BEC4" : "#7C3AED" }}
+            title="Writes every waiting correction into the ERP through the API — one write per job, each line records its fate">
+            ⬆ Push to ERP · {rows.length}
+          </button>
+        )}
+        {!!rows?.length && scope === "waiting" && (
           <>
             <button onClick={download} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}>
               ⬇ Download CSV · {rows.length}
@@ -5664,6 +5685,17 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
             </button>
           </>
         )}
+      </div>
+
+      {pushMsg && <div className="text-xs font-bold mb-2" style={{ color: /reject|not in ERP [1-9]|refused|failed/i.test(pushMsg) ? "#B3261E" : "#0D7A3F" }}>{pushMsg}</div>}
+
+      <div className="flex gap-1 mb-2">
+        {(["waiting", "pushed", "rejected", "all"] as const).map((k) => (
+          <button key={k} onClick={() => setScope(k)} className="rounded-full border px-3 py-1 text-xs font-bold"
+            style={scope === k ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: "#8A94A0", borderColor: "#E2E0DA", background: "#fff" }}>
+            {k === "waiting" ? "Waiting" : k === "pushed" ? "Pushed" : k === "rejected" ? "Rejected" : "All"}
+          </button>
+        ))}
       </div>
 
       {!installed && (
@@ -5680,7 +5712,7 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
 
       {rows && rows.length === 0 ? (
         <div className="bg-white rounded-lg border p-8 text-center text-sm" style={{ borderColor: "#E2E0DA", color: "#8A94A0" }}>
-          Nothing waiting. Everything corrected in Genie has been put back into the ERP.
+          {scope === "waiting" ? "Nothing waiting. Everything corrected in Genie has been put back into the ERP." : `Nothing ${scope === "all" ? "recorded yet" : scope}.`}
         </div>
       ) : (
         <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
@@ -5693,6 +5725,7 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
                 <th className="px-2 py-1.5 text-left">Was</th>
                 <th className="px-2 py-1.5 text-left">By</th>
                 <th className="px-2 py-1.5 text-left">When</th>
+                <th className="px-2 py-1.5 text-left">Fate</th>
               </tr>
             </thead>
             <tbody>
@@ -5704,6 +5737,15 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
                   <td className="px-2 py-1" style={{ color: "#B8B5AC", maxWidth: 220 }}>{r.old_value || "—"}</td>
                   <td className="px-2 py-1" style={{ color: "#8A94A0" }}>{r.changed_by}</td>
                   <td className="px-2 py-1 tnum" style={{ color: "#8A94A0" }} title="IST">{new Date(String(r.changed_at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })}</td>
+                  <td className="px-2 py-1">
+                    {r.push_status === "pushed" ? (
+                      <span className="rounded px-1.5 font-bold" style={{ background: "#E6F4EB", color: "#0D7A3F", fontSize: 10.5 }} title={`by ${r.pushed_by ?? ""} · ${r.pushed_at ? new Date(String(r.pushed_at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}`}>pushed</span>
+                    ) : r.push_status ? (
+                      <span className="rounded px-1.5 font-bold" style={{ background: "#FBEAE8", color: "#B3261E", fontSize: 10.5 }} title={r.push_error ?? ""}>{r.push_status === "not_in_erp" ? "not in ERP" : "rejected"}</span>
+                    ) : (
+                      <span style={{ color: "#B8B5AC", fontSize: 10.5 }}>waiting</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

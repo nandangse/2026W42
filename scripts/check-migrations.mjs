@@ -63,6 +63,7 @@ const PROBES = [
   ["genie", "0092 MIS inputs + ratio targets", "kuber_mis_input?select=key"],
   ["genie", "0093 compliance calendar", "kuber_compliance?select=id"],
   ["genie", "0094 bounce + release", "kuber_bounce?select=id"],
+  ["genie", "0095 erp push fate", "erp_update?select=push_status&limit=1"],
   ["crm", "0025 tags", "crm_tag?select=id"],
   ["crm", "0026 tags widen + 0027 year in number", "crm_tag_link?select=id"],
   ["crm", "0024 numbering + deal contacts", "opportunity_contact?select=id"],
