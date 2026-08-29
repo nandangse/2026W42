@@ -453,6 +453,9 @@ export async function POST(req: Request) {
       const stamp = me.initials ? `${me.initials} · ${me.email}` : me.email;
       const owner = me.email.toLowerCase() === RAGHU_EMAIL;
       const now = new Date().toISOString();
+      // a DRAFT (Dr Raghu, 29 Aug 2026: "provision to save it — submit may
+      // be later") parks the working: no approval, no queue, just kept.
+      const draft = !!body.draft;
       const row: Record<string, unknown> = {
         employee_id, cycle: "2026-27",
         new_gross, prev_gross: Number(body.prev_gross) || null,
@@ -461,9 +464,9 @@ export async function POST(req: Request) {
         updated_at: now,
         // HR proposes, the owner finalises. His own save IS the approval —
         // sending it to a queue he is standing in front of would be theatre.
-        pending_since: owner ? null : now,
-        pending_by: owner ? null : stamp,
-        ...(owner ? { approved_at: now, approved_by: stamp } : { approved_at: null, approved_by: null }),
+        pending_since: draft ? null : owner ? null : now,
+        pending_by: draft ? null : owner ? null : stamp,
+        ...(!draft && owner ? { approved_at: now, approved_by: stamp } : { approved_at: null, approved_by: null }),
       };
       // the hand-tuned split and the investment lines, when the card sent them (0062)
       if (body.structure && typeof body.structure === "object") row.structure = body.structure;

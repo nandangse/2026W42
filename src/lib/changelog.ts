@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.31",
+    date: "2026-08-29",
+    module: "Appraisal — the parking brake",
+    items: [
+      "💾 SAVE DRAFT on the Appraisal Final tab (Dr Raghu, 29 Aug 2026: 'provision to save it — submit may be later'): the working structure is kept — nothing submitted, nothing queued, nothing finalised — and wears an honest 'draft — not submitted' chip until the real button is pressed. The finalise path is unchanged: HR's save still queues for RJ, RJ's save still finalises.",
+    ],
+  },
+  {
     v: "3.31.0.30",
     date: "2026-08-29",
     module: "The interview's opening words",
