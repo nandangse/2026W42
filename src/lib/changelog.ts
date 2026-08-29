@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.32",
+    date: "2026-08-29",
+    module: "Appraisal — Raghu's brief",
+    items: [
+      "RAGHU'S BRIEF, a new tab on the report card (Dr Raghu, 29 Aug 2026): one click and the AI reads the whole record — the role charter, the person's own IDP words, the manager's notes, the salary climb — and writes the five-minute brief: who they are, the role in one line, WHAT THEY ACTUALLY DO, what to affirm, what to raise, THREE QUESTIONS WORTH ASKING, and a FEEDBACK SEED to adapt into the written feedback. Grounded only in the record — where it is thin it says so. Click-only, Raghu's button alone, kept on the cycle row (migration 0098).",
+    ],
+  },
+  {
     v: "3.31.0.31",
     date: "2026-08-29",
     module: "Appraisal — the parking brake",

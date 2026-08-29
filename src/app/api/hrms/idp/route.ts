@@ -420,6 +420,73 @@ export async function POST(req: Request) {
     const me = await requireHrms();
     const admin = adminClient();
     const body = await req.json();
+    // RAGHU'S BRIEF (29 Aug 2026): click-only AI pointers before the
+    // sit-down — the role, the work in their own words, what to affirm,
+    // what to raise — grounded in the record, kept on the cycle row.
+    if (String(body.action || "") === "raghu-brief") {
+      if (me.email.toLowerCase() !== RAGHU_EMAIL) throw new HttpError(403, "The brief is Raghu's own.");
+      const key = process.env.ANTHROPIC_API_KEY;
+      if (!key) throw new HttpError(503, "ANTHROPIC_API_KEY is not set.");
+      const employee_id = String(body.employee_id || "");
+      if (!employee_id) throw new HttpError(400, "employee_id required");
+
+      const T2 = await hrmsTables(admin);
+      const { data: emp } = await admin.from(T2.employees)
+        .select("id, name, department, designation, dob, doj, extra").eq("id", employee_id).maybeSingle();
+      if (!emp) throw new HttpError(404, "No such employee.");
+      const extra = (emp.extra || {}) as Record<string, string>;
+      const { data: idps } = await admin.from("hrms_idp").select("answers, ratings, role_at_time, submitted_at")
+        .eq("employee_id", employee_id).order("started_at", { ascending: false }).limit(1);
+      const idp = (idps || [])[0] || null;
+      const roleName = String(idp?.role_at_time || emp.designation || "").split(" · ")[0].trim();
+      const { data: role } = roleName
+        ? await admin.from("hrms_role").select("role, job_description, deliverable, metric, summary").ilike("role", roleName).maybeSingle()
+        : { data: null };
+      let reviews: { notes: string | null; analysis: string | null; ratings: Record<string, number> | null }[] = [];
+      if (idp) {
+        const { data: idRows } = await admin.from("hrms_idp").select("id").eq("employee_id", employee_id).order("started_at", { ascending: false }).limit(1);
+        if (idRows?.[0]) {
+          const { data: rv } = await admin.from("hrms_idp_review").select("notes, analysis, ratings").eq("idp_id", idRows[0].id);
+          reviews = (rv || []) as typeof reviews;
+        }
+      }
+      const { data: hist } = await admin.from("hrms_salary_history")
+        .select("fy, gross").eq("employee_id", employee_id).order("fy").limit(20).then((r) => ({ data: r.error ? [] : r.data }));
+
+      const answers = (idp?.answers || {}) as Record<string, string>;
+      delete answers["ask_gross"];
+      const material =
+        `PERSON: ${emp.name} · ${emp.designation || ""} · ${emp.department || ""} · in company since ${emp.doj || "?"} · reports to ${extra["Reporting Manager"] || "?"}\n\n` +
+        (role ? `ROLE (register): ${role.role}\nJD: ${role.job_description || ""}\nKRA: ${role.deliverable || ""}\nKPIs: ${role.metric || ""}\n\n` : "") +
+        (idp ? `THEIR OWN IDP WORDS:\n${Object.entries(answers).map(([k, v]) => `${k}: ${String(v).slice(0, 900)}`).join("\n")}\n\n` : "NO IDP SUBMITTED.\n\n") +
+        (reviews.length ? `MANAGER REVIEW NOTES:\n${reviews.map((r) => [r.notes, r.analysis].filter(Boolean).join(" · ")).join("\n")}\n\n` : "") +
+        (hist?.length ? `GROSS BY YEAR: ${hist.map((h) => `${h.fy}: ₹${h.gross}`).join(" · ")}` : "");
+
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-5-20250929", max_tokens: 1400,
+          system: "You brief Dr Raghu Nandan, MD of Nandan GSE, for an appraisal interview — five minutes' read, plain simple language. " +
+            "Sections, each 2-5 short pointers: WHO THEY ARE (one line); THE ROLE IN ONE LINE; WHAT THEY ACTUALLY DO (from their own IDP words); " +
+            "WORTH AFFIRMING; WORTH RAISING (concerns, gaps between role and reality); THREE QUESTIONS WORTH ASKING; " +
+            "A FEEDBACK SEED (3-4 sentences Dr Raghu could adapt into written feedback to them — warm, direct, specific). " +
+            "Grounded only in the material given — where it is thin, say so plainly. Never invent numbers or events.",
+          messages: [{ role: "user", content: material.slice(0, 60000) }],
+        }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new HttpError(502, (j as { error?: { message?: string } })?.error?.message || `Anthropic returned ${res.status}`);
+      const text = ((j as { content?: { type: string; text: string }[] }).content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n").trim();
+      const { error } = await admin.from("hrms_appraisal").upsert(
+        { employee_id, cycle: "2026-27", brief: text, brief_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+        { onConflict: "employee_id,cycle" });
+      if (error && /brief|schema cache/i.test(error.message))
+        throw new HttpError(503, "Run migration 0098 first — the brief has nowhere to live yet.");
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, brief: text });
+    }
+
     // the FINALISED DISCUSSION (29 Aug 2026): date · attendees · link · MoM ·
     // Note from Raghu — kept on the cycle row; the note rides into the IDP
     // letter later.

@@ -48,7 +48,7 @@ interface PersonData {
   } | null;
 }
 
-const TABS = ["Self IDP", "Manager IDP comment", "Finalised IDP for Employee", "Finalised discussion", "Appraisal Final"] as const;
+const TABS = ["Self IDP", "Manager IDP comment", "Finalised IDP for Employee", "Raghu's brief", "Finalised discussion", "Appraisal Final"] as const;
 
 export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: boolean }) {
   const [people, setPeople] = useState<ListRow[] | null>(null);
@@ -136,6 +136,7 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
           {tab === "Self IDP" && <SelfTab d={d} />}
           {tab === "Manager IDP comment" && <ManagerTab d={d} />}
           {tab === "Finalised IDP for Employee" && <FinalisedTab d={d} />}
+          {tab === "Raghu's brief" && <RaghuBriefTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
           {tab === "Finalised discussion" && <DiscussionTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
           {tab === "Appraisal Final" && <AppraisalTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
         </>
@@ -257,6 +258,47 @@ function GrossGraph({ years }: { years: { year: number; gross: number | null; no
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** RAGHU'S BRIEF (Dr Raghu, 29 Aug 2026): click-only AI pointers before
+ *  the sit-down — the role, the work in their own words, what to affirm,
+ *  what to raise, three questions, and a feedback seed he can reuse. */
+function RaghuBriefTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean; onSaved: () => void }) {
+  const ap = d.appraisal as Record<string, unknown> | null;
+  const brief = ap?.brief ? String(ap.brief) : "";
+  const at = ap?.brief_at ? String(ap.brief_at) : null;
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [live, setLive] = useState("");
+  const run = async () => {
+    setBusy(true); setMsg("");
+    try {
+      const r = await api.post("/api/hrms/idp", { action: "raghu-brief", employee_id: d.employee.id });
+      setLive(String(r.brief || "")); setMsg("Written ✓ — kept on the cycle"); onSaved();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+  const text = live || brief;
+  return (
+    <div className="bg-white rounded-lg border p-4" style={{ borderColor: C.line, maxWidth: 760 }}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="font-bold" style={{ fontSize: 15 }}>Raghu&apos;s brief</div>
+        {isOwner && (
+          <button onClick={run} disabled={busy} className="rounded px-3 py-1.5 text-xs font-bold text-white ml-auto" style={{ background: busy ? "#B9BEC4" : "#7C3AED" }}>
+            {busy ? "Reading the record…" : text ? "✨ Write it afresh" : "✨ Write the brief"}
+          </button>
+        )}
+      </div>
+      <p className="text-xs mb-2" style={{ color: C.dim, lineHeight: 1.5 }}>
+        Five minutes before the sit-down: the role, the work in their own words, what to affirm, what to raise, three
+        questions, and a feedback seed to adapt. Grounded in the record — click-only, like every Genie.
+        {at && <> · last written {String(at).slice(0, 16).replace("T", " ")} UTC</>}
+      </p>
+      {text
+        ? <div className="text-sm rounded border p-3" style={{ borderColor: "#D9CBF5", whiteSpace: "pre-wrap", lineHeight: 1.65, background: "#FBFAFE" }}>{text}</div>
+        : <div className="text-sm" style={{ color: C.faint }}>{isOwner ? "Not written yet — ✨ writes it from the role, the IDP and the reviews." : "Not written yet — RJ writes this one."}</div>}
     </div>
   );
 }
