@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.20",
+    date: "2026-08-29",
+    module: "The change log speaks IST",
+    items: [
+      "The jobs change-log's WHEN column was speaking UTC — a 9:41 am edit read 04:11 (Dr Raghu caught it, 29 Aug 2026). It now says the time the way the reader lives it: 29 Aug, 09:41 am, IST.",
+    ],
+  },
+  {
     v: "3.31.0.19",
     date: "2026-08-29",
     module: "CRM — the quotation carries its opportunity's whole story",

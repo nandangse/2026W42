@@ -5703,7 +5703,7 @@ function UpdateToErp({ erpLog }: { erpLog: ErpLogEntry[] }) {
                   <td className="px-2 py-1 font-semibold" style={{ color: "#16232F", maxWidth: 280 }}>{r.new_value || <i style={{ color: "#B8B5AC" }}>(cleared)</i>}</td>
                   <td className="px-2 py-1" style={{ color: "#B8B5AC", maxWidth: 220 }}>{r.old_value || "—"}</td>
                   <td className="px-2 py-1" style={{ color: "#8A94A0" }}>{r.changed_by}</td>
-                  <td className="px-2 py-1 tnum" style={{ color: "#8A94A0" }}>{String(r.changed_at).slice(0, 16).replace("T", " ")}</td>
+                  <td className="px-2 py-1 tnum" style={{ color: "#8A94A0" }} title="IST">{new Date(String(r.changed_at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })}</td>
                 </tr>
               ))}
             </tbody>
