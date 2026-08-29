@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.15",
+    date: "2026-08-28",
+    module: "CRM — the ERP's door in Integrations, Raghu's key alone",
+    items: [
+      "ERPNEXT joins Settings → Integrations (Dr Raghu, 28 Aug 2026): the site URL, API Key and API Secret from his ERPNext user's API Access — stored in the CRM's own database, shown only as the last four characters, EDITABLE BY RAGHU ALONE for now (others see the card, not the pen). A TEST-THE-DOOR button rings the ERP with the stored pair and answers with the signed-in user. Saving one field never drops another — the config merges.",
+      "The door is what the coming pulls stand on — live quotation values from the ERP among them.",
+    ],
+  },
+  {
     v: "3.31.0.14",
     date: "2026-08-28",
     module: "CRM — tags everywhere and en masse; the number wears its year",

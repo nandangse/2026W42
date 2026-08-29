@@ -14,7 +14,11 @@ export const dynamic = "force-dynamic";
  * Managed by admin, CEO and Sales Head.
  */
 const KNOWN = [
-  { key: "apollo", label: "Apollo.io", fields: ["api_key"], help: "Enriches contacts — designation, phones, LinkedIn — from apollo.io. Settings → API keys there." },
+  { key: "apollo", label: "Apollo.io", fields: ["api_key"], ownerOnly: false, help: "Enriches contacts — designation, phones, LinkedIn — from apollo.io. Settings → API keys there." },
+  // ERPNext (Dr Raghu, 28 Aug 2026): the Frappe token pair from his user's
+  // API Access — auth is `token api_key:api_secret`; the SECRET shows only
+  // once at Generate Keys. Editable by Raghu alone, for now.
+  { key: "erpnext", label: "ERPNext", fields: ["url", "api_key", "api_secret"], ownerOnly: true, help: "The ERP's door — site URL (https://…), API Key and API Secret from your ERPNext user's API Access. The secret shows once at Generate Keys; paste both. Only Raghu edits this one." },
 ] as const;
 
 const mayManage = (role: string) => ["admin", "ceo", "sales_head"].includes(role);
@@ -38,8 +42,10 @@ export async function GET() {
         const cfg = (row?.config || {}) as Record<string, string>;
         return {
           key: k.key, label: k.label, fields: k.fields, help: k.help,
-          configured: !!cfg.api_key,
+          ownerOnly: k.ownerOnly, mayEdit: !k.ownerOnly || me.isOwner,
+          configured: k.key === "erpnext" ? !!(cfg.api_key && cfg.api_secret) : !!cfg.api_key,
           tail: cfg.api_key ? String(cfg.api_key).slice(-4) : null,
+          url: k.key === "erpnext" ? cfg.url ?? null : null,
           updated_by: row?.updated_by ?? null, updated_at: row?.updated_at ?? null,
         };
       }),
@@ -57,13 +63,36 @@ export async function POST(req: Request) {
     const db = crmDb();
     const body = await req.json();
     const key = String(body.key || "");
-    if (!KNOWN.some((k) => k.key === key)) throw new HttpError(400, "Unknown integration.");
-    const config: Record<string, string> = {};
-    for (const f of KNOWN.find((k) => k.key === key)!.fields) {
-      const v = String((body.config || {})[f] ?? "").trim();
-      if (v) config[f] = v;
+    const known = KNOWN.find((k) => k.key === key);
+    if (!known) throw new HttpError(400, "Unknown integration.");
+    if (known.ownerOnly && !me.isOwner) throw new HttpError(403, "This one is Raghu's to edit, for now.");
+
+    // ?action=test — ring the ERP's own door with the stored pair
+    if (String(body.action || "") === "test" && key === "erpnext") {
+      const { data: row } = await db.from("integration_setting").select("config").eq("key", key).maybeSingle();
+      const cfg = (row?.config || {}) as Record<string, string>;
+      if (!cfg.url || !cfg.api_key || !cfg.api_secret) throw new HttpError(400, "Save the URL, key and secret first.");
+      try {
+        const r = await fetch(`${cfg.url.replace(/\/+$/, "")}/api/method/frappe.auth.get_logged_user`, {
+          headers: { authorization: `token ${cfg.api_key}:${cfg.api_secret}` },
+        });
+        const j = await r.json().catch(() => null);
+        if (!r.ok) throw new Error((j as { message?: string } | null)?.message || `ERPNext answered ${r.status}`);
+        return NextResponse.json({ ok: true, user: (j as { message?: string } | null)?.message || "connected" });
+      } catch (e) {
+        throw new HttpError(502, `The ERP did not answer: ${e instanceof Error ? e.message : String(e)}`);
+      }
     }
-    if (!Object.keys(config).length) throw new HttpError(400, "Nothing to save — paste the key.");
+
+    // MERGE, never replace — saving only a new URL must not drop the secret
+    const { data: existing } = await db.from("integration_setting").select("config").eq("key", key).maybeSingle();
+    const config: Record<string, string> = { ...((existing?.config || {}) as Record<string, string>) };
+    let touched = false;
+    for (const f of known.fields) {
+      const v = String((body.config || {})[f] ?? "").trim();
+      if (v) { config[f] = v; touched = true; }
+    }
+    if (!touched) throw new HttpError(400, "Nothing to save — paste the key.");
     const { error } = await db.from("integration_setting").upsert({
       key, config, updated_by: me.email.toLowerCase(), updated_at: new Date().toISOString(),
     }, { onConflict: "key" });
