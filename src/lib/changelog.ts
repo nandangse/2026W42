@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.29",
+    date: "2026-08-29",
+    module: "HRMS — Salary Growth, the table under the climb",
+    items: [
+      "SALARY GROWTH (Dr Raghu, 29 Aug 2026, from the salary workbook's Employee Master): a per-year gross table (migration 0097) now feeds the appraisal card's climb — the axis widens to 2019→2027, and beneath the graph the listing reads his way: 2025-26: Rs ⟨gross⟩/month, year by year, newest first, each line naming its source. The year's truth speaks in order: the Employee Master sheet first, then the appraisal cycle, then today's salary sheet.",
+    ],
+  },
+  {
     v: "3.31.0.28",
     date: "2026-08-29",
     module: "IDP — the manager's scoreboard, and roles that read clean",

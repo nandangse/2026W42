@@ -312,9 +312,19 @@ export async function GET(req: Request) {
           .select("cycle, new_gross, prev_gross").eq("employee_id", person);
         cycles = (aps || []) as typeof cycles;
       } catch { /* pre-0061 */ }
-      for (let y = 2020; y <= 2027; y++) {
+      // the Employee Master's own history (0097) speaks first for each year
+      let hist: { fy: string; gross: number }[] = [];
+      try {
+        const { data: hh } = await admin.from("hrms_salary_history")
+          .select("fy, gross").eq("employee_id", person);
+        hist = ((hh || []) as { fy: string; gross: number }[]);
+      } catch { /* pre-0097 */ }
+      const histOf = (y: number) => hist.find((h) => String(h.fy).startsWith(String(y)));
+      for (let y = 2019; y <= 2027; y++) {
+        const hh = histOf(y);
         const cy = cycles.find((c) => String(c.cycle).startsWith(String(y)));
-        if (cy?.new_gross) salaryYears.push({ year: y, gross: Number(cy.new_gross), note: `appraisal ${cy.cycle}` });
+        if (hh?.gross) salaryYears.push({ year: y, gross: Number(hh.gross), note: `sheet ${hh.fy}` });
+        else if (cy?.new_gross) salaryYears.push({ year: y, gross: Number(cy.new_gross), note: `appraisal ${cy.cycle}` });
         else if (y === 2026 && grossNow) salaryYears.push({ year: y, gross: grossNow, note: "current sheet" });
         else salaryYears.push({ year: y, gross: null, note: "" });
       }
