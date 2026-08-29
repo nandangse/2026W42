@@ -93,6 +93,12 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
           ))}
         </select>
         {people !== null && people.length === 0 && <span className="text-xs" style={{ color: C.faint }}>Nobody has an IDP yet.</span>}
+        {/* the interview's opening words (Dr Raghu, 29 Aug 2026) — in the
+            blank space to the right, where the eye rests before the sit-down */}
+        <div className="rounded-lg p-3 ml-auto" style={{ background: "#FFF9EC", border: "1px solid #F0D9A8", maxWidth: 460, fontSize: 13, color: "#6B5518", lineHeight: 1.65 }}>
+          <b>We have read your IDP.</b> If you have any presentation to make, please do so in the first 10 minutes.
+          <br />Post that, we will discuss your role, your concerns, and your final remuneration.
+        </div>
       </div>
 
       {pick && !d && <div className="text-xs" style={{ color: C.faint }}>loading…</div>}

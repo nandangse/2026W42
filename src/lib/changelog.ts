@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.30",
+    date: "2026-08-29",
+    module: "The interview's opening words",
+    items: [
+      "On the Individual Report Card, the blank space to the right now carries the sit-down's opening (Dr Raghu, 29 Aug 2026): 'We have read your IDP. If you have any presentation to make, please do so in the first 10 minutes. Post that, we will discuss your role, your concerns, and your final remuneration.' — the same words at every desk, so every interview opens the same way.",
+    ],
+  },
+  {
     v: "3.31.0.29",
     date: "2026-08-29",
     module: "HRMS — Salary Growth, the table under the climb",
