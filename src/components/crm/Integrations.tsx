@@ -94,10 +94,26 @@ export default function Integrations() {
               {busy === it.key ? "…" : "Save"}
             </button>
             {it.key === "erpnext" && it.configured && (
-              <button onClick={() => test(it.key)} disabled={busy === it.key}
-                className="rounded px-3 py-1.5 font-bold border" style={{ borderColor: BORDER, color: NAVY, fontSize: 12.5 }}>
-                Test the door
-              </button>
+              <>
+                <button onClick={() => test(it.key)} disabled={busy === it.key}
+                  className="rounded px-3 py-1.5 font-bold border" style={{ borderColor: BORDER, color: NAVY, fontSize: 12.5 }}>
+                  Test the door
+                </button>
+                <button onClick={async () => {
+                  setBusy(it.key); setMsg("Reading the ERP's quotations…");
+                  try {
+                    const r = await fetch("/api/crm/erp", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "pull_quotation_values" }) });
+                    const j = await r.json();
+                    if (!r.ok) throw new Error(String(j.error || r.status));
+                    setMsg(`ERP holds ${j.erpCount} quotations · ${j.matched} matched ours · ${j.filled} zero-value quotes filled ✓`);
+                  } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+                  setBusy(null);
+                }} disabled={busy === it.key}
+                  className="rounded px-3 py-1.5 font-bold border" style={{ borderColor: BORDER, color: "#7C3AED", fontSize: 12.5 }}
+                  title="Reads only — fills our zero-value quotations by quote number; never overwrites a typed value, never touches the ERP">
+                  ⬇ Pull quotation values
+                </button>
+              </>
             )}
           </div>
           )}

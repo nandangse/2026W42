@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.16",
+    date: "2026-08-28",
+    module: "CRM — the first walk through the ERP's door",
+    items: [
+      "⬇ PULL QUOTATION VALUES stands on the ERPNext card (Dr Raghu pointed at the Frappe REST docs, 28 Aug 2026): one click reads every quotation from the ERP through /api/resource and FILLS OUR ZERO-VALUE QUOTATIONS by quote number — reads only, never a write to the ERP, and a value someone typed here is never overwritten. Raghu's button alone, like the keys it uses. The answer says exactly what happened: how many the ERP holds, how many matched, how many filled.",
+    ],
+  },
+  {
     v: "3.31.0.15",
     date: "2026-08-28",
     module: "CRM — the ERP's door in Integrations, Raghu's key alone",
