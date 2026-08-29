@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
-import { mayUseCrm } from "@/crm/auth";
+import { mayUseCrm, requireCrm } from "@/crm/auth";
 import { UPDATES } from "@/lib/changelog";
 import CrmApp from "@/components/crm/CrmApp";
 
@@ -36,6 +36,7 @@ export default async function CrmPage() {
       role={user.role ?? "user"}
       version={UPDATES[0].v}
       initialSlug="dashboard"
+      profileId={(await requireCrm().catch(() => null))?.profileId ?? null}
     />
   );
 }

@@ -288,8 +288,10 @@ export const DOCTYPES: Doctype[] = [
         options: ["Follow Up Call", "Cold call", "Follow Up Visit", "Cold Visit", "Existing Customer Visit", "Video Call", "SMS or Whatsapp", "Mail", "Internal"] },
       { name: "result", label: "Result", type: "select", inList: true,
         options: ["Warmer", "Colder", "Status Quo", "Closed Lost", "Closed Won"] },
-      { name: "happened_at", label: "Date", type: "date", inList: true },
-      { name: "by_id", label: "By", type: "link", link: "profile", inList: true },
+      // logging a call starts on TODAY, BY the person logging it
+      // (Dr Raghu, 29 Aug 2026) — both still changeable
+      { name: "happened_at", label: "Date", type: "date", inList: true, default: "today" },
+      { name: "by_id", label: "By", type: "link", link: "profile", inList: true, default: "me" },
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
       { name: "person_name", label: "Spoke with", type: "text", inList: true },
       { name: "remark", label: "Remark", type: "textarea", required: true },

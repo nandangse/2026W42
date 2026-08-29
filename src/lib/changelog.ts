@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.40",
+    date: "2026-08-29",
+    module: "CRM — logging a call starts filled in",
+    items: [
+      "A NEW INTERACTION arrives with TODAY'S DATE already in the Date box and the SIGNED-IN PERSON already in By (Dr Raghu, 29 Aug 2026) — both still changeable. The little machinery: a date field can say default \"today\", and a profile link can now say default \"me\".",
+    ],
+  },
+  {
     v: "3.31.0.39",
     date: "2026-08-29",
     module: "CRM — the opportunity list leads with the date",

@@ -52,6 +52,9 @@ const PINNED_W = 180; // pinned columns take a fixed width so sticky offsets add
 
 type Row = Record<string, unknown>;
 type Links = Record<string, { id: string; label: string }[]>;
+
+/** Set once when CrmApp mounts — one user per page, so module scope is safe. */
+let MY_PROFILE_ID: string | null = null;
 /** What the lightbox is showing: possibly another doctype than the page. */
 type ViewState = { dt: Doctype; row: Row; links: Links; mode: "view" | "edit" };
 
@@ -101,11 +104,14 @@ const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string } | { 
 ];
 
 export default function CrmApp({
-  email, displayName, version, initialSlug, initials = null, role = "user",
+  email, displayName, version, initialSlug, initials = null, role = "user", profileId = null,
 }: {
   email: string; displayName: string | null; version: string; initialSlug?: string;
-  initials?: string | null; role?: string;
+  initials?: string | null; role?: string; profileId?: string | null;
 }) {
+  // the signed-in person's CRM profile id, readable from anywhere in this
+  // client bundle — `default: "me"` on a profile link field resolves to it
+  MY_PROFILE_ID = profileId;
   const [slug, setSlug] = useState(initialSlug ?? DOCTYPES[0].name);
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState<number | null>(null);
@@ -3014,6 +3020,9 @@ function RecordForm({
         // default: "today" on a date field means exactly that (28 Aug 2026)
         if (f.type === "date" && f.default === "today")
           dv = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+        // default: "me" on a profile link = the signed-in person (29 Aug 2026)
+        if (f.link === "profile" && f.default === "me")
+          dv = MY_PROFILE_ID ?? "";
         // The close is expected by the LAST DATE OF NEXT MONTH unless said
         // otherwise (Dr Raghu, 26 Aug 2026).
         if (dt.name === "opportunity" && f.name === "expected_close_on") {
