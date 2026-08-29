@@ -20,6 +20,11 @@ export const NO_BENEFITS = new Set(["Management"]);
 
 /** Contract engagements are taxed flat at source; employees by the slab. */
 const CONTRACT_TDS = new Set(["Contractor", "Labour - Contract", "Staff - Contract"]);
+/** Contract engagements (Dr Raghu, 29 Aug 2026): ALL benefits zero — their
+ *  CTC is the Basic & DA alone. */
+export const CONTRACT_TYPES_SET = CONTRACT_TDS;
+/** The annual bonus belongs to Staff and Labour alone (same day). */
+const BONUS_TYPES = new Set(["Staff", "Labour"]);
 
 /**
  * Approximate TDS on the gross — INDICATIVE ONLY, printed with that word.
@@ -59,28 +64,39 @@ export interface ExtraRow { label: string; monthly: number }
 export interface SalaryRow { label: string; monthly: number | null; yearly: number | null; kind: "head" | "row" | "total" | "note" }
 
 export function salaryTable(get: (k: string) => unknown, type: string | null, extras?: ExtraRow[]): { rows: SalaryRow[]; ctcLakhs: string; exempt: boolean; gross: number } | null {
-  const exempt = NO_STATUTORY.has(String(type || "").trim());
-  const noBenefits = NO_BENEFITS.has(String(type || "").trim());
-  const basic = num(get("Basic and DA")), hra = exempt ? 0 : num(get("HRA")), fixed = num(get("Fixed Allowance"));
-  const conv = num(get("Conveyance")), med = num(get("Medical Allowance"));
+  const t = String(type || "").trim();
+  const exempt = NO_STATUTORY.has(t);
+  const noBenefits = NO_BENEFITS.has(t);
+  const isContract = CONTRACT_TDS.has(t);
+  const basic = num(get("Basic and DA"));
+  // a contract engagement is Basic & DA ALONE (Dr Raghu, 29 Aug 2026) —
+  // no HRA, no allowances, no statutory, no benefits; CTC = the basic.
+  const hra = exempt ? 0 : num(get("HRA"));
+  const fixed = isContract ? 0 : num(get("Fixed Allowance"));
+  const conv = isContract ? 0 : num(get("Conveyance"));
+  const med = isContract ? 0 : num(get("Medical Allowance"));
   const gross = basic + hra + fixed + conv + med;
   if (!gross) return null;
 
-  const pf = !exempt && basic > 0 ? Math.round(Math.min(basic, 15000) * 0.12) : 0;
-  const pt = !exempt && gross >= 10000 ? 200 : 0;
-  const dedM = pf + pt, dedY = pf * 12 + (pt ? 2500 : 0);
+  // PF: 12% of Basic & DA or ₹1,800, whichever is lower (the 15,000 wage
+  // ceiling says the same thing). PT: the Maharashtra slab — 175 between
+  // 7,500 and 10,000, 200 above (300 in February, hence 2,500 a year).
+  const pf = !exempt && basic > 0 ? Math.min(Math.round(basic * 0.12), 1800) : 0;
+  const pt = exempt ? 0 : gross > 10000 ? 200 : gross >= 7500 ? 175 : 0;
+  const dedM = pf + pt, dedY = pf * 12 + (pt === 200 ? 2500 : pt === 175 ? 2100 : 0);
   const netM = gross - dedM, netY = gross * 12 - dedY;
 
   const mediclaim = 5000 / 12, shoes = 2000 / 12;
-  const bonus = basic * 0.10;
+  const bonus = BONUS_TYPES.has(t) ? basic * 0.10 : 0;
   const perDay = gross / 26;
   const leaves = (perDay * 20) / 12;
   // twelve a year — the third Saturday of each month, not every Saturday
   const thirdSat = (perDay * THIRD_SATURDAYS_A_YEAR) / 12;
-  const benM = noBenefits ? 0 : pf + mediclaim + shoes + bonus + leaves + thirdSat;
+  const benM = noBenefits || isContract ? 0 : pf + mediclaim + shoes + bonus + leaves + thirdSat;
   const inv = (extras || []).filter((e) => e.monthly > 0);
   const invM = inv.reduce((a, e) => a + e.monthly, 0);
-  const ctcY = netY + benM * 12 + invM * 12;
+  // contract CTC is the basic alone — the agreed payout, nothing added
+  const ctcY = isContract ? basic * 12 : netY + benM * 12 + invM * 12;
   const tds = approxTds(gross, type);
 
   const R = (label: string, m: number | null, kind: SalaryRow["kind"] = "row"): SalaryRow =>
@@ -105,12 +121,13 @@ export function salaryTable(get: (k: string) => unknown, type: string | null, ex
     { label: "Total Deductions (B)", monthly: dedM, yearly: dedY, kind: "total" },
     { label: "Net Salary (C = A - B)", monthly: netM, yearly: netY, kind: "total" },
     { label: "Benefits", monthly: null, yearly: null, kind: "head" },
-    ...(noBenefits
-      ? [{ label: "Benefits are not applicable for Management", monthly: null, yearly: null, kind: "note" as const }]
+    ...(noBenefits || isContract
+      ? [{ label: isContract ? "A contract engagement — no benefits; the CTC is the Basic & DA alone" : "Benefits are not applicable for Management", monthly: null, yearly: null, kind: "note" as const }]
       : [
           ...(exempt ? [] : [R("Provident Fund Employer", pf)]),
           R("Mediclaim of 2 lakhs", mediclaim),
-          R("Shoes & Uniform Allowance", shoes), R("Annual Bonus Approx @10%", bonus),
+          R("Shoes & Uniform Allowance", shoes),
+          ...(bonus > 0 ? [R("Annual Bonus Approx @10%", bonus)] : []),
           R("Annual Paid Leaves Approx 20 days", leaves), R(`Third Saturday Paid ${THIRD_SATURDAYS_A_YEAR} days`, thirdSat),
         ]),
     { label: "Total Benefits (D)", monthly: Math.round(benM), yearly: Math.round(benM * 12), kind: "total" },
@@ -177,6 +194,9 @@ export interface Components { basic_da: number; hra: number; fixed_allowance: nu
 export function splitGross(gross: number, basicPct = SPLIT_DEFAULTS.basicPct, type?: string | null): Components {
   const g = Math.max(0, Math.round(num(gross)));
   if (!g) return { basic_da: 0, hra: 0, fixed_allowance: 0, conveyance: 0, medical_allowance: 0 };
+  // contract: the whole engagement IS the basic (29 Aug 2026)
+  if (CONTRACT_TDS.has(String(type || "").trim()))
+    return { basic_da: g, hra: 0, fixed_allowance: 0, conveyance: 0, medical_allowance: 0 };
   const exempt = NO_STATUTORY.has(String(type || "").trim());
   const pct = Math.min(100, Math.max(1, num(basicPct) || SPLIT_DEFAULTS.basicPct));
 

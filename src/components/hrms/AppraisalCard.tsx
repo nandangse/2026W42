@@ -266,6 +266,13 @@ const EXTRAS = [
 ] as const;
 
 function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean; onSaved: () => void }) {
+  // THE STAFF LAW (Dr Raghu, 29 Aug 2026): for Staff, HRA = 20% OF BASIC &
+  // DA — derived, never typed. Caught on Santosh Patra's card, where a
+  // proportional scale left HRA at 19.9%.
+  const isStaff = String(d.employee.type || "") === "Staff";
+  // more of the same day's laws: MEDICAL IS ALWAYS ₹1,250 (never typed),
+  // and a CONTRACT engagement is Basic & DA alone — every other box closes.
+  const isContract = ["Contractor", "Labour - Contract", "Staff - Contract"].includes(String(d.employee.type || ""));
   const prev = d.salary?.gross ?? null;
   const proposed = d.reviews.find((r) => r.gross_proposed != null)?.gross_proposed ?? null;
   const [busy, setBusy] = useState(false);
@@ -283,8 +290,27 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
     const cur = Object.values(baseComps).reduce((a, b) => a + b, 0);
     const out: Record<string, string> = {};
     for (const [key] of COMPS) out[key] = String(cur && target ? Math.round((baseComps[key] / cur) * target) : 0);
+    if (isContract && target) {
+      // a contract target IS the basic
+      return { basic_da: String(target), hra: "0", fixed: "0", conveyance: "0", medical: "0" };
+    }
+    if (target) {
+      // medical is a constant, never a share; fixed absorbs
+      const oldMed = Number(out.medical) || 0;
+      out.medical = "1250";
+      out.fixed = String(Math.max(0, (Number(out.fixed) || 0) + oldMed - 1250));
+    }
+    if (isStaff && target) {
+      // HRA snaps to the law; Fixed Allowance absorbs the difference so the
+      // gross still lands exactly on the target.
+      const basic = Number(out.basic_da) || 0;
+      const oldHra = Number(out.hra) || 0;
+      const hra = Math.round(basic * 0.2);
+      out.hra = String(hra);
+      out.fixed = String(Math.max(0, (Number(out.fixed) || 0) + oldHra - hra));
+    }
     return out;
-  }, [baseComps]);
+  }, [baseComps, isStaff, isContract]);
 
   // the split being decided: saved tuning first, else today's shares at the decided/proposed gross
   const [comps, setComps] = useState<Record<string, string>>(() => {
@@ -314,9 +340,33 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
   };
   const setComp = (key: string, raw: string) => {
     const next = { ...comps, [key]: raw.replace(/[^0-9]/g, "") };
+    // the Staff law rides every Basic edit
+    if (isStaff && key === "basic_da") next.hra = String(Math.round((Number(next.basic_da) || 0) * 0.2));
     setComps(next);
     setGrossBox(String(COMPS.reduce((a, [k]) => a + (Number(next[k]) || 0), 0) || ""));
   };
+  // a saved structure from before the law wears the correction the moment
+  // the card opens — visibly, so what is saved next is right
+  useEffect(() => {
+    const basic = Number(comps.basic_da) || 0;
+    if (!basic) return;
+    const next: Record<string, string> = { ...comps };
+    let touched = false;
+    if (isContract) {
+      for (const k of ["hra", "fixed", "conveyance", "medical"]) if (next[k] !== "0") { next[k] = "0"; touched = true; }
+    } else {
+      if (next.medical !== "1250") { next.medical = "1250"; touched = true; }
+      if (isStaff) {
+        const want = String(Math.round(basic * 0.2));
+        if (next.hra !== want) { next.hra = want; touched = true; }
+      }
+    }
+    if (touched) {
+      setComps(next);
+      setGrossBox(String(COMPS.reduce((a, [k]) => a + (Number(next[k]) || 0), 0) || ""));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStaff, isContract]);
 
   const extraRows: ExtraRow[] = EXTRAS.map(([key, label, unit]) => ({
     label: unit === "yr" ? `${label} (annual)` : label,
@@ -400,7 +450,7 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
         <div className="mt-3">
           <div className="flex items-baseline gap-2 flex-wrap">
             <div className="font-bold" style={{ fontSize: 14 }}>The New Salary Structure</div>
-            <span style={{ fontSize: 11, color: C.faint }}>the five components are editable — type in the Monthly column and everything recomputes</span>
+            <span style={{ fontSize: 11, color: C.faint }}>type in the Monthly column and everything recomputes{isStaff ? " · Staff rule: HRA stays 20% of Basic & DA by itself" : ""}</span>
           </div>
           <table style={{ fontSize: 12.5, width: "100%", tableLayout: "fixed", borderCollapse: "collapse", marginTop: 6 }}>
             <thead>
@@ -421,9 +471,19 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
                           <td className="px-1.5 py-1" style={{ border: `1px solid ${C.line}` }}>{r.label}</td>
                           <td className="px-1.5 py-1 text-right tnum" style={{ border: `1px solid ${C.line}`, padding: key ? "2px 4px" : undefined }}>
                             {key
-                              ? <input value={comps[key]} inputMode="numeric" onChange={(e) => setComp(key, e.target.value)}
-                                  className="tnum rounded text-right px-1.5 py-1 w-full"
-                                  style={{ border: `1.5px solid ${C.green}`, fontWeight: 600, fontSize: 12.5, maxWidth: 130, marginLeft: "auto", display: "block" }} />
+                              ? (isContract && key !== "basic_da"
+                                ? <span className="tnum" title="A contract engagement is Basic & DA alone" style={{ color: C.dim }}>—</span>
+                                : key === "medical"
+                                ? <span className="tnum" title="Medical Allowance is always ₹1,250 — the rule" style={{ fontWeight: 600 }}>
+                                    {inr(Number(comps[key]) || 0)} <span style={{ fontSize: 10, color: C.dim }}>always</span>
+                                  </span>
+                                : isStaff && key === "hra"
+                                ? <span className="tnum" title="Staff rule: HRA is always 20% of Basic & DA — it follows the Basic, it is not typed" style={{ fontWeight: 600 }}>
+                                    {inr(Number(comps[key]) || 0)} <span style={{ fontSize: 10, color: C.dim }}>= 20% of Basic</span>
+                                  </span>
+                                : <input value={comps[key]} inputMode="numeric" onChange={(e) => setComp(key, e.target.value)}
+                                    className="tnum rounded text-right px-1.5 py-1 w-full"
+                                    style={{ border: `1.5px solid ${C.green}`, fontWeight: 600, fontSize: 12.5, maxWidth: 130, marginLeft: "auto", display: "block" }} />)
                               : inr(r.monthly)}
                           </td>
                           <td className="px-1.5 py-1 text-right tnum" style={{ border: `1px solid ${C.line}` }}>{inr(r.yearly)}</td>

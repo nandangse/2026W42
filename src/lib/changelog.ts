@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.18",
+    date: "2026-08-29",
+    module: "HRMS — the compensation laws, said once and kept everywhere",
+    items: [
+      "THE SALARY STRUCTURE OBEYS THE LAWS (Dr Raghu, 29 Aug 2026, caught on Santosh Patra's card where a proportional scale left HRA at 19.9%): for STAFF, HRA IS ALWAYS 20% OF BASIC & DA — it follows the Basic by itself and cannot be typed; MEDICAL ALLOWANCE IS ALWAYS ₹1,250 for the employed types; PF is 12% of Basic or ₹1,800 whichever is lower; PROFESSIONAL TAX walks the slab (175 between 7,500 and 10,000, 200 above, February's 300 in the annual); the ANNUAL BONUS @10% of Basic belongs to STAFF AND LABOUR alone.",
+      "A CONTRACT ENGAGEMENT IS BASIC & DA ALONE: every other component closes, no statutory, no benefits — the CTC is the basic, full stop, with the 2% TDS shown as before. The appraisal card, the offer table and the gross-splitter all read the same arithmetic in src/lib/salary.ts — one law, no drift.",
+      "A structure saved before the laws wears the correction the moment its card opens — visibly, so what is saved next is right.",
+    ],
+  },
+  {
     v: "3.31.0.17",
     date: "2026-08-29",
     module: "The ERP door swings both ways — push the dates, pull the enquiry",
