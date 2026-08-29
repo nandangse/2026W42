@@ -211,6 +211,7 @@ export const DOCTYPES: Doctype[] = [
       { name: "enquiry_info", label: "Enquiry Info", type: "textarea", big: true, tab: "enquiry",
         help: "The enquiry as it arrived — the customer's own words. 2,087 carried in from the ERP." },
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
+      { name: "contact_id", label: "Contact", type: "link", link: "person", help: "The one person this enquiry speaks to — 1:1 with the ERP's contact; the importer keeps it true." },
       { name: "opportunity_on", label: "Date", type: "date", inList: true, default: "today",
         help: "The business date the enquiry arrived — the ERP's Opportunity Date, distinct from when the row was written." },
       { name: "stage_id", label: "Stage", type: "link", link: "stage", required: true, inList: true,

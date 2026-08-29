@@ -18,7 +18,7 @@ const KNOWN = [
   // ERPNext (Dr Raghu, 28 Aug 2026): the Frappe token pair from his user's
   // API Access — auth is `token api_key:api_secret`; the SECRET shows only
   // once at Generate Keys. Editable by Raghu alone, for now.
-  { key: "erpnext", label: "ERPNext", fields: ["url", "api_key", "api_secret", "push_doctype", "push_tdd_field", "push_kit_field", "push_pct_field", "opp_info_field"], ownerOnly: true, help: "The ERP's door — site URL, API Key and API Secret from your ERPNext user's API Access (the secret shows once at Generate Keys). Below them, THE MAPPING: the job doctype and its field names for TDD / kitting % / production %, and the Opportunity field holding the enquiry text — use 🔍 Inspect to read the ERP's own field names before setting them. Only Raghu edits this one." },
+  { key: "erpnext", label: "ERPNext", fields: ["url", "api_key", "api_secret", "push_doctype", "push_tdd_field", "push_kit_field", "push_pct_field", "opp_info_field"], ownerOnly: true, help: "The ERP's door — site URL, API Key and API Secret from your ERPNext user's API Access (the secret shows once at Generate Keys). Below them, THE MAPPING: the job doctype and its field names for TDD / kitting % / production %, and the Opportunity field holding the enquiry text — use 🔍 Inspect to read the ERP's own field names before setting them. Only Raghu edits this one. SALES-SIDE IS PULL-ONLY for now — Opportunity, Quotation and Sales Order changes made in Genie are tracked in the audit and NOT written to the ERP until Raghu says sync." },
 ] as const;
 
 const mayManage = (role: string) => ["admin", "ceo", "sales_head"].includes(role);

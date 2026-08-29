@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.24",
+    date: "2026-08-29",
+    module: "CRM — the opportunity knows its person; sales-side stays pull-only",
+    items: [
+      "THE OPPORTUNITY GETS ITS CONTACT (Dr Raghu, 29 Aug 2026: 'each 1:1 inside this'): a Contact field beside the Company, filled by the importer from the ERP's own contact_person — matched through person.erp_name, the missing persons created with their name, email and phone so the match holds forever. The companies are set the same way, ERP customer by ERP customer. CRM migration 0029 adds the column.",
+      "AND THE RULE, SAID ON THE CARD: sales-side is PULL-ONLY for now — Opportunity, Quotation and Sales Order changes made in Genie are tracked in the audit and NOT written to the ERP, until Raghu says sync.",
+    ],
+  },
+  {
     v: "3.31.0.23",
     date: "2026-08-29",
     module: "CRM — the enquiry's images stand in the page",
