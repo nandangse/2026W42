@@ -3705,12 +3705,16 @@ function JobPlan({
           fixed overlay above the header cannot be hidden by it, and while
           the real card is still on screen the strip stays away entirely, so
           nothing is ever said twice. */}
+      {/* the floating first line (Dr Raghu, 29 Aug 2026): ONLY the job and
+          its customer tag, every screen size — it appears the moment the big
+          card scrolls away, and the milestone header keeps floating in its
+          own box beneath it. */}
       {hdrGone && (
-        <div className="md:hidden flex items-baseline px-4 py-1.5"
+        <div className="flex items-baseline px-4 py-1.5"
           style={{ position: "fixed", top: "var(--hdr-h, 92px)", left: 0, right: 0, zIndex: 46, background: "#16232F", color: "#fff", minWidth: 0, boxShadow: "0 6px 12px -8px rgba(0,0,0,.5)" }}>
           <span className="font-bold tnum" style={{ fontSize: 14, flexShrink: 0 }}>JOB {jobNo(dj.id)}</span>
-          <span className="truncate" style={{ fontSize: 12, color: "#B7C4D0", marginLeft: 8 }} title={dj.tag}>
-            {dj.tag}
+          <span className="truncate" style={{ fontSize: 12, color: "#B7C4D0", marginLeft: 8 }} title={`${dj.tag} — ${dj.cust}`}>
+            {dj.tag}{dj.cust ? ` — ${dj.cust}` : ""}
           </span>
         </div>
       )}

@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.22",
+    date: "2026-08-29",
+    module: "Job Plan — the floating first line",
+    items: [
+      "On the Job Plan, the moment the big card scrolls away a ONE-LINE STRIP floats up top on EVERY screen size — just the job number and its customer tag, nothing else (Dr Raghu, 29 Aug 2026) — and beneath it the milestone table's own header keeps floating in its box, dates always in sight.",
+    ],
+  },
+  {
     v: "3.31.0.21",
     date: "2026-08-29",
     module: "Update-to-ERP becomes the push console",
