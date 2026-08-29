@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.41",
+    date: "2026-08-29",
+    module: "CRM — Enrich with Apollo on the blue strip",
+    items: [
+      "🔎 ENRICH WITH APOLLO stands on the blue strip of every COMPANY and CONTACT (Dr Raghu, 29 Aug 2026) — and it says out loud that APOLLO CREDITS WILL BE CONSUMED before it spends one. On a company: empty fields filled (never overwritten), up to 10 people brought in as contacts, the rest — industry, headcount, LinkedIn, keywords — filed into Notes with a dated source line. On a contact: it opens the Visiting Card tab and runs the lookup, and the tick-through apply stays in your hands — enrichment is a claim, not a fact.",
+      "The ☎ dial-queue button now stands on companies and contacts too (CRM migration 0030 widens the queue's kinds).",
+      "The EVA brief no longer saves its own preamble — the brief starts at 'Who they are'.",
+    ],
+  },
+  {
     v: "3.31.0.40",
     date: "2026-08-29",
     module: "CRM — logging a call starts filled in",

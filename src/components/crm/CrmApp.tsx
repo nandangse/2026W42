@@ -1444,7 +1444,8 @@ function RecordModal({
   const ageDays = /^\d{4}-\d{2}-\d{2}$/.test(oppDate)
     ? Math.floor((Date.now() - new Date(oppDate + "T00:00:00").getTime()) / 864e5)
     : null;
-  const QUEUEABLE = ["opportunity", "quotation", "sales_order", "lead"];
+  // companies and contacts joined the dial queue on 29 Aug 2026
+  const QUEUEABLE = ["opportunity", "quotation", "sales_order", "lead", "company", "person"];
   const queueThis = async () => {
     try {
       const r = await fetch("/api/crm/prospect", {
@@ -1458,7 +1459,8 @@ function RecordModal({
     } catch (e) { setQueueMsg(e instanceof Error ? e.message : String(e)); }
   };
   const [tab, setTab] = useState("details");
-  useEffect(() => setTab("details"), [row.id]);
+  const [apolloMsg, setApolloMsg] = useState("");
+  useEffect(() => { setTab("details"); setApolloMsg(""); }, [row.id]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -1567,6 +1569,7 @@ function RecordModal({
                 </span>
               )}
               {queueMsg && <span style={{ color: "#F5B32B", fontWeight: 700 }}>{queueMsg}</span>}
+              {apolloMsg && apolloMsg !== "asking Apollo…" && <span style={{ color: apolloMsg.startsWith("✓") ? "#8FD5A6" : "#F5B32B", fontWeight: 700 }}>{apolloMsg}</span>}
             </div>
             {QUEUEABLE.includes(dt.name) && (
               <button
@@ -1585,6 +1588,38 @@ function RecordModal({
             )}
           </div>
           <div className="flex items-center gap-2">
+            {mode === "view" && (dt.name === "company" || dt.name === "person") && (
+              <button
+                onClick={async () => {
+                  // Apollo bills for what it answers — the consent is here
+                  if (!window.confirm(`Enrich with Apollo? APOLLO CREDITS WILL BE CONSUMED.\n\n${dt.name === "company"
+                    ? "Fills the company's empty fields, brings in up to 10 people as contacts, and files the rest into Notes."
+                    : "Looks this contact up — you tick which suggestions to apply on the Visiting Card tab."}`)) return;
+                  if (dt.name === "person") {
+                    try { window.sessionStorage.setItem("crm.apollo.auto", rid); } catch { /* fine */ }
+                    setTab("card");
+                    return;
+                  }
+                  setApolloMsg("asking Apollo…");
+                  try {
+                    const r = await fetch("/api/crm/enrich", {
+                      method: "POST", headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ action: "company", company_id: rid }),
+                    });
+                    const j = await r.json();
+                    if (!r.ok) throw new Error(String(j.error || r.status));
+                    setApolloMsg(!j.found ? "Apollo has no match" :
+                      `✓ ${j.contacts_created} contact${j.contacts_created === 1 ? "" : "s"} in · ${j.filled.length ? "filled " + j.filled.join(", ") : "fields already full"}${j.noted ? " · noted" : ""}`);
+                    onSaved();
+                  } catch (e) { setApolloMsg(e instanceof Error ? e.message : String(e)); }
+                }}
+                title="Fetch from Apollo.io — Apollo credits will be consumed"
+                className="px-3 py-1.5 rounded text-sm font-semibold"
+                style={{ background: "rgba(255,255,255,.10)", color: "#fff", border: "1px solid rgba(255,255,255,.3)" }}
+              >
+                {apolloMsg === "asking Apollo…" ? "Asking Apollo…" : "🔎 Enrich with Apollo"}
+              </button>
+            )}
             {mode === "view" && (
               <button
                 onClick={onEdit}

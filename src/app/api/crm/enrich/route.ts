@@ -20,6 +20,117 @@ export async function POST(req: Request) {
     const db = crmDb();
     const body = await req.json();
     const action = String(body.action || "lookup");
+
+    // ---- a whole COMPANY in one stroke (Dr Raghu, 29 Aug 2026: "Enrich
+    // with Apollo" on the blue strip) — the org's facts onto empty fields,
+    // up to ten people in as contacts, everything else into Notes. The
+    // person flow below keeps its tick-through hands; a company's volume
+    // makes the confirm dialog the consent.
+    if (action === "company") {
+      const companyId = String(body.company_id || "");
+      if (!companyId) throw new HttpError(400, "Which company?");
+      const { data: cfgRow2 } = await db.from("integration_setting").select("config").eq("key", "apollo").maybeSingle();
+      const key2 = String(((cfgRow2?.config || {}) as Record<string, string>).api_key || "");
+      if (!key2) throw new HttpError(503, "Apollo is not connected — paste its API key in Settings → Integrations first.");
+      const AH = { "content-type": "application/json", "x-api-key": key2 };
+      const { data: co } = await db.from("company")
+        .select("id, name, website, domain_name, city, state, country, notes")
+        .eq("id", companyId).maybeSingle();
+      if (!co) throw new HttpError(404, "No such company.");
+
+      const host = (u: string) => { try { return new URL(/^https?:/i.test(u) ? u : "https://" + u).hostname.replace(/^www\./, ""); } catch { return ""; } };
+      let domain = String(co.domain_name || "") || host(String(co.website || ""));
+      type Org = { id?: string; name?: string; website_url?: string; primary_domain?: string; linkedin_url?: string;
+        industry?: string; estimated_num_employees?: number; founded_year?: number; phone?: string;
+        city?: string; state?: string; country?: string; keywords?: string[]; short_description?: string };
+      let org: Org | null = null;
+      if (domain) {
+        const r1 = await fetch(`https://api.apollo.io/api/v1/organizations/enrich?domain=${encodeURIComponent(domain)}`, { headers: AH });
+        if (r1.ok) org = ((await r1.json()) as { organization?: Org }).organization ?? null;
+      }
+      if (!org) {
+        const r2 = await fetch("https://api.apollo.io/api/v1/mixed_companies/search", {
+          method: "POST", headers: AH,
+          body: JSON.stringify({ q_organization_name: String(co.name), page: 1, per_page: 3 }),
+        });
+        if (!r2.ok) throw new HttpError(502, r2.status === 401 || r2.status === 403
+          ? "Apollo refused the key — check it in Settings → Integrations."
+          : `Apollo answered ${r2.status} on the company search.`);
+        const hits = ((await r2.json()) as { organizations?: Org[] }).organizations ?? [];
+        org = hits[0] ?? null;
+        if (org?.primary_domain && !domain) domain = String(org.primary_domain);
+      }
+      if (!org) return NextResponse.json({ found: false, note: "Apollo has no match for this company." });
+
+      // the org's facts onto EMPTY fields only — enrichment never overwrites
+      const patch: Record<string, string> = {};
+      if (!String(co.website || "").trim() && org.website_url) patch.website = String(org.website_url);
+      if (!String(co.domain_name || "").trim() && (org.primary_domain || domain)) patch.domain_name = String(org.primary_domain || domain);
+      if (!String(co.city || "").trim() && org.city) patch.city = String(org.city);
+      if (!String(co.state || "").trim() && org.state) patch.state = String(org.state);
+      if (!String(co.country || "").trim() && org.country) patch.country = String(org.country);
+
+      // up to ten people, in as contacts — names and titles are search-tier
+      // (no per-person email credits burned); emails come one at a time
+      // through the contact's own tick-through enrich
+      let created = 0, already = 0;
+      const people: { name?: string; title?: string }[] = [];
+      if (org.id) {
+        const r3 = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
+          method: "POST", headers: AH,
+          body: JSON.stringify({ organization_ids: [org.id], page: 1, per_page: 10 }),
+        });
+        if (r3.ok) {
+          const ppl = ((await r3.json()) as { people?: { name?: string; title?: string }[] }).people ?? [];
+          people.push(...ppl);
+          const { data: existing } = await db.from("person").select("first_name").eq("company_id", companyId).limit(500);
+          const have = new Set((existing || []).map((p) => String(p.first_name || "").trim().toLowerCase()));
+          const rows2 = [];
+          for (const p of ppl) {
+            const nm = String(p.name || "").trim();
+            if (!nm) continue;
+            if (have.has(nm.toLowerCase())) { already++; continue; }
+            have.add(nm.toLowerCase());
+            rows2.push({ first_name: nm.slice(0, 180), job_title: String(p.title || "").slice(0, 160) || null, company_id: companyId });
+          }
+          if (rows2.length) {
+            const { error: pe } = await db.from("person").insert(rows2);
+            if (!pe) created = rows2.length;
+          }
+        }
+      }
+
+      // everything else into Notes, dated and sourced
+      const extra = [
+        `— Apollo enrichment (${new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10)}) —`,
+        [org.industry && `Industry: ${org.industry}`,
+         org.estimated_num_employees && `Employees: ~${org.estimated_num_employees}`,
+         org.founded_year && `Founded: ${org.founded_year}`].filter(Boolean).join(" · "),
+        org.linkedin_url && `LinkedIn: ${org.linkedin_url}`,
+        org.phone && `Phone: ${org.phone}`,
+        Array.isArray(org.keywords) && org.keywords.length ? `Keywords: ${org.keywords.slice(0, 12).join(", ")}` : "",
+        org.short_description ? String(org.short_description).slice(0, 600) : "",
+      ].filter(Boolean).join("\n");
+      const prevNotes = String(co.notes || "").trim();
+      if (!prevNotes.includes("— Apollo enrichment"))
+        patch.notes = (prevNotes ? prevNotes + "\n\n" : "") + extra;
+
+      if (Object.keys(patch).length) {
+        const { error: ue } = await db.from("company").update(patch).eq("id", companyId);
+        if (ue) throw new HttpError(500, ue.message);
+      }
+      await db.from("crm_audit").insert({
+        entity: "company", entity_id: companyId, action: "apollo_enrich",
+        after: { fields: Object.keys(patch), contacts_created: created }, by_user: me.profileId,
+      }).then(() => null, () => null);
+      return NextResponse.json({
+        found: true, org: org.name ?? co.name,
+        filled: Object.keys(patch).filter((k) => k !== "notes"),
+        noted: "notes" in patch, contacts_created: created, contacts_already: already,
+        people_seen: people.length,
+      });
+    }
+
     const personId = String(body.person_id || "");
     if (!personId) throw new HttpError(400, "Which contact?");
 

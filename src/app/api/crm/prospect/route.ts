@@ -78,6 +78,18 @@ export async function GET(req: Request) {
     await load("quotation", "quotation", "quote_no");
     await load("sales_order", "sales_order", "so_no");
     await load("lead", "lead", "raw_subject", "contact_phone");
+    await load("person", "person", "full_name", "primary_phone");
+    // a company IS its own company — the dial number comes from its people
+    {
+      const coIds = byKind.get("company");
+      if (coIds?.length) {
+        const { data } = await db.from("company").select("id, name").in("id", coIds);
+        for (const r of data || []) {
+          companyIds.add(String(r.id));
+          info.set(`company:${r.id}`, { title: String(r.name ?? ""), company_id: String(r.id), phone: null });
+        }
+      }
+    }
 
     // companies, and their first person with a number — the dial target
     const companyName = new Map<string, string>();
@@ -125,7 +137,7 @@ export async function POST(req: Request) {
     if (action === "add") {
       const kind = String(body.kind || "");
       const ref = String(body.id || "");
-      if (!["opportunity", "quotation", "sales_order", "lead"].includes(kind)) throw new HttpError(400, "Which kind of deal?");
+      if (!["opportunity", "quotation", "sales_order", "lead", "company", "person"].includes(kind)) throw new HttpError(400, "Which kind of deal?");
       if (!ref) throw new HttpError(400, "Which deal?");
       const { error } = await db.from("prospect_queue").insert({ kind, ref_id: ref, added_by: mine });
       if (error) {

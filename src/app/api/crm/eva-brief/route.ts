@@ -138,7 +138,11 @@ keep it short. No preamble. Start at "**Who they are**".`;
     if (response.stop_reason === "refusal")
       throw new HttpError(422, "The research was declined by safety classifiers — try again, or write the brief by hand.");
 
-    const brief = response.content.filter((x) => x.type === "text").map((x) => x.text).join("\n").trim();
+    let brief = response.content.filter((x) => x.type === "text").map((x) => x.text).join("\n").trim();
+    // despite "no preamble", a research turn sometimes opens with chatter —
+    // the brief starts where its first section starts
+    const start = brief.indexOf("**Who they are**");
+    if (start > 0) brief = brief.slice(start);
     if (!brief) throw new HttpError(502, "The research came back empty — try again.");
 
     const at = new Date().toISOString();

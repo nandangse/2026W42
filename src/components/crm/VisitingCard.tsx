@@ -446,6 +446,15 @@ export function PersonCardPanel({ personId, personRow, onSaved }: {
     fetch(`/api/crm/visiting-card?person_id=${encodeURIComponent(personId)}`)
       .then(async (r) => setCards(((await r.json()).cards || []) as CardRow[]))
       .catch(() => setCards([]));
+    // arrived from the blue strip's "Enrich with Apollo" — the confirm (and
+    // the credits warning) already happened there, so the lookup runs itself
+    try {
+      if (window.sessionStorage.getItem("crm.apollo.auto") === personId) {
+        window.sessionStorage.removeItem("crm.apollo.auto");
+        void lookup();
+      }
+    } catch { /* fine */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personId]);
 
   const lookup = async () => {

@@ -69,6 +69,8 @@ const PROBES = [
   ["genie", "0098 raghu brief", "hrms_appraisal?select=brief&limit=1"],
   ["genie", "0099 new designation", "hrms_appraisal?select=new_designation&limit=1"],
   ["genie", "0100 learning queue order", "lms_progress?select=sort_order&limit=1"],
+  // 0030 widens a CHECK — no new column to probe; verified by queueing a company
+
   ["crm", "0029 opportunity contact", "opportunity?select=contact_id&limit=1"],
   ["crm", "0025 tags", "crm_tag?select=id"],
   ["crm", "0026 tags widen + 0027 year in number", "crm_tag_link?select=id"],
