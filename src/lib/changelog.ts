@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.23",
+    date: "2026-08-29",
+    module: "CRM — the enquiry's images stand in the page",
+    items: [
+      "THE IMAGES EMBED (Dr Raghu, 29 Aug 2026: 'it's not possible to click and see'): an ERP file demands the ERP's own login, so those links died at the gate for anyone not signed into the ERP. Genie now fetches them through ITS OWN DOOR — server-side, with the stored token — and the enquiry's images stand IN the page, full size a click away; the 📎 attachments open the same way. Anyone signed into Genie sees everything; nobody needs an ERP login.",
+      "The door is not a proxy for the world: only files under the configured ERP host travel, only for signed-in CRM users, capped at 25 MB.",
+    ],
+  },
+  {
     v: "3.31.0.22",
     date: "2026-08-29",
     module: "Job Plan — the floating first line",

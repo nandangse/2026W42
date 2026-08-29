@@ -2026,16 +2026,35 @@ function RichTextArea({ value, onChange, rows }: { value: string; onChange: (v: 
  * clickable links, bare URLs link themselves, bold reads bold. Rendered as
  * React nodes — never injected HTML, so a pasted enquiry cannot run code.
  */
+/** An ERP file URL needs the ERP's login — those travel through Genie's own
+ *  door instead, fetched server-side with the stored token (29 Aug 2026), so
+ *  images EMBED and attachments open for anyone signed into Genie. */
+const isErpFile = (u: string) => /^https?:\/\/[^/]*nandanerp[^/]*\/(private\/)?files?\//i.test(u);
+const viaDoor = (u: string) => (isErpFile(u) ? `/api/crm/erp-file?u=${encodeURIComponent(u)}` : u);
+const looksImage = (u: string) => /\.(png|jpe?g|gif|webp|bmp)(\?|$)/i.test(u) || /\/files?\//i.test(u);
+
 function RichText({ text }: { text: string }) {
   const parts: React.ReactNode[] = [];
   // ![alt](url) · [label](url) · bare http(s) URLs · **bold**
   const re = /!\[([^\]]*)\]\(([^)\s]+)\)|\[([^\]]+)\]\(([^)\s]+)\)|(https?:\/\/[^\s)]+)|\*\*([^*]+)\*\*/g;
   let last = 0; let m: RegExpExecArray | null; let k = 0;
+  const img = (url: string, alt: string) => (
+    <a key={k++} href={viaDoor(url)} target="_blank" rel="noreferrer" title={alt || "open full size"} style={{ display: "block", margin: "6px 0" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={viaDoor(url)} alt={alt || "image"} loading="lazy"
+        style={{ maxWidth: "100%", maxHeight: 420, borderRadius: 6, border: "1px solid #E2E0DA", display: "block" }} />
+    </a>
+  );
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index));
-    if (m[2]) parts.push(<a key={k++} href={m[2]} target="_blank" rel="noreferrer" style={{ color: "#2C5B82", fontWeight: 600, textDecoration: "underline" }}>🖼 {m[1] || "image"}</a>);
-    else if (m[4]) parts.push(<a key={k++} href={m[4]} target="_blank" rel="noreferrer" style={{ color: "#2C5B82", fontWeight: 600, textDecoration: "underline" }}>{m[3]}</a>);
-    else if (m[5]) parts.push(<a key={k++} href={m[5]} target="_blank" rel="noreferrer" style={{ color: "#2C5B82", textDecoration: "underline" }}>{m[5].length > 60 ? m[5].slice(0, 57) + "…" : m[5]}</a>);
+    if (m[2]) parts.push(img(m[2], m[1]));
+    else if (m[4]) {
+      // a "[🖼 image](…)" from the ERP import EMBEDS; other links stay links,
+      // ERP-held files opening through the door
+      if (/🖼/.test(m[3]) && looksImage(m[4])) parts.push(img(m[4], m[3]));
+      else parts.push(<a key={k++} href={viaDoor(m[4])} target="_blank" rel="noreferrer" style={{ color: "#2C5B82", fontWeight: 600, textDecoration: "underline" }}>{m[3]}</a>);
+    }
+    else if (m[5]) parts.push(<a key={k++} href={viaDoor(m[5])} target="_blank" rel="noreferrer" style={{ color: "#2C5B82", textDecoration: "underline" }}>{m[5].length > 60 ? m[5].slice(0, 57) + "…" : m[5]}</a>);
     else if (m[6]) parts.push(<b key={k++}>{m[6]}</b>);
     last = m.index + m[0].length;
   }
