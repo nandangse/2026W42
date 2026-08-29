@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.42",
+    date: "2026-08-29",
+    module: "CRM — the week has a budget, and the ERP door stays open",
+    items: [
+      "EVA BRIEF QUOTAS (Dr Raghu, 29 Aug 2026): each brief is ~₹60–100 of live research, so the week has a budget — 10 per salesperson, 100 for Raghu, Monday to Sunday on the IST calendar, counted from the audit trail and editable in Settings → Integrations → EVA Brief quota. The tab tells you where you stand after every brief.",
+      "APOLLO ALLOTMENTS the same way: contact lookups and company enrichments both count — 25 a week per salesperson, 200 for Raghu, editable on the Apollo card. Applying ticked suggestions stays free.",
+      "THE ERP PULL IS NOW HOURLY: the big import was a one-time carry — a cron at a quarter past every hour now brings in opportunities newly born in the ERP, with the same 1:1 customer and contact links, the enquiry as rich text, stage, sector, product family and salesperson mapped. Existing rows are never overwritten — Genie's edits win, and the sales-side stays pull-only.",
+    ],
+  },
+  {
     v: "3.31.0.41",
     date: "2026-08-29",
     module: "CRM — Enrich with Apollo on the blue strip",

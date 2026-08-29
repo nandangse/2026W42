@@ -2185,7 +2185,8 @@ function EvaBriefTab({ companyId, initial, initialAt }: { companyId: string; ini
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "EVA could not research this one");
-      setBrief(j.brief); setAt(j.at); setMsg("");
+      setBrief(j.brief); setAt(j.at);
+      setMsg(j.allotment ? `${j.allotment.used} of your ${j.allotment.limit} briefs this week used — resets Monday` : "");
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   };

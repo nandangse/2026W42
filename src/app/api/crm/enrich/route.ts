@@ -21,6 +21,32 @@ export async function POST(req: Request) {
     const body = await req.json();
     const action = String(body.action || "lookup");
 
+    // THE WEEK HAS AN APOLLO ALLOTMENT (Dr Raghu, 29 Aug 2026): lookups and
+    // company enrichments both spend real Apollo credits, so each salesperson
+    // gets a weekly number — 25 by default, 200 for Raghu, editable in
+    // Settings → Integrations → Apollo.io. Applying ticked fields is free.
+    // Counted from the audit trail, Monday to Sunday on the IST calendar.
+    const apolloGate = async () => {
+      const { data: qRow } = await db.from("integration_setting").select("config").eq("key", "apollo").maybeSingle();
+      const qc = (qRow?.config || {}) as Record<string, string>;
+      const limit = me.isOwner ? (Number(qc.raghu_per_week) || 200) : (Number(qc.per_week) || 25);
+      const nowIst = Date.now() + 330 * 60000;
+      const dIst = new Date(nowIst);
+      const dow = (dIst.getUTCDay() + 6) % 7;
+      const weekStart = new Date(Date.UTC(dIst.getUTCFullYear(), dIst.getUTCMonth(), dIst.getUTCDate() - dow) - 330 * 60000).toISOString();
+      let used = 0;
+      if (me.profileId) {
+        const { count } = await db.from("crm_audit")
+          .select("id", { count: "exact", head: true })
+          .in("action", ["apollo_lookup", "apollo_enrich"]).eq("by_user", me.profileId).gte("at", weekStart);
+        used = count ?? 0;
+      }
+      if (used >= limit)
+        throw new HttpError(429,
+          `Your Apollo allotment for the week is spent — ${used} of ${limit} asks since Monday. It resets Monday; ${me.isOwner ? "raise your own number in Settings → Integrations." : "ask Raghu or the Sales Head if it cannot wait."}`);
+      return { used, limit };
+    };
+
     // ---- a whole COMPANY in one stroke (Dr Raghu, 29 Aug 2026: "Enrich
     // with Apollo" on the blue strip) — the org's facts onto empty fields,
     // up to ten people in as contacts, everything else into Notes. The
@@ -29,6 +55,7 @@ export async function POST(req: Request) {
     if (action === "company") {
       const companyId = String(body.company_id || "");
       if (!companyId) throw new HttpError(400, "Which company?");
+      const quota = await apolloGate();
       const { data: cfgRow2 } = await db.from("integration_setting").select("config").eq("key", "apollo").maybeSingle();
       const key2 = String(((cfgRow2?.config || {}) as Record<string, string>).api_key || "");
       if (!key2) throw new HttpError(503, "Apollo is not connected — paste its API key in Settings → Integrations first.");
@@ -128,6 +155,7 @@ export async function POST(req: Request) {
         filled: Object.keys(patch).filter((k) => k !== "notes"),
         noted: "notes" in patch, contacts_created: created, contacts_already: already,
         people_seen: people.length,
+        allotment: { used: quota.used + 1, limit: quota.limit },
       });
     }
 
@@ -163,6 +191,7 @@ export async function POST(req: Request) {
     }
     if (!person.primary_email && !companyName)
       throw new HttpError(409, "Apollo needs at least an email or a company name to match on — this contact has neither.");
+    const quota = await apolloGate();
 
     const r = await fetch("https://api.apollo.io/api/v1/people/match", {
       method: "POST",
@@ -182,11 +211,17 @@ export async function POST(req: Request) {
         : `Apollo answered ${r.status}: ${t.slice(0, 160)}`);
     }
     const j = await r.json();
+    // the ask happened, match or not — it counts against the allotment
+    await db.from("crm_audit").insert({
+      entity: "person", entity_id: personId, action: "apollo_lookup",
+      after: { matched: !!j?.person }, by_user: me.profileId,
+    }).then(() => null, () => null);
     const p = j?.person;
-    if (!p) return NextResponse.json({ found: false });
+    if (!p) return NextResponse.json({ found: false, allotment: { used: quota.used + 1, limit: quota.limit } });
 
     return NextResponse.json({
       found: true,
+      allotment: { used: quota.used + 1, limit: quota.limit },
       suggestion: {
         name: p.name ?? null,
         job_title: p.title ?? null,

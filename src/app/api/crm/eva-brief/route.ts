@@ -27,6 +27,31 @@ export async function POST(req: Request) {
     if (!companyId) throw new HttpError(400, "Which company? eva-brief needs company_id.");
 
     const db = crmDb();
+
+    // THE WEEK HAS A BUDGET (Dr Raghu, 29 Aug 2026): each brief is ~₹60-100
+    // of live research, so 10 per salesperson per week, 100 for Raghu —
+    // editable in Settings → Integrations → EVA Brief quota. Counted from
+    // the audit trail, Monday to Sunday on the IST calendar.
+    const { data: qRow } = await db.from("integration_setting").select("config").eq("key", "eva_quota").maybeSingle();
+    const qc = (qRow?.config || {}) as Record<string, string>;
+    const isOwner = !!user.isOwner;
+    const limit = isOwner ? (Number(qc.raghu_per_week) || 100) : (Number(qc.per_week) || 10);
+    const nowIst = Date.now() + 330 * 60000;
+    const dIst = new Date(nowIst);
+    const dow = (dIst.getUTCDay() + 6) % 7;
+    const mondayIstMidnightUtc = Date.UTC(dIst.getUTCFullYear(), dIst.getUTCMonth(), dIst.getUTCDate() - dow) - 330 * 60000;
+    const weekStart = new Date(mondayIstMidnightUtc).toISOString();
+    let used = 0;
+    if (user.profileId) {
+      const { count } = await db.from("crm_audit")
+        .select("id", { count: "exact", head: true })
+        .eq("action", "eva_brief").eq("by_user", user.profileId).gte("at", weekStart);
+      used = count ?? 0;
+    }
+    if (used >= limit)
+      throw new HttpError(429,
+        `Your EVA week is spent — ${used} of ${limit} briefs used since Monday. The counter resets Monday; each brief is real research money. ${isOwner ? "Raise your own number in Settings → Integrations." : "Ask Raghu or the Sales Head if a company truly cannot wait."}`);
+
     const { data: co } = await db.from("company")
       .select("id, name, website, city, country, is_customer, industry_id, industry:industry_id(name, sector_id)")
       .eq("id", companyId).maybeSingle();
@@ -156,7 +181,7 @@ keep it short. No preamble. Start at "**Who they are**".`;
       entity: "company", entity_id: companyId, action: "eva_brief",
       after: { eva_brief_at: at }, by_user: user.profileId,
     });
-    return NextResponse.json({ brief, at });
+    return NextResponse.json({ brief, at, allotment: { used: used + 1, limit } });
   } catch (e) {
     return errJson(e);
   }

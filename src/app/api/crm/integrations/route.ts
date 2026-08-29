@@ -14,7 +14,10 @@ export const dynamic = "force-dynamic";
  * Managed by admin, CEO and Sales Head.
  */
 const KNOWN = [
-  { key: "apollo", label: "Apollo.io", fields: ["api_key"], ownerOnly: false, help: "Enriches contacts — designation, phones, LinkedIn — from apollo.io. Settings → API keys there." },
+  // EVA quotas (Dr Raghu, 29 Aug 2026): each brief is real research money
+  // (~₹60-100), so the week has a budget — 10 per salesperson, 100 for Raghu.
+  { key: "eva_quota", label: "EVA Brief quota", fields: ["per_week", "raghu_per_week"], ownerOnly: false, help: "How many ✨ EVA Briefs each salesperson may run per week (Monday to Sunday, IST) — and Raghu's own number. Each brief costs roughly ₹60–100 of live web research. Blank falls back to 10 and 100." },
+  { key: "apollo", label: "Apollo.io", fields: ["api_key", "per_week", "raghu_per_week"], ownerOnly: false, help: "Enriches contacts and companies from apollo.io (Settings → API keys there). PER_WEEK is each salesperson's weekly allotment of Apollo asks — contact lookups and company enrichments both count, applying ticked fields is free — and RAGHU_PER_WEEK is Raghu's own. Blank falls back to 25 and 200. Monday to Sunday, IST." },
   // ERPNext (Dr Raghu, 28 Aug 2026): the Frappe token pair from his user's
   // API Access — auth is `token api_key:api_secret`; the SECRET shows only
   // once at Generate Keys. Editable by Raghu alone, for now.
@@ -43,7 +46,9 @@ export async function GET() {
         return {
           key: k.key, label: k.label, fields: k.fields, help: k.help,
           ownerOnly: k.ownerOnly, mayEdit: !k.ownerOnly || me.isOwner,
-          configured: k.key === "erpnext" ? !!(cfg.api_key && cfg.api_secret) : !!cfg.api_key,
+          configured: k.key === "erpnext" ? !!(cfg.api_key && cfg.api_secret)
+            : k.key === "eva_quota" ? !!(cfg.per_week || cfg.raghu_per_week)
+            : !!cfg.api_key,
           tail: cfg.api_key ? String(cfg.api_key).slice(-4) : null,
           url: k.key === "erpnext" ? cfg.url ?? null : null,
           mapping: k.key === "erpnext" ? {
