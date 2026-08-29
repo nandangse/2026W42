@@ -119,6 +119,25 @@ export default function CrmApp({
   const [qLive, setQLive] = useState("");            // debounced into q
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [tagQ, setTagQ] = useState("");
+  // the date view (Dr Raghu, 28 Aug 2026): YTD by default, the salesperson's
+  // last view remembered per list, the saved views on the menu.
+  const [dateView, setDateView] = useState<DateView | null>(null);
+  useEffect(() => {
+    const dts = DOCTYPES.find((d2) => d2.name === slug);
+    const fld = dts?.fields.find((f) => f.type === "date" && !f.virtual)?.name ?? "created_at";
+    try {
+      const kept = localStorage.getItem(`crm.dateview.${slug}`);
+      if (kept) { setDateView(JSON.parse(kept)); return; }
+    } catch { /* fine */ }
+    setDateView({ field: fld, preset: "ytd", from: "", to: "" });
+  }, [slug]);
+  const applyDateView = (v: DateView | null) => {
+    setDateView(v);
+    try {
+      if (v) localStorage.setItem(`crm.dateview.${slug}`, JSON.stringify(v));
+      else localStorage.removeItem(`crm.dateview.${slug}`);
+    } catch { /* fine */ }
+  };
   const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" } | null>(null);
   const [cols, setCols] = useState<string[] | null>(null);   // null = registry default
   const [pin, setPin] = useState(0);
@@ -193,10 +212,15 @@ export default function CrmApp({
     if (q.trim()) p.set("q", q.trim());
     for (const [k, v] of Object.entries(filters)) if (v !== "") p.set(`f_${k}`, v);
     if (tagQ.trim()) p.set("tag", tagQ.trim());
+    if (dateView && dateView.preset !== "all") {
+      const r = dateRangeOf(dateView);
+      if (r.from) p.set(`f_${dateView.field}_gte`, r.from);
+      if (r.to) p.set(`f_${dateView.field}_lte`, r.to);
+    }
     if (sort) { p.set("sort", sort.col); p.set("dir", sort.dir); }
     p.set("limit", pageSize);
     return p;
-  }, [q, filters, tagQ, sort, pageSize]);
+  }, [q, filters, tagQ, dateView, sort, pageSize]);
 
   useEffect(() => {
     if (!groupBy) { setGroups(null); return; }
@@ -563,6 +587,7 @@ export default function CrmApp({
             {["company", "person", "opportunity"].includes(dt.name) && (
               <TagFilterBox value={tagQ} onSet={setTagQ} />
             )}
+            {dateView && <DateViewBar dt={dt} value={dateView} onChange={applyDateView} />}
             <div style={{ position: "relative" }}>
               <button
                 onClick={() => setColsOpen((v) => !v)}
@@ -2476,6 +2501,95 @@ function GenieTab({ type, id }: { type: string; id: string }) {
  * email or phone, then names that start the same — and one click absorbs the
  * duplicate: every reference on it moves to this record, everywhere.
  */
+/**
+ * THE DATE VIEWS (Dr Raghu, 28 Aug 2026): every list with a date opens on
+ * YTD, remembers the salesperson's last view, and offers the saved views —
+ * Last 7/15/30 Days, This/Last/Last-Two Weeks, Months, Quarters, This YTD,
+ * Last FY, Greater Than, Less Than, Custom. Quarters and the year run the
+ * Indian way, April first.
+ */
+interface DateView { field: string; preset: string; from: string; to: string }
+
+const DATE_PRESETS: [string, string][] = [
+  ["all", "All time"],
+  ["last7", "Last 7 Days"], ["last15", "Last 15 Days"], ["last30", "Last 30 Days"],
+  ["thisWeek", "This Week"], ["lastWeek", "Last Week"], ["lastTwoWeeks", "Last Two Weeks"],
+  ["thisMonth", "This Month"], ["lastMonth", "Last Month"], ["lastTwoMonths", "Last Two Months"],
+  ["thisQuarter", "This Quarter"], ["lastQuarter", "Last Quarter"], ["lastTwoQuarters", "Last Two Quarters"],
+  ["ytd", "This YTD"], ["lastFy", "Last FY"],
+  ["gt", "Greater Than"], ["lt", "Less Than"], ["custom", "Custom"],
+];
+
+function dateRangeOf(v: DateView): { from: string; to: string } {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const D = (iso: string, n: number) => {
+    const t = new Date(iso + "T00:00:00Z");
+    t.setUTCDate(t.getUTCDate() + n);
+    return t.toISOString().slice(0, 10);
+  };
+  const monday = (iso: string) => {
+    const t = new Date(iso + "T00:00:00Z");
+    return D(iso, -((t.getUTCDay() + 6) % 7));
+  };
+  const monthStart = (iso: string, back: number) => {
+    let y = Number(iso.slice(0, 4)), m = Number(iso.slice(5, 7)) - back;
+    while (m <= 0) { m += 12; y -= 1; }
+    return `${y}-${String(m).padStart(2, "0")}-01`;
+  };
+  const y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7));
+  const fyStart = m >= 4 ? `${y}-04-01` : `${y - 1}-04-01`;
+  const qBack = (back: number) => {
+    // FY quarters: Apr Jul Oct Jan
+    const qi = Math.floor(((m + 8) % 12) / 3) - back;
+    let qy2 = m >= 4 ? y : y - 1, q2 = qi;
+    while (q2 < 0) { q2 += 4; qy2 -= 1; }
+    const qm = 4 + q2 * 3;
+    return `${qm <= 12 ? qy2 : qy2 + 1}-${String(qm <= 12 ? qm : qm - 12).padStart(2, "0")}-01`;
+  };
+  switch (v.preset) {
+    case "last7": return { from: D(today, -6), to: today };
+    case "last15": return { from: D(today, -14), to: today };
+    case "last30": return { from: D(today, -29), to: today };
+    case "thisWeek": return { from: monday(today), to: today };
+    case "lastWeek": return { from: D(monday(today), -7), to: D(monday(today), -1) };
+    case "lastTwoWeeks": return { from: D(monday(today), -14), to: D(monday(today), -1) };
+    case "thisMonth": return { from: monthStart(today, 0), to: today };
+    case "lastMonth": return { from: monthStart(today, 1), to: D(monthStart(today, 0), -1) };
+    case "lastTwoMonths": return { from: monthStart(today, 2), to: D(monthStart(today, 0), -1) };
+    case "thisQuarter": return { from: qBack(0), to: today };
+    case "lastQuarter": return { from: qBack(1), to: D(qBack(0), -1) };
+    case "lastTwoQuarters": return { from: qBack(2), to: D(qBack(0), -1) };
+    case "ytd": return { from: fyStart, to: today };
+    case "lastFy": return { from: D(fyStart, -365).slice(0, 4) + "-04-01", to: D(fyStart, -1) };
+    case "gt": return { from: v.from, to: "" };
+    case "lt": return { from: "", to: v.to };
+    case "custom": return { from: v.from, to: v.to };
+    default: return { from: "", to: "" };
+  }
+}
+
+function DateViewBar({ dt, value, onChange }: { dt: Doctype; value: DateView; onChange: (v: DateView) => void }) {
+  const dateFields = dt.fields.filter((f) => f.type === "date" && !f.virtual).map((f) => ({ name: f.name, label: f.label }));
+  const fields = [...dateFields, { name: "created_at", label: "Created" }];
+  const needsFrom = ["gt", "custom"].includes(value.preset);
+  const needsTo = ["lt", "custom"].includes(value.preset);
+  const active = value.preset !== "all";
+  return (
+    <span className="flex items-center gap-1 flex-wrap">
+      <select value={value.field} onChange={(e) => onChange({ ...value, field: e.target.value })}
+        className="px-1.5 py-1.5 rounded text-sm border bg-white" style={{ borderColor: BORDER, color: "#5A6672" }}>
+        {fields.map((f) => (<option key={f.name} value={f.name}>{f.label}</option>))}
+      </select>
+      <select value={value.preset} onChange={(e) => onChange({ ...value, preset: e.target.value })}
+        className="px-1.5 py-1.5 rounded text-sm border bg-white font-semibold" style={{ borderColor: active ? ORANGE : BORDER }}>
+        {DATE_PRESETS.map(([k, lbl]) => (<option key={k} value={k}>{lbl}</option>))}
+      </select>
+      {needsFrom && <input type="date" value={value.from} onChange={(e) => onChange({ ...value, from: e.target.value })} className="px-1.5 py-1 rounded text-sm border tnum" style={{ borderColor: BORDER }} />}
+      {needsTo && <input type="date" value={value.to} onChange={(e) => onChange({ ...value, to: e.target.value })} className="px-1.5 py-1 rounded text-sm border tnum" style={{ borderColor: BORDER }} />}
+    </span>
+  );
+}
+
 /**
  * TAGS (Dr Raghu, 28 Aug 2026): the section below every company, contact and
  * opportunity. Type-along, one or more; each salesperson sees only their own

@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.13",
+    date: "2026-08-28",
+    module: "CRM — the date views: YTD by default, your last view remembered",
+    items: [
+      "EVERY CRM LIST WITH A DATE gets the view bar (Dr Raghu, 28 Aug 2026): pick the date it reads (the record's own date, or Created) and the view — Last 7/15/30 Days, This/Last/Last-Two Weeks, Months and Quarters, This YTD, Last FY, Greater Than, Less Than, Custom — quarters and the year running the Indian way, April first.",
+      "YTD stands by default, THE SALESPERSON'S LAST VIEW IS REMEMBERED per list on their machine, and All Time is one click when the whole book is wanted. The chosen window rides to the server, so the counts and pages are the window's own — not a trimmed page of everything.",
+    ],
+  },
+  {
     v: "3.31.0.12",
     date: "2026-08-28",
     module: "Kuber — the REGISTERS shelf, and instruments that act",

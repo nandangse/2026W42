@@ -369,10 +369,26 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       for (const f of d.fields) {
         if (f.virtual) continue;
         const v = u.searchParams.get(`f_${f.name}`);
-        if (v === null || v === "") continue;
-        qy = f.type === "bool" ? qy.eq(f.name, v === "true")
-          : v.includes(",") ? qy.in(f.name, v.split(","))
-          : qy.eq(f.name, v);
+        if (v !== null && v !== "") {
+          qy = f.type === "bool" ? qy.eq(f.name, v === "true")
+            : v.includes(",") ? qy.in(f.name, v.split(","))
+            : qy.eq(f.name, v);
+        }
+        // the date views (Dr Raghu, 28 Aug 2026): any date field takes a
+        // range — the client's presets (YTD, This Quarter, Last FY…) all
+        // land here as plain gte/lte.
+        if (f.type === "date") {
+          const g = u.searchParams.get(`f_${f.name}_gte`);
+          const l = u.searchParams.get(`f_${f.name}_lte`);
+          if (g) qy = qy.gte(f.name, g);
+          if (l) qy = qy.lte(f.name, l);
+        }
+      }
+      {
+        const g = u.searchParams.get("f_created_at_gte");
+        const l = u.searchParams.get("f_created_at_lte");
+        if (g) qy = qy.gte("created_at", g);
+        if (l) qy = qy.lte("created_at", l + "T23:59:59");
       }
       const q = u.searchParams.get("q")?.trim();
       if (q) qy = qy.ilike(d.titleField, `%${q.replace(/[%_]/g, "\\$&")}%`);
