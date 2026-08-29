@@ -47,6 +47,35 @@ export function MoneyEntry({ value, onChange, usd }: { value: string; onChange: 
 }
 
 const CONFIGS: Record<string, { title: string; blurb: string; fields: Field[]; dateKey: string; amountKey: string; warnDays?: number; statusWords?: Record<string, string> }> = {
+  bounce: {
+    title: "Bounced Cheques",
+    blurb: "Every cheque that came back — whose, which bank, why, and where the recovery stands. A bounce forgotten is money forgiven.",
+    dateKey: "date", amountKey: "amount",
+    fields: [
+      { key: "date", label: "Bounce date", type: "date" },
+      { key: "party", label: "Party", type: "text" },
+      { key: "cheque_no", label: "Cheque No", type: "text" },
+      { key: "bank", label: "Bank", type: "text" },
+      { key: "amount", label: "Amount", type: "money" },
+      { key: "reason", label: "Reason", type: "text", hint: "insufficient funds, signature, stale…" },
+      { key: "status", label: "Status", type: "select", options: ["received back", "replaced", "recovered", "legal", "written off"] },
+      { key: "note", label: "Note", type: "text" },
+    ],
+  },
+  release: {
+    title: "Payments to Release",
+    blurb: "The queue cleared to go out — who gets what, who approved it, and the day it leaves. The 13-week plan decides; this list executes.",
+    dateKey: "release_on", amountKey: "amount",
+    fields: [
+      { key: "party", label: "Party", type: "text" },
+      { key: "amount", label: "Amount", type: "money" },
+      { key: "purpose", label: "Purpose / bill ref", type: "text" },
+      { key: "approved_by", label: "Approved by", type: "text" },
+      { key: "release_on", label: "Release on", type: "date" },
+      { key: "status", label: "Status", type: "select", options: ["waiting", "approved", "released", "held"] },
+      { key: "note", label: "Note", type: "text" },
+    ],
+  },
   loan: {
     title: "Banking — Loan Status",
     blurb: "Every borrowing with its sanction, outstanding, EMI and ROI — cut Dr Raghu's way: Secured–Banks (A), Secured–Others (B), Non-fund/BG (C), Unsecured (D). The status totals ARE the A/B/C/D lines; ALL is Total Debts.",

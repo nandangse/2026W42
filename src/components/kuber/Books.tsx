@@ -1605,3 +1605,83 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
     </div>
   );
 }
+
+// ---------------- Sales & Purchase Registers ----------------
+// (Dr Raghu, 28 Aug 2026): every voucher of the family in the period —
+// YTD by default, dates / MTD / QTD on the bar, totals on top, sortable.
+
+interface VregData { empty?: boolean; kind: string; from: string; to: string; rows: { id: string; date: string; vtype: string; vno: string; party: string; narration: string; amount: number }[]; count: number; total: number }
+export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+  const [from, setFrom] = useState(fyStart);
+  const [to, setTo] = useState(today);
+  const [data] = useBooks<VregData>("vreg", `&kind=${kind}&from=${from}&to=${to}`);
+  const { fmt: fmtMoney } = useMoneyFmt();
+  const [sortK, setSortK] = useState<"date" | "party" | "amount" | "vno">("date");
+  const [dir, setDir] = useState<1 | -1>(-1);
+  const [q, setQ] = useState("");
+  if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
+  const needle = q.trim().toLowerCase();
+  const rows = (data?.rows || [])
+    .filter((r) => !needle || r.party.toLowerCase().includes(needle) || r.vno.toLowerCase().includes(needle) || r.narration.toLowerCase().includes(needle))
+    .sort((a, b) => (sortK === "amount" ? a.amount - b.amount : String(a[sortK]).localeCompare(String(b[sortK]))) * dir);
+  const shown = rows.reduce((s2, r) => s2 + r.amount, 0);
+  const Hd = ({ k, children, right }: { k: typeof sortK; children: React.ReactNode; right?: boolean }) => (
+    <th className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap`}
+      onClick={() => { if (sortK === k) setDir((d2) => (d2 === 1 ? -1 : 1)); else { setSortK(k); setDir(k === "amount" ? -1 : k === "date" ? -1 : 1); } }}
+      style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}>
+      {children}{sortK === k ? (dir === 1 ? " ▲" : " ▼") : ""}
+    </th>
+  );
+  return (
+    <div style={{ maxWidth: 940 }}>
+      <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <div className="text-lg font-bold" style={{ color: INK }}>{kind === "sales" ? "Sales Register" : "Purchase Register"}</div>
+          <div className="text-sm" style={{ color: "#5A6672" }}>
+            Every {kind === "sales" ? "GST Sales voucher" : "purchase-family voucher (Purchase · Cap-Ex · Import)"} in the period, straight from the books.
+          </div>
+        </div>
+        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+      </div>
+      {!data ? <div className="text-sm" style={{ color: MUTED }}>reading…</div> : (
+        <>
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <Card label={`TOTAL — ${data.count} vouchers`} value={fmtMoney(data.total)} color={kind === "sales" ? GREEN : "#1B6B93"} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="filter party · no · narration…"
+              className="border rounded px-2 py-1.5 text-sm ml-auto" style={{ borderColor: needle ? ORANGE : BORDER, width: 240, alignSelf: "center" }} />
+          </div>
+          <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "64vh" }}>
+            <table className="w-full text-xs" style={{ minWidth: 720, borderCollapse: "separate", borderSpacing: 0 }}>
+              <thead>
+                <tr style={{ background: "#22303C", color: "#fff" }}>
+                  <Hd k="date">Date</Hd><Hd k="vno">No</Hd><Hd k="party">Party</Hd>
+                  <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>Narration</th>
+                  <Hd k="amount" right>Amount</Hd>
+                </tr>
+                <tr style={{ background: "#F3F1EB" }}>
+                  <td colSpan={4} className="px-2 py-1.5 font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>SHOWN — {rows.length}</td>
+                  <td className="px-2 py-1.5 text-right tnum font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>{fmtMoney(shown)}</td>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length === 0 && (<tr><td colSpan={5} className="px-3 py-4 text-center" style={{ color: MUTED }}>Nothing in the period.</td></tr>)}
+                {rows.map((r, i) => (
+                  <tr key={r.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                    <td className="px-2 py-1 tnum whitespace-nowrap">{fmtD(r.date)}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{r.vno}</td>
+                    <td className="px-2 py-1 font-semibold">{r.party || "—"}</td>
+                    <td className="px-2 py-1" style={{ color: MUTED, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.narration}</td>
+                    <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(r.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {data.count > 3000 && <p className="text-xs mt-1" style={{ color: "#8A6D1A" }}>Showing the first 3,000 of {data.count} — narrow the period for the rest.</p>}
+        </>
+      )}
+    </div>
+  );
+}

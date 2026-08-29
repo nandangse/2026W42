@@ -17,7 +17,7 @@ import ModuleMenu from "@/components/ModuleMenu";
 import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
 import KuberTasking from "@/components/kuber/Tasking";
-import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen, RatioScreen, CfoNoteScreen } from "@/components/kuber/Books";
+import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen, RatioScreen, CfoNoteScreen, VoucherRegister } from "@/components/kuber/Books";
 import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 import PlaybookScreen from "@/components/Playbook";
 import ComplianceCalendar from "@/components/kuber/Compliance";
@@ -43,11 +43,22 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
     ],
   },
   {
-    header: "INSTRUMENTS",
+    header: "REGISTERS",
     items: [
+      { key: "salesreg", label: "Sales Register", icon: "▤" },
+      { key: "purchreg", label: "Purchase Register", icon: "▥" },
+      { key: "loan", label: "Bank Loan Register", icon: "◨" },
       { key: "bg", label: "Bank Guarantees", icon: "🏦" },
       { key: "fd", label: "Fixed Deposits", icon: "▤" },
       { key: "insurance", label: "Insurance", icon: "☂" },
+    ],
+  },
+  {
+    header: "INSTRUMENTS",
+    items: [
+      { key: "bankreco", label: "Bank Reconciliation", icon: "◫" },
+      { key: "bounce", label: "Bounced Cheques", icon: "↩" },
+      { key: "release", label: "Payments to Release", icon: "➤" },
     ],
   },
   {
@@ -63,7 +74,6 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
       { key: "expreg", label: "Expenses Register", icon: "▙" },
       { key: "oereg", label: "OE Register", icon: "▚" },
       { key: "tvcreg", label: "TVC Register", icon: "▞" },
-      { key: "loan", label: "Banking — Loan Status", icon: "◨" },
       { key: "compliance", label: "Compliance Calendar", icon: "▦" },
     ],
   },
@@ -96,6 +106,7 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
 const ALL_KEYS = NAV.flatMap((g) => g.items.map((i) => i.key));
 
 const STUBS: Record<string, string> = {
+  bankreco: "Bank Reconciliation — the statement against the books, line by line, feeding the cash flow's opening balance. It needs the bank statement data in; the moment Dr Raghu names the format (CSV export from the bank / manual), it is built.",
   targets: "Targets — the JSA business-dashboard parameters, PLAN against ACTUAL: GP%, NP%, ROI, inventory turn, current and quick ratios, debtor/inventory/creditor days, CCC, working capital, cash & bank, net worth. The ACTUAL side computes from the books; the PLAN side is typed once. Being built next — the plan figures come from Dr Raghu.",
 
   bank: "Bank & Cash — the balances, the BRS and the PDC register (the sheet's Bank Reco tab), feeding the cash flow's opening balance. Being built next.",
@@ -230,7 +241,9 @@ export default function Accounts({
           {openKey === "ratios" && <RatioScreen />}
           {openKey === "compliance" && <ComplianceCalendar />}
           {openKey === "cfonote" && <CfoNoteScreen go={go} />}
-          {["bg", "fd", "insurance", "payplan", "cashitem", "loan"].includes(openKey) && <RegisterScreen kind={openKey} key={openKey} />}
+          {openKey === "salesreg" && <VoucherRegister kind="sales" key="s" />}
+          {openKey === "purchreg" && <VoucherRegister kind="purchase" key="p" />}
+          {["bg", "fd", "insurance", "payplan", "cashitem", "loan", "bounce", "release"].includes(openKey) && <RegisterScreen kind={openKey} key={openKey} />}
           {openKey in STUBS && (
             <div className="bg-white rounded-lg border p-6" style={{ borderColor: "#E2E0DA", maxWidth: 720 }}>
               <div className="text-sm" style={{ color: "#5A6672", lineHeight: 1.6 }}>{STUBS[openKey]}</div>

@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.12",
+    date: "2026-08-28",
+    module: "Kuber — the REGISTERS shelf, and instruments that act",
+    items: [
+      "A REGISTERS group stands above Instruments (Dr Raghu, 28 Aug 2026): the SALES REGISTER and PURCHASE REGISTER — every voucher of the family straight from the books, YTD by default with dates, MTD and QTD on the bar, totals on top, sortable, filterable — beside the BANK LOAN REGISTER, and the Bank Guarantees, Fixed Deposits and Insurance moved home there.",
+      "INSTRUMENTS is reborn as the acting shelf: BOUNCED CHEQUES (whose, which bank, why, where the recovery stands) and PAYMENTS TO RELEASE (the queue cleared to go out — who gets what, who approved, the day it leaves) — migration 0094 lays both. BANK RECONCILIATION stands as an honest door: it builds the moment the bank-statement format is named.",
+    ],
+  },
+  {
     v: "3.31.0.11",
     date: "2026-08-28",
     module: "CRM — tags that are yours alone, and merge by hand",

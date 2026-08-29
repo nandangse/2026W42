@@ -1073,6 +1073,32 @@ export async function GET(req: Request) {
       });
     }
 
+    // ---- the voucher registers (Dr Raghu, 28 Aug 2026): SALES and PURCHASE,
+    // YTD by default with dates / MTD / QTD — every voucher of the family in
+    // the period, totals on top.
+    if (view === "vreg") {
+      const kind = url.searchParams.get("kind") === "purchase" ? "purchase" : "sales";
+      const TYPES = kind === "sales" ? ["GST Sales"] : ["Purchase", "Cap-Ex Purchase", "Excise Purchase Import"];
+      const fyStartV = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+      const from = url.searchParams.get("from") || fyStartV;
+      const to = url.searchParams.get("to") || today;
+      const rows: RR[] = [];
+      for (let f = 0; ; f += 1000) {
+        const { data, error } = await admin.from("kuber_voucher")
+          .select("id, date, vtype, vno, party, narration, amount")
+          .in("vtype", TYPES).gte("date", from).lte("date", to)
+          .order("date", { ascending: false }).order("id").range(f, f + 999);
+        if (error) {
+          if (/does not exist|schema cache/i.test(error.message)) return NextResponse.json({ empty: true });
+          throw new Error(error.message);
+        }
+        rows.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
+      const total = rows.reduce((s2, r) => s2 + (Number(r.amount) || 0), 0);
+      return NextResponse.json({ kind, from, to, rows: rows.slice(0, 3000), count: rows.length, total });
+    }
+
     if (view === "ledgers") {
       const q = (url.searchParams.get("q") || "").trim();
       let query = admin.from("kuber_ledger").select("name, parent, opening, closing, loaded_at").order("name").limit(500);

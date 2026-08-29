@@ -12,6 +12,14 @@ export const dynamic = "force-dynamic";
  * every row carrying its time frame.
  */
 const KINDS: Record<string, { table: string; fields: string[]; order: string }> = {
+  bounce: {
+    table: "kuber_bounce", order: "date",
+    fields: ["date", "party", "cheque_no", "bank", "amount", "reason", "status", "note"],
+  },
+  release: {
+    table: "kuber_release", order: "release_on",
+    fields: ["party", "amount", "purpose", "approved_by", "release_on", "status", "note"],
+  },
   loan: {
     table: "kuber_loan", order: "bank",
     fields: ["bank", "loan_ac_no", "ltype", "drawn_on", "sanctioned", "outstanding", "emi", "roi", "emi_date", "tenor_months", "upto", "security", "status", "note"],
