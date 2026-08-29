@@ -133,7 +133,9 @@ function fyOf(iso: string): string {
  * the same export twice in a day cannot overwrite the first one.
  */
 export function archivePath(kind: string, when: Date) {
-  const iso = when.toISOString().slice(0, 10);
+  // the archive files by the IST calendar — a 00:30 IST upload belongs to
+  // today's folder, not yesterday's UTC date
+  const iso = new Date(when.getTime() + 330 * 60000).toISOString().slice(0, 10);
   return {
     fy: fyOf(iso),
     kind: FOLDERS[kind] || "09 Other",
@@ -170,8 +172,10 @@ export async function archiveUpload(
   let parent = cfg.folderId;
   for (const step of [p.fy, p.kind, p.month]) parent = await folder(token, parent, step);
 
-  // "2026-08-19 1801 · Jobmaster - Planning Reporting (8).xlsx"
-  const stamp = `${when.toISOString().slice(0, 10)} ${when.toISOString().slice(11, 16).replace(":", "")}`;
+  // "2026-08-19 1801 · Jobmaster - Planning Reporting (8).xlsx" — IST, the
+  // clock the office lives by (Dr Raghu, 29 Aug 2026: every timing in IST)
+  const ist = new Date(when.getTime() + 330 * 60000).toISOString();
+  const stamp = `${ist.slice(0, 10)} ${ist.slice(11, 16).replace(":", "")}`;
   const name = `${stamp} · ${filename}`;
   const ext = filename.split(".").pop()?.toLowerCase() || "";
   const mime = MIME[ext] || "application/octet-stream";

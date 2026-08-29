@@ -34,7 +34,7 @@ const fmtD = (d: unknown) => {
   const s2 = String(d || "").slice(0, 10);
   return /^\d{4}/.test(s2) ? `${s2.slice(8, 10)}-${s2.slice(5, 7)}-${s2.slice(0, 4)}` : "—";
 };
-const ago = (at: unknown) => new Date(String(at)).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+const ago = (at: unknown) => new Date(String(at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 const TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
 function useReg(kind: string): [Row[] | null, { id: string; tag: string }[], boolean, () => void] {

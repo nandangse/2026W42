@@ -1688,7 +1688,7 @@ function GoalEditor({ ctx, target, onClose }: { ctx: Ctx; target: EditTarget; on
               <Avatar text={c.by} size={20} />
               <div>
                 <div className="text-xs tnum" style={{ color: C.mute }}>
-                  {new Date(c.at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} · {c.by}
+                  {new Date(c.at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short" })} · {c.by}
                 </div>
                 <div className="text-xs" style={{ color: C.sub, lineHeight: 1.45 }}>{c.body}</div>
               </div>

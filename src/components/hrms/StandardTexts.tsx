@@ -51,7 +51,7 @@ export default function StandardTexts({ who }: { who: string }) {
               <span className="rounded px-1.5 py-0.5" style={{ fontSize: 10, background: "#F4F2EC", color: C.faint }}>v{t.version}</span>
               <div style={{ flex: 1 }} />
               <span style={{ fontSize: 11, color: C.faint }}>
-                {t.updated_by ? `${String(t.updated_by).split("·")[0].trim()} · ${t.updated_at ? fmtFull(String(t.updated_at).slice(0, 10)) : ""}` : "not edited yet"}
+                {t.updated_by ? `${String(t.updated_by).split("·")[0].trim()} · ${t.updated_at ? fmtFull(String(t.updated_at)) : ""}` : "not edited yet"}
               </span>
               <span style={{ color: C.faint, fontSize: 12 }}>{open === t.key ? "▲" : "▼"}</span>
             </div>

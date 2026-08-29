@@ -25,7 +25,7 @@ interface Row {
   answered_by: string | null; answered_at: string | null;
 }
 
-const day = (iso: string | null) => (iso ? fmtFull(String(iso).slice(0, 10)) : "—");
+const day = (iso: string | null) => (iso ? fmtFull(String(iso)) : "—");
 const who = (s: string | null) => String(s || "—").split("·")[0].trim();
 const TOPICS = ["Salary", "Increment", "Deduction", "Statutory", "Policy", "Other"];
 

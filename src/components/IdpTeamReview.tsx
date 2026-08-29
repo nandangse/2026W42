@@ -173,7 +173,7 @@ export function TeamReview({ row, onClose }: { row: TeamRow; onClose: () => void
           <div>
             <div className="font-bold">{row.name}</div>
             <div style={{ fontSize: 11, color: "#8FA1B3" }}>
-              {row.role || "—"} · submitted {row.submitted_at ? fmtFull(String(row.submitted_at).slice(0, 10)) : ""}
+              {row.role || "—"} · submitted {row.submitted_at ? fmtFull(String(row.submitted_at)) : ""}
             </div>
           </div>
           {locked && <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#E6F4EA", color: C.green }}>reviewed</span>}

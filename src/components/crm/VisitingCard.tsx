@@ -171,7 +171,7 @@ export default function VisitingCard({ onOpen }: { onOpen: (target: string, id: 
               <span className="rounded px-1.5 font-bold" style={{ fontSize: 9.5, background: c.status === "added" ? "#E6F4EB" : NAVY_SOFT, color: c.status === "added" ? GREEN : NAVY }}>
                 {c.status === "added" ? "IN CRM" : "SAVED"}
               </span>
-              <span style={{ fontSize: 10, color: MUTED }}>{String(c.added_at).slice(0, 10)}</span>
+              <span style={{ fontSize: 10, color: MUTED }}>{new Date(String(c.added_at)).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric" })}</span>
               <span style={{ flex: 1 }} />
               {c.person_id && (
                 <button onClick={() => onOpen("person", c.person_id!)} className="underline font-bold" style={{ fontSize: 10.5, color: NAVY }}>contact ↗</button>

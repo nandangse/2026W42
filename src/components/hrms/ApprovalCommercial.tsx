@@ -19,7 +19,7 @@ interface SalaryRow { id: string; name: string; department: string | null; prev:
 interface LoanRow { id: string; employee_id: string; name: string; department: string | null; amount: number | null; kind: string; reason: string | null; months: number | null; from_month: string | null; status: string; asked: string | null; approved: string | null; by: string | null; approvedBy: string | null; note: string | null }
 
 const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
-const day = (iso: string | null) => (iso ? fmtFull(String(iso).slice(0, 10)) : "—");
+const day = (iso: string | null) => (iso ? fmtFull(String(iso)) : "—");
 const who = (s: string | null) => String(s || "—").split("·")[0].trim();
 
 export default function ApprovalCommercial({ who: me, isOwner }: { who: string; isOwner: boolean }) {

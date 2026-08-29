@@ -121,11 +121,11 @@ export default function RoleRecord({
         {pending ? (
           <span className="text-xs" style={{ color: "#8A5B00" }}>
             <b>Waiting on Dr Raghu.</b> Changed by {String(r.pending_by || "").split("·")[0].trim() || "somebody"} on{" "}
-            {fmtFull(String(r.pending_since).slice(0, 10))} — it is in <b>Approvals → RJ Approval - Records</b>.
+            {fmtFull(String(r.pending_since))} — it is in <b>Approvals → RJ Approval - Records</b>.
           </span>
         ) : (
           <span className="text-xs" style={{ color: C.dim }}>
-            No unseen changes. {r.approved_at && <>Last approved {fmtFull(String(r.approved_at).slice(0, 10))}.</>}
+            No unseen changes. {r.approved_at && <>Last approved {fmtFull(String(r.approved_at))}.</>}
           </span>
         )}
         {isOwner && pending && (
@@ -217,8 +217,8 @@ export default function RoleRecord({
                         {String(c.changed_by || "—").split("·")[0].trim()}
                       </span>{" "}
                       <span style={{ color: C.faint }}>
-                        {fmtFull(String(c.changed_at).slice(0, 10))} at{" "}
-                        {new Date(c.changed_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                        {fmtFull(String(c.changed_at))} at{" "}
+                        {new Date(c.changed_at).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })}
                       </span>{" "}
                       · <b>{LABEL[c.field] || c.field}</b>
                     </div>

@@ -111,12 +111,12 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
               {d.employee.id} · {[d.employee.designation, d.employee.department, d.employee.type].filter(Boolean).join(" · ")}
             </span>
             {d.idp?.submitted_at
-              ? <span style={{ fontSize: 11, color: "#9AD3AE" }}>IDP submitted {fmtFull(String(d.idp.submitted_at).slice(0, 10))}</span>
+              ? <span style={{ fontSize: 11, color: "#9AD3AE" }}>IDP submitted {fmtFull(String(d.idp.submitted_at))}</span>
               : <span style={{ fontSize: 11, color: "#F5B32B" }}>IDP not submitted — read with that in mind</span>}
           </div>
           <div className="flex gap-x-4 gap-y-1 flex-wrap mb-2 px-1" style={{ fontSize: 12, color: C.dim }}>
             {d.employee.age != null && <span>Age <b style={{ color: C.ink }}>{d.employee.age}</b></span>}
-            {d.employee.years != null && <span>In company <b style={{ color: C.ink }}>{d.employee.years} yrs</b>{d.employee.doj ? ` (since ${fmtFull(String(d.employee.doj).slice(0, 10))})` : ""}</span>}
+            {d.employee.years != null && <span>In company <b style={{ color: C.ink }}>{d.employee.years} yrs</b>{d.employee.doj ? ` (since ${fmtFull(String(d.employee.doj))})` : ""}</span>}
             {d.employee.department && <span>Dept <b style={{ color: C.ink }}>{d.employee.department}</b></span>}
             {d.employee.designation && <span>Designation <b style={{ color: C.ink }}>{d.employee.designation}</b></span>}
             {d.employee.manager && <span>Reports to <b style={{ color: C.ink }}>{d.employee.manager}</b></span>}
@@ -191,7 +191,7 @@ function ManagerTab({ d }: { d: PersonData }) {
           <div className="font-bold text-sm">
             {r.reviewer_name || r.reviewer_email}
             {r.submitted_at
-              ? <span className="font-normal" style={{ fontSize: 11, color: C.green }}> · submitted {fmtFull(String(r.submitted_at).slice(0, 10))}</span>
+              ? <span className="font-normal" style={{ fontSize: 11, color: C.green }}> · submitted {fmtFull(String(r.submitted_at))}</span>
               : <span className="font-normal" style={{ fontSize: 11, color: "#8A5B00" }}> · in progress</span>}
           </div>
           <div className="flex gap-1 flex-wrap mt-2">
@@ -294,7 +294,7 @@ function RaghuBriefTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolea
       <p className="text-xs mb-2" style={{ color: C.dim, lineHeight: 1.5 }}>
         Five minutes before the sit-down: the role, the work in their own words, what to affirm, what to raise, three
         questions, and a feedback seed to adapt. Grounded in the record — click-only, like every Genie.
-        {at && <> · last written {String(at).slice(0, 16).replace("T", " ")} UTC</>}
+        {at && <> · last written {new Date(String(at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} IST</>}
       </p>
       {text
         ? <div className="text-sm rounded border p-3" style={{ borderColor: "#D9CBF5", whiteSpace: "pre-wrap", lineHeight: 1.65, background: "#FBFAFE" }}>{text}</div>
@@ -347,7 +347,7 @@ function DiscussionTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolea
           <textarea disabled={ro} value={f.note_raghu} onChange={(e) => setF({ ...f, note_raghu: e.target.value })} rows={4}
             className="w-full mt-1 px-2 py-1.5 rounded border font-normal" style={{ borderColor: "#D9CBF5", lineHeight: 1.5 }} /></label>
       </div>
-      {saved.at && <div className="text-xs mt-2" style={{ color: C.faint }}>last saved by {saved.by} · {String(saved.at).slice(0, 16).replace("T", " ")} UTC</div>}
+      {saved.at && <div className="text-xs mt-2" style={{ color: C.faint }}>last saved by {saved.by} · {new Date(String(saved.at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} IST</div>}
       {msg && <div className="text-xs font-bold mt-2" style={{ color: /✓/.test(msg) ? C.green : "#B3261E" }}>{msg}</div>}
       {!ro && (
         <button onClick={save} disabled={busy} className="rounded px-4 py-1.5 text-sm font-bold text-white mt-3" style={{ background: busy ? "#B9BEC4" : C.orange }}>
@@ -641,7 +641,7 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
       {d.appraisal && (
         d.appraisal.approved_at
           ? <div className="rounded px-2.5 py-1.5 mt-2 inline-block" style={{ background: "#E6F4EA", color: "#0D7A3F", fontSize: 12, fontWeight: 700 }}>
-              ✓ Finalised by {String(d.appraisal.approved_by || "").split("·")[0].trim() || "RJ"} on {fmtFull(String(d.appraisal.approved_at).slice(0, 10))}
+              ✓ Finalised by {String(d.appraisal.approved_by || "").split("·")[0].trim() || "RJ"} on {fmtFull(String(d.appraisal.approved_at))}
             </div>
           : d.appraisal.pending_since
             ? <div className="rounded px-2.5 py-1.5 mt-2 inline-block" style={{ background: "#FFF3E8", color: "#8A5B00", fontSize: 12, fontWeight: 700 }}>
@@ -757,7 +757,7 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
         )}
         {d.appraisal?.decided_by && (
           <span style={{ fontSize: 11.5, color: C.faint }}>
-            last decided by {String(d.appraisal.decided_by).split("·")[0].trim()} on {fmtFull(String(d.appraisal.decided_at).slice(0, 10))}
+            last decided by {String(d.appraisal.decided_by).split("·")[0].trim()} on {fmtFull(String(d.appraisal.decided_at))}
           </span>
         )}
         {msg && <span className="text-xs font-semibold" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</span>}

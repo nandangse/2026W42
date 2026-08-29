@@ -134,7 +134,7 @@ function assignees(board: Board): { value: string; label: string; group: string 
 /** Date+time stamp for "last updated". */
 const stamp = (iso: string | null) =>
   iso
-    ? new Date(iso).toLocaleString("en-IN", {
+    ? new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata",
         day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
       })
     : "—";
@@ -698,7 +698,7 @@ export default function PlanningSuite({
     setErpLog((l) => [
       {
         id: String(Math.random()),
-        time: new Date().toLocaleTimeString("en-IN"),
+        time: new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" }),
         doctype,
         docname: "JOB " + jobNo(id),
         field,
@@ -1323,7 +1323,7 @@ function ProfileSelf() {
       <div className="mt-3 rounded p-2.5" style={{ background: "#F4F2EC" }}>
         <div className="text-xs font-bold" style={{ color: "#16232F" }}>✉ Gmail connection</div>
         {connectedAt ? (
-          <div className="text-xs mt-0.5" style={{ color: "#0D7A3F", fontWeight: 700 }}>Connected · {fmtFull(String(connectedAt).slice(0, 10))}</div>
+          <div className="text-xs mt-0.5" style={{ color: "#0D7A3F", fontWeight: 700 }}>Connected · {fmtFull(String(connectedAt))}</div>
         ) : oauthOk ? (
           <div className="mt-1">
             <a href="/api/crm/gmail/connect"
@@ -3252,7 +3252,7 @@ function GenieHint({ jobId, jobLabel }: { jobId: string; jobLabel: string }) {
           {hint && may && (
             <button onClick={() => ask(true)} disabled={busy} className="text-xs font-bold" style={{ color: "#7C3AED", opacity: busy ? 0.5 : 1 }}
               title={
-                (meta?.builtBy ? `Read built by ${meta.builtBy}${meta.builtAt ? " on " + fmtFull(String(meta.builtAt).slice(0, 10)) : ""}. ` : "") +
+                (meta?.builtBy ? `Read built by ${meta.builtBy}${meta.builtAt ? " on " + fmtFull(String(meta.builtAt)) : ""}. ` : "") +
                 "Re-read the job from scratch — everyone sees the new one."
               }>
               ↻
@@ -5346,7 +5346,7 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = f
   /** "raghu@nandan.co.in · 28 Aug, 07:04 am" without the address when a name would do. */
   const whoMade = task.by ? task.by.split("@")[0] : task.kind === "erp" ? "the ERP ToDo upload" : null;
   const madeAt = task.created_at
-    ? new Date(task.created_at).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    ? new Date(task.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
     : null;
   const add = async () => {
     if (!cmt.trim()) return;
@@ -5584,7 +5584,7 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = f
             )}
             <div className="text-xs font-bold mb-1" style={{ color: "#5A6672" }}>Comments</div>
             {comments.map((c, i) => (
-              <div key={i} className="text-xs mb-1"><span className="font-bold">{c.by}</span> <span style={{ color: "#8A94A0" }}>{new Date(c.at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span><div>{c.body}</div></div>
+              <div key={i} className="text-xs mb-1"><span className="font-bold">{c.by}</span> <span style={{ color: "#8A94A0" }}>{new Date(c.at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span><div>{c.body}</div></div>
             ))}
             <div className="flex gap-1 mt-2">
               <input value={cmt} onChange={(e) => setCmt(e.target.value)} placeholder="Add a comment…" className="flex-1 text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
@@ -5644,7 +5644,7 @@ function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPush?: boo
     };
     const csv = [
       ["Job ID", "Field", "New value", "Was", "Changed by", "Changed at"].join(","),
-      ...rows.map((r) => [r.job_id, r.label, r.new_value, r.old_value, r.changed_by, String(r.changed_at).slice(0, 16).replace("T", " ")].map(esc).join(",")),
+      ...rows.map((r) => [r.job_id, r.label, r.new_value, r.old_value, r.changed_by, new Date(String(r.changed_at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) + " IST"].map(esc).join(",")),
     ].join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
@@ -6786,7 +6786,7 @@ function Admin({
                   </div>
                 </td>
                 <td className="py-1.5 tnum" style={{ color: "#8A94A0" }}>
-                  {u.last_sign_in_at ? fmtFull(String(u.last_sign_in_at).slice(0, 10)) : "never"}
+                  {u.last_sign_in_at ? fmtFull(String(u.last_sign_in_at)) : "never"}
                 </td>
                 <td className="py-1.5">
                   <button onClick={() => setDisabled(u.id, !u.disabled, u.email)} disabled={!mayManage(u)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E6F4EA", color: u.disabled ? "#fff" : "#0D7A3F", opacity: mayManage(u) ? 1 : 0.5, cursor: mayManage(u) ? "pointer" : "not-allowed" }} title={mayManage(u) ? (u.disabled ? "Click to re-enable sign-in" : "Click to disable sign-in") : `Only ${OWNER_EMAIL} may change this account`}>{u.disabled ? "disabled" : "active"}</button>
@@ -7354,7 +7354,7 @@ function LiveProjects({
                           {j.floorSummary && (
                             <div className="text-xs mt-1" style={{ color: "#22303C" }}>
                               <b style={{ color: "#8A94A0" }}>FROM THE FLOOR</b> {redactMoney(j.floorSummary)}
-                              {j.floorSummaryAt && <span style={{ color: "#B8B5AC" }}> · {fmt(String(j.floorSummaryAt).slice(0, 10))}</span>}
+                              {j.floorSummaryAt && <span style={{ color: "#B8B5AC" }}> · {fmt(String(j.floorSummaryAt))}</span>}
                             </div>
                           )}
                           {j.note && (
@@ -7548,7 +7548,7 @@ function ProjectGantt({ g, board, onOpenJob }: { g: ProjGroup; board: Board; onO
   // month lines: every first-of-month inside the range
   const months: { at: string; label: string }[] = [];
   for (let d = min.slice(0, 7) + "-01"; d <= max; ) {
-    if (d >= min) months.push({ at: d, label: new Date(d + "T00:00:00Z").toLocaleString("en-IN", { month: "short" }) });
+    if (d >= min) months.push({ at: d, label: new Date(d + "T00:00:00Z").toLocaleString("en-IN", { timeZone: "Asia/Kolkata", month: "short" }) });
     const [y, m] = d.split("-").map(Number);
     d = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`;
   }
@@ -8565,7 +8565,7 @@ function Principles({ isOwner }: { isOwner: boolean }) {
           <div className="flex gap-4 mt-4 flex-wrap" style={{ fontSize: 12, color: "#8FA1B3" }}>
             <span><b style={{ color: "#fff" }}>{groups.length}</b> themes</span>
             <span><b style={{ color: "#fff" }}>{total}</b> principles</span>
-            <span>updated {fmtFull(String(doc?.created_at || "").slice(0, 10))}</span>
+            <span>updated {fmtFull(String(doc?.created_at || ""))}</span>
             <span style={{ opacity: .7 }}>v{doc?.version}</span>
           </div>
         )}
@@ -9937,7 +9937,7 @@ function VoiceNotes({
           <div className="text-xs mt-0.5" style={{ color: "#22303C", lineHeight: 1.55 }}>{floor}</div>
           {floorAt && (
             <div style={{ fontSize: 10, color: "#8A94A0", marginTop: 3 }}>
-              from the last {Math.min(notes.length, RECENT)} note{Math.min(notes.length, RECENT) === 1 ? "" : "s"} · {new Date(floorAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+              from the last {Math.min(notes.length, RECENT)} note{Math.min(notes.length, RECENT) === 1 ? "" : "s"} · {new Date(floorAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
             </div>
           )}
         </div>
@@ -9972,7 +9972,7 @@ function VoiceNotes({
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             {n.url && <audio controls preload="none" src={n.url} style={{ height: 26, maxWidth: 210 }} />}
             <span style={{ fontSize: 10, color: "#8A94A0" }}>
-              {whoTag(n.by)} · {new Date(n.at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+              {whoTag(n.by)} · {new Date(n.at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
               {n.seconds ? ` · ${n.seconds}s` : ""}
             </span>
             {n.transcript && n.transcript !== n.summary && (
@@ -10107,7 +10107,7 @@ function PrincipleFiles({ isOwner }: { isOwner: boolean }) {
               )}
               {f.note && <div className="text-xs mt-0.5" style={{ color: "#5A6672", lineHeight: 1.5 }}>{f.note}</div>}
               <div style={{ fontSize: 10.5, color: "#B8B5AC", marginTop: 3 }}>
-                {size(f.bytes)}{f.bytes ? " · " : ""}{whoTag(f.by)} · {fmtFull(String(f.at).slice(0, 10))}
+                {size(f.bytes)}{f.bytes ? " · " : ""}{whoTag(f.by)} · {fmtFull(String(f.at))}
               </div>
             </div>
             {isOwner && (
@@ -10563,7 +10563,7 @@ function ShopUpdatesBody({ job }: { job: Job }) {
                 {todayN} today
               </span>
               <span className="text-xs" style={{ color: "#8A94A0" }}>
-                {notes.length} in total{notes.length ? ` · latest ${new Date(notes[0].at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}
+                {notes.length} in total{notes.length ? ` · latest ${new Date(notes[0].at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}
               </span>
             </div>
           )}
@@ -10574,7 +10574,7 @@ function ShopUpdatesBody({ job }: { job: Job }) {
               <div className="text-sm mt-1" style={{ color: "#22303C", lineHeight: 1.6 }}>{redactMoney(job.floorSummary)}</div>
               {job.floorSummaryAt && (
                 <div style={{ fontSize: 10, color: "#8A94A0", marginTop: 4 }}>
-                  from the latest notes · {new Date(job.floorSummaryAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  from the latest notes · {new Date(job.floorSummaryAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </div>
               )}
             </div>
@@ -10592,7 +10592,7 @@ function ShopUpdatesBody({ job }: { job: Job }) {
               <div className="flex items-baseline justify-between gap-2 flex-wrap">
                 <b className="text-sm" style={{ color: "#16232F" }}>{n.summary || "(no summary)"}</b>
                 <span style={{ fontSize: 11, color: "#8A94A0", whiteSpace: "nowrap" }}>
-                  {whoTag(n.by)} · {new Date(n.at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  {whoTag(n.by)} · {new Date(n.at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                   {n.seconds ? ` · ${n.seconds}s` : ""}
                 </span>
               </div>
@@ -10931,7 +10931,7 @@ function FeatureRequests({ isOwner }: { isOwner: boolean }) {
               <div className="flex-1" style={{ minWidth: 240 }}>
                 <div className="font-bold text-sm" style={{ color: "#16232F" }}>{f.title}</div>
                 <div className="text-xs" style={{ color: "#8A94A0" }}>
-                  {whoTag(f.by)} · {fmtFull(String(f.at).slice(0, 10))}
+                  {whoTag(f.by)} · {fmtFull(String(f.at))}
                 </div>
               </div>
               <span className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: `${w?.[2]}18`, color: w?.[2] }}>{w?.[1]}</span>

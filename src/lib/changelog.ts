@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.37",
+    date: "2026-08-29",
+    module: "Genie-wide — every timing speaks IST",
+    items: [
+      "EVERY TIMING IN GENIE IS INDIAN STANDARD TIME now (Dr Raghu, 29 Aug 2026): 29 clock renders across the suite carry the IST zone explicitly instead of trusting the browser's; the appraisal desk's two 'last saved … UTC' stamps read IST; the change-log CSV export and the voice-note record stamp too.",
+      "DATES STOP SLIPPING AT MIDNIGHT: fmt/fmtFull shift a timestamp to IST before reading its date — a 00:30 am save no longer wears yesterday's UTC date — across 43 call sites; today() is pinned to the IST calendar even on the UTC servers; the Drive archive's file stamps and month folders file by the IST clock.",
+    ],
+  },
+  {
     v: "3.31.0.36",
     date: "2026-08-29",
     module: "Kuber — a proforma is not an invoice",

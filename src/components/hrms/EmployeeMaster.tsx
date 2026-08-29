@@ -534,8 +534,8 @@ function PersonCard({ e, frozen, onClose }: { e: HrmsEmployee; frozen?: boolean;
                         {h.by_initials || "—"}
                       </span>{" "}
                       <span style={{ color: CC.faint }}>
-                        on {fmtFull(String(h.edited_at).slice(0, 10))} at{" "}
-                        {new Date(h.edited_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                        on {fmtFull(String(h.edited_at))} at{" "}
+                        {new Date(h.edited_at).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })}
                       </span>{" "}
                       changed <b>{h.label}</b>{" "}
                       <span style={{ color: CC.faint, textDecoration: "line-through" }}>{h.old_value || "—"}</span>{" → "}

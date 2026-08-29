@@ -31,7 +31,7 @@ interface Detail {
 }
 
 const mins = (s: number) => (s >= 60 ? `${Math.round(s / 60)} min` : s > 0 ? `${s} sec` : "");
-const day = (iso: string | null | undefined) => (iso ? fmtFull(String(iso).slice(0, 10)) : "");
+const day = (iso: string | null | undefined) => (iso ? fmtFull(String(iso)) : "");
 
 // every voice note lives against a question id; name them for the auditor
 const Q_LABEL: Record<string, string> = Object.fromEntries(

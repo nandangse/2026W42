@@ -110,8 +110,8 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
                       </td>
                       <td className="px-2 py-1.5 font-semibold">{r.kind === "Record" ? `${r.id} · ${r.name}` : r.name}</td>
                       <td className="px-2 py-1.5">{r.what}</td>
-                      <td className="px-2 py-1.5">{r.asked ? fmtFull(String(r.asked).slice(0, 10)) : "—"}</td>
-                      <td className="px-2 py-1.5 font-semibold" style={{ color: C.green }}>{r.approved ? fmtFull(String(r.approved).slice(0, 10)) : "—"}</td>
+                      <td className="px-2 py-1.5">{r.asked ? fmtFull(String(r.asked)) : "—"}</td>
+                      <td className="px-2 py-1.5 font-semibold" style={{ color: C.green }}>{r.approved ? fmtFull(String(r.approved)) : "—"}</td>
                       <td className="px-2 py-1.5">{initialsOf(r.by)}</td>
                       <td className="px-2 py-1.5">{initialsOf(r.approvedBy)}</td>
                     </tr>
@@ -186,7 +186,7 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
                         {p.count > 2 && ` and ${p.count - 2} more`}
                       </span>
                       <span className="text-xs" style={{ color: C.faint, minWidth: 150 }}>
-                        {initialsOf(p.by)} · {p.last ? fmtFull(String(p.last).slice(0, 10)) : ""}
+                        {initialsOf(p.by)} · {p.last ? fmtFull(String(p.last)) : ""}
                       </span>
                       <a href={`/hrms/employee/${encodeURIComponent(p.id)}`} target="_blank" rel="noopener noreferrer"
                         className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#DCE8F5", color: "#1B3A5C" }}
@@ -204,7 +204,7 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
                           <div key={k} className="text-xs py-0.5" style={{ color: C.dim, lineHeight: 1.6 }}>
                             <b>{c.label}</b> → <span style={{ color: C.green }}>{c.value || "—"}</span>
                             <span style={{ color: C.faint }}>
-                              {"  "}({initialsOf(c.by)}, {fmtFull(String(c.at).slice(0, 10))})
+                              {"  "}({initialsOf(c.by)}, {fmtFull(String(c.at))})
                             </span>
                           </div>
                         ))}
@@ -228,7 +228,7 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
                     <span className="text-xs font-semibold" style={{ minWidth: 220, flex: 1 }}>{r.role}</span>
                     <span className="text-xs" style={{ color: C.dim, minWidth: 140 }}>{r.department || "—"}</span>
                     <span className="text-xs" style={{ color: C.faint, minWidth: 150 }}>
-                      {initialsOf(r.by)} · {r.since ? fmtFull(String(r.since).slice(0, 10)) : ""}
+                      {initialsOf(r.by)} · {r.since ? fmtFull(String(r.since)) : ""}
                     </span>
                     <a href={`/hrms/role/${encodeURIComponent(r.id)}`} target="_blank" rel="noopener noreferrer"
                       className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>open ↗</a>

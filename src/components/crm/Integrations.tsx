@@ -167,7 +167,7 @@ export default function Integrations() {
             )}
           </div>
           )}
-          {it.updated_by && <div className="text-xs mt-1" style={{ color: MUTED }}>last set by {it.updated_by} · {String(it.updated_at).slice(0, 10)}</div>}
+          {it.updated_by && <div className="text-xs mt-1" style={{ color: MUTED }}>last set by {it.updated_by} · {new Date(String(it.updated_at)).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric" })}</div>}
         </div>
       ))}
     </div>

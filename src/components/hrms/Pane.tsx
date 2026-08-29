@@ -41,7 +41,7 @@ export function Pane({
         <div style={{ fontSize: 15, fontWeight: 700 }}>Nandan GSE — HRMS — {title}</div>
         <div style={{ fontSize: 10, color: "#444" }}>
           Printed by {who} on{" "}
-          {new Date().toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+          {new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
           {" · CONFIDENTIAL — personnel record"}
         </div>
       </div>

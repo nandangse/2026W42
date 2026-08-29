@@ -1430,7 +1430,11 @@ function RecordModal({
    * salesperson · and the AGE — red past two days, because an enquiry that
    * sat three days is already an apology.
    */
-  const oppDate = String(row.opportunity_on ?? row.created_at ?? "").slice(0, 10);
+  // opportunity_on is a plain date; the created_at fallback is a timestamp,
+  // shifted to IST before the date is read (a 00:30 IST enquiry is today's)
+  const oppDate = row.opportunity_on
+    ? String(row.opportunity_on).slice(0, 10)
+    : row.created_at ? new Date(new Date(String(row.created_at)).getTime() + 330 * 60000).toISOString().slice(0, 10) : "";
   const ageDays = /^\d{4}-\d{2}-\d{2}$/.test(oppDate)
     ? Math.floor((Date.now() - new Date(oppDate + "T00:00:00").getTime()) / 864e5)
     : null;
@@ -2169,7 +2173,7 @@ function EvaBriefTab({ companyId, initial, initialAt }: { companyId: string; ini
             ? <button onClick={() => void saveEdit()} className="px-3 py-1.5 rounded text-sm font-bold" style={{ background: NAVY, color: "#fff" }}>Save</button>
             : <button onClick={() => setEditing(true)} className="px-3 py-1.5 rounded text-sm font-bold border" style={{ borderColor: BORDER, color: "#5A6672", background: "#fff" }}>✎ Edit</button>
         )}
-        {at && <span className="text-xs" style={{ color: MUTED }}>researched {new Date(at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
+        {at && <span className="text-xs" style={{ color: MUTED }}>researched {new Date(at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
         {msg && <span className="text-xs font-semibold" style={{ color: busy ? MUTED : "#8E2C20" }}>{msg}</span>}
       </div>
       {editing ? (

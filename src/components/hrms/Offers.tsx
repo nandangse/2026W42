@@ -18,7 +18,7 @@ import { Pane } from "./Pane";
 import { C } from "./RecordFields";
 
 const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
-const day = (s: string | null) => (s ? fmtFull(String(s).slice(0, 10)) : "—");
+const day = (s: string | null) => (s ? fmtFull(String(s)) : "—");
 
 interface Row {
   id: string; offer_no: string | null; name: string; email: string | null; mobile: string | null;

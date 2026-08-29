@@ -54,7 +54,7 @@ export default function StatutoryRecords({ who }: { who: string }) {
           <div style={{ minWidth: 170 }}>
             <b style={{ fontSize: 14 }}>{MONTHS[s.month - 1]} {s.year}</b>
             <div style={{ fontSize: 10.5, color: C.faint }}>
-              ❄ frozen {s.frozen_at ? fmtFull(String(s.frozen_at).slice(0, 10)) : ""} · {s.total_count ?? "—"} employees
+              ❄ frozen {s.frozen_at ? fmtFull(String(s.frozen_at)) : ""} · {s.total_count ?? "—"} employees
             </div>
           </div>
           {RETURNS.map(([k, label]) => (

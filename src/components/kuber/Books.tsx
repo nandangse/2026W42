@@ -81,7 +81,7 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
       )}
       {!stale && (
         <div className="text-xs mb-2" style={{ color: MUTED }}>
-          Books as of the last upload: {new Date(s.loadedAt as string).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+          Books as of the last upload: {new Date(s.loadedAt as string).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
           {" · "}the registers are live always.
         </div>
       )}

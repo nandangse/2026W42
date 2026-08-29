@@ -125,7 +125,7 @@ export default function UploadFiles({ email }: { email?: string }) {
       .then((j) => {
         setRows(j.uploads || []); setReviewLink(j.reviewLink ?? null);
         setReviewWho(j.reviewLinkBy
-          ? `updated by ${j.reviewLinkBy}${j.reviewLinkAt ? " · " + new Date(j.reviewLinkAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}`
+          ? `updated by ${j.reviewLinkBy}${j.reviewLinkAt ? " · " + new Date(j.reviewLinkAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}`
           : "");
       })
       .catch(() => setRows([]));
@@ -356,7 +356,7 @@ export default function UploadFiles({ email }: { email?: string }) {
                 </td>
                 <td className="px-2 py-1.5 font-semibold">{r.initials || r.by || "—"}</td>
                 <td className="px-2 py-1.5 tnum whitespace-nowrap" style={{ color: MUTED }}>
-                  {new Date(r.at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  {new Date(r.at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </td>
                 <td className="px-2 py-1.5">
                   {r.drive_synced_at

@@ -72,7 +72,7 @@ export default function IdpRecords({ who }: { who: string }) {
         : <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#FFF3E8", color: "#8A5B00" }}>started, not finished</span>,
     },
     { key: "submitted_at", label: "Submitted", width: 110, value: (r) => r.submitted_at,
-      render: (r) => (r.submitted_at ? fmtFull(String(r.submitted_at).slice(0, 10)) : null) },
+      render: (r) => (r.submitted_at ? fmtFull(String(r.submitted_at)) : null) },
     { key: "answered", label: "Answers", width: 90, align: "right", numeric: true, value: (r) => r.answered },
     { key: "recordings", label: "🎙", width: 60, align: "right", numeric: true, value: (r) => r.recordings,
       title: "Recordings" },
@@ -148,8 +148,8 @@ function IdpFullView({ f, onReopened }: { f: Full; onReopened: () => void }) {
         </div>
         <div style={{ fontSize: 11, color: "#8FA1B3", marginTop: 2 }}>
           {f.submitted_at
-            ? <>Submitted {fmtFull(String(f.submitted_at).slice(0, 10))}</>
-            : <b style={{ color: "#F5B32B" }}>Started {fmtFull(String(f.started_at).slice(0, 10))} and NOT submitted — this is not an IDP yet</b>}
+            ? <>Submitted {fmtFull(String(f.submitted_at))}</>
+            : <b style={{ color: "#F5B32B" }}>Started {fmtFull(String(f.started_at))} and NOT submitted — this is not an IDP yet</b>}
         </div>
         {f.submitted_at && (
           <button onClick={reopen} disabled={busy}
@@ -246,7 +246,7 @@ function IdpFullView({ f, onReopened }: { f: Full; onReopened: () => void }) {
 
         <div className="rounded p-2" style={{ background: "#F4F2EC", fontSize: 11.5, color: C.dim, lineHeight: 1.6 }}>
           <b>Consent:</b> {f.consent_text || "—"}
-          {f.consent_at && <> — ticked {fmtFull(String(f.consent_at).slice(0, 10))}</>}
+          {f.consent_at && <> — ticked {fmtFull(String(f.consent_at))}</>}
           {f.role_summary && (<><br /><b>The expectation they answered against:</b> <span style={{ whiteSpace: "pre-wrap" }}>{f.role_summary}</span></>)}
         </div>
       </div>

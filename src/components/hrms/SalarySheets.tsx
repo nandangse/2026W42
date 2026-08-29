@@ -35,7 +35,7 @@ interface Line { employee_id: string | null; name: string | null; type: string |
 
 const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
 const lakh = (n: number | null | undefined) => (n == null ? "—" : n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹${(n / 1e5).toFixed(2)} L` : `₹${inr(n)}`);
-const day = (iso: string | null) => (iso ? fmtFull(String(iso).slice(0, 10)) : "—");
+const day = (iso: string | null) => (iso ? fmtFull(String(iso)) : "—");
 const who = (s: string | null) => String(s || "—").split("·")[0].trim();
 
 export default function SalarySheets({ who: me, isOwner }: { who: string; isOwner: boolean }) {

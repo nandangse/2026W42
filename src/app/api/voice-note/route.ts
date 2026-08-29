@@ -173,7 +173,7 @@ export async function POST(req: Request) {
         };
         const said = (recent || [])
           .reverse()
-          .map((n) => `[${initials(n.by)} · ${String(n.at).slice(0, 16).replace("T", " ")}] ${n.transcript || n.summary}`)
+          .map((n) => `[${initials(n.by)} · ${new Date(String(n.at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} IST] ${n.transcript || n.summary}`)
           .join("\n");
 
         /**

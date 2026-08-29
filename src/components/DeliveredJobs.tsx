@@ -228,7 +228,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
             </div>
             {data.lastUpload && (
               <div style={{ color: C.faint }}>
-                loaded {fmtFull(String(data.lastUpload).slice(0, 10))}
+                loaded {fmtFull(String(data.lastUpload))}
               </div>
             )}
           </div>
@@ -641,7 +641,7 @@ function NoData({ lastUpload }: { lastUpload: string | null }) {
       </p>
       {lastUpload && (
         <p className="text-xs" style={{ color: C.amber, lineHeight: 1.6 }}>
-          A delivered-jobs file was loaded on {fmtFull(String(lastUpload).slice(0, 10))} but produced no rows — worth
+          A delivered-jobs file was loaded on {fmtFull(String(lastUpload))} but produced no rows — worth
           re-checking that the right report was uploaded.
         </p>
       )}

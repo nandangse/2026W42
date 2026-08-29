@@ -693,7 +693,7 @@ function Inspector({ tree, id, onClose, reload }: { tree: Tree; id: string; onCl
                 <div key={i} className="flex gap-2 mb-2">
                   <Who ids={[c.by]} size={20} />
                   <div>
-                    <div className="text-xs tnum" style={{ color: "#8A94A0" }}>{new Date(c.at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</div>
+                    <div className="text-xs tnum" style={{ color: "#8A94A0" }}>{new Date(c.at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short" })}</div>
                     <div className="text-xs" style={{ color: "#5A6672", lineHeight: 1.45 }}>{c.body}</div>
                   </div>
                 </div>

@@ -148,7 +148,7 @@ export default function SalesGenie({
             background: "rgba(255,255,255,0.55)", padding: "2px 8px", borderRadius: 4,
           }}
         >
-          {email} · {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+          {email} · {new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric" })}
         </div>
       </div>
     </div>

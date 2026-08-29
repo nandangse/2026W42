@@ -212,7 +212,7 @@ function GoalsTab({ ctx }: { ctx: Ctx }) {
           <span className="text-xs font-bold tracking-widest" style={{ color: C.violet }}>✨ MY LEARNING PLAN</span>
           {d.plan?.generated_at && (
             <span className="text-xs" style={{ color: C.faint }}>
-              written {fmtFull(String(d.plan.generated_at).slice(0, 10))}
+              written {fmtFull(String(d.plan.generated_at))}
             </span>
           )}
           <div className="flex-1" style={{ minWidth: 10 }} />

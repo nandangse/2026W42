@@ -68,7 +68,7 @@ export default function SalarySlipsTable({ who }: { who: string }) {
     {
       key: "ack", label: "Ack Date", width: 160, value: (r) => r.first_at,
       render: (r) => r.first_at
-        ? <span style={{ fontSize: 11.5 }}><b style={{ color: C.green }}>{fmtFull(String(r.first_at).slice(0, 10))}</b><span style={{ color: C.faint }}> · last {fmtFull(String(r.last_at).slice(0, 10))} · {r.opens}×</span></span>
+        ? <span style={{ fontSize: 11.5 }}><b style={{ color: C.green }}>{fmtFull(String(r.first_at))}</b><span style={{ color: C.faint }}> · last {fmtFull(String(r.last_at))} · {r.opens}×</span></span>
         : <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#FFF3E8", color: "#8A5B00" }}>not yet seen</span>,
     },
   ], []);

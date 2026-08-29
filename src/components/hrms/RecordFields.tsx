@@ -41,7 +41,7 @@ export function ReadField({ f, e }: { f: FieldSpec; e: HrmsEmployee }) {
           v
         )}
         {edited && (
-          <span title={`Edited by ${e.edited[f.key].by || "somebody"} on ${fmtFull(String(e.edited[f.key].at).slice(0, 10))}`}
+          <span title={`Edited by ${e.edited[f.key].by || "somebody"} on ${fmtFull(String(e.edited[f.key].at))}`}
             style={{ color: C.orange, marginLeft: 6 }}>•</span>
         )}
       </div>

@@ -308,7 +308,7 @@ export function MatBox({
               {comments.map((c) => (
                 <div key={c.id} className="rounded p-2 mb-1" style={{ background: C.panel }}>
                   <div className="text-xs font-bold" style={{ color: C.navy }}>
-                    {c.by || "someone"} <span className="font-normal" style={{ color: C.faint }}>{fmtFull(String(c.at).slice(0, 10))}</span>
+                    {c.by || "someone"} <span className="font-normal" style={{ color: C.faint }}>{fmtFull(String(c.at))}</span>
                   </div>
                   <div className="text-xs" style={{ color: C.body, lineHeight: 1.5 }}>{c.body}</div>
                 </div>

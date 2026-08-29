@@ -117,7 +117,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
             <div className="font-bold" style={{ fontSize: 18, color: C.green }}>Thank you, {name}. Your IDP is done.</div>
             <div className="mt-2" style={{ fontSize: 14, color: C.dim, lineHeight: 1.7 }}>
               Completed on{" "}
-              {new Date(last.submitted_at).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}.
+              {new Date(last.submitted_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}.
               It is on your record and your HoD, HR and Management can read it.
             </div>
           </div>

@@ -105,13 +105,13 @@ function QueueScreen({ channel }: { channel: "email" | "whatsapp" }) {
               {(tracked || []).map((m, i) => (
                 <tr key={m.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   <td className="px-2 py-1.5 whitespace-nowrap" style={{ color: MUTED }}>
-                    {new Date(m.occurred_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    {new Date(m.occurred_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </td>
                   <td className="px-2 py-1.5">{(m.to_handles || []).join(", ")}</td>
                   <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.subject}</td>
                   <td className="px-2 py-1.5 whitespace-nowrap">
                     {m.opened_at
-                      ? <span className="font-bold" style={{ color: "#0D7A3F" }}>✓ {new Date(m.opened_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                      ? <span className="font-bold" style={{ color: "#0D7A3F" }}>✓ {new Date(m.opened_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                       : <span style={{ color: MUTED }}>not yet</span>}
                   </td>
                   <td className="px-2 py-1.5 tnum">{m.open_count || 0}</td>

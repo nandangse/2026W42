@@ -104,7 +104,7 @@ export default function PlaybookScreen({ kind, email }: { kind: string; email?: 
           </div>
           <div className="text-xs" style={{ color: MUTED }}>
             {book.compiled_at
-              ? `compiled ${new Date(book.compiled_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}${book.by ? ` · ${book.by}` : ""}`
+              ? `compiled ${new Date(book.compiled_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}${book.by ? ` · ${book.by}` : ""}`
               : "not compiled yet"}
             {" · "}the midnight cron weaves in whatever is pending
             {book.folder_id && (<>
@@ -164,7 +164,7 @@ export default function PlaybookScreen({ kind, email }: { kind: string; email?: 
                   <td className="px-2 py-1.5">{d.category || "—"}</td>
                   <td className="px-2 py-1.5">{d.hasExtract ? "✓" : <span style={{ color: MUTED }}>title only</span>}</td>
                   <td className="px-2 py-1.5">{d.by || "—"}</td>
-                  <td className="px-2 py-1.5 whitespace-nowrap" style={{ color: MUTED }}>{new Date(d.at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</td>
+                  <td className="px-2 py-1.5 whitespace-nowrap" style={{ color: MUTED }}>{new Date(d.at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short" })}</td>
                   <td className="px-2 py-1.5">
                     {d.status === "pending" && (
                       <button onClick={async () => {

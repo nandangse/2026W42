@@ -94,7 +94,7 @@ export default function EmployeeRecord({
         next.edited[field] = { by: initials ? `${initials} · ${email}` : email, at: new Date().toISOString() };
         return next;
       });
-      setMsg(`Saved ✓  ${new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`);
+      setMsg(`Saved ✓  ${new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })}`);
       setHistory(null); // the log has moved on
     } catch (x) {
       setMsg(x instanceof Error ? x.message : String(x));
@@ -250,8 +250,8 @@ export default function EmployeeRecord({
                       {h.by_initials || "—"}
                     </span>{" "}
                     <span style={{ color: C.faint }}>
-                      on {fmtFull(String(h.edited_at).slice(0, 10))} at{" "}
-                      {new Date(h.edited_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                      on {fmtFull(String(h.edited_at))} at{" "}
+                      {new Date(h.edited_at).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })}
                     </span>{" "}
                     changed <b>{h.label}</b>{" "}
                     <span style={{ color: C.faint, textDecoration: "line-through" }}>{h.old_value || "—"}</span>{" → "}
@@ -267,7 +267,7 @@ export default function EmployeeRecord({
         <div className="text-xs mt-4" style={{ color: C.faint, lineHeight: 1.6 }}>
           Employee ID <b>{id}</b> · {onRoll(e.value) ? "on the roll" : "not on the roll"}
           {e.value.doj && <> · {tenure(e.value.doj)} of service</>}
-          {" · "}first seen {e.firstSeen ? fmtFull(String(e.firstSeen).slice(0, 10)) : "—"}
+          {" · "}first seen {e.firstSeen ? fmtFull(String(e.firstSeen)) : "—"}
         </div>
       </div>
     </Shell>
@@ -460,7 +460,7 @@ function EditField({
                   awaiting approval
                 </span>
               )}
-              Changed by {e.edited[f.key].by || "somebody"} on {fmtFull(String(e.edited[f.key].at).slice(0, 10))}
+              Changed by {e.edited[f.key].by || "somebody"} on {fmtFull(String(e.edited[f.key].at))}
               {was != null && was !== "" && <> — it said <b>{was}</b></>}{" "}
               <button onClick={onClear} className="font-bold rounded px-1.5" style={{ background: "#F4F2EC", color: C.dim }}>
                 {was != null && was !== "" ? "put it back" : "clear"}

@@ -7,10 +7,10 @@ import { TRADES, templateFor, type Crew } from "./templates";
 export const DAY = 86400000;
 
 export const today = (): string => {
-  const d = new Date();
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 10);
+  // pinned to IST, not the machine's clock — a Vercel server lives on UTC
+  // and would otherwise say yesterday until 5:30 am (Dr Raghu, 29 Aug 2026:
+  // every timing in Genie speaks IST)
+  return new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
 };
 
 export const toISO = (d: Date): string => d.toISOString().slice(0, 10);
@@ -28,14 +28,25 @@ export const diffDays = (a: string, b: string): number =>
  * fmt() drops the year for compactness inside a table that is already scoped
  * to a period; fmtFull() always carries it.
  */
+/** Every timing in Genie speaks IST (Dr Raghu, 29 Aug 2026). A full
+ *  timestamp that carries its zone is shifted to IST before the date is
+ *  read — a 00:30 IST save must not wear yesterday's UTC date. A bare
+ *  calendar date passes through untouched. */
+const istDay = (iso: string): string => {
+  if (iso.length > 10 && /[zZ]$|[+-]\d\d:?\d\d$/.test(iso)) {
+    const t = new Date(iso);
+    if (!isNaN(t.getTime())) return new Date(t.getTime() + 330 * 60000).toISOString().slice(0, 10);
+  }
+  return iso.slice(0, 10);
+};
 export const fmt = (iso: string | null): string => {
   if (!iso) return "—";
-  const [y, m, d] = iso.slice(0, 10).split("-");
+  const [y, m, d] = istDay(iso).split("-");
   return `${d}-${m}`;
 };
 export const fmtFull = (iso: string | null): string => {
   if (!iso) return "—";
-  const [y, m, d] = iso.slice(0, 10).split("-");
+  const [y, m, d] = istDay(iso).split("-");
   return `${d}-${m}-${y}`;
 };
 export const lakh = (v: number): string =>
