@@ -509,12 +509,35 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
     setBasicPct(clean);
     if (Number(grossBox)) setComps(scaleTo(Number(grossBox) || 0, clean));
   };
+  // THE GROSS IS FIXED (Dr Raghu, 29 Aug 2026: "gross total is fixed —
+  // adjustment below will change the % of basic"): typing in the table never
+  // moves the gross. Fixed Allowance absorbs the difference, the Staff HRA
+  // law rides every Basic edit, and the % lever FOLLOWS the split. Editing
+  // Fixed Allowance itself re-balances through Basic — the gross still holds.
   const setComp = (key: string, raw: string) => {
-    const next = { ...comps, [key]: raw.replace(/[^0-9]/g, "") };
-    // the Staff law rides every Basic edit
-    if (isStaff && key === "basic_da") next.hra = String(Math.round((Number(next.basic_da) || 0) * 0.2));
+    const clean = raw.replace(/[^0-9]/g, "");
+    const next = { ...comps, [key]: clean };
+    const gross = Number(grossBox) || 0;
+    if (isContract || !gross) {
+      // contract: the basic IS the gross · no anchor yet: the sum becomes it
+      if (isStaff && key === "basic_da") next.hra = String(Math.round((Number(next.basic_da) || 0) * 0.2));
+      setComps(next);
+      setGrossBox(String(COMPS.reduce((a, [k]) => a + (Number(next[k]) || 0), 0) || ""));
+      return;
+    }
+    if (key === "fixed") {
+      const rest = (Number(next.conveyance) || 0) + (Number(next.medical) || 0) + (Number(next.fixed) || 0);
+      const basic = isStaff
+        ? Math.max(0, Math.round((gross - rest) / 1.2))          // basic + 20% hra fill the room
+        : Math.max(0, gross - rest - (Number(next.hra) || 0));
+      next.basic_da = String(basic);
+      if (isStaff) next.hra = String(Math.round(basic * 0.2));
+    } else {
+      if (isStaff && key === "basic_da") next.hra = String(Math.round((Number(next.basic_da) || 0) * 0.2));
+      next.fixed = String(Math.max(0, gross - (Number(next.basic_da) || 0) - (Number(next.hra) || 0) - (Number(next.conveyance) || 0) - (Number(next.medical) || 0)));
+    }
     setComps(next);
-    setGrossBox(String(COMPS.reduce((a, [k]) => a + (Number(next[k]) || 0), 0) || ""));
+    setBasicPct(String(Math.round(((Number(next.basic_da) || 0) / gross) * 100)));
   };
   // a saved structure from before the law wears the correction the moment
   // the card opens — visibly, so what is saved next is right
@@ -555,15 +578,15 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
 
   const inc = prev != null && n ? n - prev : null;
 
-  const save = async () => {
+  const save = async (draft = false) => {
     setBusy(true); setMsg("");
     try {
       const structure = {
         components: Object.fromEntries(COMPS.map(([key]) => [key, Number(comps[key]) || 0])),
         extras: Object.fromEntries(EXTRAS.map(([key]) => [key, Number(extras[key]) || 0])),
       };
-      const r = await api.post("/api/hrms/idp", { action: "appraisal", employee_id: d.employee.id, new_gross: String(n), prev_gross: prev, structure });
-      setMsg(r?.warning ? String(r.warning) : r?.approved ? "Saved and finalised ✓" : "Saved — it now waits for RJ to finalise ✓");
+      const r = await api.post("/api/hrms/idp", { action: "appraisal", employee_id: d.employee.id, new_gross: String(n), prev_gross: prev, structure, new_designation: newDesig.trim(), draft });
+      setMsg(r?.warning ? String(r.warning) : draft ? "Draft saved — not submitted ✓" : r?.approved ? "Saved and finalised ✓" : "Saved — it now waits for RJ to finalise ✓");
       onSaved();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
@@ -624,7 +647,9 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
             ? <div className="rounded px-2.5 py-1.5 mt-2 inline-block" style={{ background: "#FFF3E8", color: "#8A5B00", fontSize: 12, fontWeight: 700 }}>
                 Proposed by {String(d.appraisal.pending_by || "").split("·")[0].trim() || "HR"} — waiting for RJ to finalise. It is in Approvals → RJ Approval - Commercial.
               </div>
-            : null
+            : <div className="rounded px-2.5 py-1.5 mt-2 inline-block" style={{ background: "#F1F0FB", color: "#5B54B8", fontSize: 12, fontWeight: 700 }}>
+                💾 draft — not submitted
+              </div>
       )}
 
       {/* the headline, on top — the increment both ways, and the new CTC */}
@@ -640,7 +665,7 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
         <div className="mt-3">
           <div className="flex items-baseline gap-2 flex-wrap">
             <div className="font-bold" style={{ fontSize: 14 }}>The New Salary Structure</div>
-            <span style={{ fontSize: 11, color: C.faint }}>type in the Monthly column and everything recomputes{isStaff ? " · Staff rule: HRA stays 20% of Basic & DA by itself" : ""}</span>
+            <span style={{ fontSize: 11, color: C.faint }}>the gross HOLDS — type in the Monthly column and Fixed Allowance absorbs, the Basic % follows{isStaff ? " · Staff rule: HRA stays 20% of Basic & DA by itself" : ""}</span>
           </div>
           <table style={{ fontSize: 12.5, width: "100%", tableLayout: "fixed", borderCollapse: "collapse", marginTop: 6 }}>
             <thead>
@@ -713,10 +738,16 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
       </div>
 
       <div className="flex items-center gap-2 mt-3">
-        <button onClick={save} disabled={busy || !n}
+        <button onClick={() => save()} disabled={busy || !n}
           className="rounded font-bold px-4 py-2"
           style={{ background: n ? C.green : "#E2E0DA", color: n ? "#fff" : "#8A94A0", fontSize: 14 }}>
           {busy ? "Saving…" : isOwner ? (d.appraisal ? "✓ Update and finalise" : "✓ Save and finalise") : (d.appraisal ? "Update — send to RJ" : "Save — send to RJ")}
+        </button>
+        <button onClick={() => save(true)} disabled={busy || !n}
+          title="Park the working — nothing submitted, nothing finalised, just kept for the sit-down"
+          className="rounded font-bold px-3 py-2"
+          style={{ background: "#fff", color: C.dim, border: `1px solid ${C.line}`, fontSize: 13 }}>
+          💾 Save draft
         </button>
         {isOwner && d.appraisal?.pending_since && !d.appraisal?.approved_at && (
           <button onClick={approveThis} disabled={busy}

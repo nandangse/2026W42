@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.35",
+    date: "2026-08-29",
+    module: "Appraisal — the gross holds, the designation stays",
+    items: [
+      "THE GROSS IS FIXED (Dr Raghu, 29 Aug 2026): typing in the Monthly column no longer moves the gross — Fixed Allowance absorbs every adjustment, the Staff HRA law rides each Basic edit, and the BASIC % LEVER FOLLOWS the split instead of the gross drifting under it. Editing Fixed Allowance itself re-balances through Basic; the gross still holds.",
+      "NEW DESIGNATION now actually SAVES — the card was collecting it and never sending it. It travels with every save, comes back on every open, and stays Raghu's to change on any later update.",
+      "THE 💾 SAVE DRAFT button, promised in .31, is truly on the desk now — parks the working with a 'draft — not submitted' chip, nothing queued, nothing finalised.",
+    ],
+  },
+  {
     v: "3.31.0.34",
     date: "2026-08-29",
     module: "Kuber — the dashboard tells the truth",
