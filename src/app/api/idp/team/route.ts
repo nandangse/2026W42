@@ -26,10 +26,15 @@ const CYCLE = "2026-27";
  * asked for. Two independent ratings are only worth having if they are
  * independent, so those fields are stripped HERE, not hidden on the page.
  */
+/** Named exemptions from the own-IDP-first rule (Dr Raghu, 29 Aug 2026:
+ *  "for Tushar Giri also allow him to fill the reporting manager's IDP
+ *  without filling his own"). The rule stands for everyone else. */
+const OWN_FIRST_EXEMPT = new Set(["tushar@nandan.co.in"]);
+
 async function gate(u: { email: string; id: string }) {
   const admin = adminClient();
   const isOwner = u.email.toLowerCase() === RAGHU_EMAIL;
-  if (!isOwner) {
+  if (!isOwner && !OWN_FIRST_EXEMPT.has(u.email.toLowerCase())) {
     const { data: mine } = await admin
       .from("hrms_idp").select("id").eq("person_email", u.email).eq("cycle", CYCLE)
       .not("submitted_at", "is", null).limit(1);

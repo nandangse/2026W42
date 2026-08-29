@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.27",
+    date: "2026-08-29",
+    module: "IDP — Tushar's exemption",
+    items: [
+      "TUSHAR GIRI may fill his team's manager-side IDPs WITHOUT having submitted his own (Dr Raghu, 29 Aug 2026) — a named exemption from the own-IDP-first rule, which stands unchanged for everyone else.",
+    ],
+  },
+  {
     v: "3.31.0.26",
     date: "2026-08-29",
     module: "HRMS — the discussion on record, the letter's address on the card",
