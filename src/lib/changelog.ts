@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.19",
+    date: "2026-08-29",
+    module: "CRM — the quotation carries its opportunity's whole story",
+    items: [
+      "A QUOTATION MADE FROM AN OPPORTUNITY now carries the transfer Dr Raghu named (29 Aug 2026): its ENQUIRY INFO tab shows the opportunity's rich text — images, attachments and all — read LIVE from the opportunity, never a stale copy; its DEAL CONTACTS tab shows and adds the same people; and its COMMUNICATION feed is the union of its own and its opportunity's — every call and mail that led to the quote, on the quote.",
+      "And the night's harvest behind it: ALL 53,670 ERP OPPORTUNITIES now stand in Genie — 22,255 refreshed, 30,900 inserted, every enquiry as rich text with 44,008 attachments linked across 36,995 of them.",
+    ],
+  },
+  {
     v: "3.31.0.18",
     date: "2026-08-29",
     module: "HRMS — the compensation laws, said once and kept everywhere",

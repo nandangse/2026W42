@@ -33,24 +33,46 @@ export async function GET(req: Request) {
     const fk = FK[type];
     if (!fk || !id) throw new HttpError(400, "Which record? comms needs type and id.");
 
+    // THE TRANSFER (Dr Raghu, 29 Aug 2026): a quotation made from an
+    // opportunity carries its communication — the quotation's feed is the
+    // union of its own and its opportunity's.
+    let oppId: string | null = null;
+    if (type === "quotation") {
+      const { data: q } = await db.from("quotation").select("opportunity_id").eq("id", id).maybeSingle();
+      oppId = q?.opportunity_id ? String(q.opportunity_id) : null;
+    }
+
     const { data: ints, error: ierr } = await db.from("interaction")
       .select("id, kind, call_type, result, happened_at, by_id, person_name, remark, next_action, next_action_on")
       .eq(fk.interaction, id)
       .order("happened_at", { ascending: false })
       .limit(300);
     if (ierr) throw new HttpError(500, ierr.message);
+    const intsAll = [...(ints ?? [])];
+    if (oppId) {
+      const { data: oi } = await db.from("interaction")
+        .select("id, kind, call_type, result, happened_at, by_id, person_name, remark, next_action, next_action_on")
+        .eq("opportunity_id", oppId)
+        .order("happened_at", { ascending: false })
+        .limit(300);
+      const have = new Set(intsAll.map((r) => String(r.id)));
+      for (const r of oi ?? []) if (!have.has(String(r.id))) intsAll.push(r);
+    }
 
     let msgs: Record<string, unknown>[] = [];
-    if (fk.message) {
-      const { data } = await db.from("message")
+    if (fk.message || oppId) {
+      let mq = db.from("message")
         .select("id, channel, direction, subject, body_text, from_handle, to_handles, occurred_at, thread_key, raw_payload")
-        .eq(fk.message, id)
         .order("occurred_at", { ascending: false })
         .limit(300);
+      if (fk.message && oppId) mq = mq.or(`${fk.message}.eq.${id},opportunity_id.eq.${oppId}`);
+      else if (fk.message) mq = mq.eq(fk.message, id);
+      else mq = mq.eq("opportunity_id", oppId as string);
+      const { data } = await mq;
       msgs = (data ?? []) as Record<string, unknown>[];
     }
 
-    const profileIds = [...new Set((ints ?? []).map((r) => r.by_id).filter(Boolean).map(String))];
+    const profileIds = [...new Set(intsAll.map((r) => r.by_id).filter(Boolean).map(String))];
     const names = new Map<string, string>();
     if (profileIds.length) {
       const { data: profs } = await db.from("profile").select("id, full_name").in("id", profileIds);
@@ -58,7 +80,7 @@ export async function GET(req: Request) {
     }
 
     const feed = [
-      ...(ints ?? []).map((r) => ({
+      ...intsAll.map((r) => ({
         kind: "interaction" as const,
         at: r.happened_at,
         type: r.kind || r.call_type || "Interaction",

@@ -1492,8 +1492,18 @@ function RecordModal({
       recordTabs.push({ key: "dealppl", label: "Deal contacts", slug: "opportunity_contact", filterField: "opportunity_id", filterValue: rid, addPresets: { opportunity_id: rid }, presetOptions: { opportunity: [{ id: rid, label: String(row.name || "this opportunity") }] } });
     if (dt.name === "opportunity")
       recordTabs.push({ key: "quotes", label: "Quotations", slug: "quotation", filterField: "opportunity_id", filterValue: rid, addPresets: { opportunity_id: rid, ...(companyId ? { company_id: companyId } : {}) }, presetOptions: { opportunity: [{ id: rid, label: String(row.name || "this opportunity") }] } });
-    if (dt.name === "quotation")
+    if (dt.name === "quotation") {
+      const qOpp = row.opportunity_id ? String(row.opportunity_id) : null;
+      // THE TRANSFER (Dr Raghu, 29 Aug 2026): a quotation made from an
+      // opportunity carries its enquiry info, deal contacts, attachments and
+      // communication — shown FROM the opportunity, always in step, never a
+      // stale copy.
+      if (qOpp) {
+        recordTabs.push({ key: "oppenquiry", label: "Enquiry Info" });
+        recordTabs.push({ key: "dealppl", label: "Deal Contacts", slug: "opportunity_contact", filterField: "opportunity_id", filterValue: qOpp, addPresets: { opportunity_id: qOpp }, presetOptions: { opportunity: [{ id: qOpp, label: "this quotation's opportunity" }] } });
+      }
       recordTabs.push({ key: "lines", label: "Lines", slug: "quotation_line", filterField: "quotation_id", filterValue: rid, addPresets: { quotation_id: rid } });
+    }
     if (dt.name === "person") recordTabs.push({ key: "card", label: "Visiting Card" });
     recordTabs.push(
       { key: "comms", label: "Communication" },
@@ -1650,6 +1660,8 @@ function RecordModal({
                   : <span style={{ color: MUTED }}>No enquiry text recorded.</span>}
               </div>
             </div>
+          ) : tab === "oppenquiry" ? (
+            <OppEnquiryTab oppId={row.opportunity_id ? String(row.opportunity_id) : null} />
           ) : tab === "qual" ? (
             <div className="p-4">
               <QualView dt={dt} row={row} links={links} />
@@ -2521,6 +2533,29 @@ function GenieTab({ type, id }: { type: string; id: string }) {
  * email or phone, then names that start the same — and one click absorbs the
  * duplicate: every reference on it moves to this record, everywhere.
  */
+/** The linked opportunity's enquiry, worn by the quotation (Dr Raghu,
+ *  29 Aug 2026) — read live from the opportunity, attachments included. */
+function OppEnquiryTab({ oppId }: { oppId: string | null }) {
+  const [text, setText] = useState<string | null>(null);
+  useEffect(() => {
+    if (!oppId) { setText(""); return; }
+    fetch(`/api/crm/opportunity?id=${encodeURIComponent(oppId)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setText(String(j?.row?.enquiry_info ?? "")))
+      .catch(() => setText(""));
+  }, [oppId]);
+  return (
+    <div className="p-4">
+      <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>FROM THE OPPORTUNITY — always its current text, never a copy</div>
+      <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "calc(100vh - 280px)", overflowY: "auto", overflowWrap: "anywhere" }}>
+        {text === null ? <span style={{ color: MUTED }}>reading…</span>
+          : text.trim() ? <RichText text={text} />
+          : <span style={{ color: MUTED }}>The opportunity holds no enquiry text.</span>}
+      </div>
+    </div>
+  );
+}
+
 /**
  * THE DATE VIEWS (Dr Raghu, 28 Aug 2026): every list with a date opens on
  * YTD, remembers the salesperson's last view, and offers the saved views —
