@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.33",
+    date: "2026-08-29",
+    module: "Appraisal — the % lever, the fixed conveyance, the new designation",
+    items: [
+      "THE SPLIT OBEYS TWO MORE LAWS (Dr Raghu, 29 Aug 2026): a BASIC % OF GROSS lever stands beside New Gross — change the gross OR the percentage and the split recomputes; and NOTHING SCALES PROPORTIONALLY any more — CONVEYANCE HOLDS where it stands, medical stays ₹1,250, HRA follows its law, and THE FIXED ALLOWANCE ALONE absorbs every difference.",
+      "NEW DESIGNATION on the desk: defaults to the current one, changed right there when the promotion is part of the decision — saved with the appraisal, the change flagged in violet with what it was (migration 0099).",
+    ],
+  },
+  {
     v: "3.31.0.32",
     date: "2026-08-29",
     module: "Appraisal — Raghu's brief",

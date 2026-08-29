@@ -526,6 +526,7 @@ export async function POST(req: Request) {
       const row: Record<string, unknown> = {
         employee_id, cycle: "2026-27",
         new_gross, prev_gross: Number(body.prev_gross) || null,
+        new_designation: String(body.new_designation || "").trim() || null,
         note: String(body.note || "").trim() || null,
         decided_by: stamp,
         updated_at: now,

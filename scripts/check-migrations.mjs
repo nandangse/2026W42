@@ -67,6 +67,7 @@ const PROBES = [
   ["genie", "0096 appraisal discussion", "hrms_appraisal?select=discussion&limit=1"],
   ["genie", "0097 salary history", "hrms_salary_history?select=id"],
   ["genie", "0098 raghu brief", "hrms_appraisal?select=brief&limit=1"],
+  ["genie", "0099 new designation", "hrms_appraisal?select=new_designation&limit=1"],
   ["crm", "0029 opportunity contact", "opportunity?select=contact_id&limit=1"],
   ["crm", "0025 tags", "crm_tag?select=id"],
   ["crm", "0026 tags widen + 0027 year in number", "crm_tag_link?select=id"],

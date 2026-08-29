@@ -442,6 +442,9 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
   const proposed = d.reviews.find((r) => r.gross_proposed != null)?.gross_proposed ?? null;
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  // NEW DESIGNATION (29 Aug 2026): same as before until changed at the desk
+  const [newDesig, setNewDesig] = useState<string>(() =>
+    String((d.appraisal as Record<string, unknown> | null)?.new_designation || d.employee.designation || ""));
 
   // today's split, off the current table, for proportional scaling
   const baseComps = useMemo(() => {
@@ -451,31 +454,29 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
     return out;
   }, [d]);
 
-  const scaleTo = useCallback((target: number) => {
+  // % OF BASIC drives the split (Dr Raghu, 29 Aug 2026: "changing the gross
+  // AND the % of basic should also be an update") — and NOTHING scales
+  // proportionally any more: conveyance HOLDS, medical is 1250, HRA follows
+  // its law, and THE FIXED ALLOWANCE ALONE absorbs the difference.
+  const [basicPct, setBasicPct] = useState<string>(() => {
     const cur = Object.values(baseComps).reduce((a, b) => a + b, 0);
-    const out: Record<string, string> = {};
-    for (const [key] of COMPS) out[key] = String(cur && target ? Math.round((baseComps[key] / cur) * target) : 0);
+    const b = baseComps.basic_da || 0;
+    return String(cur && b ? Math.round((b / cur) * 100) : 58);
+  });
+  const scaleTo = useCallback((target: number, pctRaw?: string) => {
     if (isContract && target) {
       // a contract target IS the basic
       return { basic_da: String(target), hra: "0", fixed: "0", conveyance: "0", medical: "0" };
     }
-    if (target) {
-      // medical is a constant, never a share; fixed absorbs
-      const oldMed = Number(out.medical) || 0;
-      out.medical = "1250";
-      out.fixed = String(Math.max(0, (Number(out.fixed) || 0) + oldMed - 1250));
-    }
-    if (isStaff && target) {
-      // HRA snaps to the law; Fixed Allowance absorbs the difference so the
-      // gross still lands exactly on the target.
-      const basic = Number(out.basic_da) || 0;
-      const oldHra = Number(out.hra) || 0;
-      const hra = Math.round(basic * 0.2);
-      out.hra = String(hra);
-      out.fixed = String(Math.max(0, (Number(out.fixed) || 0) + oldHra - hra));
-    }
-    return out;
-  }, [baseComps, isStaff, isContract]);
+    if (!target) return { basic_da: "0", hra: "0", fixed: "0", conveyance: "0", medical: "0" };
+    const pct = Math.min(100, Math.max(1, Number(pctRaw ?? basicPct) || 58));
+    const basic = Math.round((target * pct) / 100);
+    const hra = isStaff ? Math.round(basic * 0.2) : (baseComps.hra || 0);
+    const conveyance = baseComps.conveyance || 0;   // fixed — never scaled
+    const medical = 1250;                            // always
+    const fixed = Math.max(0, target - basic - hra - conveyance - medical);
+    return { basic_da: String(basic), hra: String(hra), fixed: String(fixed), conveyance: String(conveyance), medical: String(medical) };
+  }, [baseComps, isStaff, isContract, basicPct]);
 
   // the split being decided: saved tuning first, else today's shares at the decided/proposed gross
   const [comps, setComps] = useState<Record<string, string>>(() => {
@@ -502,6 +503,11 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
     const clean = raw.replace(/[^0-9]/g, "");
     setGrossBox(clean);
     setComps(scaleTo(Number(clean) || 0));
+  };
+  const setPctAndScale = (raw: string) => {
+    const clean = raw.replace(/[^0-9]/g, "");
+    setBasicPct(clean);
+    if (Number(grossBox)) setComps(scaleTo(Number(grossBox) || 0, clean));
   };
   const setComp = (key: string, raw: string) => {
     const next = { ...comps, [key]: raw.replace(/[^0-9]/g, "") };
@@ -588,6 +594,25 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
         <input value={grossBox} inputMode="numeric" onChange={(e) => setGrossAndScale(e.target.value)}
           className="rounded px-2 py-2 tnum" style={{ border: `2px solid ${C.green}`, color: C.green, fontWeight: 700, fontSize: 17, width: 160 }} />
         <span className="font-bold" style={{ fontSize: 15, color: C.dim }}>/month</span>
+        {!isContract && (
+          <>
+            <span className="font-bold ml-2" style={{ fontSize: 14, color: C.dim }}>Basic:</span>
+            <input value={basicPct} inputMode="numeric" onChange={(e) => setPctAndScale(e.target.value)}
+              title="Basic & DA as % of gross — change it and the split recomputes: conveyance holds, medical stays 1,250, HRA follows its law, Fixed Allowance absorbs"
+              className="rounded px-2 py-2 tnum text-right" style={{ border: `2px solid #7C3AED`, color: "#7C3AED", fontWeight: 700, fontSize: 15, width: 64 }} />
+            <span className="font-bold" style={{ fontSize: 14, color: "#7C3AED" }}>% of gross</span>
+          </>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
+        <span className="font-bold" style={{ fontSize: 14 }}>New Designation:</span>
+        <input value={newDesig} onChange={(e) => setNewDesig(e.target.value)}
+          title="Defaults to the current designation — change it when the promotion is part of the decision"
+          className="rounded px-2 py-1.5" style={{ border: `1px solid ${newDesig !== String(d.employee.designation || "") ? "#7C3AED" : C.line}`, fontSize: 14, minWidth: 280 }} />
+        {newDesig !== String(d.employee.designation || "") && (
+          <span className="text-xs font-bold" style={{ color: "#7C3AED" }}>changed — was {d.employee.designation || "—"}</span>
+        )}
       </div>
 
       {d.appraisal && (
