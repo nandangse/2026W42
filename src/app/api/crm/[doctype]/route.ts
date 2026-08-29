@@ -342,10 +342,29 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       : SIZES.includes(Number(limitRaw)) ? Number(limitRaw) : 500;
     const offset = Math.max(0, Number(u.searchParams.get("offset")) || 0);
 
+    // ?tag=NAME — the tag filter (Dr Raghu, 28 Aug 2026): an exact existing
+    // name opens every record carrying it, whoever owns the tag.
+    let tagIds: string[] | null = null;
+    const tagQ = u.searchParams.get("tag")?.trim();
+    if (tagQ && ["company", "person", "opportunity"].includes(d.name)) {
+      const { data: tags } = await db.from("crm_tag").select("id").ilike("name", tagQ);
+      const ids: string[] = [];
+      if (tags?.length) {
+        for (let a = 0; ; a += 1000) {
+          const { data: links } = await db.from("crm_tag_link").select("entity_id")
+            .in("tag_id", tags.map((t) => t.id)).eq("entity", d.name).order("id").range(a, a + 999);
+          ids.push(...(links || []).map((l) => String(l.entity_id)));
+          if (!links || links.length < 1000) break;
+        }
+      }
+      tagIds = [...new Set(ids)];
+    }
+
     const buildList = (withCount: boolean) => {
       let qy = db.from(d.table).select(select, withCount ? { count: "exact" as const } : undefined);
       // Merged and soft-deleted rows stay in the ledger, not on the screens.
       if (["company", "person", "opportunity"].includes(d.name)) qy = qy.is("deleted_at", null);
+      if (tagIds) qy = qy.in("id", tagIds.length ? tagIds.slice(0, 2000) : ["00000000-0000-0000-0000-000000000000"]);
       if (wantsInd) qy = (String(indFilter).includes(",") ? qy.in("company_join.industry_id", String(indFilter).split(",")) : qy.eq("company_join.industry_id", indFilter));
       for (const f of d.fields) {
         if (f.virtual) continue;

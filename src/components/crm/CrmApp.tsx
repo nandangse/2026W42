@@ -118,6 +118,7 @@ export default function CrmApp({
   const [q, setQ] = useState("");
   const [qLive, setQLive] = useState("");            // debounced into q
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const [tagQ, setTagQ] = useState("");
   const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" } | null>(null);
   const [cols, setCols] = useState<string[] | null>(null);   // null = registry default
   const [pin, setPin] = useState(0);
@@ -191,10 +192,11 @@ export default function CrmApp({
     const p = new URLSearchParams();
     if (q.trim()) p.set("q", q.trim());
     for (const [k, v] of Object.entries(filters)) if (v !== "") p.set(`f_${k}`, v);
+    if (tagQ.trim()) p.set("tag", tagQ.trim());
     if (sort) { p.set("sort", sort.col); p.set("dir", sort.dir); }
     p.set("limit", pageSize);
     return p;
-  }, [q, filters, sort, pageSize]);
+  }, [q, filters, tagQ, sort, pageSize]);
 
   useEffect(() => {
     if (!groupBy) { setGroups(null); return; }
@@ -558,6 +560,9 @@ export default function CrmApp({
               className="px-2 py-1.5 rounded text-sm border"
               style={{ borderColor: BORDER, minWidth: 210 }}
             />
+            {["company", "person", "opportunity"].includes(dt.name) && (
+              <TagFilterBox value={tagQ} onSet={setTagQ} />
+            )}
             <div style={{ position: "relative" }}>
               <button
                 onClick={() => setColsOpen((v) => !v)}
@@ -1645,6 +1650,9 @@ function RecordModal({
           </div>
         )}
         </div>
+        {["company", "person", "opportunity"].includes(dt.name) && mode === "view" && (
+          <TagStrip entity={dt.name} id={rid} />
+        )}
       </div>
     </div>
   );
@@ -2468,6 +2476,100 @@ function GenieTab({ type, id }: { type: string; id: string }) {
  * email or phone, then names that start the same — and one click absorbs the
  * duplicate: every reference on it moves to this record, everywhere.
  */
+/**
+ * TAGS (Dr Raghu, 28 Aug 2026): the section below every company, contact and
+ * opportunity. Type-along, one or more; each salesperson sees only their own
+ * — typing a name that already exists opens that tag's records; Raghu and
+ * the Sales Head see everyone's, owner named on the chip.
+ */
+function TagStrip({ entity, id }: { entity: string; id: string }) {
+  const [tags, setTags] = useState<{ link_id: string; name: string; owner: string | null }[]>([]);
+  const [installed, setInstalled] = useState(true);
+  const [text, setText] = useState("");
+  const [sugs, setSugs] = useState<string[]>([]);
+  const load = useCallback(() => {
+    fetch(`/api/crm/tags?entity=${entity}&id=${id}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => { setTags(j.tags || []); setInstalled(j.installed !== false); })
+      .catch(() => {});
+  }, [entity, id]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetch(`/api/crm/tags?pick=${encodeURIComponent(text)}`, { cache: "no-store" })
+        .then((r) => r.json()).then((j) => setSugs(j.names || [])).catch(() => {});
+    }, 250);
+    return () => clearTimeout(t);
+  }, [text]);
+  const add = async (name: string) => {
+    const n = name.trim();
+    if (!n) return;
+    setText("");
+    await fetch("/api/crm/tags", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "add", entity, id, name: n }),
+    });
+    load();
+  };
+  if (!installed) return (
+    <div className="px-4 py-2 text-xs font-semibold" style={{ background: "#FCF6E8", color: "#8A6D1A" }}>
+      Run CRM migration 0025 — the tags have nowhere to live yet.
+    </div>
+  );
+  return (
+    <div className="px-4 py-2 flex items-center gap-1.5 flex-wrap border-t" style={{ borderColor: BORDER, background: "#FAF9F5" }}>
+      <span className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.6 }}>TAGS</span>
+      {tags.map((t) => (
+        <span key={t.link_id} className="rounded-full border px-2 py-0.5 text-xs font-semibold flex items-center gap-1"
+          style={{ borderColor: "#C9D6E4", background: "#EEF1FA", color: "#1B2D6B" }}>
+          {t.name}{t.owner ? <i style={{ color: MUTED, fontStyle: "normal", fontWeight: 400 }}> · {t.owner.split(" ")[0]}</i> : null}
+          <button onClick={async () => {
+            await fetch("/api/crm/tags", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "remove", entity, id, link_id: t.link_id }) });
+            load();
+          }} style={{ color: MUTED }} title="Take this tag off">✕</button>
+        </span>
+      ))}
+      <input
+        value={text} list={`tags-${entity}-${id}`}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") void add(text); }}
+        onBlur={() => { if (text.trim() && sugs.some((s2) => s2.toLowerCase() === text.trim().toLowerCase())) void add(text); }}
+        placeholder="＋ tag… (Enter adds; new names are yours alone)"
+        className="border rounded-full px-2 py-0.5 text-xs" style={{ borderColor: BORDER, width: 220, background: "#fff" }}
+      />
+      <datalist id={`tags-${entity}-${id}`}>{sugs.map((s2) => (<option key={s2} value={s2} />))}</datalist>
+    </div>
+  );
+}
+
+/** The list's tag filter: an EXACT existing name opens that tag's records. */
+function TagFilterBox({ value, onSet }: { value: string; onSet: (v: string) => void }) {
+  const [text, setText] = useState(value);
+  const [sugs, setSugs] = useState<string[]>([]);
+  useEffect(() => { setText(value); }, [value]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetch(`/api/crm/tags?pick=${encodeURIComponent(text)}`, { cache: "no-store" })
+        .then((r) => r.json()).then((j) => setSugs(j.names || [])).catch(() => {});
+    }, 250);
+    return () => clearTimeout(t);
+  }, [text]);
+  return (
+    <span className="flex items-center gap-1">
+      <input
+        value={text} list="tagfilter-names"
+        onChange={(e) => { setText(e.target.value); if (e.target.value === "") onSet(""); }}
+        onKeyDown={(e) => { if (e.key === "Enter") onSet(text.trim()); }}
+        placeholder="🏷 tag filter — exact name, Enter"
+        className="px-2 py-1.5 rounded text-sm border"
+        style={{ borderColor: value ? ORANGE : BORDER, minWidth: 180 }}
+      />
+      <datalist id="tagfilter-names">{sugs.map((s2) => (<option key={s2} value={s2} />))}</datalist>
+      {value && <button onClick={() => onSet("")} className="text-xs font-bold" style={{ color: ORANGE }}>✕</button>}
+    </span>
+  );
+}
+
 function MergeTab({
   type, id, title, onMerged,
 }: {
@@ -2478,6 +2580,10 @@ function MergeTab({
   const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  // find-it-yourself (Dr Raghu, 28 Aug 2026): search ANY record and merge it
+  // in — the suggestions are a head start, not a fence.
+  const [pickId, setPickId] = useState("");
+  const [pickLabel, setPickLabel] = useState("");
 
   useEffect(() => {
     setSugs(null); setErr("");
@@ -2520,8 +2626,37 @@ Everything on it — ${type === "company" ? "contacts, opportunities, quotations
       {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
       {sugs === null && !err && <div className="text-sm" style={{ color: MUTED }}>looking for twins…</div>}
       {sugs !== null && sugs.length === 0 && (
-        <div className="text-sm" style={{ color: MUTED }}>No likely duplicates found. Clean as it stands.</div>
+        <div className="text-sm" style={{ color: MUTED }}>No likely duplicates found below. Clean as it stands — or find one yourself:</div>
       )}
+      <div className="rounded border p-2.5 mb-3" style={{ borderColor: BORDER, background: "#FAF9F5" }}>
+        <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>OR FIND THE DUPLICATE YOURSELF</div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <LinkAutocomplete
+              target={type}
+              value={pickId}
+              valueLabel={pickLabel}
+              onPick={async (pid) => {
+                setPickId(pid);
+                if (!pid) { setPickLabel(""); return; }
+                try {
+                  const j = await (await fetch(`/api/crm/${type}?id=${encodeURIComponent(pid)}`, { cache: "no-store" })).json();
+                  const t2 = doctypeBySlug(type);
+                  setPickLabel(String(j?.row?.[t2?.titleField ?? "id"] ?? pid));
+                } catch { setPickLabel(pid); }
+              }}
+            />
+          </div>
+          <button
+            disabled={!pickId || pickId === id || busyId !== null}
+            onClick={() => void doMerge({ id: pickId, label: pickLabel || "the picked record", detail: "", why: "picked by hand" })}
+            className="rounded px-3 py-1.5 text-sm font-bold text-white"
+            style={{ background: !pickId || pickId === id ? "#B9BEC4" : ORANGE }}>
+            Merge it into this one
+          </button>
+        </div>
+        {pickId === id && <div className="text-xs mt-1" style={{ color: "#8E2C20" }}>That is this record itself.</div>}
+      </div>
       {(sugs ?? []).map((s) => (
         <div key={s.id} className="rounded border p-2.5 mb-2 flex items-center gap-3 flex-wrap" style={{ borderColor: BORDER }}>
           <div className="flex-1" style={{ minWidth: 200 }}>

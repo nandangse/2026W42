@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.11",
+    date: "2026-08-28",
+    module: "CRM — tags that are yours alone, and merge by hand",
+    items: [
+      "TAGS on companies, contacts and opportunities (Dr Raghu, 28 Aug 2026): a strip below every record — type-along, one or more, Enter adds. THE PRIVACY IS THE POINT: a salesperson sees ONLY THEIR OWN tags; typing a tag name that already exists — exactly — opens every record carrying it, whoever owns it; Raghu and the Sales Head see everyone's, the owner named on each chip. A 🏷 tag filter stands beside the search on the three lists. CRM migration 0025 lays the two tables.",
+      "MERGE FINDS WHAT YOU POINT AT: beside Genie's suggested twins, a search box — pick ANY company, contact or opportunity by name and merge it into the open record. Same audit, same care; the suggestions are a head start, not a fence.",
+    ],
+  },
+  {
     v: "3.31.0.10",
     date: "2026-08-28",
     module: "The numbered groups — one law across every statement",
