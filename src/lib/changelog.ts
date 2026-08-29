@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.17",
+    date: "2026-08-29",
+    module: "The ERP door swings both ways — push the dates, pull the enquiry",
+    items: [
+      "⬆ PUSH JOB DATES & % (Dr Raghu, 29 Aug 2026): Target Delivery Date, Kitting % and Production % travel from Genie to the ERP for every active job — through a MAPPING RAGHU CONFIRMS FIRST (the job doctype and its three field names, typed on the ERPNext card), writing only where the value differs, answering with pushed / already-matched / not-found / refused counts. No mapping, no write.",
+      "⬇ PULL ENQUIRY INFO AS RICH TEXT: the ERP Opportunity's own text field (its name also mapped, never guessed) comes across with its HTML turned into the rich text our reader renders — bold, links, bullets, images as links — the breaking enquiry infos refreshed in one pass.",
+      "🔍 INSPECT: name any ERP doctype and the card lists that document's real field names with samples — the mapping is set from the ERP's own truth. And the day's first verification through the door: ERP Customers 54,669 against CRM's 54,689 live companies — every customer in, the 20 extra born in the CRM since.",
+    ],
+  },
+  {
     v: "3.31.0.16",
     date: "2026-08-28",
     module: "CRM — the first walk through the ERP's door",

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { NAVY, INK, MUTED, BORDER, GREEN } from "./palette";
 
-interface Integration { key: string; label: string; fields: string[]; help: string; configured: boolean; tail: string | null; url: string | null; ownerOnly?: boolean; mayEdit?: boolean; updated_by: string | null; updated_at: string | null }
+interface Integration { key: string; label: string; fields: string[]; help: string; configured: boolean; tail: string | null; url: string | null; ownerOnly?: boolean; mayEdit?: boolean; mapping?: Record<string, string> | null; updated_by: string | null; updated_at: string | null }
 
 export default function Integrations() {
   const [rows, setRows] = useState<Integration[] | null>(null);
@@ -16,6 +16,22 @@ export default function Integrations() {
   const [vals, setVals] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const [inspect, setInspect] = useState({ doctype: "", name: "" });
+  const [inspected, setInspected] = useState<{ field: string; sample: string }[] | null>(null);
+
+  const erpAction = async (action: string, extra: Record<string, string> = {}) => {
+    setBusy("erpnext"); setMsg(action === "inspect" ? "Reading the ERP…" : "Working — this can take a few minutes on the big books…");
+    try {
+      const r = await fetch("/api/crm/erp", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, ...extra }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(String(j.error || r.status));
+      if (action === "inspect") { setInspected(j.fields || []); setMsg(`Fields of ${j.name || inspect.doctype} ↓`); }
+      else if (action === "push_jobs") setMsg(`${j.jobs} jobs read · ${j.pushed} pushed · ${j.unchanged} already matched · ${j.missing} not in the ERP · ${j.failed} refused${j.firstErr ? ` (first: ${j.firstErr})` : ""}`);
+      else if (action === "pull_enquiry_info") setMsg(`ERP holds ${j.erpWithInfo} opportunities with text · ${j.matched} matched ours · ${j.updated} enquiry infos refreshed as rich text ✓`);
+      else setMsg(JSON.stringify(j));
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy(null);
+  };
 
   const load = useCallback(() => {
     fetch("/api/crm/integrations").then(async (r) => {
@@ -82,13 +98,18 @@ export default function Integrations() {
             </div>
           ) : (
           <div className="flex gap-2 flex-wrap">
-            {it.fields.map((f) => (
+            {it.fields.map((f) => {
+              const secret = f === "api_key" || f === "api_secret";
+              const mapped = it.mapping?.[f] || "";
+              return (
               <input key={f} value={vals[`${it.key}.${f}`] || ""}
                 onChange={(e) => setVals((v) => ({ ...v, [`${it.key}.${f}`]: e.target.value }))}
-                type={f === "url" ? "text" : "password"}
-                placeholder={f === "url" ? (it.url || "https://erp.…") : it.configured ? `${f} — paste to replace` : f.replace("_", " ")}
-                className="rounded border px-2 py-1.5" style={{ borderColor: BORDER, fontSize: 13, flex: f === "url" ? "1 1 100%" : 1, minWidth: 140 }} />
-            ))}
+                type={secret ? "password" : "text"}
+                title={f}
+                placeholder={f === "url" ? (it.url || "https://erp.…") : secret ? (it.configured ? `${f} — paste to replace` : f.replace(/_/g, " ")) : (mapped ? `${f.replace(/_/g, " ")}: ${mapped}` : f.replace(/_/g, " "))}
+                className="rounded border px-2 py-1.5" style={{ borderColor: mapped && !secret ? "#BFD9C8" : BORDER, fontSize: 13, flex: f === "url" ? "1 1 100%" : "1 1 30%", minWidth: 140 }} />
+              );
+            })}
             <button onClick={() => save(it.key, it.fields)} disabled={busy === it.key || !it.fields.some((f) => (vals[`${it.key}.${f}`] || "").trim())}
               className="rounded px-3 py-1.5 font-bold" style={{ background: NAVY, color: "#fff", fontSize: 12.5 }}>
               {busy === it.key ? "…" : "Save"}
@@ -113,6 +134,35 @@ export default function Integrations() {
                   title="Reads only — fills our zero-value quotations by quote number; never overwrites a typed value, never touches the ERP">
                   ⬇ Pull quotation values
                 </button>
+                <button onClick={() => erpAction("pull_enquiry_info")} disabled={busy === it.key}
+                  className="rounded px-3 py-1.5 font-bold border" style={{ borderColor: BORDER, color: "#7C3AED", fontSize: 12.5 }}
+                  title="Reads the mapped Opportunity field, converts its HTML to rich text, refreshes our enquiry infos">
+                  ⬇ Pull enquiry info
+                </button>
+                <button onClick={() => erpAction("push_jobs")} disabled={busy === it.key}
+                  className="rounded px-3 py-1.5 font-bold border" style={{ borderColor: "#F5B32B", color: "#8A5B00", fontSize: 12.5 }}
+                  title="Writes TDD / kitting % / production % to the ERP through the confirmed mapping — only where the value differs">
+                  ⬆ Push job dates &amp; %
+                </button>
+                <span className="flex items-center gap-1" style={{ flexBasis: "100%" }}>
+                  <input value={inspect.doctype} onChange={(e) => setInspect((v) => ({ ...v, doctype: e.target.value }))}
+                    placeholder="doctype — Opportunity, Task…" className="rounded border px-2 py-1" style={{ borderColor: BORDER, fontSize: 12, width: 200 }} />
+                  <input value={inspect.name} onChange={(e) => setInspect((v) => ({ ...v, name: e.target.value }))}
+                    placeholder="document name (blank = first)" className="rounded border px-2 py-1" style={{ borderColor: BORDER, fontSize: 12, width: 200 }} />
+                  <button onClick={() => erpAction("inspect", inspect)} disabled={busy === it.key || !inspect.doctype.trim()}
+                    className="rounded px-2 py-1 font-bold border" style={{ borderColor: BORDER, color: NAVY, fontSize: 12 }}>🔍 Inspect</button>
+                </span>
+                {inspected && (
+                  <div className="rounded border p-2" style={{ borderColor: BORDER, background: "#FAF9F5", maxHeight: 200, overflowY: "auto", flexBasis: "100%", fontSize: 11.5 }}>
+                    {inspected.length === 0 && <span style={{ color: MUTED }}>No plain fields found.</span>}
+                    {inspected.map((f) => (
+                      <div key={f.field} className="flex gap-2">
+                        <b style={{ minWidth: 180, color: NAVY }}>{f.field}</b>
+                        <span style={{ color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.sample}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </div>

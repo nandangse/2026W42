@@ -18,7 +18,7 @@ const KNOWN = [
   // ERPNext (Dr Raghu, 28 Aug 2026): the Frappe token pair from his user's
   // API Access — auth is `token api_key:api_secret`; the SECRET shows only
   // once at Generate Keys. Editable by Raghu alone, for now.
-  { key: "erpnext", label: "ERPNext", fields: ["url", "api_key", "api_secret"], ownerOnly: true, help: "The ERP's door — site URL (https://…), API Key and API Secret from your ERPNext user's API Access. The secret shows once at Generate Keys; paste both. Only Raghu edits this one." },
+  { key: "erpnext", label: "ERPNext", fields: ["url", "api_key", "api_secret", "push_doctype", "push_tdd_field", "push_kit_field", "push_pct_field", "opp_info_field"], ownerOnly: true, help: "The ERP's door — site URL, API Key and API Secret from your ERPNext user's API Access (the secret shows once at Generate Keys). Below them, THE MAPPING: the job doctype and its field names for TDD / kitting % / production %, and the Opportunity field holding the enquiry text — use 🔍 Inspect to read the ERP's own field names before setting them. Only Raghu edits this one." },
 ] as const;
 
 const mayManage = (role: string) => ["admin", "ceo", "sales_head"].includes(role);
@@ -46,6 +46,11 @@ export async function GET() {
           configured: k.key === "erpnext" ? !!(cfg.api_key && cfg.api_secret) : !!cfg.api_key,
           tail: cfg.api_key ? String(cfg.api_key).slice(-4) : null,
           url: k.key === "erpnext" ? cfg.url ?? null : null,
+          mapping: k.key === "erpnext" ? {
+            push_doctype: cfg.push_doctype ?? "", push_tdd_field: cfg.push_tdd_field ?? "",
+            push_kit_field: cfg.push_kit_field ?? "", push_pct_field: cfg.push_pct_field ?? "",
+            opp_info_field: cfg.opp_info_field ?? "",
+          } : null,
           updated_by: row?.updated_by ?? null, updated_at: row?.updated_at ?? null,
         };
       }),
