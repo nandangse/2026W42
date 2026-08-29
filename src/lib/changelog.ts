@@ -75,6 +75,23 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.39",
+    date: "2026-08-29",
+    module: "CRM — the opportunity list leads with the date",
+    items: [
+      "The Opportunities list now SORTS BY DATE, NEWEST FIRST by default (Dr Raghu, 29 Aug 2026) — undated rows sink instead of floating to the top — and the long blurb above the list is gone; the one line that remains says the sort.",
+    ],
+  },
+  {
+    v: "3.31.0.38",
+    date: "2026-08-29",
+    module: "LMS — The Goal and Kaizen on every queue",
+    items: [
+      "THE GOAL MOVIE (HINDI) stands at the top of EVERY learning queue in the company (Dr Raghu, 29 Aug 2026), with KAIZEN TRAINING DAYS 1–5 right behind it — 63 people, 378 queue entries, nobody's started or completed lesson touched.",
+      "The queue learned ORDER: assigned trainings wear the low numbers and float up; self-planned lessons follow (migration 0100).",
+    ],
+  },
+  {
     v: "3.31.0.37",
     date: "2026-08-29",
     module: "Genie-wide — every timing speaks IST",

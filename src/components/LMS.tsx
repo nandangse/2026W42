@@ -584,7 +584,10 @@ function MineTab({ ctx }: { ctx: Ctx }) {
       </div>
 
       {STATUS_ORDER.map((st) => {
-        const list = rows.filter((x) => x.p.status === st);
+        // the queue's own order: assigned trainings wear the low numbers and
+        // stand at the top; self-planned lessons (default 1000) follow
+        const list = rows.filter((x) => x.p.status === st)
+          .sort((a, b) => ((a.p.sort_order ?? 1000) - (b.p.sort_order ?? 1000)) || a.l.title.localeCompare(b.l.title));
         if (!list.length) return null;
         return (
           <div key={st} className="mb-3">

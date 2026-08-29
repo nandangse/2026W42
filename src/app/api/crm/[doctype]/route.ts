@@ -399,7 +399,8 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       const order = sortOk
         ? { column: sortCol as string, ascending: u.searchParams.get("dir") !== "desc" }
         : (d.orderBy ?? { column: "created_at", ascending: false });
-      return qy.order(order.column, { ascending: order.ascending });
+      // nullsFirst:false — undated rows must not float above today's work
+      return qy.order(order.column, { ascending: order.ascending, nullsFirst: false });
     };
 
     const collected: Record<string, unknown>[] = [];

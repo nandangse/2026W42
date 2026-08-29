@@ -202,9 +202,11 @@ export const DOCTYPES: Doctype[] = [
   {
     name: "opportunity", label: "Opportunity", plural: "Opportunities", table: "opportunity",
     titleField: "name", group: "Funnel", icon: "🎯",
-    orderBy: { column: "updated_at", ascending: false },
+    // Date, newest first (Dr Raghu, 29 Aug 2026) — the long blurb is gone,
+    // the one line that remains says how the list is sorted
+    orderBy: { column: "opportunity_on", ascending: false },
     autoNumber: { field: "opportunity_no", series: "opportunity" },
-    blurb: "The thing that moves, from Suspect to Order Received. Every stage change is timed automatically, and a lost stage refuses to save without a reason.",
+    blurb: "Sorted by Date — newest first.",
     fields: [
       { name: "opportunity_no", label: "ENQ No", type: "readonly", inList: true, help: "Issued by the database on save. Imported rows keep their ERP number." },
       { name: "name", label: "Opportunity", type: "text", required: true, inList: true, help: "What is being sold, in words." },

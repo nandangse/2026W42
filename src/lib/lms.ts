@@ -55,6 +55,10 @@ export interface Progress {
   learning: string;
   minutes: number;
   planned_by: string | null;
+  /** Queue position within a status — smaller floats up. Assigned trainings
+   *  (The Goal movie, Kaizen days) take the low numbers; self-planned
+   *  lessons default to 1000 and follow. Absent until migration 0100. */
+  sort_order?: number | null;
 }
 
 export interface Extra {
