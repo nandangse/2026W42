@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.21",
+    date: "2026-08-30",
+    module: "Settings → Genie — active HOURS per person",
+    items: [
+      "The usage table now estimates ACTIVE HOURS per person — actions clustered into work sessions (a 30-minute silence starts a new one), last 30 days and all time (Dr Raghu, 30 Aug 2026). Honest about its limits: reading without acting leaves no trail and does not count.",
+    ],
+  },
+  {
     v: "3.31.1.20",
     date: "2026-08-30",
     module: "CRM — email templates write rich and send rich",

@@ -15,7 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 const BORDER = "#E2E0DA", MUTED = "#8A94A0", INK = "#22303C", ORANGE = "#E8600A", NAVY = "#16232F";
 
 /* ------------------------------------------------ Genie usage (owner) */
-type UsageRow = { name: string; total: number; last30: number; ai: Record<string, number>; costInr: number; costInr30: number };
+type UsageRow = { name: string; total: number; last30: number; ai: Record<string, number>; costInr: number; costInr30: number; hours30?: number; hoursAll?: number };
 export function GenieUsagePanel() {
   const [rows, setRows] = useState<UsageRow[] | null>(null);
   const [totals, setTotals] = useState<{ actions: number; last30: number; costInr: number; costInr30: number } | null>(null);
@@ -53,6 +53,8 @@ export function GenieUsagePanel() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead><tr style={{ textAlign: "left", color: MUTED, fontSize: 11 }}>
               <th className="py-1 pr-3">PERSON</th>
+              <th className="py-1 pr-3" style={{ textAlign: "right" }}>≈HOURS · 30D</th>
+              <th className="py-1 pr-3" style={{ textAlign: "right" }}>≈HOURS · ALL</th>
               <th className="py-1 pr-3" style={{ textAlign: "right" }}>LAST 30 DAYS</th>
               <th className="py-1 pr-3" style={{ textAlign: "right" }}>ALL TIME</th>
               <th className="py-1 pr-3" style={{ textAlign: "right" }}>EVA</th>
@@ -65,6 +67,8 @@ export function GenieUsagePanel() {
               {rows.map((r) => (
                 <tr key={r.name} style={{ borderTop: `1px solid ${BORDER}` }}>
                   <td className="py-1.5 pr-3 font-semibold">{r.name}</td>
+                  <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right", fontWeight: 800, color: "#1B3A5C" }}>{r.hours30 ?? "—"}</td>
+                  <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right", color: MUTED }}>{r.hoursAll ?? "—"}</td>
                   <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right", fontWeight: 700 }}>{r.last30.toLocaleString("en-IN")}</td>
                   <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right", color: MUTED }}>{r.total.toLocaleString("en-IN")}</td>
                   <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{r.ai.eva_brief || "—"}</td>

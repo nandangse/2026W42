@@ -37,13 +37,14 @@ export async function GET() {
     const { data: profs } = await db.from("profile").select("id, full_name, email");
     const nameOf = new Map((profs ?? []).map((p) => [String(p.id), String(p.full_name || p.email || p.id)]));
 
-    type RowAgg = { name: string; total: number; last30: number; ai: Record<string, number>; costInr: number; costInr30: number };
+    type RowAgg = { name: string; total: number; last30: number; ai: Record<string, number>; costInr: number; costInr30: number; hours30: number; hoursAll: number };
     const byUser = new Map<string, RowAgg>();
+    const stamps = new Map<string, number[]>();
     let system = 0;
     for (const a of audit) {
       const key = a.by_user ? String(a.by_user) : "system";
       if (key === "system") { system++; continue; }
-      const r = byUser.get(key) ?? { name: nameOf.get(key) ?? key.slice(0, 8), total: 0, last30: 0, ai: {}, costInr: 0, costInr30: 0 };
+      const r = byUser.get(key) ?? { name: nameOf.get(key) ?? key.slice(0, 8), total: 0, last30: 0, ai: {}, costInr: 0, costInr30: 0, hours30: 0, hoursAll: 0 };
       r.total++;
       const recent = a.at >= since30;
       if (recent) r.last30++;
@@ -53,6 +54,29 @@ export async function GET() {
         if (recent) r.costInr30 += COST_INR[a.action];
       }
       byUser.set(key, r);
+      (stamps.get(key) ?? stamps.set(key, []).get(key)!).push(new Date(a.at).getTime());
+    }
+    // ACTIVE HOURS, honestly estimated (Dr Raghu, 30 Aug 2026: "show how many
+    // hours I worked"): actions clustered into sessions — a gap over 30
+    // minutes starts a new one; each session counts its span plus 5 minutes.
+    const GAP = 30 * 60000, FLOOR = 5 * 60000;
+    const since30ms = new Date(since30).getTime();
+    for (const [key, ts] of stamps) {
+      ts.sort((x, y) => x - y);
+      let all = 0, recent = 0, start = ts[0], prev = ts[0];
+      const close = (endT: number, startT: number) => {
+        const span = endT - startT + FLOOR;
+        all += span;
+        if (endT >= since30ms) recent += Math.min(span, Math.max(0, endT - Math.max(startT, since30ms) + FLOOR));
+      };
+      for (let i = 1; i < ts.length; i++) {
+        if (ts[i] - prev > GAP) { close(prev, start); start = ts[i]; }
+        prev = ts[i];
+      }
+      close(prev, start);
+      const r = byUser.get(key)!;
+      r.hoursAll = Math.round(all / 360000) / 10;
+      r.hours30 = Math.round(recent / 360000) / 10;
     }
     const rows = [...byUser.values()].sort((x, y) => y.last30 - x.last30);
     const totals = rows.reduce((t, r) => ({
@@ -62,7 +86,7 @@ export async function GET() {
 
     return NextResponse.json({
       rows, totals, systemActions: system, sampled: audit.length,
-      note: "Counted from the CRM audit trail (the trail every click leaves). AI runs costed at per-run estimates: EVA ₹85, Ask Genie ₹8, Situational ₹6, Letter ₹4 — approximations. Apollo consumes Apollo credits, not API money.",
+      note: "Counted from the CRM audit trail (the trail every click leaves). ACTIVE HOURS are estimated by clustering a person's actions into sessions (a 30-minute silence starts a new one) — honest about its limits: reading without writing leaves no trail and does not count. AI runs costed at per-run estimates: EVA ₹85, Ask Genie ₹8, Situational ₹6, Letter ₹4 — approximations. Apollo consumes Apollo credits, not API money.",
     });
   } catch (e) {
     return errJson(e);
