@@ -146,6 +146,18 @@ export const DOCTYPES: Doctype[] = [
     ],
   },
   {
+    name: "quote_template", label: "Quote Template", plural: "Quote Templates", table: "quote_template",
+    titleField: "name", group: "Masters", icon: "📋",
+    orderBy: { column: "sort_order", ascending: true },
+    blurb: "The default texts a quotation starts from (Dr Raghu, 30 Aug 2026): Terms & Conditions sets and Covering Letter flavours. Edit here once, and every new quote picks it up.",
+    fields: [
+      { name: "kind", label: "Kind", type: "select", required: true, inList: true, options: ["terms", "letter"], help: "terms = Terms & Conditions; letter = Covering Letter." },
+      { name: "name", label: "Name", type: "text", required: true, inList: true },
+      { name: "sort_order", label: "Order", type: "number", inList: true, default: 0 },
+      { name: "content", label: "Default text", type: "textarea", big: true, rich: true },
+    ],
+  },
+  {
     name: "payment_term", label: "Payment Term", plural: "Payment Terms", table: "payment_term",
     titleField: "name", group: "Masters", icon: "💳",
     orderBy: { column: "sort_order", ascending: true },

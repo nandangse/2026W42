@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.81",
+    date: "2026-08-30",
+    module: "CRM — Terms & Conditions and the Covering Letter",
+    items: [
+      "Two tabs after Quote items (Dr Raghu, 30 Aug 2026): TERMS & CONDITIONS picks its set — Standard Sales, Spares and Service, Export — and the defaults dump in; COVERING LETTER picks its flavour — Standard, Spares, Aggresive, First time, Proposal, Defense Customer, Tender, Export.",
+      "Both draw from a new Quote Templates master (Masters → Quote Templates) — edit the house text once, every new quote picks it up.",
+      "✨ Use Genie to beautify on the letter — twice per quote at most, polishing with the customer, contact and items in mind.",
+      "CRM migration 0036 carries the master, its seed texts, and the quote's columns.",
+    ],
+  },
+  {
     v: "3.31.0.80",
     date: "2026-08-30",
     module: "CRM — Quote items and Situational Details",

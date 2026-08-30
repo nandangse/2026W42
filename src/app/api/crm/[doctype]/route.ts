@@ -544,6 +544,8 @@ export async function PATCH(req: Request, { params }: { params: { doctype: strin
       if (typeof body.show_decimals === "boolean") row.show_decimals = body.show_decimals;
       if (typeof body.authorized_by === "string") row.authorized_by = body.authorized_by.slice(0, 160);
       if (typeof body.situational_details === "string") row.situational_details = body.situational_details;
+      for (const k of ["terms_template", "terms_text", "letter_template", "letter_text"] as const)
+        if (typeof body[k] === "string") row[k] = body[k];
       if (body.discount_pct !== undefined && body.discount_pct !== null && body.discount_pct !== "")
         row.discount_pct = Number(body.discount_pct) || 0;
     }

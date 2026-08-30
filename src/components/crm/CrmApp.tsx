@@ -1865,6 +1865,108 @@ function SituationalTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void
   );
 }
 
+/** Terms & Conditions and the Covering Letter (Dr Raghu, 30 Aug 2026) —
+ *  one tab shape for both: a dropdown of Quote Templates; choosing one
+ *  DUMPS its default text in, then the hand edits. The letter also gets
+ *  "Use Genie to beautify", twice at most. */
+function QuoteTemplateTab({ row, onSaved, kind }: { row: Row; onSaved: (r?: Row) => void; kind: "terms" | "letter" }) {
+  const rid = String(row.id ?? "");
+  const tplField = kind === "terms" ? "terms_template" : "letter_template";
+  const textField = kind === "terms" ? "terms_text" : "letter_text";
+  const stored = String(row[textField] ?? "").trim();
+  const chosen = String(row[tplField] ?? "");
+  const runs = Number(row.letter_genie_runs) || 0;
+  const [tpls, setTpls] = useState<{ id: string; name: string; content: string }[]>([]);
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState<"save" | "genie" | "dump" | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    fetch(`/api/crm/quote_template?f_kind=${kind}&limit=100`, { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json();
+        setTpls(((j.rows ?? []) as { id: string; name: string; content: string; sort_order?: number }[])
+          .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0)));
+      })
+      .catch(() => setTpls([]));
+  }, [kind]);
+
+  const patch = async (fields: Record<string, unknown>) => {
+    const r = await fetch(`/api/crm/quotation?id=${encodeURIComponent(rid)}`, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(fields),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "Could not save");
+    onSaved(j.row as Row);
+  };
+  const choose = async (name: string) => {
+    if (!name) return;
+    const t = tpls.find((x) => x.name === name);
+    if (!t) return;
+    if (stored && !window.confirm(`Replace the current text with the "${name}" defaults?`)) return;
+    setBusy("dump"); setErr("");
+    try { await patch({ [tplField]: name, [textField]: t.content }); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(null); }
+  };
+  const beautify = async () => {
+    setBusy("genie"); setErr("");
+    try {
+      const r = await fetch("/api/crm/letter-beautify", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ quotation_id: rid }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Genie could not beautify it");
+      const rr = await (await fetch(`/api/crm/quotation?id=${encodeURIComponent(rid)}`, { cache: "no-store" })).json();
+      if (rr?.row) onSaved(rr.row as Row);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(null); }
+  };
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center gap-3 mb-2 flex-wrap">
+        <label className="text-xs font-semibold flex items-center gap-1.5" style={{ color: MUTED }}>
+          {kind === "terms" ? "Terms set" : "Letter flavour"}
+          <select value={chosen} disabled={busy !== null} onChange={(e) => void choose(e.target.value)}
+            className="px-2 py-1 rounded text-xs border font-bold" style={{ borderColor: chosen ? ORANGE : BORDER, background: "#fff", color: INK }}>
+            <option value="">— choose —</option>
+            {tpls.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+          </select>
+        </label>
+        {!editing && <button title="Edit by hand" onClick={() => setEditing(true)} style={{ fontSize: 13, opacity: 0.7 }}>✏️ Edit</button>}
+        {kind === "letter" && (
+          <button disabled={busy !== null || runs >= 2 || !stored} onClick={() => void beautify()}
+            className="rounded px-3 py-1 text-xs font-bold text-white"
+            style={{ background: busy === null && runs < 2 && stored ? "#7C3AED" : "#B9BEC4" }}
+            title={stored ? "" : "Pick a flavour first — Genie polishes, it does not start from nothing"}>
+            {busy === "genie" ? "Genie is polishing…" : `✨ Use Genie to beautify (${Math.max(0, 2 - runs)} left)`}
+          </button>
+        )}
+        {kind === "letter" && runs >= 2 && <span className="text-xs" style={{ color: MUTED }}>Beautified twice — the letter is yours now.</span>}
+        <span className="text-xs" style={{ color: MUTED }}>defaults live in Masters → Quote Templates</span>
+        {err && <span className="text-xs font-semibold" style={{ color: "#8E2C20" }}>{err}</span>}
+      </div>
+      {editing ? (
+        <RichTextEditor initial={stored} busy={busy === "save"} minHeight={300}
+          onCancel={() => setEditing(false)}
+          onSave={(v) => {
+            setBusy("save");
+            patch({ [textField]: v }).then(() => setEditing(false))
+              .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
+              .finally(() => setBusy(null));
+          }} />
+      ) : (
+        <div className="rounded border p-4 text-sm" style={{ borderColor: BORDER, lineHeight: 1.7, maxWidth: "80ch" }}>
+          {stored
+            ? <RichContent text={stored} legacy={(s2) => <RichText text={s2} />} />
+            : <span style={{ color: MUTED }}>Nothing here yet — choose a {kind === "terms" ? "terms set" : "letter flavour"} above and its defaults dump in.</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ============================== QUOTE ITEMS (Dr Raghu, 30 Aug 2026)
    "Sr No - Item Group - Item - Rate - Qty - Amount… arrows to indent or
    move… floating Net Total, Discount, Taxes from masters by address,
@@ -2625,6 +2727,8 @@ function RecordModal({
       }
       recordTabs.push({ key: "situational", label: "Situational Details" });
       recordTabs.push({ key: "lines", label: "Quote items", slug: "quotation_line", filterField: "quotation_id", filterValue: rid, addPresets: { quotation_id: rid } });
+      recordTabs.push({ key: "terms", label: "Terms & Conditions" });
+      recordTabs.push({ key: "letter", label: "Covering Letter" });
     }
     if (dt.name === "person") recordTabs.push({ key: "card", label: "Visiting Card" });
     recordTabs.push(
@@ -2848,6 +2952,10 @@ function RecordModal({
             <SituationalTab row={row} onSaved={onSaved} />
           ) : tab === "lines" && dt.name === "quotation" ? (
             <QuoteItemsTab quote={row} onSaved={onSaved} />
+          ) : tab === "terms" && dt.name === "quotation" ? (
+            <QuoteTemplateTab row={row} onSaved={onSaved} kind="terms" />
+          ) : tab === "letter" && dt.name === "quotation" ? (
+            <QuoteTemplateTab row={row} onSaved={onSaved} kind="letter" />
           ) : tab === "pquotes" ? (
             <ProductQuotesTab id={rid} />
           ) : tab === "ppricing" ? (
