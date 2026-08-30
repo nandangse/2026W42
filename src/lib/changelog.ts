@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.51",
+    date: "2026-08-30",
+    module: "CRM — the enquiry desk finishes",
+    items: [
+      "A TRUE rich-text editor on the enquiry (Dr Raghu, 30 Aug 2026: \"it's not rich text\"): Bold, • List and 🔗 Link pressed on a toolbar, seen as they will look — stored as the same text every reader already renders.",
+      "AN ATTACHED JPG SHOWS ITSELF — uploaded images embed small in the enquiry panel (the panel scrolls), click for full size; files stay links.",
+      "QUALIFICATION LIVES ON THE ENQUIRY TAB now — the BANTTC strip and score under the enquiry text, its own tab gone, and every new enquiry starts all six at 50%.",
+      "⬆ PUSH TO ERP on the enquiry desk: a Genie-born enquiry is CREATED in ERPNext — with a new Customer and Contact there when the ERP lacks them — and wears its ERP number from then on (✓ in ERP). The hourly pull knows the name and never brings it back as a twin. This is the ONE sanctioned exception to the pull-only law; edits still never flow out.",
+    ],
+  },
+  {
     v: "3.31.0.50",
     date: "2026-08-30",
     module: "CRM — the enquiry desk",

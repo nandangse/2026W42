@@ -1761,7 +1761,12 @@ function RecordModal({
             </div>
           ) : tab === "enquiry" ? (
             dt.name === "opportunity"
-              ? <EnquiryInfoTab row={row} onSaved={onSaved} />
+              ? <>
+                  <EnquiryInfoTab row={row} onSaved={onSaved} />
+                  {/* qualification lives HERE now (Dr Raghu, 30 Aug 2026) —
+                      the BANTTC strip under the enquiry, its own tab gone */}
+                  <div className="px-4 pb-4"><QualView dt={dt} row={row} links={links} /></div>
+                </>
               : <div className="p-4">
                   <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "calc(100vh - 260px)", overflowY: "auto", overflowWrap: "anywhere" }}>
                     {String(row.enquiry_info ?? "").trim()
@@ -2158,9 +2163,10 @@ function RichText({ text }: { text: string }) {
     if (m.index > last) parts.push(text.slice(last, m.index));
     if (m[2]) parts.push(img(m[2], m[1]));
     else if (m[4]) {
-      // a "[🖼 image](…)" from the ERP import EMBEDS; other links stay links,
-      // ERP-held files opening through the door
-      if (/🖼/.test(m[3]) && looksImage(m[4])) parts.push(img(m[4], m[3]));
+      // a "[🖼 image](…)" from the ERP import EMBEDS, and so does an uploaded
+      // opp-attach image (Dr Raghu, 30 Aug 2026: "if it's a jpg, show it
+      // there, small, with a scroll"); other links stay links
+      if ((/🖼/.test(m[3]) || m[4].includes("opp-attach")) && looksImage(m[4])) parts.push(img(m[4], m[3]));
       else parts.push(<a key={k++} href={viaDoor(m[4])} target="_blank" rel="noreferrer" style={{ color: "#2C5B82", fontWeight: 600, textDecoration: "underline" }}>{m[3]}</a>);
     }
     else if (m[5]) parts.push(<a key={k++} href={viaDoor(m[5])} target="_blank" rel="noreferrer" style={{ color: "#2C5B82", textDecoration: "underline" }}>{m[5].length > 60 ? m[5].slice(0, 57) + "…" : m[5]}</a>);
@@ -2665,6 +2671,73 @@ function GenieTab({ type, id }: { type: string; id: string }) {
 /** The linked opportunity's enquiry, worn by the quotation (Dr Raghu,
  *  29 Aug 2026) — read live from the opportunity, attachments included. */
 /**
+ * A REAL rich-text editor (Dr Raghu, 30 Aug 2026: "it's not rich text") —
+ * bold, bullets and links pressed on a toolbar, seen as they will look,
+ * stored as the same markdown the RichText renderer reads everywhere else.
+ */
+function mdToEditorHtml(md: string): string {
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const inline = (s: string) => esc(s)
+    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+    .replace(/\[([^\]]*)\]\(([^()\s]+)\)/g, '<a href="$2">$1</a>');
+  let html = "", inUl = false;
+  for (const line of md.split("\n")) {
+    if (/^\s*-\s+/.test(line)) {
+      if (!inUl) { html += "<ul>"; inUl = true; }
+      html += "<li>" + inline(line.replace(/^\s*-\s+/, "")) + "</li>";
+    } else {
+      if (inUl) { html += "</ul>"; inUl = false; }
+      html += inline(line) + "<br>";
+    }
+  }
+  if (inUl) html += "</ul>";
+  return html;
+}
+function editorHtmlToMd(h: string): string {
+  return h
+    .replace(/<div><br\s*\/?><\/div>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(div|p)>/gi, "\n")
+    .replace(/<(div|p)[^>]*>/gi, "")
+    .replace(/<li[^>]*>/gi, "\n- ").replace(/<\/li>/gi, "")
+    .replace(/<\/?[uo]l[^>]*>/gi, "\n")
+    .replace(/<img[^>]*src="([^"]+)"[^>]*>/gi, " [🖼 image]($1) ")
+    .replace(/<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, u, t) => `[${String(t).replace(/<[^>]+>/g, "").trim() || "link"}](${u})`)
+    .replace(/<(b|strong)[^>]*>([\s\S]*?)<\/\1>/gi, "**$2**")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;/gi, "\"").replace(/&#39;/gi, "'")
+    .replace(/\n{3,}/g, "\n\n").trim();
+}
+function RichEditor({ initial, onSave, onCancel, busy }: { initial: string; onSave: (md: string) => void; onCancel: () => void; busy: boolean }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const cmd = (c: string, v?: string) => { ref.current?.focus(); document.execCommand(c, false, v); };
+  const TB = ({ label, title, onClick, strong }: { label: string; title: string; onClick: () => void; strong?: boolean }) => (
+    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onClick} title={title}
+      className="rounded border px-2 py-0.5 text-xs" style={{ borderColor: BORDER, background: "#fff", fontWeight: strong ? 800 : 500 }}>{label}</button>
+  );
+  return (
+    <div>
+      <div className="flex gap-1 mb-1">
+        <TB label="B" title="Bold" strong onClick={() => cmd("bold")} />
+        <TB label="• List" title="Bullet list" onClick={() => cmd("insertUnorderedList")} />
+        <TB label="🔗 Link" title="Turn the selection into a link" onClick={() => { const u = window.prompt("Link to:", "https://"); if (u) cmd("createLink", u); }} />
+      </div>
+      <div ref={ref} contentEditable suppressContentEditableWarning
+        className="w-full rounded border p-3 text-sm"
+        style={{ borderColor: ORANGE, lineHeight: 1.6, minHeight: 260, maxHeight: "calc(100vh - 360px)", overflowY: "auto", outline: "none", background: "#fff" }}
+        dangerouslySetInnerHTML={{ __html: mdToEditorHtml(initial) }} />
+      <div className="flex gap-2 mt-1.5">
+        <button onClick={() => onSave(editorHtmlToMd(ref.current?.innerHTML || ""))} disabled={busy}
+          className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: "#0D7A3F" }}>
+          {busy ? "Saving…" : "✓ Save"}
+        </button>
+        <button onClick={onCancel} className="rounded px-3 py-1 text-xs font-bold" style={{ background: "#EFEDE7", color: "#5A6672" }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * THE ENQUIRY DESK (Dr Raghu, 30 Aug 2026): the enquiry text on the left —
  * rich text, pencil-edited in place, attachments woven in as links — and
  * ASK GENIE on the right: a quick Opus read of the customer, the contact and
@@ -2701,7 +2774,8 @@ function EnquiryInfoTab({ row, onSaved }: { row: Row; onSaved: () => void }) {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Upload failed");
       const isImg = /\.(png|jpe?g|gif|webp)$/i.test(String(j.name));
-      await save((text ? text + "\n\n" : "") + `${isImg ? "🖼 " : "📎 "}[${j.name}](${j.url})`);
+      // the marker rides INSIDE the label — that is what tells RichText to embed
+      await save((text ? text + "\n\n" : "") + `[${isImg ? "🖼 " : "📎 "}${j.name}](${j.url})`);
       setMsg("Attached ✓");
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     setBusy("");
@@ -2736,20 +2810,33 @@ function EnquiryInfoTab({ row, onSaved }: { row: Row; onSaved: () => void }) {
             {busy === "attach" ? "Attaching…" : "📎 Add Attachment"}
             <input type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void attach(f); e.target.value = ""; }} />
           </label>
+          {!row.erp_opportunity_name && !/^ENQ-/.test(String(row.opportunity_no || "")) ? (
+            <button onClick={async () => {
+              if (!window.confirm("Create this enquiry in ERPNext? The customer and contact are created there too if the ERP lacks them.")) return;
+              setBusy("erp"); setMsg("");
+              try {
+                const r = await fetch("/api/crm/erp-create-enquiry", {
+                  method: "POST", headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ opportunity_id: rid }),
+                });
+                const j = await r.json();
+                if (!r.ok) throw new Error(j.error || "The ERP refused");
+                setMsg(`✓ In the ERP as ${j.erp_name}${j.made_customer ? " · customer created" : ""}${j.made_contact ? " · contact created" : ""}`);
+                onSaved();
+              } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+              setBusy("");
+            }} disabled={busy === "erp"}
+              className="text-xs rounded border px-2 py-0.5 font-bold" style={{ borderColor: "#0D7A3F", color: "#0D7A3F", background: "#fff" }}>
+              {busy === "erp" ? "Walking it over…" : "⬆ Push to ERP"}
+            </button>
+          ) : (
+            <span className="text-xs rounded px-2 py-0.5" style={{ background: "#E6F4EA", color: "#0D7A3F", fontWeight: 700 }}
+              title={String(row.erp_opportunity_name || row.opportunity_no)}>✓ in ERP</span>
+          )}
           {msg && <span className="text-xs font-semibold" style={{ color: msg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{msg}</span>}
         </div>
         {editing ? (
-          <div>
-            <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={16}
-              className="w-full rounded border p-3 text-sm" style={{ borderColor: ORANGE, lineHeight: 1.6 }}
-              placeholder="The enquiry, in the customer's words — **bold**, [links](https://…) and bullets render as rich text." />
-            <div className="flex gap-2 mt-1.5">
-              <button onClick={() => void save(draft)} disabled={busy === "save"} className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: "#0D7A3F" }}>
-                {busy === "save" ? "Saving…" : "✓ Save"}
-              </button>
-              <button onClick={() => setEditing(false)} className="rounded px-3 py-1 text-xs font-bold" style={{ background: "#EFEDE7", color: "#5A6672" }}>Cancel</button>
-            </div>
-          </div>
+          <RichEditor initial={draft} busy={busy === "save"} onCancel={() => setEditing(false)} onSave={(md) => void save(md)} />
         ) : (
           <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "calc(100vh - 300px)", overflowY: "auto", overflowWrap: "anywhere" }}>
             {text.trim() ? <RichText text={text} /> : <span style={{ color: MUTED }}>No enquiry text recorded — ✎ writes it right here.</span>}

@@ -64,10 +64,18 @@ export async function GET(req: Request) {
       .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&#39;|&apos;/gi, "'").replace(/&quot;/gi, "\"")
       .replace(/\n{3,}/g, "\n\n").trim();
 
-    // who is already in — never touched again
+    // who is already in — never touched again. A Genie-born enquiry pushed
+    // INTO the ERP carries its ERP name on erp_opportunity_name, so the pull
+    // must not bring it back as a twin.
     const names = rows.map((x) => String(x.name));
-    const { data: have } = await db.from("opportunity").select("opportunity_no").in("opportunity_no", names);
-    const haveSet = new Set((have || []).map((x) => String(x.opportunity_no)));
+    const [{ data: have }, { data: pushed }] = await Promise.all([
+      db.from("opportunity").select("opportunity_no").in("opportunity_no", names),
+      db.from("opportunity").select("erp_opportunity_name").in("erp_opportunity_name", names),
+    ]);
+    const haveSet = new Set([
+      ...(have || []).map((x) => String(x.opportunity_no)),
+      ...(pushed || []).map((x) => String(x.erp_opportunity_name)),
+    ]);
 
     // the lookup tables, once per run
     const [{ data: stages }, { data: sectors }] = await Promise.all([
