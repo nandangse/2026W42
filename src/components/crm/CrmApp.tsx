@@ -2316,6 +2316,31 @@ function QuoteTemplateTab({ row, onSaved, kind }: { row: Row; onSaved: (r?: Row)
         <span className="text-xs" style={{ color: MUTED }}>defaults live in Masters → Quote Templates</span>
         {err && <span className="text-xs font-semibold" style={{ color: "#8E2C20" }}>{err}</span>}
       </div>
+      {/* THE VARIABLES, SAID OUT LOUD (Dr Raghu, 31 Aug 2026: "in the
+          standard sales how to insert qtn no and date? and client name? in
+          template?"). They already worked — the terms, the letter, the cover
+          and the back page have all been filled on print for as long as they
+          have existed. Nothing on the screen ever said so, which is why the
+          Proposal Number line sat empty. A feature nobody is told about is a
+          feature nobody has. */}
+      <div className="text-xs rounded p-2 mb-2" style={{ background: NAVY_SOFT, color: NAVY, lineHeight: 1.7 }}>
+        <b>Type any of these and the printed quote fills them in:</b>{" "}
+        <code>{"{{quote_no}}"}</code> the quotation number ·{" "}
+        <code>{"{{quote_date}}"}</code> its date ·{" "}
+        <code>{"{{customer}}"}</code> the client&apos;s name ·{" "}
+        <code>{"{{contact}}"}</code> the person it is addressed to ·{" "}
+        <code>{"{{sales_person}}"}</code> who owns the quote ·{" "}
+        <code>{"{{authorized_by}}"}</code> ·{" "}
+        <code>{"{{subject}}"}</code> ·{" "}
+        <code>{"{{valid_until}}"}</code> ·{" "}
+        <code>{"{{delivery}}"}</code>
+        <div style={{ marginTop: 4 }}>
+          So <code>{"Proposal Number : {{quote_no}}"}</code> prints as <b>Proposal Number : {String(row.quote_no ?? "NGSE/QTN/…")}</b>.
+          Spaces inside the braces are fine — <code>{"{{ sales_person }}"}</code> works too. A name that is not on
+          this list stays visible exactly as typed, so a spelling mistake shows up here rather than on a client&apos;s copy.
+          They are replaced only on the PDF, so one template serves every quote.
+        </div>
+      </div>
       {editing ? (
         <RichTextEditor initial={stored} busy={busy === "save"} minHeight={300}
           onUploadImage={async (f) => {

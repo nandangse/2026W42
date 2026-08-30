@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.0.1.5",
+    date: "2026-08-31",
+    module: "CRM — the quote's template variables, said out loud and finally forgiving",
+    items: [
+      "\"in the standard sales how to insert qtn no and date? and client name? in template?\" (Dr Raghu, 31 Aug 2026) — they already worked. The terms, the covering letter, the cover and the back page have been filled on print for as long as they have existed, and nothing on the screen ever said so, which is why Proposal Number sat empty. Every template tab now names them where you type: {{quote_no}}, {{quote_date}}, {{customer}}, {{contact}}, {{subject}}, {{valid_until}}, {{delivery}} — with a worked example.",
+      "\"also bottom sales person variable\" — {{sales_person}} did not exist, so it printed as braces. It does now, along with {{authorized_by}} and {{company}}.",
+      "AND THE BUG UNDERNEATH BOTH: the substitution matched {{customer}} exactly, so the {{ sales_person }} anybody would naturally type — with spaces, as his own template has it — went straight through and printed the braces on a client's quotation. Spacing inside the braces is now ignored and the name read regardless of case. A name that is NOT a variable is deliberately left standing exactly as typed, so a spelling mistake shows itself on your screen rather than on the client's copy.",
+    ],
+  },
+  {
     v: "4.0.1.4",
     date: "2026-08-31",
     module: "CRM — the search finds what the eye sees; a lone quote can grow its enquiry",

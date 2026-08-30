@@ -134,14 +134,44 @@ export async function GET(req: Request) {
     };
     // every section fills its variables (Dr Raghu, 30 Aug 2026: "this also
     // didn't replace the variable") — the whole set, wherever they appear
-    const fill = (html: string) => html
-      .replace(/\{\{customer\}\}/g, esc(customer))
-      .replace(/\{\{quote_no\}\}/g, esc(q.quote_no))
-      .replace(/\{\{quote_date\}\}/g, esc(dIN(q.quoted_on)))
-      .replace(/\{\{subject\}\}/g, esc(String(q.subject || "")))
-      .replace(/\{\{valid_until\}\}/g, esc(dIN(q.valid_until)))
-      .replace(/\{\{delivery\}\}/g, esc(String(q.delivery_weeks || "")))
-      .replace(/\{\{contact\}\}/g, esc(String(contact?.full_name || "")));
+    /**
+     * THE TEMPLATE VARIABLES (Dr Raghu, 31 Aug 2026: "how to insert qtn no
+     * and date? and client name? in template?" — then, pointing at a template
+     * already carrying it, "also bottom sales person variable").
+     *
+     * Two things were wrong with the old substitution, and he found both.
+     *
+     * SPACING. It matched "{{customer}}" exactly, so the "{{ sales_person }}"
+     * anybody would naturally type — his own template does — sailed through
+     * untouched and printed the braces on the client's quotation. Whitespace
+     * inside the braces is now ignored, and the name matched case-insensitively.
+     *
+     * THE SALESPERSON. There was no such variable to find. The quote knows
+     * who owns it; the letter that goes out under their name should be able
+     * to say so.
+     *
+     * An UNKNOWN name is deliberately left standing as it was written. A typo
+     * that vanishes silently is a typo nobody finds until a client reads it.
+     */
+    const VARS: Record<string, string> = {
+      customer,
+      quote_no: String(q.quote_no ?? ""),
+      quote_date: dIN(q.quoted_on),
+      subject: String(q.subject || ""),
+      valid_until: dIN(q.valid_until),
+      delivery: String(q.delivery_weeks || ""),
+      contact: String(contact?.full_name || ""),
+      // Who is sending it, and who signs it off.
+      sales_person: ownerName,
+      salesperson: ownerName,
+      authorized_by: String(q.authorized_by || "Dr Raghunandan Jagdish, MD and CEO"),
+      company: "Nandan GSE Pvt Ltd",
+    };
+    const fill = (html: string) =>
+      html.replace(/\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g, (whole, key: string) => {
+        const v = VARS[String(key).toLowerCase()];
+        return v === undefined ? whole : esc(v);
+      });
 
     // ---- content per section: [sectionKey, title, html-chunks] ----------
     type Sec = { key: string; title: string; chunks: string[]; centered?: boolean };
