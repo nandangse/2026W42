@@ -55,19 +55,8 @@ export async function POST(req: Request) {
 
     let pdfB64: string;
     try {
-      const chromium = (await import("@sparticuz/chromium")).default;
-      const puppeteer = await import("puppeteer-core");
-      const executablePath = process.env.CHROME_PATH || await chromium.executablePath();
-      const browser = await puppeteer.launch({
-        args: chromium.args, executablePath, headless: true,
-      });
-      try {
-        const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: "load", timeout: 60000 });
-        await new Promise((z) => setTimeout(z, 800));
-        const pdf = await page.pdf({ format: "A4", printBackground: true, margin: { top: 0, bottom: 0, left: 0, right: 0 } });
-        pdfB64 = Buffer.from(pdf).toString("base64");
-      } finally { await browser.close(); }
+      const { pressPdf } = await import("@/lib/pdf-press");
+      pdfB64 = (await pressPdf(html)).toString("base64");
     } catch (e) {
       throw new HttpError(502, `The PDF press jammed: ${e instanceof Error ? e.message : e}. On a Mac dev box set CHROME_PATH to a Chrome binary; on Vercel this works out of the box.`);
     }

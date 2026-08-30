@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.8",
+    date: "2026-08-30",
+    module: "CRM — the PDF comes off a real press",
+    items: [
+      "⬇ Download now hands over a REAL PDF pressed server-side by Chromium — the browser's print dialog (which sliced 13 pages into 63 and mangled every footer and table break) is out of the road entirely. Footers, page counts and table breaks land exactly as the preview shows.",
+    ],
+  },
+  {
     v: "3.31.1.7",
     date: "2026-08-30",
     module: "CRM — submission kills the watermark; Amend is a true revision",

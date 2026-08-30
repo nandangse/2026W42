@@ -1952,7 +1952,8 @@ function ReviewQuoteTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void
             {lab}
           </label>
         ))}
-        <a href={`${url}&print=1`} target="_blank" rel="noreferrer"
+        <a href={`/api/crm/quote-pdf?id=${encodeURIComponent(rid)}`} target="_blank" rel="noreferrer"
+          title="A real PDF, pressed server-side — no print dialog, no slicing"
           className="rounded px-3 py-1.5 text-xs font-bold text-white ml-auto" style={{ background: ORANGE, textDecoration: "none" }}>
           ⬇ Download PDF{String(row.status) === "submitted" ? "" : " (DRAFT)"}
         </a>

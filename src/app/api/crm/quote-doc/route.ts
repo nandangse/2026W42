@@ -270,7 +270,7 @@ export async function GET(req: Request) {
 <style>
   * { box-sizing: border-box; margin: 0; }
   body { font-family: Georgia, 'Times New Roman', serif; background: #666; }
-  .page { width: 210mm; height: 297mm; background: #fff; margin: 6mm auto; padding: 7mm 14mm 16mm;
+  .page { width: 210mm; height: 296mm; background: #fff; margin: 6mm auto; padding: 7mm 14mm 16mm;
           position: relative; display: flex; flex-direction: column; overflow: hidden;
           box-shadow: 0 2px 12px rgba(0,0,0,.35); }
   .hdr { border-bottom: 2px solid #1B3A5C; padding-bottom: 1.5mm; margin-bottom: 4mm; }
