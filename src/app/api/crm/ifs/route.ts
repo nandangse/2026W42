@@ -25,6 +25,53 @@ export async function POST(req: Request) {
 
     const { data: co } = await db.from("company").select("id, name, cin").eq("id", cid).maybeSingle();
     if (!co) throw new HttpError(404, "That company no longer exists.");
+
+    // 🔍 FIND CIN (Dr Raghu, 30 Aug 2026: "how do I get the CIN?") — the
+    // GetCIN API, 1 credit: search by name, offer every CIN-shaped answer.
+    if (body.action === "find_cin") {
+      const { data: cfgRow2 } = await db.from("integration_setting").select("config").eq("key", "instafinancials").maybeSingle();
+      const cfg2 = (cfgRow2?.config || {}) as Record<string, string>;
+      if (!cfg2.api_key) throw new HttpError(503, "The InstaFinancials key is not saved — Settings → Integrations.");
+      const nameQ = String(body.name || co.name || "").trim();
+      if (!nameQ) throw new HttpError(400, "A company name to search.");
+      const tmpl2 = (cfg2.cin_url_template || "https://instafinancials.com/api/GetCIN/v1/json/CompanyName/{name}").trim();
+      const url2 = tmpl2.replace("{name}", encodeURIComponent(nameQ));
+      const r2 = await fetch(url2, { headers: { "user-key": cfg2.api_key, accept: "application/json" } });
+      const text2 = await r2.text();
+      if (!r2.ok) throw new HttpError(502, `GetCIN said ${r2.status}: ${text2.slice(0, 200)} — is the GetCIN API toggled Active on instafinancials.com?`);
+      // harvest every CIN-shaped string with whatever name stands near it
+      const candidates: { cin: string; name: string }[] = [];
+      try {
+        const walk = (o: unknown, near: string) => {
+          if (candidates.length >= 8) return;
+          if (Array.isArray(o)) { for (const x of o) walk(x, near); return; }
+          if (o && typeof o === "object") {
+            const rec = o as Record<string, unknown>;
+            const nm = String(rec.CompanyName || rec.companyName || rec.Name || near || "");
+            for (const v of Object.values(rec)) {
+              if (typeof v === "string" && /^[LUF]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}$/.test(v.trim().toUpperCase())) {
+                if (!candidates.some((c) => c.cin === v.trim().toUpperCase()))
+                  candidates.push({ cin: v.trim().toUpperCase(), name: nm });
+              } else walk(v, nm);
+            }
+          }
+        };
+        walk(JSON.parse(text2), "");
+      } catch { /* fall through to the raw scan */ }
+      if (!candidates.length) {
+        for (const m of text2.toUpperCase().matchAll(/[LUF]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}/g)) {
+          if (!candidates.some((c) => c.cin === m[0])) candidates.push({ cin: m[0], name: "" });
+          if (candidates.length >= 8) break;
+        }
+      }
+      if (!candidates.length) throw new HttpError(404, `GetCIN found no CIN for "${nameQ}" — try a shorter or exact registered name.`);
+      await db.from("crm_audit").insert({
+        entity: "company", entity_id: cid, action: "ifs_find_cin",
+        after: { q: nameQ, found: candidates.length, credits: 1 }, by_user: me.profileId,
+      }).then(() => null, () => null);
+      return NextResponse.json({ candidates });
+    }
+
     const cin = String(body.cin || co.cin || "").trim().toUpperCase();
     if (!/^[A-Z0-9]{15,25}$/.test(cin))
       throw new HttpError(400, "A CIN first — the 21-character company identification number (find it on the MCA site or the customer's letterhead).");

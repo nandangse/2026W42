@@ -5827,7 +5827,24 @@ function IfsTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
   const isRaghu = MY_EMAIL === "raghu@nandan.co.in";
   const [cin, setCin] = useState(String(row.cin ?? ""));
   const [busy, setBusy] = useState(false);
+  const [finding, setFinding] = useState(false);
+  const [candidates, setCandidates] = useState<{ cin: string; name: string }[]>([]);
   const [err, setErr] = useState("");
+  const findCin = async () => {
+    setFinding(true); setErr(""); setCandidates([]);
+    try {
+      const r = await fetch("/api/crm/ifs", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ company_id: rid, action: "find_cin" }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "GetCIN failed");
+      const cands = (j.candidates ?? []) as { cin: string; name: string }[];
+      if (cands.length === 1) setCin(cands[0].cin);
+      else setCandidates(cands);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setFinding(false); }
+  };
   const data = (row.ifs_summary as { InstaSummary?: Record<string, unknown> } | null)?.InstaSummary;
 
   const buy = async () => {
@@ -5869,6 +5886,11 @@ function IfsTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
           <>
             <input value={cin} onChange={(e) => setCin(e.target.value)} placeholder="CIN (21 characters)"
               className="px-2 py-1 rounded border text-xs tnum" style={{ borderColor: BORDER, width: 220 }} />
+            <button onClick={() => void findCin()} disabled={finding || busy}
+              title="GetCIN by company name — 1 InstaFinancials credit (toggle GetCIN Active on instafinancials.com first)"
+              className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: "#EEF3F8", color: NAVY, border: "1px solid #C9D6E2" }}>
+              {finding ? "Searching…" : "🔍 Find CIN (1 credit)"}
+            </button>
             <button onClick={() => void buy()} disabled={busy}
               className="rounded px-3 py-1.5 text-xs font-bold text-white" style={{ background: busy ? "#B9BEC4" : "#0D7A3F" }}>
               {busy ? "Buying…" : data ? "🪙 Buy fresh (75 credits)" : "🪙 Buy InstaFinancial Summary"}
@@ -5877,6 +5899,17 @@ function IfsTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
         ) : !data && <span className="text-xs" style={{ color: MUTED }}>Only Dr Raghu can buy this summary — ask him.</span>}
         {err && <span className="text-xs font-semibold" style={{ color: "#8E2C20" }}>{err}</span>}
       </div>
+      {candidates.length > 1 && (
+        <div className="rounded border p-2.5 mb-3" style={{ borderColor: "#C9D6E2", background: "#F7FAFD" }}>
+          <div className="text-xs font-bold mb-1" style={{ color: NAVY }}>GetCIN found more than one — pick the right company:</div>
+          {candidates.map((c) => (
+            <button key={c.cin} onClick={() => { setCin(c.cin); setCandidates([]); }}
+              className="block text-left text-sm py-0.5" style={{ color: "#2C5B82" }}>
+              <b className="tnum">{c.cin}</b>{c.name ? ` — ${c.name}` : ""}
+            </button>
+          ))}
+        </div>
+      )}
 
       {!data ? (
         <div className="rounded p-6 text-sm" style={{ background: "#FAF9F5", border: `1px dashed ${BORDER}`, color: MUTED }}>

@@ -25,7 +25,7 @@ const KNOWN = [
   // InstaFinancials (Dr Raghu, 30 Aug 2026): company financials by CIN.
   // InstaSummary costs 75 credits a pull — Raghu's hand alone triggers it;
   // everyone reads the result on the company's IFS tab.
-  { key: "instafinancials", label: "InstaFinancials", fields: ["api_key", "url_template"], ownerOnly: true, help: "The InstaFinancials API key (instafinancials.com → API Key Configuration). URL_TEMPLATE is the InstaSummary endpoint with {cin} where the CIN goes — blank falls back to the standard https://instafinancials.com/api/InstaSummary/v1/json/CompanyCIN/{cin} — adjust it here if their docs show a different path or when switching sandbox to production. Only Raghu edits or triggers; the bought summary is visible to all." },
+  { key: "instafinancials", label: "InstaFinancials", fields: ["api_key", "url_template", "cin_url_template"], ownerOnly: true, help: "The InstaFinancials API key (instafinancials.com → API Key Configuration). URL_TEMPLATE is the InstaSummary endpoint with {cin} where the CIN goes — blank falls back to the standard https://instafinancials.com/api/InstaSummary/v1/json/CompanyCIN/{cin} — adjust it here if their docs show a different path or when switching sandbox to production. Only Raghu edits or triggers; the bought summary is visible to all." },
 ] as const;
 
 const mayManage = (role: string) => ["admin", "ceo", "sales_head"].includes(role);

@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.23",
+    date: "2026-08-30",
+    module: "CRM — 🔍 Find CIN, one credit",
+    items: [
+      "Beside the CIN box: 🔍 FIND CIN searches InstaFinancials' GetCIN by the company's name (1 credit) — one match fills the box, several offer a pick (Dr Raghu, 30 Aug 2026). Toggle GetCIN Active on instafinancials.com first; the endpoint is adjustable in Integrations. The free road stays: mca.gov.in or the customer's letterhead.",
+    ],
+  },
+  {
     v: "3.31.1.22",
     date: "2026-08-30",
     module: "CRM — InstaFinancials on the company",
