@@ -41,7 +41,7 @@ export async function GET(req: Request) {
       // item group is chosen the dropdown will come in") — typing narrows
       if (q.length < 2 && !group) return NextResponse.json({ hits: [] });
       let qy = db.from("product")
-        .select("id, name, sku, item_group, approved_price_inr, description")
+        .select("id, name, sku, item_group, approved_price_inr, last_quoted_price, avg_quoted_price_1y, description")
         .is("deleted_at", null).eq("is_active", true)
         .order("name").limit(10);
       if (q.length >= 2) qy = qy.or(`name.ilike.*${q}*,item_group.ilike.*${q}*,sku.ilike.*${q}*,description.ilike.*${q}*`);
@@ -51,7 +51,10 @@ export async function GET(req: Request) {
       return NextResponse.json({
         hits: (data ?? []).map((p) => ({
           id: p.id, name: p.name, sku: p.sku, item_group: p.item_group,
-          approved_price_inr: p.approved_price_inr,
+          // the price that rides in: approved first, else last quoted, else
+          // the year's average (Dr Raghu, 30 Aug 2026: "why isn't the price
+          // being pulled?")
+          approved_price_inr: p.approved_price_inr ?? p.last_quoted_price ?? p.avg_quoted_price_1y ?? null,
           snippet: String(p.description || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 120),
         })),
       });

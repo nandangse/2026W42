@@ -2231,7 +2231,8 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
           quotation_id: qid, line_no: (lines?.length ? Math.max(...lines.map((l) => l.line_no)) : 0) + 1,
           description: desc, item_group: ghost.item_group.trim() || null,
           product_id: ghost.product_id || null,
-          unit_price: Number(ghost.unit_price) || 0, quantity: Number(ghost.quantity) || 1,
+          unit_price: Math.max(0, Number(ghost.unit_price) || 0),
+          quantity: Number(ghost.quantity) > 0 ? Number(ghost.quantity) : 1,
           uom: "Nos", discountable: true, indent: 0,
         }),
       });
@@ -2297,7 +2298,11 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
     const v = draft[l.id]?.[k];
     if (v === undefined || String(l[k] ?? "") === v) return;
     if (k === "description" && !String(v).trim()) { setD(l.id, k, l.description); return; }
-    void patchLine(l.id, { [k]: k === "unit_price" || k === "quantity" ? Number(v) || 0 : v });
+    let out: unknown = v;
+    if (k === "unit_price") out = Math.max(0, Number(v) || 0);
+    // qty can never be negative (Dr Raghu, 30 Aug 2026)
+    if (k === "quantity") { const n = Number(v); out = n > 0 ? n : 1; setD(l.id, k, String(out)); }
+    void patchLine(l.id, { [k]: out });
   };
 
   // the foot adds up exactly what the grid shows (Dr Raghu, 30 Aug 2026:
@@ -2378,7 +2383,7 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
                   </td>
                   <td><input style={{ ...cellIn, textAlign: "right" }} inputMode="decimal" value={groupIn(D(l, "unit_price"))}
                     onChange={(e) => setD(l.id, "unit_price", ungroup(e.target.value))} onBlur={() => commitD(l, "unit_price")} /></td>
-                  <td><input style={{ ...cellIn, textAlign: "right" }} type="number" value={D(l, "quantity")}
+                  <td><input style={{ ...cellIn, textAlign: "right" }} type="number" min={1} value={D(l, "quantity")}
                     onChange={(e) => setD(l.id, "quantity", e.target.value)} onBlur={() => commitD(l, "quantity")} /></td>
                   <td className="px-2 tnum" style={{ textAlign: "right", fontWeight: 600 }}>{fm(l.line_total)}</td>
                   <td className="px-2" style={{ whiteSpace: "nowrap", textAlign: "right" }}>
@@ -2386,13 +2391,11 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
                       <input type="checkbox" checked={l.discountable !== false} disabled={busy}
                         onChange={(e) => void patchLine(l.id, { discountable: e.target.checked })} style={{ accentColor: NAVY, verticalAlign: "middle" }} /> disc
                     </label>
-                    {i > 0 && <>
-                      <button title="Move up" disabled={busy} onClick={() => void move(i, -1)} style={{ fontSize: 12, padding: "0 2px" }}>↑</button>
-                      <button title="Move down" disabled={busy || i === (lines?.length ?? 0) - 1} onClick={() => void move(i, 1)} style={{ fontSize: 12, padding: "0 2px", opacity: i === (lines?.length ?? 0) - 1 ? 0.3 : 1 }}>↓</button>
-                      {(l.indent ?? 0) === 0
-                        ? <button title="Indent — becomes 1.1 under the line above" disabled={busy} onClick={() => void patchLine(l.id, { indent: 1 })} style={{ fontSize: 12, padding: "0 2px" }}>→</button>
-                        : <button title="Outdent — back to a main line" disabled={busy} onClick={() => void patchLine(l.id, { indent: 0 })} style={{ fontSize: 12, padding: "0 2px" }}>←</button>}
-                    </>}
+                    {i > 0 && <button title="Move up" disabled={busy} onClick={() => void move(i, -1)} style={{ fontSize: 12, padding: "0 2px" }}>↑</button>}
+                    {i < (lines?.length ?? 0) - 1 && <button title="Move down" disabled={busy} onClick={() => void move(i, 1)} style={{ fontSize: 12, padding: "0 2px" }}>↓</button>}
+                    {i > 0 && ((l.indent ?? 0) === 0
+                      ? <button title="Indent — becomes 1.1 under the line above" disabled={busy} onClick={() => void patchLine(l.id, { indent: 1 })} style={{ fontSize: 12, padding: "0 2px" }}>→</button>
+                      : <button title="Outdent — back to a main line" disabled={busy} onClick={() => void patchLine(l.id, { indent: 0 })} style={{ fontSize: 12, padding: "0 2px" }}>←</button>)}
                     <button title="Remove this item" disabled={busy} onClick={() => void delLine(l.id)} style={{ fontSize: 12, padding: "0 4px", color: "#8E2C20" }}>✕</button>
                   </td>
                 </tr>
@@ -2424,7 +2427,7 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
                   </div>
                 </td>
                 <td><input style={{ ...cellIn, textAlign: "right" }} inputMode="decimal" placeholder="rate" value={groupIn(ghost.unit_price)} onChange={(e) => setGhost((g) => ({ ...g, unit_price: ungroup(e.target.value) }))} onKeyDown={(e) => { if (e.key === "Enter") void addLine(); }} /></td>
-                <td><input style={{ ...cellIn, textAlign: "right" }} type="number" value={ghost.quantity} onChange={(e) => setGhost((g) => ({ ...g, quantity: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") void addLine(); }} /></td>
+                <td><input style={{ ...cellIn, textAlign: "right" }} type="number" min={1} value={ghost.quantity} onChange={(e) => setGhost((g) => ({ ...g, quantity: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") void addLine(); }} /></td>
                 <td className="px-2 tnum" style={{ textAlign: "right", color: MUTED }}>{ghost.unit_price ? fm((Number(ghost.unit_price) || 0) * (Number(ghost.quantity) || 1)) : "—"}</td>
                 <td className="px-2" style={{ textAlign: "right" }}>
                   <button disabled={busy || !ghost.description.trim()} onClick={() => void addLine()}

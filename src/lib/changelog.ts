@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.94",
+    date: "2026-08-30",
+    module: "CRM — quote grid corrections",
+    items: [
+      "Qty can never go negative — a non-positive quantity lands back at 1 (Dr Raghu, 30 Aug 2026).",
+      "Picking an item now always brings a price: the approved price first, else the LAST QUOTED, else the year's average — only an item never priced anywhere arrives blank.",
+      "The TOP line has the same rights as every other — it moves down, and every cell edits in place.",
+    ],
+  },
+  {
     v: "3.31.0.93",
     date: "2026-08-30",
     module: "Genie — /api/version answers which Genie is live",
