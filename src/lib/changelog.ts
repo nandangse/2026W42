@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.5",
+    date: "2026-08-30",
+    module: "CRM — the quote document's layout laws",
+    items: [
+      "Text can no longer run into the footer — the page body now truly respects its box (Dr Raghu, 30 Aug 2026: \"bottom should never cut\"), and pages fill conservatively so a row that will not fit whole moves to the next page instead of slicing.",
+      "The item tables wear FIXED columns, identical on every page: Rate holds ₹ 10,00,00,000 on one line, Qty holds 100, Amount wider still — money never wraps.",
+    ],
+  },
+  {
     v: "3.31.1.4",
     date: "2026-08-30",
     module: "CRM — the quote item's image uploads from the computer",

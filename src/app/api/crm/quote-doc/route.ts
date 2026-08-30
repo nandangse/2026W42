@@ -19,7 +19,7 @@ export const maxDuration = 60;
  */
 
 const ORDER = ["cover", "letter", "situational", "items", "items_split", "terms", "about", "back"] as const;
-const CHARS_PER_PAGE = 2000;
+const CHARS_PER_PAGE = 1750;
 
 const esc = (x: unknown) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const dIN = (v: unknown) => (v ? String(v).slice(0, 10).split("-").reverse().join("/") : "");
@@ -166,7 +166,7 @@ export async function GET(req: Request) {
             const p = l.product_id ? prodMap.get(String(l.product_id)) : undefined;
             const sp = specsOf(l);
             const desc = String(sp.rich ?? p?.description ?? "").replace(/<[^>]+>/g, "");
-            return 1 + (sp.image || p?.image ? 0.8 : 0) + Math.min(desc.length, 4000) / 450;
+            return 1 + (sp.image || p?.image ? 1 : 0) + Math.min(desc.length, 6000) / 350;
           };
           const chunkBy = (items: typeof numbered, cap: number, w: (l: Record<string, unknown>) => number) => {
             const out: typeof numbered[] = [];
@@ -193,9 +193,9 @@ export async function GET(req: Request) {
 
           if (key === "items") {
             // ONE table: Sr No · Item (rich) · Rate · Qty · Amount
-            const pagesOf = chunkBy(numbered, 6.5, weightOf);
+            const pagesOf = chunkBy(numbered, 5.2, weightOf);
             const chunks = pagesOf.map((page, pi) => `<h2 class="sect">Schedule of Items &amp; Prices${pi ? " (contd.)" : ""}</h2>
-              <table class="items"><thead><tr><th>Sr No</th><th>Item</th><th class="tr">Rate</th><th>Qty</th><th class="tr">Amount</th></tr></thead>
+              <table class="items"><colgroup><col class="c-sr"/><col/><col class="c-rate"/><col class="c-qty"/><col class="c-amt"/></colgroup><thead><tr><th>Sr No</th><th>Item</th><th class="tr">Rate</th><th>Qty</th><th class="tr">Amount</th></tr></thead>
               <tbody>${page.map(({ l, sr }) => `<tr>
                 <td class="tc">${sr}</td><td class="icell">${cellFull(l as unknown as Record<string, unknown>)}</td>
                 <td class="tr">${money(l.unit_price, cur, dec)}</td><td class="tc">${Number(l.quantity)}</td>
@@ -204,14 +204,14 @@ export async function GET(req: Request) {
             secs.push({ key, title: "", chunks });
           } else {
             // TECHNICAL pages (Sr No · Item, rich) then the COMMERCIAL OFFER
-            const techPages = chunkBy(numbered, 6.5, weightOf);
+            const techPages = chunkBy(numbered, 5.2, weightOf);
             const chunks = techPages.map((page, pi) => `<h2 class="sect">Schedule of Items${pi ? " (contd.)" : ""}</h2>
-              <table class="items"><thead><tr><th style="width:12mm">Sr No</th><th>Item</th></tr></thead>
+              <table class="items"><colgroup><col class="c-sr"/><col/></colgroup><thead><tr><th>Sr No</th><th>Item</th></tr></thead>
               <tbody>${page.map(({ l, sr }) => `<tr><td class="tc">${sr}</td><td class="icell">${cellFull(l as unknown as Record<string, unknown>)}</td></tr>`).join("")}</tbody></table>`);
-            const comPages = chunkBy(numbered, 14, () => 1);
+            const comPages = chunkBy(numbered, 11, () => 1);
             for (let pi = 0; pi < comPages.length; pi++) {
               chunks.push(`<h2 class="sect">Commercial Offer${pi ? " (contd.)" : ""}</h2>
-                <table class="items"><thead><tr><th>Sr No</th><th>Item</th><th class="tr">Rate</th><th>Qty</th><th class="tr">Amount</th></tr></thead>
+                <table class="items"><colgroup><col class="c-sr"/><col/><col class="c-rate"/><col class="c-qty"/><col class="c-amt"/></colgroup><thead><tr><th>Sr No</th><th>Item</th><th class="tr">Rate</th><th>Qty</th><th class="tr">Amount</th></tr></thead>
                 <tbody>${comPages[pi].map(({ l, sr }) => `<tr>
                   <td class="tc">${sr}</td><td class="icell">${cellSlim(l as unknown as Record<string, unknown>)}</td>
                   <td class="tr">${money(l.unit_price, cur, dec)}</td><td class="tc">${Number(l.quantity)}</td>
@@ -260,7 +260,7 @@ export async function GET(req: Request) {
           box-shadow: 0 2px 12px rgba(0,0,0,.35); }
   .hdr { border-bottom: 2px solid #1B3A5C; padding-bottom: 1.5mm; margin-bottom: 4mm; }
   .hdr img { height: 11mm; object-fit: contain; }
-  .body { flex: 1; font-size: 11.5pt; line-height: 1.55; color: #16232F; overflow: hidden; }
+  .body { flex: 1; min-height: 0; font-size: 11.5pt; line-height: 1.55; color: #16232F; overflow: hidden; }
   .body.centered { display: flex; flex-direction: column; justify-content: center; text-align: center; }
   .body p { margin: 0 0 8pt; } .body h1 { font-size: 22pt; margin: 8pt 0; color: #1B3A5C; }
   .body h2 { font-size: 15pt; margin: 8pt 0; color: #1B3A5C; } .body ul, .body ol { margin: 0 0 8pt 18pt; }
@@ -268,7 +268,11 @@ export async function GET(req: Request) {
   .body table { border-collapse: collapse; margin: 6pt 0; max-width: 100%; }
   .body td, .body th { border: 1px solid #999; padding: 3pt 6pt; font-size: 10pt; }
   h2.sect { border-bottom: 1px solid #C9C6BD; padding-bottom: 2mm; margin-bottom: 5mm; }
-  table.items { width: 100%; }
+  table.items { width: 100%; table-layout: fixed; }
+  table.items col.c-sr { width: 12mm; } table.items col.c-rate { width: 32mm; }
+  table.items col.c-qty { width: 13mm; } table.items col.c-amt { width: 36mm; }
+  table.items td.tr, table.items th.tr { white-space: nowrap; font-size: 10pt; }
+  table.items td { word-wrap: break-word; }
   table.items th { background: #EEF1F5; text-align: left; font-size: 9.5pt; }
   table.items .tr { text-align: right; } table.items .tc { text-align: center; }
   table.items tr.tot td { border-top: 2px solid #1B3A5C; }
