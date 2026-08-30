@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.16",
+    date: "2026-08-30",
+    module: "CRM — a long description FLOWS to the next page",
+    items: [
+      "An item whose description outgrows a page no longer loses a word (Dr Raghu, 30 Aug 2026: \"so much content got cut off\") — the description splits on paragraph boundaries and continues on the next page as \"(contd.)\" rows, the rate and amount staying with the first. Nothing clips, nothing vanishes.",
+    ],
+  },
+  {
     v: "3.31.1.15",
     date: "2026-08-30",
     module: "CRM — the head block carries the address; Kind Attn on its own line",

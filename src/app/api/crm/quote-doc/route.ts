@@ -126,6 +126,7 @@ export async function GET(req: Request) {
     </div>`;
     const dec = q.show_decimals === true;
     const cur = String(q.currency || "INR");
+    const cur2 = cur;
     const tplOf = (kind: string, chosen?: unknown) => {
       const list = (tpls ?? []).filter((t) => t.kind === kind);
       return (chosen ? list.find((t) => t.name === String(chosen)) : null) ?? list[0] ?? null;
@@ -155,7 +156,6 @@ export async function GET(req: Request) {
       } else if (key === "items" || key === "items_split") {
         const rows = (lines ?? []).filter((l) => !l.is_optional);
         if (rows.length) {
-          // the products behind the lines — code, image, description
           const pids = [...new Set(rows.map((l) => l.product_id).filter(Boolean).map(String))];
           const prodMap = new Map<string, Record<string, unknown>>();
           for (let i = 0; i < pids.length; i += 100) {
@@ -168,79 +168,105 @@ export async function GET(req: Request) {
             minor++; return { l, sr: `${Math.max(major, 1)}.${minor}` };
           });
           const specsOf = (l: Record<string, unknown>) => (l.specs && typeof l.specs === "object" ? l.specs as { rich?: string; image?: string } : {});
-          // the item cell: Item Group :: Item Code / Item Name / thumbnail / description
-          const cellFull = (l: Record<string, unknown>) => {
+          const partsOf = (l: Record<string, unknown>) => {
             const p = l.product_id ? prodMap.get(String(l.product_id)) : undefined;
             const sp = specsOf(l);
-            const code = String(p?.sku ?? "");
-            const group = String(l.item_group ?? p?.item_group ?? "");
-            const img = String(sp.image || p?.image || "");
-            const desc = String(sp.rich ?? p?.description ?? "");
+            return {
+              code: String(p?.sku ?? ""), group: String(l.item_group ?? p?.item_group ?? ""),
+              img: String(sp.image || p?.image || ""), desc: String(sp.rich ?? p?.description ?? ""),
+            };
+          };
+          const cellHead = (l: Record<string, unknown>) => {
+            const { code, group, img } = partsOf(l);
             return `<div class="ig">${esc([group, code].filter(Boolean).join(" :: "))}</div>
               <div class="inm">${esc(l.description)}</div>
-              ${img ? `<img class="thumb" src="${esc(img)}"/>` : ""}
-              ${desc ? `<div class="idesc">${desc}</div>` : ""}`;
+              ${img ? `<img class="thumb" src="${esc(img)}"/>` : ""}`;
           };
-          const cellSlim = (l: Record<string, unknown>) => {
-            const p = l.product_id ? prodMap.get(String(l.product_id)) : undefined;
-            const group = String(l.item_group ?? p?.item_group ?? "");
-            const code = String(p?.sku ?? "");
-            return `<div class="ig">${esc([group, code].filter(Boolean).join(" :: "))}</div><div class="inm">${esc(l.description)}</div>`;
-          };
-          const weightOf = (l: Record<string, unknown>) => {
-            const p = l.product_id ? prodMap.get(String(l.product_id)) : undefined;
-            const sp = specsOf(l);
-            const desc = String(sp.rich ?? p?.description ?? "").replace(/<[^>]+>/g, "");
-            return 1 + (sp.image || p?.image ? 1 : 0) + Math.min(desc.length, 6000) / 350;
-          };
-          const chunkBy = (items: typeof numbered, cap: number, w: (l: Record<string, unknown>) => number) => {
-            const out: typeof numbered[] = [];
-            let cur: typeof numbered = [], used = 0;
-            for (const n of items) {
-              const wt = w(n.l as unknown as Record<string, unknown>);
-              if (cur.length && used + wt > cap) { out.push(cur); cur = []; used = 0; }
-              cur.push(n); used += wt;
+          /** Split rich HTML into char-budgeted pieces on block boundaries —
+           *  A DESCRIPTION LONGER THAN A PAGE FLOWS TO THE NEXT
+           *  (Dr Raghu, 30 Aug 2026: "it should go to the next page"). */
+          const splitDesc = (html: string, firstBudget: number, restBudget: number): string[] => {
+            const blocks = html.split(/(?=<(?:p|h1|h2|h3|ul|ol|table|blockquote|div)[\s>])/i).filter((b) => b.trim());
+            if (!blocks.length) return html.trim() ? [html] : [];
+            const out: string[] = [];
+            let cur = "", used = 0, budget = firstBudget;
+            for (const b of blocks) {
+              const w = b.replace(/<[^>]+>/g, "").length + 60;
+              if (cur && used + w > budget) { out.push(cur); cur = ""; used = 0; budget = restBudget; }
+              cur += b; used += w;
             }
-            if (cur.length) out.push(cur);
+            if (cur.trim()) out.push(cur);
             return out;
           };
+          const CAP = 5.2, CHARS = 350;
+          type Frag = { sr: string; cell: string; l: Record<string, unknown> | null; w: number };
+          const frags: Frag[] = [];
+          for (const { l, sr } of numbered) {
+            const { img, desc } = partsOf(l);
+            const plain = desc.replace(/<[^>]+>/g, "").length;
+            const baseW = 1 + (img ? 1 : 0);
+            if (baseW + plain / CHARS <= CAP - 0.4) {
+              frags.push({ sr, cell: `${cellHead(l)}${desc ? `<div class="idesc">${desc}</div>` : ""}`, l, w: baseW + plain / CHARS });
+            } else {
+              const pieces = splitDesc(desc, Math.max(400, Math.floor((CAP - 0.6 - baseW) * CHARS)), Math.floor((CAP - 0.6) * CHARS));
+              pieces.forEach((piece, i) => {
+                const pw = piece.replace(/<[^>]+>/g, "").length / CHARS;
+                if (i === 0) frags.push({ sr, cell: `${cellHead(l)}<div class="idesc">${piece}</div>`, l, w: baseW + pw });
+                else frags.push({ sr: "", cell: `<div class="ig">${esc(l.description)} <i>(contd.)</i></div><div class="idesc">${piece}</div>`, l: null, w: 0.3 + pw });
+              });
+            }
+          }
+          const pagesOfFrags: Frag[][] = [];
+          let cur: Frag[] = [], used = 0;
+          for (const f of frags) {
+            if (cur.length && used + f.w > CAP) { pagesOfFrags.push(cur); cur = []; used = 0; }
+            cur.push(f); used += f.w;
+          }
+          if (cur.length) pagesOfFrags.push(cur);
+
           const sub = Number(q.subtotal) || 0, disc = Number(q.discount_amount) || 0;
           const taxAmt = Number(q.tax_amount) || 0, grand = Number(q.grand_total) || 0;
           const comps = (Array.isArray(tax?.components) ? tax!.components as { name: string; pct: number }[] : []);
-          const totalsRows = (span: number) => `<tr class="tot"><td colspan="${span}" class="tr">Net Total</td><td class="tr">${money(sub, cur, dec)}</td></tr>
-            ${disc ? `<tr><td colspan="${span}" class="tr">Discount ${Number(q.discount_pct)}%</td><td class="tr">− ${money(disc, cur, dec)}</td></tr>
-            <tr><td colspan="${span}" class="tr">Discounted Total</td><td class="tr">${money(sub - disc, cur, dec)}</td></tr>` : ""}
+          const totalsRows = (span: number) => `<tr class="tot"><td colspan="${span}" class="tr">Net Total</td><td class="tr">${money(sub, cur2, dec)}</td></tr>
+            ${disc ? `<tr><td colspan="${span}" class="tr">Discount ${Number(q.discount_pct)}%</td><td class="tr">− ${money(disc, cur2, dec)}</td></tr>
+            <tr><td colspan="${span}" class="tr">Discounted Total</td><td class="tr">${money(sub - disc, cur2, dec)}</td></tr>` : ""}
             ${comps.length > 1
-              ? comps.map((c) => `<tr><td colspan="${span}" class="tr">${esc(c.name)} ${c.pct}%</td><td class="tr">${money((sub - disc) * c.pct / 100, cur, dec)}</td></tr>`).join("")
-              : `<tr><td colspan="${span}" class="tr">${esc(tax?.name || "GST 18%")}</td><td class="tr">${money(taxAmt, cur, dec)}</td></tr>`}
-            <tr class="grand"><td colspan="${span}" class="tr"><b>Grand Total</b></td><td class="tr"><b>${money(grand, cur, dec)}</b></td></tr>
-            <tr><td colspan="${span + 1}" class="words">${esc(`${cur === "INR" ? "Rupees" : cur === "USD" ? "US Dollars" : "Euros"} ${cur === "INR" ? wordsIndian(Math.floor(grand)) : wordsWestern(Math.floor(grand))} Only`)}</td></tr>`;
+              ? comps.map((c) => `<tr><td colspan="${span}" class="tr">${esc(c.name)} ${c.pct}%</td><td class="tr">${money((sub - disc) * c.pct / 100, cur2, dec)}</td></tr>`).join("")
+              : `<tr><td colspan="${span}" class="tr">${esc(tax?.name || "GST 18%")}</td><td class="tr">${money(taxAmt, cur2, dec)}</td></tr>`}
+            <tr class="grand"><td colspan="${span}" class="tr"><b>Grand Total</b></td><td class="tr"><b>${money(grand, cur2, dec)}</b></td></tr>
+            <tr><td colspan="${span + 1}" class="words">${esc(`${cur2 === "INR" ? "Rupees" : cur2 === "USD" ? "US Dollars" : "Euros"} ${cur2 === "INR" ? wordsIndian(Math.floor(grand)) : wordsWestern(Math.floor(grand))} Only`)}</td></tr>`;
+
+          const COLS_FULL = '<colgroup><col class="c-sr"/><col/><col class="c-rate"/><col class="c-qty"/><col class="c-amt"/></colgroup>';
+          const COLS_TECH = '<colgroup><col class="c-sr"/><col/></colgroup>';
+          const fragRowFull = (f: Frag) => `<tr>
+            <td class="tc">${f.sr}</td><td class="icell">${f.cell}</td>
+            <td class="tr">${f.l ? money(f.l.unit_price, cur2, dec) : ""}</td><td class="tc">${f.l ? Number(f.l.quantity) : ""}</td>
+            <td class="tr">${f.l ? money(f.l.line_total, cur2, dec) : ""}</td></tr>`;
+          const fragRowTech = (f: Frag) => `<tr><td class="tc">${f.sr}</td><td class="icell">${f.cell}</td></tr>`;
 
           if (key === "items") {
-            // ONE table: Sr No · Item (rich) · Rate · Qty · Amount
-            const pagesOf = chunkBy(numbered, 5.2, weightOf);
-            const chunks = pagesOf.map((page, pi) => `${pi === 0 ? compactHead : ""}<h2 class="sect">Schedule of Items &amp; Prices${pi ? " (contd.)" : ""}</h2>
-              <table class="items"><colgroup><col class="c-sr"/><col/><col class="c-rate"/><col class="c-qty"/><col class="c-amt"/></colgroup><thead><tr><th>Sr No</th><th>Item</th><th class="tr">Rate</th><th>Qty</th><th class="tr">Amount</th></tr></thead>
-              <tbody>${page.map(({ l, sr }) => `<tr>
-                <td class="tc">${sr}</td><td class="icell">${cellFull(l as unknown as Record<string, unknown>)}</td>
-                <td class="tr">${money(l.unit_price, cur, dec)}</td><td class="tc">${Number(l.quantity)}</td>
-                <td class="tr">${money(l.line_total, cur, dec)}</td></tr>`).join("")}
-              ${pi === pagesOf.length - 1 ? totalsRows(4) : ""}</tbody></table>`);
+            const chunks = pagesOfFrags.map((page, pi) => `${pi === 0 ? compactHead : ""}<h2 class="sect">Schedule of Items &amp; Prices${pi ? " (contd.)" : ""}</h2>
+              <table class="items">${COLS_FULL}<thead><tr><th>Sr No</th><th>Item</th><th class="tr">Rate</th><th>Qty</th><th class="tr">Amount</th></tr></thead>
+              <tbody>${page.map(fragRowFull).join("")}
+              ${pi === pagesOfFrags.length - 1 ? totalsRows(4) : ""}</tbody></table>`);
             secs.push({ key, title: "", chunks });
           } else {
-            // TECHNICAL pages (Sr No · Item, rich) then the COMMERCIAL OFFER
-            const techPages = chunkBy(numbered, 5.2, weightOf);
-            const chunks = techPages.map((page, pi) => `${pi === 0 ? compactHead : ""}<h2 class="sect">Schedule of Items${pi ? " (contd.)" : ""}</h2>
-              <table class="items"><colgroup><col class="c-sr"/><col/></colgroup><thead><tr><th>Sr No</th><th>Item</th></tr></thead>
-              <tbody>${page.map(({ l, sr }) => `<tr><td class="tc">${sr}</td><td class="icell">${cellFull(l as unknown as Record<string, unknown>)}</td></tr>`).join("")}</tbody></table>`);
-            const comPages = chunkBy(numbered, 11, () => 1);
+            const chunks = pagesOfFrags.map((page, pi) => `${pi === 0 ? compactHead : ""}<h2 class="sect">Schedule of Items${pi ? " (contd.)" : ""}</h2>
+              <table class="items">${COLS_TECH}<thead><tr><th>Sr No</th><th>Item</th></tr></thead>
+              <tbody>${page.map(fragRowTech).join("")}</tbody></table>`);
+            const slim = (l: Record<string, unknown>) => {
+              const { code, group } = partsOf(l);
+              return `<div class="ig">${esc([group, code].filter(Boolean).join(" :: "))}</div><div class="inm">${esc(l.description)}</div>`;
+            };
+            const comPages: typeof numbered[] = [];
+            for (let i = 0; i < numbered.length; i += 11) comPages.push(numbered.slice(i, i + 11));
             for (let pi = 0; pi < comPages.length; pi++) {
               chunks.push(`${pi === 0 ? compactHead : ""}<h2 class="sect">Commercial Offer${pi ? " (contd.)" : ""}</h2>
-                <table class="items"><colgroup><col class="c-sr"/><col/><col class="c-rate"/><col class="c-qty"/><col class="c-amt"/></colgroup><thead><tr><th>Sr No</th><th>Item</th><th class="tr">Rate</th><th>Qty</th><th class="tr">Amount</th></tr></thead>
+                <table class="items">${COLS_FULL}<thead><tr><th>Sr No</th><th>Item</th><th class="tr">Rate</th><th>Qty</th><th class="tr">Amount</th></tr></thead>
                 <tbody>${comPages[pi].map(({ l, sr }) => `<tr>
-                  <td class="tc">${sr}</td><td class="icell">${cellSlim(l as unknown as Record<string, unknown>)}</td>
-                  <td class="tr">${money(l.unit_price, cur, dec)}</td><td class="tc">${Number(l.quantity)}</td>
-                  <td class="tr">${money(l.line_total, cur, dec)}</td></tr>`).join("")}
+                  <td class="tc">${sr}</td><td class="icell">${slim(l as unknown as Record<string, unknown>)}</td>
+                  <td class="tr">${money(l.unit_price, cur2, dec)}</td><td class="tc">${Number(l.quantity)}</td>
+                  <td class="tr">${money(l.line_total, cur2, dec)}</td></tr>`).join("")}
                 ${pi === comPages.length - 1 ? totalsRows(4) : ""}</tbody></table>`);
             }
             secs.push({ key, title: "", chunks });
