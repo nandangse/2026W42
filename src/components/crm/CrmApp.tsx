@@ -1035,7 +1035,19 @@ export default function CrmApp({
                 overflow: "auto", maxHeight: "calc(100vh - 250px)",
               }}
             >
-              <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, minWidth: 520 }}>
+              <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, minWidth: 520,
+                // once a hand has sized any column, the table obeys hands —
+                // fixed layout is the only mode where a dragged width is law
+                tableLayout: Object.keys(colWidths).length ? "fixed" : undefined }}>
+                {Object.keys(colWidths).length > 0 && (
+                  <colgroup>
+                    <col style={{ width: 30 }} />
+                    {visible.map((f, ci) => (
+                      <col key={f.name} style={{ width: ci < pin ? PINNED_W : colWidths[f.name] || Math.min(colW, 220) }} />
+                    ))}
+                    <col style={{ width: 84 }} />
+                  </colgroup>
+                )}
                 <thead>
                   <tr>
                     <th style={{ position: "sticky", top: 0, zIndex: 8, background: "#fff", boxShadow: `inset 0 -2px 0 ${BORDER}`, width: 30, padding: "8px 4px 8px 10px" }}>

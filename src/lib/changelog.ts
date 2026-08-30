@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.73",
+    date: "2026-08-30",
+    module: "CRM — dragged widths become law",
+    items: [
+      "The dragged column width now actually TAKES (Dr Raghu, 30 Aug 2026: \"the width is not changing\"): the moment any column is hand-sized, the table switches to fixed layout with a real column model — a dragged width is obeyed to the pixel, wider and narrower both.",
+    ],
+  },
+  {
     v: "3.31.0.72",
     date: "2026-08-30",
     module: "ERP — push, pull back, and file the record",
