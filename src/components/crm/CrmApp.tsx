@@ -4455,8 +4455,9 @@ function EnquiryInfoTab({ row, onSaved }: { row: Row; onSaved: () => void }) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
-  const [brief, setBrief] = useState("");
-  useEffect(() => { setText(String(row.enquiry_info ?? "")); setEditing(false); setBrief(""); setMsg(""); }, [rid]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the stored brief opens already written — asked once, kept on the record
+  const [brief, setBrief] = useState(String(row.genie_brief ?? ""));
+  useEffect(() => { setText(String(row.enquiry_info ?? "")); setEditing(false); setBrief(String(row.genie_brief ?? "")); setMsg(""); }, [rid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async (next: string) => {
     setBusy("save"); setMsg("");
@@ -4579,14 +4580,21 @@ function EnquiryInfoTab({ row, onSaved }: { row: Row; onSaved: () => void }) {
 function OppEnquiryTab({ oppId }: { oppId: string | null }) {
   const [text, setText] = useState<string | null>(null);
   const [brief, setBrief] = useState("");
+  const [briefAt, setBriefAt] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   useEffect(() => {
-    setBrief(""); setErr("");
+    setBrief(""); setBriefAt(""); setErr("");
     if (!oppId) { setText(""); return; }
     fetch(`/api/crm/opportunity?id=${encodeURIComponent(oppId)}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((j) => setText(String(j?.row?.enquiry_info ?? "")))
+      .then((j) => {
+        setText(String(j?.row?.enquiry_info ?? ""));
+        // the brief Genie wrote ON THE OPPORTUNITY, shown — never re-run
+        // from here (Dr Raghu, 30 Aug 2026)
+        setBrief(String(j?.row?.genie_brief ?? ""));
+        setBriefAt(String(j?.row?.genie_brief_at ?? ""));
+      })
       .catch(() => setText(""));
   }, [oppId]);
   // the same quick Opus read the opportunity has — pulled up onto the quote
@@ -4602,6 +4610,7 @@ function OppEnquiryTab({ oppId }: { oppId: string | null }) {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Genie could not answer");
       setBrief(String(j.brief || ""));
+      setBriefAt(String(j.at || new Date().toISOString()));
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   };
@@ -4619,17 +4628,25 @@ function OppEnquiryTab({ oppId }: { oppId: string | null }) {
         <div style={{ flex: "1 1 360px", minWidth: 300 }}>
           <div className="rounded-lg border p-3" style={{ borderColor: "#D9CFF2", background: "#FBFAFE", borderTop: "3px solid #7C3AED" }}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold" style={{ color: "#7C3AED", letterSpacing: 0.8 }}>✨ ASK GENIE</span>
-              <button onClick={() => void askGenie()} disabled={busy || !oppId}
-                className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: busy ? "#B9BEC4" : "#7C3AED" }}>
-                {busy ? "Reading the record…" : brief ? "Ask again" : "Ask Genie"}
-              </button>
-            </div>
-            <div className="text-xs mb-2" style={{ color: "#5A6672", lineHeight: 1.5 }}>
-              The customer, the contact, the enquiry — have we done this before, what is the relation, what is the scope. A quick CRM read, no web.
+              <span className="text-xs font-bold" style={{ color: "#7C3AED", letterSpacing: 0.8 }}>✨ GENIE&apos;S BRIEF — from the opportunity</span>
+              {!brief && (
+                <button onClick={() => void askGenie()} disabled={busy || !oppId}
+                  className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: busy ? "#B9BEC4" : "#7C3AED" }}>
+                  {busy ? "Reading the record…" : "Write it once"}
+                </button>
+              )}
             </div>
             {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
-            {brief && <div className="rounded bg-white border p-3 text-sm" style={{ borderColor: "#E2E0DA", lineHeight: 1.6, maxHeight: "calc(100vh - 460px)", overflowY: "auto" }}><RichText text={brief} /></div>}
+            {brief ? (
+              <>
+                {briefAt && <div className="text-xs mb-1.5" style={{ color: MUTED }}>written {briefAt.slice(0, 10).split("-").reverse().join("/")} on the opportunity — Ask Genie there to refresh it</div>}
+                <div className="rounded bg-white border p-3 text-sm" style={{ borderColor: "#E2E0DA", lineHeight: 1.6, maxHeight: "calc(100vh - 460px)", overflowY: "auto" }}><RichText text={brief} /></div>
+              </>
+            ) : !busy && (
+              <div className="text-xs" style={{ color: "#5A6672", lineHeight: 1.5 }}>
+                The opportunity has no Genie brief yet — one click writes it there once, and every quote from it shows the same brief.
+              </div>
+            )}
           </div>
         </div>
       </div>

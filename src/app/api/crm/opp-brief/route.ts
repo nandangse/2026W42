@@ -17,7 +17,9 @@ export const maxDuration = 120;
  *
  * A QUICK run on Opus — no web research, only what the CRM already knows —
  * so it answers in seconds, not minutes, and costs a fraction of an EVA
- * brief. Nothing is saved; the answer lives in the box it was asked from.
+ * brief. The answer is SAVED on the opportunity (Dr Raghu, 30 Aug 2026:
+ * "show that here, without running this again and again") — the quote reads
+ * the stored brief; Ask again refreshes it.
  */
 export async function POST(req: Request) {
   try {
@@ -136,7 +138,10 @@ Write in Markdown, exactly these sections:
       throw new HttpError(422, "The classifiers declined this one — try again.");
     const brief = response.content.filter((x) => x.type === "text").map((x) => x.text).join("\n").trim();
     if (!brief) throw new HttpError(502, "Genie came back empty — try again.");
-    return NextResponse.json({ brief });
+    const at = new Date().toISOString();
+    await db.from("opportunity").update({ genie_brief: brief, genie_brief_at: at }).eq("id", oppId)
+      .then(() => null, () => null);
+    return NextResponse.json({ brief, at });
   } catch (e) {
     return errJson(e);
   }

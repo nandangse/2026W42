@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.89",
+    date: "2026-08-30",
+    module: "CRM — Genie's brief is written once and kept",
+    items: [
+      "Ask Genie on an opportunity now SAVES its brief onto the record (Dr Raghu, 30 Aug 2026: \"show that here, without running this again and again\") — the box opens already written next time, and Ask again refreshes it.",
+      "The quote's Enquiry Info shows THAT stored brief, dated, read-only — no re-running from the quote. A quote whose opportunity has no brief yet offers one \"Write it once\" click.",
+      "CRM migration 0039 (two lines) carries the columns.",
+    ],
+  },
+  {
     v: "3.31.0.88",
     date: "2026-08-30",
     module: "CRM — Apollo stands wherever the client's people stand",
