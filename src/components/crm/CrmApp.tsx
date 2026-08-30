@@ -1423,7 +1423,10 @@ function Cell({
   // NGSE/QTN/26-27/39514 reads as 39514 in a list; the whole id is the tooltip.
   if (short && ["opportunity_no", "quote_no", "so_no"].includes(field.name)) {
     const m = String(value).match(/(\d+)\s*$/);
-    return <span className="tnum" title={String(value)}>{m ? m[1] : String(value)}</span>;
+    // an ERP record hand-titled with a company name is not a number —
+    // the number column shows a dash and the full title waits in the tooltip
+    if (!m) return <span title={String(value)} style={{ color: "#C7CCD2" }}>—</span>;
+    return <span className="tnum" title={String(value)}>{m[1]}</span>;
   }
 
   if (field.type === "readonly") {
@@ -1686,7 +1689,7 @@ function RecordModal({
             <div style={{ fontSize: 12, color: "#C8D2DC", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "baseline", marginTop: 2 }}>
               {/* the enquiry number, trailing digits — the whole dress on hover
                   (Dr Raghu, 30 Aug 2026: "show this in the header, the last digits") */}
-              {dt.name === "opportunity" && row.opportunity_no != null && (
+              {dt.name === "opportunity" && row.opportunity_no != null && /\d\s*$/.test(String(row.opportunity_no)) && (
                 <span title={String(row.opportunity_no)} className="font-bold rounded px-1.5" style={{ background: "rgba(255,255,255,.12)", color: "#fff" }}>
                   № {(String(row.opportunity_no).match(/(\d+)\s*$/) || [])[1] ?? String(row.opportunity_no)}
                 </span>

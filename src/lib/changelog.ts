@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.74",
+    date: "2026-08-30",
+    module: "CRM — the ENQ No column speaks numbers only",
+    items: [
+      "Errors in the enquiry number cleaned (Dr Raghu, 30 Aug 2026: \"some errors in the enquiry no\"): eight ERP records were hand-titled with company names instead of numbers — the ENQ No column now shows a dash for those (the full title waits in the tooltip), and the № chip in the header only wears a real number.",
+      "The stray \"Total\" line that came in with the 26 Aug ERP pull leaves through CRM migration 0031.",
+    ],
+  },
+  {
     v: "3.31.0.73",
     date: "2026-08-30",
     module: "CRM — dragged widths become law",
