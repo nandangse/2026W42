@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.0",
+    date: "2026-08-30",
+    module: "THE QUOTE ENGINE — a milestone, on Dr Raghu's word",
+    items: [
+      "One sitting, sixty-six releases: the Products catalogue imported whole from the ERP (6,672 items, images, prices, quote history), the product record with its tabs and pricing ladder, the quote desk rebuilt — Draft closure, thinking defaults, Payment Terms/Taxes/Quote Templates masters in Settings, the client's 39,711 addresses — the Quote items grid with catalogue search and indents, Situational Details and the Covering Letter desk with Genie's pen, and Review Quote assembling the whole document into DRAFT-watermarked pages.",
+      "Version steps to 3.31.1.0 to mark it.",
+    ],
+  },
+  {
     v: "3.31.0.99",
     date: "2026-08-30",
     module: "CRM — the Prospecting Queue obeys the hand",
