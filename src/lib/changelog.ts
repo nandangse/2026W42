@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.91",
+    date: "2026-08-30",
+    module: "CRM — the quote's masters move into Settings",
+    items: [
+      "Quote Templates, Payment Terms and Taxes now stand in SETTINGS, next to Email and WhatsApp Templates — where Dr Raghu first asked for them (30 Aug 2026: \"templates should be here right?\").",
+    ],
+  },
+  {
     v: "3.31.0.90",
     date: "2026-08-30",
     module: "CRM — the item dropdown breathes, the quote PDF connects",

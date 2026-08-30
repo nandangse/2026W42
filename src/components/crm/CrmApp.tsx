@@ -84,6 +84,7 @@ const URL_OF: Record<string, string> = {
   product: "product", sales_invoice: "salesinvoice", message_variable: "variables",
   email_template: "emailtemplates", whatsapp_template: "whatsapptemplates",
   sector: "sector", industry: "industry", stage: "stage", profile: "users",
+  quote_template: "quotetemplates", payment_term: "paymentterms", tax_master: "taxes",
 };
 
 /** The sidebar, in Dr Raghu's order (24 Aug 2026). `dt` names a doctype,
@@ -102,7 +103,10 @@ const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string } | { 
     items: [{ dt: "company" }, { dt: "person" }, { dt: "address" }, { dt: "person_phone" }, { dt: "industry" }, { dt: "product" }, { dt: "sales_invoice" }],
   },
   { header: "MORE", items: [{ dt: "interaction" }, { dt: "task" }, { dt: "quotation_line" }, { sp: "communication" }] },
-  { header: "SETTINGS", collapsible: true, items: [{ sp: "integrations" }, { dt: "sector" }, { dt: "stage" }, { dt: "profile" }, { dt: "message_variable" }, { dt: "email_template" }, { dt: "whatsapp_template" }] },
+  { header: "SETTINGS", collapsible: true, items: [{ sp: "integrations" }, { dt: "sector" }, { dt: "stage" }, { dt: "profile" }, { dt: "message_variable" }, { dt: "email_template" }, { dt: "whatsapp_template" },
+    // the quote's masters live in Settings, where Dr Raghu first asked for
+    // them (30 Aug 2026: "templates should be here right?")
+    { dt: "quote_template" }, { dt: "payment_term" }, { dt: "tax_master" }] },
 ];
 
 export default function CrmApp({
