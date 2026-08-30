@@ -46,6 +46,9 @@ export interface Field {
   big?: boolean;
   /** A textarea that edits in the common rich text box. */
   rich?: boolean;
+  /** A text field whose distinct values make a filter dropdown — for a
+   *  column like Item Group where the answers are finite but not declared. */
+  filterDistinct?: boolean;
   /** Which lightbox tab the field lives on — absent means Details. */
   tab?: "enquiry" | "qual" | "eva";
   /** Shown only while Is Tender is ticked — the tender unfolds. */
@@ -410,7 +413,8 @@ export const DOCTYPES: Doctype[] = [
     orderBy: { column: "sku", ascending: true },
     blurb: "The sellable catalogue, imported from the ERP Item table (Allow Sales = Yes, raw material excluded). For SALE only — Purchase Item is a pointer, never a purchase-side record.",
     fields: [
-      { name: "item_group", label: "Item Group", type: "text", inList: true },
+      { name: "item_group", label: "Item Group", type: "text", inList: true, filterDistinct: true,
+        help: "The ERP's product family — filterable from the bar above the list." },
       { name: "name", label: "Item", type: "text", required: true, inList: true },
       { name: "sku", label: "Item ID", type: "text", required: true, inList: true, help: "The ERP item code. Unique — the database refuses a twin." },
       { name: "image", label: "Image", type: "text", inList: true, noFilter: true, help: "Shows small in the list and on the record; click to see it whole." },

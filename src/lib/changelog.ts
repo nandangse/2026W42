@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.76",
+    date: "2026-08-30",
+    module: "CRM — Products filter by family",
+    items: [
+      "The Products list gains an Item Group filter (Dr Raghu, 30 Aug 2026: \"filter by product family\") — the dropdown holds the families actually in the catalogue, each with its count, multi-pickable like every other filter.",
+    ],
+  },
+  {
     v: "3.31.0.75",
     date: "2026-08-30",
     module: "CRM — the Products catalogue takes Dr Raghu's shape",

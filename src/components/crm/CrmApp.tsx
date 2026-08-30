@@ -359,8 +359,32 @@ export default function CrmApp({
   // company filter types along instead of dropping 54k names down.
   const filterables = (dt?.fields ?? []).filter(
     (f) => !f.noFilter && !f.virtual
-      && (f.type === "select" || f.type === "bool" || (f.type === "link" && f.link)),
+      && (f.type === "select" || f.type === "bool" || (f.type === "link" && f.link)
+        || (f.type === "text" && f.filterDistinct)),
   );
+
+  // a filterDistinct field's dropdown holds the values actually in the data —
+  // Item Group on a product ("filter by product family", Dr Raghu, 30 Aug 2026)
+  const [distinctOpts, setDistinctOpts] = useState<Record<string, { id: string; label: string }[]>>({});
+  useEffect(() => {
+    const wants = (dt?.fields ?? []).filter((f) => f.filterDistinct && !f.virtual);
+    if (!wants.length) { setDistinctOpts({}); return; }
+    let dead = false;
+    void (async () => {
+      const out: Record<string, { id: string; label: string }[]> = {};
+      for (const f of wants) {
+        try {
+          const j = await (await fetch(`/api/crm/${slug}?groupby=${encodeURIComponent(f.name)}`, { cache: "no-store" })).json();
+          out[f.name] = ((j.groups ?? []) as { key: string; label: string; count: number }[])
+            .filter((g) => g.key !== "")
+            .sort((a, b) => a.label.localeCompare(b.label))
+            .map((g) => ({ id: g.key, label: `${g.label} (${g.count})` }));
+        } catch { /* the filter simply stays empty */ }
+      }
+      if (!dead) setDistinctOpts(out);
+    })();
+    return () => { dead = true; };
+  }, [slug, dt]);
   // Anything hanging off a company can also be filtered by the customer's industry.
   const industryFilter = !!dt && dt.name !== "company"
     && dt.fields.some((f) => f.name === "company_id") && (links.industry?.length ?? 0) > 0;
@@ -849,6 +873,8 @@ export default function CrmApp({
                     label={f.label}
                     options={f.type === "select"
                       ? (f.options || []).map((o) => ({ id: o, label: o }))
+                      : f.filterDistinct
+                      ? (distinctOpts[f.name] || [])
                       : (links[f.link as string] || [])}
                     value={filters[f.name] ?? ""}
                     onChange={(v) => setFilters((cur) => ({ ...cur, [f.name]: v }))}
