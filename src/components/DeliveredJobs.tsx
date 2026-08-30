@@ -315,24 +315,45 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
 
       {/* ===== what the period can STILL produce (Dr Raghu, 29 Aug 2026):
           active jobs whose target date lands inside it, to its natural end ===== */}
-      {pipe.nos > 0 && (
-        <div className="rounded-lg border p-3 mb-3" style={{ borderColor: "#B9C7D4", background: "#F2F7FB", borderLeft: "4px solid #1B3A5C" }}>
-          <div className="text-sm" style={{ color: "#16232F" }}>
-            <b>More additional jobs planned for {period === "mtd" ? "MTD" : period === "qtd" ? "QTD" : period === "ytd" ? "YTD" : "this period"}</b>
-            {" — "}<b className="tnum">{pipe.nos}</b> nos + <b className="tnum" style={{ color: C.accent }}>{V(pipe.val)}</b> value + <b className="tnum" style={{ color: C.green }}>{V(pipe.tp)}</b> throughput
-            <span className="text-xs" style={{ color: "#5A6672" }}> · target dates up to {fmtFull(periodEnd)} · on the boards, not yet delivered</span>
-          </div>
-          {pipe.fams.length > 0 && (
-            <div className="flex gap-1.5 flex-wrap mt-2">
-              {pipe.fams.map(([f, n]) => (
-                <span key={f} className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#fff", border: "1px solid #B9C7D4", color: "#1B3A5C" }}>
-                  {n} × {f}
-                </span>
-              ))}
+      {pipe.nos > 0 && (() => {
+        const pl = period === "mtd" ? "MTD" : period === "qtd" ? "QTD" : period === "ytd" ? "YTD" : "this period";
+        return (
+          <div className="flex gap-2 flex-wrap mb-3">
+            {/* LEFT — what still stands on the boards for the period */}
+            <div className="rounded-lg border p-3" style={{ flex: "1 1 420px", minWidth: 320, borderColor: "#B9C7D4", background: "#F2F7FB", borderLeft: "4px solid #1B3A5C" }}>
+              <div className="text-sm" style={{ color: "#16232F" }}>
+                <b>More additional jobs planned for {pl}</b>
+                {" — "}<b className="tnum">{pipe.nos}</b> nos + <b className="tnum" style={{ color: C.accent }}>{V(pipe.val)}</b> value + <b className="tnum" style={{ color: C.green }}>{V(pipe.tp)}</b> throughput
+                <span className="text-xs" style={{ color: "#5A6672" }}> · target dates up to {fmtFull(periodEnd)} · on the boards, not yet delivered</span>
+              </div>
+              {pipe.fams.length > 0 && (
+                <div className="flex gap-1.5 flex-wrap mt-2">
+                  {pipe.fams.map(([f, n]) => (
+                    <span key={f} className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#fff", border: "1px solid #B9C7D4", color: "#1B3A5C" }}>
+                      {n} × {f}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+            {/* RIGHT — the prize, if every one of them goes out the gate */}
+            <div className="rounded-lg border p-3" style={{ flex: "1 1 360px", minWidth: 300, borderColor: "#BFE3CB", background: "#F2FAF4", borderLeft: "4px solid #0D7A3F" }}>
+              <div className="text-xs font-bold" style={{ color: "#0D7A3F", letterSpacing: 0.8 }}>IF COMPLETED AND DELIVERED — the {pl} report will read</div>
+              <div className="mt-1 tnum" style={{ fontSize: 20, fontWeight: 800, color: "#16232F" }}>
+                {totals.nos + pipe.nos} nos
+                <span style={{ color: C.accent }}> · {V(totals.value + pipe.val)}</span>
+                <span style={{ color: C.green }}> · {V(totals.throughput + pipe.tp)}</span>
+              </div>
+              <div className="text-xs mt-1" style={{ color: "#5A6672" }}>
+                {totals.nos} already out the gate + {pipe.nos} on the boards
+              </div>
+              <div className="mt-1.5 font-bold" style={{ color: "#0D7A3F", fontSize: 13 }}>
+                Come on — LET&apos;S DO IT AND SHOW THIS SUCCESS! 🚀
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ===== averages, and the honesty about them ===== */}
       <div className="flex gap-2 flex-wrap mb-3">

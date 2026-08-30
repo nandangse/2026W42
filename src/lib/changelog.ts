@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.53",
+    date: "2026-08-30",
+    module: "Delivered Jobs — the prize on the right",
+    items: [
+      "THE PIPELINE STRIP IS TWO BOXES now (Dr Raghu, 30 Aug 2026): the LEFT holds what still stands on the boards for the period; the RIGHT holds the prize — IF COMPLETED AND DELIVERED, the MTD/QTD/YTD report will read N nos · value · throughput (delivered + planned, summed) — and the rally cry under it: come on, let's do it and show this success. 🚀",
+    ],
+  },
+  {
     v: "3.31.0.52",
     date: "2026-08-30",
     module: "Update to ERP — cancel the ticked",
