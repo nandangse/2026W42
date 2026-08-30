@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.83",
+    date: "2026-08-30",
+    module: "CRM — the quote grid learns the catalogue by heart",
+    items: [
+      "Item Group is a dropdown from the masters — the catalogue's own families, \"+ Add new…\" always last (Dr Raghu, 30 Aug 2026); choosing one throttles the item search to that family.",
+      "The Item cell IS the search: type and Genie looks across item name, group, code and description; each hit shows on two lines — name, then family · approved price · description. Picking fills the rate, group and description, and links the product; free text still files with Enter.",
+    ],
+  },
+  {
     v: "3.31.0.82",
     date: "2026-08-30",
     module: "CRM — the quote's To/CC dressed like email; Genie writes again",

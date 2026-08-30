@@ -2022,7 +2022,18 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
   const [taxes, setTaxes] = useState<TaxRow[]>([]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const [ghost, setGhost] = useState({ item_group: "", description: "", unit_price: "", quantity: "1" });
+  const [ghost, setGhost] = useState({ item_group: "", description: "", unit_price: "", quantity: "1", product_id: "" });
+  // Item Group comes from the MASTERS (Dr Raghu, 30 Aug 2026) — the
+  // catalogue's own families; choosing one throttles the item search
+  const [groups, setGroups] = useState<string[]>([]);
+  useEffect(() => {
+    fetch("/api/crm/product?groupby=item_group", { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json();
+        setGroups(((j.groups ?? []) as { key: string }[]).map((g) => g.key).filter(Boolean).sort((a, b) => a.localeCompare(b)));
+      })
+      .catch(() => setGroups([]));
+  }, []);
   const [draft, setDraft] = useState<Record<string, Partial<Record<keyof QLine, string>>>>({});
   const [discPct, setDiscPct] = useState<string | null>(null);
   const taxPicked = useRef(false);
@@ -2102,13 +2113,14 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
         body: JSON.stringify({
           quotation_id: qid, line_no: (lines?.length ? Math.max(...lines.map((l) => l.line_no)) : 0) + 1,
           description: desc, item_group: ghost.item_group.trim() || null,
+          product_id: ghost.product_id || null,
           unit_price: Number(ghost.unit_price) || 0, quantity: Number(ghost.quantity) || 1,
           uom: "Nos", discountable: true, indent: 0,
         }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Could not add the item");
-      setGhost({ item_group: "", description: "", unit_price: "", quantity: "1" });
+      setGhost({ item_group: "", description: "", unit_price: "", quantity: "1", product_id: "" });
       await reloadLines(); await reloadQuote();
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
@@ -2193,6 +2205,22 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
   const grand = Number(q.grand_total) || 0;
   const taxRow = taxes.find((t) => t.id === String(q.tax_id ?? ""));
   const cellIn = { width: "100%", border: "none", outline: "none", background: "transparent", fontSize: 13, padding: "6px 8px" } as const;
+  // the group dropdown: the masters\' families, and "+ Add new" always last
+  const GroupCell = ({ value, onPick }: { value: string; onPick: (v: string) => void }) => (
+    <select value={value} disabled={busy}
+      onChange={(e) => {
+        if (e.target.value === "__new") {
+          const v = window.prompt("New item group:", "");
+          if (v && v.trim()) onPick(v.trim());
+        } else onPick(e.target.value);
+      }}
+      style={{ ...cellIn, cursor: "pointer", color: value ? undefined : "#9AA1A8" }}>
+      <option value="">— group —</option>
+      {value && !groups.includes(value) && <option value={value}>{value}</option>}
+      {groups.map((g) => <option key={g} value={g}>{g}</option>)}
+      <option value="__new">＋ Add new…</option>
+    </select>
+  );
 
   return (
     <div className="flex flex-col" style={{ height: "100%", minHeight: 0 }}>
@@ -2227,14 +2255,17 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
                 <tr key={l.id} style={{ borderTop: `1px solid ${BORDER}` }}>
                   <td className="px-2 tnum" style={{ color: MUTED }}>{srOf(i)}</td>
                   <td style={{ paddingLeft: (l.indent ?? 0) ? 14 : 0 }}>
-                    <input style={cellIn} value={D(l, "item_group")} placeholder="—"
-                      onChange={(e) => setD(l.id, "item_group", e.target.value)} onBlur={() => commitD(l, "item_group")} />
+                    <GroupCell value={String(l.item_group ?? "")} onPick={(v) => void patchLine(l.id, { item_group: v || null })} />
                   </td>
                   <td style={{ paddingLeft: (l.indent ?? 0) ? 14 : 0 }}>
                     <div className="flex items-center gap-1">
-                      <input style={cellIn} value={D(l, "description")}
-                        onChange={(e) => setD(l.id, "description", e.target.value)} onBlur={() => commitD(l, "description")} />
-                      <ProductCellPick onPick={(pid) => void pickProduct(l.id, pid)} />
+                      <ItemSearchCell style={cellIn} value={D(l, "description")} group={String(l.item_group ?? "") || undefined}
+                        onType={(v) => setD(l.id, "description", v)} onCommit={() => commitD(l, "description")}
+                        onPick={(h) => void patchLine(l.id, {
+                          product_id: h.id, description: h.name, item_group: h.item_group,
+                          ...(h.approved_price_inr != null ? { unit_price: h.approved_price_inr } : {}),
+                        })} />
+                      <ProductCellPick group={String(l.item_group ?? "") || undefined} onPick={(pid) => void pickProduct(l.id, pid)} />
                     </div>
                   </td>
                   <td><input style={{ ...cellIn, textAlign: "right" }} type="number" value={D(l, "unit_price")}
@@ -2261,13 +2292,17 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
               {/* the write-item row — always there, Enter files it */}
               <tr style={{ borderTop: `1px solid ${BORDER}`, background: "#FDFCFA" }}>
                 <td className="px-2 tnum" style={{ color: "#C7CCD2" }}>{(() => { const n = (lines ?? []).filter((l) => (l.indent ?? 0) === 0).length + 1; return n; })()}</td>
-                <td><input style={cellIn} placeholder="item group" value={ghost.item_group} onChange={(e) => setGhost((g) => ({ ...g, item_group: e.target.value }))} /></td>
+                <td><GroupCell value={ghost.item_group} onPick={(v) => setGhost((g) => ({ ...g, item_group: v }))} /></td>
                 <td>
                   <div className="flex items-center gap-1">
-                    <input style={cellIn} placeholder="write item…" value={ghost.description}
-                      onChange={(e) => setGhost((g) => ({ ...g, description: e.target.value }))}
-                      onKeyDown={(e) => { if (e.key === "Enter") void addLine(); }} />
-                    <ProductCellPick onPick={async (pid) => {
+                    <ItemSearchCell style={cellIn} placeholder="write item…" value={ghost.description} group={ghost.item_group || undefined}
+                      onType={(v) => setGhost((g) => ({ ...g, description: v, product_id: "" }))}
+                      onEnter={() => void addLine()}
+                      onPick={(h) => setGhost((g) => ({
+                        ...g, description: h.name, item_group: h.item_group || g.item_group, product_id: h.id,
+                        unit_price: h.approved_price_inr != null ? String(h.approved_price_inr) : g.unit_price,
+                      }))} />
+                    <ProductCellPick group={ghost.item_group || undefined} onPick={async (pid) => {
                       try {
                         const j = await (await fetch(`/api/crm/product?id=${encodeURIComponent(pid)}`, { cache: "no-store" })).json();
                         const p = j?.row as Row | undefined;
@@ -2355,14 +2390,62 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
   );
 }
 
+/** The Item cell IS the search (Dr Raghu, 30 Aug 2026: "type in the item
+ *  and search item name or item group or description") — free text stays
+ *  free; a pick fills rate, group and description. Two lines per hit. */
+type CatHit = { id: string; name: string; sku: string; item_group: string | null; approved_price_inr: number | null; snippet: string };
+function ItemSearchCell({ value, group, placeholder, onType, onCommit, onPick, onEnter, style }: {
+  value: string; group?: string; placeholder?: string;
+  onType: (v: string) => void; onCommit?: () => void;
+  onPick: (hit: CatHit) => void; onEnter?: () => void;
+  style?: React.CSSProperties;
+}) {
+  const [hits, setHits] = useState<CatHit[]>([]);
+  const [open, setOpen] = useState(false);
+  const timer = useRef<number | null>(null);
+  const seek = (q: string) => {
+    if (timer.current) window.clearTimeout(timer.current);
+    if (q.trim().length < 2) { setHits([]); setOpen(false); return; }
+    timer.current = window.setTimeout(() => {
+      fetch(`/api/crm/product-extra?search=${encodeURIComponent(q)}${group ? `&group=${encodeURIComponent(group)}` : ""}`, { cache: "no-store" })
+        .then(async (r) => { const j = await r.json(); setHits((j.hits ?? []) as CatHit[]); setOpen(true); })
+        .catch(() => { setHits([]); setOpen(false); });
+    }, 250);
+  };
+  return (
+    <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+      <input style={style} value={value} placeholder={placeholder}
+        onChange={(e) => { onType(e.target.value); seek(e.target.value); }}
+        onFocus={() => { if (hits.length) setOpen(true); }}
+        onBlur={() => { window.setTimeout(() => setOpen(false), 200); onCommit?.(); }}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setOpen(false); onEnter?.(); } if (e.key === "Escape") setOpen(false); }} />
+      {open && hits.length > 0 && (
+        <div className="rounded border" style={{ position: "absolute", top: "100%", left: 0, zIndex: 45, background: "#fff", borderColor: BORDER, boxShadow: "0 8px 24px rgba(27,45,107,.18)", minWidth: 320, maxWidth: 460, maxHeight: 300, overflowY: "auto" }}>
+          {hits.map((h) => (
+            <button key={h.id} type="button" onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { setOpen(false); onPick(h); }}
+              className="block w-full text-left px-2.5 py-1.5 hover:bg-[#F7F5F0]" style={{ borderBottom: `1px solid ${BORDER}` }}>
+              <div className="text-sm font-bold" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.name}</div>
+              <div className="text-xs" style={{ color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {[h.item_group, h.approved_price_inr != null ? `₹ ${Number(h.approved_price_inr).toLocaleString("en-IN")}` : null, h.snippet].filter(Boolean).join(" · ")}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The little 📦 that turns into a product search inside a grid cell. */
-function ProductCellPick({ onPick }: { onPick: (productId: string) => void }) {
+function ProductCellPick({ onPick, group }: { onPick: (productId: string) => void; group?: string }) {
   const [open, setOpen] = useState(false);
   if (!open)
-    return <button title="Pick from the Products catalogue" onClick={() => setOpen(true)} style={{ fontSize: 13, opacity: 0.65, flexShrink: 0 }}>📦</button>;
+    return <button title={group ? `Pick from ${group}` : "Pick from the Products catalogue"} onClick={() => setOpen(true)} style={{ fontSize: 13, opacity: 0.65, flexShrink: 0 }}>📦</button>;
   return (
     <div style={{ width: 220, flexShrink: 0 }}>
       <LinkAutocomplete target="product" value="" valueLabel=""
+        extraQuery={group ? `f_item_group=${encodeURIComponent(group)}` : undefined}
         onPick={(id) => { setOpen(false); if (id) onPick(id); }} />
     </div>
   );
@@ -3202,9 +3285,11 @@ function RelatedTab({
  * companies. Type, pick from the top matches, done.
  */
 function LinkAutocomplete({
-  target, value, valueLabel, onPick,
+  target, value, valueLabel, onPick, extraQuery,
 }: {
   target: string; value: string; valueLabel: string; onPick: (id: string) => void;
+  /** Extra f_ filters for the pick search — a quote line's group throttles its items. */
+  extraQuery?: string;
 }) {
   const [text, setText] = useState(valueLabel);
   const [options, setOptions] = useState<{ id: string; label: string }[]>([]);
@@ -3252,7 +3337,7 @@ function LinkAutocomplete({
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => {
-      fetch(`/api/crm/${target}?pick=${encodeURIComponent(text)}`, { cache: "no-store" })
+      fetch(`/api/crm/${target}?pick=${encodeURIComponent(text)}${extraQuery ? `&${extraQuery}` : ""}`, { cache: "no-store" })
         .then((r) => r.json())
         .then((j) => setOptions(j.options ?? []))
         .catch(() => setOptions([]));

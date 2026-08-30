@@ -29,7 +29,33 @@ export async function GET(req: Request) {
     await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const id = String(new URL(req.url).searchParams.get("id") || "");
+    const u = new URL(req.url);
+
+    // ?search= — the quote grid's item type-ahead (Dr Raghu, 30 Aug 2026:
+    // "search item name or item group or description"), throttled by ?group=
+    const search = String(u.searchParams.get("search") || "").trim();
+    if (search) {
+      const q = search.replace(/[,%()]/g, " ").trim();
+      if (q.length < 2) return NextResponse.json({ hits: [] });
+      let qy = db.from("product")
+        .select("id, name, sku, item_group, approved_price_inr, description")
+        .is("deleted_at", null).eq("is_active", true)
+        .or(`name.ilike.%${q}%,item_group.ilike.%${q}%,sku.ilike.%${q}%,description.ilike.%${q}%`)
+        .limit(8);
+      const group = String(u.searchParams.get("group") || "").trim();
+      if (group) qy = qy.eq("item_group", group);
+      const { data, error } = await qy;
+      if (error) throw new HttpError(500, error.message);
+      return NextResponse.json({
+        hits: (data ?? []).map((p) => ({
+          id: p.id, name: p.name, sku: p.sku, item_group: p.item_group,
+          approved_price_inr: p.approved_price_inr,
+          snippet: String(p.description || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 120),
+        })),
+      });
+    }
+
+    const id = String(u.searchParams.get("id") || "");
     if (!id) throw new HttpError(400, "Which product?");
     const { data: prod } = await db.from("product").select("id, item_group").eq("id", id).maybeSingle();
     if (!prod) throw new HttpError(404, "That product no longer exists.");
