@@ -1954,7 +1954,7 @@ function ReviewQuoteTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void
         ))}
         <a href={`${url}&print=1`} target="_blank" rel="noreferrer"
           className="rounded px-3 py-1.5 text-xs font-bold text-white ml-auto" style={{ background: ORANGE, textDecoration: "none" }}>
-          ⬇ Download PDF (DRAFT)
+          ⬇ Download PDF{String(row.status) === "submitted" ? "" : " (DRAFT)"}
         </a>
         <button onClick={() => setSubmitMode("review")}
           className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: "#EEF3F8", color: NAVY, border: "1px solid #C9D6E2" }}>
@@ -3567,9 +3567,23 @@ function RecordModal({
             )}
             {mode === "view" && (
               <button
-                onClick={() => {
-                  if (dt.name === "quotation" && String(row.status) === "submitted"
-                    && !window.confirm("This quote is SUBMITTED. Amend it?")) return;
+                onClick={async () => {
+                  // AMEND a submitted quote = a revision: old one CANCELLED,
+                  // every item MOVES to <no>-1 (Dr Raghu, 30 Aug 2026)
+                  if (dt.name === "quotation" && String(row.status) === "submitted") {
+                    if (!window.confirm(`Amend ${title}?\n\nThis quote will stand CANCELLED and every item MOVES to a new revision named ${String(row.quote_no).replace(/-\d+$/, "")}-${(Number(row.revision) || 0) + 1}.`)) return;
+                    try {
+                      const r = await fetch("/api/crm/quote-amend", {
+                        method: "POST", headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ quotation_id: rid }),
+                      });
+                      const j = await r.json();
+                      if (!r.ok) throw new Error(j.error || "Could not amend");
+                      onSaved();
+                      onOpenLink("quotation", String(j.id));
+                    } catch (e) { window.alert(e instanceof Error ? e.message : String(e)); }
+                    return;
+                  }
                   onEdit();
                 }}
                 className="px-3 py-1.5 rounded text-sm font-semibold"

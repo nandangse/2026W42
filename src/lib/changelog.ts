@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.7",
+    date: "2026-08-30",
+    module: "CRM — submission kills the watermark; Amend is a true revision",
+    items: [
+      "A SUBMITTED quote never wears DRAFT again — the preview and the download both print clean (Dr Raghu, 30 Aug 2026).",
+      "AMEND now makes a revision: the old quote stands fully CANCELLED, and every item MOVES to the new one, named QTN no -1 (then -2, -3…), carrying every field, born at Draft with today's date and opened at once.",
+    ],
+  },
+  {
     v: "3.31.1.6",
     date: "2026-08-30",
     module: "CRM — the quote SUBMITS: to Raghu for review, or to the client",

@@ -78,11 +78,13 @@ export async function GET(req: Request) {
     const qid = String(u.searchParams.get("id") || "");
     if (!qid) throw new HttpError(400, "Which quotation?");
     const wantPrint = u.searchParams.get("print") === "1";
-    const isFinal = u.searchParams.get("final") === "1";
+    let isFinal = u.searchParams.get("final") === "1";
     const secParam = String(u.searchParams.get("sections") || "").split(",").map((s) => s.trim()).filter(Boolean);
 
     const { data: q } = await db.from("quotation").select("*").eq("id", qid).maybeSingle();
     if (!q) throw new HttpError(404, "That quotation no longer exists.");
+    // once SUBMITTED, the DRAFT watermark is gone for good (Dr Raghu, 30 Aug 2026)
+    if (String(q.status) === "submitted") isFinal = true;
     const sections = (secParam.length ? secParam : Array.isArray(q.print_sections) ? (q.print_sections as string[]) : [...ORDER])
       .filter((s) => (ORDER as readonly string[]).includes(s));
 
