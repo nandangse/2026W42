@@ -1916,7 +1916,8 @@ function ReviewQuoteTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void
   const rid = String(row.id ?? "");
   const SECTIONS: [string, string][] = [
     ["cover", "Cover Page"], ["letter", "Covering Letter"], ["situational", "Situational Analysis"],
-    ["items", "Items (with Rate)"], ["terms", "Terms and Conditions"], ["about", "About Nandan"], ["back", "Back Page"],
+    ["items", "Items (with Rate)"], ["items_split", "Items & Rate separate"],
+    ["terms", "Terms and Conditions"], ["about", "About Nandan"], ["back", "Back Page"],
   ];
   const chosen = Array.isArray(row.print_sections)
     ? (row.print_sections as unknown[]).map(String)
@@ -1924,7 +1925,10 @@ function ReviewQuoteTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const toggle = async (k: string) => {
-    const next = chosen.includes(k) ? chosen.filter((x) => x !== k) : [...chosen, k];
+    // the two item modes are one choice, never both (Dr Raghu, 30 Aug 2026)
+    let next = chosen.includes(k) ? chosen.filter((x) => x !== k) : [...chosen, k];
+    if (k === "items" && next.includes("items")) next = next.filter((x) => x !== "items_split");
+    if (k === "items_split" && next.includes("items_split")) next = next.filter((x) => x !== "items");
     setBusy(true); setErr("");
     try {
       const r = await fetch(`/api/crm/quotation?id=${encodeURIComponent(rid)}`, {

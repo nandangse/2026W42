@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.95",
+    date: "2026-08-30",
+    module: "CRM — items print two ways, one choice",
+    items: [
+      "Review Quote offers Items (with Rate) OR Items & Rate separate — ticking one unticks the other (Dr Raghu, 30 Aug 2026).",
+      "With Rate: one table — Sr No · Item · Rate · Qty · Amount, the Item cell carrying Item Group :: Item Code, the bold name, a small thumbnail and the description.",
+      "Separate: the technical pages first (Sr No · Item, full dress), then a fresh page headed COMMERCIAL OFFER — Sr No · Item (group :: code + name only) · Rate · Qty · Amount with the totals and words.",
+      "Pages fill by content weight, so description-heavy items get the room they need.",
+    ],
+  },
+  {
     v: "3.31.0.94",
     date: "2026-08-30",
     module: "CRM — quote grid corrections",
