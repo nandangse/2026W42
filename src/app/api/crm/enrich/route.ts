@@ -83,7 +83,17 @@ export async function POST(req: Request) {
         if (!r2.ok) throw new HttpError(502, r2.status === 401 || r2.status === 403
           ? "Apollo refused the key — check it in Settings → Integrations."
           : `Apollo answered ${r2.status} on the company search.`);
-        const hits = ((await r2.json()) as { organizations?: Org[] }).organizations ?? [];
+        // Apollo answers in TWO arrays: organizations (net-new) and accounts
+        // (companies already saved in the workspace) — read both
+        type Acct = Org & { organization_id?: string; organization_city?: string; organization_state?: string; organization_country?: string };
+        const j2 = (await r2.json()) as { organizations?: Org[]; accounts?: Acct[] };
+        const fromAcct = (a: Acct): Org => ({
+          id: a.organization_id || a.id, name: a.name, website_url: a.website_url,
+          primary_domain: a.primary_domain, linkedin_url: a.linkedin_url, phone: a.phone,
+          founded_year: a.founded_year, city: a.city || a.organization_city,
+          state: a.state || a.organization_state, country: a.country || a.organization_country,
+        });
+        const hits = [...(j2.organizations ?? []), ...((j2.accounts ?? []).map(fromAcct))];
         org = hits[0] ?? null;
         if (org?.primary_domain && !domain) domain = String(org.primary_domain);
       }
@@ -100,15 +110,22 @@ export async function POST(req: Request) {
       // up to ten people, in as contacts — names and titles are search-tier
       // (no per-person email credits burned); emails come one at a time
       // through the contact's own tick-through enrich
-      let created = 0, already = 0;
+      let created = 0, already = 0, insertNote = "";
       const people: { name?: string; title?: string }[] = [];
       if (org.id) {
-        const r3 = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
+        // mixed_people/search is DEPRECATED for API callers (found 30 Aug
+        // 2026, by its own 422) — api_search is the road; last names come
+        // obfuscated at search tier and the contact's own 🔎 completes them
+        const r3 = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
           method: "POST", headers: AH,
           body: JSON.stringify({ organization_ids: [org.id], page: 1, per_page: 10 }),
         });
         if (r3.ok) {
-          const ppl = ((await r3.json()) as { people?: { name?: string; title?: string }[] }).people ?? [];
+          const raw3 = (await r3.json()) as { people?: { name?: string; first_name?: string; last_name_obfuscated?: string; title?: string }[] };
+          const ppl = (raw3.people ?? []).map((p) => ({
+            name: String(p.name || [p.first_name, p.last_name_obfuscated].filter(Boolean).join(" ")).trim(),
+            title: p.title,
+          }));
           people.push(...ppl);
           const { data: existing } = await db.from("person").select("first_name").eq("company_id", companyId).limit(500);
           const have = new Set((existing || []).map((p) => String(p.first_name || "").trim().toLowerCase()));
@@ -123,6 +140,7 @@ export async function POST(req: Request) {
           if (rows2.length) {
             const { error: pe } = await db.from("person").insert(rows2);
             if (!pe) created = rows2.length;
+            else insertNote = `contacts failed to file: ${pe.message.slice(0, 120)}`;
           }
         }
       }
@@ -151,7 +169,7 @@ export async function POST(req: Request) {
         after: { fields: Object.keys(patch), contacts_created: created }, by_user: me.profileId,
       }).then(() => null, () => null);
       return NextResponse.json({
-        found: true, org: org.name ?? co.name,
+        found: true, org: org.name ?? co.name, insert_note: insertNote || undefined,
         filled: Object.keys(patch).filter((k) => k !== "notes"),
         noted: "notes" in patch, contacts_created: created, contacts_already: already,
         people_seen: people.length,

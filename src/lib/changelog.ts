@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.25",
+    date: "2026-08-30",
+    module: "CRM — Enrich with Apollo works again",
+    items: [
+      "Three faults found by testing Apollo's API directly (Dr Raghu, 30 Aug 2026: \"even enrich with apollo is not working\"): company matches were arriving in an array the code never read (companies already saved in the Apollo workspace land in accounts, not organizations); Apollo had DEPRECATED the people-search endpoint — its successor api_search is now used; and a failed contact insert vanished silently — it speaks now.",
+      "Apollo veils last names at search tier (\"Colonel Pa***l\") — the contact's own 🔎 Visiting-Card enrich completes them, one credit at a time, as before.",
+    ],
+  },
+  {
     v: "3.31.1.24",
     date: "2026-08-30",
     module: "CRM — IFS refuses an error dressed as a summary",
