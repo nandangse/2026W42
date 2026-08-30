@@ -131,10 +131,16 @@ export async function GET(req: Request) {
       const list = (tpls ?? []).filter((t) => t.kind === kind);
       return (chosen ? list.find((t) => t.name === String(chosen)) : null) ?? list[0] ?? null;
     };
+    // every section fills its variables (Dr Raghu, 30 Aug 2026: "this also
+    // didn't replace the variable") — the whole set, wherever they appear
     const fill = (html: string) => html
       .replace(/\{\{customer\}\}/g, esc(customer))
       .replace(/\{\{quote_no\}\}/g, esc(q.quote_no))
-      .replace(/\{\{quote_date\}\}/g, esc(dIN(q.quoted_on)));
+      .replace(/\{\{quote_date\}\}/g, esc(dIN(q.quoted_on)))
+      .replace(/\{\{subject\}\}/g, esc(String(q.subject || "")))
+      .replace(/\{\{valid_until\}\}/g, esc(dIN(q.valid_until)))
+      .replace(/\{\{delivery\}\}/g, esc(String(q.delivery_weeks || "")))
+      .replace(/\{\{contact\}\}/g, esc(String(contact?.full_name || "")));
 
     // ---- content per section: [sectionKey, title, html-chunks] ----------
     type Sec = { key: string; title: string; chunks: string[]; centered?: boolean };
@@ -145,14 +151,14 @@ export async function GET(req: Request) {
         const t = tplOf("cover", q.cover_template);
         secs.push({ key, title: "", chunks: [fill(String(q.cover_text || t?.content || ""))], centered: true });
       } else if (key === "letter") {
-        const html = String(q.letter_text || "").trim();
+        const html = fill(String(q.letter_text || "").trim());
         if (html) {
           const head = headBlock;
           const tail = `<p><br>Yours faithfully,<br><b>${esc(q.authorized_by || "Dr Raghunandan Jagdish, MD and CEO")}</b><br>Nandan GSE Pvt Ltd</p>`;
           secs.push({ key, title: "", chunks: paginate(head + html + tail) });
         }
       } else if (key === "situational") {
-        if (situational.trim()) secs.push({ key, title: "Situational Details", chunks: paginate(situational) });
+        if (situational.trim()) secs.push({ key, title: "Situational Details", chunks: paginate(fill(situational)) });
       } else if (key === "items" || key === "items_split") {
         const rows = (lines ?? []).filter((l) => !l.is_optional);
         if (rows.length) {
@@ -273,7 +279,7 @@ export async function GET(req: Request) {
           }
         }
       } else if (key === "terms") {
-        const html = String(q.terms_text || "").trim();
+        const html = fill(String(q.terms_text || "").trim());
         if (html) secs.push({ key, title: "Terms & Conditions", chunks: paginate(html) });
       } else if (key === "about") {
         const t = tplOf("about", q.about_template);

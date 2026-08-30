@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.18",
+    date: "2026-08-30",
+    module: "CRM — template variables fill on every page",
+    items: [
+      "{{quote_no}}, {{quote_date}}, {{customer}}, {{subject}}, {{valid_until}}, {{delivery}} and {{contact}} now fill wherever they stand — terms, covering letter, situational, cover, about and back alike (Dr Raghu, 30 Aug 2026).",
+    ],
+  },
+  {
     v: "3.31.1.17",
     date: "2026-08-30",
     module: "CRM — an address reads whole wherever it stands",
