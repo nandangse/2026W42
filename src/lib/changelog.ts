@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.2",
+    date: "2026-08-30",
+    module: "Settings — the owner's two rooms: Genie usage and Consult Raghu",
+    items: [
+      "SETTINGS → 🧞 GENIE (Dr Raghu alone): who uses Genie — actions per person, last 30 days and all time — and roughly what the AI costs, per person and in total, from measured per-run estimates.",
+      "SETTINGS → 🎓 CONSULT RAGHU (Dr Raghu alone): four living knowledgebases — Planning, Sales, Kuber, Vishwakarma. Paste or attach knowledge; OPUS weaves every drop into ONE large organized document, nothing lost; each version files into his Drive folder, one subfolder per section. The intelligence layer the Consult Raghu advisors will stand on.",
+      "Genie migration 0104 carries the tables. The Drive folder must be shared with the service account as Editor for the Drive copies.",
+    ],
+  },
+  {
     v: "3.31.1.1",
     date: "2026-08-30",
     module: "CRM — the line always files; the quote duplicates",

@@ -200,3 +200,31 @@ export async function archiveUpload(
 
   return { name, path: `${p.fy}/${p.kind}/${p.month}`, link: j.webViewLink ?? null };
 }
+
+/**
+ * Upload into a NAMED Drive folder — Consult Raghu's knowledgebase lives in
+ * Dr Raghu's own folder, one subfolder per section (30 Aug 2026). The
+ * service account must have editor access to that folder.
+ */
+export async function uploadToFolder(
+  cfg: DriveConfig, rootFolderId: string, subName: string,
+  bytes: ArrayBuffer, filename: string, mime = "text/markdown",
+): Promise<{ id: string; link: string | null }> {
+  const token = await accessToken(cfg);
+  const parent = await folder(token, rootFolderId, subName);
+  const boundary = "genie" + Math.random().toString(36).slice(2);
+  const meta = JSON.stringify({ name: filename, parents: [parent] });
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`),
+    Buffer.from(bytes),
+    Buffer.from(`\r\n--${boundary}--`),
+  ]);
+  const res = await fetch(`${UPLOAD}?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": `multipart/related; boundary=${boundary}` },
+    body,
+  });
+  const j = await res.json();
+  if (!res.ok || !j.id) throw new Error(j.error?.message || `Drive refused the file (${res.status})`);
+  return { id: j.id, link: j.webViewLink ?? null };
+}

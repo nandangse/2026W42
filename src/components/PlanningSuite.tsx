@@ -6,6 +6,7 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
 import { ModuleLinks, ReloadRow } from "@/components/ModuleMenu";
 import PlaybookScreen from "@/components/Playbook";
 import { LOGO } from "@/lib/logo";
+import { GenieUsagePanel, ConsultRaghuPanel } from "./ConsultRaghu";
 import { APP_VERSION, UPDATES, EFFORT } from "@/lib/changelog";
 import SoftwareDescription from "./SoftwareDescription";
 import { TRADES, zeroCrew, templateFor, type Crew } from "@/lib/templates";
@@ -5903,7 +5904,7 @@ function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPush?: boo
 }
 
 // ============================ Admin ============================
-type AdminTab = "users" | "org" | "milestones" | "setup" | "report" | "updates" | "software";
+type AdminTab = "users" | "org" | "milestones" | "setup" | "report" | "updates" | "software" | "genie" | "consult";
 
 /**
  * The Name column stays put while the rest scrolls. With department,
@@ -6251,10 +6252,12 @@ function GroupTicks({
   );
 }
 
-function AdminTabs({ tab, setTab }: { tab: AdminTab; setTab: (t: AdminTab) => void }) {
+function AdminTabs({ tab, setTab, owner }: { tab: AdminTab; setTab: (t: AdminTab) => void; owner?: boolean }) {
   return (
-    <div className="flex gap-1 rounded p-1 bg-white border" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
-      {([["users", "👥 Users"], ["org", "🧬 Org Chart"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["report", "📊 Report"], ["updates", "🗒 Updates"], ["software", "📘 Software description"]] as const).map(([k, l]) => (
+    <div className="flex gap-1 rounded p-1 bg-white border flex-wrap" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
+      {([["users", "👥 Users"], ["org", "🧬 Org Chart"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["report", "📊 Report"], ["updates", "🗒 Updates"], ["software", "📘 Software description"],
+        // the owner's two rooms (Dr Raghu, 30 Aug 2026): usage + the knowledgebase
+        ...(owner ? [["genie", "🧞 Genie"], ["consult", "🎓 Consult Raghu"]] as const : [])] as readonly (readonly [AdminTab, string])[]).map(([k, l]) => (
         <button
           key={k}
           onClick={() => setTab(k)}
@@ -6625,8 +6628,27 @@ function Admin({
   if (adminTab === "updates") {
     return (
       <div className="p-4 space-y-4">
-        <AdminTabs tab={adminTab} setTab={setAdminTab} />
+        <AdminTabs tab={adminTab} setTab={setAdminTab} owner={isOwner} />
         <Updates />
+      </div>
+    );
+  }
+
+  // the owner's two rooms — the tabs never render for anyone else, and the
+  // APIs behind them answer only the owner
+  if (adminTab === "genie" && isOwner) {
+    return (
+      <div className="p-4 space-y-4">
+        <AdminTabs tab={adminTab} setTab={setAdminTab} owner={isOwner} />
+        <GenieUsagePanel />
+      </div>
+    );
+  }
+  if (adminTab === "consult" && isOwner) {
+    return (
+      <div className="p-4 space-y-4">
+        <AdminTabs tab={adminTab} setTab={setAdminTab} owner={isOwner} />
+        <ConsultRaghuPanel />
       </div>
     );
   }
@@ -6637,7 +6659,7 @@ function Admin({
   if (adminTab === "software") {
     return (
       <div className="p-4 space-y-4">
-        <AdminTabs tab={adminTab} setTab={setAdminTab} />
+        <AdminTabs tab={adminTab} setTab={setAdminTab} owner={isOwner} />
         <SoftwareDescription />
       </div>
     );
@@ -6645,7 +6667,7 @@ function Admin({
 
   return (
     <div className="p-4 space-y-4">
-      <AdminTabs tab={adminTab} setTab={setAdminTab} />
+      <AdminTabs tab={adminTab} setTab={setAdminTab} owner={isOwner} />
       {adminTab === "setup" && <LabourRatesCard />}
 
       {adminTab === "setup" && <ImageQuotesPanel />}

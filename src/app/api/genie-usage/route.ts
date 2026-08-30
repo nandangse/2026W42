@@ -1,0 +1,70 @@
+import { NextResponse } from "next/server";
+import { requireOwner, errJson } from "@/lib/auth";
+import { crmDb, crmConfigured } from "@/crm/db";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+/**
+ * SETTINGS → GENIE (Dr Raghu, 30 Aug 2026, owner alone): who uses Genie and
+ * roughly what the AI costs. Counted from the CRM audit trail — the one
+ * place every hand leaves a mark — with the AI actions costed at measured
+ * per-run estimates (EVA ~₹85 with its web searches; the quick Opus reads
+ * a few rupees each). Approximations, honestly labelled.
+ */
+const COST_INR: Record<string, number> = {
+  eva_brief: 85, opp_brief: 8, situational_run: 6, letter_beautify: 4,
+};
+const AI_ACTIONS = Object.keys(COST_INR);
+
+export async function GET() {
+  try {
+    await requireOwner();
+    if (!crmConfigured()) return NextResponse.json({ rows: [], note: "CRM database not configured." });
+    const db = crmDb();
+
+    const since30 = new Date(Date.now() - 30 * 86400000).toISOString();
+    type A = { by_user: string | null; action: string; at: string };
+    const audit: A[] = [];
+    for (let a = 0; ; a += 1000) {
+      const { data, error } = await db.from("crm_audit").select("by_user, action, at")
+        .order("at", { ascending: false }).range(a, a + 999);
+      if (error) throw new Error(error.message);
+      audit.push(...((data ?? []) as A[]));
+      if (!data || data.length < 1000 || audit.length >= 50000) break;
+    }
+
+    const { data: profs } = await db.from("profile").select("id, full_name, email");
+    const nameOf = new Map((profs ?? []).map((p) => [String(p.id), String(p.full_name || p.email || p.id)]));
+
+    type RowAgg = { name: string; total: number; last30: number; ai: Record<string, number>; costInr: number; costInr30: number };
+    const byUser = new Map<string, RowAgg>();
+    let system = 0;
+    for (const a of audit) {
+      const key = a.by_user ? String(a.by_user) : "system";
+      if (key === "system") { system++; continue; }
+      const r = byUser.get(key) ?? { name: nameOf.get(key) ?? key.slice(0, 8), total: 0, last30: 0, ai: {}, costInr: 0, costInr30: 0 };
+      r.total++;
+      const recent = a.at >= since30;
+      if (recent) r.last30++;
+      if (AI_ACTIONS.includes(a.action)) {
+        r.ai[a.action] = (r.ai[a.action] || 0) + 1;
+        r.costInr += COST_INR[a.action];
+        if (recent) r.costInr30 += COST_INR[a.action];
+      }
+      byUser.set(key, r);
+    }
+    const rows = [...byUser.values()].sort((x, y) => y.last30 - x.last30);
+    const totals = rows.reduce((t, r) => ({
+      actions: t.actions + r.total, last30: t.last30 + r.last30,
+      costInr: t.costInr + r.costInr, costInr30: t.costInr30 + r.costInr30,
+    }), { actions: 0, last30: 0, costInr: 0, costInr30: 0 });
+
+    return NextResponse.json({
+      rows, totals, systemActions: system, sampled: audit.length,
+      note: "Counted from the CRM audit trail (the trail every click leaves). AI runs costed at per-run estimates: EVA ₹85, Ask Genie ₹8, Situational ₹6, Letter ₹4 — approximations. Apollo consumes Apollo credits, not API money.",
+    });
+  } catch (e) {
+    return errJson(e);
+  }
+}
