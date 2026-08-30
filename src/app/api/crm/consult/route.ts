@@ -57,12 +57,76 @@ async function recordBrief(db: ReturnType<typeof crmDb>, tt: string, tid: string
   return "";
 }
 
+/** Labels for the owner's collated view — one query per target type. */
+async function targetLabels(db: ReturnType<typeof crmDb>, pairs: { target_type: string; target_id: string }[]) {
+  const COLS: Record<string, string> = {
+    company: "name", person: "full_name", opportunity: "name", quotation: "quote_no",
+    sales_order: "so_no", industry: "name", product: "name",
+  };
+  const out = new Map<string, string>();
+  const byType = new Map<string, Set<string>>();
+  for (const p of pairs) {
+    if (!byType.has(p.target_type)) byType.set(p.target_type, new Set());
+    byType.get(p.target_type)!.add(p.target_id);
+  }
+  for (const [tt, ids] of byType) {
+    const col = COLS[tt];
+    if (!col) continue;
+    const { data } = await db.from(tt).select(`id, ${col}`).in("id", [...ids]);
+    for (const r of (data ?? []) as unknown as Record<string, unknown>[]) out.set(`${tt}:${r.id}`, String(r[col] ?? ""));
+  }
+  return out;
+}
+
 export async function GET(req: Request) {
   try {
     const me = await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
     const u = new URL(req.url);
+
+    // the owner's reading room — every consultation, everyone's
+    if (u.searchParams.get("all") === "1") {
+      if (me.email.toLowerCase() !== "raghu@nandan.co.in") throw new HttpError(403, "Dr Raghu's eyes alone.");
+      const one = String(u.searchParams.get("chat_id") || "");
+      if (one) {
+        const { data: msgs } = await db.from("consult_msg").select("role, content, at")
+          .eq("chat_id", one).order("at").limit(200);
+        return NextResponse.json({ messages: msgs ?? [] });
+      }
+      const { data: chats } = await db.from("consult_chat")
+        .select("id, profile_id, target_type, target_id, started_at")
+        .order("started_at", { ascending: false }).limit(300);
+      const rows = chats ?? [];
+      const profIds = [...new Set(rows.map((c) => String(c.profile_id)))];
+      const names = new Map<string, string>();
+      if (profIds.length) {
+        const { data: profs } = await db.from("profile").select("id, full_name").in("id", profIds);
+        for (const p of profs ?? []) names.set(String(p.id), String(p.full_name));
+      }
+      const labels = await targetLabels(db, rows);
+      const counts = new Map<string, { n: number; last: string }>();
+      if (rows.length) {
+        const { data: ms } = await db.from("consult_msg").select("chat_id, at")
+          .in("chat_id", rows.map((c) => c.id)).order("at");
+        for (const m of ms ?? []) {
+          const cur = counts.get(String(m.chat_id)) ?? { n: 0, last: "" };
+          cur.n++; cur.last = String(m.at);
+          counts.set(String(m.chat_id), cur);
+        }
+      }
+      return NextResponse.json({
+        chats: rows.map((c) => ({
+          id: c.id, started_at: c.started_at,
+          who: names.get(String(c.profile_id)) ?? "—",
+          target_type: c.target_type, target_id: c.target_id,
+          target: labels.get(`${c.target_type}:${c.target_id}`) || c.target_type,
+          messages: counts.get(String(c.id))?.n ?? 0,
+          last_at: counts.get(String(c.id))?.last ?? c.started_at,
+        })),
+      });
+    }
+
     const tt = String(u.searchParams.get("target_type") || "");
     const tid = String(u.searchParams.get("target_id") || "");
     if (!TARGETS.includes(tt) || !tid) throw new HttpError(400, "Which record?");
@@ -70,8 +134,10 @@ export async function GET(req: Request) {
       .eq("profile_id", me.profileId).eq("target_type", tt).eq("target_id", tid)
       .order("started_at", { ascending: false }).limit(1).maybeSingle();
     if (!chat) return NextResponse.json({ chat_id: null, messages: [] });
-    const { data: msgs } = await db.from("consult_msg").select("role, content, at")
-      .eq("chat_id", chat.id).order("at").limit(60);
+    let msgs: unknown[] | null = (await db.from("consult_msg").select("role, content, at, files")
+      .eq("chat_id", chat.id).order("at").limit(60)).data;
+    if (!msgs) msgs = (await db.from("consult_msg").select("role, content, at")
+      .eq("chat_id", chat.id).order("at").limit(60)).data;
     return NextResponse.json({ chat_id: chat.id, messages: msgs ?? [] });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -92,8 +158,11 @@ export async function POST(req: Request) {
     const tid = String(body.target_id || "");
     if (!TARGETS.includes(tt) || !tid) throw new HttpError(400, "Which record?");
     const opening = body.message === "__open__";
+    const files = (Array.isArray(body.files) ? body.files : [])
+      .map((f: { name?: unknown; path?: unknown }) => ({ name: String(f.name || "file").slice(0, 120), path: String(f.path || "") }))
+      .filter((f: { path: string }) => f.path.startsWith("note/consult/")).slice(0, 4);
     const message = opening ? "(The salesperson has just sat down at your desk with this record open. Open the consultation.)" : String(body.message || "").trim();
-    if (!message) throw new HttpError(400, "Say something.");
+    if (!message && !files.length) throw new HttpError(400, "Say something.");
 
     let chatId = String(body.chat_id || "");
     if (!chatId) {
@@ -118,6 +187,27 @@ export async function POST(req: Request) {
     const { data: history } = await db.from("consult_msg").select("role, content")
       .eq("chat_id", chatId).order("at").limit(24);
 
+    // attachments ride to the advisor: images and PDFs whole, text inline
+    type Block = { type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: "image/jpeg" | "image/png" | "image/gif" | "image/webp"; data: string } } | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string } };
+    const blocks: Block[] = [];
+    for (const f of files) {
+      try {
+        const { data: blob } = await db.storage.from("cards").download(f.path);
+        if (!blob) { blocks.push({ type: "text", text: `[Attached file "${f.name}" could not be read]` }); continue; }
+        const buf = Buffer.from(await blob.arrayBuffer());
+        const ext = f.name.toLowerCase().split(".").pop() || "";
+        const IMG: Record<string, "image/jpeg" | "image/png" | "image/gif" | "image/webp"> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp" };
+        if (IMG[ext] && buf.length <= 5 * 1024 * 1024) blocks.push({ type: "image", source: { type: "base64", media_type: IMG[ext], data: buf.toString("base64") } });
+        else if (ext === "pdf" && buf.length <= 10 * 1024 * 1024) blocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: buf.toString("base64") } });
+        else if (["txt", "md", "csv", "html", "json"].includes(ext)) blocks.push({ type: "text", text: `[Attached file "${f.name}"]:
+${buf.toString("utf8").slice(0, 20000)}` });
+        else blocks.push({ type: "text", text: `[The salesperson attached "${f.name}" — a file type you cannot open. Ask about it if it matters.]` });
+      } catch { blocks.push({ type: "text", text: `[Attached file "${f.name}" could not be read]` }); }
+    }
+    const userContent: string | Block[] = blocks.length
+      ? [...blocks, { type: "text" as const, text: message || `(Attached: ${files.map((f: { name: string }) => f.name).join(", ")})` }]
+      : message;
+
     const firstName = String(me.displayName || me.email.split("@")[0]).trim().split(/\s+/)[0];
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const msg = await anthropic.messages.create({
@@ -133,17 +223,50 @@ export async function POST(req: Request) {
 The record on the desk: ${brief || "(none loaded)"}`,
       messages: [
         ...((history ?? []) as { role: "user" | "assistant"; content: string }[]).map((h) => ({ role: h.role, content: h.content })),
-        { role: "user" as const, content: message },
+        { role: "user" as const, content: userContent },
       ],
     });
     const reply = msg.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
     if (!reply) throw new HttpError(502, "The chair went quiet — say that again.");
 
     // every word both ways is KEPT
-    await db.from("consult_msg").insert([
-      { chat_id: chatId, role: "user", content: message },
+    const storedUser = message || `(Attached: ${files.map((f: { name: string }) => f.name).join(", ")})`;
+    const ins = await db.from("consult_msg").insert([
+      { chat_id: chatId, role: "user", content: storedUser, files: files.length ? files : null },
       { chat_id: chatId, role: "assistant", content: reply },
-    ]).then(() => null, () => null);
+    ]);
+    if (ins.error) // pre-0045: no files column yet — the words still land
+      await db.from("consult_msg").insert([
+        { chat_id: chatId, role: "user", content: storedUser },
+        { chat_id: chatId, role: "assistant", content: reply },
+      ]).then(() => null, () => null);
+
+    // "Can the discussion be in the notes of that transaction?" (Dr Raghu,
+    // 30 Aug 2026) — the chat maintains ONE note on its record, rewritten
+    // after every exchange. Best-effort: the consultation never fails on it.
+    try {
+      const { data: allMsgs } = await db.from("consult_msg").select("role, content")
+        .eq("chat_id", chatId).order("at").limit(200);
+      const transcript = (allMsgs ?? [])
+        .filter((m) => !String(m.content).startsWith("(The salesperson has just sat down"))
+        .map((m) => `${m.role === "user" ? firstName : "Raghu"}: ${m.content}`)
+        .join("\n\n").slice(0, 20000);
+      if (transcript) {
+        const { data: chatRow } = await db.from("consult_chat").select("note_id").eq("id", chatId).maybeSingle();
+        if (chatRow?.note_id) {
+          await db.from("note").update({ body: transcript }).eq("id", chatRow.note_id);
+        } else if (chatRow) {
+          const { data: note } = await db.from("note").insert({
+            title: `Consult Raghu — ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}`,
+            body: transcript, created_by: me.profileId,
+          }).select("id").single();
+          if (note) {
+            await db.from("record_link").insert({ source_type: "note", source_id: note.id, target_type: tt, target_id: tid }).then(() => null, () => null);
+            await db.from("consult_chat").update({ note_id: note.id }).eq("id", chatId);
+          }
+        }
+      }
+    } catch { /* pre-0045, or a notes hiccup — the chat itself is untouched */ }
 
     return NextResponse.json({ chat_id: chatId, reply });
   } catch (e) {

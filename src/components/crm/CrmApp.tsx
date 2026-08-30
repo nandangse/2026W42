@@ -6035,10 +6035,13 @@ function IfsTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
 function ConsultRaghuModal({ targetType, targetId, title, onClose }: {
   targetType: string; targetId: string; title: string; onClose: () => void;
 }) {
-  type M = { role: "user" | "assistant"; content: string };
+  type M = { role: "user" | "assistant"; content: string; files?: { name: string }[] | null };
   const [msgs, setMsgs] = useState<M[] | null>(null);
   const [chatId, setChatId] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const [pend, setPend] = useState<{ name: string; path: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [listening, setListening] = useState(false);
@@ -6046,12 +6049,12 @@ function ConsultRaghuModal({ targetType, targetId, title, onClose }: {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => { scrollRef.current?.scrollTo({ top: 999999, behavior: "smooth" }); }, [msgs, busy]);
 
-  const send = useCallback(async (text: string, cid: string | null) => {
+  const send = useCallback(async (text: string, cid: string | null, files?: { name: string; path: string }[]) => {
     setBusy(true); setErr("");
     try {
       const r = await fetch("/api/crm/consult", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ chat_id: cid, target_type: targetType, target_id: targetId, message: text }),
+        body: JSON.stringify({ chat_id: cid, target_type: targetType, target_id: targetId, message: text, files: files ?? [] }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "The chair went quiet");
@@ -6096,12 +6099,27 @@ function ConsultRaghuModal({ targetType, targetId, title, onClose }: {
     recRef.current = rec; setListening(true); rec.start();
   };
 
+  const attach = async (f: File) => {
+    setUploading(true); setErr("");
+    try {
+      const fd = new FormData();
+      fd.set("target_type", "consult"); fd.set("target_id", targetId); fd.set("file", f);
+      const r = await fetch("/api/crm/opp-attach", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Upload failed");
+      const path = new URLSearchParams(String(j.url).split("?")[1] || "").get("path") || "";
+      setPend((p) => [...p, { name: f.name, path }]);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setUploading(false); }
+  };
+
   const submit = () => {
     const text = input.trim();
-    if (!text || busy) return;
-    setMsgs((cur) => [...(cur ?? []), { role: "user", content: text }]);
-    setInput("");
-    void send(text, chatId);
+    if ((!text && !pend.length) || busy) return;
+    const files = pend;
+    setMsgs((cur) => [...(cur ?? []), { role: "user", content: text || `(Attached: ${files.map((f) => f.name).join(", ")})`, files }]);
+    setInput(""); setPend([]);
+    void send(text, chatId, files);
   };
 
   return (
@@ -6127,13 +6145,35 @@ function ConsultRaghuModal({ targetType, targetId, title, onClose }: {
                 border: m.role === "user" ? "none" : `1px solid ${BORDER}`,
               }}>
                 {m.content}
+                {!!m.files?.length && (
+                  <div className="mt-1 flex gap-1 flex-wrap">
+                    {m.files.map((f, k) => (
+                      <span key={k} className="rounded px-1.5 py-0.5 text-xs" style={{ background: m.role === "user" ? "rgba(255,255,255,.18)" : "#EFEDE7" }}>📎 {f.name}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}
           {busy && <div className="text-xs" style={{ color: MUTED }}>Raghu is thinking…</div>}
           {err && <div className="rounded p-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
         </div>
-        <div className="flex gap-1.5 items-end p-2.5" style={{ borderTop: `1px solid ${BORDER}` }}>
+        {(pend.length > 0 || uploading) && (
+          <div className="flex gap-1.5 flex-wrap px-2.5 pt-2" style={{ borderTop: `1px solid ${BORDER}` }}>
+            {pend.map((f, i) => (
+              <span key={i} className="rounded border px-2 py-0.5 text-xs flex items-center gap-1" style={{ borderColor: BORDER, background: "#FAF9F5" }}>
+                📎 {f.name}
+                <button onClick={() => setPend((p) => p.filter((_, k) => k !== i))} style={{ color: MUTED }}>✕</button>
+              </span>
+            ))}
+            {uploading && <span className="text-xs" style={{ color: MUTED }}>uploading…</span>}
+          </div>
+        )}
+        <div className="flex gap-1.5 items-end p-2.5" style={{ borderTop: pend.length > 0 || uploading ? "none" : `1px solid ${BORDER}` }}>
+          <input ref={fileRef} type="file" multiple style={{ display: "none" }}
+            onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) void attach(f); e.target.value = ""; }} />
+          <button onClick={() => fileRef.current?.click()} title="Attach a file — an email, a drawing, a PDF; Raghu reads images and PDFs himself"
+            className="rounded px-2.5 py-2 text-sm" style={{ background: "#EFEDE7" }}>📎</button>
           <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
             placeholder="Tell him what's on your mind… (Enter sends, Shift+Enter for a new line)"
@@ -6142,8 +6182,8 @@ function ConsultRaghuModal({ targetType, targetId, title, onClose }: {
             className="rounded px-2.5 py-2 text-sm" style={{ background: listening ? "#B3261E" : "#EFEDE7" }}>
             {listening ? "⏹" : "🎤"}
           </button>
-          <button onClick={submit} disabled={busy || !input.trim()}
-            className="rounded px-3 py-2 text-sm font-bold text-white" style={{ background: busy || !input.trim() ? "#B9BEC4" : ORANGE }}>
+          <button onClick={submit} disabled={busy || (!input.trim() && !pend.length)}
+            className="rounded px-3 py-2 text-sm font-bold text-white" style={{ background: busy || (!input.trim() && !pend.length) ? "#B9BEC4" : ORANGE }}>
             ➤
           </button>
         </div>

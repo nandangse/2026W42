@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.31",
+    date: "2026-08-30",
+    module: "CRM — the consultation files itself; attachments; the reading room",
+    items: [
+      "Three asks in one breath (Dr Raghu, 30 Aug 2026): every Consult Raghu conversation now writes itself into the record's Notes as one living note, rewritten after each exchange — the discussion stays with the transaction. The chat gains 📎: attach an email, a drawing, a PDF — Raghu reads images and PDFs himself, plain-text files inline. And Settings → Consult Raghu grows the reading room — every conversation across the team, newest first, click to read whole. Dr Raghu's eyes alone. CRM migration 0045 carries the note pointer and the files column.",
+    ],
+  },
+  {
     v: "3.31.1.30",
     date: "2026-08-30",
     module: "CRM — Consult Raghu takes his chair at every record",

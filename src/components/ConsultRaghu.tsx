@@ -201,6 +201,64 @@ export function ConsultRaghuPanel() {
           ))}
         </div>
       )}
+      <DiscussionsPanel />
+    </div>
+  );
+}
+
+/** "where can i see all the collated discussions?" (Dr Raghu, 30 Aug 2026) —
+ *  every Consult Raghu conversation across the team, his eyes alone. */
+function DiscussionsPanel() {
+  type ChatRow = { id: string; who: string; target_type: string; target: string; messages: number; last_at: string; started_at: string };
+  const [chats, setChats] = useState<ChatRow[] | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [thread, setThread] = useState<{ role: string; content: string }[] | null>(null);
+  useEffect(() => {
+    fetch("/api/crm/consult?all=1", { cache: "no-store" }).then((r) => r.json())
+      .then((j) => setChats(j.chats ?? [])).catch(() => setChats([]));
+  }, []);
+  const read = async (id: string) => {
+    if (open === id) { setOpen(null); return; }
+    setOpen(id); setThread(null);
+    try {
+      const j = await (await fetch(`/api/crm/consult?all=1&chat_id=${id}`, { cache: "no-store" })).json();
+      setThread((j.messages ?? []).filter((m: { content: string }) => !m.content.startsWith("(The salesperson has just sat down")));
+    } catch { setThread([]); }
+  };
+  const TT: Record<string, string> = { opportunity: "Opportunity", quotation: "Quotation", sales_order: "Sales Order", company: "Company", person: "Contact", industry: "Industry", product: "Product" };
+  return (
+    <div className="mt-4 rounded border p-3" style={{ borderColor: BORDER, background: "#fff" }}>
+      <div className="font-bold text-sm mb-1">💬 The discussions — everything the team told Raghu</div>
+      <div className="text-xs mb-3" style={{ color: MUTED, maxWidth: "90ch", lineHeight: 1.5 }}>
+        Every Consult Raghu conversation, newest first. Click one to read it whole. This is the raw material —
+        what people are actually thinking at the deal.
+      </div>
+      {chats === null && <div className="text-sm" style={{ color: MUTED }}>loading…</div>}
+      {chats !== null && chats.length === 0 && <div className="text-sm" style={{ color: MUTED }}>No consultations yet.</div>}
+      {(chats ?? []).map((c) => (
+        <div key={c.id} className="mb-1.5">
+          <button onClick={() => void read(c.id)} className="w-full text-left rounded border px-3 py-2 text-sm flex items-center gap-2 flex-wrap"
+            style={{ borderColor: open === c.id ? ORANGE : BORDER, background: open === c.id ? "#FFFDF9" : "#fff" }}>
+            <span className="font-semibold">{c.who}</span>
+            <span style={{ color: MUTED }}>on</span>
+            <span className="font-semibold">{c.target}</span>
+            <span className="text-xs rounded px-1.5 py-0.5" style={{ background: "#EFEDE7", color: "#5A6672" }}>{TT[c.target_type] ?? c.target_type}</span>
+            <span className="ml-auto text-xs tnum" style={{ color: MUTED }}>
+              {c.messages} msg · {new Date(c.last_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}
+            </span>
+          </button>
+          {open === c.id && (
+            <div className="rounded-b border border-t-0 p-2.5" style={{ borderColor: ORANGE, background: "#FFFDF9" }}>
+              {thread === null && <div className="text-xs" style={{ color: MUTED }}>reading…</div>}
+              {(thread ?? []).map((m, i) => (
+                <div key={i} className="text-sm mb-1.5" style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                  <span className="font-bold">{m.role === "user" ? c.who.split(" ")[0] : "Raghu"}:</span> {m.content}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

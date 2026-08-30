@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  *   GET  /api/crm/notes?target_type=company&target_id=<uuid>
  *   POST /api/crm/notes { target_type, target_id, body, title? }
  */
-const TARGETS = ["company", "person", "lead", "opportunity", "quotation", "installed_unit", "product"];
+const TARGETS = ["company", "person", "lead", "opportunity", "quotation", "installed_unit", "product", "sales_order", "industry"];
 
 export async function GET(req: Request) {
   try {
