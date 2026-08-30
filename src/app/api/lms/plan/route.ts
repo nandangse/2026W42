@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -61,6 +62,7 @@ const SCHEMA = {
 
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     const user = await requireUser();
     const admin = adminClient();
     const body = await req.json().catch(() => ({}));

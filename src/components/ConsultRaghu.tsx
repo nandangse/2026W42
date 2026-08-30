@@ -34,6 +34,7 @@ export function GenieUsagePanel() {
   return (
     <div className="bg-white rounded-lg border p-3" style={{ borderColor: BORDER }}>
       <div className="font-bold text-sm mb-1">🧞 Genie — who uses it, and what the AI costs</div>
+      <AiMasterSwitch />
       <div className="text-xs mb-3" style={{ color: MUTED, maxWidth: "90ch", lineHeight: 1.5 }}>{note}</div>
       {err && <div className="text-sm" style={{ color: "#B3261E" }}>{err}</div>}
       {rows === null && !err && <div className="text-sm" style={{ color: MUTED }}>reading the trail…</div>}
@@ -335,6 +336,51 @@ function DiscussionsPanel() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** "stop all the genie on planning and crm also" (Dr Raghu, 30 Aug 2026) —
+ *  the owner's master switch over every AI feature in the whole app. */
+function AiMasterSwitch() {
+  const [paused, setPaused] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    fetch("/api/app-settings", { cache: "no-store" }).then((r) => r.json())
+      .then((j) => setPaused(!!j.ai_paused)).catch(() => setPaused(false));
+  }, []);
+  const flip = async () => {
+    if (paused === null || busy) return;
+    setBusy(true); setMsg("");
+    try {
+      const r = await fetch("/api/app-settings", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ai_paused: !paused }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not flip the switch");
+      setPaused(!paused);
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="rounded border p-2.5 mb-3 flex items-center gap-3 flex-wrap" style={{ borderColor: paused ? "#B3261E" : BORDER, background: paused ? "#FBEDEA" : "#F6FBF7" }}>
+      <div>
+        <div className="text-sm font-bold" style={{ color: paused ? "#8E2C20" : "#1A7F4E" }}>
+          {paused === null ? "…" : paused ? "⏻ Genie AI is PAUSED — everywhere" : "⏻ Genie AI is ON"}
+        </div>
+        <div className="text-xs" style={{ color: MUTED, maxWidth: "70ch" }}>
+          One switch over every AI feature across Planning, CRM, HRMS, LMS, Kuber, Vishwakarma and the playbooks —
+          nothing spends a rupee of API money while it is paused. Your hand alone.
+        </div>
+      </div>
+      <button onClick={flip} disabled={busy || paused === null}
+        className="ml-auto rounded px-4 py-2 text-sm font-black text-white"
+        style={{ background: paused ? "#1A7F4E" : "#B3261E" }}>
+        {busy ? "…" : paused ? "TURN AI ON" : "PAUSE ALL AI"}
+      </button>
+      {msg && <div className="text-xs w-full" style={{ color: "#8E2C20" }}>{msg}</div>}
     </div>
   );
 }

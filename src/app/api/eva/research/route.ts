@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -21,6 +22,7 @@ export const maxDuration = 300; // web research can take a few minutes
 
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     const user = await requireUser();
     if (!(await resolveSalesAccess(adminClient(), user.id, user.isOwner, user.role)))
       throw new HttpError(403, "Sales Genie has not been shared with this account");

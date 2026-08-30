@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireVishwakarma } from "@/lib/vishwakarma";
@@ -50,6 +51,7 @@ const RAGHU =
 
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     const user = await requireVishwakarma();
     const key = process.env.ANTHROPIC_API_KEY;
     if (!key) throw new HttpError(503, "ANTHROPIC_API_KEY is not set — Genie cannot answer yet.");

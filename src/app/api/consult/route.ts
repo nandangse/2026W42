@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import { requireReader, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { throughputOf } from "@/lib/delivered";
@@ -23,6 +24,7 @@ const MODEL = "claude-sonnet-4-5-20250929";
 
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     await requireReader();
     const key = process.env.ANTHROPIC_API_KEY;
     if (!key)

@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.41",
+    date: "2026-08-30",
+    module: "Genie — the AI master switch",
+    items: [
+      "\"stop all the genie on planning and crm also\" (Dr Raghu, 30 Aug 2026) — Settings → Genie now opens with one owner-held switch over every AI feature in the whole app: Consult Dr Raghu on both sides, EVA, Ask Genie, Situational, letters, deal scores, IDPs, LMS plans, playbooks, voice notes — 22 doors, one hand. While paused, nothing spends a rupee of API money and every door says so politely. Genie migration 0106 carries the flag.",
+    ],
+  },
+  {
     v: "3.31.1.40",
     date: "2026-08-30",
     module: "Planning — User management stands up straight",

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser, requireAdmin, errJson } from "@/lib/auth";
+import { requireUser, requireAdmin, requireOwner, errJson } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,13 @@ export async function GET() {
         .from("app_settings").select("delivered_targets").eq("id", true).maybeSingle();
       if (!te) delivered_targets = t?.delivered_targets ?? null;
     }
+    let ai_paused = false;
+    try {
+      const { data: ap } = await adminClient().from("app_settings").select("ai_paused").eq("id", true).maybeSingle();
+      ai_paused = !!(ap as { ai_paused?: boolean } | null)?.ai_paused;
+    } catch { /* pre-0106 */ }
     return NextResponse.json({
+      ai_paused,
       app_name: data?.app_name || "Genie",
       theme_name: data?.theme_name || "Nandan Breakthrough 2026-27",
       logo_url: data?.logo_url || null,
@@ -39,7 +45,10 @@ export async function POST(req: Request) {
   try {
     const user = await requireAdmin();
     const body = await req.json();
+    // the AI master switch is the owner's hand alone (Dr Raghu, 30 Aug 2026)
+    if ("ai_paused" in body) await requireOwner();
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString(), updated_by: user.id };
+    if ("ai_paused" in body) patch.ai_paused = !!body.ai_paused;
     if ("app_name" in body) {
       const v = String(body.app_name || "").trim();
       if (!v) return NextResponse.json({ error: "App name can't be empty" }, { status: 400 });

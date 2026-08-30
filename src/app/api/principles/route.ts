@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import { requireReader, requireOwner, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -68,6 +69,7 @@ export async function GET() {
  */
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     const user = await requireOwner();
     const admin = adminClient();
     const body = await req.json();

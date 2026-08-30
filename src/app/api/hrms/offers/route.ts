@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables } from "@/lib/hrms";
@@ -144,6 +145,7 @@ async function readResume(buf: Buffer, mime: string, filename: string): Promise<
 
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     const me = await requireHrms();
     const admin = adminClient();
     const stamp = me.initials ? `${me.initials} · ${me.email}` : me.email;

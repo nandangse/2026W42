@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import { requireUser, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, splitMulti, FIELD_GROUPS, fieldSpec } from "@/lib/hrms";
@@ -353,6 +354,7 @@ async function polishSpoken(email: string, text: string): Promise<string> {
  */
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     const u = await requireUser();
     const admin = adminClient();
 

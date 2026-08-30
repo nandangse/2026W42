@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
@@ -19,6 +20,7 @@ export const maxDuration = 300; // web research takes minutes
  */
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     const user = await requireCrm();
     if (!process.env.ANTHROPIC_API_KEY)
       throw new HttpError(503, "Server is missing ANTHROPIC_API_KEY — add it in the Vercel env vars.");

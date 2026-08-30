@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import { requireUser, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { teamOf } from "@/lib/team";
@@ -180,6 +181,7 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     const u = await requireUser();
     const { admin, members } = await gate(u);
     const emails = members.map((m) => String(m.email).toLowerCase());

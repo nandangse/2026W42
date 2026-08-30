@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireReader, errJson, HttpError } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -200,6 +201,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     const user = await requireReader();
     // The cache below is free to read for anyone; GENERATING is what costs,
     // and generating is MC and Stratcom's alone while Genie is paused.

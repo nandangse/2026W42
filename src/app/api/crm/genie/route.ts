@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
@@ -37,6 +38,7 @@ type Row = Record<string, unknown>;
 
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     if (!process.env.ANTHROPIC_API_KEY)

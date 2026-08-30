@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireOwner, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -46,6 +47,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     const me = await requireOwner();
     if (!process.env.ANTHROPIC_API_KEY)
       throw new HttpError(503, "Server is missing ANTHROPIC_API_KEY.");

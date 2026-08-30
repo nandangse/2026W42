@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { NextResponse as NR } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
@@ -417,6 +418,7 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     const me = await requireHrms();
     const admin = adminClient();
     const body = await req.json();

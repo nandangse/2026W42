@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import { requireReader, requireTasker, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { today } from "@/lib/schedule";
@@ -71,6 +72,7 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
   try {
+    await assertAiOn();
     const user = await requireTasker();
     const admin = adminClient();
     const form = await req.formData();
