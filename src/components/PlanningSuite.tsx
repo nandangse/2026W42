@@ -8550,6 +8550,7 @@ function ConsultRaghu() {
   const [turns, setTurns] = useState<{ q: string; a: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [started, setStarted] = useState(false);
 
   const SUGGESTIONS = [
     "What should we finish this week to move the number most?",
@@ -8569,14 +8570,48 @@ function ConsultRaghu() {
     setBusy(false);
   };
 
+  // "put the consult Raghu there in large letters. On clicking the start,
+  // put some instructions there as to what can be done. and then lets go
+  // with the flow" (Dr Raghu, 30 Aug 2026)
+  if (!started) {
+    return (
+      <div className="p-4 flex flex-col items-center" style={{ maxWidth: 900, margin: "0 auto", paddingTop: 56 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/consult-raghu.png" alt="Consult Raghu" style={{ width: 120, height: 120, borderRadius: "50%", objectFit: "cover", border: "4px solid #E8600A", boxShadow: "0 8px 28px rgba(27,45,107,.25)" }} />
+        <div className="font-black mt-4" style={{ color: "#16232F", fontSize: 46, letterSpacing: 1, lineHeight: 1.1, textAlign: "center" }}>
+          CONSULT RAGHU
+        </div>
+        <div className="text-sm mt-2 mb-6" style={{ color: "#5A6672", textAlign: "center", maxWidth: "56ch", lineHeight: 1.6 }}>
+          Sit down with the boss. He has today&apos;s live board in front of him — every job, every date, every escalation.
+        </div>
+        <button onClick={() => setStarted(true)} className="rounded-lg px-10 py-3 font-black text-white"
+          style={{ background: "#E8600A", fontSize: 20, letterSpacing: 1, boxShadow: "0 4px 16px rgba(232,96,10,.35)" }}>
+          START
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4" style={{ maxWidth: 900 }}>
-      <h2 className="font-bold text-lg" style={{ color: "#16232F" }}>Consult Raghu</h2>
-      <p className="text-xs mb-3" style={{ color: "#5A6672", lineHeight: 1.6 }}>
-        Ask about the work in front of you. Every question goes with today&apos;s live board — the jobs, what is
-        late, what is kitted and not moving, and every open escalation — so the answer names jobs rather than
-        offering advice. It will say when the board does not answer the question rather than inventing a date.
-      </p>
+      <div className="flex items-center gap-3 mb-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/consult-raghu.png" alt="" style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: "2px solid #E8600A" }} />
+        <h2 className="font-black" style={{ color: "#16232F", fontSize: 28, letterSpacing: 0.5 }}>CONSULT RAGHU</h2>
+      </div>
+
+      {turns.length === 0 && (
+        <div className="rounded-lg border p-3 mb-3" style={{ borderColor: "#E8600A", background: "#FFFDF9" }}>
+          <div className="text-xs font-bold mb-1.5" style={{ color: "#16232F" }}>WHAT YOU CAN DO HERE</div>
+          <ul className="text-xs" style={{ color: "#22303C", lineHeight: 1.7, paddingLeft: 18, listStyle: "disc" }}>
+            <li><b>Ask about the work in front of you</b> — every question goes with today&apos;s live board: the jobs, what is late, what is kitted and not moving, and every open escalation.</li>
+            <li><b>Get names, not advice</b> — the answer says &ldquo;chase 2114 and 2560&rdquo; rather than &ldquo;follow up on overdue jobs&rdquo;. If the board doesn&apos;t answer the question, it says so instead of inventing a date.</li>
+            <li><b>Ask the money questions</b> — what to finish this week to move the number most, the single biggest risk to this month&apos;s delivery, which escalations are really one problem.</li>
+            <li><b>Keep asking</b> — each answer stacks below; follow up as many times as the situation needs.</li>
+            <li><b>On a deal?</b> His face also sits on every CRM record — Opportunity, Quotation, Company and the rest. Click it there and he consults on that specific deal, attachments and all.</li>
+          </ul>
+        </div>
+      )}
 
       <div className="flex gap-2 mb-2">
         <input

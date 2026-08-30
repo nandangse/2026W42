@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.33",
+    date: "2026-08-30",
+    module: "Planning — Consult Raghu gets his door",
+    items: [
+      "The Consult Raghu tab opens on his face and his name in large letters with one START button (Dr Raghu, 30 Aug 2026). Click START and the instructions lay out what can be done — ask about today's board, get job numbers not advice, keep asking — and then the flow begins. The instruction card steps aside after the first answer.",
+    ],
+  },
+  {
     v: "3.31.1.32",
     date: "2026-08-30",
     module: "Genie — Consult Raghu joins the usage ledger",
