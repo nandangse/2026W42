@@ -422,6 +422,13 @@ export default function CrmApp({
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            {/* the way home, visible — not only behind the account menu
+                (Dr Raghu, 29 Aug 2026: "back to genie button has disappeared") */}
+            <a href="/" className="rounded-full border px-3 flex items-center gap-1 font-bold flex-shrink-0"
+              title="Back to Main Genie"
+              style={{ height: 34, borderColor: BORDER, background: "#fff", color: NAVY, fontSize: 12.5, textDecoration: "none" }}>
+              🧞 Genie
+            </a>
             {/* the Prospecting Queue, folded into the top bar like a bell */}
             <div style={{ position: "relative" }}>
               <button

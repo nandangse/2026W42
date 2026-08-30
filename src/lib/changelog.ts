@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.45",
+    date: "2026-08-29",
+    module: "CRM — the way home, visible",
+    items: [
+      "A 🧞 GENIE button stands on the CRM top bar beside the ☎ (Dr Raghu, 29 Aug 2026) — one click back to Main Genie, no longer only behind the account menu.",
+    ],
+  },
+  {
     v: "3.31.0.44",
     date: "2026-08-29",
     module: "LMS — its own URLs, and a player with speed and full screen",
