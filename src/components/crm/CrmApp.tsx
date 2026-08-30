@@ -4122,6 +4122,9 @@ function RelatedTab({
   const [adding, setAdding] = useState(false);
   const [tick, setTick] = useState(0);
   const [apollo, setApollo] = useState("");
+  /** "in this also let me search!" (Dr Raghu, 31 Aug 2026) — 43 contacts on
+   *  one company is a list nobody scrolls twice. */
+  const [q, setQ] = useState("");
 
   useEffect(() => {
     if (filterValue === null) return;
@@ -4151,8 +4154,43 @@ function RelatedTab({
   // 2026: "on this page as well as in Companies show enrich with apollo")
   const apolloHere = slug === "person" && filterField === "company_id" && !!filterValue;
 
+  /**
+   * The search (Dr Raghu, 31 Aug 2026: "in this also let me search!").
+   *
+   * It reads every column the tab shows, and a linked column by the LABEL on
+   * screen rather than the uuid behind it — searching "Raghunandan" must find
+   * the row that reads Raghunandan, not fail because the cell holds a key.
+   * Filtering happens here rather than at the server: the tab already holds
+   * every row, so the list narrows as the letters land.
+   */
+  const allRows = rows;
+  const needle = q.trim().toLowerCase();
+  const shown = !needle ? allRows : allRows.filter((r) =>
+    fields.some((f) => {
+      const raw = r[f.name];
+      if (raw === null || raw === undefined || raw === "") return false;
+      const asLabel = f.link ? (links[f.link] || []).find((o) => o.id === String(raw))?.label : null;
+      return String(asLabel ?? raw).toLowerCase().includes(needle);
+    }));
+
   return (
     <div style={{ maxHeight: "calc(100vh - 260px)", overflow: "auto" }}>
+      {allRows.length > 5 && (
+        <div className="px-4 pt-3">
+          <input
+            value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder={`🔍 Search ${dt.plural.toLowerCase()} — ${fields.map((f) => f.label.toLowerCase()).slice(0, 4).join(", ")}…`}
+            className="px-2 py-1.5 rounded border text-sm"
+            style={{ borderColor: needle ? ORANGE : BORDER, width: "min(420px, 100%)" }}
+          />
+          {needle && (
+            <span className="text-xs ml-2" style={{ color: MUTED }}>
+              {shown.length} of {allRows.length}
+              {" · "}<button onClick={() => setQ("")} style={{ color: ORANGE, fontWeight: 700 }}>clear</button>
+            </span>
+          )}
+        </div>
+      )}
       {(addPresets || apolloHere) && (
         <div className="px-4 pt-3 flex items-center gap-2 flex-wrap">
           {addPresets && (
@@ -4198,10 +4236,12 @@ function RelatedTab({
           )}
         </div>
       )}
-      {!rows.length && (
-        <div className="p-6 text-sm" style={{ color: MUTED }}>No {dt.plural.toLowerCase()} here yet.</div>
+      {!shown.length && (
+        <div className="p-6 text-sm" style={{ color: MUTED }}>
+          {allRows.length ? `Nothing here matches “${q.trim()}”.` : `No ${dt.plural.toLowerCase()} here yet.`}
+        </div>
       )}
-      {rows.length > 0 && (
+      {shown.length > 0 && (
       <div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
@@ -4217,7 +4257,7 @@ function RelatedTab({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
+          {shown.map((r, i) => (
             <tr
               key={String(r.id ?? i)}
               onClick={() => onOpenLink(slug, String(r.id))}
@@ -4258,9 +4298,12 @@ function RelatedTab({
           ))}
         </tbody>
       </table>
-      {total > rows.length && (
+      {total > allRows.length && (
         <div className="p-3 text-xs" style={{ color: MUTED }}>
-          Showing {rows.length.toLocaleString("en-IN")} of {total.toLocaleString("en-IN")} — the full list lives on the {dt.plural} screen.
+          Showing {allRows.length.toLocaleString("en-IN")} of {total.toLocaleString("en-IN")} — the full list lives on the {dt.plural} screen.
+          {/* Said plainly: the box searches what this tab loaded, not the
+              whole table, so a miss here is not proof of absence. */}
+          {needle && <> The search reads these {allRows.length.toLocaleString("en-IN")} only.</>}
         </div>
       )}
       </div>

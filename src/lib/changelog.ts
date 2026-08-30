@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.0.1.3",
+    date: "2026-08-31",
+    module: "CRM — every record's own tabs can be searched",
+    items: [
+      "\"in this also let me search!\" (Dr Raghu, 31 Aug 2026) — a company with 43 contacts, 42 sales orders and 20 opportunities is three lists nobody scrolls twice. A search box now stands over every one of those tabs, appearing once a tab holds more than five rows, and it reads every column on screen: a contact by name, designation, email or phone; an order by its number; an opportunity by its subject.",
+      "A linked column is searched by the NAME you can see rather than the key behind it, so typing a salesperson's name finds their rows instead of failing against a uuid. The list narrows as the letters land, and where a tab shows only the first slice of a long list it now says so — the search reads what the tab loaded, and a miss there is not proof the record is absent.",
+    ],
+  },
+  {
     v: "4.0.1.2",
     date: "2026-08-31",
     module: "CRM — a quotation may stand on its own",
