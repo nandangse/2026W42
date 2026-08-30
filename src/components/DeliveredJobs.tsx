@@ -347,14 +347,19 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
           const req = (targetMo: number, done: number) => (leftM > 0.1 ? Math.max(0, targetMo * periodM - done) / leftM : null);
           const reqVal = req(tgt.value_cr * 1e7, totals.value);
           const reqTp = req(tgt.tp_cr * 1e7, totals.throughput);
-          const reqNos = tgt.nos ? req(tgt.nos, totals.nos) : null;
+          // the QUANTITY target derives itself (Dr Raghu, 30 Aug 2026): the
+          // value target over the last 12 months' average value per job —
+          // a hand-typed nos in the masters outranks the derivation
+          const avgJob = m12.perMonth && m12.perMonth.nos > 0 ? m12.perMonth.value / m12.perMonth.nos : 0;
+          const nosTarget = tgt.nos || (avgJob > 0 ? (tgt.value_cr * 1e7) / avgJob : null);
+          const reqNos = nosTarget ? req(nosTarget, totals.nos) : null;
           const Rw = ({ l, a, t, r, money }: { l: string; a: number; t: number | null; r: number | null; money?: boolean }) => (
             <tr>
               <td className="pr-2 py-0.5 font-bold" style={{ color: C.mute, fontSize: 10.5 }}>{l}</td>
               <td className="text-right px-1 py-0.5 tnum font-bold" style={{ color: C.ink }}>{money ? V(a) : a.toFixed(1)}</td>
-              <td className="text-right px-1 py-0.5 tnum" style={{ color: C.navy }}>{t != null ? (money ? V(t) : t.toFixed(1)) : "—"}</td>
+              <td className="text-right px-1 py-0.5 tnum" style={{ color: C.navy }}>{t != null ? (money ? V(t) : String(Math.ceil(t))) : "—"}</td>
               <td className="text-right pl-1 py-0.5 tnum font-bold" style={{ color: r == null ? C.faint : t != null && r > t ? "#B3261E" : C.green }}>
-                {r != null ? (money ? V(r) : r.toFixed(1)) : "—"}
+                {r != null ? (money ? V(r) : String(Math.ceil(r))) : "—"}
               </td>
             </tr>
           );
@@ -368,13 +373,13 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
                   </tr>
                 </thead>
                 <tbody>
-                  <Rw l="NOS" a={rr.nos} t={tgt.nos ?? null} r={reqNos} />
+                  <Rw l="NOS" a={rr.nos} t={nosTarget} r={reqNos} />
                   <Rw l="VALUE" a={rr.val} t={tgt.value_cr * 1e7} r={reqVal} money />
                   <Rw l="THROUGHPUT" a={rr.tp} t={tgt.tp_cr * 1e7} r={reqTp} money />
                 </tbody>
               </table>
               <div className="text-xs mt-0.5" style={{ color: C.faint, fontSize: 9.5 }}>
-                required = what each remaining month must deliver to end the period on target ({tgt.value_cr} Cr / {tgt.tp_cr} Cr a month — the settings&apos; numbers)
+                required = what each remaining month must deliver to end the period on target ({tgt.value_cr} Cr / {tgt.tp_cr} Cr a month, from the masters{avgJob > 0 && !tgt.nos ? ` · nos target = value target ÷ avg job value (${lakh(avgJob)}, last 12 months)` : ""})
               </div>
             </div>
           );

@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.60",
+    date: "2026-08-30",
+    module: "Run-rate box — the quantity target derives itself",
+    items: [
+      "The NOS TARGET now DERIVES ITSELF (Dr Raghu, 30 Aug 2026): the value target from the masters divided by the last 12 months' average value per job — so 10 Cr a month against a ~30 L average job says the target quantity out loud. A hand-typed nos in the masters outranks the derivation; target and required round UP to whole jobs, because 33.4 machines is not a thing a factory ships.",
+    ],
+  },
+  {
     v: "3.31.0.59",
     date: "2026-08-30",
     module: "Run-rate box — the NOS target joins",
