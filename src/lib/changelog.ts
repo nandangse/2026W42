@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.58",
+    date: "2026-08-30",
+    module: "Delivered Jobs — three submodules, Stratcom's door",
+    items: [
+      "DELIVERED JOBS wears THREE SUBMODULES now (Dr Raghu, 30 Aug 2026): DELIVERED JOBS (the headline numbers, the pipeline boxes and the job list), INSTALLATION JOBS (the machines standing at site with their money), and DELIVERED JOBS ANALYTICS (the run rate against target, averages, OTD and the breakdowns).",
+      "THE DOOR NARROWED TO STRATCOM: the workspace and its API now open for Stratcom alone — the Leadership Circle's wider key no longer turns it.",
+    ],
+  },
+  {
     v: "3.31.0.57",
     date: "2026-08-30",
     module: "Anticipated FY — the gap named for what it is",

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireLC, errJson } from "@/lib/auth";
+import { requireStratcom, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -29,7 +29,8 @@ const PAGE = 1000;
 
 export async function GET() {
   try {
-    await requireLC();
+    // STRATCOM ONLY (Dr Raghu, 30 Aug 2026) — narrowed from the LC
+    await requireStratcom();
     const db = supabaseServer();
 
     const rows: Record<string, unknown>[] = [];

@@ -399,7 +399,8 @@ export default function PlanningSuite({
    * The owner is in all three without anything being stored against him.
    */
   const groups = { lc, stratcom, management, isRaghu };
-  const canSeeDelivered = isLC(groups);
+  // Delivered Jobs narrowed to STRATCOM (Dr Raghu, 30 Aug 2026)
+  const canSeeDelivered = isStratcom(groups);
   const canSeeForward = isStratcom(groups);
   const canEdit = role === "admin" || role === "planner" || role === "project_owner";
   // Upload lives in the account menu now — admins and Shweta only.
