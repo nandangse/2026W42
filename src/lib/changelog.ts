@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.49",
+    date: "2026-08-30",
+    module: "Delivered Jobs — what the period can still produce",
+    items: [
+      "A NEW ROW under the headline numbers (Dr Raghu, 29 Aug 2026): 'More additional jobs planned for MTD/QTD/YTD' — how many active jobs have target dates inside the period, their value and their throughput, measured to the period's NATURAL end (month end, quarter end, 31 March) rather than merely to today. The product families ride along as chips — 3 × AGSE Hi-Lift, 2 × MHE Scissor — and the family filter applies here too.",
+    ],
+  },
+  {
     v: "3.31.0.48",
     date: "2026-08-29",
     module: "Job Plan — See more, straight to the milestones",

@@ -81,6 +81,8 @@ interface Payload {
   lastUpload: string | null;
   dateSources: string[];
   truncated: boolean;
+  /** Active, undelivered jobs — what the period could still produce. */
+  pipeline?: { id: string; tag: string | null; fam: string | null; val: number; tp: number; tpv: number; tdd: string | null }[];
 }
 
 export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) {
@@ -140,6 +142,30 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
 
   const inWindow = useMemo(() => within(rows, from, to), [rows, from, to]);
   const totals = useMemo(() => totalsOf(inWindow), [inWindow]);
+
+  // WHAT MORE THE PERIOD CAN STILL PRODUCE (Dr Raghu, 29 Aug 2026): active
+  // undelivered jobs whose target date lands inside the period — measured to
+  // the period's NATURAL end (month end for MTD, quarter end, FY end for
+  // YTD), not merely to today, because "more" is about the road ahead.
+  const periodEnd = useMemo(() => {
+    const d = new Date(TODAY + "T00:00:00Z");
+    if (period === "mtd") return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+    if (period === "qtd") { const m = d.getUTCMonth(); const qs = m >= 9 ? 9 : m >= 6 ? 6 : m >= 3 ? 3 : 0; return new Date(Date.UTC(d.getUTCFullYear(), qs + 3, 0)).toISOString().slice(0, 10); }
+    if (period === "ytd") { const y = d.getUTCMonth() >= 3 ? d.getUTCFullYear() + 1 : d.getUTCFullYear(); return `${y}-03-31`; }
+    return to;
+  }, [period, to]);
+  const pipe = useMemo(() => {
+    const src = (data?.pipeline ?? []).filter((j) =>
+      (!fam || (j.fam?.trim() || "Unclassified") === fam) && j.tdd && j.tdd >= from && j.tdd <= periodEnd);
+    const t = { nos: src.length, val: 0, tp: 0 };
+    const byFam = new Map<string, number>();
+    for (const j of src) {
+      t.val += j.val; t.tp += throughputOf(j);
+      const f = j.fam?.trim() || "Unclassified";
+      byFam.set(f, (byFam.get(f) || 0) + 1);
+    }
+    return { ...t, fams: [...byFam.entries()].sort((a, b) => b[1] - a[1]) };
+  }, [data, fam, from, periodEnd]);
   const undatedRows = useMemo(() => undated(rows), [rows]);
 
   const ytd = useMemo(
@@ -286,6 +312,27 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
         <Headline label="Value" value={V(totals.value)} note="order value of those jobs" color={C.accent} />
         <Headline label="Throughput" value={V(totals.throughput)} note="Throughput Expected Value (Auto)" color={C.green} />
       </div>
+
+      {/* ===== what the period can STILL produce (Dr Raghu, 29 Aug 2026):
+          active jobs whose target date lands inside it, to its natural end ===== */}
+      {pipe.nos > 0 && (
+        <div className="rounded-lg border p-3 mb-3" style={{ borderColor: "#B9C7D4", background: "#F2F7FB", borderLeft: "4px solid #1B3A5C" }}>
+          <div className="text-sm" style={{ color: "#16232F" }}>
+            <b>More additional jobs planned for {period === "mtd" ? "MTD" : period === "qtd" ? "QTD" : period === "ytd" ? "YTD" : "this period"}</b>
+            {" — "}<b className="tnum">{pipe.nos}</b> nos + <b className="tnum" style={{ color: C.accent }}>{V(pipe.val)}</b> value + <b className="tnum" style={{ color: C.green }}>{V(pipe.tp)}</b> throughput
+            <span className="text-xs" style={{ color: "#5A6672" }}> · target dates up to {fmtFull(periodEnd)} · on the boards, not yet delivered</span>
+          </div>
+          {pipe.fams.length > 0 && (
+            <div className="flex gap-1.5 flex-wrap mt-2">
+              {pipe.fams.map(([f, n]) => (
+                <span key={f} className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#fff", border: "1px solid #B9C7D4", color: "#1B3A5C" }}>
+                  {n} × {f}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ===== averages, and the honesty about them ===== */}
       <div className="flex gap-2 flex-wrap mb-3">

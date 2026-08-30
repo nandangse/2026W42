@@ -64,7 +64,24 @@ export async function GET() {
 
     const dateSources = [...new Set(rows.map((r) => r.date_source).filter(Boolean))] as string[];
 
+    // THE PIPELINE (Dr Raghu, 29 Aug 2026): what more the period could still
+    // produce — every active, undelivered job with its target date, value,
+    // throughput and family. The page windows it by whatever period is shown.
+    let pipeline: Record<string, unknown>[] = [];
+    try {
+      const { data: act } = await adminClient()
+        .from("jobs")
+        .select("id, tag, fam, val, tp, tpv, tdd")
+        .eq("active", true)
+        // NULL != true is NULL in SQL — neq would silently drop the undated
+        .or("delivered.is.null,delivered.eq.false");
+      pipeline = (act || []).map((j) => ({
+        ...j, val: Number(j.val) || 0, tp: Number(j.tp) || 0, tpv: Number(j.tpv) || 0,
+      }));
+    } catch { /* the board is optional context here */ }
+
     return NextResponse.json({
+      pipeline,
       jobs: rows.map((r) => ({
         ...r,
         val: Number(r.val) || 0,
