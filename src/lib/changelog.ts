@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.0.1.4",
+    date: "2026-08-31",
+    module: "CRM — the search finds what the eye sees; a lone quote can grow its enquiry",
+    items: [
+      "\"its there but in search not coming!\" (Dr Raghu, 31 Aug 2026) — typing \"taj\" on Quotations answered 0 records while the Company column plainly read Taj Sats Air Catering Limited. The list search only ever read the TITLE field, which on a quotation is the quote number: every other column on screen was invisible to it. It now reads the record's own words AND follows the links — \"taj\" finds the companies carrying that name, then the quotations pointing at them. 644 of them, as it turns out. Salesperson, contact and opportunity are searchable the same way, on every doctype, and the group totals use the identical clause so they cannot disagree with the list beneath them.",
+      "\"when Opportunity is empty, can you create one to backflush it? make it the same day!\" — a quote standing alone now wears ⤴ Create the enquiry. It writes the missing opportunity from the quote's own company, contact, salesperson and value, and dates it THE QUOTE'S OWN DAY rather than today: the enquiry is being recorded late, not happening late, and an August quote answering a January enquiry would otherwise read as a deal that closed before it opened.",
+      "\"how would i know which guy it is? show me organization also in the drop down\" — three identical Faisal Khans in a picker are not a choice, they are a guess. Every person option now carries its ORGANIZATION and designation underneath the name, and on a deal the opportunity's own company rises to the top of the list. It sorts rather than filters: a deal's people genuinely can come from a consultant or a PMC, and a picker that hid them would be worse than one that buried them.",
+      "\"in this also let me search!\" — a search box over every child tab on a record, once it holds more than five rows: 43 contacts, 42 sales orders, 20 opportunities all narrow as the letters land.",
+    ],
+  },
+  {
     v: "4.0.1.3",
     date: "2026-08-31",
     module: "CRM — every record's own tabs can be searched",

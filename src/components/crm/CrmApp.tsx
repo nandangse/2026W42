@@ -3872,6 +3872,35 @@ function RecordModal({
                 ⧉ Duplicate
               </button>
             )}
+            {/* BACKFLUSH (Dr Raghu, 31 Aug 2026: "when Opportunity is empty,
+                can you create one to backflush it? make it the same day!").
+                Only where the quote genuinely stands alone. */}
+            {mode === "view" && dt.name === "quotation" && !row.opportunity_id && (
+              <button
+                onClick={async () => {
+                  if (!window.confirm(
+                    `Write the missing enquiry behind ${title}?\n\n`
+                    + `It takes this quote's own company, contact, salesperson and value — and THIS QUOTE'S DATE, `
+                    + `not today's, so the funnel reads the enquiry as having come before the quote it produced.\n\n`
+                    + `The quote is then linked to it.`)) return;
+                  try {
+                    const r = await fetch("/api/crm/quote-backflush", {
+                      method: "POST", headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ quotation_id: rid }),
+                    });
+                    const j = await r.json();
+                    if (!r.ok) throw new Error(j.error || "Could not create the enquiry");
+                    onSaved();
+                    onOpenLink("opportunity", String(j.opportunity_id));
+                  } catch (e) { window.alert(e instanceof Error ? e.message : String(e)); }
+                }}
+                className="px-3 py-1.5 rounded text-sm font-semibold"
+                style={{ background: "rgba(255,255,255,.10)", color: "#fff", border: "1px solid rgba(255,255,255,.3)" }}
+                title="This quote has no enquiry behind it — write one from the quote, dated the same day"
+              >
+                ⤴ Create the enquiry
+              </button>
+            )}
             {mode === "view" && (dt.name === "company" || dt.name === "person") && (
               <button
                 onClick={async () => {
@@ -4324,7 +4353,7 @@ function LinkAutocomplete({
   extraQuery?: string;
 }) {
   const [text, setText] = useState(valueLabel);
-  const [options, setOptions] = useState<{ id: string; label: string }[]>([]);
+  const [options, setOptions] = useState<{ id: string; label: string; hint?: string }[]>([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (valueLabel) setText(valueLabel); }, [valueLabel]);
@@ -4405,6 +4434,9 @@ function LinkAutocomplete({
               style={{ color: INK }}
             >
               {o.label}
+              {/* the organization, so three namesakes are three people
+                  (Dr Raghu, 31 Aug 2026) */}
+              {o.hint && <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.35 }}>{o.hint}</div>}
             </button>
           ))}
           {creatable && text.trim() && !options.some((o) => o.label.trim().toLowerCase() === text.trim().toLowerCase()) && (
@@ -5707,12 +5739,29 @@ Everything on it — ${type === "company" ? "contacts, opportunities, quotations
  * linked to the company (Dr Raghu, 25 Aug 2026).
  */
 function PersonTypeAhead({
-  value, valueLabel, companyId, onPick,
+  value, valueLabel, companyId, opportunityId, onPick,
 }: {
-  value: string; valueLabel: string; companyId?: string; onPick: (id: string) => void;
+  value: string; valueLabel: string; companyId?: string;
+  /** A deal carries no company of its own — the picker borrows the
+   *  opportunity's, and PREFERS its people rather than restricting to them
+   *  (Dr Raghu, 31 Aug 2026: "first show the contacts of the company"). A
+   *  deal's people genuinely can come from elsewhere — a consultant, a PMC —
+   *  so this must sort, never exclude. */
+  opportunityId?: string;
+  onPick: (id: string) => void;
 }) {
+  const [preferCo, setPreferCo] = useState("");
+  useEffect(() => {
+    if (!opportunityId || companyId) { setPreferCo(""); return; }
+    let dead = false;
+    fetch(`/api/crm/opportunity?id=${encodeURIComponent(opportunityId)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => { if (!dead) setPreferCo(String(j?.row?.company_id ?? "")); })
+      .catch(() => { /* the picker still works unsorted */ });
+    return () => { dead = true; };
+  }, [opportunityId, companyId]);
   const [text, setText] = useState(valueLabel);
-  const [options, setOptions] = useState<{ id: string; label: string }[]>([]);
+  const [options, setOptions] = useState<{ id: string; label: string; hint?: string }[]>([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (valueLabel) setText(valueLabel); }, [valueLabel]);
@@ -5729,14 +5778,16 @@ function PersonTypeAhead({
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => {
-      const f = companyId ? `&f_company_id=${encodeURIComponent(companyId)}` : "";
+      const f = companyId
+        ? `&f_company_id=${encodeURIComponent(companyId)}`
+        : preferCo ? `&prefer_company=${encodeURIComponent(preferCo)}` : "";
       fetch(`/api/crm/person?pick=${encodeURIComponent(text)}${f}`, { cache: "no-store" })
         .then((r) => r.json())
         .then((j) => setOptions(j.options ?? []))
         .catch(() => setOptions([]));
     }, 250);
     return () => clearTimeout(t);
-  }, [text, open, companyId]);
+  }, [text, open, companyId, preferCo]);
 
   const createNew = async () => {
     const name = text.trim();
@@ -5786,6 +5837,9 @@ function PersonTypeAhead({
               style={{ color: INK }}
             >
               {o.label}
+              {/* the organization, so three namesakes are three people
+                  (Dr Raghu, 31 Aug 2026) */}
+              {o.hint && <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.35 }}>{o.hint}</div>}
             </button>
           ))}
           {text.trim() && !exact && (
@@ -6013,6 +6067,7 @@ function RecordForm({
                 value={String(form[f.name] ?? "")}
                 valueLabel={(links.person || []).find((o) => o.id === String(form[f.name] ?? ""))?.label ?? ""}
                 companyId={String(form["company_id"] ?? "") || undefined}
+                opportunityId={String(form["opportunity_id"] ?? "") || undefined}
                 onPick={(id) => set(f.name, id)}
               />
             ) : f.type === "link" && f.link === "company" ? (

@@ -29,6 +29,71 @@ import { advanceNewToHandled } from "@/crm/stageflow";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
 import { doctypeBySlug, linkTargets, type Doctype, type Field } from "@/crm/doctypes";
 
+/**
+ * THE LIST SEARCH (Dr Raghu, 31 Aug 2026: "its there but in search not
+ * coming!" — typing "taj" on Quotations returned nothing while the Company
+ * column plainly read Taj Sats Air Catering Limited).
+ *
+ * It searched the TITLE FIELD alone. On a quotation that is quote_no, so the
+ * box would only ever find a quote by its number: every other column on
+ * screen — the company, the salesperson, the subject — was invisible to it.
+ *
+ * Now it reads what the eye reads. The record's own words are matched
+ * directly, and a LINKED column is matched through the linked record's own
+ * title: "taj" finds the companies whose name carries it, then the quotations
+ * pointing at those companies. That second step costs one small query per
+ * link, which is why the id lists are capped — a search is a way to find the
+ * row you mean, not a report.
+ *
+ * Numbers and dates stay out of it deliberately: ilike against a numeric
+ * column is an error in Postgres, not a miss.
+ */
+const LINK_CAP = 500;
+
+function likeValue(q: string): string {
+  // Inside an or() the value must be quoted, or a comma in the search text
+  // ends the clause early and PostgREST rejects the lot.
+  const esc = q.replace(/[%_]/g, "\\$&").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `"%${esc}%"`;
+}
+
+async function searchClause(
+  db: ReturnType<typeof crmDb>,
+  d: Doctype,
+  q: string,
+): Promise<string | null> {
+  const v = likeValue(q);
+  const parts: string[] = [];
+  const seen = new Set<string>();
+
+  const addText = (name: string) => {
+    if (seen.has(name)) return;
+    seen.add(name);
+    parts.push(`${name}.ilike.${v}`);
+  };
+  // The title always, whatever type it is declared as — quote_no is
+  // "readonly" and is still the first thing anybody types.
+  addText(d.titleField);
+  for (const f of d.fields) {
+    if (f.virtual) continue;
+    if (f.type === "text" || f.type === "textarea" || f.type === "select") addText(f.name);
+  }
+
+  // The linked columns, by the name shown rather than the uuid stored.
+  for (const f of d.fields) {
+    if (f.type !== "link" || !f.link || f.virtual) continue;
+    const ld = doctypeBySlug(f.link);
+    if (!ld) continue;
+    try {
+      const { data } = await db.from(ld.table).select("id")
+        .ilike(ld.titleField, `%${q.replace(/[%_]/g, "\\$&")}%`).limit(LINK_CAP);
+      const ids = (data ?? []).map((r) => String((r as { id: unknown }).id)).filter(Boolean);
+      if (ids.length) parts.push(`${f.name}.in.(${ids.join(",")})`);
+    } catch { /* one unsearchable link must not blind the whole box */ }
+  }
+  return parts.length ? parts.join(",") : null;
+}
+
 export const dynamic = "force-dynamic";
 
 const COMPANY_SELECT = "*, opps:opportunity(count), contacts:person(count), sos:sales_order(count)";
@@ -248,11 +313,54 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
         .order(d.titleField, { ascending: true })
         .limit(20);
       if (error) throw new HttpError(500, error.message);
-      const list = (data ?? []) as unknown as Record<string, unknown>[];
+      let list = (data ?? []) as unknown as Record<string, unknown>[];
+
+      /**
+       * WHICH FAISAL KHAN? (Dr Raghu, 31 Aug 2026: "in deal also first show
+       * the contacts of the company. how would i know which guy it is? show
+       * me organization also in the drop down".)
+       *
+       * Three identical names in a list are not a choice, they are a guess.
+       * A person option therefore carries the ORGANIZATION it belongs to, and
+       * the designation where there is one — and where the caller names the
+       * company this deal is with, that company's own people rise to the top
+       * instead of being buried alphabetically among namesakes elsewhere.
+       */
+      let hints = new Map<string, string>();
+      if (d.name === "person") {
+        const ids = list.map((r) => String(r.id));
+        try {
+          const { data: people } = await db.from("person")
+            .select("id, company_id, designation").in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+          const coIds = [...new Set((people ?? []).map((p) => p.company_id).filter(Boolean).map(String))];
+          const coName = new Map<string, string>();
+          if (coIds.length) {
+            const { data: cos } = await db.from("company").select("id, name").in("id", coIds);
+            for (const c of cos ?? []) coName.set(String(c.id), String(c.name || ""));
+          }
+          const byId = new Map((people ?? []).map((p) => [String(p.id), p]));
+          for (const id2 of ids) {
+            const p = byId.get(id2);
+            const bits = [
+              p?.company_id ? coName.get(String(p.company_id)) : "",
+              String(p?.designation || ""),
+            ].filter(Boolean);
+            if (bits.length) hints.set(id2, bits.join(" · "));
+          }
+          // The named company's people first, each group still alphabetical.
+          const prefer = u.searchParams.get("prefer_company");
+          if (prefer) {
+            const mine = (id2: string) => String(byId.get(id2)?.company_id || "") === prefer;
+            list = [...list.filter((r) => mine(String(r.id))), ...list.filter((r) => !mine(String(r.id)))];
+          }
+        } catch { hints = new Map(); }
+      }
+
       return NextResponse.json({
         options: list.map((r) => ({
           id: String(r.id),
           label: String(r[d.titleField] ?? r.id),
+          ...(hints.get(String(r.id)) ? { hint: hints.get(String(r.id)) } : {}),
           ...(r.primary_email ? { email: String(r.primary_email) } : {}),
         })),
       });
@@ -286,6 +394,10 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       const joinNeeded = wantsInd || viaCompany;
       const aggSelect = [viaCompany ? null : groupby, moneyField].filter(Boolean).join(", ")
         + (joinNeeded ? `${moneyField || !viaCompany ? ", " : ""}company_join:company_id!inner(industry_id)` : "");
+      // The same clause the list uses — a group total that counted different
+      // rows from the list beneath it would be worse than no total at all.
+      const aggQ = u.searchParams.get("q")?.trim();
+      const aggSearch = aggQ ? await searchClause(db, d, aggQ) : null;
       const buildAgg = () => {
         let qy = db.from(d.table).select(aggSelect);
         if (["company", "person", "opportunity", "product"].includes(d.name)) qy = qy.is("deleted_at", null);
@@ -298,8 +410,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
           : v.includes(",") ? qy.in(f.name, v.split(","))
           : qy.eq(f.name, v);
         }
-        const q = u.searchParams.get("q")?.trim();
-        if (q) qy = qy.ilike(d.titleField, `%${q.replace(/[%_]/g, "\\$&")}%`);
+        if (aggSearch) qy = qy.or(aggSearch);
         return qy;
       };
       const agg = new Map<string, { count: number; sum: number }>();
@@ -368,6 +479,11 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       tagIds = [...new Set(ids)];
     }
 
+    // Worked out once, before the pager starts: the clause is the same on
+    // every page, and it costs a query per linked column to build.
+    const listQ = u.searchParams.get("q")?.trim();
+    const listSearch = listQ ? await searchClause(db, d, listQ) : null;
+
     const buildList = (withCount: boolean) => {
       let qy = db.from(d.table).select(select, withCount ? { count: "exact" as const } : undefined);
       // Merged and soft-deleted rows stay in the ledger, not on the screens.
@@ -398,8 +514,8 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
         if (g) qy = qy.gte("created_at", g);
         if (l) qy = qy.lte("created_at", l + "T23:59:59");
       }
-      const q = u.searchParams.get("q")?.trim();
-      if (q) qy = qy.ilike(d.titleField, `%${q.replace(/[%_]/g, "\\$&")}%`);
+      // Every column the eye can see, plus the linked records by their name.
+      if (listSearch) qy = qy.or(listSearch);
 
       const sortCol = u.searchParams.get("sort");
       const sortOk = !!sortCol && (sortCol === "created_at"
