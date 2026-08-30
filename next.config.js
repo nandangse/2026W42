@@ -23,7 +23,7 @@ const nextConfig = {
         // our own workspace iframes (those routes set SAMEORIGIN /
         // frame-ancestors 'self' themselves — still no third-party framing
         // anywhere).
-        source: "/((?!api/sales/html|api/sales/plan).*)",
+        source: "/((?!api/sales/html|api/sales/plan|api/crm/quote-doc).*)",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },

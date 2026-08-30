@@ -233,7 +233,14 @@ export async function GET(req: Request) {
 ${wantPrint ? "<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),400));</script>" : ""}
 </body></html>`;
 
-    return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+    return new Response(html, {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        // embeddable by Genie's own Review Quote iframe — nobody else's
+        "X-Frame-Options": "SAMEORIGIN",
+        "Content-Security-Policy": "frame-ancestors 'self'",
+      },
+    });
   } catch (e) {
     return errJson(e);
   }

@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.90",
+    date: "2026-08-30",
+    module: "CRM — the item dropdown breathes, the quote PDF connects",
+    items: [
+      "The write-item search dropdown was being CLIPPED by the grid's frame — it opens below the row now, choose or add freely (Dr Raghu, 30 Aug 2026: \"it should allow me to choose or add\").",
+      "Review Quote's preview said refused-to-connect — the site's own frame-blocking header was shutting out Genie's own iframe; the quote document may now be framed by Genie alone.",
+    ],
+  },
+  {
     v: "3.31.0.89",
     date: "2026-08-30",
     module: "CRM — Genie's brief is written once and kept",

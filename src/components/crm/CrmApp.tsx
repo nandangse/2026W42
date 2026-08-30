@@ -2324,7 +2324,7 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
         </div>
 
         <datalist id="quote-groups">{groups.map((g) => <option key={g} value={g} />)}</datalist>
-        <div className="rounded border" style={{ borderColor: BORDER, overflow: "hidden" }}>
+        <div className="rounded border" style={{ borderColor: BORDER }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#FAF9F5", color: MUTED, fontSize: 11, textAlign: "left" }}>
