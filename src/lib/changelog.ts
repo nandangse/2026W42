@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.47",
+    date: "2026-08-29",
+    module: "My Week — milestones see further",
+    items: [
+      "SEE MORE under 'My milestones landing this week' (Dr Raghu, 29 Aug 2026): the button opens FURTHER OUT — every undone milestone on your jobs beyond this week, dated in full, each card opening its job plan. See less folds it back.",
+    ],
+  },
+  {
     v: "3.31.0.46",
     date: "2026-08-29",
     module: "LMS — share the lesson, resume the movie",

@@ -1543,18 +1543,23 @@ function MyWeek({
   );
 
   // milestones of mine landing this week
+  // this week's landings, and — behind "See more" — everything undone that
+  // lands after it (Dr Raghu, 29 Aug 2026: "they can scroll further away")
   const myMilestones = useMemo(() => {
-    const out: { job: Job; idx: number; name: string; end: string }[] = [];
+    const week: { job: Job; idx: number; name: string; end: string }[] = [];
+    const later: typeof week = [];
     for (const j of myJobs) {
       const plan = board.plans[j.id];
       if (!plan?.milestones?.length) continue;
       for (const m of computeSchedule({ start: plan.start || TODAY, milestones: plan.milestones })) {
-        if (!m.done && m.end >= TODAY && m.end <= weekEnd && manDays(m) > 0)
-          out.push({ job: j, idx: m.idx, name: m.name, end: m.end });
+        if (m.done || m.end < TODAY || manDays(m) <= 0) continue;
+        (m.end <= weekEnd ? week : later).push({ job: j, idx: m.idx, name: m.name, end: m.end });
       }
     }
-    return out.sort((a, b) => (a.end < b.end ? -1 : 1));
+    const byEnd = (a: { end: string }, b: { end: string }) => (a.end < b.end ? -1 : 1);
+    return { week: week.sort(byEnd), later: later.sort(byEnd).slice(0, 40) };
   }, [myJobs, board.plans, weekEnd]);
+  const [msMore, setMsMore] = useState(false);
 
   const [lightbox, setLightbox] = useState<Task | null>(null);
   const who = me.displayName || me.email.split("@")[0];
@@ -1738,21 +1743,40 @@ function MyWeek({
         <div className="flex flex-col gap-4" style={{ minWidth: 0 }}>
           <ImageQuote data={mw} isAdmin={isAdmin} />
           <MyLearningCard data={mw} onOpenLms={goLms} />
-        {/* my milestones this week */}
+        {/* my milestones this week — and, behind See more, the ones after */}
         <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
           <div className="font-bold text-sm mb-2">My milestones landing this week</div>
-          {myMilestones.length === 0 ? (
+          {myMilestones.week.length === 0 && (
             <div className="text-sm py-4 text-center" style={{ color: "#8A94A0" }}>No milestones due on your jobs this week.</div>
-          ) : (
-            myMilestones.map((m, i) => (
-              <div key={i} onClick={() => onOpen(m.job.id)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ background: "#DDE6EE", borderColor: "#B9C7D4" }}>
-                <div className="text-xs font-bold" style={{ color: "#1B3A5C" }}>⚑ M{m.idx} · {m.name}</div>
-                <div className="text-xs flex justify-between mt-0.5" style={{ color: "#5A6672" }}>
-                  <span>JOB {jobNo(m.job.id)} · {m.job.tag}</span>
-                  <span className="tnum">{fmt(m.end)}</span>
-                </div>
+          )}
+          {myMilestones.week.map((m, i) => (
+            <div key={i} onClick={() => onOpen(m.job.id)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ background: "#DDE6EE", borderColor: "#B9C7D4" }}>
+              <div className="text-xs font-bold" style={{ color: "#1B3A5C" }}>⚑ M{m.idx} · {m.name}</div>
+              <div className="text-xs flex justify-between mt-0.5" style={{ color: "#5A6672" }}>
+                <span>JOB {jobNo(m.job.id)} · {m.job.tag}</span>
+                <span className="tnum">{fmt(m.end)}</span>
               </div>
-            ))
+            </div>
+          ))}
+          {msMore && myMilestones.later.length > 0 && (
+            <>
+              <div className="text-xs font-bold mt-2 mb-1" style={{ color: "#8A94A0", letterSpacing: 0.8 }}>FURTHER OUT</div>
+              {myMilestones.later.map((m, i) => (
+                <div key={i} onClick={() => onOpen(m.job.id)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ background: "#F4F2EC", borderColor: "#E2E0DA" }}>
+                  <div className="text-xs font-bold" style={{ color: "#5A6672" }}>⚑ M{m.idx} · {m.name}</div>
+                  <div className="text-xs flex justify-between mt-0.5" style={{ color: "#8A94A0" }}>
+                    <span>JOB {jobNo(m.job.id)} · {m.job.tag}</span>
+                    <span className="tnum font-bold">{fmtFull(m.end)}</span>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+          {myMilestones.later.length > 0 && (
+            <button onClick={() => setMsMore((v) => !v)} className="w-full text-xs font-bold rounded py-1.5 mt-1 border"
+              style={{ color: "#1B3A5C", borderColor: "#B9C7D4", background: "#fff" }}>
+              {msMore ? "See less ↑" : `See more ↓ · ${myMilestones.later.length} further out`}
+            </button>
           )}
         </div>
         {/* my jobs */}
