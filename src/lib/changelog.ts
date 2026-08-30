@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.99",
+    date: "2026-08-30",
+    module: "CRM — the Prospecting Queue obeys the hand",
+    items: [
+      "Drag a row up or down and the queue keeps that order (Dr Raghu, 30 Aug 2026) — on the tray and the home screen both. CRM migration 0040 (one line) carries the order column.",
+    ],
+  },
+  {
     v: "3.31.0.98",
     date: "2026-08-30",
     module: "CRM — a pencil on every quote line",

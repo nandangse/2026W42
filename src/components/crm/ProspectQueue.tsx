@@ -8,7 +8,7 @@
  * load, so a corrected phone corrects the queue. Done keeps the row — the
  * queue is also its own record of calls made.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NAVY, NAVY_SOFT, INK, MUTED, BORDER, ORANGE, GREEN } from "./palette";
 
 interface Item {
@@ -28,6 +28,30 @@ export default function ProspectQueue({ onOpen, compact = false }: { onOpen: (ta
   const [err, setErr] = useState("");
   const [needs, setNeeds] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  // drag to rearrange (Dr Raghu, 30 Aug 2026) — the drop writes the order
+  const dragFrom = useRef<number | null>(null);
+  const drop = async (to: number) => {
+    const from = dragFrom.current;
+    dragFrom.current = null;
+    if (from === null || from === to || !items) return;
+    const next = items.slice();
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setItems(next);
+    try {
+      await fetch("/api/crm/prospect", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "reorder", ids: next.map((x) => x.id) }),
+      });
+    } catch { /* the next load re-reads the truth */ }
+  };
+  const dragProps = (i: number) => ({
+    draggable: true,
+    onDragStart: () => { dragFrom.current = i; },
+    onDragOver: (e: React.DragEvent) => e.preventDefault(),
+    onDrop: (e: React.DragEvent) => { e.preventDefault(); void drop(i); },
+    style: { cursor: "grab" } as React.CSSProperties,
+  });
 
   const load = useCallback(async () => {
     try {
@@ -74,7 +98,7 @@ export default function ProspectQueue({ onOpen, compact = false }: { onOpen: (ta
       )}
 
       {(items || []).map((it, i) => compact ? (
-        <div key={it.id} className="px-2.5 py-1.5" style={{ borderBottom: "1px solid #F2F4F8", background: i === 0 ? "#FCF8F2" : "#fff" }}>
+        <div key={it.id} {...dragProps(i)} className="px-2.5 py-1.5" style={{ borderBottom: "1px solid #F2F4F8", background: i === 0 ? "#FCF8F2" : "#fff", cursor: "grab" }}>
           <div className="flex items-center gap-1.5" style={{ minWidth: 0 }}>
             <span className="tnum" style={{ width: 14, textAlign: "right", color: i === 0 ? ORANGE : "#C9CDD6", fontWeight: 800, fontSize: 10.5, flexShrink: 0 }}>{i + 1}</span>
             <button onClick={() => onOpen(it.kind, it.ref_id)} className="text-left font-bold" title={`${it.title}`}
@@ -97,7 +121,7 @@ export default function ProspectQueue({ onOpen, compact = false }: { onOpen: (ta
           </div>
         </div>
       ) : (
-        <div key={it.id} className="flex items-center gap-3 px-3 py-2 flex-wrap" style={{ borderBottom: `1px solid #F2F4F8`, background: i === 0 ? "#FCF8F2" : "#fff" }}>
+        <div key={it.id} {...dragProps(i)} className="flex items-center gap-3 px-3 py-2 flex-wrap" style={{ borderBottom: `1px solid #F2F4F8`, background: i === 0 ? "#FCF8F2" : "#fff", cursor: "grab" }}>
           <span className="tnum" style={{ width: 20, textAlign: "right", color: i === 0 ? ORANGE : "#C9CDD6", fontWeight: 800, fontSize: 12 }}>{i + 1}</span>
           <div style={{ minWidth: 0, flex: "1 1 240px" }}>
             <button onClick={() => onOpen(it.kind, it.ref_id)} className="text-left font-bold" style={{ color: NAVY, fontSize: 13 }}>

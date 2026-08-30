@@ -41,6 +41,7 @@ export async function GET(req: Request) {
     const { data: items, error } = await db
       .from("prospect_queue").select("id, kind, ref_id, added_at, done_at, note")
       .eq("added_by", me.email.toLowerCase())
+      .order("sort_order", { ascending: true, nullsFirst: false })
       .order("added_at", { ascending: true })
       .limit(400);
     if (error) {
@@ -158,6 +159,17 @@ export async function POST(req: Request) {
         : db.from("prospect_queue").delete().eq("id", id).eq("added_by", mine);
       const { error } = await q;
       if (error) throw new HttpError(500, error.message);
+      return NextResponse.json({ ok: true });
+    }
+
+    // the drag writes the order — my rows alone (Dr Raghu, 30 Aug 2026)
+    if (action === "reorder") {
+      const ids = (Array.isArray(body.ids) ? body.ids : []).map(String).filter(Boolean).slice(0, 200);
+      if (!ids.length) throw new HttpError(400, "Nothing to reorder.");
+      for (let i = 0; i < ids.length; i++) {
+        await db.from("prospect_queue").update({ sort_order: i + 1 })
+          .eq("id", ids[i]).eq("added_by", me.email.toLowerCase()).is("done_at", null);
+      }
       return NextResponse.json({ ok: true });
     }
 
