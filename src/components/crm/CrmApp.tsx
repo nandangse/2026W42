@@ -2622,15 +2622,22 @@ function ItemSearchCell({ value, group, placeholder, onType, onCommit, onPick, o
   style?: React.CSSProperties;
 }) {
   const [hits, setHits] = useState<CatHit[]>([]);
+  const [note, setNote] = useState("");
   const [open, setOpen] = useState(false);
   const timer = useRef<number | null>(null);
   const seek = (q: string) => {
     if (timer.current) window.clearTimeout(timer.current);
     if (q.trim().length < 2 && !group) { setHits([]); setOpen(false); return; }
     timer.current = window.setTimeout(() => {
+      setNote("searching…"); setOpen(true);
       fetch(`/api/crm/product-extra?search=${encodeURIComponent(q.trim())}${group ? `&group=${encodeURIComponent(group)}` : ""}`, { cache: "no-store" })
-        .then(async (r) => { const j = await r.json(); setHits((j.hits ?? []) as CatHit[]); setOpen(true); })
-        .catch(() => { setHits([]); setOpen(false); });
+        .then(async (r) => {
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.error || String(r.status));
+          const h = (j.hits ?? []) as CatHit[];
+          setHits(h); setNote(h.length ? "" : group ? `nothing in ${group} matches` : "no match — Enter files it as written"); setOpen(true);
+        })
+        .catch((e) => { setHits([]); setNote(e instanceof Error ? e.message : String(e)); setOpen(true); });
     }, 200);
   };
   return (
@@ -2640,8 +2647,9 @@ function ItemSearchCell({ value, group, placeholder, onType, onCommit, onPick, o
         onFocus={() => { if (hits.length) setOpen(true); else seek(value); }}
         onBlur={() => { window.setTimeout(() => setOpen(false), 200); onCommit?.(); }}
         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setOpen(false); onEnter?.(); } if (e.key === "Escape") setOpen(false); }} />
-      {open && hits.length > 0 && (
+      {open && (hits.length > 0 || note) && (
         <div className="rounded border" style={{ position: "absolute", top: "100%", left: 0, zIndex: 45, background: "#fff", borderColor: BORDER, boxShadow: "0 8px 24px rgba(27,45,107,.18)", minWidth: 320, maxWidth: 460, maxHeight: 300, overflowY: "auto" }}>
+          {note && <div className="px-2.5 py-1.5 text-xs" style={{ color: MUTED }}>{note}</div>}
           {hits.map((h) => (
             <button key={h.id} type="button" onMouseDown={(e) => e.preventDefault()}
               onClick={() => { setOpen(false); onPick(h); }}

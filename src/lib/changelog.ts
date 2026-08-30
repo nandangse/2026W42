@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.96",
+    date: "2026-08-30",
+    module: "CRM — the item dropdown always answers",
+    items: [
+      "Focusing the Item cell now always shows the dropdown — searching…, the hits, \"nothing in this family matches\", or the error itself — a silent nothing is no longer possible.",
+    ],
+  },
+  {
     v: "3.31.0.95",
     date: "2026-08-30",
     module: "CRM — items print two ways, one choice",
