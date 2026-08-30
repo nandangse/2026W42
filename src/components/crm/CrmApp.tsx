@@ -3412,6 +3412,7 @@ function RecordModal({
   };
   const [tab, setTab] = useState("details");
   const [apolloMsg, setApolloMsg] = useState("");
+  const [consultOpen, setConsultOpen] = useState(false);
   useEffect(() => {
     let t0 = "details";
     try {
@@ -3421,6 +3422,7 @@ function RecordModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id]);
 
+  useEffect(() => { setConsultOpen(false); }, [row.id]);
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", h);
@@ -3529,6 +3531,9 @@ function RecordModal({
           height: "calc(100vh - 20px)", display: "flex", flexDirection: "column", minHeight: 0,
         }}
       >
+        {consultOpen && (
+          <ConsultRaghuModal targetType={dt.name} targetId={rid} title={title} onClose={() => setConsultOpen(false)} />
+        )}
         <div
           className="flex items-center justify-between px-4 py-3"
           style={{ background: NAVY, borderRadius: "6px 6px 0 0", position: "relative", flexShrink: 0 }}
@@ -3579,6 +3584,13 @@ function RecordModal({
             )}
           </div>
           <div className="flex items-center gap-2">
+            {mode === "view" && ["opportunity", "quotation", "sales_order", "company", "person", "industry", "product"].includes(dt.name) && (
+              <button onClick={() => setConsultOpen(true)} title="Consult Raghu"
+                style={{ padding: 0, border: "2px solid rgba(255,255,255,.5)", borderRadius: "50%", overflow: "hidden", width: 38, height: 38, flexShrink: 0, background: "#fff" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/consult-raghu.png" alt="Consult Raghu" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </button>
+            )}
             {/* "allow to duplicate quote" (Dr Raghu, 30 Aug 2026) */}
             {mode === "view" && dt.name === "quotation" && (
               <button
@@ -6013,6 +6025,129 @@ function IfsTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/** CONSULT RAGHU (Dr Raghu, 30 Aug 2026) — his advisory voice at every
+ *  record. Greets by first name, asks before it advises, and grows sharper
+ *  as the knowledgebase grows. Speak or type; 🎤 dictates. */
+function ConsultRaghuModal({ targetType, targetId, title, onClose }: {
+  targetType: string; targetId: string; title: string; onClose: () => void;
+}) {
+  type M = { role: "user" | "assistant"; content: string };
+  const [msgs, setMsgs] = useState<M[] | null>(null);
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [listening, setListening] = useState(false);
+  const recRef = useRef<{ stop: () => void } | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => { scrollRef.current?.scrollTo({ top: 999999, behavior: "smooth" }); }, [msgs, busy]);
+
+  const send = useCallback(async (text: string, cid: string | null) => {
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/crm/consult", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chat_id: cid, target_type: targetType, target_id: targetId, message: text }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "The chair went quiet");
+      setChatId(String(j.chat_id));
+      setMsgs((cur) => [...(cur ?? []), { role: "assistant", content: String(j.reply) }]);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  }, [targetType, targetId]);
+
+  useEffect(() => {
+    let dead = false;
+    void (async () => {
+      try {
+        const j = await (await fetch(`/api/crm/consult?target_type=${targetType}&target_id=${encodeURIComponent(targetId)}`, { cache: "no-store" })).json();
+        if (dead) return;
+        if (j.needsMigration) { setErr("Run CRM migration 0044 first — the chair is not built yet."); setMsgs([]); return; }
+        const hist = ((j.messages ?? []) as M[]).filter((m) => !m.content.startsWith("(The salesperson has just sat down"));
+        setMsgs(hist);
+        setChatId(j.chat_id);
+        if (!hist.length) void send("__open__", j.chat_id);
+      } catch { if (!dead) setMsgs([]); }
+    })();
+    return () => { dead = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetType, targetId]);
+
+  const speak = () => {
+    type SR = { new (): { lang: string; interimResults: boolean; continuous: boolean; onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void; onend: () => void; onerror: () => void; start: () => void; stop: () => void } };
+    const W = window as unknown as { webkitSpeechRecognition?: SR; SpeechRecognition?: SR };
+    const Rec = W.SpeechRecognition || W.webkitSpeechRecognition;
+    if (!Rec) { setErr("This browser has no dictation — Chrome does."); return; }
+    if (listening) { recRef.current?.stop(); return; }
+    const rec = new Rec();
+    rec.lang = "en-IN"; rec.interimResults = true; rec.continuous = true;
+    rec.onresult = (e) => {
+      let t = "";
+      for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+      setInput(t);
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recRef.current = rec; setListening(true); rec.start();
+  };
+
+  const submit = () => {
+    const text = input.trim();
+    if (!text || busy) return;
+    setMsgs((cur) => [...(cur ?? []), { role: "user", content: text }]);
+    setInput("");
+    void send(text, chatId);
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(22,35,47,.5)", display: "flex", alignItems: "center", justifyContent: "flex-end", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} className="rounded" style={{ background: "#fff", width: "min(460px, 100%)", height: "min(680px, calc(100vh - 32px))", display: "flex", flexDirection: "column", boxShadow: "0 12px 40px rgba(27,45,107,.4)" }}>
+        <div className="flex items-center gap-2.5 px-3 py-2.5" style={{ background: NAVY, borderRadius: "6px 6px 0 0" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/consult-raghu.png" alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,.4)" }} />
+          <div style={{ minWidth: 0 }}>
+            <div className="text-white font-bold" style={{ fontSize: 15 }}>Consult Raghu</div>
+            <div className="text-xs" style={{ color: "#C8D2DC", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
+          </div>
+          <button onClick={onClose} className="ml-auto text-white font-bold px-2">✕</button>
+        </div>
+        <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 14, background: "#FAF9F5" }}>
+          {msgs === null && <div className="text-sm" style={{ color: MUTED }}>taking the chair…</div>}
+          {(msgs ?? []).map((m, i) => (
+            <div key={i} className="mb-2.5 flex" style={{ justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+              <div className="rounded-lg px-3 py-2 text-sm" style={{
+                maxWidth: "85%", lineHeight: 1.55, whiteSpace: "pre-wrap",
+                background: m.role === "user" ? NAVY : "#fff",
+                color: m.role === "user" ? "#fff" : INK,
+                border: m.role === "user" ? "none" : `1px solid ${BORDER}`,
+              }}>
+                {m.content}
+              </div>
+            </div>
+          ))}
+          {busy && <div className="text-xs" style={{ color: MUTED }}>Raghu is thinking…</div>}
+          {err && <div className="rounded p-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
+        </div>
+        <div className="flex gap-1.5 items-end p-2.5" style={{ borderTop: `1px solid ${BORDER}` }}>
+          <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
+            placeholder="Tell him what's on your mind… (Enter sends, Shift+Enter for a new line)"
+            className="flex-1 rounded border px-2 py-1.5 text-sm" style={{ borderColor: BORDER, resize: "none" }} />
+          <button onClick={speak} title={listening ? "Stop dictating" : "Dictate — speak instead of typing"}
+            className="rounded px-2.5 py-2 text-sm" style={{ background: listening ? "#B3261E" : "#EFEDE7" }}>
+            {listening ? "⏹" : "🎤"}
+          </button>
+          <button onClick={submit} disabled={busy || !input.trim()}
+            className="rounded px-3 py-2 text-sm font-bold text-white" style={{ background: busy || !input.trim() ? "#B9BEC4" : ORANGE }}>
+            ➤
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

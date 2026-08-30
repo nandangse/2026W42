@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.30",
+    date: "2026-08-30",
+    module: "CRM — Consult Raghu takes his chair at every record",
+    items: [
+      "Consult Raghu arrives (Dr Raghu, 30 Aug 2026): his face sits in the header of every Opportunity, Quotation, Sales Order, Company, Contact, Industry and Product. Click it and a chat opens — he greets you by first name, asks the sharp questions before he advises, and remembers where the last consultation left off. Type or press 🎤 and dictate. He stands on the Consult Raghu knowledgebase, so every drop Dr Raghu adds in Settings makes him wiser. CRM migration 0044 builds the chair.",
+    ],
+  },
+  {
     v: "3.31.1.29",
     date: "2026-08-30",
     module: "CRM — contacts get a Birthday; the IF report links from the company",
