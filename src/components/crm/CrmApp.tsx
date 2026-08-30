@@ -156,6 +156,28 @@ export default function CrmApp({
   const [compose, setCompose] = useState<ComposeCtx | null>(null);
   const [pageSize, setPageSize] = useState<string>("500");   // 100|500|2500|10000|50000|all
   const [colW, setColW] = useState<number>(280);             // narrow 140 · normal 280 · wide 440
+  // per-COLUMN widths, dragged by hand (Dr Raghu, 30 Aug 2026) — remembered
+  // per list, like everything else about the view
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const dragRef = useRef<{ name: string; startX: number; startW: number } | null>(null);
+  const startColDrag = (e: React.MouseEvent, name: string, currentW: number) => {
+    e.preventDefault(); e.stopPropagation();
+    dragRef.current = { name, startX: e.clientX, startW: currentW };
+    const move = (ev: MouseEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      const w = Math.max(70, Math.min(800, d.startW + (ev.clientX - d.startX)));
+      setColWidths((cur) => ({ ...cur, [d.name]: w }));
+    };
+    const up = () => {
+      dragRef.current = null;
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      setColWidths((cur) => { try { localStorage.setItem(`crmColWidths.${slug}`, JSON.stringify(cur)); } catch { /* fine */ } return cur; });
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
   const [moreBusy, setMoreBusy] = useState(false);
   // The sidebar folds to an icon rail — open all the time was noise.
   const [navOpen, setNavOpen] = useState<boolean>(() => {
@@ -194,7 +216,8 @@ export default function CrmApp({
       setCols(c ? (JSON.parse(c) as string[]) : null);
       setPin(Number(localStorage.getItem(`crmPin.${slug}`)) || 0);
       setColW(Number(localStorage.getItem(`crmW.${slug}`)) || 280);
-    } catch { setCols(null); setPin(0); setColW(280); }
+      setColWidths(JSON.parse(localStorage.getItem(`crmColWidths.${slug}`) || "{}"));
+    } catch { setCols(null); setPin(0); setColW(280); setColWidths({}); }
     try { window.history.replaceState(null, "", `/crm/${URL_OF[slug] ?? slug}`); } catch { /* SSR */ }
   }, [slug]);
 
@@ -1035,9 +1058,16 @@ export default function CrmApp({
                           // freezes on both axes at once.
                           position: "sticky", top: 0, zIndex: ci < pin ? 7 : 6,
                           boxShadow: `inset 0 -2px 0 ${BORDER}` + (ci < pin ? `, inset -1px 0 0 ${BORDER}` : ""),
-                          ...(ci < pin ? { left: ci * PINNED_W, width: PINNED_W, minWidth: PINNED_W } : null),
+                          ...(ci < pin ? { left: ci * PINNED_W, width: PINNED_W, minWidth: PINNED_W }
+                            : colWidths[f.name] ? { width: colWidths[f.name], minWidth: colWidths[f.name], maxWidth: colWidths[f.name] } : null),
                         }}
                       >
+                        {ci >= pin && (
+                          <span onMouseDown={(e) => startColDrag(e, f.name, colWidths[f.name] || (e.currentTarget.parentElement?.offsetWidth ?? 160))}
+                            onClick={(e) => e.stopPropagation()}
+                            title="Drag to size this column"
+                            style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 8, cursor: "col-resize" }} />
+                        )}
                         {f.label.toUpperCase()}
                         {sort?.col === f.name && <span style={{ color: ORANGE }}> {sort.dir === "asc" ? "▲" : "▼"}</span>}
                         <button
@@ -1073,7 +1103,8 @@ export default function CrmApp({
                             // lightbox is the read (Dr Raghu, 26 Aug 2026)
                             padding: "8px 12px", fontSize: 13, borderBottom: "1px solid #F0EEE8",
                             verticalAlign: "top", background: "#fff",
-                            maxWidth: ci < pin ? PINNED_W : colW,
+                            maxWidth: ci < pin ? PINNED_W : colWidths[f.name] ?? colW,
+                            ...(ci >= pin && colWidths[f.name] ? { width: colWidths[f.name], minWidth: colWidths[f.name] } : null),
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             ...(ci < pin ? stickyCell(ci, 5) : null),
                           }}

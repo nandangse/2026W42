@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.70",
+    date: "2026-08-30",
+    module: "CRM — columns size by hand",
+    items: [
+      "DRAG THE EDGE of any column header and it takes the width you give it (Dr Raghu, 30 Aug 2026) — per column, per list, remembered with the rest of your view. Pinned columns keep their fixed width so the freeze stays true.",
+    ],
+  },
+  {
     v: "3.31.0.69",
     date: "2026-08-30",
     module: "CRM — the view remembers you",
