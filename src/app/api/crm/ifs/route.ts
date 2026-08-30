@@ -101,16 +101,25 @@ export async function POST(req: Request) {
       return null;
     };
 
-    // InstaSummary is an ORDER → STATUS → DOWNLOAD pipeline (Dr Raghu's
-    // usage panel, 30 Aug 2026: Order 10 · Status 40 · Download 20).
-    // A direct-JSON template still works when configured and answering.
+    // InstaSummary is a DIRECT GET (their docs, read 30 Aug 2026):
+    //   /api/InstaSummary/v1/json/CompanyCIN/{cin}/{UpdateOption}
+    // BestEffort matters: without it a company younger than three years of
+    // financials is REJECTED — half the prospects are young companies.
+    // The Order→Status→Download pipeline was a wrong turn (it answered
+    // "Invalid uri" for every path) — kept only if a template is configured.
     let j: Record<string, unknown> | null = null;
-    if (cfg.url_template) {
-      const direct = await grab(cfg.url_template.replace("{cin}", encodeURIComponent(cin)), "direct");
-      if (!errOf(direct) && (direct as { InstaSummary?: unknown }).InstaSummary) j = direct;
+    {
+      const directT = (cfg.url_template || "https://instafinancials.com/api/InstaSummary/v1/json/CompanyCIN/{cin}/BestEffort").trim();
+      const direct = await grab(directT.replace("{cin}", encodeURIComponent(cin)), "direct");
+      const derr = errOf(direct);
+      if (derr && !cfg.order_url_template)
+        throw new HttpError(502, `InstaFinancials refused: ${derr}. If it names the wrong path, copy the By-CompanyCIN URL from their InstaSummary doc into URL_TEMPLATE (with {cin}).`);
+      if (!derr && (direct as { InstaSummary?: unknown }).InstaSummary) j = direct;
+      if (!derr && !j && !cfg.order_url_template)
+        throw new HttpError(502, `InstaFinancials answered without an InstaSummary: ${JSON.stringify(direct).slice(0, 200)}`);
     }
     if (!j) {
-      const orderT = (cfg.order_url_template || "https://instafinancials.com/api/InstaSummary/v1/json/Order/CompanyCIN/{cin}").trim();
+      const orderT = (cfg.order_url_template || "").trim();
       const statusT = (cfg.status_url_template || "https://instafinancials.com/api/InstaSummary/v1/json/OrderStatus/OrderId/{order_id}").trim();
       const dlT = (cfg.download_url_template || "https://instafinancials.com/api/InstaSummary/v1/json/Download/OrderId/{order_id}").trim();
       const ordered = await grab(orderT.replace("{cin}", encodeURIComponent(cin)), "order");

@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.36",
+    date: "2026-08-30",
+    module: "CRM — the InstaSummary buy takes the road their docs actually name",
+    items: [
+      "Buy InstaFinancial Summary was refused with Invalid uri (Dr Raghu, 30 Aug 2026, Groundworx Aviation): InstaSummary is a single direct GET — /api/InstaSummary/v1/json/CompanyCIN/{cin} — not an Order→Status→Download pipeline. The buy now takes that road with BestEffort, which matters doubly: without it any company younger than three years of financials is rejected outright, and half the prospects are young companies. The pipeline path survives only if templates are configured by hand.",
+    ],
+  },
+  {
     v: "3.31.1.35",
     date: "2026-08-30",
     module: "Genie — Conversations done as a table; the General Voice",
