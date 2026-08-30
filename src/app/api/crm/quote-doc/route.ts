@@ -110,6 +110,10 @@ export async function GET(req: Request) {
       const { data: ow } = await db.from("profile").select("full_name").eq("id", String(q.owner_id)).maybeSingle();
       ownerName = String(ow?.full_name || "");
     }
+    const compactHead = `<div style="display:flex;justify-content:space-between;gap:6mm;border-bottom:1px solid #C9C6BD;padding-bottom:2mm;margin-bottom:4mm;font-size:10pt">
+      <span><b>Qtn No:</b> ${esc(q.quote_no)} &nbsp;·&nbsp; <b>Date:</b> ${esc(dIN(q.quoted_on))}</span>
+      <span><b>To:</b> ${esc(customer)}</span>
+    </div>`;
     const headBlock = `<div style="border:1px solid #C9C6BD;border-left:4px solid #1B3A5C;padding:3mm 4mm;margin-bottom:5mm;font-size:10.5pt">
       <div><b>Qtn No:</b> ${esc(q.quote_no)} &nbsp;·&nbsp; <b>Date:</b> ${esc(dIN(q.quoted_on))}</div>
       <div><b>To:</b> ${esc(customer)}${contact?.full_name ? ` — Kind Attn: ${esc(contact.full_name)}` : ""}</div>
@@ -212,7 +216,7 @@ export async function GET(req: Request) {
           if (key === "items") {
             // ONE table: Sr No · Item (rich) · Rate · Qty · Amount
             const pagesOf = chunkBy(numbered, 5.2, weightOf);
-            const chunks = pagesOf.map((page, pi) => `<h2 class="sect">Schedule of Items &amp; Prices${pi ? " (contd.)" : ""}</h2>
+            const chunks = pagesOf.map((page, pi) => `${pi === 0 ? compactHead : ""}<h2 class="sect">Schedule of Items &amp; Prices${pi ? " (contd.)" : ""}</h2>
               <table class="items"><colgroup><col class="c-sr"/><col/><col class="c-rate"/><col class="c-qty"/><col class="c-amt"/></colgroup><thead><tr><th>Sr No</th><th>Item</th><th class="tr">Rate</th><th>Qty</th><th class="tr">Amount</th></tr></thead>
               <tbody>${page.map(({ l, sr }) => `<tr>
                 <td class="tc">${sr}</td><td class="icell">${cellFull(l as unknown as Record<string, unknown>)}</td>
@@ -223,12 +227,12 @@ export async function GET(req: Request) {
           } else {
             // TECHNICAL pages (Sr No · Item, rich) then the COMMERCIAL OFFER
             const techPages = chunkBy(numbered, 5.2, weightOf);
-            const chunks = techPages.map((page, pi) => `<h2 class="sect">Schedule of Items${pi ? " (contd.)" : ""}</h2>
+            const chunks = techPages.map((page, pi) => `${pi === 0 ? compactHead : ""}<h2 class="sect">Schedule of Items${pi ? " (contd.)" : ""}</h2>
               <table class="items"><colgroup><col class="c-sr"/><col/></colgroup><thead><tr><th>Sr No</th><th>Item</th></tr></thead>
               <tbody>${page.map(({ l, sr }) => `<tr><td class="tc">${sr}</td><td class="icell">${cellFull(l as unknown as Record<string, unknown>)}</td></tr>`).join("")}</tbody></table>`);
             const comPages = chunkBy(numbered, 11, () => 1);
             for (let pi = 0; pi < comPages.length; pi++) {
-              chunks.push(`<h2 class="sect">Commercial Offer${pi ? " (contd.)" : ""}</h2>
+              chunks.push(`${pi === 0 ? compactHead : ""}<h2 class="sect">Commercial Offer${pi ? " (contd.)" : ""}</h2>
                 <table class="items"><colgroup><col class="c-sr"/><col/><col class="c-rate"/><col class="c-qty"/><col class="c-amt"/></colgroup><thead><tr><th>Sr No</th><th>Item</th><th class="tr">Rate</th><th>Qty</th><th class="tr">Amount</th></tr></thead>
                 <tbody>${comPages[pi].map(({ l, sr }) => `<tr>
                   <td class="tc">${sr}</td><td class="icell">${cellSlim(l as unknown as Record<string, unknown>)}</td>
@@ -254,7 +258,7 @@ export async function GET(req: Request) {
 
     // the first page after the cover always wears the head block
     const firstContent = secs.find((x) => x.key !== "cover");
-    if (firstContent && firstContent.key !== "letter" && firstContent.chunks.length)
+    if (firstContent && firstContent.key !== "letter" && !firstContent.key.startsWith("items") && firstContent.chunks.length)
       firstContent.chunks[0] = headBlock + firstContent.chunks[0];
     const flat: { title: string; html: string; centered?: boolean }[] = [];
     for (const s of secs) for (const c of s.chunks) flat.push({ title: s.title, html: c, centered: s.centered });
