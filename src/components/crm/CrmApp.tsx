@@ -2600,6 +2600,27 @@ function LineItemBox({ line, onClose, onSaved }: { line: QLine; onClose: () => v
               )}
               <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="image URL…"
                 className="w-full mt-1.5 px-2 py-1 rounded border text-xs" style={{ borderColor: BORDER }} />
+              {/* or straight from the computer (Dr Raghu, 30 Aug 2026) */}
+              <label className="block mt-1.5 text-xs rounded border px-2 py-1 font-bold cursor-pointer text-center"
+                style={{ borderColor: BORDER, background: "#fff", color: NAVY }}>
+                {busy ? "Uploading…" : "⬆ Upload from computer"}
+                <input type="file" className="hidden" accept="image/*" disabled={busy}
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!f) return;
+                    setBusy(true); setErr("");
+                    try {
+                      const fd = new FormData();
+                      fd.append("target_type", "quotation_line"); fd.append("target_id", line.id); fd.append("file", f);
+                      const r = await fetch("/api/crm/opp-attach", { method: "POST", body: fd });
+                      const j = await r.json();
+                      if (!r.ok) throw new Error(j.error || "Upload failed");
+                      setImage(String(j.url));
+                    } catch (e2) { setErr(e2 instanceof Error ? e2.message : String(e2)); }
+                    finally { setBusy(false); }
+                  }} />
+              </label>
             </div>
           </div>
         </div>

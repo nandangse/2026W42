@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.4",
+    date: "2026-08-30",
+    module: "CRM — the quote item's image uploads from the computer",
+    items: [
+      "The item box's IMAGE panel takes a file straight from the computer as well as a URL (Dr Raghu, 30 Aug 2026) — uploaded to the record and mirrored to Drive, like every attachment.",
+    ],
+  },
+  {
     v: "3.31.1.3",
     date: "2026-08-30",
     module: "Genie — the rich text detector sees past a leading &nbsp;",
