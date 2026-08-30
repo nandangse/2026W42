@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.26",
+    date: "2026-08-30",
+    module: "CRM — IFS walks InstaFinancials' real road: Order → Status → Download",
+    items: [
+      "InstaSummary is an ordered pipeline, not a single call (the usage panel says so: Order 10 · Status 40 · Download 20) — the 🪙 Buy now places the ORDER, polls the STATUS, and DOWNLOADS the summary, each step speaking its own words when refused. The three endpoints are adjustable in Integrations if their Doc shows different paths.",
+    ],
+  },
+  {
     v: "3.31.1.25",
     date: "2026-08-30",
     module: "CRM — Enrich with Apollo works again",

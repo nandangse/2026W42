@@ -79,19 +79,65 @@ export async function POST(req: Request) {
     const { data: cfgRow } = await db.from("integration_setting").select("config").eq("key", "instafinancials").maybeSingle();
     const cfg = (cfgRow?.config || {}) as Record<string, string>;
     if (!cfg.api_key) throw new HttpError(503, "The InstaFinancials key is not saved — Settings → Integrations, Raghu's card.");
-    const tmpl = (cfg.url_template || "https://instafinancials.com/api/InstaSummary/v1/json/CompanyCIN/{cin}").trim();
-    const url = tmpl.replace("{cin}", encodeURIComponent(cin));
+    const IH = { "user-key": cfg.api_key, accept: "application/json" };
+    const grab = async (url: string, step: string): Promise<Record<string, unknown>> => {
+      const r = await fetch(url, { headers: IH });
+      const text = await r.text();
+      if (!r.ok) throw new HttpError(502, `InstaFinancials ${step} said ${r.status}: ${text.slice(0, 200)} — the ${step.toUpperCase()}_URL_TEMPLATE in Integrations may need the path from their 🌐 Doc.`);
+      try { return JSON.parse(text) as Record<string, unknown>; } catch { throw new HttpError(502, `InstaFinancials ${step} answered but not with JSON: ${text.slice(0, 160)}`); }
+    };
+    const errOf = (j: Record<string, unknown>) => {
+      const resp = j.Response as { Status?: string; Type?: string; Message?: string } | undefined;
+      return resp?.Status === "error" ? `${resp.Type || "error"}${resp.Message ? ` — ${resp.Message}` : ""}` : null;
+    };
+    const findDeep = (o: unknown, keyRe: RegExp): string | null => {
+      if (Array.isArray(o)) { for (const x of o) { const f = findDeep(x, keyRe); if (f) return f; } return null; }
+      if (o && typeof o === "object") {
+        for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
+          if (keyRe.test(k) && (typeof v === "string" || typeof v === "number") && String(v).trim()) return String(v);
+          const f = findDeep(v, keyRe); if (f) return f;
+        }
+      }
+      return null;
+    };
 
-    const r = await fetch(url, { headers: { "user-key": cfg.api_key, accept: "application/json" } });
-    const text = await r.text();
-    if (!r.ok)
-      throw new HttpError(502, `InstaFinancials said ${r.status}: ${text.slice(0, 220)} — check the key and URL_TEMPLATE in Integrations.`);
-    let j: unknown;
-    try { j = JSON.parse(text); } catch { throw new HttpError(502, `InstaFinancials answered but not with JSON: ${text.slice(0, 180)}`); }
-    // a 200 can still carry an error body — never store one as a summary
-    const jr = j as { Response?: { Status?: string; Type?: string; Message?: string }; InstaSummary?: unknown };
-    if (jr.Response?.Status === "error" || !jr.InstaSummary)
-      throw new HttpError(502, `InstaFinancials refused: ${jr.Response?.Type || "no InstaSummary in the answer"}${jr.Response?.Message ? ` — ${jr.Response.Message}` : ""}. TotalLimitExceeded means the account has no allowance for this call — switch Sandbox to Production / add prepaid credits on instafinancials.com.`);
+    // InstaSummary is an ORDER → STATUS → DOWNLOAD pipeline (Dr Raghu's
+    // usage panel, 30 Aug 2026: Order 10 · Status 40 · Download 20).
+    // A direct-JSON template still works when configured and answering.
+    let j: Record<string, unknown> | null = null;
+    if (cfg.url_template) {
+      const direct = await grab(cfg.url_template.replace("{cin}", encodeURIComponent(cin)), "direct");
+      if (!errOf(direct) && (direct as { InstaSummary?: unknown }).InstaSummary) j = direct;
+    }
+    if (!j) {
+      const orderT = (cfg.order_url_template || "https://instafinancials.com/api/InstaSummary/v1/json/Order/CompanyCIN/{cin}").trim();
+      const statusT = (cfg.status_url_template || "https://instafinancials.com/api/InstaSummary/v1/json/OrderStatus/OrderId/{order_id}").trim();
+      const dlT = (cfg.download_url_template || "https://instafinancials.com/api/InstaSummary/v1/json/Download/OrderId/{order_id}").trim();
+      const ordered = await grab(orderT.replace("{cin}", encodeURIComponent(cin)), "order");
+      const oerr = errOf(ordered);
+      if (oerr) throw new HttpError(502, `InstaFinancials refused the ORDER: ${oerr}. If it names the wrong path, copy the Order URL from the InstaSummary 🌐 Doc into ORDER_URL_TEMPLATE (with {cin}).`);
+      // the order sometimes answers with the summary itself
+      if ((ordered as { InstaSummary?: unknown }).InstaSummary) j = ordered;
+      else {
+        const orderId = findDeep(ordered, /order.?id/i);
+        if (!orderId) throw new HttpError(502, `The ORDER answered without an order id: ${JSON.stringify(ordered).slice(0, 200)}`);
+        let done = false;
+        for (let i = 0; i < 10 && !done; i++) {
+          await new Promise((z) => setTimeout(z, 3000));
+          const st = await grab(statusT.replace("{order_id}", encodeURIComponent(orderId)), "status");
+          const stTxt = findDeep(st, /status/i) || "";
+          if (/complete|success|ready|delivered/i.test(stTxt)) done = true;
+          else if (/fail|error|reject/i.test(stTxt)) throw new HttpError(502, `The order failed at InstaFinancials: ${stTxt}`);
+        }
+        if (!done) throw new HttpError(504, "InstaFinancials is still preparing the summary — press Buy again in a minute; the order is placed and will not bill twice.");
+        const dl = await grab(dlT.replace("{order_id}", encodeURIComponent(orderId)), "download");
+        const derr = errOf(dl);
+        if (derr) throw new HttpError(502, `The DOWNLOAD refused: ${derr}`);
+        if (!(dl as { InstaSummary?: unknown }).InstaSummary)
+          throw new HttpError(502, `The download carried no InstaSummary: ${JSON.stringify(dl).slice(0, 200)}`);
+        j = dl;
+      }
+    }
 
     const now = new Date().toISOString();
     const { error } = await db.from("company").update({ cin, ifs_summary: j, ifs_at: now, ifs_by: me.email }).eq("id", cid);
