@@ -8,7 +8,7 @@
  * Consult Raghu: four living knowledgebases — Planning, Sales, Kuber,
  * Vishwakarma. He dumps knowledge in; Opus weaves it into ONE large
  * organized document; a copy files into his Drive folder. This is the
- * intelligence layer the Consult Raghu advisors will stand on.
+ * intelligence layer the Consult Dr Raghu advisors will stand on.
  */
 import { useCallback, useEffect, useState } from "react";
 
@@ -138,11 +138,11 @@ export function ConsultRaghuPanel() {
 
   return (
     <div className="bg-white rounded-lg border p-3" style={{ borderColor: BORDER }}>
-      <div className="font-bold text-sm mb-1">🎓 Consult Raghu — the knowledgebase</div>
+      <div className="font-bold text-sm mb-1">🎓 Consult Dr Raghu — the knowledgebase</div>
       <div className="text-xs mb-3" style={{ color: MUTED, maxWidth: "90ch", lineHeight: 1.5 }}>
         Four living documents, one per module. Dump knowledge in — pasted text or a text file — and Opus weaves it
         into ONE large organized document, nothing lost. A copy files into your Drive folder each time. This is the
-        intelligence layer the Consult Raghu advisors will stand on. Your eyes alone.
+        intelligence layer the Consult Dr Raghu advisors will stand on. Your eyes alone.
       </div>
       {needs && <div className="rounded px-3 py-2 mb-2 text-xs" style={{ background: "#FFF7E6", color: "#8A5B00" }}>Run Genie migration 0104 first — the knowledgebase has nowhere to live yet.</div>}
 
@@ -232,7 +232,7 @@ function DiscussionsPanel() {
     <div className="mt-4 rounded border p-3" style={{ borderColor: BORDER, background: "#fff" }}>
       <div className="font-bold text-sm mb-1">💬 The discussions — everything the team told Raghu</div>
       <div className="text-xs mb-3" style={{ color: MUTED, maxWidth: "90ch", lineHeight: 1.5 }}>
-        Every Consult Raghu conversation, newest first. Click one to read it whole. This is the raw material —
+        Every Consult Dr Raghu conversation, newest first. Click one to read it whole. This is the raw material —
         what people are actually thinking at the deal.
       </div>
       {chats === null && <div className="text-sm" style={{ color: MUTED }}>loading…</div>}

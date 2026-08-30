@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.34",
+    date: "2026-08-30",
+    module: "Genie — he is Consult DR Raghu, and his word is on the door",
+    items: [
+      "Renamed everywhere to Consult Dr Raghu (Dr Raghu, 30 Aug 2026). His own word now stands on the instructions card: he is giving his advice through the system as he would across the desk — use it for decisions, give it a lot of context, ask the right questions. And the disclaimer in his voice: use human judgement, don't blindly follow the advice. The record-side chat carries the same line, and the advisor itself now presses for context and says when a call is the salesperson's to make.",
+    ],
+  },
+  {
     v: "3.31.1.33",
     date: "2026-08-30",
     module: "Planning — Consult Raghu gets his door",

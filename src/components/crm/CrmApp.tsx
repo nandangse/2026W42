@@ -3585,10 +3585,10 @@ function RecordModal({
           </div>
           <div className="flex items-center gap-2">
             {mode === "view" && ["opportunity", "quotation", "sales_order", "company", "person", "industry", "product"].includes(dt.name) && (
-              <button onClick={() => setConsultOpen(true)} title="Consult Raghu"
+              <button onClick={() => setConsultOpen(true)} title="Consult Dr Raghu"
                 style={{ padding: 0, border: "2px solid rgba(255,255,255,.5)", borderRadius: "50%", overflow: "hidden", width: 38, height: 38, flexShrink: 0, background: "#fff" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/consult-raghu.png" alt="Consult Raghu" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <img src="/consult-raghu.png" alt="Consult Dr Raghu" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </button>
             )}
             {/* "allow to duplicate quote" (Dr Raghu, 30 Aug 2026) */}
@@ -6129,7 +6129,7 @@ function ConsultRaghuModal({ targetType, targetId, title, onClose }: {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/consult-raghu.png" alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,.4)" }} />
           <div style={{ minWidth: 0 }}>
-            <div className="text-white font-bold" style={{ fontSize: 15 }}>Consult Raghu</div>
+            <div className="text-white font-bold" style={{ fontSize: 15 }}>Consult Dr Raghu</div>
             <div className="text-xs" style={{ color: "#C8D2DC", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
           </div>
           <button onClick={onClose} className="ml-auto text-white font-bold px-2">✕</button>
@@ -6186,6 +6186,9 @@ function ConsultRaghuModal({ targetType, targetId, title, onClose }: {
             className="rounded px-3 py-2 text-sm font-bold text-white" style={{ background: busy || (!input.trim() && !pend.length) ? "#B9BEC4" : ORANGE }}>
             ➤
           </button>
+        </div>
+        <div className="text-center pb-1.5" style={{ fontSize: 10, color: MUTED }}>
+          His advice, your judgement — don&apos;t follow it blindly.
         </div>
       </div>
     </div>

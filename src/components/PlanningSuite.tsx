@@ -768,7 +768,7 @@ export default function PlanningSuite({
     ["lms", "📚 LMS"],
     // Ask, and read. One is a question about today's board; the other is how
     // the answers are meant to be reached in the first place.
-    ["consult", "🧭 Consult Raghu"],
+    ["consult", "🧭 Consult Dr Raghu"],
     ["principles", "📜 Principles"],
   ];
   // Sub-nav inside the Planning Suite workspace only.
@@ -6257,7 +6257,7 @@ function AdminTabs({ tab, setTab, owner }: { tab: AdminTab; setTab: (t: AdminTab
     <div className="flex gap-1 rounded p-1 bg-white border flex-wrap" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
       {([["users", "👥 Users"], ["org", "🧬 Org Chart"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["report", "📊 Report"], ["updates", "🗒 Updates"], ["software", "📘 Software description"],
         // the owner's two rooms (Dr Raghu, 30 Aug 2026): usage + the knowledgebase
-        ...(owner ? [["genie", "🧞 Genie"], ["consult", "🎓 Consult Raghu"]] as const : [])] as readonly (readonly [AdminTab, string])[]).map(([k, l]) => (
+        ...(owner ? [["genie", "🧞 Genie"], ["consult", "🎓 Consult Dr Raghu"]] as const : [])] as readonly (readonly [AdminTab, string])[]).map(([k, l]) => (
         <button
           key={k}
           onClick={() => setTab(k)}
@@ -8577,9 +8577,9 @@ function ConsultRaghu() {
     return (
       <div className="p-4 flex flex-col items-center" style={{ maxWidth: 900, margin: "0 auto", paddingTop: 56 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/consult-raghu.png" alt="Consult Raghu" style={{ width: 120, height: 120, borderRadius: "50%", objectFit: "cover", border: "4px solid #E8600A", boxShadow: "0 8px 28px rgba(27,45,107,.25)" }} />
+        <img src="/consult-raghu.png" alt="Consult Dr Raghu" style={{ width: 120, height: 120, borderRadius: "50%", objectFit: "cover", border: "4px solid #E8600A", boxShadow: "0 8px 28px rgba(27,45,107,.25)" }} />
         <div className="font-black mt-4" style={{ color: "#16232F", fontSize: 46, letterSpacing: 1, lineHeight: 1.1, textAlign: "center" }}>
-          CONSULT RAGHU
+          CONSULT DR RAGHU
         </div>
         <div className="text-sm mt-2 mb-6" style={{ color: "#5A6672", textAlign: "center", maxWidth: "56ch", lineHeight: 1.6 }}>
           Sit down with the boss. He has today&apos;s live board in front of him — every job, every date, every escalation.
@@ -8597,7 +8597,7 @@ function ConsultRaghu() {
       <div className="flex items-center gap-3 mb-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/consult-raghu.png" alt="" style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: "2px solid #E8600A" }} />
-        <h2 className="font-black" style={{ color: "#16232F", fontSize: 28, letterSpacing: 0.5 }}>CONSULT RAGHU</h2>
+        <h2 className="font-black" style={{ color: "#16232F", fontSize: 28, letterSpacing: 0.5 }}>CONSULT DR RAGHU</h2>
       </div>
 
       {turns.length === 0 && (
@@ -8610,6 +8610,10 @@ function ConsultRaghu() {
             <li><b>Keep asking</b> — each answer stacks below; follow up as many times as the situation needs.</li>
             <li><b>On a deal?</b> His face also sits on every CRM record — Opportunity, Quotation, Company and the rest. Click it there and he consults on that specific deal, attachments and all.</li>
           </ul>
+          <div className="rounded p-2.5 mt-2 text-xs" style={{ background: "#FFF3E8", color: "#22303C", lineHeight: 1.7, borderLeft: "3px solid #E8600A" }}>
+            <b>A word from Dr Raghu:</b> &ldquo;I am giving you my advice through this system, the way I would across the desk — that is the training I am doing here. Use it for decisions. Give it a lot of context. Ask the right questions — then I will be able to help you.&rdquo;
+            <div className="mt-1"><b>Disclaimer:</b> use human judgement. Don&apos;t blindly follow the advice.</div>
+          </div>
         </div>
       )}
 
