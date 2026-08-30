@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.38",
+    date: "2026-08-30",
+    module: "CRM — the Apollo reveal completes the masked names",
+    items: [
+      "Apollo's search tier files people with masked last names (\"Pratyush Ti***i\") and no email — that is Apollo withholding the paid part, not a fault (Dr Raghu asked why, 30 Aug 2026). The contact's Look-this-contact-up on the Visiting Card tab is the reveal: it now also corrects the NAME (auto-ticked when the current name is masked), and the masked half no longer poisons the Apollo match query. One Apollo credit per reveal, from the weekly allotment.",
+    ],
+  },
+  {
     v: "3.31.1.37",
     date: "2026-08-30",
     module: "CRM — the directors file themselves as contacts",

@@ -472,6 +472,8 @@ export function PersonCardPanel({ personId, personRow, onSaved }: {
         const t: Record<string, boolean> = {};
         for (const k of ["job_title", "department", "primary_email", "primary_phone"])
           t[k] = !!j.suggestion[k] && !String(personRow[k] ?? "").trim();
+        // a masked name ("Ti***i") wants its reveal ticked by default
+        t.name = !!j.suggestion.name && String(personRow.first_name ?? "").includes("*");
         setTicked(t);
       }
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
@@ -495,7 +497,7 @@ export function PersonCardPanel({ personId, personRow, onSaved }: {
     setBusy(null);
   };
 
-  const APPLYABLE = ["job_title", "department", "primary_email", "primary_phone"];
+  const APPLYABLE = ["name", "job_title", "department", "primary_email", "primary_phone"];
   const LABEL: Record<string, string> = {
     job_title: "Designation", department: "Department", primary_email: "Email", primary_phone: "Phone",
     linkedin: "LinkedIn", city: "Location", company: "Company (per Apollo)", seniority: "Seniority", name: "Name (per Apollo)",
@@ -543,8 +545,8 @@ export function PersonCardPanel({ personId, personRow, onSaved }: {
                 {k === "linkedin"
                   ? <a href={String(v)} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: NAVY }}>{String(v)}</a>
                   : <b style={{ color: INK }}>{String(v)}</b>}
-                {applyable && String(personRow[k] ?? "").trim() && (
-                  <span style={{ fontSize: 10.5, color: MUTED }}>(now: {String(personRow[k])})</span>
+                {applyable && String(personRow[k === "name" ? "first_name" : k] ?? "").trim() && (
+                  <span style={{ fontSize: 10.5, color: MUTED }}>(now: {String(personRow[k === "name" ? "first_name" : k])})</span>
                 )}
               </div>
             );

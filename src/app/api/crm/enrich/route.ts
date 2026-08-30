@@ -187,6 +187,10 @@ export async function POST(req: Request) {
         const v = String((body.fields || {})[k] ?? "").trim();
         if (v) patch[k] = v;
       }
+      // Apollo's search tier files masked names ("Pratyush Ti***i") — the
+      // reveal is allowed to correct the name itself (Dr Raghu, 30 Aug 2026)
+      const nm = String((body.fields || {}).name ?? "").trim();
+      if (nm) patch.first_name = nm.slice(0, 180);
       if (!Object.keys(patch).length) throw new HttpError(400, "Nothing ticked to apply.");
       const { error } = await db.from("person").update(patch).eq("id", personId);
       if (error) throw new HttpError(500, error.message);
@@ -215,7 +219,8 @@ export async function POST(req: Request) {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": apiKey },
       body: JSON.stringify({
-        name: String(person.first_name || "") || undefined,
+        // a masked "Ti***i" half would poison the match — send the clean part
+        name: String(person.first_name || "").split(/\s+/).filter((w) => !w.includes("*")).join(" ") || undefined,
         email: String(person.primary_email || "") || undefined,
         organization_name: companyName || undefined,
         reveal_personal_emails: false,
