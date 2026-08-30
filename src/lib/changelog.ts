@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.79",
+    date: "2026-08-30",
+    module: "CRM — the quote desk cleaned to Dr Raghu's hand",
+    items: [
+      "Create Quote leaned (Dr Raghu, 30 Aug 2026): quote value gone (the lines compute it), the ₹0 clutter — freight, insurance, packing, installation, subtotal, tax, margin — gone from the record; one computed Value remains.",
+      "A quotation is born at Closure = DRAFT and stays there until sent; the stage now also shows in the record's top header.",
+      "Defaults that think: the signed-in person is the Salesperson, Valid until lands on the LAST date of next month, Delivery reads 8-12 weeks.",
+      "Payment Terms is now a Masters dropdown — a new Payment Terms master under Masters holds the list.",
+      "Address is a dropdown of the client's own addresses, the client's first one pre-picked.",
+      "The quote's main screen carries all the client's contacts with To / CC ticks — the send list lives on the quote. CRM migration 0034 carries the columns.",
+    ],
+  },
+  {
     v: "3.31.0.78",
     date: "2026-08-30",
     module: "CRM — the product record grows its tabs",

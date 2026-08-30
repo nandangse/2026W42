@@ -1792,6 +1792,102 @@ function ProductTrainingTab({ id, group }: { id: string; group: string | null })
   );
 }
 
+/** The client's addresses in a dropdown, the client's own as default
+ *  (Dr Raghu, 30 Aug 2026: "Address have a drop down — the default should
+ *  be the one of the client"). */
+function AddressSelect({ companyId, value, onPick }: {
+  companyId: string; value: string; onPick: (id: string) => void;
+}) {
+  const [opts, setOpts] = useState<{ id: string; label: string }[]>([]);
+  useEffect(() => {
+    if (!companyId) { setOpts([]); return; }
+    let dead = false;
+    void (async () => {
+      try {
+        const j = await (await fetch(`/api/crm/address?f_company_id=${encodeURIComponent(companyId)}&limit=100`, { cache: "no-store" })).json();
+        const rows = (j.rows ?? []) as Row[];
+        if (!dead) setOpts(rows.map((r) => ({
+          id: String(r.id),
+          label: [r.label, r.line1, r.city].filter(Boolean).join(" · ") || String(r.id),
+        })));
+      } catch { /* the quote can still save without one */ }
+    })();
+    return () => { dead = true; };
+  }, [companyId]);
+  useEffect(() => {
+    if (!value && opts.length) onPick(opts[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opts]);
+  return (
+    <select value={value} onChange={(e) => onPick(e.target.value)}
+      className="w-full px-2 py-1.5 rounded text-sm border" style={{ borderColor: "#E2E0DA", background: "#fff" }}>
+      <option value="">{companyId ? (opts.length ? "—" : "no address on the company yet") : "pick the company first"}</option>
+      {opts.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+    </select>
+  );
+}
+
+/** All the client's contacts on the quote's main screen, each tickable as
+ *  To or CC (Dr Raghu, 30 Aug 2026). */
+function QuoteRecipients({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
+  const companyId = row.company_id ? String(row.company_id) : "";
+  type P = { id: string; full_name: string | null; primary_email: string | null; designation: string | null };
+  const [people, setPeople] = useState<P[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const to = new Set(Array.isArray(row.mail_to) ? (row.mail_to as unknown[]).map(String) : []);
+  const cc = new Set(Array.isArray(row.mail_cc) ? (row.mail_cc as unknown[]).map(String) : []);
+  useEffect(() => {
+    if (!companyId) { setPeople([]); return; }
+    fetch(`/api/crm/person?f_company_id=${encodeURIComponent(companyId)}&limit=200`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); setPeople((j.rows ?? []) as P[]); })
+      .catch(() => setPeople([]));
+  }, [companyId]);
+  const toggle = async (kind: "mail_to" | "mail_cc", pid: string) => {
+    const cur = kind === "mail_to" ? to : cc;
+    const n = new Set(cur);
+    if (n.has(pid)) n.delete(pid); else n.add(pid);
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch(`/api/crm/quotation?id=${encodeURIComponent(String(row.id))}`, {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ [kind]: [...n] }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save");
+      onSaved(j.row as Row);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="rounded border p-3 mt-1" style={{ borderColor: BORDER }}>
+      <div className="text-xs font-bold mb-1.5" style={{ color: MUTED, letterSpacing: 0.6 }}>
+        CONTACTS — TO / CC {busy && <span style={{ fontWeight: 500 }}>saving…</span>}
+      </div>
+      {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
+      {people === null && <div className="text-sm" style={{ color: MUTED }}>reading the client&apos;s people…</div>}
+      {people !== null && people.length === 0 && <div className="text-sm" style={{ color: MUTED }}>{companyId ? "The client has no contacts on record yet — add them on the Contacts tab." : "Put a company on the quote first."}</div>}
+      {people !== null && people.length > 0 && (
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead><tr style={{ textAlign: "left", color: MUTED, fontSize: 11 }}>
+            <th className="py-1 pr-3">NAME</th><th className="py-1 pr-3">EMAIL</th>
+            <th className="py-1 pr-3" style={{ width: 48 }}>TO</th><th className="py-1" style={{ width: 48 }}>CC</th></tr></thead>
+          <tbody>
+            {people.map((p) => (
+              <tr key={p.id} style={{ borderTop: `1px solid ${BORDER}` }}>
+                <td className="py-1.5 pr-3">{p.full_name || "—"}{p.designation ? <span style={{ color: MUTED }}> · {p.designation}</span> : null}</td>
+                <td className="py-1.5 pr-3" style={{ color: p.primary_email ? undefined : "#C7CCD2" }}>{p.primary_email || "no email on record"}</td>
+                <td className="py-1.5 pr-3"><input type="checkbox" checked={to.has(p.id)} disabled={busy} onChange={() => void toggle("mail_to", p.id)} style={{ accentColor: NAVY }} /></td>
+                <td className="py-1.5"><input type="checkbox" checked={cc.has(p.id)} disabled={busy} onChange={() => void toggle("mail_cc", p.id)} style={{ accentColor: NAVY }} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 /** The first actionable email and phone in a row, whichever fields hold them. */
 function rowContacts(dt: Doctype, r: Row): { email: string | null; phone: string | null } {
   let email: string | null = null, phone: string | null = null;
@@ -2120,6 +2216,12 @@ function RecordModal({
                   № {(String(row.opportunity_no).match(/(\d+)\s*$/) || [])[1] ?? String(row.opportunity_no)}
                 </span>
               )}
+              {/* the quote's stage lives in the header (Dr Raghu, 30 Aug 2026) */}
+              {dt.name === "quotation" && row.stage_id != null && (
+                <span className="font-bold rounded px-1.5" style={{ background: "rgba(255,255,255,.12)", color: "#fff" }}>
+                  {linkLabel("stage", row.stage_id) ?? "—"}
+                </span>
+              )}
               {row.company_id != null && <span><b style={{ color: "#fff" }}>{linkLabel("company", row.company_id) ?? "—"}</b></span>}
               {row.owner_id != null && <span>: {linkLabel("profile", row.owner_id) ?? "—"}</span>}
               {ageDays !== null && (
@@ -2258,6 +2360,13 @@ function RecordModal({
                   </div>
                 </div>
               ))}
+              {/* the quote's To and CC live on the main screen
+                  (Dr Raghu, 30 Aug 2026) */}
+              {dt.name === "quotation" && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <QuoteRecipients row={row} onSaved={onSaved} />
+                </div>
+              )}
             </div>
             )
           ) : tab === "pquotes" ? (
@@ -3866,6 +3975,12 @@ function RecordForm({
         // default: "me" on a profile link = the signed-in person (29 Aug 2026)
         if (f.link === "profile" && f.default === "me")
           dv = MY_PROFILE_ID ?? "";
+        // default: "end_next_month" = the LAST DATE OF NEXT MONTH — a
+        // quote's valid-until (Dr Raghu, 30 Aug 2026)
+        if (f.type === "date" && f.default === "end_next_month") {
+          const n = new Date(Date.now() + 330 * 60000);
+          dv = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() + 2, 0)).toISOString().slice(0, 10);
+        }
         // The close is expected by the LAST DATE OF NEXT MONTH unless said
         // otherwise (Dr Raghu, 26 Aug 2026).
         if (dt.name === "opportunity" && f.name === "expected_close_on") {
@@ -4011,6 +4126,12 @@ function RecordForm({
                   <option key={o} value={o}>{o}</option>
                 ))}
               </select>
+            ) : f.type === "link" && f.link === "address" ? (
+              <AddressSelect
+                companyId={String(form.company_id ?? "")}
+                value={String(form[f.name] ?? "")}
+                onPick={(id) => set(f.name, id)}
+              />
             ) : f.type === "link" && f.link === "person" ? (
               <PersonTypeAhead
                 value={String(form[f.name] ?? "")}

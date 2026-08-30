@@ -446,6 +446,11 @@ export async function POST(req: Request, { params }: { params: { doctype: string
       const { data: st } = await db.from("stage").select("id").eq("code", "new").maybeSingle();
       if (st) row.stage_id = st.id;
     }
+    // A quotation is born DRAFT until it is sent (Dr Raghu, 30 Aug 2026).
+    if (d.name === "quotation" && !row.stage_id) {
+      const { data: st } = await db.from("stage").select("id").eq("code", "q_draft").maybeSingle();
+      if (st) row.stage_id = st.id;
+    }
 
     // Human-facing numbers come from the database, never from counting rows —
     // unless the form carries one already (an ERP import keeps its number).
@@ -526,6 +531,12 @@ export async function PATCH(req: Request, { params }: { params: { doctype: strin
     for (const f of d.fields) {
       if (f.type === "readonly" || f.virtual || !(f.name in body)) continue;
       row[f.name] = coerce(f, body[f.name]);
+    }
+    // the quote's To and CC (Dr Raghu, 30 Aug 2026) — arrays of person ids,
+    // no doctype field of their own so they pass through here
+    if (d.name === "quotation") {
+      for (const k of ["mail_to", "mail_cc"] as const)
+        if (Array.isArray(body[k])) row[k] = (body[k] as unknown[]).map(String).slice(0, 50);
     }
     if (!Object.keys(row).length) throw new HttpError(400, "Nothing to update.");
 
