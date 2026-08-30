@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.1",
+    date: "2026-08-30",
+    module: "CRM — the line always files; the quote duplicates",
+    items: [
+      "A quote item now saves from ANY tab, old or new — the server itself fills every required column an old cached page fails to send (Dr Raghu, 30 Aug 2026: \"quote item not saving\"). With the line filed, the PDF carries the items too.",
+      "⧉ DUPLICATE in the quote's header: a fresh number, every field and every line copied, born at Draft with today's date — the fastest road to a revision.",
+    ],
+  },
+  {
     v: "3.31.1.0",
     date: "2026-08-30",
     module: "THE QUOTE ENGINE — a milestone, on Dr Raghu's word",

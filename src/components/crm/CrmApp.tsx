@@ -3301,6 +3301,28 @@ function RecordModal({
             )}
           </div>
           <div className="flex items-center gap-2">
+            {/* "allow to duplicate quote" (Dr Raghu, 30 Aug 2026) */}
+            {mode === "view" && dt.name === "quotation" && (
+              <button
+                onClick={async () => {
+                  if (!window.confirm(`Duplicate ${title}?\n\nA fresh quote number carries every field and every line, born at Draft with today's date.`)) return;
+                  try {
+                    const r = await fetch("/api/crm/quote-duplicate", {
+                      method: "POST", headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ quotation_id: rid }),
+                    });
+                    const j = await r.json();
+                    if (!r.ok) throw new Error(j.error || "Could not duplicate");
+                    onSaved();
+                    onOpenLink("quotation", String(j.id));
+                  } catch (e) { window.alert(e instanceof Error ? e.message : String(e)); }
+                }}
+                className="px-3 py-1.5 rounded text-sm font-semibold"
+                style={{ background: "rgba(255,255,255,.10)", color: "#fff", border: "1px solid rgba(255,255,255,.3)" }}
+              >
+                ⧉ Duplicate
+              </button>
+            )}
             {mode === "view" && (dt.name === "company" || dt.name === "person") && (
               <button
                 onClick={async () => {

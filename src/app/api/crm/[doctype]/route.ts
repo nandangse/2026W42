@@ -446,6 +446,18 @@ export async function POST(req: Request, { params }: { params: { doctype: string
       const { data: st } = await db.from("stage").select("id").eq("code", "new").maybeSingle();
       if (st) row.stage_id = st.id;
     }
+    // A quote line survives ANY client: the NOT NULL columns get their
+    // defaults server-side, whatever an old cached tab failed to send.
+    if (d.name === "quotation_line") {
+      if (row.unit_cost === null || row.unit_cost === undefined) row.unit_cost = 0;
+      if (row.discount_pct === null || row.discount_pct === undefined) row.discount_pct = 0;
+      if (row.gst_rate === null || row.gst_rate === undefined) row.gst_rate = 18;
+      if (row.is_optional === null || row.is_optional === undefined) row.is_optional = false;
+      if (!(Number(row.quantity) > 0)) row.quantity = 1;
+      if (row.unit_price === null || row.unit_price === undefined) row.unit_price = 0;
+      if (!row.uom) row.uom = "Nos";
+    }
+
     // A quotation is born DRAFT until it is sent (Dr Raghu, 30 Aug 2026).
     if (d.name === "quotation" && !row.stage_id) {
       const { data: st } = await db.from("stage").select("id").eq("code", "q_draft").maybeSingle();
