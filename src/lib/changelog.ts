@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.50",
+    date: "2026-08-30",
+    module: "CRM — the enquiry desk",
+    items: [
+      "THE ENQUIRY TAB IS A DESK NOW (Dr Raghu, 30 Aug 2026): the enquiry text takes the LEFT HALF — rich text, ✎ pencil-edited in place without touching the full Edit, and 📎 ADD ATTACHMENT uploads a file and weaves its login-gated link straight into the text.",
+      "ASK GENIE on the RIGHT HALF: one press and Opus reads the customer, the contact, the history, the invoices and the industry record — have we done this before, what is the relation, what is the scope — a quick CRM-only read that answers in seconds, no web, a fraction of an EVA brief's cost.",
+      "ENQUIRY NUMBERS wear the full dress: new enquiries are NGSE/ENQ/26-27/xxxxx continuing the ERP's counter, and the lightbox HEADER shows the number's last digits with the whole number on hover.",
+    ],
+  },
+  {
     v: "3.31.0.49",
     date: "2026-08-30",
     module: "Delivered Jobs — what the period can still produce",

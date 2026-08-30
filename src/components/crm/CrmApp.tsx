@@ -1616,6 +1616,13 @@ function RecordModal({
             </div>
             <div className="text-white font-bold" style={{ fontSize: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>
             <div style={{ fontSize: 12, color: "#C8D2DC", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "baseline", marginTop: 2 }}>
+              {/* the enquiry number, trailing digits — the whole dress on hover
+                  (Dr Raghu, 30 Aug 2026: "show this in the header, the last digits") */}
+              {dt.name === "opportunity" && row.opportunity_no != null && (
+                <span title={String(row.opportunity_no)} className="font-bold rounded px-1.5" style={{ background: "rgba(255,255,255,.12)", color: "#fff" }}>
+                  № {(String(row.opportunity_no).match(/(\d+)\s*$/) || [])[1] ?? String(row.opportunity_no)}
+                </span>
+              )}
               {row.company_id != null && <span><b style={{ color: "#fff" }}>{linkLabel("company", row.company_id) ?? "—"}</b></span>}
               {row.owner_id != null && <span>: {linkLabel("profile", row.owner_id) ?? "—"}</span>}
               {ageDays !== null && (
@@ -1753,13 +1760,15 @@ function RecordModal({
               ))}
             </div>
           ) : tab === "enquiry" ? (
-            <div className="p-4">
-              <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "calc(100vh - 260px)", overflowY: "auto", overflowWrap: "anywhere" }}>
-                {String(row.enquiry_info ?? "").trim()
-                  ? <RichText text={String(row.enquiry_info)} />
-                  : <span style={{ color: MUTED }}>No enquiry text recorded.</span>}
-              </div>
-            </div>
+            dt.name === "opportunity"
+              ? <EnquiryInfoTab row={row} onSaved={onSaved} />
+              : <div className="p-4">
+                  <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "calc(100vh - 260px)", overflowY: "auto", overflowWrap: "anywhere" }}>
+                    {String(row.enquiry_info ?? "").trim()
+                      ? <RichText text={String(row.enquiry_info)} />
+                      : <span style={{ color: MUTED }}>No enquiry text recorded.</span>}
+                  </div>
+                </div>
           ) : tab === "oppenquiry" ? (
             <OppEnquiryTab oppId={row.opportunity_id ? String(row.opportunity_id) : null} />
           ) : tab === "qual" ? (
@@ -2655,6 +2664,124 @@ function GenieTab({ type, id }: { type: string; id: string }) {
  */
 /** The linked opportunity's enquiry, worn by the quotation (Dr Raghu,
  *  29 Aug 2026) — read live from the opportunity, attachments included. */
+/**
+ * THE ENQUIRY DESK (Dr Raghu, 30 Aug 2026): the enquiry text on the left —
+ * rich text, pencil-edited in place, attachments woven in as links — and
+ * ASK GENIE on the right: a quick Opus read of the customer, the contact and
+ * the enquiry, from the CRM's own record alone.
+ */
+function EnquiryInfoTab({ row, onSaved }: { row: Row; onSaved: () => void }) {
+  const rid = String(row.id);
+  const [text, setText] = useState(String(row.enquiry_info ?? ""));
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState("");
+  const [msg, setMsg] = useState("");
+  const [brief, setBrief] = useState("");
+  useEffect(() => { setText(String(row.enquiry_info ?? "")); setEditing(false); setBrief(""); setMsg(""); }, [rid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const save = async (next: string) => {
+    setBusy("save"); setMsg("");
+    try {
+      const r = await fetch(`/api/crm/opportunity?id=${encodeURIComponent(rid)}`, {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ enquiry_info: next }),
+      });
+      if (!r.ok) throw new Error((await r.json()).error || "Could not save");
+      setText(next); setEditing(false); onSaved();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy("");
+  };
+
+  const attach = async (file: File) => {
+    setBusy("attach"); setMsg("");
+    try {
+      const fd = new FormData();
+      fd.set("opportunity_id", rid); fd.set("file", file);
+      const r = await fetch("/api/crm/opp-attach", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Upload failed");
+      const isImg = /\.(png|jpe?g|gif|webp)$/i.test(String(j.name));
+      await save((text ? text + "\n\n" : "") + `${isImg ? "🖼 " : "📎 "}[${j.name}](${j.url})`);
+      setMsg("Attached ✓");
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy("");
+  };
+
+  const askGenie = async () => {
+    setBusy("genie"); setBrief("");
+    try {
+      const r = await fetch("/api/crm/opp-brief", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ opportunity_id: rid }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Genie could not answer");
+      setBrief(String(j.brief || ""));
+    } catch (e) { setBrief(""); setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy("");
+  };
+
+  const [draft, setDraft] = useState("");
+  return (
+    <div className="p-4 flex gap-3 flex-wrap" style={{ alignItems: "flex-start" }}>
+      {/* LEFT — the enquiry, half the room */}
+      <div style={{ flex: "1 1 420px", minWidth: 320 }}>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.6 }}>ENQUIRY INFO</span>
+          {!editing && (
+            <button onClick={() => { setDraft(text); setEditing(true); }} title="Edit the enquiry text right here"
+              className="text-xs rounded border px-1.5 py-0.5 font-bold" style={{ borderColor: BORDER, color: "#5A6672", background: "#fff" }}>✎</button>
+          )}
+          <label className="text-xs rounded border px-2 py-0.5 font-bold cursor-pointer" style={{ borderColor: BORDER, color: NAVY, background: "#fff" }}>
+            {busy === "attach" ? "Attaching…" : "📎 Add Attachment"}
+            <input type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void attach(f); e.target.value = ""; }} />
+          </label>
+          {msg && <span className="text-xs font-semibold" style={{ color: msg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{msg}</span>}
+        </div>
+        {editing ? (
+          <div>
+            <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={16}
+              className="w-full rounded border p-3 text-sm" style={{ borderColor: ORANGE, lineHeight: 1.6 }}
+              placeholder="The enquiry, in the customer's words — **bold**, [links](https://…) and bullets render as rich text." />
+            <div className="flex gap-2 mt-1.5">
+              <button onClick={() => void save(draft)} disabled={busy === "save"} className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: "#0D7A3F" }}>
+                {busy === "save" ? "Saving…" : "✓ Save"}
+              </button>
+              <button onClick={() => setEditing(false)} className="rounded px-3 py-1 text-xs font-bold" style={{ background: "#EFEDE7", color: "#5A6672" }}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "calc(100vh - 300px)", overflowY: "auto", overflowWrap: "anywhere" }}>
+            {text.trim() ? <RichText text={text} /> : <span style={{ color: MUTED }}>No enquiry text recorded — ✎ writes it right here.</span>}
+          </div>
+        )}
+      </div>
+
+      {/* RIGHT — Ask Genie */}
+      <div style={{ flex: "1 1 380px", minWidth: 300 }}>
+        <div className="rounded-lg border p-3" style={{ borderColor: "#D9CFF2", background: "#FBFAFE", borderTop: "3px solid #7C3AED" }}>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-bold" style={{ color: "#7C3AED", letterSpacing: 0.8 }}>✨ ASK GENIE</span>
+            <button onClick={() => void askGenie()} disabled={busy === "genie"}
+              className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: busy === "genie" ? "#B9BEC4" : "#7C3AED" }}>
+              {busy === "genie" ? "Reading the record…" : brief ? "Ask again" : "Ask Genie"}
+            </button>
+          </div>
+          <div className="text-xs mb-2" style={{ color: "#5A6672", lineHeight: 1.5 }}>
+            Checks the customer, the contact and the enquiry — have we done this before, what is the relation
+            with the customer, what is the scope in the industry. A quick read of the CRM record, no web.
+          </div>
+          {brief
+            ? <div className="rounded bg-white border p-3 text-sm" style={{ borderColor: "#E2E0DA", lineHeight: 1.6, maxHeight: "calc(100vh - 380px)", overflowY: "auto" }}><RichText text={brief} /></div>
+            : busy === "genie"
+              ? <div className="text-xs py-4 text-center" style={{ color: MUTED }}>Opus is reading the customer, the history and the enquiry…</div>
+              : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OppEnquiryTab({ oppId }: { oppId: string | null }) {
   const [text, setText] = useState<string | null>(null);
   useEffect(() => {
