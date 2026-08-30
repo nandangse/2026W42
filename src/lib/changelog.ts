@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.55",
+    date: "2026-08-30",
+    module: "Delivered Jobs — run rate vs target vs required",
+    items: [
+      "A FOURTH BOX on the headline row (Dr Raghu, 30 Aug 2026): RUN RATE / MONTH · TARGET · REQUIRED — nos, value and throughput. The run rate is the period's actual monthly pace; the target is the settings' number (10 Cr value, 4 Cr throughput a month — migration 0102 makes it editable without a deploy); REQUIRED is what each remaining month of the period must deliver to end on target, red when the pace demanded exceeds the target itself.",
+    ],
+  },
+  {
     v: "3.31.0.54",
     date: "2026-08-30",
     module: "Delivered Jobs — the band and the Installation Stage",

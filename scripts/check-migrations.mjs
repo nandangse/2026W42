@@ -70,6 +70,7 @@ const PROBES = [
   ["genie", "0099 new designation", "hrms_appraisal?select=new_designation&limit=1"],
   ["genie", "0100 learning queue order", "lms_progress?select=sort_order&limit=1"],
   ["genie", "0101 lms urls", "lms_lesson?select=code&limit=1"],
+  ["genie", "0102 delivered targets", "app_settings?select=delivered_targets&limit=1"],
   // 0030 widens a CHECK — no new column to probe; verified by queueing a company
 
   ["crm", "0029 opportunity contact", "opportunity?select=contact_id&limit=1"],

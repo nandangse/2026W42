@@ -106,9 +106,21 @@ export async function GET() {
       });
     } catch { /* the board is optional context here */ }
 
+    // the monthly TARGET the run-rate box measures against — from settings
+    // once 0102 is in; the stated numbers (10 Cr value, 4 Cr throughput,
+    // Dr Raghu, 30 Aug 2026) carry until then
+    let targets = { value_cr: 10, tp_cr: 4 };
+    try {
+      const { data: st } = await adminClient().from("app_settings").select("delivered_targets").eq("id", true).maybeSingle();
+      const t = (st?.delivered_targets ?? null) as { value_cr?: number; tp_cr?: number } | null;
+      if (t && (Number(t.value_cr) || Number(t.tp_cr)))
+        targets = { value_cr: Number(t.value_cr) || 10, tp_cr: Number(t.tp_cr) || 4 };
+    } catch { /* pre-0102 — the defaults stand */ }
+
     return NextResponse.json({
       pipeline,
       installation,
+      targets,
       jobs: rows.map((r) => ({
         ...r,
         val: Number(r.val) || 0,
