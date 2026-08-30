@@ -94,10 +94,14 @@ export async function GET(req: Request) {
           .eq("chat_id", one).order("at").limit(200);
         return NextResponse.json({ messages: msgs ?? [] });
       }
-      const { data: chats } = await db.from("consult_chat")
-        .select("id, profile_id, target_type, target_id, started_at")
-        .order("started_at", { ascending: false }).limit(300);
-      const rows = chats ?? [];
+      let chats = (await db.from("consult_chat")
+        .select("id, profile_id, target_type, target_id, started_at, remarks")
+        .order("started_at", { ascending: false }).limit(300)).data as Record<string, unknown>[] | null;
+      if (!chats) // pre-0046: no remarks column yet
+        chats = (await db.from("consult_chat")
+          .select("id, profile_id, target_type, target_id, started_at")
+          .order("started_at", { ascending: false }).limit(300)).data as Record<string, unknown>[] | null;
+      const rows = (chats ?? []) as { id: string; profile_id: string; target_type: string; target_id: string; started_at: string; remarks?: string | null }[];
       const profIds = [...new Set(rows.map((c) => String(c.profile_id)))];
       const names = new Map<string, string>();
       if (profIds.length) {
@@ -105,25 +109,33 @@ export async function GET(req: Request) {
         for (const p of profs ?? []) names.set(String(p.id), String(p.full_name));
       }
       const labels = await targetLabels(db, rows);
-      const counts = new Map<string, { n: number; last: string }>();
+      const counts = new Map<string, { n: number; first: string; last: string; letters: number }>();
       if (rows.length) {
-        const { data: ms } = await db.from("consult_msg").select("chat_id, at")
+        const { data: ms } = await db.from("consult_msg").select("chat_id, at, content")
           .in("chat_id", rows.map((c) => c.id)).order("at");
         for (const m of ms ?? []) {
-          const cur = counts.get(String(m.chat_id)) ?? { n: 0, last: "" };
-          cur.n++; cur.last = String(m.at);
+          const txt = String(m.content);
+          if (txt.startsWith("(The salesperson has just sat down")) continue;
+          const cur = counts.get(String(m.chat_id)) ?? { n: 0, first: String(m.at), last: "", letters: 0 };
+          cur.n++; cur.last = String(m.at); cur.letters += txt.length;
           counts.set(String(m.chat_id), cur);
         }
       }
       return NextResponse.json({
-        chats: rows.map((c) => ({
-          id: c.id, started_at: c.started_at,
-          who: names.get(String(c.profile_id)) ?? "—",
-          target_type: c.target_type, target_id: c.target_id,
-          target: labels.get(`${c.target_type}:${c.target_id}`) || c.target_type,
-          messages: counts.get(String(c.id))?.n ?? 0,
-          last_at: counts.get(String(c.id))?.last ?? c.started_at,
-        })),
+        chats: rows.map((c) => {
+          const k = counts.get(String(c.id));
+          return {
+            id: c.id, started_at: c.started_at,
+            who: names.get(String(c.profile_id)) ?? "—",
+            target_type: c.target_type, target_id: c.target_id,
+            target: labels.get(`${c.target_type}:${c.target_id}`) || c.target_type,
+            messages: k?.n ?? 0,
+            last_at: k?.last ?? c.started_at,
+            minutes: k ? Math.max(1, Math.round((new Date(k.last).getTime() - new Date(k.first).getTime()) / 60000)) : 0,
+            letters: k?.letters ?? 0,
+            remarks: c.remarks ?? "",
+          };
+        }),
       });
     }
 
@@ -143,6 +155,27 @@ export async function GET(req: Request) {
     const msg = e instanceof Error ? e.message : String(e);
     if (/consult_chat|does not exist|schema cache/i.test(msg))
       return NextResponse.json({ chat_id: null, messages: [], needsMigration: true });
+    return errJson(e);
+  }
+}
+
+/** Dr Raghu's remark on a conversation — his eyes, his hand. */
+export async function PATCH(req: Request) {
+  try {
+    const me = await requireCrm();
+    if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
+    if (me.email.toLowerCase() !== "raghu@nandan.co.in") throw new HttpError(403, "Dr Raghu's hand alone.");
+    const body = await req.json();
+    const chatId = String(body.chat_id || "");
+    if (!chatId) throw new HttpError(400, "Which conversation?");
+    const { error } = await crmDb().from("consult_chat")
+      .update({ remarks: String(body.remarks ?? "").slice(0, 2000) }).eq("id", chatId);
+    if (error) {
+      if (/remarks|schema cache/i.test(error.message)) throw new HttpError(503, "Run CRM migration 0046 first — the Remarks column is not built yet.");
+      throw new HttpError(500, error.message);
+    }
+    return NextResponse.json({ ok: true });
+  } catch (e) {
     return errJson(e);
   }
 }
@@ -179,8 +212,11 @@ export async function POST(req: Request) {
     // the knowledgebase — Dr Raghu's own words, from the MAIN database
     let kb = "";
     try {
-      const { data: kbRow } = await adminClient().from("consult_kb").select("content").eq("section", "sales").maybeSingle();
-      kb = String(kbRow?.content || "").slice(0, 30000);
+      const { data: kbRows } = await adminClient().from("consult_kb").select("section, content")
+        .in("section", ["general_voice", "sales"]);
+      const bySec = new Map((kbRows ?? []).map((r) => [String(r.section), String(r.content || "")]));
+      kb = [bySec.get("general_voice"), bySec.get("sales")].filter(Boolean)
+        .map((t) => String(t).slice(0, 15000)).join("\n\n---\n\n").slice(0, 30000);
     } catch { /* the advisor stands on Nandan alone until the kb exists */ }
 
     const brief = await recordBrief(db, tt, tid);

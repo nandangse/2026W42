@@ -94,11 +94,14 @@ const SECTIONS: [string, string, string][] = [
   ["sales", "🤝 Sales", "How Dr Raghu sells — qualification, pricing, the close."],
   ["kuber", "💰 Kuber", "How Dr Raghu reads the money — collections, margins, discipline."],
   ["vishwakarma", "🔨 Vishwakarma", "How Dr Raghu builds — the works, quality, the floor."],
+  ["general_voice", "🗣️ General Voice", "How Dr Raghu speaks and decides — the voice that applies everywhere."],
 ];
 type KbRow = { content: string; version: number; updated_at?: string };
 type KbUpload = { filename: string | null; chars: number; note: string | null; uploaded_at: string };
 
 export function ConsultRaghuPanel() {
+  // "First - Knowledgebase / Next - Conversations done" (Dr Raghu, 30 Aug 2026)
+  const [view, setView] = useState<"kb" | "conv">("kb");
   const [section, setSection] = useState("planning");
   const [row, setRow] = useState<KbRow | null>(null);
   const [uploads, setUploads] = useState<KbUpload[]>([]);
@@ -138,9 +141,19 @@ export function ConsultRaghuPanel() {
 
   return (
     <div className="bg-white rounded-lg border p-3" style={{ borderColor: BORDER }}>
-      <div className="font-bold text-sm mb-1">🎓 Consult Dr Raghu — the knowledgebase</div>
+      <div className="font-bold text-sm mb-2">🎓 Consult Dr Raghu</div>
+      <div className="flex gap-1 mb-3">
+        {([["kb", "📚 Knowledgebase"], ["conv", "💬 Conversations done"]] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setView(k)} className="px-3 py-1.5 rounded text-sm font-bold"
+            style={view === k ? { background: ORANGE, color: "#fff" } : { color: "#5A6672", border: `1px solid ${BORDER}` }}>
+            {l}
+          </button>
+        ))}
+      </div>
+      {view === "conv" ? <DiscussionsPanel /> : (<>
+      <div className="font-bold text-sm mb-1">The knowledgebase</div>
       <div className="text-xs mb-3" style={{ color: MUTED, maxWidth: "90ch", lineHeight: 1.5 }}>
-        Four living documents, one per module. Dump knowledge in — pasted text or a text file — and Opus weaves it
+        Five living documents — one per module, and the General Voice that applies everywhere. Dump knowledge in — pasted text or a text file — and Opus weaves it
         into ONE large organized document, nothing lost. A copy files into your Drive folder each time. This is the
         intelligence layer the Consult Dr Raghu advisors will stand on. Your eyes alone.
       </div>
@@ -203,64 +216,125 @@ export function ConsultRaghuPanel() {
           ))}
         </div>
       )}
-      <DiscussionsPanel />
+      </>)}
     </div>
   );
 }
 
 /** "where can i see all the collated discussions?" (Dr Raghu, 30 Aug 2026) —
- *  every Consult Raghu conversation across the team, his eyes alone. */
+ *  Conversations done: Date · By · From · Record · Minutes · Letters ·
+ *  Remarks, a row per consultation; clicking opens the lightbox. */
 function DiscussionsPanel() {
-  type ChatRow = { id: string; who: string; target_type: string; target: string; messages: number; last_at: string; started_at: string };
+  type ChatRow = { id: string; who: string; target_type: string; target: string; messages: number; last_at: string; started_at: string; minutes: number; letters: number; remarks: string };
   const [chats, setChats] = useState<ChatRow[] | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<ChatRow | null>(null);
   const [thread, setThread] = useState<{ role: string; content: string }[] | null>(null);
+  const [remark, setRemark] = useState<Record<string, string>>({});
+  const [rMsg, setRMsg] = useState("");
   useEffect(() => {
     fetch("/api/crm/consult?all=1", { cache: "no-store" }).then((r) => r.json())
-      .then((j) => setChats(j.chats ?? [])).catch(() => setChats([]));
+      .then((j) => {
+        const rows: ChatRow[] = j.chats ?? [];
+        setChats(rows);
+        setRemark(Object.fromEntries(rows.map((c) => [c.id, c.remarks || ""])));
+      }).catch(() => setChats([]));
   }, []);
-  const read = async (id: string) => {
-    if (open === id) { setOpen(null); return; }
-    setOpen(id); setThread(null);
+  const read = async (c: ChatRow) => {
+    setOpen(c); setThread(null);
     try {
-      const j = await (await fetch(`/api/crm/consult?all=1&chat_id=${id}`, { cache: "no-store" })).json();
+      const j = await (await fetch(`/api/crm/consult?all=1&chat_id=${c.id}`, { cache: "no-store" })).json();
       setThread((j.messages ?? []).filter((m: { content: string }) => !m.content.startsWith("(The salesperson has just sat down")));
     } catch { setThread([]); }
   };
+  const saveRemark = async (id: string) => {
+    setRMsg("");
+    try {
+      const r = await fetch("/api/crm/consult", {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chat_id: id, remarks: remark[id] ?? "" }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save the remark");
+    } catch (e) { setRMsg(e instanceof Error ? e.message : String(e)); }
+  };
   const TT: Record<string, string> = { opportunity: "Opportunity", quotation: "Quotation", sales_order: "Sales Order", company: "Company", person: "Contact", industry: "Industry", product: "Product" };
+  const d = (v: string) => new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
   return (
-    <div className="mt-4 rounded border p-3" style={{ borderColor: BORDER, background: "#fff" }}>
-      <div className="font-bold text-sm mb-1">💬 The discussions — everything the team told Raghu</div>
-      <div className="text-xs mb-3" style={{ color: MUTED, maxWidth: "90ch", lineHeight: 1.5 }}>
-        Every Consult Dr Raghu conversation, newest first. Click one to read it whole. This is the raw material —
-        what people are actually thinking at the deal.
+    <div>
+      <div className="text-xs mb-2" style={{ color: MUTED, maxWidth: "90ch", lineHeight: 1.5 }}>
+        Every Consult Dr Raghu conversation, newest first — click a row to read it whole. Your eyes alone.
       </div>
+      {rMsg && <div className="text-xs mb-2" style={{ color: "#B3261E" }}>{rMsg}</div>}
       {chats === null && <div className="text-sm" style={{ color: MUTED }}>loading…</div>}
       {chats !== null && chats.length === 0 && <div className="text-sm" style={{ color: MUTED }}>No consultations yet.</div>}
-      {(chats ?? []).map((c) => (
-        <div key={c.id} className="mb-1.5">
-          <button onClick={() => void read(c.id)} className="w-full text-left rounded border px-3 py-2 text-sm flex items-center gap-2 flex-wrap"
-            style={{ borderColor: open === c.id ? ORANGE : BORDER, background: open === c.id ? "#FFFDF9" : "#fff" }}>
-            <span className="font-semibold">{c.who}</span>
-            <span style={{ color: MUTED }}>on</span>
-            <span className="font-semibold">{c.target}</span>
-            <span className="text-xs rounded px-1.5 py-0.5" style={{ background: "#EFEDE7", color: "#5A6672" }}>{TT[c.target_type] ?? c.target_type}</span>
-            <span className="ml-auto text-xs tnum" style={{ color: MUTED }}>
-              {c.messages} msg · {new Date(c.last_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}
-            </span>
-          </button>
-          {open === c.id && (
-            <div className="rounded-b border border-t-0 p-2.5" style={{ borderColor: ORANGE, background: "#FFFDF9" }}>
+      {chats !== null && chats.length > 0 && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead><tr style={{ textAlign: "left", color: MUTED, fontSize: 11 }}>
+              <th className="py-1 pr-3">DATE</th>
+              <th className="py-1 pr-3">BY</th>
+              <th className="py-1 pr-3">FROM</th>
+              <th className="py-1 pr-3">RECORD NAME</th>
+              <th className="py-1 pr-3" style={{ textAlign: "right" }}>MINUTES</th>
+              <th className="py-1 pr-3" style={{ textAlign: "right" }}>LETTERS</th>
+              <th className="py-1" style={{ minWidth: 180 }}>REMARKS</th>
+            </tr></thead>
+            <tbody>
+              {chats.map((c) => (
+                <tr key={c.id} style={{ borderTop: `1px solid ${BORDER}`, cursor: "pointer" }}
+                  onClick={() => void read(c)}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#FAF9F5"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}>
+                  <td className="py-1.5 pr-3 tnum" style={{ whiteSpace: "nowrap" }}>{d(c.started_at)}</td>
+                  <td className="py-1.5 pr-3 font-semibold" style={{ whiteSpace: "nowrap" }}>{c.who}</td>
+                  <td className="py-1.5 pr-3" style={{ whiteSpace: "nowrap", color: "#5A6672" }}>{TT[c.target_type] ?? c.target_type}</td>
+                  <td className="py-1.5 pr-3 font-semibold">{c.target}</td>
+                  <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{c.minutes || "—"}</td>
+                  <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{c.letters.toLocaleString("en-IN")}</td>
+                  <td className="py-1.5" onClick={(e) => e.stopPropagation()}>
+                    <input value={remark[c.id] ?? ""} placeholder="—"
+                      onChange={(e) => setRemark((m) => ({ ...m, [c.id]: e.target.value }))}
+                      onBlur={() => void saveRemark(c.id)}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      className="w-full rounded border px-2 py-1 text-xs" style={{ borderColor: BORDER }} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {open && (
+        <div onClick={() => setOpen(null)} style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(22,35,47,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} className="rounded" style={{ background: "#fff", width: "min(640px, 100%)", maxHeight: "calc(100vh - 48px)", display: "flex", flexDirection: "column", boxShadow: "0 12px 40px rgba(27,45,107,.4)" }}>
+            <div className="flex items-center gap-2.5 px-3 py-2.5" style={{ background: NAVY, borderRadius: "6px 6px 0 0" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/consult-raghu.png" alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,.4)" }} />
+              <div style={{ minWidth: 0 }}>
+                <div className="text-white font-bold text-sm">{open.who} · {open.target}</div>
+                <div className="text-xs" style={{ color: "#C8D2DC" }}>{TT[open.target_type] ?? open.target_type} · {d(open.started_at)} · {open.minutes} min · {open.letters.toLocaleString("en-IN")} letters</div>
+              </div>
+              <button onClick={() => setOpen(null)} className="ml-auto text-white font-bold px-2">✕</button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 14, background: "#FAF9F5" }}>
               {thread === null && <div className="text-xs" style={{ color: MUTED }}>reading…</div>}
               {(thread ?? []).map((m, i) => (
-                <div key={i} className="text-sm mb-1.5" style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-                  <span className="font-bold">{m.role === "user" ? c.who.split(" ")[0] : "Raghu"}:</span> {m.content}
+                <div key={i} className="mb-2.5 flex" style={{ justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+                  <div className="rounded-lg px-3 py-2 text-sm" style={{
+                    maxWidth: "85%", lineHeight: 1.55, whiteSpace: "pre-wrap",
+                    background: m.role === "user" ? NAVY : "#fff",
+                    color: m.role === "user" ? "#fff" : "#22303C",
+                    border: m.role === "user" ? "none" : `1px solid ${BORDER}`,
+                  }}>
+                    {m.content}
+                  </div>
                 </div>
               ))}
             </div>
-          )}
+          </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }

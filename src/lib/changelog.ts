@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.35",
+    date: "2026-08-30",
+    module: "Genie — Conversations done as a table; the General Voice",
+    items: [
+      "Settings → Consult Dr Raghu splits into two (Dr Raghu, 30 Aug 2026): 📚 Knowledgebase first, 💬 Conversations done next — Date · By · From · Record name · Minutes · Letters · Remarks, one row per consultation, clicking opens the whole conversation in a lightbox. Remarks is his to type; CRM migration 0046 gives it a column.",
+      "A fifth knowledgebase joins: 🗣️ General Voice — how Dr Raghu speaks and decides, the voice that applies everywhere. The record-side advisor now stands on General Voice + Sales together.",
+    ],
+  },
+  {
     v: "3.31.1.34",
     date: "2026-08-30",
     module: "Genie — he is Consult DR Raghu, and his word is on the door",

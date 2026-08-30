@@ -19,8 +19,8 @@ export const maxDuration = 300;
  * This document is the intelligence layer the Consult Raghu chatbots will
  * stand on — one per module, each in his voice.
  */
-const SECTIONS = ["planning", "sales", "kuber", "vishwakarma"] as const;
-const SECTION_LABEL: Record<string, string> = { planning: "Planning", sales: "Sales", kuber: "Kuber", vishwakarma: "Vishwakarma" };
+const SECTIONS = ["planning", "sales", "kuber", "vishwakarma", "general_voice"] as const;
+const SECTION_LABEL: Record<string, string> = { planning: "Planning", sales: "Sales", kuber: "Kuber", vishwakarma: "Vishwakarma", general_voice: "General Voice" };
 const DRIVE_FOLDER = "1XDk_hL-9zqv16llhR1JZDGvmF9Cqjp3z";
 const TEXT_EXT = ["md", "txt", "csv", "json", "html", "htm", "xml", "log", "text"];
 
