@@ -3482,6 +3482,7 @@ function RecordModal({
       recordTabs.push({ key: "letterdesk", label: "Covering Letter" });
     }
     if (dt.name === "person") recordTabs.push({ key: "card", label: "Visiting Card" });
+    if (dt.name === "sales_order") recordTabs.push({ key: "soitems", label: "Order items" });
     recordTabs.push(
       { key: "comms", label: "Communication" },
       { key: "notes", label: "Notes" },
@@ -3801,6 +3802,8 @@ function RecordModal({
             <EvaBriefTab companyId={rid} initial={row.eva_brief ? String(row.eva_brief) : null} initialAt={row.eva_brief_at ? String(row.eva_brief_at) : null} />
           ) : tab === "card" ? (
             <PersonCardPanel personId={rid} personRow={row} onSaved={() => onSaved()} />
+          ) : tab === "soitems" ? (
+            <SoItemsTab id={rid} />
           ) : tab === "comms" ? (
             <CommsFeed
               type={dt.name} id={rid} companyId={companyId} onOpenLink={onOpenLink}
@@ -6205,6 +6208,49 @@ function ConsultRaghuModal({ targetType, targetId, title, onClose }: {
           His advice, your judgement — don&apos;t follow it blindly.
         </div>
       </div>
+    </div>
+  );
+}
+
+/** ORDER ITEMS (Dr Raghu, 30 Aug 2026) — the sales order's lines from the
+ *  ERP, read-only: the order is a fact, not a draft. */
+function SoItemsTab({ id }: { id: string }) {
+  type L = { line_no: number; description: string | null; item_group: string | null; quantity: number; uom: string | null; unit_price: number; amount: number };
+  const [lines, setLines] = useState<L[] | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    fetch(`/api/crm/so-lines?so=${encodeURIComponent(id)}`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "Could not read the items"); setLines(j.lines ?? []); })
+      .catch((e) => { setErr(e instanceof Error ? e.message : String(e)); setLines([]); });
+  }, [id]);
+  const inr = (n: number) => Number(n).toLocaleString("en-IN");
+  return (
+    <div className="p-4" style={{ maxHeight: "calc(100vh - 240px)", overflowY: "auto" }}>
+      {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
+      {lines === null && <div className="text-sm" style={{ color: MUTED }}>loading…</div>}
+      {lines !== null && lines.length === 0 && !err && <div className="text-sm" style={{ color: MUTED }}>No items on record for this order.</div>}
+      {lines !== null && lines.length > 0 && (
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead><tr style={{ textAlign: "left", color: MUTED, fontSize: 11 }}>
+            <th className="py-1 pr-3">SR</th><th className="py-1 pr-3">ITEM</th><th className="py-1 pr-3">GROUP</th>
+            <th className="py-1 pr-3" style={{ textAlign: "right" }}>QTY</th><th className="py-1 pr-3">UOM</th>
+            <th className="py-1 pr-3" style={{ textAlign: "right" }}>RATE</th><th className="py-1" style={{ textAlign: "right" }}>AMOUNT</th>
+          </tr></thead>
+          <tbody>
+            {lines.map((l, i) => (
+              <tr key={i} style={{ borderTop: `1px solid ${BORDER}` }}>
+                <td className="py-1.5 pr-3 tnum">{l.line_no}</td>
+                <td className="py-1.5 pr-3 font-semibold">{l.description ?? "—"}</td>
+                <td className="py-1.5 pr-3" style={{ color: MUTED }}>{l.item_group ?? "—"}</td>
+                <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{inr(l.quantity)}</td>
+                <td className="py-1.5 pr-3">{l.uom ?? "—"}</td>
+                <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>₹ {inr(l.unit_price)}</td>
+                <td className="py-1.5 tnum" style={{ textAlign: "right", fontWeight: 700 }}>₹ {inr(l.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

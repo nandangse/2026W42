@@ -107,6 +107,53 @@ export async function GET(req: Request) {
       return NextResponse.json({ hot: (hot ?? []).map(dress), expiring: (expiring ?? []).map(dress), cold: cold.map(dress) });
     }
 
+    // ---- BREAKDOWNS: the range by product family, product, source, industry
+    // (Dr Raghu, 30 Aug 2026: "in analytics also show product family and
+    // product / Source / industry")
+    if (view === "breakdown") {
+      const quotes3 = await pageAll((a, b) =>
+        db.from("quotation").select("id, grand_total")
+          .gte("quoted_on", fromD).lte("quoted_on", toD).range(a, b));
+      const qIds = new Set(quotes3.map((q) => String(q.id)));
+      const qLines = await pageAll((a, b) =>
+        db.from("quotation_line").select("quotation_id, product_id, description, item_group, quantity, unit_price").range(a, b));
+      type Agg = Map<string, { count: Set<string>; amt: number }>;
+      const bump = (m: Agg, key: string, qid: string, amt: number) => {
+        const cur = m.get(key) ?? { count: new Set<string>(), amt: 0 };
+        cur.count.add(qid); cur.amt += amt; m.set(key, cur);
+      };
+      const fam: Agg = new Map(), prod: Agg = new Map();
+      for (const l of qLines) {
+        const qid = String(l.quotation_id);
+        if (!qIds.has(qid)) continue;
+        const amt = (Number(l.quantity) || 0) * (Number(l.unit_price) || 0);
+        bump(fam, String(l.item_group || "— ungrouped —"), qid, amt);
+        bump(prod, String(l.description || "—"), qid, amt);
+      }
+      const opps3 = await pageAll((a, b) =>
+        db.from("opportunity").select("id, amount, source, company_id")
+          .is("deleted_at", null).gte("opportunity_on", fromD).lte("opportunity_on", toD).range(a, b));
+      const src: Agg = new Map(), ind: Agg = new Map();
+      const coIds = [...new Set(opps3.map((o) => o.company_id).filter(Boolean).map(String))];
+      const coInd = new Map<string, string>();
+      for (let i = 0; i < coIds.length; i += 150) {
+        const { data: cs } = await db.from("company").select("id, industry:industry_id(name)").in("id", coIds.slice(i, i + 150));
+        for (const c of cs ?? []) coInd.set(String(c.id), String((c.industry as { name?: string } | null)?.name || ""));
+      }
+      for (const o of opps3) {
+        const amt = Number(o.amount) || 0, oid = String(o.id);
+        bump(src, String(o.source || "— unknown —"), oid, amt);
+        bump(ind, coInd.get(String(o.company_id)) || "— no industry —", oid, amt);
+      }
+      const out = (m: Agg, cap: number) => [...m.entries()]
+        .map(([name, v]) => ({ name, count: v.count.size, amt: Math.round(v.amt) }))
+        .sort((x, y) => y.amt - x.amt).slice(0, cap);
+      return NextResponse.json({
+        families: out(fam, 40), products: out(prod, 30), sources: out(src, 20), industries: out(ind, 30),
+        quotes: quotes3.length, opps: opps3.length,
+      });
+    }
+
     // ---- EFFORT: activity vs output per salesperson, inside the range
     if (view === "effort") {
       const ints = await pageAll((a, b) =>

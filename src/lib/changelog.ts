@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.44",
+    date: "2026-08-30",
+    module: "CRM — sales orders get their items; Analytics learns Breakdowns",
+    items: [
+      "\"pl import all sales order no. add fields as needed\" (Dr Raghu, 30 Aug 2026) — the sales order gains an Order items tab (read-only: an order is a fact, not a draft), PO number and date, taxable value and tax, and the LINK to the quotation it came from. CRM migration 0048 builds the lines table; the ERP import fills all 890 orders behind it.",
+      "Analytics gains 📦 Breakdowns: the chosen range sliced by Product family and Product (from the quote lines' money) and by Source and Industry (from the opportunities) — bars, counts and ₹ on every row.",
+    ],
+  },
+  {
     v: "3.31.1.43",
     date: "2026-08-30",
     module: "CRM — the quote's status stands in the header, in colour",

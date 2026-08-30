@@ -37,7 +37,7 @@ const pct = (num: number, den: number) =>
 export default function AnalyticsScreen() {
   const [range, setRange] = useState<DateRange>(DEFAULT_RANGE);
   // the four rooms (Dr Raghu, 30 Aug 2026)
-  const [view, setView] = useState<"ratios" | "funnel" | "focus" | "effort">("ratios");
+  const [view, setView] = useState<"ratios" | "funnel" | "focus" | "effort" | "breakdown">("ratios");
   // sector · person · all — the same three-station arithmetic, cut three ways
   const [mode, setMode] = useState<"sector" | "person" | "all">("sector");
   const swim = mode !== "all";
@@ -64,7 +64,7 @@ export default function AnalyticsScreen() {
       <DateRangeBar value={range} onChange={setRange} />
 
       <div className="flex gap-1 mb-3 flex-wrap">
-        {([["ratios", "📐 Conversion Ratios"], ["funnel", "🏺 Sales Funnel"], ["focus", "🎯 Focus Dashboard"], ["effort", "🏃 Effort Dashboard"]] as const).map(([k, l]) => (
+        {([["ratios", "📐 Conversion Ratios"], ["funnel", "🏺 Sales Funnel"], ["focus", "🎯 Focus Dashboard"], ["effort", "🏃 Effort Dashboard"], ["breakdown", "📦 Breakdowns"]] as const).map(([k, l]) => (
           <button key={k} onClick={() => setView(k)} className="px-3 py-1.5 rounded text-sm font-bold"
             style={view === k ? { background: NAVY, color: "#fff" } : { color: "#5A6672", border: `1px solid ${BORDER}`, background: "#fff" }}>
             {l}
@@ -75,6 +75,7 @@ export default function AnalyticsScreen() {
       {view === "funnel" && <FunnelView range={range} />}
       {view === "focus" && <FocusView />}
       {view === "effort" && <EffortView range={range} />}
+      {view === "breakdown" && <BreakdownView range={range} />}
       {view !== "ratios" ? null : (<>
 
       <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -360,6 +361,54 @@ function EffortView({ range }: { range: DateRange }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+/** BREAKDOWNS (Dr Raghu, 30 Aug 2026) — the range sliced four ways:
+ *  product family and product from the quote lines; source and industry
+ *  from the opportunities. Counts are distinct records, ₹ is the money. */
+function BreakdownView({ range }: { range: { from: string; to: string } }) {
+  type RowB = { name: string; count: number; amt: number };
+  const [data, setData] = useState<{ families: RowB[]; products: RowB[]; sources: RowB[]; industries: RowB[] } | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    setData(null); setErr("");
+    fetch(`/api/crm/analytics?view=breakdown&from=${range.from}&to=${range.to}`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "Could not read"); setData(j); })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [range.from, range.to]);
+  const inr = (n: number) => n >= 10000000 ? `₹ ${(n / 10000000).toFixed(2)} Cr` : n >= 100000 ? `₹ ${(n / 100000).toFixed(1)} L` : `₹ ${n.toLocaleString("en-IN")}`;
+  const Lane = ({ title, note, rows }: { title: string; note: string; rows: RowB[] }) => (
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+      <div className="font-bold text-sm">{title}</div>
+      <div className="text-xs mb-2" style={{ color: "#8A94A0" }}>{note}</div>
+      {rows.length === 0 && <div className="text-sm" style={{ color: "#8A94A0" }}>Nothing in this range.</div>}
+      {rows.map((r) => {
+        const max = rows[0]?.amt || 1;
+        return (
+          <div key={r.name} className="flex items-center gap-2 py-1" style={{ borderTop: "1px solid #F0F1F6" }}>
+            <span className="text-sm" style={{ minWidth: 220, maxWidth: 340, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.name}>{r.name}</span>
+            <div style={{ flex: 1, height: 10, background: "#F4F2EC", borderRadius: 5, overflow: "hidden" }}>
+              <div style={{ width: `${Math.max(2, (r.amt / max) * 100)}%`, height: "100%", background: "#1B3A5C", borderRadius: 5 }} />
+            </div>
+            <span className="text-xs tnum" style={{ color: "#8A94A0", minWidth: 34, textAlign: "right" }}>{r.count}</span>
+            <span className="text-sm tnum font-bold" style={{ minWidth: 90, textAlign: "right" }}>{inr(r.amt)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+  return (
+    <div className="grid gap-3" style={{ gridTemplateColumns: "1fr", maxWidth: 980 }}>
+      {err && <div className="rounded p-2 text-sm" style={{ background: "#FBEDEA", color: "#B3261E" }}>{err}</div>}
+      {data === null && !err && <div className="text-sm" style={{ color: "#8A94A0" }}>slicing the range…</div>}
+      {data && (<>
+        <Lane title="📦 Product family" note="Quote money per Item Group in the range — count is distinct quotations" rows={data.families} />
+        <Lane title="🔩 Product" note="The top products by quote money in the range" rows={data.products} />
+        <Lane title="🧭 Source" note="Opportunity money by where it came from" rows={data.sources} />
+        <Lane title="🏭 Industry" note="Opportunity money by the customer's industry" rows={data.industries} />
+      </>)}
     </div>
   );
 }
