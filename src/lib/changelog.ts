@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.67",
+    date: "2026-08-30",
+    module: "Rich box — pictures upload, thumbnails expand, Drive keeps a copy",
+    items: [
+      "A PASTED PICTURE becomes an UPLOAD, never a base64 blob in the database (Dr Raghu, 30 Aug 2026) — 🖼 opens a file picker too; the file lands in the record's store AND in the Drive archive under FY / 10 CRM Attachments / month, subfolders made as needed.",
+      "IN COMMENTS AND NOTES the image always stands SMALL — a click opens it whole. The note that pasted as a wall of base64 now shows its picture.",
+    ],
+  },
+  {
     v: "3.31.0.66",
     date: "2026-08-30",
     module: "Genie-wide — the one rich text box",

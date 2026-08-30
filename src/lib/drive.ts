@@ -112,6 +112,7 @@ const FOLDERS: Record<string, string> = {
   delivered: "04 Delivered Jobs",
   employees: "05 Employee Master",
   pre: "06 PRE Workbook",
+  crm: "10 CRM Attachments",
 };
 
 /** 1 April to 31 March, written the way the business writes it. */

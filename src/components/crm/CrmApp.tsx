@@ -2146,7 +2146,7 @@ function RichTextArea({ value, onChange, rows }: { value: string; onChange: (v: 
  *  images EMBED and attachments open for anyone signed into Genie. */
 const isErpFile = (u: string) => /^https?:\/\/[^/]*nandanerp[^/]*\/(private\/)?files?\//i.test(u);
 const viaDoor = (u: string) => (isErpFile(u) ? `/api/crm/erp-file?u=${encodeURIComponent(u)}` : u);
-const looksImage = (u: string) => /\.(png|jpe?g|gif|webp|bmp)(\?|$)/i.test(u) || /\/files?\//i.test(u);
+const looksImage = (u: string) => /\.(png|jpe?g|gif|webp|bmp)(\?|$)/i.test(u) || /\/files?\//i.test(u) || u.startsWith("data:image/");
 
 function RichText({ text }: { text: string }) {
   // new content wears sanitized HTML (the common rich box, 30 Aug 2026);
@@ -2170,7 +2170,7 @@ function RichText({ text }: { text: string }) {
       // a "[🖼 image](…)" from the ERP import EMBEDS, and so does an uploaded
       // opp-attach image (Dr Raghu, 30 Aug 2026: "if it's a jpg, show it
       // there, small, with a scroll"); other links stay links
-      if ((/🖼/.test(m[3]) || m[4].includes("opp-attach")) && looksImage(m[4])) parts.push(img(m[4], m[3]));
+      if ((/🖼/.test(m[3]) || m[4].includes("opp-attach") || m[4].startsWith("data:image/")) && looksImage(m[4])) parts.push(img(m[4], m[3]));
       else parts.push(<a key={k++} href={viaDoor(m[4])} target="_blank" rel="noreferrer" style={{ color: "#2C5B82", fontWeight: 600, textDecoration: "underline" }}>{m[3]}</a>);
     }
     else if (m[5]) parts.push(<a key={k++} href={viaDoor(m[5])} target="_blank" rel="noreferrer" style={{ color: "#2C5B82", textDecoration: "underline" }}>{m[5].length > 60 ? m[5].slice(0, 57) + "…" : m[5]}</a>);
@@ -2552,6 +2552,16 @@ function CommsFeed({
 }
 
 /** Notes on the record — the polymorphic note + record_link the schema always had. */
+
+/** One door for editor pictures — uploads through opp-attach, lands in the
+ *  record's store AND the Drive archive, returns the login-gated URL. */
+async function uploadEditorImage(fd: FormData): Promise<string> {
+  const r = await fetch("/api/crm/opp-attach", { method: "POST", body: fd });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || "Upload failed");
+  return String(j.url);
+}
+
 function NotesTab({ type, id }: { type: string; id: string }) {
   type NoteRow = { id: string; title: string | null; body: string; author: string | null; created_at: string };
   const [notes, setNotes] = useState<NoteRow[] | null>(null);
@@ -2602,7 +2612,8 @@ function NotesTab({ type, id }: { type: string; id: string }) {
       <div className="mb-3">
         {composing ? (
           <RichTextEditor initial="" minHeight={120} busy={busy} onCancel={() => setComposing(false)}
-            onSave={(html) => { setText(html); void saveRich(html); }} />
+            onSave={(html) => { setText(html); void saveRich(html); }}
+            onUploadImage={async (f) => { const fd = new FormData(); fd.set("target_type", type); fd.set("target_id", id); fd.set("file", f); return uploadEditorImage(fd); }} />
         ) : (
           <button onClick={() => setComposing(true)} className="w-full rounded border px-3 py-2 text-sm text-left"
             style={{ borderColor: BORDER, color: MUTED, background: "#fff" }}>
@@ -2622,7 +2633,7 @@ function NotesTab({ type, id }: { type: string; id: string }) {
           </div>
           {n.title && <div className="text-sm font-bold mt-0.5">{n.title}</div>}
           {/* comments read as rich text (Dr Raghu, 30 Aug 2026) */}
-          <div className="text-sm mt-0.5" style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}><RichText text={n.body} /></div>
+          <div className="text-sm mt-0.5" style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}><RichContent text={n.body} thumbs legacy={(s2) => <RichText text={s2} />} /></div>
         </div>
       ))}
     </div>
@@ -2853,7 +2864,8 @@ function EnquiryInfoTab({ row, onSaved }: { row: Row; onSaved: () => void }) {
           {msg && <span className="text-xs font-semibold" style={{ color: msg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{msg}</span>}
         </div>
         {editing ? (
-          <RichTextEditor initial={draft} busy={busy === "save"} onCancel={() => setEditing(false)} onSave={(html) => void save(html)} placeholder="The enquiry, as it should look." />
+          <RichTextEditor initial={draft} busy={busy === "save"} onCancel={() => setEditing(false)} onSave={(html) => void save(html)} placeholder="The enquiry, as it should look."
+              onUploadImage={async (f) => { const fd = new FormData(); fd.set("opportunity_id", rid); fd.set("file", f); return uploadEditorImage(fd); }} />
         ) : (
           <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "calc(100vh - 300px)", overflowY: "auto", overflowWrap: "anywhere" }}>
             {text.trim() ? <RichText text={text} /> : <span style={{ color: MUTED }}>No enquiry text recorded — ✎ writes it right here.</span>}

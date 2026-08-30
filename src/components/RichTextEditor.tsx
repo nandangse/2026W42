@@ -71,17 +71,27 @@ export function legacyToHtml(md: string): string {
 }
 
 /** Rendered rich content: new HTML (sanitized) or the legacy renderer. */
-export function RichContent({ text, legacy }: { text: string; legacy: (s: string) => React.ReactNode }) {
+export function RichContent({ text, legacy, thumbs }: { text: string; legacy: (s: string) => React.ReactNode; thumbs?: boolean }) {
+  // in comments the image stands SMALL; a click opens it whole
+  // (Dr Raghu, 30 Aug 2026)
+  const expand = (e: React.MouseEvent) => {
+    const t = e.target as HTMLElement;
+    if (t.tagName === "IMG") window.open((t as HTMLImageElement).src, "_blank", "noopener");
+  };
   if (looksHtml(text)) {
-    return <div className="rich-html" style={{ lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: sanitizeRich(text) }} />;
+    return <div className={"rich-html" + (thumbs ? " rich-thumbs" : "")} style={{ lineHeight: 1.6 }}
+      onClick={thumbs ? expand : undefined} dangerouslySetInnerHTML={{ __html: sanitizeRich(text) }} />;
   }
-  return <>{legacy(text)}</>;
+  return <div className={thumbs ? "rich-thumbs" : undefined} onClick={thumbs ? expand : undefined}>{legacy(text)}</div>;
 }
 
 const COLORS = ["#16232F", "#B3261E", "#E8600A", "#0D7A3F", "#1B3A5C", "#7C3AED"];
 
-export default function RichTextEditor({ initial, onSave, onCancel, busy, minHeight = 220, placeholder }: {
+export default function RichTextEditor({ initial, onSave, onCancel, busy, minHeight = 220, placeholder, onUploadImage }: {
   initial: string; onSave: (html: string) => void; onCancel: () => void; busy?: boolean; minHeight?: number; placeholder?: string;
+  /** Where a pasted or picked image goes — returns its URL. Without it,
+   *  image paste is refused rather than bloating the record with base64. */
+  onUploadImage?: (file: File) => Promise<string>;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [colorOpen, setColorOpen] = useState(false);
@@ -99,9 +109,26 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
     const cell = '<td style=""> </td>';
     cmd("insertHTML", `<table border="1"><tbody>${`<tr>${cell.repeat(3)}</tr>`.repeat(2)}</tbody></table><br>`);
   };
+  const fileInput = useRef<HTMLInputElement | null>(null);
+  const uploadAndInsert = async (f: File) => {
+    if (!onUploadImage) { window.alert("Pictures attach through 📎 on this screen."); return; }
+    try { const url = await onUploadImage(f); if (url) cmd("insertImage", url); }
+    catch (e) { window.alert(e instanceof Error ? e.message : String(e)); }
+  };
   const insertPicture = () => {
+    if (onUploadImage) { fileInput.current?.click(); return; }
     const u = window.prompt("Picture URL (https://…, or an attachment link from this record):", "https://");
     if (u && /^(https?:|\/)/i.test(u)) cmd("insertImage", u);
+  };
+  // a PASTED image becomes an UPLOAD, never a base64 blob in the database
+  const onPaste = (e: React.ClipboardEvent) => {
+    const items = [...(e.clipboardData?.items || [])];
+    const img = items.find((i) => i.kind === "file" && i.type.startsWith("image/"));
+    if (img) {
+      e.preventDefault();
+      const f = img.getAsFile();
+      if (f) void uploadAndInsert(f);
+    }
   };
 
   return (
@@ -130,7 +157,9 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
         <TB label="🖼 Picture" title="Insert a picture by URL" onClick={insertPicture} />
         <TB label="⊞ Table" title="Insert a 2×3 table" onClick={insertTable} />
       </div>
-      <div ref={ref} contentEditable suppressContentEditableWarning
+      <input ref={fileInput} type="file" accept="image/*" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadAndInsert(f); e.target.value = ""; }} />
+      <div ref={ref} contentEditable suppressContentEditableWarning onPaste={onPaste}
         data-placeholder={placeholder || ""}
         className="w-full rounded border p-3 text-sm rich-html"
         style={{ borderColor: "#E8600A", lineHeight: 1.6, minHeight, maxHeight: "calc(100vh - 360px)", overflowY: "auto", outline: "none", background: "#fff" }} />
@@ -150,6 +179,7 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
         .rich-html ol { list-style: decimal; padding-left: 22px; }
         .rich-html a { color: #2C5B82; text-decoration: underline; }
         .rich-html blockquote { border-left: 3px solid #E2E0DA; margin: 4px 0; padding-left: 10px; color: #5A6672; }
+        .rich-thumbs img { max-height: 120px !important; max-width: 220px !important; cursor: zoom-in; }
       `}</style>
     </div>
   );
