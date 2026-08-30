@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.80",
+    date: "2026-08-30",
+    module: "CRM — Quote items and Situational Details",
+    items: [
+      "Lines becomes QUOTE ITEMS (Dr Raghu, 30 Aug 2026): a real grid — Sr No · Item Group · Item · Rate · Qty · Amount, typed in place, a 📦 to pick from the Products catalogue (approved price rides in), a write-item row always waiting, Enter files it.",
+      "From the 2nd line: ↑↓ move, → indents to 1.1, ← brings it back. Each line ticks whether the header discount touches it.",
+      "The floating foot: Net Total · Discount % with its ₹ · Discounted Total · Taxes from the new Taxes master (IGST 18% outside Maharashtra, CGST 9% + SGST 9% within — decided by the quote's address) · Grand Total, in words too — lakhs and crores for INR, thousands and millions for USD/EUR. Show-decimals checkbox, off by default. Authorized By: Dr Raghunandan Jagdish, MD and CEO.",
+      "SITUATIONAL DETAILS tab before Quote items: six bold headings; ✨ Genie writes or improves it when asked — at most three runs per quote, then the pen is the hand's alone.",
+      "The database still computes every rupee — recalc rewritten in CRM migration 0035; discount now leaves unticked lines alone.",
+    ],
+  },
+  {
     v: "3.31.0.79",
     date: "2026-08-30",
     module: "CRM — the quote desk cleaned to Dr Raghu's hand",

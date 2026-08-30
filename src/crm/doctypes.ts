@@ -134,6 +134,18 @@ export const DOCTYPES: Doctype[] = [
 
   // ------------------------------------------------------------- masters
   {
+    name: "tax_master", label: "Tax", plural: "Taxes", table: "tax_master",
+    titleField: "name", group: "Masters", icon: "🧾",
+    orderBy: { column: "sort_order", ascending: true },
+    blurb: "The Taxes master (Dr Raghu, 30 Aug 2026). A quote picks its scheme here — IGST outside Maharashtra, CGST + SGST within.",
+    fields: [
+      { name: "name", label: "Tax", type: "text", required: true, inList: true },
+      { name: "total_pct", label: "Rate %", type: "number", required: true, inList: true },
+      { name: "sort_order", label: "Order", type: "number", inList: true, default: 0 },
+      { name: "is_default", label: "Default", type: "bool", inList: true, help: "Picked when a quote has no address to decide by." },
+    ],
+  },
+  {
     name: "payment_term", label: "Payment Term", plural: "Payment Terms", table: "payment_term",
     titleField: "name", group: "Masters", icon: "💳",
     orderBy: { column: "sort_order", ascending: true },
@@ -151,8 +163,11 @@ export const DOCTYPES: Doctype[] = [
     fields: [
       { name: "quotation_id", label: "Quotation", type: "link", link: "quotation", required: true, inList: true },
       { name: "line_no", label: "Line", type: "number", required: true, inList: true, default: 1 },
+      { name: "indent", label: "Indent", type: "number", default: 0, noFilter: true, help: "0 = a main line (1, 2, 3…); 1 = indented under the line above (1.1, 1.2…)." },
+      { name: "item_group", label: "Item Group", type: "text", noFilter: true },
       { name: "product_id", label: "Product", type: "link", link: "product", inList: true },
       { name: "description", label: "Description", type: "text", required: true, inList: true },
+      { name: "discountable", label: "Discount applies", type: "bool", default: true, help: "Unticked, the quote's header discount leaves this line alone." },
       { name: "quantity", label: "Qty", type: "number", inList: true, default: 1 },
       { name: "uom", label: "UOM", type: "text", default: "Nos" },
       { name: "unit_price", label: "Unit price", type: "money", inList: true },

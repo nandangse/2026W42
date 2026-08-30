@@ -537,6 +537,15 @@ export async function PATCH(req: Request, { params }: { params: { doctype: strin
     if (d.name === "quotation") {
       for (const k of ["mail_to", "mail_cc"] as const)
         if (Array.isArray(body[k])) row[k] = (body[k] as unknown[]).map(String).slice(0, 50);
+      // the Quote items desk's own knobs — tax scheme, currency, decimals,
+      // the signature line, the header discount
+      if (typeof body.tax_id === "string") row.tax_id = body.tax_id || null;
+      if (typeof body.currency === "string" && /^[A-Z]{3}$/.test(body.currency)) row.currency = body.currency;
+      if (typeof body.show_decimals === "boolean") row.show_decimals = body.show_decimals;
+      if (typeof body.authorized_by === "string") row.authorized_by = body.authorized_by.slice(0, 160);
+      if (typeof body.situational_details === "string") row.situational_details = body.situational_details;
+      if (body.discount_pct !== undefined && body.discount_pct !== null && body.discount_pct !== "")
+        row.discount_pct = Number(body.discount_pct) || 0;
     }
     if (!Object.keys(row).length) throw new HttpError(400, "Nothing to update.");
 

@@ -1792,6 +1792,480 @@ function ProductTrainingTab({ id, group }: { id: string; group: string | null })
   );
 }
 
+/** Situational Details on a quote (Dr Raghu, 30 Aug 2026): six bold
+ *  headings, blank below each by default; Genie writes or improves the
+ *  text when ASKED — at most three runs, then the pen is the hand's. */
+const SITUATIONAL_BLANK = ["Situational Analysis", "Situation", "Current Reality", "Solution We discussed", "Result", "Why nandan"]
+  .map((h) => `<p><b>${h}:</b></p><p><br></p>`).join("");
+
+function SituationalTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
+  const rid = String(row.id ?? "");
+  const stored = String(row.situational_details ?? "").trim();
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState<"save" | "genie" | null>(null);
+  const [armed, setArmed] = useState(false);
+  const [err, setErr] = useState("");
+  const runs = Number(row.situational_runs) || 0;
+  const html = stored || SITUATIONAL_BLANK;
+
+  const save = async (v: string) => {
+    setBusy("save"); setErr("");
+    try {
+      const r = await fetch(`/api/crm/quotation?id=${encodeURIComponent(rid)}`, {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ situational_details: v }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save");
+      onSaved(j.row as Row); setEditing(false);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(null); }
+  };
+  const genie = async () => {
+    setBusy("genie"); setErr("");
+    try {
+      const r = await fetch("/api/crm/situational", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ quotation_id: rid }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Genie could not write it");
+      const rr = await (await fetch(`/api/crm/quotation?id=${encodeURIComponent(rid)}`, { cache: "no-store" })).json();
+      if (rr?.row) onSaved(rr.row as Row);
+      setArmed(false);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(null); }
+  };
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center gap-3 mb-2 flex-wrap">
+        {!editing && <button title="Edit by hand" onClick={() => setEditing(true)} style={{ fontSize: 13, opacity: 0.7 }}>✏️ Edit</button>}
+        <label className="text-xs flex items-center gap-1.5" style={{ color: MUTED }}>
+          <input type="checkbox" checked={armed} disabled={runs >= 3 || busy !== null} onChange={(e) => setArmed(e.target.checked)} style={{ accentColor: NAVY }} />
+          Let Genie {stored ? "improve" : "write"} it
+        </label>
+        <button disabled={!armed || runs >= 3 || busy !== null} onClick={() => void genie()}
+          className="rounded px-3 py-1 text-xs font-bold text-white"
+          style={{ background: armed && runs < 3 && busy === null ? "#7C3AED" : "#B9BEC4" }}>
+          {busy === "genie" ? "Genie is writing…" : `✨ Situational Analysis (${3 - runs} left)`}
+        </button>
+        {runs >= 3 && <span className="text-xs" style={{ color: MUTED }}>Genie has improved this three times — the pen is yours now.</span>}
+        {err && <span className="text-xs font-semibold" style={{ color: "#8E2C20" }}>{err}</span>}
+      </div>
+      {editing ? (
+        <RichTextEditor initial={html} busy={busy === "save"} minHeight={320}
+          onCancel={() => setEditing(false)} onSave={(v) => void save(v)} />
+      ) : (
+        <div className="rounded border p-4 text-sm" style={{ borderColor: BORDER, lineHeight: 1.7, maxWidth: "80ch" }}>
+          <RichContent text={html} legacy={(s2) => <RichText text={s2} />} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================== QUOTE ITEMS (Dr Raghu, 30 Aug 2026)
+   "Sr No - Item Group - Item - Rate - Qty - Amount… arrows to indent or
+   move… floating Net Total, Discount, Taxes from masters by address,
+   Grand Total in words, show decimals, Authorized By." */
+
+const W_ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve",
+  "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+const W_TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+const w2 = (n: number): string => n < 20 ? W_ONES[n] : `${W_TENS[Math.floor(n / 10)]}${n % 10 ? " " + W_ONES[n % 10] : ""}`;
+const w3 = (n: number): string => n < 100 ? w2(n) : `${W_ONES[Math.floor(n / 100)]} Hundred${n % 100 ? " " + w2(n % 100) : ""}`;
+/** Lakhs and crores — the Indian ear (Dr Raghu, 30 Aug 2026). */
+function wordsIndian(n: number): string {
+  if (n === 0) return "Zero";
+  const parts: string[] = [];
+  const crore = Math.floor(n / 1e7), lakh = Math.floor((n % 1e7) / 1e5), thou = Math.floor((n % 1e5) / 1000), rest = n % 1000;
+  if (crore) parts.push(`${crore > 99 ? wordsIndian(crore) : w2(crore)} Crore`);
+  if (lakh) parts.push(`${w2(lakh)} Lakh`);
+  if (thou) parts.push(`${w2(thou)} Thousand`);
+  if (rest) parts.push(w3(rest));
+  return parts.join(" ");
+}
+/** Thousands and millions — for USD and EUR. */
+function wordsWestern(n: number): string {
+  if (n === 0) return "Zero";
+  const parts: string[] = [];
+  const bil = Math.floor(n / 1e9), mil = Math.floor((n % 1e9) / 1e6), thou = Math.floor((n % 1e6) / 1000), rest = n % 1000;
+  if (bil) parts.push(`${w3(bil)} Billion`);
+  if (mil) parts.push(`${w3(mil)} Million`);
+  if (thou) parts.push(`${w3(thou)} Thousand`);
+  if (rest) parts.push(w3(rest));
+  return parts.join(" ");
+}
+function amountInWords(v: number, currency: string, withDecimals: boolean): string {
+  const i = Math.floor(Math.abs(v)), frac = Math.round((Math.abs(v) - i) * 100);
+  const inr = currency === "INR";
+  const main = inr ? wordsIndian(i) : wordsWestern(i);
+  const unit = inr ? "Rupees" : currency === "USD" ? "US Dollars" : currency === "EUR" ? "Euros" : currency;
+  const sub = inr ? "Paise" : "Cents";
+  return `${unit} ${main}${withDecimals && frac ? ` and ${w2(frac)} ${sub}` : ""} Only`;
+}
+
+type QLine = {
+  id: string; line_no: number; indent: number; item_group: string | null;
+  product_id: string | null; description: string; quantity: number;
+  unit_price: number; line_total: number; discountable: boolean; is_optional: boolean;
+};
+type TaxRow = { id: string; name: string; total_pct: number; is_default: boolean; sort_order?: number; components?: { name: string; pct: number }[] };
+
+function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => void }) {
+  const qid = String(quote.id ?? "");
+  const [q, setQ] = useState<Row>(quote);
+  const [lines, setLines] = useState<QLine[] | null>(null);
+  const [taxes, setTaxes] = useState<TaxRow[]>([]);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [ghost, setGhost] = useState({ item_group: "", description: "", unit_price: "", quantity: "1" });
+  const [draft, setDraft] = useState<Record<string, Partial<Record<keyof QLine, string>>>>({});
+  const [discPct, setDiscPct] = useState<string | null>(null);
+  const taxPicked = useRef(false);
+
+  const reloadQuote = useCallback(async () => {
+    try {
+      const j = await (await fetch(`/api/crm/quotation?id=${encodeURIComponent(qid)}`, { cache: "no-store" })).json();
+      if (j?.row) { setQ(j.row as Row); onSaved(j.row as Row); }
+    } catch { /* stale totals heal on the next move */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qid]);
+  const reloadLines = useCallback(async () => {
+    try {
+      const j = await (await fetch(`/api/crm/quotation_line?f_quotation_id=${encodeURIComponent(qid)}&limit=200`, { cache: "no-store" })).json();
+      const rows = ((j.rows ?? []) as QLine[]).slice().sort((a, b) => a.line_no - b.line_no);
+      setLines(rows);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+  }, [qid]);
+  useEffect(() => { setQ(quote); }, [quote]);
+  useEffect(() => {
+    void reloadLines();
+    fetch("/api/crm/tax_master?limit=50", { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); setTaxes(((j.rows ?? []) as TaxRow[]).sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))); })
+      .catch(() => setTaxes([]));
+  }, [reloadLines]);
+
+  const patchQuote = async (fields: Record<string, unknown>) => {
+    const r = await fetch(`/api/crm/quotation?id=${encodeURIComponent(qid)}`, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(fields),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "Could not save");
+    setQ(j.row as Row); onSaved(j.row as Row);
+  };
+
+  // IGST outside Maharashtra, CGST + SGST within — decided by the quote's
+  // address, once, the first time this desk opens without a scheme
+  useEffect(() => {
+    if (taxPicked.current || !taxes.length || q.tax_id) return;
+    taxPicked.current = true;
+    void (async () => {
+      let inMaha = false, known = false;
+      if (q.address_id) {
+        try {
+          const j = await (await fetch(`/api/crm/address?id=${encodeURIComponent(String(q.address_id))}`, { cache: "no-store" })).json();
+          const st = String(j?.row?.state ?? "").toLowerCase();
+          if (st) { known = true; inMaha = st.includes("maharashtra"); }
+        } catch { /* fall to the default */ }
+      }
+      const pick = known
+        ? taxes.find((t) => (inMaha ? /cgst/i.test(t.name) : /igst/i.test(t.name)))
+        : taxes.find((t) => t.is_default);
+      if (pick) { try { await patchQuote({ tax_id: pick.id }); } catch { /* hand can pick */ } }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taxes, q.tax_id, q.address_id]);
+
+  const patchLine = async (id: string, fields: Record<string, unknown>) => {
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch(`/api/crm/quotation_line?id=${encodeURIComponent(id)}`, {
+        method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(fields),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save the line");
+      await reloadLines(); await reloadQuote();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  const addLine = async () => {
+    const desc = ghost.description.trim();
+    if (!desc) return;
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/crm/quotation_line", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          quotation_id: qid, line_no: (lines?.length ? Math.max(...lines.map((l) => l.line_no)) : 0) + 1,
+          description: desc, item_group: ghost.item_group.trim() || null,
+          unit_price: Number(ghost.unit_price) || 0, quantity: Number(ghost.quantity) || 1,
+          uom: "Nos", discountable: true, indent: 0,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not add the item");
+      setGhost({ item_group: "", description: "", unit_price: "", quantity: "1" });
+      await reloadLines(); await reloadQuote();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  const move = async (i: number, dir: -1 | 1) => {
+    if (!lines) return;
+    const a = lines[i], b = lines[i + dir];
+    if (!a || !b) return;
+    setBusy(true); setErr("");
+    try {
+      // three steps through a parking number — line_no is unique per quote
+      const park = -Math.abs(a.line_no) - 1000;
+      for (const [id, no] of [[a.id, park], [b.id, a.line_no], [a.id, b.line_no]] as const) {
+        const r = await fetch(`/api/crm/quotation_line?id=${encodeURIComponent(String(id))}`, {
+          method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ line_no: no }),
+        });
+        if (!r.ok) throw new Error((await r.json()).error || "Could not move the line");
+      }
+      await reloadLines(); await reloadQuote();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  const delLine = async (id: string) => {
+    if (lines && lines.length <= 1) { setErr("A quote keeps at least one item — add another before removing this one."); return; }
+    if (!window.confirm("Remove this item?")) return;
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch(`/api/crm/quotation_line?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!r.ok) throw new Error((await r.json()).error || "Could not remove");
+      await reloadLines(); await reloadQuote();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  const pickProduct = async (lineId: string, productId: string) => {
+    if (!productId) return;
+    try {
+      const j = await (await fetch(`/api/crm/product?id=${encodeURIComponent(productId)}`, { cache: "no-store" })).json();
+      const p = j?.row as Row | undefined;
+      if (!p) return;
+      const line = lines?.find((l) => l.id === lineId);
+      await patchLine(lineId, {
+        product_id: productId,
+        item_group: String(p.item_group ?? "") || null,
+        ...(line && !line.description.trim() ? { description: String(p.name ?? "") } : {}),
+        ...(line && !(line.unit_price > 0) && p.approved_price_inr != null ? { unit_price: Number(p.approved_price_inr) } : {}),
+      });
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+  };
+
+  // Sr No: main lines count 1, 2, 3…; an indented line reads 1.1, 1.2
+  const srOf = (i: number): string => {
+    if (!lines) return "";
+    let major = 0, minor = 0;
+    let label = "";
+    for (let k = 0; k <= i; k++) {
+      if ((lines[k].indent ?? 0) === 0) { major++; minor = 0; label = String(major); }
+      else { minor++; label = `${Math.max(major, 1)}.${minor}`; }
+    }
+    return label;
+  };
+
+  const currency = String(q.currency ?? "INR");
+  const dec = q.show_decimals === true;
+  const fm = (v: unknown) => {
+    const n = Number(v) || 0;
+    const s = n.toLocaleString(currency === "INR" ? "en-IN" : "en-US", { minimumFractionDigits: dec ? 2 : 0, maximumFractionDigits: dec ? 2 : 0 });
+    return `${currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency + " "} ${s}`;
+  };
+  const D = (l: QLine, k: "item_group" | "description" | "unit_price" | "quantity") =>
+    draft[l.id]?.[k] !== undefined ? String(draft[l.id]![k]) : String(l[k] ?? (k === "item_group" ? "" : l[k]));
+  const setD = (id: string, k: string, v: string) => setDraft((cur) => ({ ...cur, [id]: { ...cur[id], [k]: v } }));
+  const commitD = (l: QLine, k: "item_group" | "description" | "unit_price" | "quantity") => {
+    const v = draft[l.id]?.[k];
+    if (v === undefined || String(l[k] ?? "") === v) return;
+    if (k === "description" && !String(v).trim()) { setD(l.id, k, l.description); return; }
+    void patchLine(l.id, { [k]: k === "unit_price" || k === "quantity" ? Number(v) || 0 : v });
+  };
+
+  const subtotal = Number(q.subtotal) || 0;
+  const discAmt = Number(q.discount_amount) || 0;
+  const taxAmt = Number(q.tax_amount) || 0;
+  const grand = Number(q.grand_total) || 0;
+  const taxRow = taxes.find((t) => t.id === String(q.tax_id ?? ""));
+  const cellIn = { width: "100%", border: "none", outline: "none", background: "transparent", fontSize: 13, padding: "6px 8px" } as const;
+
+  return (
+    <div className="flex flex-col" style={{ height: "100%", minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
+        <div className="flex items-center gap-3 mb-2 flex-wrap">
+          <label className="text-xs font-semibold flex items-center gap-1.5" style={{ color: MUTED }}>
+            Currency
+            <select value={currency} onChange={(e) => void patchQuote({ currency: e.target.value }).catch((x) => setErr(String(x.message || x)))}
+              className="px-2 py-1 rounded text-xs border font-bold" style={{ borderColor: BORDER, background: "#fff", color: INK }}>
+              {["INR", "USD", "EUR"].map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </label>
+          {busy && <span className="text-xs" style={{ color: MUTED }}>saving…</span>}
+          {err && <span className="text-xs font-semibold" style={{ color: "#8E2C20" }}>{err}</span>}
+        </div>
+
+        <div className="rounded border" style={{ borderColor: BORDER, overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#FAF9F5", color: MUTED, fontSize: 11, textAlign: "left" }}>
+                <th className="px-2 py-1.5" style={{ width: 52 }}>SR NO</th>
+                <th className="px-2 py-1.5" style={{ width: 170 }}>ITEM GROUP</th>
+                <th className="px-2 py-1.5">ITEM</th>
+                <th className="px-2 py-1.5" style={{ width: 110, textAlign: "right" }}>RATE</th>
+                <th className="px-2 py-1.5" style={{ width: 70, textAlign: "right" }}>QTY</th>
+                <th className="px-2 py-1.5" style={{ width: 120, textAlign: "right" }}>AMOUNT</th>
+                <th className="px-2 py-1.5" style={{ width: 150 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {(lines ?? []).map((l, i) => (
+                <tr key={l.id} style={{ borderTop: `1px solid ${BORDER}` }}>
+                  <td className="px-2 tnum" style={{ color: MUTED }}>{srOf(i)}</td>
+                  <td style={{ paddingLeft: (l.indent ?? 0) ? 14 : 0 }}>
+                    <input style={cellIn} value={D(l, "item_group")} placeholder="—"
+                      onChange={(e) => setD(l.id, "item_group", e.target.value)} onBlur={() => commitD(l, "item_group")} />
+                  </td>
+                  <td style={{ paddingLeft: (l.indent ?? 0) ? 14 : 0 }}>
+                    <div className="flex items-center gap-1">
+                      <input style={cellIn} value={D(l, "description")}
+                        onChange={(e) => setD(l.id, "description", e.target.value)} onBlur={() => commitD(l, "description")} />
+                      <ProductCellPick onPick={(pid) => void pickProduct(l.id, pid)} />
+                    </div>
+                  </td>
+                  <td><input style={{ ...cellIn, textAlign: "right" }} type="number" value={D(l, "unit_price")}
+                    onChange={(e) => setD(l.id, "unit_price", e.target.value)} onBlur={() => commitD(l, "unit_price")} /></td>
+                  <td><input style={{ ...cellIn, textAlign: "right" }} type="number" value={D(l, "quantity")}
+                    onChange={(e) => setD(l.id, "quantity", e.target.value)} onBlur={() => commitD(l, "quantity")} /></td>
+                  <td className="px-2 tnum" style={{ textAlign: "right", fontWeight: 600 }}>{fm(l.line_total)}</td>
+                  <td className="px-2" style={{ whiteSpace: "nowrap", textAlign: "right" }}>
+                    <label title="Header discount applies to this line" className="mr-1" style={{ fontSize: 11, color: MUTED }}>
+                      <input type="checkbox" checked={l.discountable !== false} disabled={busy}
+                        onChange={(e) => void patchLine(l.id, { discountable: e.target.checked })} style={{ accentColor: NAVY, verticalAlign: "middle" }} /> disc
+                    </label>
+                    {i > 0 && <>
+                      <button title="Move up" disabled={busy} onClick={() => void move(i, -1)} style={{ fontSize: 12, padding: "0 2px" }}>↑</button>
+                      <button title="Move down" disabled={busy || i === (lines?.length ?? 0) - 1} onClick={() => void move(i, 1)} style={{ fontSize: 12, padding: "0 2px", opacity: i === (lines?.length ?? 0) - 1 ? 0.3 : 1 }}>↓</button>
+                      {(l.indent ?? 0) === 0
+                        ? <button title="Indent — becomes 1.1 under the line above" disabled={busy} onClick={() => void patchLine(l.id, { indent: 1 })} style={{ fontSize: 12, padding: "0 2px" }}>→</button>
+                        : <button title="Outdent — back to a main line" disabled={busy} onClick={() => void patchLine(l.id, { indent: 0 })} style={{ fontSize: 12, padding: "0 2px" }}>←</button>}
+                    </>}
+                    <button title="Remove this item" disabled={busy} onClick={() => void delLine(l.id)} style={{ fontSize: 12, padding: "0 4px", color: "#8E2C20" }}>✕</button>
+                  </td>
+                </tr>
+              ))}
+              {/* the write-item row — always there, Enter files it */}
+              <tr style={{ borderTop: `1px solid ${BORDER}`, background: "#FDFCFA" }}>
+                <td className="px-2 tnum" style={{ color: "#C7CCD2" }}>{(() => { const n = (lines ?? []).filter((l) => (l.indent ?? 0) === 0).length + 1; return n; })()}</td>
+                <td><input style={cellIn} placeholder="item group" value={ghost.item_group} onChange={(e) => setGhost((g) => ({ ...g, item_group: e.target.value }))} /></td>
+                <td>
+                  <div className="flex items-center gap-1">
+                    <input style={cellIn} placeholder="write item…" value={ghost.description}
+                      onChange={(e) => setGhost((g) => ({ ...g, description: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter") void addLine(); }} />
+                    <ProductCellPick onPick={async (pid) => {
+                      try {
+                        const j = await (await fetch(`/api/crm/product?id=${encodeURIComponent(pid)}`, { cache: "no-store" })).json();
+                        const p = j?.row as Row | undefined;
+                        if (p) setGhost((g) => ({
+                          ...g, description: g.description || String(p.name ?? ""),
+                          item_group: g.item_group || String(p.item_group ?? ""),
+                          unit_price: g.unit_price || (p.approved_price_inr != null ? String(p.approved_price_inr) : ""),
+                        }));
+                      } catch { /* type it by hand */ }
+                    }} />
+                  </div>
+                </td>
+                <td><input style={{ ...cellIn, textAlign: "right" }} type="number" placeholder="rate" value={ghost.unit_price} onChange={(e) => setGhost((g) => ({ ...g, unit_price: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") void addLine(); }} /></td>
+                <td><input style={{ ...cellIn, textAlign: "right" }} type="number" value={ghost.quantity} onChange={(e) => setGhost((g) => ({ ...g, quantity: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") void addLine(); }} /></td>
+                <td className="px-2 tnum" style={{ textAlign: "right", color: MUTED }}>{ghost.unit_price ? fm((Number(ghost.unit_price) || 0) * (Number(ghost.quantity) || 1)) : "—"}</td>
+                <td className="px-2" style={{ textAlign: "right" }}>
+                  <button disabled={busy || !ghost.description.trim()} onClick={() => void addLine()}
+                    className="rounded px-2 py-0.5 text-xs font-bold text-white" style={{ background: ghost.description.trim() ? ORANGE : "#B9BEC4" }}>+ Add</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* THE FLOATING FOOT — totals ride along as the items scroll */}
+      <div style={{ flexShrink: 0, borderTop: `2px solid ${NAVY}`, background: "#fff", padding: "10px 16px" }}>
+        <div className="flex gap-6 flex-wrap items-start">
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div className="text-sm mt-1" style={{ color: MUTED, lineHeight: 1.5 }}>
+              <b style={{ color: INK }}>In words:</b> {amountInWords(grand, currency, dec)}
+            </div>
+            <div className="flex items-center gap-4 mt-2 flex-wrap">
+              <label className="text-xs flex items-center gap-1.5" style={{ color: MUTED }}>
+                <input type="checkbox" checked={dec} onChange={(e) => void patchQuote({ show_decimals: e.target.checked }).catch((x) => setErr(String(x.message || x)))} style={{ accentColor: NAVY }} />
+                show decimals
+              </label>
+              <label className="text-xs flex items-center gap-1.5" style={{ color: MUTED }}>
+                Authorized By:
+                <input defaultValue={String(q.authorized_by ?? "Dr Raghunandan Jagdish, MD and CEO")}
+                  onBlur={(e) => { if (e.target.value !== String(q.authorized_by ?? "")) void patchQuote({ authorized_by: e.target.value }).catch((x) => setErr(String(x.message || x))); }}
+                  className="px-2 py-1 rounded border text-xs" style={{ borderColor: BORDER, width: 260, fontWeight: 700, color: INK }} />
+              </label>
+            </div>
+          </div>
+          <table style={{ fontSize: 13, minWidth: 320 }}>
+            <tbody>
+              <tr><td className="py-0.5 pr-6" style={{ color: MUTED }}>Net Total</td><td className="tnum" style={{ textAlign: "right" }}>{fm(subtotal)}</td></tr>
+              <tr>
+                <td className="py-0.5 pr-6" style={{ color: MUTED }}>
+                  Discount
+                  <input type="number" value={discPct ?? String(Number(q.discount_pct) || 0)}
+                    onChange={(e) => setDiscPct(e.target.value)}
+                    onBlur={() => { if (discPct !== null) { void patchQuote({ discount_pct: Number(discPct) || 0 }).catch((x) => setErr(String(x.message || x))); setDiscPct(null); } }}
+                    className="mx-1.5 px-1.5 py-0.5 rounded border tnum" style={{ borderColor: BORDER, width: 60, textAlign: "right" }} />%
+                </td>
+                <td className="tnum" style={{ textAlign: "right", color: discAmt ? "#8E2C20" : MUTED }}>{discAmt ? `− ${fm(discAmt)}` : fm(0)}</td>
+              </tr>
+              <tr style={{ borderTop: `1px solid ${BORDER}` }}><td className="py-0.5 pr-6" style={{ color: MUTED }}>Discounted Total</td><td className="tnum" style={{ textAlign: "right" }}>{fm(subtotal - discAmt)}</td></tr>
+              <tr><td colSpan={2} style={{ height: 8 }} /></tr>
+              <tr>
+                <td className="py-0.5 pr-6" style={{ color: MUTED }}>
+                  Taxes
+                  <select value={String(q.tax_id ?? "")} onChange={(e) => void patchQuote({ tax_id: e.target.value }).catch((x) => setErr(String(x.message || x)))}
+                    className="mx-1.5 px-1.5 py-0.5 rounded border text-xs" style={{ borderColor: BORDER, background: "#fff", maxWidth: 170 }}>
+                    <option value="">— pick —</option>
+                    {taxes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </td>
+                <td className="tnum" style={{ textAlign: "right" }}>{fm(taxAmt)}</td>
+              </tr>
+              {(taxRow?.components ?? []).length > 1 && (taxRow!.components!).map((c) => (
+                <tr key={c.name}><td className="py-0 pr-6 text-xs" style={{ color: MUTED, paddingLeft: 14 }}>{c.name} {c.pct}%</td>
+                  <td className="tnum text-xs" style={{ textAlign: "right", color: MUTED }}>{fm((subtotal - discAmt) * c.pct / 100)}</td></tr>
+              ))}
+              <tr style={{ borderTop: `2px solid ${NAVY}` }}>
+                <td className="py-1 pr-6 font-bold" style={{ color: INK }}>Grand Total</td>
+                <td className="tnum font-bold" style={{ textAlign: "right", fontSize: 15 }}>{fm(grand)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The little 📦 that turns into a product search inside a grid cell. */
+function ProductCellPick({ onPick }: { onPick: (productId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  if (!open)
+    return <button title="Pick from the Products catalogue" onClick={() => setOpen(true)} style={{ fontSize: 13, opacity: 0.65, flexShrink: 0 }}>📦</button>;
+  return (
+    <div style={{ width: 220, flexShrink: 0 }}>
+      <LinkAutocomplete target="product" value="" valueLabel=""
+        onPick={(id) => { setOpen(false); if (id) onPick(id); }} />
+    </div>
+  );
+}
+
 /** The client's addresses in a dropdown, the client's own as default
  *  (Dr Raghu, 30 Aug 2026: "Address have a drop down — the default should
  *  be the one of the client"). */
@@ -2149,7 +2623,8 @@ function RecordModal({
         recordTabs.push({ key: "oppenquiry", label: "Enquiry Info" });
         recordTabs.push({ key: "dealppl", label: "Deal Contacts", slug: "opportunity_contact", filterField: "opportunity_id", filterValue: qOpp, addPresets: { opportunity_id: qOpp }, presetOptions: { opportunity: [{ id: qOpp, label: "this quotation's opportunity" }] } });
       }
-      recordTabs.push({ key: "lines", label: "Lines", slug: "quotation_line", filterField: "quotation_id", filterValue: rid, addPresets: { quotation_id: rid } });
+      recordTabs.push({ key: "situational", label: "Situational Details" });
+      recordTabs.push({ key: "lines", label: "Quote items", slug: "quotation_line", filterField: "quotation_id", filterValue: rid, addPresets: { quotation_id: rid } });
     }
     if (dt.name === "person") recordTabs.push({ key: "card", label: "Visiting Card" });
     recordTabs.push(
@@ -2369,6 +2844,10 @@ function RecordModal({
               )}
             </div>
             )
+          ) : tab === "situational" && dt.name === "quotation" ? (
+            <SituationalTab row={row} onSaved={onSaved} />
+          ) : tab === "lines" && dt.name === "quotation" ? (
+            <QuoteItemsTab quote={row} onSaved={onSaved} />
           ) : tab === "pquotes" ? (
             <ProductQuotesTab id={rid} />
           ) : tab === "ppricing" ? (
