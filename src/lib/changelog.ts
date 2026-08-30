@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.0.1.6",
+    date: "2026-08-31",
+    module: "CRM — a company can start its own enquiry and its own quote",
+    items: [
+      "\"in this also make a button to add opportunity\" (Dr Raghu, 31 Aug 2026) — a company's Opportunities tab could list them but not add one, and its Quotations tab the same. The one screen that knows the customer sent you somewhere else to raise their enquiry. Both now carry the add button, with the company already chosen on the form.",
+    ],
+  },
+  {
     v: "4.0.1.5",
     date: "2026-08-31",
     module: "CRM — the quote's template variables, said out loud and finally forgiving",

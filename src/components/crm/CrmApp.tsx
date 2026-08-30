@@ -3726,8 +3726,14 @@ function RecordModal({
     if (dt.name === "company") {
       recordTabs.push(
         { key: "addresses", label: "Addresses", slug: "address", filterField: "company_id", filterValue: rid, addPresets: { company_id: rid } },
-        { key: "opps", label: "Opportunities", count: row.opp_count, slug: "opportunity", filterField: "company_id", filterValue: rid },
-        { key: "quotes", label: "Quotations", slug: "quotation", filterField: "company_id", filterValue: rid },
+        // A company's own funnel starts HERE (Dr Raghu, 31 Aug 2026: "in this
+        // also make a button to add opportunity"). Both tabs could list but
+        // not add, so the one screen that knows the customer sent you
+        // elsewhere to raise their enquiry. The company rides in pre-chosen.
+        { key: "opps", label: "Opportunities", count: row.opp_count, slug: "opportunity", filterField: "company_id", filterValue: rid,
+          addPresets: { company_id: rid }, presetOptions: { company: [{ id: rid, label: title }] } },
+        { key: "quotes", label: "Quotations", slug: "quotation", filterField: "company_id", filterValue: rid,
+          addPresets: { company_id: rid }, presetOptions: { company: [{ id: rid, label: title }] } },
         { key: "sos", label: "Sales Orders", count: row.so_count, slug: "sales_order", filterField: "company_id", filterValue: rid },
       );
     }
