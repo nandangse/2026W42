@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.24",
+    date: "2026-08-30",
+    module: "CRM — IFS refuses an error dressed as a summary",
+    items: [
+      "InstaFinancials can answer 200 with an error body (TotalLimitExceeded on a Sandbox key) — the buy now refuses to store it, says the API's own words, and points at the fix: switch to Production / add credits.",
+    ],
+  },
+  {
     v: "3.31.1.23",
     date: "2026-08-30",
     module: "CRM — 🔍 Find CIN, one credit",

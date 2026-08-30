@@ -88,6 +88,10 @@ export async function POST(req: Request) {
       throw new HttpError(502, `InstaFinancials said ${r.status}: ${text.slice(0, 220)} — check the key and URL_TEMPLATE in Integrations.`);
     let j: unknown;
     try { j = JSON.parse(text); } catch { throw new HttpError(502, `InstaFinancials answered but not with JSON: ${text.slice(0, 180)}`); }
+    // a 200 can still carry an error body — never store one as a summary
+    const jr = j as { Response?: { Status?: string; Type?: string; Message?: string }; InstaSummary?: unknown };
+    if (jr.Response?.Status === "error" || !jr.InstaSummary)
+      throw new HttpError(502, `InstaFinancials refused: ${jr.Response?.Type || "no InstaSummary in the answer"}${jr.Response?.Message ? ` — ${jr.Response.Message}` : ""}. TotalLimitExceeded means the account has no allowance for this call — switch Sandbox to Production / add prepaid credits on instafinancials.com.`);
 
     const now = new Date().toISOString();
     const { error } = await db.from("company").update({ cin, ifs_summary: j, ifs_at: now, ifs_by: me.email }).eq("id", cid);
