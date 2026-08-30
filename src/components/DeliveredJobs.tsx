@@ -344,7 +344,8 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
           const periodM = Math.max(elapsedM, days(from, periodEnd) / 30.44);
           const leftM = periodM - elapsedM;
           const rr = { nos: totals.nos / elapsedM, val: totals.value / elapsedM, tp: totals.throughput / elapsedM };
-          const req = (targetMo: number, done: number) => (leftM > 0.1 ? Math.max(0, targetMo * periodM - done) / leftM : null);
+          // even the period's last day states its demand — only a truly closed window shows the dash
+          const req = (targetMo: number, done: number) => (leftM > 0.015 ? Math.max(0, targetMo * periodM - done) / leftM : null);
           const reqVal = req(tgt.value_cr * 1e7, totals.value);
           const reqTp = req(tgt.tp_cr * 1e7, totals.throughput);
           // the QUANTITY target derives itself (Dr Raghu, 30 Aug 2026): the

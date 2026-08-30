@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.61",
+    date: "2026-08-30",
+    module: "Planning Suite — the Believable Plan",
+    items: [
+      "MONTH & QUARTER PLAN, a new desk in the Planning Suite (Dr Raghu, 30 Aug 2026): DONE so far and MORE due by the period's natural end — and against every job, the signed-in planner's OWN read: a comment, a BELIEF (0 · 10 · 25 · 50 · 75 · 90 · 100), and MY BEST ESTIMATE of the date, born as the TDD and changed freely. Every keystroke saves itself.",
+      "THE SIGNATURE: '✍ This is my Plan for the MTD/QTD' asks once more — is this your final Plan? — then freezes it, mails it to the signer with stratcom@nandan.co.in in cc, and ONLY THEN shows THE REALISTIC PLAN: money weighted by belief, membership decided by the planner's own dates. Believability, made a number (migration 0103).",
+      "The run-rate box states its demand even on the period's last day instead of hiding behind a dash.",
+    ],
+  },
+  {
     v: "3.31.0.60",
     date: "2026-08-30",
     module: "Run-rate box — the quantity target derives itself",

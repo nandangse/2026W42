@@ -46,6 +46,7 @@ import DeliveredJobs from "./DeliveredJobs";
 import MorningUpload from "./MorningUpload";
 import DeliveryOutlook from "./DeliveryOutlook";
 import LMS from "./LMS";
+import MonthQuarterPlan from "./MonthQuarterPlan";
 import JobsInProgress, { JobLightbox, type WipJob } from "./JobsInProgress";
 import MaterialKitting, { MatBox, type Mat } from "./MaterialKitting";
 import { useMyWeek, HowsMyDay, ImageQuote, Birthdays, MyLearningCard } from "./MyWeekPanels";
@@ -441,7 +442,7 @@ export default function PlanningSuite({
   }, [workspace, canSeeDelivered]);
 
   // land on "My Week" within the suite, not the delivery board
-  const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature" | "opsbook">(() => {
+  const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "mplan" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature" | "opsbook">(() => {
     if (typeof window === "undefined") return "home";
     try {
       const v = localStorage.getItem("genie.tab");
@@ -786,6 +787,7 @@ export default function PlanningSuite({
     ["esc", "Escalations"],
     ["load", "Load Board"],
     ["plan", "Job Plan"],
+    ["mplan", "Month & Qtr Plan"],
   ];
 
   return (
@@ -1133,6 +1135,7 @@ export default function PlanningSuite({
       {workspace === "suite" && tab === "material" && <PendingMaterial board={board} onOpen={openJobPlan} reload={reload} canEdit={canEdit} />}
       {workspace === "suite" && tab === "esc" && <Escalations board={board} V={V} onOpen={openJobPlan} reload={reload} isAdmin={isAdmin} />}
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
+      {workspace === "suite" && tab === "mplan" && <MonthQuarterPlan V={V} />}
       {workspace === "suite" && tab === "plan" && <JobPlan isAdmin={isAdmin} board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} canPush={role === "admin" || role === "planner"} />}
       {workspace === "suite" && tab === "upload" && canUpload && <MorningUpload email={email} embedded />}
