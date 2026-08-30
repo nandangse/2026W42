@@ -53,12 +53,12 @@
  * which is the only evidence available for the part no clock sees.
  */
 export const EFFORT = {
-  measuredTo: "2026-08-20",
-  commits: 127,
-  days: 17,
-  windowHours: 47.5,
-  raghuLow: 24,
-  raghuHigh: 36,
+  measuredTo: "2026-08-30",
+  commits: 451,
+  days: 26,
+  windowHours: 150.5,
+  raghuLow: 75,
+  raghuHigh: 110,
 };
 
 export interface UpdateEntry {
@@ -74,6 +74,14 @@ export interface UpdateEntry {
 
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
+  {
+    v: "3.31.1.28",
+    date: "2026-08-30",
+    module: "Genie — the time-invested card catches up with the truth",
+    items: [
+      "Re-measured from the commit history to 30 Aug: 451 commits across 26 working days, a 150.5-hour build window — 30 August alone ran a 10-hour span with 86 commits. Dr Raghu's own specifying-and-reviewing range moves to 75–110 hours, held as a range for the same honest reason as before.",
+    ],
+  },
   {
     v: "3.31.1.27",
     date: "2026-08-30",
