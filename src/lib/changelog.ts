@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.64",
+    date: "2026-08-30",
+    module: "Delivered Jobs — the average speaks, the band explains",
+    items: [
+      "MONTHLY AVERAGE on the green projection box (Dr Raghu, 30 Aug 2026): the if-everything-delivers total said as a per-month pace over the period.",
+      "The run-rate box's small-print explainer moved INTO THE NAVY BAND at a readable size — the required-run-rate arithmetic and the target's source (the Admin FY targets ÷ 12, or the Monthly card) said where everyone reads.",
+    ],
+  },
+  {
     v: "3.31.0.63",
     date: "2026-08-30",
     module: "Run-rate box — one target, the Admin FY card's",

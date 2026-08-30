@@ -198,6 +198,17 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
     return averagePerMonth(rows, r.from, r.to, earliest, 12);
   }, [rows, earliest]);
 
+  // ONE set of targets, shared by the run-rate box and the navy band
+  const boxTgt = useMemo(() => {
+    const fyT: { value_cr: number; tp_cr: number; nos?: number | null } | null =
+      rr?.hasTarget ? { value_cr: rr.targets.sales / 12 / 1e7, tp_cr: rr.targets.throughput / 12 / 1e7, nos: data?.targets?.nos ?? null } : null;
+    const tgt = fyT ?? data?.targets ?? { value_cr: 10, tp_cr: 4 };
+    const avgJob = m12.perMonth && m12.perMonth.nos > 0 ? m12.perMonth.value / m12.perMonth.nos : 0;
+    const nosTarget = tgt.nos || (avgJob > 0 ? (tgt.value_cr * 1e7) / avgJob : null);
+    return { tgt, avgJob, nosTarget, fromFy: !!fyT };
+  }, [rr, data, m12]);
+
+
   const months = useMemo(() => byMonth(rows, from, to), [rows, from, to]);
   const families = useMemo(() => byFamily(rows, from, to), [rows, from, to]);
   const customers = useMemo(() => byCustomer(rows, from, to), [rows, from, to]);
@@ -338,12 +349,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
             month's pace, the settings' target, and what the rest of the
             period demands to close the gap */}
         {(() => {
-          // ONE set of targets (Dr Raghu, 30 Aug 2026: "take the target from
-          // settings in admin"): the Admin FY targets card (85 Cr / 35 Cr a
-          // year) ÷ 12 is the monthly truth; the Monthly Delivered Targets
-          // card only speaks when no FY target is set.
-          const fyT: { value_cr: number; tp_cr: number; nos?: number | null } | null = rr?.hasTarget ? { value_cr: rr.targets.sales / 12 / 1e7, tp_cr: rr.targets.throughput / 12 / 1e7, nos: data?.targets?.nos ?? null } : null;
-          const tgt = fyT ?? data?.targets ?? { value_cr: 10, tp_cr: 4 };
+          const { tgt, nosTarget } = boxTgt;
           const days = (a: string, b: string) => Math.max(0, Math.round((new Date(b + "T00:00:00Z").getTime() - new Date(a + "T00:00:00Z").getTime()) / 86400000) + 1);
           const elapsedM = Math.max(0.25, days(from, TODAY < periodEnd ? TODAY : periodEnd) / 30.44);
           const periodM = Math.max(elapsedM, days(from, periodEnd) / 30.44);
@@ -353,11 +359,6 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
           const req = (targetMo: number, done: number) => (leftM > 0.015 ? Math.max(0, targetMo * periodM - done) / leftM : null);
           const reqVal = req(tgt.value_cr * 1e7, totals.value);
           const reqTp = req(tgt.tp_cr * 1e7, totals.throughput);
-          // the QUANTITY target derives itself (Dr Raghu, 30 Aug 2026): the
-          // value target over the last 12 months' average value per job —
-          // a hand-typed nos in the masters outranks the derivation
-          const avgJob = m12.perMonth && m12.perMonth.nos > 0 ? m12.perMonth.value / m12.perMonth.nos : 0;
-          const nosTarget = tgt.nos || (avgJob > 0 ? (tgt.value_cr * 1e7) / avgJob : null);
           const reqNos = nosTarget ? req(nosTarget, totals.nos) : null;
           const Rw = ({ l, a, t, r, money }: { l: string; a: number; t: number | null; r: number | null; money?: boolean }) => (
             <tr>
@@ -384,9 +385,6 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
                   <Rw l="THROUGHPUT" a={pace.tp} t={tgt.tp_cr * 1e7} r={reqTp} money />
                 </tbody>
               </table>
-              <div className="text-xs mt-0.5" style={{ color: C.faint, fontSize: 9.5 }}>
-                required = what each remaining month must deliver to end the period on target ({tgt.value_cr.toFixed(2)} Cr / {tgt.tp_cr.toFixed(2)} Cr a month{rr?.hasTarget ? " — the Admin FY targets ÷ 12" : ", from the masters"}{avgJob > 0 && !tgt.nos ? ` · nos target = value target ÷ avg job value (${lakh(avgJob)}, last 12 months)` : ""})
-              </div>
             </div>
           );
         })()}
@@ -396,6 +394,11 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
       <div className="rounded-lg px-3 py-2 mb-3 text-sm font-semibold" style={{ background: "#1B3A5C", color: "#fff", lineHeight: 1.5, display: sub === "jobs" ? undefined : "none" }}>
         These deliveries are based on ERP dates — NOT invoice dates. ERP dates are the actual delivery from the factory.
         <span style={{ color: "#B9C7D4", fontWeight: 500 }}> · Note: Delivered = Delivered and Installation Stage.</span>
+        <div className="mt-1" style={{ color: "#B9C7D4", fontWeight: 500, fontSize: 13 }}>
+          Required = what each remaining month must deliver to end the period on target
+          ({boxTgt.tgt.value_cr.toFixed(2)} Cr / {boxTgt.tgt.tp_cr.toFixed(2)} Cr a month{boxTgt.fromFy ? " — the Admin FY targets ÷ 12" : " — the Monthly Delivered Targets card"}
+          {boxTgt.avgJob > 0 && !boxTgt.tgt.nos ? ` · nos target = value target ÷ avg job value (${lakh(boxTgt.avgJob)}, last 12 months)` : ""}).
+        </div>
       </div>
 
       {/* ===== what the period can STILL produce (Dr Raghu, 29 Aug 2026):
@@ -432,6 +435,17 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
               <div className="text-xs mt-1" style={{ color: "#5A6672" }}>
                 {totals.nos} already out the gate + {pipe.nos} on the boards
               </div>
+              {(() => {
+                const pm = Math.max(0.5, (Math.round((new Date(periodEnd + "T00:00:00Z").getTime() - new Date(from + "T00:00:00Z").getTime()) / 86400000) + 1) / 30.44);
+                return (
+                  <div className="text-sm mt-1 tnum" style={{ color: "#16232F" }}>
+                    <b>Monthly average:</b> {((totals.nos + pipe.nos) / pm).toFixed(1)} nos
+                    <span style={{ color: C.accent }}> · {V((totals.value + pipe.val) / pm)}</span>
+                    <span style={{ color: C.green }}> · {V((totals.throughput + pipe.tp) / pm)}</span>
+                    <span className="text-xs" style={{ color: "#5A6672" }}> over the {pm.toFixed(1)}-month period</span>
+                  </div>
+                );
+              })()}
               <div className="mt-1.5 font-bold" style={{ color: "#0D7A3F", fontSize: 13 }}>
                 Come on — LET&apos;S DO IT AND SHOW THIS SUCCESS! 🚀
               </div>
