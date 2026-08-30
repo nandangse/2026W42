@@ -61,6 +61,7 @@ export function GenieUsagePanel() {
               <th className="py-1 pr-3" style={{ textAlign: "right" }}>ASK GENIE</th>
               <th className="py-1 pr-3" style={{ textAlign: "right" }}>SITUATIONAL</th>
               <th className="py-1 pr-3" style={{ textAlign: "right" }}>LETTERS</th>
+              <th className="py-1 pr-3" style={{ textAlign: "right" }}>CONSULT</th>
               <th className="py-1" style={{ textAlign: "right" }}>~AI SPEND</th>
             </tr></thead>
             <tbody>
@@ -75,6 +76,7 @@ export function GenieUsagePanel() {
                   <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{r.ai.opp_brief || "—"}</td>
                   <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{r.ai.situational_run || "—"}</td>
                   <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{r.ai.letter_beautify || "—"}</td>
+                  <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{r.ai.consult || "—"}</td>
                   <td className="py-1.5 tnum" style={{ textAlign: "right", fontWeight: 700 }}>{r.costInr ? inr(r.costInr) : "—"}</td>
                 </tr>
               ))}

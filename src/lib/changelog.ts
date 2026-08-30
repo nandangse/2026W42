@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.32",
+    date: "2026-08-30",
+    module: "Genie — Consult Raghu joins the usage ledger",
+    items: [
+      "\"data is good to measure!\" (Dr Raghu, 30 Aug 2026) — the Settings → Genie panel gains a CONSULT column: every message each person sends to the advisor, counted from the consultation tables themselves and costed at ~₹5 a message into the per-person and whole-business AI spend.",
+    ],
+  },
+  {
     v: "3.31.1.31",
     date: "2026-08-30",
     module: "CRM — the consultation files itself; attachments; the reading room",
