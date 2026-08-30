@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.19",
+    date: "2026-08-30",
+    module: "Genie — the template master edits as a real HTML page",
+    items: [
+      "Editing a Quote Template (and every rich field in any form — product descriptions, notes, extras) now opens the COMMON rich editor live: what you see is the page, never raw markup (Dr Raghu, 30 Aug 2026: \"very difficult to work on this\"). B, lists, colour, pictures, tables — the full toolbar, saving with the form.",
+    ],
+  },
+  {
     v: "3.31.1.18",
     date: "2026-08-30",
     module: "CRM — template variables fill on every page",

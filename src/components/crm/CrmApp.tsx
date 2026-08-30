@@ -5653,7 +5653,12 @@ function RecordForm({
                 />
                 <span style={{ color: "#5A6672" }}>{f.label}</span>
               </label>
-            ) : f.type === "textarea" && (f.rich || f.name === "enquiry_info") ? (
+            ) : f.type === "textarea" && f.rich ? (
+              /* the COMMON rich editor, live — an HTML page, not raw markup
+                 (Dr Raghu, 30 Aug 2026: "we need to have an HTML page here") */
+              <RichTextEditor live initial={String(form[f.name] ?? "")}
+                onChangeHtml={(v) => set(f.name, v)} minHeight={f.big ? 220 : 130} />
+            ) : f.type === "textarea" && f.name === "enquiry_info" ? (
               <RichTextArea value={String(form[f.name] ?? "")} onChange={(v) => set(f.name, v)} rows={f.big ? 8 : 3} />
             ) : f.type === "textarea" ? (
               <textarea

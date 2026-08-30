@@ -92,14 +92,19 @@ export function RichContent({ text, legacy, thumbs }: { text: string; legacy: (s
 
 const COLORS = ["#16232F", "#B3261E", "#E8600A", "#0D7A3F", "#1B3A5C", "#7C3AED"];
 
-export default function RichTextEditor({ initial, onSave, onCancel, busy, minHeight = 220, placeholder, onUploadImage }: {
-  initial: string; onSave: (html: string) => void; onCancel: () => void; busy?: boolean; minHeight?: number; placeholder?: string;
+export default function RichTextEditor({ initial, onSave, onCancel, busy, minHeight = 220, placeholder, onUploadImage, live, onChangeHtml }: {
+  initial: string; onSave?: (html: string) => void; onCancel?: () => void; busy?: boolean; minHeight?: number; placeholder?: string;
   /** Where a pasted or picked image goes — returns its URL. Without it,
    *  image paste is refused rather than bloating the record with base64. */
   onUploadImage?: (file: File) => Promise<string>;
+  /** LIVE mode (30 Aug 2026): no Save/Cancel — every keystroke reports the
+   *  HTML up through onChangeHtml. For rich fields inside a bigger form. */
+  live?: boolean;
+  onChangeHtml?: (html: string) => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [colorOpen, setColorOpen] = useState(false);
+  const mounted = useRef(false);
   // click a picture to select it; 🖼− / 🖼+ walk its width down and up
   // (Dr Raghu, 30 Aug 2026: "increase and decrease size")
   const selImg = useRef<HTMLImageElement | null>(null);
@@ -121,7 +126,12 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
     img.style.width = `${next}%`;
   };
   useEffect(() => {
+    // live mode seeds ONCE — re-seeding on every reported change would
+    // throw the caret to the start with each keystroke
+    if (live && mounted.current) return;
+    mounted.current = true;
     if (ref.current) ref.current.innerHTML = looksHtml(initial) ? sanitizeRich(initial) : legacyToHtml(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial]);
 
   const cmd = (c: string, v?: string) => { ref.current?.focus(); document.execCommand(c, false, v); };
@@ -187,16 +197,19 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
       <input ref={fileInput} type="file" accept="image/*" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadAndInsert(f); e.target.value = ""; }} />
       <div ref={ref} contentEditable suppressContentEditableWarning onPaste={onPaste} onClick={pickImg}
+        onInput={live && onChangeHtml ? () => onChangeHtml(ref.current?.innerHTML || "") : undefined}
         data-placeholder={placeholder || ""}
         className="w-full rounded border p-3 text-sm rich-html"
         style={{ borderColor: "#E8600A", lineHeight: 1.6, minHeight, maxHeight: "calc(100vh - 360px)", overflowY: "auto", outline: "none", background: "#fff" }} />
+      {!live && (
       <div className="flex gap-2 mt-1.5">
-        <button onClick={() => { if (selImg.current) selImg.current.style.outline = ""; onSave(sanitizeRich(ref.current?.innerHTML || "")); }} disabled={!!busy}
+        <button onClick={() => { if (selImg.current) selImg.current.style.outline = ""; onSave?.(sanitizeRich(ref.current?.innerHTML || "")); }} disabled={!!busy}
           className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: "#0D7A3F" }}>
           {busy ? "Saving…" : "✓ Save"}
         </button>
         <button onClick={onCancel} className="rounded px-3 py-1 text-xs font-bold" style={{ background: "#EFEDE7", color: "#5A6672" }}>Cancel</button>
       </div>
+      )}
       {/* the table/img dress, once for every rich box on the page */}
       <style jsx global>{`
         .rich-html table { border-collapse: collapse; margin: 6px 0; }
