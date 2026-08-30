@@ -5648,8 +5648,18 @@ function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPush?: boo
   const [installed, setInstalled] = useState(true);
   const [busy, setBusy] = useState(false);
   // the fate filter (Dr Raghu, 29 Aug 2026): waiting · pushed · rejected · all
-  const [scope, setScope] = useState<"waiting" | "pushed" | "rejected" | "all">("waiting");
+  const [scope, setScope] = useState<"waiting" | "pushed" | "rejected" | "cancelled" | "all">("waiting");
   const [pushMsg, setPushMsg] = useState("");
+  // ticked lines can leave the queue as CANCELLED (Dr Raghu, 30 Aug 2026)
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  useEffect(() => setSel(new Set()), [scope]);
+  const cancelSel = async () => {
+    if (!sel.size || !window.confirm(`Cancel ${sel.size} correction${sel.size === 1 ? "" : "s"}? They will not be pushed — the record stays, marked cancelled.`)) return;
+    setBusy(true);
+    try { await api.post("/api/erp-update", { action: "cancel", ids: [...sel] }); setSel(new Set()); load(); }
+    catch (e) { setPushMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
 
   const load = useCallback(() => {
     api.get(`/api/erp-update?scope=${scope}`)
@@ -5705,6 +5715,13 @@ function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPush?: boo
           </div>
         </div>
         <div className="flex-1" style={{ minWidth: 10 }} />
+        {canPush && scope === "waiting" && sel.size > 0 && (
+          <button onClick={cancelSel} disabled={busy} className="text-xs font-bold rounded px-3 py-1.5"
+            style={{ background: "#fff", border: "1px solid #B3261E", color: "#B3261E", opacity: busy ? 0.5 : 1 }}
+            title="The ticked lines leave the queue as cancelled — never pushed, never deleted">
+            🗑 Cancel selected · {sel.size}
+          </button>
+        )}
         {canPush && scope === "waiting" && !!rows?.length && (
           <button onClick={pushNow} disabled={busy} className="text-xs font-bold rounded px-3 py-1.5 text-white"
             style={{ background: busy ? "#B9BEC4" : "#7C3AED" }}
@@ -5728,10 +5745,10 @@ function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPush?: boo
       {pushMsg && <div className="text-xs font-bold mb-2" style={{ color: /reject|not in ERP [1-9]|refused|failed/i.test(pushMsg) ? "#B3261E" : "#0D7A3F" }}>{pushMsg}</div>}
 
       <div className="flex gap-1 mb-2">
-        {(["waiting", "pushed", "rejected", "all"] as const).map((k) => (
+        {(["waiting", "pushed", "rejected", "cancelled", "all"] as const).map((k) => (
           <button key={k} onClick={() => setScope(k)} className="rounded-full border px-3 py-1 text-xs font-bold"
             style={scope === k ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: "#8A94A0", borderColor: "#E2E0DA", background: "#fff" }}>
-            {k === "waiting" ? "Waiting" : k === "pushed" ? "Pushed" : k === "rejected" ? "Rejected" : "All"}
+            {k === "waiting" ? "Waiting" : k === "pushed" ? "Pushed" : k === "rejected" ? "Rejected" : k === "cancelled" ? "Cancelled" : "All"}
           </button>
         ))}
       </div>
@@ -5757,6 +5774,13 @@ function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPush?: boo
           <table className="text-xs w-full" style={{ borderCollapse: "collapse", minWidth: 720 }}>
             <thead>
               <tr style={{ background: "#22303C", color: "#fff" }}>
+                {canPush && scope === "waiting" && (
+                  <th className="px-2 py-1.5">
+                    <input type="checkbox" title="Tick all"
+                      checked={!!rows?.length && sel.size === rows.length}
+                      onChange={(e) => setSel(e.target.checked ? new Set((rows || []).map((r) => r.id)) : new Set())} />
+                  </th>
+                )}
                 <th className="px-2 py-1.5 text-left">Job ID</th>
                 <th className="px-2 py-1.5 text-left">Field</th>
                 <th className="px-2 py-1.5 text-left">New value</th>
@@ -5769,6 +5793,12 @@ function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPush?: boo
             <tbody>
               {(rows || []).map((r) => (
                 <tr key={r.id} style={{ borderTop: "1px solid #EEECE6" }}>
+                  {canPush && scope === "waiting" && (
+                    <td className="px-2 py-1 text-center">
+                      <input type="checkbox" checked={sel.has(r.id)}
+                        onChange={(e) => setSel((s) => { const n = new Set(s); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} />
+                    </td>
+                  )}
                   <td className="px-2 py-1 font-bold tnum" style={{ color: "#1B3A5C" }}>{r.job_id}</td>
                   <td className="px-2 py-1" style={{ color: "#5A6672" }}>{r.label}</td>
                   <td className="px-2 py-1 font-semibold" style={{ color: "#16232F", maxWidth: 280 }}>{r.new_value || <i style={{ color: "#B8B5AC" }}>(cleared)</i>}</td>
@@ -5778,6 +5808,8 @@ function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPush?: boo
                   <td className="px-2 py-1">
                     {r.push_status === "pushed" ? (
                       <span className="rounded px-1.5 font-bold" style={{ background: "#E6F4EB", color: "#0D7A3F", fontSize: 10.5 }} title={`by ${r.pushed_by ?? ""} · ${r.pushed_at ? new Date(String(r.pushed_at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}`}>pushed</span>
+                    ) : r.push_status === "cancelled" ? (
+                      <span className="rounded px-1.5 font-bold" style={{ background: "#EFEDE7", color: "#5A6672", fontSize: 10.5 }} title={r.push_error ?? ""}>cancelled</span>
                     ) : r.push_status ? (
                       <span className="rounded px-1.5 font-bold" style={{ background: "#FBEAE8", color: "#B3261E", fontSize: 10.5 }} title={r.push_error ?? ""}>{r.push_status === "not_in_erp" ? "not in ERP" : "rejected"}</span>
                     ) : (

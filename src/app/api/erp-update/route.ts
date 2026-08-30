@@ -24,6 +24,7 @@ export async function GET(req: Request) {
     if (scope === "waiting") q = q.is("exported_at", null);
     else if (scope === "pushed") q = q.eq("push_status", "pushed");
     else if (scope === "rejected") q = q.in("push_status", ["rejected", "not_in_erp"]);
+    else if (scope === "cancelled") q = q.eq("push_status", "cancelled");
     const { data, error } = await q;
     if (error) throw new Error(error.message);
     return NextResponse.json({ installed: true, rows: data || [] });
@@ -63,6 +64,18 @@ export async function POST(req: Request) {
     const body = await req.json();
     const admin = adminClient();
     const who = user.initials || user.displayName || user.email.split("@")[0];
+
+    // ticked lines leave the queue as CANCELLED (Dr Raghu, 30 Aug 2026) —
+    // never pushed, never deleted: the record of the correction stays
+    if (String(body.action || "") === "cancel") {
+      const ids = (Array.isArray(body.ids) ? body.ids : []).map(String).filter(Boolean);
+      if (!ids.length) throw new HttpError(400, "Tick the lines to cancel first.");
+      const { error } = await admin.from("erp_update")
+        .update({ push_status: "cancelled", push_error: `cancelled by ${who}`, exported_at: new Date().toISOString() })
+        .in("id", ids).is("exported_at", null);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, cancelled: ids.length });
+    }
 
     if (String(body.action || "") === "push") {
       const { data: cfgRow } = await crmDb().from("integration_setting").select("config").eq("key", "erpnext").maybeSingle();

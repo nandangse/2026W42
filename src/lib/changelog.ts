@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.52",
+    date: "2026-08-30",
+    module: "Update to ERP — cancel the ticked",
+    items: [
+      "CHECKBOXES on the waiting corrections (Dr Raghu, 30 Aug 2026): tick the lines that should never go, press 🗑 CANCEL SELECTED, and they leave the queue wearing 'cancelled' — never pushed, never deleted; a Cancelled chip keeps them one press away.",
+    ],
+  },
+  {
     v: "3.31.0.51",
     date: "2026-08-30",
     module: "CRM — the enquiry desk finishes",
