@@ -3742,21 +3742,34 @@ function JobPlan({
           its customer tag, every screen size — it appears the moment the big
           card scrolls away, and the milestone header keeps floating in its
           own box beneath it. */}
-      {hdrGone && (
-        <div className="flex items-baseline px-4 py-1.5"
-          style={{ position: "fixed", top: "var(--hdr-h, 92px)", left: 0, right: 0, zIndex: 46, background: "#16232F", color: "#fff", minWidth: 0, boxShadow: "0 6px 12px -8px rgba(0,0,0,.5)" }}>
-          <span className="font-bold tnum" style={{ fontSize: 14, flexShrink: 0 }}>JOB {jobNo(dj.id)}</span>
-          <span className="truncate" style={{ fontSize: 12, color: "#B7C4D0", marginLeft: 8 }} title={`${dj.tag} — ${dj.cust}`}>
-            {dj.tag}{dj.cust ? ` — ${dj.cust}` : ""}
-          </span>
-        </div>
-      )}
+      {/* ONE LINE floats, nothing else (Dr Raghu, 30 Aug 2026): job number
+          bold at 14 on dark blue with white text · Customer Tag · OTD · PM */}
+      {hdrGone && (() => {
+        const pm = (board.projectOwners || []).find((p) => p.email?.toLowerCase() === String(dj.own || "").toLowerCase());
+        const pmName = pm ? (pm.name || pm.initials) : (dj.own ? String(dj.own).split("@")[0] : "—");
+        return (
+          <div className="flex items-baseline px-4 py-1.5"
+            style={{ position: "fixed", top: "var(--hdr-h, 92px)", left: 0, right: 0, zIndex: 46, background: "#1B3A5C", color: "#fff", minWidth: 0, boxShadow: "0 6px 12px -8px rgba(0,0,0,.5)", gap: 10, whiteSpace: "nowrap", overflow: "hidden" }}>
+            <span className="font-bold tnum" style={{ fontSize: 14, flexShrink: 0 }}>JOB {jobNo(dj.id)}</span>
+            <span style={{ color: "#8FA1B3" }}>|</span>
+            <span className="truncate" style={{ fontSize: 12.5 }} title={dj.tag || ""}>
+              <span style={{ color: "#8FA1B3" }}>Customer Tag: </span>{dj.tag || "—"}
+            </span>
+            <span style={{ color: "#8FA1B3" }}>|</span>
+            <span className="tnum" style={{ fontSize: 12.5, flexShrink: 0 }}>
+              <span style={{ color: "#8FA1B3" }}>OTD: </span>{fmtFull(dj.otd)}
+            </span>
+            <span style={{ color: "#8FA1B3" }}>|</span>
+            <span style={{ fontSize: 12.5, flexShrink: 0 }}>
+              <span style={{ color: "#8FA1B3" }}>PM: </span>{pmName}
+            </span>
+          </div>
+        );
+      })()}
 
       <JobTopRow
         job={dj}
         V={V}
-        sticky
-        shadow={hdrGone}
         onShopUpdate={() => setShopOpen(true)}
       />
 

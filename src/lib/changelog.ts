@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.68",
+    date: "2026-08-30",
+    module: "Job Plan — one line floats",
+    items: [
+      "The job plan's floating strip is ONE LINE and nothing else (Dr Raghu, 30 Aug 2026): JOB NUMBER bold at 14 on dark blue with white text · Customer Tag · OTD · PM. The big top card scrolls away like ordinary content now — only the line follows you down.",
+    ],
+  },
+  {
     v: "3.31.0.67",
     date: "2026-08-30",
     module: "Rich box — pictures upload, thumbnails expand, Drive keeps a copy",
