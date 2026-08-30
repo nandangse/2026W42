@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.84",
+    date: "2026-08-30",
+    module: "CRM — the quote grid speaks commas, the foot adds live, the 📦 opens",
+    items: [
+      "Rate wears Indian commas as you type — 545000 reads 5,45,000 (Dr Raghu, 30 Aug 2026).",
+      "The floating foot now adds up exactly what the grid shows, the moment it shows it — Net Total, Discount, Taxes and Grand Total move live with every line; the database's recalc stores the same law.",
+      "The 📦 on a line opens the item whole: name as it prints, the rich description and image carried in from the masters — all editable, and the edit lives on THIS QUOTE alone; the product master never changes.",
+    ],
+  },
+  {
     v: "3.31.0.83",
     date: "2026-08-30",
     module: "CRM — the quote grid learns the catalogue by heart",

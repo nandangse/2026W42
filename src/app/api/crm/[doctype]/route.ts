@@ -549,6 +549,10 @@ export async function PATCH(req: Request, { params }: { params: { doctype: strin
       if (body.discount_pct !== undefined && body.discount_pct !== null && body.discount_pct !== "")
         row.discount_pct = Number(body.discount_pct) || 0;
     }
+    // a quote line's own dress — rich description and image carried in specs,
+    // edited on the QUOTE alone, never written back to the product master
+    if (d.name === "quotation_line" && body.specs && typeof body.specs === "object" && !Array.isArray(body.specs))
+      row.specs = body.specs;
     if (!Object.keys(row).length) throw new HttpError(400, "Nothing to update.");
 
     const { data: before, error: berr } = await db.from(d.table).select("*").eq("id", id).maybeSingle();

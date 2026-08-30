@@ -2012,7 +2012,18 @@ type QLine = {
   id: string; line_no: number; indent: number; item_group: string | null;
   product_id: string | null; description: string; quantity: number;
   unit_price: number; line_total: number; discountable: boolean; is_optional: boolean;
+  specs?: { rich?: string; image?: string } | null;
 };
+
+/** Digits with Indian commas while typing — "545000" reads 5,45,000. */
+const groupIn = (raw: string): string => {
+  if (!raw) return "";
+  const [i, d] = String(raw).replace(/,/g, "").split(".");
+  const n = Number(i);
+  if (isNaN(n)) return raw;
+  return n.toLocaleString("en-IN") + (d !== undefined ? "." + d : "");
+};
+const ungroup = (v: string) => v.replace(/[^0-9.]/g, "");
 type TaxRow = { id: string; name: string; total_pct: number; is_default: boolean; sort_order?: number; components?: { name: string; pct: number }[] };
 
 function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => void }) {
@@ -2026,6 +2037,7 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
   // Item Group comes from the MASTERS (Dr Raghu, 30 Aug 2026) — the
   // catalogue's own families; choosing one throttles the item search
   const [groups, setGroups] = useState<string[]>([]);
+  const [openLine, setOpenLine] = useState<QLine | null>(null);
   useEffect(() => {
     fetch("/api/crm/product?groupby=item_group", { cache: "no-store" })
       .then(async (r) => {
@@ -2154,22 +2166,6 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   };
-  const pickProduct = async (lineId: string, productId: string) => {
-    if (!productId) return;
-    try {
-      const j = await (await fetch(`/api/crm/product?id=${encodeURIComponent(productId)}`, { cache: "no-store" })).json();
-      const p = j?.row as Row | undefined;
-      if (!p) return;
-      const line = lines?.find((l) => l.id === lineId);
-      await patchLine(lineId, {
-        product_id: productId,
-        item_group: String(p.item_group ?? "") || null,
-        ...(line && !line.description.trim() ? { description: String(p.name ?? "") } : {}),
-        ...(line && !(line.unit_price > 0) && p.approved_price_inr != null ? { unit_price: Number(p.approved_price_inr) } : {}),
-      });
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
-  };
-
   // Sr No: main lines count 1, 2, 3…; an indented line reads 1.1, 1.2
   const srOf = (i: number): string => {
     if (!lines) return "";
@@ -2199,11 +2195,17 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
     void patchLine(l.id, { [k]: k === "unit_price" || k === "quantity" ? Number(v) || 0 : v });
   };
 
-  const subtotal = Number(q.subtotal) || 0;
-  const discAmt = Number(q.discount_amount) || 0;
-  const taxAmt = Number(q.tax_amount) || 0;
-  const grand = Number(q.grand_total) || 0;
+  // the foot adds up exactly what the grid shows (Dr Raghu, 30 Aug 2026:
+  // "net total should add up all the above amounts") — the database's own
+  // recalc stores the same law, this is its live mirror
+  const real = (lines ?? []).filter((l) => !l.is_optional);
+  const subtotal = real.reduce((sum, l) => sum + (Number(l.line_total) || 0), 0);
+  const discable = real.filter((l) => l.discountable !== false).reduce((sum, l) => sum + (Number(l.line_total) || 0), 0);
+  const discPctN = discPct !== null ? Number(discPct) || 0 : Number(q.discount_pct) || 0;
+  const discAmt = Math.round(discable * discPctN) / 100;
   const taxRow = taxes.find((t) => t.id === String(q.tax_id ?? ""));
+  const taxAmt = Math.round((subtotal - discAmt) * (taxRow?.total_pct ?? 18)) / 100;
+  const grand = subtotal - discAmt + taxAmt;
   const cellIn = { width: "100%", border: "none", outline: "none", background: "transparent", fontSize: 13, padding: "6px 8px" } as const;
   // the group dropdown: the masters\' families, and "+ Add new" always last
   const GroupCell = ({ value, onPick }: { value: string; onPick: (v: string) => void }) => (
@@ -2265,11 +2267,12 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
                           product_id: h.id, description: h.name, item_group: h.item_group,
                           ...(h.approved_price_inr != null ? { unit_price: h.approved_price_inr } : {}),
                         })} />
-                      <ProductCellPick group={String(l.item_group ?? "") || undefined} onPick={(pid) => void pickProduct(l.id, pid)} />
+                      <button title="Open this item — name, description and image, for THIS quote alone"
+                        onClick={() => setOpenLine(l)} style={{ fontSize: 13, opacity: 0.65, flexShrink: 0 }}>📦</button>
                     </div>
                   </td>
-                  <td><input style={{ ...cellIn, textAlign: "right" }} type="number" value={D(l, "unit_price")}
-                    onChange={(e) => setD(l.id, "unit_price", e.target.value)} onBlur={() => commitD(l, "unit_price")} /></td>
+                  <td><input style={{ ...cellIn, textAlign: "right" }} inputMode="decimal" value={groupIn(D(l, "unit_price"))}
+                    onChange={(e) => setD(l.id, "unit_price", ungroup(e.target.value))} onBlur={() => commitD(l, "unit_price")} /></td>
                   <td><input style={{ ...cellIn, textAlign: "right" }} type="number" value={D(l, "quantity")}
                     onChange={(e) => setD(l.id, "quantity", e.target.value)} onBlur={() => commitD(l, "quantity")} /></td>
                   <td className="px-2 tnum" style={{ textAlign: "right", fontWeight: 600 }}>{fm(l.line_total)}</td>
@@ -2315,7 +2318,7 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
                     }} />
                   </div>
                 </td>
-                <td><input style={{ ...cellIn, textAlign: "right" }} type="number" placeholder="rate" value={ghost.unit_price} onChange={(e) => setGhost((g) => ({ ...g, unit_price: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") void addLine(); }} /></td>
+                <td><input style={{ ...cellIn, textAlign: "right" }} inputMode="decimal" placeholder="rate" value={groupIn(ghost.unit_price)} onChange={(e) => setGhost((g) => ({ ...g, unit_price: ungroup(e.target.value) }))} onKeyDown={(e) => { if (e.key === "Enter") void addLine(); }} /></td>
                 <td><input style={{ ...cellIn, textAlign: "right" }} type="number" value={ghost.quantity} onChange={(e) => setGhost((g) => ({ ...g, quantity: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") void addLine(); }} /></td>
                 <td className="px-2 tnum" style={{ textAlign: "right", color: MUTED }}>{ghost.unit_price ? fm((Number(ghost.unit_price) || 0) * (Number(ghost.quantity) || 1)) : "—"}</td>
                 <td className="px-2" style={{ textAlign: "right" }}>
@@ -2326,6 +2329,10 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
             </tbody>
           </table>
         </div>
+        {openLine && (
+          <LineItemBox line={openLine} onClose={() => setOpenLine(null)}
+            onSaved={async () => { setOpenLine(null); await reloadLines(); await reloadQuote(); }} />
+        )}
       </div>
 
       {/* THE FLOATING FOOT — totals ride along as the items scroll */}
@@ -2384,6 +2391,108 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** One quote line opened whole (Dr Raghu, 30 Aug 2026): name, rich
+ *  description and image as carried in from the masters — editable, but the
+ *  edit lives on THIS QUOTE alone; the product master never changes. */
+function LineItemBox({ line, onClose, onSaved }: { line: QLine; onClose: () => void; onSaved: () => Promise<void> }) {
+  const [name, setName] = useState(line.description);
+  const [rich, setRich] = useState<string | null>(null);
+  const [image, setImage] = useState<string>(String(line.specs?.image ?? ""));
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  // the master's description and image arrive as the starting point
+  useEffect(() => {
+    let dead = false;
+    void (async () => {
+      if (line.specs?.rich !== undefined && line.specs?.rich !== null) { setRich(String(line.specs.rich)); }
+      if (!line.product_id) { if (line.specs?.rich === undefined || line.specs?.rich === null) setRich(""); return; }
+      try {
+        const j = await (await fetch(`/api/crm/product?id=${encodeURIComponent(String(line.product_id))}`, { cache: "no-store" })).json();
+        if (dead || !j?.row) return;
+        if (line.specs?.rich === undefined || line.specs?.rich === null) setRich(String(j.row.description ?? ""));
+        if (!line.specs?.image && j.row.image) setImage(String(j.row.image));
+      } catch { if (!dead && rich === null) setRich(""); }
+    })();
+    return () => { dead = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [line.id]);
+
+  const save = async () => {
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch(`/api/crm/quotation_line?id=${encodeURIComponent(line.id)}`, {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          description: name.trim() || line.description,
+          specs: { ...(line.specs || {}), rich: rich ?? "", image: image || undefined },
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save");
+      await onSaved();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(22,35,47,.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} className="rounded" style={{ background: "#fff", width: "min(760px, 100%)", maxHeight: "calc(100vh - 40px)", display: "flex", flexDirection: "column", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
+        <div className="flex items-center justify-between px-4 py-2.5" style={{ background: NAVY, borderRadius: "6px 6px 0 0" }}>
+          <div className="text-white font-bold text-sm">Quote item — this quote alone, the master stays untouched</div>
+          <button onClick={onClose} className="text-white font-bold px-2">✕</button>
+        </div>
+        <div className="p-4" style={{ overflowY: "auto" }}>
+          {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
+          <div className="flex gap-4 flex-wrap">
+            <div style={{ flex: 1, minWidth: 280 }}>
+              <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>ITEM NAME (as it prints on the quote)</div>
+              <input value={name} onChange={(e) => setName(e.target.value)}
+                className="w-full px-2 py-1.5 rounded border text-sm font-bold" style={{ borderColor: BORDER }} />
+              <div className="flex items-center gap-2 mt-3 mb-0.5">
+                <span className="text-xs font-semibold" style={{ color: MUTED }}>DESCRIPTION</span>
+                {!editingDesc && <button title="Edit the description for this quote" onClick={() => setEditingDesc(true)} style={{ fontSize: 12, opacity: 0.6 }}>✏️</button>}
+              </div>
+              {rich === null ? (
+                <div className="text-sm" style={{ color: MUTED }}>reading the master…</div>
+              ) : editingDesc ? (
+                <RichTextEditor initial={rich} minHeight={220} busy={false}
+                  onCancel={() => setEditingDesc(false)}
+                  onSave={(html) => { setRich(html); setEditingDesc(false); }} />
+              ) : (
+                <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, lineHeight: 1.6, maxHeight: 300, overflowY: "auto" }}>
+                  {rich.trim() ? <RichContent text={rich} legacy={(s2) => <RichText text={s2} />} /> : <span style={{ color: MUTED }}>No description — ✏️ writes one for this quote.</span>}
+                </div>
+              )}
+            </div>
+            <div style={{ width: 220, flexShrink: 0 }}>
+              <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>IMAGE</div>
+              {image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={image} alt="" style={{ maxWidth: "100%", maxHeight: 180, borderRadius: 8, border: `1px solid ${BORDER}`, cursor: "zoom-in" }}
+                  onClick={() => window.open(image, "_blank", "noopener")} />
+              ) : (
+                <div className="rounded border text-xs flex items-center justify-center" style={{ borderColor: BORDER, color: MUTED, height: 100 }}>no image</div>
+              )}
+              <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="image URL…"
+                className="w-full mt-1.5 px-2 py-1 rounded border text-xs" style={{ borderColor: BORDER }} />
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2 px-4 py-3" style={{ borderTop: `1px solid ${BORDER}` }}>
+          <button onClick={() => void save()} disabled={busy || editingDesc}
+            title={editingDesc ? "Finish the description edit first (✓ Save inside the editor)" : ""}
+            className="rounded px-4 py-1.5 text-sm font-bold text-white" style={{ background: busy || editingDesc ? "#B9BEC4" : "#0D7A3F" }}>
+            {busy ? "Saving…" : "✓ Save to this quote"}
+          </button>
+          <button onClick={onClose} className="rounded px-3 py-1.5 text-sm font-bold" style={{ background: "#EFEDE7", color: "#5A6672" }}>Cancel</button>
         </div>
       </div>
     </div>
