@@ -133,7 +133,14 @@ export default function AnticipatedFY({
                         <td className="py-1.5 text-right tnum" style={{ color: C.sub }}>{V(targets.throughput)}</td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 px-1 font-bold" style={{ color: C.body }}>Gap</td>
+                        <td className="py-1.5 px-1" style={{ color: C.body }}>
+                          <b>Gap</b>
+                          {/* the gap is an INVITATION, not a shortfall
+                              (Dr Raghu, 30 Aug 2026) */}
+                          <div className="font-normal" style={{ fontSize: 11, color: "#8A94A0", lineHeight: 1.4 }}>
+                            = more sales that can be booked and billed in this year, comfortably
+                          </div>
+                        </td>
                         <td />
                         <td className="py-1.5 text-right tnum font-bold" style={{ color: tone(salesPct) }}>
                           {a.expected.sales >= targets.sales ? "+" : "−"}{V(Math.abs(targets.sales - a.expected.sales))}

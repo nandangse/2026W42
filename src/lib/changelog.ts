@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.57",
+    date: "2026-08-30",
+    module: "Anticipated FY — the gap named for what it is",
+    items: [
+      "The GAP row on 'Where the year finishes' says its meaning out loud (Dr Raghu, 30 Aug 2026): gap = MORE SALES THAT CAN BE BOOKED AND BILLED IN THIS YEAR, COMFORTABLY — an invitation, not a shortfall.",
+    ],
+  },
+  {
     v: "3.31.0.56",
     date: "2026-08-30",
     module: "Admin — the monthly targets live in settings",
