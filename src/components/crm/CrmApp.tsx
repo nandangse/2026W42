@@ -1859,6 +1859,14 @@ function SituationalTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void
       </div>
       {editing ? (
         <RichTextEditor initial={html} busy={busy === "save"} minHeight={320}
+          onUploadImage={async (f) => {
+            const fd = new FormData();
+            fd.append("target_type", "quotation"); fd.append("target_id", rid); fd.append("file", f);
+            const r = await fetch("/api/crm/opp-attach", { method: "POST", body: fd });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.error || "Upload failed");
+            return String(j.url);
+          }}
           onCancel={() => setEditing(false)} onSave={(v) => void save(v)} />
       ) : (
         <div className="rounded border p-4 text-sm" style={{ borderColor: BORDER, lineHeight: 1.7, maxWidth: "80ch" }}>
@@ -2038,6 +2046,14 @@ function QuoteTemplateTab({ row, onSaved, kind }: { row: Row; onSaved: (r?: Row)
       </div>
       {editing ? (
         <RichTextEditor initial={stored} busy={busy === "save"} minHeight={300}
+          onUploadImage={async (f) => {
+            const fd = new FormData();
+            fd.append("target_type", "quotation"); fd.append("target_id", rid); fd.append("file", f);
+            const r = await fetch("/api/crm/opp-attach", { method: "POST", body: fd });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.error || "Upload failed");
+            return String(j.url);
+          }}
           onCancel={() => setEditing(false)}
           onSave={(v) => {
             setBusy("save");
@@ -2603,18 +2619,18 @@ function ItemSearchCell({ value, group, placeholder, onType, onCommit, onPick, o
   const timer = useRef<number | null>(null);
   const seek = (q: string) => {
     if (timer.current) window.clearTimeout(timer.current);
-    if (q.trim().length < 2) { setHits([]); setOpen(false); return; }
+    if (q.trim().length < 2 && !group) { setHits([]); setOpen(false); return; }
     timer.current = window.setTimeout(() => {
-      fetch(`/api/crm/product-extra?search=${encodeURIComponent(q)}${group ? `&group=${encodeURIComponent(group)}` : ""}`, { cache: "no-store" })
+      fetch(`/api/crm/product-extra?search=${encodeURIComponent(q.trim())}${group ? `&group=${encodeURIComponent(group)}` : ""}`, { cache: "no-store" })
         .then(async (r) => { const j = await r.json(); setHits((j.hits ?? []) as CatHit[]); setOpen(true); })
         .catch(() => { setHits([]); setOpen(false); });
-    }, 250);
+    }, 200);
   };
   return (
     <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
       <input style={style} value={value} placeholder={placeholder}
         onChange={(e) => { onType(e.target.value); seek(e.target.value); }}
-        onFocus={() => { if (hits.length) setOpen(true); }}
+        onFocus={() => { if (hits.length) setOpen(true); else seek(value); }}
         onBlur={() => { window.setTimeout(() => setOpen(false), 200); onCommit?.(); }}
         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setOpen(false); onEnter?.(); } if (e.key === "Escape") setOpen(false); }} />
       {open && hits.length > 0 && (

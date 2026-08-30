@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.92",
+    date: "2026-08-30",
+    module: "CRM — the item list opens on a click; the document dresses right",
+    items: [
+      "Choose an Item Group and CLICK into Item — the family's items drop down at once, no typing needed; typing narrows (Dr Raghu, 30 Aug 2026: \"the item is still not working!!\" — it waited for two typed letters; it no longer waits).",
+      "The quote document: header margin halved, footer centre-set on a narrow margin, and text can no longer collide into the footer; pictures print undistorted.",
+      "Pictures PASTE straight into the Covering Letter desk and Situational tabs (uploaded, never base64), and the editor grows 🖼− / 🖼+ — click a picture, shrink or grow it in steps.",
+    ],
+  },
+  {
     v: "3.31.0.91",
     date: "2026-08-30",
     module: "CRM — the quote's masters move into Settings",

@@ -34,15 +34,17 @@ export async function GET(req: Request) {
     // ?search= — the quote grid's item type-ahead (Dr Raghu, 30 Aug 2026:
     // "search item name or item group or description"), throttled by ?group=
     const search = String(u.searchParams.get("search") || "").trim();
-    if (search) {
-      const q = search.replace(/[,%()]/g, " ").trim();
-      if (q.length < 2) return NextResponse.json({ hits: [] });
+    const group = String(u.searchParams.get("group") || "").trim();
+    if (search || group) {
+      const q = search.replace(/[,%()*]/g, " ").trim();
+      // a chosen group BROWSES on focus (Dr Raghu, 30 Aug 2026: "once the
+      // item group is chosen the dropdown will come in") — typing narrows
+      if (q.length < 2 && !group) return NextResponse.json({ hits: [] });
       let qy = db.from("product")
         .select("id, name, sku, item_group, approved_price_inr, description")
         .is("deleted_at", null).eq("is_active", true)
-        .or(`name.ilike.*${q}*,item_group.ilike.*${q}*,sku.ilike.*${q}*,description.ilike.*${q}*`)
-        .limit(8);
-      const group = String(u.searchParams.get("group") || "").trim();
+        .order("name").limit(10);
+      if (q.length >= 2) qy = qy.or(`name.ilike.*${q}*,item_group.ilike.*${q}*,sku.ilike.*${q}*,description.ilike.*${q}*`);
       if (group) qy = qy.eq("item_group", group);
       const { data, error } = await qy;
       if (error) throw new HttpError(500, error.message);

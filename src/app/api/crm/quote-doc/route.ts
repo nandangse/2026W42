@@ -19,7 +19,7 @@ export const maxDuration = 60;
  */
 
 const ORDER = ["cover", "letter", "situational", "items", "terms", "about", "back"] as const;
-const CHARS_PER_PAGE = 2600;
+const CHARS_PER_PAGE = 2000;
 
 const esc = (x: unknown) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const dIN = (v: unknown) => (v ? String(v).slice(0, 10).split("-").reverse().join("/") : "");
@@ -196,16 +196,16 @@ export async function GET(req: Request) {
 <style>
   * { box-sizing: border-box; margin: 0; }
   body { font-family: Georgia, 'Times New Roman', serif; background: #666; }
-  .page { width: 210mm; min-height: 297mm; background: #fff; margin: 6mm auto; padding: 12mm 16mm 22mm;
+  .page { width: 210mm; height: 297mm; background: #fff; margin: 6mm auto; padding: 7mm 14mm 16mm;
           position: relative; display: flex; flex-direction: column; overflow: hidden;
           box-shadow: 0 2px 12px rgba(0,0,0,.35); }
-  .hdr { border-bottom: 2px solid #1B3A5C; padding-bottom: 3mm; margin-bottom: 6mm; }
-  .hdr img { height: 14mm; object-fit: contain; }
-  .body { flex: 1; font-size: 11.5pt; line-height: 1.55; color: #16232F; }
+  .hdr { border-bottom: 2px solid #1B3A5C; padding-bottom: 1.5mm; margin-bottom: 4mm; }
+  .hdr img { height: 11mm; object-fit: contain; }
+  .body { flex: 1; font-size: 11.5pt; line-height: 1.55; color: #16232F; overflow: hidden; }
   .body.centered { display: flex; flex-direction: column; justify-content: center; text-align: center; }
   .body p { margin: 0 0 8pt; } .body h1 { font-size: 22pt; margin: 8pt 0; color: #1B3A5C; }
   .body h2 { font-size: 15pt; margin: 8pt 0; color: #1B3A5C; } .body ul, .body ol { margin: 0 0 8pt 18pt; }
-  .body img { max-width: 100%; max-height: 90mm; }
+  .body img { max-width: 100%; height: auto; max-height: 235mm; object-fit: contain; }
   .body table { border-collapse: collapse; margin: 6pt 0; max-width: 100%; }
   .body td, .body th { border: 1px solid #999; padding: 3pt 6pt; font-size: 10pt; }
   h2.sect { border-bottom: 1px solid #C9C6BD; padding-bottom: 2mm; margin-bottom: 5mm; }
@@ -215,8 +215,9 @@ export async function GET(req: Request) {
   table.items tr.tot td { border-top: 2px solid #1B3A5C; }
   table.items tr.grand td { font-size: 12pt; background: #F5F7FA; }
   table.items td.words { font-style: italic; font-size: 10pt; }
-  .ftr { position: absolute; left: 16mm; right: 16mm; bottom: 8mm; border-top: 1px solid #1B3A5C;
-         padding-top: 2mm; display: flex; justify-content: space-between; font-size: 8.5pt; color: #444; }
+  .ftr { position: absolute; left: 14mm; right: 14mm; bottom: 4mm; border-top: 1px solid #1B3A5C;
+         padding-top: 1.5mm; display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center;
+         font-size: 8pt; color: #444; }
   .ftr .fc { text-align: center; } .ftr .fr { text-align: right; }
   .wm { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
         font-size: 90pt; font-weight: 800; color: rgba(180, 38, 30, .08); transform: rotate(-30deg);

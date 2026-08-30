@@ -38,6 +38,7 @@ export function sanitizeRich(html: string): string {
         (n === "src" && el.tagName === "IMG" && /^(https?:|\/)/i.test(attr.value)) ||
         (n === "color" && el.tagName === "FONT") ||
         (n === "style" && /^\s*color\s*:[^;]+;?\s*$/i.test(attr.value)) ||
+        (n === "style" && el.tagName === "IMG" && /^\s*width:\s*\d{1,3}%\s*;?\s*$/i.test(attr.value)) ||
         (n === "border" && el.tagName === "TABLE");
       if (!keep) el.removeAttribute(attr.name);
     }
@@ -95,6 +96,26 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [colorOpen, setColorOpen] = useState(false);
+  // click a picture to select it; 🖼− / 🖼+ walk its width down and up
+  // (Dr Raghu, 30 Aug 2026: "increase and decrease size")
+  const selImg = useRef<HTMLImageElement | null>(null);
+  const pickImg = (e: React.MouseEvent) => {
+    const t = e.target as HTMLElement;
+    if (selImg.current) selImg.current.style.outline = "";
+    if (t.tagName === "IMG") {
+      selImg.current = t as HTMLImageElement;
+      selImg.current.style.outline = "3px solid #E8600A";
+    } else selImg.current = null;
+  };
+  const SIZES = [25, 33, 50, 66, 75, 100];
+  const resizeImg = (dir: -1 | 1) => {
+    const img = selImg.current;
+    if (!img) { window.alert("Click a picture first, then − or +."); return; }
+    const cur = parseInt(img.style.width || "100", 10) || 100;
+    const i = SIZES.reduce((best, v, k) => (Math.abs(v - cur) < Math.abs(SIZES[best] - cur) ? k : best), 0);
+    const next = SIZES[Math.min(SIZES.length - 1, Math.max(0, i + dir))];
+    img.style.width = `${next}%`;
+  };
   useEffect(() => {
     if (ref.current) ref.current.innerHTML = looksHtml(initial) ? sanitizeRich(initial) : legacyToHtml(initial);
   }, [initial]);
@@ -156,15 +177,17 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
         <TB label="🔗 Link" title="Turn the selection into a link" onClick={() => { const u = window.prompt("Link to:", "https://"); if (u) cmd("createLink", u); }} />
         <TB label="🖼 Picture" title="Insert a picture by URL" onClick={insertPicture} />
         <TB label="⊞ Table" title="Insert a 2×3 table" onClick={insertTable} />
+        <TB label="🖼−" title="Shrink the selected picture (click a picture first)" onClick={() => resizeImg(-1)} />
+        <TB label="🖼+" title="Grow the selected picture" onClick={() => resizeImg(1)} />
       </div>
       <input ref={fileInput} type="file" accept="image/*" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadAndInsert(f); e.target.value = ""; }} />
-      <div ref={ref} contentEditable suppressContentEditableWarning onPaste={onPaste}
+      <div ref={ref} contentEditable suppressContentEditableWarning onPaste={onPaste} onClick={pickImg}
         data-placeholder={placeholder || ""}
         className="w-full rounded border p-3 text-sm rich-html"
         style={{ borderColor: "#E8600A", lineHeight: 1.6, minHeight, maxHeight: "calc(100vh - 360px)", overflowY: "auto", outline: "none", background: "#fff" }} />
       <div className="flex gap-2 mt-1.5">
-        <button onClick={() => onSave(sanitizeRich(ref.current?.innerHTML || ""))} disabled={!!busy}
+        <button onClick={() => { if (selImg.current) selImg.current.style.outline = ""; onSave(sanitizeRich(ref.current?.innerHTML || "")); }} disabled={!!busy}
           className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: "#0D7A3F" }}>
           {busy ? "Saving…" : "✓ Save"}
         </button>
