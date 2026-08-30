@@ -401,6 +401,7 @@ export const DOCTYPES: Doctype[] = [
       { name: "job_title", label: "Designation", type: "text", inList: true },
       { name: "primary_email", label: "Email", type: "text", inList: true },
       { name: "primary_phone", label: "Phone", type: "text", inList: true, help: "Stored as +919820012345. A number typed four ways is four numbers." },
+      { name: "birthday", label: "Birthday", type: "date", help: "A birthday wish opens doors (Dr Raghu, 30 Aug 2026) — filled by the InstaFinancials import where MCA knows it." },
       { name: "whatsapp_number", label: "WhatsApp", type: "text" },
       { name: "salutation", label: "Salutation", type: "select", options: ["Mr", "Ms", "Dr", "Capt", "Cdr", "Lt Cdr", "Col"] },
       { name: "department", label: "Department", type: "text" },

@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.29",
+    date: "2026-08-30",
+    module: "CRM — contacts get a Birthday; the IF report links from the company",
+    items: [
+      "The contact gains a BIRTHDAY field (Dr Raghu, 30 Aug 2026) — the InstaFinancials import fills it wherever MCA knows it, and the IFS tab shows which downloaded report PDF on Drive the company's data links to. CRM migration 0043 carries both columns.",
+    ],
+  },
+  {
     v: "3.31.1.28",
     date: "2026-08-30",
     module: "Genie — the time-invested card catches up with the truth",

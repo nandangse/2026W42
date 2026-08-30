@@ -5882,6 +5882,11 @@ function IfsTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <span className="text-sm font-bold" style={{ color: NAVY }}>₹ InstaFinancials Summary</span>
         {row.ifs_at != null && <span className="text-xs" style={{ color: MUTED }}>bought {String(row.ifs_at).slice(0, 10).split("-").reverse().join("/")} by {String(row.ifs_by ?? "")}</span>}
+        {row.ifs_pdf != null && String(row.ifs_pdf) && (
+          <span className="text-xs" title={String(row.ifs_pdf)} style={{ color: "#2C5B82" }}>
+            📄 report PDF on Drive: {String(row.ifs_pdf).split("/").pop()}
+          </span>
+        )}
         {isRaghu ? (
           <>
             <input value={cin} onChange={(e) => setCin(e.target.value)} placeholder="CIN (21 characters)"
