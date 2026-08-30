@@ -105,10 +105,17 @@ export async function GET(req: Request) {
     const subject = String(q.subject || "").trim();
     // Qtn No · Date / To / Subject — the head the FIRST page wears, and the
     // covering letter too (Dr Raghu, 30 Aug 2026)
+    let ownerName = "";
+    if (q.owner_id) {
+      const { data: ow } = await db.from("profile").select("full_name").eq("id", String(q.owner_id)).maybeSingle();
+      ownerName = String(ow?.full_name || "");
+    }
     const headBlock = `<div style="border:1px solid #C9C6BD;border-left:4px solid #1B3A5C;padding:3mm 4mm;margin-bottom:5mm;font-size:10.5pt">
       <div><b>Qtn No:</b> ${esc(q.quote_no)} &nbsp;·&nbsp; <b>Date:</b> ${esc(dIN(q.quoted_on))}</div>
       <div><b>To:</b> ${esc(customer)}${contact?.full_name ? ` — Kind Attn: ${esc(contact.full_name)}` : ""}</div>
+      <div><b>From:</b> Nandan GSE Pvt Ltd${ownerName ? ` — ${esc(ownerName)}` : ""}</div>
       ${subject ? `<div><b>Subject:</b> ${esc(subject)}</div>` : ""}
+      <div><b>Authorized by:</b> ${esc(q.authorized_by || "Dr Raghunandan Jagdish, MD and CEO")}</div>
     </div>`;
     const dec = q.show_decimals === true;
     const cur = String(q.currency || "INR");
@@ -270,7 +277,7 @@ export async function GET(req: Request) {
 <style>
   * { box-sizing: border-box; margin: 0; }
   body { font-family: Georgia, 'Times New Roman', serif; background: #666; }
-  .page { width: 210mm; height: 296mm; background: #fff; margin: 6mm auto; padding: 7mm 14mm 16mm;
+  .page { width: 210mm; height: 296mm; background: #fff; margin: 6mm auto; padding: 7mm 14mm 8mm;
           position: relative; display: flex; flex-direction: column; overflow: hidden;
           box-shadow: 0 2px 12px rgba(0,0,0,.35); }
   .hdr { border-bottom: 2px solid #1B3A5C; padding-bottom: 1.5mm; margin-bottom: 4mm; }
@@ -299,9 +306,10 @@ export async function GET(req: Request) {
   .icell .idesc { font-size: 9pt; line-height: 1.4; margin-top: 1mm; }
   .icell .idesc table { margin: 2pt 0; } .icell .idesc td, .icell .idesc th { font-size: 8pt; padding: 2pt 4pt; }
   .icell .idesc img { max-height: 30mm; max-width: 100%; height: auto; }
-  .ftr { position: absolute; left: 14mm; right: 14mm; bottom: 4mm; border-top: 1px solid #1B3A5C;
-         padding-top: 1.5mm; display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center;
-         font-size: 8pt; color: #444; }
+  .ftr { flex-shrink: 0; margin-top: 2mm; border-top: 1px solid #1B3A5C;
+         padding-top: 1.5mm; display: grid; grid-template-columns: auto 1fr auto; column-gap: 6mm;
+         align-items: baseline; font-size: 8pt; color: #444; }
+  .ftr span { white-space: nowrap; }
   .ftr .fc { text-align: center; } .ftr .fr { text-align: right; }
   .wm { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
         font-size: 90pt; font-weight: 800; color: rgba(180, 38, 30, .08); transform: rotate(-30deg);
