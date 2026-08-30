@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.42",
+    date: "2026-08-30",
+    module: "Planning — App access leads the Users tab",
+    items: [
+      "App access — who may open CRM, HRMS, Kuber and Vishwakarma — moves to the top of Admin → Users (Dr Raghu, 30 Aug 2026), above the user table. The doors first, then the people.",
+    ],
+  },
+  {
     v: "3.31.1.41",
     date: "2026-08-30",
     module: "Genie — the AI master switch",
