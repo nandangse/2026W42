@@ -85,7 +85,7 @@ async function linkOptions(d: Doctype) {
     if (f.type !== "link" || !f.link) continue;
     const t = doctypeBySlug(f.link);
     if (!t) continue;
-    let qy = db.from(t.table).select(`id, ${t.titleField}`);
+    let qy = db.from(t.table).select(t.name === "address" ? "id, label, line1, city" : `id, ${t.titleField}`);
     if (f.linkFilter) qy = qy.eq(f.linkFilter.column, f.linkFilter.value);
     // Only ACTIVE salespeople stand in the dropdowns — Settings → Users →
     // Active is the switch. Old rows keep their names via resolveRowLabels.
@@ -97,7 +97,9 @@ async function linkOptions(d: Doctype) {
     const list = (rows ?? []) as unknown as Record<string, unknown>[];
     links[f.link] = list.map((r) => ({
       id: String(r.id),
-      label: String(r[t.titleField] ?? r.id),
+      label: t.name === "address"
+        ? [r.label, r.line1, r.city].filter(Boolean).join(" · ") || String(r.id)
+        : String(r[t.titleField] ?? r.id),
     }));
   }
   // Any doctype hanging off a company can be filtered by the customer's
@@ -132,11 +134,12 @@ async function resolveRowLabels(
       .filter((id) => !have.has(id));
     if (!missing.length) continue;
     let list: Record<string, unknown>[] = [];
+    const selCols = t.name === "address" ? "id, label, line1, city" : `id, ${t.titleField}`;
     if (missing.length > 3000) {
       // A big pull (10k/50k/All rows) — sweeping the whole target table in
       // pages beats thousands of IN() calls.
       for (let a = 0; ; a += 1000) {
-        const { data } = await db.from(t.table).select(`id, ${t.titleField}`).range(a, a + 999);
+        const { data } = await db.from(t.table).select(selCols).range(a, a + 999);
         const chunk = (data ?? []) as unknown as Record<string, unknown>[];
         list.push(...chunk);
         if (chunk.length < 1000) break;
@@ -145,13 +148,18 @@ async function resolveRowLabels(
       list = list.filter((r) => want.has(String(r.id)));
     } else {
       for (let i = 0; i < missing.length; i += 150) {
-        const { data } = await db.from(t.table).select(`id, ${t.titleField}`).in("id", missing.slice(i, i + 150));
+        const { data } = await db.from(t.table).select(selCols).in("id", missing.slice(i, i + 150));
         list.push(...(data ?? []) as unknown as Record<string, unknown>[]);
       }
     }
     links[f.link] = [
       ...(links[f.link] ?? []),
-      ...list.map((r) => ({ id: String(r.id), label: String(r[t.titleField] ?? r.id) })),
+      ...list.map((r) => ({
+        id: String(r.id),
+        label: t.name === "address"
+          ? [r.label, r.line1, r.city].filter(Boolean).join(" · ") || String(r.id)
+          : String(r[t.titleField] ?? r.id),
+      })),
     ];
   }
   return links;

@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.17",
+    date: "2026-08-30",
+    module: "CRM — an address reads whole wherever it stands",
+    items: [
+      "Address links everywhere now read as Billing · line 1 · city instead of a bare label — the quote's Details, the dropdowns, every list (Dr Raghu, 30 Aug 2026: \"address??\").",
+    ],
+  },
+  {
     v: "3.31.1.16",
     date: "2026-08-30",
     module: "CRM — a long description FLOWS to the next page",
