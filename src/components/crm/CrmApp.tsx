@@ -3096,7 +3096,14 @@ function RecordModal({
   };
   const [tab, setTab] = useState("details");
   const [apolloMsg, setApolloMsg] = useState("");
-  useEffect(() => { setTab("details"); setApolloMsg(""); }, [row.id]);
+  useEffect(() => {
+    let t0 = "details";
+    try {
+      if (dt.name === "person" && window.sessionStorage.getItem("crm.apollo.auto") === String(row.id)) t0 = "card";
+    } catch { /* details it is */ }
+    setTab(t0); setApolloMsg("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -3481,6 +3488,7 @@ function RelatedTab({
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [tick, setTick] = useState(0);
+  const [apollo, setApollo] = useState("");
 
   useEffect(() => {
     if (filterValue === null) return;
@@ -3506,11 +3514,15 @@ function RelatedTab({
   if (rows === null) return <div className="p-4 text-sm" style={{ color: MUTED }}>loading…</div>;
 
   const fields = dt.fields.filter((f) => f.inList && f.name !== filterField);
+  // Apollo stands wherever the client's people stand (Dr Raghu, 30 Aug
+  // 2026: "on this page as well as in Companies show enrich with apollo")
+  const apolloHere = slug === "person" && filterField === "company_id" && !!filterValue;
 
   return (
     <div style={{ maxHeight: "calc(100vh - 260px)", overflow: "auto" }}>
-      {addPresets && (
-        <div className="px-4 pt-3">
+      {(addPresets || apolloHere) && (
+        <div className="px-4 pt-3 flex items-center gap-2 flex-wrap">
+          {addPresets && (
           <button
             onClick={() => setAdding((v) => !v)}
             className="px-3 py-1 rounded text-xs font-bold"
@@ -3518,8 +3530,33 @@ function RelatedTab({
           >
             {adding ? "Cancel" : `+ Add ${dt.label.toLowerCase()}`}
           </button>
-          {adding && (
-            <div className="mt-2">
+          )}
+          {apolloHere && (
+            <button
+              onClick={async () => {
+                if (!window.confirm("Enrich with Apollo? APOLLO CREDITS WILL BE CONSUMED.\n\nFills the company's empty fields, brings in up to 10 people as contacts, and files the rest into Notes.")) return;
+                setApollo("asking Apollo…");
+                try {
+                  const r = await fetch("/api/crm/enrich", {
+                    method: "POST", headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ action: "company", company_id: filterValue }),
+                  });
+                  const j = await r.json();
+                  if (!r.ok) throw new Error(String(j.error || r.status));
+                  setApollo(!j.found ? "Apollo has no match" : `✓ ${j.contacts_created} contact${j.contacts_created === 1 ? "" : "s"} in`);
+                  setTick((t) => t + 1);
+                } catch (e) { setApollo(e instanceof Error ? e.message : String(e)); }
+              }}
+              className="px-3 py-1 rounded text-xs font-bold"
+              style={{ background: "#2C5B82", color: "#fff" }}
+              title="Fetch the company's people from Apollo.io — credits will be consumed"
+            >
+              {apollo === "asking Apollo…" ? "Asking Apollo…" : "🔎 Enrich with Apollo"}
+            </button>
+          )}
+          {apollo && apollo !== "asking Apollo…" && <span className="text-xs font-semibold" style={{ color: apollo.startsWith("✓") ? "#1A7F4E" : "#8E2C20" }}>{apollo}</span>}
+          {adding && addPresets && (
+            <div className="mt-2" style={{ width: "100%" }}>
               <RecordForm
                 dt={dt} links={links} presets={addPresets}
                 onDone={() => { setAdding(false); setTick((t) => t + 1); }}
@@ -3543,6 +3580,7 @@ function RelatedTab({
                 position: "sticky", top: 0, background: "#fff",
               }}>{f.label.toUpperCase()}</th>
             ))}
+            {apolloHere && <th style={{ borderBottom: `2px solid ${BORDER}`, position: "sticky", top: 0, background: "#fff", width: 40 }} />}
           </tr>
         </thead>
         <tbody>
@@ -3570,6 +3608,19 @@ function RelatedTab({
                   )}
                 </td>
               ))}
+              {apolloHere && (
+                <td style={{ padding: "8px 10px", borderBottom: "1px solid #F0F1F6", textAlign: "right" }}>
+                  <button
+                    title="Enrich this contact with Apollo — credits will be consumed"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!window.confirm("Enrich this contact with Apollo? APOLLO CREDITS WILL BE CONSUMED.\n\nOpens the contact on the Visiting Card tab where the suggestions apply.")) return;
+                      try { window.sessionStorage.setItem("crm.apollo.auto", String(r.id)); } catch { /* fine */ }
+                      onOpenLink(slug, String(r.id));
+                    }}
+                    style={{ fontSize: 13, opacity: 0.75 }}>🔎</button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

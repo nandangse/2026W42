@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.88",
+    date: "2026-08-30",
+    module: "CRM — Apollo stands wherever the client's people stand",
+    items: [
+      "Every Contacts tab — on a quotation, a company, an opportunity — carries 🔎 Enrich with Apollo (Dr Raghu, 30 Aug 2026): the company-level button fills empty fields and brings in up to 10 people; each contact row has its own 🔎 that opens the Visiting Card with Apollo's suggestions ready to tick. Credits warned before every call.",
+    ],
+  },
+  {
     v: "3.31.0.87",
     date: "2026-08-30",
     module: "CRM — the quote becomes a DOCUMENT",
