@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.86",
+    date: "2026-08-30",
+    module: "CRM — quote desk polish round",
+    items: [
+      "Item Group TYPES now (Dr Raghu, 30 Aug 2026): a combo box — type to filter the masters' families, or type a brand-new group straight in.",
+      "The item search answers again — a wildcard fault made typed codes like NE-AM find nothing; fixed, and the dropdown follows the chosen group.",
+      "The floating foot counts the write-item row the moment it carries a number — what the eye sees above, the foot adds.",
+      "Situational Analysis writes in Dr Raghu's shape: bold heading on its own line, text on the next, an empty line between sections.",
+      "The quote's Enquiry Info pulls up the Genie content (the same quick Opus read) AND the BANTTC strip — every % an instant-saving dropdown onto the opportunity. The Qualification tab retires.",
+    ],
+  },
+  {
     v: "3.31.0.85",
     date: "2026-08-30",
     module: "CRM — BCC on the quote, and an email becomes a contact",

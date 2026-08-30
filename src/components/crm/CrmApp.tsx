@@ -2199,31 +2199,30 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
   // "net total should add up all the above amounts") — the database's own
   // recalc stores the same law, this is its live mirror
   const real = (lines ?? []).filter((l) => !l.is_optional);
-  const subtotal = real.reduce((sum, l) => sum + (Number(l.line_total) || 0), 0);
-  const discable = real.filter((l) => l.discountable !== false).reduce((sum, l) => sum + (Number(l.line_total) || 0), 0);
+  // the write-item row counts the moment it carries a number — what the eye
+  // sees above, the foot adds (it files into the database on + Add / Enter)
+  const ghostAmt = ghost.description.trim() ? (Number(ghost.unit_price) || 0) * (Number(ghost.quantity) || 1) : 0;
+  const subtotal = real.reduce((sum, l) => sum + (Number(l.line_total) || 0), 0) + ghostAmt;
+  const discable = real.filter((l) => l.discountable !== false).reduce((sum, l) => sum + (Number(l.line_total) || 0), 0) + ghostAmt;
   const discPctN = discPct !== null ? Number(discPct) || 0 : Number(q.discount_pct) || 0;
   const discAmt = Math.round(discable * discPctN) / 100;
   const taxRow = taxes.find((t) => t.id === String(q.tax_id ?? ""));
   const taxAmt = Math.round((subtotal - discAmt) * (taxRow?.total_pct ?? 18)) / 100;
   const grand = subtotal - discAmt + taxAmt;
   const cellIn = { width: "100%", border: "none", outline: "none", background: "transparent", fontSize: 13, padding: "6px 8px" } as const;
-  // the group dropdown: the masters\' families, and "+ Add new" always last
-  const GroupCell = ({ value, onPick }: { value: string; onPick: (v: string) => void }) => (
-    <select value={value} disabled={busy}
-      onChange={(e) => {
-        if (e.target.value === "__new") {
-          const v = window.prompt("New item group:", "");
-          if (v && v.trim()) onPick(v.trim());
-        } else onPick(e.target.value);
-      }}
-      style={{ ...cellIn, cursor: "pointer", color: value ? undefined : "#9AA1A8" }}>
-      <option value="">— group —</option>
-      {value && !groups.includes(value) && <option value={value}>{value}</option>}
-      {groups.map((g) => <option key={g} value={g}>{g}</option>)}
-      <option value="__new">＋ Add new…</option>
-    </select>
-  );
-
+  // the group cell TYPES (Dr Raghu, 30 Aug 2026: "let me type the item
+  // group") — a datalist offers the masters\' families while any text stands
+  const GroupCell = ({ value, onCommit, placeholder }: { value: string; onCommit: (v: string) => void; placeholder?: string }) => {
+    const [local, setLocal] = useState(value);
+    useEffect(() => setLocal(value), [value]);
+    return (
+      <input list="quote-groups" value={local} placeholder={placeholder || "group…"} disabled={busy}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={() => { if (local.trim() !== value) onCommit(local.trim()); }}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        style={{ ...cellIn }} />
+    );
+  };
   return (
     <div className="flex flex-col" style={{ height: "100%", minHeight: 0 }}>
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
@@ -2239,6 +2238,7 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
           {err && <span className="text-xs font-semibold" style={{ color: "#8E2C20" }}>{err}</span>}
         </div>
 
+        <datalist id="quote-groups">{groups.map((g) => <option key={g} value={g} />)}</datalist>
         <div className="rounded border" style={{ borderColor: BORDER, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
@@ -2257,7 +2257,7 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
                 <tr key={l.id} style={{ borderTop: `1px solid ${BORDER}` }}>
                   <td className="px-2 tnum" style={{ color: MUTED }}>{srOf(i)}</td>
                   <td style={{ paddingLeft: (l.indent ?? 0) ? 14 : 0 }}>
-                    <GroupCell value={String(l.item_group ?? "")} onPick={(v) => void patchLine(l.id, { item_group: v || null })} />
+                    <GroupCell value={String(l.item_group ?? "")} onCommit={(v) => void patchLine(l.id, { item_group: v || null })} />
                   </td>
                   <td style={{ paddingLeft: (l.indent ?? 0) ? 14 : 0 }}>
                     <div className="flex items-center gap-1">
@@ -2295,7 +2295,7 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
               {/* the write-item row — always there, Enter files it */}
               <tr style={{ borderTop: `1px solid ${BORDER}`, background: "#FDFCFA" }}>
                 <td className="px-2 tnum" style={{ color: "#C7CCD2" }}>{(() => { const n = (lines ?? []).filter((l) => (l.indent ?? 0) === 0).length + 1; return n; })()}</td>
-                <td><GroupCell value={ghost.item_group} onPick={(v) => setGhost((g) => ({ ...g, item_group: v }))} /></td>
+                <td><GroupCell value={ghost.item_group} onCommit={(v) => setGhost((g) => ({ ...g, item_group: v }))} /></td>
                 <td>
                   <div className="flex items-center gap-1">
                     <ItemSearchCell style={cellIn} placeholder="write item…" value={ghost.description} group={ghost.item_group || undefined}
@@ -3042,7 +3042,8 @@ function RecordModal({
       recordTabs.push({ key: "contacts", label: "Contacts", count: row.contact_count, slug: "person", filterField: "company_id", filterValue: rid, addPresets: { company_id: rid } });
     else if (dt.name !== "person")
       recordTabs.push({ key: "contacts", label: "Contacts", slug: "person", filterField: "company_id", filterValue: companyId, addPresets: companyId ? { company_id: companyId } : undefined });
-    if (hasQual) recordTabs.push({ key: "qual", label: "Qualification" });
+    // the Qualification tab retired (Dr Raghu, 30 Aug 2026) — BANTTC lives
+    // inside Enquiry Info now, editable in place
     if (dt.name === "company") {
       recordTabs.push(
         { key: "addresses", label: "Addresses", slug: "address", filterField: "company_id", filterValue: rid, addPresets: { company_id: rid } },
@@ -3306,9 +3307,10 @@ function RecordModal({
             dt.name === "opportunity"
               ? <>
                   <EnquiryInfoTab row={row} onSaved={onSaved} />
-                  {/* qualification lives HERE now (Dr Raghu, 30 Aug 2026) —
-                      the BANTTC strip under the enquiry, its own tab gone */}
-                  <div className="px-4 pb-4"><QualView dt={dt} row={row} links={links} /></div>
+                  {/* qualification lives HERE now, and the numbers EDIT in
+                      place (Dr Raghu, 30 Aug 2026: "BANTTC can be edited
+                      regularly") */}
+                  <div className="px-4 pb-4"><BanttcEditor oppId={rid} initial={row} onSaved={(r2) => onSaved(r2)} /></div>
                 </>
               : <div className="p-4">
                   <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "calc(100vh - 260px)", overflowY: "auto", overflowWrap: "anywhere" }}>
@@ -4444,20 +4446,135 @@ function EnquiryInfoTab({ row, onSaved }: { row: Row; onSaved: () => void }) {
 
 function OppEnquiryTab({ oppId }: { oppId: string | null }) {
   const [text, setText] = useState<string | null>(null);
+  const [brief, setBrief] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
   useEffect(() => {
+    setBrief(""); setErr("");
     if (!oppId) { setText(""); return; }
     fetch(`/api/crm/opportunity?id=${encodeURIComponent(oppId)}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => setText(String(j?.row?.enquiry_info ?? "")))
       .catch(() => setText(""));
   }, [oppId]);
+  // the same quick Opus read the opportunity has — pulled up onto the quote
+  // (Dr Raghu, 30 Aug 2026: "in enquiry info pull up all the genie content")
+  const askGenie = async () => {
+    if (!oppId) return;
+    setBusy(true); setErr(""); setBrief("");
+    try {
+      const r = await fetch("/api/crm/opp-brief", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ opportunity_id: oppId }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Genie could not answer");
+      setBrief(String(j.brief || ""));
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
   return (
     <div className="p-4">
-      <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>FROM THE OPPORTUNITY — always its current text, never a copy</div>
-      <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "calc(100vh - 280px)", overflowY: "auto", overflowWrap: "anywhere" }}>
-        {text === null ? <span style={{ color: MUTED }}>reading…</span>
-          : text.trim() ? <RichText text={text} />
-          : <span style={{ color: MUTED }}>The opportunity holds no enquiry text.</span>}
+      <div className="flex gap-3 flex-wrap" style={{ alignItems: "flex-start" }}>
+        <div style={{ flex: "1 1 420px", minWidth: 320 }}>
+          <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>FROM THE OPPORTUNITY — always its current text, never a copy</div>
+          <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "calc(100vh - 380px)", overflowY: "auto", overflowWrap: "anywhere" }}>
+            {text === null ? <span style={{ color: MUTED }}>reading…</span>
+              : text.trim() ? <RichText text={text} />
+              : <span style={{ color: MUTED }}>The opportunity holds no enquiry text.</span>}
+          </div>
+        </div>
+        <div style={{ flex: "1 1 360px", minWidth: 300 }}>
+          <div className="rounded-lg border p-3" style={{ borderColor: "#D9CFF2", background: "#FBFAFE", borderTop: "3px solid #7C3AED" }}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-bold" style={{ color: "#7C3AED", letterSpacing: 0.8 }}>✨ ASK GENIE</span>
+              <button onClick={() => void askGenie()} disabled={busy || !oppId}
+                className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: busy ? "#B9BEC4" : "#7C3AED" }}>
+                {busy ? "Reading the record…" : brief ? "Ask again" : "Ask Genie"}
+              </button>
+            </div>
+            <div className="text-xs mb-2" style={{ color: "#5A6672", lineHeight: 1.5 }}>
+              The customer, the contact, the enquiry — have we done this before, what is the relation, what is the scope. A quick CRM read, no web.
+            </div>
+            {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
+            {brief && <div className="rounded bg-white border p-3 text-sm" style={{ borderColor: "#E2E0DA", lineHeight: 1.6, maxHeight: "calc(100vh - 460px)", overflowY: "auto" }}><RichText text={brief} /></div>}
+          </div>
+        </div>
+      </div>
+      {oppId && <div className="mt-3"><BanttcEditor oppId={oppId} /></div>}
+    </div>
+  );
+}
+
+/** BANTTC, edited in place (Dr Raghu, 30 Aug 2026: "BANTTC can be edited
+ *  regularly") — every % is a dropdown that saves onto the OPPORTUNITY the
+ *  moment it changes; quote and opportunity read the same numbers. */
+function BanttcEditor({ oppId, initial, onSaved }: { oppId: string; initial?: Row; onSaved?: (r: Row) => void }) {
+  const [row, setRow] = useState<Row | null>(initial ?? null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    if (initial) { setRow(initial); return; }
+    fetch(`/api/crm/opportunity?id=${encodeURIComponent(oppId)}`, { cache: "no-store" })
+      .then((r) => r.json()).then((j) => setRow((j?.row ?? null) as Row | null))
+      .catch(() => setRow(null));
+  }, [oppId, initial]);
+  const setPct = async (name: string, v: string) => {
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch(`/api/crm/opportunity?id=${encodeURIComponent(oppId)}`, {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ [name]: v === "" ? null : Number(v) }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save");
+      setRow(j.row as Row); onSaved?.(j.row as Row);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  if (!row) return <div className="text-xs" style={{ color: MUTED }}>reading BANTTC…</div>;
+  const score = (() => {
+    let sum = 0, den = 0;
+    for (const b of BANTTC) {
+      const v = row[b.name];
+      if (v === null || v === undefined || v === "") continue;
+      sum += Number(v) * b.w; den += b.w;
+    }
+    return den > 0 ? Math.round(sum / den) : null;
+  })();
+  return (
+    <div>
+      <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>
+        BANTTC — edits save instantly {busy && <span style={{ fontWeight: 500 }}>· saving…</span>}
+        {err && <span className="ml-2 font-semibold" style={{ color: "#8E2C20" }}>{err}</span>}
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse", minWidth: 560 }}>
+          <thead><tr>
+            {BANTTC.map((b) => (
+              <th key={b.name} style={{ textAlign: "center", padding: "4px 10px", fontSize: 11, color: MUTED, borderBottom: `2px solid ${BORDER}`, whiteSpace: "nowrap" }}>
+                {b.label}{b.w > 1 && <span style={{ color: ORANGE }}> ×{b.w}</span>}
+              </th>
+            ))}
+            <th style={{ textAlign: "center", padding: "4px 10px", fontSize: 11, color: NAVY, borderBottom: `2px solid ${BORDER}`, fontWeight: 800 }}>SCORE</th>
+          </tr></thead>
+          <tbody><tr>
+            {BANTTC.map((b) => (
+              <td key={b.name} style={{ textAlign: "center", padding: "6px 10px" }}>
+                <select value={row[b.name] === null || row[b.name] === undefined ? "" : String(row[b.name])} disabled={busy}
+                  onChange={(e) => void setPct(b.name, e.target.value)}
+                  className="tnum rounded border px-1 py-0.5" style={{ borderColor: BORDER, fontSize: 14, fontWeight: 700, background: "#fff" }}>
+                  <option value="">—</option>
+                  {[0, 10, 25, 50, 75, 90, 100].map((v) => <option key={v} value={v}>{v}%</option>)}
+                </select>
+              </td>
+            ))}
+            <td className="tnum" style={{ textAlign: "center", padding: "6px 10px", fontWeight: 800, fontSize: 17,
+              color: score === null ? MUTED : score >= 60 ? "#1A7F4E" : score >= 35 ? "#B45309" : "#C0392B" }}>
+              {score === null ? "—" : `${score}%`}
+            </td>
+          </tr></tbody>
+        </table>
       </div>
     </div>
   );

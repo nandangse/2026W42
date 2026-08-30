@@ -40,7 +40,7 @@ export async function GET(req: Request) {
       let qy = db.from("product")
         .select("id, name, sku, item_group, approved_price_inr, description")
         .is("deleted_at", null).eq("is_active", true)
-        .or(`name.ilike.%${q}%,item_group.ilike.%${q}%,sku.ilike.%${q}%,description.ilike.%${q}%`)
+        .or(`name.ilike.*${q}*,item_group.ilike.*${q}*,sku.ilike.*${q}*,description.ilike.*${q}*`)
         .limit(8);
       const group = String(u.searchParams.get("group") || "").trim();
       if (group) qy = qy.eq("item_group", group);
