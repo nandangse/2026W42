@@ -1420,6 +1420,13 @@ function Cell({
   if (value === null || value === undefined || value === "")
     return <span style={{ color: "#C7CCD2" }}>—</span>;
 
+  // a product image stands SMALL wherever it appears; a click opens it whole
+  if (field.name === "image" && /^(https?:|\/)/.test(String(value))) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={String(value)} alt="" style={{ maxHeight: 36, maxWidth: 72, borderRadius: 4, cursor: "zoom-in" }}
+      onClick={(e) => { e.stopPropagation(); window.open(String(value), "_blank", "noopener"); }} />;
+  }
+
   // NGSE/QTN/26-27/39514 reads as 39514 in a list; the whole id is the tooltip.
   if (short && ["opportunity_no", "quote_no", "so_no"].includes(field.name)) {
     const m = String(value).match(/(\d+)\s*$/);
@@ -3532,7 +3539,7 @@ function RecordForm({
                 />
                 <span style={{ color: "#5A6672" }}>{f.label}</span>
               </label>
-            ) : f.type === "textarea" && f.name === "enquiry_info" ? (
+            ) : f.type === "textarea" && (f.rich || f.name === "enquiry_info") ? (
               <RichTextArea value={String(form[f.name] ?? "")} onChange={(v) => set(f.name, v)} rows={f.big ? 8 : 3} />
             ) : f.type === "textarea" ? (
               <textarea

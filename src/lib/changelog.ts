@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.75",
+    date: "2026-08-30",
+    module: "CRM — the Products catalogue takes Dr Raghu's shape",
+    items: [
+      "Products rebuilt for the ERP import (Dr Raghu, 30 Aug 2026): Item Group, Item, Item ID, rich-text Description, Image (small in the list, click to open whole), Approved Price INR, Last Quoted, Average Quoted in 1 year, Alternate USD, Delivery Period, Throughput %, Optional Extras, Purchase Item pointer, and rich Notes. Sale only — the purchase side never crosses.",
+      "Any doctype textarea can now wear the common rich text box; Description, Optional Extras and Notes on a product do.",
+      "CRM migration 0032 adds the columns; the import of ~6,700 sellable ERP items runs the moment it lands.",
+    ],
+  },
+  {
     v: "3.31.0.74",
     date: "2026-08-30",
     module: "CRM — the ENQ No column speaks numbers only",

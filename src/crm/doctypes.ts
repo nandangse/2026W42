@@ -44,6 +44,8 @@ export interface Field {
   noFilter?: boolean;
   /** A textarea that deserves the whole row and real height. */
   big?: boolean;
+  /** A textarea that edits in the common rich text box. */
+  rich?: boolean;
   /** Which lightbox tab the field lives on — absent means Details. */
   tab?: "enquiry" | "qual" | "eva";
   /** Shown only while Is Tender is ticked — the tender unfolds. */
@@ -406,21 +408,24 @@ export const DOCTYPES: Doctype[] = [
     name: "product", label: "Product", plural: "Products", table: "product",
     titleField: "name", group: "Catalogue", icon: "📦",
     orderBy: { column: "sku", ascending: true },
-    blurb: "The GSE model list — the spine of the quotation engine. Real SKUs only; a quote built on invented ones is worthless.",
+    blurb: "The sellable catalogue, imported from the ERP Item table (Allow Sales = Yes, raw material excluded). For SALE only — Purchase Item is a pointer, never a purchase-side record.",
     fields: [
-      { name: "sku", label: "SKU", type: "text", required: true, inList: true },
-      { name: "name", label: "Product", type: "text", required: true, inList: true },
-      { name: "category", label: "Category", type: "select", inList: true,
-        options: ["Hi-Lift", "Bowser", "GPU", "Towbar", "ASRS", "Platform", "Conveyor", "Spare", "Service", "Other"] },
-      { name: "pipeline", label: "Pipeline", type: "select", options: [...PIPELINES], required: true, inList: true, default: "capital" },
-      { name: "sector_id", label: "Sector", type: "link", link: "sector", inList: true },
-      { name: "base_price", label: "Base price", type: "money", inList: true },
-      { name: "standard_cost", label: "Standard cost", type: "money", help: "What margin is measured against. Visible to sales_head and above only, once the quote screen exists." },
-      { name: "hsn_code", label: "HSN", type: "text" },
-      { name: "gst_rate", label: "GST %", type: "number", default: 18 },
-      { name: "lead_time_weeks", label: "Lead time (weeks)", type: "number" },
-      { name: "erpnext_item_code", label: "ERPNext item code", type: "text", help: "Plain text. ERPNext is not modified and never queried live." },
-      { name: "description", label: "Description", type: "textarea" },
+      { name: "item_group", label: "Item Group", type: "text", inList: true },
+      { name: "name", label: "Item", type: "text", required: true, inList: true },
+      { name: "sku", label: "Item ID", type: "text", required: true, inList: true, help: "The ERP item code. Unique — the database refuses a twin." },
+      { name: "image", label: "Image", type: "text", inList: true, noFilter: true, help: "Shows small in the list and on the record; click to see it whole." },
+      { name: "approved_price_inr", label: "Approved Price INR", type: "money", inList: true, help: "From the ERP's Standard Selling price list." },
+      { name: "last_quoted_price", label: "Last Quoted Price", type: "money", inList: true, help: "The most recent ERP quotation line carrying this item." },
+      { name: "last_quoted_on", label: "Last Quoted On", type: "date", noFilter: true },
+      { name: "avg_quoted_price_1y", label: "Avg Quoted (1 yr)", type: "money", help: "Mean of every ERP quotation line for this item in the last twelve months." },
+      { name: "alt_price_usd", label: "Alternate Price USD", type: "number", help: "From the ERP's US Dollar Selling price list." },
+      { name: "delivery_period", label: "Delivery Period", type: "text" },
+      { name: "throughput_pct", label: "Throughput %", type: "number" },
+      { name: "purchase_item", label: "Purchase Item", type: "text", help: "The ERP purchase item this sale item is made from or bought as. A pointer only — Genie never imports the purchase side." },
+      { name: "pipeline", label: "Pipeline", type: "select", options: [...PIPELINES], required: true, default: "capital" },
+      { name: "description", label: "Description", type: "textarea", big: true, rich: true },
+      { name: "optional_extras", label: "Optional Extras", type: "textarea", rich: true },
+      { name: "notes", label: "Notes", type: "textarea", big: true, rich: true, help: "Everything else the ERP knew — UOM, brand, country, end of life…" },
       { name: "is_active", label: "Active", type: "bool", default: true },
     ],
   },
