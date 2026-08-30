@@ -478,6 +478,17 @@ function LessonDrawer({ ctx, lesson, onClose }: { ctx: Ctx; lesson: Lesson; onCl
     finally { setBusy(false); }
   };
 
+  // the lesson's URL, copied from the top bar (Dr Raghu, 29 Aug 2026:
+  // "how do I point to the movie?") — /lms/<4-digit code>
+  const [copied, setCopied] = useState(false);
+  const shareUrl = lesson.code ? `${typeof window !== "undefined" ? window.location.origin : "https://genie.nandan.co.in"}/lms/${lesson.code}` : null;
+  const share = () => {
+    if (!shareUrl) return;
+    const done = () => { setCopied(true); window.setTimeout(() => setCopied(false), 2200); };
+    try { void navigator.clipboard.writeText(shareUrl).then(done, () => window.prompt("Copy the lesson's URL:", shareUrl)); }
+    catch { window.prompt("Copy the lesson's URL:", shareUrl); }
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,0.45)", zIndex: 60, display: "flex", justifyContent: "flex-end" }}
       onClick={onClose}>
@@ -494,6 +505,13 @@ function LessonDrawer({ ctx, lesson, onClose }: { ctx: Ctx; lesson: Lesson; onCl
               {lesson.minutes > 0 && <span className="text-xs rounded px-1.5" style={{ background: "#22303C", color: "#8FA1B3" }}>{lesson.minutes} min</span>}
             </div>
           </div>
+          {shareUrl && (
+            <button onClick={share} className="rounded font-bold flex items-center gap-1"
+              title={`Copy this lesson's URL — ${shareUrl}`} aria-label="Copy the lesson's URL"
+              style={{ background: copied ? "#0D7A3F" : "#22303C", color: "#fff", fontSize: 12, padding: "5px 9px", flexShrink: 0 }}>
+              {copied ? "✓ Copied" : "🔗 Share"}
+            </button>
+          )}
           <button onClick={onClose} className="font-bold" style={{ color: "#8FA1B3", fontSize: 20, lineHeight: 1 }} title="Close">✕</button>
         </div>
 

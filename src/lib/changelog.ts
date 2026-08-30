@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.46",
+    date: "2026-08-29",
+    module: "LMS — share the lesson, resume the movie",
+    items: [
+      "🔗 SHARE on the lesson's top bar (Dr Raghu, 29 Aug 2026: \"how do I point to the movie?\") — one click copies its URL. The Goal Movie is genie.nandan.co.in/lms/7367; every lesson wears its own four digits, every book its slug (0101 is in, the codes are stamped).",
+      "THE MOVIE RESUMES WHERE IT WAS LEFT: the player remembers the position on this device and cues there on return — nothing autoplays, and the memory clears once the ending is reached.",
+    ],
+  },
+  {
     v: "3.31.0.45",
     date: "2026-08-29",
     module: "CRM — the way home, visible",

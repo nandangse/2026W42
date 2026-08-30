@@ -102,6 +102,12 @@ function YouTubePlayer({ id }: { id: string }) {
     let dead = false;
     let tick: ReturnType<typeof setInterval> | null = null;
 
+    // the lesson resumes where it was left (Dr Raghu, 29 Aug 2026) — the
+    // position is kept per device, cued before play so nothing autostarts
+    let resumeAt = 0;
+    try { resumeAt = Math.floor(Number(window.localStorage.getItem(`lms.pos.${id}`) || 0)); } catch { /* fine */ }
+    if (resumeAt < 15) resumeAt = 0;
+
     loadYouTubeApi().then(() => {
       if (dead || !host.current || !window.YT?.Player) { if (!dead) setFailed(true); return; }
       player.current = new window.YT.Player(host.current, {
@@ -109,6 +115,7 @@ function YouTubePlayer({ id }: { id: string }) {
         playerVars: {
           controls: 0, modestbranding: 1, rel: 0, iv_load_policy: 3,
           disablekb: 1, playsinline: 1, fs: 0,
+          ...(resumeAt ? { start: resumeAt } : {}),
         },
         events: {
           onReady: (e: any) => {
@@ -120,13 +127,22 @@ function YouTubePlayer({ id }: { id: string }) {
             // (Dr Raghu, 29 Aug 2026: "this goal movie is muted — check this")
             try { e.target.unMute?.(); e.target.setVolume?.(100); } catch { /* fine */ }
             setMuted(!!e.target.isMuted?.());
-            // one clock for the whole player, cleared on unmount
+            if (resumeAt) setAt(resumeAt);
+            // one clock for the whole player, cleared on unmount — it also
+            // remembers the position, and forgets it near the end
             tick = setInterval(() => {
               if (!player.current?.getCurrentTime) return;
-              setAt(player.current.getCurrentTime() || 0);
+              const now = player.current.getCurrentTime() || 0;
+              setAt(now);
               const d = player.current.getDuration?.() || 0;
               if (d) setLen(d);
               setMuted(!!player.current.isMuted?.());
+              try {
+                if (player.current.getPlayerState?.() === window.YT?.PlayerState?.PLAYING) {
+                  if (d && now > d - 60) window.localStorage.removeItem(`lms.pos.${id}`);
+                  else if (now > 15) window.localStorage.setItem(`lms.pos.${id}`, String(Math.floor(now)));
+                }
+              } catch { /* private mode — the clock still runs */ }
             }, 500);
           },
           onStateChange: (e: any) => {
