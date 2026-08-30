@@ -53,11 +53,12 @@ export async function POST(req: Request) {
     // the delivered run-rate targets (Dr Raghu, 30 Aug 2026): Cr per month,
     // read by the Delivered Jobs fourth box (column arrives with 0102)
     if ("delivered_targets" in body) {
-      const t = body.delivered_targets as { value_cr?: unknown; tp_cr?: unknown };
+      const t = body.delivered_targets as { value_cr?: unknown; tp_cr?: unknown; nos?: unknown };
       const value_cr = Number(t?.value_cr), tp_cr = Number(t?.tp_cr);
       if (!Number.isFinite(value_cr) || !Number.isFinite(tp_cr) || value_cr <= 0 || tp_cr <= 0)
         return NextResponse.json({ error: "Targets must be positive numbers, in crores per month." }, { status: 400 });
-      patch.delivered_targets = { value_cr, tp_cr };
+      const nos = Number(t?.nos);
+      patch.delivered_targets = { value_cr, tp_cr, ...(Number.isFinite(nos) && nos > 0 ? { nos } : {}) };
     }
     if (Object.keys(patch).length <= 2) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
 

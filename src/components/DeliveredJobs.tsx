@@ -86,7 +86,7 @@ interface Payload {
   /** Delivered from the factory, standing at site. */
   installation?: { id: string; tag: string | null; cust: string | null; delivered_on: string | null; proj: string | null; val: number; pending: number | null; billed: number | null; status: string | null }[];
   /** The monthly target the run-rate box measures against (0102 / defaults). */
-  targets?: { value_cr: number; tp_cr: number };
+  targets?: { value_cr: number; tp_cr: number; nos?: number | null };
 }
 
 export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) {
@@ -347,6 +347,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
           const req = (targetMo: number, done: number) => (leftM > 0.1 ? Math.max(0, targetMo * periodM - done) / leftM : null);
           const reqVal = req(tgt.value_cr * 1e7, totals.value);
           const reqTp = req(tgt.tp_cr * 1e7, totals.throughput);
+          const reqNos = tgt.nos ? req(tgt.nos, totals.nos) : null;
           const Rw = ({ l, a, t, r, money }: { l: string; a: number; t: number | null; r: number | null; money?: boolean }) => (
             <tr>
               <td className="pr-2 py-0.5 font-bold" style={{ color: C.mute, fontSize: 10.5 }}>{l}</td>
@@ -367,7 +368,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
                   </tr>
                 </thead>
                 <tbody>
-                  <Rw l="NOS" a={rr.nos} t={null} r={null} />
+                  <Rw l="NOS" a={rr.nos} t={tgt.nos ?? null} r={reqNos} />
                   <Rw l="VALUE" a={rr.val} t={tgt.value_cr * 1e7} r={reqVal} money />
                   <Rw l="THROUGHPUT" a={rr.tp} t={tgt.tp_cr * 1e7} r={reqTp} money />
                 </tbody>

@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.59",
+    date: "2026-08-30",
+    module: "Run-rate box — the NOS target joins",
+    items: [
+      "The NOS row of RUN RATE · TARGET · REQUIRED takes a target too (Dr Raghu, 30 Aug 2026: \"target?\"): an optional JOBS PER MONTH number on the Admin's Monthly Delivered Targets card — set it and the row fills its target and required pace; leave it blank and the dashes stand honestly.",
+    ],
+  },
+  {
     v: "3.31.0.58",
     date: "2026-08-30",
     module: "Delivered Jobs — three submodules, Stratcom's door",
