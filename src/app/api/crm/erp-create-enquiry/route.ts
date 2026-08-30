@@ -109,6 +109,12 @@ export async function POST(req: Request) {
       after: { erp_name: erpName, customer, made_customer: madeCustomer, contact, made_contact: madeContact },
       by_user: me.profileId,
     }).then(() => null, () => null);
+    // the walk comes straight back, so the ERP's own stamp of the new
+    // enquiry reaches Genie now rather than at a quarter past
+    try {
+      const secret = process.env.CRON_SECRET;
+      if (secret) void fetch(new URL("/api/cron/erp-pull", req.url), { headers: { authorization: `Bearer ${secret}` } }).catch(() => null);
+    } catch { /* the hourly walk still covers it */ }
     return NextResponse.json({ ok: true, erp_name: erpName, customer, made_customer: madeCustomer, contact, made_contact: madeContact });
   } catch (e) {
     return errJson(e);

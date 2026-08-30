@@ -135,7 +135,39 @@ export async function POST(req: Request) {
           await fate(mappable.map((l) => l.id), "rejected", String(e).slice(0, 200));
         }
       }
-      return NextResponse.json({ ok: true, jobs: byJob.size, pushed, rejected, notInErp });
+      // THE RECORD DOCUMENT (Dr Raghu, 30 Aug 2026): every push files its
+      // own CSV into the Drive archive — FY / 11 ERP Push Records / month —
+      // job, field, value, was, by whom, and the fate the ERP gave it.
+      let recordFiled = false;
+      try {
+        const { driveConfig, archiveUpload } = await import("@/lib/drive");
+        const dCfg = driveConfig();
+        if (dCfg) {
+          const esc = (v: unknown) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+          const { data: batch } = await admin.from("erp_update").select("job_id, label, new_value, old_value, changed_by, push_status, push_error")
+            .eq("pushed_at", now).order("job_id");
+          const csv = [
+            ["Job ID", "Field", "New value", "Was", "Changed by", "Fate", "ERP's words"].join(","),
+            ...(batch || []).map((r) => [r.job_id, r.label, r.new_value, r.old_value, r.changed_by, r.push_status, r.push_error].map(esc).join(",")),
+            "", `Pushed by ${who} · ${pushed} pushed · ${rejected} rejected · ${notInErp} not in ERP`,
+          ].join("\n");
+          await archiveUpload(dCfg, new TextEncoder().encode(csv).buffer as ArrayBuffer, "erp-push-record.csv", "erp");
+          recordFiled = true;
+        }
+      } catch { /* the record is a mirror, never the push */ }
+
+      // AND THE PULL COMES STRAIGHT BACK: what the ERP now says returns to
+      // Genie at once, not at a quarter past — the same walk the cron makes.
+      let pulledBack = false;
+      try {
+        const secret = process.env.CRON_SECRET;
+        if (secret) {
+          const r2 = await fetch(new URL("/api/cron/erp-pull", req.url), { headers: { authorization: `Bearer ${secret}` } });
+          pulledBack = r2.ok;
+        }
+      } catch { /* the hourly walk still covers it */ }
+
+      return NextResponse.json({ ok: true, jobs: byJob.size, pushed, rejected, notInErp, recordFiled, pulledBack });
     }
 
     if (String(body.action || "") !== "exported")

@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.72",
+    date: "2026-08-30",
+    module: "ERP — push, pull back, and file the record",
+    items: [
+      "EVERY PUSH PULLS STRAIGHT BACK (Dr Raghu, 30 Aug 2026): the moment corrections or a new enquiry land in the ERP, the same walk the hourly cron makes fires at once — what the ERP now says returns to Genie without waiting for a quarter past.",
+      "EVERY CORRECTIONS PUSH FILES ITS DOCUMENT: a CSV record into the Drive archive — FY / 11 ERP Push Records / month — job, field, new value, was, who, and the fate the ERP gave each line.",
+      "The whole contract is WRITTEN DOWN: docs/ERP-SYNC.md — the pull-only law, its two sanctioned doors, the hourly walk, the cursors, and where the keys live.",
+    ],
+  },
+  {
     v: "3.31.0.71",
     date: "2026-08-30",
     module: "ERP pull — quiet hours still work",
