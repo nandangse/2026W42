@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.27",
+    date: "2026-08-30",
+    module: "CRM — the directors give their emails, mobiles and birthdays",
+    items: [
+      "The IFS directors now show everything MCA filed: email, mobile and 🎂 birthday beside name, designation and DIN (Dr Raghu, 30 Aug 2026) — and a ＋ contact button files any director straight into the company's contacts, email and phone riding along.",
+    ],
+  },
+  {
     v: "3.31.1.26",
     date: "2026-08-30",
     module: "CRM — IFS walks InstaFinancials' real road: Order → Status → Download",

@@ -5955,14 +5955,42 @@ function IfsTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
           {dirs.length > 0 && (
             <div className="rounded border p-3 mb-3" style={{ borderColor: BORDER }}>
               <div className="font-bold text-sm mb-2">Current directors <span className="text-xs" style={{ color: MUTED }}>({dirs.length})</span></div>
-              {dirs.map((d2) => (
-                <div key={String(d2.DirectorDin)} className="text-sm py-0.5 flex gap-3 flex-wrap">
-                  <b style={{ minWidth: 220 }}>{V(d2.DirectorName)}</b>
-                  <span style={{ color: MUTED }}>{V(d2.DirectorDesignation)}</span>
-                  <span className="tnum text-xs" style={{ color: MUTED }}>DIN {V(d2.DirectorDin)}</span>
-                  {String(d2.DirectorContactNo ?? "") !== "null" && d2.DirectorContactNo ? <span className="tnum text-xs">{String(d2.DirectorContactNo)}</span> : null}
-                </div>
-              ))}
+              {dirs.map((d2) => {
+                const email = String(d2.DirectorEmail ?? "") !== "null" ? String(d2.DirectorEmail ?? "") : "";
+                const phone = String(d2.DirectorContactNo ?? "") !== "null" ? String(d2.DirectorContactNo ?? "") : "";
+                const dob = String(d2.DirectorDateOfBirth ?? "") !== "null" ? String(d2.DirectorDateOfBirth ?? "") : "";
+                return (
+                  <div key={String(d2.DirectorDin)} className="text-sm py-1 flex gap-3 flex-wrap items-baseline" style={{ borderTop: `1px solid #F0F1F6` }}>
+                    <b style={{ minWidth: 190 }}>{V(d2.DirectorName)}</b>
+                    <span style={{ color: MUTED, minWidth: 120 }}>{V(d2.DirectorDesignation)}</span>
+                    {email && <span style={{ color: "#2C5B82" }}>{email}</span>}
+                    {phone && <span className="tnum">{phone}</span>}
+                    {dob && <span className="text-xs" title="Date of birth — a birthday wish opens doors">🎂 {dob}</span>}
+                    <span className="tnum text-xs" style={{ color: MUTED }}>DIN {V(d2.DirectorDin)}</span>
+                    <button title="File this director as a contact of the company"
+                      onClick={async () => {
+                        try {
+                          const r3 = await fetch("/api/crm/person", {
+                            method: "POST", headers: { "content-type": "application/json" },
+                            body: JSON.stringify({
+                              first_name: String(d2.DirectorName ?? "").trim(),
+                              job_title: String(d2.DirectorDesignation ?? "Director"),
+                              primary_email: email || null, primary_phone: phone || null,
+                              company_id: rid,
+                            }),
+                          });
+                          const j3 = await r3.json();
+                          if (!r3.ok) throw new Error(j3.error || "Could not file");
+                          window.alert(`✓ ${d2.DirectorName} filed as a contact.`);
+                          onSaved();
+                        } catch (e3) { window.alert(e3 instanceof Error ? e3.message : String(e3)); }
+                      }}
+                      className="text-xs font-bold rounded border px-1.5 py-0.5" style={{ borderColor: BORDER, color: ORANGE, background: "#fff" }}>
+                      ＋ contact
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
           {ratings.length > 0 && (
