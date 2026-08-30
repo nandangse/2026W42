@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.3",
+    date: "2026-08-30",
+    module: "Genie — the rich text detector sees past a leading &nbsp;",
+    items: [
+      "Descriptions that begin with a stray &nbsp; before their first tag were rendering as garbled markup (Dr Raghu, 30 Aug 2026) — the HTML detector now recognizes real tags anywhere in the text, so every ERP description renders and edits rich, everywhere the common editor stands.",
+    ],
+  },
+  {
     v: "3.31.1.2",
     date: "2026-08-30",
     module: "Settings — the owner's two rooms: Genie usage and Consult Raghu",

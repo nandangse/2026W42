@@ -48,8 +48,12 @@ export function sanitizeRich(html: string): string {
   return root.innerHTML;
 }
 
-/** Does a stored string carry the new HTML dress? */
-export const looksHtml = (s: string) => /^\s*</.test(s || "");
+/** Does a stored string carry the HTML dress? A leading &nbsp; before the
+ *  first tag fooled the old check (Dr Raghu, 30 Aug 2026: "garbled!") — now
+ *  any real HTML tag in the text counts. */
+export const looksHtml = (s: string) =>
+  /^\s*(?:&[a-zA-Z#0-9]{1,8};|\s)*</.test(s || "") ||
+  /<(b|strong|i|em|u|p|div|br|span|a|ul|ol|li|table|tbody|tr|td|th|img|h[1-6]|blockquote|font)[\s/>]/i.test(s || "");
 
 /** The legacy markdown-ish, upgraded into editor HTML so old text edits cleanly. */
 export function legacyToHtml(md: string): string {
