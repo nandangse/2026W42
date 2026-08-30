@@ -1372,11 +1372,25 @@ function MultiFilter({ label, options, value, onChange }: {
   value: string; onChange: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // typing narrows the list; Enter ticks every match — multiple picks by
+  // keyboard alone (Dr Raghu, 30 Aug 2026: "allow me to choose multiple by
+  // typing too")
+  const [q, setQ] = useState("");
   const chosen = new Set(value ? value.split(",") : []);
   const toggle = (id: string) => {
     const n = new Set(chosen);
     if (n.has(id)) n.delete(id); else n.add(id);
     onChange([...n].join(","));
+  };
+  const shown = q.trim()
+    ? options.filter((o) => o.label.toLowerCase().includes(q.trim().toLowerCase()))
+    : options;
+  const tickShown = () => {
+    if (!shown.length) return;
+    const n = new Set(chosen);
+    for (const o of shown) n.add(o.id);
+    onChange([...n].join(","));
+    setQ("");
   };
   const title = !chosen.size
     ? `${label}: all`
@@ -1392,14 +1406,25 @@ function MultiFilter({ label, options, value, onChange }: {
       </button>
       {open && (
         <>
-          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 39 }} />
+          <div onClick={() => { setOpen(false); setQ(""); }} style={{ position: "fixed", inset: 0, zIndex: 39 }} />
           <div className="rounded border" style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 40, background: "#fff", borderColor: BORDER, boxShadow: "0 8px 24px rgba(27,45,107,.18)", minWidth: 220, maxHeight: 320, overflowY: "auto", padding: 6 }}>
             <div className="flex items-center gap-3 px-1.5 pb-1.5 mb-1 text-xs font-bold" style={{ borderBottom: `1px solid ${BORDER}` }}>
               <button onClick={() => onChange("")} style={{ color: NAVY }}>All</button>
-              <button onClick={() => onChange(options.map((o) => o.id).join(","))} style={{ color: NAVY }}>Every ✓</button>
-              <button onClick={() => setOpen(false)} className="ml-auto" style={{ color: MUTED }}>✕</button>
+              <button onClick={() => { if (q.trim()) tickShown(); else onChange(options.map((o) => o.id).join(",")); }} style={{ color: NAVY }}
+                title={q.trim() ? "Tick every match" : "Tick every option"}>Every ✓</button>
+              <button onClick={() => { setOpen(false); setQ(""); }} className="ml-auto" style={{ color: MUTED }}>✕</button>
             </div>
-            {options.map((o) => (
+            <input
+              value={q} onChange={(e) => setQ(e.target.value)} autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); tickShown(); } if (e.key === "Escape") { setOpen(false); setQ(""); } }}
+              placeholder="Type to find… Enter ticks all matches"
+              className="w-full mb-1 px-1.5 py-1 rounded text-xs border"
+              style={{ borderColor: BORDER, outline: "none" }}
+            />
+            {shown.length === 0 && (
+              <div className="px-1.5 py-1 text-xs" style={{ color: MUTED }}>Nothing matches “{q.trim()}”.</div>
+            )}
+            {shown.map((o) => (
               <label key={o.id} className="flex items-center gap-2 px-1.5 py-1 text-sm cursor-pointer rounded hover:bg-[#F7F5F0]">
                 <input type="checkbox" checked={chosen.has(o.id)} onChange={() => toggle(o.id)} style={{ accentColor: NAVY }} />
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>

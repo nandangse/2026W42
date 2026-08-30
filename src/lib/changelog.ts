@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.77",
+    date: "2026-08-30",
+    module: "CRM — filter dropdowns pick by typing",
+    items: [
+      "Every multi-pick filter dropdown (Item Group, Stage, Salesperson…) gains a type-to-find box (Dr Raghu, 30 Aug 2026: \"allow me to choose multiple by typing too\"): typing narrows the list, Enter ticks everything that matches — \"scissor\" + Enter selects every scissor family in one stroke. Every ✓ honours the typed match too.",
+    ],
+  },
+  {
     v: "3.31.0.76",
     date: "2026-08-30",
     module: "CRM — Products filter by family",
