@@ -2237,6 +2237,9 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
           product_id: ghost.product_id || null,
           unit_price: Math.max(0, Number(ghost.unit_price) || 0),
           quantity: Number(ghost.quantity) > 0 ? Number(ghost.quantity) : 1,
+          // every NOT NULL column travels explicitly — the generic route
+          // writes a missing field as null, and the table refuses null
+          unit_cost: 0, discount_pct: 0, gst_rate: 18, is_optional: false,
           uom: "Nos", discountable: true, indent: 0,
         }),
       });

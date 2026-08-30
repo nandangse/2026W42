@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.97",
+    date: "2026-08-30",
+    module: "CRM — + Add files the line whole",
+    items: [
+      "Adding a quote item failed on a null unit_cost — the write-item row now sends every required column explicitly (cost 0, discount 0, GST 18) and files cleanly.",
+    ],
+  },
+  {
     v: "3.31.0.96",
     date: "2026-08-30",
     module: "CRM — the item dropdown always answers",
