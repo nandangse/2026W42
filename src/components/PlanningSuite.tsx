@@ -1048,7 +1048,9 @@ export default function PlanningSuite({
               // Planning Suite lands on the Job Delivery Board. My Week has its
               // own 🏠 beside this row, so arriving here on My Week would leave
               // the sub-tab bar with nothing lit and look like a fault.
-              onClick={() => { setWorkspace(k); if (k === "suite" && tab === "home") setTab("wip"); }}
+              // the LMS lives at its own URL now (Dr Raghu, 29 Aug 2026) —
+              // /lms, /lms/<code>, /lms/<book-slug> — so the nav walks there
+              onClick={() => { if (k === "lms") { window.location.href = "/lms"; return; } setWorkspace(k); if (k === "suite" && tab === "home") setTab("wip"); }}
               className="px-3 py-1.5 rounded text-sm font-semibold whitespace-nowrap flex-shrink-0"
               style={workspace === k ? { background: "#E8600A", color: "#fff" } : { color: "#8FA1B3" }}
             >

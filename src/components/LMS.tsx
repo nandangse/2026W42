@@ -56,7 +56,7 @@ interface Payload {
   canAuthor: boolean;
 }
 
-export default function LMS() {
+export default function LMS({ initialKey = null }: { initialKey?: string | null }) {
   const [d, setD] = useState<Payload | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "not_installed" | "error">("loading");
   const [err, setErr] = useState("");
@@ -64,6 +64,8 @@ export default function LMS() {
   const [openBook, setOpenBook] = useState<string | null>(null);
   const [openLesson, setOpenLesson] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id?: string } | null>(null);
+  // /lms/<key> handed in by the page — resolved once the library loads
+  const [pendingKey, setPendingKey] = useState<string | null>(initialKey);
 
   const load = useCallback(async () => {
     try {
@@ -92,6 +94,30 @@ export default function LMS() {
   const lessonById = new Map(d.lessons.map((l) => [l.id, l]));
   const progressBy = new Map(d.progress.map((p) => [p.lesson_id, p]));
   const totals = totalsOf(d.progress, lessonById, d.extras);
+
+  // /lms/<key>: a 4-digit code opens its lesson, a slug opens its book
+  if (pendingKey) {
+    setPendingKey(null);
+    const k = pendingKey.toLowerCase();
+    if (/^\d{4}$/.test(k)) {
+      const hit = d.lessons.find((l) => String(l.code || "") === k);
+      if (hit) setOpenLesson(hit.id);
+    } else {
+      const hit = d.books.find((b) => String(b.slug || "").toLowerCase() === k);
+      if (hit) { setTab("library"); setOpenBook(hit.id); }
+    }
+  }
+  // the address bar follows what stands open — a URL worth copying
+  const urlFor = (): string => {
+    if (openLesson) { const c = lessonById.get(openLesson)?.code; if (c) return `/lms/${c}`; }
+    if (openBook) { const s = d.books.find((b) => b.id === openBook)?.slug; if (s) return `/lms/${s}`; }
+    return "/lms";
+  };
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/lms")) {
+    const want = urlFor();
+    if (window.location.pathname !== want) window.history.replaceState(null, "", want);
+  }
+
   const book = openBook ? d.books.find((b) => b.id === openBook) ?? null : null;
   const lesson = openLesson ? lessonById.get(openLesson) ?? null : null;
 

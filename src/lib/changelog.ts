@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.44",
+    date: "2026-08-29",
+    module: "LMS — its own URLs, and a player with speed and full screen",
+    items: [
+      "THE LMS SPEAKS URLS (Dr Raghu, 29 Aug 2026): genie.nandan.co.in/lms is the library's own address; /lms/<4-digit code> opens a lesson (every lesson wears a random, stable code); /lms/<two-word-slug> opens a book — wcm-kaizen, safety, toc and the rest. The address bar follows whatever stands open, so every lesson has a URL worth pasting into WhatsApp; the top-nav LMS button walks there (migration 0101).",
+      "THE PLAYER GREW UP: playback SPEED cycles 1× → 1.25× → 1.5× → 1.75× → 2×, FULL SCREEN keeps Genie's own controls (no YouTube doors out), a 🔊 mute button stands on the bar — and the mute that ate The Goal movie is undone: the player unmutes itself the moment it loads, whatever YouTube remembered.",
+    ],
+  },
+  {
     v: "3.31.0.43",
     date: "2026-08-29",
     module: "CRM — the queue rings from the top bar",

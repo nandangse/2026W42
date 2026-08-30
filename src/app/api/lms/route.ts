@@ -208,18 +208,45 @@ export async function POST(req: Request) {
       };
       if (!patch.title) throw new HttpError(400, "A lesson needs a title");
 
+      // every lesson wears a 4-DIGIT CODE — its URL, /lms/<code> (0101).
+      // Random, checked against the taken set, stable once given.
+      const freshCode = async (): Promise<string | null> => {
+        try {
+          const { data: taken } = await admin.from("lms_lesson").select("code").not("code", "is", null).limit(10000);
+          const have = new Set((taken || []).map((x) => String(x.code)));
+          for (let a = 0; a < 60; a++) {
+            const c = String(1000 + Math.floor(Math.random() * 9000));
+            if (!have.has(c)) return c;
+          }
+        } catch { /* pre-0101 — the column waits */ }
+        return null;
+      };
+
       let lessonId = id;
       if (id) {
         const { error } = await admin.from("lms_lesson").update(patch).eq("id", id);
         if (error) throw new Error(error.message);
+        // an old lesson without a code earns one on its next save
+        const { data: cur } = await admin.from("lms_lesson").select("code").eq("id", id).maybeSingle();
+        if (cur && !cur.code) {
+          const c = await freshCode();
+          if (c) await admin.from("lms_lesson").update({ code: c }).eq("id", id);
+        }
       } else {
+        const code = await freshCode();
         const { data, error } = await admin
           .from("lms_lesson")
-          .insert({ ...patch, created_by: user.id })
+          .insert({ ...patch, ...(code ? { code } : {}), created_by: user.id })
           .select("id")
           .single();
-        if (error) throw new Error(error.message);
-        lessonId = data.id;
+        if (error) {
+          if (/code/.test(error.message)) {
+            const { data: d2, error: e2 } = await admin.from("lms_lesson")
+              .insert({ ...patch, created_by: user.id }).select("id").single();
+            if (e2) throw new Error(e2.message);
+            lessonId = d2.id;
+          } else throw new Error(error.message);
+        } else lessonId = data.id;
       }
 
       // Shelves are replaced wholesale — the editor sends the full set, and a
@@ -295,7 +322,14 @@ export async function POST(req: Request) {
       // never orphan the lessons shelved under its old id.
       const id = (str(body.id, 64).trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")).slice(0, 64);
       if (!id) throw new HttpError(400, "A book needs a name");
-      const { error } = await admin.from("lms_book").upsert({
+      // the book's URL slug — two words max, dashed (0101): sent explicitly,
+      // else derived from the last two significant words of the name
+      const slugOf = (nm: string) => nm.toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, "").split(/\s+/)
+        .filter((w) => w && !["the", "of", "and", "a", "an", "nandan", "trainings", "training"].includes(w))
+        .slice(0, 2).join("-") || nm.toLowerCase().replace(/[^a-z0-9]+/g, "-").split("-").slice(0, 2).join("-");
+      const slug = (str(body.slug, 60).trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "") || slugOf(name)).slice(0, 60) || null;
+      const row: Record<string, unknown> = {
         id,
         name: str(body.name, 200).trim() || id,
         blurb: str(body.blurb, 600) || null,
@@ -303,7 +337,13 @@ export async function POST(req: Request) {
         color: str(body.color, 20) || "#1B3A5C",
         sort_order: int(body.sort_order),
         active: body.active !== false,
-      });
+        slug,
+      };
+      let { error } = await admin.from("lms_book").upsert(row);
+      if (error && /slug/.test(error.message)) {
+        delete row.slug;
+        ({ error } = await admin.from("lms_book").upsert(row));
+      }
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true });
     }

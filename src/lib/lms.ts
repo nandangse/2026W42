@@ -27,6 +27,9 @@ export interface Book {
   icon: string | null;
   color: string;
   sort_order: number;
+  /** The book's URL name — genie.nandan.co.in/lms/<slug>. Two words max,
+   *  dashed. Absent until migration 0101. */
+  slug?: string | null;
 }
 
 export interface Section {
@@ -44,6 +47,9 @@ export interface Lesson {
   pdf_url: string | null;
   video_url: string | null;
   minutes: number;
+  /** The lesson's URL — genie.nandan.co.in/lms/<4-digit code>. Random,
+   *  unique, stable once given. Absent until migration 0101. */
+  code?: string | null;
   /** Which books it is shelved in, and where inside each. */
   shelves: { book_id: string; section_id: string | null; sort_order: number }[];
 }
