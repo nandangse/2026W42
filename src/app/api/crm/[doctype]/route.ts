@@ -226,7 +226,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       // picker on an opportunity searches only that company's people.
       // the mail composer's To-picker needs the address beside the name
       let pq = db.from(d.table).select(d.name === "person" ? `id, ${d.titleField}, primary_email` : `id, ${d.titleField}`);
-      if (["company", "person", "opportunity"].includes(d.name)) pq = pq.is("deleted_at", null);
+      if (["company", "person", "opportunity", "product"].includes(d.name)) pq = pq.is("deleted_at", null);
       for (const f of d.fields) {
         if (f.virtual) continue;
         const v = u.searchParams.get(`f_${f.name}`);
@@ -280,7 +280,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
         + (joinNeeded ? `${moneyField || !viaCompany ? ", " : ""}company_join:company_id!inner(industry_id)` : "");
       const buildAgg = () => {
         let qy = db.from(d.table).select(aggSelect);
-        if (["company", "person", "opportunity"].includes(d.name)) qy = qy.is("deleted_at", null);
+        if (["company", "person", "opportunity", "product"].includes(d.name)) qy = qy.is("deleted_at", null);
         if (wantsInd) qy = (String(indFilter).includes(",") ? qy.in("company_join.industry_id", String(indFilter).split(",")) : qy.eq("company_join.industry_id", indFilter));
         for (const f of d.fields) {
           if (f.virtual) continue;
@@ -363,7 +363,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
     const buildList = (withCount: boolean) => {
       let qy = db.from(d.table).select(select, withCount ? { count: "exact" as const } : undefined);
       // Merged and soft-deleted rows stay in the ledger, not on the screens.
-      if (["company", "person", "opportunity"].includes(d.name)) qy = qy.is("deleted_at", null);
+      if (["company", "person", "opportunity", "product"].includes(d.name)) qy = qy.is("deleted_at", null);
       if (tagIds) qy = qy.in("id", tagIds.length ? tagIds.slice(0, 2000) : ["00000000-0000-0000-0000-000000000000"]);
       if (wantsInd) qy = (String(indFilter).includes(",") ? qy.in("company_join.industry_id", String(indFilter).split(",")) : qy.eq("company_join.industry_id", indFilter));
       for (const f of d.fields) {

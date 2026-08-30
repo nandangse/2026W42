@@ -23,7 +23,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ModuleMenu from "@/components/ModuleMenu";
 import PlaybookScreen from "@/components/Playbook";
-import { DOCTYPES, doctypeBySlug, type Doctype, type Field } from "@/crm/doctypes";
+import { DOCTYPES, PIPELINES, doctypeBySlug, type Doctype, type Field } from "@/crm/doctypes";
 import { LOGO } from "@/lib/logo";
 import AnalyticsScreen from "./Analytics";
 import DealsScreen from "./DealBoard";
@@ -1437,6 +1437,361 @@ function MultiFilter({ label, options, value, onChange }: {
   );
 }
 
+/* ============================== THE PRODUCT RECORD (Dr Raghu, 30 Aug 2026)
+   Tabs: Basic (default, image on the right, a pencil next to each field,
+   description full width as rich text) · Quotations · Pricing (the approved
+   row leads and is the quote default) · Training (per product family) ·
+   Notes · Merge. */
+
+const dIN = (v: unknown) => (v ? String(v).slice(0, 10).split("-").reverse().join("/") : "—");
+const money = (v: unknown, cur = "INR") =>
+  v === null || v === undefined || v === "" ? "—"
+    : `${cur === "USD" ? "$" : cur === "EUR" ? "€" : "₹"} ${Number(v).toLocaleString("en-IN")}`;
+
+/** One line of the Basic tab: label, value, and the pencil that edits it. */
+function PencilField({ label, value, type = "text", options, display, onSave }: {
+  label: string; value: unknown; type?: "text" | "number" | "select";
+  options?: string[]; display?: (v: unknown) => React.ReactNode;
+  onSave?: (v: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const commit = async () => {
+    if (!onSave) return;
+    setBusy(true); setErr("");
+    try { await onSave(v.trim()); setEditing(false); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div>
+      <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>{label}</div>
+      {!editing ? (
+        <div className="text-sm flex items-baseline gap-1.5" style={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>
+          <span>{display ? display(value) : (value === null || value === undefined || value === "" ? <span style={{ color: "#C7CCD2" }}>—</span> : String(value))}</span>
+          {onSave && (
+            <button title={`Edit ${label}`} onClick={() => { setV(value === null || value === undefined ? "" : String(value)); setEditing(true); }}
+              style={{ fontSize: 12, opacity: 0.6 }}>✏️</button>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          {type === "select" ? (
+            <select value={v} onChange={(e) => setV(e.target.value)} className="px-2 py-1 rounded text-sm border" style={{ borderColor: ORANGE, background: "#fff" }}>
+              <option value="">—</option>
+              {(options || []).map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ) : (
+            <input value={v} onChange={(e) => setV(e.target.value)} autoFocus type={type === "number" ? "number" : "text"}
+              onKeyDown={(e) => { if (e.key === "Enter") void commit(); if (e.key === "Escape") setEditing(false); }}
+              className="px-2 py-1 rounded text-sm border" style={{ borderColor: ORANGE, width: type === "number" ? 130 : 200 }} />
+          )}
+          <button onClick={() => void commit()} disabled={busy} className="rounded px-2 py-1 text-xs font-bold text-white" style={{ background: "#0D7A3F" }}>{busy ? "…" : "✓"}</button>
+          <button onClick={() => setEditing(false)} className="text-xs" style={{ color: MUTED }}>✕</button>
+          {err && <span className="text-xs" style={{ color: "#8E2C20" }}>{err}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProductBasicTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
+  const rid = String(row.id ?? "");
+  const [busyErp, setBusyErp] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [editDesc, setEditDesc] = useState(false);
+  const [busyDesc, setBusyDesc] = useState(false);
+
+  const patch = async (fields: Record<string, unknown>) => {
+    const r = await fetch(`/api/crm/product?id=${encodeURIComponent(rid)}`, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(fields),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "Could not save");
+    onSaved((j.row ?? { ...row, ...fields }) as Row);
+  };
+  const P = (name: string) => (v: string) => patch({ [name]: v === "" ? null : v });
+  const PN = (name: string) => (v: string) => patch({ [name]: v === "" ? null : Number(v) });
+
+  // pull this one item AGAIN from the ERP — description rich with images,
+  // the image field, and every file attached to the Item
+  const pullErp = async () => {
+    setBusyErp(true); setMsg("");
+    try {
+      const r = await fetch("/api/crm/product-extra", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "erp_refresh", product_id: rid }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "The ERP did not answer");
+      const rr = await (await fetch(`/api/crm/product?id=${encodeURIComponent(rid)}`, { cache: "no-store" })).json();
+      if (rr?.row) onSaved(rr.row as Row);
+      setMsg(`Pulled from ERP ✓${j.attachments ? ` · ${j.attachments} file${j.attachments === 1 ? "" : "s"}` : ""}`);
+      window.setTimeout(() => setMsg(""), 4000);
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setBusyErp(false); }
+  };
+
+  const attachments = Array.isArray(row.attachments) ? (row.attachments as { name?: string; url?: string }[]) : [];
+  const img = row.image ? String(row.image) : "";
+  const desc = String(row.description ?? "");
+
+  const uploadImage = async (f: File) => {
+    const fd = new FormData();
+    fd.append("target_type", "product"); fd.append("target_id", rid); fd.append("file", f);
+    const r = await fetch("/api/crm/opp-attach", { method: "POST", body: fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "Upload failed");
+    return String(j.url);
+  };
+
+  return (
+    <div className="p-4">
+      <div className="flex gap-5 flex-wrap">
+        <div className="grid gap-x-6 gap-y-3" style={{ flex: 1, minWidth: 340, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", alignContent: "start" }}>
+          <PencilField label="Item Group" value={row.item_group} onSave={P("item_group")} />
+          <PencilField label="Item" value={row.name} onSave={(v) => (v ? patch({ name: v }) : Promise.reject(new Error("The item needs a name")))} />
+          <PencilField label="Item ID" value={row.sku} display={(v) => <b>{String(v ?? "—")}</b>} />
+          <PencilField label="Approved Price INR" value={row.approved_price_inr} type="number" display={(v) => <b>{money(v)}</b>} onSave={PN("approved_price_inr")} />
+          <PencilField label="Last Quoted Price" value={row.last_quoted_price} display={(v) => money(v)} />
+          <PencilField label="Last Quoted On" value={row.last_quoted_on} display={dIN} />
+          <PencilField label="Avg Quoted (1 yr)" value={row.avg_quoted_price_1y} display={(v) => money(v)} />
+          <PencilField label="Alternate Price USD" value={row.alt_price_usd} type="number" display={(v) => money(v, "USD")} onSave={PN("alt_price_usd")} />
+          <PencilField label="Delivery Period" value={row.delivery_period} onSave={P("delivery_period")} />
+          <PencilField label="Throughput %" value={row.throughput_pct} type="number" display={(v) => (v === null || v === undefined ? "—" : `${v}%`)} onSave={PN("throughput_pct")} />
+          <PencilField label="Purchase Item" value={row.purchase_item} onSave={P("purchase_item")} />
+          <PencilField label="Pipeline" value={row.pipeline} type="select" options={[...PIPELINES]} onSave={P("pipeline")} />
+          <PencilField label="Optional Extras" value={row.optional_extras} onSave={P("optional_extras")} />
+        </div>
+        <div style={{ width: 240, flexShrink: 0 }}>
+          <div className="text-xs font-semibold mb-1" style={{ color: MUTED }}>IMAGE</div>
+          {img ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={img} alt="" style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 8, border: `1px solid ${BORDER}`, cursor: "zoom-in" }}
+              onClick={() => window.open(img, "_blank", "noopener")} />
+          ) : (
+            <div className="rounded border text-xs flex items-center justify-center" style={{ borderColor: BORDER, color: MUTED, height: 120 }}>no image yet</div>
+          )}
+          <button onClick={() => void pullErp()} disabled={busyErp}
+            className="mt-2 w-full rounded px-2 py-1.5 text-xs font-bold text-white" style={{ background: busyErp ? "#B9BEC4" : NAVY }}>
+            {busyErp ? "Pulling…" : "↻ Pull from ERP"}
+          </button>
+          <div className="text-xs mt-1" style={{ color: MUTED, lineHeight: 1.5 }}>Re-reads this item — description, image and its attached files.</div>
+          {msg && <div className="text-xs mt-1 font-semibold" style={{ color: msg.includes("✓") ? "#1A7F4E" : "#8E2C20" }}>{msg}</div>}
+          {attachments.length > 0 && (
+            <div className="mt-3">
+              <div className="text-xs font-semibold mb-1" style={{ color: MUTED }}>ATTACHMENTS</div>
+              {attachments.map((a, i) => (
+                <a key={i} href={String(a.url)} target="_blank" rel="noreferrer" className="block text-xs mb-0.5" style={{ color: "#2C5B82", textDecoration: "underline", overflowWrap: "anywhere" }}>📎 {String(a.name || a.url)}</a>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-semibold" style={{ color: MUTED }}>DESCRIPTION</span>
+          {!editDesc && <button title="Edit the description" onClick={() => setEditDesc(true)} style={{ fontSize: 12, opacity: 0.6 }}>✏️</button>}
+        </div>
+        {editDesc ? (
+          <RichTextEditor initial={desc} busy={busyDesc} minHeight={260} onCancel={() => setEditDesc(false)}
+            onUploadImage={uploadImage}
+            onSave={(html) => {
+              setBusyDesc(true);
+              patch({ description: html }).then(() => setEditDesc(false)).catch((e) => window.alert(e instanceof Error ? e.message : String(e))).finally(() => setBusyDesc(false));
+            }} />
+        ) : (
+          <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, lineHeight: 1.6, overflowWrap: "anywhere" }}>
+            {desc.trim()
+              ? <RichContent text={desc} legacy={(s2) => <RichText text={s2} />} />
+              : <span style={{ color: MUTED }}>No description yet — ✏️ or ↻ Pull from ERP.</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProductQuotesTab({ id }: { id: string }) {
+  type Q = { id: string; qtn_no: string; client: string | null; quoted_on: string | null; qty: number | null; rate: number | null; amount: number | null; currency: string; source: string };
+  const [quotes, setQuotes] = useState<Q[] | null>(null);
+  const [erpUrl, setErpUrl] = useState<string | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    setQuotes(null); setErr("");
+    fetch(`/api/crm/product-extra?id=${encodeURIComponent(id)}`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "?"); setQuotes(j.quotes); setErpUrl(j.erp_url); })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [id]);
+  return (
+    <div className="p-4">
+      {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
+      {quotes === null && !err && <div className="text-sm" style={{ color: MUTED }}>reading the quote history…</div>}
+      {quotes !== null && quotes.length === 0 && <div className="text-sm" style={{ color: MUTED }}>No quotation has carried this item in the imported year.</div>}
+      {quotes !== null && quotes.length > 0 && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead><tr style={{ textAlign: "left", color: MUTED, fontSize: 11 }}>
+              <th className="py-1 pr-3">QTN NO</th><th className="py-1 pr-3">CLIENT</th><th className="py-1 pr-3">DATE</th>
+              <th className="py-1 pr-3" style={{ textAlign: "right" }}>QTY</th><th className="py-1 pr-3" style={{ textAlign: "right" }}>RATE</th>
+              <th className="py-1 pr-3" style={{ textAlign: "right" }}>AMOUNT</th><th className="py-1" /></tr></thead>
+            <tbody>
+              {quotes.map((q) => (
+                <tr key={q.id} style={{ borderTop: `1px solid ${BORDER}` }}>
+                  <td className="py-1.5 pr-3 tnum" title={q.qtn_no}>{(q.qtn_no.match(/(\d+)\s*$/) || [, q.qtn_no])[1]}</td>
+                  <td className="py-1.5 pr-3">{q.client || "—"}</td>
+                  <td className="py-1.5 pr-3 tnum">{dIN(q.quoted_on)}</td>
+                  <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{q.qty ?? "—"}</td>
+                  <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{money(q.rate, q.currency)}</td>
+                  <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{money(q.amount, q.currency)}</td>
+                  <td className="py-1.5">
+                    {q.source === "erp" && erpUrl ? (
+                      <a href={`${erpUrl}/app/quotation/${encodeURIComponent(q.qtn_no)}`} target="_blank" rel="noreferrer"
+                        className="text-xs font-bold" style={{ color: "#2C5B82" }}>View Quote ↗</a>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProductPricingTab({ id, onSaved }: { id: string; onSaved: () => void }) {
+  type P = { id: string; priced_on: string; currency: string; amount: number; remarks: string | null; approved_by: string | null; is_approved: boolean };
+  const [prices, setPrices] = useState<P[] | null>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const todayIst = new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
+  const [form, setForm] = useState({ priced_on: todayIst, currency: "INR", amount: "", remarks: "", approved_by: "", is_approved: false });
+  const load = useCallback(() => {
+    fetch(`/api/crm/product-extra?id=${encodeURIComponent(id)}`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "?"); setPrices(j.prices); })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [id]);
+  useEffect(() => { setPrices(null); setErr(""); load(); }, [load]);
+  const act = async (body: Record<string, unknown>) => {
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/crm/product-extra", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save");
+      load(); onSaved();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="p-4">
+      <p className="text-xs mb-3" style={{ color: MUTED, maxWidth: "72ch", lineHeight: 1.6 }}>
+        The pricing ladder. The <b style={{ color: "#1A7F4E" }}>Approved</b> row leads the table and is the price a quote line
+        starts from when this product is picked. Approving a new row retires the old approval.
+      </p>
+      {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
+      <div className="rounded border p-2.5 mb-3 flex items-end gap-2 flex-wrap" style={{ borderColor: BORDER, background: "#FAF9F5" }}>
+        {([["Date", "priced_on", "date", 130], ["Currency", "currency", "select", 90], ["Amount", "amount", "number", 130], ["Remarks", "remarks", "text", 220], ["Approved by", "approved_by", "text", 140]] as const).map(([lab, key, typ, w]) => (
+          <label key={key} className="block">
+            <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>{lab}</div>
+            {typ === "select" ? (
+              <select value={form[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} className="px-2 py-1 rounded text-sm border" style={{ borderColor: BORDER, background: "#fff", width: w }}>
+                {["INR", "USD", "EUR"].map((c) => <option key={c}>{c}</option>)}
+              </select>
+            ) : (
+              <input type={typ} value={form[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                className="px-2 py-1 rounded text-sm border" style={{ borderColor: BORDER, width: w }} />
+            )}
+          </label>
+        ))}
+        <label className="flex items-center gap-1.5 text-xs font-semibold pb-1.5" style={{ color: "#1A7F4E" }}>
+          <input type="checkbox" checked={form.is_approved} onChange={(e) => setForm((f) => ({ ...f, is_approved: e.target.checked }))} style={{ accentColor: "#0D7A3F" }} />
+          This is the Approved price
+        </label>
+        <button disabled={busy || !(Number(form.amount) > 0)} onClick={() => void act({ action: "price_add", product_id: id, ...form }).then(() => setForm((f) => ({ ...f, amount: "", remarks: "" })))}
+          className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: Number(form.amount) > 0 ? ORANGE : "#B9BEC4" }}>
+          + Add price
+        </button>
+      </div>
+      {prices === null && !err && <div className="text-sm" style={{ color: MUTED }}>reading the ladder…</div>}
+      {prices !== null && prices.length === 0 && <div className="text-sm" style={{ color: MUTED }}>No price rows yet — the first one you add can wear the approval.</div>}
+      {prices !== null && prices.length > 0 && (
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead><tr style={{ textAlign: "left", color: MUTED, fontSize: 11 }}>
+            <th className="py-1 pr-3">DATE</th><th className="py-1 pr-3">CURRENCY</th>
+            <th className="py-1 pr-3" style={{ textAlign: "right" }}>AMOUNT</th>
+            <th className="py-1 pr-3">REMARKS</th><th className="py-1 pr-3">APPROVED BY</th><th className="py-1" /></tr></thead>
+          <tbody>
+            {prices.map((p) => (
+              <tr key={p.id} style={{ borderTop: `1px solid ${BORDER}`, background: p.is_approved ? "#E6F4EB" : undefined }}>
+                <td className="py-1.5 pr-3 tnum">{dIN(p.priced_on)}</td>
+                <td className="py-1.5 pr-3">{p.currency}</td>
+                <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right", fontWeight: p.is_approved ? 800 : 500 }}>{money(p.amount, p.currency)}</td>
+                <td className="py-1.5 pr-3">{p.remarks || "—"}</td>
+                <td className="py-1.5 pr-3">{p.approved_by || "—"}</td>
+                <td className="py-1.5" style={{ whiteSpace: "nowrap" }}>
+                  {p.is_approved
+                    ? <span className="rounded px-1.5 py-0.5 text-xs font-bold" style={{ background: "#0D7A3F", color: "#fff" }}>APPROVED</span>
+                    : <button title="Remove this price row" disabled={busy} onClick={() => { if (window.confirm("Remove this price row?")) void act({ action: "price_del", id: p.id }); }} style={{ color: "#8E2C20", fontSize: 12 }}>✕</button>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function ProductTrainingTab({ id, group }: { id: string; group: string | null }) {
+  const [content, setContent] = useState<string | null>(null);
+  const [meta, setMeta] = useState<{ updated_by?: string; updated_at?: string } | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    setContent(null); setErr(""); setEditing(false);
+    fetch(`/api/crm/product-extra?id=${encodeURIComponent(id)}`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "?"); setContent(String(j.training?.content ?? "")); setMeta(j.training); })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [id]);
+  if (!group) return <div className="p-4 text-sm" style={{ color: MUTED }}>Give this product an Item Group first — training lives per product family.</div>;
+  const save = async (html: string) => {
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/crm/product-extra", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "training_save", item_group: group, content: html }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save");
+      setContent(html); setEditing(false);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="p-4">
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        <span className="text-sm font-bold">Training — {group}</span>
+        {!editing && content !== null && <button title="Edit the training" onClick={() => setEditing(true)} style={{ fontSize: 12, opacity: 0.6 }}>✏️</button>}
+        <span className="text-xs" style={{ color: MUTED }}>written once for the family, read on every product in it{meta?.updated_by ? ` · last by ${meta.updated_by}` : ""}</span>
+      </div>
+      {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
+      {content === null && !err && <div className="text-sm" style={{ color: MUTED }}>reading…</div>}
+      {content !== null && (editing ? (
+        <RichTextEditor initial={content} busy={busy} minHeight={260} onCancel={() => setEditing(false)} onSave={(html) => void save(html)}
+          placeholder={`What every salesperson should know about ${group}.`} />
+      ) : (
+        <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, lineHeight: 1.6 }}>
+          {content.trim()
+            ? <RichContent text={content} legacy={(s2) => <RichText text={s2} />} />
+            : <span style={{ color: MUTED }}>Nothing written for this family yet — ✏️ starts it.</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** The first actionable email and phone in a row, whichever fields hold them. */
 function rowContacts(dt: Doctype, r: Row): { email: string | null; phone: string | null } {
   let email: string | null = null, phone: string | null = null;
@@ -1709,6 +2064,19 @@ function RecordModal({
       recordTabs.push({ key: "merge", label: "Merge" });
     recordTabs.push({ key: "genie", label: "Genie" });
   }
+  // the product record's own tabs (Dr Raghu, 30 Aug 2026: "in this have
+  // tabs — first one is the default, basic content; quotations; training
+  // about product family; pricing; notes; keep the provision to merge")
+  if (dt.name === "product") {
+    recordTabs.push(
+      { key: "details", label: "Basic" },
+      { key: "pquotes", label: "Quotations" },
+      { key: "ppricing", label: "Pricing" },
+      { key: "ptraining", label: "Training" },
+      { key: "notes", label: "Notes" },
+      { key: "merge", label: "Merge" },
+    );
+  }
   const hasTabs = recordTabs.length > 0;
   const EDITABLE_TABS = ["details", "enquiry", "qual"];
   const editTabKey = (EDITABLE_TABS.includes(tab) ? tab : "details") as "details" | "enquiry" | "qual";
@@ -1865,6 +2233,9 @@ function RecordModal({
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {mode === "view" ? (
           !hasTabs || tab === "details" ? (
+            dt.name === "product" ? (
+              <ProductBasicTab row={row} onSaved={onSaved} />
+            ) : (
             <div
               className="grid gap-x-6 gap-y-3 p-4"
               style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}
@@ -1888,6 +2259,13 @@ function RecordModal({
                 </div>
               ))}
             </div>
+            )
+          ) : tab === "pquotes" ? (
+            <ProductQuotesTab id={rid} />
+          ) : tab === "ppricing" ? (
+            <ProductPricingTab id={rid} onSaved={() => onSaved()} />
+          ) : tab === "ptraining" ? (
+            <ProductTrainingTab id={rid} group={row.item_group ? String(row.item_group) : null} />
           ) : tab === "enquiry" ? (
             dt.name === "opportunity"
               ? <>
@@ -3509,6 +3887,27 @@ function RecordForm({
   useEffect(() => setForm(blank), [blank]);
 
   const set = (name: string, v: string | boolean) => setForm((f) => ({ ...f, [name]: v }));
+
+  // a quote line that picks a product starts from the APPROVED price
+  // (Dr Raghu, 30 Aug 2026: "when choosing quote this will come by default")
+  const pricedProduct = useRef<string>("");
+  const productPick = dt.name === "quotation_line" ? String(form.product_id ?? "") : "";
+  useEffect(() => {
+    if (!productPick || productPick === pricedProduct.current) return;
+    pricedProduct.current = productPick;
+    void (async () => {
+      try {
+        const j = await (await fetch(`/api/crm/product?id=${encodeURIComponent(productPick)}`, { cache: "no-store" })).json();
+        const p = j?.row as Row | undefined;
+        if (!p) return;
+        setForm((f) => ({
+          ...f,
+          ...(String(f.unit_price ?? "") === "" && p.approved_price_inr != null ? { unit_price: String(p.approved_price_inr) } : {}),
+          ...(String(f.description ?? "") === "" && p.name ? { description: String(p.name) } : {}),
+        }));
+      } catch { /* the hand can still type a price */ }
+    })();
+  }, [productPick]);
 
   // Lost reason and Lost to only come into the picture when the chosen stage
   // is a dead end — before that they are noise on the form.

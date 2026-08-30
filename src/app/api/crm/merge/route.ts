@@ -26,6 +26,12 @@ const PERSON_REFS: [string, string][] = [
   ["call_log", "person_id"], ["person_phone", "person_id"],
   ["opportunity", "point_of_contact_id"], ["quotation", "contact_id"],
 ];
+// products merge too (Dr Raghu, 30 Aug 2026: "keep the provision to merge
+// products") — quote lines, quote history and the pricing ladder follow
+const PRODUCT_REFS: [string, string][] = [
+  ["quotation_line", "product_id"], ["product_quote", "product_id"],
+  ["product_price", "product_id"], ["opportunity", "product_id"],
+];
 
 export async function GET(req: Request) {
   try {
@@ -35,7 +41,7 @@ export async function GET(req: Request) {
     const u = new URL(req.url);
     const type = u.searchParams.get("type") || "";
     const id = u.searchParams.get("id") || "";
-    if (!["company", "person"].includes(type) || !id) throw new HttpError(400, "Which record?");
+    if (!["company", "person", "product"].includes(type) || !id) throw new HttpError(400, "Which record?");
 
     const suggestions: { id: string; label: string; detail: string; why: string }[] = [];
     const seen = new Set<string>([id]);
@@ -58,6 +64,16 @@ export async function GET(req: Request) {
       const { data: close } = await db.from("company").select("id, name, city, erp_name")
         .ilike("name", `${stem.replace(/[%_]/g, "\\$&")}%`).is("deleted_at", null).neq("id", id).limit(8);
       for (const r of close ?? []) push(r, String(r.name), [r.city, r.erp_name].filter(Boolean).join(" · "), "name starts the same");
+    } else if (type === "product") {
+      const { data: me } = await db.from("product").select("id, name, sku, item_group").eq("id", id).maybeSingle();
+      if (!me) throw new HttpError(404, "That product no longer exists.");
+      const { data: same } = await db.from("product").select("id, name, sku, item_group")
+        .ilike("name", String(me.name).replace(/[%_]/g, "\\$&")).is("deleted_at", null).neq("id", id).limit(6);
+      for (const r of same ?? []) push(r, String(r.name), [r.sku, r.item_group].filter(Boolean).join(" · "), "identical name");
+      const stem = String(me.name).slice(0, Math.max(6, Math.floor(String(me.name).length * 0.6)));
+      const { data: close } = await db.from("product").select("id, name, sku, item_group")
+        .ilike("name", `${stem.replace(/[%_]/g, "\\$&")}%`).is("deleted_at", null).neq("id", id).limit(8);
+      for (const r of close ?? []) push(r, String(r.name), [r.sku, r.item_group].filter(Boolean).join(" · "), "name starts the same");
     } else {
       const { data: me } = await db.from("person").select("id, full_name, primary_email, primary_phone").eq("id", id).maybeSingle();
       if (!me) throw new HttpError(404, "That contact no longer exists.");
@@ -95,16 +111,16 @@ export async function POST(req: Request) {
     const type = String(body.type || "");
     const keep = String(body.keep_id || "");
     const drop = String(body.drop_id || "");
-    if (!["company", "person"].includes(type) || !keep || !drop || keep === drop)
+    if (!["company", "person", "product"].includes(type) || !keep || !drop || keep === drop)
       throw new HttpError(400, "Merge needs a keeper and a duplicate.");
 
-    const table = type === "company" ? "company" : "person";
+    const table = type;
     const { data: keeper } = await db.from(table).select("id").eq("id", keep).maybeSingle();
     const { data: dupe } = await db.from(table).select("*").eq("id", drop).maybeSingle();
     if (!keeper || !dupe) throw new HttpError(404, "One side of the merge no longer exists.");
 
     let moved = 0;
-    for (const [t, col] of type === "company" ? COMPANY_REFS : PERSON_REFS) {
+    for (const [t, col] of type === "company" ? COMPANY_REFS : type === "product" ? PRODUCT_REFS : PERSON_REFS) {
       const { data, error } = await db.from(t).update({ [col]: keep }).eq(col, drop).select("id");
       if (error && !/duplicate key/i.test(error.message)) throw new HttpError(500, `${t}: ${error.message}`);
       moved += data?.length ?? 0;
@@ -115,7 +131,8 @@ export async function POST(req: Request) {
     moved += rl?.length ?? 0;
 
     const patch: Record<string, unknown> = { deleted_at: new Date().toISOString() };
-    if (type === "company") patch.merged_into_id = keep;
+    if (type === "company" || type === "product") patch.merged_into_id = keep;
+    if (type === "product") patch.is_active = false;
     const { error: derr } = await db.from(table).update(patch).eq("id", drop);
     if (derr) throw new HttpError(500, derr.message);
 

@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.78",
+    date: "2026-08-30",
+    module: "CRM — the product record grows its tabs",
+    items: [
+      "The product lightbox rebuilt to Dr Raghu's spec (30 Aug 2026): Basic tab default — fields with a ✏️ pencil each, the image on the right, the description FULL WIDTH as real rich text with its pictures.",
+      "↻ Pull from ERP on the record re-reads that one item — description, image, and every file the ERP holds against it, listed as attachments.",
+      "Quotations tab: every ERP quotation of the last year that carried this item — Qtn No, client, date, qty, rate, amount, View Quote straight into the ERP.",
+      "Pricing tab: the ladder — Date, Currency, Amount, Remarks, Approved by. The Approved row leads, and it is the price a quote line starts from when the product is picked.",
+      "Training tab: written once per product family, read on every product in it. Notes tab and Merge (with twin suggestions) round it off. CRM migration 0033 carries the tables.",
+    ],
+  },
+  {
     v: "3.31.0.77",
     date: "2026-08-30",
     module: "CRM — filter dropdowns pick by typing",
