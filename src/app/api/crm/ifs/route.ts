@@ -148,6 +148,40 @@ export async function POST(req: Request) {
       }
     }
 
+    // "u dont need to ask!! just add them to the company contacts"
+    // (Dr Raghu, 30 Aug 2026) — every director files as a contact the moment
+    // the summary lands: new ones created, existing ones filled where empty.
+    try {
+      const summ = (j as { InstaSummary?: Record<string, unknown> }).InstaSummary ?? {};
+      const dirs = ((((summ.DirectorSignatoryMasterSummary as Record<string, unknown> | undefined)
+        ?.DirectorCurrentMasterSummary as { Director?: Record<string, unknown>[] } | undefined)?.Director) ?? []) as Record<string, unknown>[];
+      const cleanN = (v: unknown) => String(v ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const iso = (v: unknown) => { const m = String(v ?? "").match(/(\d{2})[-/](\d{2})[-/](\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
+      const val = (v: unknown) => { const t = String(v ?? "").trim(); return t && t !== "null" ? t : ""; };
+      const { data: existing } = await db.from("person")
+        .select("id, first_name, primary_email, primary_phone, birthday").eq("company_id", cid).limit(500);
+      const byName = new Map((existing ?? []).map((p) => [cleanN(p.first_name), p]));
+      for (const d of dirs) {
+        const nm = val(d.DirectorName);
+        if (nm.length < 3) continue;
+        const email = val(d.DirectorEmail) || null, phone = val(d.DirectorContactNo) || null, dob = iso(d.DirectorDateOfBirth);
+        const ex = byName.get(cleanN(nm));
+        if (ex) {
+          const fill: Record<string, unknown> = {};
+          if (email && !ex.primary_email) fill.primary_email = email;
+          if (phone && !ex.primary_phone) fill.primary_phone = phone;
+          if (dob && !ex.birthday) fill.birthday = dob;
+          if (Object.keys(fill).length) await db.from("person").update(fill).eq("id", ex.id).then(() => null, () => null);
+        } else {
+          await db.from("person").insert({
+            first_name: nm.slice(0, 180), job_title: val(d.DirectorDesignation) || "Director",
+            primary_email: email, primary_phone: phone, birthday: dob,
+            company_id: cid, is_decision_maker: true,
+          }).then(() => null, () => null);
+        }
+      }
+    } catch { /* the summary is the purchase; contacts are the bonus */ }
+
     const now = new Date().toISOString();
     const { error } = await db.from("company").update({ cin, ifs_summary: j, ifs_at: now, ifs_by: me.email }).eq("id", cid);
     if (error) {

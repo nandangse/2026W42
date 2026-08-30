@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.37",
+    date: "2026-08-30",
+    module: "CRM — the directors file themselves as contacts",
+    items: [
+      "\"u dont need to ask!! just add them to the company contacts\" (Dr Raghu, 30 Aug 2026) — the moment an InstaSummary lands, every current director files as a contact of the company: email, mobile, 🎂 birthday, designation, marked decision-maker. Existing contacts are filled where empty, never overwritten. The ＋ contact button stays for the odd hand-filing. The two summaries already bought were backfilled the same minute.",
+    ],
+  },
+  {
     v: "3.31.1.36",
     date: "2026-08-30",
     module: "CRM — the InstaSummary buy takes the road their docs actually name",
