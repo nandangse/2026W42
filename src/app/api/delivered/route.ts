@@ -80,8 +80,35 @@ export async function GET() {
       }));
     } catch { /* the board is optional context here */ }
 
+    // INSTALLATION STAGE (Dr Raghu, 30 Aug 2026): delivered from the factory,
+    // standing at site — the ledger names them, the live board lends their
+    // project, status and the money still to come.
+    let installation: Record<string, unknown>[] = [];
+    try {
+      const inst = rows.filter((r) => String(r.stat || "") === "Installation Stage");
+      const ids = inst.map((r) => String(r.id));
+      const { data: live } = ids.length
+        ? await adminClient().from("jobs").select("id, proj, client_update, pay_on_delivery, val").in("id", ids)
+        : { data: [] as Record<string, unknown>[] };
+      const liveBy = new Map((live || []).map((j) => [String(j.id), j]));
+      installation = inst.map((r) => {
+        const j = liveBy.get(String(r.id));
+        const val = Number(j?.val ?? r.val) || 0;
+        const pending = j?.pay_on_delivery != null ? Number(j.pay_on_delivery) || 0 : null;
+        return {
+          id: r.id, tag: r.tag, cust: r.cust, delivered_on: r.delivered_on,
+          proj: String(j?.proj || r.proj || "") || null,
+          val,
+          pending,
+          billed: pending != null && val > 1 ? Math.max(0, val - pending) : null,
+          status: String(j?.client_update || "").replace(/[#*|]/g, " ").replace(/\s+/g, " ").trim().slice(0, 220) || null,
+        };
+      });
+    } catch { /* the board is optional context here */ }
+
     return NextResponse.json({
       pipeline,
+      installation,
       jobs: rows.map((r) => ({
         ...r,
         val: Number(r.val) || 0,

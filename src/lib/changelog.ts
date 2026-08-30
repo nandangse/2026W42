@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.54",
+    date: "2026-08-30",
+    module: "Delivered Jobs — the band and the Installation Stage",
+    items: [
+      "A NAVY BAND under the headline numbers says what a delivery IS (Dr Raghu, 30 Aug 2026): these are ERP dates, NOT invoice dates — the actual delivery from the factory — and Delivered = Delivered and Installation Stage.",
+      "INSTALLATION STAGE is a tab of its own on the breakdown: every machine out of the factory and standing at site — project, job, customer, delivered date, VALUE, BILLED, PENDING TO RECEIVE (red), and the current status from the live board — totalled at the foot.",
+    ],
+  },
+  {
     v: "3.31.0.53",
     date: "2026-08-30",
     module: "Delivered Jobs — the prize on the right",

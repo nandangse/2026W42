@@ -83,6 +83,8 @@ interface Payload {
   truncated: boolean;
   /** Active, undelivered jobs — what the period could still produce. */
   pipeline?: { id: string; tag: string | null; fam: string | null; val: number; tp: number; tpv: number; tdd: string | null }[];
+  /** Delivered from the factory, standing at site. */
+  installation?: { id: string; tag: string | null; cust: string | null; delivered_on: string | null; proj: string | null; val: number; pending: number | null; billed: number | null; status: string | null }[];
 }
 
 export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) {
@@ -94,7 +96,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
   const [from, setFrom] = useState(fyStart(TODAY));
   const [to, setTo] = useState(TODAY);
   const [fam, setFam] = useState("");
-  const [cut, setCut] = useState<"month" | "family" | "customer">("month");
+  const [cut, setCut] = useState<"month" | "family" | "customer" | "installation">("month");
 
   /**
    * The run-rate payload, read here as well as inside <RunRate/>.
@@ -313,6 +315,12 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
         <Headline label="Throughput" value={V(totals.throughput)} note="Throughput Expected Value (Auto)" color={C.green} />
       </div>
 
+      {/* what a "delivery" means here — said once, in the company's own navy */}
+      <div className="rounded-lg px-3 py-2 mb-3 text-sm font-semibold" style={{ background: "#1B3A5C", color: "#fff", lineHeight: 1.5 }}>
+        These deliveries are based on ERP dates — NOT invoice dates. ERP dates are the actual delivery from the factory.
+        <span style={{ color: "#B9C7D4", fontWeight: 500 }}> · Note: Delivered = Delivered and Installation Stage.</span>
+      </div>
+
       {/* ===== what the period can STILL produce (Dr Raghu, 29 Aug 2026):
           active jobs whose target date lands inside it, to its natural end ===== */}
       {pipe.nos > 0 && (() => {
@@ -430,15 +438,63 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
       <div className="rounded-lg border bg-white mb-3" style={{ borderColor: C.line, overflow: "hidden" }}>
         <div className="flex items-center gap-2 px-3 py-2" style={{ background: C.panel, borderBottom: `1px solid ${C.line}` }}>
           <span className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>BREAK IT DOWN BY</span>
-          {([["month", "Month"], ["family", "Product family"], ["customer", "Customer"]] as const).map(([k, l]) => (
+          {([["month", "Month"], ["family", "Product family"], ["customer", "Customer"], ["installation", "Installation Stage"]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setCut(k)} className="text-xs font-bold rounded px-2.5 py-1"
               style={cut === k ? { background: C.body, color: "#fff" } : { background: "#fff", border: `1px solid ${C.line}`, color: C.sub }}>
               {l}
             </button>
           ))}
-          <span className="ml-auto text-xs" style={{ color: C.mute }}>{cuts.length} rows</span>
+          <span className="ml-auto text-xs" style={{ color: C.mute }}>{cut === "installation" ? (data?.installation?.length ?? 0) : cuts.length} rows</span>
         </div>
 
+        {/* INSTALLATION STAGE (Dr Raghu, 30 Aug 2026): out of the factory,
+            standing at site — the project, the job, the status, the money */}
+        {cut === "installation" ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ color: C.mute, borderBottom: `1px solid ${C.line}` }}>
+                  <th className="text-left px-3 py-2" style={TH}>PROJECT</th>
+                  <th className="text-left px-2 py-2" style={TH}>JOB</th>
+                  <th className="text-left px-2 py-2" style={TH}>CUSTOMER</th>
+                  <th className="text-right px-2 py-2" style={TH}>DELIVERED</th>
+                  <th className="text-right px-2 py-2" style={TH}>VALUE</th>
+                  <th className="text-right px-2 py-2" style={TH}>BILLED</th>
+                  <th className="text-right px-2 py-2" style={TH}>PENDING TO RECEIVE</th>
+                  <th className="text-left px-2 py-2" style={TH}>CURRENT STATUS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data?.installation ?? []).map((r) => (
+                  <tr key={r.id} style={{ borderBottom: `1px solid ${C.line}` }}>
+                    <td className="px-3 py-1.5 font-semibold" style={{ ...TD, color: C.navy }}>{r.proj || "—"}</td>
+                    <td className="px-2 py-1.5" style={TD}><b className="tnum">{String(r.id).slice(-4)}</b> <span style={{ color: C.sub }} title={String(r.id)}>{r.tag || ""}</span></td>
+                    <td className="px-2 py-1.5" style={{ ...TD, color: C.sub }}>{r.cust || "—"}</td>
+                    <td className="text-right px-2 py-1.5 tnum" style={TD}>{r.delivered_on ? fmtFull(r.delivered_on) : "—"}</td>
+                    <td className="text-right px-2 py-1.5 tnum" style={{ ...TD, color: C.ink }}>{r.val > 1 ? V(r.val) : "—"}</td>
+                    <td className="text-right px-2 py-1.5 tnum" style={{ ...TD, color: C.green }}>{r.billed != null ? V(r.billed) : "—"}</td>
+                    <td className="text-right px-2 py-1.5 tnum font-bold" style={{ ...TD, color: r.pending ? "#B3261E" : C.faint }}>{r.pending != null ? V(r.pending) : "—"}</td>
+                    <td className="px-2 py-1.5" style={{ ...TD, color: C.sub, maxWidth: 340 }} title={r.status || ""}>{r.status ? r.status.slice(0, 120) + (r.status.length > 120 ? "…" : "") : "—"}</td>
+                  </tr>
+                ))}
+                {(data?.installation ?? []).length === 0 && (
+                  <tr><td colSpan={8} className="px-3 py-6 text-center" style={{ ...TD, color: C.mute }}>Nothing stands at installation — everything delivered is handed over.</td></tr>
+                )}
+              </tbody>
+              {(data?.installation ?? []).length > 0 && (
+                <tfoot>
+                  <tr style={{ background: C.panel, fontWeight: 700 }}>
+                    <td className="px-3 py-2" colSpan={4} style={{ ...TD, color: C.ink }}>Total · {(data?.installation ?? []).length} at site</td>
+                    <td className="text-right px-2 py-2 tnum" style={{ ...TD, color: C.ink }}>{V((data?.installation ?? []).reduce((s, r) => s + (r.val > 1 ? r.val : 0), 0))}</td>
+                    <td className="text-right px-2 py-2 tnum" style={{ ...TD, color: C.green }}>{V((data?.installation ?? []).reduce((s, r) => s + (r.billed ?? 0), 0))}</td>
+                    <td className="text-right px-2 py-2 tnum" style={{ ...TD, color: "#B3261E" }}>{V((data?.installation ?? []).reduce((s, r) => s + (r.pending ?? 0), 0))}</td>
+                    <td className="px-2" style={{ fontSize: 10, color: C.faint }}>billed = value − pending, where the live board still knows the money</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
             <thead>
@@ -485,6 +541,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
             )}
           </table>
         </div>
+        )}
       </div>
 
       {/* ===== the jobs themselves ===== */}
