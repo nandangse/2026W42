@@ -49,7 +49,8 @@ export async function GET(req: Request) {
     const r = await fetch(u2, { headers: EH });
     if (!r.ok) throw new HttpError(502, `The ERP answered ${r.status} on the pull.`);
     const rows = ((await r.json()) as { data?: Record<string, unknown>[] }).data ?? [];
-    if (!rows.length) return NextResponse.json({ ok: true, pulled: 0, cursor });
+    // a quiet hour still walks phase 2 and still leaves its footprint —
+    // an early return here once skipped the delivered sync entirely
 
     // the ERP's HTML becomes the markdown our reader renders (same law as
     // the import — bold, links, bullets, never raw angle brackets)
@@ -68,10 +69,11 @@ export async function GET(req: Request) {
     // INTO the ERP carries its ERP name on erp_opportunity_name, so the pull
     // must not bring it back as a twin.
     const names = rows.map((x) => String(x.name));
-    const [{ data: have }, { data: pushed }] = await Promise.all([
+    // an empty in.() is a PostgREST error, not an empty answer
+    const [{ data: have }, { data: pushed }] = names.length ? await Promise.all([
       db.from("opportunity").select("opportunity_no").in("opportunity_no", names),
       db.from("opportunity").select("erp_opportunity_name").in("erp_opportunity_name", names),
-    ]);
+    ]) : [{ data: [] }, { data: [] }];
     const haveSet = new Set([
       ...(have || []).map((x) => String(x.opportunity_no)),
       ...(pushed || []).map((x) => String(x.erp_opportunity_name)),

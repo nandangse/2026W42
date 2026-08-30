@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.71",
+    date: "2026-08-30",
+    module: "ERP pull — quiet hours still work",
+    items: [
+      "A QUIET HOUR NO LONGER SKIPS THE WALK (Dr Raghu, 30 Aug 2026: \"opportunities have not been pulled?\"): an hour with no new enquiries used to return before the delivered-ledger sync and left no footprint — now every hour runs both phases and writes its audit line, so 'did the pull run' always has an answer in the record.",
+    ],
+  },
+  {
     v: "3.31.0.70",
     date: "2026-08-30",
     module: "CRM — columns size by hand",
