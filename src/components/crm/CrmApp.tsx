@@ -57,6 +57,7 @@ type Links = Record<string, { id: string; label: string }[]>;
 
 /** Set once when CrmApp mounts — one user per page, so module scope is safe. */
 let MY_PROFILE_ID: string | null = null;
+let MY_EMAIL = "";
 /** What the lightbox is showing: possibly another doctype than the page. */
 type ViewState = { dt: Doctype; row: Row; links: Links; mode: "view" | "edit" };
 
@@ -118,6 +119,7 @@ export default function CrmApp({
   // the signed-in person's CRM profile id, readable from anywhere in this
   // client bundle — `default: "me"` on a profile link field resolves to it
   MY_PROFILE_ID = profileId;
+  MY_EMAIL = email.toLowerCase();
   const [slug, setSlug] = useState(initialSlug ?? DOCTYPES[0].name);
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState<number | null>(null);
@@ -3484,6 +3486,8 @@ function RecordModal({
     );
     if (dt.name === "company" || dt.name === "person")
       recordTabs.push({ key: "merge", label: "Merge" });
+    // IFS before Genie (Dr Raghu, 30 Aug 2026) — bought by Raghu, read by all
+    if (dt.name === "company") recordTabs.push({ key: "ifs", label: "₹ IFS" });
     recordTabs.push({ key: "genie", label: "Genie" });
   }
   // the product record's own tabs (Dr Raghu, 30 Aug 2026: "in this have
@@ -3780,6 +3784,8 @@ function RecordModal({
             />
           ) : tab === "notes" ? (
             <NotesTab type={dt.name} id={rid} />
+          ) : tab === "ifs" ? (
+            <IfsTab row={row} onSaved={onSaved} />
           ) : tab === "merge" ? (
             <MergeTab type={dt.name} id={rid} title={title} onMerged={() => onSaved({ id: rid })} />
           ) : tab === "genie" ? (
@@ -5808,6 +5814,139 @@ function RecordForm({
       >
         {busy ? "Saving…" : initial ? "Save changes" : `Save ${dt.label.toLowerCase()}`}
       </button>
+    </div>
+  );
+}
+
+/** IFS — the InstaFinancials InstaSummary on a company (Dr Raghu, 30 Aug
+ *  2026). Bought by Raghu's hand alone (75 credits a pull), read by all:
+ *  the MCA profile, seven years of financials, directors, charges and
+ *  credit ratings. */
+function IfsTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
+  const rid = String(row.id ?? "");
+  const isRaghu = MY_EMAIL === "raghu@nandan.co.in";
+  const [cin, setCin] = useState(String(row.cin ?? ""));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const data = (row.ifs_summary as { InstaSummary?: Record<string, unknown> } | null)?.InstaSummary;
+
+  const buy = async () => {
+    if (!window.confirm(`Buy the InstaFinancials summary for ${String(row.name)}?\n\n75 INSTAFINANCIALS CREDITS WILL BE CONSUMED.`)) return;
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/crm/ifs", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ company_id: rid, cin: cin.trim() }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "The buy failed");
+      const rr = await (await fetch(`/api/crm/company?id=${encodeURIComponent(rid)}`, { cache: "no-store" })).json();
+      if (rr?.row) onSaved(rr.row as Row);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+
+  const V = (v: unknown) => {
+    const s2 = String(v ?? "");
+    return !s2 || s2 === "null" ? "—" : s2;
+  };
+  const crn = (v: unknown) => {
+    const n = Number(String(v ?? "").replace(/[^0-9.-]/g, ""));
+    if (!n) return "—";
+    return n >= 1e7 ? `₹ ${(n / 1e7).toFixed(1)} Cr` : `₹ ${Math.round(n).toLocaleString("en-IN")}`;
+  };
+  const master = (data?.CompanyMasterSummary ?? null) as Record<string, unknown> | null;
+  const fy = ((data?.FinancialsSummary as { FinancialsYearWise?: Record<string, unknown>[] } | undefined)?.FinancialsYearWise ?? []) as Record<string, unknown>[];
+  const dirs = (((data?.DirectorSignatoryMasterSummary as Record<string, unknown> | undefined)?.DirectorCurrentMasterSummary as { Director?: Record<string, unknown>[] } | undefined)?.Director ?? []) as Record<string, unknown>[];
+  const ratings = (((data?.CreditRatingDetail as Record<string, unknown> | undefined)?.CreditRating ?? []) as Record<string, unknown>[]).slice(0, 8);
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <span className="text-sm font-bold" style={{ color: NAVY }}>₹ InstaFinancials Summary</span>
+        {row.ifs_at != null && <span className="text-xs" style={{ color: MUTED }}>bought {String(row.ifs_at).slice(0, 10).split("-").reverse().join("/")} by {String(row.ifs_by ?? "")}</span>}
+        {isRaghu ? (
+          <>
+            <input value={cin} onChange={(e) => setCin(e.target.value)} placeholder="CIN (21 characters)"
+              className="px-2 py-1 rounded border text-xs tnum" style={{ borderColor: BORDER, width: 220 }} />
+            <button onClick={() => void buy()} disabled={busy}
+              className="rounded px-3 py-1.5 text-xs font-bold text-white" style={{ background: busy ? "#B9BEC4" : "#0D7A3F" }}>
+              {busy ? "Buying…" : data ? "🪙 Buy fresh (75 credits)" : "🪙 Buy InstaFinancial Summary"}
+            </button>
+          </>
+        ) : !data && <span className="text-xs" style={{ color: MUTED }}>Only Dr Raghu can buy this summary — ask him.</span>}
+        {err && <span className="text-xs font-semibold" style={{ color: "#8E2C20" }}>{err}</span>}
+      </div>
+
+      {!data ? (
+        <div className="rounded p-6 text-sm" style={{ background: "#FAF9F5", border: `1px dashed ${BORDER}`, color: MUTED }}>
+          No summary bought yet. It brings the MCA profile, seven years of financials, the directors, open charges and credit ratings — from instafinancials.com.
+        </div>
+      ) : (
+        <>
+          {master && (
+            <div className="rounded border p-3 mb-3" style={{ borderColor: BORDER }}>
+              <div className="font-bold text-sm mb-2">{V(master.CompanyName)} <span className="tnum text-xs" style={{ color: MUTED }}>· {V(master.CompanyCIN)}</span></div>
+              <div className="grid gap-x-6 gap-y-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", fontSize: 13 }}>
+                {([["MCA status", master.CompanyMcaStatus], ["Incorporated", master.CompanyDateOfInc], ["Class", master.CompanyClass],
+                   ["Category", master.CompanySubCategory], ["Paid-up capital", crn(master.CompanyPaidUpCapital)], ["Authorised capital", crn(master.CompanyAuthCapital)],
+                   ["Last AGM", master.CompanyLastAgmDate], ["Last balance sheet", master.CompanyLastBsDate], ["Email", master.CompanyEmail],
+                   ["Industry", master.CompanyMcaIndustry], ["Registered address", master.CompanyFullAddress]] as const).map(([l, v]) => (
+                  <div key={l}><div className="text-xs font-semibold" style={{ color: MUTED }}>{l}</div><div>{V(v)}</div></div>
+                ))}
+              </div>
+            </div>
+          )}
+          {fy.length > 0 && (
+            <div className="rounded border p-3 mb-3" style={{ borderColor: BORDER, overflowX: "auto" }}>
+              <div className="font-bold text-sm mb-2">Financials, year-wise</div>
+              <table style={{ borderCollapse: "collapse", fontSize: 12.5, minWidth: 560 }}>
+                <thead><tr style={{ textAlign: "right", color: MUTED, fontSize: 11 }}>
+                  <th className="py-1 pr-4" style={{ textAlign: "left" }}>FY</th><th className="py-1 pr-4">TOTAL INCOME</th>
+                  <th className="py-1 pr-4">EXPENSE</th><th className="py-1 pr-4">PBT</th><th className="py-1 pr-4">PAT</th><th className="py-1">NET WORTH</th></tr></thead>
+                <tbody>
+                  {fy.map((y) => (
+                    <tr key={String(y.FinancialYear)} style={{ borderTop: `1px solid ${BORDER}`, textAlign: "right" }}>
+                      <td className="py-1 pr-4 font-bold" style={{ textAlign: "left" }}>{V(y.FinancialYear)}</td>
+                      <td className="py-1 pr-4 tnum">{crn(y.TotalIncome)}</td>
+                      <td className="py-1 pr-4 tnum">{crn(y.TotalExpense)}</td>
+                      <td className="py-1 pr-4 tnum">{crn(y.ProfitBeforeTax)}</td>
+                      <td className="py-1 pr-4 tnum font-bold" style={{ color: Number(String(y.ProfitAfterTax).replace(/[^0-9.-]/g, "")) >= 0 ? "#0D7A3F" : "#B3261E" }}>{crn(y.ProfitAfterTax)}</td>
+                      <td className="py-1 tnum">{crn(y.NetWorth)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {dirs.length > 0 && (
+            <div className="rounded border p-3 mb-3" style={{ borderColor: BORDER }}>
+              <div className="font-bold text-sm mb-2">Current directors <span className="text-xs" style={{ color: MUTED }}>({dirs.length})</span></div>
+              {dirs.map((d2) => (
+                <div key={String(d2.DirectorDin)} className="text-sm py-0.5 flex gap-3 flex-wrap">
+                  <b style={{ minWidth: 220 }}>{V(d2.DirectorName)}</b>
+                  <span style={{ color: MUTED }}>{V(d2.DirectorDesignation)}</span>
+                  <span className="tnum text-xs" style={{ color: MUTED }}>DIN {V(d2.DirectorDin)}</span>
+                  {String(d2.DirectorContactNo ?? "") !== "null" && d2.DirectorContactNo ? <span className="tnum text-xs">{String(d2.DirectorContactNo)}</span> : null}
+                </div>
+              ))}
+            </div>
+          )}
+          {ratings.length > 0 && (
+            <div className="rounded border p-3" style={{ borderColor: BORDER }}>
+              <div className="font-bold text-sm mb-2">Credit ratings</div>
+              {ratings.map((r2, i) => (
+                <div key={i} className="text-sm py-0.5 flex gap-3 flex-wrap">
+                  <b style={{ minWidth: 80 }}>{V(r2.RatingAgency)}</b>
+                  <span>{V(r2.RatingAssigned)}</span>
+                  <span style={{ color: MUTED }}>{V(r2.RatingInstrumentName)}</span>
+                  <span className="text-xs" style={{ color: MUTED }}>{V(r2.RatingAssignedDate)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

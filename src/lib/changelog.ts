@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.22",
+    date: "2026-08-30",
+    module: "CRM — InstaFinancials on the company",
+    items: [
+      "A new ₹ IFS tab on every company, standing before Genie (Dr Raghu, 30 Aug 2026): the InstaFinancials InstaSummary — MCA profile, seven years of financials, current directors with DINs, credit ratings — readable by everyone once bought.",
+      "🪙 Buy InstaFinancial Summary is Raghu's hand alone (75 credits a pull, warned before each); the CIN is remembered on the company. The key and endpoint live in Settings → Integrations → InstaFinancials. CRM migration 0042 carries the columns.",
+    ],
+  },
+  {
     v: "3.31.1.21",
     date: "2026-08-30",
     module: "Settings → Genie — active HOURS per person",
