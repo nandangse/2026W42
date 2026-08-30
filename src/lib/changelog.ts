@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.85",
+    date: "2026-08-30",
+    module: "CRM — BCC on the quote, and an email becomes a contact",
+    items: [
+      "The quote's send list gains BCC, and every line takes as many people as needed (Dr Raghu, 30 Aug 2026).",
+      "The add box searches the client's people first, then the whole book — and a typed email nobody has offers \"Add contact?\" in a popup asking name and mobile, filing the person under the same client and chipping them straight in.",
+      "CRM migration 0037 (one line) carries the BCC column.",
+    ],
+  },
+  {
     v: "3.31.0.84",
     date: "2026-08-30",
     module: "CRM — the quote grid speaks commas, the foot adds live, the 📦 opens",

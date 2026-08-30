@@ -535,8 +535,8 @@ export async function PATCH(req: Request, { params }: { params: { doctype: strin
     // the quote's To and CC (Dr Raghu, 30 Aug 2026) — arrays of person ids,
     // no doctype field of their own so they pass through here
     if (d.name === "quotation") {
-      for (const k of ["mail_to", "mail_cc"] as const)
-        if (Array.isArray(body[k])) row[k] = (body[k] as unknown[]).map(String).slice(0, 50);
+      for (const k of ["mail_to", "mail_cc", "mail_bcc"] as const)
+        if (Array.isArray(body[k])) row[k] = (body[k] as unknown[]).map(String).slice(0, 200);
       // the Quote items desk's own knobs — tax scheme, currency, decimals,
       // the signature line, the header discount
       if (typeof body.tax_id === "string") row.tax_id = body.tax_id || null;

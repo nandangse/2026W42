@@ -2595,6 +2595,119 @@ function AddressSelect({ companyId, value, onPick }: {
   );
 }
 
+/** The recipient type-ahead: the client's people first, then everyone —
+ *  and a typed EMAIL nobody has offers "Add contact?" in a popup that also
+ *  asks for the mobile, filing the person under the same client
+ *  (Dr Raghu, 30 Aug 2026). */
+function RecipientAdd({ companyId, onPick }: { companyId?: string; onPick: (pid: string) => void }) {
+  const [text, setText] = useState("");
+  const [opts, setOpts] = useState<{ id: string; label: string; mine?: boolean }[]>([]);
+  const [open, setOpen] = useState(false);
+  const [popup, setPopup] = useState<{ email: string; name: string; phone: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const timer = useRef<number | null>(null);
+  const seek = (q: string) => {
+    if (timer.current) window.clearTimeout(timer.current);
+    if (q.trim().length < 2) { setOpts([]); setOpen(false); return; }
+    timer.current = window.setTimeout(async () => {
+      try {
+        const [mine, all] = await Promise.all([
+          companyId
+            ? (await fetch(`/api/crm/person?pick=${encodeURIComponent(q)}&f_company_id=${encodeURIComponent(companyId)}`, { cache: "no-store" })).json()
+            : Promise.resolve({ options: [] }),
+          (await fetch(`/api/crm/person?pick=${encodeURIComponent(q)}`, { cache: "no-store" })).json(),
+        ]);
+        const seen = new Set<string>();
+        const merged: { id: string; label: string; mine?: boolean }[] = [];
+        for (const o of (mine.options ?? []) as { id: string; label: string }[]) { seen.add(o.id); merged.push({ ...o, mine: true }); }
+        for (const o of (all.options ?? []) as { id: string; label: string }[]) if (!seen.has(o.id)) merged.push(o);
+        setOpts(merged.slice(0, 8)); setOpen(true);
+      } catch { setOpts([]); }
+    }, 250);
+  };
+  const createContact = async () => {
+    if (!popup) return;
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/crm/person", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          first_name: popup.name.trim() || popup.email.split("@")[0],
+          primary_email: popup.email.trim(),
+          primary_phone: popup.phone.trim() || null,
+          ...(companyId ? { company_id: companyId } : {}),
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not add the contact");
+      onPick(String(j.row.id));
+      setPopup(null); setText(""); setOpts([]); setOpen(false);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  const emailish = isEmailish(text.trim());
+  return (
+    <div style={{ position: "relative", width: 230 }}>
+      <input value={text} placeholder="add a person or email…"
+        onChange={(e) => { setText(e.target.value); seek(e.target.value); }}
+        onFocus={() => { if (opts.length) setOpen(true); }}
+        onBlur={() => window.setTimeout(() => setOpen(false), 200)}
+        onKeyDown={(e) => { if (e.key === "Enter" && emailish) { e.preventDefault(); setOpen(false); setPopup({ email: text.trim(), name: "", phone: "" }); } }}
+        className="w-full px-2 py-1 rounded border text-xs" style={{ borderColor: BORDER }} />
+      {open && (opts.length > 0 || emailish) && (
+        <div className="rounded border" style={{ position: "absolute", top: "100%", left: 0, zIndex: 45, background: "#fff", borderColor: BORDER, boxShadow: "0 8px 24px rgba(27,45,107,.18)", minWidth: 260, maxHeight: 240, overflowY: "auto" }}>
+          {opts.map((o) => (
+            <button key={o.id} type="button" onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { onPick(o.id); setText(""); setOpts([]); setOpen(false); }}
+              className="block w-full text-left px-2.5 py-1.5 text-sm hover:bg-[#F7F5F0]" style={{ borderBottom: `1px solid ${BORDER}` }}>
+              {o.label}{o.mine && <span className="text-xs" style={{ color: "#1A7F4E" }}> · this client</span>}
+            </button>
+          ))}
+          {emailish && (
+            <button type="button" onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { setOpen(false); setPopup({ email: text.trim(), name: "", phone: "" }); }}
+              className="block w-full text-left px-2.5 py-1.5 text-sm font-bold hover:bg-[#F7F5F0]" style={{ color: ORANGE }}>
+              ＋ Add {text.trim()} as a contact…
+            </button>
+          )}
+        </div>
+      )}
+      {popup && (
+        <div onClick={() => setPopup(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(22,35,47,.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} className="rounded p-4" style={{ background: "#fff", width: "min(420px, 100%)", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
+            <div className="font-bold text-sm mb-2">Add contact?</div>
+            <div className="text-xs mb-3" style={{ color: MUTED }}>Nobody has {popup.email} yet — this files them under {companyId ? "this client" : "the CRM"}.</div>
+            {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
+            <label className="block mb-2">
+              <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>Name</div>
+              <input value={popup.name} autoFocus onChange={(e) => setPopup((p) => p && { ...p, name: e.target.value })}
+                className="w-full px-2 py-1.5 rounded border text-sm" style={{ borderColor: BORDER }} />
+            </label>
+            <label className="block mb-2">
+              <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>Email</div>
+              <input value={popup.email} onChange={(e) => setPopup((p) => p && { ...p, email: e.target.value })}
+                className="w-full px-2 py-1.5 rounded border text-sm" style={{ borderColor: BORDER }} />
+            </label>
+            <label className="block mb-3">
+              <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>Mobile</div>
+              <input value={popup.phone} onChange={(e) => setPopup((p) => p && { ...p, phone: e.target.value })} placeholder="+91 …"
+                className="w-full px-2 py-1.5 rounded border text-sm" style={{ borderColor: BORDER }} />
+            </label>
+            <div className="flex gap-2">
+              <button onClick={() => void createContact()} disabled={busy || !isEmailish(popup.email)}
+                className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: busy ? "#B9BEC4" : "#0D7A3F" }}>
+                {busy ? "Adding…" : "✓ Add contact"}
+              </button>
+              <button onClick={() => setPopup(null)} className="rounded px-3 py-1.5 text-sm font-bold" style={{ background: "#EFEDE7", color: "#5A6672" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The quote's send list, dressed like an email header (Dr Raghu, 30 Aug
  *  2026: "keep like email — To: able to add people and their email id seen;
  *  CC: by default always cced to sales@nandan.co.in"). */
@@ -2606,6 +2719,7 @@ function QuoteRecipients({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
   const [err, setErr] = useState("");
   const to = Array.isArray(row.mail_to) ? (row.mail_to as unknown[]).map(String) : [];
   const cc = Array.isArray(row.mail_cc) ? (row.mail_cc as unknown[]).map(String) : [];
+  const bcc = Array.isArray(row.mail_bcc) ? (row.mail_bcc as unknown[]).map(String) : [];
 
   // the address book: the client's people, plus anyone already on the lists
   useEffect(() => {
@@ -2618,7 +2732,7 @@ function QuoteRecipients({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
           for (const p of (j.rows ?? []) as P[]) m.set(String(p.id), p);
         } catch { /* chips heal below */ }
       }
-      for (const pid of [...to, ...cc]) {
+      for (const pid of [...to, ...cc, ...bcc]) {
         if (m.has(pid)) continue;
         try {
           const j = await (await fetch(`/api/crm/person?id=${encodeURIComponent(pid)}`, { cache: "no-store" })).json();
@@ -2629,9 +2743,9 @@ function QuoteRecipients({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
     })();
     return () => { dead = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, to.join(","), cc.join(",")]);
+  }, [companyId, to.join(","), cc.join(","), bcc.join(",")]);
 
-  const save = async (kind: "mail_to" | "mail_cc", ids: string[]) => {
+  const save = async (kind: "mail_to" | "mail_cc" | "mail_bcc", ids: string[]) => {
     setBusy(true); setErr("");
     try {
       const r = await fetch(`/api/crm/quotation?id=${encodeURIComponent(String(row.id))}`, {
@@ -2645,7 +2759,7 @@ function QuoteRecipients({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
     finally { setBusy(false); }
   };
 
-  const Chip = ({ pid, kind }: { pid: string; kind: "mail_to" | "mail_cc" }) => {
+  const Chip = ({ pid, kind }: { pid: string; kind: "mail_to" | "mail_cc" | "mail_bcc" }) => {
     const p = book.get(pid);
     const email = p?.primary_email || null;
     return (
@@ -2654,20 +2768,18 @@ function QuoteRecipients({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
         <b>{p?.full_name || "…"}</b>
         <span style={{ color: email ? "#2C5B82" : "#B3541E" }}>{email ? `<${email}>` : "· no email on record"}</span>
         <button title="Remove" disabled={busy}
-          onClick={() => void save(kind, (kind === "mail_to" ? to : cc).filter((x) => x !== pid))}
+          onClick={() => void save(kind, (kind === "mail_to" ? to : kind === "mail_cc" ? cc : bcc).filter((x) => x !== pid))}
           style={{ color: MUTED, fontWeight: 700 }}>✕</button>
       </span>
     );
   };
-  const Line = ({ label, kind, ids, fixed }: { label: string; kind: "mail_to" | "mail_cc"; ids: string[]; fixed?: React.ReactNode }) => (
+  const Line = ({ label, kind, ids, fixed }: { label: string; kind: "mail_to" | "mail_cc" | "mail_bcc"; ids: string[]; fixed?: React.ReactNode }) => (
     <div className="flex items-center gap-1.5 flex-wrap py-1.5" style={{ borderBottom: `1px solid ${BORDER}` }}>
-      <span className="text-xs font-bold" style={{ color: MUTED, width: 30 }}>{label}</span>
+      <span className="text-xs font-bold" style={{ color: MUTED, width: 34 }}>{label}</span>
       {fixed}
       {ids.map((pid) => <Chip key={pid} pid={pid} kind={kind} />)}
-      <div style={{ width: 220 }}>
-        <PersonTypeAhead value="" valueLabel="" companyId={companyId || undefined}
-          onPick={(pid) => { if (pid && !ids.includes(pid)) void save(kind, [...ids, pid]); }} />
-      </div>
+      <RecipientAdd companyId={companyId || undefined}
+        onPick={(pid) => { if (pid && !ids.includes(pid)) void save(kind, [...ids, pid]); }} />
     </div>
   );
 
@@ -2686,7 +2798,8 @@ function QuoteRecipients({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
             sales@nandan.co.in <span style={{ fontSize: 10 }}>(always)</span>
           </span>
         } />
-      <div className="text-xs mt-1.5" style={{ color: MUTED }}>Type a name to add — the client&apos;s people come up first. A chip without an email needs one on the contact before sending.</div>
+      <Line label="BCC:" kind="mail_bcc" ids={bcc} />
+      <div className="text-xs mt-1.5" style={{ color: MUTED }}>Type a name to add — the client&apos;s people come up first, then everyone. Type an email nobody has and Genie offers to make the contact. A chip without an email needs one before sending.</div>
     </div>
   );
 }
