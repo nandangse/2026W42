@@ -556,6 +556,7 @@ export async function PATCH(req: Request, { params }: { params: { doctype: strin
       if (typeof body.show_decimals === "boolean") row.show_decimals = body.show_decimals;
       if (typeof body.authorized_by === "string") row.authorized_by = body.authorized_by.slice(0, 160);
       if (typeof body.situational_details === "string") row.situational_details = body.situational_details;
+      if (typeof body.subject === "string") row.subject = body.subject.slice(0, 300);
       for (const k of ["terms_template", "terms_text", "letter_template", "letter_text",
         "cover_template", "cover_text", "back_template", "back_text", "about_template", "about_text"] as const)
         if (typeof body[k] === "string") row[k] = body[k];

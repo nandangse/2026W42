@@ -1924,6 +1924,7 @@ function ReviewQuoteTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void
     : SECTIONS.map(([k]) => k);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [submitMode, setSubmitMode] = useState<"review" | "client" | null>(null);
   const toggle = async (k: string) => {
     // the two item modes are one choice, never both (Dr Raghu, 30 Aug 2026)
     let next = chosen.includes(k) ? chosen.filter((x) => x !== k) : [...chosen, k];
@@ -1955,7 +1956,19 @@ function ReviewQuoteTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void
           className="rounded px-3 py-1.5 text-xs font-bold text-white ml-auto" style={{ background: ORANGE, textDecoration: "none" }}>
           ⬇ Download PDF (DRAFT)
         </a>
+        <button onClick={() => setSubmitMode("review")}
+          className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: "#EEF3F8", color: NAVY, border: "1px solid #C9D6E2" }}>
+          📨 Submit to Raghu for Review
+        </button>
+        <button onClick={() => setSubmitMode("client")}
+          className="rounded px-3 py-1.5 text-xs font-bold text-white" style={{ background: "#0D7A3F" }}>
+          ✈ Submit to Client
+        </button>
       </div>
+      {submitMode && (
+        <SubmitQuoteModal row={row} mode={submitMode} onClose={() => setSubmitMode(null)}
+          onSent={() => { setSubmitMode(null); onSaved(); }} />
+      )}
       <div className="text-xs mb-2" style={{ color: MUTED }}>
         Items print with rates on their own pages. Every page: Nandan logo up top; Quotation No + Date, Private and Confidential, Page x of y below. The DRAFT watermark rides until the quote is sent.
         {err && <span className="ml-2 font-semibold" style={{ color: "#8E2C20" }}>{err}</span>}
@@ -2854,6 +2867,164 @@ function RecipientAdd({ companyId, onPick }: { companyId?: string; onPick: (pid:
   );
 }
 
+/** SUBMIT THE QUOTE (Dr Raghu, 30 Aug 2026): to Raghu for review, or to
+ *  the client — a popup with To/CC/BCC/Subject, the covering letter as the
+ *  body, the PDF riding along with any ticked attachments; sent through the
+ *  salesperson's own Gmail and logged into Communication. */
+function SubmitQuoteModal({ row, mode, onClose, onSent }: {
+  row: Row; mode: "review" | "client"; onClose: () => void; onSent: () => void;
+}) {
+  const rid = String(row.id ?? "");
+  const dISub = String(row.quoted_on ?? "").slice(0, 10).split("-").reverse().join("/");
+  const [to, setTo] = useState("");
+  const [cc, setCc] = useState("sales@nandan.co.in");
+  const [bcc, setBcc] = useState("");
+  const [subject, setSubject] = useState(
+    `Submission of Qtn ${String(row.quote_no ?? "")} : Dt ${dISub}${row.subject ? ` | ${row.subject}` : ""}`);
+  const [files, setFiles] = useState<{ name: string; path: string; from: "quote" | "library" }[]>([]);
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState<"send" | "up" | null>(null);
+  const [err, setErr] = useState("");
+
+  // the quote's To/CC/BCC arrive resolved to real addresses
+  useEffect(() => {
+    void (async () => {
+      const resolve = async (ids: unknown): Promise<string> => {
+        const list = Array.isArray(ids) ? ids.map(String) : [];
+        const emails: string[] = [];
+        for (const pid of list) {
+          try {
+            const j = await (await fetch(`/api/crm/person?id=${encodeURIComponent(pid)}`, { cache: "no-store" })).json();
+            if (j?.row?.primary_email) emails.push(String(j.row.primary_email));
+          } catch { /* skip */ }
+        }
+        return emails.join(", ");
+      };
+      setTo(await resolve(row.mail_to));
+      const ccR = await resolve(row.mail_cc);
+      setCc(["sales@nandan.co.in", ccR].filter(Boolean).join(", "));
+      setBcc(await resolve(row.mail_bcc));
+    })();
+    fetch(`/api/crm/library?quote=${encodeURIComponent(rid)}`, { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json();
+        setFiles([
+          ...((j.quoteFiles ?? []) as { name: string; path: string }[]).map((f) => ({ ...f, from: "quote" as const })),
+          ...((j.library ?? []) as { name: string; path: string }[]).map((f) => ({ ...f, from: "library" as const })),
+        ]);
+      }).catch(() => setFiles([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rid]);
+
+  const upload = async (f: File, toLibrary: boolean) => {
+    setBusy("up"); setErr("");
+    try {
+      const fd = new FormData();
+      if (toLibrary) { fd.append("file", f); }
+      else { fd.append("target_type", "quotation"); fd.append("target_id", rid); fd.append("file", f); }
+      const r = await fetch(toLibrary ? "/api/crm/library" : "/api/crm/opp-attach", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Upload failed");
+      const path = toLibrary ? String(j.path) : String(j.url).replace(/^.*path=/, "");
+      const p = decodeURIComponent(path);
+      setFiles((cur) => [{ name: f.name, path: p, from: toLibrary ? "library" : "quote" }, ...cur]);
+      setTicked((cur) => new Set([...cur, p]));
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(null); }
+  };
+
+  const send = async () => {
+    setBusy("send"); setErr("");
+    try {
+      const split = (v: string) => v.split(/[,;\s]+/).map((x) => x.trim()).filter((x) => isEmailish(x));
+      const r = await fetch("/api/crm/quote-submit", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          quotation_id: rid, mode,
+          to: split(to), cc: split(cc), bcc: split(bcc),
+          subject, body_html: String(row.letter_text || ""),
+          attach_paths: [...ticked],
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "The send failed");
+      window.alert(mode === "client"
+        ? `✈ Submitted to the client — PDF + ${j.attachments - 1} attachment(s). The quote stands SUBMITTED; Edit is now Amend.`
+        : "📨 Sent to Dr Raghu for review (DRAFT PDF).");
+      onSent();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(null); }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 75, background: "rgba(22,35,47,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} className="rounded" style={{ background: "#fff", width: "min(680px, 100%)", maxHeight: "calc(100vh - 40px)", display: "flex", flexDirection: "column", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
+        <div className="flex items-center justify-between px-4 py-2.5" style={{ background: mode === "client" ? "#0D7A3F" : NAVY, borderRadius: "6px 6px 0 0" }}>
+          <div className="text-white font-bold text-sm">{mode === "client" ? "✈ Submit to Client" : "📨 Submit to Raghu for Review"}</div>
+          <button onClick={onClose} className="text-white font-bold px-2">✕</button>
+        </div>
+        <div className="p-4" style={{ overflowY: "auto" }}>
+          {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
+          {mode === "client" ? (
+            <>
+              {([["To", to, setTo], ["CC", cc, setCc], ["BCC", bcc, setBcc]] as const).map(([lab, v, set]) => (
+                <label key={lab} className="block mb-2">
+                  <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>{lab}</div>
+                  <input value={v} onChange={(e) => set(e.target.value)} placeholder="addresses, comma-separated"
+                    className="w-full px-2 py-1.5 rounded border text-sm" style={{ borderColor: BORDER }} />
+                </label>
+              ))}
+            </>
+          ) : (
+            <div className="text-xs mb-2 rounded px-3 py-2" style={{ background: "#EEF3F8", color: NAVY }}>Goes to <b>raghu@nandan.co.in</b> with the DRAFT-watermarked PDF.</div>
+          )}
+          <label className="block mb-2">
+            <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>Subject</div>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)}
+              className="w-full px-2 py-1.5 rounded border text-sm" style={{ borderColor: BORDER }} />
+          </label>
+          <div className="text-xs mb-2 rounded px-3 py-2" style={{ background: "#FAF9F5", border: `1px solid ${BORDER}`, color: "#5A6672" }}>
+            The <b>Covering Letter</b> rides as the email body — edit it on the Covering Letter tab. The quotation
+            <b> PDF attaches itself</b>{mode === "client" ? " (clean, no watermark)" : " (DRAFT watermark)"}.
+          </div>
+          <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>MORE ATTACHMENTS</div>
+          {files.length === 0 && <div className="text-xs mb-1" style={{ color: MUTED }}>None on the quote, and the Library is empty.</div>}
+          <div style={{ maxHeight: 160, overflowY: "auto" }}>
+            {files.map((f) => (
+              <label key={f.path} className="flex items-center gap-2 text-sm py-0.5">
+                <input type="checkbox" checked={ticked.has(f.path)}
+                  onChange={() => setTicked((cur) => { const n = new Set(cur); if (n.has(f.path)) n.delete(f.path); else n.add(f.path); return n; })}
+                  style={{ accentColor: NAVY }} />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                <span className="text-xs" style={{ color: MUTED }}>{f.from === "library" ? "· Library" : "· this quote"}</span>
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-2 flex-wrap">
+            <label className="text-xs rounded border px-2 py-1 font-bold cursor-pointer" style={{ borderColor: BORDER, background: "#fff" }}>
+              {busy === "up" ? "Uploading…" : "⬆ Attach from computer"}
+              <input type="file" className="hidden" disabled={busy !== null}
+                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload(f, false); }} />
+            </label>
+            <label className="text-xs rounded border px-2 py-1 font-bold cursor-pointer" style={{ borderColor: BORDER, background: "#fff", color: "#2C5B82" }}>
+              ＋ Add to Library (brochures…)
+              <input type="file" className="hidden" disabled={busy !== null}
+                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload(f, true); }} />
+            </label>
+          </div>
+        </div>
+        <div className="flex gap-2 px-4 py-3" style={{ borderTop: `1px solid ${BORDER}` }}>
+          <button onClick={() => void send()} disabled={busy !== null}
+            className="rounded px-4 py-1.5 text-sm font-bold text-white" style={{ background: busy ? "#B9BEC4" : mode === "client" ? "#0D7A3F" : "#7C3AED" }}>
+            {busy === "send" ? "Pressing the PDF & sending…" : mode === "client" ? "✈ Send to client" : "📨 Send for review"}
+          </button>
+          <button onClick={onClose} className="rounded px-3 py-1.5 text-sm font-bold" style={{ background: "#EFEDE7", color: "#5A6672" }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** The quote's send list, dressed like an email header (Dr Raghu, 30 Aug
  *  2026: "keep like email — To: able to add people and their email id seen;
  *  CC: by default always cced to sales@nandan.co.in"). */
@@ -2891,6 +3062,16 @@ function QuoteRecipients({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, to.join(","), cc.join(","), bcc.join(",")]);
 
+  const save2 = async (field: string, v: string) => {
+    try {
+      const r = await fetch(`/api/crm/quotation?id=${encodeURIComponent(String(row.id))}`, {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ [field]: v }),
+      });
+      const j = await r.json();
+      if (r.ok) onSaved(j.row as Row);
+    } catch { /* typed again, saved again */ }
+  };
   const save = async (kind: "mail_to" | "mail_cc" | "mail_bcc", ids: string[]) => {
     setBusy(true); setErr("");
     try {
@@ -2945,6 +3126,14 @@ function QuoteRecipients({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
           </span>
         } />
       <Line label="BCC:" kind="mail_bcc" ids={bcc} />
+      {/* the SUBJECT lives on the quote and prints on page one
+          (Dr Raghu, 30 Aug 2026) */}
+      <div className="flex items-center gap-1.5 py-1.5" style={{ borderBottom: `1px solid ${BORDER}` }}>
+        <span className="text-xs font-bold" style={{ color: MUTED, width: 34, flexShrink: 0 }}>Sub:</span>
+        <input defaultValue={String(row.subject ?? "")} placeholder="Subject — prints on the quote's first page and rides the email"
+          onBlur={(e) => { if (e.target.value !== String(row.subject ?? "")) void save2("subject", e.target.value); }}
+          className="flex-1 px-2 py-1 rounded border text-xs" style={{ borderColor: BORDER, minWidth: 240 }} />
+      </div>
       <div className="text-xs mt-1.5" style={{ color: MUTED }}>Type a name to add — the client&apos;s people come up first, then everyone. Type an email nobody has and Genie offers to make the contact. A chip without an email needs one before sending.</div>
     </div>
   );
@@ -3378,11 +3567,15 @@ function RecordModal({
             )}
             {mode === "view" && (
               <button
-                onClick={onEdit}
+                onClick={() => {
+                  if (dt.name === "quotation" && String(row.status) === "submitted"
+                    && !window.confirm("This quote is SUBMITTED. Amend it?")) return;
+                  onEdit();
+                }}
                 className="px-3 py-1.5 rounded text-sm font-semibold"
                 style={{ background: ORANGE, color: "#fff" }}
               >
-                Edit
+                {dt.name === "quotation" && String(row.status) === "submitted" ? "Amend" : "Edit"}
               </button>
             )}
             <button

@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       model: "claude-opus-5",
       max_tokens: 1200,
       output_config: { effort: "low" },
-      system: `You polish the covering letter of a NANDAN GSE sales quotation. About Nandan:\n${NANDAN.slice(0, 1500)}\n\nRespond with HTML only (no markdown, no preamble): the improved letter, 3-5 short paragraphs in <p> tags. Keep the letter's flavour (${String(qt.letter_template || "Standard")}), make it specific to this customer and quote, warm and confident, never flowery. Do not invent facts, prices or dates. Keep the salutation and sign-off style of the draft.`,
+      system: `You polish the covering letter of a NANDAN GSE sales quotation. About Nandan:\n${NANDAN.slice(0, 1500)}\n\nTHE DRAFT IS THE LETTER (Dr Raghu, 30 Aug 2026: "consider the content that is already there — add masala, don't disregard it"). Every point, fact, promise and paragraph intent in the draft SURVIVES into your output — you sharpen the sentences, warm the tone, add the masala; you never replace the letter with your own. Keep its salutation, its sign-off, its flavour (${String(qt.letter_template || "Standard")}). Weave in the customer and quote specifics where they strengthen what is already said. Do not invent facts, prices or dates.\n\nRespond with HTML only (no markdown, no preamble): the same letter, better — <p> paragraphs.`,
       messages: [{
         role: "user",
         content: `Customer: ${companyLine}. ${contactLine ? `Addressed to: ${contactLine}. ` : ""}Quote ${qt.quote_no} carrying: ${itemsTxt}.\n\nTHE DRAFT TO BEAUTIFY:\n${current.slice(0, 5000)}`,

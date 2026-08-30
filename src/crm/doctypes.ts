@@ -113,7 +113,7 @@ export const DOCTYPES: Doctype[] = [
         linkFilter: { column: "entity", value: "quotation" },
         help: "Draft until it is SENT (Dr Raghu, 30 Aug 2026); then the closure ladder. A Lost or Not Target move needs a reason first." },
       { name: "status", label: "Status", type: "select", inList: true, default: "draft",
-        options: ["draft", "live", "hotlist", "lost", "expired"],
+        options: ["draft", "live", "hotlist", "submitted", "lost", "expired"],
         help: "Draft until it goes out; Live once it is; Hotlist when it deserves the daily chase; Lost and Expired close it." },
       { name: "lost_reason", label: "Lost reason", type: "textarea", tab: "qual", help: "Required by the database before a move to Lost or Not Target." },
       { name: "lost_to_competitor", label: "Lost to", type: "text", tab: "qual" },

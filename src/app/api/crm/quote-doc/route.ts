@@ -78,6 +78,7 @@ export async function GET(req: Request) {
     const qid = String(u.searchParams.get("id") || "");
     if (!qid) throw new HttpError(400, "Which quotation?");
     const wantPrint = u.searchParams.get("print") === "1";
+    const isFinal = u.searchParams.get("final") === "1";
     const secParam = String(u.searchParams.get("sections") || "").split(",").map((s) => s.trim()).filter(Boolean);
 
     const { data: q } = await db.from("quotation").select("*").eq("id", qid).maybeSingle();
@@ -99,6 +100,14 @@ export async function GET(req: Request) {
     } else situational = String(q.situational_details || "");
 
     const customer = String(co?.name || "");
+    const subject = String(q.subject || "").trim();
+    // Qtn No · Date / To / Subject — the head the FIRST page wears, and the
+    // covering letter too (Dr Raghu, 30 Aug 2026)
+    const headBlock = `<div style="border:1px solid #C9C6BD;border-left:4px solid #1B3A5C;padding:3mm 4mm;margin-bottom:5mm;font-size:10.5pt">
+      <div><b>Qtn No:</b> ${esc(q.quote_no)} &nbsp;·&nbsp; <b>Date:</b> ${esc(dIN(q.quoted_on))}</div>
+      <div><b>To:</b> ${esc(customer)}${contact?.full_name ? ` — Kind Attn: ${esc(contact.full_name)}` : ""}</div>
+      ${subject ? `<div><b>Subject:</b> ${esc(subject)}</div>` : ""}
+    </div>`;
     const dec = q.show_decimals === true;
     const cur = String(q.currency || "INR");
     const tplOf = (kind: string, chosen?: unknown) => {
@@ -121,7 +130,7 @@ export async function GET(req: Request) {
       } else if (key === "letter") {
         const html = String(q.letter_text || "").trim();
         if (html) {
-          const head = `<p>${esc(dIN(q.quoted_on))}</p><p><b>${esc(customer)}</b>${contact?.full_name ? `<br>Kind Attn: ${esc(contact.full_name)}` : ""}</p><p><b>Sub: Quotation ${esc(q.quote_no)}</b></p>`;
+          const head = headBlock;
           const tail = `<p><br>Yours faithfully,<br><b>${esc(q.authorized_by || "Dr Raghunandan Jagdish, MD and CEO")}</b><br>Nandan GSE Pvt Ltd</p>`;
           secs.push({ key, title: "", chunks: paginate(head + html + tail) });
         }
@@ -234,13 +243,17 @@ export async function GET(req: Request) {
       }
     }
 
+    // the first page after the cover always wears the head block
+    const firstContent = secs.find((x) => x.key !== "cover");
+    if (firstContent && firstContent.key !== "letter" && firstContent.chunks.length)
+      firstContent.chunks[0] = headBlock + firstContent.chunks[0];
     const flat: { title: string; html: string; centered?: boolean }[] = [];
     for (const s of secs) for (const c of s.chunks) flat.push({ title: s.title, html: c, centered: s.centered });
     const total = flat.length || 1;
 
     const pages = flat.map((p, i) => `
       <div class="page">
-        <div class="wm">DRAFT</div>
+        ${isFinal ? "" : '<div class="wm">DRAFT</div>'}
         <div class="hdr"><img src="${LOGO}" alt="Nandan GSE"/></div>
         <div class="body${p.centered ? " centered" : ""}">${p.title ? `<h2 class="sect">${esc(p.title)}</h2>` : ""}${p.html}</div>
         <div class="ftr">
@@ -272,7 +285,7 @@ export async function GET(req: Request) {
   table.items col.c-sr { width: 12mm; } table.items col.c-rate { width: 32mm; }
   table.items col.c-qty { width: 13mm; } table.items col.c-amt { width: 36mm; }
   table.items td.tr, table.items th.tr { white-space: nowrap; font-size: 10pt; }
-  table.items td { word-wrap: break-word; }
+  table.items td { word-wrap: break-word; vertical-align: top; }
   table.items th { background: #EEF1F5; text-align: left; font-size: 9.5pt; }
   table.items .tr { text-align: right; } table.items .tc { text-align: center; }
   table.items tr.tot td { border-top: 2px solid #1B3A5C; }

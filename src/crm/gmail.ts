@@ -240,3 +240,51 @@ export async function driveUploadAttachment(
   });
   return { id: String(up.id), name: String(up.name), link: String(up.webViewLink) };
 }
+
+/** Send with ATTACHMENTS — multipart/mixed over the same per-user Gmail
+ *  (Dr Raghu, 30 Aug 2026: the quote submits itself, PDF riding along). */
+export async function gmailSendMixed(
+  token: string, fromEmail: string, to: string, subject: string, htmlBody: string,
+  attachments: { name: string; mime: string; base64: string }[],
+  cc?: string, bcc?: string, fromName?: string,
+): Promise<string> {
+  const from = fromName
+    ? `=?UTF-8?B?${Buffer.from(fromName).toString("base64")}?= <${fromEmail}>`
+    : fromEmail;
+  const bd = "genie" + Date.now().toString(36);
+  const parts: string[] = [
+    `From: ${from}`,
+    `To: ${to}`,
+    ...(cc ? [`Cc: ${cc}`] : []),
+    ...(bcc ? [`Bcc: ${bcc}`] : []),
+    `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/mixed; boundary="${bd}"`,
+    "",
+    `--${bd}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    Buffer.from(htmlBody).toString("base64"),
+  ];
+  for (const a of attachments) {
+    parts.push(
+      `--${bd}`,
+      `Content-Type: ${a.mime}; name="${a.name.replace(/"/g, "'")}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; filename="${a.name.replace(/"/g, "'")}"`,
+      "",
+      a.base64,
+    );
+  }
+  parts.push(`--${bd}--`);
+  const raw = Buffer.from(parts.join("\r\n")).toString("base64url");
+  const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ raw }),
+  });
+  const j = (await r.json()) as { id?: string; error?: { message?: string } };
+  if (!r.ok || !j.id) throw new Error(j.error?.message || `Gmail refused the send (${r.status})`);
+  return j.id;
+}

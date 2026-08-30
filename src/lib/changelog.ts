@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.6",
+    date: "2026-08-30",
+    module: "CRM — the quote SUBMITS: to Raghu for review, or to the client",
+    items: [
+      "Review Quote grows two buttons (Dr Raghu, 30 Aug 2026): 📨 SUBMIT TO RAGHU FOR REVIEW mails him the DRAFT-watermarked PDF; ✈ SUBMIT TO CLIENT opens the send popup — To/CC/BCC pre-filled from the quote, Subject defaulting to \"Submission of Qtn № : Dt …\", the Covering Letter as the body, the quotation PDF (clean, no watermark) attached by a real Chromium press, plus the quote's own files, the LIBRARY of brochures, or anything from the computer, each tickable.",
+      "On a client submission the quote stands SUBMITTED, the closure moves to Sent, and EDIT becomes AMEND (with a warning). The send flows through the salesperson's own Gmail and lands in Communication.",
+      "The quote gains a SUBJECT — typed beside To/CC/BCC on the Details screen, printed on the document's first page and in the covering letter head: Qtn No · Date / To / Subject.",
+      "Item tables top-align. CRM migration 0041 carries the enum value and columns; a ＋ Add to Library door starts the brochure shelf.",
+    ],
+  },
+  {
     v: "3.31.1.5",
     date: "2026-08-30",
     module: "CRM — the quote document's layout laws",
