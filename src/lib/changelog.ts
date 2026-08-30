@@ -75,6 +75,12 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.93",
+    date: "2026-08-30",
+    module: "Genie — /api/version answers which Genie is live",
+    items: ["A public one-liner: /api/version says the deployed version, so \"not live yet\" has an instant answer."],
+  },
+  {
     v: "3.31.0.92",
     date: "2026-08-30",
     module: "CRM — the item list opens on a click; the document dresses right",
