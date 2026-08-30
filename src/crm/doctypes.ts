@@ -458,7 +458,7 @@ export const DOCTYPES: Doctype[] = [
       { name: "last_quoted_price", label: "Last Quoted Price", type: "money", inList: true, help: "The most recent ERP quotation line carrying this item." },
       { name: "last_quoted_on", label: "Last Quoted On", type: "date", noFilter: true },
       { name: "avg_quoted_price_1y", label: "Avg Quoted (1 yr)", type: "money", help: "Mean of every ERP quotation line for this item in the last twelve months." },
-      { name: "alt_price_usd", label: "Alternate Price USD", type: "number", help: "From the ERP's US Dollar Selling price list." },
+      { name: "alt_price_usd", label: "Alternate Price USD", type: "money", help: "From the ERP's US Dollar Selling price list." },
       { name: "delivery_period", label: "Delivery Period", type: "text" },
       { name: "throughput_pct", label: "Throughput %", type: "number" },
       { name: "purchase_item", label: "Purchase Item", type: "text", help: "The ERP purchase item this sale item is made from or bought as. A pointer only — Genie never imports the purchase side." },

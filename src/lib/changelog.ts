@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.0.1.0",
+    date: "2026-08-31",
+    module: "CRM — money wears its commas wherever it is typed",
+    items: [
+      "\"in quotation show commas\" (Dr Raghu, 31 Aug 2026) — the quote's own lines already grouped, but the masters behind them did not, so an approved price read \"20000000\" and nobody could tell two crore from twenty lakh without counting zeros. The quote's two helpers move up to serve the whole CRM, and every money box now groups the Indian way as you type: the product's Approved Price and Alternate Price USD, every money field on every form, and the bulk-edit box.",
+      "A grouped box cannot be a browser number box — it refuses commas and shows nothing at all — so money fields became text boxes carrying a decimal keypad, right-aligned and tabular. Quantities, percentages and orders stay plain numbers, because a discount of 1,8% is not a thing.",
+    ],
+  },
+  {
     v: "4.0.0.1",
     date: "2026-08-30",
     module: "CRM — the ERP's placeholder stops printing on quotations",

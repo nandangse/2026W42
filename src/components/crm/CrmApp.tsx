@@ -977,8 +977,11 @@ export default function CrmApp({
                             className="w-full mt-1 px-2 py-1.5 rounded text-sm border font-normal" style={{ borderColor: BORDER, background: "#fff" }}>
                             <option value="">—</option><option value="true">Yes</option><option value="false">No</option>
                           </select>
+                        ) : bf.type === "money" ? (
+                          <MoneyBox value={bulkValue} onChange={setBulkValue}
+                            className="w-full mt-1 px-2 py-1.5 rounded text-sm border font-normal tnum" style={{ borderColor: BORDER, background: "#fff" }} />
                         ) : (
-                          <input type={bf.type === "date" ? "date" : bf.type === "number" || bf.type === "money" ? "number" : "text"}
+                          <input type={bf.type === "date" ? "date" : bf.type === "number" ? "number" : "text"}
                             value={bulkValue} onChange={(e) => setBulkValue(e.target.value)}
                             className="w-full mt-1 px-2 py-1.5 rounded text-sm border font-normal" style={{ borderColor: BORDER, background: "#fff" }} />
                         )}
@@ -1450,13 +1453,62 @@ function MultiFilter({ label, options, value, onChange }: {
    Notes · Merge. */
 
 const dIN = (v: unknown) => (v ? String(v).slice(0, 10).split("-").reverse().join("/") : "—");
+
+/**
+ * MONEY, GROUPED WHEREVER IT IS TYPED (Dr Raghu, 31 Aug 2026: "in quotation
+ * show commas").
+ *
+ * The quote lines already grouped; the masters behind them did not, so an
+ * approved price read "20000000" and nobody could tell two crore from twenty
+ * lakh without counting zeros. These are the quote's own two helpers, lifted
+ * up here so every money box in the CRM shares them: `groupIn` puts the
+ * Indian grouping on, `ungroup` takes it off before the number is stored.
+ *
+ * A grouped box cannot be <input type="number"> — a browser refuses commas
+ * there and simply shows nothing. So money boxes are text boxes with a
+ * decimal keypad, which is what MoneyBox below is.
+ */
+const groupIn = (raw: string): string => {
+  if (!raw) return "";
+  const [i, d] = String(raw).replace(/,/g, "").split(".");
+  const n = Number(i);
+  if (isNaN(n)) return raw;
+  return n.toLocaleString("en-IN") + (d !== undefined ? "." + d : "");
+};
+const ungroup = (v: string) => v.replace(/[^0-9.]/g, "");
+
+/** A money box: grouped as you read it, plain digits stored. */
+function MoneyBox({ value, onChange, className, style, placeholder, onKeyDown, autoFocus }: {
+  value: unknown;
+  onChange: (raw: string) => void;
+  className?: string;
+  style?: React.CSSProperties;
+  placeholder?: string;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  autoFocus?: boolean;
+}) {
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      autoFocus={autoFocus}
+      placeholder={placeholder}
+      value={groupIn(String(value ?? ""))}
+      onChange={(e) => onChange(ungroup(e.target.value))}
+      onKeyDown={onKeyDown}
+      className={className}
+      style={{ textAlign: "right", ...style }}
+    />
+  );
+}
+
 const money = (v: unknown, cur = "INR") =>
   v === null || v === undefined || v === "" ? "—"
     : `${cur === "USD" ? "$" : cur === "EUR" ? "€" : "₹"} ${Number(v).toLocaleString("en-IN")}`;
 
 /** One line of the Basic tab: label, value, and the pencil that edits it. */
 function PencilField({ label, value, type = "text", options, display, onSave }: {
-  label: string; value: unknown; type?: "text" | "number" | "select";
+  label: string; value: unknown; type?: "text" | "number" | "select" | "money";
   options?: string[]; display?: (v: unknown) => React.ReactNode;
   onSave?: (v: string) => Promise<void>;
 }) {
@@ -1489,6 +1541,10 @@ function PencilField({ label, value, type = "text", options, display, onSave }: 
               <option value="">—</option>
               {(options || []).map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
+          ) : type === "money" ? (
+            <MoneyBox value={v} onChange={setV} autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") void commit(); if (e.key === "Escape") setEditing(false); }}
+              className="px-2 py-1 rounded text-sm border tnum" style={{ borderColor: ORANGE, width: 150 }} />
           ) : (
             <input value={v} onChange={(e) => setV(e.target.value)} autoFocus type={type === "number" ? "number" : "text"}
               onKeyDown={(e) => { if (e.key === "Enter") void commit(); if (e.key === "Escape") setEditing(false); }}
@@ -1560,11 +1616,11 @@ function ProductBasicTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
           <PencilField label="Item Group" value={row.item_group} onSave={P("item_group")} />
           <PencilField label="Item" value={row.name} onSave={(v) => (v ? patch({ name: v }) : Promise.reject(new Error("The item needs a name")))} />
           <PencilField label="Item ID" value={row.sku} display={(v) => <b>{String(v ?? "—")}</b>} />
-          <PencilField label="Approved Price INR" value={row.approved_price_inr} type="number" display={(v) => <b>{money(v)}</b>} onSave={PN("approved_price_inr")} />
+          <PencilField label="Approved Price INR" value={row.approved_price_inr} type="money" display={(v) => <b>{money(v)}</b>} onSave={PN("approved_price_inr")} />
           <PencilField label="Last Quoted Price" value={row.last_quoted_price} display={(v) => money(v)} />
           <PencilField label="Last Quoted On" value={row.last_quoted_on} display={dIN} />
           <PencilField label="Avg Quoted (1 yr)" value={row.avg_quoted_price_1y} display={(v) => money(v)} />
-          <PencilField label="Alternate Price USD" value={row.alt_price_usd} type="number" display={(v) => money(v, "USD")} onSave={PN("alt_price_usd")} />
+          <PencilField label="Alternate Price USD" value={row.alt_price_usd} type="money" display={(v) => money(v, "USD")} onSave={PN("alt_price_usd")} />
           <PencilField label="Delivery Period" value={row.delivery_period} onSave={P("delivery_period")} />
           <PencilField label="Throughput %" value={row.throughput_pct} type="number" display={(v) => (v === null || v === undefined ? "—" : `${v}%`)} onSave={PN("throughput_pct")} />
           <PencilField label="Purchase Item" value={row.purchase_item} onSave={P("purchase_item")} />
@@ -2141,14 +2197,6 @@ type QLine = {
 };
 
 /** Digits with Indian commas while typing — "545000" reads 5,45,000. */
-const groupIn = (raw: string): string => {
-  if (!raw) return "";
-  const [i, d] = String(raw).replace(/,/g, "").split(".");
-  const n = Number(i);
-  if (isNaN(n)) return raw;
-  return n.toLocaleString("en-IN") + (d !== undefined ? "." + d : "");
-};
-const ungroup = (v: string) => v.replace(/[^0-9.]/g, "");
 type TaxRow = { id: string; name: string; total_pct: number; is_default: boolean; sort_order?: number; components?: { name: string; pct: number }[] };
 
 function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => void }) {
@@ -5747,9 +5795,16 @@ function RecordForm({
                   <option key={o.id} value={o.id}>{o.label}</option>
                 ))}
               </select>
+            ) : f.type === "money" ? (
+              <MoneyBox
+                value={form[f.name]}
+                onChange={(raw) => set(f.name, raw)}
+                className="w-full px-2 py-1.5 rounded text-sm border tnum"
+                style={{ borderColor: BORDER }}
+              />
             ) : (
               <input
-                type={f.type === "date" ? "date" : f.type === "number" || f.type === "money" ? "number" : "text"}
+                type={f.type === "date" ? "date" : f.type === "number" ? "number" : "text"}
                 value={String(form[f.name] ?? "")}
                 onChange={(e) => set(f.name, e.target.value)}
                 className="w-full px-2 py-1.5 rounded text-sm border"
