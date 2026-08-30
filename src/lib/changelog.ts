@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.0.1.1",
+    date: "2026-08-31",
+    module: "CRM — the product takes files from your computer, and can answer the ERP back",
+    items: [
+      "\"in product also allow upload from computer\" (Dr Raghu, 31 Aug 2026) — the product no longer waits for somebody to put a picture into the ERP first. ⇪ Upload an image sets it straight from the machine you are sitting at, and ＋ Add a file hangs any document off the item, each removable. 25 MB a file, and every one is copied into the Drive archive as all CRM attachments are.",
+      "\"Can this be pushed back to erp? along with the modification?\" — it can, and now it does. ⇧ PUSH TO ERP reads BOTH sides first and shows them against each other: what the ERP holds now, what Genie holds, and only the rows that actually differ are tickable. Description, image, approved price and attachments, each chosen one by one. The price is not a field on the Item — it is the Standard Selling row — so it is updated there, or created where the item never carried one; and an image living in Genie is uploaded to the ERP as a real file rather than handed over as a link the ERP could not read.",
+      "Nothing is written until it is ticked and pressed, nothing outside those fields is touched, and every push is written to the CRM audit with what went and what refused. The ERP's Item table is the company's master record, and a button that rewrote it quietly would be a button nobody could trust.",
+    ],
+  },
+  {
     v: "4.0.1.0",
     date: "2026-08-31",
     module: "CRM — money wears its commas wherever it is typed",

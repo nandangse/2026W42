@@ -175,6 +175,187 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, attachments: attachments.length, image: !!patch.image });
     }
 
+    /**
+     * { action: "attach_add" | "attach_del", product_id, name?, url? }
+     *
+     * The product's own attachment list. The file itself is already in the
+     * cards bucket (opp-attach put it there and mirrored it to Drive); this
+     * only keeps the list on the record, because `attachments` is a jsonb
+     * column rather than a declared field the generic PATCH would accept.
+     */
+    if (action === "attach_add" || action === "attach_del") {
+      const pid = String(body.product_id || "");
+      const { data: prod } = await db.from("product").select("id, attachments").eq("id", pid).maybeSingle();
+      if (!prod) throw new HttpError(404, "That product no longer exists.");
+      const list = Array.isArray(prod.attachments) ? (prod.attachments as { name?: string; url?: string }[]) : [];
+      const url = String(body.url || "");
+      let next: typeof list;
+      if (action === "attach_add") {
+        if (!url) throw new HttpError(400, "A file, please.");
+        next = [...list, { name: String(body.name || url).slice(0, 200), url }].slice(-100);
+      } else {
+        next = list.filter((a) => String(a.url) !== url);
+      }
+      const { error } = await db.from("product").update({ attachments: next, updated_at: new Date().toISOString() }).eq("id", pid);
+      if (error) throw new HttpError(500, error.message);
+      return NextResponse.json({ ok: true, attachments: next });
+    }
+
+    /**
+     * ⇧ PUSH TO ERP (Dr Raghu, 31 Aug 2026: "Can this be pushed back to erp?
+     * along with the modification?").
+     *
+     * Yes — the stored token is his own ERP user, which holds write on Item,
+     * Item Price and File. But a write into the master data of the ERP is not
+     * a thing to do quietly, so this route is deliberately two-step:
+     *
+     *   { action: "erp_diff", product_id }  — reads both sides and says what
+     *       differs. Writes NOTHING.
+     *   { action: "erp_push", product_id, fields: ["description","image",
+     *       "price","attachments"] } — pushes ONLY what is named, and only
+     *       what actually differs.
+     *
+     * The price does not live on the Item: it is a row in the Standard
+     * Selling price list, so it is updated there, or created if the item has
+     * never carried one.
+     */
+    if (action === "erp_diff" || action === "erp_push") {
+      const pid = String(body.product_id || "");
+      const { data: prod } = await db.from("product")
+        .select("id, sku, name, description, image, approved_price_inr, attachments").eq("id", pid).maybeSingle();
+      if (!prod) throw new HttpError(404, "That product no longer exists.");
+      const sku = String(prod.sku || "");
+      if (!sku) throw new HttpError(400, "That product carries no ERP item code, so there is nothing to push to.");
+      const cfg = await erpCfg(db);
+      if (!cfg) throw new HttpError(503, "ERPNext is not connected — the keys live in Settings → Integrations.");
+
+      const ir = await fetch(`${cfg.base}/api/resource/Item/${encodeURIComponent(sku)}`, { headers: cfg.H });
+      if (!ir.ok) throw new HttpError(502, `The ERP has no Item ${sku} (${ir.status}).`);
+      const it = ((await ir.json()) as { data: Record<string, unknown> }).data;
+
+      // The Standard Selling row — the ERP's answer to "what does it cost".
+      const pf = encodeURIComponent(JSON.stringify([["item_code", "=", sku], ["price_list", "=", "Standard Selling"]]));
+      const pr = await fetch(`${cfg.base}/api/resource/Item Price?filters=${pf}&fields=${encodeURIComponent(JSON.stringify(["name", "price_list_rate", "currency"]))}`, { headers: cfg.H });
+      const priceRow = (((await pr.json().catch(() => null)) as { data?: Record<string, unknown>[] })?.data ?? [])[0] || null;
+
+      // Genie's description is stored with the ERP's own files made absolute;
+      // they must go back relative or the ERP stores a link to itself.
+      const rel = (h: string) => h.split(`${cfg.base}/files/`).join("/files/").split(`${cfg.base}/private/files/`).join("/private/files/");
+      const genieDesc = rel(String(prod.description || ""));
+      const erpDesc = String(it.description || "");
+      const genieImg = String(prod.image || "");
+      const erpImg = String(it.image || "");
+      const geniePrice = prod.approved_price_inr == null ? null : Number(prod.approved_price_inr);
+      const erpPrice = priceRow ? Number(priceRow.price_list_rate) : null;
+
+      // An image Genie holds in its own bucket cannot be handed to the ERP as
+      // a link — the ERP could not read it. It must be uploaded as a file.
+      const imageIsOurs = /^\/api\/crm\/opp-attach/.test(genieImg);
+
+      const diff = {
+        description: { genie: genieDesc.slice(0, 400), erp: erpDesc.slice(0, 400), differs: genieDesc.trim() !== erpDesc.trim() && !!genieDesc.trim() },
+        image: { genie: genieImg, erp: erpImg, differs: !!genieImg && genieImg !== erpImg, needsUpload: imageIsOurs },
+        price: { genie: geniePrice, erp: erpPrice, differs: geniePrice != null && geniePrice !== erpPrice, hasRow: !!priceRow },
+      };
+      if (action === "erp_diff")
+        return NextResponse.json({ ok: true, sku, erp_url: `${cfg.base}/app/item/${encodeURIComponent(sku)}`, diff, erp_modified: it.modified ?? null });
+
+      // ---------------- the write ----------------
+      const want: string[] = Array.isArray(body.fields) ? body.fields.map(String) : [];
+      if (!want.length) throw new HttpError(400, "Name at least one thing to push.");
+      const done: string[] = [];
+      const failed: { field: string; why: string }[] = [];
+
+      const itemPatch: Record<string, unknown> = {};
+      if (want.includes("description") && diff.description.differs) itemPatch.description = genieDesc;
+
+      // The image: uploaded to the ERP first where it is Genie's own, then
+      // the Item is pointed at what the ERP itself now holds.
+      if (want.includes("image") && diff.image.differs) {
+        try {
+          let erpUrl = genieImg;
+          if (imageIsOurs) {
+            const path = decodeURIComponent(new URL(genieImg, "http://x").searchParams.get("path") || "");
+            const { data: dl, error: dErr } = await db.storage.from("cards").download(path);
+            if (dErr || !dl) throw new Error("Genie could not read its own copy of the image.");
+            const fd = new FormData();
+            fd.append("file", new File([await dl.arrayBuffer()], path.split("/").pop() || "image.png", { type: dl.type || "image/png" }));
+            fd.append("is_private", "0");
+            fd.append("doctype", "Item");
+            fd.append("docname", sku);
+            const ur = await fetch(`${cfg.base}/api/method/upload_file`, { method: "POST", headers: cfg.H, body: fd });
+            const uj = await ur.json().catch(() => null);
+            if (!ur.ok) throw new Error(`The ERP refused the upload (${ur.status}).`);
+            erpUrl = String((uj as { message?: { file_url?: string } })?.message?.file_url || "");
+            if (!erpUrl) throw new Error("The ERP took the file but named no URL.");
+          }
+          itemPatch.image = erpUrl;
+        } catch (e) {
+          failed.push({ field: "image", why: e instanceof Error ? e.message : String(e) });
+        }
+      }
+
+      if (Object.keys(itemPatch).length) {
+        const w = await fetch(`${cfg.base}/api/resource/Item/${encodeURIComponent(sku)}`, {
+          method: "PUT", headers: { ...cfg.H, "content-type": "application/json" }, body: JSON.stringify(itemPatch),
+        });
+        if (w.ok) done.push(...Object.keys(itemPatch));
+        else {
+          const t = await w.text().catch(() => "");
+          for (const f of Object.keys(itemPatch)) failed.push({ field: f, why: `The ERP answered ${w.status}${/PermissionError/.test(t) ? " — no permission on Item" : ""}` });
+        }
+      }
+
+      // The price is a row of its own, updated or created.
+      if (want.includes("price") && diff.price.differs && geniePrice != null) {
+        try {
+          const res = priceRow
+            ? await fetch(`${cfg.base}/api/resource/Item Price/${encodeURIComponent(String(priceRow.name))}`, {
+                method: "PUT", headers: { ...cfg.H, "content-type": "application/json" },
+                body: JSON.stringify({ price_list_rate: geniePrice }),
+              })
+            : await fetch(`${cfg.base}/api/resource/Item Price`, {
+                method: "POST", headers: { ...cfg.H, "content-type": "application/json" },
+                body: JSON.stringify({ item_code: sku, price_list: "Standard Selling", price_list_rate: geniePrice, currency: "INR", selling: 1 }),
+              });
+          if (res.ok) done.push("price");
+          else failed.push({ field: "price", why: `The ERP answered ${res.status}` });
+        } catch (e) {
+          failed.push({ field: "price", why: e instanceof Error ? e.message : String(e) });
+        }
+      }
+
+      // Attachments Genie holds go up as files against the Item.
+      if (want.includes("attachments")) {
+        const list = Array.isArray(prod.attachments) ? (prod.attachments as { name?: string; url?: string }[]) : [];
+        const ours = list.filter((a) => /^\/api\/crm\/opp-attach/.test(String(a.url)));
+        let sent = 0;
+        for (const a of ours) {
+          try {
+            const path = decodeURIComponent(new URL(String(a.url), "http://x").searchParams.get("path") || "");
+            const { data: dl } = await db.storage.from("cards").download(path);
+            if (!dl) continue;
+            const fd = new FormData();
+            fd.append("file", new File([await dl.arrayBuffer()], String(a.name || "file"), { type: dl.type || "application/octet-stream" }));
+            fd.append("is_private", "0");
+            fd.append("doctype", "Item");
+            fd.append("docname", sku);
+            const ur = await fetch(`${cfg.base}/api/method/upload_file`, { method: "POST", headers: cfg.H, body: fd });
+            if (ur.ok) sent++;
+          } catch { /* one file failing must not stop the rest */ }
+        }
+        if (sent) done.push(`${sent} attachment${sent === 1 ? "" : "s"}`);
+        else if (ours.length) failed.push({ field: "attachments", why: "The ERP took none of them." });
+      }
+
+      await db.from("crm_audit").insert({
+        entity: "product", entity_id: pid, action: "erp_push",
+        after: { sku, pushed: done, failed }, by_user: me.profileId,
+      }).then(() => null, () => null);
+
+      return NextResponse.json({ ok: failed.length === 0, sku, pushed: done, failed });
+    }
+
     throw new HttpError(400, "Unknown action.");
   } catch (e) {
     return errJson(e);

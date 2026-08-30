@@ -1506,6 +1506,138 @@ const money = (v: unknown, cur = "INR") =>
   v === null || v === undefined || v === "" ? "—"
     : `${cur === "USD" ? "$" : cur === "EUR" ? "€" : "₹"} ${Number(v).toLocaleString("en-IN")}`;
 
+/**
+ * ⇧ PUSH TO ERP (Dr Raghu, 31 Aug 2026: "Can this be pushed back to erp?
+ * along with the modification?").
+ *
+ * It can — the saved token is his own ERP user, which holds write on Item,
+ * Item Price and File. But the ERP's Item table is the company's master
+ * record, and a button that quietly rewrites it is a button nobody can trust.
+ * So this reads BOTH sides first and shows them side by side; only what is
+ * ticked is written, and only where the two actually differ.
+ *
+ * The price is not a field on the Item — it is a row in the Standard Selling
+ * price list, updated there or created if the item never carried one.
+ */
+function ErpPushBox({ pid, onClose }: { pid: string; onClose: () => void }) {
+  type Side = { genie: unknown; erp: unknown; differs: boolean; needsUpload?: boolean; hasRow?: boolean };
+  const [d, setD] = useState<{ sku: string; erp_url: string; diff: Record<string, Side> } | null>(null);
+  const [pick, setPick] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState<{ pushed: string[]; failed: { field: string; why: string }[] } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/crm/product-extra", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "erp_diff", product_id: pid }),
+    })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "The ERP did not answer"); return j; })
+      .then((j) => { setD(j); setPick(Object.entries(j.diff).filter(([, v]) => (v as Side).differs).map(([k]) => k)); })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [pid]);
+
+  const show = (v: unknown) => {
+    const s = String(v ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    return s ? (s.length > 150 ? s.slice(0, 150) + "…" : s) : "— empty —";
+  };
+  const rows: [string, string][] = [["description", "Description"], ["image", "Image"], ["price", "Approved price (Standard Selling)"]];
+  const anyDiff = d ? rows.some(([k]) => d.diff[k]?.differs) : false;
+
+  const run = async () => {
+    setBusy(true); setErr("");
+    const r = await fetch("/api/crm/product-extra", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "erp_push", product_id: pid, fields: pick }),
+    });
+    const j = await r.json();
+    setBusy(false);
+    if (!r.ok) { setErr(j.error || "The ERP refused the write"); return; }
+    setDone({ pushed: j.pushed || [], failed: j.failed || [] });
+  };
+
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)", zIndex: 70 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 680, maxHeight: "90vh", overflow: "auto" }}>
+        <div className="flex items-center justify-between px-4 py-2.5" style={{ background: NAVY, borderRadius: "6px 6px 0 0" }}>
+          <div className="text-white font-bold text-sm">Push to the ERP{d ? ` — Item ${d.sku}` : ""}</div>
+          <button onClick={onClose} className="text-white font-bold px-2">✕</button>
+        </div>
+        <div className="p-4">
+          {!d && !err && <div className="text-sm" style={{ color: MUTED }}>Reading both sides…</div>}
+          {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
+
+          {d && !done && (
+            <>
+              <div className="text-xs mb-3 rounded p-2" style={{ background: "#FCF6E8", color: "#8A6D1A", lineHeight: 1.6 }}>
+                This writes into the ERP&apos;s <b>own master record</b> for this item — everyone who reads
+                nandanerp reads what goes from here. Only what you tick is written, and only where the two
+                differ. Nothing else on the Item is touched.
+              </div>
+              {!anyDiff && <div className="text-sm mb-2" style={{ color: "#1A7F4E", fontWeight: 600 }}>The two already agree — there is nothing to push.</div>}
+              {rows.map(([k, label]) => {
+                const s = d.diff[k];
+                if (!s) return null;
+                return (
+                  <div key={k} className="border rounded p-2 mb-2" style={{ borderColor: s.differs ? ORANGE : BORDER }}>
+                    <label className="flex items-center gap-2 text-sm font-bold" style={{ color: s.differs ? INK : MUTED, cursor: s.differs ? "pointer" : "default" }}>
+                      <input type="checkbox" disabled={!s.differs} checked={pick.includes(k)}
+                        onChange={(e) => setPick((p) => (e.target.checked ? [...p, k] : p.filter((x) => x !== k)))}
+                        style={{ accentColor: ORANGE, width: 14, height: 14 }} />
+                      {label} {!s.differs && <span className="font-normal" style={{ color: MUTED }}>— already the same</span>}
+                    </label>
+                    {s.differs && (
+                      <div className="text-xs mt-1.5" style={{ lineHeight: 1.6 }}>
+                        <div><b style={{ color: MUTED }}>ERP now:</b> {k === "price" ? money(s.erp) : show(s.erp)}</div>
+                        <div><b style={{ color: "#1A7F4E" }}>Genie:</b> {k === "price" ? money(s.genie) : show(s.genie)}</div>
+                        {k === "image" && s.needsUpload && <div style={{ color: MUTED }}>The picture lives in Genie, so it is uploaded to the ERP and attached to the Item.</div>}
+                        {k === "price" && !s.hasRow && <div style={{ color: MUTED }}>The item has no Standard Selling row — one is created.</div>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              <label className="flex items-center gap-2 text-sm font-bold border rounded p-2 mb-2" style={{ borderColor: BORDER, cursor: "pointer" }}>
+                <input type="checkbox" checked={pick.includes("attachments")}
+                  onChange={(e) => setPick((p) => (e.target.checked ? [...p, "attachments"] : p.filter((x) => x !== "attachments")))}
+                  style={{ accentColor: ORANGE, width: 14, height: 14 }} />
+                Attachments <span className="font-normal" style={{ color: MUTED }}>— send Genie&apos;s files up as ERP attachments</span>
+              </label>
+              <div className="flex gap-2 mt-3">
+                <button onClick={() => void run()} disabled={busy || !pick.length}
+                  className="rounded px-4 py-1.5 text-sm font-bold text-white" style={{ background: busy || !pick.length ? "#B9BEC4" : ORANGE }}>
+                  {busy ? "Writing to the ERP…" : `⇧ Push ${pick.length} thing${pick.length === 1 ? "" : "s"}`}
+                </button>
+                <a href={d.erp_url} target="_blank" rel="noreferrer" className="rounded px-3 py-1.5 text-sm font-bold" style={{ color: NAVY }}>Open on the ERP ↗</a>
+                <button onClick={onClose} className="ml-auto rounded px-3 py-1.5 text-sm font-bold" style={{ color: MUTED }}>Cancel</button>
+              </div>
+            </>
+          )}
+
+          {done && (
+            <>
+              <div className="text-sm" style={{ lineHeight: 1.8 }}>
+                {done.pushed.length > 0
+                  ? <><b style={{ color: "#1A7F4E" }}>Written to the ERP:</b> {done.pushed.join(", ")}.</>
+                  : <b style={{ color: "#8E2C20" }}>Nothing was written.</b>}
+                {done.failed.length > 0 && (
+                  <div className="mt-1" style={{ color: "#8E2C20" }}>
+                    {done.failed.map((f, i) => (<div key={i}>✕ {f.field} — {f.why}</div>))}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2 mt-3">
+                {d && <a href={d.erp_url} target="_blank" rel="noreferrer" className="rounded px-3 py-1.5 text-sm font-bold" style={{ color: NAVY }}>See it on the ERP ↗</a>}
+                <button onClick={onClose} className="rounded px-4 py-1.5 text-sm font-bold text-white" style={{ background: ORANGE }}>Close</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** One line of the Basic tab: label, value, and the pencil that edits it. */
 function PencilField({ label, value, type = "text", options, display, onSave }: {
   label: string; value: unknown; type?: "text" | "number" | "select" | "money";
@@ -1609,6 +1741,9 @@ function ProductBasicTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
     return String(j.url);
   };
 
+  const [busyUp, setBusyUp] = useState("");
+  const [pushOpen, setPushOpen] = useState(false);
+
   return (
     <div className="p-4">
       <div className="flex gap-5 flex-wrap">
@@ -1636,20 +1771,79 @@ function ProductBasicTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
           ) : (
             <div className="rounded border text-xs flex items-center justify-center" style={{ borderColor: BORDER, color: MUTED, height: 120 }}>no image yet</div>
           )}
+          {/* UPLOAD FROM THIS COMPUTER (Dr Raghu, 31 Aug 2026: "in product
+              also allow upload from computer") — the picture need not wait
+              on somebody putting it into the ERP first. */}
+          <label className="mt-2 block w-full rounded px-2 py-1.5 text-xs font-bold text-center cursor-pointer border"
+            style={{ borderColor: NAVY, color: NAVY }}>
+            {busyUp === "image" ? "Uploading…" : img ? "⇪ Replace the image" : "⇪ Upload an image"}
+            <input type="file" accept="image/*" hidden disabled={!!busyUp}
+              onChange={async (e) => {
+                const f = e.target.files?.[0]; e.target.value = "";
+                if (!f) return;
+                setBusyUp("image"); setMsg("");
+                try { await patch({ image: await uploadImage(f) }); setMsg("Image uploaded ✓"); window.setTimeout(() => setMsg(""), 4000); }
+                catch (er) { setMsg(er instanceof Error ? er.message : String(er)); }
+                finally { setBusyUp(""); }
+              }} />
+          </label>
+
           <button onClick={() => void pullErp()} disabled={busyErp}
             className="mt-2 w-full rounded px-2 py-1.5 text-xs font-bold text-white" style={{ background: busyErp ? "#B9BEC4" : NAVY }}>
             {busyErp ? "Pulling…" : "↻ Pull from ERP"}
           </button>
           <div className="text-xs mt-1" style={{ color: MUTED, lineHeight: 1.5 }}>Re-reads this item — description, image and its attached files.</div>
+
+          {/* …and the other way (Dr Raghu, 31 Aug 2026: "Can this be pushed
+              back to erp? along with the modification?"). It shows what
+              differs before it writes anything. */}
+          <button onClick={() => setPushOpen(true)}
+            className="mt-2 w-full rounded px-2 py-1.5 text-xs font-bold border" style={{ borderColor: ORANGE, color: ORANGE }}>
+            ⇧ Push to ERP
+          </button>
           {msg && <div className="text-xs mt-1 font-semibold" style={{ color: msg.includes("✓") ? "#1A7F4E" : "#8E2C20" }}>{msg}</div>}
-          {attachments.length > 0 && (
-            <div className="mt-3">
-              <div className="text-xs font-semibold mb-1" style={{ color: MUTED }}>ATTACHMENTS</div>
-              {attachments.map((a, i) => (
-                <a key={i} href={String(a.url)} target="_blank" rel="noreferrer" className="block text-xs mb-0.5" style={{ color: "#2C5B82", textDecoration: "underline", overflowWrap: "anywhere" }}>📎 {String(a.name || a.url)}</a>
-              ))}
-            </div>
-          )}
+
+          <div className="mt-3">
+            <div className="text-xs font-semibold mb-1" style={{ color: MUTED }}>ATTACHMENTS</div>
+            {attachments.map((a, i) => (
+              <div key={i} className="flex items-start gap-1 mb-0.5">
+                <a href={String(a.url)} target="_blank" rel="noreferrer" className="text-xs flex-1" style={{ color: "#2C5B82", textDecoration: "underline", overflowWrap: "anywhere" }}>📎 {String(a.name || a.url)}</a>
+                <button title="Remove from this product" style={{ color: MUTED, fontSize: 11 }}
+                  onClick={async () => {
+                    if (!window.confirm(`Remove "${String(a.name || a.url)}" from this product?`)) return;
+                    await fetch("/api/crm/product-extra", {
+                      method: "POST", headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ action: "attach_del", product_id: rid, url: a.url }),
+                    });
+                    const rr = await (await fetch(`/api/crm/product?id=${encodeURIComponent(rid)}`, { cache: "no-store" })).json();
+                    if (rr?.row) onSaved(rr.row as Row);
+                  }}>✕</button>
+              </div>
+            ))}
+            {attachments.length === 0 && <div className="text-xs" style={{ color: MUTED }}>None yet.</div>}
+            <label className="mt-1 block w-full rounded px-2 py-1 text-xs font-bold text-center cursor-pointer border"
+              style={{ borderColor: BORDER, color: MUTED }}>
+              {busyUp === "file" ? "Uploading…" : "＋ Add a file from this computer"}
+              <input type="file" hidden disabled={!!busyUp}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0]; e.target.value = "";
+                  if (!f) return;
+                  setBusyUp("file"); setMsg("");
+                  try {
+                    const url = await uploadImage(f);
+                    await fetch("/api/crm/product-extra", {
+                      method: "POST", headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ action: "attach_add", product_id: rid, name: f.name, url }),
+                    });
+                    const rr = await (await fetch(`/api/crm/product?id=${encodeURIComponent(rid)}`, { cache: "no-store" })).json();
+                    if (rr?.row) onSaved(rr.row as Row);
+                    setMsg("File attached ✓"); window.setTimeout(() => setMsg(""), 4000);
+                  } catch (er) { setMsg(er instanceof Error ? er.message : String(er)); }
+                  finally { setBusyUp(""); }
+                }} />
+            </label>
+            <div className="text-xs mt-1" style={{ color: MUTED, lineHeight: 1.5 }}>Up to 25 MB. Every file is copied to the Drive archive too.</div>
+          </div>
         </div>
       </div>
 
@@ -1673,6 +1867,8 @@ function ProductBasicTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
           </div>
         )}
       </div>
+
+      {pushOpen && <ErpPushBox pid={rid} onClose={() => setPushOpen(false)} />}
     </div>
   );
 }
