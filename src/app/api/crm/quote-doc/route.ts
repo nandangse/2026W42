@@ -2,6 +2,7 @@ import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
 import { LOGO } from "@/lib/logo";
+import { cleanDesc } from "@/lib/desc-clean";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -179,13 +180,15 @@ export async function GET(req: Request) {
             const sp = specsOf(l);
             return {
               code: String(p?.sku ?? ""), group: String(l.item_group ?? p?.item_group ?? ""),
-              img: String(sp.image || p?.image || ""), desc: String(sp.rich ?? p?.description ?? ""),
+              // The ERP's "_place_holder;" never prints on a quotation
+              // (Dr Raghu, 30 Aug 2026).
+              img: String(sp.image || p?.image || ""), desc: cleanDesc(sp.rich ?? p?.description ?? ""),
             };
           };
           const cellHead = (l: Record<string, unknown>) => {
             const { code, group, img } = partsOf(l);
             return `<div class="ig">${esc([group, code].filter(Boolean).join(" :: "))}</div>
-              <div class="inm">${esc(l.description)}</div>
+              <div class="inm">${esc(cleanDesc(l.description))}</div>
               ${img ? `<img class="thumb" src="${esc(img)}"/>` : ""}`;
           };
           /** Split rich HTML into char-budgeted pieces on block boundaries —
@@ -218,7 +221,7 @@ export async function GET(req: Request) {
               pieces.forEach((piece, i) => {
                 const pw = piece.replace(/<[^>]+>/g, "").length / CHARS;
                 if (i === 0) frags.push({ sr, cell: `${cellHead(l)}<div class="idesc">${piece}</div>`, l, w: baseW + pw });
-                else frags.push({ sr: "", cell: `<div class="ig">${esc(l.description)} <i>(contd.)</i></div><div class="idesc">${piece}</div>`, l: null, w: 0.3 + pw });
+                else frags.push({ sr: "", cell: `<div class="ig">${esc(cleanDesc(l.description))} <i>(contd.)</i></div><div class="idesc">${piece}</div>`, l: null, w: 0.3 + pw });
               });
             }
           }
@@ -262,7 +265,7 @@ export async function GET(req: Request) {
               <tbody>${page.map(fragRowTech).join("")}</tbody></table>`);
             const slim = (l: Record<string, unknown>) => {
               const { code, group } = partsOf(l);
-              return `<div class="ig">${esc([group, code].filter(Boolean).join(" :: "))}</div><div class="inm">${esc(l.description)}</div>`;
+              return `<div class="ig">${esc([group, code].filter(Boolean).join(" :: "))}</div><div class="inm">${esc(cleanDesc(l.description))}</div>`;
             };
             const comPages: typeof numbered[] = [];
             for (let i = 0; i < numbered.length; i += 11) comPages.push(numbered.slice(i, i + 11));

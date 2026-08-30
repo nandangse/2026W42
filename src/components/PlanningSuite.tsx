@@ -300,6 +300,9 @@ interface AdminUser {
   /** Vishwakarma, design, at /vishwakarma (0076). Same arrangement. */
   vishwakarma_access: boolean;
   vishwakarma_implicit: boolean;
+  /** Seva, customer service, at /seva (0107). Same arrangement. */
+  seva_access: boolean;
+  seva_implicit: boolean;
 }
 
 const ROLE_OPTIONS: { value: string; label: string; hint: string }[] = [
@@ -6535,6 +6538,15 @@ function Admin({
     } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
   };
 
+  /** Seva, the sixth. Owner only, same as the rest. */
+  const setSeva = async (id: string, grant: boolean) => {
+    setGaMsg("");
+    try {
+      await api.post("/api/admin/users", { action: "seva_access", id, grant });
+      loadUsers();
+    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
   /** Goals access from inside the Users table. Reloads both lists. */
   const setGoalsLevel = async (id: string, level: string) => {
     const who = (users ?? []).find((x) => x.id === id);
@@ -6797,6 +6809,7 @@ function Admin({
                   <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/hrms — people records">👤 HRMS</th>
                   <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/kuber — Kuber, the accounts module">💰 Kuber</th>
                   <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/vishwakarma — Vishwakarma, the design module">🛠 Vishwakarma</th>
+                  <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/seva — Seva, the customer-service module">🛎 Seva</th>
                 </tr>
               </thead>
               <tbody>
@@ -6827,6 +6840,12 @@ function Admin({
                         onChange={(e) => setVishwakarma(u.id, e.target.checked)}
                         style={{ accentColor: "#7C3AED", width: 14, height: 14, cursor: isOwner && !u.vishwakarma_implicit ? "pointer" : "default" }}
                         title={u.vishwakarma_implicit ? "The owner holds it already" : isOwner ? "Open Vishwakarma — the design module" : `Only ${OWNER_EMAIL} may grant this`} />
+                    </td>
+                    <td className="py-1.5 text-center">
+                      <input type="checkbox" checked={!!u.seva_access} disabled={!isOwner || u.seva_implicit}
+                        onChange={(e) => setSeva(u.id, e.target.checked)}
+                        style={{ accentColor: "#0F766E", width: 14, height: 14, cursor: isOwner && !u.seva_implicit ? "pointer" : "default" }}
+                        title={u.seva_implicit ? "The owner holds it already" : isOwner ? "Open Seva — the customer-service module" : `Only ${OWNER_EMAIL} may grant this`} />
                     </td>
                   </tr>
                 ))}

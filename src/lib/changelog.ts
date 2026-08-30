@@ -75,6 +75,29 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.0.0.1",
+    date: "2026-08-30",
+    module: "CRM — the ERP's placeholder stops printing on quotations",
+    items: [
+      "\"In item description remove this _place_holder; from everywhere. keep a space before and after the : too\" (Dr Raghu, 30 Aug 2026) — the old ERP wrote specifications as \"Capacity : _place_holder;750 kgs\", a marker for a field it never filled, and it was going out on quotations. It is now swept at the point of reading rather than row by row in the data: every rich text box in Genie and every printed quote clean it, so product masters, quote lines, copies of either and whatever imports tomorrow are all covered at once. The label's colon keeps a space on each side; a time, a ratio and a URL are left exactly as they were.",
+    ],
+  },
+  {
+    v: "4.0.0.0",
+    date: "2026-08-30",
+    module: "SEVA — the sixth door: customer service",
+    items: [
+      "\"Seva - customer service. follow same genie database. lets do version 4.0 from here\" (Dr Raghu, 30 Aug 2026) — the MAIN version turns on his instruction, and it turns for a reason: Genie now has six doors, and the sixth is the one that faces the customer AFTER the machine is theirs. genie.nandan.co.in/seva, the same login, granted per person and to nobody by default.",
+      "ISSUES — what the customer says is wrong, logged the hour it arrives: customer, machine, serial, category, how it was reported, an owner, a due date, and the resolution written down before it may be called closed. Open-only by default, and anything past its due date says how many days late in red.",
+      "ANNUAL MAINTENANCE — every AMC on one register: what it covers, from when to when, visits owed against visits made, the value, what has been billed, the engineer. ⇪ IMPORT takes an Excel by paste — headers matched by NAME rather than position, dates read day-first, every row previewed before one is written.",
+      "⇩ PULL FROM ERP — the register comes straight off nandanerp's Annual Maintenance Contract doctype (Dr Raghu, 30 Aug 2026, handing over the report link). The statuses are counted off the ERP first and offered with their numbers — 68 AMC valid paid, 280 AMC lapse, 12 cancelled, 1 Warranty, 1 Visit AMC Chargable — so the choice is made against the real register. The ERP is READ ONLY; a contract already here is refreshed rather than duplicated, and the visits made, notes, serial and location the team typed are never overwritten. Seva's AMC statuses are the ERP's own five words, kept as masters so they stay editable.",
+      "The dates, honestly: the ERP keeps the machine and the contract dates in a child table that is EMPTY on 349 of its 362 contracts — only one of the 68 live ones has it. Where it is filled it is believed; where it is not, the end date is taken as one year from the contract date, the row is stamped, and the register shows that date with a ≈. The renewal view therefore exists, and an inference is never dressed up as the ERP's word.",
+      "PUSH, 1:1 — \"build a 1:1 push system here\": one named person hands one named person one thing. Two names on it, so nobody can leave it for somebody else to pick up. It rings their bell at once, opening it stamps it seen, their answer rings yours back, and either end may close it. A push can be raised from an issue or a contract, and the thread stands beside the record it came from.",
+      "SETTINGS — every dropdown Seva offers is a row somebody can edit, not a constant in the code: issue categories, issue statuses, AMC statuses, service engineers, reported-via. Retiring a word takes it off the pickers without rewriting what was already closed under it.",
+      "Genie migration 0107 builds the four tables and the grant; the Seva tick joins CRM, HRMS, Kuber and Vishwakarma at the top of Admin → Users.",
+    ],
+  },
+  {
     v: "3.31.1.44",
     date: "2026-08-30",
     module: "CRM — sales orders get their items; Analytics learns Breakdowns",

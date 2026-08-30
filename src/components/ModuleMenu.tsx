@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The module switcher — Genie's four doors on one list, and the account menu
+ * The module switcher — Genie's doors on one list, and the account menu
  * for the modules that had none.
  *
  * Dr Raghu, 28 Aug 2026: the account dropdown should carry Main Genie · CRM ·
@@ -18,7 +18,7 @@
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
-export type ModuleKey = "main" | "crm" | "hrms" | "accounts" | "vishwakarma";
+export type ModuleKey = "main" | "crm" | "hrms" | "accounts" | "vishwakarma" | "seva";
 
 const MODULES: { key: ModuleKey; label: string; icon: string; href: string }[] = [
   { key: "main", label: "Main Genie", icon: "🧞", href: "/" },
@@ -26,6 +26,7 @@ const MODULES: { key: ModuleKey; label: string; icon: string; href: string }[] =
   { key: "hrms", label: "HRMS", icon: "👤", href: "/hrms" },
   { key: "accounts", label: "Kuber", icon: "💰", href: "/kuber" },
   { key: "vishwakarma", label: "Vishwakarma", icon: "🛠", href: "/vishwakarma" },
+  { key: "seva", label: "Seva", icon: "🛎", href: "/seva" },
 ];
 
 /** The rows alone — dropped into the main app's existing account dropdown. */

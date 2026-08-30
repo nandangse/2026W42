@@ -47,7 +47,9 @@ export async function notify(
   admin: SupabaseClient,
   n: {
     person_id: string;
-    kind: "task_assigned" | "task_reassigned" | "goal_assigned";
+    /** The kinds the bell rings for — matched by the table's own check
+     *  constraint, so a new one is added in both places or neither. */
+    kind: "task_assigned" | "task_reassigned" | "goal_assigned" | "seva_push";
     title: string;
     body?: string;
     ref_kind?: string;

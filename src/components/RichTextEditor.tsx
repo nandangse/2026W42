@@ -16,6 +16,7 @@
  * door; with it, it is a text box.
  */
 import React, { useEffect, useRef, useState } from "react";
+import { cleanDesc } from "@/lib/desc-clean";
 
 const ALLOWED = new Set(["B", "STRONG", "I", "EM", "U", "S", "P", "DIV", "BR", "SPAN", "A", "UL", "OL", "LI",
   "TABLE", "TBODY", "THEAD", "TR", "TD", "TH", "IMG", "BLOCKQUOTE", "H1", "H2", "H3", "FONT"]);
@@ -83,11 +84,14 @@ export function RichContent({ text, legacy, thumbs }: { text: string; legacy: (s
     const t = e.target as HTMLElement;
     if (t.tagName === "IMG") window.open((t as HTMLImageElement).src, "_blank", "noopener");
   };
-  if (looksHtml(text)) {
+  // The ERP's "_place_holder;" never reaches a reader's eye (Dr Raghu,
+  // 30 Aug 2026) — swept here, so every rich box in Genie is clean at once.
+  const clean = cleanDesc(text);
+  if (looksHtml(clean)) {
     return <div className={"rich-html" + (thumbs ? " rich-thumbs" : "")} style={{ lineHeight: 1.6 }}
-      onClick={thumbs ? expand : undefined} dangerouslySetInnerHTML={{ __html: sanitizeRich(text) }} />;
+      onClick={thumbs ? expand : undefined} dangerouslySetInnerHTML={{ __html: sanitizeRich(clean) }} />;
   }
-  return <div className={thumbs ? "rich-thumbs" : undefined} onClick={thumbs ? expand : undefined}>{legacy(text)}</div>;
+  return <div className={thumbs ? "rich-thumbs" : undefined} onClick={thumbs ? expand : undefined}>{legacy(clean)}</div>;
 }
 
 const COLORS = ["#16232F", "#B3261E", "#E8600A", "#0D7A3F", "#1B3A5C", "#7C3AED"];
