@@ -1869,10 +1869,95 @@ function SituationalTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void
  *  one tab shape for both: a dropdown of Quote Templates; choosing one
  *  DUMPS its default text in, then the hand edits. The letter also gets
  *  "Use Genie to beautify", twice at most. */
-function QuoteTemplateTab({ row, onSaved, kind }: { row: Row; onSaved: (r?: Row) => void; kind: "terms" | "letter" }) {
+/** The document desk (Dr Raghu, 30 Aug 2026): the Covering Letter tab holds
+ *  the whole printed quote — letter, situational, terms, cover, back, about,
+ *  and Review Quote where the PDF assembles with a DRAFT watermark. */
+function QuoteDocDesk({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
+  const [sub, setSub] = useState("letter");
+  const T = [
+    ["letter", "Covering Letter"], ["situational", "Situational Analysis"], ["terms", "Terms and Conditions"],
+    ["cover", "Cover Page"], ["back", "Back Page"], ["about", "About Nandan"], ["review", "🖨 Review Quote"],
+  ] as const;
+  return (
+    <div>
+      <div className="flex gap-1 px-4 pt-3 flex-wrap" style={{ borderBottom: `1px solid ${BORDER}`, background: "#FAF9F5" }}>
+        {T.map(([k, lab]) => (
+          <button key={k} onClick={() => setSub(k)} className="px-3 py-1.5 text-xs font-bold rounded-t"
+            style={{ background: sub === k ? "#fff" : "#F2F0EA", border: `1px solid ${BORDER}`,
+              borderBottom: sub === k ? "1px solid #fff" : `1px solid ${BORDER}`, marginBottom: -1,
+              color: sub === k ? ORANGE : "#5A6672" }}>
+            {lab}
+          </button>
+        ))}
+      </div>
+      {sub === "review" ? <ReviewQuoteTab row={row} onSaved={onSaved} />
+        : sub === "situational" ? <SituationalTab row={row} onSaved={onSaved} />
+        : <QuoteTemplateTab row={row} onSaved={onSaved} kind={sub as TplKind} />}
+    </div>
+  );
+}
+
+/** Review Quote: tick the sections, watch the document assemble below —
+ *  every page wearing the Nandan header, the confidential footer, and the
+ *  DRAFT watermark. Download opens the browser's Save-as-PDF. */
+function ReviewQuoteTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
   const rid = String(row.id ?? "");
-  const tplField = kind === "terms" ? "terms_template" : "letter_template";
-  const textField = kind === "terms" ? "terms_text" : "letter_text";
+  const SECTIONS: [string, string][] = [
+    ["cover", "Cover Page"], ["letter", "Covering Letter"], ["situational", "Situational Analysis"],
+    ["items", "Items (with Rate)"], ["terms", "Terms and Conditions"], ["about", "About Nandan"], ["back", "Back Page"],
+  ];
+  const chosen = Array.isArray(row.print_sections)
+    ? (row.print_sections as unknown[]).map(String)
+    : SECTIONS.map(([k]) => k);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const toggle = async (k: string) => {
+    const next = chosen.includes(k) ? chosen.filter((x) => x !== k) : [...chosen, k];
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch(`/api/crm/quotation?id=${encodeURIComponent(rid)}`, {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ print_sections: next }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save");
+      onSaved(j.row as Row);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  const url = `/api/crm/quote-doc?id=${encodeURIComponent(rid)}&sections=${encodeURIComponent(chosen.join(","))}`;
+  return (
+    <div className="p-4">
+      <div className="flex items-center gap-3 flex-wrap mb-2">
+        {SECTIONS.map(([k, lab]) => (
+          <label key={k} className="text-xs font-semibold flex items-center gap-1.5" style={{ color: "#3A4652" }}>
+            <input type="checkbox" checked={chosen.includes(k)} disabled={busy} onChange={() => void toggle(k)} style={{ accentColor: NAVY }} />
+            {lab}
+          </label>
+        ))}
+        <a href={`${url}&print=1`} target="_blank" rel="noreferrer"
+          className="rounded px-3 py-1.5 text-xs font-bold text-white ml-auto" style={{ background: ORANGE, textDecoration: "none" }}>
+          ⬇ Download PDF (DRAFT)
+        </a>
+      </div>
+      <div className="text-xs mb-2" style={{ color: MUTED }}>
+        Items print with rates on their own pages. Every page: Nandan logo up top; Quotation No + Date, Private and Confidential, Page x of y below. The DRAFT watermark rides until the quote is sent.
+        {err && <span className="ml-2 font-semibold" style={{ color: "#8E2C20" }}>{err}</span>}
+      </div>
+      <iframe key={chosen.join(",") + String(row.updated_at ?? "")} src={url} title="Quote preview"
+        style={{ width: "100%", height: "calc(100vh - 320px)", border: `1px solid ${BORDER}`, borderRadius: 8, background: "#666" }} />
+    </div>
+  );
+}
+
+type TplKind = "terms" | "letter" | "cover" | "back" | "about";
+const TPL_LABEL: Record<TplKind, string> = {
+  terms: "Terms set", letter: "Letter flavour", cover: "Cover page", back: "Back page", about: "About Nandan",
+};
+function QuoteTemplateTab({ row, onSaved, kind }: { row: Row; onSaved: (r?: Row) => void; kind: TplKind }) {
+  const rid = String(row.id ?? "");
+  const tplField = `${kind}_template`;
+  const textField = `${kind}_text`;
   const stored = String(row[textField] ?? "").trim();
   const chosen = String(row[tplField] ?? "");
   const runs = Number(row.letter_genie_runs) || 0;
@@ -1927,7 +2012,7 @@ function QuoteTemplateTab({ row, onSaved, kind }: { row: Row; onSaved: (r?: Row)
     <div className="p-4">
       <div className="flex items-center gap-3 mb-2 flex-wrap">
         <label className="text-xs font-semibold flex items-center gap-1.5" style={{ color: MUTED }}>
-          {kind === "terms" ? "Terms set" : "Letter flavour"}
+          {TPL_LABEL[kind]}
           <select value={chosen} disabled={busy !== null} onChange={(e) => void choose(e.target.value)}
             className="px-2 py-1 rounded text-xs border font-bold" style={{ borderColor: chosen ? ORANGE : BORDER, background: "#fff", color: INK }}>
             <option value="">— choose —</option>
@@ -1960,7 +2045,7 @@ function QuoteTemplateTab({ row, onSaved, kind }: { row: Row; onSaved: (r?: Row)
         <div className="rounded border p-4 text-sm" style={{ borderColor: BORDER, lineHeight: 1.7, maxWidth: "80ch" }}>
           {stored
             ? <RichContent text={stored} legacy={(s2) => <RichText text={s2} />} />
-            : <span style={{ color: MUTED }}>Nothing here yet — choose a {kind === "terms" ? "terms set" : "letter flavour"} above and its defaults dump in.</span>}
+            : <span style={{ color: MUTED }}>Nothing here yet — choose from the dropdown above and its defaults dump in{["cover", "back", "about"].includes(kind) ? " (the standard template prints even unchosen)" : ""}.</span>}
         </div>
       )}
     </div>
@@ -3066,10 +3151,10 @@ function RecordModal({
         recordTabs.push({ key: "oppenquiry", label: "Enquiry Info" });
         recordTabs.push({ key: "dealppl", label: "Deal Contacts", slug: "opportunity_contact", filterField: "opportunity_id", filterValue: qOpp, addPresets: { opportunity_id: qOpp }, presetOptions: { opportunity: [{ id: qOpp, label: "this quotation's opportunity" }] } });
       }
-      recordTabs.push({ key: "situational", label: "Situational Details" });
       recordTabs.push({ key: "lines", label: "Quote items", slug: "quotation_line", filterField: "quotation_id", filterValue: rid, addPresets: { quotation_id: rid } });
-      recordTabs.push({ key: "terms", label: "Terms & Conditions" });
-      recordTabs.push({ key: "letter", label: "Covering Letter" });
+      // Situational, Terms, Cover/Back/About and Review all live INSIDE the
+      // Covering Letter desk now (Dr Raghu, 30 Aug 2026)
+      recordTabs.push({ key: "letterdesk", label: "Covering Letter" });
     }
     if (dt.name === "person") recordTabs.push({ key: "card", label: "Visiting Card" });
     recordTabs.push(
@@ -3289,14 +3374,10 @@ function RecordModal({
               )}
             </div>
             )
-          ) : tab === "situational" && dt.name === "quotation" ? (
-            <SituationalTab row={row} onSaved={onSaved} />
           ) : tab === "lines" && dt.name === "quotation" ? (
             <QuoteItemsTab quote={row} onSaved={onSaved} />
-          ) : tab === "terms" && dt.name === "quotation" ? (
-            <QuoteTemplateTab row={row} onSaved={onSaved} kind="terms" />
-          ) : tab === "letter" && dt.name === "quotation" ? (
-            <QuoteTemplateTab row={row} onSaved={onSaved} kind="letter" />
+          ) : tab === "letterdesk" && dt.name === "quotation" ? (
+            <QuoteDocDesk row={row} onSaved={onSaved} />
           ) : tab === "pquotes" ? (
             <ProductQuotesTab id={rid} />
           ) : tab === "ppricing" ? (

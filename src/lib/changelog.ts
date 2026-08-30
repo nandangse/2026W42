@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.87",
+    date: "2026-08-30",
+    module: "CRM — the quote becomes a DOCUMENT",
+    items: [
+      "The Covering Letter tab is now the whole document desk (Dr Raghu, 30 Aug 2026): inner tabs for Covering Letter · Situational Analysis · Terms and Conditions · Cover Page · Back Page · About Nandan — each template-driven from Masters → Quote Templates — and 🖨 REVIEW QUOTE.",
+      "Review Quote: tick the sections — Cover, Letter, Situational, Items (with rates, their own pages), Terms, About Nandan, Back — and the assembled document previews below, page by page.",
+      "Every page wears the Nandan logo in the header and the footer rule with Quotation No + Date left, Private and Confidential centre, Page x of y right — and a DRAFT watermark across each page. ⬇ Download opens Save-as-PDF.",
+      "The old top-level Situational Details and Terms & Conditions tabs moved inside. CRM migration 0038 carries the cover/back/about templates and the print recipe.",
+    ],
+  },
+  {
     v: "3.31.0.86",
     date: "2026-08-30",
     module: "CRM — quote desk polish round",
