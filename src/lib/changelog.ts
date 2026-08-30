@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.39",
+    date: "2026-08-30",
+    module: "CRM — Find CIN takes the road their docs actually name",
+    items: [
+      "Find CIN answered Invalid uri for every company: the endpoint lives on api.instafinancials.com as /InstaReports/v1/GetCIN/Search/{term}/Mode/SW, and MCA spells \"PRIVATE LIMITED\", so the Pvt Ltd tail is dropped from the starts-with term. One catch stands outside the code: GetCIN answers ProductAccessDenied until the product is activated on the InstaFinancials API dashboard.",
+    ],
+  },
+  {
     v: "3.31.1.38",
     date: "2026-08-30",
     module: "CRM — the Apollo reveal completes the masked names",

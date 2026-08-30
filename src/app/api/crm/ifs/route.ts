@@ -34,8 +34,11 @@ export async function POST(req: Request) {
       if (!cfg2.api_key) throw new HttpError(503, "The InstaFinancials key is not saved — Settings → Integrations.");
       const nameQ = String(body.name || co.name || "").trim();
       if (!nameQ) throw new HttpError(400, "A company name to search.");
-      const tmpl2 = (cfg2.cin_url_template || "https://instafinancials.com/api/GetCIN/v1/json/CompanyName/{name}").trim();
-      const url2 = tmpl2.replace("{name}", encodeURIComponent(nameQ));
+      // real endpoint (their docs, 30 Aug 2026): api. host, Search/{term}/Mode/SW;
+      // MCA spells "PRIVATE LIMITED", so the Pvt Ltd tail is dropped from the term
+      const tmpl2 = (cfg2.cin_url_template || "https://api.instafinancials.com/InstaReports/v1/GetCIN/Search/{name}/Mode/SW").trim();
+      const baseQ = nameQ.replace(/\b(pvt|private)\.?\s*(ltd|limited)\b\.?|\b(ltd|limited)\.?$/gi, "").trim() || nameQ;
+      const url2 = tmpl2.replace("{name}", encodeURIComponent(baseQ));
       const r2 = await fetch(url2, { headers: { "user-key": cfg2.api_key, accept: "application/json" } });
       const text2 = await r2.text();
       if (!r2.ok) throw new HttpError(502, `GetCIN said ${r2.status}: ${text2.slice(0, 200)} — is the GetCIN API toggled Active on instafinancials.com?`);
