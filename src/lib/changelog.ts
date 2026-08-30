@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.65",
+    date: "2026-08-30",
+    module: "CRM — notes are rich comments, and Genie reads them",
+    items: [
+      "NOTES on every record write and read as RICH TEXT now (Dr Raghu, 30 Aug 2026): the composer carries the Bold · List · Link toolbar, each note stays a signed, dated comment.",
+      "ASK GENIE READS THE NOTES: the enquiry brief weighs the team's own comments — newest first — alongside the customer, the contact and the history.",
+    ],
+  },
+  {
     v: "3.31.0.64",
     date: "2026-08-30",
     module: "Delivered Jobs — the average speaks, the band explains",

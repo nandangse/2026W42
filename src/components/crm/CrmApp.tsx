@@ -2552,9 +2552,24 @@ function NotesTab({ type, id }: { type: string; id: string }) {
   type NoteRow = { id: string; title: string | null; body: string; author: string | null; created_at: string };
   const [notes, setNotes] = useState<NoteRow[] | null>(null);
   const [text, setText] = useState("");
+  const [composing, setComposing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [tick, setTick] = useState(0);
+  const saveRich = async (md: string) => {
+    if (!md.trim()) { setComposing(false); return; }
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/crm/notes", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ target_type: type, target_id: id, body: md.trim() }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save the note");
+      setComposing(false); setTick((t) => t + 1);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
 
   useEffect(() => {
     fetch(`/api/crm/notes?target_type=${encodeURIComponent(type)}&target_id=${encodeURIComponent(id)}`, { cache: "no-store" })
@@ -2581,18 +2596,15 @@ function NotesTab({ type, id }: { type: string; id: string }) {
   return (
     <div className="p-4" style={{ maxHeight: "calc(100vh - 240px)", overflowY: "auto" }}>
       <div className="mb-3">
-        <textarea
-          value={text} onChange={(e) => setText(e.target.value)} rows={3}
-          placeholder="Write a note — it stays on this record, signed and dated."
-          className="w-full rounded border px-2 py-1.5 text-sm" style={{ borderColor: BORDER }}
-        />
-        <div className="flex justify-end mt-1">
-          <button onClick={save} disabled={busy || !text.trim()}
-            className="px-3 py-1 rounded text-xs font-bold"
-            style={{ background: busy || !text.trim() ? "#B9BEC4" : ORANGE, color: "#fff" }}>
-            {busy ? "Saving…" : "Add note"}
+        {composing ? (
+          <RichEditor initial="" busy={busy} onCancel={() => setComposing(false)}
+            onSave={(md) => { setText(md); void saveRich(md); }} />
+        ) : (
+          <button onClick={() => setComposing(true)} className="w-full rounded border px-3 py-2 text-sm text-left"
+            style={{ borderColor: BORDER, color: MUTED, background: "#fff" }}>
+            ✎ Write a note — bold, bullets and links; it stays on this record, signed and dated.
           </button>
-        </div>
+        )}
         {err && <div className="text-xs mt-1" style={{ color: "#8E2C20" }}>{err}</div>}
       </div>
       {notes === null && <div className="text-sm" style={{ color: MUTED }}>loading…</div>}
@@ -2605,7 +2617,8 @@ function NotesTab({ type, id }: { type: string; id: string }) {
             {n.author ?? "—"} · <span className="tnum">{fmtDate(n.created_at)}</span>
           </div>
           {n.title && <div className="text-sm font-bold mt-0.5">{n.title}</div>}
-          <div className="text-sm mt-0.5" style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}>{n.body}</div>
+          {/* comments read as rich text (Dr Raghu, 30 Aug 2026) */}
+          <div className="text-sm mt-0.5" style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}><RichText text={n.body} /></div>
         </div>
       ))}
     </div>

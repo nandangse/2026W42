@@ -71,6 +71,21 @@ export async function POST(req: Request) {
       if (ints) history += "\nRecent interactions:\n" + ints;
     }
 
+    // the team's own comments on the record — Genie reads these too
+    // (Dr Raghu, 30 Aug 2026: "the genie should also read this!")
+    let teamNotes = "none on record";
+    try {
+      const { data: links } = await db.from("record_link").select("source_id")
+        .eq("source_type", "note").eq("target_type", "opportunity").eq("target_id", oppId).limit(20);
+      const nids = (links || []).map((l) => String(l.source_id));
+      if (nids.length) {
+        const { data: ns } = await db.from("note").select("body, created_at").in("id", nids)
+          .order("created_at", { ascending: false }).limit(10);
+        const lines = (ns || []).map((n) => `- ${String(n.created_at).slice(0, 10)}: ${String(n.body).replace(/\s+/g, " ").slice(0, 240)}`);
+        if (lines.length) teamNotes = lines.join("\n");
+      }
+    } catch { /* notes are optional context */ }
+
     // industry credibility — what we have made for this industry before
     let industryScope = "The company carries no industry in the CRM.";
     if (company?.industry_id) {
@@ -96,6 +111,9 @@ Contact: ${contact}
 OUR HISTORY WITH THIS CUSTOMER
 ${history}
 ${invoiced}
+
+THE TEAM'S NOTES ON THIS ENQUIRY (comments, newest first — weigh them)
+${teamNotes}
 
 INDUSTRY
 ${industryScope}
