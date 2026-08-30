@@ -2727,6 +2727,30 @@ function AddressSelect({ companyId, value, onPick }: {
   companyId: string; value: string; onPick: (id: string) => void;
 }) {
   const [opts, setOpts] = useState<{ id: string; label: string }[]>([]);
+  // "add address also in the quotation" (Dr Raghu, 30 Aug 2026) — a new
+  // address for the client, born right here
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ label: "Billing", line1: "", line2: "", city: "", state: "", pincode: "" });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const createAddress = async () => {
+    if (!form.line1.trim()) { setErr("At least the first line."); return; }
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/crm/address", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ company_id: companyId, ...form }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not save the address");
+      const label = [form.label, form.line1, form.city].filter(Boolean).join(" · ");
+      setOpts((cur) => [...cur, { id: String(j.row.id), label }]);
+      onPick(String(j.row.id));
+      setAdding(false);
+      setForm({ label: "Billing", line1: "", line2: "", city: "", state: "", pincode: "" });
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
   useEffect(() => {
     if (!companyId) { setOpts([]); return; }
     let dead = false;
@@ -2747,11 +2771,43 @@ function AddressSelect({ companyId, value, onPick }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opts]);
   return (
-    <select value={value} onChange={(e) => onPick(e.target.value)}
-      className="w-full px-2 py-1.5 rounded text-sm border" style={{ borderColor: "#E2E0DA", background: "#fff" }}>
-      <option value="">{companyId ? (opts.length ? "—" : "no address on the company yet") : "pick the company first"}</option>
-      {opts.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-    </select>
+    <div>
+      <select value={value} disabled={busy}
+        onChange={(e) => { if (e.target.value === "__new") { setAdding(true); return; } onPick(e.target.value); }}
+        className="w-full px-2 py-1.5 rounded text-sm border" style={{ borderColor: "#E2E0DA", background: "#fff" }}>
+        <option value="">{companyId ? (opts.length ? "—" : "no address on the company yet") : "pick the company first"}</option>
+        {opts.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+        {companyId && <option value="__new">＋ Add new address…</option>}
+      </select>
+      {adding && (
+        <div className="rounded border p-2.5 mt-1.5" style={{ borderColor: ORANGE, background: "#FFFDF9" }}>
+          {err && <div className="text-xs mb-1 font-semibold" style={{ color: "#8E2C20" }}>{err}</div>}
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: "1fr 1fr" }}>
+            <select value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
+              className="px-2 py-1 rounded border text-xs" style={{ borderColor: BORDER, background: "#fff" }}>
+              {["Billing", "Shipping", "Works", "Office"].map((l) => <option key={l}>{l}</option>)}
+            </select>
+            <input value={form.pincode} onChange={(e) => setForm((f) => ({ ...f, pincode: e.target.value }))} placeholder="PIN code"
+              className="px-2 py-1 rounded border text-xs" style={{ borderColor: BORDER }} />
+            <input value={form.line1} onChange={(e) => setForm((f) => ({ ...f, line1: e.target.value }))} placeholder="Address line 1 *"
+              className="px-2 py-1 rounded border text-xs" style={{ borderColor: BORDER, gridColumn: "1 / -1" }} />
+            <input value={form.line2} onChange={(e) => setForm((f) => ({ ...f, line2: e.target.value }))} placeholder="Address line 2"
+              className="px-2 py-1 rounded border text-xs" style={{ borderColor: BORDER, gridColumn: "1 / -1" }} />
+            <input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} placeholder="City"
+              className="px-2 py-1 rounded border text-xs" style={{ borderColor: BORDER }} />
+            <input value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))} placeholder="State (decides IGST vs CGST+SGST)"
+              className="px-2 py-1 rounded border text-xs" style={{ borderColor: BORDER }} />
+          </div>
+          <div className="flex gap-2 mt-1.5">
+            <button onClick={() => void createAddress()} disabled={busy}
+              className="rounded px-2.5 py-1 text-xs font-bold text-white" style={{ background: busy ? "#B9BEC4" : "#0D7A3F" }}>
+              {busy ? "Saving…" : "✓ Save address"}
+            </button>
+            <button onClick={() => setAdding(false)} className="rounded px-2 py-1 text-xs font-bold" style={{ background: "#EFEDE7", color: "#5A6672" }}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
