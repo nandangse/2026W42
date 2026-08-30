@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.11",
+    date: "2026-08-30",
+    module: "CRM — Analytics: the whole business first, then the lanes with money",
+    items: [
+      "The all-business funnel card stands FIRST; below it every salesperson (or sector) reads as one row — name on the left, the three boxes to its right (Dr Raghu, 30 Aug 2026).",
+      "Quotations and Sales Orders now carry their MONEY — ₹ in crores/lakhs under the counts, per lane and for the whole business.",
+    ],
+  },
+  {
     v: "3.31.1.10",
     date: "2026-08-30",
     module: "CRM — Analytics counts by BUSINESS dates",

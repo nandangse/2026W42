@@ -19,7 +19,16 @@ type Lane = {
   opps: number;
   quotes: number;
   sos: number;
+  quoteAmt?: number;
+  soAmt?: number;
   quoteStages: { name: string; colour: string | null; count: number }[];
+};
+
+/** ₹ 12.40 Cr / ₹ 8.2 L — money at analytics altitude. */
+const cr = (v?: number) => {
+  const n = Number(v) || 0;
+  if (!n) return null;
+  return n >= 1e7 ? `₹ ${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹ ${(n / 1e5).toFixed(1)} L` : `₹ ${Math.round(n).toLocaleString("en-IN")}`;
 };
 
 const pct = (num: number, den: number) =>
@@ -46,7 +55,7 @@ export default function AnalyticsScreen() {
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
   }, [range.from, range.to, mode]);
 
-  const shown: Lane[] = swim ? (lanes ?? []).filter((l) => l.opps + l.quotes + l.sos > 0) : all ? [all] : [];
+  const shown: Lane[] = swim ? (lanes ?? []).filter((l) => l.opps + l.quotes + l.sos > 0) : [];
 
   return (
     <div>
@@ -93,25 +102,40 @@ export default function AnalyticsScreen() {
         </div>
       )}
 
-      {shown.map((l) => (
-        <div key={l.key} className="rounded border mb-3 p-4" style={{ borderColor: BORDER, background: "#fff" }}>
+      {/* THE WHOLE BUSINESS FIRST (Dr Raghu, 30 Aug 2026) — then the lanes,
+          name on the left, the three boxes to its right */}
+      {all && (
+        <div className="rounded border mb-3 p-4" style={{ borderColor: BORDER, background: "#fff" }}>
           <div className="flex items-center gap-3 mb-3 flex-wrap">
-            <div className="font-bold" style={{ color: NAVY, fontSize: 15, minWidth: 120 }}>{l.name}</div>
-            <span
-              className="text-xs font-bold px-2 py-0.5 rounded-full"
-              style={{ background: NAVY_SOFT, color: NAVY }}
-              title="End to end: sales orders against opportunities"
-            >
-              top {pct(l.sos, l.opps)}
+            <div className="font-bold" style={{ color: NAVY, fontSize: 15, minWidth: 120 }}>{all.name}</div>
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: NAVY_SOFT, color: NAVY }}
+              title="End to end: sales orders against opportunities">
+              top {pct(all.sos, all.opps)}
             </span>
           </div>
-
           <div className="flex items-center gap-3 flex-wrap">
-            <Station label="Opportunities" n={l.opps} />
+            <Station label="Opportunities" n={all.opps} />
+            <Arrow label={pct(all.quotes, all.opps)} />
+            <Station label="Quotations" n={all.quotes} amt={cr(all.quoteAmt)} />
+            <Arrow label={pct(all.sos, all.quotes)} />
+            <Station label="Sales Orders" n={all.sos} amt={cr(all.soAmt)} strong />
+          </div>
+        </div>
+      )}
+
+      {shown.map((l) => (
+        <div key={l.key} className="rounded border mb-2 px-4 py-2.5" style={{ borderColor: BORDER, background: "#fff" }}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div style={{ minWidth: 190 }}>
+              <div className="font-bold" style={{ color: NAVY, fontSize: 14 }}>{l.name}</div>
+              <span className="text-xs font-bold" style={{ color: MUTED }}
+                title="End to end: sales orders against opportunities">top {pct(l.sos, l.opps)}</span>
+            </div>
+            <Station label="Opportunities" n={l.opps} compact />
             <Arrow label={pct(l.quotes, l.opps)} />
-            <Station label="Quotations" n={l.quotes} />
+            <Station label="Quotations" n={l.quotes} amt={cr(l.quoteAmt)} compact />
             <Arrow label={pct(l.sos, l.quotes)} />
-            <Station label="Sales Orders" n={l.sos} strong />
+            <Station label="Sales Orders" n={l.sos} amt={cr(l.soAmt)} strong compact />
           </div>
 
           {showStages && l.quoteStages.length > 0 && (
@@ -143,16 +167,21 @@ export default function AnalyticsScreen() {
   );
 }
 
-function Station({ label, n, strong }: { label: string; n: number; strong?: boolean }) {
+function Station({ label, n, amt, strong, compact }: { label: string; n: number; amt?: string | null; strong?: boolean; compact?: boolean }) {
   return (
     <div
-      className="rounded px-4 py-2 text-center"
-      style={{ background: strong ? NAVY : NAVY_SOFT, minWidth: 130 }}
+      className="rounded text-center"
+      style={{ background: strong ? NAVY : NAVY_SOFT, minWidth: compact ? 118 : 130, padding: compact ? "5px 12px" : "8px 16px" }}
     >
-      <div className="tnum font-extrabold" style={{ fontSize: 20, color: strong ? "#fff" : NAVY }}>
+      <div className="tnum font-extrabold" style={{ fontSize: compact ? 16 : 20, color: strong ? "#fff" : NAVY }}>
         {n.toLocaleString("en-IN")}
       </div>
-      <div className="text-xs font-bold" style={{ color: strong ? "#C8D2EC" : MUTED, letterSpacing: 0.4 }}>
+      {amt && (
+        <div className="tnum font-bold" style={{ fontSize: compact ? 10.5 : 12, color: strong ? "#8FD5A6" : "#0D7A3F" }}>
+          {amt}
+        </div>
+      )}
+      <div className="text-xs font-bold" style={{ color: strong ? "#C8D2EC" : MUTED, letterSpacing: 0.4, fontSize: compact ? 10 : undefined }}>
         {label}
       </div>
     </div>

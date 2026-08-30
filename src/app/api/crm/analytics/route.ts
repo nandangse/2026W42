@@ -62,14 +62,14 @@ export async function GET(req: Request) {
       db.from("opportunity").select("id, sector_id, owner_id")
         .gte("opportunity_on", from.slice(0, 10)).lte("opportunity_on", to.slice(0, 10)).range(a, b));
     const quotes = await pageAll((a, b) =>
-      db.from("quotation").select("id, stage_id, opportunity_id, owner_id")
+      db.from("quotation").select("id, stage_id, opportunity_id, owner_id, grand_total, quoted_value")
         .gte("quoted_on", from.slice(0, 10)).lte("quoted_on", to.slice(0, 10)).range(a, b));
     const sos = await pageAll((a, b) =>
-      db.from("sales_order").select("id, sector_id, opportunity_id, owner_id")
+      db.from("sales_order").select("id, sector_id, opportunity_id, owner_id, amount")
         .gte("ordered_on", from.slice(0, 10)).lte("ordered_on", to.slice(0, 10)).range(a, b));
 
-    type LaneAcc = { opps: number; quotes: number; sos: number; stageCounts: Map<number, number> };
-    const mk = (): LaneAcc => ({ opps: 0, quotes: 0, sos: 0, stageCounts: new Map() });
+    type LaneAcc = { opps: number; quotes: number; sos: number; quoteAmt: number; soAmt: number; stageCounts: Map<number, number> };
+    const mk = (): LaneAcc => ({ opps: 0, quotes: 0, sos: 0, quoteAmt: 0, soAmt: 0, stageCounts: new Map() });
     const byKey = new Map<string | number | null, LaneAcc>();
     const all = mk();
     const lane = (k: string | number | null) => {
@@ -91,6 +91,9 @@ export async function GET(req: Request) {
     for (const q of quotes) {
       const l = lane(keyQuote(q));
       l.quotes++; all.quotes++;
+      // the quote's money: the computed total once lines exist, else the typed value
+      const qa = Number(q.grand_total) > 0 ? Number(q.grand_total) : Number(q.quoted_value) || 0;
+      l.quoteAmt += qa; all.quoteAmt += qa;
       const st = q.stage_id as number | null;
       if (st !== null) {
         l.stageCounts.set(st, (l.stageCounts.get(st) ?? 0) + 1);
@@ -98,7 +101,10 @@ export async function GET(req: Request) {
       }
     }
     for (const s of sos) {
-      lane(keySo(s)).sos++; all.sos++;
+      const l = lane(keySo(s));
+      l.sos++; all.sos++;
+      const sa = Number(s.amount) || 0;
+      l.soAmt += sa; all.soAmt += sa;
     }
 
     const qStages = stages
@@ -118,24 +124,24 @@ export async function GET(req: Request) {
         .map(([k, acc]) => ({
           key: String(k ?? "none"),
           name: k === null ? "No salesperson" : (nameOf.get(String(k)) ?? "Unknown"),
-          opps: acc.opps, quotes: acc.quotes, sos: acc.sos, quoteStages: breakdown(acc),
+          opps: acc.opps, quotes: acc.quotes, sos: acc.sos, quoteAmt: acc.quoteAmt, soAmt: acc.soAmt, quoteStages: breakdown(acc),
         }))
         .sort((a, b) => (b.opps + b.quotes + b.sos) - (a.opps + a.quotes + a.sos));
     } else {
       lanes = [
         ...sectors.map((s) => {
           const acc = byKey.get(s.id as number) ?? mk();
-          return { key: String(s.code), name: String(s.name), opps: acc.opps, quotes: acc.quotes, sos: acc.sos, quoteStages: breakdown(acc) };
+          return { key: String(s.code), name: String(s.name), opps: acc.opps, quotes: acc.quotes, sos: acc.sos, quoteAmt: acc.quoteAmt, soAmt: acc.soAmt, quoteStages: breakdown(acc) };
         }),
         ...(byKey.has(null)
-          ? [{ key: "none", name: "No sector", ...(() => { const a = byKey.get(null) as LaneAcc; return { opps: a.opps, quotes: a.quotes, sos: a.sos, quoteStages: breakdown(a) }; })() }]
+          ? [{ key: "none", name: "No sector", ...(() => { const a = byKey.get(null) as LaneAcc; return { opps: a.opps, quotes: a.quotes, sos: a.sos, quoteAmt: a.quoteAmt, soAmt: a.soAmt, quoteStages: breakdown(a) }; })() }]
           : []),
       ];
     }
 
     return NextResponse.json({
       lanes,
-      all: { key: "all", name: byPerson ? "Everyone" : "All sectors", opps: all.opps, quotes: all.quotes, sos: all.sos, quoteStages: breakdown(all) },
+      all: { key: "all", name: byPerson ? "Everyone" : "All sectors", opps: all.opps, quotes: all.quotes, sos: all.sos, quoteAmt: all.quoteAmt, soAmt: all.soAmt, quoteStages: breakdown(all) },
     });
   } catch (e) {
     return errJson(e);
