@@ -138,13 +138,55 @@ export async function GET(req: Request) {
       if (!error) pulled++;
     }
 
-    // move the cursor only past what we actually walked
-    await db.from("integration_setting").update({ config: { ...cfg, last_pull: maxCreation } }).eq("key", "erpnext");
+    // ---- PHASE 2 (Dr Raghu, 30 Aug 2026): the DELIVERED LEDGER syncs from
+    // the ERP — every Jobmaster changed since the last walk rewrites its
+    // delivered row's fields, mapped from the ERP's own names (read from a
+    // live document, never guessed). The ledger's dates and money then say
+    // what the ERP says, hourly.
+    let djSynced = 0;
+    let jmCursorNew = String(cfg.jm_cursor || "2026-08-30 00:00:00");
+    try {
+      const { adminClient } = await import("@/lib/supabase/admin");
+      const gdb = adminClient();
+      const jmCursor = jmCursorNew;
+      const JM_FIELDS = ["name", "modified", "customer_tag", "product_family", "customer", "value",
+        "actual_delivery_date", "custom_otd_date", "target_delivery_date_current", "job_start_date",
+        "status", "planning_owner", "throughput", "throughput_expected_pc",
+        "kitting_percentage", "custom_production_completion_pc", "project"];
+      const u3 = `${base}/api/resource/Jobmaster?fields=${encodeURIComponent(JSON.stringify(JM_FIELDS))}` +
+        `&filters=${encodeURIComponent(JSON.stringify([["modified", ">", jmCursor]]))}` +
+        `&order_by=${encodeURIComponent("modified asc")}&limit_page_length=200`;
+      const r2 = await fetch(u3, { headers: EH });
+      if (r2.ok) {
+        const jm = ((await r2.json()) as { data?: Record<string, unknown>[] }).data ?? [];
+        for (const j of jm) {
+          const mod = String(j.modified || "");
+          if (mod > jmCursorNew) jmCursorNew = mod;
+          const patch: Record<string, unknown> = {
+            tag: j.customer_tag ?? null, fam: j.product_family ?? null, cust: j.customer ?? null,
+            val: Number(j.value) || 0,
+            delivered_on: String(j.actual_delivery_date || "").slice(0, 10) || null,
+            otd: String(j.custom_otd_date || "").slice(0, 10) || null,
+            tdd: String(j.target_delivery_date_current || "").slice(0, 10) || null,
+            start_date: String(j.job_start_date || "").slice(0, 10) || null,
+            stat: j.status ?? null, own: j.planning_owner ?? null,
+            tp: Number(j.throughput) || 0, tpp: Number(j.throughput_expected_pc) || 0,
+            kit: Number(j.kitting_percentage) || 0, pct: Number(j.custom_production_completion_pc) || 0,
+            ...(j.project ? { proj: j.project } : {}),
+          };
+          const { data: upd, error: ue2 } = await gdb.from("delivered_jobs").update(patch).eq("id", String(j.name)).select("id");
+          if (!ue2 && upd?.length) djSynced++;
+        }
+      }
+    } catch { /* the ledger sync is best-effort — the pull above still stands */ }
+
+    // move both cursors only past what we actually walked
+    await db.from("integration_setting").update({ config: { ...cfg, last_pull: maxCreation, jm_cursor: jmCursorNew } }).eq("key", "erpnext");
     await db.from("crm_audit").insert({
       entity: "opportunity", entity_id: null, action: "erp_pull",
       after: { pulled, skippedExisting, noCompany, cursor: maxCreation }, by_user: null,
     }).then(() => null, () => null);
-    return NextResponse.json({ ok: true, pulled, skippedExisting, noCompany, cursor: maxCreation, more: rows.length === 300 });
+    return NextResponse.json({ ok: true, pulled, skippedExisting, noCompany, deliveredSynced: djSynced, cursor: maxCreation, jmCursor: jmCursorNew, more: rows.length === 300 });
   } catch (e) {
     return errJson(e);
   }

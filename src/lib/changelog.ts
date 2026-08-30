@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.62",
+    date: "2026-08-30",
+    module: "Projects from the ERP; the delivered ledger syncs hourly",
+    items: [
+      "PROJECTS, a new Planning Suite tab (Dr Raghu, 30 Aug 2026): the ERP's Project doctype replicated WHOLE — every scalar field of every project, live, the main details leading and the rest trailing — so the cleanup of which fields stay is decided by looking at the real thing. Search, status filter, sticky first column, See more paging.",
+      "THE DELIVERED LEDGER SYNCS FROM THE ERP hourly: every Jobmaster changed since the last walk rewrites its delivered row — tag, family, customer, value, delivery and OTD dates, start date, status, owner, throughput and the percentages — mapped from the ERP's own field names, read from a live document, never guessed.",
+    ],
+  },
+  {
     v: "3.31.0.61",
     date: "2026-08-30",
     module: "Planning Suite — the Believable Plan",
