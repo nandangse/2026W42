@@ -30,6 +30,7 @@ import DealsScreen from "./DealBoard";
 import MailComposer, { type ComposeCtx } from "./MailComposer";
 import MailQueue from "./MailQueue";
 import Dashboard from "./Dashboard";
+import ProspectQueue from "./ProspectQueue";
 import VisitingCard, { PersonCardPanel } from "./VisitingCard";
 import Integrations from "./Integrations";
 import SalesPersonPlan from "./SalesPersonPlan";
@@ -370,6 +371,17 @@ export default function CrmApp({
       .catch((e) => { if (w) w.close(); window.alert(e instanceof Error ? e.message : String(e)); });
   };
 
+  // THE QUEUE LIVES ON THE TOP BAR (Dr Raghu, 29 Aug 2026): a ☎ with the
+  // open count, dropping the dial list like a notification tray.
+  const [queueTray, setQueueTray] = useState(false);
+  const [queueCount, setQueueCount] = useState<number | null>(null);
+  const refreshQueueCount = useCallback(() => {
+    fetch("/api/crm/prospect?marks=1", { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); if (r.ok) setQueueCount((j.open || []).length); })
+      .catch(() => null);
+  }, []);
+  useEffect(() => { refreshQueueCount(); }, [refreshQueueCount, slug]);
+
   /** A link cell is a door: open the record it points at. */
   const openLinked = async (target: string, id: string) => {
     const tDt = doctypeBySlug(target);
@@ -410,6 +422,42 @@ export default function CrmApp({
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            {/* the Prospecting Queue, folded into the top bar like a bell */}
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => { setQueueTray((v) => !v); if (!queueTray) refreshQueueCount(); }}
+                title="My Prospecting Queue — dial one by one"
+                aria-label="Prospecting queue"
+                className="rounded-full border"
+                style={{
+                  width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                  borderColor: queueTray ? ORANGE : BORDER, background: queueTray ? "#FFF3EC" : "#fff",
+                  fontSize: 15, cursor: "pointer", position: "relative",
+                }}
+              >
+                ☎
+                {(queueCount ?? 0) > 0 && (
+                  <span style={{
+                    position: "absolute", top: -5, right: -5, minWidth: 17, height: 17, padding: "0 4px",
+                    borderRadius: 9, background: ORANGE, color: "#fff", fontSize: 10.5, fontWeight: 800,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>{queueCount}</span>
+                )}
+              </button>
+              {queueTray && (
+                <>
+                  <div onClick={() => setQueueTray(false)} style={{ position: "fixed", inset: 0, zIndex: 59 }} />
+                  <div style={{
+                    position: "absolute", right: 0, top: "calc(100% + 10px)", zIndex: 60,
+                    width: "min(440px, 92vw)", maxHeight: "72vh", overflowY: "auto",
+                    background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 10,
+                    boxShadow: "0 14px 44px rgba(27,45,107,.28)", padding: 12,
+                  }}>
+                    <ProspectQueue compact onOpen={(t, id) => { setQueueTray(false); void openLinked(t, id); }} />
+                  </div>
+                </>
+              )}
+            </div>
             <span className="text-xs" style={{ color: MUTED }}>
               {displayName || email}
             </span>
