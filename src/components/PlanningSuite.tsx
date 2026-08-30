@@ -5643,6 +5643,52 @@ function TaskModal({ task, owners = [], onClose, onToggle, reload, canDelete = f
  * The JOB ID leads every line, because the job of this page is to be pasted
  * over a spreadsheet and uploaded, not read.
  */
+/** The monthly delivered targets — Cr value and Cr throughput a month —
+ *  read by the Delivered Jobs run-rate box. Stored in settings (0102). */
+function MonthlyTargetsCard() {
+  const [f, setF] = useState({ value_cr: "", tp_cr: "" });
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api.get("/api/app-settings").then((r) => {
+      const t = (r.delivered_targets || {}) as { value_cr?: number; tp_cr?: number };
+      setF({ value_cr: String(t.value_cr ?? 10), tp_cr: String(t.tp_cr ?? 4) });
+    }).catch(() => setF({ value_cr: "10", tp_cr: "4" }));
+  }, []);
+  const save = async () => {
+    setBusy(true); setMsg("");
+    try {
+      await api.post("/api/app-settings", { delivered_targets: { value_cr: Number(f.value_cr), tp_cr: Number(f.tp_cr) } });
+      setMsg("Saved ✓ — the run-rate box follows");
+    } catch (e) {
+      const t = e instanceof Error ? e.message : String(e);
+      setMsg(/delivered_targets|does not exist|schema cache/i.test(t) ? "Run migration 0102 first — the column has nowhere to live yet." : t);
+    }
+    setBusy(false);
+  };
+  return (
+    <div className="bg-white rounded-lg border p-3 mt-3" style={{ borderColor: "#E2E0DA" }}>
+      <div className="text-xs font-bold mb-1" style={{ color: "#8A94A0", letterSpacing: 1.1 }}>MONTHLY DELIVERED TARGETS</div>
+      <div className="text-xs mb-2" style={{ color: "#8A94A0" }}>What Delivered Jobs&apos; RUN RATE · TARGET · REQUIRED box measures against — crores per month.</div>
+      <div className="flex items-end gap-3 flex-wrap">
+        <label className="text-xs font-semibold" style={{ color: "#8A94A0" }}>Value (₹ Cr / month)
+          <input value={f.value_cr} inputMode="decimal" onChange={(e) => setF({ ...f, value_cr: e.target.value.replace(/[^0-9.]/g, "") })}
+            className="block mt-1 text-sm border rounded px-2 py-1.5 tnum" style={{ borderColor: "#E2E0DA", width: 120 }} />
+        </label>
+        <label className="text-xs font-semibold" style={{ color: "#8A94A0" }}>Throughput (₹ Cr / month)
+          <input value={f.tp_cr} inputMode="decimal" onChange={(e) => setF({ ...f, tp_cr: e.target.value.replace(/[^0-9.]/g, "") })}
+            className="block mt-1 text-sm border rounded px-2 py-1.5 tnum" style={{ borderColor: "#E2E0DA", width: 120 }} />
+        </label>
+        <button onClick={save} disabled={busy || !Number(f.value_cr) || !Number(f.tp_cr)}
+          className="text-xs font-bold rounded px-3 py-1.5 text-white" style={{ background: "#E8600A", opacity: busy ? 0.5 : 1 }}>
+          {busy ? "Saving…" : "Save"}
+        </button>
+        {msg && <span className="text-xs font-semibold" style={{ color: msg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
 function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPush?: boolean }) {
   const [rows, setRows] = useState<{ id: string; job_id: string; field: string; label: string; old_value: string | null; new_value: string | null; changed_by: string | null; changed_at: string; push_status?: string | null; push_error?: string | null; pushed_by?: string | null; pushed_at?: string | null }[] | null>(null);
   const [installed, setInstalled] = useState(true);
@@ -6606,6 +6652,10 @@ function Admin({
           {idMsg && <span className="text-xs font-semibold" style={{ color: idMsg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{idMsg}</span>}
         </div>
       </div>
+
+      {/* ---- monthly delivered targets (Dr Raghu, 30 Aug 2026): the numbers
+          the Delivered Jobs run-rate box measures against ---- */}
+      <MonthlyTargetsCard />
       </>)}
 
       {adminTab === "setup" && (<>

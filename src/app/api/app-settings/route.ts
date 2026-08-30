@@ -16,10 +16,18 @@ export async function GET() {
       .eq("id", true)
       .maybeSingle();
     if (error) throw new Error(error.message);
+    // the run-rate targets ride along once 0102's column exists
+    let delivered_targets: unknown = null;
+    {
+      const { data: t, error: te } = await adminClient()
+        .from("app_settings").select("delivered_targets").eq("id", true).maybeSingle();
+      if (!te) delivered_targets = t?.delivered_targets ?? null;
+    }
     return NextResponse.json({
       app_name: data?.app_name || "Genie",
       theme_name: data?.theme_name || "Nandan Breakthrough 2026-27",
       logo_url: data?.logo_url || null,
+      delivered_targets,
     });
   } catch (e) {
     return errJson(e);
@@ -41,6 +49,15 @@ export async function POST(req: Request) {
       const v = String(body.theme_name || "").trim();
       if (!v) return NextResponse.json({ error: "Theme name can't be empty" }, { status: 400 });
       patch.theme_name = v;
+    }
+    // the delivered run-rate targets (Dr Raghu, 30 Aug 2026): Cr per month,
+    // read by the Delivered Jobs fourth box (column arrives with 0102)
+    if ("delivered_targets" in body) {
+      const t = body.delivered_targets as { value_cr?: unknown; tp_cr?: unknown };
+      const value_cr = Number(t?.value_cr), tp_cr = Number(t?.tp_cr);
+      if (!Number.isFinite(value_cr) || !Number.isFinite(tp_cr) || value_cr <= 0 || tp_cr <= 0)
+        return NextResponse.json({ error: "Targets must be positive numbers, in crores per month." }, { status: 400 });
+      patch.delivered_targets = { value_cr, tp_cr };
     }
     if (Object.keys(patch).length <= 2) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
 

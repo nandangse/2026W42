@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.56",
+    date: "2026-08-30",
+    module: "Admin — the monthly targets live in settings",
+    items: [
+      "MONTHLY DELIVERED TARGETS are a settings card now (Dr Raghu, 30 Aug 2026: \"these targets take from settings\"): value and throughput in crores per month, edited on the Admin screen, read by the Delivered Jobs run-rate box the moment they change — no deploy in between. Migration 0102 gives them their column; the 10 Cr / 4 Cr defaults stand until it runs.",
+    ],
+  },
+  {
     v: "3.31.0.55",
     date: "2026-08-30",
     module: "Delivered Jobs — run rate vs target vs required",
