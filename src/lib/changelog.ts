@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.15",
+    date: "2026-08-30",
+    module: "CRM — the head block carries the address; Kind Attn on its own line",
+    items: [
+      "The quote's head block now reads: Qtn No · Date / To: the company / its ADDRESS beneath / Kind Attn: on the next line / From / Subject / Authorized by (Dr Raghu, 30 Aug 2026).",
+    ],
+  },
+  {
     v: "3.31.1.14",
     date: "2026-08-30",
     module: "CRM — the item pages introduce themselves",

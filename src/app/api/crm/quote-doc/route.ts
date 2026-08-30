@@ -88,11 +88,12 @@ export async function GET(req: Request) {
     const sections = (secParam.length ? secParam : Array.isArray(q.print_sections) ? (q.print_sections as string[]) : [...ORDER])
       .filter((s) => (ORDER as readonly string[]).includes(s));
 
-    const [{ data: lines }, { data: co }, { data: contact }, { data: tax }, { data: tpls }] = await Promise.all([
+    const [{ data: lines }, { data: co }, { data: contact }, { data: tax }, { data: addr }, { data: tpls }] = await Promise.all([
       db.from("quotation_line").select("*").eq("quotation_id", qid).order("line_no"),
       q.company_id ? db.from("company").select("name").eq("id", String(q.company_id)).maybeSingle() : Promise.resolve({ data: null }),
       q.contact_id ? db.from("person").select("full_name").eq("id", String(q.contact_id)).maybeSingle() : Promise.resolve({ data: null }),
       q.tax_id ? db.from("tax_master").select("name, total_pct, components").eq("id", String(q.tax_id)).maybeSingle() : Promise.resolve({ data: null }),
+      q.address_id ? db.from("address").select("label, line1, line2, city, state, pincode").eq("id", String(q.address_id)).maybeSingle() : Promise.resolve({ data: null }),
       db.from("quote_template").select("kind, name, content, sort_order").order("sort_order"),
     ] as const);
     let situational = "";
@@ -116,7 +117,9 @@ export async function GET(req: Request) {
     </div>`;
     const headBlock = `<div style="border:1px solid #C9C6BD;border-left:4px solid #1B3A5C;padding:3mm 4mm;margin-bottom:5mm;font-size:10.5pt">
       <div><b>Qtn No:</b> ${esc(q.quote_no)} &nbsp;·&nbsp; <b>Date:</b> ${esc(dIN(q.quoted_on))}</div>
-      <div><b>To:</b> ${esc(customer)}${contact?.full_name ? ` — Kind Attn: ${esc(contact.full_name)}` : ""}</div>
+      <div><b>To:</b> ${esc(customer)}</div>
+      ${addr ? `<div style="padding-left:9mm">${esc([addr.line1, addr.line2, [addr.city, addr.state, addr.pincode].filter(Boolean).join(", ")].filter(Boolean).join(", "))}</div>` : ""}
+      ${contact?.full_name ? `<div><b>Kind Attn:</b> ${esc(contact.full_name)}</div>` : ""}
       <div><b>From:</b> Nandan GSE Pvt Ltd${ownerName ? ` — ${esc(ownerName)}` : ""}</div>
       ${subject ? `<div><b>Subject:</b> ${esc(subject)}</div>` : ""}
       <div><b>Authorized by:</b> ${esc(q.authorized_by || "Dr Raghunandan Jagdish, MD and CEO")}</div>
