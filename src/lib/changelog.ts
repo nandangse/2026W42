@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.66",
+    date: "2026-08-30",
+    module: "Genie-wide — the one rich text box",
+    items: [
+      "ONE RICH TEXT BOX for the whole of Genie (Dr Raghu, 30 Aug 2026): B · I · U, bullet and numbered lists, indent in and out, TEXT COLOUR, 🖼 pictures and ⊞ tables — one shared component, already standing on the CRM's enquiry desk and every record's Notes. New content keeps full fidelity; every old note still reads exactly as it did, and graduates the moment it is edited.",
+      "The box is sanitized both writing and reading — an editor this permissive without an allowlist is a security hole; with it, it is a text box. Other Genie screens adopt it as they come up for work.",
+    ],
+  },
+  {
     v: "3.31.0.65",
     date: "2026-08-30",
     module: "CRM — notes are rich comments, and Genie reads them",

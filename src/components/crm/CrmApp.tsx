@@ -31,6 +31,7 @@ import MailComposer, { type ComposeCtx } from "./MailComposer";
 import MailQueue from "./MailQueue";
 import Dashboard from "./Dashboard";
 import ProspectQueue from "./ProspectQueue";
+import RichTextEditor, { RichContent, looksHtml } from "../RichTextEditor";
 import VisitingCard, { PersonCardPanel } from "./VisitingCard";
 import Integrations from "./Integrations";
 import SalesPersonPlan from "./SalesPersonPlan";
@@ -2148,6 +2149,9 @@ const viaDoor = (u: string) => (isErpFile(u) ? `/api/crm/erp-file?u=${encodeURIC
 const looksImage = (u: string) => /\.(png|jpe?g|gif|webp|bmp)(\?|$)/i.test(u) || /\/files?\//i.test(u);
 
 function RichText({ text }: { text: string }) {
+  // new content wears sanitized HTML (the common rich box, 30 Aug 2026);
+  // everything below is the legacy markdown-ish reader
+  if (looksHtml(text)) return <RichContent text={text} legacy={(s2) => <>{s2}</>} />;
   const parts: React.ReactNode[] = [];
   // ![alt](url) · [label](url) · bare http(s) URLs · **bold**
   const re = /!\[([^\]]*)\]\(([^)\s]+)\)|\[([^\]]+)\]\(([^)\s]+)\)|(https?:\/\/[^\s)]+)|\*\*([^*]+)\*\*/g;
@@ -2597,8 +2601,8 @@ function NotesTab({ type, id }: { type: string; id: string }) {
     <div className="p-4" style={{ maxHeight: "calc(100vh - 240px)", overflowY: "auto" }}>
       <div className="mb-3">
         {composing ? (
-          <RichEditor initial="" busy={busy} onCancel={() => setComposing(false)}
-            onSave={(md) => { setText(md); void saveRich(md); }} />
+          <RichTextEditor initial="" minHeight={120} busy={busy} onCancel={() => setComposing(false)}
+            onSave={(html) => { setText(html); void saveRich(html); }} />
         ) : (
           <button onClick={() => setComposing(true)} className="w-full rounded border px-3 py-2 text-sm text-left"
             style={{ borderColor: BORDER, color: MUTED, background: "#fff" }}>
@@ -2849,7 +2853,7 @@ function EnquiryInfoTab({ row, onSaved }: { row: Row; onSaved: () => void }) {
           {msg && <span className="text-xs font-semibold" style={{ color: msg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{msg}</span>}
         </div>
         {editing ? (
-          <RichEditor initial={draft} busy={busy === "save"} onCancel={() => setEditing(false)} onSave={(md) => void save(md)} />
+          <RichTextEditor initial={draft} busy={busy === "save"} onCancel={() => setEditing(false)} onSave={(html) => void save(html)} placeholder="The enquiry, as it should look." />
         ) : (
           <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, whiteSpace: "pre-wrap", lineHeight: 1.6, maxHeight: "calc(100vh - 300px)", overflowY: "auto", overflowWrap: "anywhere" }}>
             {text.trim() ? <RichText text={text} /> : <span style={{ color: MUTED }}>No enquiry text recorded — ✎ writes it right here.</span>}

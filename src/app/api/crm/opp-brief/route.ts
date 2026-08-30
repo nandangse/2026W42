@@ -81,7 +81,7 @@ export async function POST(req: Request) {
       if (nids.length) {
         const { data: ns } = await db.from("note").select("body, created_at").in("id", nids)
           .order("created_at", { ascending: false }).limit(10);
-        const lines = (ns || []).map((n) => `- ${String(n.created_at).slice(0, 10)}: ${String(n.body).replace(/\s+/g, " ").slice(0, 240)}`);
+        const lines = (ns || []).map((n) => `- ${String(n.created_at).slice(0, 10)}: ${String(n.body).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 240)}`);
         if (lines.length) teamNotes = lines.join("\n");
       }
     } catch { /* notes are optional context */ }
@@ -104,7 +104,7 @@ export async function POST(req: Request) {
 THE ENQUIRY
 Number: ${opp.opportunity_no ?? "—"} · Title: ${opp.name}
 Product family: ${opp.product_family ?? "not set"}
-Enquiry text: ${String(opp.enquiry_info ?? "").slice(0, 3000) || "(empty)"}
+Enquiry text: ${String(opp.enquiry_info ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 3000) || "(empty)"}
 Customer: ${company ? `${company.name} · customer already: ${company.is_customer ? "yes" : "no"}` : "not set"}
 Contact: ${contact}
 
