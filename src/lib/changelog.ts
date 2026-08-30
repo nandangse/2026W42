@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.63",
+    date: "2026-08-30",
+    module: "Run-rate box — one target, the Admin FY card's",
+    items: [
+      "The monthly TARGET now comes from the Admin FY TARGETS card ÷ 12 (Dr Raghu, 30 Aug 2026: \"take the target from settings in admin\") — 85 Cr / 35 Cr a year reads as 7.08 Cr / 2.92 Cr a month, one set of targets across the Required Run Rate strip and the monthly box. The Monthly Delivered Targets card speaks only when no FY target is set; the footnote names whichever source is speaking.",
+    ],
+  },
+  {
     v: "3.31.0.62",
     date: "2026-08-30",
     module: "Projects from the ERP; the delivered ledger syncs hourly",

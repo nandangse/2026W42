@@ -338,12 +338,17 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
             month's pace, the settings' target, and what the rest of the
             period demands to close the gap */}
         {(() => {
-          const tgt = data?.targets ?? { value_cr: 10, tp_cr: 4 };
+          // ONE set of targets (Dr Raghu, 30 Aug 2026: "take the target from
+          // settings in admin"): the Admin FY targets card (85 Cr / 35 Cr a
+          // year) ÷ 12 is the monthly truth; the Monthly Delivered Targets
+          // card only speaks when no FY target is set.
+          const fyT: { value_cr: number; tp_cr: number; nos?: number | null } | null = rr?.hasTarget ? { value_cr: rr.targets.sales / 12 / 1e7, tp_cr: rr.targets.throughput / 12 / 1e7, nos: data?.targets?.nos ?? null } : null;
+          const tgt = fyT ?? data?.targets ?? { value_cr: 10, tp_cr: 4 };
           const days = (a: string, b: string) => Math.max(0, Math.round((new Date(b + "T00:00:00Z").getTime() - new Date(a + "T00:00:00Z").getTime()) / 86400000) + 1);
           const elapsedM = Math.max(0.25, days(from, TODAY < periodEnd ? TODAY : periodEnd) / 30.44);
           const periodM = Math.max(elapsedM, days(from, periodEnd) / 30.44);
           const leftM = periodM - elapsedM;
-          const rr = { nos: totals.nos / elapsedM, val: totals.value / elapsedM, tp: totals.throughput / elapsedM };
+          const pace = { nos: totals.nos / elapsedM, val: totals.value / elapsedM, tp: totals.throughput / elapsedM };
           // even the period's last day states its demand — only a truly closed window shows the dash
           const req = (targetMo: number, done: number) => (leftM > 0.015 ? Math.max(0, targetMo * periodM - done) / leftM : null);
           const reqVal = req(tgt.value_cr * 1e7, totals.value);
@@ -374,13 +379,13 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
                   </tr>
                 </thead>
                 <tbody>
-                  <Rw l="NOS" a={rr.nos} t={nosTarget} r={reqNos} />
-                  <Rw l="VALUE" a={rr.val} t={tgt.value_cr * 1e7} r={reqVal} money />
-                  <Rw l="THROUGHPUT" a={rr.tp} t={tgt.tp_cr * 1e7} r={reqTp} money />
+                  <Rw l="NOS" a={pace.nos} t={nosTarget} r={reqNos} />
+                  <Rw l="VALUE" a={pace.val} t={tgt.value_cr * 1e7} r={reqVal} money />
+                  <Rw l="THROUGHPUT" a={pace.tp} t={tgt.tp_cr * 1e7} r={reqTp} money />
                 </tbody>
               </table>
               <div className="text-xs mt-0.5" style={{ color: C.faint, fontSize: 9.5 }}>
-                required = what each remaining month must deliver to end the period on target ({tgt.value_cr} Cr / {tgt.tp_cr} Cr a month, from the masters{avgJob > 0 && !tgt.nos ? ` · nos target = value target ÷ avg job value (${lakh(avgJob)}, last 12 months)` : ""})
+                required = what each remaining month must deliver to end the period on target ({tgt.value_cr.toFixed(2)} Cr / {tgt.tp_cr.toFixed(2)} Cr a month{rr?.hasTarget ? " — the Admin FY targets ÷ 12" : ", from the masters"}{avgJob > 0 && !tgt.nos ? ` · nos target = value target ÷ avg job value (${lakh(avgJob)}, last 12 months)` : ""})
               </div>
             </div>
           );
