@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.98",
+    date: "2026-08-30",
+    module: "CRM — a pencil on every quote line",
+    items: [
+      "Every quote line ends in ✏️ — it opens the item whole for editing: the name as it prints, the rich description, the image; saved to this quote alone (Dr Raghu, 30 Aug 2026).",
+    ],
+  },
+  {
     v: "3.31.0.97",
     date: "2026-08-30",
     module: "CRM — + Add files the line whole",

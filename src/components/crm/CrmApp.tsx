@@ -2403,6 +2403,8 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
                     {i > 0 && ((l.indent ?? 0) === 0
                       ? <button title="Indent — becomes 1.1 under the line above" disabled={busy} onClick={() => void patchLine(l.id, { indent: 1 })} style={{ fontSize: 12, padding: "0 2px" }}>→</button>
                       : <button title="Outdent — back to a main line" disabled={busy} onClick={() => void patchLine(l.id, { indent: 0 })} style={{ fontSize: 12, padding: "0 2px" }}>←</button>)}
+                    <button title="Edit this item — name, description, image (this quote alone)" disabled={busy}
+                      onClick={() => setOpenLine(l)} style={{ fontSize: 12, padding: "0 3px" }}>✏️</button>
                     <button title="Remove this item" disabled={busy} onClick={() => void delLine(l.id)} style={{ fontSize: 12, padding: "0 4px", color: "#8E2C20" }}>✕</button>
                   </td>
                 </tr>
