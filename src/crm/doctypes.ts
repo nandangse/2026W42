@@ -517,7 +517,7 @@ export const DOCTYPES: Doctype[] = [
       { name: "name", label: "Template name", type: "text", required: true, inList: true },
       { name: "subject", label: "Subject", type: "text", inList: true, help: "Fixed on the template — {{variables}} render on send." },
       { name: "cc", label: "CC", type: "text", help: "Fixed cc for every mail sent with this template. Comma-separate for more than one." },
-      { name: "body", label: "Body", type: "textarea", big: true, help: "Dear {{name}}, … — every message variable works here." },
+      { name: "body", label: "Body", type: "textarea", big: true, rich: true, help: "Dear {{name}}, … — every message variable works here; write it as the letter should look." },
       { name: "attachments", label: "Attachments", type: "textarea",
         help: "One per line: Display Name | Drive link. Share each file anyone-with-link; only the link travels." },
     ],

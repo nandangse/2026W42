@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.20",
+    date: "2026-08-30",
+    module: "CRM — email templates write rich and send rich",
+    items: [
+      "The Email Template body now edits in the common rich editor — bold, lists, colour, pictures, tables (Dr Raghu, 30 Aug 2026) — and a rich body SENDS as real HTML mail, with a clean plain-text part riding alongside for old mail clients. {{variables}} still fill on send.",
+    ],
+  },
+  {
     v: "3.31.1.19",
     date: "2026-08-30",
     module: "Genie — the template master edits as a real HTML page",

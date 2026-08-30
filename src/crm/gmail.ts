@@ -149,12 +149,18 @@ export async function gmailSend(
     "MIME-Version: 1.0",
   ];
   let mime: string;
-  if (pixelUrl) {
-    const esc = body
+  // a template written rich sends as HTML; plain text still travels plain
+  // (Dr Raghu, 30 Aug 2026: "even email templates need to be rich text")
+  const isHtml = /<(p|div|br|b|strong|i|em|u|ul|ol|table|span|h[1-6]|img|a)[\s/>]/i.test(body);
+  const plainOf = (b: string) => isHtml
+    ? b.replace(/<br\s*\/?>(?=.)/gi, "\n").replace(/<\/(p|div|li|h[1-6])>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim()
+    : b;
+  if (pixelUrl || isHtml) {
+    const esc = isHtml ? body : body
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/\n/g, "<br>\n");
     const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5">${esc}</div>` +
-      `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none">`;
+      (pixelUrl ? `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none">` : "");
     const bd = "genie" + Date.now().toString(36);
     mime = [
       ...headers,
@@ -164,7 +170,7 @@ export async function gmailSend(
       'Content-Type: text/plain; charset="UTF-8"',
       "Content-Transfer-Encoding: base64",
       "",
-      Buffer.from(body).toString("base64"),
+      Buffer.from(plainOf(body)).toString("base64"),
       `--${bd}`,
       'Content-Type: text/html; charset="UTF-8"',
       "Content-Transfer-Encoding: base64",
