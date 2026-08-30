@@ -73,8 +73,7 @@ export async function POST(req: Request) {
     const msg = await anthropic.messages.create({
       model: "claude-opus-5",
       max_tokens: 2000,
-      // @ts-expect-error effort is accepted by the API
-      effort: "low",
+      output_config: { effort: "low" },
       system: `You write the Situational Details section of a NANDAN GSE sales quotation — the one-page story that makes the customer feel understood. About Nandan:\n${NANDAN.slice(0, 2000)}\n\nRespond with HTML only (no markdown, no preamble): exactly these six sections, each as <p><b>Heading:</b></p> followed by one short paragraph (2-4 sentences). Headings, in order: ${HEADINGS.map((h) => h + ":").join(" · ")}. Write in confident, plain business English — specific to THIS customer and THIS quote, never generic filler. If the CRM knows too little for a section, write one honest sentence rather than inventing facts.`,
       messages: [{
         role: "user",

@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.82",
+    date: "2026-08-30",
+    module: "CRM — the quote's To/CC dressed like email; Genie writes again",
+    items: [
+      "The quote's contacts panel now reads like an email header (Dr Raghu, 30 Aug 2026): To: and CC: lines with name-and-email chips, a type-ahead to add people (the client's come up first), ✕ to remove — and CC always carries sales@nandan.co.in, unremovable.",
+      "Situational Analysis and Use-Genie-to-beautify were refusing with an API error (effort sent in the wrong place) — fixed; both write now.",
+    ],
+  },
+  {
     v: "3.31.0.81",
     date: "2026-08-30",
     module: "CRM — Terms & Conditions and the Covering Letter",

@@ -51,8 +51,7 @@ export async function POST(req: Request) {
     const msg = await anthropic.messages.create({
       model: "claude-opus-5",
       max_tokens: 1200,
-      // @ts-expect-error effort is accepted by the API
-      effort: "low",
+      output_config: { effort: "low" },
       system: `You polish the covering letter of a NANDAN GSE sales quotation. About Nandan:\n${NANDAN.slice(0, 1500)}\n\nRespond with HTML only (no markdown, no preamble): the improved letter, 3-5 short paragraphs in <p> tags. Keep the letter's flavour (${String(qt.letter_template || "Standard")}), make it specific to this customer and quote, warm and confident, never flowery. Do not invent facts, prices or dates. Keep the salutation and sign-off style of the draft.`,
       messages: [{
         role: "user",
