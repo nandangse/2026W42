@@ -136,12 +136,9 @@ export default function AnalyticsScreen() {
       ))}
 
       <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "80ch", lineHeight: 1.6 }}>
-        Counted by date: opportunities by when they were created, quotations by
-        when they were made, sales orders by when they were ordered — each
-        within the chosen range. The conversions compare those counts, so a
-        quote made this month against last month&apos;s enquiry shows in its own
-        column, not the arrow.
-      </p>
+        Counted by BUSINESS date (Dr Raghu, 30 Aug 2026): opportunities by their Opportunity Date, quotations by
+        the Date of Quote, sales orders by the Order Date — never by when a row entered Genie. The conversions compare those
+        counts, so a quote made this month against last month&apos;s enquiry shows in its own column, not the arrow.</p>
     </div>
   );
 }

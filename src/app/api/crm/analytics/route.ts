@@ -56,12 +56,14 @@ export async function GET(req: Request) {
     const oppSector = new Map(allOpps.map((o) => [String(o.id), o.sector_id as number | null]));
     const oppOwner = new Map(allOpps.map((o) => [String(o.id), (o.owner_id as string | null) ?? null]));
 
+    // BUSINESS dates, never created_at (Dr Raghu, 30 Aug 2026): an imported
+    // enquiry keeps its real Opportunity Date, and that is the date it counts by.
     const opps = await pageAll((a, b) =>
       db.from("opportunity").select("id, sector_id, owner_id")
-        .gte("created_at", from).lte("created_at", to).range(a, b));
+        .gte("opportunity_on", from.slice(0, 10)).lte("opportunity_on", to.slice(0, 10)).range(a, b));
     const quotes = await pageAll((a, b) =>
       db.from("quotation").select("id, stage_id, opportunity_id, owner_id")
-        .gte("created_at", from).lte("created_at", to).range(a, b));
+        .gte("quoted_on", from.slice(0, 10)).lte("quoted_on", to.slice(0, 10)).range(a, b));
     const sos = await pageAll((a, b) =>
       db.from("sales_order").select("id, sector_id, opportunity_id, owner_id")
         .gte("ordered_on", from.slice(0, 10)).lte("ordered_on", to.slice(0, 10)).range(a, b));

@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.10",
+    date: "2026-08-30",
+    module: "CRM — Analytics counts by BUSINESS dates",
+    items: [
+      "The funnel now counts opportunities by their Opportunity Date, quotations by the Date of Quote, and sales orders by the Order Date — never by when a row entered Genie (Dr Raghu, 30 Aug 2026). The imported history stops crowding into import week; YTD reads as the business lived it.",
+    ],
+  },
+  {
     v: "3.31.1.9",
     date: "2026-08-30",
     module: "CRM — the footer verified with eyes, the head block complete",
