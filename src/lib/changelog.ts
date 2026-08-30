@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.48",
+    date: "2026-08-29",
+    module: "Job Plan — See more, straight to the milestones",
+    items: [
+      "SEE MORE on the job plan's header card (Dr Raghu, 29 Aug 2026): one press scrolls smoothly down to the Milestone Plan itself — switching the sub-tab there if it stood elsewhere — with the milestone count on the button.",
+    ],
+  },
+  {
     v: "3.31.0.47",
     date: "2026-08-29",
     module: "My Week — milestones see further",

@@ -3808,6 +3808,14 @@ function JobPlan({
         {dj.tdd && ends > dj.tdd && (
           <div className="mt-2 text-xs font-bold rounded px-2 py-1 inline-block" style={{ background: "#B3261E", color: "#fff" }}>⚠ Plan ends {diffDays(dj.tdd, ends)} days after Target Delivery — compress durations or add crew</div>
         )}
+        {/* the way down to the plan itself (Dr Raghu, 29 Aug 2026:
+            "See more — this way they can scroll") */}
+        <button
+          onClick={() => { setPlanView("plan"); window.setTimeout(() => document.getElementById("job-milestone-plan")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
+          className="mt-2 w-full text-xs font-bold rounded py-1.5 border"
+          style={{ color: "#1B3A5C", borderColor: "#B9C7D4", background: "#F7FAFC" }}>
+          See more ↓ · the milestone plan ({sched.length})
+        </button>
       </div>
 
       <JobStanding job={dj} V={V} />
@@ -3817,8 +3825,8 @@ function JobPlan({
 
       <JobManpowerStrip jobId={dj.id} canEdit={canEdit} />
 
-      {/* plan / materials sub-tabs */}
-      <div className="flex gap-1 rounded p-1 bg-white border mb-3" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
+      {/* plan / materials sub-tabs — the See more button above lands here */}
+      <div id="job-milestone-plan" className="flex gap-1 rounded p-1 bg-white border mb-3" style={{ borderColor: "#E2E0DA", width: "fit-content", scrollMarginTop: "var(--hdr-h, 90px)" }}>
         {(["plan", "mat", "shop", "pics", "mp"] as const).map((k) => (
           <button key={k} onClick={() => { if (k === "mat") ensureMats(); setPlanView(k); }} className="px-3 py-1 rounded text-sm font-semibold" style={planView === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>
             {k === "plan" ? "Milestone Plan" : k === "mat" ? "Material Kitting" : k === "shop" ? "Shop Updates" : k === "pics" ? "Photos" : "Manpower"}
