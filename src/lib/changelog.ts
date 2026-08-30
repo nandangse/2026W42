@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.43",
+    date: "2026-08-30",
+    module: "CRM — the quote's status stands in the header, in colour",
+    items: [
+      "\"show status live here\" (Dr Raghu, 30 Aug 2026) — every quotation header now wears its STATUS as a coloured chip: LIVE green, HOTLIST orange, SUBMITTED blue, DRAFT grey, LOST red, CANCELLED and EXPIRED in their darker shades. The pipeline stage rides beside it when the quote has one.",
+    ],
+  },
+  {
     v: "3.31.1.42",
     date: "2026-08-30",
     module: "Planning — App access leads the Users tab",

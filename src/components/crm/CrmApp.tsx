@@ -3551,7 +3551,21 @@ function RecordModal({
                   № {(String(row.opportunity_no).match(/(\d+)\s*$/) || [])[1] ?? String(row.opportunity_no)}
                 </span>
               )}
-              {/* the quote's stage lives in the header (Dr Raghu, 30 Aug 2026) */}
+              {/* the quote's STATUS lives in the header, always and in colour
+                  (Dr Raghu, 30 Aug 2026: "show status live here") */}
+              {dt.name === "quotation" && !!row.status && (() => {
+                const st = String(row.status);
+                const tint: Record<string, string> = {
+                  draft: "#8A94A0", live: "#1A7F4E", hotlist: "#E8600A", submitted: "#2C5B82",
+                  cancelled: "#7A2E24", lost: "#B3261E", expired: "#6B7280",
+                };
+                return (
+                  <span className="font-bold rounded px-1.5" style={{ background: tint[st] ?? "rgba(255,255,255,.12)", color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    {st}
+                  </span>
+                );
+              })()}
+              {/* the quote's stage rides beside it when it has one */}
               {dt.name === "quotation" && row.stage_id != null && (
                 <span className="font-bold rounded px-1.5" style={{ background: "rgba(255,255,255,.12)", color: "#fff" }}>
                   {linkLabel("stage", row.stage_id) ?? "—"}
