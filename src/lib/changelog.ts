@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.40",
+    date: "2026-08-30",
+    module: "Planning — User management stands up straight",
+    items: [
+      "One row is one person (Dr Raghu, 30 Aug 2026): Initials, Name and Email freeze on the left, the header freezes on top and every column sorts on a click, the group ticks stay in their row on the right, and the table scrolls instead of wrapping.",
+      "Every user-management change is now logged — who changed what, on whom, when — into the admin_audit ledger (Genie migration 0105), readable under the table via \"Change log\". Passwords never enter the ledger.",
+      "Admin now opens on Updates first, then Users — the release log greets before the levers.",
+    ],
+  },
+  {
     v: "3.31.1.39",
     date: "2026-08-30",
     module: "CRM — Find CIN takes the road their docs actually name",

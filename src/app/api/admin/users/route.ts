@@ -51,9 +51,14 @@ async function wouldStrandAdmins(id: string): Promise<boolean> {
 }
 
 // GET /api/admin/users — list users. admin only.
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await requireAdmin();
+    if (new URL(req.url).searchParams.get("log")) {
+      const { data } = await adminClient().from("admin_audit")
+        .select("at, by_email, action, target").order("at", { ascending: false }).limit(100);
+      return NextResponse.json({ log: data ?? [] });
+    }
     const admin = adminClient();
     const { data, error } = await admin
       .from("profiles")
@@ -209,6 +214,21 @@ export async function POST(req: Request) {
     // making a new admin creates a peer, so that too is the owner's call
     if ((body.action === "create" || body.action === "role") && body.role === "admin" && !caller.isOwner)
       throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant the admin role.`);
+
+    // "we should log it" (Dr Raghu, 30 Aug 2026) — every user-management
+    // change of hands into admin_audit (Genie migration 0105). Passwords
+    // never ride along; the ledger never blocks the change.
+    try {
+      const { password: _pw, pw: _pw2, ...clean } = body as Record<string, unknown>;
+      let target = String(body.email || "");
+      if (!target && body.id) {
+        const { data: t } = await admin.from("profiles").select("email").eq("id", String(body.id)).maybeSingle();
+        target = String(t?.email || body.id);
+      }
+      await admin.from("admin_audit").insert({
+        by_email: String((caller as { email?: string }).email || ""), action: String(body.action || ""), target, detail: clean,
+      });
+    } catch { /* pre-0105, or a ledger hiccup */ }
 
     if (body.action === "create") {
       const email = String(body.email || "").trim().toLowerCase();

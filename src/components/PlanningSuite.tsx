@@ -6255,7 +6255,7 @@ function GroupTicks({
 function AdminTabs({ tab, setTab, owner }: { tab: AdminTab; setTab: (t: AdminTab) => void; owner?: boolean }) {
   return (
     <div className="flex gap-1 rounded p-1 bg-white border flex-wrap" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
-      {([["users", "👥 Users"], ["org", "🧬 Org Chart"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["report", "📊 Report"], ["updates", "🗒 Updates"], ["software", "📘 Software description"],
+      {([["updates", "🗒 Updates"], ["users", "👥 Users"], ["org", "🧬 Org Chart"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["report", "📊 Report"], ["software", "📘 Software description"],
         // the owner's two rooms (Dr Raghu, 30 Aug 2026): usage + the knowledgebase
         ...(owner ? [["genie", "🧞 Genie"], ["consult", "🎓 Consult Dr Raghu"]] as const : [])] as readonly (readonly [AdminTab, string])[]).map(([k, l]) => (
         <button
@@ -6619,11 +6619,16 @@ function Admin({
   };
 
   // ---- admin sub-tabs: the setup pages, and the release log ----
-  const [adminTab, setAdminTab] = useState<AdminTab>("users");
+  // Admin opens on Updates first, then Users (Dr Raghu, 30 Aug 2026)
+  const [adminTab, setAdminTab] = useState<AdminTab>("updates");
   // Goals access is folded away behind a toggle on the Users tab. It is the
   // only place a grant can be revoked, so it is hidden rather than removed —
   // a page nobody can reach is a permission nobody can take back.
   const [showGoalsAccess, setShowGoalsAccess] = useState(false);
+  // one row one person: frozen first columns, frozen sortable header (Dr Raghu, 30 Aug 2026)
+  const [uSort, setUSort] = useState<{ k: string; d: 1 | -1 }>({ k: "display_name", d: 1 });
+  const [uLog, setULog] = useState<{ at: string; by_email: string; action: string; target: string }[] | null>(null);
+  const [showULog, setShowULog] = useState(false);
 
   if (adminTab === "updates") {
     return (
@@ -6784,24 +6789,57 @@ function Admin({
           <button onClick={createUser} className="text-xs font-bold rounded px-2 py-1" style={{ background: "#E8600A", color: "#fff" }}>+ Add user</button>
         </div>
         {uMsg && <div className="text-xs font-semibold mb-2" style={{ color: uMsg.includes("✓") || uMsg.includes("removed") ? "#0D7A3F" : "#B3261E" }}>{uMsg}</div>}
-        <div className="overflow-x-auto">
-        <table className="text-xs w-full" style={{ minWidth: 720 }}>
+        {(() => {
+          const deptName = (id?: string | null) => departments.find((d) => d.id === id)?.name ?? "";
+          const personName = (id?: string | null) => (users ?? []).find((p) => p.id === id)?.display_name ?? "";
+          const sortVal = (u2: NonNullable<typeof users>[number]): string => {
+            switch (uSort.k) {
+              case "initials": return u2.initials || "";
+              case "email": return u2.email;
+              case "erp": return u2.erp_owner || "";
+              case "dept": return deptName(u2.department_id);
+              case "desig": return u2.designation || "";
+              case "reports": return personName(u2.reports_to);
+              case "role": return u2.role;
+              case "goals": return u2.goals_level || "";
+              case "seen": return String(u2.last_sign_in_at || "");
+              case "status": return u2.disabled ? "1" : "0";
+              default: return u2.display_name || u2.email;
+            }
+          };
+          const sorted = [...(users ?? [])].sort((a, b) => sortVal(a).localeCompare(sortVal(b), "en", { sensitivity: "base", numeric: true }) * uSort.d);
+          const HSort = ({ k, label, sticky, title, right }: { k?: string; label: string; sticky?: React.CSSProperties; title?: string; right?: boolean }) => (
+            <th className={`${right ? "text-right" : "text-left"} py-1 font-semibold`} title={title}
+              onClick={k ? () => setUSort((c) => ({ k, d: c.k === k ? (c.d === 1 ? -1 : 1) : 1 })) : undefined}
+              style={{ position: "sticky", top: 0, background: "#fff", zIndex: sticky ? 5 : 4, whiteSpace: "nowrap", cursor: k ? "pointer" : "default", boxShadow: "inset 0 -2px 0 #E2E0DA", ...(sticky || {}) }}>
+              {label}{k && uSort.k === k ? (uSort.d === 1 ? " ▲" : " ▼") : ""}
+            </th>
+          );
+          const L0 = { left: 0, minWidth: 58 } as React.CSSProperties;
+          const L1 = { left: 58, minWidth: 148 } as React.CSSProperties;
+          const L2 = { left: 206, minWidth: 220, boxShadow: "inset -1px 0 0 #E2E0DA, inset 0 -2px 0 #E2E0DA" } as React.CSSProperties;
+          const C0 = { position: "sticky" as const, left: 0, background: "#fff", zIndex: 2, minWidth: 58 };
+          const C1 = { position: "sticky" as const, left: 58, background: "#fff", zIndex: 2, minWidth: 148 };
+          const C2 = { position: "sticky" as const, left: 206, background: "#fff", zIndex: 2, minWidth: 220, boxShadow: "inset -1px 0 0 #E2E0DA" };
+          return (
+        <div style={{ overflow: "auto", maxHeight: "calc(100vh - 300px)" }}>
+        <table className="text-xs w-full" style={{ minWidth: 1500, whiteSpace: "nowrap" }}>
           <thead>
             <tr style={{ color: "#8A94A0" }}>
-              <th className="text-left py-1 font-semibold">Initials</th>
-              <th className="text-left py-1 font-semibold" style={STICKY_NAME}>Name</th>
-              <th className="text-left py-1 font-semibold">Email</th>
-              <th className="text-left py-1 font-semibold" title="The Planning Owner / Project Owner text as it appears in the Jobmaster — links this login to its jobs">ERP User</th>
-              <th className="text-left py-1 font-semibold" title="Read by Goals — departmental goals, and who a department's head can edit">Department</th>
-              <th className="text-left py-1 font-semibold" title="Job title, shown on Goals and the org view">Designation</th>
-              <th className="text-left py-1 font-semibold" title="Their line manager — drives “tasks of people reporting to me” in Nandan Tasking">Reports to</th>
-              <th className="text-left py-1 font-semibold" title="Sales Genie access comes with the role now: Sales team, Admins and the owner">Role</th>
-              <th className="text-left py-1 font-semibold" title="Goals access is granted per person, not by role">Goals</th>
-              <th className="text-left py-1 font-semibold" title="HRMS — the employee records at /hrms. Dates of birth, contact details and next of kin. Granted per person by the owner alone.">HRMS</th>
-              <th className="text-left py-1 font-semibold" title="Which room they are in. Not a role — this does not change what they may do, only what they may see. Only the owner may tick these.">Groups</th>
-              <th className="text-left py-1 font-semibold" title="When this account last signed in">Last seen</th>
-              <th className="text-left py-1 font-semibold">Status</th>
-              <th className="text-right py-1 font-semibold">Actions</th>
+              <HSort k="initials" label="Initials" sticky={L0} />
+              <HSort label="Name" k="name" sticky={L1} />
+              <HSort k="email" label="Email" sticky={L2} />
+              <HSort k="erp" label="ERP User" title="The Planning Owner / Project Owner text as it appears in the Jobmaster — links this login to its jobs" />
+              <HSort k="dept" label="Department" title="Read by Goals — departmental goals, and who a department's head can edit" />
+              <HSort k="desig" label="Designation" title="Job title, shown on Goals and the org view" />
+              <HSort k="reports" label="Reports to" title="Their line manager — drives “tasks of people reporting to me” in Nandan Tasking" />
+              <HSort k="role" label="Role" title="Sales Genie access comes with the role now: Sales team, Admins and the owner" />
+              <HSort k="goals" label="Goals" title="Goals access is granted per person, not by role" />
+              <HSort label="HRMS" title="HRMS — the employee records at /hrms. Granted per person by the owner alone." />
+              <HSort label="Groups" title="Which room they are in. Not a role — only what they may see. Only the owner may tick these." />
+              <HSort k="seen" label="Last seen" title="When this account last signed in" />
+              <HSort k="status" label="Status" />
+              <HSort label="Actions" right />
             </tr>
           </thead>
           <tbody>
@@ -6818,9 +6856,9 @@ function Admin({
             {users?.length === 0 && (
               <tr><td className="py-3" colSpan={9} style={{ color: "#8A94A0" }}>No users found.</td></tr>
             )}
-            {(users ?? []).map((u) => (
+            {sorted.map((u) => (
               <tr key={u.id} style={{ borderTop: "1px solid #EEECE6" }}>
-                <td className="py-1.5">
+                <td className="py-1.5" style={C0}>
                   <input
                     defaultValue={u.initials || ""}
                     maxLength={3}
@@ -6831,7 +6869,7 @@ function Admin({
                     title="Two or three letters, unique across everyone — press Tab to save"
                   />
                 </td>
-                <td className="py-1.5" style={STICKY_NAME}>
+                <td className="py-1.5" style={C1}>
                   <input
                     defaultValue={u.display_name || ""}
                     placeholder="—"
@@ -6840,7 +6878,7 @@ function Admin({
                     style={{ borderColor: "#E2E0DA" }}
                   />
                 </td>
-                <td className="py-1.5">
+                <td className="py-1.5" style={C2}>
                   {u.email}
                   {u.email.toLowerCase() === OWNER_EMAIL && (
                     <span className="ml-1 rounded px-1 font-bold" style={{ background: "#FFF3E8", color: "#E8600A", fontSize: 9 }} title="Owner — governs the other admins and cannot be demoted, disabled or removed">
@@ -6925,7 +6963,7 @@ function Admin({
                   />
                 </td>
                 <td className="py-1.5">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" style={{ flexWrap: "nowrap", whiteSpace: "nowrap" }}>
                     <GroupTicks u={u} isOwner={isOwner} onSet={setGroups} />
                     <label className="flex items-center gap-1 whitespace-nowrap text-xs"
                       title="Marks this person ready to connect Gmail — the connect itself happens with an administrator in tow"
@@ -6968,8 +7006,34 @@ function Admin({
           </tbody>
         </table>
         </div>
+          );
+        })()}
         <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>
           Initials and names save when you click away from the field. Jobs are filtered by <b>Planning Owners</b>; tasks are assigned to <b>Users</b> — both lists come only from accounts created here, never from raw spreadsheet text.
+        </div>
+
+        {/* "we should log it" (Dr Raghu, 30 Aug 2026) — every change of hands, kept */}
+        <div className="mt-3">
+          <button onClick={async () => {
+            const next = !showULog; setShowULog(next);
+            if (next && uLog === null) {
+              try { setULog(((await api.get("/api/admin/users?log=1")) as { log?: { at: string; by_email: string; action: string; target: string }[] }).log ?? []); }
+              catch { setULog([]); }
+            }
+          }} className="text-xs font-bold rounded border px-2 py-1" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#5A6672" }}>
+            {showULog ? "▾" : "▸"} Change log — who changed what
+          </button>
+          {showULog && (
+            <div className="rounded border p-2 mt-1" style={{ borderColor: "#E2E0DA", maxHeight: 220, overflowY: "auto" }}>
+              {uLog === null && <div className="text-xs" style={{ color: "#8A94A0" }}>reading…</div>}
+              {uLog !== null && uLog.length === 0 && <div className="text-xs" style={{ color: "#8A94A0" }}>Nothing logged yet — run Genie migration 0105 if this stays empty after a change.</div>}
+              {(uLog ?? []).map((e, i) => (
+                <div key={i} className="text-xs py-0.5" style={{ borderTop: i ? "1px solid #F0F1F6" : "none" }}>
+                  <span className="tnum" style={{ color: "#8A94A0" }}>{fmtFull(e.at)}</span> · <b>{e.by_email.split("@")[0]}</b> → {e.action} <b>{e.target ? e.target.split("@")[0] : ""}</b>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* the bridge between Jobmaster text and accounts */}
