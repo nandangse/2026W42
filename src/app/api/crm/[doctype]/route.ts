@@ -439,6 +439,9 @@ export async function POST(req: Request, { params }: { params: { doctype: string
     for (const f of d.fields) {
       if (f.type === "readonly" || f.virtual) continue;   // the database fills these
       row[f.name] = coerce(f, body[f.name]);
+      // a missing tick is FALSE, never null — NOT NULL booleans survive any client
+      if (f.type === "bool" && (row[f.name] === null || row[f.name] === undefined))
+        row[f.name] = f.default === true;
     }
 
     // An opportunity is born NEW unless the form says otherwise.

@@ -36,6 +36,8 @@ const pct = (num: number, den: number) =>
 
 export default function AnalyticsScreen() {
   const [range, setRange] = useState<DateRange>(DEFAULT_RANGE);
+  // the four rooms (Dr Raghu, 30 Aug 2026)
+  const [view, setView] = useState<"ratios" | "funnel" | "focus" | "effort">("ratios");
   // sector · person · all — the same three-station arithmetic, cut three ways
   const [mode, setMode] = useState<"sector" | "person" | "all">("sector");
   const swim = mode !== "all";
@@ -60,6 +62,20 @@ export default function AnalyticsScreen() {
   return (
     <div>
       <DateRangeBar value={range} onChange={setRange} />
+
+      <div className="flex gap-1 mb-3 flex-wrap">
+        {([["ratios", "📐 Conversion Ratios"], ["funnel", "🏺 Sales Funnel"], ["focus", "🎯 Focus Dashboard"], ["effort", "🏃 Effort Dashboard"]] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setView(k)} className="px-3 py-1.5 rounded text-sm font-bold"
+            style={view === k ? { background: NAVY, color: "#fff" } : { color: "#5A6672", border: `1px solid ${BORDER}`, background: "#fff" }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {view === "funnel" && <FunnelView range={range} />}
+      {view === "focus" && <FocusView />}
+      {view === "effort" && <EffortView range={range} />}
+      {view !== "ratios" ? null : (<>
 
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <button
@@ -163,6 +179,7 @@ export default function AnalyticsScreen() {
         Counted by BUSINESS date (Dr Raghu, 30 Aug 2026): opportunities by their Opportunity Date, quotations by
         the Date of Quote, sales orders by the Order Date — never by when a row entered Genie. The conversions compare those
         counts, so a quote made this month against last month&apos;s enquiry shows in its own column, not the arrow.</p>
+      </>)}
     </div>
   );
 }
@@ -193,6 +210,156 @@ function Arrow({ label }: { label: string }) {
     <div className="text-center" style={{ minWidth: 64 }}>
       <div className="tnum font-bold" style={{ color: GREEN, fontSize: 13 }}>{label}</div>
       <div style={{ color: MUTED, fontSize: 16, lineHeight: 1 }}>→</div>
+    </div>
+  );
+}
+
+/** The opportunity ladder as a funnel — every rung with its count and money. */
+function FunnelView({ range }: { range: DateRange }) {
+  type Rung = { name: string; colour: string | null; count: number; amt: number };
+  const [rungs, setRungs] = useState<Rung[] | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    setRungs(null); setErr("");
+    fetch(`/api/crm/analytics?view=funnel&from=${range.from}&to=${range.to}`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "?"); setRungs(j.rungs); })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [range.from, range.to]);
+  if (err) return <div className="rounded p-3 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>;
+  if (rungs === null) return <div className="text-sm" style={{ color: MUTED }}>loading…</div>;
+  const max = Math.max(1, ...rungs.map((r) => r.count));
+  return (
+    <div className="rounded border p-4" style={{ borderColor: BORDER, background: "#fff" }}>
+      <div className="text-xs mb-3" style={{ color: MUTED, maxWidth: "80ch", lineHeight: 1.5 }}>
+        Opportunities dated inside the range, rung by rung down the ladder — the bar is the count, the money beside it.
+      </div>
+      {rungs.map((r) => (
+        <div key={r.name} className="flex items-center gap-3 mb-1.5">
+          <div className="text-xs font-bold" style={{ width: 170, textAlign: "right", color: INK }}>{r.name}</div>
+          <div style={{ flex: 1 }}>
+            <div className="rounded-r flex items-center px-2" style={{
+              width: `${Math.max(2, (r.count / max) * 100)}%`, minWidth: 44, height: 22,
+              background: r.colour || "#8A94A0", color: "#fff", fontSize: 11.5, fontWeight: 800, whiteSpace: "nowrap",
+            }}>
+              {r.count.toLocaleString("en-IN")}
+            </div>
+          </div>
+          <div className="tnum text-xs font-bold" style={{ width: 100, color: "#0D7A3F" }}>{cr(r.amt) ?? "—"}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Where the attention should go today — biggest open quotes, quotes about
+ *  to expire, opportunities going cold. */
+function FocusView() {
+  type Q = { id: string; quote_no: string; grand_total: number; quoted_value: number; valid_until: string | null; status: string; company: string | null };
+  type C = { id: string; name: string; company: string | null; amount: number | null; opportunity_on: string | null; stage: string | null };
+  const [data, setData] = useState<{ hot: Q[]; expiring: Q[]; cold: C[] } | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    fetch("/api/crm/analytics?view=focus", { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "?"); setData(j); })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, []);
+  if (err) return <div className="rounded p-3 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>;
+  if (!data) return <div className="text-sm" style={{ color: MUTED }}>loading…</div>;
+  const money = (q: Q) => cr(Number(q.grand_total) > 0 ? Number(q.grand_total) : Number(q.quoted_value) || 0) ?? "—";
+  const d = (v: string | null) => (v ? v.slice(0, 10).split("-").reverse().join("/") : "—");
+  const Card = ({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) => (
+    <div className="rounded border p-3 mb-3" style={{ borderColor: BORDER, background: "#fff" }}>
+      <div className="font-bold text-sm" style={{ color: NAVY }}>{title}</div>
+      <div className="text-xs mb-2" style={{ color: MUTED }}>{hint}</div>
+      {children}
+    </div>
+  );
+  return (
+    <div>
+      <Card title="💰 The biggest open quotes" hint="Every rupee on the table, largest first — draft, live, hotlist and submitted.">
+        {data.hot.map((q) => (
+          <div key={q.id} className="flex items-baseline gap-3 text-sm py-0.5 flex-wrap">
+            <b className="tnum" style={{ width: 90, color: "#0D7A3F" }}>{money(q)}</b>
+            <span style={{ minWidth: 160 }}>{q.company ?? "—"}</span>
+            <span className="tnum text-xs" style={{ color: MUTED }}>{(q.quote_no.match(/(\d+)\s*$/) || [, q.quote_no])[1]}</span>
+            <span className="text-xs rounded px-1.5" style={{ background: "#EEF1F5", color: NAVY, fontWeight: 700 }}>{q.status}</span>
+            <span className="text-xs" style={{ color: MUTED }}>valid till {d(q.valid_until)}</span>
+          </div>
+        ))}
+        {data.hot.length === 0 && <div className="text-sm" style={{ color: MUTED }}>No open quotes.</div>}
+      </Card>
+      <Card title="⏳ Expiring inside 14 days" hint="Still open, validity running out — extend or chase.">
+        {data.expiring.map((q) => (
+          <div key={q.id} className="flex items-baseline gap-3 text-sm py-0.5 flex-wrap">
+            <b style={{ color: "#B45309", width: 90 }}>{d(q.valid_until)}</b>
+            <span style={{ minWidth: 160 }}>{q.company ?? "—"}</span>
+            <b className="tnum" style={{ color: "#0D7A3F" }}>{money(q)}</b>
+          </div>
+        ))}
+        {data.expiring.length === 0 && <div className="text-sm" style={{ color: MUTED }}>Nothing expiring soon.</div>}
+      </Card>
+      <Card title="🧊 Going cold" hint="Open opportunities with no touch in 14 days — biggest first; one call warms them.">
+        {data.cold.map((o) => (
+          <div key={o.id} className="flex items-baseline gap-3 text-sm py-0.5 flex-wrap">
+            <b className="tnum" style={{ width: 90, color: "#0D7A3F" }}>{cr(Number(o.amount) || 0) ?? "—"}</b>
+            <span style={{ minWidth: 160 }}>{o.company ?? "—"}</span>
+            <span className="text-xs" style={{ color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 260 }}>{o.name}</span>
+            <span className="text-xs rounded px-1.5" style={{ background: "#EEF1F5", color: NAVY, fontWeight: 700 }}>{o.stage ?? "—"}</span>
+            <span className="text-xs" style={{ color: MUTED }}>since {d(o.opportunity_on)}</span>
+          </div>
+        ))}
+        {data.cold.length === 0 && <div className="text-sm" style={{ color: MUTED }}>Nothing going cold — every open deal was touched inside 14 days.</div>}
+      </Card>
+    </div>
+  );
+}
+
+/** Activity against output, per salesperson, inside the range. */
+function EffortView({ range }: { range: DateRange }) {
+  type E = { key: string; name: string; touches: number; calls: number; mails: number; visits: number; quotes: number; quoteAmt: number; opps: number };
+  const [rows, setRows] = useState<E[] | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    setRows(null); setErr("");
+    fetch(`/api/crm/analytics?view=effort&from=${range.from}&to=${range.to}`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "?"); setRows(j.rows); })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [range.from, range.to]);
+  if (err) return <div className="rounded p-3 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>;
+  if (rows === null) return <div className="text-sm" style={{ color: MUTED }}>loading…</div>;
+  return (
+    <div className="rounded border p-4" style={{ borderColor: BORDER, background: "#fff" }}>
+      <div className="text-xs mb-3" style={{ color: MUTED, maxWidth: "84ch", lineHeight: 1.5 }}>
+        Effort against output, inside the range: every interaction logged (calls, mails, visits), the enquiries opened, and the quotes made with their money. Effort that never becomes a quote shows itself here.
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead><tr style={{ textAlign: "left", color: MUTED, fontSize: 11 }}>
+            <th className="py-1 pr-3">PERSON</th>
+            <th className="py-1 pr-3" style={{ textAlign: "right" }}>TOUCHES</th>
+            <th className="py-1 pr-3" style={{ textAlign: "right" }}>CALLS</th>
+            <th className="py-1 pr-3" style={{ textAlign: "right" }}>MAILS</th>
+            <th className="py-1 pr-3" style={{ textAlign: "right" }}>VISITS</th>
+            <th className="py-1 pr-3" style={{ textAlign: "right" }}>ENQUIRIES</th>
+            <th className="py-1 pr-3" style={{ textAlign: "right" }}>QUOTES</th>
+            <th className="py-1" style={{ textAlign: "right" }}>QUOTED ₹</th>
+          </tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key} style={{ borderTop: `1px solid ${BORDER}` }}>
+                <td className="py-1.5 pr-3 font-semibold">{r.name}</td>
+                <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right", fontWeight: 800 }}>{r.touches.toLocaleString("en-IN")}</td>
+                <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{r.calls || "—"}</td>
+                <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{r.mails || "—"}</td>
+                <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{r.visits || "—"}</td>
+                <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{r.opps || "—"}</td>
+                <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{r.quotes || "—"}</td>
+                <td className="py-1.5 tnum font-bold" style={{ textAlign: "right", color: "#0D7A3F" }}>{cr(r.quoteAmt) ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

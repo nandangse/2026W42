@@ -2763,7 +2763,7 @@ function RecipientAdd({ companyId, onPick }: { companyId?: string; onPick: (pid:
   const [text, setText] = useState("");
   const [opts, setOpts] = useState<{ id: string; label: string; mine?: boolean }[]>([]);
   const [open, setOpen] = useState(false);
-  const [popup, setPopup] = useState<{ email: string; name: string; phone: string } | null>(null);
+  const [popup, setPopup] = useState<{ email: string; name: string; phone: string; companyId: string; companyLabel: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const timer = useRef<number | null>(null);
@@ -2796,7 +2796,7 @@ function RecipientAdd({ companyId, onPick }: { companyId?: string; onPick: (pid:
           first_name: popup.name.trim() || popup.email.split("@")[0],
           primary_email: popup.email.trim(),
           primary_phone: popup.phone.trim() || null,
-          ...(companyId ? { company_id: companyId } : {}),
+          ...(popup.companyId ? { company_id: popup.companyId } : {}),
         }),
       });
       const j = await r.json();
@@ -2813,7 +2813,7 @@ function RecipientAdd({ companyId, onPick }: { companyId?: string; onPick: (pid:
         onChange={(e) => { setText(e.target.value); seek(e.target.value); }}
         onFocus={() => { if (opts.length) setOpen(true); }}
         onBlur={() => window.setTimeout(() => setOpen(false), 200)}
-        onKeyDown={(e) => { if (e.key === "Enter" && emailish) { e.preventDefault(); setOpen(false); setPopup({ email: text.trim(), name: "", phone: "" }); } }}
+        onKeyDown={(e) => { if (e.key === "Enter" && emailish) { e.preventDefault(); setOpen(false); setPopup({ email: text.trim(), name: "", phone: "", companyId: companyId || "", companyLabel: "" }); } }}
         className="w-full px-2 py-1 rounded border text-xs" style={{ borderColor: BORDER }} />
       {open && (opts.length > 0 || emailish) && (
         <div className="rounded border" style={{ position: "absolute", top: "100%", left: 0, zIndex: 45, background: "#fff", borderColor: BORDER, boxShadow: "0 8px 24px rgba(27,45,107,.18)", minWidth: 260, maxHeight: 240, overflowY: "auto" }}>
@@ -2826,7 +2826,7 @@ function RecipientAdd({ companyId, onPick }: { companyId?: string; onPick: (pid:
           ))}
           {emailish && (
             <button type="button" onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { setOpen(false); setPopup({ email: text.trim(), name: "", phone: "" }); }}
+              onClick={() => { setOpen(false); setPopup({ email: text.trim(), name: "", phone: "", companyId: companyId || "", companyLabel: "" }); }}
               className="block w-full text-left px-2.5 py-1.5 text-sm font-bold hover:bg-[#F7F5F0]" style={{ color: ORANGE }}>
               ＋ Add {text.trim()} as a contact…
             </button>
@@ -2837,7 +2837,7 @@ function RecipientAdd({ companyId, onPick }: { companyId?: string; onPick: (pid:
         <div onClick={() => setPopup(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(22,35,47,.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div onClick={(e) => e.stopPropagation()} className="rounded p-4" style={{ background: "#fff", width: "min(420px, 100%)", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
             <div className="font-bold text-sm mb-2">Add contact?</div>
-            <div className="text-xs mb-3" style={{ color: MUTED }}>Nobody has {popup.email} yet — this files them under {companyId ? "this client" : "the CRM"}.</div>
+            <div className="text-xs mb-3" style={{ color: MUTED }}>Nobody has {popup.email} yet.</div>
             {err && <div className="rounded p-2 mb-2 text-sm" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
             <label className="block mb-2">
               <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>Name</div>
@@ -2849,11 +2849,18 @@ function RecipientAdd({ companyId, onPick }: { companyId?: string; onPick: (pid:
               <input value={popup.email} onChange={(e) => setPopup((p) => p && { ...p, email: e.target.value })}
                 className="w-full px-2 py-1.5 rounded border text-sm" style={{ borderColor: BORDER }} />
             </label>
-            <label className="block mb-3">
+            <label className="block mb-2">
               <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>Mobile</div>
               <input value={popup.phone} onChange={(e) => setPopup((p) => p && { ...p, phone: e.target.value })} placeholder="+91 …"
                 className="w-full px-2 py-1.5 rounded border text-sm" style={{ borderColor: BORDER }} />
             </label>
+            {/* files under THIS company by default — any company can be picked
+                (Dr Raghu, 30 Aug 2026) */}
+            <div className="mb-3">
+              <div className="text-xs font-semibold mb-0.5" style={{ color: MUTED }}>Company</div>
+              <LinkAutocomplete target="company" value={popup.companyId} valueLabel={popup.companyLabel}
+                onPick={(cid) => setPopup((p) => p && { ...p, companyId: cid })} />
+            </div>
             <div className="flex gap-2">
               <button onClick={() => void createContact()} disabled={busy || !isEmailish(popup.email)}
                 className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: busy ? "#B9BEC4" : "#0D7A3F" }}>

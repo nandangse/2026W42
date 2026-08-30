@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.1.12",
+    date: "2026-08-30",
+    module: "CRM — Analytics grows four rooms; Add contact? files anywhere",
+    items: [
+      "Analytics now has four tabs (Dr Raghu, 30 Aug 2026): 📐 CONVERSION RATIOS (the funnel arithmetic), 🏺 SALES FUNNEL (the fourteen-rung ladder as bars with counts and money), 🎯 FOCUS DASHBOARD (the biggest open quotes, quotes expiring inside 14 days, opportunities going cold untouched), and 🏃 EFFORT DASHBOARD (touches, calls, mails, visits, enquiries and quoted ₹ per salesperson).",
+      "Add contact? no longer trips on a null tick (every missing checkbox now lands FALSE server-wide) and gains a Company picker — this client pre-filled, any company choosable.",
+    ],
+  },
+  {
     v: "3.31.1.11",
     date: "2026-08-30",
     module: "CRM — Analytics: the whole business first, then the lanes with money",
