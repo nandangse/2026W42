@@ -105,7 +105,13 @@ export const DOCTYPES: Doctype[] = [
     fields: [
       { name: "quote_no", label: "Quote No", type: "readonly", inList: true, help: "NGSE/QTN/26-27/00001, issued by the database on save." },
       { name: "quoted_on", label: "Date of quote", type: "date", inList: true, default: "today", help: "The business date the quote went out." },
-      { name: "opportunity_id", label: "Opportunity", type: "link", link: "opportunity", required: true, inList: true, noFilter: true },
+      // A QUOTE MAY STAND ALONE (Dr Raghu, 31 Aug 2026: "opportunity is not
+      // compulsory. It can be made without opportunity too"). The database
+      // has allowed it since CRM migration 0028 — and 16,764 of the 17,345
+      // quotations on record already have no opportunity against them, the
+      // ERP's own imports among them. Only this add-form still argued.
+      { name: "opportunity_id", label: "Opportunity", type: "link", link: "opportunity", inList: true, noFilter: true,
+        help: "Optional — a quote can be raised on its own. Linking one lets the deal, its stage and its forecast follow the quote." },
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
       { name: "contact_id", label: "Contact", type: "link", link: "person", noFilter: true },
       { name: "owner_id", label: "Salesperson", type: "link", link: "profile", inList: true, default: "me" },

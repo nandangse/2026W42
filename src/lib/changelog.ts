@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.0.1.2",
+    date: "2026-08-31",
+    module: "CRM — a quotation may stand on its own",
+    items: [
+      "\"opportunity is not compulsory. It can be made without opportunity too\" (Dr Raghu, 31 Aug 2026) — New quotation no longer refuses to save without one. The database has allowed it since CRM migration 0028, and 16,764 of the 17,345 quotations on record already stand with no opportunity against them, the ERP's own imports among them; only the add form was still arguing with the data it holds. Linking a deal is now an option that says what it buys you — the deal, its stage and its forecast follow the quote — rather than a gate.",
+    ],
+  },
+  {
     v: "4.0.1.1",
     date: "2026-08-31",
     module: "CRM — the product takes files from your computer, and can answer the ERP back",
