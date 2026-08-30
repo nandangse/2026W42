@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "3.31.0.69",
+    date: "2026-08-30",
+    module: "CRM — the view remembers you",
+    items: [
+      "EVERY LIST OPENS AS YOU LEFT IT (Dr Raghu, 30 Aug 2026): filters, search, sort, the tag filter, the date view and the columns all come back per person, surviving reloads and tomorrows.",
+      "✕ ALL FILTERS, in red, stands on every filter bar — one press clears the lot and shows everything.",
+      "TAGS TAKE SEVERAL AT ONCE: type them comma-separated and each one lands.",
+    ],
+  },
+  {
     v: "3.31.0.68",
     date: "2026-08-30",
     module: "Job Plan — one line floats",

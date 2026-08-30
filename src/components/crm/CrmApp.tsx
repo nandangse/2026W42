@@ -179,8 +179,16 @@ export default function CrmApp({
   // Switching doctype resets the working state, recalls its saved layout,
   // and keeps the address bar honest — every section has its URL.
   useEffect(() => {
-    setQ(""); setQLive(""); setFilters({}); setSort(null); setAdding(false);
-    setColsOpen(false); setView(null);
+    setAdding(false); setColsOpen(false); setView(null);
+    // the person's LAST view comes back — filters, search, sort, tag —
+    // surviving reloads (Dr Raghu, 30 Aug 2026); ✕ All filters clears it
+    try {
+      const saved = JSON.parse(localStorage.getItem(`crmView.${slug}`) || "{}") as { q?: string; filters?: Record<string, string>; sort?: { col: string; dir: "asc" | "desc" } | null; tag?: string };
+      setQ(saved.q || ""); setQLive(saved.q || "");
+      setFilters(saved.filters || {});
+      setSort(saved.sort || null);
+      setTagQ(saved.tag || "");
+    } catch { setQ(""); setQLive(""); setFilters({}); setSort(null); setTagQ(""); }
     try {
       const c = localStorage.getItem(`crmCols.${slug}`);
       setCols(c ? (JSON.parse(c) as string[]) : null);
@@ -194,6 +202,11 @@ export default function CrmApp({
     const t = setTimeout(() => setQ(qLive), 300);
     return () => clearTimeout(t);
   }, [qLive]);
+
+  // remember the view as it changes — reloads and tomorrow both find it
+  useEffect(() => {
+    try { localStorage.setItem(`crmView.${slug}`, JSON.stringify({ q, filters, sort, tag: tagQ })); } catch { /* fine */ }
+  }, [slug, q, filters, sort, tagQ]);
 
   /** Multi-select for the bulk Edit — checked row ids. */
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -765,6 +778,17 @@ export default function CrmApp({
           {(filterables.length > 0 || industryFilter) && (
             <div className="flex items-center gap-2 mb-3 flex-wrap">
               <span className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>FILTER</span>
+              {(q || tagQ || Object.values(filters).some(Boolean) || sort || dateView) && (
+                <button onClick={() => {
+                  setQ(""); setQLive(""); setFilters({}); setSort(null); setTagQ("");
+                  applyDateView(null);
+                  try { localStorage.removeItem(`crmView.${slug}`); } catch { /* fine */ }
+                }}
+                  className="text-xs font-bold rounded px-2 py-1 text-white" style={{ background: "#B3261E" }}
+                  title="Clear every filter, the search, the tag, the sort and the date view — see all">
+                  ✕ All filters
+                </button>
+              )}
               {filterables.filter((f) => f.link === "company").map((f) => (
                 <div key={f.name} style={{ width: 210 }}>
                   <LinkAutocomplete
@@ -3037,13 +3061,16 @@ function TagStrip({ entity, id }: { entity: string; id: string }) {
     return () => clearTimeout(t);
   }, [text]);
   const add = async (name: string) => {
-    const n = name.trim();
-    if (!n) return;
+    // several at once, comma-separated (Dr Raghu, 30 Aug 2026)
+    const parts = name.split(",").map((x) => x.trim()).filter(Boolean);
+    if (!parts.length) return;
     setText("");
-    await fetch("/api/crm/tags", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "add", entity, id, name: n }),
-    });
+    for (const n of parts) {
+      await fetch("/api/crm/tags", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "add", entity, id, name: n }),
+      });
+    }
     load();
   };
   if (!installed) return (
