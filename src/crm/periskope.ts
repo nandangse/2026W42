@@ -35,6 +35,20 @@ export async function periskopeConfig(db: SupabaseClient): Promise<PeriskopeCfg 
   const cfg = (data?.config || {}) as Record<string, string>;
   if (!cfg.api_key) return { error: "Paste the Periskope API key in Settings → Integrations first." };
   if (!cfg.phone) return { error: "Periskope needs the sending WhatsApp number (Settings → Integrations → Periskope → phone). It travels as the x-phone header, so nothing sends without it." };
+
+  /**
+   * THE COUNTRY CODE (Dr Raghu, 31 Aug 2026, having saved 9653671322).
+   *
+   * Periskope reads x-phone as the number WITH its country code — their own
+   * example is 919876512340. A bare ten-digit Indian mobile is refused at
+   * their end, and the refusal comes back looking like a bad key rather than
+   * a bad number, which is a long hour of debugging the wrong thing. Better
+   * to say it here, in words, before anything is sent.
+   */
+  const digits = String(cfg.phone).replace(/\D/g, "");
+  if (digits.length <= 10) {
+    return { error: `The Periskope number reads ${digits} — that is missing its country code. Periskope wants it as 91${digits}, with the code and no symbols. Settings → Integrations → Periskope → phone.` };
+  }
   const num = (v: unknown, fallback: number) => {
     const n = Number(String(v ?? "").replace(/[^0-9.]/g, ""));
     return n > 0 ? n : fallback;
