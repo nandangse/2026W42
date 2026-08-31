@@ -3,6 +3,7 @@ import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
 import { myMailbox, accessTokenFor, gmailSendMixed } from "@/crm/gmail";
+import { quoteVars, fillQuoteVars } from "@/crm/quote-vars";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -39,7 +40,23 @@ export async function POST(req: Request) {
     if (mode === "client" && !toList.length) throw new HttpError(400, "Who does it go To?");
     const to = mode === "review" ? "raghu@nandan.co.in" : toList.join(", ");
     const subject = String(body.subject || `Submission of Qtn ${q.quote_no} : Dt ${String(q.quoted_on || "").slice(0, 10).split("-").reverse().join("/")}`).slice(0, 300);
-    const bodyHtml = String(body.body_html || q.letter_text || "<p>Please find our quotation enclosed.</p>");
+    /**
+     * THE LETTER'S VARIABLES — filled HERE too (Dr Raghu, 31 Aug 2026).
+     *
+     * They were not, and a quotation went to a client signed
+     * "Warm regards, {{sales_person}}". The PDF filled them because the
+     * substitution lived inside the PDF renderer; this route sends the same
+     * covering letter as the email body and never passed it through anything.
+     * Both now use the one implementation in @/crm/quote-vars.
+     *
+     * No escaping: the letter is already HTML the sender wrote, and escaping
+     * a name into it a second time would print &amp; where an ampersand was.
+     */
+    const vars = await quoteVars(db, q as Record<string, unknown>);
+    const bodyHtml = fillQuoteVars(
+      String(body.body_html || q.letter_text || "<p>Please find our quotation enclosed.</p>"),
+      vars,
+    );
 
     // the sender's own Gmail — the road every CRM mail takes
     const mailbox = await myMailbox(me.profileId!);
@@ -96,6 +113,50 @@ export async function POST(req: Request) {
     } else {
       await db.from("quotation").update({ review_requested_at: now, subject }).eq("id", qid).then(() => null, () => null);
     }
+    /**
+     * WHAT WAS ACTUALLY SENT (Dr Raghu, 31 Aug 2026, reading the feed after
+     * his first real submission: "this should show what was sent right?").
+     *
+     * It did not. The feed carried a one-line summary — subject, recipients,
+     * a count of attachments — and the letter itself was nowhere: the body
+     * went to Gmail and was forgotten, and the PDF was pressed, attached and
+     * thrown away. Six months on, "what did we actually quote them?" had no
+     * answer here, only in somebody's Sent folder.
+     *
+     * So the letter is kept whole, and the PDF is kept as a file. The
+     * Communication row holds the real body; the interaction line remains as
+     * the ledger entry it always was.
+     *
+     * Neither is allowed to break the send. The email has already gone by
+     * this point — failing the request now would tell him it did not.
+     */
+    let pdfLink: { name: string; url: string } | null = null;
+    try {
+      const stamp = now.replace(/[:.]/g, "-");
+      const safeNo = String(q.quote_no).replace(/[/\\]/g, "_");
+      const path = `note/quotation/${qid}/${stamp}-${safeNo}${mode === "review" ? "-DRAFT" : ""}.pdf`;
+      const { error: upErr } = await db.storage.from("cards")
+        .upload(path, Buffer.from(pdfB64, "base64"), { contentType: "application/pdf" });
+      if (!upErr) pdfLink = { name: `${safeNo}.pdf`, url: `/api/crm/opp-attach?path=${encodeURIComponent(path)}` };
+    } catch { /* the copy is a convenience; the send already happened */ }
+
+    try {
+      await db.from("message").insert({
+        channel: "email",
+        direction: "outbound",
+        external_id: gmailId ? String(gmailId) : null,
+        subject,
+        body_html: bodyHtml,
+        body_text: String(bodyHtml).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 8000),
+        from_handle: String(mailbox.email_address),
+        to_handles: [...to.split(",").map((s: string) => s.trim()).filter(Boolean), ...(mode === "client" ? ccList : [])],
+        attachments: pdfLink ? [pdfLink] : [],
+        occurred_at: now,
+        company_id: q.company_id, person_id: q.contact_id ?? null,
+        opportunity_id: q.opportunity_id,
+      });
+    } catch { /* never let the ledger break a send that already went */ }
+
     await db.from("interaction").insert({
       kind: "Email", happened_at: now,
       company_id: q.company_id, opportunity_id: q.opportunity_id, quotation_id: qid,

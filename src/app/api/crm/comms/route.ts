@@ -62,7 +62,7 @@ export async function GET(req: Request) {
     let msgs: Record<string, unknown>[] = [];
     if (fk.message || oppId) {
       let mq = db.from("message")
-        .select("id, channel, direction, subject, body_text, from_handle, to_handles, occurred_at, thread_key, raw_payload")
+        .select("id, channel, direction, subject, body_text, from_handle, to_handles, occurred_at, thread_key, raw_payload, attachments")
         .order("occurred_at", { ascending: false })
         .limit(300);
       if (fk.message && oppId) mq = mq.or(`${fk.message}.eq.${id},opportunity_id.eq.${oppId}`);
@@ -107,6 +107,9 @@ export async function GET(req: Request) {
         to_handles: (m.to_handles as string[] | null) ?? null,
         thread_key: m.thread_key ? String(m.thread_key) : null,
         rfc_message_id: (m.raw_payload as { rfc_message_id?: string } | null)?.rfc_message_id ?? null,
+        // what actually rode with it — the quotation PDF, by name and link
+        // (Dr Raghu, 31 Aug 2026: "this should show what was sent right?")
+        attachments: Array.isArray(m.attachments) ? (m.attachments as { name?: string; url?: string }[]) : [],
         next_action: null,
         next_action_on: null,
       })),

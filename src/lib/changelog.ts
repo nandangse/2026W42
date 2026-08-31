@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.1.0.1",
+    date: "2026-08-31",
+    module: "CRM — the covering letter fills its variables, and the sent mail reaches Communication",
+    items: [
+      "A REAL QUOTATION WENT TO A CLIENT SIGNED \"Warm regards, {{sales_person}}\" (Dr Raghu, 31 Aug 2026: \"this messed up\" — then, of the PDF, \"here it went right!\"). Both halves of that are the diagnosis: the attached PDF resolved the variable correctly and the EMAIL BODY did not. The substitution lived inside the PDF renderer, and the covering letter — the same words, sent as the email body by a different route — never passed through it. Two routes, two ideas of what a variable is, and the customer read the one that was wrong.",
+      "The map and the filling now live in ONE place that both import, so a third caller gets it right for free and the two can no longer drift apart. Nothing was fixed twice; the duplicate in the PDF renderer is gone.",
+      "\"also the mail didnt come in communication\" — it did not, and neither did the letter. Submitting wrote a one-line summary to the record (subject, recipients, a count of attachments) while the letter itself went to Gmail and was forgotten and the PDF was pressed, attached and thrown away. Six months on, \"what did we actually quote them?\" had no answer here, only in somebody's Sent folder. The full letter is now written to Communication as a real outbound mail, and the exact PDF is KEPT as a file and linked from it.",
+      "Neither the copy nor the log is allowed to fail a send: by the time they run the email has already gone, and an error then would report a failure that did not happen.",
+    ],
+  },
+  {
     v: "4.1.0.0",
     date: "2026-08-31",
     module: "WhatsApp Business — the Periskope queue",

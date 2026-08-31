@@ -3,6 +3,7 @@ import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
 import { LOGO } from "@/lib/logo";
 import { cleanDesc } from "@/lib/desc-clean";
+import { quoteVars, fillQuoteVars } from "@/crm/quote-vars";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -153,25 +154,10 @@ export async function GET(req: Request) {
      * An UNKNOWN name is deliberately left standing as it was written. A typo
      * that vanishes silently is a typo nobody finds until a client reads it.
      */
-    const VARS: Record<string, string> = {
-      customer,
-      quote_no: String(q.quote_no ?? ""),
-      quote_date: dIN(q.quoted_on),
-      subject: String(q.subject || ""),
-      valid_until: dIN(q.valid_until),
-      delivery: String(q.delivery_weeks || ""),
-      contact: String(contact?.full_name || ""),
-      // Who is sending it, and who signs it off.
-      sales_person: ownerName,
-      salesperson: ownerName,
-      authorized_by: String(q.authorized_by || "Dr Raghunandan Jagdish, MD and CEO"),
-      company: "Nandan GSE Pvt Ltd",
-    };
-    const fill = (html: string) =>
-      html.replace(/\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g, (whole, key: string) => {
-        const v = VARS[String(key).toLowerCase()];
-        return v === undefined ? whole : esc(v);
-      });
+    // ONE implementation, shared with the email that carries the same letter
+    // (@/crm/quote-vars) — see the note there about how they came to differ.
+    const VARS = await quoteVars(db, q as Record<string, unknown>);
+    const fill = (html: string) => fillQuoteVars(html, VARS, esc);
 
     // ---- content per section: [sectionKey, title, html-chunks] ----------
     type Sec = { key: string; title: string; chunks: string[]; centered?: boolean };
