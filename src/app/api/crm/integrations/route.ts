@@ -31,7 +31,16 @@ const KNOWN = [
   // stored the way every other key here is, in the CRM's own database behind
   // the service role, never in an env var that would need a redeploy to
   // rotate, and never echoed back whole.
-  { key: "periskope", label: "Periskope", fields: ["api_key", "base_url", "org_id", "phone"], ownerOnly: true, help: "The Periskope API key, pasted from your Periskope dashboard. BASE_URL is their API root if it ever differs from the default; ORG_ID and PHONE identify which workspace and which WhatsApp number the key speaks for — leave them blank until Periskope's own screen tells you what they are. Nothing in Genie calls Periskope yet: this is the key's home, ready for whatever is built on it. Only Raghu edits it." },
+  // Periskope (Dr Raghu, 31 Aug 2026) — the WhatsApp Business automation.
+  // The field names follow Periskope's own API: the key rides as
+  // `Authorization: Bearer …` and the number as the `x-phone` header, which
+  // is why PHONE is not optional decoration but half the credential.
+  //
+  // THE THREE CEILINGS ARE HIS ("messages / hr max - 100. Min time between
+  // two message - 10 sec. max per day 500") and they live here rather than in
+  // code so they can be lowered the day the number feels heat — see the
+  // warning the queue screen carries about Periskope's own advice.
+  { key: "periskope", label: "Periskope — WhatsApp Business", fields: ["api_key", "phone", "base_url", "per_hour", "per_day", "gap_seconds"], ownerOnly: true, help: "API_KEY from Periskope → Settings → API, sent as a Bearer token. PHONE is the sending WhatsApp number with country code and no symbols (919876543210) — Periskope reads it as the x-phone header, so it is half the credential, not a note. BASE_URL only if it ever moves off https://api.periskope.app/v1. THE CEILINGS: PER_HOUR (blank = 100), PER_DAY (blank = 500) and GAP_SECONDS, the least time between any two messages (blank = 10). They are enforced by the queue at the moment of sending, not by the screen. NOTE: Periskope's own guidance calls 100+ a day HIGH RISK of a ban and suggests 20–50 for an established number — 500 is your call, made knowingly." },
   { key: "instafinancials", label: "InstaFinancials", fields: ["api_key", "order_url_template", "status_url_template", "download_url_template", "cin_url_template", "url_template"], ownerOnly: true, help: "The InstaFinancials API key (instafinancials.com → API Key Configuration). URL_TEMPLATE is the InstaSummary endpoint with {cin} where the CIN goes — blank falls back to the standard https://instafinancials.com/api/InstaSummary/v1/json/CompanyCIN/{cin} — adjust it here if their docs show a different path or when switching sandbox to production. Only Raghu edits or triggers; the bought summary is visible to all." },
 ] as const;
 

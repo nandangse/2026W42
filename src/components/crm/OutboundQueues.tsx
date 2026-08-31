@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import MailComposer from "./MailComposer";
+import PeriskopeQueue from "./PeriskopeQueue";
 import { NAVY, NAVY_SOFT, INK, MUTED, BORDER, ORANGE, GREEN } from "./palette";
 
 interface QItem {
@@ -27,7 +28,39 @@ const d10 = (s: unknown) => String(s || "").slice(0, 10);
 type TrackedMail = { id: string; subject: string; to_handles: string[]; occurred_at: string; opened_at: string | null; open_count: number };
 
 export function EmailQueue() { return <QueueScreen channel="email" />; }
-export function WhatsAppQueue() { return <QueueScreen channel="whatsapp" />; }
+
+/**
+ * WhatsApp has two doors now (Dr Raghu, 31 Aug 2026), and they are genuinely
+ * different things rather than two views of one:
+ *
+ *   MANUAL     the salesperson's own number. SEND opens WhatsApp with the
+ *              words ready and a human presses send there. No limits apply
+ *              because no automation is involved.
+ *   BUSINESS   Periskope. The message leaves the server under the company's
+ *              WhatsApp Business number, throttled, and reaches Communication
+ *              only once Periskope confirms it arrived.
+ *
+ * Keeping them side by side rather than merging them means nobody sends a
+ * hundred automated messages believing they were opening their own WhatsApp.
+ */
+export function WhatsAppQueue() {
+  const [door, setDoor] = useState<"manual" | "biz">("manual");
+  return (
+    <div>
+      <div className="flex gap-1 mb-3">
+        <button onClick={() => setDoor("manual")} className="rounded px-3 py-1.5 text-sm font-bold"
+          style={door === "manual" ? { background: NAVY, color: "#fff" } : { background: NAVY_SOFT, color: NAVY }}>
+          💬 From your own WhatsApp
+        </button>
+        <button onClick={() => setDoor("biz")} className="rounded px-3 py-1.5 text-sm font-bold"
+          style={door === "biz" ? { background: NAVY, color: "#fff" } : { background: NAVY_SOFT, color: NAVY }}>
+          🏢 Business — Periskope
+        </button>
+      </div>
+      {door === "manual" ? <QueueScreen channel="whatsapp" /> : <PeriskopeQueue />}
+    </div>
+  );
+}
 
 function QueueScreen({ channel }: { channel: "email" | "whatsapp" }) {
   const [tab, setTab] = useState<"queue" | "sent" | "auto" | "tracking">("queue");

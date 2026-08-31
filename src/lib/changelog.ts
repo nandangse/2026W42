@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.1.0.0",
+    date: "2026-08-31",
+    module: "WhatsApp Business — the Periskope queue",
+    items: [
+      "\"This periskope will be for automation. personalised messages can be created and sent from this. keep settings for it also. messages / hr max - 100. Min time between two message - 10 sec. max per day 500. create a queue for this automation too. While creating it put into queue and when clicked and sent send it. After sending and its delivered put it into communication as Whatsapp Biz message.\" (Dr Raghu, 31 Aug 2026) — a new room, so the third digit turns.",
+      "THREE ACTS, THREE BUTTONS, never one. ✎ Compose renders the {{variables}} per person and PARKS the finished text, so what stands in the queue is exactly what will go out. ➤ Send releases one message by hand. ↻ Check asks Periskope what arrived — and only what it confirms DELIVERED becomes a WhatsApp Biz message on the record. Periskope answers \"queued\" when it merely accepts a message, and writing Communication then would be recording a conversation that may never have happened.",
+      "THE CEILINGS ARE HIS — 100 an hour, 500 a day, 10 seconds apart — kept in Settings → Integrations so they can be lowered without a deploy, and enforced by the SERVER against the queue's own history at the moment of sending. A limit checked only in the screen is a limit a second browser tab walks straight through.",
+      "Written against Periskope's published API rather than guessed at: the key rides as a Bearer token, the sending number as the x-phone header, and a one-to-one chat is the number as …@c.us. THEIR OWN GUIDANCE IS STATED ON THE SCREEN, because it disagrees with the settings: Periskope calls 100+ messages a day high risk of a ban and suggests 20–50 for an established number, spread across the day. The queue carries that warning where the numbers are read.",
+      "The manual WhatsApp queue is untouched and sits beside it under its own tab — one sends from the salesperson's own phone with no limits, the other from the company's Business number with all of them. They are not merged, so nobody sends a hundred automated messages believing they were opening their own WhatsApp. CRM migration 0049 builds the queue.",
+    ],
+  },
+  {
     v: "4.0.1.8",
     date: "2026-08-31",
     module: "CRM — Periskope has a home in Integrations",
