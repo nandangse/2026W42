@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.0.1.8",
+    date: "2026-08-31",
+    module: "CRM — Periskope has a home in Integrations",
+    items: [
+      "\"Add an integration API. Call it periskope. Keep it in the CRM settings itself. I'll feed in the API in that.\" (Dr Raghu, 31 Aug 2026) — Settings → Integrations gains PERISKOPE: the API key, and beside it a base URL, an org id and a phone for when Periskope's own screen says what they should be. Raghu's to edit, as with the ERP and InstaFinancials.",
+      "It is stored the way every key here is — in the CRM's own database behind the service role, never echoed back whole (the screen shows the last four characters, enough to recognise a key, not enough to steal one), and never in an env var that would need a redeploy to rotate.",
+      "\"this way we'll be able to change the same when we change a provider\" — exactly the point. Nothing in Genie calls Periskope yet: WhatsApp still hands the salesperson a wa.me link from their own phone. When something IS built on this key, it reads the provider out of Integrations rather than out of the code, so changing provider is a paste rather than a deploy.",
+    ],
+  },
+  {
     v: "4.0.1.7",
     date: "2026-08-31",
     module: "CRM — the PDF press unjammed: quotations can go out again",

@@ -25,6 +25,13 @@ const KNOWN = [
   // InstaFinancials (Dr Raghu, 30 Aug 2026): company financials by CIN.
   // InstaSummary costs 75 credits a pull — Raghu's hand alone triggers it;
   // everyone reads the result on the company's IFS tab.
+  // Periskope (Dr Raghu, 31 Aug 2026: "Add an integration API. Call it
+  // periskope. Keep it in the CRM settings itself. I'll feed in the API in
+  // that."). The key has somewhere to live before anything is built on it —
+  // stored the way every other key here is, in the CRM's own database behind
+  // the service role, never in an env var that would need a redeploy to
+  // rotate, and never echoed back whole.
+  { key: "periskope", label: "Periskope", fields: ["api_key", "base_url", "org_id", "phone"], ownerOnly: true, help: "The Periskope API key, pasted from your Periskope dashboard. BASE_URL is their API root if it ever differs from the default; ORG_ID and PHONE identify which workspace and which WhatsApp number the key speaks for — leave them blank until Periskope's own screen tells you what they are. Nothing in Genie calls Periskope yet: this is the key's home, ready for whatever is built on it. Only Raghu edits it." },
   { key: "instafinancials", label: "InstaFinancials", fields: ["api_key", "order_url_template", "status_url_template", "download_url_template", "cin_url_template", "url_template"], ownerOnly: true, help: "The InstaFinancials API key (instafinancials.com → API Key Configuration). URL_TEMPLATE is the InstaSummary endpoint with {cin} where the CIN goes — blank falls back to the standard https://instafinancials.com/api/InstaSummary/v1/json/CompanyCIN/{cin} — adjust it here if their docs show a different path or when switching sandbox to production. Only Raghu edits or triggers; the bought summary is visible to all." },
 ] as const;
 
