@@ -31,6 +31,36 @@ function nextWeekday(dow: number): string {
 
 /** Every variable's current value for a context — builtins computed, statics
  *  read from the master. */
+/**
+ * THE CATALOGUE — every variable this file can produce, in one list.
+ *
+ * "please put these variables in the settings so that I know. Also in the
+ * templates page showcase this" (Dr Raghu, 31 Aug 2026), after typing
+ * {{user_name}} — which does not exist and would have printed as braces on
+ * a customer's WhatsApp.
+ *
+ * The list is exported rather than retyped on each screen so it cannot drift
+ * from what the code above actually fills. WHAT IT NEEDS matters as much as
+ * the name: {{name}} is empty unless the message is tied to a person, and a
+ * variable that quietly renders empty is the same trap as one that does not
+ * exist. Both settings and the template editors read this.
+ */
+export const VARIABLE_CATALOGUE: { key: string; what: string; needs: string }[] = [
+  { key: "name", what: "The person's full name", needs: "a contact" },
+  { key: "small_name", what: "Their first name alone", needs: "a contact" },
+  { key: "company_name", what: "The customer's company", needs: "a contact, company or deal" },
+  { key: "qtn_no", what: "The quotation number", needs: "a quotation" },
+  { key: "qtn_subject", what: "What the deal is for", needs: "a deal or quotation" },
+  { key: "enq_no", what: "The enquiry (opportunity) number", needs: "a deal or quotation" },
+  { key: "today", what: "Today's date, 31/08/2026", needs: "nothing" },
+  { key: "next_monday", what: "The coming Monday's date", needs: "nothing" },
+  { key: "next_tuesday", what: "The coming Tuesday's date", needs: "nothing" },
+  { key: "next_wednesday", what: "The coming Wednesday's date", needs: "nothing" },
+  { key: "next_thursday", what: "The coming Thursday's date", needs: "nothing" },
+  { key: "next_friday", what: "The coming Friday's date", needs: "nothing" },
+  { key: "next_saturday", what: "The coming Saturday's date", needs: "nothing" },
+];
+
 export async function variableValues(ctx: VariableContext): Promise<Record<string, string>> {
   const db = crmDb();
   const out: Record<string, string> = {};

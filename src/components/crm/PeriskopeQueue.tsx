@@ -18,6 +18,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { NAVY, NAVY_SOFT, INK, MUTED, BORDER, ORANGE, GREEN } from "./palette";
+import VariableHelp from "./VariableHelp";
 
 interface QRow {
   id: string; phone: string; person_id: string | null; person_name: string | null;
@@ -232,10 +233,11 @@ function ComposeBox({ onClose, onQueued }: { onClose: () => void; onQueued: () =
               placeholder="Dear {{name}}, …"
               className="w-full border rounded px-2 py-1.5 text-sm" style={{ borderColor: BORDER }} />
             <div className="text-xs mt-1" style={{ color: MUTED, lineHeight: 1.6 }}>
-              The same {"{{variables}}"} the templates use are filled per person when it is queued, so what you see
-              in the queue is exactly what goes out. <b>Personalise it</b> — Periskope&apos;s advice is that identical
-              text across many numbers is the fingerprint that gets a number banned.
+              The {"{{variables}}"} are filled per person when it is queued, so what you see in the queue is exactly
+              what goes out. <b>Personalise it</b> — Periskope&apos;s advice is that identical text across many
+              numbers is the fingerprint that gets a number banned.
             </div>
+            <div className="mt-2"><VariableHelp compact /></div>
           </div>
           <div>
             <span className="block text-xs font-bold mb-0.5" style={{ color: MUTED }}>Numbers — one per line, with country code</span>

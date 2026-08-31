@@ -75,6 +75,25 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.1.0.3",
+    date: "2026-08-31",
+    module: "CRM — the variables name themselves, wherever one might be typed",
+    items: [
+      "\"please put these variables in the settings so that I know. Also in the templates page showcase this\" (Dr Raghu, 31 Aug 2026) — after writing {{user_name}} into a WhatsApp, a name that has never existed and would have gone out as braces on a customer's phone. The full list now stands on Settings → Message Variables, on both template screens, and inside the WhatsApp compose box.",
+      "The list is READ FROM THE CODE that fills the variables rather than typed onto each screen. The old hint under a template body was hand-written and had already drifted from the truth — it hid {{qtn_no}} unless the module happened to be Quotation, and never said what a variable needs in order to work.",
+      "AND IT NOW SAYS WHAT EACH ONE NEEDS, which is the part that actually bites: {{name}} on a message sent to a phone number typed by hand renders EMPTY, because there is no person behind it to name. A variable that silently disappears misleads exactly as much as one that prints its own braces — so both are said out loud, and an unknown name is left standing as typed.",
+    ],
+  },
+  {
+    v: "4.1.0.2",
+    date: "2026-08-31",
+    module: "CRM — Periskope: the country code, said before it costs an hour",
+    items: [
+      "\"whats the base url?\" (Dr Raghu, 31 Aug 2026) — blank, and the field now says so plainly instead of describing the case in which you would fill it. Blank uses https://api.periskope.app/v1.",
+      "The real fault on that screen was the number beside it: 9653671322, saved without its country code. Periskope reads x-phone WITH the code — their own example is 919876512340 — and refuses a bare ten-digit mobile with an error that reads like a bad key rather than a bad number, which is an hour spent debugging the wrong thing. The check now names it before anything is sent, and spells out the corrected number.",
+    ],
+  },
+  {
     v: "4.1.0.1",
     date: "2026-08-31",
     module: "CRM — the covering letter fills its variables, and the sent mail reaches Communication",
