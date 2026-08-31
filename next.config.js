@@ -3,11 +3,30 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false, // don't advertise the framework
   experimental: {
-    // SheetJS ships CJS; keep it external to the server bundle so Next doesn't try to trace it.
-    serverComponentsExternalPackages: ["xlsx"],
+    /**
+     * PACKAGES THE SERVER BUNDLE MUST NOT SWALLOW.
+     *
+     * SheetJS ships CJS; keep it external so Next doesn't try to trace it.
+     *
+     * @sparticuz/chromium is the one that bit (Dr Raghu, 31 Aug 2026, trying
+     * to send a real quotation): "The input directory
+     * /vercel/path0/node_modules/@sparticuz/chromium/bin does not exist."
+     * The package is not really JavaScript — it is a brotli-compressed
+     * Chromium (chromium.br, fonts, swiftshader) that the code unpacks at
+     * runtime by looking beside its own file. Webpack relocated the code and
+     * left the payload behind, so the press had nothing to unpack and every
+     * PDF failed: no quotation could go to a client at all. Externalizing it
+     * keeps the folder whole. puppeteer-core rides along for the same reason.
+     */
+    serverComponentsExternalPackages: ["xlsx", "@sparticuz/chromium", "puppeteer-core"],
     // the bundled Sales Regrow playbook and the My Sales Plan sources are read
     // from disk at runtime — make sure Vercel's file tracing packages them
     outputFileTracingIncludes: {
+      // The two routes that press a PDF need Chromium's actual payload
+      // shipped beside them — externalizing keeps the folder whole, this
+      // makes sure the folder travels at all.
+      "/api/crm/quote-pdf": ["./node_modules/@sparticuz/chromium/bin/**"],
+      "/api/crm/quote-submit": ["./node_modules/@sparticuz/chromium/bin/**"],
       "/api/sales/html": ["./src/sales-regrow/*.html"],
       "/api/sales/plan": [
         "./src/sales-plan/*",

@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.0.1.7",
+    date: "2026-08-31",
+    module: "CRM — the PDF press unjammed: quotations can go out again",
+    items: [
+      "Trying to send a real quotation to Taj Sats, both Submit to Client and Submit for Review answered \"The PDF press jammed: the input directory /vercel/path0/node_modules/@sparticuz/chromium/bin does not exist\" (Dr Raghu, 31 Aug 2026). NO QUOTATION COULD LEAVE THE BUILDING — not to a client, not even to review.",
+      "The cause: @sparticuz/chromium is not really JavaScript. It is a brotli-compressed Chromium — the browser itself, its fonts and its software renderer — which the code unpacks at runtime by looking in the folder beside its own file. Webpack, doing its job, relocated the code into the server bundle and left the 50 MB payload where it found it, so the press had a set of instructions and nothing to unpack.",
+      "The package is now externalized so its folder stays whole, and Chromium's payload is named explicitly in the file trace for the two routes that press a PDF — verified in the build output: chromium.br, the fonts and swiftshader all travel with the route now.",
+    ],
+  },
+  {
     v: "4.0.1.6",
     date: "2026-08-31",
     module: "CRM — a company can start its own enquiry and its own quote",
