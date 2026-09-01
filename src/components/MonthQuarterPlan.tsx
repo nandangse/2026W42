@@ -30,6 +30,18 @@ interface Payload {
   window: { from: string; end: string; key: string; label: string };
   jobs: PlanJob[]; done: Totals; doneFy: Totals;
   entries: Entry[];
+  /** Who is looking — the plan is theirs, and it says so at the top. */
+  me?: { name: string; email: string };
+  /** Everyone's words on each job, verbatim, over their own initials. */
+  voices?: Record<string, { initials: string; belief: number; comment: string }[]>;
+  /**
+   * PLANNING AND LEADERS ONLY (Dr Raghu, 1 Sep 2026: "remember this box and
+   * the edits are visible to planning and leaders only!"). The job box shows
+   * the commercials — value, throughput, what is still owed on delivery — and
+   * lets kitting and production be corrected. Neither belongs to everyone who
+   * can write a belief.
+   */
+  canEdit?: boolean;
   signoff: { signed_at: string; jobs: number; value: number; throughput: number; realistic_jobs: number | null; realistic_value: number | null; realistic_throughput: number | null; emailed: string | null; is_draft?: boolean } | null;
   /** Everyone's latest word on this period — draft or signature. */
   room?: { by_email: string; is_draft: boolean; signed_at: string; jobs: number; value: number; throughput: number }[];
@@ -148,11 +160,18 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
 
   const so = d.signoff;
   return (
-    <div className="p-4" style={{ maxWidth: 1680 }}>
+    <div className="p-4" style={{ maxWidth: "100%" }}>
       <div className="flex items-center gap-2 flex-wrap mb-3">
         <div>
           <div className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.4 }}>THE BELIEVABLE PLAN</div>
-          <div className="text-lg font-bold" style={{ color: C.ink, lineHeight: 1.2 }}>Month, Quarter &amp; Year Plan</div>
+          {/* WHOSE PLAN, AND FROM WHEN (Dr Raghu, 1 Sep 2026: "On top of page
+              write - Plan of <name> Dated <date>"). It heads the screen and
+              the signed PDF alike: a plan that does not say whose it is, is a
+              plan nobody owns. */}
+          <div className="text-lg font-bold" style={{ color: C.ink, lineHeight: 1.2 }}>
+            Plan of {d.me?.name || "—"} <span style={{ color: C.mute, fontWeight: 600 }}>Dated {fmtFull(d.today || "")}</span>
+          </div>
+          <div className="text-xs" style={{ color: C.mute }}>Month, Quarter &amp; Year Plan</div>
         </div>
         <div className="flex gap-1 ml-2">
           {/* YTD joins them (Dr Raghu, 1 Sep 2026: "make a button for YTD so
@@ -168,6 +187,20 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
         </div>
         <span className="text-xs" style={{ color: C.mute }}>{fmtFull(d.window.from)} → {fmtFull(d.window.end)} · {d.window.key}</span>
         <div className="flex-1" style={{ minWidth: 10 }} />
+        {/* THE DOCUMENT (Dr Raghu, 1 Sep 2026: "let the pdf be available on
+            top after they submit the plan too … not in draft" and "I should
+            be able to see the pdf regardless!"). Everyone gets it once they
+            have SIGNED; planning and leaders get it whenever they ask, and an
+            unsigned one says UNSIGNED on its face so a working document can
+            never be mistaken for a commitment. */}
+        {(d.signoff?.signed_at && !d.signoff?.is_draft) || d.canEdit ? (
+          <a href={`/api/month-plan?pdf=1&kind=${kind}`} target="_blank" rel="noreferrer"
+            className="rounded border px-3 py-1 text-xs font-bold"
+            style={{ borderColor: C.navy, color: C.navy, background: "#fff" }}
+            title={d.signoff?.signed_at && !d.signoff?.is_draft ? "The plan you signed" : "The plan as it stands — marked UNSIGNED"}>
+            ↓ PDF{d.signoff?.signed_at && !d.signoff?.is_draft ? "" : " (unsigned)"}
+          </a>
+        ) : null}
         {msg && <span className="text-xs font-bold" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</span>}
       </div>
 
@@ -203,6 +236,41 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
           })()}
           <div className="text-xs mt-0.5" style={{ color: C.mute }}>on the target delivery dates the board carries · overdue included</div>
         </div>
+
+        {/* BELIEF OF <name> ON <date> (Dr Raghu, 1 Sep 2026: "on the top
+            right make a box which shows Belief of <name> on <>").
+ 
+            It stands beside DONE and MORE because it is the third number of
+            the same sentence — what has happened, what is owed, and what the
+            person actually believes will land. It moves as the beliefs are
+            typed, which is the point: the signed plan showed a realistic read
+            only afterwards, when it was too late to think again.
+ 
+            The job count is deliberately FRACTIONAL. Nine jobs at 50% is four
+            and a half jobs of expectation, and rounding that to nine or to
+            four would be choosing a comfortable number over a true one. */}
+        {(() => {
+          const wb = (d.jobs || []).reduce((a, j) => {
+            const b = (rows[j.id]?.belief ?? 100) / 100;
+            return { n: a.n + b, v: a.v + j.val * b, t: a.t + tpOf(j) * b, pod: a.pod + (Number(j.pod) || 0) * b };
+          }, { n: 0, v: 0, t: 0, pod: 0 });
+          const share = totals.value ? Math.round((wb.v / totals.value) * 100) : 0;
+          return (
+            <div className="rounded-lg border bg-white p-3" style={{ borderColor: C.line, borderTop: `3px solid ${C.violet}`, flex: "1 1 260px" }}>
+              <div className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>
+                BELIEF OF {String(d.me?.name || "—").toUpperCase()} ON {fmtFull(d.today || "")}
+              </div>
+              <div className="tnum mt-1" style={{ fontSize: 18, fontWeight: 800, color: C.ink }}>
+                {wb.n.toFixed(1)} jobs <span style={{ color: C.accent }}>· {V(Math.round(wb.v))}</span>{" "}
+                <span style={{ color: C.green }}>· {V(Math.round(wb.t))}</span>
+              </div>
+              <div className="text-xs mt-0.5" style={{ color: C.mute }}>
+                every job weighted by belief · {V(Math.round(wb.pod))} receivable ·{" "}
+                <b style={{ color: share >= 75 ? C.green : share >= 50 ? "#D97706" : C.red }}>{share}%</b> of the money on the table
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* the REALISTIC plan — shown only after a signature stands */}
@@ -233,7 +301,7 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
         <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 1180 }}>
           <thead>
             <tr style={{ background: "#22303C", color: "#fff", position: "sticky", top: 0, zIndex: 2 }}>
-              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>Job</th>
+              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C", width: 210 }}>Job</th>
               <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }}>Value</th>
               <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }}>TP</th>
               <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }} title="Falls due when this job is delivered — the cash the month actually brings in">Receivable</th>
@@ -243,6 +311,8 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
               <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "#22303C" }}>My best estimate</th>
               <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "#22303C" }}>My belief</th>
               <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>What I believe needs to HAPPEN</th>
+              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}
+                title="What everybody else said about this job — verbatim">The room says</th>
             </tr>
           </thead>
           <tbody>
@@ -251,11 +321,14 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
               const late = j.tdd && d.today && j.tdd < d.today;
               return (
                 <tr key={j.id} style={{ background: r.belief === 0 ? "#FBEDEA" : undefined, boxShadow: "inset 0 1px 0 #EFEDE7" }}>
-                  <td className="px-2 py-1.5 whitespace-nowrap">
-                    <button onClick={() => setOpenJob(j)} className="text-left"
-                      title={`${jobNo(j.id)} · ${j.tag || ""}\n${j.cust || ""}\n\nStatus: ${j.stat || "—"}\nKitting ${j.kit}% · Production ${j.pct}%\nTDD ${fmtFull(j.tdd)} · OTD ${fmtFull(j.otd)}\n\nClick to open the job — the same box as the boards, and editable there.`}>
-                      <b className="tnum" style={{ color: C.navy, textDecoration: "underline", textUnderlineOffset: 2 }}>{jobNo(j.id)}</b>{" "}
-                      <span style={{ color: C.sub }}>{j.tag || ""}</span>
+                  {/* narrower (Dr Raghu, 1 Sep 2026: "job width can be
+                      less") — the number is the handle, the tag is context
+                      and may be clipped; the whole of it is on hover. */}
+                  <td className="px-2 py-1.5" style={{ width: 210, maxWidth: 210 }}>
+                    <button onClick={() => { if (d.canEdit) setOpenJob(j); }} className="text-left" style={{ cursor: d.canEdit ? "pointer" : "default" }}
+                      title={`${jobNo(j.id)} · ${j.tag || ""}\n${j.cust || ""}\n\nStatus: ${j.stat || "—"}\nKitting ${j.kit}% · Production ${j.pct}%\nTDD ${fmtFull(j.tdd)} · OTD ${fmtFull(j.otd)}\n\n${d.canEdit ? "Click to open the job — the same box as the boards, and editable there." : ""}`}>
+                      <b className="tnum" style={{ color: C.navy, textDecoration: d.canEdit ? "underline" : "none", textUnderlineOffset: 2 }}>{jobNo(j.id)}</b>{" "}
+                      <span style={{ color: C.sub, display: "inline-block", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "bottom" }}>{j.tag || ""}</span>
                     </button>
                   </td>
                   <td className="px-2 py-1.5 text-right tnum whitespace-nowrap">{V(j.val)}</td>
@@ -295,11 +368,31 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
                       className="w-full text-xs border rounded px-2 py-1"
                       style={{ borderColor: C.line, minWidth: 260, resize: "vertical", lineHeight: 1.4 }} />
                   </td>
+                  {/* THE ROOM, VERBATIM (Dr Raghu, 1 Sep 2026: "all the
+                      comments written by all verbatim one on each line …
+                      Initials <>% : Comments"). Nothing is summarised: the
+                      whole reason to crowdsource a plan is to see planning
+                      say 100% while the floor says 40%, and a tidy paraphrase
+                      would throw away the disagreement it was collected for. */}
+                  <td className="px-2 py-1.5" style={{ minWidth: 300, maxWidth: 420 }}>
+                    <div style={{ maxHeight: 74, overflowY: "auto", lineHeight: 1.45 }}>
+                      {((d.voices || {})[j.id] || []).length === 0
+                        ? <span style={{ color: C.faint }}>nobody has said anything yet</span>
+                        : ((d.voices || {})[j.id] || []).map((vv, n) => (
+                            <div key={n} style={{ whiteSpace: "normal" }}>
+                              <b style={{ color: C.ink }}>{vv.initials}</b>{" "}
+                              <b style={{ color: vv.belief >= 75 ? C.green : vv.belief >= 50 ? "#D97706" : C.red }}>{vv.belief}%</b>
+                              <span style={{ color: C.mute }}> : </span>
+                              <span style={{ color: C.sub }}>{vv.comment}</span>
+                            </div>
+                          ))}
+                    </div>
+                  </td>
                 </tr>
               );
             })}
             {(d.jobs || []).length === 0 && (
-              <tr><td colSpan={10} className="px-3 py-6 text-center" style={{ color: C.mute }}>No jobs carry a target date inside this window.</td></tr>
+              <tr><td colSpan={11} className="px-3 py-6 text-center" style={{ color: C.mute }}>No jobs carry a target date inside this window.</td></tr>
             )}
           </tbody>
         </table>
@@ -310,7 +403,7 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
           job={toWip(openJob)}
           V={V}
           colour={C.navy}
-          canEdit
+          canEdit={!!d.canEdit}
           onClose={() => setOpenJob(null)}
           onOpenPlan={() => setOpenJob(null)}
           onSaved={async () => { await load(); }}

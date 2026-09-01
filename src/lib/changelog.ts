@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.4.0",
+    date: "2026-09-01",
+    module: "The Plan desk — whose plan, what the room said, and the document itself",
+    items: [
+      "\"On top of page write - Plan of <name> Dated <date>\" (Dr Raghu, 1 Sep 2026) — it heads the screen and the PDF alike. A signed plan that does not say whose it is, is a plan nobody owns.",
+      "\"on the top right make a box which shows Belief of <name> on <date>\" — it stands beside DONE and MORE, because it is the third number of the same sentence: what has happened, what is owed, and what this person actually believes will land. Every job weighted by their own belief, moving as they type. The job count is deliberately FRACTIONAL: nine jobs at 50% is four and a half jobs of expectation, and rounding it either way would be choosing a comfortable number over a true one.",
+      "\"show a comments column with all the comments written by all verbatim one on each line … Initials <>% : Comments\" — THE ROOM SAYS, on the right of every job. Nothing is summarised: the whole reason to crowdsource a plan is to see planning say 100% while the floor says 40%, and a tidy paraphrase would throw away the disagreement it was collected for.",
+      "POST-SUBMIT MAIL, in his words: To the signer, cc Raghu, Tushar and Pankaj, subject \"Thanks for submitting your plan\" — \"Now do what it takes to make it happen!\" — with THE PLAN ATTACHED as a PDF: every job, their date, their belief and what they said must happen, not three summary rows.",
+      "\"let the pdf be available on top after they submit\" and \"I should be able to see the pdf regardless!\" — both. ↓ PDF sits in the header once signed; planning and leaders may take it any time, and an unsigned one is stamped UNSIGNED on its face so a working document can never pass for a commitment. One template serves the mail and the button, because two would drift and nobody could say which was signed.",
+      "\"this box and the edits are visible to planning and leaders only\" — the job lightbox carries the commercials and edits kitting and production, so it opens for planners, admins, Stratcom and the owner. Everyone else writes their belief and their words, and the job number simply does not open.",
+      "Full-page width, a narrower Job column with the tag clipped and whole on hover, and the empty comment renamed to what it should always have asked.",
+    ],
+  },
+  {
     v: "4.2.3.2",
     date: "2026-09-01",
     module: "Month & Quarter Plan — YTD, the board's own job box, and a table that fits",

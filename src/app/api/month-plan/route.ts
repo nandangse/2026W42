@@ -21,9 +21,22 @@ export const maxDuration = 60;
  */
 const BELIEFS = new Set([0, 10, 25, 50, 75, 90, 100]);
 const STRATCOM_CC = "stratcom@nandan.co.in";
+/**
+ * WHO SEES A SIGNED PLAN (Dr Raghu, 1 Sep 2026: "cc: raghu, tushar, pankaj").
+ * The signer is the To — it is their plan and their commitment; these three
+ * are the standing witnesses. Named here rather than typed at the send, so
+ * changing the list is one edit and not a hunt.
+ */
+const PLAN_CC = ["raghu@nandan.co.in", "tushar@nandan.co.in", "pankajs@nandan.co.in"];
 
 const istToday = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
 const cr = (n: number) => `₹${(n / 1e7).toFixed(2)} Cr`;
+/** 2026-09-01 → 01-09-2026, the way a plan is read aloud here. */
+const esc = (x: unknown) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const dmy = (iso: string) => {
+  const s2 = String(iso || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s2) ? s2.split("-").reverse().join("-") : "—";
+};
 
 /**
  * YTD joins MTD and QTD (Dr Raghu, 1 Sep 2026: "also in that make a button
@@ -94,6 +107,83 @@ async function doneTotals(admin: ReturnType<typeof adminClient>, from: string, t
 
 export async function GET(req: Request) {
   try {
+    /**
+     * ?pdf=1 — the signed plan as a document (Dr Raghu, 1 Sep 2026: "let the
+     * pdf be available on top after they submit the plan too … not in draft").
+     *
+     * Rebuilt from the SNAPSHOT the signature stored, never from today's
+     * table: the point of a signed plan is that it says what was signed, and
+     * a PDF that quietly re-rendered from live data would be a different
+     * document wearing the same date. A draft has nothing to hand over.
+     */
+    const pu = new URL(req.url);
+    if (pu.searchParams.get("pdf")) {
+      const u0 = await requireUser();
+      const kq0 = pu.searchParams.get("kind");
+      const k0 = kq0 === "qtd" ? "qtd" : kq0 === "ytd" ? "ytd" : "mtd";
+      const w0 = windowOf(k0);
+      const admin0 = adminClient();
+      const { data: sg } = await admin0.from("plan_signoff").select("*")
+        .eq("by_email", u0.email.toLowerCase()).eq("period_kind", k0).eq("period_key", w0.key)
+        .eq("is_draft", false).order("signed_at", { ascending: false }).limit(1);
+      const row = sg?.[0];
+      const { planPdfHtml } = await import("@/lib/plan-pdf");
+      let html: string;
+      if (row) {
+        // the signed thing, exactly as it was signed
+        html = planPdfHtml({
+          title: `Plan of ${u0.displayName || u0.email.split("@")[0]} Dated ${dmy(String(row.signed_at).slice(0, 10))}`,
+          window: w0,
+          snapshot: (row.snapshot as Record<string, unknown>[]) || [],
+          plan: { jobs: Number(row.jobs) || 0, value: Number(row.value) || 0, throughput: Number(row.throughput) || 0 },
+          real: { jobs: Number(row.realistic_jobs) || 0, value: Number(row.realistic_value) || 0, throughput: Number(row.realistic_throughput) || 0 },
+          signedOn: dmy(String(row.signed_at).slice(0, 10)),
+        });
+      } else {
+        /**
+         * NOTHING SIGNED YET (Dr Raghu, 1 Sep 2026: "I should be able to see
+         * the pdf regardless!"). Planning and leaders get the plan AS IT
+         * STANDS — the one under discussion is exactly the one worth reading.
+         * It is stamped UNSIGNED in the title so nobody can mistake a working
+         * document for a commitment.
+         */
+        if (!mayPlan(u0)) throw new HttpError(404, "Nothing signed for this period yet.");
+        const T0 = istToday();
+        const jobs0 = await moreJobs(admin0, w0.end);
+        const { data: e0 } = await admin0.from("plan_belief").select("*").eq("by_email", u0.email.toLowerCase());
+        const by0 = new Map((e0 || []).map((e) => [String(e.job_id), e]));
+        const plan0 = { jobs: jobs0.length, value: 0, throughput: 0 };
+        const real0 = { jobs: 0, value: 0, throughput: 0 };
+        const snap0: Record<string, unknown>[] = [];
+        for (const j of jobs0) {
+          plan0.value += j.val; plan0.throughput += tpOf(j);
+          const e = by0.get(String(j.id));
+          const belief = e ? Number(e.belief_pct) : 100;
+          const est = String(e?.best_estimate || j.tdd || "").slice(0, 10);
+          if (est >= w0.from && est <= w0.end && belief > 0) {
+            real0.jobs += belief >= 50 ? 1 : 0;
+            real0.value += (j.val * belief) / 100;
+            real0.throughput += (tpOf(j) * belief) / 100;
+          }
+          snap0.push({ id: j.id, tag: j.tag, val: j.val, tp: tpOf(j), tdd: j.tdd, belief, best_estimate: est || null, comment: e?.comment ?? null });
+        }
+        html = planPdfHtml({
+          title: `Plan of ${u0.displayName || u0.email.split("@")[0]} Dated ${dmy(T0)} — UNSIGNED, as it stands`,
+          window: w0, snapshot: snap0, plan: plan0,
+          real: { jobs: real0.jobs, value: Math.round(real0.value), throughput: Math.round(real0.throughput) },
+          signedOn: dmy(T0),
+        });
+      }
+      const { pressPdf } = await import("@/lib/pdf-press");
+      const pdf = await pressPdf(html);
+      return new NextResponse(new Uint8Array(pdf), {
+        headers: {
+          "content-type": "application/pdf",
+          "content-disposition": `inline; filename="Plan ${w0.key} ${(u0.displayName || u0.email.split("@")[0]).replace(/[^A-Za-z0-9 ]/g, "")}.pdf"`,
+        },
+      });
+    }
+
     const u = await requireUser();
     if (!mayPlan(u)) throw new HttpError(403, "The plan desk is for planners, project owners, admins and Stratcom.");
     const admin = adminClient();
@@ -117,7 +207,7 @@ export async function GET(req: Request) {
         .eq("by_email", u.email.toLowerCase()).eq("period_kind", kind).eq("period_key", w.key)
         .order("signed_at", { ascending: false }).limit(1);
       signoff = s?.[0] ?? null;
-    } catch { return NextResponse.json({ installed: false, window: w, jobs: [], done, doneFy, entries: [], signoff: null, room: [] }); }
+    } catch { return NextResponse.json({ installed: false, window: w, jobs: [], done, doneFy, entries: [], signoff: null, room: [], voices: {}, canEdit: mayPlan(u), me: { name: u.displayName || u.email.split("@")[0], email: u.email } }); }
 
     /**
      * WHO IS READY (Dr Raghu, 1 Sep 2026: "the final one will only be once
@@ -129,6 +219,47 @@ export async function GET(req: Request) {
      * Waiting for people is only possible if you can see who you are waiting
      * for.
      */
+    /**
+     * EVERY VOICE ON EVERY JOB (Dr Raghu, 1 Sep 2026: "on right side show a
+     * comments column with all the comments written by all verbatim one on
+     * each line … Initials <>% : Comments").
+     *
+     * VERBATIM is the instruction and the point. A plan is crowdsourced so
+     * that the room can disagree in public — planning saying 100% while the
+     * floor says 40% is the most useful line on the page, and summarising it
+     * away would destroy exactly what it was collected for. So each person's
+     * words stand as typed, over their own initials and their own number.
+     */
+    let voices: Record<string, { initials: string; belief: number; comment: string }[]> = {};
+    try {
+      const ids = jobs.map((j) => String(j.id));
+      if (ids.length) {
+        const { data: all } = await admin.from("plan_belief")
+          .select("job_id, by_email, belief_pct, comment").in("job_id", ids);
+        const emails = [...new Set((all || []).map((r) => String(r.by_email).toLowerCase()))];
+        const ini = new Map<string, string>();
+        if (emails.length) {
+          const { data: profs } = await admin.from("profiles").select("email, initials, display_name").in("email", emails);
+          for (const pr of profs || []) {
+            const e = String(pr.email || "").toLowerCase();
+            ini.set(e, String(pr.initials || String(pr.display_name || e).split(/[@ ]/)[0]).toUpperCase().slice(0, 4));
+          }
+        }
+        const out: typeof voices = {};
+        for (const r of all || []) {
+          const c = String(r.comment || "").trim();
+          if (!c) continue;                       // a blank says nothing worth a line
+          const jid = String(r.job_id);
+          (out[jid] = out[jid] || []).push({
+            initials: ini.get(String(r.by_email).toLowerCase()) || String(r.by_email).split("@")[0].slice(0, 4).toUpperCase(),
+            belief: Number(r.belief_pct) || 0,
+            comment: c,
+          });
+        }
+        voices = out;
+      }
+    } catch { voices = {}; }
+
     let room: Record<string, unknown>[] = [];
     try {
       const { data: all } = await admin.from("plan_signoff")
@@ -144,7 +275,7 @@ export async function GET(req: Request) {
       room = [...latest.values()];
     } catch { room = []; }
 
-    return NextResponse.json({ installed: true, window: w, today: T, jobs, done, doneFy, entries, signoff, room });
+    return NextResponse.json({ installed: true, window: w, today: T, jobs, done, doneFy, entries, signoff, room, voices, canEdit: mayPlan(u), me: { name: u.displayName || u.email.split("@")[0], email: u.email } });
   } catch (e) {
     return errJson(e);
   }
@@ -233,31 +364,75 @@ export async function POST(req: Request) {
         throw new Error(se.message);
       }
 
+      /**
+       * THE PLAN AS A DOCUMENT (Dr Raghu, 1 Sep 2026: "Also attach the PDF").
+       *
+       * The mail used to carry three summary rows, which is a number without
+       * its working. What a signer should be able to open in six months is
+       * the plan they actually signed — every job, their date, their belief,
+       * and what they said had to happen. So the PDF is the whole table, and
+       * it is pressed from the same Chromium the quotations use.
+       *
+       * The header carries "Plan of <name> Dated <date>", which is the line
+       * he asked to be kept: a signed plan that does not say whose it is, is
+       * a plan nobody owns.
+       */
+      const planTitle = `Plan of ${u.displayName || u.email.split("@")[0]} Dated ${dmy(T)}`;
+      const { planPdfHtml } = await import("@/lib/plan-pdf");
+      const pdfHtml = planPdfHtml({
+        title: planTitle, window: w, snapshot, plan, signedOn: dmy(T),
+        real: { jobs: real.jobs, value: Math.round(real.value), throughput: Math.round(real.throughput) },
+        done: { nos: done.nos, value: done.value, throughput: done.throughput },
+      });
+
+      let pdfB64 = "";
+      if (!isDraft) {
+        try {
+          const { pressPdf } = await import("@/lib/pdf-press");
+          pdfB64 = (await pressPdf(pdfHtml)).toString("base64");
+        } catch { pdfB64 = ""; }   // the mail still goes; it just goes bare
+      }
+
       // the mail — attempted, never load-bearing, and NEVER for a draft:
       // a mail is what makes a number other people's business.
       let mailed = "";
       const key = isDraft ? "" : process.env.RESEND_API_KEY;
       if (key) {
+        /**
+         * HIS WORDS (Dr Raghu, 1 Sep 2026), tidied only for spelling — the
+         * sentiment is the point and it is his: thanks, here it is, now go
+         * and make it happen.
+         */
+        const who = u.displayName || u.email.split("@")[0];
         const html = `
-<p><b>${u.displayName || u.email}</b> signed the ${w.label} plan (${w.key}) on ${T} (IST).</p>
-<table border="1" cellpadding="6" style="border-collapse:collapse">
-<tr><th></th><th>Jobs</th><th>Value</th><th>Throughput</th></tr>
-<tr><td><b>Done so far</b></td><td>${done.nos}</td><td>${cr(done.value)}</td><td>${cr(done.throughput)}</td></tr>
-<tr><td><b>The plan (all jobs due by ${w.end})</b></td><td>${plan.jobs}</td><td>${cr(plan.value)}</td><td>${cr(plan.throughput)}</td></tr>
-<tr><td><b>The realistic plan (my dates, my belief)</b></td><td>${real.jobs} at ≥50% belief</td><td>${cr(real.value)}</td><td>${cr(real.throughput)}</td></tr>
-</table>
-<p style="color:#777">Belief-weighted, on my best-estimate dates. Signed in Genie — the job-by-job working is on the Month &amp; Quarter Plan desk.</p>`;
+<p>Dear ${esc(who)}</p>
+<p>Thanks for submitting the plan. It's as attached!</p>
+<p>Now do what it takes to make it happen!</p>
+<p>Raghu</p>
+<hr>
+<p style="color:#777;font-size:12px">
+${esc(planTitle)} · ${esc(w.label)} (${esc(w.key)})<br>
+The plan as it stands: <b>${plan.jobs} jobs</b> · ${cr(plan.value)} · ${cr(plan.throughput)} throughput<br>
+The realistic read, on your dates and your belief: <b>${real.jobs} at 50% or better</b> · ${cr(real.value)} · ${cr(real.throughput)} throughput
+</p>`;
         try {
+          const fileName = `${planTitle.replace(/[^A-Za-z0-9 .-]/g, "")}.pdf`;
           const r = await fetch("https://api.resend.com/emails", {
             method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
             body: JSON.stringify({
               from: "Genie <hr@nandan.co.in>",
-              to: [u.email], cc: [STRATCOM_CC],
-              subject: `${w.label} plan · ${w.key} · signed by ${u.displayName || u.email}`,
+              to: [u.email],
+              // the standing witnesses, minus the signer if they are one of
+              // them — nobody needs their own name in their own cc
+              cc: PLAN_CC.filter((a) => a.toLowerCase() !== u.email.toLowerCase()),
+              subject: "Thanks for submitting your plan",
               html,
+              ...(pdfB64 ? { attachments: [{ filename: fileName, content: pdfB64 }] } : {}),
             }),
           });
-          mailed = r.ok ? `${u.email} · cc ${STRATCOM_CC}` : `send failed (${r.status})`;
+          mailed = r.ok
+            ? `${u.email} · cc ${PLAN_CC.filter((a) => a.toLowerCase() !== u.email.toLowerCase()).join(", ")}${pdfB64 ? " · PDF attached" : " · PDF could not be pressed"}`
+            : `send failed (${r.status})`;
         } catch { mailed = "send failed (network)"; }
       } else mailed = "RESEND_API_KEY not set";
       if (signed?.id)
