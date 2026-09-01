@@ -141,12 +141,34 @@ export const DELIVERED_FIELDS = [
 ];
 export const JOB_DELIVERED_STATUS = "Delivered";
 
-export interface SyncResult {
-  projects: { read: number; written: number };
-  jobs: { read: number; written: number; archived: number };
-  delivered: { read: number; written: number; undated: number };
-  notes: string[];
+/** One field that moved, in the words the morning needs to read it. */
+export interface FieldChange {
+  kind: "job" | "project" | "delivered";
+  id: string;
+  /** The customer tag, so a row reads as a machine rather than a number. */
+  label: string;
+  field: string;
+  from: string;
+  to: string;
 }
+
+export interface SyncResult {
+  projects: { read: number; written: number; created: number; changed: number };
+  jobs: { read: number; written: number; archived: number; created: number; changed: number };
+  delivered: { read: number; written: number; undated: number; created: number; changed: number };
+  changes: FieldChange[];
+  notes: string[];
+  seconds: number;
+}
+
+/** The columns worth telling somebody about when they move. */
+const WATCHED: Record<string, string> = {
+  tag: "Tag", fam: "Family", cust: "Customer", val: "Value",
+  tdd: "Target delivery", otd: "OTD", start_date: "Start", proj: "Project",
+  stat: "Status", own: "Owner",
+  mgr: "Manager", committed: "Committed", exp_end: "Expected end",
+  stage: "Stage", so: "Sales order", delivered_on: "Delivered on",
+};
 
 /**
  * Pull both doctypes into Genie.
@@ -159,6 +181,32 @@ export async function erpSync(
 ): Promise<SyncResult> {
   const notes: string[] = [];
   const dry = !!opts.dry;
+  const began = Date.now();
+  const changes: FieldChange[] = [];
+
+  /** Compare what is coming against what is held, and remember the difference. */
+  const noteChanges = (
+    kind: FieldChange["kind"], next: Record<string, unknown>,
+    prev: Record<string, unknown> | undefined, label: string,
+  ) => {
+    if (!prev) return "created";
+    let moved = false;
+    for (const [k, v] of Object.entries(next)) {
+      if (!(k in WATCHED)) continue;
+      const a = prev[k], b = v;
+      // A blank arriving where something stands is not a change: the guard
+      // below keeps the old value, so reporting it would be a lie.
+      const bEmpty = b === null || b === "" || (Array.isArray(b) && b.length === 0);
+      const aHas = a !== null && a !== undefined && a !== "";
+      if (bEmpty && aHas) continue;
+      if (String(a ?? "") === String(b ?? "")) continue;
+      moved = true;
+      if (changes.length < 2000) {
+        changes.push({ kind, id: String(next.id), label, field: WATCHED[k], from: String(a ?? "—"), to: String(b ?? "—") });
+      }
+    }
+    return moved ? "changed" : "same";
+  };
 
   // ---------------- jobs ----------------
   const erpJobs = await erpAll(cfg, "Jobmaster", JOB_FIELDS, [["status", "=", JOB_ACTIVE_STATUS]]);
@@ -219,12 +267,43 @@ export async function erpSync(
   const undated = delRows.filter((d) => !d.delivered_on).length;
   if (undated) notes.push(`${undated} delivered job(s) carry no actual_delivery_date on the ERP — banked, but undated.`);
 
+  // ---------------- what would move ----------------
+  // Read first, compare first. A dry run must be able to say exactly what a
+  // real one would do, or it is a rehearsal that proves nothing.
+  const projBefore = await allRows(genie, "projects", "*");
+  const projPrev = new Map(projBefore.map((p) => [String(p.id), p]));
+  const jobBefore = await allRows(genie, "jobs", "*");
+  const jobPrev = new Map(jobBefore.map((r) => [String(r.id), r]));
+  const delBefore = await allRows(genie, "delivered_jobs", "*");
+  const delPrev = new Map(delBefore.map((r) => [String(r.id), r]));
+
+  let jobsCreated = 0, jobsChanged = 0;
+  for (const j of jobRows) {
+    const v = noteChanges("job", j, jobPrev.get(j.id), j.tag);
+    if (v === "created") jobsCreated++; else if (v === "changed") jobsChanged++;
+  }
+  let projCreated = 0, projChanged = 0;
+  for (const p of projRows) {
+    const v = noteChanges("project", p, projPrev.get(p.id), p.id);
+    if (v === "created") projCreated++; else if (v === "changed") projChanged++;
+  }
+  let delCreated = 0, delChanged = 0;
+  for (const d of delRows) {
+    const v = noteChanges("delivered", d, delPrev.get(d.id), d.tag);
+    if (v === "created") delCreated++; else if (v === "changed") delChanged++;
+  }
+
+  const liveIdsEarly = new Set(jobRows.map((j) => j.id));
+  const wouldArchive = jobBefore.filter((r) => r.active === true && !liveIdsEarly.has(String(r.id))).length;
+
   if (dry) {
     return {
-      projects: { read: projRows.length, written: 0 },
-      jobs: { read: jobRows.length, written: 0, archived: 0 },
-      delivered: { read: delRows.length, written: 0, undated },
+      projects: { read: projRows.length, written: 0, created: projCreated, changed: projChanged },
+      jobs: { read: jobRows.length, written: 0, archived: wouldArchive, created: jobsCreated, changed: jobsChanged },
+      delivered: { read: delRows.length, written: 0, undated, created: delCreated, changed: delChanged },
+      changes,
       notes: [...notes, "Dry run — the ERP was read and nothing was written."],
+      seconds: (Date.now() - began) / 1000,
     };
   }
 
@@ -252,8 +331,6 @@ export async function erpSync(
   };
 
   let projWritten = 0;
-  const projBefore = await allRows(genie, "projects", "*");
-  const projPrev = new Map(projBefore.map((p) => [String(p.id), p]));
   const projFinal = projRows.map((p) => keepFilled(p, projPrev.get(p.id)));
   for (let i = 0; i < projFinal.length; i += 200) {
     const slice = projFinal.slice(i, i + 200);
@@ -266,8 +343,6 @@ export async function erpSync(
   // job arrives active; an existing one keeps its mgmt date, its percentages,
   // its floor note and everything else typed on this side.
   let jobWritten = 0;
-  const existing = await allRows(genie, "jobs", "*");
-  const jobPrev = new Map(existing.map((r) => [String(r.id), r]));
   for (const j of jobRows) {
     const prev = jobPrev.get(j.id);
     const mapped = keepFilled(j, prev);
@@ -283,7 +358,7 @@ export async function erpSync(
   // never deleted, so its plans and history stay reachable.
   let archived = 0;
   const liveIds = new Set(jobRows.map((j) => j.id));
-  const onBoard = existing.filter((r) => r.active === true);
+  const onBoard = jobBefore.filter((r) => r.active === true);
   const leaving = onBoard.map((r) => String(r.id)).filter((id) => !liveIds.has(id));
   if (leaving.length) {
     const { error } = await genie.from("jobs")
@@ -305,8 +380,7 @@ export async function erpSync(
    * So a blank date from the ERP LEAVES the banked date alone. The ERP may
    * fill a gap; it may not open one.
    */
-  const banked = await allRows(genie, "delivered_jobs", "id, delivered_on, date_source");
-  const bankedDate = new Map(banked.map((r) => [String(r.id), { on: r.delivered_on as string | null, src: r.date_source as string | null }]));
+  const bankedDate = new Map(delBefore.map((r) => [String(r.id), { on: r.delivered_on as string | null, src: r.date_source as string | null }]));
   let delWritten = 0, keptDate = 0;
   const delFinal = delRows.map((d) => {
     if (d.delivered_on) return d;
@@ -326,9 +400,11 @@ export async function erpSync(
   }
 
   return {
-    projects: { read: projRows.length, written: projWritten },
-    jobs: { read: jobRows.length, written: jobWritten, archived },
-    delivered: { read: delRows.length, written: delWritten, undated },
+    projects: { read: projRows.length, written: projWritten, created: projCreated, changed: projChanged },
+    jobs: { read: jobRows.length, written: jobWritten, archived, created: jobsCreated, changed: jobsChanged },
+    delivered: { read: delRows.length, written: delWritten, undated, created: delCreated, changed: delChanged },
+    changes,
     notes,
+    seconds: (Date.now() - began) / 1000,
   };
 }

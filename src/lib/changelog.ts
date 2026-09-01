@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.1.0",
+    date: "2026-09-01",
+    module: "Morning Update — one button where five files used to be",
+    items: [
+      "\"just make a button there saying Synchronise … Anybody pressing that will just synchronise it once again\" (Dr Raghu, 1 Sep 2026). THE MORNING ROUND IS OVER. Every card is retired: Jobs, Projects and Delivered now come off nandanerp through ↻ Synchronise; Tasks drops because \"we are going to be maintaining only in the genie and not in the ERP\"; the Employee Master went on 23 Aug when HRMS became the master. Nobody downloads a sheet at 8am any more.",
+      "\"it should just mention that, in the last one day, whatever changes have happened in the last one week or last one month. Just make a table which showcases what summary has happened.\" — the table stands under the button: last 24 hours, last 7 days, last 30 days, and for each of them jobs in, jobs changed, jobs off the board, projects in and changed, delivered in, and how many syncs ran.",
+      "A count alone would teach nobody anything, so every run also records WHAT MOVED, field by field — this job, this column, from this to that — and the page will show you the list. \"The Hi-Lift's target delivery slipped from 5 Sep to 14 Oct\" is a sentence somebody can act on; \"14 changed\" is not.",
+      "CHECK FIRST reads the ERP and reports exactly what a real run would do, writing nothing. Failed runs are logged as carefully as good ones — a failure is worth more on the ledger than a success, on the morning somebody asks why the board looks a day old.",
+      "The button belongs to everyone who ran the morning update, not to the owner alone: gating it tighter than the sheets it replaces would only move the bottleneck onto one person. Genie migration 0108 builds the ledger; the sync runs without it, only the summary stays blank.",
+    ],
+  },
+  {
     v: "4.2.0.0",
     date: "2026-09-01",
     module: "Planning — Jobs, Projects and Delivered come from the ERP, not a sheet",

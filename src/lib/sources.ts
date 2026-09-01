@@ -21,8 +21,31 @@ export interface MorningSource {
   ownerOnly?: boolean;
 }
 
+/**
+ * THE MORNING ROUND IS OVER (Dr Raghu, 1 Sep 2026).
+ *
+ * Every card below is retired, and each for its own reason:
+ *
+ *   jobs · projects · delivered — "can we now stop the upload and instead do
+ *       the API import from erpnext?" They come straight off nandanerp now,
+ *       through the ↻ Synchronise button at the top of this page. The mapping
+ *       was checked field by field against what these very sheets had loaded,
+ *       and the ERP proved to be AHEAD of them — fourteen of the 112 live jobs
+ *       held delivery dates the morning file had never carried across.
+ *
+ *   tasks — "we are going to be maintaining only in the genie and not in the
+ *       ERP, so that also can be dropped out." Genie is the master; there is
+ *       nothing left to import.
+ *
+ *   employees — retired earlier, on 23 Aug 2026: HRMS is the master.
+ *
+ * THE PARSERS AND MERGE PATHS ARE LEFT IN PLACE, as the Employee Master's
+ * were. Restoring any of these is a one-line change if an import is ever
+ * needed again, and deleting working code to express a policy is how the
+ * policy becomes irreversible by accident.
+ */
 export const DEFAULT_SOURCES: MorningSource[] = [
-  {
+  /* {
     key: "jobs",
     nm: "Job in progress - Jobs",
     desc: "All active jobs — TDD, OTD, Job Status, Prod %, value, Mgmt dates (primary file)",
@@ -38,18 +61,12 @@ export const DEFAULT_SOURCES: MorningSource[] = [
     gs: "https://docs.google.com/spreadsheets/d/1zsFATRDFyt1SEIc7bh2MrWPGjE-XKqFW8qhZy4x7Vkg/edit",
     daily: true,
   },
-  // Third on the page by Dr Raghu's instruction (17 Aug 2026). It sits with
-  // the jobs files it belongs beside rather than last, even though it is the
-  // one file that is not part of the daily ritual.
   {
     key: "delivered",
     nm: "Delivered Jobs",
     desc: "Jobs already delivered + the delivery date — the only file that carries delivery history",
-    // URL exactly as given by Dr Raghu (ERPNext serves /desk and /app alike).
     erp: "https://nandanerp.in/desk/jobmaster/view/report/Delivered%20Jobs%20for%20Analysis",
-    // No Google-Sheets mirror for this report — download it from the ERP itself.
     gs: "",
-    // History, not a daily snapshot — see MorningSource.daily.
     daily: false,
   },
   {
@@ -59,7 +76,7 @@ export const DEFAULT_SOURCES: MorningSource[] = [
     erp: "https://nandanerp.in/app/todo/view/report/ToDo%20Dashboard%20All",
     gs: "https://docs.google.com/spreadsheets/d/18jCqt8d_sIHsYOYPkHFnavWwclfEMIsqCoOCVJsCxrY/edit",
     daily: true,
-  },
+  }, */
   /**
    * ---- RJ Uploads — owner only ----
    *

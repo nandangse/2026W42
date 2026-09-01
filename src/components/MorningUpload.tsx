@@ -6,6 +6,7 @@ import { gsExport } from "@/lib/sources";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { LOGO } from "@/lib/logo";
 import QuoteOfDay from "./QuoteOfDay";
+import ErpSyncPanel from "./ErpSyncPanel";
 
 interface StatusRow {
   key: string;
@@ -121,6 +122,12 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
       )}
 
       <div className="p-4 max-w-3xl mx-auto">
+        {/* THE BUTTON THAT REPLACED THREE OF THESE SHEETS (Dr Raghu, 1 Sep
+            2026). It stands ABOVE the file cards deliberately: pressing it is
+            now the morning's first act, and the cards below are what is left
+            over. */}
+        <ErpSyncPanel />
+
         <div className="mb-3 flex items-baseline justify-between flex-wrap gap-2">
           <h2 className="text-lg font-bold" style={{ color: "#16232F" }}>
             {rows.length === dailyTotal
