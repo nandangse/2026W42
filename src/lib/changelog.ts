@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.4.1",
+    date: "2026-09-01",
+    module: "The Plan desk — everyone fills it, and the belief follows the dates they set",
+    items: [
+      "\"this should be accessible for all. they all need to fill it up\" (Dr Raghu, 1 Sep 2026) — the desk opens for anybody signed in. It was gated to planners, project owners, admins and Stratcom, which made a company-wide read impossible: five planners give five opinions, everyone who touches the work gives a reading of the company.",
+      "\"they only can fill up the details to post! they of course cant edit the other details of the job\" — exactly so. Two questions that were being answered by one gate are now answered separately: ANYONE may write a belief, a date and what needs to happen; only planning and leaders may open a job, because that box carries the value, the throughput and what is owed on delivery, and it edits kitting and production straight into the ERP queue.",
+      "\"the room says should not be seen by others for now … only raghu see it!\" — that column is the owner's alone, and it is withheld AT THE SOURCE rather than hidden in the screen: a column the browser is told about and merely does not draw is one anybody can read out of the network tab. The reason is sound too — a person about to give their own belief should not first read everyone else's, or the exercise collects one opinion wearing five names.",
+      "\"this should take the dates he has told. even if he takes october to september then it should change total too\" — A REAL ERROR, now fixed. The belief card weighted every job in the window by belief while ignoring the date the planner had just set. Membership now follows their OWN best-estimate date: push a job to October and its money leaves September; pull one back and it counts. The card says how many jobs their dates moved out.",
+    ],
+  },
+  {
     v: "4.2.4.0",
     date: "2026-09-01",
     module: "The Plan desk — whose plan, what the room said, and the document itself",

@@ -71,6 +71,24 @@ const fyWindow = () => {
   return { from: `${y}-04-01`, end: `${y + 1}-03-31` };
 };
 
+/**
+ * THE DESK IS EVERYONE'S; THE JOB BOX IS NOT (Dr Raghu, 1 Sep 2026: "this
+ * should be accessible for all. they all need to fill it up" — and earlier,
+ * "this box and the edits are visible to planning and leaders only").
+ *
+ * Two different questions, and they were being answered by one gate:
+ *
+ *   WHO WRITES A BELIEF — anybody signed in. A plan crowdsourced from five
+ *     planners is five opinions; crowdsourced from everyone who touches the
+ *     work it is a reading of the company. That is the whole ask.
+ *   WHO OPENS A JOB — planning and leaders. That box carries the value, the
+ *     throughput and what is still owed on delivery, and it edits kitting and
+ *     production straight into the ERP queue. Neither belongs to everyone who
+ *     can hold an opinion about a date.
+ *
+ * So mayPlan no longer decides whether the desk opens. It decides `canEdit`,
+ * and nothing else.
+ */
 const mayPlan = (u: AuthedUser) =>
   u.isOwner || u.stratcom || ["admin", "planner", "project_owner"].includes(String(u.role));
 
@@ -147,7 +165,6 @@ export async function GET(req: Request) {
          * It is stamped UNSIGNED in the title so nobody can mistake a working
          * document for a commitment.
          */
-        if (!mayPlan(u0)) throw new HttpError(404, "Nothing signed for this period yet.");
         const T0 = istToday();
         const jobs0 = await moreJobs(admin0, w0.end);
         const { data: e0 } = await admin0.from("plan_belief").select("*").eq("by_email", u0.email.toLowerCase());
@@ -185,7 +202,6 @@ export async function GET(req: Request) {
     }
 
     const u = await requireUser();
-    if (!mayPlan(u)) throw new HttpError(403, "The plan desk is for planners, project owners, admins and Stratcom.");
     const admin = adminClient();
     const kq = new URL(req.url).searchParams.get("kind");
     const kind = kq === "qtd" ? "qtd" : kq === "ytd" ? "ytd" : "mtd";
@@ -207,7 +223,7 @@ export async function GET(req: Request) {
         .eq("by_email", u.email.toLowerCase()).eq("period_kind", kind).eq("period_key", w.key)
         .order("signed_at", { ascending: false }).limit(1);
       signoff = s?.[0] ?? null;
-    } catch { return NextResponse.json({ installed: false, window: w, jobs: [], done, doneFy, entries: [], signoff: null, room: [], voices: {}, canEdit: mayPlan(u), me: { name: u.displayName || u.email.split("@")[0], email: u.email } }); }
+    } catch { return NextResponse.json({ installed: false, window: w, jobs: [], done, doneFy, entries: [], signoff: null, room: [], voices: {}, canEdit: mayPlan(u), canSeeRoom: u.isOwner, me: { name: u.displayName || u.email.split("@")[0], email: u.email } }); }
 
     /**
      * WHO IS READY (Dr Raghu, 1 Sep 2026: "the final one will only be once
@@ -230,8 +246,19 @@ export async function GET(req: Request) {
      * away would destroy exactly what it was collected for. So each person's
      * words stand as typed, over their own initials and their own number.
      */
+    /**
+     * RAGHU ALONE (Dr Raghu, 1 Sep 2026: "the room says should not be seen
+     * by others for now" → "only raghu see it!").
+     *
+     * Withheld at the SOURCE rather than hidden in the screen: a column the
+     * browser is told about and merely does not draw is a column anybody can
+     * read out of the network tab. And the reason is sound — a person about
+     * to give their own belief should not first read everyone else's, or the
+     * crowdsourcing collects one opinion wearing five names.
+     */
     let voices: Record<string, { initials: string; belief: number; comment: string }[]> = {};
     try {
+      if (!u.isOwner) throw new Error("not for this pair of eyes");
       const ids = jobs.map((j) => String(j.id));
       if (ids.length) {
         const { data: all } = await admin.from("plan_belief")
@@ -275,7 +302,7 @@ export async function GET(req: Request) {
       room = [...latest.values()];
     } catch { room = []; }
 
-    return NextResponse.json({ installed: true, window: w, today: T, jobs, done, doneFy, entries, signoff, room, voices, canEdit: mayPlan(u), me: { name: u.displayName || u.email.split("@")[0], email: u.email } });
+    return NextResponse.json({ installed: true, window: w, today: T, jobs, done, doneFy, entries, signoff, room, voices, canEdit: mayPlan(u), canSeeRoom: u.isOwner, me: { name: u.displayName || u.email.split("@")[0], email: u.email } });
   } catch (e) {
     return errJson(e);
   }
@@ -284,7 +311,6 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const u = await requireUser();
-    if (!mayPlan(u)) throw new HttpError(403, "The plan desk is for planners, project owners, admins and Stratcom.");
     const admin = adminClient();
     const body = await req.json();
     const action = String(body.action || "");

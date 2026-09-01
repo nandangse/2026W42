@@ -42,6 +42,8 @@ interface Payload {
    * can write a belief.
    */
   canEdit?: boolean;
+  /** "The room says" is Raghu's alone, for now — see the API's note. */
+  canSeeRoom?: boolean;
   signoff: { signed_at: string; jobs: number; value: number; throughput: number; realistic_jobs: number | null; realistic_value: number | null; realistic_throughput: number | null; emailed: string | null; is_draft?: boolean } | null;
   /** Everyone's latest word on this period — draft or signature. */
   room?: { by_email: string; is_draft: boolean; signed_at: string; jobs: number; value: number; throughput: number }[];
@@ -250,10 +252,29 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
             and a half jobs of expectation, and rounding that to nine or to
             four would be choosing a comfortable number over a true one. */}
         {(() => {
+          /**
+           * THE DATE HE SET DECIDES MEMBERSHIP (Dr Raghu, 1 Sep 2026: "this
+           * should take the dates he has told. even if he takes october to
+           * september then it shold change total too").
+           *
+           * A belief is two statements, not one — HOW SURE, and BY WHEN — and
+           * the second one moves the job in or out of the period entirely.
+           * Pushing a September job to October must take its money out of
+           * September, or the card quietly reports as this month's a job the
+           * planner has just said will not land this month. Pulling one back
+           * IN counts it, which is why the estimate is read rather than the
+           * TDD it was born from.
+           */
+          const inWin = (id: string, fallbackTdd: string | null) => {
+            const est = String(rows[id]?.est || fallbackTdd || "").slice(0, 10);
+            return !!est && est >= d.window.from && est <= d.window.end;
+          };
           const wb = (d.jobs || []).reduce((a, j) => {
+            if (!inWin(j.id, j.tdd)) return a;
             const b = (rows[j.id]?.belief ?? 100) / 100;
-            return { n: a.n + b, v: a.v + j.val * b, t: a.t + tpOf(j) * b, pod: a.pod + (Number(j.pod) || 0) * b };
-          }, { n: 0, v: 0, t: 0, pod: 0 });
+            return { n: a.n + b, v: a.v + j.val * b, t: a.t + tpOf(j) * b, pod: a.pod + (Number(j.pod) || 0) * b, out: a.out };
+          }, { n: 0, v: 0, t: 0, pod: 0, out: 0 });
+          const moved = (d.jobs || []).filter((j) => !inWin(j.id, j.tdd));
           const share = totals.value ? Math.round((wb.v / totals.value) * 100) : 0;
           return (
             <div className="rounded-lg border bg-white p-3" style={{ borderColor: C.line, borderTop: `3px solid ${C.violet}`, flex: "1 1 260px" }}>
@@ -265,8 +286,13 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
                 <span style={{ color: C.green }}>· {V(Math.round(wb.t))}</span>
               </div>
               <div className="text-xs mt-0.5" style={{ color: C.mute }}>
-                every job weighted by belief · {V(Math.round(wb.pod))} receivable ·{" "}
+                on your dates, weighted by your belief · {V(Math.round(wb.pod))} receivable ·{" "}
                 <b style={{ color: share >= 75 ? C.green : share >= 50 ? "#D97706" : C.red }}>{share}%</b> of the money on the table
+                {moved.length > 0 && (
+                  <div style={{ color: C.violet, fontWeight: 700 }}>
+                    {moved.length} job{moved.length === 1 ? "" : "s"} moved out of {d.window.label} by your own dates — not counted here
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -311,8 +337,10 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
               <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "#22303C" }}>My best estimate</th>
               <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "#22303C" }}>My belief</th>
               <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>What I believe needs to HAPPEN</th>
-              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}
-                title="What everybody else said about this job — verbatim">The room says</th>
+              {d.canSeeRoom && (
+                <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}
+                  title="What everybody else said about this job — verbatim">The room says</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -368,12 +396,16 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
                       className="w-full text-xs border rounded px-2 py-1"
                       style={{ borderColor: C.line, minWidth: 260, resize: "vertical", lineHeight: 1.4 }} />
                   </td>
-                  {/* THE ROOM, VERBATIM (Dr Raghu, 1 Sep 2026: "all the
+                  {d.canSeeRoom && (
+                  /* THE ROOM, VERBATIM (Dr Raghu, 1 Sep 2026: "all the
                       comments written by all verbatim one on each line …
                       Initials <>% : Comments"). Nothing is summarised: the
                       whole reason to crowdsource a plan is to see planning
                       say 100% while the floor says 40%, and a tidy paraphrase
-                      would throw away the disagreement it was collected for. */}
+                      would throw away the disagreement it was collected for.
+                      Planning and leaders only, for now — a person about to
+                      give their own belief should not first read everyone
+                      else's. */
                   <td className="px-2 py-1.5" style={{ minWidth: 300, maxWidth: 420 }}>
                     <div style={{ maxHeight: 74, overflowY: "auto", lineHeight: 1.45 }}>
                       {((d.voices || {})[j.id] || []).length === 0
@@ -388,11 +420,12 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
                           ))}
                     </div>
                   </td>
+                  )}
                 </tr>
               );
             })}
             {(d.jobs || []).length === 0 && (
-              <tr><td colSpan={11} className="px-3 py-6 text-center" style={{ color: C.mute }}>No jobs carry a target date inside this window.</td></tr>
+              <tr><td colSpan={d.canSeeRoom ? 11 : 10} className="px-3 py-6 text-center" style={{ color: C.mute }}>No jobs carry a target date inside this window.</td></tr>
             )}
           </tbody>
         </table>
@@ -413,7 +446,7 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
       {/* WHO IS READY (Dr Raghu, 1 Sep 2026: "the final one will only be
           once they are all ready for it"). Waiting for people is only
           possible if you can see who you are waiting for. */}
-      {(d.room || []).length > 0 && (
+      {d.canEdit && (d.room || []).length > 0 && (
         <div className="rounded-lg border bg-white p-3 mb-2" style={{ borderColor: C.line }}>
           <div className="text-xs font-bold mb-1.5" style={{ color: C.mute, letterSpacing: 1.1 }}>
             THE ROOM · {d.window.label} ({d.window.key})
@@ -461,6 +494,8 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
         </button>
       </div>
       <div className="text-xs mt-2" style={{ color: C.faint }}>
+        {!d.canEdit && <><b>The job numbers open only for planning and leaders</b> — the box behind them carries the
+        commercials. Your belief, your date and your words are yours to write. <br /></>}
         <b>Save as draft</b> keeps your read and mails nothing — change it as often as you like.
         <b> Signing</b> freezes the plan and mails it to you, cc {`stratcom@nandan.co.in`}; the realistic,
         belief-weighted read appears only after the signature.
