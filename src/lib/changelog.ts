@@ -75,6 +75,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.5.0",
+    date: "2026-09-02",
+    module: "Manpower Planning — owners, the milestone still undone, and one pass to fill it",
+    items: [
+      "\"show also Owners and in that show Project Owner, Production Owner, Kitting Owner\" (Dr Raghu, 2 Sep 2026) — all three stand on every row, so a foreman reading the floor knows whose job it is before he asks.",
+      "\"Show also Last Milestone undone\" — the first milestone still open on the job's plan, with its due date; \"all done\" where the plan is finished and nothing where no plan exists yet. It is the thing actually holding the job, which is what a manpower decision is really about.",
+      "\"on top make filter for Product and Owner make a searchbox\" — both, plus a search across job, tag, project, status and every owner. THE TOTALS FOLLOW THE FILTER: a number that ignored the filter above it would be answering a question nobody asked.",
+      "\"also show the totals of each trade on top as well as total\" — fitters, helpers, welders, painters, electricians and hydraulics, each counted above the table beside the headcount, and again at its foot.",
+      "\"ON TOP ALSO MAKE A BUTTON edit all\" — ✎ Edit all opens every visible row at once and writes only the rows that actually changed. One row at a time stays the default, because these numbers are checked against the attendance muster; but filling a whole morning one row at a time is its own kind of error.",
+      "\"freeze the top row\" — the heading stays while the floor scrolls beneath it.",
+      "\"Mouseover on the job to show details / Clicking on the job gets lightbox as normal\" and then \"clicking on the job should open the lightbox FIRST, only then open the full job\" — hovering gives the job, its customer, status, kitting, production, both dates and its value; clicking opens the same lightbox the floor view opens, and its own button walks on to the full plan. A click should show you the job, not move you to another screen.",
+      "ON FLOOR gains JOBS WORKED ON — the jobs that actually have people standing at them today, beside the count of jobs merely ticked as on the floor. The gap between those two numbers is the interesting part, and it now has somewhere to show itself.",
+    ],
+  },
+  {
     v: "4.2.4.2",
     date: "2026-09-01",
     module: "The Plan desk — a job can be pulled INTO the period, not only pushed out",

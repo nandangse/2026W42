@@ -9206,8 +9206,26 @@ function ManpowerLedger({ jobId, V }: { jobId: string; V: (n: number) => string 
  * stray keystroke into a ledger that is checked against the attendance
  * muster. A row is opened, typed, saved, closed.
  */
+/**
+ * MANPOWER PLANNING (Dr Raghu, 1–2 Sep 2026).
+ *
+ * The floor view asks what is happening on a job. This one asks where the
+ * people are — so it is the whole floor at once, one row a job, a column a
+ * trade, and the day at the top because manpower is planned forward as much
+ * as it is recorded back.
+ *
+ * It answers a foreman's questions in his own order: who owns this, what is
+ * the last thing still not done, and how many hands are on it today. Hence
+ * the owners, the outstanding milestone, and the trade totals standing above
+ * the table rather than buried at its foot.
+ *
+ * EDIT ONE, OR EDIT ALL. A single row opened is the safe default — these
+ * numbers are checked against the attendance muster. But filling a whole
+ * morning one row at a time is its own kind of error, so ✎ Edit all opens
+ * every visible row at once and saves them together.
+ */
 function ManpowerPlanning({
-  jobs, projects, manpower, day, onDay, onSaved, canEdit,
+  jobs, projects, manpower, day, onDay, onSaved, canEdit, plans, V, onOpenJob,
 }: {
   jobs: Job[];
   projects: Record<string, { mgr?: string | null }>;
@@ -9216,45 +9234,123 @@ function ManpowerPlanning({
   onDay: (d: string) => void;
   onSaved: () => void;
   canEdit: boolean;
+  plans: Record<string, Plan & { baseline_on?: string | null; baseline_end?: string | null }>;
+  V: (n: number) => string;
+  onOpenJob: (j: Job) => void;
 }) {
-  /** The one row being typed into. Null means the table is at rest. */
   const [editing, setEditing] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [all, setAll] = useState(false);
+  const [draft, setDraft] = useState<Record<string, Record<string, string>>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [q, setQ] = useState("");
+  const [fam, setFam] = useState("all");
+  const [owner, setOwner] = useState("all");
 
-  const open = (j: Job) => {
-    if (!canEdit) return;
-    const c = manpower[j.id];
-    setDraft(Object.fromEntries(TRADES.map((t) => [t.key, String(Number(c?.[t.key]) || 0)])));
-    setEditing(j.id);
-    setErr("");
+  const crewOf = (id: string) => manpower[id];
+  const sumOf = (id: string) => TRADES.reduce((n, t) => n + (Number(crewOf(id)?.[t.key]) || 0), 0);
+
+  /** The last milestone still not done — the thing actually holding the job. */
+  const lastUndone = (j: Job): string => {
+    const pl = plans[j.id];
+    if (!pl?.milestones?.length) return "";
+    const sched = computeSchedule({ start: pl.start || TODAY, milestones: pl.milestones });
+    const open = sched.filter((m) => !m.done);
+    if (!open.length) return "all done";
+    const m = open[0];
+    return `${m.name}${m.end ? ` · due ${fmt(m.end)}` : ""}`;
   };
-  const save = async (jobId: string) => {
+
+  const ownerOf = (j: Job) => ({
+    project: projects[j.proj]?.mgr || j.ownerName || "—",
+    production: j.productionOwner || "—",
+    kitting: j.kittingOwner || "—",
+  });
+
+  const fams = useMemo(() => [...new Set(jobs.map((x) => x.fam).filter(Boolean))].sort(), [jobs]);
+  const owners = useMemo(() => {
+    const set = new Set<string>();
+    for (const j of jobs) {
+      const o = ownerOf(j);
+      [o.project, o.production, o.kitting].forEach((x) => { if (x && x !== "—") set.add(x); });
+    }
+    return [...set].sort();
+  }, [jobs, projects]);
+
+  const needle = q.trim().toLowerCase();
+  const rows = useMemo(() => {
+    const list = jobs.filter((j) => {
+      if (fam !== "all" && j.fam !== fam) return false;
+      if (owner !== "all") {
+        const o = ownerOf(j);
+        if (o.project !== owner && o.production !== owner && o.kitting !== owner) return false;
+      }
+      if (!needle) return true;
+      const o = ownerOf(j);
+      return `${j.id} ${j.tag} ${j.proj} ${j.stat} ${j.fam} ${o.project} ${o.production} ${o.kitting}`
+        .toLowerCase().includes(needle);
+    });
+    return list.sort((a, b) =>
+      String(a.proj || "zzz").localeCompare(String(b.proj || "zzz"))
+      || String(a.tdd || "9999").localeCompare(String(b.tdd || "9999")));
+  }, [jobs, fam, owner, needle, projects]);
+
+  // Totals follow the FILTER, not the floor: a number that ignored the filter
+  // above it would be answering a question nobody asked.
+  const colTotal = (k: keyof Crew) => rows.reduce((n, j) => n + (Number(crewOf(j.id)?.[k]) || 0), 0);
+  const grand = rows.reduce((n, j) => n + sumOf(j.id), 0);
+  const staffed = rows.filter((j) => sumOf(j.id) > 0).length;
+  const filtered = fam !== "all" || owner !== "all" || !!needle;
+
+  const openRow = (j: Job) => {
+    const c = manpower[j.id];
+    setDraft((d) => ({ ...d, [j.id]: Object.fromEntries(TRADES.map((t) => [t.key, String(Number(c?.[t.key]) || 0)])) }));
+    setEditing(j.id);
+  };
+  const openAll = () => {
+    const next: Record<string, Record<string, string>> = {};
+    for (const j of rows) {
+      const c = manpower[j.id];
+      next[j.id] = Object.fromEntries(TRADES.map((t) => [t.key, String(Number(c?.[t.key]) || 0)]));
+    }
+    setDraft(next); setAll(true); setEditing(null); setErr("");
+  };
+  const cell = (id: string, k: string) => draft[id]?.[k] ?? "0";
+  const setCell = (id: string, k: string, v: string) =>
+    setDraft((d) => ({ ...d, [id]: { ...(d[id] || {}), [k]: v.replace(/[^0-9]/g, "").slice(0, 2) } }));
+
+  const saveOne = async (jobId: string) => {
     setBusy(true); setErr("");
     try {
       await api.post("/api/on-floor/manpower", {
         job_id: jobId, day,
-        crew: Object.fromEntries(TRADES.map((t) => [t.key, Number(draft[t.key]) || 0])),
+        crew: Object.fromEntries(TRADES.map((t) => [t.key, Number(cell(jobId, t.key)) || 0])),
       });
-      setEditing(null);
-      onSaved();
+      setEditing(null); onSaved();
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   };
-
-  const crewOf = (id: string) => manpower[id];
-  const sumOf = (id: string) => TRADES.reduce((n, t) => n + (Number(crewOf(id)?.[t.key]) || 0), 0);
-  const draftSum = TRADES.reduce((n, t) => n + (Number(draft[t.key]) || 0), 0);
-  const colTotal = (k: keyof Crew) => jobs.reduce((n, j) => n + (Number(crewOf(j.id)?.[k]) || 0), 0);
-  const grand = jobs.reduce((n, j) => n + sumOf(j.id), 0);
-  const staffed = jobs.filter((j) => sumOf(j.id) > 0).length;
-
-  // Jobs stand in project order so a manager reads his own block together,
-  // then by delivery date within it — the order the floor actually works.
-  const rows = [...jobs].sort((a, b) =>
-    String(a.proj || "zzz").localeCompare(String(b.proj || "zzz"))
-    || String(a.tdd || "9999").localeCompare(String(b.tdd || "9999")));
+  const saveAll = async () => {
+    setBusy(true); setErr("");
+    let n = 0;
+    try {
+      for (const j of rows) {
+        const d = draft[j.id];
+        if (!d) continue;
+        const was = TRADES.map((t) => Number(manpower[j.id]?.[t.key]) || 0).join(",");
+        const now = TRADES.map((t) => Number(d[t.key]) || 0).join(",");
+        if (was === now) continue;           // only what actually moved
+        await api.post("/api/on-floor/manpower", {
+          job_id: j.id, day,
+          crew: Object.fromEntries(TRADES.map((t) => [t.key, Number(d[t.key]) || 0])),
+        });
+        n++;
+      }
+      setAll(false); setDraft({}); onSaved();
+      setErr(n ? "" : "Nothing had changed — nothing was written.");
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
 
   const shift = (n: number) => {
     const d = new Date(day + "T00:00:00Z");
@@ -9262,70 +9358,131 @@ function ManpowerPlanning({
     onDay(d.toISOString().slice(0, 10));
   };
 
+  const HEAD: React.CSSProperties = { position: "sticky", top: 0, background: "#22303C", zIndex: 2 };
+
   return (
     <div className="mb-4">
-      <div className="rounded-lg border px-3 py-2 mb-2 flex items-center gap-3 flex-wrap"
-        style={{ borderColor: "#E2E0DA", background: "#fff" }}>
-        <b className="text-xs" style={{ color: "#8A94A0", letterSpacing: ".04em" }}>MANPOWER FOR</b>
-        <button onClick={() => shift(-1)} className="rounded border px-2 py-1 text-xs font-bold"
-          style={{ borderColor: "#E2E0DA", color: "#22303C" }} title="The day before">‹</button>
-        <input type="date" value={day} onChange={(e) => onDay(e.target.value)}
-          className="rounded border px-2 py-1 text-sm font-bold tnum" style={{ borderColor: "#E2E0DA" }} />
-        <button onClick={() => shift(1)} className="rounded border px-2 py-1 text-xs font-bold"
-          style={{ borderColor: "#E2E0DA", color: "#22303C" }} title="The day after">›</button>
-        <button onClick={() => onDay(TODAY)} className="rounded px-2 py-1 text-xs font-bold"
-          style={{ background: "#F3F1EB", color: "#1B3A5C" }}>today</button>
-        <span className="text-sm font-extrabold" style={{ color: "#22303C" }}>{grand} people</span>
-        <span className="text-xs" style={{ color: "#8A94A0" }}>
-          on {staffed} of {jobs.length} job{jobs.length === 1 ? "" : "s"} on the floor
-        </span>
-        {!canEdit && <span className="text-xs" style={{ color: "#8A94A0" }}>· read-only for your role</span>}
-        {err && <span className="text-xs font-bold" style={{ color: "#B3261E" }}>{err}</span>}
+      {/* the day, the filters, the search — and the totals, on top */}
+      <div className="rounded-lg border px-3 py-2 mb-2" style={{ borderColor: "#E2E0DA", background: "#fff" }}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <b className="text-xs" style={{ color: "#8A94A0", letterSpacing: ".04em" }}>MANPOWER FOR</b>
+          <button onClick={() => shift(-1)} className="rounded border px-2 py-1 text-xs font-bold" style={{ borderColor: "#E2E0DA" }}>‹</button>
+          <input type="date" value={day} onChange={(e) => onDay(e.target.value)}
+            className="rounded border px-2 py-1 text-sm font-bold tnum" style={{ borderColor: "#E2E0DA" }} />
+          <button onClick={() => shift(1)} className="rounded border px-2 py-1 text-xs font-bold" style={{ borderColor: "#E2E0DA" }}>›</button>
+          <button onClick={() => onDay(TODAY)} className="rounded px-2 py-1 text-xs font-bold" style={{ background: "#F3F1EB", color: "#1B3A5C" }}>today</button>
+
+          <select value={fam} onChange={(e) => setFam(e.target.value)}
+            className="rounded border px-2 py-1 text-xs font-bold bg-white"
+            style={{ borderColor: fam === "all" ? "#E2E0DA" : "#E8600A" }}>
+            <option value="all">All products</option>
+            {fams.map((f) => <option key={f}>{f}</option>)}
+          </select>
+          <select value={owner} onChange={(e) => setOwner(e.target.value)}
+            className="rounded border px-2 py-1 text-xs font-bold bg-white"
+            style={{ borderColor: owner === "all" ? "#E2E0DA" : "#E8600A" }}>
+            <option value="all">All owners</option>
+            {owners.map((o) => <option key={o}>{o}</option>)}
+          </select>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 job, tag, project, owner…"
+            className="rounded border px-2 py-1 text-xs" style={{ borderColor: needle ? "#E8600A" : "#E2E0DA", width: 230 }} />
+          {filtered && (
+            <span className="text-xs" style={{ color: "#8A94A0" }}>
+              {rows.length} of {jobs.length} ·{" "}
+              <button onClick={() => { setFam("all"); setOwner("all"); setQ(""); }} style={{ color: "#E8600A", fontWeight: 700 }}>clear</button>
+            </span>
+          )}
+
+          <span className="ml-auto" />
+          {canEdit && !all && (
+            <button onClick={openAll} className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: "#1B3A5C" }}
+              title="Open every row on screen and fill them in one pass">
+              ✎ Edit all{filtered ? ` (${rows.length})` : ""}
+            </button>
+          )}
+          {all && (
+            <>
+              <button onClick={() => void saveAll()} disabled={busy}
+                className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: busy ? "#B9BEC4" : "#0D7A3F" }}>
+                {busy ? "Saving…" : "💾 Save all"}
+              </button>
+              <button onClick={() => { setAll(false); setDraft({}); }} className="text-xs font-bold" style={{ color: "#8A94A0" }}>cancel</button>
+            </>
+          )}
+        </div>
+
+        {/* THE TRADE TOTALS, ON TOP (Dr Raghu, 2 Sep 2026) */}
+        <div className="flex items-center gap-3 flex-wrap mt-2 pt-2" style={{ borderTop: "1px solid #EFEDE7" }}>
+          <span className="text-sm font-extrabold" style={{ color: "#22303C" }}>{grand} people</span>
+          {TRADES.map((t) => (
+            <span key={t.key} className="text-xs" style={{ color: colTotal(t.key) ? t.color : "#C9C6BE", fontWeight: colTotal(t.key) ? 700 : 400 }}>
+              {t.label} <b>{colTotal(t.key) || "·"}</b>
+            </span>
+          ))}
+          <span className="text-xs" style={{ color: "#8A94A0" }}>
+            on {staffed} of {rows.length} job{rows.length === 1 ? "" : "s"}{filtered ? " shown" : " on the floor"}
+          </span>
+          {!canEdit && <span className="text-xs" style={{ color: "#8A94A0" }}>· read-only for your role</span>}
+          {err && <span className="text-xs font-bold" style={{ color: "#B3261E" }}>{err}</span>}
+        </div>
       </div>
 
-      <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
-        <table className="text-xs w-full" style={{ minWidth: 860, borderCollapse: "separate", borderSpacing: 0 }}>
+      <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: "#E2E0DA", maxHeight: "70vh" }}>
+        <table className="text-xs w-full" style={{ minWidth: 1320, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
             <tr style={{ background: "#22303C", color: "#fff" }}>
-              <th className="px-2 py-2 text-left whitespace-nowrap">Date</th>
-              <th className="px-2 py-2 text-left whitespace-nowrap">Project</th>
-              <th className="px-2 py-2 text-left">Job</th>
+              <th className="px-2 py-2 text-left whitespace-nowrap" style={HEAD}>Date</th>
+              <th className="px-2 py-2 text-left whitespace-nowrap" style={HEAD}>Project</th>
+              <th className="px-2 py-2 text-left" style={HEAD}>Job</th>
+              <th className="px-2 py-2 text-left whitespace-nowrap" style={HEAD}>Owners</th>
+              <th className="px-2 py-2 text-left" style={HEAD}>Last milestone undone</th>
               {TRADES.map((t) => (
-                <th key={t.key} className="px-2 py-2 text-center whitespace-nowrap" title={t.label}>{t.label}</th>
+                <th key={t.key} className="px-2 py-2 text-center whitespace-nowrap" style={HEAD} title={t.label}>{t.label}</th>
               ))}
-              <th className="px-2 py-2 text-center">Total</th>
-              <th className="px-2 py-2" />
+              <th className="px-2 py-2 text-center" style={HEAD}>Total</th>
+              <th className="px-2 py-2" style={HEAD} />
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={TRADES.length + 5} className="px-3 py-6 text-center" style={{ color: "#8A94A0" }}>
-                No jobs are on the floor — tick a job On Floor and it appears here.
+              <tr><td colSpan={TRADES.length + 7} className="px-3 py-6 text-center" style={{ color: "#8A94A0" }}>
+                {jobs.length ? "Nothing matches the filter." : "No jobs are on the floor — tick a job On Floor and it appears here."}
               </td></tr>
             )}
             {rows.map((j, i) => {
-              const live = editing === j.id;
-              const total = live ? draftSum : sumOf(j.id);
-              const none = !live && total === 0;
+              const live = all || editing === j.id;
+              const o = ownerOf(j);
+              const total = live
+                ? TRADES.reduce((n, t) => n + (Number(cell(j.id, t.key)) || 0), 0)
+                : sumOf(j.id);
+              const undone = lastUndone(j);
               return (
-                <tr key={j.id} className="border-t"
-                  style={{ borderColor: "#EFEDE7", background: live ? "#FFF7E6" : i % 2 ? "#FAF9F5" : "#fff" }}>
-                  <td className="px-2 py-1.5 tnum whitespace-nowrap" style={{ color: "#8A94A0" }}>{fmtFull(day)}</td>
-                  <td className="px-2 py-1.5 whitespace-nowrap">
-                    <b>{j.proj || "—"}</b>
-                    {projects[j.proj]?.mgr && <div style={{ color: "#8A94A0", fontSize: 10 }}>{projects[j.proj]?.mgr}</div>}
+                <tr key={j.id} style={{ background: live ? "#FFF7E6" : i % 2 ? "#FAF9F5" : "#fff", boxShadow: "inset 0 1px 0 #EFEDE7" }}>
+                  <td className="px-2 py-1.5 tnum whitespace-nowrap" style={{ color: "#8A94A0" }}>{fmt(day)}</td>
+                  <td className="px-2 py-1.5 whitespace-nowrap"><b>{j.proj || "—"}</b></td>
+                  <td className="px-2 py-1.5" style={{ maxWidth: 300 }}>
+                    <button onClick={() => onOpenJob(j)} className="text-left"
+                      title={`${jobNo(j.id)} · ${j.tag}\n${j.cust}\n\nStatus: ${j.stat}\nKitting ${j.kit}% · Production ${j.pct}%\nTDD ${fmtFull(j.tdd)} · OTD ${fmtFull(j.otd)}\nValue ${V(j.val)}\n\nClick to open the job.`}>
+                      <b style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2 }}>{jobNo(j.id)}</b>{" "}
+                      <span style={{ color: "#5A6672" }}>{j.tag}</span>
+                      <div style={{ color: "#8A94A0", fontSize: 10 }}>{j.stat}</div>
+                    </button>
                   </td>
-                  <td className="px-2 py-1.5">
-                    <b>{j.id.slice(-4)}</b> <span style={{ color: "#5A6672" }}>{j.tag}</span>
-                    <div style={{ color: "#8A94A0", fontSize: 10 }}>{j.stat}</div>
+                  <td className="px-2 py-1.5" style={{ color: "#5A6672", lineHeight: 1.5, minWidth: 170 }}>
+                    <div><span style={{ color: "#8A94A0" }}>Proj</span> <b>{o.project}</b></div>
+                    <div><span style={{ color: "#8A94A0" }}>Prod</span> {o.production}</div>
+                    <div><span style={{ color: "#8A94A0" }}>Kit</span> {o.kitting}</div>
+                  </td>
+                  <td className="px-2 py-1.5" style={{ minWidth: 190, maxWidth: 260, color: undone === "all done" ? "#0D7A3F" : "#22303C" }}>
+                    {undone || <span style={{ color: "#C9C6BE" }}>no plan yet</span>}
                   </td>
                   {TRADES.map((t) => (
                     <td key={t.key} className="px-2 py-1.5 text-center tnum">
                       {live ? (
-                        <input value={draft[t.key]} inputMode="numeric" autoFocus={t.key === TRADES[0].key}
-                          onChange={(e) => setDraft((c) => ({ ...c, [t.key]: e.target.value.replace(/[^0-9]/g, "").slice(0, 2) }))}
+                        <input value={cell(j.id, t.key)} inputMode="numeric"
+                          onChange={(e) => setCell(j.id, t.key, e.target.value)}
                           className="w-10 text-center rounded border px-1 py-0.5 font-bold"
-                          style={{ borderColor: t.color, color: "#22303C" }} />
+                          style={{ borderColor: t.color }} />
                       ) : (
                         <span style={{ color: Number(crewOf(j.id)?.[t.key]) ? t.color : "#C9C6BE", fontWeight: Number(crewOf(j.id)?.[t.key]) ? 700 : 400 }}>
                           {Number(crewOf(j.id)?.[t.key]) || "·"}
@@ -9333,19 +9490,16 @@ function ManpowerPlanning({
                       )}
                     </td>
                   ))}
-                  <td className="px-2 py-1.5 text-center font-bold tnum"
-                    style={{ color: none ? "#B3261E" : "#22303C" }}>{total || "—"}</td>
+                  <td className="px-2 py-1.5 text-center font-bold tnum" style={{ color: total ? "#22303C" : "#B3261E" }}>{total || "—"}</td>
                   <td className="px-2 py-1.5 text-center whitespace-nowrap">
-                    {live ? (
+                    {all ? null : editing === j.id ? (
                       <>
-                        <button onClick={() => void save(j.id)} disabled={busy}
-                          className="rounded px-2 py-1 font-bold" style={{ background: "#0D7A3F", color: "#fff" }}>
-                          {busy ? "…" : "Save"}
-                        </button>
+                        <button onClick={() => void saveOne(j.id)} disabled={busy}
+                          className="rounded px-2 py-1 font-bold text-white" style={{ background: "#0D7A3F" }}>{busy ? "…" : "Save"}</button>
                         <button onClick={() => setEditing(null)} className="ml-1 font-bold" style={{ color: "#8A94A0" }}>✕</button>
                       </>
                     ) : canEdit ? (
-                      <button onClick={() => open(j)} className="rounded border px-2 py-1 font-bold"
+                      <button onClick={() => openRow(j)} className="rounded border px-2 py-1 font-bold"
                         style={{ borderColor: "#E2E0DA", color: "#1B3A5C" }}>✎ Edit</button>
                     ) : null}
                   </td>
@@ -9353,7 +9507,7 @@ function ManpowerPlanning({
               );
             })}
             <tr style={{ background: "#16232F", color: "#F5B32B" }} className="font-bold">
-              <td className="px-2 py-2" colSpan={3}>TOTAL · {fmtFull(day)}</td>
+              <td className="px-2 py-2" colSpan={5}>TOTAL · {fmt(day)}{filtered ? " · filtered" : ""}</td>
               {TRADES.map((t) => (<td key={t.key} className="px-2 py-2 text-center tnum">{colTotal(t.key) || "·"}</td>))}
               <td className="px-2 py-2 text-center tnum">{grand}</td>
               <td />
@@ -9362,8 +9516,8 @@ function ManpowerPlanning({
         </table>
       </div>
       <div className="text-xs mt-1" style={{ color: "#8A94A0" }}>
-        One job is edited at a time, and the row you are typing into is the only one that can change.
-        Numbers here are checked against the attendance muster, so they are a ledger rather than a scribble.
+        One job at a time by default; <b>✎ Edit all</b> opens every row on screen and writes only the ones that changed.
+        These numbers are checked against the attendance muster, so they are a ledger rather than a scribble.
       </div>
     </div>
   );
@@ -9674,6 +9828,14 @@ function OnFloor({
           onDay={setMpDay}
           onSaved={loadManpower}
           canEdit={canTask}
+          plans={board.plans}
+          V={V}
+          /* THE LIGHTBOX FIRST (Dr Raghu, 2 Sep 2026: "clicking on the job
+             should open the lightbox first. only then open the full job") —
+             the same `picked` the floor view uses, whose own button walks on
+             to the full plan. A click should show you the job, not move you
+             to another screen. */
+          onOpenJob={(j) => setPicked(j)}
         />
       )}
 
@@ -9689,7 +9851,15 @@ function OnFloor({
         <span className="text-xs" style={{ color: "#B3261E" }}>must match the attendance muster</span>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 mb-3">
-        <StatCard label="ON FLOOR" value={String(jobs.length)} sub="jobs being worked on now" color="#0D7A3F" />
+        <StatCard label="ON FLOOR" value={String(jobs.length)} sub="jobs ticked as being worked on" color="#0D7A3F" />
+        {/* "also show Jobs worked on - that is those jobs with people working
+            on them" (Dr Raghu, 2 Sep 2026). ON FLOOR is a tick somebody made;
+            this is the ledger's own answer — where the manpower actually
+            stands today. The gap between the two numbers is the interesting
+            part, and it now has somewhere to show itself. */}
+        <StatCard label="JOBS WORKED ON" value={String(mpTotals.jobsWith)}
+          sub={`${mpTotals.people} people${mpTotals.jobsWith < jobs.length ? ` · ${jobs.length - mpTotals.jobsWith} on floor with nobody recorded` : ""}`}
+          color={mpTotals.jobsWith ? "#1B3A5C" : "#B3261E"} />
         <StatCard label="VALUE" value={V(totVal)} color="#1B3A5C" />
         <StatCard label="THROUGHPUT" value={V(totTp)} sub={totVal ? `${Math.round((totTp / totVal) * 100)}% of value` : ""} color="#E8600A" />
         <StatCard label="DELIVERED · 7 DAYS" value={String(d7.n)}
