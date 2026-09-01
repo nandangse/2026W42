@@ -29,7 +29,9 @@ interface Payload {
   window: { from: string; end: string; key: string; label: string };
   jobs: PlanJob[]; done: Totals; doneFy: Totals;
   entries: Entry[];
-  signoff: { signed_at: string; jobs: number; value: number; throughput: number; realistic_jobs: number | null; realistic_value: number | null; realistic_throughput: number | null; emailed: string | null } | null;
+  signoff: { signed_at: string; jobs: number; value: number; throughput: number; realistic_jobs: number | null; realistic_value: number | null; realistic_throughput: number | null; emailed: string | null; is_draft?: boolean } | null;
+  /** Everyone's latest word on this period — draft or signature. */
+  room?: { by_email: string; is_draft: boolean; signed_at: string; jobs: number; value: number; throughput: number }[];
 }
 const tpOf = (j: { tp: number; tpv: number }) => (Number(j.tpv) || 0) > 0 ? Number(j.tpv) : Number(j.tp) || 0;
 
@@ -184,14 +186,24 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
     return t;
   }, [d]);
 
-  const sign = async () => {
+  /**
+   * SAVE AS DRAFT / SIGN (Dr Raghu, 1 Sep 2026: "keep a button for Save as
+   * draft, and then the final one will only be once they are all ready").
+   *
+   * The beliefs themselves have always saved as they were typed; what the
+   * draft adds is the difference between working and finished. Only the
+   * signature asks twice, and only the signature mails — a draft is a person
+   * saying "this is my read so far", which is nobody's business but the
+   * room's.
+   */
+  const sign = async (draft = false) => {
     if (!d) return;
-    if (!window.confirm(`This is my Plan for the ${d.window.label} — ${totals.jobs} jobs more, worth ${V(totals.value)} with ${V(totals.throughput)} throughput.\n\nIs this your final Plan?`)) return;
+    if (!draft && !window.confirm(`This is my Plan for the ${d.window.label} — ${totals.jobs} jobs more, worth ${V(totals.value)} with ${V(totals.throughput)} throughput.\n\nIs this your final Plan?`)) return;
     setBusy(true); setMsg("");
     try {
-      const r = await api.post("/api/month-plan", { action: "sign", kind });
-      setSigned({ plan: r.plan, realistic: r.realistic, mailed: String(r.mailed || "") });
-      setMsg("Signed ✓");
+      const r = await api.post("/api/month-plan", { action: draft ? "draft" : "sign", kind });
+      if (!draft) setSigned({ plan: r.plan, realistic: r.realistic, mailed: String(r.mailed || "") });
+      setMsg(draft ? "Draft saved ✓ — not mailed, and you can keep changing it" : "Signed ✓");
       load();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
@@ -364,6 +376,38 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
         <JobBox job={openJob} V={V} onClose={() => setOpenJob(null)} onSaved={() => { setOpenJob(null); void load(); }} />
       )}
 
+      {/* WHO IS READY (Dr Raghu, 1 Sep 2026: "the final one will only be
+          once they are all ready for it"). Waiting for people is only
+          possible if you can see who you are waiting for. */}
+      {(d.room || []).length > 0 && (
+        <div className="rounded-lg border bg-white p-3 mb-2" style={{ borderColor: C.line }}>
+          <div className="text-xs font-bold mb-1.5" style={{ color: C.mute, letterSpacing: 1.1 }}>
+            THE ROOM · {d.window.label} ({d.window.key})
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {(d.room || [])
+              .slice()
+              .sort((a, b) => Number(a.is_draft) - Number(b.is_draft) || String(a.by_email).localeCompare(String(b.by_email)))
+              .map((r) => (
+                <span key={r.by_email} className="rounded px-2 py-1 text-xs"
+                  style={{
+                    background: r.is_draft ? "#F4F2EC" : "#E8F3EC",
+                    border: `1px solid ${r.is_draft ? C.line : "#B7DFC8"}`,
+                    color: r.is_draft ? C.sub : C.green,
+                  }}
+                  title={`${r.jobs} jobs · ${V(Number(r.value) || 0)} · ${new Date(r.signed_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`}>
+                  {r.is_draft ? "✎" : "✍"} <b>{String(r.by_email).split("@")[0]}</b>
+                  <span style={{ color: C.mute }}> · {r.is_draft ? "draft" : "signed"}</span>
+                </span>
+              ))}
+          </div>
+          <div className="text-xs mt-1.5" style={{ color: C.faint }}>
+            {(d.room || []).filter((r) => !r.is_draft).length} signed ·{" "}
+            {(d.room || []).filter((r) => r.is_draft).length} still in draft — hover a name for their numbers.
+          </div>
+        </div>
+      )}
+
       {/* the signature */}
       <div className="rounded-lg border bg-white p-3 flex items-center gap-3 flex-wrap" style={{ borderColor: C.line }}>
         <div className="text-sm" style={{ color: C.ink }}>
@@ -371,13 +415,24 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
           <span className="text-xs" style={{ color: C.mute }}> · {d.window.label} ({d.window.key}) · YTD so far {d.doneFy.nos} nos, {V(d.doneFy.value)}</span>
         </div>
         <div className="flex-1" style={{ minWidth: 10 }} />
-        <button onClick={() => void sign()} disabled={busy}
+        <button onClick={() => void sign(true)} disabled={busy}
+          className="rounded px-4 py-2 text-sm font-bold border"
+          style={{ borderColor: C.navy, color: C.navy, background: "#fff" }}
+          title="Keep your read without finishing it — nothing is mailed, and you can change it as often as you like">
+          {busy ? "Saving…" : "💾 Save as draft"}
+        </button>
+        <button onClick={() => void sign(false)} disabled={busy}
           className="rounded px-4 py-2 text-sm font-bold text-white" style={{ background: busy ? "#B9BEC4" : C.violet }}>
           {busy ? "Signing…" : `✍ This is my Plan for the ${d.window.label}`}
         </button>
       </div>
       <div className="text-xs mt-2" style={{ color: C.faint }}>
-        Signing freezes the plan and mails it to you, cc {`stratcom@nandan.co.in`} — the realistic, belief-weighted read appears only after the signature.
+        <b>Save as draft</b> keeps your read and mails nothing — change it as often as you like.
+        <b> Signing</b> freezes the plan and mails it to you, cc {`stratcom@nandan.co.in`}; the realistic,
+        belief-weighted read appears only after the signature.
+      </div>
+      <div className="text-xs mt-1" style={{ color: C.faint }}>
+        Every belief is already saved the moment it is typed — the buttons are about what it MEANS, not whether it is kept.
       </div>
     </div>
   );

@@ -103,8 +103,34 @@ export async function GET(req: Request) {
         .eq("by_email", u.email.toLowerCase()).eq("period_kind", kind).eq("period_key", w.key)
         .order("signed_at", { ascending: false }).limit(1);
       signoff = s?.[0] ?? null;
-    } catch { return NextResponse.json({ installed: false, window: w, jobs: [], done, doneFy, entries: [], signoff: null }); }
-    return NextResponse.json({ installed: true, window: w, today: T, jobs, done, doneFy, entries, signoff });
+    } catch { return NextResponse.json({ installed: false, window: w, jobs: [], done, doneFy, entries: [], signoff: null, room: [] }); }
+
+    /**
+     * WHO IS READY (Dr Raghu, 1 Sep 2026: "the final one will only be once
+     * they are all ready for it").
+     *
+     * The signature is his to give, but it should not be given blind — so
+     * the desk shows the room: everyone who has saved a draft or signed for
+     * this period, latest word each, with the numbers they stood behind.
+     * Waiting for people is only possible if you can see who you are waiting
+     * for.
+     */
+    let room: Record<string, unknown>[] = [];
+    try {
+      const { data: all } = await admin.from("plan_signoff")
+        .select("by_email, is_draft, signed_at, jobs, value, throughput, realistic_jobs, realistic_value, realistic_throughput")
+        .eq("period_kind", kind).eq("period_key", w.key)
+        .order("signed_at", { ascending: false }).limit(400);
+      const latest = new Map<string, Record<string, unknown>>();
+      for (const r of all || []) {
+        const who = String(r.by_email || "").toLowerCase();
+        if (!who || latest.has(who)) continue;   // ordered desc, so the first is the latest
+        latest.set(who, r as Record<string, unknown>);
+      }
+      room = [...latest.values()];
+    } catch { room = []; }
+
+    return NextResponse.json({ installed: true, window: w, today: T, jobs, done, doneFy, entries, signoff, room });
   } catch (e) {
     return errJson(e);
   }
@@ -139,7 +165,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    if (action === "sign") {
+    /**
+     * SAVE AS DRAFT / SIGN (Dr Raghu, 1 Sep 2026: "keep a button for Save as
+     * draft, and then the final one will only be once they are all ready").
+     *
+     * The same arithmetic either way — the difference is what it MEANS. A
+     * draft says "this is my read so far" and stays in the building; the
+     * signature says "this is my Plan" and goes out by mail. Anything else
+     * would make a half-finished read look like a commitment.
+     */
+    if (action === "sign" || action === "draft") {
+      const isDraft = action === "draft";
       const kind = body.kind === "qtd" ? "qtd" : "mtd";
       const w = windowOf(kind);
       const T = istToday();
@@ -173,17 +209,20 @@ export async function POST(req: Request) {
         by_email: me, period_kind: kind, period_key: w.key,
         jobs: plan.jobs, value: plan.value, throughput: plan.throughput,
         realistic_jobs: real.jobs, realistic_value: Math.round(real.value), realistic_throughput: Math.round(real.throughput),
-        snapshot, emailed: null,
+        snapshot, emailed: null, is_draft: isDraft,
       }).select("id").single();
       if (se) {
+        if (/is_draft/i.test(se.message))
+          throw new HttpError(503, "Run migration 0109 first — a draft has nowhere to be told apart from a signature yet.");
         if (/plan_signoff|does not exist|schema cache/i.test(se.message))
           throw new HttpError(503, "Run migration 0103 first — the signature has nowhere to live yet.");
         throw new Error(se.message);
       }
 
-      // the mail — attempted, never load-bearing
+      // the mail — attempted, never load-bearing, and NEVER for a draft:
+      // a mail is what makes a number other people's business.
       let mailed = "";
-      const key = process.env.RESEND_API_KEY;
+      const key = isDraft ? "" : process.env.RESEND_API_KEY;
       if (key) {
         const html = `
 <p><b>${u.displayName || u.email}</b> signed the ${w.label} plan (${w.key}) on ${T} (IST).</p>

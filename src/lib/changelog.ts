@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.3.1",
+    date: "2026-09-01",
+    module: "Month & Quarter Plan — a draft, and a room to see who is ready",
+    items: [
+      "\"In this, also keep a button for Save as draft, and then the final one will only be once they are all ready for it.\" (Dr Raghu, 1 Sep 2026, crowdsourcing September before freezing it.) 💾 SAVE AS DRAFT stands beside the signature: it keeps your read, asks nothing twice, and MAILS NOBODY.",
+      "The beliefs themselves were never at risk — they have always saved the moment they are typed. What was missing is the difference between WORKING and FINISHED: a planner half-way through fifty jobs looked exactly like one who had thought about none of them, and the only way to say \"I am done\" was to sign.",
+      "THE ROOM now stands above the buttons: everyone who has saved a draft or signed for this period, their latest word each, ✎ for a draft and ✍ for a signature, with their jobs and value on hover. Waiting for people is only possible if you can see who you are waiting for.",
+      "Only the signature mails, and only the signature reveals the belief-weighted realistic read. A draft is a person saying \"this is my read so far\" — which is the room's business and nobody else's. Genie migration 0109 adds the one column that tells them apart, defaulted so every signature already on record stays a signature.",
+    ],
+  },
+  {
     v: "4.2.3.0",
     date: "2026-09-01",
     module: "Month & Quarter Plan — what the belief rests on, and what it collects",
