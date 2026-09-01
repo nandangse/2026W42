@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.0.0",
+    date: "2026-09-01",
+    module: "Planning — Jobs, Projects and Delivered come from the ERP, not a sheet",
+    items: [
+      "\"can we now stop the upload and instead do the API import from erpnext?\" (Dr Raghu, 1 Sep 2026) — three of the morning upload's five cards are replaced by a direct read of nandanerp: Jobs, Projects and Delivered Jobs. Tasks and Employees still come by sheet; their doctypes exist on the ERP but their mapping does not yet.",
+      "THE MAPPING WAS READ, NOT GUESSED. Every pair was checked against rows Genie already held from the sheet and agrees character for character — customer_tag→tag, job_status→stat, target_delivery_date_current→tdd, custom_project_director→mgr, project_stage→stage, jobnumberslist→job_numbers, and the rest. status=\"Jobs in Process\" returns EXACTLY the 112 jobs on the board, with none missing in either direction.",
+      "THE SHEET WAS ALREADY BEHIND: of those 112, fourteen carry ERP updates Genie never received — mostly target delivery dates that had moved. On delivered jobs the two sides now agree exactly: all 2,717 the ERP calls delivered are in Genie, and none are missing.",
+      "WHAT IT REFUSES TO DO. The upload's apply_jobs overwrites every column, which is safe from a sheet carrying every column and destructive from an API that does not: Genie owns the Management Target Date, the kitting and production percentages, the floor note, the escalation and the client update. Those are never touched. And a BLANK from the ERP never erases a value Genie holds — the ERP may fill a gap, it may not open one. 1,491 of its delivered jobs carry no delivery date at all, and a plain import would have blanked every date the sheet had banked for them.",
+      "A NEAR MISS WORTH RECORDING: the guard protecting those dates was itself built on a read capped at 1,000 rows — PostgREST silently returns no more, whatever limit is asked — so it would have covered 1,000 of 2,734 rows and let the other 1,734 be blanked. Every read of a Genie table in the import is now paged. A safety check built on a silently truncated read is not a safety check.",
+      "Run it from the owner's hand or hourly by cron, and always dry first: a dry run reads the ERP and reports what would change without writing a row. The sheet upload is left working and untouched, so a bad hour can still fall back to it.",
+    ],
+  },
+  {
     v: "4.1.0.3",
     date: "2026-08-31",
     module: "CRM — the variables name themselves, wherever one might be typed",
