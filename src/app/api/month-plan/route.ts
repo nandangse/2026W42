@@ -50,18 +50,22 @@ const fyWindow = () => {
 const mayPlan = (u: AuthedUser) =>
   u.isOwner || u.stratcom || ["admin", "planner", "project_owner"].includes(String(u.role));
 
-type JobRow = { id: string; tag: string | null; cust: string | null; fam: string | null; val: number; tp: number; tpv: number; tdd: string | null };
+// kit and pct ride along (Dr Raghu, 1 Sep 2026: "In this also show kitting%
+// and production %"). A belief about a delivery date is worth more when the
+// two numbers behind it are on the same row: 100% believed on a job that is
+// 20% kitted is a sentence that should be hard to write.
+type JobRow = { id: string; tag: string | null; cust: string | null; fam: string | null; val: number; tp: number; tpv: number; tdd: string | null; kit: number; pct: number; pod: number | null; stat: string | null; own: string | null; proj: string | null; otd: string | null };
 const tpOf = (j: { tp: number; tpv: number }) => (Number(j.tpv) || 0) > 0 ? Number(j.tpv) : Number(j.tp) || 0;
 
 async function moreJobs(admin: ReturnType<typeof adminClient>, end: string): Promise<JobRow[]> {
   const { data } = await admin.from("jobs")
-    .select("id, tag, cust, fam, val, tp, tpv, tdd")
+    .select("id, tag, cust, fam, val, tp, tpv, tdd, kit, pct, stat, own, proj, otd, pay_on_delivery")
     .eq("active", true)
     .or("delivered.is.null,delivered.eq.false")
     .not("tdd", "is", null)
     .lte("tdd", end)
     .order("tdd");
-  return (data || []).map((j) => ({ ...j, val: Number(j.val) || 0, tp: Number(j.tp) || 0, tpv: Number(j.tpv) || 0 })) as JobRow[];
+  return (data || []).map((j) => ({ ...j, val: Number(j.val) || 0, tp: Number(j.tp) || 0, tpv: Number(j.tpv) || 0, kit: Number(j.kit) || 0, pct: Number(j.pct) || 0, pod: j.pay_on_delivery == null ? null : Number(j.pay_on_delivery) })) as JobRow[];
 }
 
 async function doneTotals(admin: ReturnType<typeof adminClient>, from: string, to: string) {

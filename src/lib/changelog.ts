@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.3.0",
+    date: "2026-09-01",
+    module: "Month & Quarter Plan — what the belief rests on, and what it collects",
+    items: [
+      "\"In this also show kitting% and production %\" (Dr Raghu, 1 Sep 2026, with the September plan open to freeze it) — both stand beside the target date now, coloured green past 90, amber past 50, red below. Believing a date is one judgement; believing it beside a job that is 20% kitted is another, and the plan should make the second one hard to avoid.",
+      "\"Show also in this the Amount receivable\" — what each delivery actually collects, with the month's total on the MORE card. The total says how many jobs carry the figure, because a receivable total that quietly omits half the list is worse than none at all.",
+      "\"Above the mouseover of the jobs show the same box as normal! In that also we can change it\" — the job number opens the job's own box: project, family, status, planning owner, value, throughput, receivable, TDD and OTD, with KITTING and PRODUCTION editable right there. It writes through the same door the boards use, so a correction made while planning is queued for the ERP like any other rather than staying a private Genie opinion.",
+      "\"and freeze the header in this as floating\" — the heading row stays put while the fifty jobs scroll beneath it.",
+    ],
+  },
+  {
     v: "4.2.2.0",
     date: "2026-09-01",
     module: "On Floor — Manpower Planning, and the schedule tells you which jobs",
