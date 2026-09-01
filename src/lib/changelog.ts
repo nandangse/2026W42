@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.3.2",
+    date: "2026-09-01",
+    module: "Month & Quarter Plan — YTD, the board's own job box, and a table that fits",
+    items: [
+      "\"also in that make a button for YTD so all are seen\" (Dr Raghu, 1 Sep 2026) — the desk now holds MTD, QTD and YTD: the financial year entire, so no job is out of sight merely because its target date falls outside this month.",
+      "\"The box you show in lightbox for the job keep the one we do in the Job board too!\" — it does. The bespoke box built an hour earlier is DELETED and the plan opens the boards' own JobLightbox, fed from the plan's row. A second box showing the same job differently would have been a second thing to learn and a second thing to keep true.",
+      "\"its breaking into next line / remove customer / Job - Cust id is enough\" — the Customer column is gone, since the job's tag already carries it, and nothing money- or date-shaped wraps any more: \"₹38.5 L\" over two lines was unreadable and a date split as \"31- 08\" was worse. The desk is wider to match.",
+      "\"my comments can be 2 lines\" and \"rename the my comments as What I believe needs to HAPPEN\" — both. It is two lines and stretchable, and the heading no longer asks anybody to justify a number: it asks what has to happen for the date to hold, which is the only answer worth collecting.",
+    ],
+  },
+  {
     v: "4.2.3.1",
     date: "2026-09-01",
     module: "Month & Quarter Plan — a draft, and a room to see who is ready",

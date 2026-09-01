@@ -25,13 +25,24 @@ const STRATCOM_CC = "stratcom@nandan.co.in";
 const istToday = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
 const cr = (n: number) => `₹${(n / 1e7).toFixed(2)} Cr`;
 
-function windowOf(kind: "mtd" | "qtd") {
+/**
+ * YTD joins MTD and QTD (Dr Raghu, 1 Sep 2026: "also in that make a button
+ * for YTD so all are seen"). The financial year entire — April to March — so
+ * the plan desk can hold every job the year carries rather than only the ones
+ * whose date happens to fall inside this month or quarter.
+ */
+function windowOf(kind: "mtd" | "qtd" | "ytd") {
   const T = istToday();
   const d = new Date(T + "T00:00:00Z");
   if (kind === "mtd") {
     const from = T.slice(0, 8) + "01";
     const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
     return { from, end, key: T.slice(0, 7), label: "MTD" };
+  }
+  if (kind === "ytd") {
+    const fy = fyWindow();
+    const y = Number(fy.from.slice(0, 4));
+    return { from: fy.from, end: fy.end, key: `FY${String(y).slice(2)}-${String(y + 1).slice(2)}`, label: "YTD" };
   }
   const m = d.getUTCMonth();
   const qs = m >= 9 ? 9 : m >= 6 ? 6 : m >= 3 ? 3 : 0;
@@ -54,18 +65,20 @@ const mayPlan = (u: AuthedUser) =>
 // and production %"). A belief about a delivery date is worth more when the
 // two numbers behind it are on the same row: 100% believed on a job that is
 // 20% kitted is a sentence that should be hard to write.
-type JobRow = { id: string; tag: string | null; cust: string | null; fam: string | null; val: number; tp: number; tpv: number; tdd: string | null; kit: number; pct: number; pod: number | null; stat: string | null; own: string | null; proj: string | null; otd: string | null };
+type JobRow = { id: string; tag: string | null; cust: string | null; fam: string | null; val: number; tp: number; tpv: number; tdd: string | null; kit: number; pct: number; pod: number | null; tpp: number; note: string; escalation: string | null; amtNeeded: number | null; stat: string | null; own: string | null; proj: string | null; otd: string | null };
 const tpOf = (j: { tp: number; tpv: number }) => (Number(j.tpv) || 0) > 0 ? Number(j.tpv) : Number(j.tp) || 0;
 
 async function moreJobs(admin: ReturnType<typeof adminClient>, end: string): Promise<JobRow[]> {
   const { data } = await admin.from("jobs")
-    .select("id, tag, cust, fam, val, tp, tpv, tdd, kit, pct, stat, own, proj, otd, pay_on_delivery")
+    .select("id, tag, cust, fam, val, tp, tpv, tdd, kit, pct, stat, own, proj, otd, pay_on_delivery, tpp, note, escalation, amt_needed")
     .eq("active", true)
     .or("delivered.is.null,delivered.eq.false")
     .not("tdd", "is", null)
     .lte("tdd", end)
     .order("tdd");
-  return (data || []).map((j) => ({ ...j, val: Number(j.val) || 0, tp: Number(j.tp) || 0, tpv: Number(j.tpv) || 0, kit: Number(j.kit) || 0, pct: Number(j.pct) || 0, pod: j.pay_on_delivery == null ? null : Number(j.pay_on_delivery) })) as JobRow[];
+  return (data || []).map((j) => ({ ...j, val: Number(j.val) || 0, tp: Number(j.tp) || 0, tpv: Number(j.tpv) || 0, kit: Number(j.kit) || 0, pct: Number(j.pct) || 0, pod: j.pay_on_delivery == null ? null : Number(j.pay_on_delivery),
+    tpp: Number(j.tpp) || 0, note: j.note ?? "", escalation: j.escalation ?? null,
+    amtNeeded: j.amt_needed == null ? null : Number(j.amt_needed) })) as JobRow[];
 }
 
 async function doneTotals(admin: ReturnType<typeof adminClient>, from: string, to: string) {
@@ -84,7 +97,8 @@ export async function GET(req: Request) {
     const u = await requireUser();
     if (!mayPlan(u)) throw new HttpError(403, "The plan desk is for planners, project owners, admins and Stratcom.");
     const admin = adminClient();
-    const kind = new URL(req.url).searchParams.get("kind") === "qtd" ? "qtd" : "mtd";
+    const kq = new URL(req.url).searchParams.get("kind");
+    const kind = kq === "qtd" ? "qtd" : kq === "ytd" ? "ytd" : "mtd";
     const w = windowOf(kind);
     const fy = fyWindow();
     const T = istToday();
@@ -176,7 +190,7 @@ export async function POST(req: Request) {
      */
     if (action === "sign" || action === "draft") {
       const isDraft = action === "draft";
-      const kind = body.kind === "qtd" ? "qtd" : "mtd";
+      const kind = body.kind === "qtd" ? "qtd" : body.kind === "ytd" ? "ytd" : "mtd";
       const w = windowOf(kind);
       const T = istToday();
       const jobs = await moreJobs(admin, w.end);

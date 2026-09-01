@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { fmt, fmtFull, jobNo } from "@/lib/schedule";
+import { JobLightbox, type WipJob } from "./JobsInProgress";
 
 const C = {
   ink: "#16232F", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC", line: "#E2E0DA",
@@ -21,7 +22,7 @@ const C = {
 };
 const BELIEFS = [0, 10, 25, 50, 75, 90, 100];
 
-interface PlanJob { id: string; tag: string | null; cust: string | null; fam: string | null; val: number; tp: number; tpv: number; tdd: string | null; kit: number; pct: number; pod: number | null; stat: string | null; own: string | null; proj: string | null; otd: string | null }
+interface PlanJob { id: string; tag: string | null; cust: string | null; fam: string | null; val: number; tp: number; tpv: number; tdd: string | null; kit: number; pct: number; pod: number | null; tpp: number; note: string; escalation: string | null; amtNeeded: number | null; stat: string | null; own: string | null; proj: string | null; otd: string | null }
 interface Entry { job_id: string; comment: string | null; belief_pct: number; best_estimate: string | null }
 interface Totals { nos: number; value: number; throughput: number }
 interface Payload {
@@ -36,112 +37,39 @@ interface Payload {
 const tpOf = (j: { tp: number; tpv: number }) => (Number(j.tpv) || 0) > 0 ? Number(j.tpv) : Number(j.tp) || 0;
 
 /**
- * THE JOB BOX (Dr Raghu, 1 Sep 2026: "Above the mouseover of the jobs show
- * the same box as normal! In that also we can change it").
+ * THE JOB'S OWN LIGHTBOX — the Job board's, not another one
+ * (Dr Raghu, 1 Sep 2026: "The box you show in lightbox for the job keep the
+ * one we do in the Job board too!").
  *
- * The same facts the boards show about a job, opened from the plan without
- * leaving it — and the two numbers a delivery belief actually rests on,
- * kitting and production, editable right here. Believing a date is one
- * judgement; believing it beside a job that is 20% kitted is another, and
- * this is where a planner corrects whichever of the two is wrong.
- *
- * It writes through /api/job-field, the same door the boards use, so an edit
- * made here is queued for the ERP exactly as an edit made anywhere else.
+ * A second box that showed the same job differently would be a second thing
+ * to learn and a second thing to keep true. So the plan opens the SAME
+ * JobLightbox the boards open, fed from the plan's own row — every field it
+ * edits still writes through /api/job-field and is still queued for the ERP,
+ * exactly as it is everywhere else.
  */
-function JobBox({ job, V, onClose, onSaved }: {
-  job: PlanJob; V: (n: number) => string; onClose: () => void; onSaved: () => void;
-}) {
-  const [kit, setKit] = useState(String(job.kit ?? 0));
-  const [pct, setPct] = useState(String(job.pct ?? 0));
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const [done, setDone] = useState("");
-
-  const dirty = String(job.kit ?? 0) !== kit || String(job.pct ?? 0) !== pct;
-
-  const save = async () => {
-    setBusy(true); setErr(""); setDone("");
-    try {
-      if (String(job.kit ?? 0) !== kit)
-        await api.post("/api/job-field", { job_id: job.id, field: "kit", value: Number(kit) || 0 });
-      if (String(job.pct ?? 0) !== pct)
-        await api.post("/api/job-field", { job_id: job.id, field: "pct", value: Number(pct) || 0 });
-      setDone("Saved — and queued for the ERP.");
-      onSaved();
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
-    finally { setBusy(false); }
-  };
-
-  const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
-    <div className="flex justify-between gap-3 py-1" style={{ borderBottom: "1px solid #F1EFE9" }}>
-      <span className="text-xs" style={{ color: C.mute }}>{k}</span>
-      <span className="text-xs font-semibold text-right" style={{ color: C.ink }}>{v}</span>
-    </div>
-  );
-
-  return (
-    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.45)", zIndex: 80 }}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full"
-        style={{ maxWidth: 460, maxHeight: "90vh", overflow: "auto" }}>
-        <div className="flex items-start justify-between px-4 py-2.5" style={{ background: C.navy, borderRadius: "6px 6px 0 0" }}>
-          <div>
-            <div className="text-white font-bold text-sm">{jobNo(job.id)} · {job.tag || ""}</div>
-            <div className="text-xs" style={{ color: "#B9C7D6" }}>{job.cust || "—"}</div>
-          </div>
-          <button onClick={onClose} className="text-white font-bold px-2">✕</button>
-        </div>
-        <div className="p-4">
-          <Row k="Project" v={job.proj || "—"} />
-          <Row k="Product family" v={job.fam || "—"} />
-          <Row k="Status" v={job.stat || "—"} />
-          <Row k="Planning owner" v={(job.own || "—").split("@")[0]} />
-          <Row k="Value" v={V(job.val)} />
-          <Row k="Throughput" v={<span style={{ color: C.green }}>{V(tpOf(job))}</span>} />
-          <Row k="Amount receivable on delivery" v={job.pod == null ? <span style={{ color: C.faint }}>not recorded</span> : <b style={{ color: C.navy }}>{V(job.pod)}</b>} />
-          <Row k="Target delivery" v={<span className="tnum">{fmtFull(job.tdd)}</span>} />
-          <Row k="Customer commitment (OTD)" v={<span className="tnum">{fmtFull(job.otd)}</span>} />
-
-          <div className="mt-3 rounded p-3" style={{ background: "#F7F6F2", border: `1px solid ${C.line}` }}>
-            <div className="text-xs font-bold mb-2" style={{ color: C.ink }}>
-              What the date rests on — change either and it saves to the job
-            </div>
-            <div className="flex gap-4 flex-wrap items-end">
-              <label className="text-xs font-bold" style={{ color: C.sub }}>
-                Kitting %
-                <input value={kit} inputMode="numeric"
-                  onChange={(e) => setKit(e.target.value.replace(/[^0-9]/g, "").slice(0, 3))}
-                  className="block w-20 text-center rounded border px-2 py-1 text-sm font-bold mt-0.5"
-                  style={{ borderColor: C.line, color: C.ink }} />
-              </label>
-              <label className="text-xs font-bold" style={{ color: C.sub }}>
-                Production %
-                <input value={pct} inputMode="numeric"
-                  onChange={(e) => setPct(e.target.value.replace(/[^0-9]/g, "").slice(0, 3))}
-                  className="block w-20 text-center rounded border px-2 py-1 text-sm font-bold mt-0.5"
-                  style={{ borderColor: C.line, color: C.ink }} />
-              </label>
-              <button onClick={() => void save()} disabled={busy || !dirty}
-                className="rounded px-3 py-1.5 text-xs font-bold text-white"
-                style={{ background: busy || !dirty ? "#B9BEC4" : C.green }}>
-                {busy ? "Saving…" : "Save"}
-              </button>
-            </div>
-            {err && <div className="text-xs font-bold mt-1" style={{ color: C.red }}>{err}</div>}
-            {done && <div className="text-xs font-bold mt-1" style={{ color: C.green }}>{done}</div>}
-            <div className="text-xs mt-2" style={{ color: C.mute, lineHeight: 1.6 }}>
-              Both are the ERP&apos;s own numbers, so a correction here is queued for it like any other —
-              it does not stay a private Genie opinion.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+const toWip = (j: PlanJob): WipJob => ({
+  id: j.id,
+  tag: j.tag || "",
+  cust: j.cust || "",
+  fam: j.fam || "",
+  tdd: j.tdd,
+  otd: j.otd,
+  stat: j.stat || "",
+  val: Number(j.val) || 0,
+  tpv: Number(j.tpv) || 0,
+  tpp: Number(j.tpp) || 0,
+  kit: Number(j.kit) || 0,
+  pct: Number(j.pct) || 0,
+  note: j.note || "",
+  escalation: j.escalation ?? null,
+  amtNeeded: j.amtNeeded ?? null,
+  payOnDelivery: j.pod ?? null,
+  ownerInitials: null,
+  ownerName: j.own ? j.own.split("@")[0] : null,
+});
 
 export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string }) {
-  const [kind, setKind] = useState<"mtd" | "qtd">("mtd");
+  const [kind, setKind] = useState<"mtd" | "qtd" | "ytd">("mtd");
   const [d, setD] = useState<Payload | null>(null);
   /** The job whose box is open — the same facts the boards show, editable. */
   const [openJob, setOpenJob] = useState<PlanJob | null>(null);
@@ -220,17 +148,21 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
 
   const so = d.signoff;
   return (
-    <div className="p-4" style={{ maxWidth: 1200 }}>
+    <div className="p-4" style={{ maxWidth: 1680 }}>
       <div className="flex items-center gap-2 flex-wrap mb-3">
         <div>
           <div className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.4 }}>THE BELIEVABLE PLAN</div>
-          <div className="text-lg font-bold" style={{ color: C.ink, lineHeight: 1.2 }}>Month &amp; Quarter Plan</div>
+          <div className="text-lg font-bold" style={{ color: C.ink, lineHeight: 1.2 }}>Month, Quarter &amp; Year Plan</div>
         </div>
         <div className="flex gap-1 ml-2">
-          {(["mtd", "qtd"] as const).map((k) => (
+          {/* YTD joins them (Dr Raghu, 1 Sep 2026: "make a button for YTD so
+              all are seen") — the financial year entire, so no job is out of
+              sight merely because its date falls outside this month. */}
+          {(["mtd", "qtd", "ytd"] as const).map((k) => (
             <button key={k} onClick={() => setKind(k)} className="rounded-full border px-3 py-1 text-xs font-bold"
-              style={kind === k ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: C.mute, borderColor: C.line, background: "#fff" }}>
-              {k === "mtd" ? "Months Plan" : "Quarter Plan"}
+              style={kind === k ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: C.mute, borderColor: C.line, background: "#fff" }}
+              title={k === "ytd" ? "The whole financial year — every job the year carries" : undefined}>
+              {k === "mtd" ? "Months Plan" : k === "qtd" ? "Quarter Plan" : "YTD — all"}
             </button>
           ))}
         </div>
@@ -298,11 +230,10 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
           separate borders, because a collapsed border does not travel with a
           sticky row and the heading would lose its edge on the way down. */}
       <div className="rounded-lg border bg-white mb-3" style={{ borderColor: C.line, overflow: "auto", maxHeight: "68vh" }}>
-        <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 1100 }}>
+        <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 1180 }}>
           <thead>
             <tr style={{ background: "#22303C", color: "#fff", position: "sticky", top: 0, zIndex: 2 }}>
               <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>Job</th>
-              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>Customer</th>
               <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }}>Value</th>
               <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }}>TP</th>
               <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }} title="Falls due when this job is delivered — the cash the month actually brings in">Receivable</th>
@@ -311,7 +242,7 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
               <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "#22303C" }} title="Production completion">Prod %</th>
               <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "#22303C" }}>My best estimate</th>
               <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "#22303C" }}>My belief</th>
-              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>My comments</th>
+              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>What I believe needs to HAPPEN</th>
             </tr>
           </thead>
           <tbody>
@@ -322,29 +253,28 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
                 <tr key={j.id} style={{ background: r.belief === 0 ? "#FBEDEA" : undefined, boxShadow: "inset 0 1px 0 #EFEDE7" }}>
                   <td className="px-2 py-1.5 whitespace-nowrap">
                     <button onClick={() => setOpenJob(j)} className="text-left"
-                      title={`${jobNo(j.id)} · ${j.tag || ""}\n${j.cust || ""}\n\nStatus: ${j.stat || "—"}\nKitting ${j.kit}% · Production ${j.pct}%\nTDD ${fmtFull(j.tdd)} · OTD ${fmtFull(j.otd)}\n\nClick to open — kitting and production can be changed there.`}>
+                      title={`${jobNo(j.id)} · ${j.tag || ""}\n${j.cust || ""}\n\nStatus: ${j.stat || "—"}\nKitting ${j.kit}% · Production ${j.pct}%\nTDD ${fmtFull(j.tdd)} · OTD ${fmtFull(j.otd)}\n\nClick to open the job — the same box as the boards, and editable there.`}>
                       <b className="tnum" style={{ color: C.navy, textDecoration: "underline", textUnderlineOffset: 2 }}>{jobNo(j.id)}</b>{" "}
                       <span style={{ color: C.sub }}>{j.tag || ""}</span>
                     </button>
                   </td>
-                  <td className="px-2 py-1.5" style={{ color: C.sub, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={j.cust || ""}>{j.cust || "—"}</td>
-                  <td className="px-2 py-1.5 text-right tnum">{V(j.val)}</td>
-                  <td className="px-2 py-1.5 text-right tnum" style={{ color: C.green }}>{V(tpOf(j))}</td>
+                  <td className="px-2 py-1.5 text-right tnum whitespace-nowrap">{V(j.val)}</td>
+                  <td className="px-2 py-1.5 text-right tnum whitespace-nowrap" style={{ color: C.green }}>{V(tpOf(j))}</td>
                   {/* AMOUNT RECEIVABLE (Dr Raghu, 1 Sep 2026) — what the
                       delivery actually collects. A plan of jobs is a plan of
                       cash, and the two are not the same number. */}
-                  <td className="px-2 py-1.5 text-right tnum"
+                  <td className="px-2 py-1.5 text-right tnum whitespace-nowrap"
                     style={{ color: j.pod == null ? C.faint : C.navy, fontWeight: j.pod ? 700 : 400 }}
                     title={j.pod == null ? "Not recorded on the job" : "Falls due when this job is delivered"}>
                     {j.pod == null ? "—" : V(j.pod)}
                   </td>
-                  <td className="px-2 py-1.5 text-center tnum font-bold" style={{ color: late ? C.red : C.ink }} title={late ? "already past — still counted in the window" : ""}>{fmt(j.tdd)}</td>
+                  <td className="px-2 py-1.5 text-center tnum font-bold whitespace-nowrap" style={{ color: late ? C.red : C.ink }} title={late ? "already past — still counted in the window" : ""}>{fmt(j.tdd)}</td>
                   {/* Kitting and production (Dr Raghu, 1 Sep 2026). Believing
                       a date is easier than believing it beside a job that is
                       20% kitted, which is the point of putting them here. */}
-                  <td className="px-2 py-1.5 text-center tnum font-bold"
+                  <td className="px-2 py-1.5 text-center tnum font-bold whitespace-nowrap"
                     style={{ color: j.kit >= 90 ? C.green : j.kit >= 50 ? "#D97706" : C.red }}>{j.kit}%</td>
-                  <td className="px-2 py-1.5 text-center tnum font-bold"
+                  <td className="px-2 py-1.5 text-center tnum font-bold whitespace-nowrap"
                     style={{ color: j.pct >= 90 ? C.green : j.pct >= 50 ? "#D97706" : C.red }}>{j.pct}%</td>
                   <td className="px-2 py-1.5 text-center">
                     <input type="date" value={r.est} onChange={(e) => saveRow(j.id, { ...r, est: e.target.value })}
@@ -358,22 +288,33 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
                     </select>
                   </td>
                   <td className="px-2 py-1.5">
-                    <input value={r.comment} onChange={(e) => saveRow(j.id, { ...r, comment: e.target.value })}
-                      placeholder="why I believe it — or don't"
-                      className="w-full text-xs border rounded px-2 py-1" style={{ borderColor: C.line, minWidth: 200 }} />
+                    {/* two lines, because "why I believe it" is a sentence
+                        and a one-line slot quietly asks for three words */}
+                    <textarea value={r.comment} onChange={(e) => saveRow(j.id, { ...r, comment: e.target.value })}
+                      rows={2} placeholder="what has to happen for this date to hold"
+                      className="w-full text-xs border rounded px-2 py-1"
+                      style={{ borderColor: C.line, minWidth: 260, resize: "vertical", lineHeight: 1.4 }} />
                   </td>
                 </tr>
               );
             })}
             {(d.jobs || []).length === 0 && (
-              <tr><td colSpan={11} className="px-3 py-6 text-center" style={{ color: C.mute }}>No jobs carry a target date inside this window.</td></tr>
+              <tr><td colSpan={10} className="px-3 py-6 text-center" style={{ color: C.mute }}>No jobs carry a target date inside this window.</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
       {openJob && (
-        <JobBox job={openJob} V={V} onClose={() => setOpenJob(null)} onSaved={() => { setOpenJob(null); void load(); }} />
+        <JobLightbox
+          job={toWip(openJob)}
+          V={V}
+          colour={C.navy}
+          canEdit
+          onClose={() => setOpenJob(null)}
+          onOpenPlan={() => setOpenJob(null)}
+          onSaved={async () => { await load(); }}
+        />
       )}
 
       {/* WHO IS READY (Dr Raghu, 1 Sep 2026: "the final one will only be
