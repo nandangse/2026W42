@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.1.1",
+    date: "2026-09-01",
+    module: "Morning Update — every difference gets a side, and a date to change its mind",
+    items: [
+      "\"for now show those with a radio button and complete it in that import. Post that we will say Genie wins!!! For now I will still make them new records in the ERP. Post end september we will use the Genie fully.\" (Dr Raghu, 1 Sep 2026.)",
+      "Check first now lists every differing field as a row with TWO RADIO BUTTONS — Genie's value against the ERP's — and the choices are applied by the next ↻ Synchronise. There is a \"keep Genie on all\" shortcut for the impatient, and only genuine differences appear: asking somebody to adjudicate two identical values is how a review screen teaches people to click through without reading.",
+      "THE DEFAULT IS A SETTING, NOT A DEPLOY. ERP wins today, because records are still born there; one switch at the top flips it to Genie for October, and the screen warns you while Genie-wins is on — the rule that is right once records begin in Genie is wrong while they still begin in the ERP.",
+      "New jobs and new projects never appear on the list. There is nothing on Genie's side to weigh them against, so they simply arrive.",
+      "SAID PLAINLY, because it is the half that is not built yet: this decides who wins INSIDE the import. Keeping Genie's answer stops the ERP overwriting it — it does not yet write Genie's answer back to nandanerp, so the two stay apart until somebody edits the ERP. The push half is the piece that touches ERP master data, and it will show what it intends to write before it writes it.",
+    ],
+  },
+  {
     v: "4.2.1.0",
     date: "2026-09-01",
     module: "Morning Update — one button where five files used to be",

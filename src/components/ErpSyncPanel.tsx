@@ -22,7 +22,9 @@ interface Win {
   proj_new: number; proj_changed: number;
   deliv_new: number; deliv_changed: number;
 }
-interface Change { kind: string; id: string; label: string; field: string; from: string; to: string }
+interface Change { kind: string; id: string; label: string; key: string; field: string; from: string; to: string }
+type Winner = "erp" | "genie";
+const dKey = (c: Change) => `${c.kind}:${c.id}:${c.key}`;
 interface Run {
   id: string; at: string; by: string | null; dry: boolean; ok: boolean; error: string;
   jobs_new: number; jobs_changed: number; jobs_archived: number;
@@ -49,15 +51,33 @@ export default function ErpSyncPanel() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  /**
+   * WHO WINS, ONE ROW AT A TIME (Dr Raghu, 1 Sep 2026: "for now show those
+   * with a radio button and complete it in that import. Post that we will say
+   * Genie wins!!!").
+   *
+   * Records are still born in the ERP this month, so the ERP's answer is
+   * pre-selected and a difference is only overruled deliberately. From
+   * October the default flips to Genie, and the switch below is how — the
+   * date is a setting, not a deploy.
+   */
+  const [pick, setPick] = useState<Record<string, Winner>>({});
+  const [fallback, setFallback] = useState<Winner>("erp");
+
   const run = async (dry: boolean) => {
     setBusy(dry ? "dry" : "live"); setErr(""); setResult(null);
     try {
       const r = await fetch("/api/erp-sync", {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ dry }),
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dry, decisions: dry ? {} : pick, fallback }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "The sync did not finish.");
-      setResult(j); setShowChanges(true); load();
+      setResult(j); setShowChanges(true);
+      // A completed import has answered its own questions; the next check
+      // starts from a clean sheet rather than yesterday's ticks.
+      if (!dry) setPick({});
+      load();
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(""); }
   };
@@ -164,29 +184,77 @@ export default function ErpSyncPanel() {
         )}
       </div>
 
-      {/* THE DETAIL — which machine, which field, from what to what */}
+      {/* THE DETAIL — which machine, which field, and WHO WINS */}
       {showChanges && changes.length > 0 && (
-        <div className="mt-2 border rounded overflow-auto" style={{ borderColor: BORDER, maxHeight: 280 }}>
-          <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
-            <thead><tr style={{ background: "#F3F1EB", color: MUTED }}>
-              <th className="px-2 py-1 text-left">What</th><th className="px-2 py-1 text-left">Job / project</th>
-              <th className="px-2 py-1 text-left">Field</th><th className="px-2 py-1 text-left">Was</th>
-              <th className="px-2 py-1 text-left">Now</th>
-            </tr></thead>
-            <tbody>
-              {changes.slice(0, 300).map((c, i) => (
-                <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7" }}>
-                  <td className="px-2 py-1" style={{ color: MUTED }}>{c.kind}</td>
-                  <td className="px-2 py-1"><b>{c.id}</b>{c.label && c.label !== c.id ? ` · ${c.label}` : ""}</td>
-                  <td className="px-2 py-1 font-semibold">{c.field}</td>
-                  <td className="px-2 py-1" style={{ color: MUTED }}>{c.from}</td>
-                  <td className="px-2 py-1" style={{ color: INK, fontWeight: 600 }}>{c.to}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {changes.length > 300 && <div className="px-2 py-1 text-xs" style={{ color: MUTED }}>…and {changes.length - 300} more.</div>}
-        </div>
+        <>
+          <div className="flex items-center gap-3 mt-2 flex-wrap text-xs">
+            <span style={{ color: MUTED }}>
+              Pick a side for any row that should not follow the default.
+            </span>
+            <span className="rounded px-2 py-1" style={{ background: "#F3F1EB" }}>
+              Anything untouched:{" "}
+              <label className="ml-1 cursor-pointer">
+                <input type="radio" checked={fallback === "erp"} onChange={() => setFallback("erp")} style={{ accentColor: NAVY }} />{" "}
+                <b>ERP wins</b>
+              </label>
+              <label className="ml-2 cursor-pointer">
+                <input type="radio" checked={fallback === "genie"} onChange={() => setFallback("genie")} style={{ accentColor: ORANGE }} />{" "}
+                <b>Genie wins</b>
+              </label>
+            </span>
+            <button onClick={() => setPick(Object.fromEntries(changes.map((c) => [dKey(c), "genie" as Winner])))}
+              style={{ color: ORANGE, fontWeight: 700 }}>keep Genie on all</button>
+            <button onClick={() => setPick({})} style={{ color: NAVY, fontWeight: 700 }}>clear picks</button>
+          </div>
+          {fallback === "genie" && (
+            <div className="rounded p-2 text-xs font-semibold mt-1" style={{ background: "#FCF6E8", color: "#8A6D1A" }}>
+              Genie wins by default — the ERP&apos;s answers below will NOT be applied unless you pick ERP on the row.
+              Right while records are born in Genie; wrong while they are still born in the ERP.
+            </div>
+          )}
+          <div className="mt-2 border rounded overflow-auto" style={{ borderColor: BORDER, maxHeight: 300 }}>
+            <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+              <thead><tr style={{ background: "#F3F1EB", color: MUTED }}>
+                <th className="px-2 py-1 text-left">What</th><th className="px-2 py-1 text-left">Job / project</th>
+                <th className="px-2 py-1 text-left">Field</th>
+                <th className="px-2 py-1 text-left">Keep Genie&apos;s</th>
+                <th className="px-2 py-1 text-left">Take the ERP&apos;s</th>
+              </tr></thead>
+              <tbody>
+                {changes.slice(0, 300).map((c, i) => {
+                  const k = dKey(c);
+                  const who: Winner = pick[k] ?? fallback;
+                  return (
+                    <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7" }}>
+                      <td className="px-2 py-1" style={{ color: MUTED }}>{c.kind}</td>
+                      <td className="px-2 py-1"><b>{c.id}</b>{c.label && c.label !== c.id ? ` · ${c.label}` : ""}</td>
+                      <td className="px-2 py-1 font-semibold">{c.field}</td>
+                      <td className="px-2 py-1">
+                        <label className="cursor-pointer flex items-start gap-1">
+                          <input type="radio" name={k} checked={who === "genie"} onChange={() => setPick((p) => ({ ...p, [k]: "genie" }))}
+                            style={{ accentColor: ORANGE, marginTop: 2 }} />
+                          <span style={{ color: who === "genie" ? INK : MUTED, fontWeight: who === "genie" ? 700 : 400 }}>{c.from}</span>
+                        </label>
+                      </td>
+                      <td className="px-2 py-1">
+                        <label className="cursor-pointer flex items-start gap-1">
+                          <input type="radio" name={k} checked={who === "erp"} onChange={() => setPick((p) => ({ ...p, [k]: "erp" }))}
+                            style={{ accentColor: NAVY, marginTop: 2 }} />
+                          <span style={{ color: who === "erp" ? INK : MUTED, fontWeight: who === "erp" ? 700 : 400 }}>{c.to}</span>
+                        </label>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {changes.length > 300 && <div className="px-2 py-1 text-xs" style={{ color: MUTED }}>…and {changes.length - 300} more, which follow the default.</div>}
+          </div>
+          <div className="text-xs mt-1" style={{ color: MUTED }}>
+            These choices apply to the <b>next ↻ Synchronise</b> — Check first only rehearses. New jobs and new
+            projects are never in this list: there is nothing on Genie&apos;s side to weigh them against.
+          </div>
+        </>
       )}
     </div>
   );

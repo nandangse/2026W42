@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { crmDb, crmConfigured } from "@/crm/db";
-import { erpConfig, erpSync } from "@/lib/erp-sync";
+import { erpConfig, erpSync, type SyncOptions, type Winner } from "@/lib/erp-sync";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -21,14 +21,14 @@ export const maxDuration = 300;
  * alone; nothing here deletes it, so a bad hour can fall back to the sheet.
  */
 /** Run it, and write down what moved — the summary table reads that ledger. */
-async function run(dry: boolean, by: string) {
+async function run(dry: boolean, by: string, opts: Omit<SyncOptions, "dry"> = {}) {
   if (!crmConfigured())
     throw new HttpError(503, "The ERP keys live in the CRM's database, and it is not connected here.");
   const cfg = await erpConfig(crmDb());
   if ("error" in cfg) throw new HttpError(400, cfg.error);
   const genie = adminClient();
   try {
-    const out = await erpSync(genie, cfg, { dry });
+    const out = await erpSync(genie, cfg, { ...opts, dry });
     await genie.from("erp_sync_log").insert({
       by, dry, ok: true,
       jobs_new: out.jobs.created, jobs_changed: out.jobs.changed, jobs_archived: out.jobs.archived,
@@ -62,7 +62,15 @@ export async function POST(req: Request) {
     const mayRun = u.isOwner || ["admin", "planner", "uploader", "project_owner"].includes(String(u.role));
     if (!mayRun) throw new HttpError(403, "Synchronise belongs to the people who run the morning update.");
     const body = await req.json().catch(() => ({}));
-    const out = await run(body.dry === true, u.email);
+    // The radio buttons come back as kind:id:field → "genie" | "erp", and
+    // `fallback` is what an unadjudicated difference does: the ERP wins while
+    // records are still born there, Genie wins from October.
+    const decisions: Record<string, Winner> = {};
+    for (const [k, v] of Object.entries((body.decisions ?? {}) as Record<string, unknown>)) {
+      if (v === "genie" || v === "erp") decisions[k] = v;
+    }
+    const fallback: Winner = body.fallback === "genie" ? "genie" : "erp";
+    const out = await run(body.dry === true, u.email, { decisions, fallback });
     return NextResponse.json({ ok: true, ...out });
   } catch (e) {
     return errJson(e);

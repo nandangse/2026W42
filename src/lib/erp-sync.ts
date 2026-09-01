@@ -147,6 +147,8 @@ export interface FieldChange {
   id: string;
   /** The customer tag, so a row reads as a machine rather than a number. */
   label: string;
+  /** The column itself — what a radio button decides on. */
+  key: string;
   field: string;
   from: string;
   to: string;
@@ -159,6 +161,34 @@ export interface SyncResult {
   changes: FieldChange[];
   notes: string[];
   seconds: number;
+}
+
+/**
+ * WHO WINS, FIELD BY FIELD (Dr Raghu, 1 Sep 2026):
+ *
+ *   "for now show those with a radio button and complete it in that import.
+ *    Post that we will say Genie wins!!! For now I will still make them new
+ *    records in the ERP. Post end september we will use the Genie fully."
+ *
+ * So the answer changes with the calendar, and the code should not have to.
+ * Today the ERP is where records are born, so its answer is the default and
+ * a human overrules it one row at a time on the import screen. After
+ * September, Genie is the master and the default flips — a setting, not a
+ * deploy.
+ *
+ * A DECISION IS KEYED BY kind:id:field, and only the differing fields ever
+ * appear, because asking somebody to adjudicate two identical values is how
+ * a review screen teaches people to click through without reading.
+ */
+export type Winner = "erp" | "genie";
+export const decisionKey = (kind: string, id: string, field: string) => `${kind}:${id}:${field}`;
+
+export interface SyncOptions {
+  dry?: boolean;
+  /** Per-field overrides from the radio buttons: kind:id:field → who wins. */
+  decisions?: Record<string, Winner>;
+  /** What happens to a difference nobody adjudicated. "erp" until October. */
+  fallback?: Winner;
 }
 
 /** The columns worth telling somebody about when they move. */
@@ -177,12 +207,18 @@ const WATCHED: Record<string, string> = {
  * the first run of anything that touches the boards should be a dry one.
  */
 export async function erpSync(
-  genie: SupabaseClient, cfg: ErpCfg, opts: { dry?: boolean } = {},
+  genie: SupabaseClient, cfg: ErpCfg, opts: SyncOptions = {},
 ): Promise<SyncResult> {
   const notes: string[] = [];
   const dry = !!opts.dry;
+  const decisions = opts.decisions ?? {};
+  const fallback: Winner = opts.fallback ?? "erp";
   const began = Date.now();
   const changes: FieldChange[] = [];
+
+  /** Genie keeps this field when the radio said so, or when the default does. */
+  const genieKeeps = (kind: string, id: string, field: string) =>
+    (decisions[decisionKey(kind, id, field)] ?? fallback) === "genie";
 
   /** Compare what is coming against what is held, and remember the difference. */
   const noteChanges = (
@@ -202,7 +238,7 @@ export async function erpSync(
       if (String(a ?? "") === String(b ?? "")) continue;
       moved = true;
       if (changes.length < 2000) {
-        changes.push({ kind, id: String(next.id), label, field: WATCHED[k], from: String(a ?? "—"), to: String(b ?? "—") });
+        changes.push({ kind, id: String(next.id), label, key: k, field: WATCHED[k], from: String(a ?? "—"), to: String(b ?? "—") });
       }
     }
     return moved ? "changed" : "same";
@@ -317,10 +353,19 @@ export async function erpSync(
    * import that empties a column the first time somebody leaves a field
    * unfilled. A real change still lands, because a real change is not blank.
    */
-  const keepFilled = <T extends Record<string, unknown>>(next: T, prev: Record<string, unknown> | undefined): T => {
+  const keepFilled = <T extends Record<string, unknown>>(
+    next: T, prev: Record<string, unknown> | undefined, kind?: string,
+  ): T => {
     if (!prev) return next;
     const out: Record<string, unknown> = { ...next };
     for (const [k, v] of Object.entries(next)) {
+      // The radio button, or the standing default, wins here: where Genie is
+      // to keep a field, the ERP's answer is simply not applied.
+      if (kind && k in WATCHED && String(prev[k] ?? "") !== String(v ?? "")
+          && genieKeeps(kind, String(next.id), k)) {
+        out[k] = prev[k];
+        continue;
+      }
       const empty = v === null || v === "" || (Array.isArray(v) && v.length === 0);
       const had = prev[k];
       const hadSomething = had !== null && had !== undefined && had !== ""
@@ -331,7 +376,7 @@ export async function erpSync(
   };
 
   let projWritten = 0;
-  const projFinal = projRows.map((p) => keepFilled(p, projPrev.get(p.id)));
+  const projFinal = projRows.map((p) => keepFilled(p, projPrev.get(p.id), "project"));
   for (let i = 0; i < projFinal.length; i += 200) {
     const slice = projFinal.slice(i, i + 200);
     const { error } = await genie.from("projects").upsert(slice, { onConflict: "id" });
@@ -345,7 +390,7 @@ export async function erpSync(
   let jobWritten = 0;
   for (const j of jobRows) {
     const prev = jobPrev.get(j.id);
-    const mapped = keepFilled(j, prev);
+    const mapped = keepFilled(j, prev, "job");
     const payload = prev
       ? { ...mapped, active: true, archived_at: null, updated_at: new Date().toISOString() }
       : { ...mapped, active: true, archived_at: null, pct: 0, kit: 0, tp: 0, tpv: 0, tpp: 0, updated_at: new Date().toISOString() };
