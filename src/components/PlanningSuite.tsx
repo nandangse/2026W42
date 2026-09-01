@@ -2762,13 +2762,26 @@ function DeliveryBoard({
         // throughput is what the company actually earns on it, and the two
         // rank the families differently — a big-value family bought in as a
         // bought-out item can earn less than a small one made in-house.
-        const groups: Record<string, { total: { n: number; v: number; t: number }; m: Record<string, { n: number; v: number; t: number }> }> = {};
+        // THE JOBS THEMSELVES ride in every cell (Dr Raghu, 1 Sep 2026: "in
+        // this by product and by customer show the mouseover which will show
+        // the details of the job list"). A number tells you seven Hi Lifts
+        // land in October; only the list tells you WHICH seven, so hovering
+        // gives the job, its tag, its date and its value.
+        type Cell = { n: number; v: number; t: number; jobs: Job[] };
+        const cell = (): Cell => ({ n: 0, v: 0, t: 0, jobs: [] });
+        const groups: Record<string, { total: Cell; m: Record<string, Cell> }> = {};
         byTDD.forEach((j) => {
-          const g = (groups[j[key]] = groups[j[key]] || { total: { n: 0, v: 0, t: 0 }, m: {} });
-          g.total.n++; g.total.v += j.val; g.total.t += tpOf(j);
+          const g = (groups[j[key]] = groups[j[key]] || { total: cell(), m: {} });
+          g.total.n++; g.total.v += j.val; g.total.t += tpOf(j); g.total.jobs.push(j);
           const mm = (j.tdd || "").slice(0, 7);
-          if (mm) { const c = (g.m[mm] = g.m[mm] || { n: 0, v: 0, t: 0 }); c.n++; c.v += j.val; c.t += tpOf(j); }
+          if (mm) { const c = (g.m[mm] = g.m[mm] || cell()); c.n++; c.v += j.val; c.t += tpOf(j); c.jobs.push(j); }
         });
+        /** What the mouse reveals: one line a job, in delivery order. */
+        const hover = (list: Job[]) => list
+          .slice()
+          .sort((a, b) => String(a.tdd || "").localeCompare(String(b.tdd || "")))
+          .map((j) => `${j.id.slice(-4)}  ${j.tag}\n      TDD ${fmtFull(j.tdd)} · ${V(j.val)}${j.stat ? " · " + j.stat : ""}`)
+          .join("\n");
         const names = Object.keys(groups).sort();
         return (
           <div className="bg-white rounded-lg border overflow-x-auto mb-4" style={{ borderColor: "#E2E0DA" }}>
@@ -2783,16 +2796,16 @@ function DeliveryBoard({
               <tbody>
                 {names.map((n, i) => (
                   <tr key={n} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
-                    <td className="px-3 py-1.5 font-semibold">{n}</td>
-                    <td className="px-2 py-1.5 text-center font-bold tnum">{groups[n].total.n}</td>
+                    <td className="px-3 py-1.5 font-semibold" title={`${n} — ${groups[n].total.n} job${groups[n].total.n === 1 ? "" : "s"}\n\n${hover(groups[n].total.jobs)}`} style={{ cursor: "help" }}>{n}</td>
+                    <td className="px-2 py-1.5 text-center font-bold tnum" title={hover(groups[n].total.jobs)} style={{ cursor: "help" }}>{groups[n].total.n}</td>
                     <td className="px-2 py-1.5 text-center whitespace-nowrap tnum">{V(groups[n].total.v)}</td>
                     <td className="px-2 py-1.5 text-center whitespace-nowrap tnum font-semibold" style={{ color: "#0D7A3F" }}>{V(groups[n].total.t)}</td>
-                    {mset.map((m) => { const c = groups[n].m[m]; return (<td key={m} className="px-2 py-1.5 text-center whitespace-nowrap tnum" style={{ background: c ? "#DCE8F5" : "transparent", border: "1px solid #F1EFE9" }}>{c ? (<><div><b>{c.n}</b> · {V(c.v)}</div><div style={{ color: "#0D7A3F", fontSize: 10.5 }}>T {V(c.t)}</div></>) : "·"}</td>); })}
+                    {mset.map((m) => { const c = groups[n].m[m]; return (<td key={m} title={c ? `${n} · ${mlabel(m)} — ${c.n} job${c.n === 1 ? "" : "s"}\n\n${hover(c.jobs)}` : undefined} className="px-2 py-1.5 text-center whitespace-nowrap tnum" style={{ background: c ? "#DCE8F5" : "transparent", border: "1px solid #F1EFE9", cursor: c ? "help" : "default" }}>{c ? (<><div><b>{c.n}</b> · {V(c.v)}</div><div style={{ color: "#0D7A3F", fontSize: 10.5 }}>T {V(c.t)}</div></>) : "·"}</td>); })}
                   </tr>
                 ))}
                 <tr style={{ background: "#16232F", color: "#F5B32B" }} className="font-bold">
                   <td className="px-3 py-2">TOTAL</td><td className="px-2 py-2 text-center">{byTDD.length}</td><td className="px-2 py-2 text-center whitespace-nowrap">{V(byTDD.reduce((s, j) => s + j.val, 0))}</td><td className="px-2 py-2 text-center whitespace-nowrap">{V(byTDD.reduce((s, j) => s + tpOf(j), 0))}</td>
-                  {mset.map((m) => { const list = byTDD.filter((j) => (j.tdd || "").slice(0, 7) === m); return (<td key={m} className="px-2 py-2 text-center whitespace-nowrap">{list.length ? (<><div>{list.length} · {V(list.reduce((s, j) => s + j.val, 0))}</div><div style={{ fontSize: 10.5, opacity: .85 }}>T {V(list.reduce((s, j) => s + tpOf(j), 0))}</div></>) : "·"}</td>); })}
+                  {mset.map((m) => { const list = byTDD.filter((j) => (j.tdd || "").slice(0, 7) === m); return (<td key={m} title={list.length ? `${mlabel(m)} — ${list.length} job${list.length === 1 ? "" : "s"}\n\n${hover(list)}` : undefined} className="px-2 py-2 text-center whitespace-nowrap" style={{ cursor: list.length ? "help" : "default" }}>{list.length ? (<><div>{list.length} · {V(list.reduce((s, j) => s + j.val, 0))}</div><div style={{ fontSize: 10.5, opacity: .85 }}>T {V(list.reduce((s, j) => s + tpOf(j), 0))}</div></>) : "·"}</td>); })}
                 </tr>
               </tbody>
             </table>
@@ -9174,6 +9187,188 @@ function ManpowerLedger({ jobId, V }: { jobId: string; V: (n: number) => string 
   );
 }
 
+/**
+ * MANPOWER PLANNING (Dr Raghu, 1 Sep 2026):
+ *
+ *   "In On floor make another view - for Manpower planning as a button on the
+ *    top. In the buttons number show how many have people working on the 'On
+ *    floor jobs'. Manpower planning should show Date - Project - Job - Fitter
+ *    - Welder - Helper etc. Then show this as editable for each job at a time
+ *    By default"
+ *
+ * The floor view answers "what is happening on this job". This one answers a
+ * different question — "where are my people today" — so it is a table of the
+ * whole floor at once, one row a job, a column a trade, and the day at the
+ * top because manpower is planned forward as well as recorded back.
+ *
+ * EDITABLE ONE JOB AT A TIME, as asked, and that is a real safeguard rather
+ * than a limitation: a grid where every cell of every row is live invites a
+ * stray keystroke into a ledger that is checked against the attendance
+ * muster. A row is opened, typed, saved, closed.
+ */
+function ManpowerPlanning({
+  jobs, projects, manpower, day, onDay, onSaved, canEdit,
+}: {
+  jobs: Job[];
+  projects: Record<string, { mgr?: string | null }>;
+  manpower: Record<string, Crew>;
+  day: string;
+  onDay: (d: string) => void;
+  onSaved: () => void;
+  canEdit: boolean;
+}) {
+  /** The one row being typed into. Null means the table is at rest. */
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const open = (j: Job) => {
+    if (!canEdit) return;
+    const c = manpower[j.id];
+    setDraft(Object.fromEntries(TRADES.map((t) => [t.key, String(Number(c?.[t.key]) || 0)])));
+    setEditing(j.id);
+    setErr("");
+  };
+  const save = async (jobId: string) => {
+    setBusy(true); setErr("");
+    try {
+      await api.post("/api/on-floor/manpower", {
+        job_id: jobId, day,
+        crew: Object.fromEntries(TRADES.map((t) => [t.key, Number(draft[t.key]) || 0])),
+      });
+      setEditing(null);
+      onSaved();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+
+  const crewOf = (id: string) => manpower[id];
+  const sumOf = (id: string) => TRADES.reduce((n, t) => n + (Number(crewOf(id)?.[t.key]) || 0), 0);
+  const draftSum = TRADES.reduce((n, t) => n + (Number(draft[t.key]) || 0), 0);
+  const colTotal = (k: keyof Crew) => jobs.reduce((n, j) => n + (Number(crewOf(j.id)?.[k]) || 0), 0);
+  const grand = jobs.reduce((n, j) => n + sumOf(j.id), 0);
+  const staffed = jobs.filter((j) => sumOf(j.id) > 0).length;
+
+  // Jobs stand in project order so a manager reads his own block together,
+  // then by delivery date within it — the order the floor actually works.
+  const rows = [...jobs].sort((a, b) =>
+    String(a.proj || "zzz").localeCompare(String(b.proj || "zzz"))
+    || String(a.tdd || "9999").localeCompare(String(b.tdd || "9999")));
+
+  const shift = (n: number) => {
+    const d = new Date(day + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    onDay(d.toISOString().slice(0, 10));
+  };
+
+  return (
+    <div className="mb-4">
+      <div className="rounded-lg border px-3 py-2 mb-2 flex items-center gap-3 flex-wrap"
+        style={{ borderColor: "#E2E0DA", background: "#fff" }}>
+        <b className="text-xs" style={{ color: "#8A94A0", letterSpacing: ".04em" }}>MANPOWER FOR</b>
+        <button onClick={() => shift(-1)} className="rounded border px-2 py-1 text-xs font-bold"
+          style={{ borderColor: "#E2E0DA", color: "#22303C" }} title="The day before">‹</button>
+        <input type="date" value={day} onChange={(e) => onDay(e.target.value)}
+          className="rounded border px-2 py-1 text-sm font-bold tnum" style={{ borderColor: "#E2E0DA" }} />
+        <button onClick={() => shift(1)} className="rounded border px-2 py-1 text-xs font-bold"
+          style={{ borderColor: "#E2E0DA", color: "#22303C" }} title="The day after">›</button>
+        <button onClick={() => onDay(TODAY)} className="rounded px-2 py-1 text-xs font-bold"
+          style={{ background: "#F3F1EB", color: "#1B3A5C" }}>today</button>
+        <span className="text-sm font-extrabold" style={{ color: "#22303C" }}>{grand} people</span>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>
+          on {staffed} of {jobs.length} job{jobs.length === 1 ? "" : "s"} on the floor
+        </span>
+        {!canEdit && <span className="text-xs" style={{ color: "#8A94A0" }}>· read-only for your role</span>}
+        {err && <span className="text-xs font-bold" style={{ color: "#B3261E" }}>{err}</span>}
+      </div>
+
+      <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
+        <table className="text-xs w-full" style={{ minWidth: 860, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead>
+            <tr style={{ background: "#22303C", color: "#fff" }}>
+              <th className="px-2 py-2 text-left whitespace-nowrap">Date</th>
+              <th className="px-2 py-2 text-left whitespace-nowrap">Project</th>
+              <th className="px-2 py-2 text-left">Job</th>
+              {TRADES.map((t) => (
+                <th key={t.key} className="px-2 py-2 text-center whitespace-nowrap" title={t.label}>{t.label}</th>
+              ))}
+              <th className="px-2 py-2 text-center">Total</th>
+              <th className="px-2 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={TRADES.length + 5} className="px-3 py-6 text-center" style={{ color: "#8A94A0" }}>
+                No jobs are on the floor — tick a job On Floor and it appears here.
+              </td></tr>
+            )}
+            {rows.map((j, i) => {
+              const live = editing === j.id;
+              const total = live ? draftSum : sumOf(j.id);
+              const none = !live && total === 0;
+              return (
+                <tr key={j.id} className="border-t"
+                  style={{ borderColor: "#EFEDE7", background: live ? "#FFF7E6" : i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <td className="px-2 py-1.5 tnum whitespace-nowrap" style={{ color: "#8A94A0" }}>{fmtFull(day)}</td>
+                  <td className="px-2 py-1.5 whitespace-nowrap">
+                    <b>{j.proj || "—"}</b>
+                    {projects[j.proj]?.mgr && <div style={{ color: "#8A94A0", fontSize: 10 }}>{projects[j.proj]?.mgr}</div>}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <b>{j.id.slice(-4)}</b> <span style={{ color: "#5A6672" }}>{j.tag}</span>
+                    <div style={{ color: "#8A94A0", fontSize: 10 }}>{j.stat}</div>
+                  </td>
+                  {TRADES.map((t) => (
+                    <td key={t.key} className="px-2 py-1.5 text-center tnum">
+                      {live ? (
+                        <input value={draft[t.key]} inputMode="numeric" autoFocus={t.key === TRADES[0].key}
+                          onChange={(e) => setDraft((c) => ({ ...c, [t.key]: e.target.value.replace(/[^0-9]/g, "").slice(0, 2) }))}
+                          className="w-10 text-center rounded border px-1 py-0.5 font-bold"
+                          style={{ borderColor: t.color, color: "#22303C" }} />
+                      ) : (
+                        <span style={{ color: Number(crewOf(j.id)?.[t.key]) ? t.color : "#C9C6BE", fontWeight: Number(crewOf(j.id)?.[t.key]) ? 700 : 400 }}>
+                          {Number(crewOf(j.id)?.[t.key]) || "·"}
+                        </span>
+                      )}
+                    </td>
+                  ))}
+                  <td className="px-2 py-1.5 text-center font-bold tnum"
+                    style={{ color: none ? "#B3261E" : "#22303C" }}>{total || "—"}</td>
+                  <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                    {live ? (
+                      <>
+                        <button onClick={() => void save(j.id)} disabled={busy}
+                          className="rounded px-2 py-1 font-bold" style={{ background: "#0D7A3F", color: "#fff" }}>
+                          {busy ? "…" : "Save"}
+                        </button>
+                        <button onClick={() => setEditing(null)} className="ml-1 font-bold" style={{ color: "#8A94A0" }}>✕</button>
+                      </>
+                    ) : canEdit ? (
+                      <button onClick={() => open(j)} className="rounded border px-2 py-1 font-bold"
+                        style={{ borderColor: "#E2E0DA", color: "#1B3A5C" }}>✎ Edit</button>
+                    ) : null}
+                  </td>
+                </tr>
+              );
+            })}
+            <tr style={{ background: "#16232F", color: "#F5B32B" }} className="font-bold">
+              <td className="px-2 py-2" colSpan={3}>TOTAL · {fmtFull(day)}</td>
+              {TRADES.map((t) => (<td key={t.key} className="px-2 py-2 text-center tnum">{colTotal(t.key) || "·"}</td>))}
+              <td className="px-2 py-2 text-center tnum">{grand}</td>
+              <td />
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="text-xs mt-1" style={{ color: "#8A94A0" }}>
+        One job is edited at a time, and the row you are typing into is the only one that can change.
+        Numbers here are checked against the attendance muster, so they are a ledger rather than a scribble.
+      </div>
+    </div>
+  );
+}
+
 /** Six small boxes and a save — today's reality for one job. */
 function ManpowerEditor({ jobId, value, onSaved }: { jobId: string; value?: Crew; onSaved: () => void }) {
   const [crew, setCrew] = useState<Record<string, string>>(
@@ -9395,13 +9590,24 @@ function OnFloor({
    */
   const [manpower, setManpower] = useState<Record<string, Crew>>({});
   const [mpOpen, setMpOpen] = useState<string | null>(null);
+  /**
+   * THE SECOND VIEW (Dr Raghu, 1 Sep 2026: "In On floor make another view -
+   * for Manpower planning as a button on the top").
+   *
+   * The floor view asks what is happening on a job; this one asks where the
+   * people are. Same jobs, a different question, so it is a view rather than
+   * a page — and the day is part of its state because manpower is planned
+   * forward as much as it is recorded back.
+   */
+  const [view, setView] = useState<"floor" | "manpower">("floor");
+  const [mpDay, setMpDay] = useState<string>(() => TODAY);
   const loadManpower = useCallback(() => {
-    api.get("/api/on-floor/manpower")
+    api.get(`/api/on-floor/manpower?day=${encodeURIComponent(mpDay)}`)
       .then((r: { rows?: { job_id: string; crew: Crew }[] }) => {
         setManpower(Object.fromEntries((r.rows || []).map((x) => [x.job_id, x.crew])));
       })
       .catch(() => {});
-  }, []);
+  }, [mpDay]);
   useEffect(() => { loadManpower(); }, [loadManpower]);
 
   const mpTotals = useMemo(() => {
@@ -9424,7 +9630,27 @@ function OnFloor({
 
   return (
     <div className="p-4">
-      <div className="flex justify-end gap-2 mb-2 no-print">
+      {/* THE VIEW SWITCH (Dr Raghu, 1 Sep 2026) — the count rides on the
+          button itself, because "how many people are on the floor today" is
+          the number he wants without opening anything. */}
+      <div className="flex items-center gap-2 mb-2 no-print flex-wrap">
+        <button onClick={() => setView("floor")}
+          className="rounded px-3 py-1.5 font-bold text-xs"
+          style={view === "floor" ? { background: "#16232F", color: "#fff" } : { background: "#EDEAE3", color: "#5A6672" }}>
+          ▣ On Floor · {jobs.length}
+        </button>
+        <button onClick={() => setView("manpower")}
+          className="rounded px-3 py-1.5 font-bold text-xs"
+          style={view === "manpower" ? { background: "#0D7A3F", color: "#fff" } : { background: "#EDEAE3", color: "#5A6672" }}
+          title="Where the people are — by job, by trade, by day">
+          👷 Manpower planning · {mpTotals.people}
+        </button>
+        <span className="text-xs" style={{ color: "#8A94A0" }}>
+          {view === "manpower"
+            ? "people standing at the jobs on the floor"
+            : `${mpTotals.people} people on the floor today`}
+        </span>
+        <span className="ml-auto" />
         <a href="/floor-report" target="_blank" rel="noopener noreferrer"
           className="rounded px-3 py-1.5 font-bold text-xs"
           style={{ background: "#16232F", color: "#fff" }}>
@@ -9439,6 +9665,19 @@ function OnFloor({
           </a>
         )}
       </div>
+      {view === "manpower" && (
+        <ManpowerPlanning
+          jobs={jobs}
+          projects={board.projects as unknown as Record<string, { mgr?: string | null }>}
+          manpower={manpower}
+          day={mpDay}
+          onDay={setMpDay}
+          onSaved={loadManpower}
+          canEdit={canTask}
+        />
+      )}
+
+      {view === "floor" && (<>
       <div className="rounded-lg border px-3 py-2 mb-2 flex items-center gap-3 flex-wrap" style={{ borderColor: "#E2E0DA", background: "#fff" }}>
         <b className="text-xs" style={{ color: "#8A94A0", letterSpacing: ".04em" }}>WORKING TODAY</b>
         <CrewRowsTable rows={[{ label: "today", crew: mpTotals.tot as Partial<Crew>, bold: true }]} />
@@ -9668,6 +9907,8 @@ function OnFloor({
           );
         })}
       </div>
+
+      </>)}
 
       {picked && (
         <JobLightbox

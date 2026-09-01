@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.2.0",
+    date: "2026-09-01",
+    module: "On Floor — Manpower Planning, and the schedule tells you which jobs",
+    items: [
+      "\"In On floor make another view - for Manpower planning as a button on the top. In the buttons number show how many have people working on the On floor jobs.\" (Dr Raghu, 1 Sep 2026) — On Floor now has two doors at the top, and the manpower one carries the count on its face: how many people are standing at the jobs on the floor, without opening anything.",
+      "The view is the table he asked for — Date · Project · Job · Fitter · Helper · Welder · Painter · Electrician · Hydraulic · Total, with a totals row beneath and the jobs in project order, then delivery date within it, so a manager reads his own block together.",
+      "EDITABLE ONE JOB AT A TIME, as instructed, and that is a safeguard rather than a limit: these numbers are checked against the attendance muster, and a grid where every cell of every row is live invites a stray keystroke into a ledger somebody later has to defend. A row is opened, typed, saved, closed.",
+      "The day sits at the top with arrows and a \"today\", because manpower is planned forward as much as it is recorded back — the ledger has always been per job per day, so the past and the future both open.",
+      "\"in this by product and by customer show the mouseover which will show the details of the job list\" — every cell of the production schedule now names its jobs on hover: number, tag, target date and value, in delivery order. \"7 · ₹2.08 Cr\" tells you October is busy; the hover tells you WHICH seven. The row label, the jobs count and the TOTAL row carry it too.",
+    ],
+  },
+  {
     v: "4.2.1.1",
     date: "2026-09-01",
     module: "Morning Update — every difference gets a side, and a date to change its mind",
