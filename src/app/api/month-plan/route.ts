@@ -99,17 +99,62 @@ const mayPlan = (u: AuthedUser) =>
 type JobRow = { id: string; tag: string | null; cust: string | null; fam: string | null; val: number; tp: number; tpv: number; tdd: string | null; kit: number; pct: number; pod: number | null; tpp: number; note: string; escalation: string | null; amtNeeded: number | null; stat: string | null; own: string | null; proj: string | null; otd: string | null };
 const tpOf = (j: { tp: number; tpv: number }) => (Number(j.tpv) || 0) > 0 ? Number(j.tpv) : Number(j.tp) || 0;
 
-async function moreJobs(admin: ReturnType<typeof adminClient>, end: string): Promise<JobRow[]> {
+const JOB_COLS = "id, tag, cust, fam, val, tp, tpv, tdd, kit, pct, stat, own, proj, otd, pay_on_delivery, tpp, note, escalation, amt_needed";
+const mapJob = (j: Record<string, unknown>): JobRow => ({
+  ...(j as object),
+  val: Number(j.val) || 0, tp: Number(j.tp) || 0, tpv: Number(j.tpv) || 0,
+  kit: Number(j.kit) || 0, pct: Number(j.pct) || 0,
+  pod: j.pay_on_delivery == null ? null : Number(j.pay_on_delivery),
+  tpp: Number(j.tpp) || 0, note: (j.note as string) ?? "", escalation: (j.escalation as string) ?? null,
+  amtNeeded: j.amt_needed == null ? null : Number(j.amt_needed),
+} as JobRow);
+
+/**
+ * THE JOBS THIS PERIOD HOLDS — including the ones PULLED IN
+ * (Dr Raghu, 1 Sep 2026: "I changed the job of October to September. I need
+ * to make sure that it comes into my quarter plan when I look at it").
+ *
+ * The board's own target date decides who is here by default. But the whole
+ * point of "my best estimate" is that a planner may disagree with it, and
+ * disagreement runs BOTH WAYS: pushing a job out was always visible, while
+ * pulling one in was impossible — a job dated October never appeared on the
+ * September desk at all, so there was no row on which to say "actually, this
+ * lands in September".
+ *
+ * So the list is the union: every job the board dates inside the window, plus
+ * every job THIS PLANNER has dated into it. A job pulled in arrives with its
+ * real ERP date showing, so nobody mistakes the opinion for the record.
+ */
+async function moreJobs(
+  admin: ReturnType<typeof adminClient>, end: string,
+  pull?: { from: string; email: string },
+): Promise<JobRow[]> {
   const { data } = await admin.from("jobs")
-    .select("id, tag, cust, fam, val, tp, tpv, tdd, kit, pct, stat, own, proj, otd, pay_on_delivery, tpp, note, escalation, amt_needed")
+    .select(JOB_COLS)
     .eq("active", true)
     .or("delivered.is.null,delivered.eq.false")
     .not("tdd", "is", null)
     .lte("tdd", end)
     .order("tdd");
-  return (data || []).map((j) => ({ ...j, val: Number(j.val) || 0, tp: Number(j.tp) || 0, tpv: Number(j.tpv) || 0, kit: Number(j.kit) || 0, pct: Number(j.pct) || 0, pod: j.pay_on_delivery == null ? null : Number(j.pay_on_delivery),
-    tpp: Number(j.tpp) || 0, note: j.note ?? "", escalation: j.escalation ?? null,
-    amtNeeded: j.amt_needed == null ? null : Number(j.amt_needed) })) as JobRow[];
+  const base = (data || []).map((j) => mapJob(j as Record<string, unknown>));
+  if (!pull) return base;
+
+  const have = new Set(base.map((j) => String(j.id)));
+  const { data: mine } = await admin.from("plan_belief")
+    .select("job_id, best_estimate")
+    .eq("by_email", pull.email.toLowerCase())
+    .gte("best_estimate", pull.from)
+    .lte("best_estimate", end);
+  const extra = [...new Set((mine || []).map((r) => String(r.job_id)))].filter((id) => !have.has(id));
+  if (!extra.length) return base;
+
+  const { data: more } = await admin.from("jobs")
+    .select(JOB_COLS)
+    .in("id", extra)
+    .eq("active", true)
+    .or("delivered.is.null,delivered.eq.false");
+  const pulled = (more || []).map((j) => mapJob(j as Record<string, unknown>));
+  return [...base, ...pulled].sort((a, b) => String(a.tdd || "9999").localeCompare(String(b.tdd || "9999")));
 }
 
 async function doneTotals(admin: ReturnType<typeof adminClient>, from: string, to: string) {
@@ -166,7 +211,7 @@ export async function GET(req: Request) {
          * document for a commitment.
          */
         const T0 = istToday();
-        const jobs0 = await moreJobs(admin0, w0.end);
+        const jobs0 = await moreJobs(admin0, w0.end, { from: w0.from, email: u0.email });
         const { data: e0 } = await admin0.from("plan_belief").select("*").eq("by_email", u0.email.toLowerCase());
         const by0 = new Map((e0 || []).map((e) => [String(e.job_id), e]));
         const plan0 = { jobs: jobs0.length, value: 0, throughput: 0 };
@@ -210,7 +255,7 @@ export async function GET(req: Request) {
     const T = istToday();
 
     const [jobs, done, doneFy] = await Promise.all([
-      moreJobs(admin, w.end),
+      moreJobs(admin, w.end, { from: w.from, email: u.email }),
       doneTotals(admin, w.from, T),
       doneTotals(admin, fy.from, T),
     ]);
@@ -350,7 +395,7 @@ export async function POST(req: Request) {
       const kind = body.kind === "qtd" ? "qtd" : body.kind === "ytd" ? "ytd" : "mtd";
       const w = windowOf(kind);
       const T = istToday();
-      const jobs = await moreJobs(admin, w.end);
+      const jobs = await moreJobs(admin, w.end, { from: w.from, email: u.email });
       const { data: eRows } = await admin.from("plan_belief").select("*").eq("by_email", me);
       const eBy = new Map((eRows || []).map((e) => [String(e.job_id), e]));
 

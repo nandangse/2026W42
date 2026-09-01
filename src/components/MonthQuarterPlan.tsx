@@ -369,7 +369,20 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
                     title={j.pod == null ? "Not recorded on the job" : "Falls due when this job is delivered"}>
                     {j.pod == null ? "—" : V(j.pod)}
                   </td>
-                  <td className="px-2 py-1.5 text-center tnum font-bold whitespace-nowrap" style={{ color: late ? C.red : C.ink }} title={late ? "already past — still counted in the window" : ""}>{fmt(j.tdd)}</td>
+                  {/* A job PULLED IN by this planner's own date keeps its
+                      real board date on show, marked, so an opinion is never
+                      mistaken for the record (Dr Raghu, 1 Sep 2026). */}
+                  <td className="px-2 py-1.5 text-center tnum font-bold whitespace-nowrap"
+                    style={{ color: late ? C.red : C.ink }}
+                    title={late ? "already past — still counted in the window" : ""}>
+                    {fmt(j.tdd)}
+                    {j.tdd && j.tdd > d.window.end && (
+                      <div style={{ fontSize: 9, fontWeight: 700, color: C.violet }}
+                        title={`The board dates this ${fmtFull(j.tdd)} — it is here because you dated it inside ${d.window.label}`}>
+                        PULLED IN
+                      </div>
+                    )}
+                  </td>
                   {/* Kitting and production (Dr Raghu, 1 Sep 2026). Believing
                       a date is easier than believing it beside a job that is
                       20% kitted, which is the point of putting them here. */}

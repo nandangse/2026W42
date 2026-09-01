@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.4.2",
+    date: "2026-09-01",
+    module: "The Plan desk — a job can be pulled INTO the period, not only pushed out",
+    items: [
+      "\"I changed the job of October to September. I need to make sure that it comes into my quarter plan when I look at it\" (Dr Raghu, 1 Sep 2026) — it does now. Disagreeing with the board's date was only ever half-possible: pushing a job OUT worked, pulling one IN could not, because a job dated October never appeared on the September desk at all and there was no row on which to say \"actually, this lands in September\".",
+      "The list is now the union — every job the board dates inside the window, PLUS every job this planner has dated into it. A pulled-in job keeps its real board date on show under a PULLED IN mark, so an opinion is never mistaken for the record.",
+      "\"The moment I do Save as Draft, it should also reflect in this\" — saving already reloads the desk, and now that the reload can SEE the pulled-in jobs, the belief card and the totals move with it. The card counts a job only where the planner's own date lands inside the period, so a job sent to October leaves September's money and a job brought back adds to it.",
+      "On \"the room should not be seen by other people\": it already was not. The comments are assembled only when the caller is the owner — withheld at the source since 4.2.4.1, not hidden in the page — so no planner, admin or Stratcom member can reach them, from the screen or otherwise.",
+    ],
+  },
+  {
     v: "4.2.4.1",
     date: "2026-09-01",
     module: "The Plan desk — everyone fills it, and the belief follows the dates they set",
