@@ -456,6 +456,48 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
         />
       )}
 
+      {/* WHAT THE MONTH IS MADE OF (Dr Raghu, 2 Sep 2026: "show the table
+          here of the jobs also!").
+ 
+          The same two tallies the signed document carries — by product family
+          and by customer — brought onto the desk, so the shape of the period
+          is legible before anybody scrolls fifty rows. Counting the jobs SHOWN,
+          so it agrees with the table beneath it rather than with some other
+          version of the month. */}
+      {(d.jobs || []).length > 0 && (() => {
+        const tally = (get: (j: PlanJob) => string) => {
+          const m = new Map<string, { n: number; v: number; t: number }>();
+          for (const j of d.jobs || []) {
+            const k = (get(j) || "").trim() || "—";
+            const c = m.get(k) || { n: 0, v: 0, t: 0 };
+            c.n++; c.v += Number(j.val) || 0; c.t += tpOf(j);
+            m.set(k, c);
+          }
+          return [...m.entries()].sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0]));
+        };
+        const Row = ({ label, list }: { label: string; list: [string, { n: number; v: number; t: number }][] }) => (
+          <div className="mb-1.5">
+            <div className="text-xs font-bold mb-1" style={{ color: C.mute, letterSpacing: 1 }}>{label}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {list.map(([k, c]) => (
+                <span key={k} className="rounded border px-2 py-1"
+                  style={{ borderColor: C.line, background: "#FAF9F5", fontSize: 11.5, lineHeight: 1.3 }}
+                  title={`${c.n} job${c.n === 1 ? "" : "s"} · ${V(c.v)} · ${V(c.t)} throughput`}>
+                  <b className="tnum" style={{ color: C.navy }}>{c.n}</b> {k}
+                  <span style={{ color: C.mute }}> · {V(c.v)}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+        return (
+          <div className="rounded-lg border bg-white p-3 mb-2" style={{ borderColor: C.line }}>
+            <Row label="BY PRODUCT FAMILY" list={tally((j) => String(j.fam || ""))} />
+            <Row label="BY CUSTOMER" list={tally((j) => String(j.cust || ""))} />
+          </div>
+        );
+      })()}
+
       {/* WHO IS READY (Dr Raghu, 1 Sep 2026: "the final one will only be
           once they are all ready for it"). Waiting for people is only
           possible if you can see who you are waiting for. */}

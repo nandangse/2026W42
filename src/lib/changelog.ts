@@ -75,6 +75,27 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.9.0",
+    date: "2026-09-02",
+    module: "Keeping Genie's answer now tells the ERP — the loop closes",
+    items: [
+      "\"hope this means that it is writing into the erp right?\" (Dr Raghu, 2 Sep 2026, of the sync conflict screen) — IT WAS NOT, and the instinct was right. Choosing \"keep Genie\" only refused the incoming value: Genie held its answer, nandanerp kept its own, and the two stayed apart until somebody edited the ERP by hand. Worse, the same conflict was going to be put in front of him again on every sync, for ever.",
+      "Now a decision for Genie on a field the ERP can receive is QUEUED into erp_update — the same queue the boards' own corrections use — and travels on the next ⬆ Update to ERP. Deciding once settles it in both places and the conflict does not come back.",
+      "FOUR FIELDS CAN TRAVEL: target delivery, job status, kitting and production. A decision on a customer, a value or a project still holds in Genie alone, because the ERP has no field Genie may write for those — and the screen says so rather than implying otherwise. Every row on his screenshot was a target delivery or a status, so the four cover the case in front of him.",
+      "The queue is deduped against what is already waiting, so pressing Synchronise twice cannot ask the ERP to make the same change twice.",
+      "Also: the plan desk carries BY PRODUCT FAMILY and BY CUSTOMER tallies, counted off the jobs actually shown — \"show the table here of the jobs also!\"",
+    ],
+  },
+  {
+    v: "4.2.8.1",
+    date: "2026-09-02",
+    module: "The Plan desk — what the month is made of, on the desk itself",
+    items: [
+      "\"show the table here of the jobs also!\" (Dr Raghu, 2 Sep 2026) — the two tallies the signed document already carried now stand on the desk: BY PRODUCT FAMILY and BY CUSTOMER, each with its job count and value, so the shape of the period is legible before anybody scrolls fifty rows.",
+      "They count the jobs SHOWN, which means they agree with the table beneath them rather than with some other version of the month — including any job pulled in by somebody's own date. Hovering a chip gives its throughput as well.",
+    ],
+  },
+  {
     v: "4.2.8.0",
     date: "2026-09-02",
     module: "The plan document, rebuilt — and a lightbox that stops arguing with itself",

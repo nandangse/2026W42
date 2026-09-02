@@ -43,6 +43,29 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const JOB_ACTIVE_STATUS = "Jobs in Process";
 
+/**
+ * KEEPING GENIE'S ANSWER MUST TELL THE ERP (Dr Raghu, 2 Sep 2026, of the
+ * conflict screen: "hope this means that it is writing into the erp right?").
+ *
+ * It did not, and the hope was the right instinct. Choosing "keep Genie" only
+ * refused the incoming value — Genie held its answer, nandanerp kept its own,
+ * and the two stayed apart until somebody edited the ERP by hand. Worse, the
+ * same conflict would be presented again on every sync, for ever.
+ *
+ * So a decision for Genie on a field the ERP can receive is now QUEUED into
+ * erp_update, the same queue the boards' own corrections use, and goes out on
+ * the next ⬆ Push to ERP. Deciding once now settles it in both places.
+ *
+ * Only these fields can be received; a decision on anything else still holds
+ * in Genie and is reported as unable to travel, rather than silently pretending.
+ */
+export const ERP_PUSHABLE: Record<string, string> = {
+  tdd: "Target Delivery Date Current",
+  stat: "Job Status",
+  kit: "Kitting percentage",
+  pct: "Production Completion %",
+};
+
 export interface ErpCfg { base: string; H: Record<string, string> }
 
 export async function erpConfig(crm: SupabaseClient): Promise<ErpCfg | { error: string }> {
@@ -155,6 +178,8 @@ export interface FieldChange {
 }
 
 export interface SyncResult {
+  /** Fields Genie kept that are now waiting to go back to the ERP. */
+  queuedForErp?: number;
   projects: { read: number; written: number; created: number; changed: number };
   jobs: { read: number; written: number; archived: number; created: number; changed: number };
   delivered: { read: number; written: number; undated: number; created: number; changed: number };
@@ -219,6 +244,9 @@ export async function erpSync(
   /** Genie keeps this field when the radio said so, or when the default does. */
   const genieKeeps = (kind: string, id: string, field: string) =>
     (decisions[decisionKey(kind, id, field)] ?? fallback) === "genie";
+
+  /** Fields Genie kept that the ERP can be told about — queued below. */
+  const toQueue: { job_id: string; field: string; label: string; old_value: string; new_value: string }[] = [];
 
   /** Compare what is coming against what is held, and remember the difference. */
   const noteChanges = (
@@ -334,6 +362,7 @@ export async function erpSync(
 
   if (dry) {
     return {
+      queuedForErp: 0,
       projects: { read: projRows.length, written: 0, created: projCreated, changed: projChanged },
       jobs: { read: jobRows.length, written: 0, archived: wouldArchive, created: jobsCreated, changed: jobsChanged },
       delivered: { read: delRows.length, written: 0, undated, created: delCreated, changed: delChanged },
@@ -364,6 +393,13 @@ export async function erpSync(
       if (kind && k in WATCHED && String(prev[k] ?? "") !== String(v ?? "")
           && genieKeeps(kind, String(next.id), k)) {
         out[k] = prev[k];
+        // and tell the ERP, where the ERP can hear it
+        if (kind === "job" && ERP_PUSHABLE[k]) {
+          toQueue.push({
+            job_id: String(next.id), field: k, label: ERP_PUSHABLE[k],
+            old_value: String(v ?? ""), new_value: String(prev[k] ?? ""),
+          });
+        }
         continue;
       }
       const empty = v === null || v === "" || (Array.isArray(v) && v.length === 0);
@@ -444,7 +480,32 @@ export async function erpSync(
     delWritten += slice.length;
   }
 
+  /**
+   * The queue write, after the board is settled. Deduped against what is
+   * already waiting: pressing Synchronise twice must not ask the ERP to make
+   * the same change twice.
+   */
+  let queued = 0;
+  if (toQueue.length) {
+    try {
+      const { data: waiting } = await genie.from("erp_update")
+        .select("job_id, field").is("exported_at", null).limit(5000);
+      const have = new Set((waiting || []).map((r) => `${r.job_id}:${r.field}`));
+      const fresh = toQueue.filter((t) => !have.has(`${t.job_id}:${t.field}`));
+      if (fresh.length) {
+        const { error } = await genie.from("erp_update").insert(
+          fresh.map((t) => ({ ...t, changed_by: "sync (Genie kept)" })),
+        );
+        if (!error) queued = fresh.length;
+      }
+    } catch { /* the board is right either way */ }
+    notes.push(queued
+      ? `${queued} field(s) Genie kept are queued for the ERP — send them with ⬆ Update to ERP.`
+      : "The fields Genie kept were already waiting in the ERP queue.");
+  }
+
   return {
+    queuedForErp: queued,
     projects: { read: projRows.length, written: projWritten, created: projCreated, changed: projChanged },
     jobs: { read: jobRows.length, written: jobWritten, archived, created: jobsCreated, changed: jobsChanged },
     delivered: { read: delRows.length, written: delWritten, undated, created: delCreated, changed: delChanged },

@@ -129,6 +129,11 @@ export default function ErpSyncPanel() {
           {(result.projects as { created: number }).created} new, {(result.projects as { changed: number }).changed} changed ·{" "}
           Delivered {(result.delivered as { created: number }).created} new, {(result.delivered as { changed: number }).changed} changed
           {typeof result.seconds === "number" && <> · {Number(result.seconds).toFixed(1)}s</>}
+          {Number(result.queuedForErp) > 0 && (
+            <div style={{ color: NAVY, fontWeight: 700, marginTop: 4 }}>
+              {Number(result.queuedForErp)} field(s) you kept are queued for the ERP — send them with ⬆ Update to ERP.
+            </div>
+          )}
           {Array.isArray(result.notes) && (result.notes as string[]).length > 0 && (
             <div style={{ color: "#8A6D1A", marginTop: 4 }}>{(result.notes as string[]).join(" · ")}</div>
           )}
@@ -205,6 +210,15 @@ export default function ErpSyncPanel() {
             <button onClick={() => setPick(Object.fromEntries(changes.map((c) => [dKey(c), "genie" as Winner])))}
               style={{ color: ORANGE, fontWeight: 700 }}>keep Genie on all</button>
             <button onClick={() => setPick({})} style={{ color: NAVY, fontWeight: 700 }}>clear picks</button>
+          </div>
+          {/* WHAT KEEPING GENIE ACTUALLY DOES (Dr Raghu, 2 Sep 2026: "hope
+              this means that it is writing into the erp right?"). It did not,
+              and the screen never said so. Now it does both — and says both. */}
+          <div className="rounded p-2 text-xs mt-1" style={{ background: "#EEF1FA", color: NAVY, lineHeight: 1.6 }}>
+            <b>Keeping Genie&apos;s answer now tells the ERP too.</b> Target delivery, job status, kitting and
+            production go into the <b>⬆ Update to ERP</b> queue and travel on the next push, so deciding once
+            settles it in both places. Anything else — a customer, a value, a project — holds in Genie only;
+            the ERP has no field Genie may write for those.
           </div>
           {fallback === "genie" && (
             <div className="rounded p-2 text-xs font-semibold mt-1" style={{ background: "#FCF6E8", color: "#8A6D1A" }}>
