@@ -122,8 +122,8 @@ export async function GET(req: Request) {
       };
       try {
         const [projects, boms, pull] = await Promise.all([
-          all("material_project", "project_id, project_name, status, customer, product_family, approved_bom, design_stage, bom_release_target_date, bom_released_date, structural_bom, main_bom, hydraulic_bom, electric_bom, long_lead_items, erp_modified", "project_id"),
-          all("material_bom", "bom_id, item_code, item_name, project_id, is_active, is_default, docstatus, quantity, erp_modified", "bom_id"),
+          all("material_project", "project_id, project_name, status, customer, product_family, approved_bom, design_stage, bom_release_target_date, bom_released_date, structural_bom, main_bom, hydraulic_bom, electric_bom, long_lead_items, erp_modified, erp_modified_by", "project_id"),
+          all("material_bom", "bom_id, item_code, item_name, project_id, is_active, is_default, docstatus, quantity, erp_modified, erp_modified_by", "bom_id"),
           admin.from("material_pull").select("at").eq("phase", "projects").order("at", { ascending: false }).limit(1).maybeSingle(),
         ]);
         const byProject = new Map<string, Record<string, unknown>[]>();
@@ -139,6 +139,7 @@ export async function GET(req: Request) {
         return NextResponse.json({ installed: true, erpBase: base, projects: rows, lastPulledAt: pull.data?.at ?? null });
       } catch (e) {
         const m = e instanceof Error ? e.message : String((e as { message?: string })?.message || e);
+        if (/erp_modified_by/i.test(m)) return NextResponse.json({ installed: true, erpBase: base, projects: [], lastPulledAt: null, error: "Run migration 0120 first — the Last Modified By column is not there yet." }, { status: 503 });
         if (notInstalled(m)) return NextResponse.json({ installed: false, erpBase: base, projects: [], lastPulledAt: null, error: "Run migration 0119 first — Saamaan's project tables don't exist yet." }, { status: 503 });
         throw new Error(m);
       }

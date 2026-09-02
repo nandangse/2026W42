@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.0.3",
+    date: "2026-09-02",
+    module: "Saamaan — Projects, six columns",
+    items: [
+      "\"make a sub unit called Projects. In that put this data for now: Project - Item - Project Name - BOM - Last Modified By - Last Modified On\" (Dr Raghu, 2 Sep 2026). The section is now called Projects and the table is exactly that, one row per project.",
+      "\"Approved BOM is the field name\" — so BOM is the ERP's custom_approved_bom and only that. A project that names none shows a dot, whatever other BOMs the ERP may hold against it; those stay in the mirror, off the table.",
+      "ITEM IS WHAT THE APPROVED BOM MANUFACTURES. The ERP's Project has no item field of its own, so the column reads the BOM's item, code and name, and opens it on the ERP.",
+      "LAST MODIFIED IS THE PROJECT'S, as the ERP records it — who and when. The BOM's own is on the pill's hover. The ERP's modified_by had not been brought across; it is now, one column on projects and one on BOMs. Migration 0120, then a pull.",
+      "The count cards, the release date and the BOM-parts ticks came off the table. They are still in the mirror for the day they are wanted.",
+    ],
+  },
+  {
     v: "4.4.0.2",
     date: "2026-09-02",
     module: "Saamaan — Projects, and the BOM each one mentions",

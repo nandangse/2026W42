@@ -28,7 +28,7 @@ import Projects from "./Projects";
 const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: "◧" },
   { key: "items", label: "Items", icon: "📦" },
-  { key: "projects", label: "Projects & BOMs", icon: "🏗" },
+  { key: "projects", label: "Projects", icon: "🏗" },
   { key: "pull", label: "ERP pull", icon: "⇣" },
 ];
 

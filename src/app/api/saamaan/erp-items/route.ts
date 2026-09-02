@@ -313,7 +313,7 @@ export async function POST(req: Request) {
       const FIELDS = ["name", "project_name", "status", "customer", "custom_product_family", "custom_approved_bom",
         "design_stage", "custom_bom_release_target_date", "custom_bom_released_date", "custom_structural_bom",
         "custom_main_bom", "custom_hydraulic_bom", "custom_electric_bom", "custom_long_lead_items", "bom_for_action",
-        "expected_end_date", "customer_committed_delivery_", "project_stage", "sales_order", "modified"];
+        "expected_end_date", "customer_committed_delivery_", "project_stage", "sales_order", "modified", "modified_by"];
       const docs = await pages(
         (start) => `${base}/api/resource/Project?fields=${encodeURIComponent(JSON.stringify(FIELDS))}&limit_start=${start}&limit_page_length=500`,
         H, (j) => ((j as { data?: Doc[] }).data ?? []),
@@ -335,6 +335,7 @@ export async function POST(req: Request) {
         long_lead_items: B(d.custom_long_lead_items),
         bom_for_action: S(d.bom_for_action),
         erp_modified: T(d.modified),
+        erp_modified_by: S(d.modified_by),
         erp: d,
         pulled_at: startedAt,
       }));
@@ -344,6 +345,8 @@ export async function POST(req: Request) {
         if (error) {
           if (/does not exist|schema cache/i.test(error.message))
             throw new HttpError(503, "Run migration 0119 first — Saamaan's project tables don't exist yet.");
+          if (/erp_modified_by/i.test(error.message))
+            throw new HttpError(503, "Run migration 0120 first — the Last Modified By column is not there yet.");
           throw new Error(error.message);
         }
         written += Math.min(500, rows.length - i);
@@ -356,7 +359,7 @@ export async function POST(req: Request) {
 
     // ------------------------------------------------------------- boms
     if (phase === "boms") {
-      const FIELDS = ["name", "item", "item_name", "project", "is_active", "is_default", "docstatus", "quantity", "company", "modified"];
+      const FIELDS = ["name", "item", "item_name", "project", "is_active", "is_default", "docstatus", "quantity", "company", "modified", "modified_by"];
       const docs = await pages(
         (start) => `${base}/api/resource/BOM?fields=${encodeURIComponent(JSON.stringify(FIELDS))}&limit_start=${start}&limit_page_length=500`,
         H, (j) => ((j as { data?: Doc[] }).data ?? []),
@@ -371,6 +374,7 @@ export async function POST(req: Request) {
         docstatus: I(d.docstatus) ?? 0,
         quantity: N(d.quantity),
         erp_modified: T(d.modified),
+        erp_modified_by: S(d.modified_by),
         erp: d,
         pulled_at: startedAt,
       }));
@@ -380,6 +384,8 @@ export async function POST(req: Request) {
         if (error) {
           if (/does not exist|schema cache/i.test(error.message))
             throw new HttpError(503, "Run migration 0119 first — Saamaan's project tables don't exist yet.");
+          if (/erp_modified_by/i.test(error.message))
+            throw new HttpError(503, "Run migration 0120 first — the Last Modified By column is not there yet.");
           throw new Error(error.message);
         }
         written += Math.min(500, rows.length - i);

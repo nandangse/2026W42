@@ -1,42 +1,58 @@
 "use client";
 
 /**
- * Projects — and the BOM each one mentions (Dr Raghu, 2 Sep 2026: "Now we
- * have the projects. With each project there is a BOM mentioned. For now
- * please show me a table in Saamaan of the Projects - Name - BOM").
+ * Projects (Dr Raghu, 2 Sep 2026: "make a sub unit called Projects. In
+ * that put this data for now: Project - Item - Project Name - BOM - Last
+ * Modified By - Last Modified On").
  *
- * Two readings of "the BOM", both shown: the Approved BOM the project
- * itself points at, and every BOM the ERP holds against the project —
- * which is often more than one, and not always the approved one. Where
- * the two disagree the table says so rather than picking.
+ * One row per project, those six columns, nothing else. "Approved BOM is
+ * the field name" — so BOM is the ERP's custom_approved_bom and only that;
+ * a project that names none shows a dot, whatever else the ERP may hold
+ * against it. The ERP's Project has no item of its own; the Item is what
+ * the Approved BOM manufactures. Last Modified is the PROJECT's, as the
+ * ERP records it; the BOM's own is on the pill's hover.
  */
 
 import { useMemo, useState } from "react";
 import GenieTable from "@/components/GenieTable";
-import { Screen, Btn, Note, Chip, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, RED, S, fmtD, statusColour, useLoad } from "@/components/ims/ui";
+import { Screen, Btn, Note, INK, MUTED, NAVY, GREEN, AMBER, S, useLoad } from "@/components/ims/ui";
 import type { Summary } from "./Dashboard";
 
-interface Bom { bom_id: string; item_code: string; item_name: string; project_id: string; is_active: boolean; is_default: boolean; docstatus: number; quantity: number | null; erp_modified: string | null }
+interface Bom { bom_id: string; item_code: string; item_name: string; project_id: string; is_active: boolean; is_default: boolean; docstatus: number; erp_modified: string | null; erp_modified_by: string }
 interface Project {
-  project_id: string; project_name: string; status: string; customer: string; product_family: string; approved_bom: string;
-  design_stage: string; bom_release_target_date: string | null; bom_released_date: string | null;
-  structural_bom: boolean; main_bom: boolean; hydraulic_bom: boolean; electric_bom: boolean; long_lead_items: boolean;
-  erp_modified: string | null; boms: Bom[];
+  project_id: string; project_name: string; status: string; customer: string; approved_bom: string;
+  erp_modified: string | null; erp_modified_by: string; boms: Bom[];
 }
 interface Answer { installed: boolean; erpBase: string; projects: Project[]; lastPulledAt: string | null }
 
 const erpForm = (base: string, doctype: string, name: string) =>
   `${base}/app/${doctype.toLowerCase().replace(/\s+/g, "-")}/${encodeURIComponent(name)}`;
 
-/** 0 draft, 1 submitted, 2 cancelled — the ERP's docstatus in words. */
+/** dd-mm-yyyy hh:mm in Kolkata, or a dot. */
+const fmtAt = (s: string | null) =>
+  s ? new Date(s).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "") : "·";
+/** The person, not the address — shailaja rather than shailaja@nandan.co.in. */
+const who = (s: string) => (S(s).includes("@") ? S(s).split("@")[0] : S(s)) || "·";
+
 const docWord = (b: Bom) => (b.docstatus === 2 ? "cancelled" : b.docstatus === 1 ? "submitted" : "draft");
 const docColour = (b: Bom) => (b.docstatus === 2 ? "#5A6672" : b.docstatus === 1 ? GREEN : AMBER);
 
-const BomPill = ({ b, base, approved }: { b: Bom; base: string; approved: boolean }) => (
+/**
+ * The project's Approved BOM, and nothing else. Its header comes from the
+ * BOM mirror where the ERP holds it; a name the mirror lacks still shows,
+ * as a bare pill that opens the ERP.
+ */
+function leadBom(p: Project): Bom | null {
+  if (!p.approved_bom) return null;
+  const held = p.boms.find((b) => b.bom_id === p.approved_bom);
+  return held ?? { bom_id: p.approved_bom, item_code: "", item_name: "", project_id: p.project_id, is_active: false, is_default: false, docstatus: 1, erp_modified: null, erp_modified_by: "" };
+}
+
+const BomPill = ({ b, base }: { b: Bom; base: string; approved?: boolean }) => (
   <a href={erpForm(base, "BOM", b.bom_id)} target="_blank" rel="noreferrer"
     className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold mr-1 mb-0.5"
-    style={{ background: approved ? NAVY : NAVY_SOFT, color: approved ? "#fff" : NAVY, textDecoration: "none", border: `1px solid ${approved ? NAVY : BORDER}` }}
-    title={`${b.item_code} — ${b.item_name}\n${docWord(b)}${b.is_active ? ", active" : ""}${b.is_default ? ", default" : ""}${approved ? "\nthe project's Approved BOM" : ""}`}>
+    style={{ background: NAVY, color: "#fff", textDecoration: "none", border: `1px solid ${NAVY}` }}
+    title={`${b.bom_id}${b.item_code ? ` — ${b.item_code} ${b.item_name}` : ""}\n${docWord(b)}${b.is_active ? ", active" : ""}${b.is_default ? ", default" : ""}\nthe project's Approved BOM${b.erp_modified ? `\nBOM last modified ${fmtAt(b.erp_modified)} by ${who(b.erp_modified_by)}` : ""}`}>
     {b.bom_id}
     <span style={{ width: 6, height: 6, borderRadius: 3, background: docColour(b), display: "inline-block" }} />
   </a>
@@ -51,97 +67,64 @@ export default function Projects({ summary }: { summary: Summary }) {
   const rows = useMemo(() => {
     let out = data?.projects ?? [];
     if (inProcess) out = out.filter((p) => /in process/i.test(p.status));
-    if (withBom) out = out.filter((p) => p.approved_bom || p.boms.length);
+    if (withBom) out = out.filter((p) => p.approved_bom);
     return out;
   }, [data, inProcess, withBom]);
 
-  const counts = useMemo(() => {
-    const all = data?.projects ?? [];
-    return {
-      projects: all.length,
-      approved: all.filter((p) => p.approved_bom).length,
-      anyBom: all.filter((p) => p.approved_bom || p.boms.length).length,
-      disagree: all.filter((p) => p.approved_bom && p.boms.length && !p.boms.some((b) => b.bom_id === p.approved_bom)).length,
-    };
-  }, [data]);
-
   return (
     <Screen
-      title="Projects — and their BOMs"
-      blurb="Every project on the ERP, the Approved BOM it points at, and every BOM the ERP holds against it. Filled by the ERP pull; nothing here is typed."
+      title="Projects"
+      blurb="Every project on the ERP and the BOM it mentions. Filled by the ERP pull; nothing here is typed."
       action={<Btn onClick={reload} disabled={busy}>↻ Re-read</Btn>}>
       {err && <Note kind="error">{err}</Note>}
       {data && !data.lastPulledAt && (
         <Note kind="warn">Projects and BOMs have not been pulled yet — open ERP pull and run it once; phases 4 and 5 bring them.</Note>
       )}
 
-      {data?.projects.length ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-          {[
-            ["Projects", counts.projects, "on the ERP, every status"],
-            ["With an Approved BOM", counts.approved, "the project itself points at one"],
-            ["With any BOM", counts.anyBom, "approved, or held against the project"],
-            ["Approved ≠ held", counts.disagree, "approved BOM is not among the project's own"],
-          ].map(([t, n, h]) => (
-            <div key={String(t)} className="bg-white rounded-lg border p-2.5" style={{ borderColor: BORDER }}>
-              <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: 0.6 }}>{t}</div>
-              <div className="tnum" style={{ fontSize: 22, fontWeight: 800, color: t === "Approved ≠ held" && Number(n) ? RED : INK }}>{Number(n).toLocaleString("en-IN")}</div>
-              <div className="text-xs" style={{ color: MUTED }}>{h}</div>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
       <GenieTable<Project>
         rows={data ? rows : null}
-        minWidth={1100}
-        search={(p, q) => [p.project_id, p.project_name, p.customer, p.approved_bom, p.status, ...p.boms.map((b) => `${b.bom_id} ${b.item_code} ${b.item_name}`)].join(" ").toLowerCase().includes(q)}
-        searchPlaceholder="🔍 project, name, customer, BOM, item"
+        minWidth={1000}
+        search={(p, q) => [p.project_id, p.project_name, p.customer, p.approved_bom, p.erp_modified_by, ...p.boms.map((b) => `${b.bom_id} ${b.item_code} ${b.item_name}`)].join(" ").toLowerCase().includes(q)}
+        searchPlaceholder="🔍 project, name, item, BOM, who"
         empty={data?.lastPulledAt ? "No project matches." : "Nothing here yet — run the ERP pull."}
         header={<>
           <label className="text-xs flex items-center gap-1" style={{ color: MUTED }}>
             <input type="checkbox" checked={inProcess} onChange={(e) => setInProcess(e.target.checked)} /> jobs in process only
           </label>
           <label className="text-xs flex items-center gap-1" style={{ color: MUTED }}>
-            <input type="checkbox" checked={withBom} onChange={(e) => setWithBom(e.target.checked)} /> with a BOM only
+            <input type="checkbox" checked={withBom} onChange={(e) => setWithBom(e.target.checked)} /> with an Approved BOM only
           </label>
           <span className="text-xs tnum" style={{ color: MUTED }}>{rows.length.toLocaleString("en-IN")} shown</span>
         </>}
         columns={[
-          { key: "id", label: "Project", align: "left", sort: (p) => p.project_id,
-            render: (p) => <a href={erpForm(base, "Project", p.project_id)} target="_blank" rel="noreferrer" className="font-bold hover:underline" style={{ color: NAVY, textDecoration: "none" }}>{p.project_id.replace(/^NGSE-PROJ-/, "")}</a> },
-          { key: "name", label: "Name", align: "left", sort: (p) => p.project_name,
-            render: (p) => <span className="font-semibold" style={{ color: INK, whiteSpace: "normal", display: "inline-block", maxWidth: 320 }}>{p.project_name || "·"}</span> },
-          { key: "cust", label: "Customer", align: "left", sort: (p) => p.customer, render: (p) => <span style={{ color: MUTED }}>{p.customer || "·"}</span> },
-          { key: "status", label: "Status", align: "left", sort: (p) => p.status, render: (p) => p.status ? <Chip text={p.status} colour={statusColour(p.status)} /> : "·" },
-          { key: "approved", label: "Approved BOM", align: "left", sort: (p) => p.approved_bom,
+          { key: "project", label: "Project", align: "left", sort: (p) => p.project_id,
+            render: (p) => <a href={erpForm(base, "Project", p.project_id)} target="_blank" rel="noreferrer" className="font-bold hover:underline" style={{ color: NAVY, textDecoration: "none" }}>{p.project_id}</a> },
+          { key: "item", label: "Item", align: "left", sort: (p) => leadBom(p)?.item_code ?? "",
             render: (p) => {
-              if (!p.approved_bom) return <span style={{ color: MUTED }}>·</span>;
-              const held = p.boms.find((b) => b.bom_id === p.approved_bom);
-              return held ? <BomPill b={held} base={base} approved /> : (
-                <a href={erpForm(base, "BOM", p.approved_bom)} target="_blank" rel="noreferrer" className="text-xs font-bold hover:underline" style={{ color: NAVY }}
-                  title="The project points at this BOM, but the BOM itself does not name the project">{p.approved_bom} <span style={{ color: AMBER }}>?</span></a>
+              const b = leadBom(p);
+              if (!b?.item_code) return <span style={{ color: MUTED }}>·</span>;
+              return (
+                <span style={{ whiteSpace: "normal", display: "inline-block", maxWidth: 300 }}>
+                  <a href={erpForm(base, "Item", b.item_code)} target="_blank" rel="noreferrer" className="font-bold hover:underline" style={{ color: INK, textDecoration: "none" }}>{b.item_code}</a>
+                  {b.item_name && <span style={{ color: MUTED }}> — {b.item_name}</span>}
+                </span>
               );
             } },
-          { key: "boms", label: "BOMs on the project", align: "left", sort: (p) => p.boms.length,
-            render: (p) => p.boms.length ? (
-              <span style={{ whiteSpace: "normal", display: "inline-block", maxWidth: 380 }}>
-                {p.boms.filter((b) => b.bom_id !== p.approved_bom).map((b) => <BomPill key={b.bom_id} b={b} base={base} approved={false} />)}
-                {p.boms.every((b) => b.bom_id === p.approved_bom) && <span className="text-xs" style={{ color: MUTED }}>only the approved one</span>}
-              </span>
-            ) : <span style={{ color: MUTED }}>·</span> },
-          { key: "rel", label: "BOM released", align: "right", sort: (p) => S(p.bom_released_date),
-            render: (p) => <span className="tnum" style={{ color: p.bom_released_date ? INK : MUTED }} title={p.bom_release_target_date ? `target ${fmtD(p.bom_release_target_date)}` : ""}>{p.bom_released_date ? fmtD(p.bom_released_date) : p.bom_release_target_date ? `target ${fmtD(p.bom_release_target_date)}` : "·"}</span> },
-          { key: "parts", label: "BOM parts ticked", align: "left",
+          { key: "name", label: "Project Name", align: "left", sort: (p) => p.project_name,
+            render: (p) => <span className="font-semibold" style={{ color: INK, whiteSpace: "normal", display: "inline-block", maxWidth: 340 }}>{p.project_name || "·"}</span> },
+          { key: "bom", label: "BOM", title: "The ERP's Approved BOM field", align: "left", sort: (p) => p.approved_bom,
             render: (p) => {
-              const on = [p.structural_bom && "Structural", p.main_bom && "Main", p.hydraulic_bom && "Hydraulic", p.electric_bom && "Electric", p.long_lead_items && "Long lead"].filter(Boolean);
-              return on.length ? <span className="text-xs">{on.join(" · ")}</span> : <span style={{ color: MUTED }}>·</span>;
+              const lead = leadBom(p);
+              return lead ? <BomPill b={lead} base={base} approved /> : <span style={{ color: MUTED }}>·</span>;
             } },
+          { key: "by", label: "Last Modified By", align: "left", sort: (p) => who(p.erp_modified_by), render: (p) => <span>{who(p.erp_modified_by)}</span> },
+          { key: "on", label: "Last Modified On", align: "right", sort: (p) => S(p.erp_modified), render: (p) => <span className="tnum">{fmtAt(p.erp_modified)}</span> },
         ]}
       />
       <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
-        A dot on a BOM pill is its state on the ERP: <span style={{ color: GREEN }}>●</span> submitted, <span style={{ color: AMBER }}>●</span> draft, <span style={{ color: "#5A6672" }}>●</span> cancelled.
-        The dark pill is the project&apos;s Approved BOM. Every pill opens the BOM on the ERP.
+        BOM is the ERP&apos;s Approved BOM field. The pill&apos;s dot is that BOM&apos;s state on the ERP:
+        <span style={{ color: GREEN }}> ●</span> submitted, <span style={{ color: AMBER }}>●</span> draft, <span style={{ color: "#5A6672" }}>●</span> cancelled.
+        Item is what that BOM manufactures. Last Modified is the project&apos;s; hover the pill for the BOM&apos;s own.
       </div>
     </Screen>
   );
