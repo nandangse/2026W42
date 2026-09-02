@@ -39,11 +39,12 @@ export const maxDuration = 300;
  *              (custom_approved_bom and the five ticks). Dr Raghu, 2 Sep
  *              2026: "With each project there is a BOM mentioned."
  *   boms     — every BOM header: item, project, active, default, docstatus.
- *   bom_items — the LINES of every live (not cancelled) BOM on a project
- *              whose status is "Jobs in Process" — "I am concerned with
- *              the jobs in process right now." The working set, whole,
- *              every pull: a line gone from the ERP, or a project gone
- *              out of process, goes from here.
+ *   bom_items — the LINES of every live (not cancelled) BOM on a LIVE
+ *              project — one with a job on the board: "I am concerned
+ *              with the jobs in process right now"; "Live project is the
+ *              one with a Job that's live." The working set, whole, every
+ *              pull: a line gone from the ERP, or a project whose jobs
+ *              have all delivered, goes from here.
  *
  * READS ONLY. Nothing on the ERP is written, ever.
  *
@@ -104,6 +105,19 @@ async function pages(url: (start: number) => string, H: Record<string, string>, 
     if (page.length < 500) break;
   }
   return out;
+}
+
+
+/**
+ * A LIVE project is one with a live job — "Live project is the one with a
+ * Job that's live" (Dr Raghu, 3 Sep 2026) — not one whose own status field
+ * says so. The board (`jobs`) holds every job on the floor: active, not
+ * delivered, not archived. Its `proj` column is the project.
+ */
+async function liveProjectIds(admin: ReturnType<typeof adminClient>): Promise<Set<string>> {
+  const { data, error } = await admin.from("jobs").select("proj").eq("active", true).eq("delivered", false).is("archived_at", null).limit(5000);
+  if (error) throw new Error(error.message);
+  return new Set((data ?? []).map((j) => String(j.proj || "")).filter(Boolean));
 }
 
 /** Every item code Genie holds — paged past PostgREST's silent 1000 cap. */
@@ -363,7 +377,8 @@ export async function POST(req: Request) {
 
     // ------------------------------------------------------------- boms
     if (phase === "boms") {
-      const FIELDS = ["name", "item", "item_name", "project", "is_active", "is_default", "docstatus", "quantity", "company", "modified", "modified_by"];
+      const FIELDS = ["name", "item", "item_name", "project", "is_active", "is_default", "docstatus", "quantity", "company", "modified", "modified_by",
+        "total_cost", "raw_material_cost", "operating_cost"];
       const docs = await pages(
         (start) => `${base}/api/resource/BOM?fields=${encodeURIComponent(JSON.stringify(FIELDS))}&limit_start=${start}&limit_page_length=500`,
         H, (j) => ((j as { data?: Doc[] }).data ?? []),
@@ -377,6 +392,9 @@ export async function POST(req: Request) {
         is_default: B(d.is_default),
         docstatus: I(d.docstatus) ?? 0,
         quantity: N(d.quantity),
+        total_cost: N(d.total_cost),
+        raw_material_cost: N(d.raw_material_cost),
+        operating_cost: N(d.operating_cost),
         erp_modified: T(d.modified),
         erp_modified_by: S(d.modified_by),
         erp: d,
@@ -390,6 +408,8 @@ export async function POST(req: Request) {
             throw new HttpError(503, "Run migration 0119 first — Saamaan's project tables don't exist yet.");
           if (/erp_modified_by/i.test(error.message))
             throw new HttpError(503, "Run migration 0120 first — the Last Modified By column is not there yet.");
+          if (/total_cost|raw_material_cost|operating_cost/i.test(error.message))
+            throw new HttpError(503, "Run migration 0122 first — the BOM value columns are not there yet.");
           throw new Error(error.message);
         }
         written += Math.min(500, rows.length - i);
@@ -406,14 +426,8 @@ export async function POST(req: Request) {
 
     // -------------------------------------------------------- bom_items
     if (phase === "bom_items") {
-      // The scope: live BOMs on projects in process, from the mirror.
-      const { data: projs, error: pErr } = await admin.from("material_project").select("project_id").eq("status", "Jobs in Process").limit(5000);
-      if (pErr) {
-        if (/does not exist|schema cache/i.test(pErr.message))
-          throw new HttpError(503, "Run migration 0119 first — Saamaan's project tables don't exist yet.");
-        throw new Error(pErr.message);
-      }
-      const projectIds = (projs ?? []).map((p) => String(p.project_id));
+      // The scope: live BOMs on live projects — those with a job on the board.
+      const projectIds = [...(await liveProjectIds(admin))];
       const { data: bomRows, error: bErr } = projectIds.length
         ? await admin.from("material_bom").select("bom_id").in("project_id", projectIds).neq("docstatus", 2).limit(5000)
         : { data: [], error: null };
@@ -475,7 +489,7 @@ export async function POST(req: Request) {
       if (dErr && /does not exist|schema cache/i.test(dErr.message))
         throw new HttpError(503, "Run migration 0121 first — the BOM lines table doesn't exist yet.");
       const removed = count ?? 0;
-      const note = `${rows.length} lines on ${bomIds.length} live BOMs across ${projectIds.length} projects in process; ${removed} lines no longer in the set, removed.`;
+      const note = `${rows.length} lines on ${bomIds.length} live BOMs across ${projectIds.length} live projects (a job on the board); ${removed} lines no longer in the set, removed.`;
       await log(rows.length, written, removed, note);
       return NextResponse.json({ ok: true, phase, found: rows.length, written, removed, note });
     }

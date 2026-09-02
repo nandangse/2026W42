@@ -107,6 +107,7 @@ const PROBES = [
   ["genie", "0119 Saamaan BOM headers", "material_bom?select=bom_id"],
   ["genie", "0120 Saamaan modified_by", "material_project?select=erp_modified_by"],
   ["genie", "0121 Saamaan BOM lines", "material_bom_item?select=bom_status"],
+  ["genie", "0122 Saamaan BOM value", "material_bom?select=total_cost"],
 ];
 
 let missing = 0;

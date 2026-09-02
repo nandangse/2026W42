@@ -22,7 +22,7 @@ const PHASES: { key: string; label: string; what: string }[] = [
   { key: "files", label: "3 · Files", what: "every attachment the ERP holds against those items — the drawings, the images, the rest — as it is" },
   { key: "projects", label: "4 · Projects", what: "every Project, with the Approved BOM it points at and the BOM fields the ERP keeps on it" },
   { key: "boms", label: "5 · BOMs", what: "every BOM header — the item it makes, the project it belongs to, active, default, submitted" },
-  { key: "bom_items", label: "6 · BOM lines", what: "every line of every live BOM on a project in process — the working set, whole, each time" },
+  { key: "bom_items", label: "6 · BOM lines", what: "every line of every live BOM on a live project — one with a job on the board — the working set, whole, each time" },
 ];
 
 type Line = { phase: string; state: "waiting" | "running" | "done" | "failed"; note: string };

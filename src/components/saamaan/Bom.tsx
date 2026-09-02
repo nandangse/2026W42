@@ -64,8 +64,8 @@ const lineColour = (s: string) => {
 
 // ================================================================ the front
 interface Front {
-  project_id: string; project_name: string; customer: string; item_group: string;
-  bom_id: string; bom_item_code: string; bom_item_name: string; lines: number | null; submitted: number; drafts: number;
+  project_id: string; project_name: string; customer: string; status: string; live: boolean; item_group: string;
+  bom_id: string; bom_item_code: string; bom_item_name: string; lines: number | null; bom_value: number | null; submitted: number; drafts: number;
   erp_modified: string | null; erp_modified_by: string;
 }
 interface FrontAnswer { installed: boolean; erpBase: string; rows: Front[]; lastPulledAt: string | null }
@@ -74,13 +74,14 @@ export default function Bom({ summary }: { summary: Summary }) {
   const [data, busy, reload, err] = useLoad<FrontAnswer>("/api/saamaan/items?mode=bom_front");
   const [open, setOpen] = useState<Front | null>(null);
   const [withBom, setWithBom] = useState(false);
+  const [liveOnly, setLiveOnly] = useState(true);
   const base = data?.erpBase || summary.erpBase;
-  const rows = useMemo(() => (data?.rows ?? []).filter((r) => !withBom || r.bom_id), [data, withBom]);
+  const rows = useMemo(() => (data?.rows ?? []).filter((r) => (!withBom || r.bom_id) && (!liveOnly || r.live)), [data, withBom, liveOnly]);
 
   return (
     <Screen
       title="BOM"
-      blurb="The jobs in process, each with its latest submitted BOM. Click a row for the bill itself. Filled by the ERP pull; nothing here is typed."
+      blurb="Each project with its latest submitted BOM. Click a row for the bill itself. Filled by the ERP pull; nothing here is typed."
       action={<Btn onClick={reload} disabled={busy}>↻ Re-read</Btn>}>
       {err && <Note kind="error">{err}</Note>}
       {data && !data.lastPulledAt && (
@@ -93,16 +94,24 @@ export default function Bom({ summary }: { summary: Summary }) {
         searchPlaceholder="🔍 project, name, group, BOM, who"
         empty={data?.lastPulledAt ? "No project matches." : "Nothing here yet — run the ERP pull."}
         header={<>
+          <label className="text-xs flex items-center gap-1" style={{ color: MUTED }} title="Projects with a live job on the board — active, not delivered">
+            <input type="checkbox" checked={liveOnly} onChange={(e) => setLiveOnly(e.target.checked)} /> With live project only
+          </label>
           <label className="text-xs flex items-center gap-1" style={{ color: MUTED }}>
             <input type="checkbox" checked={withBom} onChange={(e) => setWithBom(e.target.checked)} /> with a submitted BOM only
           </label>
-          <span className="text-xs tnum" style={{ color: MUTED }}>{rows.length.toLocaleString("en-IN")} projects in process</span>
+          <span className="text-xs tnum" style={{ color: MUTED }}>{rows.length.toLocaleString("en-IN")} {liveOnly ? "live projects" : "projects"}</span>
         </>}
         columns={[
           { key: "project", label: "Project", align: "left", sort: (r) => r.project_id,
             render: (r) => <button onClick={() => r.bom_id && setOpen(r)} className={`font-bold ${r.bom_id ? "hover:underline" : ""}`} style={{ color: r.bom_id ? NAVY : MUTED }} title={r.bom_id ? "Open the bill" : "No submitted BOM on this project"}>{r.project_id}</button> },
           { key: "name", label: "Project Name", align: "left", sort: (r) => r.project_name,
-            render: (r) => <button onClick={() => r.bom_id && setOpen(r)} className="font-semibold text-left" style={{ color: INK, whiteSpace: "normal", maxWidth: 360 }}>{r.project_name || "·"}</button> },
+            render: (r) => (
+              <button onClick={() => r.bom_id && setOpen(r)} className="font-semibold text-left" title={`${r.project_name}${r.live ? "" : `\n${r.status}`}`}
+                style={{ color: r.live ? INK : MUTED, whiteSpace: "normal", width: 220, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.3 }}>
+                {r.project_name || "·"}
+              </button>
+            ) },
           { key: "group", label: "Item Group", align: "left", sort: (r) => r.item_group,
             render: (r) => <span style={{ color: MUTED }} title="The project's Product Family — an Item Group on the ERP">{r.item_group || "·"}</span> },
           { key: "bom", label: "BOM No", align: "left", sort: (r) => r.bom_id,
@@ -114,13 +123,16 @@ the latest submitted BOM${r.submitted > 1 ? ` of ${r.submitted}` : ""}${r.drafts
               </button>
             ) : <span style={{ color: MUTED }} title={r.drafts ? `${r.drafts} draft BOM${r.drafts === 1 ? "" : "s"}, none submitted` : "no BOM on the ERP"}>{r.drafts ? "draft only" : "·"}</span> },
           { key: "n", label: "No of items", align: "right", sort: (r) => r.lines ?? -1,
-            render: (r) => <span className="tnum">{r.lines === null ? <span style={{ color: MUTED }}>·</span> : r.lines.toLocaleString("en-IN")}</span> },
+            render: (r) => <span className="tnum" title={r.lines === null && r.bom_id ? "lines are pulled for live projects only" : ""}>{r.lines === null ? <span style={{ color: MUTED }}>·</span> : r.lines.toLocaleString("en-IN")}</span> },
+          { key: "value", label: "BOM value (ERP)", align: "right", sort: (r) => r.bom_value ?? -1,
+            render: (r) => <span className="tnum" title="The ERP's Total Cost on the BOM — raw material, operating and scrap">{money(r.bom_value)}</span> },
           { key: "by", label: "Last Modified by", align: "left", sort: (r) => who(r.erp_modified_by), render: (r) => <span>{who(r.erp_modified_by)}</span> },
           { key: "on", label: "Modified Date", align: "right", sort: (r) => S(r.erp_modified), render: (r) => <span className="tnum">{fmtAt(r.erp_modified)}</span> },
         ]}
       />
       <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
-        BOM No is the highest-numbered submitted BOM on the project; Last Modified is that BOM&apos;s. Item Group is the project&apos;s Product Family. Click anywhere on a row to open the bill.
+        BOM No is the highest-numbered submitted BOM on the project; BOM value is the ERP&apos;s Total Cost on it; Last Modified is that BOM&apos;s. Item Group is the project&apos;s Product Family.
+        Lines are pulled for live projects only — untick the first box to see every project&apos;s BOM and value, greyed. Click anywhere on a row to open the bill.
       </div>
       {open && (
         <Modal onClose={() => setOpen(null)} title={`${open.bom_id} — ${open.project_id} · ${open.project_name}`} width={1500}>
@@ -215,7 +227,7 @@ function BomLines({ bom, base: baseIn }: { bom: string; base: string; summary: S
         rows={rows}
         minWidth={1400}
         maxHeight="62vh"
-        empty={data?.lastPulledAt ? "No line matches — loosen the filters." : "Nothing here yet — run the ERP pull."}
+        empty={data?.lastPulledAt ? "No line here — lines are pulled for live projects only; loosen the filters, or open the BOM on the ERP." : "Nothing here yet — run the ERP pull."}
         columns={[
           { key: "bom", label: "BOM No", align: "left", sort: (r) => `${r.bom_id}#${String(r.idx).padStart(4, "0")}`,
             render: (r) => (
@@ -261,7 +273,7 @@ function BomLines({ bom, base: baseIn }: { bom: string; base: string; summary: S
       <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
         Description is the item&apos;s, from the Items mirror; where an item is not an RM item the line&apos;s own description shows, in grey. Supplier is the
         item&apos;s supplier list — the ERP keeps none on the line. ⧉ marks a sub-assembly.
-        <span style={{ background: NAVY_SOFT, padding: "0 4px", marginLeft: 6 }}>working set: live BOMs on projects in process</span>
+        <span style={{ background: NAVY_SOFT, padding: "0 4px", marginLeft: 6 }}>working set: live BOMs on live projects — those with a job on the board</span>
       </div>
     </div>
   );

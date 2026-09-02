@@ -21,9 +21,11 @@ export const dynamic = "force-dynamic";
  *                            ERP document, the child tables, the files.
  *   ?mode=projects         — every project with the BOMs the ERP holds on
  *                            it, joined here so the screen gets one list.
- *   ?mode=bom_front        — one row per project in process: its latest
- *                            SUBMITTED BOM, that BOM's line count, who and
- *                            when. The front the lightbox opens from.
+ *   ?mode=bom_front        — one row per project, every status, flagged
+ *                            live where a job of its is on the board: its
+ *                            latest SUBMITTED BOM, that BOM's line count
+ *                            (pulled for live projects only), its value as
+ *                            the ERP costs it, who and when.
  *   ?mode=bom&project=&bom=&status=&q=&page=&size=
  *                          — a page of BOM lines from the working set (live
  *                            BOMs on projects in process), each line joined
@@ -47,6 +49,19 @@ async function erpBase(): Promise<string> {
   } catch {
     return "";
   }
+}
+
+
+/**
+ * A LIVE project is one with a live job — "Live project is the one with a
+ * Job that's live" (Dr Raghu, 3 Sep 2026) — not one whose own status field
+ * says so. The board (`jobs`) holds every job on the floor: active, not
+ * delivered, not archived. Its `proj` column is the project.
+ */
+async function liveProjectIds(admin: ReturnType<typeof adminClient>): Promise<Set<string>> {
+  const { data, error } = await admin.from("jobs").select("proj").eq("active", true).eq("delivered", false).is("archived_at", null).limit(5000);
+  if (error) throw new Error(error.message);
+  return new Set((data ?? []).map((j) => String(j.proj || "")).filter(Boolean));
 }
 
 const LIST_COLUMNS = [
@@ -165,12 +180,10 @@ export async function GET(req: Request) {
         return out;
       };
       try {
-        const projects = await all("material_project", "project_id, project_name, product_family, customer", (s) => s.eq("status", "Jobs in Process").order("project_id", { ascending: false }));
-        const projectIds = projects.map((p) => String(p.project_id));
-        const boms = projectIds.length
-          ? await all("material_bom", "bom_id, project_id, item_code, item_name, docstatus, is_active, is_default, erp_modified, erp_modified_by", (s) => s.in("project_id", projectIds).order("bom_id"))
-          : [];
-        const bomIds = boms.filter((b) => Number(b.docstatus) !== 2).map((b) => String(b.bom_id));
+        const projects = await all("material_project", "project_id, project_name, product_family, customer, status", (s) => s.order("project_id", { ascending: false }));
+        const boms = await all("material_bom", "bom_id, project_id, item_code, item_name, docstatus, is_active, is_default, total_cost, erp_modified, erp_modified_by", (s) => s.neq("project_id", "").order("bom_id"));
+        const liveIds = await liveProjectIds(admin);
+        const bomIds = boms.filter((b) => Number(b.docstatus) !== 2 && liveIds.has(String(b.project_id))).map((b) => String(b.bom_id));
         const light = bomIds.length ? await all("material_bom_item", "bom_id", (s) => s.in("bom_id", bomIds).order("row_id")) : [];
         const linesPer = new Map<string, number>();
         for (const l of light) linesPer.set(String(l.bom_id), (linesPer.get(String(l.bom_id)) ?? 0) + 1);
@@ -187,15 +200,21 @@ export async function GET(req: Request) {
           const submitted = mine.filter((b) => Number(b.docstatus) === 1).sort((a, b) => num(b.bom_id, a.bom_id));
           const latest = submitted[0] ?? null;
           const drafts = mine.filter((b) => Number(b.docstatus) === 0).length;
+          const live = liveIds.has(String(p.project_id));
           return {
             project_id: p.project_id,
             project_name: p.project_name,
             customer: p.customer,
+            status: p.status,
+            live,
             item_group: p.product_family,
             bom_id: latest ? String(latest.bom_id) : "",
+            bom_value: latest ? latest.total_cost ?? null : null,
             bom_item_code: latest ? String(latest.item_code) : "",
             bom_item_name: latest ? String(latest.item_name) : "",
-            lines: latest ? linesPer.get(String(latest.bom_id)) ?? 0 : null,
+            // Lines are pulled for live projects only; elsewhere the count is
+            // unknown, which is not zero.
+            lines: latest ? (live ? linesPer.get(String(latest.bom_id)) ?? 0 : linesPer.get(String(latest.bom_id)) ?? null) : null,
             submitted: submitted.length,
             drafts,
             erp_modified: latest ? latest.erp_modified : null,
@@ -225,7 +244,10 @@ export async function GET(req: Request) {
         return out;
       };
       try {
-        const projects = await all("material_project", "project_id, project_name", (s) => s.eq("status", "Jobs in Process").order("project_id", { ascending: false }));
+        const liveIds = await liveProjectIds(admin);
+        const projects = liveIds.size
+          ? await all("material_project", "project_id, project_name", (s) => s.in("project_id", [...liveIds]).order("project_id", { ascending: false }))
+          : [];
         const projectIds = projects.map((p) => String(p.project_id));
         const boms = projectIds.length
           ? await all("material_bom", "bom_id, project_id, item_name, docstatus", (s) => s.in("project_id", projectIds).neq("docstatus", 2).order("bom_id"))

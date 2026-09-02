@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.1.0",
+    date: "2026-09-03",
+    module: "Saamaan — the BOM front: live projects, the BOM's value",
+    items: [
+      "\"reduce the width of the Project name and make that as two lines. Make a tickbox on top saying With live project only. Add a column next to No of items saying BOM value (ERP)\" (Dr Raghu, 3 Sep 2026).",
+      "PROJECT NAME sits in 220 pixels and wraps to two lines, clipped after that with the whole name on hover — a long name no longer pushes the BOM number off the screen.",
+      "WITH LIVE PROJECT ONLY, ticked by default. \"Live project is the one with a Job that's live\" — so live means a job of the project's is on the board, active and not delivered, not that the project's own status field says in process. Untick it and every project with a submitted BOM shows, greyed, with its BOM number, value and dates. Lines are still pulled for live projects only, so No of items reads a dot there rather than a zero: unknown is not none.",
+      "THE PULL'S SCOPE MOVED TO THE SAME RULE. Phase 6 takes the lines of live BOMs on projects with a live job; the next pull re-draws the working set on that footing.",
+      "BOM VALUE (ERP) is the ERP's own Total Cost on the BOM — raw material, operating and scrap as the ERP adds them — not a sum Genie makes of the lines. Three cost fields come across on the BOM header; migration 0122, then a pull.",
+    ],
+  },
+  {
     v: "4.4.0.5",
     date: "2026-09-02",
     module: "Saamaan — the BOM front, and the bill in a lightbox",
