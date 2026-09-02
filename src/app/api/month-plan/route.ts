@@ -117,6 +117,86 @@ async function voicesFor(admin: ReturnType<typeof adminClient>, ids: string[]) {
   return out;
 }
 
+/**
+ * MONEY IS A PERMISSION (Dr Raghu, 2 Sep 2026: "If the person is not
+ * authorized for value he cant see the value!"). The same rule the boards
+ * use — the people who may edit, plus Stratcom, plus the owner.
+ */
+/**
+ * The three groups the document closes with (Dr Raghu, 2 Sep 2026).
+ *
+ * The third is the point: people NAMED ON THE WORK — they carry open tasks on
+ * these very jobs — who have neither drafted nor signed. A plan that lists
+ * only its signatories flatters itself; this one names who is bound by it and
+ * has not looked.
+ */
+async function planPeople(
+  admin: ReturnType<typeof adminClient>, kind: string, key: string, jobIds: string[],
+) {
+  const signed: Record<string, unknown>[] = [];
+  const drafts: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+  try {
+    const { data: rows } = await admin.from("plan_signoff")
+      .select("by_email, is_draft, signed_at, jobs, value, throughput")
+      .eq("period_kind", kind).eq("period_key", key)
+      .order("signed_at", { ascending: false }).limit(500);
+    const latest = new Map<string, Record<string, unknown>>();
+    for (const r of rows || []) {
+      const who = String(r.by_email || "").toLowerCase();
+      if (who && !latest.has(who)) latest.set(who, r as Record<string, unknown>);
+    }
+    for (const [who, r] of latest) {
+      seen.add(who);
+      (r.is_draft ? drafts : signed).push({ ...r, email: who });
+    }
+  } catch { /* the document still prints */ }
+
+  // Everybody with an open task on these jobs, who has not answered at all.
+  const notViewed: { email: string }[] = [];
+  try {
+    if (jobIds.length) {
+      const { data: tasks } = await admin.from("erp_tasks")
+        .select("who").in("job_id", jobIds).eq("done", false).limit(3000);
+      const named = new Set((tasks || []).map((t) => String(t.who || "").trim()).filter(Boolean));
+      const { data: profs } = await admin.from("profiles").select("email, display_name, initials");
+      for (const pr of profs || []) {
+        const em = String(pr.email || "").toLowerCase();
+        if (!em || seen.has(em)) continue;
+        const ini = String(pr.initials || "").toUpperCase();
+        const nm = String(pr.display_name || "");
+        // matched on the initials the tasking actually uses, or the name
+        if (ini && named.has(ini)) notViewed.push({ email: em });
+        else if (nm && [...named].some((n) => n.toLowerCase() === nm.toLowerCase())) notViewed.push({ email: em });
+      }
+    }
+  } catch { /* an empty third block is honest enough */ }
+
+  // names for all three
+  const all = [...signed, ...drafts, ...notViewed].map((r) => String((r as { email: string }).email));
+  const nm = new Map<string, string>();
+  try {
+    if (all.length) {
+      const { data: profs } = await admin.from("profiles").select("email, display_name").in("email", all);
+      for (const pr of profs || []) nm.set(String(pr.email).toLowerCase(), String(pr.display_name || ""));
+    }
+  } catch { /* fall back to the address */ }
+  const dress = (r: Record<string, unknown>) => ({
+    email: String(r.email),
+    name: nm.get(String(r.email)) || String(r.email).split("@")[0],
+    jobs: Number(r.jobs) || 0, value: Number(r.value) || 0, throughput: Number(r.throughput) || 0,
+    at: (r.signed_at as string) ?? null,
+  });
+  return {
+    signed: signed.map(dress),
+    drafts: drafts.map(dress),
+    notViewed: notViewed.map((r) => dress(r as unknown as Record<string, unknown>)),
+  };
+}
+
+const mayValue = (u: AuthedUser) =>
+  u.isOwner || u.stratcom || ["admin", "planner", "project_owner"].includes(String(u.role));
+
 const mayPlan = (u: AuthedUser) =>
   u.isOwner || u.stratcom || ["admin", "planner", "project_owner"].includes(String(u.role));
 
@@ -218,7 +298,7 @@ export async function GET(req: Request) {
         .eq("by_email", u0.email.toLowerCase()).eq("period_kind", k0).eq("period_key", w0.key)
         .eq("is_draft", false).order("signed_at", { ascending: false }).limit(1);
       const row = sg?.[0];
-      const { planPdfHtml } = await import("@/lib/plan-pdf");
+      const { planPdfHtml, PLAN_FOOTER } = await import("@/lib/plan-pdf");
       let html: string;
       if (row) {
         // the signed thing, exactly as it was signed
@@ -231,6 +311,8 @@ export async function GET(req: Request) {
           signedOn: dmy(String(row.signed_at).slice(0, 10)),
           state: u0.isOwner ? "approved" : "frozen",
           voices: await voicesFor(admin0, ((row.snapshot as Record<string, unknown>[]) || []).map((r) => String(r.id))),
+          showValue: mayValue(u0),
+          ...(await planPeople(admin0, k0, w0.key, ((row.snapshot as Record<string, unknown>[]) || []).map((r) => String(r.id)))),
         });
       } else {
         /**
@@ -257,7 +339,7 @@ export async function GET(req: Request) {
             real0.value += (j.val * belief) / 100;
             real0.throughput += (tpOf(j) * belief) / 100;
           }
-          snap0.push({ id: j.id, tag: j.tag, val: j.val, tp: tpOf(j), tdd: j.tdd, belief, best_estimate: est || null, comment: e?.comment ?? null });
+          snap0.push({ id: j.id, tag: j.tag, fam: j.fam, cust: j.cust, val: j.val, tp: tpOf(j), tdd: j.tdd, belief, best_estimate: est || null, comment: e?.comment ?? null });
         }
         html = planPdfHtml({
           title: `Plan of ${u0.displayName || u0.email.split("@")[0]} Dated ${dmy(T0)} — UNSIGNED, as it stands`,
@@ -266,10 +348,12 @@ export async function GET(req: Request) {
           signedOn: dmy(T0),
           state: "draft",
           voices: await voicesFor(admin0, jobs0.map((j) => String(j.id))),
+          showValue: mayValue(u0),
+          ...(await planPeople(admin0, k0, w0.key, jobs0.map((j) => String(j.id)))),
         });
       }
       const { pressPdf } = await import("@/lib/pdf-press");
-      const pdf = await pressPdf(html);
+      const pdf = await pressPdf(html, { footerHtml: PLAN_FOOTER });
       return new NextResponse(new Uint8Array(pdf), {
         headers: {
           "content-type": "application/pdf",
@@ -477,7 +561,7 @@ export async function POST(req: Request) {
           real.value += (j.val * belief) / 100;
           real.throughput += (tpOf(j) * belief) / 100;
         }
-        snapshot.push({ id: j.id, tag: j.tag, val: j.val, tp: tpOf(j), tdd: j.tdd, belief, best_estimate: est || null, comment: e?.comment ?? null });
+        snapshot.push({ id: j.id, tag: j.tag, fam: j.fam, cust: j.cust, val: j.val, tp: tpOf(j), tdd: j.tdd, belief, best_estimate: est || null, comment: e?.comment ?? null });
       }
       const done = await doneTotals(admin, w.from, T);
 
@@ -510,12 +594,14 @@ export async function POST(req: Request) {
        * a plan nobody owns.
        */
       const planTitle = `Plan of ${u.displayName || u.email.split("@")[0]} Dated ${dmy(T)}`;
-      const { planPdfHtml } = await import("@/lib/plan-pdf");
+      const { planPdfHtml, PLAN_FOOTER } = await import("@/lib/plan-pdf");
       const pdfHtml = planPdfHtml({
         title: planTitle, window: w, snapshot, plan, signedOn: dmy(T),
         // Raghu's signature APPROVES the plan; anyone else's FREEZES theirs.
         state: isDraft ? "draft" : (u.isOwner ? "approved" : "frozen"),
         voices: await voicesFor(admin, jobs.map((j) => String(j.id))),
+        showValue: mayValue(u),
+        ...(await planPeople(admin, kind, w.key, jobs.map((j) => String(j.id)))),
         real: { jobs: real.jobs, value: Math.round(real.value), throughput: Math.round(real.throughput) },
         done: { nos: done.nos, value: done.value, throughput: done.throughput },
       });
@@ -524,7 +610,7 @@ export async function POST(req: Request) {
       if (!isDraft) {
         try {
           const { pressPdf } = await import("@/lib/pdf-press");
-          pdfB64 = (await pressPdf(pdfHtml)).toString("base64");
+          pdfB64 = (await pressPdf(pdfHtml, { footerHtml: PLAN_FOOTER })).toString("base64");
         } catch { pdfB64 = ""; }   // the mail still goes; it just goes bare
       }
 

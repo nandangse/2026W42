@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.8.0",
+    date: "2026-09-02",
+    module: "The plan document, rebuilt — and a lightbox that stops arguing with itself",
+    items: [
+      "\"after edit still old data is seen. however on closing in the main db it has changed\" (Dr Raghu, 2 Sep 2026) — A REAL BUG, on every board. The lightbox held the job as it stood at the moment of the click; saving wrote to the database and reloaded the board, but the open panel kept its own copy — so \"Saved ✓\" appeared above the OLD date, which is the one thing a confirmation must never do. All three lightboxes now follow their list, so they are right whoever caused the refresh: the panel, another tab, or the cron.",
+      "THE DOCUMENT, to his spec: the Tag column halved and allowed to wrap over two or three lines with the customer beneath it; the TDD set large; MY DATE and MY BELIEF gone, since they belong on the person's own sheet; the job-board's full grid so a long tag cannot be read against the wrong row; and PAGE NUMBERS on every page.",
+      "COUNTS ON TOP — by product family and by customer, in his shorthand: 8 AGSE - Hi Lift, 8 EIH. One glance says what the month is made of.",
+      "\"If the person is not authorized for value he cant see the value!\" — the money columns and money totals are NOT RENDERED for anyone outside the rule the boards already use. Not dotted out: a blanked cell still announces there is a number you are not allowed, which invites exactly the asking-around the permission exists to prevent.",
+      "AND THE SIGNATURE BLOCK closes it: who SIGNED OFF with their numbers, who is STILL IN DRAFT with theirs, and — the part that matters — OTHERS WHO HAD NOT VIEWED YET: people carrying open tasks on these very jobs who have neither drafted nor signed. A plan that lists only its signatories flatters itself; this one names everyone bound by it.",
+    ],
+  },
+  {
     v: "4.2.7.1",
     date: "2026-09-02",
     module: "The plan document — the logo, what it IS, and the whole team's belief on it",

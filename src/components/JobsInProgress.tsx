@@ -100,6 +100,17 @@ export default function JobsInProgress({
 }) {
   const [famFilter, setFamFilter] = useState("");
   const [picked, setPicked] = useState<WipJob | null>(null);
+  /**
+   * The open lightbox follows the list (Dr Raghu, 2 Sep 2026: "after edit
+   * still old data is seen"). `picked` was a copy taken at click time, so a
+   * saved change reloaded the board behind a panel still showing the old
+   * number — a confirmation contradicting itself.
+   */
+  useEffect(() => {
+    if (!picked) return;
+    const fresh = jobs.find((x) => x.id === picked.id);
+    if (fresh && fresh !== picked) setPicked(fresh);
+  }, [jobs, picked]);
   /** Targets, what has been billed, and the book still to come. */
   const [rr, setRr] = useState<{
     fy: string; end: string; hasTarget: boolean;

@@ -2309,6 +2309,25 @@ function DeliveryBoard({
    * actually wanted the plan.
    */
   const [picked, setPicked] = useState<Job | null>(null);
+
+  /**
+   * A LIGHTBOX MUST NOT HOLD A STALE JOB (Dr Raghu, 2 Sep 2026: "after edit
+   * still old data is seen. however on closing in the main db it has
+   * changed").
+   *
+   * `picked` was the job as it stood at the moment of the click. Saving wrote
+   * to the database and reloaded the board — but the open panel kept its own
+   * copy, so the number on screen contradicted the number just saved, which
+   * is the one thing a confirmation must never do.
+   *
+   * Syncing off the reloaded list rather than patching the field means it is
+   * right whoever caused the refresh: this panel, another tab, the cron.
+   */
+  useEffect(() => {
+    if (!picked) return;
+    const fresh = board.jobs.find((x) => x.id === picked.id);
+    if (fresh && fresh !== picked) setPicked(fresh);
+  }, [board.jobs, picked]);
   /** Which column of the 30-day strip the mouse is over. */
   const [hoverDay, setHoverDay] = useState<string | null>(null);
 
@@ -9734,6 +9753,26 @@ function OnFloor({
   const [msg, setMsg] = useState("");
   /** The job whose own lightbox is open — the same one the scatter uses. */
   const [picked, setPicked] = useState<Job | null>(null);
+
+  /**
+   * A LIGHTBOX MUST NOT HOLD A STALE JOB (Dr Raghu, 2 Sep 2026: "after edit
+   * still old data is seen. however on closing in the main db it has
+   * changed").
+   *
+   * `picked` was the job as it stood at the moment of the click. Saving wrote
+   * to the database and reloaded the board — but the open panel kept its own
+   * copy, so the number on screen contradicted the number just saved, which
+   * is the one thing a confirmation must never do.
+   *
+   * Syncing off the reloaded list rather than patching the field means it is
+   * right whoever caused the refresh: this panel, another tab, the cron.
+   */
+  useEffect(() => {
+    if (!picked) return;
+    const fresh = board.jobs.find((x) => x.id === picked.id);
+    if (fresh && fresh !== picked) setPicked(fresh);
+  }, [board.jobs, picked]);
+
   /** A job's open work, listed. "tasks" or "esc" decides which half. */
   const [work, setWork] = useState<{ job: Job; only: "tasks" | "esc" } | null>(null);
   /** A project, listed by its jobs. */

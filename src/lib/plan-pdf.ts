@@ -1,16 +1,14 @@
 /**
- * THE SIGNED PLAN, AS A DOCUMENT.
+ * THE PLAN, AS A DOCUMENT.
  *
- * One template, used by both the mail that goes out on signing and the ↓ PDF
- * button that stays on the desk afterwards (Dr Raghu, 1 Sep 2026: "Also
- * attach the PDF" … "let the pdf be available on top after they submit the
- * plan too"). Two renderers would drift, and the day they disagreed nobody
- * could say which one the signer had actually signed.
+ * One template for both the mail sent on signing and the ↓ PDF button that
+ * stays on the desk. Two renderers would drift, and the day they disagreed
+ * nobody could say which one the signer had actually signed.
  *
- * It is drawn from the SNAPSHOT the signature stored, never from live data:
- * a plan is a statement made on a date, and a document that quietly
- * re-rendered itself from today's table would be a different plan wearing
- * the same signature.
+ * Drawn from the SNAPSHOT the signature stored, never from live data: a plan
+ * is a statement made on a date, and a document that quietly re-rendered
+ * itself from today's table would be a different plan wearing the same
+ * signature.
  */
 import { LOGO } from "@/lib/logo";
 
@@ -24,25 +22,29 @@ const dmy = (iso: unknown) => {
 
 export type PlanState = "draft" | "frozen" | "approved";
 
+export interface PlanVoice { initials: string; belief: number; comment: string }
+export interface PlanPerson {
+  name: string; email: string;
+  jobs?: number; value?: number; throughput?: number;
+  at?: string | null;
+}
+
 export interface PlanPdfInput {
   title: string;
-  /**
-   * What this document IS (Dr Raghu, 2 Sep 2026: "Show the Draft — when its
-   * draft with me or when I submit — show FROZEN months plan … Once I sign it
-   * off it will be Plan Approved").
-   *
-   * A plan on a desk and a plan committed to are different documents, and a
-   * reader six months from now must be able to tell them apart at a glance.
-   */
   state?: PlanState;
-  /** Everyone's words on each job — "TEAM BELIEF", verbatim. */
-  voices?: Record<string, { initials: string; belief: number; comment: string }[]>;
   window: { from: string; end: string; key: string; label: string };
   snapshot: Record<string, unknown>[];
   plan: { jobs: number; value: number; throughput: number };
   real: { jobs: number; value: number; throughput: number };
   signedOn: string;
   done?: { nos: number; value: number; throughput: number };
+  voices?: Record<string, PlanVoice[]>;
+  /** Money is hidden from anyone not cleared for it — see the note below. */
+  showValue?: boolean;
+  /** Who signed, who is still drafting, and who has not looked at all. */
+  signed?: PlanPerson[];
+  drafts?: PlanPerson[];
+  notViewed?: PlanPerson[];
 }
 
 export function planPdfHtml(i: PlanPdfInput): string {
@@ -52,54 +54,117 @@ export function planPdfHtml(i: PlanPdfInput): string {
     : state === "frozen" ? { text: "FROZEN — MONTH PLAN", bg: "#1B3A5C" }
     : { text: "DRAFT — NOT YET SUBMITTED", bg: "#B26A00" };
 
+  /**
+   * MONEY IS A PERMISSION (Dr Raghu, 2 Sep 2026: "If the person is not
+   * authorized for value he cant see the value!").
+   *
+   * The column is not merely blanked — it is not rendered at all, and neither
+   * are the money totals. A dotted-out cell still tells the reader there is a
+   * number they are not allowed, which invites the asking around that the
+   * permission exists to prevent.
+   */
+  const money = i.showValue !== false;
+  const M = (n: number) => (money ? cr(n) : "—");
+
   const rows = (i.snapshot || []).map((r) => {
     const b = Number(r.belief) || 0;
-    /**
-     * TEAM BELIEF (Dr Raghu, 2 Sep 2026: "change it to Team belief and put in
-     * all the comments mentioned there by all").
-     *
-     * The signer's own line first, then everybody else's, each over their
-     * initials and their number. Verbatim: the value of a crowdsourced plan
-     * is that it preserves disagreement, and a paraphrase would throw away
-     * precisely what it was collected for.
-     */
     const mine = String(r.comment || "").trim();
     const others = (i.voices || {})[String(r.id ?? "")] || [];
     const lines = [
-      ...(mine ? [`<div><b>MINE</b> · ${esc(mine)}</div>`] : []),
+      ...(mine ? [`<div><b>MINE</b> ${b}% · ${esc(mine)}</div>`] : []),
       ...others.map((v) => `<div><b>${esc(v.initials)}</b> ${v.belief}% · ${esc(v.comment)}</div>`),
     ];
-    const team = lines.length ? lines.join("") : "<span style=\"color:#B8B5AC\">—</span>";
     return `<tr>
-<td>${esc(String(r.id ?? "").slice(-4))}</td>
-<td>${esc(r.tag)}</td>
-<td class="n">${cr(Number(r.val) || 0)}</td>
-<td class="n">${cr(Number(r.tp) || 0)}</td>
-<td class="c">${esc(dmy(r.tdd))}</td>
-<td class="c"><b>${esc(dmy(r.best_estimate))}</b></td>
-<td class="c" style="color:${b >= 75 ? "#0D7A3F" : b >= 50 ? "#B26A00" : "#B3261E"}"><b>${b}%</b></td>
-<td>${team}</td>
+<td class="c">${esc(String(r.id ?? "").slice(-4))}</td>
+<td class="tag">${esc(r.tag)}${r.cust ? `<div class="sub">${esc(r.cust)}</div>` : ""}</td>
+${money ? `<td class="n">${cr(Number(r.val) || 0)}</td><td class="n">${cr(Number(r.tp) || 0)}</td>` : ""}
+<td class="c tdd">${esc(dmy(r.tdd))}</td>
+<td class="team">${lines.length ? lines.join("") : '<span class="faint">—</span>'}</td>
 </tr>`;
   }).join("");
 
+  /** Counts by product family and by customer, in his own shorthand. */
+  const tally = (key: string) => {
+    const m = new Map<string, number>();
+    for (const r of i.snapshot || []) {
+      const k = String(r[key] || "").trim() || "—";
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  };
+  const chips = (list: [string, number][]) =>
+    list.map(([k, n]) => `<span class="chip"><b>${n}</b> ${esc(k)}</span>`).join("");
+
+  const person = (p: PlanPerson, kind: "signed" | "draft" | "none") => `
+<div class="sig ${kind}">
+  <div class="nm">${esc(p.name)}</div>
+  ${kind === "none"
+    ? '<div class="sub">has not opened the plan</div>'
+    : `<div class="num">${p.jobs ?? 0} jobs${money ? ` · ${cr(Number(p.value) || 0)} · ${cr(Number(p.throughput) || 0)}` : ""}</div>
+       <div class="sub">${kind === "signed" ? "signed" : "draft"}${p.at ? ` · ${dmy(p.at)}` : ""}</div>`}
+</div>`;
+
+  const sigBlock = `
+<div class="sigwrap">
+  <div class="sighead">SIGNED OFF</div>
+  <div class="sigrow">${(i.signed || []).length ? (i.signed || []).map((p) => person(p, "signed")).join("") : '<span class="faint">nobody yet</span>'}</div>
+
+  <div class="sighead">STILL IN DRAFT</div>
+  <div class="sigrow">${(i.drafts || []).length ? (i.drafts || []).map((p) => person(p, "draft")).join("") : '<span class="faint">nobody</span>'}</div>
+
+  <div class="sighead">OTHERS WHO HAD NOT VIEWED YET</div>
+  <div class="sigrow">${(i.notViewed || []).length ? (i.notViewed || []).map((p) => person(p, "none")).join("") : '<span class="faint">everybody named on the work has looked</span>'}</div>
+  <div class="foot">Named on the work — they carry tasks on these jobs — but have neither drafted nor signed. They are bound by this plan all the same.</div>
+</div>`;
+
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-@page { size: A4 landscape; margin: 12mm; }
-body { font: 10pt/1.45 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #16232F; }
-h1 { font-size: 15pt; margin: 1mm 0 0; }
+@page { size: A4 landscape; margin: 10mm 10mm 14mm; }
+body { font: 9.5pt/1.4 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #16232F; }
 .head { display: flex; align-items: center; gap: 5mm; margin-bottom: 3mm; }
 .logo { height: 13mm; }
+h1 { font-size: 14.5pt; margin: 1mm 0 0; }
 .band { display: inline-block; color: #fff; font-size: 8.5pt; font-weight: 800;
         letter-spacing: .09em; padding: 1mm 3mm; border-radius: 2mm; }
-.sub { color: #5A6672; font-size: 9pt; margin-bottom: 4mm; }
+.sub2 { color: #5A6672; font-size: 8.5pt; margin-bottom: 3mm; }
+
+.tallies { margin: 0 0 3mm; }
+.tlabel { font-size: 7.5pt; font-weight: 800; letter-spacing: .08em; color: #8A94A0; margin-bottom: 1mm; }
+.chip { display: inline-block; border: 1px solid #E2E0DA; border-radius: 2mm;
+        padding: 0.6mm 2mm; margin: 0 1.5mm 1.5mm 0; font-size: 8pt; background: #FAF9F5; }
+.chip b { color: #1B3A5C; }
+
+/* the grid the job board wears — every cell ruled, so a long tag cannot be
+   read against the wrong row (Dr Raghu, 2 Sep 2026) */
 table { border-collapse: collapse; width: 100%; font-size: 8.5pt; }
-th { background: #22303C; color: #fff; text-align: left; padding: 2mm; }
-td { border-bottom: 1px solid #E2E0DA; padding: 1.6mm 2mm; vertical-align: top; }
+th { background: #22303C; color: #fff; text-align: left; padding: 1.8mm 2mm; border: 1px solid #22303C; }
+td { border: 1px solid #D9D6CE; padding: 1.4mm 2mm; vertical-align: top; }
+tr:nth-child(even) td { background: #FAF9F5; }
 td.n { text-align: right; white-space: nowrap; }
 td.c { text-align: center; white-space: nowrap; }
+td.tdd { font-size: 11.5pt; font-weight: 800; }        /* bigger, as asked */
+td.tag { width: 18%; }                                  /* half of what it was */
+td.team { font-size: 8pt; }
+.sub { color: #8A94A0; font-size: 7.5pt; }
+.faint { color: #B8B5AC; }
+
 .tot { margin-top: 4mm; font-size: 9.5pt; }
 .tot b { color: #E8600A; }
-.foot { margin-top: 5mm; color: #8A94A0; font-size: 8pt; }
+
+.sigwrap { margin-top: 6mm; page-break-inside: avoid; border-top: 2px solid #22303C; padding-top: 3mm; }
+.sighead { font-size: 7.5pt; font-weight: 800; letter-spacing: .08em; color: #8A94A0; margin: 2.5mm 0 1.5mm; }
+.sigrow { display: flex; flex-wrap: wrap; gap: 3mm; }
+.sig { border: 1px solid #E2E0DA; border-radius: 2mm; padding: 2mm 3mm; min-width: 46mm; }
+.sig.signed { background: #E8F3EC; border-color: #B7DFC8; }
+.sig.draft  { background: #F4F2EC; }
+.sig.none   { background: #fff; border-style: dashed; }
+.sig .nm { font-family: "Segoe Script", "Bradley Hand", "Snell Roundhand", cursive;
+           font-size: 13pt; font-weight: 600; color: #0D7A3F; }
+.sig.draft .nm { color: #5A6672; font-size: 11.5pt; }
+.sig.none .nm  { color: #8A94A0; font-size: 11pt; font-family: inherit; font-weight: 700; }
+.sig .num { font-size: 8.5pt; font-weight: 700; }
+.foot { margin-top: 3mm; color: #8A94A0; font-size: 7.5pt; }
 </style></head><body>
+
 <div class="head">
   <img class="logo" src="${LOGO}" alt="Nandan GSE" />
   <div>
@@ -107,16 +172,40 @@ td.c { text-align: center; white-space: nowrap; }
     <h1>${esc(i.title)}</h1>
   </div>
 </div>
-<div class="sub">${esc(i.window.label)} · ${esc(i.window.key)} · ${esc(dmy(i.window.from))} to ${esc(dmy(i.window.end))} · signed in Genie on ${esc(i.signedOn)} (IST)</div>
+<div class="sub2">${esc(i.window.label)} · ${esc(i.window.key)} · ${esc(dmy(i.window.from))} to ${esc(dmy(i.window.end))} · ${esc(i.signedOn)} (IST)</div>
+
+<div class="tallies">
+  <div class="tlabel">BY PRODUCT FAMILY</div>
+  <div>${chips(tally("fam")) || '<span class="faint">—</span>'}</div>
+  <div class="tlabel" style="margin-top:2mm">BY CUSTOMER</div>
+  <div>${chips(tally("cust")) || '<span class="faint">—</span>'}</div>
+</div>
+
 <table>
-<thead><tr><th>Job</th><th>Tag</th><th>Value</th><th>TP</th><th>TDD</th><th>My date</th><th>Belief</th><th>Team belief — what has to happen</th></tr></thead>
+<thead><tr>
+<th style="width:6%">Job</th>
+<th style="width:18%">Tag</th>
+${money ? '<th style="width:8%">Value</th><th style="width:8%">TP</th>' : ""}
+<th style="width:9%">TDD</th>
+<th>Team belief — what has to happen</th>
+</tr></thead>
 <tbody>${rows}</tbody>
 </table>
+
 <div class="tot">
-<div>The plan as it stands: <b>${i.plan.jobs} jobs</b> · ${cr(i.plan.value)} · ${cr(i.plan.throughput)} throughput</div>
-<div>The realistic read, on my dates and my belief: <b>${i.real.jobs} jobs at 50% belief or better</b> · ${cr(i.real.value)} · ${cr(i.real.throughput)} throughput</div>
-${i.done ? `<div style="color:#5A6672">Done so far this period: ${i.done.nos} nos · ${cr(i.done.value)} · ${cr(i.done.throughput)}</div>` : ""}
+<div>The plan as it stands: <b>${i.plan.jobs} jobs</b>${money ? ` · ${M(i.plan.value)} · ${M(i.plan.throughput)} throughput` : ""}</div>
+<div>The realistic read, on my dates and my belief: <b>${i.real.jobs} jobs at 50% belief or better</b>${money ? ` · ${M(i.real.value)} · ${M(i.real.throughput)} throughput` : ""}</div>
+${i.done ? `<div style="color:#5A6672">Done so far this period: ${i.done.nos} nos${money ? ` · ${M(i.done.value)} · ${M(i.done.throughput)}` : ""}</div>` : ""}
 </div>
-<div class="foot">Belief-weighted, on the planner's own best-estimate dates. Signed in Genie — the living version is on the Month, Quarter &amp; Year Plan desk.</div>
+
+${sigBlock}
 </body></html>`;
 }
+
+/** The footer Chromium draws on every page — it will not read the page's CSS. */
+export const PLAN_FOOTER = `
+<div style="width:100%;font:7.5pt -apple-system,Arial,sans-serif;color:#8A94A0;padding:0 10mm;
+            display:flex;justify-content:space-between;">
+  <span>Nandan GSE · the living version is on the Month, Quarter &amp; Year Plan desk in Genie</span>
+  <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+</div>`;
