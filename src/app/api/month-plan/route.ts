@@ -43,22 +43,43 @@ const PLAN_CC = ["raghu@nandan.co.in", "tushar@nandan.co.in", "pankajs@nandan.co
  * tells nobody which month was frozen. The key carries the truth: 2026-09,
  * 2026-Q3, FY26-27.
  */
+/**
+ * THE PLAN'S NUMBER: NGSE/PLAN/SEP26/0209/Rev0 (Dr Raghu, 2 Sep 2026).
+ *
+ * Month of the PERIOD being planned, then the day it was signed, then the
+ * revision -- so re-freezing September on a later date gives a new, higher
+ * number rather than silently replacing the one already in people's inboxes.
+ * Rev is counted from the sign-offs already on record for that period, so it
+ * is the ledger that decides it, not a guess.
+ */
+function planNumber(periodKey: string, signedAt: Date, rev: number): string {
+  const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const m = /^(\d{4})-(\d{2})$/.exec(periodKey);
+  const q = /^(\d{4})-Q(\d)$/.exec(periodKey);
+  const per = m ? `${MON[Number(m[2]) - 1]}${m[1].slice(2)}`
+    : q ? `Q${q[2]}${q[1].slice(2)}`
+    : periodKey.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const dd = String(signedAt.getUTCDate()).padStart(2, "0");
+  const mm = String(signedAt.getUTCMonth() + 1).padStart(2, "0");
+  return `NGSE/PLAN/${per}/${dd}${mm}/Rev${rev}`;
+}
+
 function periodName(key: string, label: string): string {
   const m = /^(\d{4})-(\d{2})$/.exec(key);
   if (m) {
     const names = ["January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"];
-    return `${names[Number(m[2]) - 1]} ${m[1]}`;
+    return `${names[Number(m[2]) - 1]} ${m[1].slice(2)}`;   // "September 26"
   }
   const q = /^(\d{4})-Q(\d)$/.exec(key);
-  if (q) return `Q${q[2]} ${q[1]}`;
+  if (q) return `Q${q[2]} ${q[1].slice(2)}`;
   return key || label;
 }
 
 const FROZEN_TO = ["jckumar@nandan.co.in", "tushar@nandan.co.in", "raghu@nandan.co.in"];
 const FROZEN_CC = [
   "yashavantha@nandan.co.in", "mukesh@nandan.co.in", "suresh@nandan.co.in",
-  "pankajs@nandan.co.in", "planning@nandan.co.in", "projects@nandan.co.in",
+  "pankajs@nandan.co.in", "planning@nandan.co.in", "dosianil@yahoo.co.in",
 ];
 
 const istToday = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
@@ -627,9 +648,26 @@ export async function POST(req: Request) {
        */
       let notesMail = "";
       const planTitle = `Plan of ${u.displayName || u.email.split("@")[0]} Dated ${dmy(T)}`;
-      const { planPdfHtml, PLAN_FOOTER } = await import("@/lib/plan-pdf");
+
+      /**
+       * The revision comes off the ledger, not off a guess: how many real
+       * signatures this person has already put on this period. The first is
+       * Rev0. Re-freezing September later gives Rev1, so the copy in an inbox
+       * can always be placed against the copy on the desk.
+       */
+      const { count: priorSigs } = await admin.from("plan_signoff")
+        .select("id", { count: "exact", head: true })
+        .eq("by_email", u.email).eq("period_kind", kind).eq("period_key", w.key)
+        .eq("is_draft", false).neq("id", String(signed?.id ?? ""));
+      const docNo = planNumber(w.key, new Date(), Math.max(0, priorSigs ?? 0));
+      const { APP_VERSION } = await import("@/lib/changelog");
+
+      const { planPdfHtml, planFooter } = await import("@/lib/plan-pdf");
+      const PLAN_FOOTER = planFooter(isDraft ? undefined : docNo);
       const pdfHtml = planPdfHtml({
         title: planTitle, window: w, snapshot, plan, signedOn: dmy(T),
+        // A draft is not a numbered document -- it is not issued yet.
+        docNo: isDraft ? undefined : docNo, appVersion: isDraft ? undefined : APP_VERSION,
         // Raghu's signature APPROVES the plan; anyone else's FREEZES theirs.
         state: isDraft ? "draft" : (u.isOwner ? "approved" : "frozen"),
         voices: await voicesFor(admin, jobs.map((j) => String(j.id))),
@@ -670,7 +708,7 @@ export async function POST(req: Request) {
         // Raghu's signature is the month's instruction; everyone else's is theirs.
         const broadcast = u.isOwner;
         const subject = broadcast
-          ? `Frozen Plan for ${periodName(w.key, w.label)} as per the various discussions in the BRM and PRE`
+          ? `${docNo} · Frozen Plan for ${periodName(w.key, w.label)} as per the various discussions in the BRM and PRE`
           : "Thanks for submitting your plan";
         const html = broadcast ? `
 <p>Dear All!</p>
@@ -680,7 +718,10 @@ export async function POST(req: Request) {
 <a href="https://genie.nandan.co.in/on-floor">genie.nandan.co.in/on-floor</a></p>
 <p>Lets make some magic happen.</p>
 <p>Raghu<br><i>Attached: Months frozen plan!</i></p>
+<p><b>Lets make the Breakthrough 2027 a reality!</b></p>
 <hr>
+<p style="font:12px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.4px;color:#1B3A5C">
+<b>${esc(docNo)}</b> &middot; Genie ${esc(APP_VERSION)}</p>
 <p style="color:#777;font-size:12px">
 ${esc(planTitle)} &middot; ${esc(w.label)} (${esc(w.key)})<br>
 The plan as it stands: <b>${plan.jobs} jobs</b> &middot; ${cr(plan.value)} &middot; ${cr(plan.throughput)} throughput<br>
@@ -696,7 +737,10 @@ ${esc(planTitle)} · ${esc(w.label)} (${esc(w.key)})<br>
 The plan as it stands: <b>${plan.jobs} jobs</b> · ${cr(plan.value)} · ${cr(plan.throughput)} throughput<br>
 The realistic read, on your dates and your belief: <b>${real.jobs} at 50% or better</b> · ${cr(real.value)} · ${cr(real.throughput)} throughput
 </p>`;
-        const fileName = `${planTitle.replace(/[^A-Za-z0-9 .-]/g, "")}.pdf`;
+        // The number is the filename too -- an attachment saved to a desktop
+        // and mailed on months later must still say which plan it is.
+        const fileName = `${docNo.replace(/\//g, "-")} ${planTitle}`
+          .replace(/[^A-Za-z0-9 .()-]/g, "") + ".pdf";
         // Nobody is addressed twice: a name on the To line is dropped from Cc.
         const to = broadcast ? FROZEN_TO : [u.email];
         const seen = new Set(to.map((a) => a.toLowerCase()));
@@ -727,8 +771,8 @@ The realistic read, on your dates and your belief: <b>${real.jobs} at 50% or bet
                 cc.join(", "), undefined, "Raghunandan Jagdish",
               );
               sentBy = `${to.join(", ")} · cc ${cc.join(", ")} · from ${box.email_address}${pdfB64 ? " · PDF attached" : " · no PDF"}`;
-            }
-          }
+            } else notesMail = "Raghu's Gmail is not connected in the CRM";
+          } else notesMail = "Raghu has no profile in the CRM to hang a mailbox on";
         } catch (e) {
           sentBy = "";
           notesMail = `Gmail refused: ${e instanceof Error ? e.message : String(e)}`;
@@ -748,8 +792,10 @@ The realistic read, on your dates and your belief: <b>${real.jobs} at 50% or bet
                   ...(pdfB64 ? { attachments: [{ filename: fileName, content: pdfB64 }] } : {}),
                 }),
               });
-              sentBy = r.ok ? `${to.join(", ")} · cc ${cc.join(", ")} · via Resend` : `send failed (${r.status})`;
-            } catch { sentBy = "send failed (network)"; }
+              sentBy = r.ok
+                ? `${to.join(", ")} · cc ${cc.join(", ")} · via Resend`
+                : `NOT SENT — ${notesMail || "Gmail unavailable"}; Resend refused too (${r.status})`;
+            } catch { sentBy = `NOT SENT — ${notesMail || "Gmail unavailable"}; Resend unreachable`; }
           } else {
             sentBy = notesMail
               ? `NOT SENT — ${notesMail}, and no RESEND_API_KEY as a fallback`

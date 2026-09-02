@@ -312,7 +312,18 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
           </div>
           <div className="text-xs mt-0.5" style={{ color: C.sub }}>
             money weighted by belief, membership by my best-estimate dates
-            {(signed?.mailed || so?.emailed) && <> · 📧 {signed?.mailed || so?.emailed}</>}
+            {/*
+              A DRAFT MAILS NOBODY, so it has nothing to report about mail.
+              The old code wrote the failed-send text onto draft rows anyway,
+              and this line read it back for ever after -- so a draft saved at
+              05:58 was still flying "RESEND_API_KEY not set" hours after the
+              send moved to Gmail and the key stopped mattering. Stale status
+              on a screen is worse than none: it sends you hunting a fault
+              that was already fixed.
+            */}
+            {(signed?.mailed || (!so?.is_draft && so?.emailed)) && (
+              <> · 📧 {signed?.mailed || so?.emailed}</>
+            )}
           </div>
         </div>
       )}

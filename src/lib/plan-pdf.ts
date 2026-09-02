@@ -41,6 +41,15 @@ export interface PlanPdfInput {
   voices?: Record<string, PlanVoice[]>;
   /** Money is hidden from anyone not cleared for it — see the note below. */
   showValue?: boolean;
+  /**
+   * THE PLAN'S DOCUMENT NUMBER (Dr Raghu, 2 Sep 2026: "Number this plan also
+   * as per the Software number too"): NGSE/PLAN/SEP26/0209/Rev0, and the
+   * Genie version that pressed it. A signed plan that circulates on paper and
+   * in inboxes needs a handle -- without one, "the plan" means whichever copy
+   * the reader happens to be holding.
+   */
+  docNo?: string;
+  appVersion?: string;
   /** Who signed, who is still drafting, and who has not looked at all. */
   signed?: PlanPerson[];
   drafts?: PlanPerson[];
@@ -128,6 +137,8 @@ body { font: 9.5pt/1.4 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; col
 .head { display: flex; align-items: center; gap: 5mm; margin-bottom: 3mm; }
 .logo { height: 13mm; }
 h1 { font-size: 14.5pt; margin: 1mm 0 0; }
+.docno { font: 8.5pt "SF Mono", Menlo, Consolas, monospace; letter-spacing: .4px;
+         color: #1B3A5C; font-weight: 700; margin: 1mm 0 0 0; }
 .band { display: inline-block; color: #fff; font-size: 8.5pt; font-weight: 800;
         letter-spacing: .09em; padding: 1mm 3mm; border-radius: 2mm; }
 .sub2 { color: #5A6672; font-size: 8.5pt; margin-bottom: 3mm; }
@@ -185,6 +196,7 @@ td.team { font-size: 8pt; }
     <h1>${esc(i.title)}</h1>
   </div>
 </div>
+${i.docNo ? `<div class="docno">${esc(i.docNo)}${i.appVersion ? ` &middot; Genie ${esc(i.appVersion)}` : ""}</div>` : ""}
 <div class="sub2">${esc(i.window.label)} · ${esc(i.window.key)} · ${esc(dmy(i.window.from))} to ${esc(dmy(i.window.end))} · ${esc(i.signedOn)} (IST)</div>
 
 <div class="tallies">
@@ -216,9 +228,18 @@ ${sigBlock}
 }
 
 /** The footer Chromium draws on every page — it will not read the page's CSS. */
-export const PLAN_FOOTER = `
+export const PLAN_FOOTER = planFooter();
+
+/**
+ * The document number rides on EVERY page, not just the first. A signed plan
+ * gets photocopied, forwarded and pulled apart; a loose page with no number on
+ * it is a page nobody can place.
+ */
+export function planFooter(docNo?: string): string {
+  return `
 <div style="width:100%;font:7.5pt -apple-system,Arial,sans-serif;color:#8A94A0;padding:0 10mm;
             display:flex;justify-content:space-between;">
-  <span>Nandan GSE · the living version is on the Month, Quarter &amp; Year Plan desk in Genie</span>
+  <span>${docNo ? esc(docNo) + " &middot; " : ""}Nandan GSE &middot; the living version is on the Month, Quarter &amp; Year Plan desk in Genie</span>
   <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
 </div>`;
+}
