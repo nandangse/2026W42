@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser, errJson, HttpError, RAGHU_EMAIL, type AuthedUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
+import { periodWords as periodName } from "@/lib/plan-pdf";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -38,11 +39,10 @@ const PLAN_CC = ["raghu@nandan.co.in", "tushar@nandan.co.in", "pankajs@nandan.co
  * it goes to the floor. Anybody else's signature still gets the personal note.
  */
 /**
- * The period in words. w.label is "MTD"/"QTD"/"YTD", which is fine on a screen
- * beside the numbers and useless in a subject line -- "Frozen Plan for MTD"
- * tells nobody which month was frozen. The key carries the truth: 2026-09,
- * 2026-Q3, FY26-27.
+ * The period in words lives in plan-pdf, so the PDF's band, the subject line
+ * and the document number can never disagree about what month this is.
  */
+
 /**
  * THE PLAN'S NUMBER: NGSE/PLAN/SEP26/0209/Rev0 (Dr Raghu, 2 Sep 2026).
  *
@@ -62,18 +62,6 @@ function planNumber(periodKey: string, signedAt: Date, rev: number): string {
   const dd = String(signedAt.getUTCDate()).padStart(2, "0");
   const mm = String(signedAt.getUTCMonth() + 1).padStart(2, "0");
   return `NGSE/PLAN/${per}/${dd}${mm}/Rev${rev}`;
-}
-
-function periodName(key: string, label: string): string {
-  const m = /^(\d{4})-(\d{2})$/.exec(key);
-  if (m) {
-    const names = ["January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"];
-    return `${names[Number(m[2]) - 1]} ${m[1].slice(2)}`;   // "September 26"
-  }
-  const q = /^(\d{4})-Q(\d)$/.exec(key);
-  if (q) return `Q${q[2]} ${q[1].slice(2)}`;
-  return key || label;
 }
 
 const FROZEN_TO = ["jckumar@nandan.co.in", "tushar@nandan.co.in", "raghu@nandan.co.in"];
@@ -734,17 +722,21 @@ export async function POST(req: Request) {
         const who = u.displayName || u.email.split("@")[0];
         // Raghu's signature is the month's instruction; everyone else's is theirs.
         const broadcast = u.isOwner;
+        // "Frozen Plan for September 26" reads as asked for a month; a
+        // quarter has to say so, or October's two releases arrive looking
+        // like the same document.
+        const kindWord = kind === "qtd" ? "Quarter " : kind === "ytd" ? "Year " : "";
         const subject = broadcast
-          ? `${docNo} · Frozen Plan for ${periodName(w.key, w.label)} as per the various discussions in the BRM and PRE`
+          ? `${docNo} · Frozen ${kindWord}Plan for ${periodName(w.key, w.label)} as per the various discussions in the BRM and PRE`
           : "Thanks for submitting your plan";
         const html = broadcast ? `
 <p>Dear All!</p>
-<p>As discussed here is the plan for the Months which is as per approved plan</p>
+<p>As discussed here is the plan for ${esc(periodName(w.key, w.label))} which is as per approved plan</p>
 <p>This is digitally signed.<br>the pdf is attached.</p>
 <p>Please review the plan EVERYDAY on "On Floor"<br>
 <a href="https://genie.nandan.co.in/on-floor">genie.nandan.co.in/on-floor</a></p>
 <p>Lets make some magic happen.</p>
-<p>Raghu<br><i>Attached: Months frozen plan!</i></p>
+<p>Raghu<br><i>Attached: ${esc(kindWord.trim() || "Months")} frozen plan!</i></p>
 <p><b>Lets make the Breakthrough 2027 a reality!</b></p>
 <hr>
 <p style="font:12px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.4px;color:#1B3A5C">

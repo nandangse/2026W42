@@ -56,12 +56,41 @@ export interface PlanPdfInput {
   notViewed?: PlanPerson[];
 }
 
+/** "September 26", "Q2 26", "FY26-27" — the period as a person says it. */
+export function periodWords(key: string, label: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(key);
+  if (m) {
+    const names = ["January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"];
+    return `${names[Number(m[2]) - 1]} ${m[1].slice(2)}`;
+  }
+  const q = /^(\d{4})-Q(\d)$/.exec(key);
+  if (q) return `Q${q[2]} ${q[1].slice(2)}`;
+  return key || label;
+}
+
 export function planPdfHtml(i: PlanPdfInput): string {
   const state: PlanState = i.state ?? "draft";
+
+  /**
+   * THE DOCUMENT KNOWS WHICH PLAN IT IS (Dr Raghu, 2 Sep 2026: "when the
+   * Months plan is chosen, it will show the Months plan. When the Quarter
+   * plan is chosen, it will create a Quarter plan").
+   *
+   * The band read "FROZEN — MONTH PLAN" whatever window pressed it, so a
+   * frozen QUARTER came out of the press calling itself a month. This month
+   * that is merely wrong; from October, when the month and the quarter are
+   * both frozen and both released, it would be two documents that look like
+   * the same one -- and the wrong one gets acted on.
+   */
+  const KIND = i.window.label === "QTD" ? "QUARTER PLAN"
+    : i.window.label === "YTD" ? "YEAR PLAN"
+    : "MONTH PLAN";
+  const period = periodWords(i.window.key, i.window.label);
   const band =
-    state === "approved" ? { text: "PLAN APPROVED", bg: "#0D7A3F" }
-    : state === "frozen" ? { text: "FROZEN — MONTH PLAN", bg: "#1B3A5C" }
-    : { text: "DRAFT — NOT YET SUBMITTED", bg: "#B26A00" };
+    state === "approved" ? { text: `${KIND} APPROVED · ${period}`, bg: "#0D7A3F" }
+    : state === "frozen" ? { text: `FROZEN — ${KIND} · ${period}`, bg: "#1B3A5C" }
+    : { text: `DRAFT ${KIND} — NOT YET SUBMITTED`, bg: "#B26A00" };
 
   /**
    * MONEY IS A PERMISSION (Dr Raghu, 2 Sep 2026: "If the person is not

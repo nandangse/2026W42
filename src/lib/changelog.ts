@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.0.3",
+    date: "2026-09-02",
+    module: "The document knows which plan it is, and the desk shows when the month lands",
+    items: [
+      "\"when the Months plan is chosen, it will show the Months plan. When the Quarter plan is chosen, it will create a Quarter plan\" (Dr Raghu, 2 Sep 2026). The band read FROZEN \u2014 MONTH PLAN whatever window pressed it, so a frozen QUARTER came out of the press calling itself a month. This month that is merely wrong; from October, when the month AND the quarter are both frozen and both released, it would be two documents that look like the same one \u2014 and the wrong one gets acted on. Band, subject line, body and document number now all name the period: MONTH PLAN \u00b7 September 26, QUARTER PLAN \u00b7 Q2 26, NGSE/PLAN/Q226/\u2026",
+      "One definition of the period's words, shared by the PDF and the mail, so the band and the subject can never disagree about which month this is.",
+      "THE SYNCHRONISATION IS PROVEN, job by job: 112 live jobs in ERPNext, 112 in Genie, none orphaned either way, and every mapped field agrees \u2014 tag, family, customer, value, TDD, start, project, status, owner. The single exception is OTD on 12 jobs where Genie holds a date and the ERP holds none: sheet-era values that the blank-never-erases guard has been protecting. Named rather than silently reconciled, because clearing a dozen dates is his call, not mine.",
+      "\"this is duplicate! I had asked you to put the jobs line, this one!\" \u2014 THE REALISTIC PLAN banner carried the same three numbers as the BELIEF OF <name> card two inches above it. What it alone carried was the signature time and the fate of the mail, so that survives as one slim line, and the space goes to the thirty-day strip: the desk now shows WHEN the month lands as well as what it is worth.",
+      "That strip was written inline on the Priority List, which meant the plan desk could not have it without a copy \u2014 and a copy is two strips that drift apart the first time one is fixed. It is one component now, mounted in both places.",
+      "\"in this view also please make the lightbox job open up!\" \u2014 the Delivery calendar was the last place still jumping straight to the full job. It gives the job's read first, and you click deeper from there.",
+      "\"when clicking on the product or customer it shoiuld go the place below where thge details are there\" \u2014 the summary says a family is 15 jobs and Rs 4.49 Cr, and the jobs themselves were further down the same page with no way there but scrolling and hunting. The name now carries you, and the section it lands on is ringed for a moment so you can see where you arrived.",
+    ],
+  },
+  {
     v: "4.3.0.2",
     date: "2026-09-02",
     module: "The plan window has two ends",

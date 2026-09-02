@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { fmt, fmtFull, jobNo } from "@/lib/schedule";
 import { JobLightbox, type WipJob } from "./JobsInProgress";
+import NextThirtyDays from "./NextThirtyDays";
 
 const C = {
   ink: "#16232F", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC", line: "#E2E0DA",
@@ -299,19 +300,22 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
         })()}
       </div>
 
-      {/* the REALISTIC plan — shown only after a signature stands */}
+      {/*
+        THE BIG REALISTIC BANNER IS GONE (Dr Raghu, 2 Sep 2026: "this is
+        duplicate! I had asked you to put the jobs line, this one!").
+
+        It was: it carried the same three numbers as the BELIEF OF <name> card
+        two inches above it -- 50 jobs, Rs 15.95 Cr, Rs 6.37 Cr, twice on one
+        screen. What it alone carried was the signature time and the fate of
+        the mail, so that survives as one slim line, and the space goes to the
+        thing he actually asked for: the thirty-day strip, so the desk shows
+        WHEN the month lands as well as what it is worth.
+      */}
       {(so || signed) && (
-        <div className="rounded-lg border p-3 mb-3" style={{ borderColor: "#D9CFF2", background: "#FBFAFE", borderLeft: `4px solid ${C.violet}` }}>
-          <div className="text-xs font-bold" style={{ color: C.violet, letterSpacing: 1.1 }}>
-            THE REALISTIC PLAN — my dates, my belief{so?.signed_at ? ` · signed ${new Date(so.signed_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} IST` : ""}
-          </div>
-          <div className="tnum mt-1" style={{ fontSize: 20, fontWeight: 800, color: C.ink }}>
-            {(signed?.realistic.jobs ?? so?.realistic_jobs ?? 0)} jobs at ≥50% belief
-            <span style={{ color: C.accent }}> · {V(signed?.realistic.value ?? Number(so?.realistic_value) ?? 0)}</span>
-            <span style={{ color: C.green }}> · {V(signed?.realistic.throughput ?? Number(so?.realistic_throughput) ?? 0)}</span>
-          </div>
-          <div className="text-xs mt-0.5" style={{ color: C.sub }}>
-            money weighted by belief, membership by my best-estimate dates
+        <div className="text-xs mb-2" style={{ color: C.sub }}>
+          <b style={{ color: C.violet }}>THE REALISTIC PLAN</b>
+          {so?.signed_at ? ` · signed ${new Date(so.signed_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} IST` : ""}
+          {" · "}money weighted by belief, membership by my best-estimate dates
             {/*
               A DRAFT MAILS NOBODY, so it has nothing to report about mail.
               The old code wrote the failed-send text onto draft rows anyway,
@@ -321,12 +325,14 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
               on a screen is worse than none: it sends you hunting a fault
               that was already fixed.
             */}
-            {(signed?.mailed || (!so?.is_draft && so?.emailed)) && (
-              <> · 📧 {signed?.mailed || so?.emailed}</>
-            )}
-          </div>
+          {(signed?.mailed || (!so?.is_draft && so?.emailed)) && (
+            <> · 📧 {signed?.mailed || so?.emailed}</>
+          )}
         </div>
       )}
+
+      {/* WHEN the month lands, not just what it is worth. */}
+      <NextThirtyDays jobs={(d.jobs || []).map((j) => ({ id: String(j.id), tag: j.tag, tdd: j.tdd }))} />
 
       {/* the job-by-job working */}
       {/* FROZEN HEADING (Dr Raghu, 1 Sep 2026: "freeze the header in this as
