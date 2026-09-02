@@ -354,6 +354,9 @@ interface AdminUser {
   /** IMS, the management system, at /ims (0111). Same arrangement. */
   ims_access: boolean;
   ims_implicit: boolean;
+  /** Saamaan, materials, at /saamaan (0117, material_access). Same arrangement. */
+  saamaan_access: boolean;
+  saamaan_implicit: boolean;
 }
 
 const ROLE_OPTIONS: { value: string; label: string; hint: string }[] = [
@@ -6810,6 +6813,15 @@ function Admin({
     } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
   };
 
+  /** Saamaan, the eighth. Owner only, same as the rest. */
+  const setSaamaan = async (id: string, grant: boolean) => {
+    setGaMsg("");
+    try {
+      await api.post("/api/admin/users", { action: "saamaan_access", id, grant });
+      loadUsers();
+    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
   /** Goals access from inside the Users table. Reloads both lists. */
   const setGoalsLevel = async (id: string, level: string) => {
     const who = (users ?? []).find((x) => x.id === id);
@@ -7074,6 +7086,7 @@ function Admin({
                   <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/vishwakarma — Vishwakarma, the design module">🛠 Vishwakarma</th>
                   <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/seva — Seva, the customer-service module">🛎 Seva</th>
                   <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/ims — the Integrated Management System">📐 IMS</th>
+                  <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/saamaan — Saamaan, the materials module">📦 Saamaan</th>
                 </tr>
               </thead>
               <tbody>
@@ -7116,6 +7129,12 @@ function Admin({
                         onChange={(e) => setIms(u.id, e.target.checked)}
                         style={{ accentColor: "#1B2D6B", width: 14, height: 14, cursor: isOwner && !u.ims_implicit ? "pointer" : "default" }}
                         title={u.ims_implicit ? "The owner holds it already" : isOwner ? "Open the IMS — the Integrated Management System" : `Only ${OWNER_EMAIL} may grant this`} />
+                    </td>
+                    <td className="py-1.5 text-center">
+                      <input type="checkbox" checked={!!u.saamaan_access} disabled={!isOwner || u.saamaan_implicit}
+                        onChange={(e) => setSaamaan(u.id, e.target.checked)}
+                        style={{ accentColor: "#B45309", width: 14, height: 14, cursor: isOwner && !u.saamaan_implicit ? "pointer" : "default" }}
+                        title={u.saamaan_implicit ? "The owner holds it already" : isOwner ? "Open Saamaan — the materials module" : `Only ${OWNER_EMAIL} may grant this`} />
                     </td>
                   </tr>
                 ))}
@@ -10411,7 +10430,7 @@ function OnFloor({
 }
 
 /** A board Job in the shape the scatter's lightbox expects. */
-function toWip(j: Job): WipJob {
+export function toWip(j: Job): WipJob {
   return {
     id: j.id, tag: j.tag, cust: j.cust, fam: j.fam || "Unassigned",
     tdd: j.tdd, otd: j.otd, stat: j.stat, val: j.val, tpv: j.tpv, tpp: j.tpp,

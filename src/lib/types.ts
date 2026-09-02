@@ -61,6 +61,7 @@ export interface ParsedJob {
   payPct30?: number | null;
   payPct60?: number | null;
   payPct90?: number | null;
+  gst?: number | null;
 }
 
 /**

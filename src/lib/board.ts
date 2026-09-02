@@ -63,6 +63,7 @@ export interface BoardJob {
   payPct30: number | null;
   payPct60: number | null;
   payPct90: number | null;
+  gst: number | null;
 }
 
 /** A person who can own jobs or be assigned tasks. */
@@ -130,6 +131,7 @@ function mapJob(r: any): BoardJob {
     payPct30:  r.pay_pct_30  == null ? null : Number(r.pay_pct_30),
     payPct60:  r.pay_pct_60  == null ? null : Number(r.pay_pct_60),
     payPct90:  r.pay_pct_90  == null ? null : Number(r.pay_pct_90),
+    gst:       r.gst         == null ? null : Number(r.gst),
   };
 }
 

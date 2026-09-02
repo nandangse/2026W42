@@ -12,12 +12,12 @@ export const metadata: Metadata = { title: "Nandan Saamaan Genie" };
  * genie.nandan.co.in/saamaan/<section> — every section at its own URL, so a
  * link to the item somebody is asking about still means something tomorrow.
  */
-const SECTIONS = ["dashboard", "items", "settings"];
+const SECTIONS = ["dashboard", "items", "pull"];
 
 /** The plurals and the plain words all land somewhere sensible. */
 const ALIAS: Record<string, string> = {
-  item: "items", material: "items", materials: "items", master: "items", stock: "items",
-  masters: "settings", setting: "settings",
+  item: "items", material: "items", materials: "items", master: "items", stock: "items", rm: "items",
+  erp: "pull", import: "pull", sync: "pull", settings: "pull",
 };
 
 export default async function SaamaanSectionPage({ params }: { params: { section: string } }) {
@@ -36,6 +36,7 @@ export default async function SaamaanSectionPage({ params }: { params: { section
       displayName={user.displayName}
       initials={user.initials ?? null}
       role={user.role ?? "user"}
+      isOwner={user.isOwner}
     />
   );
 }

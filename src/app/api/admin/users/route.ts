@@ -118,6 +118,14 @@ export async function GET(req: Request) {
       for (const g of ig || []) imsEmails.add(String(g.email || "").toLowerCase());
     } catch { /* pre-0111 */ }
 
+    // Saamaan grants — the eighth, materials (0117). The table is
+    // material_access: every Saamaan table wears the material_ prefix.
+    const saamaanEmails = new Set<string>();
+    try {
+      const { data: mg } = await admin.from("material_access").select("email");
+      for (const g of mg || []) saamaanEmails.add(String(g.email || "").toLowerCase());
+    } catch { /* pre-0117 */ }
+
     // Last sign-in lives in auth.users, not profiles, so it comes from the
     // admin auth API. Failure here must not take the page down — the column
     // simply reads "—".
@@ -178,6 +186,10 @@ export async function GET(req: Request) {
           imsEmails.has(String(u.email || "").toLowerCase()) ||
           String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         ims_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        saamaan_access:
+          saamaanEmails.has(String(u.email || "").toLowerCase()) ||
+          String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        saamaan_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         goals_level:
           String(u.email || "").toLowerCase() === RAGHU_EMAIL
             ? "edit"
@@ -511,6 +523,30 @@ export async function POST(req: Request) {
         }
       } else {
         const { error } = await admin.from("ims_access").delete().eq("email", target);
+        if (error) throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    /** { action: "saamaan_access", id, grant } — owner only, as with HRMS. */
+    if (body.action === "saamaan_access") {
+      if (!caller.isOwner)
+        throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant Saamaan.`);
+      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+      const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
+      const target = String(t?.email || "").toLowerCase();
+      if (!target) return NextResponse.json({ error: "no such user" }, { status: 404 });
+      if (target === RAGHU_EMAIL)
+        return NextResponse.json({ error: "The owner holds Saamaan implicitly." }, { status: 400 });
+      if (body.grant) {
+        const { error } = await admin.from("material_access").upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
+        if (error) {
+          if (/material_access|schema cache|does not exist/i.test(error.message))
+            return NextResponse.json({ error: "Run migration 0117 first — the Saamaan grant table doesn't exist yet" }, { status: 400 });
+          throw new Error(error.message);
+        }
+      } else {
+        const { error } = await admin.from("material_access").delete().eq("email", target);
         if (error) throw new Error(error.message);
       }
       return NextResponse.json({ ok: true });

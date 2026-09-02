@@ -157,6 +157,9 @@ export const JOB_FIELDS = [
   "name", "customer_tag", "product_family", "customer", "value",
   "target_delivery_date_current", "custom_otd_date", "job_start_date",
   "project", "job_status", "planning_owner", "status",
+  // Dr Raghu, 2 Sep 2026: the GST rate is already on Jobmaster, so nobody
+  // types it 112 times.
+  "custom_gst_rate",
 ];
 
 /**
@@ -239,6 +242,7 @@ const WATCHED: Record<string, string> = {
   mgr: "Manager", committed: "Committed", exp_end: "Expected end",
   stage: "Stage", so: "Sales order", delivered_on: "Delivered on",
   description: "Short summary description", name: "Project name",
+  gst: "GST rate",
 };
 
 /**
@@ -302,6 +306,7 @@ export async function erpSync(
     proj: S(j.project),
     stat: S(j.job_status),
     own: S(j.planning_owner),
+    gst: j.custom_gst_rate == null || j.custom_gst_rate === "" ? null : N(j.custom_gst_rate),
   })).filter((j) => j.id);
 
   // ---------------- projects ----------------

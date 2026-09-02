@@ -55,6 +55,7 @@ const FIELDS: Record<string, { label: string; kind: "date" | "number" | "text"; 
   pay_pct_30:  { label: "% at 30 days",         kind: "number", genieOnly: true },
   pay_pct_60:  { label: "% at 60 days",         kind: "number", genieOnly: true },
   pay_pct_90:  { label: "% at 90 days",         kind: "number", genieOnly: true },
+  gst:         { label: "GST rate",             kind: "number", genieOnly: true },
 };
 
 /** What goes in the export — never null, never "null". */

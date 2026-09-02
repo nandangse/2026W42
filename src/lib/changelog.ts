@@ -75,6 +75,39 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.5.0",
+    date: "2026-09-02",
+    module: "Job Commercials does the arithmetic he set out",
+    items: [
+      "Dr Raghu, 2 Sep 2026, gave the whole chain: Throughput = Value \u00d7 T%; Material = Value \u00d7 (1 \u2212 T%); Invested = Material \u00d7 Kitting%; Balance = invoice \u2212 Advance; the four collection terms should total 100%.",
+      "INVESTED STOPPED BEING A BOX. It was a typed field; it is a consequence of two numbers the board already keeps, and a typed copy of a derived figure goes stale the first time kitting moves. Material is derived beside it. Both carry their formula in the tooltip so nobody has to trust the column blindly.",
+      "GST IS A NEW FIELD \u2014 AND THE ERP ALREADY HAD IT. Jobmaster carries custom_gst_rate, so it is mapped on the import and nobody types it 112 times. It is editable where the ERP is silent.",
+      "ONE READING I MADE, AND HE SHOULD OVERRULE ME IF IT IS WRONG. \"Balance Due = Value * GST - Advance\" taken literally is the tax alone, so it is read as the INVOICE value \u2014 value PLUS GST \u2014 less what has come in, which is the number a cash forecast needs. He flagged it himself: \"(will rewrite)\". With NO GST rate recorded the invoice is the value as it stands and the cell is flagged amber, because a guessed 18% on an exempt job is a wrong number stated confidently.",
+      "THE FOUR TERMS NOW SHOW THEIR SUM, and anything that is not 100% turns red. A job whose terms come to 80% has a fifth of its money vanish from the forecast; one at 120% invents money. Both are typos, and neither announced itself before.",
+      "\"also show the total on the top of the heading of all / Show number of jobs\" \u2014 a strip above the table: jobs, value, throughput, material, invested, WIP labour, advance in, balance due, then the six months. It follows the SEARCH, not the whole book: a filtered table whose totals ignore the filter answers a question nobody asked.",
+      "\"keep the edit at the next of the job so these data can be edited\" \u2014 a pencil beside every job number opens THAT ROW for editing, all its fields at once. Click-per-cell was fine for correcting one number and wrong for entering a job's terms, where seven fields belong together and hunting them across a wide table is how three get missed. The job number itself keeps its hover and opens the job's lightbox.",
+      "AND A BALANCE LARGER THAN THE JOB'S VALUE IS FLAGGED. Thirteen jobs are in that state today \u2014 8 BRD - TMC - Chennai carries Rs 60.2 L due on a Rs 51.0 L job, and a Bomb Loader Rs 70.8 L on a job whose value reads zero. Either the value is stale or the balance is; both make the forecast wrong, and a screen that prints such a number quietly is a screen that gets believed.",
+      "NEEDS MIGRATION 0117.",
+    ],
+  },
+  {
+    v: "4.4.0.0",
+    date: "2026-09-02",
+    module: "Saamaan — the eighth door, and the Item master mirrored from the ERP",
+    items: [
+      "\"lets make another App now inside Genie. It will be called Saamaan — genie.nandan.co.in/saamaan. make the access from within genie. The database is the same in supabase but show a table distinction by putting material_\" (Dr Raghu, 2 Sep 2026). सामान — the goods, the material a works runs on. Same login, same database, a new door: the 📦 Saamaan tick on Admin → module access, the owner implicit, nobody else until ticked. The switcher in every module's account menu lists it for whoever holds it.",
+      "EVERY TABLE SAAMAAN OWNS BEGINS WITH material_ — material_access, material_item, material_item_file, material_pull. That prefix is the module's boundary inside the one database: a glance down the table list says whose row it is without opening it.",
+      "\"Item table needs to be imported. Item Group like RM. Disabled equals no. All these fields that existed in the main one will need to be imported. Description is rich text. Also import the attachments and the links as it is. I want to create the Bill of Materials subsequently. Hence getting this right is important.\" So the Item master is MIRRORED, not re-typed: every item whose group is \"RM - …\" and which is not disabled — 21,916 of them in 29 groups on the day this shipped — with the WHOLE document as the ERP returned it. Typed columns for the fields the screens and the coming BOM read by name; the verbatim document alongside, so no field is lost however the columns were chosen; the eight child tables (UOM conversions, item defaults, suppliers, reorder levels, taxes, barcodes, customer items, variant attributes) with it.",
+      "THE SHAPE WAS READ OFF THE ERP, NOT GUESSED — the doctype's own meta and a live item, the ERP-SYNC rule. Which is how Nandan's own fields came along by name: drawing_no, the drawing in PDF, DWG and DXF, kittable, raw_material, each_blank, qc_status, the item class, the short description, the optional extras, the master-reference flag, the price-updated date, the BOM status.",
+      "THE ATTACHMENTS AND THE LINKS, AS THEY ARE. 14,305 Files the ERP holds against Items come across with the file_url exactly as the ERP wrote it, and the screen prefixes the ERP's address when one is opened — the path itself is never rewritten in the mirror. The rich description is drawn as the ERP draws it, pictures included, by the same rule. Every Link field opens the ERP's own form for what it points at; every item has an Open in the ERP.",
+      "NULL IS NOT ZERO, and on a rate column that matters most: an item whose last purchase rate the ERP does not hold shows a quiet dot, never ₹0. Number(null) is 0 in JavaScript, and a defaulted nought here would read \"no rate recorded\" as \"free\".",
+      "AN ITEM THE ERP HAS SINCE DISABLED IS MARKED, NEVER DROPPED. A Bill of Materials line pointing at it must still find it. The pull says how many it marked.",
+      "THE PULL WALKS IN THREE PHASES — items, then child tables, then files — each its own request, because one request that walked 22,000 items, their children and 14,000 files would be one that timed out half-way with nobody sure what landed. Each phase reports what it found and wrote before the next begins, and every walk goes into the ledger. Raghu's hand only, as with Seva's ERP door; everyone else sees the ledger. Reads only — nothing on the ERP is written, ever.",
+      "The browse pages through the mirror rather than shipping 22,000 rows to a phone: search across code, name, description and drawing number runs in the database, the group filter likewise, 200 a page. Print / PDF prints the page on screen and names the filters in its heading.",
+      "NOTHING IN SAAMAAN IS TYPED BY HAND. The ERP owns the Item master; what is wrong in the mirror is wrong in the ERP and is fixed there. The Bill of Materials comes next, on this base.",
+    ],
+  },
+  {
     v: "4.3.4.2",
     date: "2026-09-02",
     module: "Two faults found by reading the signed plan itself",
