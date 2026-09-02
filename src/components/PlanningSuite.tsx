@@ -75,6 +75,44 @@ type Role = "admin" | "planner" | "project_owner" | "user" | "viewer" | "sales";
 const TODAY = today();
 
 /** A safe DOM id for a free-text group name off the ERP. */
+/**
+ * A PASTEL PER OWNER (Dr Raghu, 2 Sep 2026: "Can the colour scheme be made in
+ * pastel colours depending on the project owner").
+ *
+ * The colour is DERIVED from the owner's name, not assigned from a list, so a
+ * new planning owner gets a colour the day they appear and nobody has to keep
+ * a table in step. Pastel is the point: these sit behind small dark text on a
+ * dense grid, so saturation is capped and lightness kept high -- a calendar
+ * you cannot read is not a prettier calendar.
+ *
+ * Overdue still wins. A late job is red whoever owns it: the warning outranks
+ * the attribution, and a pastel that hid it would be a worse calendar than one
+ * with no colours at all.
+ */
+const ownerHue = (who: string): number => {
+  let h = 0;
+  for (let i = 0; i < who.length; i++) h = (h * 31 + who.charCodeAt(i)) >>> 0;
+  return h % 360;
+};
+const ownerTint = (who: string | null | undefined) =>
+  who ? `hsl(${ownerHue(String(who))} 62% 90%)` : "#ECEFF3";
+const ownerInk = (who: string | null | undefined) =>
+  who ? `hsl(${ownerHue(String(who))} 55% 26%)` : "#5A6672";
+
+/**
+ * WHO MAY MOVE A DATE BY DRAGGING (Dr Raghu, 2 Sep 2026: "Dragging is only
+ * allowed for Raghu and Pankaj for the TDD change of jobs ... no one else!").
+ *
+ * Tighter than the lightbox on purpose. Editing a date there is a considered
+ * act -- open the job, read it, type the date. A drag is one gesture over a
+ * dense grid, it travels to Jobmaster, and the whole works reads that date.
+ * The two people who own the plan carry it; everyone else still sees the
+ * calendar and still opens any job on it.
+ */
+const MAY_DRAG_TDD = ["raghu@nandan.co.in", "pankajs@nandan.co.in"];
+const mayDragTdd = (email: string | null | undefined) =>
+  !!email && MAY_DRAG_TDD.includes(String(email).toLowerCase());
+
 const groupAnchor = (g: string) => "grp-" + encodeURIComponent(g).replace(/%/g, "_");
 /** An ISO date shown the way the rest of Genie shows one; anything else as typed. */
 const asHuman = (v: string): string =>
@@ -1139,7 +1177,7 @@ export default function PlanningSuite({
       {/* Kept MOUNTED and merely hidden, so its filters, search, sort and view
           survive a round-trip through Job Plan — unmounting was wiping them. */}
       <div style={{ display: workspace === "suite" && tab === "delivery" ? undefined : "none" }}>
-        <DeliveryBoard showForward={canSeeForward} canFloor={canSeeForward || role === "planner" || role === "admin"} board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
+        <DeliveryBoard canDragTdd={mayDragTdd(me.email)} showForward={canSeeForward} canFloor={canSeeForward || role === "planner" || role === "admin"} board={board} V={V} onOpen={openJobPlan} reload={reload} pushERP={pushERP} />
       </div>
       {workspace === "suite" && tab === "wip" && <JobsInProgressTab board={board} V={V} onOpen={openJobPlan} canEdit={canEdit} reload={reload} />}
       {workspace === "suite" && tab === "liveproj" && <LiveProjects board={board} V={V} canEdit={canEdit} reload={reload} />}
@@ -2079,12 +2117,15 @@ function DeliveryBoard({
   pushERP,
   showForward,
   canFloor,
+  canDragTdd,
 }: {
   board: Board;
   V: (v: number) => string;
   onOpen: (id: string) => void;
   reload: () => Promise<Board | null>;
   pushERP: (dt: string, id: string, f: string, v: string) => void;
+  /** Raghu and Pankaj only — a dragged date goes to the ERP. */
+  canDragTdd: boolean;
   /** Stratcom. The two forward-looking cards are theirs. */
   showForward: boolean;
   /** The On Floor tick — Stratcom, planners and admins (28 Aug 2026). */
@@ -2322,6 +2363,35 @@ function DeliveryBoard({
    * encoded rather than dropped into an id raw, where a space or a slash would
    * quietly break the lookup.
    */
+  /**
+   * DRAGGING A JOB TO ANOTHER DAY (Dr Raghu, 2 Sep 2026: "in the calendar
+   * view, can we make the job draf and drop?").
+   *
+   * A drag here is not a cosmetic move: the day you drop on becomes the job's
+   * TARGET DELIVERY DATE, it is written through the same /api/job-field the
+   * lightbox uses, and it QUEUES FOR THE ERP like any other correction. That
+   * is the whole point -- the calendar is where a date is best judged -- but
+   * it is also why the drop asks first. A date that a slip of the mouse can
+   * change is a date nobody can trust, and this one travels to Jobmaster.
+   */
+  const [dragJob, setDragJob] = useState<Job | null>(null);
+  const [dropDay, setDropDay] = useState<string | null>(null);
+  const moveTdd = useCallback(async (day: string) => {
+    const j = dragJob;
+    setDropDay(null); setDragJob(null);
+    if (!j || !canDragTdd) return;
+    if ((j.tdd || "").slice(0, 10) === day) return;          // dropped where it already was
+    const ok = window.confirm(
+      `Move ${jobNo(j.id)} — ${j.tag}\n\n`
+      + `Target delivery ${fmtFull(j.tdd)}  →  ${fmtFull(day)}\n\n`
+      + `This changes the job's Target Delivery Date and queues it to go back to the ERP.`,
+    );
+    if (!ok) return;
+    const r = await api.post("/api/job-field", { job_id: j.id, field: "tdd", value: day });
+    if (!r.ok) { window.alert(`Could not move it: ${r.error || "unknown error"}`); return; }
+    await reload();
+  }, [dragJob, canDragTdd, reload]);
+
   const [jumped, setJumped] = useState<string | null>(null);
   const jumpTo = useCallback((g: string) => {
     setJumped(g);
@@ -2608,7 +2678,15 @@ function DeliveryBoard({
                         {wk.map((d2) => {
                           const list = byDay[d2] || [];
                           return (
-                            <td key={d2} className="px-1 py-1 border-l" style={{ borderColor: "#EFEDE7", background: d2 === TODAY ? "#FFF3E8" : "#fff", height: 78 }}>
+                            <td key={d2} className="px-1 py-1 border-l"
+                              onDragOver={(ev) => { if (dragJob) { ev.preventDefault(); setDropDay(d2); } }}
+                              onDragLeave={() => setDropDay((c) => (c === d2 ? null : c))}
+                              onDrop={(ev) => { ev.preventDefault(); void moveTdd(d2); }}
+                              style={{
+                                borderColor: "#EFEDE7", height: 78,
+                                background: dropDay === d2 && dragJob ? "#E8F3E9" : d2 === TODAY ? "#FFF3E8" : "#fff",
+                                outline: dropDay === d2 && dragJob ? "2px dashed #0D7A3F" : undefined,
+                              }}>
                               <div className="font-bold tnum" style={{ color: d2 === TODAY ? "#E8600A" : "#8A94A0" }}>
                                 {parseInt(d2.slice(8), 10)}
                                 {list.length > 1 && <span style={{ color: "#1B3A5C" }}> ({list.length})</span>}
@@ -2626,9 +2704,17 @@ function DeliveryBoard({
                                      place still jumping straight to the full
                                      job. */
                                   onClick={() => setPicked(j)}
-                                  title={j.tag + " · " + j.cust + " · " + (j.stat || "") + " — click for the job's read"}
+                                  draggable={canDragTdd}
+                                  onDragStart={(ev) => { setDragJob(j); ev.dataTransfer.effectAllowed = "move"; }}
+                                  onDragEnd={() => { setDragJob(null); setDropDay(null); }}
+                                  title={`${j.tag} · ${j.cust} · ${j.stat || ""} — click for the job's read${canDragTdd ? " · drag to another day to change its target delivery date" : ""}`}
                                   className="rounded px-1 py-0.5 mb-0.5 cursor-pointer"
-                                  style={{ background: j.tdd && j.tdd < TODAY ? "#B3261E" : "#DCE8F5", color: j.tdd && j.tdd < TODAY ? "#fff" : "#1B3A5C", fontSize: 9, overflow: "hidden" }}
+                                  style={{
+                                    background: j.tdd && j.tdd < TODAY ? "#B3261E" : ownerTint(j.ownerName || j.ownerInitials || j.own),
+                                    color: j.tdd && j.tdd < TODAY ? "#fff" : ownerInk(j.ownerName || j.ownerInitials || j.own),
+                                    fontSize: 9, overflow: "hidden",
+                                    opacity: dragJob?.id === j.id ? .4 : 1,
+                                  }}
                                 >
                                   {/* Two lines: the job number always readable,
                                       the description given the room to be read.

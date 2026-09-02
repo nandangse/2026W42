@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.0.4",
+    date: "2026-09-02",
+    module: "Drag a job to a new day; the calendar takes its colours from the owner",
+    items: [
+      "\"in the calendar view, can we make the job draf and drop?\" (Dr Raghu, 2 Sep 2026) \u2014 and \"of course it will also wayway to erp\". It does: the day you drop on becomes the job's Target Delivery Date, written through the same /api/job-field the lightbox uses, and queued for Jobmaster like any other correction.",
+      "THE DROP ASKS FIRST, naming the job, the old date and the new one. A date a slip of the mouse can change is a date nobody can trust, and this one travels to the ERP and is read by the whole works.",
+      "\"Dragging is only allowed for Raghu and Pankaj for the TDD change of jobs ... no one else!\" Tighter than the lightbox on purpose: editing a date there is a considered act \u2014 open the job, read it, type the date \u2014 while a drag is one gesture over a dense grid. Everyone else still sees the calendar and still opens any job on it; the chips simply do not lift. NOTE: this is the screen's gate. The lightbox still lets a planner type a TDD, as it always has \u2014 say the word if that should close too.",
+      "\"Can the colour scheme be made in pastel colours depending on the project owner\". The colour is DERIVED from the owner's name rather than assigned from a list, so a new planning owner gets a colour the day they appear and nobody keeps a table in step. Saturation is capped and lightness kept high because these sit behind small dark text on a dense grid \u2014 a calendar you cannot read is not a prettier calendar.",
+      "OVERDUE STILL WINS. A late job stays red whoever owns it: the warning outranks the attribution, and a pastel that hid it would be a worse calendar than one with no colours at all.",
+    ],
+  },
+  {
     v: "4.3.0.3",
     date: "2026-09-02",
     module: "The document knows which plan it is, and the desk shows when the month lands",
