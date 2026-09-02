@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.0.2",
+    date: "2026-09-02",
+    module: "The plan window has two ends",
+    items: [
+      "\"the Months and Qtd plan should use TDD from the jobmaster, theres some mistake\" (Dr Raghu, 2 Sep 2026). It does use it \u2014 checked job by job against Jobmaster, 110 of the 112 live jobs agree to the day, and the two that differ are his own edits from this morning still sitting in the push queue, so Genie is AHEAD of the ERP there, not stale. The mistake was elsewhere.",
+      "THE WINDOW HAD ONLY ONE END. The query asked for tdd <= end and nothing else, so \"September\" meant every live job dated on or before 30 September \u2014 the whole backlog, however old. Today that is invisible, because nothing live is overdue: MTD and QTD both come to 48 jobs and both are right. It bites on 1 October, when every September job not yet delivered silently joins OCTOBER's plan. Measured on today's board: October would have shown 92 jobs against Jobmaster's 44, absorbing 48 jobs and Rs 15.22 Cr the ERP dates in September. The plan would have been reporting a month the ERP never dated.",
+      "Membership is now the Jobmaster date BETWEEN both ends. Today's numbers do not move by one job \u2014 48, 48 and 111 before and after \u2014 which is the proof it fixes a future fault rather than papering over a present one.",
+      "OVERDUE WORK IS NOT DROPPED. That would have swapped one wrong answer for a worse one: a job quietly owed to nobody. A job whose date has passed and which is still undelivered stays on the window holding TODAY, because it is still owed now. It does not follow you into next month when you look ahead \u2014 a November plan is November's work, not a place to hide September's.",
+    ],
+  },
+  {
     v: "4.3.0.1",
     date: "2026-09-02",
     module: "The frozen plan is a numbered document, and it goes to the floor from Raghu's Gmail",

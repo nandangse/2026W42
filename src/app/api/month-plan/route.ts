@@ -285,18 +285,45 @@ const mapJob = (j: Record<string, unknown>): JobRow => ({
  * So the list is the union: every job the board dates inside the window, plus
  * every job THIS PLANNER has dated into it. A job pulled in arrives with its
  * real ERP date showing, so nobody mistakes the opinion for the record.
+ *
+ * THE WINDOW HAS TWO ENDS (Dr Raghu, 2 Sep 2026: "the Months and Qtd plan
+ * should use TDD from the jobmaster, theres some mistake").
+ *
+ * It used to have one. The query asked for tdd <= end and nothing else, so
+ * "September" meant every live job dated on or before 30 September --- the
+ * whole backlog, however old. Today that is invisible: nothing live is
+ * overdue, so MTD and QTD both come to the same 48 jobs and both are right.
+ * It bites the first time a job slips. On 1 October, every September job not
+ * yet delivered would silently join OCTOBER's plan, counted against October's
+ * value and October's throughput, while Jobmaster goes on saying September.
+ * The plan would be reporting a month the ERP never dated.
+ *
+ * So membership is now the Jobmaster date, BETWEEN both ends.
+ *
+ * OVERDUE WORK IS NOT DROPPED, though --- that would swap one wrong answer
+ * for a worse one, a job quietly owed to nobody. A job whose date has passed
+ * and which is still not delivered stays on the CURRENT window (the one
+ * holding today), because it is still owed now. It does not follow you into
+ * next month's plan when you look ahead: a November plan is November's work,
+ * not a place to hide September's.
  */
 async function moreJobs(
   admin: ReturnType<typeof adminClient>, end: string,
   pull?: { from: string; email: string },
 ): Promise<JobRow[]> {
-  const { data } = await admin.from("jobs")
+  const today = istToday();
+  // The floor of the window: its own start, except on the window we are
+  // LIVING in, where overdue work still counts as owed today.
+  const from = pull?.from ?? "";
+  const holdsToday = !!from && from <= today && today <= end;
+  let q = admin.from("jobs")
     .select(JOB_COLS)
     .eq("active", true)
     .or("delivered.is.null,delivered.eq.false")
     .not("tdd", "is", null)
-    .lte("tdd", end)
-    .order("tdd");
+    .lte("tdd", end);
+  if (from && !holdsToday) q = q.gte("tdd", from);
+  const { data } = await q.order("tdd");
   const base = (data || []).map((j) => mapJob(j as Record<string, unknown>));
   if (!pull) return base;
 
