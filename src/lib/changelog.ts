@@ -75,7 +75,7 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
-    v: "4.3.4.0",
+    v: "4.3.4.1",
     date: "2026-09-02",
     module: "The Target Delivery Date decides the plan, and nothing else",
     items: [
@@ -85,7 +85,7 @@ export const UPDATES: UpdateEntry[] = [
       "The belief still weights the money. It simply no longer decides who is in the room.",
       "The screen and the server were taught the rule TOGETHER, so the card you look at and the number in the signed PDF cannot tell two different stories about the same month.",
       "\"keep a button on top to refresh it\" \u2014 \u21bb Refresh reads the board again. The desk took its read when the page opened, so a date changed in the job plan left it quietly showing yesterday, which is exactly how a plan gets frozen against dates that have already moved.",
-      "THE HOURLY CRON IS OFF, as asked. But the ledger says something worth knowing: NO CRON HAS EVER RUN THE JOB SYNCHRONISATION. All fourteen runs on record are Raghu's own, by hand, and the only hourly job was a CRM opportunity pull that never touches a delivery date. Whatever moved those dates, it was not a robot in the night.",
+      "THE HOURLY CRON WAS STOPPED AND THEN PUT BACK, in the same breath and correctly. It was never the culprit: the ledger says NO CRON HAS EVER RUN THE JOB SYNCHRONISATION \u2014 all fourteen runs on record are Raghu's own, by hand, and the only hourly job is a CRM opportunity pull that never touches a delivery date. Stopping it would have cost the CRM its new opportunities to fix a fault it was not causing. \"keep the cron running for CRM\" \u2014 it runs, at :15 past the hour.",
     ],
   },
   {
