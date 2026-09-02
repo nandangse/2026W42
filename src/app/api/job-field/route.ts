@@ -15,6 +15,8 @@ export const dynamic = "force-dynamic";
  */
 const FIELDS: Record<string, { label: string; kind: "date" | "number" | "text"; genieOnly?: boolean }> = {
   tdd: { label: "Target Delivery Date Current", kind: "date" },
+  // The ERP takes this one (custom_otd_date) and now Genie can send it.
+  otd: { label: "OTD Date", kind: "date" },
   stat: { label: "Job Status", kind: "text" },
   mgmt: { label: "Management Target Date Request", kind: "date" },
   note: { label: "Current Status", kind: "text" },

@@ -46,6 +46,11 @@ const ERP_FIELD: Record<string, string> = {
   note: "current_status",
   amt_needed: "custom_amount_needed_in_next_month",
   escalation: "custom_currrent_project_escalation",
+  // Dr Raghu, 2 Sep 2026: "upload those OTD dates to erp". Twelve FAZE 3 jobs
+  // carried an OTD in Genie that the ERP had never been told -- sheet-era
+  // values the blank-never-erases guard had been quietly protecting since the
+  // import. They went up by hand; this is so the next one goes by itself.
+  otd: "custom_otd_date",
 };
 const NUMERIC = new Set(["kit", "pct", "amt_needed"]);
 

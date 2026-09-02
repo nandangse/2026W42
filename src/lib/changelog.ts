@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.2.2",
+    date: "2026-09-02",
+    module: "The twelve OTD dates are in the ERP, and OTD can travel by itself now",
+    items: [
+      "\"upload those OTD dates to erp\" (Dr Raghu, 2 Sep 2026) \u2014 the right call. The other road was clearing them to make Genie match, which would have deleted twelve real dates to tidy a difference. Sending them up keeps the work and closes the gap from the correct end.",
+      "All twelve are FAZE 3 jobs \u2014 the PANIPAT and DADRA lifts \u2014 carrying an OTD in Genie that the ERP had never been told, sheet-era values the blank-never-erases guard had been quietly protecting since the import. Written one first and read back before the other eleven followed, because a bad field name would have written twelve wrong records instead of one. Twelve written, none refused, and the gap re-measured afterwards: ZERO.",
+      "Each one is on the ledger as a pushed correction. A change that travelled to the ERP without a row behind it is a change nobody can trace back \u2014 and the ledger is the only place that ever answers \"who moved that date, and when\".",
+      "AND IT NEEDED A HAND ONLY BECAUSE OTD COULD NOT TRAVEL. The push has carried TDD, Status, Kitting and Production since 29 August; OTD was not on the list, so an OTD corrected in Genie stayed in Genie for ever with nothing on any screen to say so. It is now editable in the lightbox and queues to the ERP like the rest. The next one goes by itself.",
+    ],
+  },
+  {
     v: "4.3.2.1",
     date: "2026-09-02",
     module: "The project page opens inside Genie",

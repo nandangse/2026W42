@@ -64,6 +64,7 @@ export const ERP_PUSHABLE: Record<string, string> = {
   stat: "Job Status",
   kit: "Kitting percentage",
   pct: "Production Completion %",
+  otd: "OTD Date",
 };
 
 export interface ErpCfg { base: string; H: Record<string, string> }
