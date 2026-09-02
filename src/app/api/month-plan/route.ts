@@ -367,7 +367,29 @@ export async function GET(req: Request) {
         .eq("by_email", u0.email.toLowerCase()).eq("period_kind", k0).eq("period_key", w0.key)
         .eq("is_draft", false).order("signed_at", { ascending: false }).limit(1);
       const row = sg?.[0];
-      const { planPdfHtml, PLAN_FOOTER } = await import("@/lib/plan-pdf");
+      const { planPdfHtml, planFooter } = await import("@/lib/plan-pdf");
+      const { APP_VERSION: V0 } = await import("@/lib/changelog");
+      /**
+       * THE DOWNLOADED COPY CARRIES THE NUMBER TOO (found on Raghu's own
+       * "Plan 2026-09" PDF, 2 Sep 2026: an APPROVED plan with no
+       * NGSE/PLAN/... on it anywhere).
+       *
+       * The number was computed only where the plan is SIGNED. This is the
+       * button people actually press to get the file, so the copy that
+       * circulates was the one without a reference on it -- the exact
+       * opposite of the intent. It is rebuilt here from the row on record,
+       * with its own revision, so the download and the mailed attachment
+       * carry the same number.
+       */
+      let docNo0: string | undefined;
+      if (row) {
+        const { count: prior0 } = await admin0.from("plan_signoff")
+          .select("id", { count: "exact", head: true })
+          .eq("by_email", u0.email).eq("period_kind", k0).eq("period_key", w0.key)
+          .eq("is_draft", false).lt("signed_at", String(row.signed_at));
+        docNo0 = planNumber(w0.key, new Date(String(row.signed_at)), Math.max(0, prior0 ?? 0));
+      }
+      const PLAN_FOOTER = planFooter(docNo0);
       let html: string;
       if (row) {
         // the signed thing, exactly as it was signed
@@ -378,6 +400,7 @@ export async function GET(req: Request) {
           plan: { jobs: Number(row.jobs) || 0, value: Number(row.value) || 0, throughput: Number(row.throughput) || 0 },
           real: { jobs: Number(row.realistic_jobs) || 0, value: Number(row.realistic_value) || 0, throughput: Number(row.realistic_throughput) || 0 },
           signedOn: dmy(String(row.signed_at).slice(0, 10)),
+          docNo: docNo0, appVersion: V0,
           state: u0.isOwner ? "approved" : "frozen",
           voices: await voicesFor(admin0, ((row.snapshot as Record<string, unknown>[]) || []).map((r) => String(r.id))),
           showValue: mayValue(u0),

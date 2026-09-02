@@ -184,6 +184,20 @@ table { border-collapse: collapse; width: 100%; font-size: 8.5pt; }
 th { background: #22303C; color: #fff; text-align: left; padding: 1.8mm 2mm; border: 1px solid #22303C; }
 td { border: 1px solid #D9D6CE; padding: 1.4mm 2mm; vertical-align: top; }
 tr:nth-child(even) td { background: #FAF9F5; }
+/**
+ * A JOB'S ROW IS NOT SPLIT ACROSS A PAGE (found on Raghu's own signed
+ * September plan, 2 Sep 2026): page 2 opened with a customer name, five
+ * people's comments and NO JOB NUMBER, NO TAG, NO VALUE AND NO DATE -- the
+ * identity of the job had stayed behind on page 1. A comment you cannot
+ * attach to a job is worse than a comment nobody wrote, because it is read
+ * as belonging to the job above it.
+ *
+ * thead repeats on every page for the same reason: a column of dates with
+ * no header is a column of numbers.
+ */
+tr { break-inside: avoid; page-break-inside: avoid; }
+thead { display: table-header-group; }
+tfoot { display: table-footer-group; }
 td.n { text-align: right; white-space: nowrap; }
 td.c { text-align: center; white-space: nowrap; }
 td.tdd { font-size: 11.5pt; font-weight: 800; }        /* bigger, as asked */

@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.4.2",
+    date: "2026-09-02",
+    module: "Two faults found by reading the signed plan itself",
+    items: [
+      "Dr Raghu sent his own frozen September PDF, 2 Sep 2026, and reading it end to end found two things no screen would have shown.",
+      "THE DOWNLOADED COPY HAD NO DOCUMENT NUMBER. An APPROVED plan, nine pages, with no NGSE/PLAN/SEP26/... on it anywhere. The number was computed only where a plan is SIGNED \u2014 and this is the button people actually press to get the file, so the copy that circulates was the one WITHOUT a reference, which is the exact opposite of the intent. It is rebuilt now from the row on record, with its own revision, so the download and the mailed attachment carry the same number.",
+      "A JOB'S ROW WAS SPLIT ACROSS A PAGE. Page 2 opened with a customer name, five people's comments, and no job number, no tag, no value and no date \u2014 the identity of the job had stayed behind on page 1. A comment you cannot attach to a job is worse than a comment nobody wrote, because it gets read as belonging to the job above it. Rows now hold together, and the header repeats on every page: a column of dates with no header is a column of numbers.",
+      "AND THE TDD RULE IS CONFIRMED IN THE DOCUMENT ITSELF: Veda Aeronautics prints 7 jobs and Rs 2.96 Cr, exactly what the board's dates say \u2014 where before the fix the desk was showing 8 and Rs 3.60 Cr.",
+    ],
+  },
+  {
     v: "4.3.4.1",
     date: "2026-09-02",
     module: "The Target Delivery Date decides the plan, and nothing else",
