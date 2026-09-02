@@ -1,10 +1,11 @@
--- ============================================================================
--- NANDAN IMS — 0002 — SEED
+-- 0113_ims_seed.sql
 --
--- The vocabulary the module needs on the day it opens: the six standards, the
--- clause trees an auditor navigates by, the five registers Phase 1 ships with,
--- and the certification journey — what we hold, what is underway, what we aim
--- at.
+-- IMS — the vocabulary the module needs on the day it opens: the six
+-- standards, the clause trees an auditor navigates by, the five registers
+-- Phase 1 ships with, and the certification journey — what we hold, what is
+-- underway, what we aim at.
+--
+-- Run AFTER 0112_ims_core.sql. In Genie's own database.
 --
 -- The clause numbers and titles are the STANDARDS' OWN, not paraphrases.
 -- A clause list that reworded 8.5.1 would be a clause list nobody could
@@ -16,7 +17,6 @@
 -- hand is how three of them go missing.
 --
 -- Idempotent. Safe to re-run: every insert is guarded.
--- ============================================================================
 
 -- ------------------------------------------------------------- A. STANDARDS
 insert into ims_standard (code, name, sys, sort_order) values

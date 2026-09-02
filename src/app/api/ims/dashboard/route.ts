@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { errJson } from "@/lib/auth";
 import { requireIms } from "@/ims/auth";
-import { imsConfigured, imsDb, notInstalled } from "@/ims/db";
+import { imsDb, notInstalled } from "@/ims/db";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +17,6 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const me = await requireIms();
-    if (!imsConfigured()) return NextResponse.json({ installed: false });
-
     const db = imsDb();
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
     const in90 = new Date(Date.now() + 90 * 86400000).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });

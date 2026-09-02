@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Nandan IMS Genie" };
  */
 const SECTIONS = [
   "dashboard", "certifications", "certificates", "documents",
-  "registers", "standards", "tasks", "calendar",
+  "registers", "standards", "tasks", "calendar", "settings",
 ];
 
 /** Dr Raghu's spellings, and the plurals, all land somewhere sensible. */
@@ -25,6 +25,7 @@ const ALIAS: Record<string, string> = {
   standard: "standards", clauses: "standards",
   task: "tasks", todo: "tasks", "my-tasks": "tasks",
   events: "calendar", audits: "calendar",
+  roles: "settings", masters: "settings",
 };
 
 export default async function ImsSectionPage({ params }: { params: { section: string } }) {

@@ -29,7 +29,7 @@ export default function Dashboard({ boot, go }: { boot: Boot; go: (s: string) =>
     return (
       <Screen title="Dashboard">
         <Note kind="warn">
-          {boot.note || "The IMS database is connected but empty — run supabase-ims/migrations/0001_core.sql and 0002_seed.sql."}
+          {boot.note || "The IMS tables are not in the database yet — run supabase/migrations/0112_ims_core.sql and 0113_ims_seed.sql."}
         </Note>
       </Screen>
     );

@@ -1,55 +1,44 @@
 /**
- * The IMS's OWN database.
+ * The IMS's tables — in GENIE'S OWN DATABASE.
  *
- * A DIFFERENT Supabase project from Genie's, and a different one again from
- * the CRM's (Dr Raghu, 2 Sep 2026: "IMS separate fork"). Nothing in here can
- * see a Genie table and nothing in Genie can see an IMS one -- that separation
- * is the whole point and it is enforced by them being different databases,
- * not by a naming convention somebody could break in a hurry.
+ * Dr Raghu, 2 Sep 2026: "no need to create supabase. Put it in the genie."
+ * So there is no second project, no second set of keys and no second
+ * migration folder. `imsDb()` is Genie's service-role client, named for the
+ * module so that every IMS route reads the same way and so that the one place
+ * to change, if the IMS ever does move out, is this file.
  *
- * SERVICE KEY, deliberately. The session that got the caller this far was
- * issued by GENIE's auth project, so this database cannot validate it -- it
- * never signed the token. Row Level Security is therefore on and FORCED with
- * no policies at all: the anon key sees nothing, and the only way in is the
- * service key, used exclusively after src/ims/auth.ts has already established
- * who is asking and what their IMS role is. The gate lives in code that can be
- * read rather than in a policy that would have to trust a foreign signature.
+ * WHY THE SERVICE KEY AND NOT THE USER'S SESSION. Every IMS table has RLS on
+ * and FORCED with no policies at all (migration 0112), so a browser holding a
+ * Genie session sees nothing — which is the point: a signed-in fitter must
+ * not be able to read draft procedures straight out of PostgREST. Access is
+ * through /api/ims/*, which establishes the caller's IMS role in
+ * src/ims/auth.ts first and only then reads. The gate lives in code that can
+ * be read.
  *
  * NEVER import this into a client component.
  */
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
-let cached: SupabaseClient | null = null;
-
-/** True when the IMS database has been pointed at. */
-export function imsConfigured(): boolean {
-  return !!(process.env.IMS_SUPABASE_URL && process.env.IMS_SUPABASE_SERVICE_KEY);
-}
-
-export class ImsNotConfigured extends Error {
-  constructor() {
-    super(
-      "The IMS database is not connected yet. Set IMS_SUPABASE_URL and " +
-        "IMS_SUPABASE_SERVICE_KEY, then run the supabase-ims/migrations/ files in order.",
-    );
-  }
-}
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { adminClient } from "@/lib/supabase/admin";
 
 export function imsDb(): SupabaseClient {
-  if (cached) return cached;
-  if (!imsConfigured()) throw new ImsNotConfigured();
-  cached = createClient(
-    process.env.IMS_SUPABASE_URL as string,
-    process.env.IMS_SUPABASE_SERVICE_KEY as string,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-  return cached;
+  return adminClient();
+}
+
+/**
+ * True when the environment can reach the database at all.
+ *
+ * Kept as a function rather than deleted: the screens ask it, and the IMS
+ * living in Genie's project today is a decision, not a law of nature.
+ */
+export function imsConfigured(): boolean {
+  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
 /**
  * True when the error is "that table isn't there yet" rather than a real
  * failure. Every screen answers `installed: false` on this instead of a red
- * 500, so an IMS pointed at an empty project says which migration to run.
+ * 500, so an IMS on a deploy that has not run 0112 says which migration to
+ * run rather than showing a broken page.
  */
 export function notInstalled(message: unknown): boolean {
   return /does not exist|schema cache|relation .* does not exist/i.test(String(message ?? ""));

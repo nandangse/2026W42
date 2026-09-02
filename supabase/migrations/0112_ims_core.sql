@@ -1,44 +1,30 @@
--- ============================================================================
--- NANDAN IMS — 0001 — CORE
+-- 0112_ims_core.sql
 --
--- The Integrated Management System: ISO 9001, 14001, 45001, 27001, AWS D1.1
--- and EN 1090-2 EXC3, plus the non-ISO schemes (ZED, customer audits).
+-- IMS — the Integrated Management System. The tables.
 --
--- A SEPARATE FORK, exactly as the CRM is (Dr Raghu, 2 Sep 2026: "IMS separate
--- fork"). Its own Supabase project; nothing here can see a Genie table and
--- nothing in Genie can see an IMS one. That separation is enforced by them
--- being different databases, not by a naming convention somebody could break
--- in a hurry.
+-- IN GENIE'S OWN DATABASE (Dr Raghu, 2 Sep 2026: "no need to create supabase.
+-- Put it in the genie."). Everything here is `public`, prefixed `ims_` for
+-- what belongs to the management system and `core_` for the three engines
+-- that were never IMS's alone.
 --
--- WHO CAN READ THIS DATA: nobody, directly. One login — Genie's. RLS is on
--- and FORCED for every table with no policies at all, so the anon and
--- authenticated keys see nothing. The IMS route handlers verify the Genie
--- session first (src/ims/auth.ts), resolve the caller's IMS role, and then
--- use the service key, which bypasses RLS. This database never issues a
--- session of its own and could not validate a Genie one — it never signed
--- the token. The gate therefore lives in code that can be read rather than
--- in a policy that would have to trust a foreign signature.
+-- WHO A PERSON IS: `public.profiles(id)` — Genie's own account, the same id
+-- every other module names somebody by. There is no mirror table and no
+-- second user list. That was the CRM's problem to solve because the CRM sits
+-- in a different database; here the answer is simply Genie's answer.
 --
--- The identity bridge to Genie is the EMAIL ADDRESS, never a user id.
--- ims_profile.id is this database's own uuid; it means nothing in Genie's,
--- and every column here that names a person takes THIS id.
+-- WHAT A PERSON MAY DO: `ims_access` (migration 0111) — the door row IS the
+-- role row.
 --
--- DIVERGENCE FROM THE BUILD INSTRUCTION, on its own §7 ("follow the repo"):
---   · no tenant_id — Nandan GSE is one company and every other Genie
---     database is single-tenant. A column that is the same value on every
---     row of every table is a column that will be forgotten in a WHERE and
---     then trusted anyway.
---   · no references auth.users(id) — auth lives in GENIE's project, not this
---     one. Those FKs would not resolve.
---   · public schema with ims_ / core_ prefixes rather than `ims` and `core`
---     Postgres schemas — PostgREST only serves schemas exposed in the
---     project's API settings, and a migration cannot set that. Prefixes give
---     the same separation with nothing to configure by hand.
---   · RLS with no policies + a code gate, instead of ims.has_role() policies,
---     for the reason in the paragraph above.
+-- RLS IS ON AND FORCED ON EVERY TABLE, WITH NO POLICIES AT ALL.
+-- This matters more here than it did in a fork. Genie hands every signed-in
+-- person an anon-key session, and PostgREST will serve any table that has no
+-- policy stopping it — so a table left open is a table any Genie account can
+-- read straight out of the browser, drafts and all. Every read and write
+-- below goes through /api/ims/*, which checks the role and then uses the
+-- service key; nothing reaches these tables any other way, so forcing RLS
+-- costs nothing and closes the door properly.
 --
 -- Line comments only. Idempotent and additive. Safe to re-run.
--- ============================================================================
 
 create extension if not exists "pgcrypto";
 create extension if not exists "pg_trgm";
@@ -51,40 +37,7 @@ begin
   return new;
 end $$;
 
--- ============================================================== A. IDENTITY
--- A mirror of the Genie account, matched on EMAIL. A row existing here IS a
--- name in an owner dropdown; opening the IMS at all is Genie's ims_access
--- grant, which lives in Genie's database because that is where the Admin
--- screen that makes the grant lives.
---
--- ROLES (design §2):
---   ims_admin  — the Management Representative. Everything.
---   dept_head  — approves their department's documents, closes their CAPAs.
---   auditor    — plans and runs audits. May not audit their own department.
---   member     — reads APPROVED documents, raises feedback/kaizen, does tasks.
-create table if not exists ims_profile (
-  id           uuid primary key default gen_random_uuid(),
-  email        text not null unique check (email = lower(email)),
-  full_name    text not null,
-  initials     text,
-  role         text not null default 'member'
-               check (role in ('ims_admin','dept_head','auditor','member')),
-  department   text,
-  is_active    boolean not null default true,
-  last_seen_at timestamptz,
-  created_at   timestamptz not null default now(),
-  updated_at   timestamptz not null default now()
-);
-drop trigger if exists ims_profile_touch on ims_profile;
-create trigger ims_profile_touch before update on ims_profile
-  for each row execute function ims_touch();
-
--- The MR, seeded. Everybody else arrives when Genie grants them the door.
-insert into ims_profile (email, full_name, initials, role, department)
-values ('raghu@nandan.co.in', 'Raghunandan Jagdish', 'RJ', 'ims_admin', 'Management')
-on conflict (email) do update set role = 'ims_admin';
-
--- Every write the route handlers make, logged. Auditors ask who changed what.
+-- ================================================ A. THE WRITE LOG & SETTINGS
 -- NAMED _log deliberately: ims_audit is the INTERNAL AUDIT instance (§I).
 -- Two tables called ims_audit is how `create table if not exists` silently
 -- does nothing and the second table never exists.
@@ -211,7 +164,7 @@ create table if not exists core_task (
   -- 90-day warning from the 30-day one and raise both without duplicating
   -- either.
   source_key   text,
-  owner_id     uuid references ims_profile(id),
+  owner_id     uuid references public.profiles(id),
   due_date     date,
   priority     text not null default 'normal'
                check (priority in ('low','normal','high','urgent')),
@@ -246,7 +199,7 @@ create table if not exists core_event (
   department  text not null default '',
   source_type text,
   source_id   uuid,
-  owner_id    uuid references ims_profile(id),
+  owner_id    uuid references public.profiles(id),
   created_by  text,
   created_at  timestamptz not null default now()
 );
@@ -284,7 +237,7 @@ create table if not exists core_checklist_run (
   id               uuid primary key default gen_random_uuid(),
   template_id      uuid not null references core_checklist_template(id),
   template_version int not null default 1,
-  run_by           uuid references ims_profile(id),
+  run_by           uuid references public.profiles(id),
   context_type     text,
   context_id       uuid,
   location         text not null default '',
@@ -346,7 +299,7 @@ create table if not exists ims_certificate (
   issue_date        date,
   expiry_date       date,
   surveillance_dates date[] not null default '{}',
-  renewal_owner_id  uuid references ims_profile(id),
+  renewal_owner_id  uuid references public.profiles(id),
   file_path         text,
   remarks           text not null default '',
   created_by        text,
@@ -372,7 +325,7 @@ create table if not exists ims_document (
                       check (doc_type in ('MAN','PRO','WI','FRM','CHK','PLN')),
   title               text not null,
   department          text not null default '',
-  owner_id            uuid references ims_profile(id),
+  owner_id            uuid references public.profiles(id),
   status              text not null default 'draft'
                       check (status in ('draft','in_review','approved','obsolete')),
   current_revision_id uuid,
@@ -409,9 +362,9 @@ create table if not exists ims_document_revision (
   body_html      text,
   file_path      text,
   change_summary text not null default '',
-  prepared_by    uuid references ims_profile(id),
-  reviewed_by    uuid references ims_profile(id),
-  approved_by    uuid references ims_profile(id),
+  prepared_by    uuid references public.profiles(id),
+  reviewed_by    uuid references public.profiles(id),
+  approved_by    uuid references public.profiles(id),
   reviewed_at    timestamptz,
   approved_at    timestamptz,
   effective_date date,
@@ -463,7 +416,7 @@ create table if not exists ims_register_entry (
   register_id uuid not null references ims_register_definition(id) on delete cascade,
   data        jsonb not null default '{}'::jsonb,
   status      text not null default 'open',
-  owner_id    uuid references ims_profile(id),
+  owner_id    uuid references public.profiles(id),
   review_date date,
   created_by  text,
   created_at  timestamptz not null default now(),
@@ -489,7 +442,7 @@ create table if not exists ims_certification (
                  check (status in ('achieved','in_progress','target')),
   target_date    date,
   achieved_date  date,
-  owner_id       uuid references ims_profile(id),
+  owner_id       uuid references public.profiles(id),
   certificate_id uuid references ims_certificate(id),
   notes          text not null default '',
   sort_order     smallint not null default 0,
@@ -510,7 +463,7 @@ create table if not exists ims_certification_path_step (
   seq              int  not null default 0,
   title            text not null,
   description      text not null default '',
-  owner_id         uuid references ims_profile(id),
+  owner_id         uuid references public.profiles(id),
   due_date         date,
   status           text not null default 'pending'
                    check (status in ('pending','in_progress','done')),
@@ -532,7 +485,7 @@ create table if not exists ims_nonconformity (
   department  text not null default '',
   status      text not null default 'open'
               check (status in ('open','rca','capa','verification','closed')),
-  raised_by   uuid references ims_profile(id),
+  raised_by   uuid references public.profiles(id),
   closed_at   timestamptz,
   created_at  timestamptz not null default now()
 );
@@ -555,7 +508,7 @@ create table if not exists ims_rca (
   method     text not null default '5why' check (method in ('5why','fishbone','other')),
   analysis   jsonb not null default '{}'::jsonb,
   root_cause text not null default '',
-  done_by    uuid references ims_profile(id),
+  done_by    uuid references public.profiles(id),
   created_at timestamptz not null default now()
 );
 
@@ -564,9 +517,9 @@ create table if not exists ims_capa (
   nc_id                   uuid not null references ims_nonconformity(id) on delete cascade,
   correction              text not null default '',
   corrective_action       text not null,
-  owner_id                uuid references ims_profile(id),
+  owner_id                uuid references public.profiles(id),
   due_date                date,
-  verified_by             uuid references ims_profile(id),
+  verified_by             uuid references public.profiles(id),
   verified_at             timestamptz,
   -- The field every auditor turns to. Not optional in practice.
   effectiveness_check_date date,
@@ -584,7 +537,7 @@ create table if not exists ims_feedback (
   body           text not null,
   contact_ref    text not null default '',
   anonymous      boolean not null default false,
-  submitted_by   uuid references ims_profile(id),
+  submitted_by   uuid references public.profiles(id),
   triage_status  text not null default 'new'
                  check (triage_status in ('new','triaged','converted','closed')),
   converted_type text,
@@ -611,7 +564,7 @@ create table if not exists ims_objective (
   objective  text not null,
   kpi        text not null default '',
   target     text not null default '',
-  owner_id   uuid references ims_profile(id),
+  owner_id   uuid references public.profiles(id),
   frequency  text not null default 'monthly',
   csf_link   text not null default '',
   created_at timestamptz not null default now()
@@ -626,7 +579,7 @@ create table if not exists ims_objective_reading (
   period       text not null,
   actual       text,
   remarks      text not null default '',
-  entered_by   uuid references ims_profile(id),
+  entered_by   uuid references public.profiles(id),
   created_at   timestamptz not null default now(),
   unique (objective_id, period)
 );
@@ -642,10 +595,10 @@ create table if not exists ims_kaizen (
   -- Only Accounts may set this, and only from the monthly P&L. An estimated
   -- saving that nobody confirmed is an opinion (design §4.7).
   confirmed_saving numeric,
-  confirmed_by     uuid references ims_profile(id),
+  confirmed_by     uuid references public.profiles(id),
   status           text not null default 'idea'
                    check (status in ('idea','approved','implemented','verified','rejected')),
-  owner_id         uuid references ims_profile(id),
+  owner_id         uuid references public.profiles(id),
   created_by       text,
   created_at       timestamptz not null default now()
 );
@@ -665,7 +618,7 @@ create table if not exists ims_audit (
   id                uuid primary key default gen_random_uuid(),
   audit_no          text unique,
   plan_id           uuid references ims_audit_plan(id),
-  auditor_id        uuid references ims_profile(id),
+  auditor_id        uuid references public.profiles(id),
   auditee_department text not null default '',
   audit_date        date,
   checklist_run_id  uuid references core_checklist_run(id),
@@ -771,7 +724,7 @@ create table if not exists ims_welder_qual (
   qualified_date      date not null,
   last_confirmed_date date,
   revalidation_due    date,
-  confirmed_by        uuid references ims_profile(id),
+  confirmed_by        uuid references public.profiles(id),
   certificate_id      uuid references ims_certificate(id),
   status              text not null default 'valid'
                       check (status in ('valid','due','lapsed','withdrawn'))
@@ -817,7 +770,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'ims_profile','ims_audit_log','ims_settings',
+    'ims_audit_log','ims_settings',
     'ims_doc_series','ims_number_series',
     'core_task','core_event','core_checklist_template','core_checklist_item',
     'core_checklist_run','core_checklist_response',

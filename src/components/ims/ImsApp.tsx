@@ -26,6 +26,7 @@ import Registers from "./Registers";
 import Standards from "./Standards";
 import Tasks from "./Tasks";
 import Calendar from "./Calendar";
+import Settings from "./Settings";
 
 const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: "◧" },
@@ -36,6 +37,7 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "standards", label: "Standards", icon: "📐" },
   { key: "tasks", label: "Tasks", icon: "✓" },
   { key: "calendar", label: "Calendar", icon: "📅" },
+  { key: "settings", label: "Settings", icon: "⚙" },
 ];
 
 const ROLE_WORDS: Record<string, string> = {
@@ -74,14 +76,13 @@ export default function ImsApp({
   const body = () => {
     if (bootErr) return <Note kind="error">{bootErr}</Note>;
     if (!boot) return <Empty>Opening the IMS…</Empty>;
-    if (!boot.configured)
+    if (!boot.installed)
       return (
         <Note kind="warn">
-          <div className="mb-1">The IMS has its own database and this deploy is not pointed at it yet.</div>
+          <div className="mb-1">The IMS tables are not in the database yet.</div>
           <div style={{ fontWeight: 500 }}>
-            Set <b>IMS_SUPABASE_URL</b> and <b>IMS_SUPABASE_SERVICE_KEY</b>, then run
-            <b> supabase-ims/migrations/0001_core.sql</b> and <b>0002_seed.sql</b> on that project.
-            Everything below is wired and waiting for those two lines.
+            Run <b>supabase/migrations/0112_ims_core.sql</b> then <b>0113_ims_seed.sql</b> on Genie&apos;s
+            project. The IMS lives in Genie&apos;s own database — there is no second project to create.
           </div>
         </Note>
       );
@@ -93,6 +94,7 @@ export default function ImsApp({
       case "standards": return <Standards boot={boot} />;
       case "tasks": return <Tasks boot={boot} />;
       case "calendar": return <Calendar boot={boot} />;
+      case "settings": return <Settings boot={boot} />;
       default: return <Dashboard boot={boot} go={go} />;
     }
   };
@@ -134,7 +136,7 @@ export default function ImsApp({
             </button>
           ))}
           <div className="px-3 py-3 text-xs" style={{ color: MUTED, lineHeight: 1.6, borderTop: `1px solid ${BORDER}`, marginTop: 8 }}>
-            One login — Genie&apos;s. The IMS keeps its own database; nothing here can see a Genie table.
+One login, one database. Every IMS table is closed to the browser — reads go through the module, which checks your role first.
           </div>
         </nav>
 

@@ -2,75 +2,83 @@
 
 **Route:** `genie.nandan.co.in/ims`
 **Shipped:** Genie 4.3.0.0 · 2 Sep 2026
+**Lives in:** Genie's own Supabase project — migrations `0111`, `0112`, `0113`
 **Standards:** ISO 9001, ISO 14001, ISO 45001, ISO/IEC 27001, AWS D1.1, EN 1090-2 **EXC3** — plus non-ISO schemes (ZED, customer audits).
 
 ---
 
 ## 1. What it is, and where it lives
 
-A **separate fork**, exactly as the CRM is (Dr Raghu, 2 Sep 2026: *"IMS separate fork. Build."*).
+**In Genie's own database**, like Seva, HRMS, Kuber and Vishwakarma.
 
-| | Genie | CRM | **IMS** |
+It was first built as a separate fork with its own Supabase project — *"IMS separate fork. Build."* — and then moved on Dr Raghu's second instruction the same day: *"no need to create supabase. Put it in the genie."* That was the right call. The CRM's separate project is the **exception**, not the pattern, and a seventh module with its own keys, its own migration folder and its own backup would be a seventh thing to keep in step for no gain.
+
+| | Genie core | CRM | **IMS** |
 |---|---|---|---|
-| Supabase project | Genie's | CRM's own | **its own** |
-| Migrations | `supabase/migrations/` | `supabase-crm/migrations/` | **`supabase-ims/migrations/`** |
+| Supabase project | Genie's | CRM's own | **Genie's** |
+| Migrations | `supabase/migrations/` | `supabase-crm/migrations/` | **`supabase/migrations/` (0111–0113)** |
 | Server code | `src/lib/`, `src/app/` | `src/crm/` | **`src/ims/`** |
 | Screens | `src/components/` | `src/components/crm/` | **`src/components/ims/`** |
 
-Nothing in the IMS database can see a Genie table and nothing in Genie can see an IMS one. That separation is enforced by them being **different databases**, not by a naming convention.
-
-The **door** is the one thing that lives in Genie's database (`ims_access`, migration `0111`), because that is where the Admin screen that makes the grant lives.
+Because it is one database, **a person is a person**: every owner column is `public.profiles(id)`, Genie's own account id. There is no mirror table, no second user list and no second uuid for the same human — which is exactly the problem `docs/DATABASE-SPLIT.md` exists to warn about for the CRM, and which simply does not arise here.
 
 ---
 
 ## 2. Setting it up
 
-1. Create a new Supabase project (Mumbai), then put its URL and **service role** key in the environment:
+No new project. Three migrations and one optional line.
 
+1. Run, in order, in **Genie's** SQL editor:
+   - `supabase/migrations/0111_ims_door.sql` — the door and the roles
+   - `supabase/migrations/0112_ims_core.sql` — the 39 tables, numbering, buckets, RLS
+   - `supabase/migrations/0113_ims_seed.sql` — standards, clauses, registers, journey
+
+2. Optional, for the expiry alerts:
    ```
-   IMS_SUPABASE_URL=https://YOUR-IMS-PROJECT.supabase.co
-   IMS_SUPABASE_SERVICE_KEY=...
    IMS_MAIL_FROM=ims@nandan.co.in
    ```
 
-2. Run, in order, in that project's SQL editor:
-   - `supabase-ims/migrations/0001_core.sql`
-   - `supabase-ims/migrations/0002_seed.sql`
+3. Tick **IMS** for each person on Admin → module access. The owner is implicit.
 
-3. Run in **Genie's** project:
-   - `supabase/migrations/0111_ims_door.sql`
+4. Set their roles in **IMS → Settings**. The tick lets somebody in as a `member`; the MR promotes.
 
-4. Tick **IMS** for each person on Admin → module access. The owner is implicit.
-
-Until step 1 and 2 are done, `/ims` opens and says exactly which step is missing. It never shows a blank screen or a 500.
+Until step 1 is done, `/ims` opens and names the migration that is missing. It never shows a blank screen or a 500.
 
 ---
 
 ## 3. Security model — read this before changing a route
 
-The IMS database **cannot validate a Genie session**; it never signed the token. So:
+**Every IMS table has RLS on and FORCED, with no policies at all.**
 
-- **RLS is on and FORCED on every table, with no policies at all.** The anon and authenticated keys see nothing whatsoever.
-- The only way in is the **service key**, held by `src/ims/db.ts`.
-- It is used **only after** `src/ims/auth.ts` has established who is asking.
+This matters *more* now that the IMS shares Genie's database than it did in a fork. Genie hands every signed-in person an anon-key session, and PostgREST will serve any table that has no policy stopping it. An IMS table left open would therefore be readable **straight out of the browser by any Genie account** — draft procedures, the storage paths of the copyrighted standards, all of it.
 
-**Two gates, and they are different questions:**
+So:
 
-| Gate | Where | Question |
-|---|---|---|
-| The door | `ims_access` in **Genie's** DB | May this account open `/ims` at all? |
-| The role | `ims_profile` in the **IMS** DB | What may they do once inside? |
+- anon and authenticated keys see **nothing**;
+- the only way in is the **service key**, held by `src/ims/db.ts`;
+- it is used **only after** `src/ims/auth.ts` has established who is asking and what their role is.
 
-Somebody admitted through the door with no profile row is created as a **`member`** — the least they could be. A door grant is not a role.
+`node scripts/ims-rls-test.mjs` is what proves that claim rather than asserting it.
+
+**One row answers both questions.** `ims_access` is the door *and* the role:
+
+| Column | Question |
+|---|---|
+| the row existing | May this account open `/ims` at all? |
+| `role`, `department` | What may they do once inside? |
+
+Two tables for one question is how they end up disagreeing. The Admin tick creates the row as a **`member`** — the least somebody could be — and the MR promotes in IMS → Settings. A door grant is not a role. The owner is implicitly `ims_admin` and has **no row**: a row that could be edited is a row that could lock the module's only administrator out of it.
 
 ### Roles
 
 | Role | Rights |
 |---|---|
-| `ims_admin` (MR) | Everything: define registers, approve revisions, delete, make obsolete |
+| `ims_admin` (MR) | Everything: define registers, approve revisions, delete, make obsolete, set roles |
 | `dept_head` | Creates and edits documents, reviews their **own** department's, writes registers and the vault |
 | `auditor` | Reads everything including drafts (they must); plans audits (Phase 2) |
 | `member` | Reads **approved** documents only; records register entries; works their own tasks |
+
+A `dept_head` with **no department set** can approve nothing — the route matches their department against the document's, and an empty one matches nothing rather than everything.
 
 Every check is server-side, on **every route**. A hidden button is not a gate — someone with the URL reaches the route regardless.
 
@@ -149,6 +157,8 @@ With no renewal owner named, the alert goes to the MR — because *nobody owns t
 
 Four buckets, **all private**, all served by short-lived signed URLs issued after the role check:
 
+All four are in Genie's storage, alongside `job-photos` and `task-files`.
+
 | Bucket | Holds | Who may read |
 |---|---|---|
 | `ims-standards` | **purchased copies of the standards** | MR + dept heads only |
@@ -174,10 +184,10 @@ Nothing built later has to migrate data out of a spreadsheet.
 
 All taken under its own §7 — *"if the existing repo's tenant/auth pattern differs, follow the repo."*
 
-1. **No `tenant_id`.** Nandan GSE is one company and every other Genie database is single-tenant. A column that is the same value on every row is a column that gets forgotten in a `WHERE` and trusted anyway.
-2. **No `references auth.users(id)`.** Auth lives in *Genie's* project. Those FKs would not resolve. The bridge is the **email**; every column naming a person takes `ims_profile.id`, which is this database's own uuid.
-3. **`public` schema with `ims_` / `core_` prefixes**, not `ims` and `core` Postgres schemas. PostgREST only serves schemas exposed in the project's API settings, and a migration cannot set that. Prefixes give the same separation with nothing to configure by hand.
-4. **RLS with no policies + a code gate**, not `ims.has_role()` policies — for the reason in §3 above. This is the CRM's model, and `docs/DATABASE-SPLIT.md` is the standing argument for it.
+1. **No `tenant_id`.** Nandan GSE is one company and every Genie table is single-tenant. A column that is the same value on every row is a column that gets forgotten in a `WHERE` and trusted anyway.
+2. **`profiles(id)`, not a mirror table.** The spec's `auth.users(id)` FKs are honoured one step removed: `public.profiles.id` *is* the `auth.users` id, and it is what every other Genie module names a person by. One person, one id.
+3. **`public` schema with `ims_` / `core_` prefixes**, not `ims` and `core` Postgres schemas. PostgREST only serves schemas exposed in the project's API settings, and a migration cannot set that. Prefixes give the same separation with nothing to configure by hand — and they match how every other Genie module already names its tables.
+4. **RLS with no policies + a code gate**, not `ims.has_role()` policies. Policies that had to express "a member sees only approved revisions" would duplicate, in SQL, a rule the route already enforces — and the two would drift. Forcing RLS shut and putting the rule in one readable place is the stronger arrangement, and §3 explains why it is also the safer one here.
 5. **`ims_audit_log`, not `ims_audit`.** The build instruction used `ims.audit` for the internal-audit instance; the write log needed a different name or `create table if not exists` would silently skip the second one.
 6. **Vercel cron, not `pg_cron`.** Every other Genie scheduled job is a Vercel cron with `CRON_SECRET`, and one scheduler is better than two.
 7. **No TipTap.** The schema keeps `body jsonb` for it; this pass stores HTML in `body_html` and edits it as text, with PDF upload for the legacy Rev 00 ports. Adding an editor dependency to a first pass is how a first pass stops being shippable.
@@ -193,9 +203,9 @@ node scripts/check-migrations.mjs        # every migration probed, one honest li
 node scripts/ims-rls-test.mjs            # the three-role RLS + numbering check
 ```
 
-`ims-rls-test.mjs` proves, against the live IMS project:
+`ims-rls-test.mjs` proves, against Genie's live project:
 
-- the **anon key sees nothing** — RLS forced, no policies;
+- the **anon key sees nothing** — RLS forced, no policies. This is the important one: a signed-in Genie account holds that key;
 - **two concurrent document creates yield distinct sequential numbers**;
 - the seed is complete (6 standards, 306 clauses, 93 SoA rows, 5 registers).
 

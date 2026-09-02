@@ -13,7 +13,7 @@ import type { ImsUser } from "./auth";
 /** The one answer a screen gets when its tables aren't there yet. */
 export const NOT_INSTALLED = {
   installed: false as const,
-  note: "Run supabase-ims/migrations/0001_core.sql and 0002_seed.sql on the IMS project first.",
+  note: "Run supabase/migrations/0112_ims_core.sql and 0113_ims_seed.sql first.",
 };
 
 /**

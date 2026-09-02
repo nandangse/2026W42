@@ -4,12 +4,16 @@
  *
  *   node scripts/ims-rls-test.mjs
  *
- * Three things are proven against the LIVE IMS project:
+ * Three things are proven against GENIE'S LIVE PROJECT — the IMS lives in it
+ * (Dr Raghu, 2 Sep 2026: "no need to create supabase. Put it in the genie."):
  *
- *   1. RLS. The anon key must see NOTHING. Row Level Security is on and
- *      FORCED with no policies at all, so a leaked anon key is worth zero.
- *      This is the whole security model — if this test passes, the code gate
- *      in src/ims/auth.ts is the only door, which is what we designed.
+ *   1. RLS. The anon key must see NOTHING. This matters MORE now than it did
+ *      when the IMS had a project of its own: Genie hands every signed-in
+ *      person an anon-key session, so an IMS table without RLS would be a
+ *      table any Genie account could read straight out of PostgREST — draft
+ *      procedures, the paths to the copyrighted standards, all of it. RLS is
+ *      on and FORCED with no policies at all, which makes /api/ims/* the only
+ *      door. This test is what proves that claim.
  *
  *   2. NUMBERING UNDER CONCURRENCY. Ten documents created at the same instant
  *      must come back with ten DISTINCT, sequential numbers. Counting rows to
@@ -34,12 +38,13 @@ const env = Object.fromEntries(
     .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1).trim()]),
 );
 
-const URL_ = env.IMS_SUPABASE_URL;
-const SERVICE = env.IMS_SUPABASE_SERVICE_KEY;
-const ANON = env.IMS_SUPABASE_ANON_KEY; // optional — only needed for test 1
+// Genie's own project — the IMS lives in it (Dr Raghu, 2 Sep 2026).
+const URL_ = env.NEXT_PUBLIC_SUPABASE_URL;
+const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
+const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!URL_ || !SERVICE) {
-  console.error("IMS_SUPABASE_URL and IMS_SUPABASE_SERVICE_KEY must be in .env.local.");
+  console.error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be in .env.local.");
   process.exit(1);
 }
 
@@ -63,11 +68,11 @@ const ok = (name, pass, detail = "") => {
 // ---------------------------------------------------- 1. RLS, with anon key
 console.log("\n1. RLS — the anon key must see nothing\n");
 if (!ANON) {
-  console.log("  skip  IMS_SUPABASE_ANON_KEY not in .env.local. Add it to run this test —");
-  console.log("        it is the one that proves a leaked anon key is worthless.");
+  console.log("  skip  NEXT_PUBLIC_SUPABASE_ANON_KEY not in .env.local — this is the test");
+  console.log("        that proves a signed-in Genie account cannot read the IMS directly.");
 } else {
   const anon = rest(ANON);
-  for (const t of ["ims_document", "ims_certificate", "ims_register_entry", "core_task", "ims_profile"]) {
+  for (const t of ["ims_document", "ims_document_revision", "ims_certificate", "ims_register_entry", "core_task", "ims_access"]) {
     const { status, body } = await anon(`${t}?select=id&limit=1`);
     const empty = Array.isArray(body) && body.length === 0;
     const refused = status === 401 || status === 403;

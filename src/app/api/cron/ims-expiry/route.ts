@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { currentUser, errJson, HttpError } from "@/lib/auth";
-import { imsConfigured, imsDb, notInstalled } from "@/ims/db";
+import { currentUser, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
+import { imsDb, notInstalled } from "@/ims/db";
 import { sendImsMail } from "@/ims/mail";
 
 export const dynamic = "force-dynamic";
@@ -40,8 +40,6 @@ export async function GET(req: Request) {
       const u = await currentUser();
       if (!u || u.disabled) throw new HttpError(401, "The daily cron, or a signed-in hand.");
     }
-    if (!imsConfigured())
-      return NextResponse.json({ ok: false, note: "The IMS database is not connected on this deploy." });
 
     const db = imsDb();
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
@@ -55,7 +53,7 @@ export async function GET(req: Request) {
       .order("expiry_date");
     if (error) {
       if (notInstalled(error.message))
-        return NextResponse.json({ ok: false, note: "Run supabase-ims/migrations/ first." });
+        return NextResponse.json({ ok: false, note: "Run supabase/migrations/0112_ims_core.sql first." });
       throw new Error(error.message);
     }
 
@@ -111,15 +109,17 @@ export async function GET(req: Request) {
       // ---- and the nudge ----
       let to: string[] = [];
       if (c.renewal_owner_id) {
+        // Genie's own account — one id for a person, not a mirrored second.
         const { data: owner } = await db
-          .from("ims_profile").select("email").eq("id", c.renewal_owner_id).maybeSingle();
+          .from("profiles").select("email").eq("id", c.renewal_owner_id).maybeSingle();
         if (owner?.email) to = [owner.email];
       }
       if (!to.length) {
-        // No named owner is itself the finding. It goes to the MR.
+        // No named owner is itself the finding. It goes to the MR — whoever
+        // holds that role today, and the owner if nobody does.
         const { data: mr } = await db
-          .from("ims_profile").select("email").eq("role", "ims_admin").limit(1).maybeSingle();
-        if (mr?.email) to = [mr.email];
+          .from("ims_access").select("email").eq("role", "ims_admin").limit(1).maybeSingle();
+        to = [mr?.email || RAGHU_EMAIL];
       }
       const mail = await sendImsMail({
         to,
