@@ -10,6 +10,7 @@ import { GenieUsagePanel, ConsultRaghuPanel } from "./ConsultRaghu";
 import { APP_VERSION, UPDATES, EFFORT } from "@/lib/changelog";
 import SoftwareDescription from "./SoftwareDescription";
 import NextThirtyDays from "./NextThirtyDays";
+import JobCommercials from "./JobCommercials";
 import { TRADES, zeroCrew, templateFor, type Crew } from "@/lib/templates";
 import {
   today,
@@ -227,6 +228,8 @@ interface Job {
   escalation: string | null;
   amtNeeded: number | null;
   payOnDelivery: number | null;
+  /** Genie's own band — B/O, 0-50 … 700+. See 0115_job_mandays.sql. */
+  mandays?: string | null;
 }
 
 /**
@@ -495,7 +498,7 @@ export default function PlanningSuite({
   }, [workspace, canSeeDelivered]);
 
   // land on "My Week" within the suite, not the delivery board
-  const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "mplan" | "projects" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature" | "opsbook">(() => {
+  const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "mplan" | "projects" | "jobcomm" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature" | "opsbook">(() => {
     if (typeof window === "undefined") return "home";
     /**
      * A LINK MAY NAME THE TAB. The back-arrow on a project page says
@@ -506,7 +509,7 @@ export default function PlanningSuite({
      * Home every time, from wherever you had been.
      */
     const OK = ["home", "wip", "liveproj", "delivery", "load", "plan", "mplan",
-      "projects", "floor", "material", "esc", "erp", "upload", "admin", "feature", "opsbook"];
+      "projects", "jobcomm", "floor", "material", "esc", "erp", "upload", "admin", "feature", "opsbook"];
     try {
       const asked = new URLSearchParams(window.location.search).get("tab");
       if (asked && OK.includes(asked)) return asked as "home";
@@ -853,6 +856,7 @@ export default function PlanningSuite({
     ["plan", "Job Plan"],
     ["mplan", "Month & Qtr Plan"],
     ["projects", "Projects"],
+    ["jobcomm", "Job Commercials"],
   ];
 
   return (
@@ -1202,6 +1206,20 @@ export default function PlanningSuite({
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
       {workspace === "suite" && tab === "mplan" && <MonthQuarterPlan V={V} />}
       {workspace === "suite" && tab === "projects" && <ErpProjects />}
+      {/*
+        JOB COMMERCIALS (Dr Raghu, 2 Sep 2026) — after Projects, as asked.
+        The cash the order book should throw off, month by month, for the
+        13-week plan. Editing is planning's and the owners', because these
+        are terms, not observations.
+      */}
+      {workspace === "suite" && tab === "jobcomm" && (
+        <JobCommercials
+          jobs={byTDD}
+          canEdit={canEdit}
+          reload={reload}
+          today={TODAY}
+        />
+      )}
       {workspace === "suite" && tab === "plan" && <JobPlan isAdmin={isAdmin} board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} canPush={role === "admin" || role === "planner"} />}
       {workspace === "suite" && tab === "upload" && canUpload && <MorningUpload email={email} embedded />}
@@ -1890,7 +1908,7 @@ function JobsInProgressTab({ board, V, onOpen, canEdit, reload }: { board: Board
     id: j.id, tag: j.tag, cust: j.cust, fam: j.fam || "Unassigned",
     tdd: j.tdd, otd: j.otd, stat: j.stat, val: j.val, tpv: j.tpv, tpp: j.tpp,
     kit: j.kit, pct: j.pct, note: j.note, escalation: j.escalation,
-    amtNeeded: j.amtNeeded, payOnDelivery: j.payOnDelivery,
+    amtNeeded: j.amtNeeded, payOnDelivery: j.payOnDelivery, mandays: j.mandays ?? null,
     ownerInitials: j.ownerInitials, ownerName: j.ownerName,
   }));
   return (

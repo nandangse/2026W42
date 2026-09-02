@@ -78,7 +78,7 @@ const toWip = (j: PlanJob): WipJob => ({
   note: j.note || "",
   escalation: j.escalation ?? null,
   amtNeeded: j.amtNeeded ?? null,
-  payOnDelivery: j.pod ?? null,
+  payOnDelivery: j.pod ?? null, mandays: null,
   ownerInitials: null,
   ownerName: j.own ? j.own.split("@")[0] : null,
 });

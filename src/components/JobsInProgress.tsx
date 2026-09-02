@@ -44,6 +44,7 @@ export interface WipJob {
   escalation: string | null;
   amtNeeded: number | null;
   payOnDelivery: number | null;
+  mandays?: string | null;
   ownerInitials: string | null;
   ownerName: string | null;
 }
@@ -679,6 +680,9 @@ export function JobLightbox({
               kind="number" canEdit={canEdit} color={C.amber}
               display={job.amtNeeded == null ? "—" : V(job.amtNeeded)} onSave={(v) => save("amt_needed", v)} />
             <Bit label="Pending payment on delivery" value={job.payOnDelivery == null ? "—" : V(job.payOnDelivery)} color={C.green} />
+            {/* Dr Raghu, 2 Sep 2026: "Put it next to Pending Payment". */}
+            <PickBit label="Approx Mandays" value={job.mandays || ""} canEdit={canEdit}
+              options={MANDAY_BANDS} color={C.navy} onSave={(v) => save("mandays", v)} />
           </div>
 
           <EditText label="Current Project Escalation" value={job.escalation || ""} canEdit={canEdit}
@@ -811,6 +815,43 @@ function EditText({
       ) : (
         <div className="text-xs" style={{ color: C.body, lineHeight: 1.5 }}>{value || <span style={{ color: C.faint }}>— nothing recorded —</span>}</div>
       )}
+    </div>
+  );
+}
+
+/**
+ * APPROX MANDAYS (Dr Raghu, 2 Sep 2026). Bands, not a number.
+ *
+ * Nobody knows a job is 237 mandays; they know it is a two-to-three-hundred
+ * job — and a spurious 237 gets planned against as though somebody measured
+ * it. B/O is the honest answer for a bought-out job Nandan does not build at
+ * all, which is NOT zero mandays and must never average in as though it were.
+ */
+export const MANDAY_BANDS = ["B/O", "0-50", "51-100", "101-200", "201-300",
+  "301-400", "401-500", "501-600", "601-700", "700+"];
+
+/** A Bit whose value is chosen from a list rather than typed. */
+function PickBit({ label, value, options, canEdit, color, onSave }: {
+  label: string; value: string; options: string[]; canEdit: boolean;
+  color: string; onSave: (v: string) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  if (!canEdit) return <Bit label={label} value={value || "—"} color={value ? color : C.mute} />;
+  return (
+    <div className="rounded px-2 py-1" style={{ background: C.panel }}>
+      <div style={{ fontSize: 10, color: C.mute, letterSpacing: 0.4 }}>{label.toUpperCase()} ✎</div>
+      <select
+        value={value}
+        disabled={busy}
+        onChange={async (ev) => { setBusy(true); await onSave(ev.target.value); setBusy(false); }}
+        className="bg-transparent"
+        style={{ fontSize: 15, fontWeight: 800, color: value ? color : C.mute, border: 0, outline: "none", cursor: "pointer" }}
+      >
+        {/* Not recorded is a real answer and must stay reachable — otherwise
+            the first click can never be taken back. */}
+        <option value="">—</option>
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
     </div>
   );
 }

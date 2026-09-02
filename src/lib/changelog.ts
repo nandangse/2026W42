@@ -75,6 +75,31 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.3.0",
+    date: "2026-09-02",
+    module: "Job Commercials — what the order book should pay, and when",
+    items: [
+      "\"this will help me to get a little evaluation of the cash flows that can be expected from order execution. This is what we'll use for our 13-week cash flow plan\" (Dr Raghu, 2 Sep 2026). A new tab after Projects: every job's value, throughput and its percentage, kitting, production, advance, balance, TDD, manager, money invested and WIP labour \u2014 then four collection terms, then six months of expected cash spreading to the right.",
+      "THE PERCENTAGES ARE OF THE BALANCE, not of the value, and they land on TDD + 3, + 30, + 60 and + 90 days \u2014 the three days being the gap between a lorry leaving and the paperwork clearing. Each lands in whichever month holds that date, which is why a job dated late in a month pays in the next one, and why the forecast moves the moment somebody moves a delivery date.",
+      "A DASH IS NOT A ZERO, and this is the screen where that matters most. Number(null) is 0 in JavaScript; a defaulted zero here would read \"no advance recorded\" as \"no advance received\" and forecast money that is already in the bank \u2014 or was never coming. Every new column stays NULL until somebody says, and a job with no balance, no date or no terms contributes nothing to the months rather than a confident nought.",
+      "A job whose four terms add to more than 100% of its balance turns red. Terms that overcollect are a typo somewhere, and a cash plan built on one is worse than no plan.",
+      "It is a PLAN, NOT A LEDGER \u2014 what the order book should throw off if every job delivers on its date and every term is honoured. The screen says so at the bottom: test it against the bank statement, never instead of it.",
+      "Balance due prefers the board's own pending-payment figure and falls back to value less advance. Two sources, one answer, and the more specific one wins.",
+    ],
+  },
+  {
+    v: "4.3.2.3",
+    date: "2026-09-02",
+    module: "Approx Mandays on the job",
+    items: [
+      "\"in the jobs make a fied called Approx Mandays \u2014 B/O, 0-50, 51-100 \u2026 700+. Put it next to Pending Payment\" (Dr Raghu, 2 Sep 2026). It is there, as a picker, beside Pending payment on delivery.",
+      "A BAND, NOT A NUMBER, and stored as the band. Nobody knows a job is 237 mandays; they know it is a two-to-three-hundred job \u2014 and a spurious 237 gets planned against as though somebody measured it. B/O is the honest answer for a bought-out job Nandan does not build at all, which is NOT zero mandays and must never average in as though it were.",
+      "Genie's own field. The ERP has mandays_at_site_ and custom_planned_days, both numbers about something else; writing a band into either would corrupt a field somebody is already using.",
+      "Stored as text rather than an enum, because the bands are his and he may re-cut them \u2014 a check constraint would turn a re-cut into a migration and a deploy.",
+      "NEEDS MIGRATIONS 0115 and 0116.",
+    ],
+  },
+  {
     v: "4.3.2.2",
     date: "2026-09-02",
     module: "The twelve OTD dates are in the ERP, and OTD can travel by itself now",

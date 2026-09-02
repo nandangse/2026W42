@@ -30,6 +30,31 @@ const FIELDS: Record<string, { label: string; kind: "date" | "number" | "text"; 
   production_owner: { label: "Production Owner", kind: "text", genieOnly: true },
   kitting_owner:    { label: "Kitting Owner",    kind: "text", genieOnly: true },
   design_owner:     { label: "Design Owner",     kind: "text", genieOnly: true },
+  /**
+   * APPROX MANDAYS (Dr Raghu, 2 Sep 2026). A BAND, not a number: nobody knows
+   * a job is 237 mandays, they know it is a two-to-three-hundred job, and a
+   * spurious 237 gets planned against as though it were measured. B/O is the
+   * honest answer for a bought-out job Nandan does not build -- which is NOT
+   * zero mandays and must never average in as though it were.
+   *
+   * Genie's own. The ERP has mandays_at_site_ and custom_planned_days, both
+   * numbers about something else; writing a band into either would corrupt a
+   * field somebody else is already using.
+   */
+  mandays:          { label: "Approx Mandays",   kind: "text", genieOnly: true },
+  /**
+   * JOB COMMERCIALS (Dr Raghu, 2 Sep 2026) — the cash a job throws off, and
+   * when. Genie's own: the ERP carries a costing model that means something
+   * else, and writing a collection term into it would corrupt a field
+   * somebody is already using.
+   */
+  advance:     { label: "Advance received",     kind: "number", genieOnly: true },
+  invested:    { label: "Amount invested",      kind: "number", genieOnly: true },
+  wip_labour:  { label: "WIP labour invested",  kind: "number", genieOnly: true },
+  pay_pct_on:  { label: "% on delivery",        kind: "number", genieOnly: true },
+  pay_pct_30:  { label: "% at 30 days",         kind: "number", genieOnly: true },
+  pay_pct_60:  { label: "% at 60 days",         kind: "number", genieOnly: true },
+  pay_pct_90:  { label: "% at 90 days",         kind: "number", genieOnly: true },
 };
 
 /** What goes in the export — never null, never "null". */

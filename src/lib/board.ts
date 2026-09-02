@@ -53,6 +53,16 @@ export interface BoardJob {
   escalation: string | null;
   amtNeeded: number | null;
   payOnDelivery: number | null;
+  /** Genie's own band — B/O, 0-50 … 700+. See 0115_job_mandays.sql. */
+  mandays: string | null;
+  /** The cash a job throws off, and when — see 0116_job_commercials.sql. */
+  advance: number | null;
+  invested: number | null;
+  wipLabour: number | null;
+  payPctOn: number | null;
+  payPct30: number | null;
+  payPct60: number | null;
+  payPct90: number | null;
 }
 
 /** A person who can own jobs or be assigned tasks. */
@@ -109,6 +119,17 @@ function mapJob(r: any): BoardJob {
     // the one confusion this column must not make.
     amtNeeded: r.amt_needed == null ? null : Number(r.amt_needed),
     payOnDelivery: r.pay_on_delivery == null ? null : Number(r.pay_on_delivery),
+    mandays: (r.mandays as string | null) ?? null,
+    // NEVER Number(null) here: 0 would turn "nobody has recorded an advance"
+    // into "no advance was taken", and the cash forecast would promise money
+    // that is already in the bank -- or was never coming.
+    advance:   r.advance     == null ? null : Number(r.advance),
+    invested:  r.invested    == null ? null : Number(r.invested),
+    wipLabour: r.wip_labour  == null ? null : Number(r.wip_labour),
+    payPctOn:  r.pay_pct_on  == null ? null : Number(r.pay_pct_on),
+    payPct30:  r.pay_pct_30  == null ? null : Number(r.pay_pct_30),
+    payPct60:  r.pay_pct_60  == null ? null : Number(r.pay_pct_60),
+    payPct90:  r.pay_pct_90  == null ? null : Number(r.pay_pct_90),
   };
 }
 

@@ -51,6 +51,16 @@ export interface ParsedJob {
   escalation?: string | null;
   amtNeeded?: number | null;
   payOnDelivery?: number | null;
+  /** Genie's own band — see 0115_job_mandays.sql. B/O, 0-50 … 700+. */
+  mandays?: string | null;
+  /** The cash a job throws off, and when — see 0116_job_commercials.sql. */
+  advance?: number | null;
+  invested?: number | null;
+  wipLabour?: number | null;
+  payPctOn?: number | null;
+  payPct30?: number | null;
+  payPct60?: number | null;
+  payPct90?: number | null;
 }
 
 /**
