@@ -83,6 +83,22 @@ const PROBES = [
   ["crm", "0020 salesperson_plan", "salesperson_plan?select=profile_id"],
   ["crm", "0022 outbound_queue", "outbound_queue?select=id"],
   ["crm", "0023 open tracking", "message?select=track_token&limit=1"],
+  ["genie", "0111 IMS door (ims_access)", "ims_access?select=email"],
+  ["genie", "0111 IMS role on the door", "ims_access?select=role"],
+  ["genie", "0112 IMS settings (approval mode)", "ims_settings?select=approval_mode"],
+  ["genie", "0112 IMS doc numbering series", "ims_doc_series?select=next_serial"],
+  ["genie", "0112 IMS core_task (+ dedupe key)", "core_task?select=source_key"],
+  ["genie", "0112 IMS core_event", "core_event?select=starts_at"],
+  ["genie", "0112 IMS checklist engine", "core_checklist_template?select=status"],
+  ["genie", "0112 IMS certificates & statutory", "ims_certificate?select=kind"],
+  ["genie", "0112 IMS controlled documents", "ims_document?select=doc_no"],
+  ["genie", "0112 IMS document revisions", "ims_document_revision?select=rev_no"],
+  ["genie", "0112 IMS register engine", "ims_register_definition?select=columns"],
+  ["genie", "0112 IMS certification journey", "ims_certification?select=status"],
+  ["genie", "0112 IMS NC / RCA / CAPA", "ims_nonconformity?select=nc_no"],
+  ["genie", "0112 IMS welding (EXC3)", "ims_welder_qual?select=revalidation_due"],
+  ["genie", "0113 IMS standards seeded", "ims_standard?select=code"],
+  ["genie", "0113 IMS clause trees seeded", "ims_standard_clause?select=clause_no"],
 ];
 
 let missing = 0;

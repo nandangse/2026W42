@@ -306,6 +306,9 @@ interface AdminUser {
   /** Seva, customer service, at /seva (0107). Same arrangement. */
   seva_access: boolean;
   seva_implicit: boolean;
+  /** IMS, the management system, at /ims (0111). Same arrangement. */
+  ims_access: boolean;
+  ims_implicit: boolean;
 }
 
 const ROLE_OPTIONS: { value: string; label: string; hint: string }[] = [
@@ -6725,6 +6728,15 @@ function Admin({
     } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
   };
 
+  /** IMS, the seventh. Owner only, same as the rest. */
+  const setIms = async (id: string, grant: boolean) => {
+    setGaMsg("");
+    try {
+      await api.post("/api/admin/users", { action: "ims_access", id, grant });
+      loadUsers();
+    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
   /** Goals access from inside the Users table. Reloads both lists. */
   const setGoalsLevel = async (id: string, level: string) => {
     const who = (users ?? []).find((x) => x.id === id);
@@ -6988,6 +7000,7 @@ function Admin({
                   <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/kuber — Kuber, the accounts module">💰 Kuber</th>
                   <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/vishwakarma — Vishwakarma, the design module">🛠 Vishwakarma</th>
                   <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/seva — Seva, the customer-service module">🛎 Seva</th>
+                  <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/ims — the Integrated Management System">📐 IMS</th>
                 </tr>
               </thead>
               <tbody>
@@ -7024,6 +7037,12 @@ function Admin({
                         onChange={(e) => setSeva(u.id, e.target.checked)}
                         style={{ accentColor: "#0F766E", width: 14, height: 14, cursor: isOwner && !u.seva_implicit ? "pointer" : "default" }}
                         title={u.seva_implicit ? "The owner holds it already" : isOwner ? "Open Seva — the customer-service module" : `Only ${OWNER_EMAIL} may grant this`} />
+                    </td>
+                    <td className="py-1.5 text-center">
+                      <input type="checkbox" checked={!!u.ims_access} disabled={!isOwner || u.ims_implicit}
+                        onChange={(e) => setIms(u.id, e.target.checked)}
+                        style={{ accentColor: "#1B2D6B", width: 14, height: 14, cursor: isOwner && !u.ims_implicit ? "pointer" : "default" }}
+                        title={u.ims_implicit ? "The owner holds it already" : isOwner ? "Open the IMS — the Integrated Management System" : `Only ${OWNER_EMAIL} may grant this`} />
                     </td>
                   </tr>
                 ))}
