@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.1.0",
+    date: "2026-09-02",
+    module: "Every project gets its own page, and its description travels both ways",
+    items: [
+      "\"make it clickable and open each project in its own page. Make the url as genie.nandan.co.in/project/1716\" (Dr Raghu, 2 Sep 2026). The short number IS the address, because it is what people say out loud and type from memory \u2014 NGSE-PROJ-1716 reaches the same page, and so does the lower-case spelling. A URL typed from memory should not fail on punctuation.",
+      "The page answers what a project IS, then shows THE JOBS STANDING ON IT with their value, dates, kitting and production \u2014 a project without its jobs is a header, not a project \u2014 and then the ERP's whole record, folded, for the field the summary does not show. Each job number opens that job.",
+      "\"Short Summary Description - ERP / Description - Genie / Projects please mapp for the import and export too\". The ERP has carried this all along \u2014 the model, the platform, the max height \u2014 and Genie has had an empty description column waiting for it since the projects table was written. All 50 live ERP projects carry one; Genie held nought. The next Synchronise fills them.",
+      "AND IT GOES BACK. Jobs have been able to push corrections to the ERP since 29 August; projects could not, so a description written in Genie stayed in Genie. Project corrections now queue like any other and travel to the Project doctype \u2014 which needed the push itself taught the difference, because it put EVERY line to Jobmaster, and a project line sent there would have come back as a job that does not exist. That reads like a missing job rather than a missing feature, and it is the kind of error nobody chases.",
+      "Project name and customer are mapped in the same pass. Expect a long list on the next run: roughly 117 differences, nearly all of them blank-in-Genie becoming the ERP's value, which the ERP-wins default settles without a click.",
+    ],
+  },
+  {
     v: "4.3.0.4",
     date: "2026-09-02",
     module: "Drag a job to a new day; the calendar takes its colours from the owner",

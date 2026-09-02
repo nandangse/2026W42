@@ -104,7 +104,24 @@ export default function ErpProjects() {
                     style={i === 0
                       ? { position: "sticky", left: 0, background: ri % 2 ? "#FAF9F5" : "#fff", fontWeight: 700, color: C.navy, zIndex: 1 }
                       : { color: C.sub }}>
-                    {cell(r[c])}
+                    {/*
+                      THE NUMBER IS THE DOOR (Dr Raghu, 2 Sep 2026: "make it
+                      clickable and open each project in its own page. Make
+                      the url as genie.nandan.co.in/project/1716").
+
+                      The book answers WHICH project; the page answers what it
+                      is. The short number is the address because it is what
+                      people say out loud and type from memory.
+                    */}
+                    {i === 0 && r.name
+                      ? (
+                        <a href={`/project/${encodeURIComponent(String(r.name).replace(/^NGSE-PROJ-/i, ""))}`}
+                          className="underline decoration-dotted" style={{ color: C.navy }}
+                          title={`Open ${String(r.name)} on its own page`}>
+                          {String(r.name)}
+                        </a>
+                      )
+                      : cell(r[c])}
                   </td>
                 ))}
               </tr>

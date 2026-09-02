@@ -50,6 +50,22 @@ const ERP_FIELD: Record<string, string> = {
 const NUMERIC = new Set(["kit", "pct", "amt_needed"]);
 
 /**
+ * PROJECT corrections travel to a different doctype (Dr Raghu, 2 Sep 2026:
+ * "Short Summary Description - ERP / Description - Genie / Projects please
+ * mapp for the import and export too").
+ *
+ * The queue was written when only jobs could be corrected, so it put every
+ * line to Jobmaster. A project line sent there would have been rejected as a
+ * job that does not exist -- which reads like a missing job rather than a
+ * missing feature, and that is the kind of error nobody chases.
+ */
+const PROJECT_ERP_FIELD: Record<string, string> = {
+  description: "short_summary_description",
+};
+/** ERP project ids wear their doctype: NGSE-PROJ-1716. Jobs are numeric. */
+const isProjectRef = (id: string) => /^NGSE-PROJ-/i.test(String(id));
+
+/**
  * POST /api/erp-update
  *   { action: "exported", ids? } — mark applied by hand (the CSV road).
  *   { action: "push" }          — THE BUTTON (Dr Raghu, 29 Aug 2026: "me or
@@ -109,19 +125,23 @@ export async function POST(req: Request) {
       };
 
       for (const [jobId, lines] of byJob) {
-        const mappable = lines.filter((l) => ERP_FIELD[l.field]);
-        const orphans = lines.filter((l) => !ERP_FIELD[l.field]);
+        // Which book this correction belongs in, and under which names.
+        const isProj = isProjectRef(jobId);
+        const FIELD = isProj ? PROJECT_ERP_FIELD : ERP_FIELD;
+        const dt = isProj ? "Project" : doctype;
+        const mappable = lines.filter((l) => FIELD[l.field]);
+        const orphans = lines.filter((l) => !FIELD[l.field]);
         if (orphans.length) { rejected += orphans.length; await fate(orphans.map((o) => o.id), "rejected", "no ERP field mapped for this correction"); }
         if (!mappable.length) continue;
         try {
-          const probe = await fetch(`${base}/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(jobId)}`, { headers: EH });
-          if (probe.status === 404) { notInErp += mappable.length; await fate(mappable.map((l) => l.id), "not_in_erp", `no ${doctype} named ${jobId}`); continue; }
+          const probe = await fetch(`${base}/api/resource/${encodeURIComponent(dt)}/${encodeURIComponent(jobId)}`, { headers: EH });
+          if (probe.status === 404) { notInErp += mappable.length; await fate(mappable.map((l) => l.id), "not_in_erp", `no ${dt} named ${jobId}`); continue; }
           const patch: Record<string, unknown> = {};
           for (const l of mappable) {
             const v = String(l.new_value ?? "");
-            patch[ERP_FIELD[l.field]] = NUMERIC.has(l.field) ? Number(v.replace(/[^0-9.-]/g, "")) || 0 : v;
+            patch[FIELD[l.field]] = NUMERIC.has(l.field) ? Number(v.replace(/[^0-9.-]/g, "")) || 0 : v;
           }
-          const w = await fetch(`${base}/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(jobId)}`, {
+          const w = await fetch(`${base}/api/resource/${encodeURIComponent(dt)}/${encodeURIComponent(jobId)}`, {
             method: "PUT", headers: { ...EH, "content-type": "application/json" }, body: JSON.stringify(patch),
           });
           if (w.ok) { pushed += mappable.length; await fate(mappable.map((l) => l.id), "pushed"); }

@@ -136,7 +136,21 @@ const N = (v: unknown) => {
 export const PROJECT_FIELDS = [
   "name", "custom_project_director", "customer_committed_delivery_",
   "expected_end_date", "project_stage", "sales_order", "jobnumberslist", "status",
+  // Dr Raghu, 2 Sep 2026: "Short Summary Description - ERP / Description -
+  // Genie / Projects please mapp for the import and export too." The ERP has
+  // carried this all along -- the model, the platform, the max height -- and
+  // Genie has had an empty `description` column waiting for it.
+  "short_summary_description", "project_name", "customer",
 ];
+
+/**
+ * What a project correction can carry BACK to the ERP, and under which name
+ * there. Jobs have had this since 29 Aug; projects had nothing, so a
+ * description written in Genie stayed in Genie.
+ */
+export const PROJECT_PUSHABLE: Record<string, string> = {
+  description: "Short Summary Description",
+};
 
 export const JOB_FIELDS = [
   "name", "customer_tag", "product_family", "customer", "value",
@@ -223,6 +237,7 @@ const WATCHED: Record<string, string> = {
   stat: "Status", own: "Owner",
   mgr: "Manager", committed: "Committed", exp_end: "Expected end",
   stage: "Stage", so: "Sales order", delivered_on: "Delivered on",
+  description: "Short summary description", name: "Project name",
 };
 
 /**
@@ -302,6 +317,9 @@ export async function erpSync(
       exp_end: D(p.expected_end_date),
       stage: S(p.project_stage),
       so: S(p.sales_order),
+      name: S(p.project_name),
+      cust: S(p.customer),
+      description: S(p.short_summary_description),
       job_numbers: S(p.jobnumberslist).split(/[,\s]+/).filter(Boolean),
     }))
     .filter((p) => p.id);
@@ -394,9 +412,11 @@ export async function erpSync(
           && genieKeeps(kind, String(next.id), k)) {
         out[k] = prev[k];
         // and tell the ERP, where the ERP can hear it
-        if (kind === "job" && ERP_PUSHABLE[k]) {
+        const pushLabel = kind === "job" ? ERP_PUSHABLE[k]
+          : kind === "project" ? PROJECT_PUSHABLE[k] : undefined;
+        if (pushLabel) {
           toQueue.push({
-            job_id: String(next.id), field: k, label: ERP_PUSHABLE[k],
+            job_id: String(next.id), field: k, label: pushLabel,
             old_value: String(v ?? ""), new_value: String(prev[k] ?? ""),
           });
         }
