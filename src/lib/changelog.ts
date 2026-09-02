@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.9.1",
+    date: "2026-09-02",
+    module: "All seven sync fields are editable in the lightbox",
+    items: [
+      "\"sync means Production %, Kitting %, TDD, Amount needed next month, Current Project Escalation, Current Update, Status — these should be editable in the lightbox and then be able to be sync to ERP\" (Dr Raghu, 2 Sep 2026).",
+      "Six of the seven already were. STATUS was printed as plain text with no pencil — even though the ERP has always been able to receive it as job_status, and the queue has always been able to carry it. A field the ERP will take and Genie refuses to edit is the worst of both worlds: the correction ends up made in two places or in neither.",
+      "Status now edits like the rest, and every one of the seven was checked end to end rather than assumed — editable in the lightbox, permitted by /api/job-field, and mapped to a real ERPNext field. All seven pass on all three counts.",
+    ],
+  },
+  {
     v: "4.2.9.0",
     date: "2026-09-02",
     module: "Keeping Genie's answer now tells the ERP — the loop closes",

@@ -686,7 +686,21 @@ export function JobLightbox({
           <EditText label="Current Update" value={job.note || ""} canEdit={canEdit}
             tone={C.body} onSave={(v) => save("note", v)} hint="The W34-style line the ERP carries as Current Status" />
 
-          {job.stat && <div className="text-xs mt-2" style={{ color: C.sub }}><b>Status:</b> {job.stat}</div>}
+          {/* STATUS IS EDITABLE TOO (Dr Raghu, 2 Sep 2026, listing what sync
+              means: "Production %, Kitting %, TDD, Amount needed next month,
+              Current Project Escalation, Current Update, Status — these should
+              be editable in the lightbox and then be able to be sync to ERP").
+ 
+              Six of the seven already had a pencil; this one was printed as
+              plain text, though the ERP has always been able to receive it as
+              job_status. A field the ERP will take and Genie refuses to edit
+              is the worst of both — the correction gets made in two places or
+              in neither. */}
+          {(job.stat || canEdit) && (
+            <EditText label="Status" value={job.stat || ""} canEdit={canEdit}
+              tone={C.body} onSave={(v) => save("stat", v)}
+              hint="The ERP's Job Status — P: Assembly Fabrication, Q: Final Inspection, and the rest" />
+          )}
 
           {msg && (
             <div className="text-xs mt-2 font-semibold" style={{ color: msg.includes("✓") ? C.green : msg.startsWith("No change") ? C.mute : C.red }}>
