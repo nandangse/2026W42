@@ -18,6 +18,7 @@ export function Pane({
   children,
   who,
   print = false,
+  onPrint,
 }: {
   title: string;
   blurb?: string;
@@ -33,6 +34,8 @@ export function Pane({
    * whichever page is told to have it next.
    */
   print?: boolean;
+  /** Build and open your own page. Without it, the browser prints the screen. */
+  onPrint?: () => void;
 }) {
   return (
     <div id="hrms-print" className="p-3 md:p-4" style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
@@ -55,7 +58,22 @@ export function Pane({
           {tools}
           {print && (
           <button
-            onClick={() => window.print()}
+            /**
+             * A PANE MAY PRESS ITS OWN PAPER (Dr Raghu, 2 Sep 2026: "pdf npt
+             * working" — the Appraisal Table printed a blank sheet).
+             *
+             * window.print() asks the app's layout to become a document, and
+             * on a long frozen table it does not: the scroller, the sticky
+             * columns and the flex heights all have to be undone by a print
+             * stylesheet, and the same trick has already produced blank
+             * sheets twice before (the offer letter, the floor report).
+             *
+             * So a pane that knows how to build its own page hands one over,
+             * and only the panes that don't fall back to window.print().
+             * The purpose-built road is the one that already works for the
+             * delivery report and the calendar.
+             */
+            onClick={() => (onPrint ? onPrint() : window.print())}
             className="text-xs font-bold rounded px-2.5 py-1.5"
             style={{ background: "#16232F", color: "#fff" }}
             title="Print this page, or save it as a PDF for the file — the browser's own dialogue"

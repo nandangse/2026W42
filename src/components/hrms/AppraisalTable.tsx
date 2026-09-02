@@ -96,6 +96,87 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
     });
   }, [rows, q, type, dept, age, exp, minPay, maxPay]);
 
+  /**
+   * THE APPRAISAL TABLE ON PAPER.
+   *
+   * It prints WHAT IS ON SCREEN -- the filters are the point of this table,
+   * and a PDF that quietly reverts to all 202 people is not the document the
+   * person asked for. The heading says which filters were on, so a printout
+   * found on a desk in a fortnight can still be placed.
+   *
+   * Built as its own page rather than by asking the app's layout to become
+   * one: the frozen columns, the scroller and the flex heights all have to be
+   * undone by a print stylesheet, and that trick has produced blank sheets
+   * three times now.
+   */
+  const pressPaper = () => {
+    if (!shown.length) { window.alert("Nothing to print — no row matches these filters."); return; }
+    const esc = (v: unknown) => String(v ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const on: string[] = [];
+    if (type) on.push(type);
+    if (dept) on.push(dept);
+    if (age) on.push(`age ${age}`);
+    if (exp) on.push(`experience ${exp}`);
+    if (minPay || maxPay) on.push(`gross ${minPay || "any"}–${maxPay || "any"}`);
+    if (q.trim()) on.push(`"${q.trim()}"`);
+    const num = (v: number | null | undefined) => v == null ? "—" : inr(v);
+    const head = ["ID", "Name", "Department", "Designation", "Age", "Nandan Exp",
+      "Previous Gross", "New Gross", "Increase", "Increase %", "IDP Status"];
+    const body = shown.map((r) => `<tr>
+      <td class="n">${esc(r.id)}</td><td>${esc(r.name)}</td>
+      <td>${esc(r.department || "")}</td><td>${esc(r.designation || "")}</td>
+      <td class="r">${r.age == null ? "—" : r.age}</td>
+      <td class="r">${r.exp == null ? "—" : r.exp}</td>
+      <td class="r">${num(r.prevGross)}</td>
+      <td class="r b">${num(r.newGross)}</td>
+      <td class="r">${r.inc == null ? "—" : (r.inc >= 0 ? "+" : "−") + inr(Math.abs(r.inc))}</td>
+      <td class="r">${r.incPct == null ? "—" : (r.incPct >= 0 ? "+" : "") + r.incPct + "%"}</td>
+      <td>${esc(r.stage)}</td></tr>`).join("");
+    // Only the money that is actually on the page is totalled -- a blank
+    // gross adds nothing rather than a zero, and the count says how many.
+    const withPrev = shown.filter((r) => r.prevGross != null);
+    const withNew = shown.filter((r) => r.newGross != null);
+    const sumOf = (rs: Row[], k: "prevGross" | "newGross") => rs.reduce((a, r) => a + Number(r[k] || 0), 0);
+    const when = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
+    const html = `<!doctype html><html><head><meta charset="utf-8">
+<title>Appraisal Table — Nandan GSE</title>
+<style>
+  @page { size: A4 landscape; margin: 12mm; }
+  body { font: 9pt -apple-system, Arial, sans-serif; color: #16232F; margin: 0; }
+  h1 { font-size: 14pt; margin: 0 0 2px; }
+  .sub { color: #6A737D; font-size: 8.5pt; margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead { display: table-header-group; }
+  th { background: #22303C; color: #fff; text-align: left; padding: 5px 6px; font-size: 8pt; }
+  td { padding: 4px 6px; border-bottom: 1px solid #EFEDE7; }
+  tr { page-break-inside: avoid; }
+  tbody tr:nth-child(even) td { background: #FAF9F5; }
+  .r { text-align: right; } .n { font-weight: 700; color: #1B3A5C; } .b { font-weight: 700; }
+  tfoot td { border-top: 2px solid #22303C; font-weight: 700; padding-top: 6px; }
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+</style></head><body>
+<h1>Appraisal Table</h1>
+<div class="sub">Nandan GSE &middot; ${esc(when)} IST &middot; ${shown.length} of ${(rows || []).length} on the roll${on.length ? " &middot; " + esc(on.join(" &middot; ")) : ""}</div>
+<table><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+<tbody>${body}</tbody>
+<tfoot><tr>
+  <td colspan="6">TOTAL &middot; ${shown.length} shown</td>
+  <td class="r">${inr(sumOf(withPrev, "prevGross"))}</td>
+  <td class="r">${inr(sumOf(withNew, "newGross"))}</td>
+  <td colspan="3">${withPrev.length} with a previous gross &middot; ${withNew.length} with a new one</td>
+</tr></tfoot></table>
+</body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) { window.alert("Your browser blocked the print window. Allow pop-ups for this site and press PDF again."); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    // Let the page lay out before the dialogue opens, or Chrome measures an
+    // empty document and offers a blank sheet -- the very fault being fixed.
+    w.setTimeout(() => w.print(), 350);
+  };
+
   const link = (r: Row, text: string, bold = false) => (
     <button onClick={() => onOpenPerson(r.id)} className={`text-left ${bold ? "font-bold" : "font-semibold"}`}
       style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2 }}
@@ -130,7 +211,7 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
   const sub = (rows || []).filter((r) => r.stage === "Completed").length;
 
   return (
-    <Pane title="Appraisal Table" who={who} print
+    <Pane title="Appraisal Table" who={who} print onPrint={pressPaper}
       blurb="Everybody on one row: the money and where their appraisal stands. Click the EmployeeID or the name to open that person's Report Card.">
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: C.red }}>{msg}</div>}
 

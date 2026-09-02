@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.3.2",
+    date: "2026-09-02",
+    module: "The Appraisal Table's PDF prints something",
+    items: [
+      "\"pdf npt working\" (Dr Raghu, 2 Sep 2026) \u2014 it produced a blank sheet carrying nothing but Chrome's own date and URL.",
+      "THE CAUSE IS THE METHOD, NOT A TYPO. window.print() asks the running app's layout to become a document, so a print stylesheet has to undo the scroller, the frozen columns, the sticky headers and the flex heights of a live screen. On this table it undid them into nothing. The same trick has produced blank sheets twice before \u2014 the offer letter and the floor report \u2014 which is two warnings I should have taken the first time.",
+      "So the pane now hands the job to whoever knows how to build the page. The Appraisal Table presses its own: clean A4 landscape, a repeating header, rows that never split across a page, and totals that only add the money actually present \u2014 with a count of how many carried a figure at all, because summing blanks as zero is how a payroll total ends up lower than the payroll.",
+      "IT PRINTS WHAT IS ON SCREEN. The filters are the point of this table, and a PDF that quietly reverts to all 202 people is not the document anybody asked for. The heading names the filters that were on, so a printout found on a desk in a fortnight can still be placed.",
+      "Panes that have no page of their own still use the browser's print, unchanged.",
+    ],
+  },
+  {
     v: "4.3.3.1",
     date: "2026-09-02",
     module: "A salary range on the appraisal table",
