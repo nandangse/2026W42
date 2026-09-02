@@ -111,6 +111,13 @@ export async function GET(req: Request) {
       for (const g of sg || []) sevaEmails.add(String(g.email || "").toLowerCase());
     } catch { /* pre-0107 */ }
 
+    // IMS grants — the seventh, the Integrated Management System (0111).
+    const imsEmails = new Set<string>();
+    try {
+      const { data: ig } = await admin.from("ims_access").select("email");
+      for (const g of ig || []) imsEmails.add(String(g.email || "").toLowerCase());
+    } catch { /* pre-0111 */ }
+
     // Last sign-in lives in auth.users, not profiles, so it comes from the
     // admin auth API. Failure here must not take the page down — the column
     // simply reads "—".
@@ -167,6 +174,10 @@ export async function GET(req: Request) {
           sevaEmails.has(String(u.email || "").toLowerCase()) ||
           String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         seva_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        ims_access:
+          imsEmails.has(String(u.email || "").toLowerCase()) ||
+          String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        ims_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         goals_level:
           String(u.email || "").toLowerCase() === RAGHU_EMAIL
             ? "edit"
@@ -476,6 +487,30 @@ export async function POST(req: Request) {
         }
       } else {
         const { error } = await admin.from("seva_access").delete().eq("email", target);
+        if (error) throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    /** { action: "ims_access", id, grant } — owner only, as with HRMS. */
+    if (body.action === "ims_access") {
+      if (!caller.isOwner)
+        throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant the IMS.`);
+      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+      const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
+      const target = String(t?.email || "").toLowerCase();
+      if (!target) return NextResponse.json({ error: "no such user" }, { status: 404 });
+      if (target === RAGHU_EMAIL)
+        return NextResponse.json({ error: "The owner holds the IMS implicitly." }, { status: 400 });
+      if (body.grant) {
+        const { error } = await admin.from("ims_access").upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
+        if (error) {
+          if (/ims_access|schema cache|does not exist/i.test(error.message))
+            return NextResponse.json({ error: "Run migration 0111 first — the IMS grant table doesn't exist yet" }, { status: 400 });
+          throw new Error(error.message);
+        }
+      } else {
+        const { error } = await admin.from("ims_access").delete().eq("email", target);
         if (error) throw new Error(error.message);
       }
       return NextResponse.json({ ok: true });

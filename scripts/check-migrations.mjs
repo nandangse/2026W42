@@ -23,6 +23,8 @@ const env = Object.fromEntries(
 const DBS = {
   genie: { url: env.NEXT_PUBLIC_SUPABASE_URL, key: env.SUPABASE_SERVICE_ROLE_KEY },
   crm: { url: env.CRM_SUPABASE_URL, key: env.CRM_SUPABASE_SERVICE_KEY },
+  // The IMS is a separate fork with its own project, like the CRM.
+  ims: { url: env.IMS_SUPABASE_URL, key: env.IMS_SUPABASE_SERVICE_KEY },
 };
 
 // probe = a select that only succeeds when the migration ran.
@@ -83,6 +85,22 @@ const PROBES = [
   ["crm", "0020 salesperson_plan", "salesperson_plan?select=profile_id"],
   ["crm", "0022 outbound_queue", "outbound_queue?select=id"],
   ["crm", "0023 open tracking", "message?select=track_token&limit=1"],
+  ["genie", "0111 IMS door (ims_access)", "ims_access?select=email"],
+  ["ims", "IMS 0001 profile + roles", "ims_profile?select=role"],
+  ["ims", "IMS 0001 settings (approval mode)", "ims_settings?select=approval_mode"],
+  ["ims", "IMS 0001 doc numbering series", "ims_doc_series?select=next_serial"],
+  ["ims", "IMS 0001 core_task (+ dedupe key)", "core_task?select=source_key"],
+  ["ims", "IMS 0001 core_event", "core_event?select=starts_at"],
+  ["ims", "IMS 0001 checklist engine", "core_checklist_template?select=status"],
+  ["ims", "IMS 0001 certificates & statutory", "ims_certificate?select=kind"],
+  ["ims", "IMS 0001 controlled documents", "ims_document?select=doc_no"],
+  ["ims", "IMS 0001 document revisions", "ims_document_revision?select=rev_no"],
+  ["ims", "IMS 0001 register engine", "ims_register_definition?select=columns"],
+  ["ims", "IMS 0001 certification journey", "ims_certification?select=status"],
+  ["ims", "IMS 0001 NC / RCA / CAPA", "ims_nonconformity?select=nc_no"],
+  ["ims", "IMS 0001 welding (EXC3)", "ims_welder_qual?select=revalidation_due"],
+  ["ims", "IMS 0002 standards seeded", "ims_standard?select=code"],
+  ["ims", "IMS 0002 clause trees seeded", "ims_standard_clause?select=clause_no"],
 ];
 
 let missing = 0;

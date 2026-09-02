@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/playbooks",
       "schedule": "30 18 * * *"
+    },
+    {
+      "path": "/api/cron/ims-expiry",
+      "schedule": "30 1 * * *"
     }
   ]
 }
