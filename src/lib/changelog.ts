@@ -75,6 +75,28 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.9.3",
+    date: "2026-09-02",
+    module: "The frozen plan goes to the floor, from Raghu's own Gmail",
+    items: [
+      "\"can this be sent by Raghus Oauth email?\" \u2014 and the question exposed something worse. The screen was saying RESEND_API_KEY not set, which means NO plan mail had ever left Genie. Not one. Every signature since Save-as-draft shipped went out silent, and I had said the mail already went. It did not.",
+      "It now rides the same connected Gmail that sends every quotation \u2014 proven this week on a real one \u2014 so it needs no third-party key, and a plan arriving from raghu@nandan.co.in is a different instruction from one arriving from a robot. Resend stays only as the fallback, and where neither is available the screen names which, rather than implying the mail went.",
+      "The first attempt looked the mailbox up in the WRONG DATABASE: Genie's profiles.id, when the mailbox lives in the CRM against the CRM's own profile uuid. Same man, two ids, and it would have reported \"Gmail is not connected\" while the mailbox sat there active. Caught before it shipped, by checking both databases rather than reading the code.",
+      "\"its important that the mail goes to all!\" (Dr Raghu, 2 Sep 2026). Raghu's signature is not an acknowledgement to one person \u2014 it is the month's instruction, so it goes to the floor: to JC Kumar, Cdr Tushar and Raghu, cc Yashavantha, Mukesh, Suresh, Pankaj, Planning and Projects, with the signed PDF attached and the standing order to read On Floor every day. Anybody ELSE's signature still gets the personal note, cc Raghu, Tushar and Pankaj.",
+      "The subject names the month. w.label reads MTD/QTD/YTD, which is fine beside the numbers on a screen and useless in an inbox \u2014 \"Frozen Plan for MTD\" tells nobody which month was frozen. It now reads September 2026.",
+      "A draft still mails nobody.",
+    ],
+  },
+  {
+    v: "4.2.9.2",
+    date: "2026-09-02",
+    module: "The tallies carry throughput as well as value",
+    items: [
+      "\"in this show the throughput also\" (Dr Raghu, 2 Sep 2026) — every BY PRODUCT FAMILY and BY CUSTOMER chip now reads count · value · throughput, on the plan desk and in the signed PDF alike.",
+      "It is worth the width: the two moneys rank a family DIFFERENTLY. A big-value line bought in as a bought-out item can earn less than a small one made in-house, and a plan read on value alone gets that backwards. Hovering a chip adds the throughput as a percentage of value, which is where that shows up sharpest.",
+    ],
+  },
+  {
     v: "4.2.9.1",
     date: "2026-09-02",
     module: "All seven sync fields are editable in the lightbox",

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser, errJson, HttpError, type AuthedUser } from "@/lib/auth";
+import { requireUser, errJson, HttpError, RAGHU_EMAIL, type AuthedUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +28,38 @@ const STRATCOM_CC = "stratcom@nandan.co.in";
  * changing the list is one edit and not a hunt.
  */
 const PLAN_CC = ["raghu@nandan.co.in", "tushar@nandan.co.in", "pankajs@nandan.co.in"];
+
+/**
+ * WHO THE FROZEN PLAN GOES TO (Dr Raghu, 2 Sep 2026: "its important that the
+ * mail goes to all!").
+ *
+ * When RAGHU signs, the plan is approved for the whole works, so it is not an
+ * acknowledgement to one person any more -- it is the month's instruction, and
+ * it goes to the floor. Anybody else's signature still gets the personal note.
+ */
+/**
+ * The period in words. w.label is "MTD"/"QTD"/"YTD", which is fine on a screen
+ * beside the numbers and useless in a subject line -- "Frozen Plan for MTD"
+ * tells nobody which month was frozen. The key carries the truth: 2026-09,
+ * 2026-Q3, FY26-27.
+ */
+function periodName(key: string, label: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(key);
+  if (m) {
+    const names = ["January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"];
+    return `${names[Number(m[2]) - 1]} ${m[1]}`;
+  }
+  const q = /^(\d{4})-Q(\d)$/.exec(key);
+  if (q) return `Q${q[2]} ${q[1]}`;
+  return key || label;
+}
+
+const FROZEN_TO = ["jckumar@nandan.co.in", "tushar@nandan.co.in", "raghu@nandan.co.in"];
+const FROZEN_CC = [
+  "yashavantha@nandan.co.in", "mukesh@nandan.co.in", "suresh@nandan.co.in",
+  "pankajs@nandan.co.in", "planning@nandan.co.in", "projects@nandan.co.in",
+];
 
 const istToday = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
 const cr = (n: number) => `₹${(n / 1e7).toFixed(2)} Cr`;
@@ -593,6 +625,7 @@ export async function POST(req: Request) {
        * he asked to be kept: a signed plan that does not say whose it is, is
        * a plan nobody owns.
        */
+      let notesMail = "";
       const planTitle = `Plan of ${u.displayName || u.email.split("@")[0]} Dated ${dmy(T)}`;
       const { planPdfHtml, PLAN_FOOTER } = await import("@/lib/plan-pdf");
       const pdfHtml = planPdfHtml({
@@ -614,18 +647,45 @@ export async function POST(req: Request) {
         } catch { pdfB64 = ""; }   // the mail still goes; it just goes bare
       }
 
-      // the mail — attempted, never load-bearing, and NEVER for a draft:
-      // a mail is what makes a number other people's business.
+      /**
+       * THE MAIL GOES THROUGH RAGHU'S OWN GMAIL (Dr Raghu, 2 Sep 2026: "can
+       * this be sent by Raghus Oauth email?").
+       *
+       * It could, and now it does — and the question exposed something worse:
+       * the screen was reporting "RESEND_API_KEY not set", which means NO
+       * plan mail had ever gone out. The code path existed and the key did
+       * not, so every signature since Save-as-draft shipped has been silent.
+       *
+       * His connected mailbox is the better road regardless. It is the same
+       * OAuth Gmail that sends every quotation — proven this week on a real
+       * one to Taj Sats — it needs no third-party key, and a plan arriving
+       * from raghu@nandan.co.in is a different instruction from one arriving
+       * from a robot. Resend stays as the fallback for the day the mailbox is
+       * disconnected, and where neither is available the screen says exactly
+       * which, rather than implying the mail went.
+       */
       let mailed = "";
-      const key = isDraft ? "" : process.env.RESEND_API_KEY;
-      if (key) {
-        /**
-         * HIS WORDS (Dr Raghu, 1 Sep 2026), tidied only for spelling — the
-         * sentiment is the point and it is his: thanks, here it is, now go
-         * and make it happen.
-         */
+      if (!isDraft) {
         const who = u.displayName || u.email.split("@")[0];
-        const html = `
+        // Raghu's signature is the month's instruction; everyone else's is theirs.
+        const broadcast = u.isOwner;
+        const subject = broadcast
+          ? `Frozen Plan for ${periodName(w.key, w.label)} as per the various discussions in the BRM and PRE`
+          : "Thanks for submitting your plan";
+        const html = broadcast ? `
+<p>Dear All!</p>
+<p>As discussed here is the plan for the Months which is as per approved plan</p>
+<p>This is digitally signed.<br>the pdf is attached.</p>
+<p>Please review the plan EVERYDAY on "On Floor"<br>
+<a href="https://genie.nandan.co.in/on-floor">genie.nandan.co.in/on-floor</a></p>
+<p>Lets make some magic happen.</p>
+<p>Raghu<br><i>Attached: Months frozen plan!</i></p>
+<hr>
+<p style="color:#777;font-size:12px">
+${esc(planTitle)} &middot; ${esc(w.label)} (${esc(w.key)})<br>
+The plan as it stands: <b>${plan.jobs} jobs</b> &middot; ${cr(plan.value)} &middot; ${cr(plan.throughput)} throughput<br>
+The realistic read, on the dates and the belief on record: <b>${real.jobs} at 50% or better</b> &middot; ${cr(real.value)} &middot; ${cr(real.throughput)} throughput
+</p>` : `
 <p>Dear ${esc(who)}</p>
 <p>Thanks for submitting the plan. It's as attached!</p>
 <p>Now do what it takes to make it happen!</p>
@@ -636,27 +696,71 @@ ${esc(planTitle)} · ${esc(w.label)} (${esc(w.key)})<br>
 The plan as it stands: <b>${plan.jobs} jobs</b> · ${cr(plan.value)} · ${cr(plan.throughput)} throughput<br>
 The realistic read, on your dates and your belief: <b>${real.jobs} at 50% or better</b> · ${cr(real.value)} · ${cr(real.throughput)} throughput
 </p>`;
+        const fileName = `${planTitle.replace(/[^A-Za-z0-9 .-]/g, "")}.pdf`;
+        // Nobody is addressed twice: a name on the To line is dropped from Cc.
+        const to = broadcast ? FROZEN_TO : [u.email];
+        const seen = new Set(to.map((a) => a.toLowerCase()));
+        const cc = (broadcast ? FROZEN_CC : PLAN_CC).filter((a) => !seen.has(a.toLowerCase()));
+
+        // 1. Raghu's own Gmail, over OAuth.
+        let sentBy = "";
         try {
-          const fileName = `${planTitle.replace(/[^A-Za-z0-9 .-]/g, "")}.pdf`;
-          const r = await fetch("https://api.resend.com/emails", {
-            method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-            body: JSON.stringify({
-              from: "Raghunandan Jagdish <raghu@nandan.co.in>",
-              reply_to: "raghu@nandan.co.in",
-              to: [u.email],
-              // the standing witnesses, minus the signer if they are one of
-              // them — nobody needs their own name in their own cc
-              cc: PLAN_CC.filter((a) => a.toLowerCase() !== u.email.toLowerCase()),
-              subject: "Thanks for submitting your plan",
-              html,
-              ...(pdfB64 ? { attachments: [{ filename: fileName, content: pdfB64 }] } : {}),
-            }),
-          });
-          mailed = r.ok
-            ? `${u.email} · cc ${PLAN_CC.filter((a) => a.toLowerCase() !== u.email.toLowerCase()).join(", ")}${pdfB64 ? " · PDF attached" : " · PDF could not be pressed"}`
-            : `send failed (${r.status})`;
-        } catch { mailed = "send failed (network)"; }
-      } else mailed = "RESEND_API_KEY not set";
+          /**
+           * Raghu's id AS THE CRM KNOWS IT. The mailbox row lives in the CRM's
+           * database and points at the CRM's own `profile` table; Genie's
+           * profiles.id is a different uuid for the same man and finds nothing
+           * (docs/DATABASE-SPLIT.md: matched on EMAIL, never on id). Written
+           * against Genie's table first, this reported "Gmail is not
+           * connected" while the mailbox sat there active.
+           */
+          const { crmDb: cdb } = await import("@/crm/db");
+          const { data: rp } = await cdb().from("profile")
+            .select("id").eq("email", RAGHU_EMAIL).maybeSingle();
+          if (rp?.id) {
+            const { myMailbox, accessTokenFor, gmailSendMixed } = await import("@/crm/gmail");
+            const box = await myMailbox(String(rp.id));
+            if (box) {
+              const token = await accessTokenFor(String(box.id));
+              await gmailSendMixed(
+                token, String(box.email_address), to.join(", "), subject, html,
+                pdfB64 ? [{ name: fileName, mime: "application/pdf", base64: pdfB64 }] : [],
+                cc.join(", "), undefined, "Raghunandan Jagdish",
+              );
+              sentBy = `${to.join(", ")} · cc ${cc.join(", ")} · from ${box.email_address}${pdfB64 ? " · PDF attached" : " · no PDF"}`;
+            }
+          }
+        } catch (e) {
+          sentBy = "";
+          notesMail = `Gmail refused: ${e instanceof Error ? e.message : String(e)}`;
+        }
+
+        // 2. Resend, if the mailbox was not there.
+        if (!sentBy) {
+          const key = process.env.RESEND_API_KEY;
+          if (key) {
+            try {
+              const r = await fetch("https://api.resend.com/emails", {
+                method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+                body: JSON.stringify({
+                  from: "Raghunandan Jagdish <raghu@nandan.co.in>",
+                  reply_to: "raghu@nandan.co.in",
+                  to, cc, subject, html,
+                  ...(pdfB64 ? { attachments: [{ filename: fileName, content: pdfB64 }] } : {}),
+                }),
+              });
+              sentBy = r.ok ? `${to.join(", ")} · cc ${cc.join(", ")} · via Resend` : `send failed (${r.status})`;
+            } catch { sentBy = "send failed (network)"; }
+          } else {
+            sentBy = notesMail
+              ? `NOT SENT — ${notesMail}, and no RESEND_API_KEY as a fallback`
+              : "NOT SENT — Raghu's Gmail is not connected in the CRM, and RESEND_API_KEY is not set";
+          }
+        }
+        mailed = sentBy;
+      } else {
+        mailed = "";   // a draft is nobody else's business
+      }
+
       if (signed?.id)
         await admin.from("plan_signoff").update({ emailed: mailed }).eq("id", signed.id).then(() => null, () => null);
 

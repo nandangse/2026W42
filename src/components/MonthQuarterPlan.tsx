@@ -482,9 +482,14 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
               {list.map(([k, c]) => (
                 <span key={k} className="rounded border px-2 py-1"
                   style={{ borderColor: C.line, background: "#FAF9F5", fontSize: 11.5, lineHeight: 1.3 }}
-                  title={`${c.n} job${c.n === 1 ? "" : "s"} · ${V(c.v)} · ${V(c.t)} throughput`}>
+                  title={`${c.n} job${c.n === 1 ? "" : "s"} · ${V(c.v)} value · ${V(c.t)} throughput${c.v ? ` · ${Math.round((c.t / c.v) * 100)}% of value` : ""}`}>
+                  {/* throughput beside the value (Dr Raghu, 2 Sep 2026) —
+                      the two rank a family differently, and a big-value line
+                      bought in as a bought-out item can earn less than a
+                      small one made in-house. */}
                   <b className="tnum" style={{ color: C.navy }}>{c.n}</b> {k}
                   <span style={{ color: C.mute }}> · {V(c.v)}</span>
+                  <span style={{ color: C.green }}> · {V(c.t)}</span>
                 </span>
               ))}
             </div>

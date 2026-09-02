@@ -85,15 +85,20 @@ ${money ? `<td class="n">${cr(Number(r.val) || 0)}</td><td class="n">${cr(Number
 
   /** Counts by product family and by customer, in his own shorthand. */
   const tally = (key: string) => {
-    const m = new Map<string, number>();
+    const m = new Map<string, { n: number; v: number; t: number }>();
     for (const r of i.snapshot || []) {
       const k = String(r[key] || "").trim() || "—";
-      m.set(k, (m.get(k) || 0) + 1);
+      const c = m.get(k) || { n: 0, v: 0, t: 0 };
+      c.n++; c.v += Number(r.val) || 0; c.t += Number(r.tp) || 0;
+      m.set(k, c);
     }
-    return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    return [...m.entries()].sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0]));
   };
-  const chips = (list: [string, number][]) =>
-    list.map(([k, n]) => `<span class="chip"><b>${n}</b> ${esc(k)}</span>`).join("");
+  /** Count, value and THROUGHPUT — the two moneys rank a family differently. */
+  const chips = (list: [string, { n: number; v: number; t: number }][]) =>
+    list.map(([k, c]) =>
+      `<span class="chip"><b>${c.n}</b> ${esc(k)}${money ? ` · ${cr(c.v)} · <span style="color:#0D7A3F">${cr(c.t)}</span>` : ""}</span>`,
+    ).join("");
 
   const person = (p: PlanPerson, kind: "signed" | "draft" | "none") => `
 <div class="sig ${kind}">
@@ -150,10 +155,18 @@ td.team { font-size: 8pt; }
 .tot { margin-top: 4mm; font-size: 9.5pt; }
 .tot b { color: #E8600A; }
 
-.sigwrap { margin-top: 6mm; page-break-inside: avoid; border-top: 2px solid #22303C; padding-top: 3mm; }
+/* THE GAP (Dr Raghu, 2 Sep 2026: "why this gap in pdf?").
+   The whole signature block carried page-break-inside: avoid, so the moment
+   it no longer fitted in what was left of the page Chromium moved ALL of it
+   to the next one — leaving the half page of white he was looking at. The
+   rule belongs on the individual cards, which must not be sliced through a
+   person's name; the block itself is free to start where it lands and carry
+   on overleaf. */
+.sigwrap { margin-top: 6mm; border-top: 2px solid #22303C; padding-top: 3mm; }
+.sighead, .sigrow { break-inside: avoid; page-break-inside: avoid; }
 .sighead { font-size: 7.5pt; font-weight: 800; letter-spacing: .08em; color: #8A94A0; margin: 2.5mm 0 1.5mm; }
 .sigrow { display: flex; flex-wrap: wrap; gap: 3mm; }
-.sig { border: 1px solid #E2E0DA; border-radius: 2mm; padding: 2mm 3mm; min-width: 46mm; }
+.sig { break-inside: avoid; page-break-inside: avoid; border: 1px solid #E2E0DA; border-radius: 2mm; padding: 2mm 3mm; min-width: 46mm; }
 .sig.signed { background: #E8F3EC; border-color: #B7DFC8; }
 .sig.draft  { background: #F4F2EC; }
 .sig.none   { background: #fff; border-style: dashed; }
