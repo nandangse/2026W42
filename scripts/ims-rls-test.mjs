@@ -73,10 +73,17 @@ if (!ANON) {
 } else {
   const anon = rest(ANON);
   for (const t of ["ims_document", "ims_document_revision", "ims_certificate", "ims_register_entry", "core_task", "ims_access"]) {
-    const { status, body } = await anon(`${t}?select=id&limit=1`);
+    // select=* rather than select=id: ims_access is keyed on EMAIL and has no
+    // id column, and asking for one returns 400 "column does not exist" — which
+    // is a broken probe, not a locked table. A test that scores its own typo as
+    // a security pass is worse than no test.
+    const { status, body } = await anon(`${t}?select=*&limit=1`);
     const empty = Array.isArray(body) && body.length === 0;
     const refused = status === 401 || status === 403;
-    ok(`anon sees nothing in ${t}`, empty || refused, `HTTP ${status}, ${Array.isArray(body) ? body.length : "?"} rows`);
+    const broken = status === 400;
+    ok(`anon sees nothing in ${t}`, (empty || refused) && !broken,
+       broken ? `HTTP 400 — the PROBE is wrong, not the table: ${JSON.stringify(body).slice(0, 120)}`
+              : `HTTP ${status}, ${Array.isArray(body) ? body.length : "?"} rows`);
   }
   const { status } = await anon("ims_document", {
     method: "POST", body: JSON.stringify({ sys: "QMS", doc_type: "PRO", title: "anon should not manage this" }),
@@ -130,9 +137,9 @@ ok("5 system registers", (await count("ims_register_definition?is_system=eq.true
 console.log(`
 4. The role rules — checked through /api/ims/*, not through SQL
 
-   These are enforced in the route handlers (the IMS database cannot validate
-   a Genie session, so there are no policies to test). Sign in as each person
-   and confirm:
+   These are enforced in the route handlers, not in policies — RLS here is a
+   shut door, not a rule engine, so there is nothing in SQL to test. Sign in
+   as each person and confirm:
 
    member     · Documents shows ONLY approved ones — no draft, no in-review
               · Standards shows "restricted" instead of an Open-copy button
