@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.4.0",
+    date: "2026-09-02",
+    module: "The Target Delivery Date decides the plan, and nothing else",
+    items: [
+      "\"This, at the bottom, should be as per the target delivery date current and not as per my plan. Now it's going to get frozen, so the target delivery date current is what really matters and not anybody's plan\" (Dr Raghu, 2 Sep 2026).",
+      "THIS REVERSES THE PULL-IN OF 1 SEPTEMBER, and knowingly. Back then a planner could NOT move a job's real date, so \"my best estimate\" was the only way to say a job dated October would land in September. Since then the TDD became editable everywhere \u2014 lightbox, calendar drag \u2014 and travels to Jobmaster. The opinion has a proper home now, so letting it decide MEMBERSHIP as well only made the tallies disagree with the board: Veda Aeronautics read 8 jobs and Rs 3.60 Cr on a desk whose dates say 7 and Rs 2.96 Cr. A plan about to be frozen and mailed to nine people cannot count a job the ERP dates in another month.",
+      "\"This should be in a target delivery date, and that in turn will get synchronised with the ERP\" \u2014 so the date box on the plan desk now moves the REAL date. Two dates on one row is how the plan and the board come to disagree. It writes through the same /api/job-field the lightbox uses and queues for Jobmaster like any other correction: one road, not a second one that behaves almost the same.",
+      "The belief still weights the money. It simply no longer decides who is in the room.",
+      "The screen and the server were taught the rule TOGETHER, so the card you look at and the number in the signed PDF cannot tell two different stories about the same month.",
+      "\"keep a button on top to refresh it\" \u2014 \u21bb Refresh reads the board again. The desk took its read when the page opened, so a date changed in the job plan left it quietly showing yesterday, which is exactly how a plan gets frozen against dates that have already moved.",
+      "THE HOURLY CRON IS OFF, as asked. But the ledger says something worth knowing: NO CRON HAS EVER RUN THE JOB SYNCHRONISATION. All fourteen runs on record are Raghu's own, by hand, and the only hourly job was a CRM opportunity pull that never touches a delivery date. Whatever moved those dates, it was not a robot in the night.",
+    ],
+  },
+  {
     v: "4.3.3.3",
     date: "2026-09-02",
     module: "Workers get neither HRA nor Medical Allowance",

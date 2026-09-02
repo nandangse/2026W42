@@ -114,6 +114,21 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
   }, [kind]);
   useEffect(() => { load(); }, [load]);
 
+  /**
+   * Moving a delivery date from the plan desk. It goes through the same
+   * /api/job-field the lightbox uses, so it queues for the ERP exactly like a
+   * correction made anywhere else -- one road, not a second one that behaves
+   * almost the same.
+   */
+  const [savingTdd, setSavingTdd] = useState<string | null>(null);
+  const setTdd = async (jobId: string, value: string) => {
+    setSavingTdd(jobId);
+    const r = await api.post("/api/job-field", { job_id: jobId, field: "tdd", value });
+    setSavingTdd(null);
+    if (!r.ok) { window.alert(r.error || "Could not move the date."); return; }
+    load();                       // the window may no longer hold this job
+  };
+
   const saveRow = (jobId: string, next: { comment: string; belief: number; est: string }) => {
     setRows((r) => ({ ...r, [jobId]: next }));
     if (timers.current[jobId]) clearTimeout(timers.current[jobId]);
@@ -188,6 +203,19 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
             </button>
           ))}
         </div>
+        {/*
+          REFRESH (Dr Raghu, 2 Sep 2026: "keep a button on top to refresh it
+          so that I can also reload the months plan there").
+          The desk reads the board once, when it opens. Change a target
+          delivery date in the job plan or on the calendar and this page goes
+          on showing the read it took on arrival -- which is exactly how a
+          plan gets frozen against dates that have already moved.
+        */}
+        <button onClick={load} className="rounded-full border px-3 py-1 text-xs font-bold"
+          style={{ color: C.navy, borderColor: C.line, background: "#fff" }}
+          title="Read the board again — picks up any target delivery date changed since this page opened">
+          ↻ Refresh
+        </button>
         <span className="text-xs" style={{ color: C.mute }}>{fmtFull(d.window.from)} → {fmtFull(d.window.end)} · {d.window.key}</span>
         <div className="flex-1" style={{ minWidth: 10 }} />
         {/* THE DOCUMENT (Dr Raghu, 1 Sep 2026: "let the pdf be available on
@@ -266,9 +294,12 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
            * IN counts it, which is why the estimate is read rather than the
            * TDD it was born from.
            */
+          // THE BOARD'S DATE DECIDES (2 Sep 2026) — the same rule the server
+          // now uses, so the card on the screen and the number in the signed
+          // PDF cannot tell two different stories about the same month.
           const inWin = (id: string, fallbackTdd: string | null) => {
-            const est = String(rows[id]?.est || fallbackTdd || "").slice(0, 10);
-            return !!est && est >= d.window.from && est <= d.window.end;
+            const own = String(fallbackTdd || "").slice(0, 10);
+            return !!own && own >= d.window.from && own <= d.window.end;
           };
           const wb = (d.jobs || []).reduce((a, j) => {
             if (!inWin(j.id, j.tdd)) return a;
@@ -408,8 +439,25 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
                   <td className="px-2 py-1.5 text-center tnum font-bold whitespace-nowrap"
                     style={{ color: j.pct >= 90 ? C.green : j.pct >= 50 ? "#D97706" : C.red }}>{j.pct}%</td>
                   <td className="px-2 py-1.5 text-center">
-                    <input type="date" value={r.est} onChange={(e) => saveRow(j.id, { ...r, est: e.target.value })}
-                      className="text-xs border rounded px-1 py-0.5 tnum" style={{ borderColor: r.est && j.tdd && r.est !== j.tdd ? C.violet : C.line }} />
+                    {/*
+                      THE DATE ON THIS DESK IS THE REAL ONE (Dr Raghu, 2 Sep
+                      2026: "This should be in a target delivery date, and
+                      that in turn will get synchronised with the ERP").
+
+                      It used to write "my best estimate" -- a private opinion
+                      beside a date it could not change. That was right when a
+                      planner could not move a TDD; it is wrong now that they
+                      can, because two dates on one row is how the plan and
+                      the board come to disagree. Typing here moves the TARGET
+                      DELIVERY DATE, and it queues for Jobmaster like every
+                      other correction.
+                    */}
+                    <input type="date" value={String(j.tdd || "").slice(0, 10)}
+                      disabled={!d.canEdit || savingTdd === j.id}
+                      onChange={(e) => void setTdd(j.id, e.target.value)}
+                      title={d.canEdit ? "Moves the job's Target Delivery Date, and queues it for the ERP" : "Planning and the project owners move delivery dates"}
+                      className="text-xs border rounded px-1 py-0.5 tnum"
+                      style={{ borderColor: C.line, opacity: savingTdd === j.id ? .5 : 1 }} />
                   </td>
                   <td className="px-2 py-1.5 text-center">
                     <select value={r.belief} onChange={(e) => saveRow(j.id, { ...r, belief: Number(e.target.value) })}

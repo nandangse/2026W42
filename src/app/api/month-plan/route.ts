@@ -312,25 +312,26 @@ async function moreJobs(
     .lte("tdd", end);
   if (from && !holdsToday) q = q.gte("tdd", from);
   const { data } = await q.order("tdd");
-  const base = (data || []).map((j) => mapJob(j as Record<string, unknown>));
-  if (!pull) return base;
-
-  const have = new Set(base.map((j) => String(j.id)));
-  const { data: mine } = await admin.from("plan_belief")
-    .select("job_id, best_estimate")
-    .eq("by_email", pull.email.toLowerCase())
-    .gte("best_estimate", pull.from)
-    .lte("best_estimate", end);
-  const extra = [...new Set((mine || []).map((r) => String(r.job_id)))].filter((id) => !have.has(id));
-  if (!extra.length) return base;
-
-  const { data: more } = await admin.from("jobs")
-    .select(JOB_COLS)
-    .in("id", extra)
-    .eq("active", true)
-    .or("delivered.is.null,delivered.eq.false");
-  const pulled = (more || []).map((j) => mapJob(j as Record<string, unknown>));
-  return [...base, ...pulled].sort((a, b) => String(a.tdd || "9999").localeCompare(String(b.tdd || "9999")));
+  /**
+   * THE TARGET DELIVERY DATE DECIDES, AND NOTHING ELSE (Dr Raghu, 2 Sep 2026:
+   * "This, at the bottom, should be as per the target delivery date current
+   * and not as per my plan. Now it's going to get frozen, so the target
+   * delivery date current is what really matters and not anybody's plan").
+   *
+   * This REVERSES the pull-in of 1 September, and knowingly. Back then a
+   * planner could not move a job's real date, so "my best estimate" was the
+   * only way to say a job dated October would land in September, and the
+   * plan honoured it. Since then the TDD itself became editable everywhere --
+   * the lightbox, the calendar drag -- and travels to Jobmaster. The opinion
+   * has a proper home now, so letting it decide MEMBERSHIP as well made the
+   * tallies disagree with the board: Veda Aeronautics read 8 jobs and
+   * Rs 3.60 Cr on a desk where the dates say 7 and Rs 2.96 Cr.
+   *
+   * A plan about to be FROZEN and mailed to nine people cannot count a job
+   * that the ERP dates in another month. The belief still weights the money
+   * on the realistic card -- it just no longer decides who is in the room.
+   */
+  return (data || []).map((j) => mapJob(j as Record<string, unknown>));
 }
 
 async function doneTotals(admin: ReturnType<typeof adminClient>, from: string, to: string) {
@@ -623,7 +624,10 @@ export async function POST(req: Request) {
         const e = eBy.get(String(j.id));
         const belief = e ? Number(e.belief_pct) : 100;
         const est = String(e?.best_estimate || j.tdd || "").slice(0, 10);
-        const inWindow = est >= w.from && est <= w.end;
+        // Membership is the BOARD'S date now, not the estimate (2 Sep 2026).
+        // The belief still weights the money; it no longer decides the room.
+        const own = String(j.tdd || "").slice(0, 10);
+        const inWindow = own >= w.from && own <= w.end;
         if (inWindow && belief > 0) {
           real.jobs += belief >= 50 ? 1 : 0;
           real.value += (j.val * belief) / 100;
