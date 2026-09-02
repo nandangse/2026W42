@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.2.1",
+    date: "2026-09-02",
+    module: "The project page opens inside Genie",
+    items: [
+      "\"the project page is broken! Open inside genie itself\" (Dr Raghu, 2 Sep 2026) \u2014 and it was. The page drew ModuleLinks, which is the LIST that lives INSIDE the account dropdown, so it opened with every module spilled down the screen above the project. ModuleMenu is the chrome: it is what Seva, IMS and every other module page wears, and it needed to be told who is looking.",
+      "AND THE WAY BACK WAS BROKEN TOO, which the fix uncovered. \"the project book\" pointed at /?tab=projects and landed on Home, because the tab was restored from localStorage and nothing ever read the URL. Worse, PROJECTS AND THE MONTH & QTR PLAN WERE MISSING from the list of tabs allowed to be restored at all \u2014 so anyone who left Genie from either of those two was sent Home on their way back, every time, and had been since the tabs were added. A link may now name its tab, and both are on the list.",
+      "The synchronisation of the new project fields is done and verified: 50 of the 61 projects in Genie now carry their description, name and customer from the ERP, where before there were none. The other eleven are projects the ERP no longer returns as live.",
+    ],
+  },
+  {
     v: "4.3.2.0",
     date: "2026-09-02",
     module: "The project gets its thirteen tabs",

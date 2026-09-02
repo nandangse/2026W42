@@ -19,5 +19,13 @@ export const metadata: Metadata = { title: "Project · Genie" };
 export default async function Page({ params }: { params: { id: string } }) {
   const user = await currentUser();
   if (!user || user.disabled) redirect("/login");
-  return <ProjectPage id={params.id} />;
+  return (
+    <ProjectPage
+      id={params.id}
+      email={user.email}
+      displayName={user.displayName}
+      initials={user.initials ?? null}
+      role={user.role ?? "user"}
+    />
+  );
 }

@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull, jobNo } from "@/lib/schedule";
-import { ModuleLinks } from "@/components/ModuleMenu";
+import ModuleMenu from "@/components/ModuleMenu";
 import ProjectTabs from "@/components/ProjectTabs";
 
 const C = { navy: "#1B3A5C", ink: "#16232F", sub: "#8A94A0", line: "#E2E0DA", green: "#0D7A3F", accent: "#E8600A" };
@@ -32,7 +32,11 @@ const text = (v: unknown) => {
   return String(v);
 };
 
-export default function ProjectPage({ id }: { id: string }) {
+export default function ProjectPage({
+  id, email, displayName, initials, role,
+}: {
+  id: string; email: string; displayName: string | null; initials: string | null; role: string;
+}) {
   const [d, setD] = useState<Data | null>(null);
   const [err, setErr] = useState("");
   const [all, setAll] = useState(false);
@@ -43,8 +47,9 @@ export default function ProjectPage({ id }: { id: string }) {
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
   }, [id]);
 
-  if (err) return <Shell><div className="p-6" style={{ color: "#B3261E" }}>{err}</div></Shell>;
-  if (!d) return <Shell><div className="p-6" style={{ color: C.sub }}>Reading the project…</div></Shell>;
+  const shell = { email, displayName, initials, role };
+  if (err) return <Shell {...shell}><div className="p-6" style={{ color: "#B3261E" }}>{err}</div></Shell>;
+  if (!d) return <Shell {...shell}><div className="p-6" style={{ color: C.sub }}>Reading the project…</div></Shell>;
 
   const e = d.erp || {};
   const g = (d.genie || {}) as Row;
@@ -144,7 +149,7 @@ export default function ProjectPage({ id }: { id: string }) {
   );
 
   return (
-    <Shell>
+    <Shell {...shell}>
       <div className="mx-auto px-4 py-4" style={{ maxWidth: 1180 }}>
         <a href="/?tab=projects" className="text-xs font-bold" style={{ color: C.navy }}>← the project book</a>
         <div className="text-xs font-bold mt-2" style={{ color: C.sub, letterSpacing: 1.1 }}>{d.id}</div>
@@ -202,10 +207,24 @@ export default function ProjectPage({ id }: { id: string }) {
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+/**
+ * INSIDE GENIE, NOT BESIDE IT (Dr Raghu, 2 Sep 2026: "the project page is
+ * broken! Open inside genie itself").
+ *
+ * It was drawing ModuleLinks, which is the LIST that lives inside the account
+ * dropdown -- so the page opened with every module spilled down the screen
+ * above the project. ModuleMenu is the chrome; it is what Seva, IMS and every
+ * other module page wears, and it needs to know who is looking.
+ */
+function Shell({
+  children, email, displayName, initials, role,
+}: {
+  children: React.ReactNode;
+  email: string; displayName: string | null; initials: string | null; role: string;
+}) {
   return (
     <div style={{ minHeight: "100vh", background: "#F4F2EC" }}>
-      <ModuleLinks current="main" />
+      <ModuleMenu current="main" email={email} displayName={displayName} initials={initials} role={role} />
       {children}
     </div>
   );

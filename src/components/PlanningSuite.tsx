@@ -497,10 +497,21 @@ export default function PlanningSuite({
   // land on "My Week" within the suite, not the delivery board
   const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "mplan" | "projects" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature" | "opsbook">(() => {
     if (typeof window === "undefined") return "home";
+    /**
+     * A LINK MAY NAME THE TAB. The back-arrow on a project page says
+     * "the project book", and it landed on Home instead -- the tab was
+     * restored from localStorage and nothing looked at the URL. Two of the
+     * tabs were also missing from the list of what may be restored, so
+     * Projects and the Month & Qtr Plan never came back at all: you were sent
+     * Home every time, from wherever you had been.
+     */
+    const OK = ["home", "wip", "liveproj", "delivery", "load", "plan", "mplan",
+      "projects", "floor", "material", "esc", "erp", "upload", "admin", "feature", "opsbook"];
     try {
+      const asked = new URLSearchParams(window.location.search).get("tab");
+      if (asked && OK.includes(asked)) return asked as "home";
       const v = localStorage.getItem("genie.tab");
-      if (v && ["home", "wip", "liveproj", "delivery", "load", "plan", "floor", "material", "esc", "erp", "upload", "admin", "feature", "opsbook"].includes(v))
-        return v as "home";
+      if (v && OK.includes(v)) return v as "home";
     } catch { /* fine */ }
     return "home";
   });
