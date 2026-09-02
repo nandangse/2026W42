@@ -3,8 +3,9 @@
 /**
  * ERP pull — reading nandanerp into the mirror.
  *
- * Five phases, five requests, one button: items, their child tables, the
- * files, then the projects and the BOM headers. Each phase reports what it found and what it
+ * Six phases, six requests, one button: items, their child tables, the
+ * files, the projects, the BOM headers, then the BOM lines of the jobs in
+ * process. Each phase reports what it found and what it
  * wrote before the next begins, so a walk that stops half-way says exactly
  * where. Raghu's hand only, as with Seva's ERP door; everyone else sees the
  * ledger.
@@ -21,6 +22,7 @@ const PHASES: { key: string; label: string; what: string }[] = [
   { key: "files", label: "3 · Files", what: "every attachment the ERP holds against those items — the drawings, the images, the rest — as it is" },
   { key: "projects", label: "4 · Projects", what: "every Project, with the Approved BOM it points at and the BOM fields the ERP keeps on it" },
   { key: "boms", label: "5 · BOMs", what: "every BOM header — the item it makes, the project it belongs to, active, default, submitted" },
+  { key: "bom_items", label: "6 · BOM lines", what: "every line of every live BOM on a project in process — the working set, whole, each time" },
 ];
 
 type Line = { phase: string; state: "waiting" | "running" | "done" | "failed"; note: string };
@@ -52,8 +54,8 @@ export default function Pull({ summary, isOwner, onDone }: { summary: Summary; i
   return (
     <Screen
       title="ERP pull"
-      blurb="Reads nandanerp into Saamaan — items, their child tables, the files, then the projects and the BOMs. Nothing on the ERP is written, ever."
-      action={isOwner ? <Btn kind="primary" onClick={run} disabled={busy} title="Five phases, one after the other">{busy ? "Pulling…" : "⇣ Pull from the ERP"}</Btn> : undefined}>
+      blurb="Reads nandanerp into Saamaan — items, child tables, files, projects, BOMs, then the BOM lines of the jobs in process. Nothing on the ERP is written, ever."
+      action={isOwner ? <Btn kind="primary" onClick={run} disabled={busy} title="Six phases, one after the other">{busy ? "Pulling…" : "⇣ Pull from the ERP"}</Btn> : undefined}>
       {!isOwner && <Note kind="info">The ERP door is Raghu&apos;s to use, for now. The ledger below shows every walk that was made.</Note>}
       {!summary.erpBase && <Note kind="warn">The ERP&apos;s URL is not saved — CRM → Settings → Integrations holds the ERPNext keys, and Saamaan borrows them from there.</Note>}
 

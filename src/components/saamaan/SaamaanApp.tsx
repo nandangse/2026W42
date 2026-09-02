@@ -24,11 +24,13 @@ import Dashboard, { type Summary } from "./Dashboard";
 import Items from "./Items";
 import Pull from "./Pull";
 import Projects from "./Projects";
+import Bom from "./Bom";
 
 const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: "◧" },
   { key: "items", label: "Items", icon: "📦" },
   { key: "projects", label: "Projects", icon: "🏗" },
+  { key: "bom", label: "BOM", icon: "🧾" },
   { key: "pull", label: "ERP pull", icon: "⇣" },
 ];
 
@@ -66,6 +68,7 @@ export default function SaamaanApp({
     switch (here) {
       case "items": return <Items summary={summary} initialGroup={groupPick} />;
       case "projects": return <Projects summary={summary} />;
+      case "bom": return <Bom summary={summary} />;
       case "pull": return <Pull summary={summary} isOwner={isOwner} onDone={reloadSummary} />;
       default: return <Dashboard summary={summary} go={go} />;
     }

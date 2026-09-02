@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.0.4",
+    date: "2026-09-02",
+    module: "Saamaan — BOM, the lines of the jobs in process",
+    items: [
+      "\"Now its make the BOM pull in. Lets make an app called BOM. In this you will have BOM No - Item ID - Item Group - Item - Qty UOM - Rate - Description (from Item) - Remarks - Status - Last Modified by - Modified Date - Supplier. will ask more later as needed\" (Dr Raghu, 2 Sep 2026). A BOM section in Saamaan with exactly those twelve columns, one row per BOM line.",
+      "\"I am concerned with the jobs in process right now\" — so the pull takes the lines of every BOM that is not cancelled on a project whose status is Jobs in Process, and only those: 50 projects and 61 live BOMs on the day, out of 782 BOMs. It is the WORKING SET, taken whole each time; a project that leaves in-process leaves the table with its lines. The archive is the ERP.",
+      "THE SHAPE WAS READ OFF THE ERP'S BOM ITEM before a column was named. Which is how the line's own bom_status (Draft, Released, Modified, Ordered, Received, Partially Received) and bom_remark came along by name. There is NO supplier on a BOM line in the ERP: Supplier is the item's supplier list from the Items mirror, and the cell says so when there is none.",
+      "DESCRIPTION IS THE ITEM'S, from the mirror, as asked — and the line's own, in grey, where the item is not an RM item and so not in the mirror. The full text is on hover; the cell shows the first 140 characters.",
+      "Pick a project, then a BOM, or a status, or search across the set; 200 lines a page from the database. Print / PDF prints the page on screen and names the filters. Phase 6 on the pull; migration 0121.",
+    ],
+  },
+  {
     v: "4.4.0.3",
     date: "2026-09-02",
     module: "Saamaan — Projects, six columns",

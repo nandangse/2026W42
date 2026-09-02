@@ -39,7 +39,11 @@ export const maxDuration = 300;
  *              (custom_approved_bom and the five ticks). Dr Raghu, 2 Sep
  *              2026: "With each project there is a BOM mentioned."
  *   boms     — every BOM header: item, project, active, default, docstatus.
- *              The components come when the BOM is built here.
+ *   bom_items — the LINES of every live (not cancelled) BOM on a project
+ *              whose status is "Jobs in Process" — "I am concerned with
+ *              the jobs in process right now." The working set, whole,
+ *              every pull: a line gone from the ERP, or a project gone
+ *              out of process, goes from here.
  *
  * READS ONLY. Nothing on the ERP is written, ever.
  *
@@ -400,7 +404,83 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, phase, found: rows.length, written, removed, note });
     }
 
-    throw new HttpError(400, "Unknown phase — items, children, files, projects or boms.");
+    // -------------------------------------------------------- bom_items
+    if (phase === "bom_items") {
+      // The scope: live BOMs on projects in process, from the mirror.
+      const { data: projs, error: pErr } = await admin.from("material_project").select("project_id").eq("status", "Jobs in Process").limit(5000);
+      if (pErr) {
+        if (/does not exist|schema cache/i.test(pErr.message))
+          throw new HttpError(503, "Run migration 0119 first — Saamaan's project tables don't exist yet.");
+        throw new Error(pErr.message);
+      }
+      const projectIds = (projs ?? []).map((p) => String(p.project_id));
+      const { data: bomRows, error: bErr } = projectIds.length
+        ? await admin.from("material_bom").select("bom_id").in("project_id", projectIds).neq("docstatus", 2).limit(5000)
+        : { data: [], error: null };
+      if (bErr) throw new Error(bErr.message);
+      const bomIds = (bomRows ?? []).map((b) => String(b.bom_id));
+
+      const rows: Doc[] = [];
+      // Fifty BOMs a request keeps the URL sane; each pages at 500.
+      for (let i = 0; i < bomIds.length; i += 50) {
+        const slice = bomIds.slice(i, i + 50);
+        const lines = await pages(
+          (start) => `${base}/api/method/frappe.client.get_list?doctype=${encodeURIComponent("BOM Item")}&parent=BOM`
+            + `&fields=${encodeURIComponent(JSON.stringify(["*"]))}`
+            + `&filters=${encodeURIComponent(JSON.stringify([["parenttype", "=", "BOM"], ["parent", "in", slice]]))}`
+            + `&order_by=${encodeURIComponent("parent asc, idx asc")}&limit_start=${start}&limit_page_length=500`,
+          H, (j) => ((j as { message?: Doc[] }).message ?? []),
+        );
+        for (const d of lines) {
+          if (!S(d.name)) continue;
+          rows.push({
+            row_id: S(d.name),
+            bom_id: S(d.parent),
+            idx: I(d.idx) ?? 0,
+            item_code: S(d.item_code),
+            item_name: S(d.item_name),
+            item_group: S(d.custom_item_group),
+            qty: N(d.qty),
+            uom: S(d.uom),
+            stock_qty: N(d.stock_qty),
+            stock_uom: S(d.stock_uom),
+            rate: N(d.rate),
+            amount: N(d.amount),
+            description: S(d.description),
+            bom_status: S(d.bom_status),
+            bom_remark: S(d.bom_remark),
+            bom_no: S(d.bom_no),
+            is_sub_assembly: B(d.is_sub_assembly_item),
+            sourced_by_supplier: B(d.sourced_by_supplier),
+            source_warehouse: S(d.source_warehouse),
+            erp_modified: T(d.modified),
+            erp_modified_by: S(d.modified_by),
+            erp: d,
+            pulled_at: startedAt,
+          });
+        }
+      }
+      let written = 0;
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await admin.from("material_bom_item").upsert(rows.slice(i, i + 500), { onConflict: "row_id" });
+        if (error) {
+          if (/does not exist|schema cache/i.test(error.message))
+            throw new HttpError(503, "Run migration 0121 first — the BOM lines table doesn't exist yet.");
+          throw new Error(error.message);
+        }
+        written += Math.min(500, rows.length - i);
+      }
+      // The working set, whole: anything not in this walk is out of it.
+      const { count, error: dErr } = await admin.from("material_bom_item").delete({ count: "exact" }).lt("pulled_at", startedAt);
+      if (dErr && /does not exist|schema cache/i.test(dErr.message))
+        throw new HttpError(503, "Run migration 0121 first — the BOM lines table doesn't exist yet.");
+      const removed = count ?? 0;
+      const note = `${rows.length} lines on ${bomIds.length} live BOMs across ${projectIds.length} projects in process; ${removed} lines no longer in the set, removed.`;
+      await log(rows.length, written, removed, note);
+      return NextResponse.json({ ok: true, phase, found: rows.length, written, removed, note });
+    }
+
+    throw new HttpError(400, "Unknown phase — items, children, files, projects, boms or bom_items.");
   } catch (e) {
     return errJson(e);
   }

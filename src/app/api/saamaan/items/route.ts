@@ -21,6 +21,11 @@ export const dynamic = "force-dynamic";
  *                            ERP document, the child tables, the files.
  *   ?mode=projects         — every project with the BOMs the ERP holds on
  *                            it, joined here so the screen gets one list.
+ *   ?mode=bom&project=&bom=&status=&q=&page=&size=
+ *                          — a page of BOM lines from the working set (live
+ *                            BOMs on projects in process), each line joined
+ *                            to its item in the mirror for the description,
+ *                            the group and the suppliers.
  *
  * Every answer carries `erpBase`, the ERP's URL, so the screen can turn the
  * paths it holds (file_url, an <img src> inside a description, the item's
@@ -141,6 +146,103 @@ export async function GET(req: Request) {
         const m = e instanceof Error ? e.message : String((e as { message?: string })?.message || e);
         if (/erp_modified_by/i.test(m)) return NextResponse.json({ installed: true, erpBase: base, projects: [], lastPulledAt: null, error: "Run migration 0120 first — the Last Modified By column is not there yet." }, { status: 503 });
         if (notInstalled(m)) return NextResponse.json({ installed: false, erpBase: base, projects: [], lastPulledAt: null, error: "Run migration 0119 first — Saamaan's project tables don't exist yet." }, { status: 503 });
+        throw new Error(m);
+      }
+    }
+
+    if (mode === "bom") {
+      const all = async (table: string, cols: string, apply: (s: any) => any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        const out: Record<string, unknown>[] = [];
+        for (let a = 0; ; a += 1000) {
+          const { data, error } = await apply(admin.from(table).select(cols)).range(a, a + 999);
+          if (error) throw error;
+          out.push(...((data ?? []) as unknown as Record<string, unknown>[]));
+          if (!data || data.length < 1000) break;
+        }
+        return out;
+      };
+      try {
+        const projects = await all("material_project", "project_id, project_name", (s) => s.eq("status", "Jobs in Process").order("project_id", { ascending: false }));
+        const projectIds = projects.map((p) => String(p.project_id));
+        const boms = projectIds.length
+          ? await all("material_bom", "bom_id, project_id, item_name, docstatus", (s) => s.in("project_id", projectIds).neq("docstatus", 2).order("bom_id"))
+          : [];
+        const bomIds = boms.map((b) => String(b.bom_id));
+        // One light pass over the set for the counts and the statuses.
+        const light = bomIds.length ? await all("material_bom_item", "bom_id, bom_status", (s) => s.in("bom_id", bomIds).order("row_id")) : [];
+        const linesPer = new Map<string, number>();
+        const statusSet = new Set<string>();
+        for (const l of light) { linesPer.set(String(l.bom_id), (linesPer.get(String(l.bom_id)) ?? 0) + 1); statusSet.add(String(l.bom_status ?? "")); }
+        const { data: lastPull } = await admin.from("material_pull").select("at").eq("phase", "bom_items").order("at", { ascending: false }).limit(1).maybeSingle();
+
+        const project = String(p.get("project") || "").trim();
+        const bom = String(p.get("bom") || "").trim();
+        const status = p.get("status");
+        const q = safe(String(p.get("q") || ""));
+        const size = Math.min(500, Math.max(20, Number(p.get("size") || 200) || 200));
+        const page = Math.max(0, Number(p.get("page") || 0) || 0);
+        const scope = bom ? bomIds.filter((b) => b === bom) : project ? boms.filter((b) => String(b.project_id) === project).map((b) => String(b.bom_id)) : bomIds;
+
+        let rows: Record<string, unknown>[] = [];
+        let total = 0;
+        if (scope.length) {
+          let sel = admin.from("material_bom_item")
+            .select("row_id, bom_id, idx, item_code, item_name, item_group, qty, uom, rate, amount, description, bom_status, bom_remark, bom_no, is_sub_assembly, erp_modified, erp_modified_by", { count: "exact" })
+            .in("bom_id", scope);
+          if (status !== null && status !== "") sel = sel.eq("bom_status", status);
+          if (q) sel = sel.or(`item_code.ilike.%${q}%,item_name.ilike.%${q}%,bom_remark.ilike.%${q}%,description.ilike.%${q}%`);
+          const r = await sel.order("bom_id").order("idx").range(page * size, page * size + size - 1);
+          if (r.error) throw r.error;
+          rows = (r.data ?? []) as unknown as Record<string, unknown>[];
+          total = r.count ?? 0;
+        }
+
+        // The item behind each line, from the mirror: description, group, suppliers.
+        const codes = [...new Set(rows.map((r) => String(r.item_code)).filter(Boolean))];
+        const items = new Map<string, Record<string, unknown>>();
+        if (codes.length) {
+          const { data: its } = await admin.from("material_item").select("item_code, description, item_group, children").in("item_code", codes);
+          for (const it of its ?? []) items.set(String(it.item_code), it as Record<string, unknown>);
+        }
+        const bomMeta = new Map(boms.map((b) => [String(b.bom_id), b]));
+        const projMeta = new Map(projects.map((pr) => [String(pr.project_id), pr]));
+        const out = rows.map((r) => {
+          const it = items.get(String(r.item_code));
+          const sup = ((it?.children as Record<string, Record<string, unknown>[]> | undefined)?.supplier_items ?? [])
+            .map((s) => String(s.supplier || "")).filter(Boolean);
+          const bm = bomMeta.get(String(r.bom_id));
+          const pj = bm ? projMeta.get(String(bm.project_id)) : undefined;
+          return {
+            ...r,
+            item_description: it ? String(it.description ?? "") : null,
+            item_group_of_item: it ? String(it.item_group ?? "") : "",
+            suppliers: [...new Set(sup)],
+            in_mirror: !!it,
+            project_id: bm ? String(bm.project_id) : "",
+            project_name: pj ? String(pj.project_name) : "",
+          };
+        });
+
+        // A search or a status narrows the BOM/project pickers' counts no
+        // further — the counts say what the set holds, not what the page shows.
+        const bomsOut = boms.map((b) => ({ ...b, lines: linesPer.get(String(b.bom_id)) ?? 0 }));
+        const perProject = new Map<string, number>();
+        for (const b of boms) perProject.set(String(b.project_id), (perProject.get(String(b.project_id)) ?? 0) + 1);
+        return NextResponse.json({
+          installed: true, erpBase: base, rows: out, total, page, size,
+          pickers: {
+            projects: projects.filter((pr) => perProject.has(String(pr.project_id))).map((pr) => ({ ...pr, boms: perProject.get(String(pr.project_id)) ?? 0 })),
+            boms: bomsOut,
+          },
+          statuses: [...statusSet].sort(),
+          lastPulledAt: lastPull?.at ?? null,
+        });
+      } catch (e) {
+        const m = e instanceof Error ? e.message : String((e as { message?: string })?.message || e);
+        if (/material_bom_item/i.test(m) && notInstalled(m))
+          return NextResponse.json({ error: "Run migration 0121 first — the BOM lines table doesn't exist yet." }, { status: 503 });
+        if (notInstalled(m))
+          return NextResponse.json({ error: "Run migration 0119 first — Saamaan's project tables don't exist yet." }, { status: 503 });
         throw new Error(m);
       }
     }
