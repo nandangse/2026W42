@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.7.1",
+    date: "2026-09-02",
+    module: "The plan document — the logo, what it IS, and the whole team's belief on it",
+    items: [
+      "\"Put Nandan GSE Logo on top\" (Dr Raghu, 2 Sep 2026) — it heads the document now, beside a band that says what the paper actually is.",
+      "\"Show the Draft — when its draft with me or when I submit — show FROZEN months plan … Once I sign it off it will be Plan Approved\" — three states, three bands: DRAFT — NOT YET SUBMITTED in amber, FROZEN — MONTH PLAN in navy once a planner signs, and PLAN APPROVED in green when Raghu signs it. A plan on a desk and a plan committed to are different documents; a reader six months from now can tell at a glance.",
+      "\"What I believe needs to happen please change it to Team belief and put in all the comments mentioned there by all\" — the column is TEAM BELIEF, and it carries the signer's own line first and then EVERY other person's, over their initials and their number, verbatim. A crowdsourced plan is worth having because it preserves disagreement; a paraphrase would throw away exactly what it was collected for.",
+      "\"is the mail going to people once they submit with the PDF? it can be sent from raghu!\" — it is, and it now does: on signing, the mail goes To the signer, cc Raghu, Tushar and Pankaj, with the plan attached — and it now comes FROM Raghunandan Jagdish rather than from Genie, with replies landing on him. Nothing is mailed for a draft.",
+    ],
+  },
+  {
     v: "4.2.7.0",
     date: "2026-09-02",
     module: "Nobody vanishes from the room; the strip really hovers; Genie folds and is counted",

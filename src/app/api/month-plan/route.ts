@@ -89,6 +89,34 @@ const fyWindow = () => {
  * So mayPlan no longer decides whether the desk opens. It decides `canEdit`,
  * and nothing else.
  */
+/** Everybody's words on a set of jobs, over their initials. */
+async function voicesFor(admin: ReturnType<typeof adminClient>, ids: string[]) {
+  const out: Record<string, { initials: string; belief: number; comment: string }[]> = {};
+  if (!ids.length) return out;
+  try {
+    const { data: all } = await admin.from("plan_belief")
+      .select("job_id, by_email, belief_pct, comment").in("job_id", ids);
+    const emails = [...new Set((all || []).map((r) => String(r.by_email).toLowerCase()))];
+    const ini = new Map<string, string>();
+    if (emails.length) {
+      const { data: profs } = await admin.from("profiles").select("email, initials, display_name").in("email", emails);
+      for (const pr of profs || []) {
+        const e = String(pr.email || "").toLowerCase();
+        ini.set(e, String(pr.initials || String(pr.display_name || e).split(/[@ ]/)[0]).toUpperCase().slice(0, 4));
+      }
+    }
+    for (const r of all || []) {
+      const c = String(r.comment || "").trim();
+      if (!c) continue;
+      (out[String(r.job_id)] = out[String(r.job_id)] || []).push({
+        initials: ini.get(String(r.by_email).toLowerCase()) || String(r.by_email).split("@")[0].slice(0, 4).toUpperCase(),
+        belief: Number(r.belief_pct) || 0, comment: c,
+      });
+    }
+  } catch { /* the document still prints without them */ }
+  return out;
+}
+
 const mayPlan = (u: AuthedUser) =>
   u.isOwner || u.stratcom || ["admin", "planner", "project_owner"].includes(String(u.role));
 
@@ -201,6 +229,8 @@ export async function GET(req: Request) {
           plan: { jobs: Number(row.jobs) || 0, value: Number(row.value) || 0, throughput: Number(row.throughput) || 0 },
           real: { jobs: Number(row.realistic_jobs) || 0, value: Number(row.realistic_value) || 0, throughput: Number(row.realistic_throughput) || 0 },
           signedOn: dmy(String(row.signed_at).slice(0, 10)),
+          state: u0.isOwner ? "approved" : "frozen",
+          voices: await voicesFor(admin0, ((row.snapshot as Record<string, unknown>[]) || []).map((r) => String(r.id))),
         });
       } else {
         /**
@@ -234,6 +264,8 @@ export async function GET(req: Request) {
           window: w0, snapshot: snap0, plan: plan0,
           real: { jobs: real0.jobs, value: Math.round(real0.value), throughput: Math.round(real0.throughput) },
           signedOn: dmy(T0),
+          state: "draft",
+          voices: await voicesFor(admin0, jobs0.map((j) => String(j.id))),
         });
       }
       const { pressPdf } = await import("@/lib/pdf-press");
@@ -481,6 +513,9 @@ export async function POST(req: Request) {
       const { planPdfHtml } = await import("@/lib/plan-pdf");
       const pdfHtml = planPdfHtml({
         title: planTitle, window: w, snapshot, plan, signedOn: dmy(T),
+        // Raghu's signature APPROVES the plan; anyone else's FREEZES theirs.
+        state: isDraft ? "draft" : (u.isOwner ? "approved" : "frozen"),
+        voices: await voicesFor(admin, jobs.map((j) => String(j.id))),
         real: { jobs: real.jobs, value: Math.round(real.value), throughput: Math.round(real.throughput) },
         done: { nos: done.nos, value: done.value, throughput: done.throughput },
       });
@@ -520,7 +555,8 @@ The realistic read, on your dates and your belief: <b>${real.jobs} at 50% or bet
           const r = await fetch("https://api.resend.com/emails", {
             method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
             body: JSON.stringify({
-              from: "Genie <hr@nandan.co.in>",
+              from: "Raghunandan Jagdish <raghu@nandan.co.in>",
+              reply_to: "raghu@nandan.co.in",
               to: [u.email],
               // the standing witnesses, minus the signer if they are one of
               // them — nobody needs their own name in their own cc
