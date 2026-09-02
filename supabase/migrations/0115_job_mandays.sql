@@ -14,5 +14,10 @@
 -- A check constraint would turn a re-cut into a migration and a deploy.
 alter table public.jobs add column if not exists mandays text;
 
-comment on column public.jobs is
-  'mandays: Genie''s own field -- the ERP has no band for it. B/O | 0-50 | 51-100 | 101-200 | 201-300 | 301-400 | 401-500 | 501-600 | 601-700 | 700+';
+-- NOTE the column name on the end. "comment on column public.jobs" reads as
+-- table `public`, column `jobs` -- which is why the first run of this file
+-- died with 42P01 relation "public" does not exist, and took the ALTER down
+-- with it: the SQL editor runs the file as ONE transaction, so a bad line at
+-- the bottom rolls back the good ones above it.
+comment on column public.jobs.mandays is
+  'Genie''s own field -- the ERP has no band for it. B/O | 0-50 | 51-100 | 101-200 | 201-300 | 301-400 | 401-500 | 501-600 | 601-700 | 700+';
