@@ -21,6 +21,9 @@ export const dynamic = "force-dynamic";
  *                            ERP document, the child tables, the files.
  *   ?mode=projects         — every project with the BOMs the ERP holds on
  *                            it, joined here so the screen gets one list.
+ *   ?mode=bom_front        — one row per project in process: its latest
+ *                            SUBMITTED BOM, that BOM's line count, who and
+ *                            when. The front the lightbox opens from.
  *   ?mode=bom&project=&bom=&status=&q=&page=&size=
  *                          — a page of BOM lines from the working set (live
  *                            BOMs on projects in process), each line joined
@@ -146,6 +149,66 @@ export async function GET(req: Request) {
         const m = e instanceof Error ? e.message : String((e as { message?: string })?.message || e);
         if (/erp_modified_by/i.test(m)) return NextResponse.json({ installed: true, erpBase: base, projects: [], lastPulledAt: null, error: "Run migration 0120 first — the Last Modified By column is not there yet." }, { status: 503 });
         if (notInstalled(m)) return NextResponse.json({ installed: false, erpBase: base, projects: [], lastPulledAt: null, error: "Run migration 0119 first — Saamaan's project tables don't exist yet." }, { status: 503 });
+        throw new Error(m);
+      }
+    }
+
+    if (mode === "bom_front") {
+      const all = async (table: string, cols: string, apply: (s: any) => any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        const out: Record<string, unknown>[] = [];
+        for (let a = 0; ; a += 1000) {
+          const { data, error } = await apply(admin.from(table).select(cols)).range(a, a + 999);
+          if (error) throw error;
+          out.push(...((data ?? []) as unknown as Record<string, unknown>[]));
+          if (!data || data.length < 1000) break;
+        }
+        return out;
+      };
+      try {
+        const projects = await all("material_project", "project_id, project_name, product_family, customer", (s) => s.eq("status", "Jobs in Process").order("project_id", { ascending: false }));
+        const projectIds = projects.map((p) => String(p.project_id));
+        const boms = projectIds.length
+          ? await all("material_bom", "bom_id, project_id, item_code, item_name, docstatus, is_active, is_default, erp_modified, erp_modified_by", (s) => s.in("project_id", projectIds).order("bom_id"))
+          : [];
+        const bomIds = boms.filter((b) => Number(b.docstatus) !== 2).map((b) => String(b.bom_id));
+        const light = bomIds.length ? await all("material_bom_item", "bom_id", (s) => s.in("bom_id", bomIds).order("row_id")) : [];
+        const linesPer = new Map<string, number>();
+        for (const l of light) linesPer.set(String(l.bom_id), (linesPer.get(String(l.bom_id)) ?? 0) + 1);
+        const { data: lastPull } = await admin.from("material_pull").select("at").eq("phase", "bom_items").order("at", { ascending: false }).limit(1).maybeSingle();
+
+        // "The BOM No should be the latest number that is submitted" — the
+        // highest-numbered submitted BOM on the project. BOM-N052488-003
+        // beats -001; the number is the ERP's own revision serial.
+        const byProject = new Map<string, Record<string, unknown>[]>();
+        for (const b of boms) (byProject.get(String(b.project_id)) ?? byProject.set(String(b.project_id), []).get(String(b.project_id))!).push(b);
+        const num = (a: unknown, b: unknown) => String(a).localeCompare(String(b), undefined, { numeric: true });
+        const rows = projects.map((p) => {
+          const mine = byProject.get(String(p.project_id)) ?? [];
+          const submitted = mine.filter((b) => Number(b.docstatus) === 1).sort((a, b) => num(b.bom_id, a.bom_id));
+          const latest = submitted[0] ?? null;
+          const drafts = mine.filter((b) => Number(b.docstatus) === 0).length;
+          return {
+            project_id: p.project_id,
+            project_name: p.project_name,
+            customer: p.customer,
+            item_group: p.product_family,
+            bom_id: latest ? String(latest.bom_id) : "",
+            bom_item_code: latest ? String(latest.item_code) : "",
+            bom_item_name: latest ? String(latest.item_name) : "",
+            lines: latest ? linesPer.get(String(latest.bom_id)) ?? 0 : null,
+            submitted: submitted.length,
+            drafts,
+            erp_modified: latest ? latest.erp_modified : null,
+            erp_modified_by: latest ? String(latest.erp_modified_by) : "",
+          };
+        });
+        return NextResponse.json({ installed: true, erpBase: base, rows, lastPulledAt: lastPull?.at ?? null });
+      } catch (e) {
+        const m = e instanceof Error ? e.message : String((e as { message?: string })?.message || e);
+        if (/material_bom_item/i.test(m) && notInstalled(m))
+          return NextResponse.json({ error: "Run migration 0121 first — the BOM lines table doesn't exist yet." }, { status: 503 });
+        if (notInstalled(m))
+          return NextResponse.json({ error: "Run migration 0119 first — Saamaan's project tables don't exist yet." }, { status: 503 });
         throw new Error(m);
       }
     }

@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.0.5",
+    date: "2026-09-02",
+    module: "Saamaan — the BOM front, and the bill in a lightbox",
+    items: [
+      "\"in this BOM show only the BOM Front specific: Project - Project Name - Item Group - BOM No - No of items - Last Modified by - Modified Date. Then clicking will take it deeper as BOM detailed in a fresh lightbox. The BOM No should be the latest number that is submitted\" (Dr Raghu, 2 Sep 2026).",
+      "ONE ROW PER PROJECT IN PROCESS. The BOM No is the highest-numbered SUBMITTED BOM on the project — BOM-N052488-003 beats -001, the ERP's own revision serial; drafts do not count, and a project with drafts but nothing submitted says \"draft only\" rather than showing one. Hover the number for what it makes, how many submitted BOMs the project has and how many drafts besides.",
+      "ITEM GROUP IS THE PROJECT'S PRODUCT FAMILY, which on the ERP is a link to Item Group — the one Item Group a project carries. No of items is that BOM's line count; Last Modified is that BOM's.",
+      "Click anywhere on the row and the bill opens in a lightbox: the twelve columns as before, 200 lines a page, a status filter, a search, Print / PDF, and Open on the ERP.",
+    ],
+  },
+  {
     v: "4.4.0.4",
     date: "2026-09-02",
     module: "Saamaan — BOM, the lines of the jobs in process",

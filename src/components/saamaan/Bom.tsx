@@ -1,16 +1,20 @@
 "use client";
 
 /**
- * BOM — the lines of the jobs in process (Dr Raghu, 2 Sep 2026: "Lets make
- * an app called BOM. In this you will have BOM No - Item ID - Item Group -
- * Item - Qty UOM - Rate - Description (from Item) - Remarks - Status - Last
- * Modified by - Modified Date - Supplier. will ask more later as needed."
- * And: "I am concerned with the jobs in process right now.")
+ * BOM — the jobs in process, and their bills (Dr Raghu, 2 Sep 2026).
  *
- * Those twelve columns, one row per BOM line, for every live BOM on a
- * project in process. Pick a project, then a BOM, or search across all of
- * them. The lines do not all travel to the browser: the filters run in the
- * database and a page of 200 comes back.
+ * THE FRONT: "show only the BOM Front specific: Project - Project Name -
+ * Item Group - BOM No - No of items - Last Modified by - Modified Date.
+ * Then clicking will take it deeper as BOM detailed in a fresh lightbox.
+ * The BOM No should be the latest number that is submitted." One row per
+ * project in process; the BOM is the highest-numbered SUBMITTED one on
+ * the project; Item Group is the project's Product Family, which on the
+ * ERP is a link to Item Group.
+ *
+ * THE LIGHTBOX: "BOM No - Item ID - Item Group - Item - Qty UOM - Rate -
+ * Description (from Item) - Remarks - Status - Last Modified by - Modified
+ * Date - Supplier." Those twelve columns, one row per line of that BOM,
+ * 200 a page from the database.
  *
  * DESCRIPTION IS THE ITEM'S, from the Item mirror, as asked — and the
  * line's own where the item is not an RM item and so not in the mirror,
@@ -20,7 +24,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import GenieTable from "@/components/GenieTable";
-import { Screen, Btn, Note, Chip, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, S, statusColour } from "@/components/ims/ui";
+import { Screen, Btn, Note, Chip, Modal, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, S, statusColour, useLoad } from "@/components/ims/ui";
 import type { Summary } from "./Dashboard";
 
 interface Line {
@@ -58,9 +62,78 @@ const lineColour = (s: string) => {
   return statusColour(s);
 };
 
+// ================================================================ the front
+interface Front {
+  project_id: string; project_name: string; customer: string; item_group: string;
+  bom_id: string; bom_item_code: string; bom_item_name: string; lines: number | null; submitted: number; drafts: number;
+  erp_modified: string | null; erp_modified_by: string;
+}
+interface FrontAnswer { installed: boolean; erpBase: string; rows: Front[]; lastPulledAt: string | null }
+
 export default function Bom({ summary }: { summary: Summary }) {
-  const [project, setProject] = useState("");
-  const [bom, setBom] = useState("");
+  const [data, busy, reload, err] = useLoad<FrontAnswer>("/api/saamaan/items?mode=bom_front");
+  const [open, setOpen] = useState<Front | null>(null);
+  const [withBom, setWithBom] = useState(false);
+  const base = data?.erpBase || summary.erpBase;
+  const rows = useMemo(() => (data?.rows ?? []).filter((r) => !withBom || r.bom_id), [data, withBom]);
+
+  return (
+    <Screen
+      title="BOM"
+      blurb="The jobs in process, each with its latest submitted BOM. Click a row for the bill itself. Filled by the ERP pull; nothing here is typed."
+      action={<Btn onClick={reload} disabled={busy}>↻ Re-read</Btn>}>
+      {err && <Note kind="error">{err}</Note>}
+      {data && !data.lastPulledAt && (
+        <Note kind="warn">BOM lines have not been pulled yet — open ERP pull and run it once; phase 6 brings them.</Note>
+      )}
+      <GenieTable<Front>
+        rows={data ? rows : null}
+        minWidth={1000}
+        search={(r, q) => [r.project_id, r.project_name, r.customer, r.item_group, r.bom_id, r.bom_item_name, r.erp_modified_by].join(" ").toLowerCase().includes(q)}
+        searchPlaceholder="🔍 project, name, group, BOM, who"
+        empty={data?.lastPulledAt ? "No project matches." : "Nothing here yet — run the ERP pull."}
+        header={<>
+          <label className="text-xs flex items-center gap-1" style={{ color: MUTED }}>
+            <input type="checkbox" checked={withBom} onChange={(e) => setWithBom(e.target.checked)} /> with a submitted BOM only
+          </label>
+          <span className="text-xs tnum" style={{ color: MUTED }}>{rows.length.toLocaleString("en-IN")} projects in process</span>
+        </>}
+        columns={[
+          { key: "project", label: "Project", align: "left", sort: (r) => r.project_id,
+            render: (r) => <button onClick={() => r.bom_id && setOpen(r)} className={`font-bold ${r.bom_id ? "hover:underline" : ""}`} style={{ color: r.bom_id ? NAVY : MUTED }} title={r.bom_id ? "Open the bill" : "No submitted BOM on this project"}>{r.project_id}</button> },
+          { key: "name", label: "Project Name", align: "left", sort: (r) => r.project_name,
+            render: (r) => <button onClick={() => r.bom_id && setOpen(r)} className="font-semibold text-left" style={{ color: INK, whiteSpace: "normal", maxWidth: 360 }}>{r.project_name || "·"}</button> },
+          { key: "group", label: "Item Group", align: "left", sort: (r) => r.item_group,
+            render: (r) => <span style={{ color: MUTED }} title="The project's Product Family — an Item Group on the ERP">{r.item_group || "·"}</span> },
+          { key: "bom", label: "BOM No", align: "left", sort: (r) => r.bom_id,
+            render: (r) => r.bom_id ? (
+              <button onClick={() => setOpen(r)} className="rounded px-1.5 py-0.5 text-xs font-bold hover:underline" style={{ background: NAVY, color: "#fff" }}
+                title={`${r.bom_item_code} — ${r.bom_item_name}
+the latest submitted BOM${r.submitted > 1 ? ` of ${r.submitted}` : ""}${r.drafts ? `; ${r.drafts} draft${r.drafts === 1 ? "" : "s"} besides` : ""}`}>
+                {r.bom_id}
+              </button>
+            ) : <span style={{ color: MUTED }} title={r.drafts ? `${r.drafts} draft BOM${r.drafts === 1 ? "" : "s"}, none submitted` : "no BOM on the ERP"}>{r.drafts ? "draft only" : "·"}</span> },
+          { key: "n", label: "No of items", align: "right", sort: (r) => r.lines ?? -1,
+            render: (r) => <span className="tnum">{r.lines === null ? <span style={{ color: MUTED }}>·</span> : r.lines.toLocaleString("en-IN")}</span> },
+          { key: "by", label: "Last Modified by", align: "left", sort: (r) => who(r.erp_modified_by), render: (r) => <span>{who(r.erp_modified_by)}</span> },
+          { key: "on", label: "Modified Date", align: "right", sort: (r) => S(r.erp_modified), render: (r) => <span className="tnum">{fmtAt(r.erp_modified)}</span> },
+        ]}
+      />
+      <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
+        BOM No is the highest-numbered submitted BOM on the project; Last Modified is that BOM&apos;s. Item Group is the project&apos;s Product Family. Click anywhere on a row to open the bill.
+      </div>
+      {open && (
+        <Modal onClose={() => setOpen(null)} title={`${open.bom_id} — ${open.project_id} · ${open.project_name}`} width={1500}>
+          <BomLines bom={open.bom_id} base={base} summary={summary} />
+        </Modal>
+      )}
+    </Screen>
+  );
+}
+
+// ============================================================ the lightbox
+function BomLines({ bom, base: baseIn }: { bom: string; base: string; summary: Summary }) {
+  const project = "";
   const [status, setStatus] = useState("");
   const [typed, setTyped] = useState("");
   const [q, setQ] = useState("");
@@ -68,7 +141,7 @@ export default function Bom({ summary }: { summary: Summary }) {
   const [data, setData] = useState<Answer | null>(null);
   const [err, setErr] = useState("");
   const SIZE = 200;
-  const base = data?.erpBase || summary.erpBase;
+  const base = data?.erpBase || baseIn;
 
   useEffect(() => { const t = setTimeout(() => { setQ(typed); setPage(0); }, 350); return () => clearTimeout(t); }, [typed]);
 
@@ -82,7 +155,6 @@ export default function Bom({ summary }: { summary: Summary }) {
   }, [project, bom, status, q, page]);
   useEffect(() => { load(); }, [load]);
 
-  const boms = useMemo(() => (data?.pickers.boms ?? []).filter((b) => !project || b.project_id === project), [data, project]);
   const total = data?.total ?? 0;
   const from = total ? page * SIZE + 1 : 0;
   const to = Math.min(total, (page + 1) * SIZE);
@@ -120,30 +192,10 @@ export default function Bom({ summary }: { summary: Summary }) {
   };
 
   return (
-    <Screen
-      title="BOM"
-      blurb="Every line of every live BOM on a project in process — the working set. Filled by the ERP pull; nothing here is typed."
-      action={<Btn onClick={print} title="Print the rows on screen, with the filters named">Print / PDF</Btn>}>
+    <div>
       {err && <Note kind="error">{err}</Note>}
-      {data && !data.lastPulledAt && (
-        <Note kind="warn">BOM lines have not been pulled yet — open ERP pull and run it once; phase 6 brings them.</Note>
-      )}
-
       <div className="flex items-center gap-2 mb-2 flex-wrap">
-        <select value={project} onChange={(e) => { setProject(e.target.value); setBom(""); setPage(0); }}
-          className="px-2 py-1.5 rounded border text-sm bg-white" style={{ borderColor: project ? NAVY : BORDER, maxWidth: 360 }}>
-          <option value="">All projects in process ({(data?.pickers.projects ?? []).length})</option>
-          {(data?.pickers.projects ?? []).map((p) => (
-            <option key={p.project_id} value={p.project_id}>{p.project_id.replace(/^NGSE-PROJ-/, "")} · {p.project_name} ({p.boms})</option>
-          ))}
-        </select>
-        <select value={bom} onChange={(e) => { setBom(e.target.value); setPage(0); }}
-          className="px-2 py-1.5 rounded border text-sm bg-white" style={{ borderColor: bom ? NAVY : BORDER, maxWidth: 360 }}>
-          <option value="">All BOMs ({boms.length})</option>
-          {boms.map((b) => (
-            <option key={b.bom_id} value={b.bom_id}>{b.bom_id} · {b.item_name} ({b.lines}{b.docstatus === 0 ? ", draft" : ""})</option>
-          ))}
-        </select>
+        <a href={erpForm(base, "BOM", bom)} target="_blank" rel="noreferrer" className="text-xs font-bold" style={{ color: NAVY }}>Open on the ERP ↗</a>
         <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }}
           className="px-2 py-1.5 rounded border text-sm bg-white" style={{ borderColor: status ? NAVY : BORDER }}>
           <option value="">Any status</option>
@@ -156,11 +208,13 @@ export default function Bom({ summary }: { summary: Summary }) {
         </span>
         <Btn onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>‹</Btn>
         <Btn onClick={() => setPage((p) => p + 1)} disabled={to >= total}>›</Btn>
+        <Btn onClick={print} title="Print the rows on screen, with the filters named">Print / PDF</Btn>
       </div>
 
       <GenieTable<Line>
         rows={rows}
-        minWidth={1500}
+        minWidth={1400}
+        maxHeight="62vh"
         empty={data?.lastPulledAt ? "No line matches — loosen the filters." : "Nothing here yet — run the ERP pull."}
         columns={[
           { key: "bom", label: "BOM No", align: "left", sort: (r) => `${r.bom_id}#${String(r.idx).padStart(4, "0")}`,
@@ -206,9 +260,9 @@ export default function Bom({ summary }: { summary: Summary }) {
       />
       <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
         Description is the item&apos;s, from the Items mirror; where an item is not an RM item the line&apos;s own description shows, in grey. Supplier is the
-        item&apos;s supplier list — the ERP keeps none on the line. ⧉ marks a sub-assembly. Hover a BOM number for its project.
+        item&apos;s supplier list — the ERP keeps none on the line. ⧉ marks a sub-assembly.
         <span style={{ background: NAVY_SOFT, padding: "0 4px", marginLeft: 6 }}>working set: live BOMs on projects in process</span>
       </div>
-    </Screen>
+    </div>
   );
 }
