@@ -103,6 +103,8 @@ const PROBES = [
   ["genie", "0118 Saamaan item mirror", "material_item?select=item_code"],
   ["genie", "0118 Saamaan item files", "material_item_file?select=file_id"],
   ["genie", "0118 Saamaan pull ledger", "material_pull?select=phase"],
+  ["genie", "0119 Saamaan projects", "material_project?select=approved_bom"],
+  ["genie", "0119 Saamaan BOM headers", "material_bom?select=bom_id"],
 ];
 
 let missing = 0;

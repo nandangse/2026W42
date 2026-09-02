@@ -35,6 +35,11 @@ export const maxDuration = 300;
  *   files    — every File the ERP holds against an Item, the file_url
  *              exactly as the ERP wrote it. A file gone from the ERP goes
  *              from here.
+ *   projects — every Project, with the BOM fields the ERP keeps on it
+ *              (custom_approved_bom and the five ticks). Dr Raghu, 2 Sep
+ *              2026: "With each project there is a BOM mentioned."
+ *   boms     — every BOM header: item, project, active, default, docstatus.
+ *              The components come when the BOM is built here.
  *
  * READS ONLY. Nothing on the ERP is written, ever.
  *
@@ -303,7 +308,93 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, phase, found: rows.length, written, removed, note });
     }
 
-    throw new HttpError(400, "Unknown phase — items, children or files.");
+    // --------------------------------------------------------- projects
+    if (phase === "projects") {
+      const FIELDS = ["name", "project_name", "status", "customer", "custom_product_family", "custom_approved_bom",
+        "design_stage", "custom_bom_release_target_date", "custom_bom_released_date", "custom_structural_bom",
+        "custom_main_bom", "custom_hydraulic_bom", "custom_electric_bom", "custom_long_lead_items", "bom_for_action",
+        "expected_end_date", "customer_committed_delivery_", "project_stage", "sales_order", "modified"];
+      const docs = await pages(
+        (start) => `${base}/api/resource/Project?fields=${encodeURIComponent(JSON.stringify(FIELDS))}&limit_start=${start}&limit_page_length=500`,
+        H, (j) => ((j as { data?: Doc[] }).data ?? []),
+      );
+      const rows = docs.filter((d) => S(d.name)).map((d) => ({
+        project_id: S(d.name),
+        project_name: S(d.project_name),
+        status: S(d.status),
+        customer: S(d.customer),
+        product_family: S(d.custom_product_family),
+        approved_bom: S(d.custom_approved_bom),
+        design_stage: S(d.design_stage),
+        bom_release_target_date: D(d.custom_bom_release_target_date),
+        bom_released_date: D(d.custom_bom_released_date),
+        structural_bom: B(d.custom_structural_bom),
+        main_bom: B(d.custom_main_bom),
+        hydraulic_bom: B(d.custom_hydraulic_bom),
+        electric_bom: B(d.custom_electric_bom),
+        long_lead_items: B(d.custom_long_lead_items),
+        bom_for_action: S(d.bom_for_action),
+        erp_modified: T(d.modified),
+        erp: d,
+        pulled_at: startedAt,
+      }));
+      let written = 0;
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await admin.from("material_project").upsert(rows.slice(i, i + 500), { onConflict: "project_id" });
+        if (error) {
+          if (/does not exist|schema cache/i.test(error.message))
+            throw new HttpError(503, "Run migration 0119 first — Saamaan's project tables don't exist yet.");
+          throw new Error(error.message);
+        }
+        written += Math.min(500, rows.length - i);
+      }
+      const withBom = rows.filter((r) => r.approved_bom).length;
+      const note = `${rows.length} projects; ${withBom} point at an Approved BOM.`;
+      await log(rows.length, written, 0, note);
+      return NextResponse.json({ ok: true, phase, found: rows.length, written, removed: 0, note });
+    }
+
+    // ------------------------------------------------------------- boms
+    if (phase === "boms") {
+      const FIELDS = ["name", "item", "item_name", "project", "is_active", "is_default", "docstatus", "quantity", "company", "modified"];
+      const docs = await pages(
+        (start) => `${base}/api/resource/BOM?fields=${encodeURIComponent(JSON.stringify(FIELDS))}&limit_start=${start}&limit_page_length=500`,
+        H, (j) => ((j as { data?: Doc[] }).data ?? []),
+      );
+      const rows = docs.filter((d) => S(d.name)).map((d) => ({
+        bom_id: S(d.name),
+        item_code: S(d.item),
+        item_name: S(d.item_name),
+        project_id: S(d.project),
+        is_active: B(d.is_active),
+        is_default: B(d.is_default),
+        docstatus: I(d.docstatus) ?? 0,
+        quantity: N(d.quantity),
+        erp_modified: T(d.modified),
+        erp: d,
+        pulled_at: startedAt,
+      }));
+      let written = 0;
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await admin.from("material_bom").upsert(rows.slice(i, i + 500), { onConflict: "bom_id" });
+        if (error) {
+          if (/does not exist|schema cache/i.test(error.message))
+            throw new HttpError(503, "Run migration 0119 first — Saamaan's project tables don't exist yet.");
+          throw new Error(error.message);
+        }
+        written += Math.min(500, rows.length - i);
+      }
+      // A BOM gone from the ERP goes from here — the header is the ERP's
+      // word, and there is nothing of Saamaan's own on the row yet.
+      const { count } = await admin.from("material_bom").delete({ count: "exact" }).lt("pulled_at", startedAt);
+      const removed = count ?? 0;
+      const onProject = rows.filter((r) => r.project_id).length;
+      const note = `${rows.length} BOMs, ${onProject} on a project; ${removed} no longer on the ERP, removed.`;
+      await log(rows.length, written, removed, note);
+      return NextResponse.json({ ok: true, phase, found: rows.length, written, removed, note });
+    }
+
+    throw new HttpError(400, "Unknown phase — items, children, files, projects or boms.");
   } catch (e) {
     return errJson(e);
   }

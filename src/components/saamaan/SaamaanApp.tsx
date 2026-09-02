@@ -7,7 +7,8 @@
  * सामान — the goods, the stuff, the material a works runs on. Three doors to
  * start: the Dashboard (what the mirror holds), Items (the ERP's Item
  * master, every RM item with its rich description, its drawings and its
- * attachments) and Pull (the ERP walk, Raghu's hand only, and its ledger).
+ * attachments), Projects (each with the BOM it mentions) and Pull (the ERP
+ * walk, Raghu's hand only, and its ledger).
  * The Bill of Materials comes next, on this base.
  *
  * The furniture is the IMS's (components/ims/ui) rather than a ninth set of
@@ -22,10 +23,12 @@ import { BORDER, INK, MUTED, NAVY, NAVY_DARK, NAVY_SOFT, PAPER, ORANGE, Note, Em
 import Dashboard, { type Summary } from "./Dashboard";
 import Items from "./Items";
 import Pull from "./Pull";
+import Projects from "./Projects";
 
 const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: "◧" },
   { key: "items", label: "Items", icon: "📦" },
+  { key: "projects", label: "Projects & BOMs", icon: "🏗" },
   { key: "pull", label: "ERP pull", icon: "⇣" },
 ];
 
@@ -62,6 +65,7 @@ export default function SaamaanApp({
       );
     switch (here) {
       case "items": return <Items summary={summary} initialGroup={groupPick} />;
+      case "projects": return <Projects summary={summary} />;
       case "pull": return <Pull summary={summary} isOwner={isOwner} onDone={reloadSummary} />;
       default: return <Dashboard summary={summary} go={go} />;
     }

@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.0.2",
+    date: "2026-09-02",
+    module: "Saamaan — Projects, and the BOM each one mentions",
+    items: [
+      "\"Now we have the projects. With each project there is a BOM mentioned. For now please show me a table in Saamaan of the Projects - Name - BOM\" (Dr Raghu, 2 Sep 2026). A Projects & BOMs section: every project on the ERP, its name, customer and status, the Approved BOM it points at, and every BOM the ERP holds against it.",
+      "TWO READINGS OF \"THE BOM\", BOTH SHOWN. The ERP's Project carries custom_approved_bom, a link to one BOM; and every BOM carries `project` back — often more than one per project, not always the approved one. Where the two disagree the table says so with a count and an amber mark, rather than quietly picking. 1,687 projects and 782 BOMs on the day, 772 of them on a project.",
+      "Two more material_ tables, mirrored like the rest — material_project with the BOM fields the ERP keeps (approved BOM, the five ticks, release target and released dates) and material_bom with the headers (item, project, active, default, docstatus). The components come when the Bill of Materials is built here. Migration 0119.",
+      "Two more phases on the pull, 4 · Projects and 5 · BOMs; a BOM gone from the ERP goes from the mirror, since the header is entirely the ERP's word. Every pill opens the BOM on the ERP, and its dot is the BOM's state there: submitted, draft or cancelled.",
+    ],
+  },
+  {
     v: "4.4.0.1",
     date: "2026-09-02",
     module: "Saamaan — several groups at once",

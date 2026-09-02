@@ -24,6 +24,9 @@ export interface Summary {
   withDwg: number;
   withDxf: number;
   files: number;
+  /** Null until migration 0119 — no table is not no projects. */
+  projects: number | null;
+  boms: number | null;
   groups: { item_group: string; n: number }[];
   pulls: PullLine[];
   lastPulledAt: string | null;
@@ -37,7 +40,7 @@ export default function Dashboard({ summary, go }: { summary: Summary; go: (k: s
 
   return (
     <div style={{ maxWidth: 1180 }}>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-3">
         <Card title="Items" hint={`under "RM -", not disabled${summary.disabled ? ` · ${summary.disabled.toLocaleString("en-IN")} since disabled` : ""}`}>
           <Metric value={pulled ? summary.items : null} haveData={pulled} />
         </Card>
@@ -54,6 +57,12 @@ export default function Dashboard({ summary, go }: { summary: Summary; go: (k: s
         </Card>
         <Card title="Attachments" hint="every File the ERP holds on these items">
           <Metric value={pulled ? summary.files : null} haveData={pulled} />
+        </Card>
+        <Card title="Projects · BOMs" hint={summary.projects === null ? "run migration 0119" : "on the ERP — open Projects"}>
+          <button onClick={() => go("projects")} style={{ color: INK, fontSize: 26, fontWeight: 800, lineHeight: 1 }}>
+            {summary.projects === null || !pulled ? <span style={{ color: MUTED, fontSize: 15, fontWeight: 700 }}>No data</span>
+              : <>{summary.projects.toLocaleString("en-IN")} <span style={{ color: MUTED, fontSize: 14 }}>·</span> {(summary.boms ?? 0).toLocaleString("en-IN")}</>}
+          </button>
         </Card>
         <Card title="Last pulled" hint={pulled ? (age === 0 ? "today" : `${Math.abs(age ?? 0)} day${Math.abs(age ?? 0) === 1 ? "" : "s"} ago`) : "never — open ERP pull"}>
           <span style={{ color: pulled ? (age !== null && age <= -7 ? AMBER : GREEN) : MUTED, fontSize: pulled ? 20 : 15, fontWeight: 800, lineHeight: 1 }}>
@@ -89,7 +98,8 @@ export default function Dashboard({ summary, go }: { summary: Summary; go: (k: s
             pictures, the drawings in PDF, DWG and DXF, every attachment, and every link, as they are. Search it, filter
             it by group, open an item to read the whole record, and print the page you are looking at.
             <br /><br />
-            <b>ERP pull</b> reads the ERP again — items, then their child tables, then the files — and keeps a ledger
+            <b>Projects</b> lists every project with the Approved BOM it points at and every BOM the ERP holds against it.
+            <b> ERP pull</b> reads the ERP again — items, child tables, files, projects, BOMs — and keeps a ledger
             of every walk. An item the ERP has since disabled is marked here, never dropped: the Bill of Materials,
             which comes next on this base, must still find it.
             <br /><br />

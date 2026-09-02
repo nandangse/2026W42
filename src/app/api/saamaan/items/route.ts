@@ -19,6 +19,8 @@ export const dynamic = "force-dynamic";
  *                            one question, answered with IN.
  *   ?mode=one&code=N040692 — one item whole: every column, the verbatim
  *                            ERP document, the child tables, the files.
+ *   ?mode=projects         — every project with the BOMs the ERP holds on
+ *                            it, joined here so the screen gets one list.
  *
  * Every answer carries `erpBase`, the ERP's URL, so the screen can turn the
  * paths it holds (file_url, an <img src> inside a description, the item's
@@ -57,7 +59,7 @@ export async function GET(req: Request) {
     const base = await erpBase();
 
     if (mode === "summary") {
-      const [total, disabled, withPdf, withDwg, withDxf, files, groups, pulls] = await Promise.all([
+      const [total, disabled, withPdf, withDwg, withDxf, files, groups, pulls, projects, boms] = await Promise.all([
         admin.from("material_item").select("item_code", { count: "exact", head: true }).eq("disabled", false),
         admin.from("material_item").select("item_code", { count: "exact", head: true }).eq("disabled", true),
         admin.from("material_item").select("item_code", { count: "exact", head: true }).eq("disabled", false).neq("drawing_pdf", ""),
@@ -65,7 +67,9 @@ export async function GET(req: Request) {
         admin.from("material_item").select("item_code", { count: "exact", head: true }).eq("disabled", false).neq("custom_drawing_dxf", ""),
         admin.from("material_item_file").select("file_id", { count: "exact", head: true }),
         admin.rpc("material_group_counts"),
-        admin.from("material_pull").select("id, phase, found, written, removed, note, by, at").order("at", { ascending: false }).limit(30),
+        admin.from("material_pull").select("id, phase, found, written, removed, note, by, at").order("at", { ascending: false }).limit(40),
+        admin.from("material_project").select("project_id", { count: "exact", head: true }),
+        admin.from("material_bom").select("bom_id", { count: "exact", head: true }),
       ]);
       if (total.error) {
         if (notInstalled(total.error.message)) return NextResponse.json({ installed: false, erpBase: base });
@@ -81,6 +85,9 @@ export async function GET(req: Request) {
         withDwg: withDwg.count ?? 0,
         withDxf: withDxf.count ?? 0,
         files: files.count ?? 0,
+        // Null until 0119 is in — "no table" is not "no projects".
+        projects: projects.error ? null : projects.count ?? 0,
+        boms: boms.error ? null : boms.count ?? 0,
         groups: (groups.data as { item_group: string; n: number }[] | null) ?? [],
         pulls: pulls.data ?? [],
         lastPulledAt: lastItems?.at ?? null,
@@ -100,6 +107,41 @@ export async function GET(req: Request) {
       }
       if (!item.data) throw new HttpError(404, `No item ${code} in Saamaan — pull from the ERP, or check the code.`);
       return NextResponse.json({ installed: true, erpBase: base, item: item.data, files: files.data ?? [] });
+    }
+
+    if (mode === "projects") {
+      const all = async (table: string, cols: string, order: string) => {
+        const out: Record<string, unknown>[] = [];
+        for (let a = 0; ; a += 1000) {
+          const { data, error } = await admin.from(table).select(cols).order(order).range(a, a + 999);
+          if (error) throw error;
+          out.push(...((data ?? []) as unknown as Record<string, unknown>[]));
+          if (!data || data.length < 1000) break;
+        }
+        return out;
+      };
+      try {
+        const [projects, boms, pull] = await Promise.all([
+          all("material_project", "project_id, project_name, status, customer, product_family, approved_bom, design_stage, bom_release_target_date, bom_released_date, structural_bom, main_bom, hydraulic_bom, electric_bom, long_lead_items, erp_modified", "project_id"),
+          all("material_bom", "bom_id, item_code, item_name, project_id, is_active, is_default, docstatus, quantity, erp_modified", "bom_id"),
+          admin.from("material_pull").select("at").eq("phase", "projects").order("at", { ascending: false }).limit(1).maybeSingle(),
+        ]);
+        const byProject = new Map<string, Record<string, unknown>[]>();
+        for (const b of boms) {
+          const k = String(b.project_id || "");
+          if (!k) continue;
+          (byProject.get(k) ?? byProject.set(k, []).get(k)!).push(b);
+        }
+        // Newest project first — the number is the ERP's running serial.
+        const rows: Record<string, unknown>[] = projects
+          .map((p) => ({ ...p, boms: byProject.get(String(p.project_id)) ?? [] }) as Record<string, unknown>)
+          .sort((a, b) => String(b.project_id).localeCompare(String(a.project_id), undefined, { numeric: true }));
+        return NextResponse.json({ installed: true, erpBase: base, projects: rows, lastPulledAt: pull.data?.at ?? null });
+      } catch (e) {
+        const m = e instanceof Error ? e.message : String((e as { message?: string })?.message || e);
+        if (notInstalled(m)) return NextResponse.json({ installed: false, erpBase: base, projects: [], lastPulledAt: null, error: "Run migration 0119 first — Saamaan's project tables don't exist yet." }, { status: 503 });
+        throw new Error(m);
+      }
     }
 
     // ---------------------------------------------------------------- list

@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * ERP pull — reading nandanerp's Item master into the mirror.
+ * ERP pull — reading nandanerp into the mirror.
  *
- * Three phases, three requests, one button: items, then their child
- * tables, then the files. Each phase reports what it found and what it
+ * Five phases, five requests, one button: items, their child tables, the
+ * files, then the projects and the BOM headers. Each phase reports what it found and what it
  * wrote before the next begins, so a walk that stops half-way says exactly
  * where. Raghu's hand only, as with Seva's ERP door; everyone else sees the
  * ledger.
@@ -19,6 +19,8 @@ const PHASES: { key: string; label: string; what: string }[] = [
   { key: "items", label: "1 · Items", what: 'every Item whose group is "RM - …" and which is not disabled — the whole document, 500 a page' },
   { key: "children", label: "2 · Child tables", what: "UOM conversions, item defaults, suppliers, reorder levels, taxes, barcodes, customer items, variant attributes" },
   { key: "files", label: "3 · Files", what: "every attachment the ERP holds against those items — the drawings, the images, the rest — as it is" },
+  { key: "projects", label: "4 · Projects", what: "every Project, with the Approved BOM it points at and the BOM fields the ERP keeps on it" },
+  { key: "boms", label: "5 · BOMs", what: "every BOM header — the item it makes, the project it belongs to, active, default, submitted" },
 ];
 
 type Line = { phase: string; state: "waiting" | "running" | "done" | "failed"; note: string };
@@ -50,8 +52,8 @@ export default function Pull({ summary, isOwner, onDone }: { summary: Summary; i
   return (
     <Screen
       title="ERP pull"
-      blurb="Reads the Item master off nandanerp into Saamaan — items, then their child tables, then the files. Nothing on the ERP is written, ever."
-      action={isOwner ? <Btn kind="primary" onClick={run} disabled={busy} title="Three phases, one after the other">{busy ? "Pulling…" : "⇣ Pull from the ERP"}</Btn> : undefined}>
+      blurb="Reads nandanerp into Saamaan — items, their child tables, the files, then the projects and the BOMs. Nothing on the ERP is written, ever."
+      action={isOwner ? <Btn kind="primary" onClick={run} disabled={busy} title="Five phases, one after the other">{busy ? "Pulling…" : "⇣ Pull from the ERP"}</Btn> : undefined}>
       {!isOwner && <Note kind="info">The ERP door is Raghu&apos;s to use, for now. The ledger below shows every walk that was made.</Note>}
       {!summary.erpBase && <Note kind="warn">The ERP&apos;s URL is not saved — CRM → Settings → Integrations holds the ERPNext keys, and Saamaan borrows them from there.</Note>}
 
