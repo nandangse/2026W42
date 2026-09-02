@@ -118,13 +118,13 @@ export async function GET(req: Request) {
       for (const g of ig || []) imsEmails.add(String(g.email || "").toLowerCase());
     } catch { /* pre-0111 */ }
 
-    // Saamaan grants — the eighth, materials (0117). The table is
+    // Saamaan grants — the eighth, materials (0118). The table is
     // material_access: every Saamaan table wears the material_ prefix.
     const saamaanEmails = new Set<string>();
     try {
       const { data: mg } = await admin.from("material_access").select("email");
       for (const g of mg || []) saamaanEmails.add(String(g.email || "").toLowerCase());
-    } catch { /* pre-0117 */ }
+    } catch { /* pre-0118 */ }
 
     // Last sign-in lives in auth.users, not profiles, so it comes from the
     // admin auth API. Failure here must not take the page down — the column
@@ -542,7 +542,7 @@ export async function POST(req: Request) {
         const { error } = await admin.from("material_access").upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
         if (error) {
           if (/material_access|schema cache|does not exist/i.test(error.message))
-            return NextResponse.json({ error: "Run migration 0117 first — the Saamaan grant table doesn't exist yet" }, { status: 400 });
+            return NextResponse.json({ error: "Run migration 0118 first — the Saamaan grant table doesn't exist yet" }, { status: 400 });
           throw new Error(error.message);
         }
       } else {

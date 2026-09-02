@@ -9,7 +9,7 @@ import { adminClient } from "@/lib/supabase/admin";
  * सामान — the goods, the stuff, the material a works runs on. Same
  * arrangement as every module door: a grant per email held in
  * material_access, the owner implicit, "no" for everyone else until
- * migration 0117 exists. Every table the module owns is prefixed
+ * migration 0118 exists. Every table the module owns is prefixed
  * `material_` — that prefix is the distinction Dr Raghu asked for between
  * Saamaan's rows and the rest of Genie's, inside the one database.
  */

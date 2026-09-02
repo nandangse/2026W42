@@ -354,7 +354,7 @@ interface AdminUser {
   /** IMS, the management system, at /ims (0111). Same arrangement. */
   ims_access: boolean;
   ims_implicit: boolean;
-  /** Saamaan, materials, at /saamaan (0117, material_access). Same arrangement. */
+  /** Saamaan, materials, at /saamaan (0118, material_access). Same arrangement. */
   saamaan_access: boolean;
   saamaan_implicit: boolean;
 }

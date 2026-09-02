@@ -104,7 +104,7 @@ async function knownCodes(admin: ReturnType<typeof adminClient>): Promise<Set<st
     const { data, error } = await admin.from("material_item").select("item_code").order("item_code").range(a, a + 999);
     if (error) {
       if (/does not exist|schema cache/i.test(error.message))
-        throw new HttpError(503, "Run migration 0117 first — Saamaan's tables don't exist yet.");
+        throw new HttpError(503, "Run migration 0118 first — Saamaan's tables don't exist yet.");
       throw new Error(error.message);
     }
     for (const r of data || []) codes.add(String(r.item_code));
@@ -207,7 +207,7 @@ export async function POST(req: Request) {
         const { error } = await admin.from("material_item").upsert(rows.slice(i, i + 500), { onConflict: "item_code" });
         if (error) {
           if (/does not exist|schema cache/i.test(error.message))
-            throw new HttpError(503, "Run migration 0117 first — Saamaan's tables don't exist yet.");
+            throw new HttpError(503, "Run migration 0118 first — Saamaan's tables don't exist yet.");
           throw new Error(error.message);
         }
         written += Math.min(500, rows.length - i);
@@ -290,7 +290,7 @@ export async function POST(req: Request) {
         const { error } = await admin.from("material_item_file").upsert(rows.slice(i, i + 500), { onConflict: "file_id" });
         if (error) {
           if (/does not exist|schema cache/i.test(error.message))
-            throw new HttpError(503, "Run migration 0117 first — Saamaan's tables don't exist yet.");
+            throw new HttpError(503, "Run migration 0118 first — Saamaan's tables don't exist yet.");
           throw new Error(error.message);
         }
         written += Math.min(500, rows.length - i);

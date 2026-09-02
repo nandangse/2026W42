@@ -55,7 +55,7 @@ export default function SaamaanApp({
         <Note kind="warn">
           <div className="mb-1">Saamaan&apos;s tables are not in the database yet.</div>
           <div style={{ fontWeight: 500 }}>
-            Run <b>supabase/migrations/0117_saamaan.sql</b> on Genie&apos;s project. Every table it makes begins
+            Run <b>supabase/migrations/0118_saamaan.sql</b> on Genie&apos;s project. Every table it makes begins
             with <b>material_</b> — that prefix is Saamaan&apos;s boundary inside the one database.
           </div>
         </Note>

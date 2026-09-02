@@ -99,6 +99,10 @@ const PROBES = [
   ["genie", "0112 IMS welding (EXC3)", "ims_welder_qual?select=revalidation_due"],
   ["genie", "0113 IMS standards seeded", "ims_standard?select=code"],
   ["genie", "0113 IMS clause trees seeded", "ims_standard_clause?select=clause_no"],
+  ["genie", "0118 Saamaan door (material_access)", "material_access?select=email"],
+  ["genie", "0118 Saamaan item mirror", "material_item?select=item_code"],
+  ["genie", "0118 Saamaan item files", "material_item_file?select=file_id"],
+  ["genie", "0118 Saamaan pull ledger", "material_pull?select=phase"],
 ];
 
 let missing = 0;
