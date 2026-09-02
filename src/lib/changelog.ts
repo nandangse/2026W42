@@ -75,6 +75,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.0.1",
+    date: "2026-09-02",
+    module: "The frozen plan is a numbered document, and it goes to the floor from Raghu's Gmail",
+    items: [
+      "\"can this be sent by Raghus Oauth email?\" \u2014 and the question exposed something worse. The screen said RESEND_API_KEY not set, which means NO plan mail had ever left Genie. Not one. Every signature went out silent, and I had said the mail already went. It did not. It now rides the same connected Gmail that sends every quotation, and Resend is only the fallback.",
+      "The first attempt looked the mailbox up in the WRONG DATABASE: Genie's profiles.id, when the mailbox lives in the CRM against the CRM's own profile uuid. Same man, two ids \u2014 the exact trap docs/DATABASE-SPLIT.md warns about. It would have reported \"Gmail is not connected\" while the mailbox sat there active. Caught by querying both databases rather than by reading the code.",
+      "\"its important that the mail goes to all!\" (Dr Raghu, 2 Sep 2026). Raghu's signature is not an acknowledgement to one person \u2014 it is the month's instruction, so it goes to the floor: JC Kumar, Cdr Tushar and Raghu, cc Yashavantha, Mukesh, Suresh, Pankaj, Planning and dosianil@yahoo.co.in, with the signed PDF and the standing order to read On Floor every day. Anybody ELSE's signature still gets the personal note.",
+      "THE PLAN IS NUMBERED: NGSE/PLAN/SEP26/0209/Rev0, with the Genie version beside it. The revision comes off the ledger, not a guess \u2014 re-freezing September on the 15th issues Rev1 rather than quietly replacing the Rev0 already sitting in nine inboxes. The number is on the header, on EVERY page's footer, in the subject and in the filename: a loose photocopied page with no number on it is a page nobody can place. A DRAFT gets no number, because it has not been issued.",
+      "AND THE STALE BANNER, which is what he saw: the desk was still flying \"RESEND_API_KEY not set\" AFTER the send had moved to Gmail. Not a live failure \u2014 the old code wrote that text onto DRAFT rows, and the card read the stored text back for ever. Drafts mail nobody, so they now report nothing about mail, and the 70 old draft rows carrying that text were cleared. Stale status is worse than none: it sends you hunting a fault that was already fixed.",
+      "A failed send now names the reason that matters. Gmail is the road we chose; when it refuses, the message says so, instead of burying it under Resend's 403 on a domain Resend was never verified for.",
+      "The gap in the PDF was the signature block marked never-to-split: it jumped a page whole and left the rest blank. The rule belongs on the individual cards \u2014 a person's name should not be sliced in half; the block may break.",
+      "The family and customer tallies now carry throughput beside value, on the desk and in the PDF.",
+      "Numbered 4.3.0.1 and not 4.2.9.4: an earlier commit of this work carried the same code, but its changelog entry was overwritten by the IMS 4.3.0.0 line landing in the same file, so the version never moved and the code shipped silently. The code was on main throughout; only its name was missing.",
+    ],
+  },
+  {
     v: "4.3.0.0",
     date: "2026-09-02",
     module: "IMS — the seventh door: ISO 9001, 14001, 45001, 27001, D1.1 and EN 1090 EXC3",
