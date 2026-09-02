@@ -92,14 +92,16 @@ export const UPDATES: UpdateEntry[] = [
     ],
   },
   {
-    v: "4.3.5.0",
+    v: "4.3.5.1",
     date: "2026-09-02",
     module: "Job Commercials does the arithmetic he set out",
     items: [
       "Dr Raghu, 2 Sep 2026, gave the whole chain: Throughput = Value \u00d7 T%; Material = Value \u00d7 (1 \u2212 T%); Invested = Material \u00d7 Kitting%; Balance = invoice \u2212 Advance; the four collection terms should total 100%.",
       "INVESTED STOPPED BEING A BOX. It was a typed field; it is a consequence of two numbers the board already keeps, and a typed copy of a derived figure goes stale the first time kitting moves. Material is derived beside it. Both carry their formula in the tooltip so nobody has to trust the column blindly.",
       "GST IS A NEW FIELD \u2014 AND THE ERP ALREADY HAD IT. Jobmaster carries custom_gst_rate, so it is mapped on the import and nobody types it 112 times. It is editable where the ERP is silent.",
-      "ONE READING I MADE, AND HE SHOULD OVERRULE ME IF IT IS WRONG. \"Balance Due = Value * GST - Advance\" taken literally is the tax alone, so it is read as the INVOICE value \u2014 value PLUS GST \u2014 less what has come in, which is the number a cash forecast needs. He flagged it himself: \"(will rewrite)\". With NO GST rate recorded the invoice is the value as it stands and the cell is flagged amber, because a guessed 18% on an exempt job is a wrong number stated confidently.",
+      "BALANCE = VALUE \u00d7 (1 + GST) \u2212 ADVANCE, confirmed by him the same hour: \"the 60.2 is basic. It will be 60.2*1.18 where 18% is GST, hence the balance will have the GST to also add in.\" And the board proves it \u2014 the two 8 BRD - TMC - Chennai jobs carry a pending figure of EXACTLY 1.180 times their value.",
+      "WHICH KILLED A WARNING BEFORE ANYONE SAW IT. Earlier the same hour I flagged thirteen jobs whose balance exceeded their value as \"one of the two is stale\". Two of those thirteen were simply GST-inclusive, and once the new formula lands EVERY job with GST and no advance is 1.18\u00d7 its value by definition \u2014 so that warning would have reddened nearly every row on the page. A warning that fires on everything is read as decoration. Removed. What is worth flagging is a MISSING GST rate, and that is what the amber does.",
+      "The other eleven are still worth a look, and are not GST: a Bomb Loader carries Rs 70.8 L pending on a job whose value reads zero, and a Container Cradle Rs 35.9 L on Rs 4.5 L.",
       "THE FOUR TERMS NOW SHOW THEIR SUM, and anything that is not 100% turns red. A job whose terms come to 80% has a fifth of its money vanish from the forecast; one at 120% invents money. Both are typos, and neither announced itself before.",
       "\"also show the total on the top of the heading of all / Show number of jobs\" \u2014 a strip above the table: jobs, value, throughput, material, invested, WIP labour, advance in, balance due, then the six months. It follows the SEARCH, not the whole book: a filtered table whose totals ignore the filter answers a question nobody asked.",
       "\"keep the edit at the next of the job so these data can be edited\" \u2014 a pencil beside every job number opens THAT ROW for editing, all its fields at once. Click-per-cell was fine for correcting one number and wrong for entering a job's terms, where seven fields belong together and hunting them across a wide table is how three get missed. The job number itself keeps its hover and opens the job's lightbox.",

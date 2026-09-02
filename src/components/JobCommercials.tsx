@@ -7,11 +7,25 @@
  *
  * THE ARITHMETIC, stated once so the screen cannot argue with itself.
  *
- *   Balance due = the pending payment on delivery when the board carries one,
- *                 otherwise value less the advance. Never a defaulted zero:
- *                 a job with nothing recorded shows a dash, because "we do
- *                 not know" and "nothing is owed" are different sentences and
- *                 only one of them belongs in a cash forecast.
+ *   Throughput = Value x T%
+ *   Material   = Value x (1 - T%)
+ *   Invested   = Material x Kitting%
+ *   Invoice    = Value x (1 + GST%)
+ *   Balance    = Invoice - Advance
+ *
+ *   THE BALANCE IS GST-INCLUSIVE, AND THAT IS THE POINT (Dr Raghu, 2 Sep
+ *   2026: "the 60.2 is basic. It will be 60.2*1.18 where 18% is GST, hence
+ *   the balance will have the GST to also add in"). Proved on the board: the
+ *   two 8 BRD - TMC - Chennai jobs carry a pending figure of exactly 1.180
+ *   times their value. So a balance LARGER than the bare value is normal, not
+ *   a fault -- with 18% GST and nothing received it is 1.18x by definition.
+ *   An earlier warning flagged exactly that as an error; it was removed
+ *   before anyone saw it, because left in it would have reddened nearly every
+ *   row on the page, and a warning that fires on everything is decoration.
+ *
+ *   With NO GST rate the invoice is the bare value and the cell is AMBER. A
+ *   guessed 18% on an exempt job is a wrong number stated confidently, and
+ *   this screen feeds the 13-week plan.
  *
  *   The four percentages are OF THE BALANCE, not of the value. They land on
  *   TDD + 3 days, + 30, + 60 and + 90 -- the three days being the gap between
@@ -287,9 +301,9 @@ export default function JobCommercials({
                   warn={false} onSave={(v) => save(j.id, "gst", v)} />
                 <Money v={adv} canEdit={canEdit && editing === j.id} busy={busy === j.id + "advance"} onSave={(v) => save(j.id, "advance", v)} />
                 <td className="px-2 py-1 whitespace-nowrap tnum font-semibold"
-                  title={`Invoice ${cr(invoice)}${gst == null ? " (no GST rate recorded)" : ` (value + ${gst}% GST)`} less advance`}
+                  title={`Invoice ${cr(invoice)}${gst == null ? " \u2014 NO GST rate recorded, so this is the bare value" : ` = value + ${gst}% GST`}${adv ? `, less ${cr(adv)} advance` : ", nothing received yet"}`}
                   style={{ color: gst == null ? C.amber : C.ink }}>
-                  {cr(balance)}{gst == null && <span title="No GST rate on this job — the invoice is the value as it stands"> ⚠</span>}
+                  {cr(balance)}{gst == null && <span title="No GST rate on this job — the invoice is the bare value"> ⚠</span>}
                 </td>
                 <td className="px-2 py-1 whitespace-nowrap tnum" style={{ color: j.tdd && j.tdd < today ? C.red : C.ink }}>{fmt(j.tdd)}</td>
                 <td className="px-2 py-1 whitespace-nowrap" style={{ color: C.sub }}>{j.ownerName || j.ownerInitials || "—"}</td>
