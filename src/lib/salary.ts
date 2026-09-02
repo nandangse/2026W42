@@ -23,6 +23,23 @@ const CONTRACT_TDS = new Set(["Contractor", "Labour - Contract", "Staff - Contra
 /** Contract engagements (Dr Raghu, 29 Aug 2026): ALL benefits zero — their
  *  CTC is the Basic & DA alone. */
 export const CONTRACT_TYPES_SET = CONTRACT_TDS;
+/**
+ * WORKERS GET NEITHER HRA NOR MEDICAL ALLOWANCE (Dr Raghu, 2 Sep 2026: "HR
+ * medical allowance is not there for workers. Please note. No HRA either").
+ *
+ * Caught on a Prod - Fitter's appraisal card, which was offering a Medical
+ * Allowance of Rs 1,250 marked "always" and carrying an HRA line. Labour is
+ * the biggest group on the roll -- 116 of the 200 -- so this was not an edge
+ * case: it was the majority of the company being shown a structure they are
+ * not on, and every increment split against it would have put money in two
+ * heads that do not exist for them.
+ *
+ * Labour - Contract is here too. It is already contract-exempt on other
+ * grounds, but the rule is about being a WORKER, not about the contract, and
+ * a rule that only works by accident stops working when the accident does.
+ */
+export const NO_HRA_NO_MEDICAL = new Set(["Labour", "Labour - Contract"]);
+
 /** The annual bonus belongs to Staff and Labour alone (same day). */
 const BONUS_TYPES = new Set(["Staff", "Labour"]);
 
@@ -67,14 +84,15 @@ export function salaryTable(get: (k: string) => unknown, type: string | null, ex
   const t = String(type || "").trim();
   const exempt = NO_STATUTORY.has(t);
   const noBenefits = NO_BENEFITS.has(t);
+  const worker = NO_HRA_NO_MEDICAL.has(t);
   const isContract = CONTRACT_TDS.has(t);
   const basic = num(get("Basic and DA"));
   // a contract engagement is Basic & DA ALONE (Dr Raghu, 29 Aug 2026) —
   // no HRA, no allowances, no statutory, no benefits; CTC = the basic.
-  const hra = exempt ? 0 : num(get("HRA"));
+  const hra = exempt || worker ? 0 : num(get("HRA"));
   const fixed = isContract ? 0 : num(get("Fixed Allowance"));
   const conv = isContract ? 0 : num(get("Conveyance"));
-  const med = isContract ? 0 : num(get("Medical Allowance"));
+  const med = isContract || worker ? 0 : num(get("Medical Allowance"));
   const gross = basic + hra + fixed + conv + med;
   if (!gross) return null;
 
@@ -105,9 +123,10 @@ export function salaryTable(get: (k: string) => unknown, type: string | null, ex
   const rows: SalaryRow[] = [
     { label: "Gross Salary", monthly: null, yearly: null, kind: "head" },
     R("Basic & DA", basic),
-    ...(exempt ? [] : [R("HRA", hra)]),
+    ...(exempt || worker ? [] : [R("HRA", hra)]),
     R("Fixed Allowance", fixed),
-    R("Conveyance", conv), R("Medical Allowance", med),
+    R("Conveyance", conv),
+    ...(worker ? [] : [R("Medical Allowance", med)]),
     R("Total Gross Salary (A)", gross, "total"),
     { label: "Approx Tax Deducted at Source (TDS) on Gross — indicative", monthly: tds.monthly, yearly: tds.yearly, kind: "row" },
     { label: "TDS is an estimate only; the actual depends on declarations and other income", monthly: null, yearly: null, kind: "note" },
@@ -198,13 +217,16 @@ export function splitGross(gross: number, basicPct = SPLIT_DEFAULTS.basicPct, ty
   if (CONTRACT_TDS.has(String(type || "").trim()))
     return { basic_da: g, hra: 0, fixed_allowance: 0, conveyance: 0, medical_allowance: 0 };
   const exempt = NO_STATUTORY.has(String(type || "").trim());
+  // Dr Raghu, 2 Sep 2026: workers have neither head, so the split must not
+  // create one -- the Fixed Allowance takes what HRA and Medical would have.
+  const worker = NO_HRA_NO_MEDICAL.has(String(type || "").trim());
   const pct = Math.min(100, Math.max(1, num(basicPct) || SPLIT_DEFAULTS.basicPct));
 
   const basic = Math.round((g * pct) / 100);
   // HRA is not paid to the types that do not get it — the balance goes to Fixed
-  const hra = exempt ? 0 : Math.round((basic * SPLIT_DEFAULTS.hraOfBasic) / 100);
+  const hra = exempt || worker ? 0 : Math.round((basic * SPLIT_DEFAULTS.hraOfBasic) / 100);
   const conveyance = Math.min(SPLIT_DEFAULTS.conveyance, Math.max(0, g - basic - hra));
-  const medical = Math.min(SPLIT_DEFAULTS.medical, Math.max(0, g - basic - hra - conveyance));
+  const medical = worker ? 0 : Math.min(SPLIT_DEFAULTS.medical, Math.max(0, g - basic - hra - conveyance));
   const fixed = Math.max(0, g - basic - hra - conveyance - medical);
 
   return { basic_da: basic, hra, fixed_allowance: fixed, conveyance, medical_allowance: medical };

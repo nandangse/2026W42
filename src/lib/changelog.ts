@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.3.3",
+    date: "2026-09-02",
+    module: "Workers get neither HRA nor Medical Allowance",
+    items: [
+      "\"HR medical allowance is not there for workers. Please note. No HRA either\" (Dr Raghu, 2 Sep 2026), caught on a Prod - Fitter's appraisal card offering Rs 1,250 marked \"always\".",
+      "LABOUR IS 127 OF THE PEOPLE ON THE ROLL. This was not an edge case: it was the majority of the company being shown a structure they are not on, and every increment split against it put money into two heads that do not exist for them.",
+      "NOBODY'S PAY MOVES. Checked before shipping rather than after: not one worker carries an HRA or a Medical amount today, so no gross changes by a rupee. The fault was only ever in the structure the APPRAISAL was proposing \u2014 it would have created those heads on the way in.",
+      "Fixed in the shared salary engine, not just on the card, so the salary table, the default split and the appraisal all obey it \u2014 the same rule in three places is three places to forget it. Labour - Contract is included: it is already contract-exempt on other grounds, but the rule is about being a WORKER, and a rule that only works by accident stops working when the accident does.",
+      "On a worker's card the two lines read \u201c\u2014 not for workers\u201d rather than an editable zero. A box you can type into is a box somebody eventually types into.",
+    ],
+  },
+  {
     v: "4.3.3.2",
     date: "2026-09-02",
     module: "The Appraisal Table's PDF prints something",

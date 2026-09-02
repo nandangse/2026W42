@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 import { IDP_SECTIONS, IDP_RATINGS } from "@/lib/idp";
-import { salaryTable, type SalaryRow, type ExtraRow } from "@/lib/salary";
+import { NO_HRA_NO_MEDICAL, salaryTable, type SalaryRow, type ExtraRow } from "@/lib/salary";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
 
@@ -438,6 +438,15 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
   // more of the same day's laws: MEDICAL IS ALWAYS ₹1,250 (never typed),
   // and a CONTRACT engagement is Basic & DA alone — every other box closes.
   const isContract = ["Contractor", "Labour - Contract", "Staff - Contract"].includes(String(d.employee.type || ""));
+  /**
+   * A WORKER HAS NEITHER HRA NOR MEDICAL ALLOWANCE (Dr Raghu, 2 Sep 2026:
+   * "HR medical allowance is not there for workers. Please note. No HRA
+   * either") — caught on a Prod - Fitter's card offering Rs 1,250 marked
+   * "always". Labour is 116 of the 200 on the roll, so this was the MAJORITY
+   * of the company being shown a structure they are not on, and every
+   * increment split against it put money into two heads that do not exist.
+   */
+  const isWorker = NO_HRA_NO_MEDICAL.has(String(d.employee.type || ""));
   const prev = d.salary?.gross ?? null;
   const proposed = d.reviews.find((r) => r.gross_proposed != null)?.gross_proposed ?? null;
   const [busy, setBusy] = useState(false);
@@ -471,12 +480,12 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
     if (!target) return { basic_da: "0", hra: "0", fixed: "0", conveyance: "0", medical: "0" };
     const pct = Math.min(100, Math.max(1, Number(pctRaw ?? basicPct) || 58));
     const basic = Math.round((target * pct) / 100);
-    const hra = isStaff ? Math.round(basic * 0.2) : (baseComps.hra || 0);
+    const hra = isWorker ? 0 : isStaff ? Math.round(basic * 0.2) : (baseComps.hra || 0);
     const conveyance = baseComps.conveyance || 0;   // fixed — never scaled
-    const medical = 1250;                            // always
+    const medical = isWorker ? 0 : 1250;            // always, EXCEPT for workers
     const fixed = Math.max(0, target - basic - hra - conveyance - medical);
     return { basic_da: String(basic), hra: String(hra), fixed: String(fixed), conveyance: String(conveyance), medical: String(medical) };
-  }, [baseComps, isStaff, isContract, basicPct]);
+  }, [baseComps, isStaff, isContract, isWorker, basicPct]);
 
   // the split being decided: saved tuning first, else today's shares at the decided/proposed gross
   const [comps, setComps] = useState<Record<string, string>>(() => {
@@ -688,6 +697,12 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
                             {key
                               ? (isContract && key !== "basic_da"
                                 ? <span className="tnum" title="A contract engagement is Basic & DA alone" style={{ color: C.dim }}>—</span>
+                                /* A worker has neither head — shown as not
+                                   applicable rather than as a typeable zero,
+                                   because a box you can type into is a box
+                                   somebody eventually types into. */
+                                : isWorker && (key === "medical" || key === "hra")
+                                ? <span className="tnum" title="Workers are not paid HRA or Medical Allowance" style={{ color: C.dim }}>— <span style={{ fontSize: 10 }}>not for workers</span></span>
                                 : key === "medical"
                                 ? <span className="tnum" title="Medical Allowance is always ₹1,250 — the rule" style={{ fontWeight: 600 }}>
                                     {inr(Number(comps[key]) || 0)} <span style={{ fontSize: 10, color: C.dim }}>always</span>
