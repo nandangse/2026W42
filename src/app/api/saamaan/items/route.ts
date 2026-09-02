@@ -11,10 +11,12 @@ export const dynamic = "force-dynamic";
  *
  *   ?mode=summary          — the counts the dashboard draws, one per group,
  *                            and the pull ledger.
- *   ?mode=list&q=&group=&page=&size=&disabled=1
+ *   ?mode=list&q=&group=&group=&page=&size=&disabled=1
  *                          — a page of the list. 22,000 rows do not travel
  *                            to a browser; the search and the group filter
  *                            run in the database and a page comes back.
+ *                            `group` repeats: several groups at once are
+ *                            one question, answered with IN.
  *   ?mode=one&code=N040692 — one item whole: every column, the verbatim
  *                            ERP document, the child tables, the files.
  *
@@ -102,14 +104,14 @@ export async function GET(req: Request) {
 
     // ---------------------------------------------------------------- list
     const q = safe(String(p.get("q") || ""));
-    const group = String(p.get("group") || "").trim();
+    const groups = p.getAll("group").map((g) => g.trim()).filter(Boolean);
     const showDisabled = p.get("disabled") === "1";
     const size = Math.min(500, Math.max(20, Number(p.get("size") || 200) || 200));
     const page = Math.max(0, Number(p.get("page") || 0) || 0);
 
     let sel = admin.from("material_item").select(LIST_COLUMNS, { count: "exact" });
     if (!showDisabled) sel = sel.eq("disabled", false);
-    if (group) sel = sel.eq("item_group", group);
+    if (groups.length) sel = sel.in("item_group", groups);
     if (q) sel = sel.or(`item_code.ilike.%${q}%,item_name.ilike.%${q}%,description.ilike.%${q}%,drawing_no.ilike.%${q}%`);
     const { data, error, count } = await sel.order("item_code").range(page * size, page * size + size - 1);
     if (error) {

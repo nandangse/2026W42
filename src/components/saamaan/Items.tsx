@@ -15,7 +15,7 @@
  * 22,000 items is not the document anybody asked for.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GenieTable from "@/components/GenieTable";
 import { Screen, Modal, Btn, Note, Chip, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, S, fmtD, statusColour } from "@/components/ims/ui";
 import type { Summary } from "./Dashboard";
@@ -67,7 +67,7 @@ export default function Items({ summary, initialGroup }: { summary: Summary; ini
   const base = summary.erpBase;
   const [q, setQ] = useState("");
   const [typed, setTyped] = useState("");
-  const [group, setGroup] = useState(initialGroup);
+  const [groups, setGroups] = useState<string[]>(initialGroup ? [initialGroup] : []);
   const [showDisabled, setShowDisabled] = useState(false);
   const [page, setPage] = useState(0);
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -76,29 +76,29 @@ export default function Items({ summary, initialGroup }: { summary: Summary; ini
   const [open, setOpen] = useState<string | null>(null);
   const SIZE = 200;
 
-  useEffect(() => { setGroup(initialGroup); setPage(0); }, [initialGroup]);
+  useEffect(() => { setGroups(initialGroup ? [initialGroup] : []); setPage(0); }, [initialGroup]);
   /** The search waits for the typing to stop; a query a keystroke is a query too many. */
   useEffect(() => { const t = setTimeout(() => { setQ(typed); setPage(0); }, 350); return () => clearTimeout(t); }, [typed]);
 
   const load = useCallback(() => {
     setErr("");
-    const u = `/api/saamaan/items?mode=list&q=${encodeURIComponent(q)}&group=${encodeURIComponent(group)}&page=${page}&size=${SIZE}${showDisabled ? "&disabled=1" : ""}`;
+    const u = `/api/saamaan/items?mode=list&q=${encodeURIComponent(q)}${groups.map((g) => `&group=${encodeURIComponent(g)}`).join("")}&page=${page}&size=${SIZE}${showDisabled ? "&disabled=1" : ""}`;
     fetch(u, { cache: "no-store" })
       .then(async (r) => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || `The server answered ${r.status}.`); return j; })
       .then((j) => { setRows(j.rows || []); setTotal(j.total || 0); })
       .catch((e) => { setErr(e instanceof Error ? e.message : String(e)); setRows([]); });
-  }, [q, group, page, showDisabled]);
+  }, [q, groups, page, showDisabled]);
   useEffect(() => { load(); }, [load]);
 
   const from = total ? page * SIZE + 1 : 0;
   const to = Math.min(total, (page + 1) * SIZE);
   const filtersWords = useMemo(() => {
     const w: string[] = [];
-    if (group) w.push(`group "${group}"`);
+    if (groups.length) w.push(groups.length === 1 ? `group "${groups[0]}"` : `groups ${groups.map((g) => `"${g}"`).join(", ")}`);
     if (q) w.push(`search "${q}"`);
     if (showDisabled) w.push("disabled included");
     return w.length ? w.join(", ") : "all RM items, not disabled";
-  }, [group, q, showDisabled]);
+  }, [groups, q, showDisabled]);
 
   /** The page on screen, as a clean A4 sheet. Rows never split across pages. */
   const print = () => {
@@ -142,11 +142,7 @@ export default function Items({ summary, initialGroup }: { summary: Summary; ini
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="🔍 code, name, description, drawing no."
           className="px-2 py-1.5 rounded border text-sm" style={{ borderColor: BORDER, minWidth: 260, flex: "1 1 260px", maxWidth: 420 }} />
-        <select value={group} onChange={(e) => { setGroup(e.target.value); setPage(0); }}
-          className="px-2 py-1.5 rounded border text-sm bg-white" style={{ borderColor: BORDER, maxWidth: 320 }}>
-          <option value="">All groups</option>
-          {summary.groups.map((g) => <option key={g.item_group} value={g.item_group}>{g.item_group} ({g.n.toLocaleString("en-IN")})</option>)}
-        </select>
+        <GroupPicker all={summary.groups} value={groups} onChange={(g) => { setGroups(g); setPage(0); }} />
         <label className="text-xs flex items-center gap-1" style={{ color: MUTED }}>
           <input type="checkbox" checked={showDisabled} onChange={(e) => { setShowDisabled(e.target.checked); setPage(0); }} /> include disabled
         </label>
@@ -180,6 +176,70 @@ export default function Items({ summary, initialGroup }: { summary: Summary; ini
 
       {open && <Detail code={open} base={base} onClose={() => setOpen(null)} />}
     </Screen>
+  );
+}
+
+// ======================================================= the group picker
+/**
+ * A typable box with checkboxes (Dr Raghu, 2 Sep 2026: "have a typable box
+ * and also checkboxes to have multiple"). Type to narrow the 29 groups,
+ * tick as many as the question needs; the ticked ones stay on top so what
+ * is on never scrolls out of sight. Enter ticks the one group left showing.
+ */
+function GroupPicker({ all, value, onChange }: {
+  all: { item_group: string; n: number }[]; value: string[]; onChange: (v: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const away = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, []);
+  const short = (g: string) => g.replace(/^RM - /, "");
+  const shown = all
+    .filter((g) => short(g.item_group).toLowerCase().includes(q.trim().toLowerCase()))
+    .sort((a, b) => Number(value.includes(b.item_group)) - Number(value.includes(a.item_group)) || a.item_group.localeCompare(b.item_group));
+  const toggle = (g: string) => onChange(value.includes(g) ? value.filter((x) => x !== g) : [...value, g]);
+  const label = value.length === 0 ? "All groups" : value.length === 1 ? short(value[0]) : `${value.length} groups`;
+
+  return (
+    <div ref={box} style={{ position: "relative" }}>
+      <button onClick={() => setOpen((o) => !o)} className="px-2 py-1.5 rounded border text-sm bg-white flex items-center gap-2"
+        style={{ borderColor: value.length ? NAVY : BORDER, color: INK, minWidth: 180, maxWidth: 320 }} title="Type to narrow, tick to choose several">
+        <span className="truncate" style={{ fontWeight: value.length ? 700 : 400 }}>{label}</span>
+        <span className="ml-auto text-xs" style={{ color: MUTED }}>{open ? "▴" : "▾"}</span>
+      </button>
+      {open && (
+        <div className="rounded-lg border bg-white shadow-lg" style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 30, width: 340, borderColor: BORDER }}>
+          <div className="p-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
+            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="type to narrow the groups…"
+              onKeyDown={(e) => { if (e.key === "Enter" && shown.length === 1) { toggle(shown[0].item_group); setQ(""); } if (e.key === "Escape") setOpen(false); }}
+              className="w-full px-2 py-1.5 rounded border text-sm" style={{ borderColor: BORDER }} />
+            <div className="flex gap-3 mt-1.5 text-xs font-bold">
+              <button onClick={() => onChange([...new Set([...value, ...shown.map((g) => g.item_group)])])} style={{ color: NAVY }}>Tick all shown</button>
+              <button onClick={() => onChange([])} style={{ color: MUTED }} disabled={!value.length}>Clear</button>
+              <span className="ml-auto" style={{ color: MUTED }}>{value.length ? `${value.length} on` : "all groups"}</span>
+            </div>
+          </div>
+          <div style={{ maxHeight: 300, overflowY: "auto" }}>
+            {shown.map((g) => {
+              const on = value.includes(g.item_group);
+              return (
+                <label key={g.item_group} className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-gray-50"
+                  style={{ background: on ? NAVY_SOFT : undefined }}>
+                  <input type="checkbox" checked={on} onChange={() => toggle(g.item_group)} style={{ accentColor: NAVY }} />
+                  <span className="truncate" style={{ color: INK, fontWeight: on ? 700 : 400 }}>{short(g.item_group)}</span>
+                  <span className="ml-auto text-xs tnum" style={{ color: MUTED }}>{g.n.toLocaleString("en-IN")}</span>
+                </label>
+              );
+            })}
+            {!shown.length && <div className="px-3 py-2 text-sm" style={{ color: MUTED }}>No group matches that.</div>}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

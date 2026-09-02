@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.0.1",
+    date: "2026-09-02",
+    module: "Saamaan — several groups at once",
+    items: [
+      "\"have a typable box and also checkboxes to have multiple\" (Dr Raghu, 2 Sep 2026), on the group filter in Items. It was a plain dropdown of 29 groups, one at a time.",
+      "Now a box: type to narrow the groups, tick as many as the question needs, Enter ticks the one left showing. The ticked ones stay on top so what is on never scrolls out of sight; Tick all shown and Clear do what they say. The button reads the group's name for one, a count for more.",
+      "The chosen set travels to the database as one IN, so the page and the total answer for all of them together — and Print / PDF names every group that was on.",
+    ],
+  },
+  {
     v: "4.4.0.0",
     date: "2026-09-02",
     module: "Saamaan — the eighth door, and the Item master mirrored from the ERP",
