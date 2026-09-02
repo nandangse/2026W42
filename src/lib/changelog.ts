@@ -75,6 +75,27 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.6.0",
+    date: "2026-09-02",
+    module: "The next 30 days, a working plan PDF, and signatures that look like signatures",
+    items: [
+      "\"this PDF is not working\" (Dr Raghu, 2 Sep 2026) — AND IT WAS THE QUOTATIONS' BUG AGAIN, in a place I had failed to look. @sparticuz/chromium is 50 MB of compressed browser that its code unpacks at runtime, and Vercel only ships it to routes NAMED in outputFileTracingIncludes. Two quote routes were named; the plan desk, which presses a PDF exactly the same way, was not — so the button reached code that had no browser to run. It is named now, its timeout raised from 60s to the 300s the quote routes have always had, and the fix is verified in the build output rather than assumed: chromium.br, the fonts and swiftshader all travel with the route. The comment above that list now says ANY ROUTE THAT CALLS pressPdf BELONGS HERE.",
+      "\"Show a calendar view on one line … Show number of jobs TDD for each day … on mouseover show those jobs\" — THE NEXT 30 DAYS stands above the Priority List: a column a day, the count of jobs due, and every one of them named on hover. Sunday is yellow and carries its ISO week, because a delivery promised onto a Sunday is worth seeing before it is promised. PREVIOUS gathers everything already overdue and LATER everything beyond the horizon, so no job is invisible for falling outside thirty days. Desktop only, as asked — thirty columns on a phone is a smear.",
+      "\"in all these views the clicking of the job should first give lightbox then the person can click deeper\" — the job numbers on the Delivery Board open the job itself now, not the milestone plan. Hover names the customer, status, kitting, production and both dates; the lightbox's own button walks on for whoever actually wanted the plan. A click should show you the job, not move you to another screen.",
+      "\"in this show date and time as signed. Show their name cursive!\" — THE ROOM now signs in cursive, over the moment it was signed, and reads real names rather than the left half of an email. The cursive is a stand-in: it is the slot a real signature image drops into, one per person, with nothing else on the card needing to change.",
+    ],
+  },
+  {
+    v: "4.2.5.1",
+    date: "2026-09-02",
+    module: "Update to ERP — the dates read the way the rest of Genie reads them",
+    items: [
+      "\"check the date formats\" (Dr Raghu, 2 Sep 2026) — the ERP queue was printing its stored ISO straight to the screen, so a target delivery showed as 2026-09-05 while every other date in Genie reads 05-09-2026. One screen speaking a different dialect is exactly where 09-05 gets read as May.",
+      "New value and Was now read dd-mm-yyyy. ONLY values that really are dates are turned around — a percentage, a status or a sentence passes through exactly as typed, because the queue's column holds all of them.",
+      "WHAT WAS DELIBERATELY LEFT IN ISO: the payload pushed to the ERP, which is what ERPNext expects and would break on anything else; and both CSV exports, where ISO sorts correctly and cannot be re-read by a spreadsheet as an American date. The screen is for people, the wire is for machines, and they are allowed to differ.",
+    ],
+  },
+  {
     v: "4.2.5.0",
     date: "2026-09-02",
     module: "Manpower Planning — owners, the milestone still undone, and one pass to fill it",

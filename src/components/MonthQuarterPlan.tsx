@@ -46,7 +46,7 @@ interface Payload {
   canSeeRoom?: boolean;
   signoff: { signed_at: string; jobs: number; value: number; throughput: number; realistic_jobs: number | null; realistic_value: number | null; realistic_throughput: number | null; emailed: string | null; is_draft?: boolean } | null;
   /** Everyone's latest word on this period — draft or signature. */
-  room?: { by_email: string; is_draft: boolean; signed_at: string; jobs: number; value: number; throughput: number }[];
+  room?: { by_email: string; name?: string; is_draft: boolean; signed_at: string; jobs: number; value: number; throughput: number }[];
 }
 const tpOf = (j: { tp: number; tpv: number }) => (Number(j.tpv) || 0) > 0 ? Number(j.tpv) : Number(j.tp) || 0;
 
@@ -469,15 +469,35 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
               .slice()
               .sort((a, b) => Number(a.is_draft) - Number(b.is_draft) || String(a.by_email).localeCompare(String(b.by_email)))
               .map((r) => (
-                <span key={r.by_email} className="rounded px-2 py-1 text-xs"
+                <span key={r.by_email} className="rounded px-2.5 py-1.5"
                   style={{
                     background: r.is_draft ? "#F4F2EC" : "#E8F3EC",
                     border: `1px solid ${r.is_draft ? C.line : "#B7DFC8"}`,
-                    color: r.is_draft ? C.sub : C.green,
+                    lineHeight: 1.35,
                   }}
-                  title={`${r.jobs} jobs · ${V(Number(r.value) || 0)} · ${new Date(r.signed_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`}>
-                  {r.is_draft ? "✎" : "✍"} <b>{String(r.by_email).split("@")[0]}</b>
-                  <span style={{ color: C.mute }}> · {r.is_draft ? "draft" : "signed"}</span>
+                  title={`${r.jobs} jobs · ${V(Number(r.value) || 0)}`}>
+                  {/* A SIGNATURE SHOULD LOOK LIKE ONE (Dr Raghu, 2 Sep 2026:
+                      "Show their name cursive! I will try to also put Sign of
+                      the people so that it will actually show signature!").
+                      The cursive stands in until the real ones arrive — this
+                      is the slot they will drop into, one image per person,
+                      and nothing else on the card has to change. */}
+                  <span style={{
+                    display: "block",
+                    fontFamily: '"Segoe Script", "Bradley Hand", "Snell Roundhand", cursive',
+                    fontSize: r.is_draft ? 14 : 17,
+                    fontWeight: 600,
+                    color: r.is_draft ? C.sub : C.green,
+                  }}>
+                    {r.name || String(r.by_email).split("@")[0]}
+                  </span>
+                  <span className="tnum" style={{ fontSize: 10, color: C.mute }}>
+                    {r.is_draft ? "draft · " : "signed "}
+                    {new Date(r.signed_at).toLocaleString("en-IN", {
+                      timeZone: "Asia/Kolkata", day: "2-digit", month: "short",
+                      hour: "2-digit", minute: "2-digit", hour12: true,
+                    })}
+                  </span>
                 </span>
               ))}
           </div>

@@ -27,6 +27,12 @@ const nextConfig = {
       // makes sure the folder travels at all.
       "/api/crm/quote-pdf": ["./node_modules/@sparticuz/chromium/bin/**"],
       "/api/crm/quote-submit": ["./node_modules/@sparticuz/chromium/bin/**"],
+      // The plan desk presses a PDF too — signed, or stamped UNSIGNED. It was
+      // missed when this list was first written, and the symptom was exactly
+      // the quotations' old one: a button that did nothing, because the code
+      // shipped without the 50 MB of Chromium it unpacks at runtime.
+      // ANY ROUTE THAT CALLS pressPdf BELONGS HERE.
+      "/api/month-plan": ["./node_modules/@sparticuz/chromium/bin/**"],
       "/api/sales/html": ["./src/sales-regrow/*.html"],
       "/api/sales/plan": [
         "./src/sales-plan/*",

@@ -3,7 +3,7 @@ import { requireUser, errJson, HttpError, type AuthedUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /**
  * THE BELIEVABLE PLAN (Dr Raghu, 30 Aug 2026).
@@ -345,6 +345,15 @@ export async function GET(req: Request) {
         latest.set(who, r as Record<string, unknown>);
       }
       room = [...latest.values()];
+      // Real names, so a signature reads as a person rather than a login.
+      try {
+        const emails = room.map((r) => String(r.by_email).toLowerCase());
+        if (emails.length) {
+          const { data: profs } = await admin.from("profiles").select("email, display_name").in("email", emails);
+          const nm = new Map((profs || []).map((pr) => [String(pr.email).toLowerCase(), String(pr.display_name || "")]));
+          room = room.map((r) => ({ ...r, name: nm.get(String(r.by_email).toLowerCase()) || String(r.by_email).split("@")[0] }));
+        }
+      } catch { /* the initials still stand */ }
     } catch { room = []; }
 
     return NextResponse.json({ installed: true, window: w, today: T, jobs, done, doneFy, entries, signoff, room, voices, canEdit: mayPlan(u), canSeeRoom: u.isOwner, me: { name: u.displayName || u.email.split("@")[0], email: u.email } });

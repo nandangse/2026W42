@@ -72,6 +72,9 @@ const STATUSES = [
 
 type Role = "admin" | "planner" | "project_owner" | "user" | "viewer" | "sales";
 const TODAY = today();
+/** An ISO date shown the way the rest of Genie shows one; anything else as typed. */
+const asHuman = (v: string): string =>
+  /^\d{4}-\d{2}-\d{2}$/.test(String(v).trim()) ? fmtFull(String(v).trim()) : String(v);
 
 interface Person {
   id: string;
@@ -2295,8 +2298,21 @@ function DeliveryBoard({
     );
   };
 
+  /**
+   * A job number shows the JOB, not another screen (Dr Raghu, 2 Sep 2026:
+   * "in all these views the clicking of the job should first give lightbox
+   * then the person can click deeper").
+   *
+   * It used to jump straight to the milestone plan, which is a long way to
+   * travel to answer "what is this one?" — and a long way back. The lightbox
+   * answers it in place and carries its own button onward for the people who
+   * actually wanted the plan.
+   */
+  const [picked, setPicked] = useState<Job | null>(null);
+
   const JobLink = ({ j }: { j: Job }) => (
-    <button onClick={() => onOpen(j.id)} className="font-bold underline decoration-dotted" style={{ color: "#1B3A5C" }} title={"Open milestone plan for " + j.tag}>
+    <button onClick={() => setPicked(j)} className="font-bold underline decoration-dotted" style={{ color: "#1B3A5C" }}
+      title={`${jobNo(j.id)} · ${j.tag}\n${j.cust}\n\nStatus: ${j.stat}\nKitting ${j.kit}% · Production ${j.pct}%\nTDD ${fmtFull(j.tdd)} · OTD ${fmtFull(j.otd)}\n\nClick to open the job.`}>
       {jobNo(j.id)}
     </button>
   );
@@ -2597,6 +2613,85 @@ function DeliveryBoard({
       })()}
 
       {/* ---- Priority List (drag to reorder) ---- */}
+      {/* ── THE NEXT THIRTY DAYS (Dr Raghu, 2 Sep 2026) ──────────────────
+          "Show a calendar view on one line … Show number of jobs TDD for each
+          day … Firt column show - previous, last colum show later …
+          On mobile this can be skipped. Only on computer."
+
+          The priority list answers what to do first. This answers a different
+          question in one glance — WHEN the month actually lands — and the two
+          ends matter as much as the middle: everything already overdue is
+          gathered into PREVIOUS, everything beyond the horizon into LATER, so
+          no job is invisible merely because it falls outside thirty days.
+
+          Sunday is yellow and carries its ISO week, because a delivery date
+          on a Sunday is worth seeing before it is promised.
+
+          `hidden md:block` — a thirty-column strip on a phone is a smear, and
+          he said so. */}
+      {subTab === "priority" && (() => {
+        const DAYS = 30;
+        const days = Array.from({ length: DAYS }, (_, i) => addDays(TODAY, i));
+        const from = days[0], to = days[DAYS - 1];
+        const on = (iso: string) => byTDD.filter((j) => (j.tdd || "").slice(0, 10) === iso);
+        const before = byTDD.filter((j) => j.tdd && j.tdd < from);
+        const after = byTDD.filter((j) => j.tdd && j.tdd > to);
+        const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const dm = (iso: string) => { const d = parseISO(iso); return `${d.getUTCDate()}/${d.getUTCMonth() + 1}`; };
+        /** What the mouse reveals: the jobs themselves, in delivery order. */
+        const hover = (list: Job[]) => list.length
+          ? list.slice().sort((a, b) => String(a.tdd).localeCompare(String(b.tdd)))
+              .map((j) => `${jobNo(j.id)} — ${j.tag} — ${fmtFull(j.tdd)}`).join("\n")
+          : "nothing due";
+        const cell = (n: number) => n ? (n > 3 ? "#B3261E" : n > 1 ? "#E8600A" : "#16232F") : "#C9C6BE";
+
+        return (
+          <div className="hidden md:block bg-white rounded-lg border mb-3 overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
+            <div className="px-3 pt-2 text-xs font-bold" style={{ color: "#8A94A0" }}>
+              THE NEXT 30 DAYS — jobs by target delivery date · hover a day to see them
+            </div>
+            <table className="text-xs" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}>
+              <tbody>
+                <tr>
+                  <td title={hover(before)} className="px-1 py-1.5 text-center"
+                    style={{ borderRight: "2px solid #E2E0DA", background: "#F7F5EF", cursor: before.length ? "help" : "default", width: 74 }}>
+                    <div style={{ fontSize: 9.5, color: "#8A94A0", fontWeight: 700 }}>PREVIOUS</div>
+                    <div className="tnum" style={{ fontSize: 15, fontWeight: 800, color: before.length ? "#B3261E" : "#C9C6BE" }}>{before.length || "·"}</div>
+                    <div style={{ fontSize: 9, color: "#8A94A0" }}>overdue</div>
+                  </td>
+                  {days.map((iso) => {
+                    const d = parseISO(iso);
+                    const sun = d.getUTCDay() === 0;
+                    const list = on(iso);
+                    const isToday = iso === TODAY;
+                    return (
+                      <td key={iso} title={hover(list)} className="px-0.5 py-1.5 text-center"
+                        style={{
+                          background: sun ? "#FDF6D8" : isToday ? "#EAF4EE" : "#fff",
+                          borderRight: "1px solid #F1EFE9",
+                          borderTop: isToday ? "2px solid #0D7A3F" : "none",
+                          cursor: list.length ? "help" : "default",
+                        }}>
+                        {sun && <div style={{ fontSize: 8.5, fontWeight: 800, color: "#8A6D1A" }}>W{isoWeek(iso)}</div>}
+                        <div className="tnum" style={{ fontSize: 9.5, color: sun ? "#8A6D1A" : "#8A94A0", fontWeight: sun ? 700 : 400 }}>{dm(iso)}</div>
+                        <div style={{ fontSize: 9, color: sun ? "#8A6D1A" : "#B8B5AC" }}>{dow[d.getUTCDay()]}</div>
+                        <div className="tnum" style={{ fontSize: 14, fontWeight: 800, color: cell(list.length) }}>{list.length || "·"}</div>
+                      </td>
+                    );
+                  })}
+                  <td title={hover(after)} className="px-1 py-1.5 text-center"
+                    style={{ borderLeft: "2px solid #E2E0DA", background: "#F7F5EF", cursor: after.length ? "help" : "default", width: 74 }}>
+                    <div style={{ fontSize: 9.5, color: "#8A94A0", fontWeight: 700 }}>LATER</div>
+                    <div className="tnum" style={{ fontSize: 15, fontWeight: 800, color: after.length ? "#1B3A5C" : "#C9C6BE" }}>{after.length || "·"}</div>
+                    <div style={{ fontSize: 9, color: "#8A94A0" }}>beyond</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
+
       {subTab === "priority" && (() => {
         const base = prio
           ? prio.map((id) => byTDD.find((j) => j.id === id)).filter(Boolean).concat(byTDD.filter((j) => !prio.includes(j.id))) as Job[]
@@ -5888,8 +5983,15 @@ function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPush?: boo
                   )}
                   <td className="px-2 py-1 font-bold tnum" style={{ color: "#1B3A5C" }}>{r.job_id}</td>
                   <td className="px-2 py-1" style={{ color: "#5A6672" }}>{r.label}</td>
-                  <td className="px-2 py-1 font-semibold" style={{ color: "#16232F", maxWidth: 280 }}>{r.new_value || <i style={{ color: "#B8B5AC" }}>(cleared)</i>}</td>
-                  <td className="px-2 py-1" style={{ color: "#B8B5AC", maxWidth: 220 }}>{r.old_value || "—"}</td>
+                  {/* DATES READ THE INDIAN WAY HERE TOO (Dr Raghu, 2 Sep
+                      2026: "check the date formats"). The queue stores ISO,
+                      which is right for the ERP and wrong for a person: every
+                      other date in Genie is dd-mm-yyyy, and one screen
+                      speaking differently is where 09-05 gets read as May.
+                      Only values that ARE dates are turned around — a
+                      percentage or a sentence passes through untouched. */}
+                  <td className="px-2 py-1 font-semibold tnum" style={{ color: "#16232F", maxWidth: 280 }}>{r.new_value ? asHuman(r.new_value) : <i style={{ color: "#B8B5AC" }}>(cleared)</i>}</td>
+                  <td className="px-2 py-1 tnum" style={{ color: "#B8B5AC", maxWidth: 220 }}>{r.old_value ? asHuman(r.old_value) : "—"}</td>
                   <td className="px-2 py-1" style={{ color: "#8A94A0" }}>{r.changed_by}</td>
                   <td className="px-2 py-1 tnum" style={{ color: "#8A94A0" }} title="IST">{new Date(String(r.changed_at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })}</td>
                   <td className="px-2 py-1">
