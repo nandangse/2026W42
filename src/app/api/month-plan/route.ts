@@ -334,15 +334,35 @@ export async function GET(req: Request) {
 
     let room: Record<string, unknown>[] = [];
     try {
+      /**
+       * THE WHOLE ROOM, NOT THIS TAB'S SLICE (Dr Raghu, 2 Sep 2026: "even
+       * yashavantha was showing in draft now its disappeared … even raghu had
+       * pressed save as draft! what happened to that").
+       *
+       * Nothing had happened to it. The room was scoped to the period on
+       * screen, and people draft under whichever tab they were on — his own
+       * two drafts were under YTD, Yashavantha's under MTD, and looking at
+       * QTD showed neither. Correct, and indistinguishable from data loss.
+       *
+       * So the room now shows EVERY person who has answered at all, with the
+       * period each of them answered for. Their latest word for THIS period
+       * decides the colour; where they have not answered this one, the card
+       * says which they did. Nobody can silently vanish from a list they are
+       * on, which is the only way "are they all ready?" can be trusted.
+       */
       const { data: all } = await admin.from("plan_signoff")
-        .select("by_email, is_draft, signed_at, jobs, value, throughput, realistic_jobs, realistic_value, realistic_throughput")
-        .eq("period_kind", kind).eq("period_key", w.key)
-        .order("signed_at", { ascending: false }).limit(400);
+        .select("by_email, is_draft, signed_at, jobs, value, throughput, period_kind, period_key")
+        .order("signed_at", { ascending: false }).limit(2000);
       const latest = new Map<string, Record<string, unknown>>();
       for (const r of all || []) {
         const who = String(r.by_email || "").toLowerCase();
-        if (!who || latest.has(who)) continue;   // ordered desc, so the first is the latest
-        latest.set(who, r as Record<string, unknown>);
+        if (!who) continue;
+        const here = String(r.period_kind) === kind && String(r.period_key) === w.key;
+        const seen = latest.get(who) as Record<string, unknown> | undefined;
+        // This period's latest always wins; otherwise their most recent word
+        // anywhere stands in, flagged as belonging to another period.
+        if (!seen) latest.set(who, { ...r, this_period: here });
+        else if (here && !seen.this_period) latest.set(who, { ...r, this_period: here });
       }
       room = [...latest.values()];
       // Real names, so a signature reads as a person rather than a login.

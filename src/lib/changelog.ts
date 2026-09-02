@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.2.7.0",
+    date: "2026-09-02",
+    module: "Nobody vanishes from the room; the strip really hovers; Genie folds and is counted",
+    items: [
+      "\"even yashavantha was showing in draft now its disappeared … even raghu had pressed save as draft! what happened to that\" (Dr Raghu, 2 Sep 2026) — NOTHING HAD HAPPENED TO IT. All 75 rows from 10 people are on record; the room was scoped to the period on screen, and people draft under whichever tab they were on. His own two drafts are under YTD, Yashavantha's under MTD, and he was looking at QTD. Correct behaviour, and indistinguishable from data loss.",
+      "So THE ROOM now shows everyone who has answered at all. Their word for the period on screen decides the colour; where they answered a different one the card says which, and reads \"nothing for QTD yet\". Nobody can silently vanish from a list they are on — which is the only way \"are they all ready?\" can be trusted.",
+      "\"also in this show their numbers, value and throughput\" — jobs, value and throughput now stand ON the card. They were behind a hover, which is where a number goes to be unread, and comparing what people have committed to is the whole purpose of the room.",
+      "\"mouse over is not working\" — the 30-day strip leaned on the browser's own tooltip, which waits about a second, cannot be styled, and on a dense strip simply reads as broken. It now shows a real panel the instant the mouse arrives: every job that day, numbered and named.",
+      "\"job delivery board also the lightbox is not opening\" — A REAL BUG OF MINE. The click was rewired to open the job, but nothing on that board was rendering it: the state changed and the screen did not, which is exactly what a dead button looks like. The lightbox is mounted now.",
+      "\"this genie hide it in mobile view. Also on the desktop, too let it be hidden … on clicking it will expand. Please take a count of how many people are clicking it\" — Genie's read of a job is folded on every screen and opens on the header. Every open is recorded (Genie migration 0110), so \"is anyone actually using this?\" stops being a matter of opinion. The counting can never block the panel: a broken insert still answers ok.",
+    ],
+  },
+  {
     v: "4.2.6.0",
     date: "2026-09-02",
     module: "The next 30 days, a working plan PDF, and signatures that look like signatures",

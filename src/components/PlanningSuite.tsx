@@ -2309,6 +2309,8 @@ function DeliveryBoard({
    * actually wanted the plan.
    */
   const [picked, setPicked] = useState<Job | null>(null);
+  /** Which column of the 30-day strip the mouse is over. */
+  const [hoverDay, setHoverDay] = useState<string | null>(null);
 
   const JobLink = ({ j }: { j: Job }) => (
     <button onClick={() => setPicked(j)} className="font-bold underline decoration-dotted" style={{ color: "#1B3A5C" }}
@@ -2639,11 +2641,25 @@ function DeliveryBoard({
         const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         const dm = (iso: string) => { const d = parseISO(iso); return `${d.getUTCDate()}/${d.getUTCMonth() + 1}`; };
         /** What the mouse reveals: the jobs themselves, in delivery order. */
-        const hover = (list: Job[]) => list.length
-          ? list.slice().sort((a, b) => String(a.tdd).localeCompare(String(b.tdd)))
-              .map((j) => `${jobNo(j.id)} — ${j.tag} — ${fmtFull(j.tdd)}`).join("\n")
-          : "nothing due";
         const cell = (n: number) => n ? (n > 3 ? "#B3261E" : n > 1 ? "#E8600A" : "#16232F") : "#C9C6BE";
+        const panel = (list: Job[], label: string) => (
+          <div style={{
+            position: "absolute", top: "100%", left: 0, zIndex: 40, minWidth: 320, maxWidth: 460,
+            background: "#16232F", color: "#fff", borderRadius: 6, padding: "8px 10px",
+            boxShadow: "0 10px 30px rgba(22,35,47,.35)", textAlign: "left", whiteSpace: "normal",
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#F5B32B", letterSpacing: .6, marginBottom: 4 }}>
+              {label} · {list.length} job{list.length === 1 ? "" : "s"}
+            </div>
+            {list.slice(0, 14).map((j) => (
+              <div key={j.id} style={{ fontSize: 11, lineHeight: 1.5 }}>
+                <b>{jobNo(j.id)}</b> <span style={{ color: "#C9D3DE" }}>{j.tag}</span>{" "}
+                <span style={{ color: "#8FA1B3" }}>· {fmtFull(j.tdd)}</span>
+              </div>
+            ))}
+            {list.length > 14 && <div style={{ fontSize: 10, color: "#8FA1B3", marginTop: 3 }}>…and {list.length - 14} more</div>}
+          </div>
+        );
 
         return (
           <div className="hidden md:block bg-white rounded-lg border mb-3 overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
@@ -2653,8 +2669,10 @@ function DeliveryBoard({
             <table className="text-xs" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}>
               <tbody>
                 <tr>
-                  <td title={hover(before)} className="px-1 py-1.5 text-center"
-                    style={{ borderRight: "2px solid #E2E0DA", background: "#F7F5EF", cursor: before.length ? "help" : "default", width: 74 }}>
+                  <td onMouseEnter={() => setHoverDay("prev")} onMouseLeave={() => setHoverDay(null)}
+                    className="px-1 py-1.5 text-center"
+                    style={{ borderRight: "2px solid #E2E0DA", background: "#F7F5EF", cursor: before.length ? "help" : "default", width: 74, position: "relative" }}>
+                    {hoverDay === "prev" && before.length > 0 && panel(before, "OVERDUE — before today")}
                     <div style={{ fontSize: 9.5, color: "#8A94A0", fontWeight: 700 }}>PREVIOUS</div>
                     <div className="tnum" style={{ fontSize: 15, fontWeight: 800, color: before.length ? "#B3261E" : "#C9C6BE" }}>{before.length || "·"}</div>
                     <div style={{ fontSize: 9, color: "#8A94A0" }}>overdue</div>
@@ -2665,13 +2683,17 @@ function DeliveryBoard({
                     const list = on(iso);
                     const isToday = iso === TODAY;
                     return (
-                      <td key={iso} title={hover(list)} className="px-0.5 py-1.5 text-center"
+                      <td key={iso}
+                        onMouseEnter={() => setHoverDay(iso)} onMouseLeave={() => setHoverDay(null)}
+                        className="px-0.5 py-1.5 text-center"
                         style={{
                           background: sun ? "#FDF6D8" : isToday ? "#EAF4EE" : "#fff",
                           borderRight: "1px solid #F1EFE9",
                           borderTop: isToday ? "2px solid #0D7A3F" : "none",
                           cursor: list.length ? "help" : "default",
+                          position: "relative",
                         }}>
+                        {hoverDay === iso && list.length > 0 && panel(list, `${dm(iso)} ${dow[d.getUTCDay()]}`)}
                         {sun && <div style={{ fontSize: 8.5, fontWeight: 800, color: "#8A6D1A" }}>W{isoWeek(iso)}</div>}
                         <div className="tnum" style={{ fontSize: 9.5, color: sun ? "#8A6D1A" : "#8A94A0", fontWeight: sun ? 700 : 400 }}>{dm(iso)}</div>
                         <div style={{ fontSize: 9, color: sun ? "#8A6D1A" : "#B8B5AC" }}>{dow[d.getUTCDay()]}</div>
@@ -2679,8 +2701,12 @@ function DeliveryBoard({
                       </td>
                     );
                   })}
-                  <td title={hover(after)} className="px-1 py-1.5 text-center"
-                    style={{ borderLeft: "2px solid #E2E0DA", background: "#F7F5EF", cursor: after.length ? "help" : "default", width: 74 }}>
+                  <td onMouseEnter={() => setHoverDay("later")} onMouseLeave={() => setHoverDay(null)}
+                    className="px-1 py-1.5 text-center"
+                    style={{ borderLeft: "2px solid #E2E0DA", background: "#F7F5EF", cursor: after.length ? "help" : "default", width: 74, position: "relative" }}>
+                    {hoverDay === "later" && after.length > 0 && (
+                      <div style={{ position: "absolute", right: 0, top: "100%", zIndex: 40 }}>{panel(after, "BEYOND 30 DAYS")}</div>
+                    )}
                     <div style={{ fontSize: 9.5, color: "#8A94A0", fontWeight: 700 }}>LATER</div>
                     <div className="tnum" style={{ fontSize: 15, fontWeight: 800, color: after.length ? "#1B3A5C" : "#C9C6BE" }}>{after.length || "·"}</div>
                     <div style={{ fontSize: 9, color: "#8A94A0" }}>beyond</div>
@@ -2933,6 +2959,24 @@ function DeliveryBoard({
           </div>
         </div>
       ))}
+
+      {/* THE JOB ITSELF (Dr Raghu, 2 Sep 2026: "job delivery board also the
+          lightbox is not opening"). The click was rewired to setPicked, but
+          nothing was ever rendering `picked` on this board — so the state
+          changed and the screen did not, which looks exactly like a dead
+          button. Its own "Open the full job plan" walks on from here. */}
+      {picked && (
+        <JobLightbox
+          job={toWip(picked)}
+          V={V}
+          colour="#1B3A5C"
+          canEdit={canFloor}
+          onClose={() => setPicked(null)}
+          onOpenPlan={() => { const id = picked.id; setPicked(null); onOpen(id); }}
+          onSaved={async () => { await reload(); }}
+        />
+      )}
+
     </div>
   );
 }
@@ -10620,6 +10664,13 @@ function VoiceNotes({
    * when you want to hear it said or act on what was heard.
    */
   const [detail, setDetail] = useState(false);
+  /**
+   * Genie's read, folded (Dr Raghu, 2 Sep 2026). Closed on every screen, not
+   * just the phone: a paragraph that is always open is read by nobody and
+   * measured by nobody. Folded, the click is a real signal — and it is
+   * counted, so "is anyone using this?" stops being a matter of opinion.
+   */
+  const [genieOpen, setGenieOpen] = useState(false);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -10727,15 +10778,44 @@ function VoiceNotes({
       {/* Genie's read of the last three. Three separate accounts of one job is
           not a position; this is. The recordings stay underneath for anyone
           who wants to hear it said. */}
+      {/* FOLDED BY DEFAULT, ON EVERY SCREEN (Dr Raghu, 2 Sep 2026: "hide it in
+          mobile view. Also on the desktop, too let it be hidden — write
+          ✨ GENIE — THE READ ON THIS JOB, on clicking it will expand. Please
+          take a count of how many people are clicking it").
+
+          A paragraph that is always open is read by nobody and measured by
+          nobody. Folded, the click is a real signal — so it is recorded, and
+          the answer to "is anyone actually using this?" stops being a matter
+          of opinion. */}
       {floor && (
-        <div className="rounded p-2 mb-1.5" style={{ background: "#F3EEFB", border: "1px solid #C9B6EA" }}>
-          <div className="text-xs font-bold" style={{ color: "#7C3AED", letterSpacing: .6 }}>
+        <div className="rounded mb-1.5" style={{ background: "#F3EEFB", border: "1px solid #C9B6EA" }}>
+          <button
+            onClick={() => {
+              const opening = !genieOpen;
+              setGenieOpen(opening);
+              if (opening) {
+                // never blocks the panel — see /api/feature-click
+                void fetch("/api/feature-click", {
+                  method: "POST", headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ feature: "genie_read_on_job", ref: jobId }),
+                }).catch(() => {});
+              }
+            }}
+            className="w-full text-left px-2 py-1.5 text-xs font-bold flex items-center gap-1.5"
+            style={{ color: "#7C3AED", letterSpacing: .6 }}
+            title={genieOpen ? "Fold it away" : "Genie's read of the last few notes — click to open"}>
+            <span>{genieOpen ? "▾" : "▸"}</span>
             ✨ GENIE — THE READ ON THIS JOB
-          </div>
-          <div className="text-xs mt-0.5" style={{ color: "#22303C", lineHeight: 1.55 }}>{floor}</div>
-          {floorAt && (
-            <div style={{ fontSize: 10, color: "#8A94A0", marginTop: 3 }}>
-              from the last {Math.min(notes.length, RECENT)} note{Math.min(notes.length, RECENT) === 1 ? "" : "s"} · {new Date(floorAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+            {!genieOpen && <span className="font-normal" style={{ color: "#8A94A0" }}>· click to read</span>}
+          </button>
+          {genieOpen && (
+            <div className="px-2 pb-2">
+              <div className="text-xs" style={{ color: "#22303C", lineHeight: 1.55 }}>{floor}</div>
+              {floorAt && (
+                <div style={{ fontSize: 10, color: "#8A94A0", marginTop: 3 }}>
+                  from the last {Math.min(notes.length, RECENT)} note{Math.min(notes.length, RECENT) === 1 ? "" : "s"} · {new Date(floorAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </div>
+              )}
             </div>
           )}
         </div>
