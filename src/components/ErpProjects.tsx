@@ -27,7 +27,13 @@ export default function ErpProjects() {
   const [d, setD] = useState<{ count: number; columns: string[]; rows: Record<string, unknown>[] } | null>(null);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState("");
+  /**
+   * OPEN ON THE LIVE WORK (Dr Raghu, 2 Sep 2026: "by default show the is as
+   * Jobs in process"). The book holds 1,687 projects and all but fifty of
+   * them are finished; opening on all of them buries the ones being built.
+   * "All statuses" is still one click away for the cleanup.
+   */
+  const [status, setStatus] = useState("Jobs in Process");
   const [cap, setCap] = useState(300);
 
   useEffect(() => {

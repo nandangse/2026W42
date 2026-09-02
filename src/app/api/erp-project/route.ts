@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireReader, errJson, HttpError } from "@/lib/auth";
+import { requireReader, currentUser, errJson, HttpError } from "@/lib/auth";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -50,7 +50,26 @@ export async function GET(req: Request) {
         .eq("proj", id).order("tdd"),
     ]);
 
-    return NextResponse.json({ id, erp, genie: mine ?? null, jobs: jobs ?? [] });
+    /**
+     * COMMERCIALS ARE A PERMISSION (Dr Raghu, 2 Sep 2026: "Commercials (only
+     * for project managers)"). The money fields are STRIPPED from the payload
+     * for anyone not cleared, rather than hidden by the screen -- a field the
+     * browser is told about and merely does not draw is a field anybody can
+     * read out of the network tab.
+     */
+    const u = await currentUser();
+    const mayMoney = !!u && (u.isOwner || u.stratcom || ["admin", "planner", "project_owner"].includes(String(u.role)));
+    if (!mayMoney) {
+      for (const k of Object.keys(erp)) {
+        if (/cost|amount|billed|margin|price|value|profit|gross|total_purchase|total_sales|total_billable|total_consumed/i.test(k))
+          delete erp[k];
+      }
+      for (const j of jobs ?? []) { delete (j as Record<string, unknown>).val;
+        delete (j as Record<string, unknown>).tp; delete (j as Record<string, unknown>).tpv;
+        delete (j as Record<string, unknown>).tpp; }
+    }
+
+    return NextResponse.json({ id, erp, genie: mine ?? null, jobs: jobs ?? [], mayMoney });
   } catch (e) {
     return errJson(e);
   }

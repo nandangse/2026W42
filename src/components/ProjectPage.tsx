@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull, jobNo } from "@/lib/schedule";
 import { ModuleLinks } from "@/components/ModuleMenu";
+import ProjectTabs from "@/components/ProjectTabs";
 
 const C = { navy: "#1B3A5C", ink: "#16232F", sub: "#8A94A0", line: "#E2E0DA", green: "#0D7A3F", accent: "#E8600A" };
 
@@ -20,7 +21,7 @@ type Job = {
   val: number | null; tdd: string | null; kit: number | null; pct: number | null;
   stat: string | null; own: string | null; delivered: boolean | null; delivered_on: string | null;
 };
-type Data = { id: string; erp: Row; genie: Row | null; jobs: Job[] };
+type Data = { id: string; erp: Row; genie: Row | null; jobs: Job[]; mayMoney?: boolean };
 
 const cr = (n: number) =>
   n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹${(n / 1e5).toFixed(1)} L` : `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -70,35 +71,9 @@ export default function ProjectPage({ id }: { id: string }) {
     .filter(([, v]) => v !== null && v !== "" && typeof v !== "object")
     .sort(([a], [b]) => a.localeCompare(b));
 
-  return (
-    <Shell>
-      <div className="mx-auto px-4 py-4" style={{ maxWidth: 1180 }}>
-        <a href="/?tab=projects" className="text-xs font-bold" style={{ color: C.navy }}>← the project book</a>
-        <div className="text-xs font-bold mt-2" style={{ color: C.sub, letterSpacing: 1.1 }}>{d.id}</div>
-        <h1 className="font-bold" style={{ color: C.ink, fontSize: 24, lineHeight: 1.2 }}>
-          {pick("project_name", "name") || d.id}
-        </h1>
-
-        {/* what it is */}
-        <div className="grid gap-3 mt-3" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))" }}>
-          {KEY.map(([k, v]) => (
-            <div key={k} className="rounded-lg border bg-white p-2.5" style={{ borderColor: C.line }}>
-              <div className="text-xs font-bold" style={{ color: C.sub, letterSpacing: .6 }}>{k.toUpperCase()}</div>
-              <div className="mt-0.5" style={{ color: C.ink, fontWeight: 600 }}>{v}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* the description — the ERP's Short Summary, Genie's Description */}
-        {desc && (
-          <div className="rounded-lg border bg-white p-3 mt-3" style={{ borderColor: C.line }}>
-            <div className="text-xs font-bold" style={{ color: C.sub, letterSpacing: .6 }}>DESCRIPTION</div>
-            <div className="mt-1" style={{ color: C.ink, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{desc}</div>
-          </div>
-        )}
-
-        {/* the jobs standing on it */}
-        <div className="rounded-lg border bg-white mt-4 overflow-x-auto" style={{ borderColor: C.line }}>
+  /** The jobs standing on this project — a project without them is a header. */
+  const jobsPane = (
+        <div className="rounded-lg border bg-white overflow-x-auto" style={{ borderColor: C.line }}>
           <div className="px-3 pt-2 pb-1 text-xs font-bold" style={{ color: C.sub }}>
             THE JOBS ON THIS PROJECT — {d.jobs.length} · {cr(val)}
             {done.length > 0 && <> · <span style={{ color: C.green }}>{done.length} delivered</span></>}
@@ -135,6 +110,71 @@ export default function ProjectPage({ id }: { id: string }) {
             </tbody>
           </table>
         </div>
+  );
+
+  /**
+   * COMMERCIALS. The money fields the ERP keeps on a project, shown only to
+   * eyes cleared for them -- and STRIPPED SERVER-SIDE for everyone else, so
+   * this pane simply has nothing to draw rather than choosing not to.
+   */
+  const money = Object.entries(e)
+    .filter(([k, v]) => /cost|amount|billed|margin|price|total_purchase|total_sales|total_billable|total_consumed|gross/i.test(k)
+      && v !== null && v !== "" && Number(v) !== 0)
+    .sort(([a], [b]) => a.localeCompare(b));
+  const commercialsPane = (
+    <div className="rounded-lg border bg-white p-3" style={{ borderColor: C.line }}>
+      <div className="text-xs font-bold" style={{ color: C.sub, letterSpacing: .6 }}>
+        COMMERCIALS · {cr(val)} across {d.jobs.length} job{d.jobs.length === 1 ? "" : "s"}
+      </div>
+      {money.length === 0
+        ? <div className="mt-2" style={{ color: C.sub }}>The ERP carries no costing on this project yet.</div>
+        : (
+          <div className="grid gap-2 mt-2" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))" }}>
+            {money.map(([k, v]) => (
+              <div key={k} className="rounded border p-2" style={{ borderColor: C.line }}>
+                <div className="text-xs" style={{ color: C.sub }}>{k.replace(/_/g, " ")}</div>
+                <div className="tnum" style={{ color: C.ink, fontWeight: 700 }}>
+                  {Number.isFinite(Number(v)) ? cr(Number(v)) : text(v)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+    </div>
+  );
+
+  return (
+    <Shell>
+      <div className="mx-auto px-4 py-4" style={{ maxWidth: 1180 }}>
+        <a href="/?tab=projects" className="text-xs font-bold" style={{ color: C.navy }}>← the project book</a>
+        <div className="text-xs font-bold mt-2" style={{ color: C.sub, letterSpacing: 1.1 }}>{d.id}</div>
+        <h1 className="font-bold" style={{ color: C.ink, fontSize: 24, lineHeight: 1.2 }}>
+          {pick("project_name", "name") || d.id}
+        </h1>
+
+        {/* what it is */}
+        <div className="grid gap-3 mt-3" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))" }}>
+          {KEY.map(([k, v]) => (
+            <div key={k} className="rounded-lg border bg-white p-2.5" style={{ borderColor: C.line }}>
+              <div className="text-xs font-bold" style={{ color: C.sub, letterSpacing: .6 }}>{k.toUpperCase()}</div>
+              <div className="mt-0.5" style={{ color: C.ink, fontWeight: 600 }}>{v}</div>
+            </div>
+          ))}
+        </div>
+
+        {/*
+          THIRTEEN TABS (Dr Raghu, 2 Sep 2026). Jobs and Commercials come from
+          records that already exist; the other eleven are the project's own
+          room. See ProjectTabs — two shapes, ten names.
+        */}
+        <ProjectTabs
+          projectId={d.id}
+          canEdit={d.mayMoney !== false}
+          mayMoney={d.mayMoney !== false}
+          erp={e}
+          jobsPane={jobsPane}
+          commercialsPane={commercialsPane}
+        />
 
         {/* everything the ERP holds, for the field the summary does not show */}
         <div className="mt-4">

@@ -75,6 +75,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.2.0",
+    date: "2026-09-02",
+    module: "The project gets its thirteen tabs",
+    items: [
+      "\"In the project make the tabs \u2014 Product details, TDS, Jobs, Commercials (only for project managers), Project Charter, RBOM, Real Issues Solving, Risk Statement, PCD, Milestones, Checklist, Design Section, After Action Report\" (Dr Raghu, 2 Sep 2026). All thirteen are there and all thirteen work.",
+      "ONE ENGINE, MANY FACES \u2014 the call that made IMS thirty-nine tables instead of a hundred. Thirteen tabs are not thirteen features. THREE already had their data (Product details and Commercials from the ERP's own record, Jobs from the jobs table) and the other TEN are two shapes wearing ten names: a NARRATIVE (Charter, TDS, PCD, Risk Statement, Design, After Action) and a LIST (RBOM, Real Issues Solving, Milestones, Checklist \u2014 label, quantity, date, owner, state). Ten tables would have meant ten routes and ten screens that drift apart the first time one is fixed; two means a fourteenth tab later is a row in a constant, not a deploy.",
+      "COMMERCIALS ARE WITHHELD AT THE SOURCE. The money fields are STRIPPED from the payload for anyone not cleared, and the tab is not offered at all \u2014 a field the browser is told about and merely does not draw is a field anybody can read out of the network tab.",
+      "RLS ON AND FORCED on both new tables with no policies at all. Genie hands every signed-in person an anon-key session and PostgREST serves any table no policy stops, so a table left open would be a project's risk register and its commercial notes readable straight out of the browser. Everything goes through /api/project-tab, which checks the role first.",
+      "The section names are FIXED IN CODE rather than taken from the caller. A free-text section would let one typo scatter a project's charter across \"charter\", \"Charter\" and \"chartre\", and nothing would ever show it as missing.",
+      "An empty quantity stays NULL. It is not a zero and not the epoch \u2014 it is silence, and a number invented for it is a number somebody plans against later.",
+      "\"by default show the is as Jobs in process\" \u2014 the project book holds 1,687 projects and all but fifty are finished. It opens on the live work now; All statuses is one click away for the cleanup.",
+      "NEEDS MIGRATION 0114_project_workspace.sql. Until it is run the tabs are visible and say so plainly, rather than swallowing what you type.",
+    ],
+  },
+  {
     v: "4.3.1.0",
     date: "2026-09-02",
     module: "Every project gets its own page, and its description travels both ways",
