@@ -48,6 +48,15 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
   const [dept, setDept] = useState("");
   const [age, setAge] = useState("");
   const [exp, setExp] = useState("");
+  /**
+   * SALARY RANGE (Dr Raghu, 2 Sep 2026: "in this also please put a filter for
+   * salary range Min and Max"). Typed rather than banded, because the question
+   * behind it is never the same twice -- "who is under 25,000", "who is
+   * between 40 and 60" -- and a fixed set of bands would answer only the ones
+   * somebody guessed in advance.
+   */
+  const [minPay, setMinPay] = useState("");
+  const [maxPay, setMaxPay] = useState("");
 
   useEffect(() => {
     api.get("/api/hrms/idp?table=1").then((j) => setRows(j.rows || []))
@@ -66,10 +75,26 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
       if (dept && r.department !== dept) return false;
       if (ageF && (r.age == null || !ageF(r.age))) return false;
       if (expF && (r.exp == null || !expF(r.exp))) return false;
+      /**
+       * Filtered on PREVIOUS GROSS -- what they are paid now, which is what a
+       * salary question is actually about before an appraisal decides the
+       * new one. Somebody with NO previous gross recorded drops out the
+       * moment either bound is set: a blank is not a zero, and letting it
+       * pass as one would put every unrecorded person in the "under 25,000"
+       * answer.
+       */
+      const lo = minPay.trim() === "" ? null : Number(minPay);
+      const hi = maxPay.trim() === "" ? null : Number(maxPay);
+      if (lo != null || hi != null) {
+        if (r.prevGross == null) return false;
+        const g = Number(r.prevGross);
+        if (lo != null && Number.isFinite(lo) && g < lo) return false;
+        if (hi != null && Number.isFinite(hi) && g > hi) return false;
+      }
       if (n && !`${r.id} ${r.name} ${r.designation || ""}`.toLowerCase().includes(n)) return false;
       return true;
     });
-  }, [rows, q, type, dept, age, exp]);
+  }, [rows, q, type, dept, age, exp, minPay, maxPay]);
 
   const link = (r: Row, text: string, bold = false) => (
     <button onClick={() => onOpenPerson(r.id)} className={`text-left ${bold ? "font-bold" : "font-semibold"}`}
@@ -135,7 +160,28 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
           <option value="">Any experience</option>
           {EXP_BANDS.map(([l]) => (<option key={l} value={l}>{l}</option>))}
         </select>
-        <span className="text-xs" style={{ color: C.faint }}>{rows === null ? "loading…" : `${shown.length} shown`}</span>
+        {/* Dr Raghu, 2 Sep 2026: "put a filter for salary range Min and Max". */}
+        <span className="text-xs flex items-center gap-1" style={{ color: C.faint }}>
+          <span style={{ whiteSpace: "nowrap" }}>Gross ₹</span>
+          <input value={minPay} onChange={(e) => setMinPay(e.target.value)} type="number" placeholder="min"
+            className="text-xs rounded px-2 py-1.5 bg-white" style={{ border: `1px solid ${C.line}`, width: 84 }} />
+          <span>–</span>
+          <input value={maxPay} onChange={(e) => setMaxPay(e.target.value)} type="number" placeholder="max"
+            className="text-xs rounded px-2 py-1.5 bg-white" style={{ border: `1px solid ${C.line}`, width: 84 }} />
+          {(minPay || maxPay) && (
+            <button onClick={() => { setMinPay(""); setMaxPay(""); }} title="Clear the salary range"
+              style={{ color: "#B3261E", fontWeight: 700 }}>×</button>
+          )}
+        </span>
+        <span className="text-xs" style={{ color: C.faint }}>
+          {rows === null ? "loading…" : `${shown.length} shown`}
+          {/* When a salary bound is on, say how many were dropped for having
+              no figure at all — otherwise the count quietly under-reports. */}
+          {rows !== null && (minPay || maxPay) && (() => {
+            const blank = rows.filter((r) => r.prevGross == null).length;
+            return blank ? <span style={{ color: "#B26A00" }}> · {blank} with no gross recorded are not counted</span> : null;
+          })()}
+        </span>
       </div>
 
       <DataTable columns={columns} rows={shown} rowKey={(r) => r.id} initialFrozen={2}

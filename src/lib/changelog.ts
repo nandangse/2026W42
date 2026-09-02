@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.3.3.1",
+    date: "2026-09-02",
+    module: "A salary range on the appraisal table",
+    items: [
+      "\"in this also please put a filter for salary range Min and Max\" (Dr Raghu, 2 Sep 2026). Two boxes beside the age and experience filters, on PREVIOUS GROSS \u2014 what a person is paid now, which is what a salary question is about before an appraisal decides the new one.",
+      "TYPED, NOT BANDED. The question behind it is never the same twice \u2014 \"who is under 25,000\", \"who is between 40 and 60\" \u2014 and a fixed set of bands only ever answers the ones somebody guessed in advance. Either bound alone works; a \u00d7 clears both.",
+      "SOMEBODY WITH NO GROSS RECORDED DROPS OUT the moment a bound is set, and the count SAYS SO. A blank is not a zero: letting it pass as one would sweep every unrecorded person into the \"under 25,000\" answer, and a pay review run off that list would be reviewing people on a salary nobody has entered.",
+    ],
+  },
+  {
     v: "4.3.3.0",
     date: "2026-09-02",
     module: "Job Commercials — what the order book should pay, and when",
