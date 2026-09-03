@@ -43,6 +43,60 @@ export const dynamic = "force-dynamic";
 
 const notInstalled = (m: string) => /does not exist|schema cache/i.test(m);
 
+/**
+ * The ERP's URL and token, for the one live read the list makes (Bin, for
+ * the page's items). Null when the CRM is not wired — the columns then
+ * read a dot. READS ONLY: nothing in Saamaan writes to the ERP.
+ */
+async function erpAuth(): Promise<{ base: string; H: Record<string, string> } | null> {
+  try {
+    if (!crmConfigured()) return null;
+    const { data } = await crmDb().from("integration_setting").select("config").eq("key", "erpnext").maybeSingle();
+    const cfg = (data?.config || {}) as Record<string, string>;
+    if (!cfg.url || !cfg.api_key || !cfg.api_secret) return null;
+    return { base: cfg.url.replace(/\/+$/, ""), H: { authorization: `token ${cfg.api_key}:${cfg.api_secret}` } };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Closing stock for a set of items, live from the ERP's Bin: the ERP's
+ * figure (every warehouse) and Genie's (Stock warehouses only, per
+ * Masters) — "show Closing stock in ERP, Closing stock in Genie as two
+ * separate columns" (Dr Raghu, 3 Sep 2026). Null where the ERP could not
+ * be read, which is not zero.
+ */
+async function closingFor(admin: ReturnType<typeof adminClient>, codes: string[]): Promise<Map<string, { erp: number; genie: number; untyped: boolean }> | null> {
+  if (!codes.length) return new Map();
+  const auth = await erpAuth();
+  if (!auth) return null;
+  try {
+    const [bins, kinds] = await Promise.all([
+      fetch(`${auth.base}/api/resource/Bin?filters=${encodeURIComponent(JSON.stringify([["item_code", "in", codes], ["actual_qty", "!=", 0]]))}`
+        + `&fields=${encodeURIComponent(JSON.stringify(["item_code", "warehouse", "actual_qty"]))}&limit_page_length=5000`, { headers: auth.H, signal: AbortSignal.timeout(15000) })
+        .then(async (r) => (r.ok ? ((await r.json()) as { data?: Record<string, unknown>[] }).data ?? [] : null)),
+      admin.from("material_warehouse").select("warehouse, kind").limit(500).then((r) => (r.error ? [] : r.data ?? [])),
+    ]);
+    if (!bins) return null;
+    const kindOf = new Map(kinds.map((k) => [String(k.warehouse), String(k.kind || "")]));
+    const out = new Map<string, { erp: number; genie: number; untyped: boolean }>();
+    for (const c of codes) out.set(c, { erp: 0, genie: 0, untyped: false });
+    for (const b of bins) {
+      const o = out.get(String(b.item_code));
+      if (!o) continue;
+      const q = Number(b.actual_qty) || 0;
+      const kind = kindOf.get(String(b.warehouse)) ?? "";
+      o.erp += q;
+      if (kind === "Stock") o.genie += q;
+      if (!kind) o.untyped = true;
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 /** The ERP's URL alone — never the key. Empty when the CRM is not wired. */
 async function erpBase(): Promise<string> {
   try {
@@ -443,7 +497,13 @@ export async function GET(req: Request) {
       if (notInstalled(error.message)) return NextResponse.json({ installed: false, erpBase: base, rows: [], total: 0 });
       throw new Error(error.message);
     }
-    return NextResponse.json({ installed: true, erpBase: base, rows: data ?? [], total: count ?? 0, page, size });
+    const rows = (data ?? []) as unknown as Record<string, unknown>[];
+    const closing = await closingFor(admin, rows.map((r) => String(r.item_code)));
+    const out = rows.map((r) => {
+      const c = closing?.get(String(r.item_code));
+      return { ...r, closing_erp: c ? c.erp : null, closing_genie: c ? c.genie : null, closing_untyped: c ? c.untyped : false };
+    });
+    return NextResponse.json({ installed: true, erpBase: base, rows: out, total: count ?? 0, page, size, closingLive: closing !== null });
   } catch (e) {
     return errJson(e);
   }

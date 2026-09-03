@@ -1,22 +1,29 @@
 import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
+import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
 import { crmDb, crmConfigured } from "@/crm/db";
 
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/saamaan/stock?code=N000454 — an item's stock register, read LIVE
- * off the ERP (Dr Raghu, 3 Sep 2026: "Stock Register in the ERP can you
- * know where it is?" — pointing at the Stock module).
+ * GET /api/saamaan/stock?code=N000454 — an item's stock, read LIVE off the
+ * ERP (Dr Raghu, 3 Sep 2026: "Stock Register in the ERP can you know where
+ * it is?" — pointing at the Stock module).
  *
  * WHERE IT IS: a Stock Entry is the document a person makes; when it is
  * submitted the ERP writes one line per item per warehouse into the Stock
  * Ledger Entry — as do Purchase Receipts and Delivery Notes. THAT table is
  * the register: every movement, the quantity in or out, the balance after
- * it, the warehouse, the date, and the voucher that caused it. Only that
- * — "dont give me balance, i want to see the first report with every
- * transaction — in and out."
+ * it, the warehouse, the date, and the voucher that caused it. Bin holds
+ * the balance now, per item per warehouse.
+ *
+ * CLOSING STOCK IS THE STOCK WAREHOUSES ONLY: "For the purpose of the
+ * stock it's ONLY the closing stock in the 'Stock' warehouses!" Which
+ * warehouses those are is Genie's word, kept in material_warehouse
+ * (Masters). A warehouse nobody has typed yet does not count, and the
+ * answer says how many such there are, so a small number is never
+ * mistaken for a complete one.
  *
  * NOT MIRRORED. The ledger was 412,158 lines on the day and grows by
  * thousands a day; an item's slice of it is read when the tab opens, in
@@ -35,6 +42,7 @@ async function erpConfig() {
   return { base: cfg.url.replace(/\/+$/, ""), H: { authorization: `token ${cfg.api_key}:${cfg.api_secret}` } as Record<string, string> };
 }
 
+const BIN_FIELDS = ["warehouse", "actual_qty", "reserved_qty", "ordered_qty", "projected_qty", "valuation_rate", "stock_value"];
 const SLE_FIELDS = [
   "name", "posting_date", "posting_time", "warehouse", "actual_qty", "qty_after_transaction", "incoming_rate", "valuation_rate",
   "stock_value", "stock_value_difference", "voucher_type", "voucher_no", "project", "batch_no", "serial_no", "modified_by",
@@ -48,6 +56,7 @@ export async function GET(req: Request) {
     if (!code) throw new HttpError(400, "code required");
     const limit = Math.min(1000, Math.max(50, Number(p.get("limit") || 300) || 300));
     const { base, H } = await erpConfig();
+    const admin = adminClient();
 
     const get = async (u: string): Promise<Doc[]> => {
       const r = await fetch(u, { headers: H, signal: AbortSignal.timeout(20000) });
@@ -56,18 +65,45 @@ export async function GET(req: Request) {
     };
     const J = (x: unknown) => encodeURIComponent(JSON.stringify(x));
 
-    const [ledger, countRes] = await Promise.all([
+    const [bins, ledger, countRes, kinds] = await Promise.all([
+      get(`${base}/api/resource/Bin?filters=${J([["item_code", "=", code]])}&fields=${J(BIN_FIELDS)}&order_by=warehouse%20asc&limit_page_length=100`),
       get(`${base}/api/resource/${encodeURIComponent("Stock Ledger Entry")}?filters=${J([["item_code", "=", code], ["is_cancelled", "=", 0]])}`
         + `&fields=${J(SLE_FIELDS)}&order_by=${encodeURIComponent("posting_date desc, posting_time desc, creation desc")}&limit_page_length=${limit}`),
       fetch(`${base}/api/method/frappe.client.get_count?doctype=${encodeURIComponent("Stock Ledger Entry")}&filters=${J([["item_code", "=", code], ["is_cancelled", "=", 0]])}`, { headers: H, signal: AbortSignal.timeout(20000) })
         .then(async (r) => (r.ok ? Number(((await r.json()) as { message?: number }).message ?? 0) : null)).catch(() => null),
+      // Genie's word on each warehouse. No table yet → nobody has said.
+      admin.from("material_warehouse").select("warehouse, kind").limit(500).then((r) => (r.error ? null : r.data ?? [])),
     ]);
+
+    const kindOf = new Map((kinds ?? []).map((k) => [String(k.warehouse), String(k.kind || "")]));
+    const typed: Doc[] = bins.map((b) => ({ ...b, kind: kindOf.get(String(b.warehouse)) ?? "" } as Doc));
+    const held = typed.filter((b) => Number(b.actual_qty) !== 0);
+    const stock = held.filter((b) => b.kind === "Stock");
+    const sum = (rows: Doc[], k: string) => rows.reduce((a, b) => a + (Number(b[k]) || 0), 0);
+    const stockQty = sum(stock, "actual_qty");
+    const stockValue = sum(stock, "stock_value");
 
     return NextResponse.json({
       ok: true,
       erpBase: base,
       code,
       readAt: new Date().toISOString(),
+      mastersReady: kinds !== null,
+      bins: typed,
+      closing: {
+        // The ERP's own closing stock — every warehouse, as it counts it.
+        erpQty: sum(held, "actual_qty"),
+        erpValue: sum(held, "stock_value"),
+        qty: stockQty,
+        value: stockValue,
+        // The ERP's average valuation across the Stock warehouses, weighted by quantity.
+        rate: stockQty ? stockValue / stockQty : null,
+        stockWarehouses: stock.length,
+        // Held elsewhere — WIP, at a vendor, or in a warehouse nobody has typed.
+        elsewhereQty: sum(held.filter((b) => b.kind !== "Stock"), "actual_qty"),
+        untypedQty: sum(held.filter((b) => !b.kind), "actual_qty"),
+        untypedWarehouses: held.filter((b) => !b.kind).length,
+      },
       ledger,
       ledgerTotal: countRes,
       ledgerShown: ledger.length,

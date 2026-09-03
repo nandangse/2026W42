@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GenieTable from "@/components/GenieTable";
-import { Screen, Modal, Btn, Note, Chip, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, S, fmtD, statusColour } from "@/components/ims/ui";
+import { Screen, Modal, Btn, Note, Chip, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, S, fmtD, statusColour } from "@/components/ims/ui";
 import type { Summary } from "./Dashboard";
 
 type Row = Record<string, unknown> & { item_code: string };
@@ -26,6 +26,7 @@ interface FileRow { file_id: string; file_name: string; file_url: string; is_pri
 const money = (n: unknown) =>
   n === null || n === undefined || n === "" ? "·" : `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const num = (n: unknown) => (n === null || n === undefined || n === "" ? "·" : Number(n).toLocaleString("en-IN"));
+const qtyFmt = (n: unknown) => (n === null || n === undefined ? "·" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 3 }));
 
 /** An ERP path (/files/x.png, /file/abc/y.pdf) → a link that opens. As-is otherwise. */
 const erpUrl = (base: string, p: string) => (p && p.startsWith("/") ? `${base}${p}` : p);
@@ -109,6 +110,7 @@ export default function Items({ summary, initialGroup }: { summary: Summary; ini
       <td>${esc(r.item_code)}</td><td>${esc(r.item_name)}</td><td>${esc(r.item_group)}</td><td>${esc(r.stock_uom)}</td>
       <td>${esc(r.custom_item_class)}</td><td>${esc(r.qc_status)}</td>
       <td class="n">${esc(money(r.last_purchase_rate))}</td><td class="n">${esc(money(r.valuation_rate))}</td>
+      <td class="n">${r.closing_erp === null ? "·" : esc(qtyFmt(r.closing_erp))}</td><td class="n">${r.closing_genie === null ? "·" : esc(qtyFmt(r.closing_genie))}</td>
       <td>${[r.drawing_pdf && "PDF", r.drawing_dwg && "DWG", r.custom_drawing_dxf && "DXF"].filter(Boolean).join(" · ") || "·"}</td>
     </tr>`).join("");
     w.document.write(`<!doctype html><html><head><title>Saamaan — Items</title><style>
@@ -122,7 +124,7 @@ export default function Items({ summary, initialGroup }: { summary: Summary; ini
     </style></head><body>
       <h1>📦 Nandan Saamaan — Items</h1>
       <div class="sub">${esc(filtersWords)} · rows ${from}–${to} of ${total.toLocaleString("en-IN")} · printed ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</div>
-      <table><thead><tr><th>Code</th><th>Name</th><th>Group</th><th>UOM</th><th>Class</th><th>QC</th><th class="n">Last purchase</th><th class="n">Valuation</th><th>Drawings</th></tr></thead>
+      <table><thead><tr><th>Code</th><th>Name</th><th>Group</th><th>UOM</th><th>Class</th><th>QC</th><th class="n">Last purchase</th><th class="n">Valuation</th><th class="n">Closing (ERP)</th><th class="n">Closing (Genie)</th><th>Drawings</th></tr></thead>
       <tbody>${body}</tbody></table>
     </body></html>`);
     w.document.close();
@@ -169,6 +171,15 @@ export default function Items({ summary, initialGroup }: { summary: Summary; ini
           { key: "qc", label: "QC", align: "left", sort: (r) => S(r.qc_status), render: (r) => S(r.qc_status) ? <Chip text={S(r.qc_status)} colour={statusColour(S(r.qc_status))} /> : "·" },
           { key: "lpr", label: "Last purchase", align: "right", sort: (r) => Number(r.last_purchase_rate ?? -1), render: (r) => <span className="tnum">{money(r.last_purchase_rate)}</span> },
           { key: "val", label: "Valuation", align: "right", sort: (r) => Number(r.valuation_rate ?? -1), render: (r) => <span className="tnum">{money(r.valuation_rate)}</span> },
+          { key: "cerp", label: "Closing (ERP)", align: "right", sort: (r) => Number(r.closing_erp ?? -1), title: "The ERP's closing stock — every warehouse, live",
+            render: (r) => <span className="tnum" style={{ color: r.closing_erp === null ? MUTED : INK }}>{r.closing_erp === null ? "·" : qtyFmt(r.closing_erp)}</span> },
+          { key: "cgen", label: "Closing (Genie)", align: "right", sort: (r) => Number(r.closing_genie ?? -1), title: "Closing stock in the Stock warehouses only, per Masters — live",
+            render: (r) => (
+              <span className="tnum font-bold" style={{ color: r.closing_genie === null ? MUTED : r.closing_genie ? INK : MUTED }}
+                title={r.closing_untyped ? "some of it sits in a warehouse not yet typed in Masters" : ""}>
+                {r.closing_genie === null ? "·" : qtyFmt(r.closing_genie)}{r.closing_untyped ? <span style={{ color: AMBER }}>?</span> : null}
+              </span>
+            ) },
           { key: "drw", label: "Drawings", align: "left", render: (r) => <DrawingLinks r={r} base={base} /> },
           { key: "mod", label: "ERP modified", align: "right", sort: (r) => S(r.erp_modified), render: (r) => <span className="tnum" style={{ color: MUTED }}>{fmtD(r.erp_modified)}</span> },
         ]}
@@ -296,9 +307,70 @@ interface Sle {
   name: string; posting_date: string; posting_time: string; warehouse: string; actual_qty: number; qty_after_transaction: number;
   incoming_rate: number; valuation_rate: number; stock_value: number; voucher_type: string; voucher_no: string; project: string | null; modified_by: string;
 }
-interface Stock { erpBase: string; readAt: string; ledger: Sle[]; ledgerTotal: number | null; ledgerShown: number }
+interface BinRow { warehouse: string; actual_qty: number; valuation_rate: number; stock_value: number; kind: string }
+interface Closing { erpQty: number; erpValue: number; qty: number; value: number; rate: number | null; stockWarehouses: number; elsewhereQty: number; untypedQty: number; untypedWarehouses: number }
+interface Stock { erpBase: string; readAt: string; mastersReady: boolean; bins: BinRow[]; closing: Closing; ledger: Sle[]; ledgerTotal: number | null; ledgerShown: number }
 
-const qtyFmt = (n: unknown) => (n === null || n === undefined ? "·" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 3 }));
+/** One read of the ERP's stock for an item, shared by the head and the register tab. */
+function useStock(code: string): [Stock | null, string] {
+  const [data, setData] = useState<Stock | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    setData(null); setErr("");
+    fetch(`/api/saamaan/stock?code=${encodeURIComponent(code)}`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || `The server answered ${r.status}.`); return j; })
+      .then(setData)
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [code]);
+  return [data, err];
+}
+
+/**
+ * CLOSING STOCK, in large letters (Dr Raghu, 3 Sep 2026): the quantity in
+ * the STOCK warehouses only — "for the purpose of the stock it's ONLY the
+ * closing stock in the 'Stock' warehouses!" — with the UOM and the value
+ * at the ERP's valuation. What sits in WIP, at a vendor, or in a warehouse
+ * nobody has typed yet is said underneath, never folded in.
+ */
+function ClosingStock({ stock, err, uom }: { stock: Stock | null; err: string; uom: string }) {
+  if (err) return <div className="rounded border p-3 text-xs" style={{ borderColor: BORDER, background: "#fff", color: "#8A1F16" }}>{err}</div>;
+  if (!stock) return <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, background: "#fff", color: MUTED }}>Reading the ERP…</div>;
+  const c = stock.closing;
+  const held = stock.bins.filter((b) => Number(b.actual_qty) !== 0);
+  return (
+    <div className="rounded border p-3" style={{ borderColor: BORDER, background: "#fff" }}>
+      <div className="flex items-baseline gap-2">
+        <span className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: 0.6 }}>Closing stock — Genie</span>
+        <span className="ml-auto text-xs" style={{ color: MUTED }} title="every warehouse, as the ERP counts it">ERP, all warehouses: <b className="tnum" style={{ color: INK }}>{qtyFmt(c.erpQty)}</b> · {money(c.erpValue)}</span>
+      </div>
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <span className="tnum" style={{ fontSize: 34, fontWeight: 800, color: c.qty ? INK : MUTED, lineHeight: 1.1 }}>{qtyFmt(c.qty)}</span>
+        <span style={{ fontSize: 16, fontWeight: 700, color: MUTED }}>{uom || "·"}</span>
+        <span className="ml-auto text-right">
+          <span className="tnum block" style={{ fontSize: 16, fontWeight: 800, color: INK }}>{money(c.value)}</span>
+          <span className="text-xs" style={{ color: MUTED }}>{c.rate !== null ? `at ${money(c.rate)} / ${uom || "unit"}` : "at valuation"}</span>
+        </span>
+      </div>
+      <div className="text-xs mt-1" style={{ color: MUTED, lineHeight: 1.5 }}>
+        {!stock.mastersReady ? "No warehouse has a type yet — run migration 0124 and set the Stock warehouses in Masters."
+          : c.stockWarehouses ? `in ${c.stockWarehouses} Stock warehouse${c.stockWarehouses === 1 ? "" : "s"}` : "nothing in a Stock warehouse"}
+        {c.elsewhereQty ? ` · ${qtyFmt(c.elsewhereQty)} elsewhere (WIP, vendor${c.untypedQty ? ", untyped" : ""})` : ""}
+        {c.untypedWarehouses ? <span style={{ color: AMBER }}> · {c.untypedWarehouses} warehouse{c.untypedWarehouses === 1 ? "" : "s"} holding it not yet typed in Masters</span> : null}
+      </div>
+      {held.length > 0 && (
+        <div className="flex gap-1 flex-wrap mt-1.5">
+          {held.map((b) => (
+            <span key={b.warehouse} className="rounded px-1.5 py-0.5 text-xs tnum" title={`${b.kind || "not typed"} · ${money(b.stock_value)}`}
+              style={{ background: b.kind === "Stock" ? "#E6F4EC" : "#F3F4F6", color: b.kind === "Stock" ? GREEN : MUTED, fontWeight: b.kind === "Stock" ? 700 : 500 }}>
+              {b.warehouse.replace(/ - NGSE$| - NGPL-I$/, "")} {qtyFmt(b.actual_qty)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The ERP's form for the voucher — Stock Entry → /app/stock-entry/STE-28936. */
 const voucherUrl = (base: string, type: string, no: string) => `${base}/app/${type.toLowerCase().replace(/\s+/g, "-")}/${encodeURIComponent(no)}`;
 
@@ -309,15 +381,7 @@ const voucherUrl = (base: string, type: string, no: string) => `${base}/app/${ty
  * see the first report with every transaction — in and out", Dr Raghu,
  * 3 Sep 2026).
  */
-function StockRegister({ code, base }: { code: string; base: string }) {
-  const [data, setData] = useState<Stock | null>(null);
-  const [err, setErr] = useState("");
-  useEffect(() => {
-    fetch(`/api/saamaan/stock?code=${encodeURIComponent(code)}`, { cache: "no-store" })
-      .then(async (r) => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || `The server answered ${r.status}.`); return j; })
-      .then(setData)
-      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
-  }, [code]);
+function StockRegister({ code, base, data, err }: { code: string; base: string; data: Stock | null; err: string }) {
   const erp = data?.erpBase || base;
   /**
    * A Stock Reconciliation SETS a balance rather than moving a quantity:
@@ -403,6 +467,7 @@ function Detail({ code, base, onClose }: { code: string; base: string; onClose: 
   const [err, setErr] = useState("");
   const [every, setEvery] = useState(false);
   const [tab, setTab] = useState("erp");
+  const [stock, stockErr] = useStock(code);
 
   useEffect(() => {
     fetch(`/api/saamaan/items?mode=one&code=${encodeURIComponent(code)}`, { cache: "no-store" })
@@ -419,6 +484,26 @@ function Detail({ code, base, onClose }: { code: string; base: string; onClose: 
     <Modal onClose={onClose} title={`${code}${item ? ` — ${S(item.item_name)}` : ""}`} width={920}>
       {err && <Note kind="error">{err}</Note>}
       {!item && !err && <div className="text-sm" style={{ color: MUTED }}>Reading…</div>}
+
+      {/* ------------------------------------ the head, in two columns */}
+      {item && (
+        <div className="grid md:grid-cols-2 gap-3 mb-3" style={{ alignItems: "start" }}>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <Chip text={S(item.item_group)} colour={NAVY} />
+              {item.disabled ? <Chip text="Disabled on the ERP" colour="#5A6672" /> : null}
+              {S(item.qc_status) && <Chip text={S(item.qc_status)} colour={statusColour(S(item.qc_status))} />}
+              {S(item.custom_item_class) && <Chip text={`Class ${S(item.custom_item_class)}`} colour={MUTED} />}
+            </div>
+            <div className="text-xs" style={{ color: MUTED, lineHeight: 1.6 }}>
+              <div>Stock UOM <b style={{ color: INK }}>{S(item.stock_uom) || "·"}</b> · Last purchase <b style={{ color: INK }}>{money(item.last_purchase_rate)}</b> · Valuation <b style={{ color: INK }}>{money(item.valuation_rate)}</b></div>
+              <div>Kittable <b style={{ color: INK }}>{S(item.kittable) || "·"}</b> · HSN <b style={{ color: INK }}>{S(item.gst_hsn_code) || "·"}</b>{S(item.drawing_no) ? <> · Drawing <b style={{ color: INK }}>{S(item.drawing_no)}</b></> : null}</div>
+            </div>
+            <a href={erpForm(base, "Item", code)} target="_blank" rel="noreferrer" className="inline-block mt-1 text-xs font-bold" style={{ color: NAVY }}>Open in the ERP ↗</a>
+          </div>
+          <ClosingStock stock={stock} err={stockErr} uom={S(item.stock_uom)} />
+        </div>
+      )}
 
       {/* --------------------------------------------------------- the tabs */}
       {item && (
@@ -437,7 +522,7 @@ function Detail({ code, base, onClose }: { code: string; base: string; onClose: 
         </div>
       )}
 
-      {item && tab === "stock" && <StockRegister code={code} base={base} />}
+      {item && tab === "stock" && <StockRegister code={code} base={base} data={stock} err={stockErr} />}
       {item && tab === "intel" && (
         <div className="rounded border p-6 text-sm" style={{ borderColor: BORDER, background: "#fff", color: MUTED, lineHeight: 1.7 }}>
           <div className="font-bold mb-1" style={{ color: INK }}>Intelligence — to build</div>
@@ -448,16 +533,6 @@ function Detail({ code, base, onClose }: { code: string; base: string; onClose: 
 
       {item && tab === "erp" && (
         <div className="text-sm" style={{ color: INK }}>
-          {/* ------------------------------------------------ the top line */}
-          <div className="flex items-center gap-2 flex-wrap mb-3">
-            <Chip text={S(item.item_group)} colour={NAVY} />
-            {item.disabled ? <Chip text="Disabled on the ERP" colour="#5A6672" /> : null}
-            {S(item.qc_status) && <Chip text={S(item.qc_status)} colour={statusColour(S(item.qc_status))} />}
-            <a href={erpForm(base, "Item", code)} target="_blank" rel="noreferrer" className="ml-auto text-xs font-bold" style={{ color: NAVY }}>
-              Open in the ERP ↗
-            </a>
-          </div>
-
           {/* ----------------------------------------------- description */}
           <div className="text-xs font-bold uppercase mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>Description</div>
           {desc ? (

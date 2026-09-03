@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.1.5",
+    date: "2026-09-03",
+    module: "Saamaan — closing stock on the item, warehouses in Masters, the header",
+    items: [
+      "\"break this into two columns at the top. Show closing stock in large letters, UOM and valuation also of it\" (Dr Raghu, 3 Sep 2026). The item lightbox now opens on two columns: the ERP's chips and key figures on the left, CLOSING STOCK large on the right — quantity, the stock UOM, the value at the ERP's valuation, and a chip per warehouse that holds it.",
+      "\"For the purpose of the stock it's ONLY the closing stock in the 'Stock' warehouses!\" So the big number counts Stock warehouses alone. What sits in WIP or at a vendor is said underneath as \"elsewhere\", never folded in; a warehouse nobody has typed yet is called out in amber, so a small number is never mistaken for a complete one.",
+      "\"Make Masters settings. In this show warehouses, and in front of the warehouse remarks. In front of it Type — changeable to stock / wip / vendor.\" A Masters section: every warehouse the ERP has, a Type dropdown that saves at once, a remark that saves when you leave the box. The names are the ERP's, pulled as phase 7; the type and the remark are Genie's and stay through every pull. \"So this way when we revamp the warehouses properly it will help.\"",
+      "ON THE FIRST PULL THE TYPE IS GUESSED FROM THE NAME — Store and Stock → Stock, Work In Progress and Kitting → WIP, Sub-Vendor and Transit → Vendor, the rest left blank — and the remark says \"guessed from the name — check\", so the closing stock means something on day one and every guess is visible to be corrected. Migration 0124, then a pull.",
+      "\"in this show Closing stock in ERP, Closing stock in Genie as two separate columns\" — on the Items list, beside Valuation: Closing (ERP), every warehouse as the ERP counts it, and Closing (Genie), the Stock warehouses only. Read live from the ERP's Bin for the 200 items on the page when the page opens; a dot where the ERP could not be read, an amber ? where some of it sits in a warehouse not yet typed. The item's head says both too.",
+      "\"reminder again: for the moment we are not pushing anything in Saamaan into the ERP.\" Nothing does. Every ERP call Saamaan makes is a read — the pull, the stock register, the closing stock — and the RBOM lives in Genie's own tables. No Saamaan route writes to the ERP, and none will until he says.",
+      "\"in the header also put the logo. Call it there NANDAN SAAMAAN. dont need to write the other details! Keep version no on the left — Nandan Genie · <version> in small.\" Done as said: the Nandan logo, NANDAN SAAMAAN, the one Genie version number small beside it, and nothing else on the left.",
+    ],
+  },
+  {
     v: "4.4.1.4",
     date: "2026-09-03",
     module: "Stock Register — a reconciliation shows its movement",

@@ -25,12 +25,15 @@ import Items from "./Items";
 import Pull from "./Pull";
 import Projects from "./Projects";
 import Bom from "./Bom";
+import Masters from "./Masters";
+import { LOGO } from "@/lib/logo";
 
 const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: "◧" },
   { key: "items", label: "Items", icon: "📦" },
   { key: "projects", label: "Projects", icon: "🏗" },
   { key: "bom", label: "BOM", icon: "🧾" },
+  { key: "masters", label: "Masters", icon: "⚙" },
   { key: "pull", label: "ERP pull", icon: "⇣" },
 ];
 
@@ -69,6 +72,7 @@ export default function SaamaanApp({
       case "items": return <Items summary={summary} initialGroup={groupPick} />;
       case "projects": return <Projects summary={summary} />;
       case "bom": return <Bom summary={summary} />;
+      case "masters": return <Masters />;
       case "pull": return <Pull summary={summary} isOwner={isOwner} onDone={reloadSummary} />;
       default: return <Dashboard summary={summary} go={go} />;
     }
@@ -76,23 +80,22 @@ export default function SaamaanApp({
 
   return (
     <div style={{ minHeight: "100vh", background: PAPER, fontFamily: "Arial, Helvetica, sans-serif" }}>
-      {/* ------------------------------------------------------------ header */}
-      <div className="flex items-center gap-2 px-3 py-2 flex-wrap"
+      {/* ------------------------------------------------------------ header
+          Dr Raghu, 3 Sep 2026: "in the header also put the logo. Call it
+          there NANDAN SAAMAAN. dont need to write the other details! Keep
+          version no on the left — Nandan Genie · <version> in small." */}
+      <div className="flex items-center gap-3 px-3 py-2"
         style={{ background: NAVY_DARK, borderBottom: `1px solid ${NAVY}` }}>
-        <span className="font-bold text-white" style={{ fontSize: 15, letterSpacing: 0.3 }}>
-          📦 Nandan Saamaan
+        <span className="rounded px-1.5 py-1 flex items-center" style={{ background: "#fff" }}>
+          <img src={LOGO} alt="Nandan GSE" style={{ height: 26, display: "block" }} />
         </span>
-        <span className="text-xs" style={{ color: "#8FA1B3" }}>
-          Materials — the Item master, mirrored from the ERP
+        <span className="font-bold text-white" style={{ fontSize: 16, letterSpacing: 1.2 }}>
+          NANDAN SAAMAAN
+        </span>
+        <span className="text-xs" style={{ color: "#8FA1B3" }} title="Genie's one version number — Saamaan is numbered as Genie">
+          Nandan Genie · v{APP_VERSION}
         </span>
         <span className="ml-auto flex items-center gap-2">
-          {summary?.installed && (
-            <span className="rounded px-2 py-0.5 text-xs font-bold tnum" style={{ background: NAVY, color: "#CBD5E1" }}
-              title="Items in the mirror, not disabled">
-              {summary.items.toLocaleString("en-IN")} items
-            </span>
-          )}
-          <span className="text-xs" style={{ color: "#5F7183" }}>v{APP_VERSION}</span>
           <ModuleMenu current="saamaan" email={email} displayName={displayName} initials={initials} role={role} />
         </span>
       </div>

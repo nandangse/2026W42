@@ -38,6 +38,10 @@ export const maxDuration = 300;
  *   projects — every Project, with the BOM fields the ERP keeps on it
  *              (custom_approved_bom and the five ticks). Dr Raghu, 2 Sep
  *              2026: "With each project there is a BOM mentioned."
+ *   warehouses — every Warehouse the ERP has. The name is the ERP's; the
+ *              TYPE (Stock / WIP / Vendor) and the remark are Genie's, kept
+ *              across pulls. A warehouse seen for the first time gets a type
+ *              guessed from its name and a remark saying so.
  *   boms     — every BOM header: item, project, active, default, docstatus.
  *   bom_items — the LINES of every live (not cancelled) BOM on a LIVE
  *              project — one with a job on the board: "I am concerned
@@ -494,7 +498,60 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, phase, found: rows.length, written, removed, note });
     }
 
-    throw new HttpError(400, "Unknown phase — items, children, files, projects, boms or bom_items.");
+    // ------------------------------------------------------- warehouses
+    if (phase === "warehouses") {
+      const docs = await pages(
+        (start) => `${base}/api/resource/Warehouse?fields=${encodeURIComponent(JSON.stringify(["name", "warehouse_name", "company", "parent_warehouse", "is_group", "disabled", "modified"]))}&limit_start=${start}&limit_page_length=500`,
+        H, (j) => ((j as { data?: Doc[] }).data ?? []),
+      );
+      const { data: had, error: hadErr } = await admin.from("material_warehouse").select("warehouse").limit(1000);
+      if (hadErr) {
+        if (/does not exist|schema cache/i.test(hadErr.message))
+          throw new HttpError(503, "Run migration 0124 first — the warehouse master doesn't exist yet.");
+        throw new Error(hadErr.message);
+      }
+      const known = new Set((had ?? []).map((w) => String(w.warehouse)));
+      // A first guess from the name, for a warehouse nobody has typed yet.
+      // Shown as a guess in Masters; Genie's word once somebody sets it.
+      const guess = (n: string) =>
+        /sub-?ve|vendor|transit/i.test(n) ? "Vendor" : /work in pro|wip|kitting/i.test(n) ? "WIP" : /\bstore|stock\b/i.test(n) ? "Stock" : "";
+      const rows = docs.filter((d) => S(d.name)).map((d) => {
+        const name = S(d.name);
+        const row: Doc = {
+          warehouse: name,
+          warehouse_name: S(d.warehouse_name),
+          company: S(d.company),
+          parent_warehouse: S(d.parent_warehouse),
+          is_group: B(d.is_group),
+          disabled: B(d.disabled),
+          erp_modified: T(d.modified),
+          pulled_at: startedAt,
+        };
+        if (!known.has(name) && !B(d.is_group)) {
+          const k = guess(name);
+          row.kind = k;
+          row.remarks = k ? "type guessed from the name — check" : "";
+        }
+        return row;
+      });
+      // Two upserts: new rows carry the guess; known rows carry the ERP's
+      // columns only, so the type and remark somebody set stay theirs.
+      const fresh = rows.filter((r) => !known.has(String(r.warehouse)));
+      const again = rows.filter((r) => known.has(String(r.warehouse)));
+      let written = 0;
+      for (const batch of [fresh, again]) {
+        if (!batch.length) continue;
+        const { error } = await admin.from("material_warehouse").upsert(batch, { onConflict: "warehouse" });
+        if (error) throw new Error(error.message);
+        written += batch.length;
+      }
+      const guessed = fresh.filter((r) => r.kind).length;
+      const note = `${rows.length} warehouses, ${rows.filter((r) => !r.is_group).length} working; ${fresh.length} new${guessed ? `, ${guessed} typed by a guess from the name` : ""}.`;
+      await log(rows.length, written, 0, note);
+      return NextResponse.json({ ok: true, phase, found: rows.length, written, removed: 0, note });
+    }
+
+    throw new HttpError(400, "Unknown phase — items, children, files, projects, boms, bom_items or warehouses.");
   } catch (e) {
     return errJson(e);
   }

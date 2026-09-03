@@ -23,6 +23,7 @@ const PHASES: { key: string; label: string; what: string }[] = [
   { key: "projects", label: "4 · Projects", what: "every Project, with the Approved BOM it points at and the BOM fields the ERP keeps on it" },
   { key: "boms", label: "5 · BOMs", what: "every BOM header — the item it makes, the project it belongs to, active, default, submitted" },
   { key: "bom_items", label: "6 · BOM lines", what: "every line of every live BOM on a live project — one with a job on the board — the working set, whole, each time" },
+  { key: "warehouses", label: "7 · Warehouses", what: "every warehouse the ERP has — the names; the type and remark set in Masters stay through the pull" },
 ];
 
 type Line = { phase: string; state: "waiting" | "running" | "done" | "failed"; note: string };
@@ -55,7 +56,7 @@ export default function Pull({ summary, isOwner, onDone }: { summary: Summary; i
     <Screen
       title="ERP pull"
       blurb="Reads nandanerp into Saamaan — items, child tables, files, projects, BOMs, then the BOM lines of the jobs in process. Nothing on the ERP is written, ever."
-      action={isOwner ? <Btn kind="primary" onClick={run} disabled={busy} title="Six phases, one after the other">{busy ? "Pulling…" : "⇣ Pull from the ERP"}</Btn> : undefined}>
+      action={isOwner ? <Btn kind="primary" onClick={run} disabled={busy} title="Seven phases, one after the other">{busy ? "Pulling…" : "⇣ Pull from the ERP"}</Btn> : undefined}>
       {!isOwner && <Note kind="info">The ERP door is Raghu&apos;s to use, for now. The ledger below shows every walk that was made.</Note>}
       {!summary.erpBase && <Note kind="warn">The ERP&apos;s URL is not saved — CRM → Settings → Integrations holds the ERPNext keys, and Saamaan borrows them from there.</Note>}
 
