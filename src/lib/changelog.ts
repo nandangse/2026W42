@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.7",
+    date: "2026-09-03",
+    module: "MRP — jobs to add, by product family and by client",
+    items: [
+      "\"also have a drop down for product family and by client, so only their jobs are seen!!!\" (Dr Raghu, 3 Sep 2026). Two dropdowns on the picker, from the board's own words; the projects and jobs narrow to them, and Select all / Unselect then act on what is shown, leaving the rest of the choice as it was.",
+    ],
+  },
+  {
     v: "4.4.2.6",
     date: "2026-09-03",
     module: "MRP — store is kitting, purchase is the requisition",

@@ -148,6 +148,9 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState("");
   const [picker, setPicker] = useState(false);
+  /** "a drop down for product family and by client, so only their jobs are seen" */
+  const [pickFam, setPickFam] = useState("");
+  const [pickCust, setPickCust] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [openJob, setOpenJob] = useState<Col | null>(null);
   const [fullHead, setFullHead] = useState(true);
@@ -317,11 +320,14 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
     }
     return out;
   }, [grid]);
+  const shownBoard = useMemo(() => board.filter((j) => (!pickFam || j.fam === pickFam) && (!pickCust || j.cust === pickCust)), [board, pickFam, pickCust]);
   const boardByProject = useMemo(() => {
     const g = new Map<string, BoardJob[]>();
-    for (const j of board) (g.get(j.project_id) ?? g.set(j.project_id, []).get(j.project_id)!).push(j);
+    for (const j of shownBoard) (g.get(j.project_id) ?? g.set(j.project_id, []).get(j.project_id)!).push(j);
     return [...g.entries()].sort((a, b) => b[0].localeCompare(a[0], undefined, { numeric: true }));
-  }, [board]);
+  }, [shownBoard]);
+  const fams = useMemo(() => [...new Set(board.map((j) => j.fam).filter(Boolean))].sort(), [board]);
+  const custs = useMemo(() => [...new Set(board.map((j) => j.cust).filter(Boolean))].sort(), [board]);
 
   const run = grid?.run ?? null;
 
@@ -490,10 +496,18 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
       {/* ---------------------------------------------------- the picker */}
       {picker && (
         <Modal onClose={() => setPicker(false)} title="Jobs to add — every project, and its live jobs" width={860}>
-          <div className="flex gap-2 mb-2 text-xs">
-            <Btn onClick={() => setPicked(new Set(board.map((j) => j.job_no)))}>Select all jobs</Btn>
-            <Btn onClick={() => setPicked(new Set())}>Unselect all</Btn>
-            <span className="ml-auto tnum self-center" style={{ color: MUTED }}>{picked.size} of {board.length} chosen</span>
+          <div className="flex gap-2 mb-2 text-xs flex-wrap items-center">
+            <select value={pickFam} onChange={(e) => setPickFam(e.target.value)} className="rounded border px-2 py-1.5 text-sm bg-white" style={{ borderColor: pickFam ? NAVY : BORDER, maxWidth: 240 }}>
+              <option value="">All product families</option>
+              {fams.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+            <select value={pickCust} onChange={(e) => setPickCust(e.target.value)} className="rounded border px-2 py-1.5 text-sm bg-white" style={{ borderColor: pickCust ? NAVY : BORDER, maxWidth: 260 }}>
+              <option value="">All clients</option>
+              {custs.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <Btn onClick={() => setPicked((p) => new Set([...p, ...shownBoard.map((j) => j.job_no)]))} title={pickFam || pickCust ? "every job shown under these filters" : "every live job"}>Select all {pickFam || pickCust ? "shown" : "jobs"}</Btn>
+            <Btn onClick={() => setPicked((p) => { const n = new Set(p); for (const j of shownBoard) n.delete(j.job_no); return n; })} title={pickFam || pickCust ? "the jobs shown under these filters" : "every job"}>Unselect {pickFam || pickCust ? "shown" : "all"}</Btn>
+            <span className="ml-auto tnum" style={{ color: MUTED }}>{picked.size} of {board.length} chosen{shownBoard.length !== board.length ? ` · ${shownBoard.length} shown` : ""}</span>
           </div>
           <div style={{ maxHeight: "55vh", overflowY: "auto" }}>
             {boardByProject.map(([proj, jobs]) => {
