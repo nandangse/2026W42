@@ -21,11 +21,76 @@ export const maxDuration = 120;
  * as Dr Raghu's advisory voice. Every word both ways is KEPT — the raw
  * material the advisor trains on.
  */
-const TARGETS = ["opportunity", "quotation", "sales_order", "company", "person", "industry", "product"];
+/**
+ * sales_plan joined the seven on 3 Sep 2026 ("Next to it keep a consult Dr
+ * Raghu button handy and then let them chat"). Its target_id is the
+ * salesperson's PROFILE id, and the brief is not a record but a position:
+ * the nine targets, what has actually happened this year against each, and
+ * the plan in their own words. "Dr Raghu will guide them what plan to make"
+ * -- so the chair opens with the numbers already on the desk.
+ */
+const TARGETS = ["opportunity", "quotation", "sales_order", "company", "person", "industry", "product", "sales_plan"];
+
+const CALL_KINDS = ["Follow Up Call", "Cold call"];
+const VISIT_KINDS = ["Follow Up Visit", "Cold Visit", "Existing Customer Visit"];
+
+/** The salesperson's position this year, in one block of text. */
+async function planBrief(db: ReturnType<typeof crmDb>, profileId: string): Promise<string> {
+  const now = new Date();
+  const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  const fy = `${y}-${String(y + 1).slice(2)}`;
+  const fyStart = `${y}-04-01`, today = now.toISOString().slice(0, 10);
+  const weeksGone = Math.max(1, Math.round((now.getTime() - new Date(fyStart + "T00:00:00").getTime()) / 6048e5));
+  const weeksLeft = Math.max(1, Math.round((new Date(`${y + 1}-03-31T00:00:00`).getTime() - now.getTime()) / 6048e5));
+  const num = (v: unknown) => Number(v) || 0;
+  const L = (n: number) => n >= 1e7 ? `${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `${(n / 1e5).toFixed(1)} L` : String(Math.round(n));
+  const [prof, plan, so, inv, ints, qs] = await Promise.all([
+    db.from("profile").select("full_name, role").eq("id", profileId).maybeSingle(),
+    db.from("salesperson_plan").select("targets, plan_text").eq("profile_id", profileId).eq("fy", fy).maybeSingle(),
+    db.from("sales_order").select("amount").eq("owner_id", profileId).gte("ordered_on", fyStart).lte("ordered_on", today),
+    db.from("sales_invoice").select("amount, erp_status").eq("owner_id", profileId).gte("invoiced_on", fyStart).lte("invoiced_on", today),
+    db.from("interaction").select("kind").eq("by_id", profileId).gte("happened_at", fyStart).lte("happened_at", today),
+    db.from("quotation").select("grand_total, quoted_value").eq("owner_id", profileId).gte("created_at", fyStart).lte("created_at", today + "T23:59:59"),
+  ]);
+  const t = ((plan.data?.targets ?? {}) as Record<string, number>);
+  const rows = { so: (so.data ?? []) as Record<string, unknown>[], inv: (inv.data ?? []) as Record<string, unknown>[], ints: (ints.data ?? []) as Record<string, unknown>[], qs: (qs.data ?? []) as Record<string, unknown>[] };
+  const ytd = {
+    booking: rows.so.reduce((a, r) => a + num(r.amount), 0),
+    billing: rows.inv.reduce((a, r) => a + num(r.amount), 0),
+    collections: rows.inv.filter((r) => /paid/i.test(String(r.erp_status || ""))).reduce((a, r) => a + num(r.amount), 0),
+    quotation_value: rows.qs.reduce((a, r) => a + (num(r.grand_total) || num(r.quoted_value)), 0),
+    quotation_nos: rows.qs.length,
+    calls: rows.ints.filter((r) => CALL_KINDS.includes(String(r.kind))).length,
+    visits: rows.ints.filter((r) => VISIT_KINDS.includes(String(r.kind))).length,
+    video: rows.ints.filter((r) => String(r.kind) === "Video Call").length,
+  };
+  const money = (k: keyof typeof ytd, tk: string) => {
+    const tg = num(t[tk]); const got = ytd[k] as number;
+    return `${L(got)} of ${tg ? L(tg) : "no target"}${tg ? ` (${Math.round((got / tg) * 100)}%, needs ${L(Math.max(0, tg - got) / weeksLeft)}/week to close)` : ""}`;
+  };
+  const wk = (k: keyof typeof ytd, tk: string) => {
+    const tg = num(t[tk]); const got = ytd[k] as number;
+    return `${got} so far = ${(got / weeksGone).toFixed(1)}/week against ${tg ? `${tg}/week promised` : "no target"}`;
+  };
+  return [
+    `SALES PLAN of ${prof.data?.full_name ?? "the salesperson"} (${prof.data?.role ?? ""}) for FY ${fy} · week ${weeksGone} of the year, ${weeksLeft} left`,
+    `Booking: ${money("booking", "booking")}`,
+    `Billing: ${money("billing", "billing")}`,
+    `Collections: ${money("collections", "collections")}`,
+    `Quotations: ${money("quotation_value", "quotation_value")} · ${ytd.quotation_nos} quotes of ${num(t.quotation_nos) || "no target"}`,
+    `Calls: ${wk("calls", "calls_wk")}`,
+    `Visits: ${wk("visits", "visits_wk")}`,
+    `Video calls: ${wk("video", "video_calls_wk")}`,
+    `Opportunities/week promised: ${num(t.opps_wk) || "none"}`,
+    "",
+    `THE PLAN IN THEIR OWN WORDS:\n${String(plan.data?.plan_text || "").trim() || "(nothing written yet -- help them write it)"}`,
+  ].join("\n");
+}
 
 async function recordBrief(db: ReturnType<typeof crmDb>, tt: string, tid: string): Promise<string> {
   const pick = async (table: string, cols: string) => (await db.from(table).select(cols).eq("id", tid).maybeSingle()).data as Record<string, unknown> | null;
   try {
+    if (tt === "sales_plan") return await planBrief(db, tid);
     if (tt === "company") {
       const r = await pick("company", "name, city, state, is_customer, cin");
       return r ? `Company: ${r.name} · ${[r.city, r.state].filter(Boolean).join(", ")} · ${r.is_customer ? "existing customer" : "prospect"}` : "";
@@ -63,6 +128,8 @@ async function targetLabels(db: ReturnType<typeof crmDb>, pairs: { target_type: 
   const COLS: Record<string, string> = {
     company: "name", person: "full_name", opportunity: "name", quotation: "quote_no",
     sales_order: "so_no", industry: "name", product: "name",
+    // a plan's target is a PROFILE, labelled by the person's name
+    profile: "full_name",
   };
   const out = new Map<string, string>();
   const byType = new Map<string, Set<string>>();
@@ -70,11 +137,12 @@ async function targetLabels(db: ReturnType<typeof crmDb>, pairs: { target_type: 
     if (!byType.has(p.target_type)) byType.set(p.target_type, new Set());
     byType.get(p.target_type)!.add(p.target_id);
   }
-  for (const [tt, ids] of byType) {
+  for (const [tt0, ids] of byType) {
+    const tt = tt0 === "sales_plan" ? "profile" : tt0;
     const col = COLS[tt];
     if (!col) continue;
     const { data } = await db.from(tt).select(`id, ${col}`).in("id", [...ids]);
-    for (const r of (data ?? []) as unknown as Record<string, unknown>[]) out.set(`${tt}:${r.id}`, String(r[col] ?? ""));
+    for (const r of (data ?? []) as unknown as Record<string, unknown>[]) out.set(`${tt0}:${r.id}`, tt0 === "sales_plan" ? `${r[col]}'s Sales Plan` : String(r[col] ?? ""));
   }
   return out;
 }
@@ -196,7 +264,11 @@ export async function POST(req: Request) {
     const files = (Array.isArray(body.files) ? body.files : [])
       .map((f: { name?: unknown; path?: unknown }) => ({ name: String(f.name || "file").slice(0, 120), path: String(f.path || "") }))
       .filter((f: { path: string }) => f.path.startsWith("note/consult/")).slice(0, 4);
-    const message = opening ? "(The salesperson has just sat down at your desk with this record open. Open the consultation.)" : String(body.message || "").trim();
+    const message = opening
+      ? (tt === "sales_plan"
+        ? "(The salesperson has just sat down at your desk to make their sales plan for the year. Their numbers so far are on the desk. Open the consultation: greet them, read their position back to them in two lines, and ask the first question that will shape the plan.)"
+        : "(The salesperson has just sat down at your desk with this record open. Open the consultation.)")
+      : String(body.message || "").trim();
     if (!message && !files.length) throw new HttpError(400, "Say something.");
 
     let chatId = String(body.chat_id || "");
@@ -285,6 +357,9 @@ The record on the desk: ${brief || "(none loaded)"}`,
     // 30 Aug 2026) — the chat maintains ONE note on its record, rewritten
     // after every exchange. Best-effort: the consultation never fails on it.
     try {
+      // A plan is a position, not a record: there is no record for a note
+      // to hang on, so the mirror is skipped rather than linked to nothing.
+      if (tt === "sales_plan") throw new Error("no notes on a plan");
       const { data: allMsgs } = await db.from("consult_msg").select("role, content")
         .eq("chat_id", chatId).order("at").limit(200);
       const transcript = (allMsgs ?? [])

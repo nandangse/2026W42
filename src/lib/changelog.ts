@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.13",
+    date: "2026-09-03",
+    module: "The salesperson's own plan, with Dr Raghu's chair and Genie's garnish beside it",
+    items: [
+      "\"In the first tab make the Sales persons plan \u2014 eg Nitu's Sales Plan. Next to it keep a consult Dr Raghu button handy and then let them chat. Also make a button of 'Genie garnish' \u2014 this will help them to make a better plan. Dr Raghu will guide them what plan to make.\" (Dr Raghu, 3 Sep 2026.) Two tabs: MY PLAN and COMBINED PLAN, the combined one being the table that was there.",
+      "NINE NUMBERS ARE A TARGET, NOT A PLAN. A plan says how: which accounts and product families carry the number, what gets walked away from, the weekly rhythm that gets there. So the first tab has the words beside the numbers \u2014 the person's own, theirs to write; the numbers stay the Sales Head's to set.",
+      "CONSULT DR RAGHU opens his chair with the plan already on the desk: the nine targets, what has actually happened this year against each \u2014 booking, billing, collected, quoted, calls, visits \u2014 the gap per week to close, and the plan in their words. He greets, reads the position back in two lines, and asks the first question that will shape the plan. Every word both ways is kept, as with every other consultation.",
+      "GENIE GARNISH reads the same position and hands the plan back sharper: their intent kept, the how sharpened, the arithmetic checked, and the three questions Dr Raghu will ask that it does not yet answer. It is KEPT APART from the person's words \u2014 Take it into my plan, or Append below my words \u2014 never written over them by default. A plan somebody did not choose is not their plan.",
+      "The Sales Head sees a picker and can open anyone's; a salesperson sees their own. A green dot on the combined table marks who has written a plan in words.",
+      "NEEDS CRM MIGRATION 0050. Until it runs the numbers work as before and the words say so, rather than swallowing what is typed.",
+    ],
+  },
+  {
     v: "4.4.2.12",
     date: "2026-09-03",
     module: "Saamaan shows the value of stock, live",

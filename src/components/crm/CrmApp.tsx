@@ -122,6 +122,9 @@ export default function CrmApp({
   MY_PROFILE_ID = profileId;
   MY_EMAIL = email.toLowerCase();
   const [slug, setSlug] = useState(initialSlug ?? DOCTYPES[0].name);
+  // CONSULT DR RAGHU ON A SALES PLAN (3 Sep 2026): opened from the plan tab,
+  // not from a record -- the target is the person's profile.
+  const [planConsult, setPlanConsult] = useState<{ profileId: string; title: string } | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [links, setLinks] = useState<Links>({});
@@ -681,7 +684,12 @@ export default function CrmApp({
             ) : special.name === "waqueue" ? (
               <WhatsAppQueue />
             ) : special.name === "salespersonplan" ? (
-              <SalesPersonPlan />
+              <>
+                <SalesPersonPlan onConsult={(profileId, title) => setPlanConsult({ profileId, title })} />
+                {planConsult && (
+                  <ConsultRaghuModal targetType="sales_plan" targetId={planConsult.profileId} title={planConsult.title} onClose={() => setPlanConsult(null)} />
+                )}
+              </>
             ) : (
               <SalesPlan />
             )}
