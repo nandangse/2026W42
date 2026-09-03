@@ -48,10 +48,73 @@ const SLE_FIELDS = [
   "stock_value", "stock_value_difference", "voucher_type", "voucher_no", "project", "batch_no", "serial_no", "modified_by",
 ];
 
+/**
+ * THE VALUE OF STOCK, NOW (Dr Raghu, 3 Sep 2026: "show current value of
+ * stock" — on the dashboard).
+ *
+ * Read LIVE off Bin, every warehouse, and sorted by Genie's word on what
+ * each warehouse is. The ERP's own total is Rs 109.59 Cr across nineteen
+ * warehouses; only Rs 27.63 Cr of it sits in the ones typed "Stock", because
+ * Finished Goods (Rs 37.71 Cr), Khopoli Finished Goods (Rs 22.98 Cr) and ten
+ * others have never been typed. So the answer is given in FOUR PARTS, not
+ * one number: Stock, WIP, Finished goods, Vendor — and what is untyped,
+ * named and counted, because a total that quietly folds Rs 69 Cr of
+ * unclassified warehouses into "stock" is a number the balance sheet will
+ * later disagree with.
+ *
+ * 25,551 bins hold something today; five thousand a page, six pages, about
+ * two seconds. Not mirrored: it is read when the card is drawn and is as
+ * current as the ERP.
+ */
+async function readStockValue(base: string, H: Record<string, string>) {
+  const J = (x: unknown) => encodeURIComponent(JSON.stringify(x));
+  const byWh = new Map<string, { warehouse: string; value: number; qty: number; bins: number }>();
+  for (let start = 0; start < 200000; start += 5000) {
+    const u = `${base}/api/resource/Bin?fields=${J(["warehouse", "stock_value", "actual_qty"])}`
+      + `&filters=${J([["actual_qty", "!=", 0]])}&limit_start=${start}&limit_page_length=5000`;
+    const r = await fetch(u, { headers: H, signal: AbortSignal.timeout(25000) });
+    if (!r.ok) throw new HttpError(502, `The ERP answered ${r.status} reading Bin.`);
+    const page = ((await r.json()) as { data?: Doc[] }).data ?? [];
+    for (const b of page) {
+      const w = String(b.warehouse || "");
+      const cur = byWh.get(w) ?? { warehouse: w, value: 0, qty: 0, bins: 0 };
+      cur.value += Number(b.stock_value) || 0;
+      cur.qty += Number(b.actual_qty) || 0;
+      cur.bins += 1;
+      byWh.set(w, cur);
+    }
+    if (page.length < 5000) break;
+  }
+  const kinds = await adminClient().from("material_warehouse").select("warehouse, kind").limit(500)
+    .then((r) => (r.error ? null : r.data ?? []));
+  const kindOf = new Map((kinds ?? []).map((k) => [String(k.warehouse), String(k.kind || "")]));
+  const rows = [...byWh.values()]
+    .map((w) => ({ ...w, kind: kindOf.get(w.warehouse) ?? "" }))
+    .sort((a, b) => b.value - a.value);
+  const sumKind = (k: string) => rows.filter((r) => r.kind === k).reduce((a, r) => a + r.value, 0);
+  const untyped = rows.filter((r) => !r.kind);
+  return {
+    readAt: new Date().toISOString(),
+    mastersReady: kinds !== null,
+    erpTotal: rows.reduce((a, r) => a + r.value, 0),
+    stock: sumKind("Stock"),
+    wip: sumKind("WIP"),
+    finished: sumKind("Finished goods"),
+    vendor: sumKind("Vendor"),
+    untyped: untyped.reduce((a, r) => a + r.value, 0),
+    untypedWarehouses: untyped.map((r) => r.warehouse),
+    warehouses: rows,
+  };
+}
+
 export async function GET(req: Request) {
   try {
     await requireSaamaan();
     const p = new URL(req.url).searchParams;
+    if (p.get("mode") === "value") {
+      const { base, H } = await erpConfig();
+      return NextResponse.json({ ok: true, erpBase: base, ...(await readStockValue(base, H)) });
+    }
     const code = String(p.get("code") || "").trim();
     if (!code) throw new HttpError(400, "code required");
     const limit = Math.min(1000, Math.max(50, Number(p.get("limit") || 300) || 300));

@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.0.1",
+    date: "2026-09-03",
+    module: "Saamaan shows the value of stock, live",
+    items: [
+      "\"show current value of stock\" (Dr Raghu, 3 Sep 2026) \u2014 a strip on Saamaan's dashboard, read off the ERP's Bin when the page opens. 25,551 bins hold something today; five thousand a page, six pages, about two seconds. Not mirrored, so it is exactly as current as the ERP.",
+      "GIVEN IN FOUR PARTS, NOT ONE NUMBER. The ERP's own total is Rs 109.59 Cr across nineteen warehouses \u2014 and only Rs 27.63 Cr of it sits in the ones typed Stock. Finished Goods holds Rs 37.71 Cr, Khopoli Finished Goods Rs 22.98 Cr, Operation Expanse Rs 5.53 Cr, Service Spare Rs 3.03 Cr, and none of them has been typed in Masters. A total that quietly folds Rs 69 Cr of unclassified warehouses into \"stock\" is a number the balance sheet will later disagree with. So: Stock, WIP, Finished goods, Vendor \u2014 and the untyped part named, counted, and one click from Masters to type it.",
+      "It is fetched on its own, so the dashboard never waits on it. The cards draw at once; the stock strip says \"Reading every bin on the ERP\u2026\" and fills in.",
+      "STILL ONLY ELEVEN OF TWENTY-SEVEN WAREHOUSES ARE TYPED. Until Finished Goods and Khopoli Finished Goods are, the Finished goods figure reads nought and the untyped line carries them. That is the screen being honest, not the ERP being empty.",
+    ],
+  },
+  {
     v: "4.4.2.11",
     date: "2026-09-03",
     module: "Software Description — Saamaan written in",

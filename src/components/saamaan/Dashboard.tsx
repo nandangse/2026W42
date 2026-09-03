@@ -10,7 +10,16 @@
  */
 
 import GenieTable from "@/components/GenieTable";
-import { Card, Metric, INK, MUTED, BORDER, GREEN, AMBER, fmtD, daysTo } from "@/components/ims/ui";
+import { Card, Metric, INK, MUTED, BORDER, GREEN, AMBER, fmtD, daysTo, useLoad } from "@/components/ims/ui";
+
+/** The value of stock, read live off the ERP's Bin — see /api/saamaan/stock?mode=value. */
+interface StockValue {
+  ok: boolean; readAt: string; mastersReady: boolean;
+  erpTotal: number; stock: number; wip: number; finished: number; vendor: number;
+  untyped: number; untypedWarehouses: string[];
+  warehouses: { warehouse: string; value: number; qty: number; bins: number; kind: string }[];
+}
+const cr = (n: number) => `₹${(n / 1e7).toFixed(2)} Cr`;
 
 export interface PullLine {
   id: string; phase: string; found: number; written: number; removed: number; note: string; by: string | null; at: string;
@@ -37,6 +46,8 @@ const pct = (n: number, of: number) => (of > 0 ? `${Math.round((n / of) * 100)}%
 export default function Dashboard({ summary, go }: { summary: Summary; go: (k: string, group?: string) => void }) {
   const pulled = summary.lastPulledAt !== null;
   const age = pulled ? daysTo(summary.lastPulledAt!.slice(0, 10)) : null;
+  // Fetched on its own, so the dashboard never waits on 25,000 bins.
+  const [sv, svBusy, , svErr] = useLoad<StockValue>("/api/saamaan/stock?mode=value");
 
   return (
     <div style={{ maxWidth: 1180 }}>
@@ -69,6 +80,62 @@ export default function Dashboard({ summary, go }: { summary: Summary; go: (k: s
             {pulled ? fmtD(summary.lastPulledAt) : "No data"}
           </span>
         </Card>
+      </div>
+
+      {/*
+        THE VALUE OF STOCK, NOW (Dr Raghu, 3 Sep 2026: "show current value of
+        stock"). Live off the ERP's Bin, and given in FOUR PARTS rather than
+        one number — because the ERP's own total is Rs 109.59 Cr across
+        nineteen warehouses and only Rs 27.63 Cr of it sits in the ones
+        typed "Stock": Finished Goods (Rs 37.71 Cr) and eleven others have
+        never been typed in Masters. A total that quietly folds Rs 69 Cr of
+        unclassified warehouses into "stock" is a number the balance sheet
+        will later disagree with, so the untyped part is named and counted,
+        and one click opens Masters to type them.
+      */}
+      <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: BORDER }}>
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: 0.6 }}>Value of stock — live off the ERP</div>
+          {sv?.readAt && <span className="text-xs" style={{ color: MUTED }}>read {new Date(sv.readAt).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })} IST</span>}
+        </div>
+        {svErr ? (
+          <div className="text-sm mt-2" style={{ color: AMBER }}>{svErr}</div>
+        ) : !sv ? (
+          <div className="text-sm mt-2" style={{ color: MUTED }}>{svBusy ? "Reading every bin on the ERP…" : "No data"}</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-2">
+              <div>
+                <div className="tnum" style={{ color: GREEN, fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{cr(sv.stock)}</div>
+                <div className="text-xs mt-1" style={{ color: MUTED }}>in <b>Stock</b> warehouses · {sv.warehouses.filter((w) => w.kind === "Stock").length} of them</div>
+              </div>
+              <div>
+                <div className="tnum" style={{ color: INK, fontSize: 20, fontWeight: 800, lineHeight: 1.3 }}>{cr(sv.wip)}</div>
+                <div className="text-xs" style={{ color: MUTED }}>in WIP</div>
+              </div>
+              <div>
+                <div className="tnum" style={{ color: INK, fontSize: 20, fontWeight: 800, lineHeight: 1.3 }}>{cr(sv.finished)}</div>
+                <div className="text-xs" style={{ color: MUTED }}>Finished goods</div>
+              </div>
+              <div>
+                <div className="tnum" style={{ color: INK, fontSize: 20, fontWeight: 800, lineHeight: 1.3 }}>{cr(sv.vendor)}</div>
+                <div className="text-xs" style={{ color: MUTED }}>at vendors</div>
+              </div>
+              <div>
+                <div className="tnum" style={{ color: MUTED, fontSize: 20, fontWeight: 800, lineHeight: 1.3 }}>{cr(sv.erpTotal)}</div>
+                <div className="text-xs" style={{ color: MUTED }}>the ERP&rsquo;s total, every warehouse</div>
+              </div>
+            </div>
+            {sv.untypedWarehouses.length > 0 && (
+              <div className="text-xs mt-2 pt-2" style={{ color: AMBER, borderTop: `1px solid ${BORDER}` }}>
+                <b>{cr(sv.untyped)}</b> sits in {sv.untypedWarehouses.length} warehouse{sv.untypedWarehouses.length === 1 ? "" : "s"} nobody has typed yet
+                — {sv.untypedWarehouses.slice(0, 4).join(", ")}{sv.untypedWarehouses.length > 4 ? ` and ${sv.untypedWarehouses.length - 4} more` : ""}.
+                It is counted in the ERP&rsquo;s total and in none of the four parts.{" "}
+                <button onClick={() => go("masters")} className="font-bold underline" style={{ color: INK }}>Type them in Masters</button>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <div className="grid md:grid-cols-2 gap-3" style={{ alignItems: "start" }}>
