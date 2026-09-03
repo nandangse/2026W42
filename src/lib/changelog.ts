@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.8",
+    date: "2026-09-03",
+    module: "Issue slips — the slip's face, and A5 to print",
+    items: [
+      "\"Nandan Issue Slip — Date, From, To; Project, Jobs; Production Owner; Item Group, Item, Qty UOM; Please acknowledge with signature or in system\" (Dr Raghu, 3 Sep 2026). The lightbox opens on exactly that face: the logo, the slip number, date, from and to by name; then each project with its jobs and the production owner off the board; then the lines by item group; the acknowledgement at the foot. Release stays on every line for the in-system way.",
+      "\"Page break for every project in the print view; click PDF or Print — the guy can just print the A5 paper and give it.\" Print / PDF makes A5 sheets, one project a sheet, with Issued by and Received by lines to sign and the slip number on every page.",
+    ],
+  },
+  {
     v: "4.4.2.7",
     date: "2026-09-03",
     module: "MRP — jobs to add, by product family and by client",

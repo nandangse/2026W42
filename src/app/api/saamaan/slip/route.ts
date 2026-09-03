@@ -81,7 +81,26 @@ export async function GET(req: Request) {
         const projIds = [...new Set((lines ?? []).map((l) => S(l.project_id)).filter(Boolean))];
         const { data: projects } = projIds.length ? await admin.from("material_project").select("project_id, project_name").in("project_id", projIds) : { data: [] };
         const projName = new Map(((projects ?? []) as Doc[]).map((x) => [S(x.project_id), S(x.project_name)]));
-        return NextResponse.json({ ok: true, slip, lines: (lines ?? []).map((l) => ({ ...l, project_name: projName.get(S(l.project_id)) ?? "" })) });
+        // The production owner of each job, for the slip's face — from the
+        // board, named through profiles.
+        const jobNos = [...new Set((lines ?? []).map((l) => S(l.job_no)).filter(Boolean))];
+        const [{ data: jobs }, { data: people }] = await Promise.all([
+          jobNos.length ? admin.from("jobs").select("id, tag, production_owner, own").in("id", jobNos) : Promise.resolve({ data: [] }),
+          admin.from("profiles").select("email, initials, display_name"),
+        ]);
+        const byInitials = new Map(((people ?? []) as Doc[]).map((x) => [S(x.initials).toUpperCase(), S(x.display_name) || S(x.email).split("@")[0]]));
+        const byEmail = new Map(((people ?? []) as Doc[]).map((x) => [S(x.email).toLowerCase(), S(x.display_name) || S(x.email).split("@")[0]]));
+        const jobInfo: Record<string, { tag: string; production_owner: string; owner_name: string }> = {};
+        for (const j of (jobs ?? []) as Doc[]) {
+          const ini = S(j.production_owner) || S(j.own);
+          jobInfo[S(j.id)] = { tag: S(j.tag), production_owner: ini, owner_name: byInitials.get(ini.toUpperCase()) ?? ini };
+        }
+        return NextResponse.json({
+          ok: true, slip, jobs: jobInfo,
+          from_name: byEmail.get(S(slip.from_email).toLowerCase()) ?? S(slip.from_email).split("@")[0],
+          to_name: byEmail.get(S(slip.to_email).toLowerCase()) ?? S(slip.to_email).split("@")[0],
+          lines: (lines ?? []).map((l) => ({ ...l, project_name: projName.get(S(l.project_id)) ?? "" })),
+        });
       }
       // slips
       const mrp = S(p.get("mrp"));

@@ -16,6 +16,9 @@
 import { useState } from "react";
 import GenieTable from "@/components/GenieTable";
 import { Screen, Btn, Note, Chip, Modal, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, RED, S, fmtD, useLoad, post } from "@/components/ims/ui";
+import { LOGO } from "@/lib/logo";
+
+type JobInfo = { tag: string; production_owner: string; owner_name: string };
 
 export interface Slip {
   id: string; slip_no: string; kind: string; mrp_id: string | null; from_email: string | null; to_email: string | null; status: string;
@@ -64,8 +67,15 @@ export default function Slips({ mrp }: { mrp?: string } = {}) {
   );
 }
 
+/**
+ * A slip's face (Dr Raghu, 3 Sep 2026): "Nandan Issue Slip — Date, From,
+ * To; Project, Jobs; Production Owner; Item Group, Item, Qty UOM; Please
+ * acknowledge with signature or in system. Page break for every project in
+ * the print view; click PDF or Print — the guy can just print the A5 paper
+ * and give it."
+ */
 export function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void }) {
-  const [data, busy, reload, err] = useLoad<{ ok: boolean; slip: Slip; lines: Line[] }>(`/api/saamaan/slip?mode=slip&id=${encodeURIComponent(slip.id)}`);
+  const [data, busy, reload, err] = useLoad<{ ok: boolean; slip: Slip; lines: Line[]; jobs: Record<string, JobInfo>; from_name: string; to_name: string }>(`/api/saamaan/slip?mode=slip&id=${encodeURIComponent(slip.id)}`);
   const [boxes, setBoxes] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState("");
@@ -89,18 +99,83 @@ export function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void })
     reload();
   };
   // Grouped as he asked: project, then item group.
-  const groups: { project: string; project_name: string; groups: { group: string; lines: Line[] }[] }[] = [];
+  const groups: { project: string; project_name: string; jobs: string[]; groups: { group: string; lines: Line[] }[] }[] = [];
   for (const l of lines) {
     let p = groups.find((g) => g.project === l.project_id);
-    if (!p) { p = { project: l.project_id, project_name: l.project_name, groups: [] }; groups.push(p); }
+    if (!p) { p = { project: l.project_id, project_name: l.project_name, jobs: [], groups: [] }; groups.push(p); }
+    if (l.job_no && !p.jobs.includes(l.job_no)) p.jobs.push(l.job_no);
     let g = p.groups.find((x) => x.group === l.item_group);
     if (!g) { g = { group: l.item_group, lines: [] }; p.groups.push(g); }
     g.lines.push(l);
   }
+  const jobs = data?.jobs ?? {};
+  const owners = (p: { jobs: string[] }) => [...new Set(p.jobs.map((j) => jobs[j]?.owner_name).filter(Boolean))].join(", ") || "·";
+  const kindWord = s.kind === "purchase" ? "Purchase Requisition" : "Issue Slip";
+
+  /** A5, one project a page, the slip's face and nothing else. */
+  const print = () => {
+    const w = window.open("", "_blank", "width=700,height=900");
+    if (!w) { setMsg("The browser blocked the print window."); return; }
+    const esc = (x: unknown) => S(x).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const pages = groups.map((p) => `
+      <section class="page">
+        <header>
+          <img src="${LOGO}" alt="Nandan GSE" />
+          <div class="t"><div class="h1">Nandan ${kindWord}</div><div class="no">${esc(s.slip_no)}</div></div>
+        </header>
+        <table class="meta"><tr><td><b>Date</b> ${esc(fmtD(s.created_at))}</td><td><b>From</b> ${esc(data?.from_name || who(s.from_email))}</td><td><b>To</b> ${esc(data?.to_name || who(s.to_email))}</td></tr></table>
+        <div class="proj"><b>Project</b> ${esc(p.project.replace(/^NGSE-PROJ-/, "") || "—")} <span class="pn">${esc(p.project_name)}</span> &nbsp;·&nbsp; <b>Jobs</b> ${esc(p.jobs.join(", ") || "—")}</div>
+        <div class="own"><b>Production Owner:</b> ${esc(owners(p))}</div>
+        <table class="lines"><thead><tr><th>Item Group</th><th>Item</th><th class="n">Qty</th><th>UOM</th></tr></thead><tbody>
+          ${p.groups.map((g) => g.lines.map((l, i) => `<tr><td>${i === 0 ? esc(g.group.replace(/^RM - /, "")) : ""}</td><td><b>${esc(l.item_code)}</b> ${esc(l.item_name)}</td><td class="n">${esc(qtyFmt(l.qty))}</td><td>${esc(l.uom)}</td></tr>`).join("")).join("")}
+        </tbody></table>
+        <footer>
+          <div class="ack">Please acknowledge with signature or in system.</div>
+          <div class="sig"><span>Issued by ______________</span><span>Received by ______________</span></div>
+          <div class="small">${esc(s.slip_no)} · page ${groups.indexOf(p) + 1} of ${groups.length} · Genie</div>
+        </footer>
+      </section>`).join("");
+    w.document.write(`<!doctype html><html><head><title>${esc(s.slip_no)}</title><style>
+      @page { size: A5 portrait; margin: 9mm; }
+      body { font-family: Arial, Helvetica, sans-serif; color: #22283A; font-size: 10.5px; margin: 0; }
+      .page { page-break-after: always; min-height: 180mm; display: flex; flex-direction: column; }
+      .page:last-child { page-break-after: auto; }
+      header { display: flex; align-items: center; gap: 10px; border-bottom: 2px solid #1B2D6B; padding-bottom: 6px; margin-bottom: 6px; }
+      header img { height: 28px; } .h1 { font-size: 15px; font-weight: 800; color: #1B2D6B; } .no { font-size: 11px; color: #6B7280; font-weight: 700; }
+      .meta { width: 100%; margin-bottom: 6px; } .meta td { padding: 2px 0; }
+      .proj { font-size: 11.5px; margin: 4px 0 2px; } .pn { color: #6B7280; } .own { margin-bottom: 6px; }
+      .lines { width: 100%; border-collapse: collapse; } .lines th { background: #1B2D6B; color: #fff; text-align: left; padding: 3px 5px; font-size: 10px; }
+      .lines td { padding: 3px 5px; border-bottom: 1px solid #E5E8F0; vertical-align: top; } td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      tr { page-break-inside: avoid; }
+      footer { margin-top: auto; padding-top: 10px; } .ack { font-weight: 700; margin-bottom: 14px; }
+      .sig { display: flex; justify-content: space-between; margin-bottom: 8px; } .small { color: #9CA3AF; font-size: 9px; }
+    </style></head><body>${pages}</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 400);
+  };
+
   return (
-    <Modal onClose={onClose} title={`${s.slip_no} — ${s.kind === "purchase" ? "purchase requisition" : "issue slip, kitting"} · ${who(s.from_email)} → ${who(s.to_email)}`} width={1100}>
+    <Modal onClose={onClose} title={`Nandan ${kindWord} · ${s.slip_no}`} width={900}>
       {err && <Note kind="error">{err}</Note>}
       {msg && <Note kind="error">{msg}</Note>}
+
+      {/* ----------------------------------------------------- the face */}
+      <div className="rounded-lg border p-3 mb-3" style={{ borderColor: BORDER, background: "#fff" }}>
+        <div className="flex items-center gap-3 pb-2 mb-2" style={{ borderBottom: `2px solid ${NAVY}` }}>
+          <img src={LOGO} alt="Nandan GSE" style={{ height: 26 }} />
+          <div><div className="font-bold" style={{ color: NAVY, fontSize: 16 }}>Nandan {kindWord}</div><div className="text-xs font-bold" style={{ color: MUTED }}>{s.slip_no}</div></div>
+          <span className="ml-auto flex gap-2">
+            <Btn kind="primary" onClick={print} title="A5, one project a page — print it and hand it over">Print / PDF</Btn>
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-sm">
+          <div><span className="text-xs font-bold" style={{ color: MUTED }}>Date</span><div className="tnum font-semibold" style={{ color: INK }}>{fmtD(s.created_at)}</div></div>
+          <div><span className="text-xs font-bold" style={{ color: MUTED }}>From</span><div className="font-semibold" style={{ color: INK }}>{data?.from_name || who(s.from_email)}</div></div>
+          <div><span className="text-xs font-bold" style={{ color: MUTED }}>To</span><div className="font-semibold" style={{ color: INK }}>{data?.to_name || who(s.to_email)}</div></div>
+        </div>
+      </div>
+
       <div className="flex items-center gap-3 mb-3 text-xs flex-wrap" style={{ color: MUTED }}>
         <Chip text={s.status === "open" && s.escalation_level > 0 ? `issue not done · escalated to ${LADDER[s.escalation_level]}` : s.status} colour={statusColour(s.status, s.escalation_level)} />
         <span>raised <b className="tnum" style={{ color: INK }}>{fmtD(s.created_at)}</b></span>
@@ -114,8 +189,9 @@ export function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void })
       {busy && !data && <div className="text-sm" style={{ color: MUTED }}>Reading…</div>}
       {groups.map((p) => (
         <div key={p.project} className="mb-3 rounded border" style={{ borderColor: BORDER }}>
-          <div className="px-3 py-1.5 text-sm font-bold" style={{ background: NAVY_SOFT, color: INK }}>
-            {p.project ? p.project.replace(/^NGSE-PROJ-/, "Project ") : "No project"} <span style={{ color: MUTED, fontWeight: 500 }}>· {p.project_name}</span>
+          <div className="px-3 py-1.5 text-sm" style={{ background: NAVY_SOFT, color: INK }}>
+            <div><b>Project</b> {p.project ? p.project.replace(/^NGSE-PROJ-/, "") : "—"} <span style={{ color: MUTED }}>{p.project_name}</span> <span style={{ color: MUTED }}>·</span> <b>Jobs</b> <span className="tnum">{p.jobs.join(", ") || "—"}</span></div>
+            <div className="text-xs"><b>Production Owner:</b> {owners(p)}</div>
           </div>
           {p.groups.map((g) => (
             <div key={g.group}>
@@ -127,7 +203,7 @@ export function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void })
                     const full = owed <= 0;
                     return (
                       <tr key={l.id} style={{ background: full ? "#E6F4EC" : i % 2 ? "#FAF9F5" : "#fff" }}>
-                        <td className="px-3 py-1 tnum" style={{ width: 110, color: NAVY, fontWeight: 700 }}>{l.job_no || "·"}</td>
+                        <td className="px-3 py-1 tnum" style={{ width: 100, color: NAVY, fontWeight: 700 }} title="job">{l.job_no || "·"}</td>
                         <td className="px-2 py-1"><b style={{ color: INK }}>{l.item_code}</b> <span style={{ color: MUTED }}>{l.item_name}</span></td>
                         <td className="px-2 py-1 text-right tnum font-bold" style={{ whiteSpace: "nowrap" }}>{qtyFmt(l.qty)} <span style={{ color: MUTED, fontWeight: 500 }}>{l.uom}</span></td>
                         <td className="px-2 py-1 text-right tnum" style={{ color: MUTED, whiteSpace: "nowrap" }}>{money(l.amount)}</td>
@@ -152,6 +228,8 @@ export function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void })
           ))}
         </div>
       ))}
+      <div className="text-sm font-bold mt-2" style={{ color: INK }}>Please acknowledge with signature or in system.</div>
+      <div className="text-xs" style={{ color: MUTED }}>In system: Release on each line above. On paper: Print / PDF gives A5 sheets, one project a sheet, with a line to sign.</div>
     </Modal>
   );
 }
