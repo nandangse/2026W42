@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
+import { zoomConfig, zoomTokenInfo, REQUIRED_SCOPES } from "@/lib/zoom";
 
 export const dynamic = "force-dynamic";
 
@@ -52,12 +53,33 @@ const KNOWN = [
 
 const mayManage = (role: string) => ["admin", "ceo", "sales_head"].includes(role);
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const me = await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     if (!mayManage(String(me.crmRole))) throw new HttpError(403, "Integrations are managed by the CEO, the Sales Head and admin.");
     const db = crmDb();
+
+    /**
+     * ?test=zoom — PROVE the connection rather than infer it (4 Sep 2026).
+     * Mints a fresh token and reports the scopes Zoom actually granted
+     * against the six every door needs, so a missing scope is named on the
+     * card and not discovered a week later as an empty Meetings list.
+     */
+    if (new URL(req.url).searchParams.get("test") === "zoom") {
+      const cfg = await zoomConfig(db);
+      if (!cfg) return NextResponse.json({ ok: false, error: "Account ID, Client ID and Client Secret are not all saved yet." });
+      try {
+        const { scopes } = await zoomTokenInfo(cfg);
+        const missing = REQUIRED_SCOPES.filter((r) => !scopes.includes(r.scope));
+        return NextResponse.json({
+          ok: true, granted: scopes, missing,
+          webhook: cfg.secret_token ? "secret token saved — Zoom's calls will verify" : "SECRET TOKEN MISSING — Zoom's calls will be refused",
+        });
+      } catch (e) {
+        return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
     const { data, error } = await db.from("integration_setting").select("key, config, updated_by, updated_at");
     if (error) {
       if (/integration_setting|schema cache|does not exist/i.test(error.message))
@@ -72,10 +94,15 @@ export async function GET() {
         return {
           key: k.key, label: k.label, fields: k.fields, help: k.help,
           ownerOnly: k.ownerOnly, mayEdit: !k.ownerOnly || me.isOwner,
+          // "connected" means the card's OWN credentials are present -- Zoom
+          // has no api_key, and read that way it said "not connected" with
+          // all four values saved and Zoom already handing out tokens.
           configured: k.key === "erpnext" ? !!(cfg.api_key && cfg.api_secret)
             : k.key === "eva_quota" ? !!(cfg.per_week || cfg.raghu_per_week)
+            : k.key === "zoom" ? !!(cfg.account_id && cfg.client_id && cfg.client_secret)
             : !!cfg.api_key,
-          tail: cfg.api_key ? String(cfg.api_key).slice(-4) : null,
+          tail: k.key === "zoom" ? (cfg.client_id ? String(cfg.client_id).slice(-4) : null)
+            : cfg.api_key ? String(cfg.api_key).slice(-4) : null,
           url: k.key === "erpnext" ? cfg.url ?? null : null,
           mapping: k.key === "erpnext" ? {
             push_doctype: cfg.push_doctype ?? "", push_tdd_field: cfg.push_tdd_field ?? "",

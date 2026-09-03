@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.3.3",
+    date: "2026-09-04",
+    module: "The Zoom card tells the truth, and proves it",
+    items: [
+      "The Zoom card read NOT CONNECTED with all four values saved and Zoom already handing Genie tokens. The badge only knew how to recognise an api_key-shaped card, and Zoom has none. It now checks the card's own credentials.",
+      "TEST CONNECTION on the card asks Zoom for a token and lists the scopes it actually granted against the six every door needs \u2014 naming each missing one and what it is for. A missing scope is now a line on the card, not an empty Meetings list discovered a week later.",
+      "Found on the first press: Zoom granted three scopes \u2014 the meeting, its summary, its participants \u2014 which is enough for the webhook door. Recordings, users and reports were missing, so the hourly sweep was already failing with \"does not contain scopes: user:read:list_users:admin\". Three to add in the Zoom app; the card will say when they are in.",
+    ],
+  },
+  {
     v: "4.4.3.2",
     date: "2026-09-04",
     module: "Meetings has two doors, and the minutes are rich text",

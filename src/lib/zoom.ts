@@ -30,16 +30,34 @@ export async function zoomConfig(crm: SupabaseClient): Promise<ZoomCfg | null> {
 }
 
 /** Access tokens last an hour; one per request would be a token per webhook. */
-let cached: { key: string; token: string; expires: number } | null = null;
+let cached: { key: string; token: string; expires: number; scopes: string[] } | null = null;
+
+/** The scopes the app must carry for every door to work, in Zoom's own names. */
+export const REQUIRED_SCOPES: { scope: string; why: string }[] = [
+  { scope: "meeting:read:meeting:admin", why: "read a meeting" },
+  { scope: "meeting:read:list_past_participants:admin", why: "who was in the room" },
+  { scope: "meeting:read:summary:admin", why: "the AI Companion summary" },
+  { scope: "cloud_recording:read:list_recording_files:admin", why: "the recording links" },
+  { scope: "user:read:list_users:admin", why: "the hourly sweep lists users" },
+  { scope: "report:read:user:admin", why: "the hourly sweep reads each user's past meetings" },
+];
+
+/** A fresh token AND the scopes Zoom actually granted — for the Test button. */
+export async function zoomTokenInfo(cfg: ZoomCfg): Promise<{ token: string; scopes: string[] }> {
+  cached = null;
+  const token = await zoomToken(cfg);
+  return { token, scopes: cached ? (cached as { scopes: string[] }).scopes : [] };
+}
+
 export async function zoomToken(cfg: ZoomCfg): Promise<string> {
   if (cached && cached.key === cfg.client_id && cached.expires > Date.now() + 60_000) return cached.token;
   const r = await fetch(`https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(cfg.account_id)}`, {
     method: "POST",
     headers: { authorization: `Basic ${Buffer.from(`${cfg.client_id}:${cfg.client_secret}`).toString("base64")}` },
   });
-  const j = (await r.json()) as { access_token?: string; expires_in?: number; reason?: string; error?: string };
+  const j = (await r.json()) as { access_token?: string; expires_in?: number; reason?: string; error?: string; scope?: string };
   if (!r.ok || !j.access_token) throw new Error(`Zoom refused the credentials: ${j.reason || j.error || r.status}`);
-  cached = { key: cfg.client_id, token: j.access_token, expires: Date.now() + (Number(j.expires_in) || 3600) * 1000 };
+  cached = { key: cfg.client_id, token: j.access_token, expires: Date.now() + (Number(j.expires_in) || 3600) * 1000, scopes: String(j.scope || "").split(/\s+/).filter(Boolean) };
   return j.access_token;
 }
 

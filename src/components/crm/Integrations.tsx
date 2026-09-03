@@ -15,6 +15,7 @@ export default function Integrations() {
   const [needs, setNeeds] = useState(false);
   const [vals, setVals] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [zoomTest, setZoomTest] = useState<{ ok: boolean; error?: string; granted?: string[]; missing?: { scope: string; why: string }[]; webhook?: string } | null>(null);
   const [msg, setMsg] = useState("");
   const [inspect, setInspect] = useState({ doctype: "", name: "" });
   const [inspected, setInspected] = useState<{ field: string; sample: string }[] | null>(null);
@@ -90,7 +91,34 @@ export default function Integrations() {
             {it.configured
               ? <span className="rounded px-2 font-bold" style={{ fontSize: 10.5, background: "#E6F4EB", color: GREEN }}>connected · …{it.tail}</span>
               : <span className="rounded px-2 font-bold" style={{ fontSize: 10.5, background: "#FBEAE8", color: "#B3261E" }}>not connected</span>}
+            {it.key === "zoom" && it.configured && (
+              <button onClick={async () => {
+                setZoomTest(null);
+                try { setZoomTest(await (await fetch("/api/crm/integrations?test=zoom", { cache: "no-store" })).json()); }
+                catch (e) { setZoomTest({ ok: false, error: e instanceof Error ? e.message : String(e) }); }
+              }} className="rounded px-2 py-0.5 text-xs font-bold border ml-1" style={{ borderColor: NAVY, color: NAVY, background: "#fff" }}
+                title="Ask Zoom for a token and list the scopes it grants">
+                Test connection
+              </button>
+            )}
           </div>
+          {it.key === "zoom" && zoomTest && (
+            <div className="rounded border p-2 mt-2 text-xs" style={{ borderColor: zoomTest.ok && !(zoomTest.missing?.length) ? GREEN : "#F5D9A8", background: zoomTest.ok && !(zoomTest.missing?.length) ? "#F2FAF5" : "#FFF7E6", lineHeight: 1.6 }}>
+              {!zoomTest.ok ? <b style={{ color: "#B3261E" }}>Zoom refused: {zoomTest.error}</b> : (
+                <>
+                  <b style={{ color: GREEN }}>Zoom accepts the app</b> · {zoomTest.granted?.length ?? 0} scope{(zoomTest.granted?.length ?? 0) === 1 ? "" : "s"} granted · {zoomTest.webhook}
+                  {zoomTest.missing?.length ? (
+                    <div className="mt-1">
+                      <b style={{ color: "#8A5B00" }}>Missing {zoomTest.missing.length} — add these under Scopes in the Zoom app, then Test again:</b>
+                      <ul style={{ paddingLeft: 16, listStyle: "disc" }}>
+                        {zoomTest.missing.map((m) => <li key={m.scope}><code>{m.scope}</code> <span style={{ color: MUTED }}>— {m.why}</span></li>)}
+                      </ul>
+                    </div>
+                  ) : <div className="mt-1" style={{ color: GREEN }}>Every scope Genie needs is there.</div>}
+                </>
+              )}
+            </div>
+          )}
           <p className="text-xs mt-1 mb-2" style={{ color: MUTED, lineHeight: 1.5 }}>{it.help}</p>
           {it.mayEdit === false ? (
             <div className="text-xs font-semibold" style={{ color: MUTED }}>
