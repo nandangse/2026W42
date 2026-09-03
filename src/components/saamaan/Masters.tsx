@@ -12,7 +12,7 @@
  * and the remark says so — a guess is shown to be corrected, not hidden.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import GenieTable from "@/components/GenieTable";
 import { Screen, Btn, Note, INK, MUTED, BORDER, NAVY, GREEN, AMBER, S, useLoad, post } from "@/components/ims/ui";
 
@@ -22,6 +22,45 @@ interface Wh {
 }
 const KINDS = ["", "Stock", "WIP", "Vendor"];
 const kindColour = (k: string) => (k === "Stock" ? GREEN : k === "WIP" ? AMBER : k === "Vendor" ? "#1B6B93" : MUTED);
+
+/** Who the slips go to, and who sits on the ladder (Dr Raghu, 3 Sep 2026). */
+function Routing() {
+  const [people, setPeople] = useState<{ email: string; display_name: string | null }[]>([]);
+  const [set, setSet] = useState<Record<string, string>>({});
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    fetch("/api/saamaan/slip?mode=people", { cache: "no-store" }).then((r) => r.json()).then((j) => { setPeople(j.people || []); setSet(j.settings || {}); }).catch(() => {});
+  }, []);
+  const save = async (key: string, value: string) => {
+    setSet((s) => ({ ...s, [key]: value })); setMsg("");
+    const r = await post("/api/saamaan/slip", { action: "setting", key, value });
+    if (!r.ok) setMsg(r.error || "Could not save.");
+  };
+  const ROWS: [string, string, string][] = [
+    ["store_email", "Store keeper", "issue slips go here by default; releases the material"],
+    ["purchase_email", "Purchase", "purchase slips go here by default"],
+    ["coo_email", "COO", "second step of the ladder — a slip not done after two days"],
+  ];
+  return (
+    <div className="rounded-lg border p-3 mb-4" style={{ borderColor: BORDER, background: "#fff", maxWidth: 760 }}>
+      <div className="text-xs font-bold uppercase mb-2" style={{ color: MUTED, letterSpacing: 0.6 }}>Routing — slips and the ladder</div>
+      {msg && <Note kind="error">{msg}</Note>}
+      {ROWS.map(([k, label, hint]) => (
+        <div key={k} className="flex items-center gap-3 py-1.5" style={{ borderTop: `1px solid ${BORDER}` }}>
+          <span className="text-sm font-bold" style={{ color: INK, width: 120 }}>{label}</span>
+          <select value={set[k] || ""} onChange={(e) => save(k, e.target.value)} className="rounded border px-2 py-1 text-sm bg-white" style={{ borderColor: BORDER, minWidth: 220 }}>
+            <option value="">— not set —</option>
+            {people.map((p) => <option key={p.email} value={p.email}>{p.display_name || p.email.split("@")[0]} · {p.email}</option>)}
+          </select>
+          <span className="text-xs" style={{ color: MUTED }}>{hint}</span>
+        </div>
+      ))}
+      <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
+        The ladder: a slip still open a day after it was raised goes to the <b>project manager</b> (the job&apos;s planning owner on the board); after two days to the <b>COO</b>; after three to <b>Raghu</b>. Each step raises one task to that person, and the slip reads &ldquo;issue not done&rdquo;. Runs every morning at eight.
+      </div>
+    </div>
+  );
+}
 
 export default function Masters() {
   const [data, busy, reload, err] = useLoad<{ installed: boolean; rows: Wh[] }>("/api/saamaan/warehouse");
@@ -48,6 +87,7 @@ export default function Masters() {
       action={<Btn onClick={reload} disabled={busy}>↻ Re-read</Btn>}>
       {err && <Note kind="error">{err}</Note>}
       {msg && <Note kind="error">{msg}</Note>}
+      <Routing />
       {data && !data.installed && <Note kind="warn">Run migration 0124 first — the warehouse master doesn&apos;t exist yet. Then pull from the ERP; phase 7 brings the warehouses.</Note>}
       {data?.installed && !rows.length && <Note kind="warn">No warehouses yet — pull from the ERP; phase 7 brings them.</Note>}
 

@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Nandan Saamaan Genie" };
  * genie.nandan.co.in/saamaan/<section> — every section at its own URL, so a
  * link to the item somebody is asking about still means something tomorrow.
  */
-const SECTIONS = ["dashboard", "items", "projects", "bom", "wip", "mrp", "masters", "pull"];
+const SECTIONS = ["dashboard", "items", "projects", "bom", "wip", "mrp", "kitting", "slips", "masters", "pull"];
 
 /** The plurals and the plain words all land somewhere sensible. */
 const ALIAS: Record<string, string> = {
@@ -21,6 +21,8 @@ const ALIAS: Record<string, string> = {
   boms: "bom", lines: "bom", "bill-of-materials": "bom",
   jobs: "wip", job: "wip",
   planning: "mrp", "material-planning": "mrp", "material-resource-planning": "mrp",
+  issues: "kitting", register: "kitting", "kitting-register": "kitting",
+  slip: "slips", "issue-slips": "slips", "issue-slip": "slips", purchase: "slips",
   master: "masters", settings: "masters", warehouses: "masters", warehouse: "masters",
   erp: "pull", import: "pull", sync: "pull",
 };

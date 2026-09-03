@@ -115,6 +115,11 @@ const PROBES = [
   ["genie", "0126 Saamaan MRP runs", "material_mrp?select=mrp_no"],
   ["genie", "0126 Saamaan MRP jobs", "material_mrp_job?select=job_no"],
   ["genie", "0126 Saamaan issues (WIP entries)", "material_issue?select=warehouse"],
+  ["genie", "0127 Saamaan MRP plan", "material_mrp_plan?select=order_qty"],
+  ["genie", "0127 Saamaan slips", "material_slip?select=slip_no"],
+  ["genie", "0127 Saamaan slip lines", "material_slip_line?select=released_qty"],
+  ["genie", "0127 Saamaan settings", "material_setting?select=key"],
+  ["genie", "0127 issue.slip_id", "material_issue?select=slip_id&limit=1"],
 ];
 
 let missing = 0;

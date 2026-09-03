@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.0",
+    date: "2026-09-03",
+    module: "Saamaan — material planning on the MRP, the kitting register, issue slips and the ladder",
+    items: [
+      "PLANNING ON THE MRP, as Dr Raghu described it (3 Sep 2026): a + Planning on top folds in a block beside each item — Stock, Required, Kitted, Needed, In order, Balance, To order, an Order qty box, and its Value. Stock is the Stock warehouses only, read live from the ERP every time the grid is drawn — \"whenever we rerun this thing it should pull data live\" — and In order is what sits on purchase orders. Balance is stock + in order − needed, signed; To order the shortfall. Fill order boxes from To order copies the calculation into every box; a box keeps itself as you leave it — no Save, as asked. The strip on top gains the Value of the MRP run: the boxes at the RBOM rates, with the calculated figure beside it.",
+      "THE KITTING REGISTER: every tick on the MRP is a row — job, the WIP it went into, item, quantity, value, who, when — and which slip carried it to the store once submitted; the count not yet submitted sits on top.",
+      "SUBMIT TO STORE turns every tick on the run's jobs not yet on a slip into ONE issue slip, IS-0001 onwards, from you to the store keeper, lines summed by project, job, item group and item. SUBMIT TO PURCHASE turns the order boxes into a purchase slip, PR-0001 onwards. Who they go to is set once in Masters → Routing and can be changed on the day.",
+      "ISSUE SLIPS: a section of every slip, and inside one the lines by project then item group, each with a Release button and a quantity box for the store — the slip closes itself when every line is out. \"If it doesn't get done it escalates\": every morning at eight the ladder runs — a day open → the project manager (the job's planning owner on the board), two → the COO, three → Raghu — each step ONE task to that person, and the slip reads issue not done with who it has reached. Migration 0127.",
+    ],
+  },
+  {
     v: "4.4.1.9",
     date: "2026-09-03",
     module: "Saamaan — MRP: a run, its jobs, the grid, and the tick that issues into WIP",

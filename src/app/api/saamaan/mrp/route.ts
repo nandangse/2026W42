@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
+import { crmDb, crmConfigured } from "@/crm/db";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,14 @@ export const dynamic = "force-dynamic";
  *   POST { action: "create", name }
  *   POST { action: "jobs", id, job_nos: [] }   — the chosen set, kept.
  *   POST { action: "generate", id }
+ *   POST { action: "plan", id, rows: [{ item_code, order_qty }] }
+ *        — the order boxes, kept quietly on every change; no Save.
+ *   POST { action: "submit_store", id, to_email }
+ *        — every tick on this run's jobs not yet on a slip becomes ONE
+ *          issue slip to the store keeper, lines summed by project, job,
+ *          item group and item.
+ *   POST { action: "submit_purchase", id, to_email }
+ *        — the order boxes become one purchase slip.
  *   POST { action: "issue", id, job_no, item_code, qty }
  *        — the tick: one row into material_issue, the entry in that job's
  *          WIP warehouse, that quantity, that date, that person. Never more
@@ -45,6 +54,49 @@ async function nextNo(admin: ReturnType<typeof adminClient>): Promise<string> {
   const { data } = await admin.from("material_mrp").select("mrp_no").order("mrp_no", { ascending: false }).limit(1);
   const last = Number((S(data?.[0]?.mrp_no).match(/(\d+)$/) ?? [])[1] ?? 0);
   return `MRP-${String(last + 1).padStart(4, "0")}`;
+}
+
+/**
+ * Current stock per item, LIVE from the ERP's Bin — the Stock warehouses
+ * only, per Masters — and what is on order everywhere. "Do you know where
+ * to get the latest stock from": here. Null map when the ERP is not
+ * reachable, which the screen shows as dots, never as zero.
+ */
+async function liveStock(admin: ReturnType<typeof adminClient>, codes: string[]): Promise<Map<string, { stock: number; ordered: number }> | null> {
+  if (!codes.length) return new Map();
+  try {
+    if (!crmConfigured()) return null;
+    const { data } = await crmDb().from("integration_setting").select("config").eq("key", "erpnext").maybeSingle();
+    const cfg = (data?.config || {}) as Record<string, string>;
+    if (!cfg.url || !cfg.api_key || !cfg.api_secret) return null;
+    const base = cfg.url.replace(/\/+$/, ""), H = { authorization: `token ${cfg.api_key}:${cfg.api_secret}` };
+    const { data: kinds } = await admin.from("material_warehouse").select("warehouse, kind").limit(500);
+    const kindOf = new Map((kinds ?? []).map((k) => [S(k.warehouse), S(k.kind)]));
+    const out = new Map<string, { stock: number; ordered: number }>();
+    for (const c of codes) out.set(c, { stock: 0, ordered: 0 });
+    for (let i = 0; i < codes.length; i += 200) {
+      const slice = codes.slice(i, i + 200);
+      const r = await fetch(`${base}/api/resource/Bin?filters=${encodeURIComponent(JSON.stringify([["item_code", "in", slice]]))}`
+        + `&fields=${encodeURIComponent(JSON.stringify(["item_code", "warehouse", "actual_qty", "ordered_qty"]))}&limit_page_length=5000`, { headers: H, signal: AbortSignal.timeout(15000) });
+      if (!r.ok) return null;
+      for (const b of ((await r.json()) as { data?: Doc[] }).data ?? []) {
+        const o = out.get(S(b.item_code)); if (!o) continue;
+        if (kindOf.get(S(b.warehouse)) === "Stock") o.stock += Number(b.actual_qty) || 0;
+        o.ordered += Number(b.ordered_qty) || 0;
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/** IS-0007 / PR-0007: one up from the highest of that kind on record. */
+async function nextSlipNo(admin: ReturnType<typeof adminClient>, kind: string): Promise<string> {
+  const prefix = kind === "purchase" ? "PR-" : "IS-";
+  const { data } = await admin.from("material_slip").select("slip_no").like("slip_no", `${prefix}%`).order("slip_no", { ascending: false }).limit(1);
+  const last = Number((S(data?.[0]?.slip_no).match(/(\d+)$/) ?? [])[1] ?? 0);
+  return `${prefix}${String(last + 1).padStart(4, "0")}`;
 }
 
 /** The grid for a run: rows = items across every chosen job's RBOM, columns = the jobs. */
@@ -130,7 +182,21 @@ async function grid(admin: ReturnType<typeof adminClient>, mrpId: string) {
     }
   }
   const items = [...rows.values()].sort((a, b) => a.item_group.localeCompare(b.item_group) || a.item_code.localeCompare(b.item_code));
-  return { run, jobs, items, issues: issues.length };
+
+  // The planning block: live stock and on-order per item, and the order
+  // box as last typed. Both ride on the row.
+  const itemCodes = items.map((i) => i.item_code);
+  const [stock, planRes] = await Promise.all([
+    liveStock(admin, itemCodes),
+    admin.from("material_mrp_plan").select("item_code, order_qty").eq("mrp_id", mrpId).limit(10000),
+  ]);
+  const planOf = new Map<string, number | null>();
+  if (!planRes.error) for (const p of planRes.data ?? []) planOf.set(S(p.item_code), N(p.order_qty));
+  const withPlan = items.map((i) => {
+    const st = stock?.get(i.item_code);
+    return { ...i, stock: st ? st.stock : null, ordered: st ? st.ordered : null, order_qty: planOf.has(i.item_code) ? planOf.get(i.item_code) : null };
+  });
+  return { run, jobs, items: withPlan, issues: issues.length, stockLive: stock !== null };
 }
 
 export async function GET(req: Request) {
@@ -207,6 +273,64 @@ export async function POST(req: Request) {
         if (error) throw error;
         return NextResponse.json({ ok: true, ...(await grid(admin, id)) });
       }
+      if (action === "plan") {
+        const rowsIn = (Array.isArray(body.rows) ? body.rows : []) as Doc[];
+        const up = rowsIn.map((r) => ({ mrp_id: id, item_code: S(r.item_code), order_qty: N(r.order_qty), updated_by: me.email, updated_at: new Date().toISOString() })).filter((r) => r.item_code);
+        if (!up.length) throw new HttpError(400, "Nothing to keep.");
+        for (let i = 0; i < up.length; i += 500) {
+          const { error } = await admin.from("material_mrp_plan").upsert(up.slice(i, i + 500), { onConflict: "mrp_id,item_code" });
+          if (error) throw error;
+        }
+        return NextResponse.json({ ok: true, kept: up.length });
+      }
+      if (action === "submit_store" || action === "submit_purchase") {
+        const kind = action === "submit_purchase" ? "purchase" : "store";
+        const to = S(body.to_email).toLowerCase();
+        if (!to) throw new HttpError(400, `Say who the ${kind === "purchase" ? "purchase" : "store"} slip goes to — set it in Masters, or pick a person.`);
+        const g = await grid(admin, id);
+        const lines: Doc[] = [];
+        let issueIds: string[] = [];
+        if (kind === "store") {
+          // Every tick on this run's jobs not yet carried by a slip, summed
+          // by project, job, item group and item.
+          const jobNos = g.jobs.map((j) => j.job_no);
+          const { data: ticks, error } = jobNos.length
+            ? await admin.from("material_issue").select("id, job_no, item_code, item_name, qty, uom, rate, amount").in("job_no", jobNos).is("slip_id", null).limit(20000)
+            : { data: [], error: null };
+          if (error) throw error;
+          if (!ticks?.length) throw new HttpError(400, "Nothing to submit — every tick on these jobs is already on a slip, or none has been made.");
+          const projOf = new Map(g.jobs.map((j) => [j.job_no, j.project_id]));
+          const groupOf = new Map(g.items.map((i) => [i.item_code, i.item_group]));
+          const agg = new Map<string, Doc>();
+          for (const t of ticks) {
+            const key = `${projOf.get(S(t.job_no)) ?? ""}|${S(t.job_no)}|${S(t.item_code)}`;
+            const o = agg.get(key) ?? { project_id: projOf.get(S(t.job_no)) ?? "", job_no: S(t.job_no), item_group: groupOf.get(S(t.item_code)) ?? "", item_code: S(t.item_code), item_name: S(t.item_name), qty: 0, uom: S(t.uom), rate: N(t.rate), amount: 0, issue_ids: [] as string[] };
+            (o.qty as number) += Number(t.qty) || 0; (o.amount as number) += Number(t.amount) || 0; (o.issue_ids as string[]).push(S(t.id));
+            agg.set(key, o);
+          }
+          lines.push(...agg.values());
+          issueIds = ticks.map((t) => S(t.id));
+        } else {
+          for (const it of g.items) {
+            const q = Number(it.order_qty);
+            if (!q || q <= 0) continue;
+            const anyCell = Object.values(it.cells)[0] as Doc | undefined;
+            const rate = anyCell ? N(anyCell.rate) : null;
+            lines.push({ project_id: "", job_no: "", item_group: it.item_group, item_code: it.item_code, item_name: it.item_name, qty: q, uom: S(anyCell?.uom), rate, amount: rate === null ? null : q * rate, issue_ids: [] });
+          }
+          if (!lines.length) throw new HttpError(400, "Nothing to order — the order boxes are empty. Fill them from the calculation, or type.");
+        }
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const slip_no = await nextSlipNo(admin, kind);
+          const { data: slip, error } = await admin.from("material_slip").insert({ slip_no, kind, mrp_id: id, from_email: me.email, to_email: to }).select("*").maybeSingle();
+          if (error) { if (/duplicate|unique/i.test(error.message)) continue; throw error; }
+          const { error: lErr } = await admin.from("material_slip_line").insert(lines.map((l) => ({ ...l, slip_id: slip!.id })));
+          if (lErr) throw lErr;
+          if (issueIds.length) await admin.from("material_issue").update({ slip_id: slip!.id }).in("id", issueIds);
+          return NextResponse.json({ ok: true, slip, lines: lines.length });
+        }
+        throw new HttpError(409, "Two slips were numbered at once — try again.");
+      }
       if (action === "issue") {
         const job_no = S(body.job_no), item_code = S(body.item_code);
         if (!job_no || !item_code) throw new HttpError(400, "job_no and item_code required");
@@ -234,7 +358,7 @@ export async function POST(req: Request) {
       throw new HttpError(400, "Unknown action.");
     } catch (e) {
       const m = e instanceof Error ? e.message : String((e as { message?: string })?.message || e);
-      if (notInstalled(m)) throw new HttpError(503, "Run migration 0126 first — the MRP tables don't exist yet.");
+      if (notInstalled(m)) throw new HttpError(503, /slip|plan|setting/i.test(m) ? "Run migration 0127 first — the planning and slip tables don't exist yet." : "Run migration 0126 first — the MRP tables don't exist yet.");
       throw e;
     }
   } catch (e) {

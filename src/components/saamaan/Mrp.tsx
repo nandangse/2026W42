@@ -32,8 +32,26 @@ interface Cell {
   qty: number; uom: string; rate: number | null; value: number | null; status: string; source: string;
   issued: number; issued_value: number; issues: number; last_by: string; last_at: string;
 }
-interface Item { item_code: string; item_name: string; item_group: string; cells: Record<string, Cell> }
-interface Grid { run: Run; jobs: Col[]; items: Item[]; issues: number }
+interface Item { item_code: string; item_name: string; item_group: string; cells: Record<string, Cell>; stock: number | null; ordered: number | null; order_qty: number | null }
+interface Grid { run: Run; jobs: Col[]; items: Item[]; issues: number; stockLive: boolean }
+interface Person { email: string; display_name: string | null; initials: string | null }
+
+/**
+ * The planning numbers for one item across the chosen jobs (Dr Raghu,
+ * 3 Sep 2026: "current stock, required, kitted, needed, in order, sign,
+ * to order — and a final box"). Required is the RBOM quantity summed over
+ * the jobs; kitted what has gone into their WIPs; needed the difference;
+ * stock and in-order live from the ERP; the balance is stock plus on
+ * order less needed, signed; to order is the shortfall, never below zero.
+ */
+function plan(it: Item) {
+  let required = 0, kitted = 0, rate: number | null = null;
+  for (const c of Object.values(it.cells)) { required += c.qty; kitted += Math.min(c.qty, c.issued); if (rate === null && c.rate !== null) rate = c.rate; }
+  const needed = required - kitted;
+  const balance = it.stock === null || it.ordered === null ? null : it.stock + it.ordered - needed;
+  const toOrder = balance === null ? null : Math.max(0, -balance);
+  return { required, kitted, needed, balance, toOrder, rate };
+}
 
 const CR = 1e7;
 const cr = (n: number) => `₹${(n / CR).toFixed(2)} Cr`;
@@ -62,7 +80,44 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
   const [fullHead, setFullHead] = useState(true);
   const [folded, setFolded] = useState<Set<string>>(new Set());
   const [boxes, setBoxes] = useState<Record<string, string>>({});
+  const [showPlan, setShowPlan] = useState(true);
+  const [orderBox, setOrderBox] = useState<Record<string, string>>({});
+  const [people, setPeople] = useState<Person[]>([]);
+  const [routing, setRouting] = useState<Record<string, string>>({});
+  const [toStore, setToStore] = useState("");
+  const [toPurchase, setToPurchase] = useState("");
   const canEdit = ["admin", "planner", "project_owner"].includes(role);
+
+  useEffect(() => {
+    fetch("/api/saamaan/slip?mode=people", { cache: "no-store" }).then((r) => r.json()).then((j) => {
+      setPeople(j.people || []); setRouting(j.settings || {});
+      setToStore((t) => t || j.settings?.store_email || ""); setToPurchase((t) => t || j.settings?.purchase_email || "");
+    }).catch(() => {});
+  }, []);
+
+  /** The order boxes keep themselves — "no save button, always live". */
+  const keepPlan = async (rows: { item_code: string; order_qty: number | null }[]) => {
+    if (!rows.length) return;
+    const r = await post("/api/saamaan/mrp", { action: "plan", id: runId, rows });
+    if (!r.ok) setMsg(r.error || "Could not keep the order quantity.");
+  };
+  const fillFromCalc = async () => {
+    if (!grid) return;
+    const rows = grid.items.map((it) => ({ item_code: it.item_code, order_qty: plan(it).toOrder })).filter((r) => r.order_qty !== null);
+    setOrderBox({});
+    await keepPlan(rows);
+    await loadRun(runId);
+  };
+  const submit = async (kind: "store" | "purchase") => {
+    const to = kind === "store" ? toStore : toPurchase;
+    setBusy(kind); setMsg("");
+    const r = await post("/api/saamaan/mrp", { action: kind === "store" ? "submit_store" : "submit_purchase", id: runId, to_email: to });
+    setBusy("");
+    if (!r.ok) { setMsg(r.error || "Could not submit."); return; }
+    const slip = r.slip as { slip_no: string };
+    setMsg(`${slip.slip_no} raised to ${to.split("@")[0]} — ${r.lines} line${r.lines === 1 ? "" : "s"}. See Issue slips.`);
+    await loadRun(runId);
+  };
 
   const loadList = async () => {
     setErr("");
@@ -127,12 +182,19 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
 
   // ------------------------------------------------------------ the sums
   const totals = useMemo(() => {
-    let cells = 0, done = 0, value = 0, issued = 0;
-    for (const it of grid?.items ?? []) for (const c of Object.values(it.cells)) {
-      cells++; if (c.issued >= c.qty && c.qty > 0) done++;
-      value += c.value ?? 0; issued += c.issued_value;
+    let cells = 0, done = 0, value = 0, issued = 0, runValue = 0, toOrderValue = 0;
+    for (const it of grid?.items ?? []) {
+      for (const c of Object.values(it.cells)) {
+        cells++; if (c.issued >= c.qty && c.qty > 0) done++;
+        value += c.value ?? 0; issued += c.issued_value;
+      }
+      const pl = plan(it);
+      if (pl.rate !== null) {
+        if (it.order_qty) runValue += it.order_qty * pl.rate;
+        if (pl.toOrder) toOrderValue += pl.toOrder * pl.rate;
+      }
     }
-    return { cells, done, pending: cells - done, value, issued };
+    return { cells, done, pending: cells - done, value, issued, runValue, toOrderValue };
   }, [grid]);
   const perJob = useMemo(() => {
     const m = new Map<string, { cells: number; done: number; value: number; issued: number }>();
@@ -210,13 +272,14 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
 
         {/* ------------------------------------------------ the top strip */}
         {grid && grid.items.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-3">
             {[
               ["Items added", String(totals.done), "cells fully issued"],
               ["Pending", String(totals.pending), "cells not yet, or partly"],
               ["Kitting %", pct(totals.issued, totals.value), "by value"],
               ["Valuation kitted", money(totals.issued), "what has gone into the WIPs"],
               ["Valuation total", money(totals.value), "the RBOMs of these jobs, summed"],
+              ["Value of MRP run", money(totals.runValue), `the order boxes at the RBOM rates${totals.toOrderValue ? ` · calculated ${money(totals.toOrderValue)}` : ""}`],
             ].map(([t, v, h]) => (
               <div key={t} className="bg-white rounded-lg border p-2.5" style={{ borderColor: BORDER }}>
                 <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: 0.6 }}>{t}</div>
@@ -229,6 +292,26 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
 
         {/* ------------------------------------------------------ the grid */}
         {grid && grid.items.length > 0 && (<>
+          {/* -------------------------------------- planning: the + and the buttons */}
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <Btn onClick={() => setShowPlan((v) => !v)} title="Stock, required, kitted, needed, in order, balance, to order, the order box and its value">{showPlan ? "− Planning" : "+ Planning"}</Btn>
+            {showPlan && canEdit && <Btn onClick={fillFromCalc} title="Copy the calculated To order into every order box">Fill order boxes from To order</Btn>}
+            {grid && !grid.stockLive && <span className="text-xs" style={{ color: AMBER }}>the ERP could not be read — stock and in-order show dots</span>}
+            {canEdit && (
+              <span className="ml-auto flex items-center gap-1 flex-wrap">
+                <select value={toStore} onChange={(e) => setToStore(e.target.value)} className="rounded border px-1.5 py-1 text-xs bg-white" style={{ borderColor: BORDER, maxWidth: 170 }} title="the store keeper — set the default in Masters">
+                  <option value="">store → who?</option>
+                  {people.map((p) => <option key={p.email} value={p.email}>{p.display_name || p.email.split("@")[0]}</option>)}
+                </select>
+                <Btn kind="primary" onClick={() => submit("store")} disabled={busy === "store" || !toStore} title="Every tick on these jobs not yet on a slip becomes one issue slip">Submit to store →</Btn>
+                <select value={toPurchase} onChange={(e) => setToPurchase(e.target.value)} className="rounded border px-1.5 py-1 text-xs bg-white" style={{ borderColor: BORDER, maxWidth: 170 }} title="purchase — set the default in Masters">
+                  <option value="">purchase → who?</option>
+                  {people.map((p) => <option key={p.email} value={p.email}>{p.display_name || p.email.split("@")[0]}</option>)}
+                </select>
+                <Btn kind="primary" onClick={() => submit("purchase")} disabled={busy === "purchase" || !toPurchase} title="The order boxes become one purchase slip">Submit to purchase →</Btn>
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-3 mb-1 text-xs" style={{ color: MUTED }}>
             <label className="flex items-center gap-1"><input type="checkbox" checked={fullHead} onChange={(e) => setFullHead(e.target.checked)} /> full job headers (TDD, kitted, pending, %)</label>
             <button onClick={() => setFolded(new Set())} style={{ color: NAVY }}>expand all groups</button>
@@ -240,6 +323,9 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
               <thead>
                 <tr style={{ background: "#14224F", color: "#fff" }}>
                   <th rowSpan={fullHead ? 5 : 2} className="px-2 py-1 text-left" style={{ position: "sticky", left: 0, top: 0, zIndex: 3, background: "#14224F", minWidth: 300, verticalAlign: "bottom" }}>Item</th>
+                  {showPlan && PLAN_COLS.map((c) => (
+                    <th key={c.key} rowSpan={fullHead ? 5 : 2} className="px-1.5 py-1 text-right" style={{ position: "sticky", top: 0, zIndex: 2, background: "#0F766E", verticalAlign: "bottom", minWidth: c.w }} title={c.hint}>{c.label}</th>
+                  ))}
                   {projectSpans.map((p) => (
                     <th key={p.project_id} colSpan={p.n} className="px-2 py-1 text-center" style={{ position: "sticky", top: 0, zIndex: 2, background: "#14224F", borderLeft: "1px solid #2B3A7A" }} title={p.project_name}>
                       {p.project_id.replace(/^NGSE-PROJ-/, "")} <span style={{ fontWeight: 500, opacity: 0.8 }}>{p.project_name.slice(0, 26)}{p.project_name.length > 26 ? "…" : ""}</span>
@@ -264,12 +350,14 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
               <tbody>
                 {groups.map(([g, items]) => (
                   <GroupRows key={g} group={g} items={items} jobs={grid.jobs} folded={folded.has(g)} onFold={() => toggleFold(g)}
-                    boxes={boxes} setBoxes={setBoxes} busy={busy} canEdit={canEdit} onIssue={issue} />
+                    boxes={boxes} setBoxes={setBoxes} busy={busy} canEdit={canEdit} onIssue={issue}
+                    showPlan={showPlan} orderBox={orderBox} setOrderBox={setOrderBox} onKeep={(code, q) => keepPlan([{ item_code: code, order_qty: q }])} />
                 ))}
               </tbody>
             </table>
           </div>
           <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
+            Planning: stock is the Stock warehouses only, live from the ERP; in order is what is on purchase orders; balance is stock + in order − needed, signed; to order is the shortfall. The order box keeps itself as you leave it.
             A cell is the RBOM&apos;s quantity of that item for that job — each job one unit. Tick to issue it all into the job&apos;s WIP; type a smaller number first for a partial.
             Green is fully issued, with the date; hover for who and how much. <span style={{ color: AMBER }}>D</span> marks a Draft line. Kitted and pending are counts; % is by value. Stock is not reduced by an issue — that comes next.
           </div>
@@ -326,16 +414,30 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
   );
 }
 
+const PLAN_COLS: { key: string; label: string; hint: string; w: number }[] = [
+  { key: "stock", label: "Stock", hint: "current stock in the Stock warehouses, live from the ERP", w: 64 },
+  { key: "required", label: "Required", hint: "the RBOM quantity, summed over the chosen jobs", w: 64 },
+  { key: "kitted", label: "Kitted", hint: "what has gone into the jobs' WIPs", w: 60 },
+  { key: "needed", label: "Needed", hint: "required less kitted", w: 60 },
+  { key: "ordered", label: "In order", hint: "on purchase orders, not yet received — every warehouse", w: 64 },
+  { key: "balance", label: "Balance", hint: "stock + in order − needed; negative is short", w: 64 },
+  { key: "toorder", label: "To order", hint: "the shortfall, never below nothing", w: 64 },
+  { key: "box", label: "Order qty", hint: "yours to type — filled from To order by the button; keeps itself", w: 80 },
+  { key: "value", label: "Value", hint: "the order quantity at the RBOM rate", w: 84 },
+];
+
 // ============================================================ the rows
-function GroupRows({ group, items, jobs, folded, onFold, boxes, setBoxes, busy, canEdit, onIssue }: {
+function GroupRows({ group, items, jobs, folded, onFold, boxes, setBoxes, busy, canEdit, onIssue, showPlan, orderBox, setOrderBox, onKeep }: {
   group: string; items: Item[]; jobs: Col[]; folded: boolean; onFold: () => void;
   boxes: Record<string, string>; setBoxes: (f: (b: Record<string, string>) => Record<string, string>) => void;
   busy: string; canEdit: boolean; onIssue: (job: string, item: string, cell: Cell) => void;
+  showPlan: boolean; orderBox: Record<string, string>; setOrderBox: (f: (b: Record<string, string>) => Record<string, string>) => void; onKeep: (code: string, q: number | null) => void;
 }) {
+  const num = (n: number | null) => (n === null ? "·" : qtyFmt(n));
   return (
     <>
       <tr style={{ background: "#F1F3F9" }}>
-        <td colSpan={1 + jobs.length} className="px-2 py-1 font-bold" style={{ color: INK, position: "sticky", left: 0, borderTop: `1px solid ${BORDER}` }}>
+        <td colSpan={1 + (showPlan ? PLAN_COLS.length : 0) + jobs.length} className="px-2 py-1 font-bold" style={{ color: INK, position: "sticky", left: 0, borderTop: `1px solid ${BORDER}` }}>
           <button onClick={onFold} className="flex items-center gap-2">
             <span style={{ width: 12, display: "inline-block" }}>{folded ? "▸" : "▾"}</span>{group.replace(/^RM - /, "")} <span style={{ color: MUTED, fontWeight: 500 }}>· {items.length} item{items.length === 1 ? "" : "s"}</span>
           </button>
@@ -346,6 +448,33 @@ function GroupRows({ group, items, jobs, folded, onFold, boxes, setBoxes, busy, 
           <td className="px-2 py-1" style={{ position: "sticky", left: 0, background: i % 2 ? "#FAF9F5" : "#fff", borderBottom: `1px solid ${BORDER}`, zIndex: 1 }}>
             <b style={{ color: INK }}>{it.item_code}</b> <span style={{ color: MUTED, whiteSpace: "normal" }}>{it.item_name}</span>
           </td>
+          {showPlan && (() => {
+            const pl = plan(it);
+            const typed = orderBox[it.item_code];
+            const shown = typed !== undefined ? typed : it.order_qty === null ? "" : String(it.order_qty);
+            const q = shown === "" ? null : Number(shown);
+            const val = q !== null && Number.isFinite(q) && pl.rate !== null ? q * pl.rate : null;
+            const cellCss = { borderBottom: `1px solid ${BORDER}`, borderLeft: `1px solid ${BORDER}`, background: "#F0FAF7" } as const;
+            return (<>
+              <td className="px-1.5 py-1 text-right tnum" style={cellCss}>{num(it.stock)}</td>
+              <td className="px-1.5 py-1 text-right tnum font-bold" style={cellCss}>{qtyFmt(pl.required)}</td>
+              <td className="px-1.5 py-1 text-right tnum" style={{ ...cellCss, color: pl.kitted ? GREEN : MUTED }}>{qtyFmt(pl.kitted)}</td>
+              <td className="px-1.5 py-1 text-right tnum" style={cellCss}>{qtyFmt(pl.needed)}</td>
+              <td className="px-1.5 py-1 text-right tnum" style={cellCss}>{num(it.ordered)}</td>
+              <td className="px-1.5 py-1 text-right tnum font-bold" style={{ ...cellCss, color: pl.balance === null ? MUTED : pl.balance < 0 ? RED : GREEN }}>{pl.balance === null ? "·" : `${pl.balance > 0 ? "+" : ""}${qtyFmt(pl.balance)}`}</td>
+              <td className="px-1.5 py-1 text-right tnum font-bold" style={{ ...cellCss, color: pl.toOrder ? RED : MUTED }}>{num(pl.toOrder)}</td>
+              <td className="px-1 py-1 text-right" style={cellCss}>
+                {canEdit ? (
+                  <input value={shown} inputMode="decimal" placeholder="·"
+                    onChange={(e) => setOrderBox((b) => ({ ...b, [it.item_code]: e.target.value }))}
+                    onBlur={(e) => { const v = e.target.value.trim(); const n = v === "" ? null : Number(v); if (v === "" || Number.isFinite(n)) onKeep(it.item_code, n); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                    className="rounded border px-1 py-0.5 text-xs tnum text-right" style={{ width: 70, borderColor: q && pl.toOrder !== null && q !== pl.toOrder ? AMBER : BORDER }} />
+                ) : <span className="tnum">{shown || "·"}</span>}
+              </td>
+              <td className="px-1.5 py-1 text-right tnum" style={{ ...cellCss, color: val ? INK : MUTED }}>{val === null ? "·" : money(val)}</td>
+            </>);
+          })()}
           {jobs.map((j) => {
             const c = it.cells[j.job_no];
             if (!c) return <td key={j.job_no} className="px-2 py-1 text-center" style={{ borderBottom: `1px solid ${BORDER}`, borderLeft: `1px solid ${BORDER}`, color: "#D1D5DB" }}>–</td>;
@@ -379,4 +508,3 @@ function GroupRows({ group, items, jobs, folded, onFold, boxes, setBoxes, busy, 
     </>
   );
 }
-void RED;

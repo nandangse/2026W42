@@ -28,6 +28,8 @@ import Bom from "./Bom";
 import Masters from "./Masters";
 import Wip from "./Wip";
 import Mrp from "./Mrp";
+import Kitting from "./Kitting";
+import Slips from "./Slips";
 import { LOGO } from "@/lib/logo";
 
 const SECTIONS: { key: string; label: string; icon: string }[] = [
@@ -37,6 +39,8 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "bom", label: "BOM", icon: "🧾" },
   { key: "wip", label: "WIP", icon: "🏭" },
   { key: "mrp", label: "MRP", icon: "📐" },
+  { key: "kitting", label: "Kitting register", icon: "✓" },
+  { key: "slips", label: "Issue slips", icon: "📨" },
   { key: "masters", label: "Masters", icon: "⚙" },
   { key: "pull", label: "ERP pull", icon: "⇣" },
 ];
@@ -78,6 +82,8 @@ export default function SaamaanApp({
       case "bom": return <Bom summary={summary} />;
       case "wip": return <Wip erpBase={summary.erpBase} role={role} summary={summary} />;
       case "mrp": return <Mrp role={role} email={email} />;
+      case "kitting": return <Kitting />;
+      case "slips": return <Slips />;
       case "masters": return <Masters />;
       case "pull": return <Pull summary={summary} isOwner={isOwner} onDone={reloadSummary} />;
       default: return <Dashboard summary={summary} go={go} />;
