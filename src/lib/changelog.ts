@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.9",
+    date: "2026-09-03",
+    module: "Issue slip print — one sheet, not a blank second",
+    items: [
+      "\"its come as 1/2 why? only one page typically\" (Dr Raghu, 3 Sep 2026). The sheet was told to fill a fixed height and break after itself, and the browser rounded that up to a blank second page. Now the break sits only between projects, the sheet is as tall as its lines, and the acknowledgement follows them — one project, one sheet.",
+    ],
+  },
+  {
     v: "4.4.2.8",
     date: "2026-09-03",
     module: "Issue slips — the slip's face, and A5 to print",

@@ -138,8 +138,9 @@ export function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void })
     w.document.write(`<!doctype html><html><head><title>${esc(s.slip_no)}</title><style>
       @page { size: A5 portrait; margin: 9mm; }
       body { font-family: Arial, Helvetica, sans-serif; color: #22283A; font-size: 10.5px; margin: 0; }
-      .page { page-break-after: always; min-height: 180mm; display: flex; flex-direction: column; }
-      .page:last-child { page-break-after: auto; }
+      html, body { height: auto; }
+      /* A break only BETWEEN projects — a break after the last one is a blank second sheet. No fixed height either: the sheet is as tall as its lines. */
+      .page + .page { page-break-before: always; break-before: page; }
       header { display: flex; align-items: center; gap: 10px; border-bottom: 2px solid #1B2D6B; padding-bottom: 6px; margin-bottom: 6px; }
       header img { height: 28px; } .h1 { font-size: 15px; font-weight: 800; color: #1B2D6B; } .no { font-size: 11px; color: #6B7280; font-weight: 700; }
       .meta { width: 100%; margin-bottom: 6px; } .meta td { padding: 2px 0; }
@@ -147,7 +148,7 @@ export function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void })
       .lines { width: 100%; border-collapse: collapse; } .lines th { background: #1B2D6B; color: #fff; text-align: left; padding: 3px 5px; font-size: 10px; }
       .lines td { padding: 3px 5px; border-bottom: 1px solid #E5E8F0; vertical-align: top; } td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
       tr { page-break-inside: avoid; }
-      footer { margin-top: auto; padding-top: 10px; } .ack { font-weight: 700; margin-bottom: 14px; }
+      footer { padding-top: 14px; page-break-inside: avoid; } .ack { font-weight: 700; margin-bottom: 14px; }
       .sig { display: flex; justify-content: space-between; margin-bottom: 8px; } .small { color: #9CA3AF; font-size: 9px; }
     </style></head><body>${pages}</body></html>`);
     w.document.close();
