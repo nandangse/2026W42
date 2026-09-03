@@ -2,9 +2,39 @@ import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
+import { driveConfig, listFolder, downloadFile } from "@/lib/drive";
+import { structureReport, normaliseName, CIN_RE } from "@/lib/ifs-pdf";
+
+/**
+ * THE DRIVE FOLDER OF REPORTS (Dr Raghu, 4 Sep 2026): "All Instafinancial
+ * downloads". The first id is the folder he named; the second is its
+ * parent, walked if the first is empty. Overridable from Integrations as
+ * IFS_DRIVE_FOLDER without a deploy.
+ */
+const IFS_FOLDERS = ["1Bg2YFc-TKctEIHgGmr1unLH4yRQs2C0C", "1Ru-m05q-Kp6D-X_C2dPZp6yNi1np2_5j"];
+const cinLooksRight = (c: string) => CIN_RE.test(c);
+const needs0053 = (m: string) => /ifs_pdf_id|ifs_pdf_url|ifs_source|schema cache/i.test(m);
+
+/** Read one company's Drive report into its summary. Owner-only, by the caller. */
+async function importPdf(db: ReturnType<typeof crmDb>, cid: string, who: string) {
+  const { data: co } = await db.from("company").select("id, name, cin, ifs_pdf, ifs_pdf_id").eq("id", cid).maybeSingle();
+  if (!co) throw new HttpError(404, "No such company.");
+  if (!co.ifs_pdf_id) throw new HttpError(400, "No Drive report is linked to this company yet — scan the folder first.");
+  const dcfg = driveConfig();
+  if (!dcfg) throw new HttpError(503, "Drive keys are not configured on the server.");
+  const buf = await downloadFile(dcfg, String(co.ifs_pdf_id));
+  if (buf.length > 20 * 1024 * 1024) throw new HttpError(413, "That report is over 20 MB — too big to read here.");
+  const { json, cin } = await structureReport(buf, String(co.name));
+  const patch: Record<string, unknown> = { ifs_summary: json, ifs_at: new Date().toISOString(), ifs_by: `drive:${who}`, ifs_source: "pdf" };
+  if (cin && !co.cin) patch.cin = cin;
+  const { error } = await db.from("company").update(patch).eq("id", cid);
+  if (error) throw needs0053(error.message) ? new HttpError(503, "Run CRM migration 0053 first.") : new HttpError(500, error.message);
+  await db.from("crm_audit").insert({ entity: "company", entity_id: cid, action: "ifs_import_pdf", after: { cin, file: co.ifs_pdf }, by_user: null }).then(() => null, () => null);
+  return { cin: cin ?? co.cin ?? null, name: co.name };
+}
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /**
  * POST /api/crm/ifs { company_id, cin? } — BUY the InstaFinancials
@@ -28,6 +58,65 @@ export async function POST(req: Request) {
 
     // 🔍 FIND CIN (Dr Raghu, 30 Aug 2026: "how do I get the CIN?") — the
     // GetCIN API, 1 credit: search by name, offer every CIN-shaped answer.
+    /**
+     * SCAN THE DRIVE FOLDER (Dr Raghu, 4 Sep 2026). Every PDF in "All
+     * Instafinancial downloads" is matched to a company by name -- the file
+     * is called "InstaSummary Report of <company>_dd-mm-yyyy.pdf" -- and the
+     * link is written on the company. A name that matches two companies, or
+     * none, is REPORTED, not guessed: a report linked to the wrong company
+     * is a wrong CIN on a quotation.
+     */
+    if (body.action === "scan_drive") {
+      if (!me.isOwner) throw new HttpError(403, "Raghu's hand alone.");
+      const dcfg = driveConfig();
+      if (!dcfg) throw new HttpError(503, "Drive keys are not configured on the server.");
+      const { data: setting } = await db.from("integration_setting").select("config").eq("key", "instafinancials").maybeSingle();
+      const override = String(((setting?.config || {}) as Record<string, string>).drive_folder || "").trim();
+      const folders = override ? [override, ...IFS_FOLDERS] : IFS_FOLDERS;
+      let files: Awaited<ReturnType<typeof listFolder>> = [];
+      let used = "";
+      for (const f of folders) {
+        try { files = await listFolder(dcfg, f, { pdfOnly: true }); used = f; if (files.length) break; }
+        catch (e) { if (f === folders[folders.length - 1] && !files.length) throw new HttpError(502, e instanceof Error ? e.message : String(e)); }
+      }
+      const { data: companies } = await db.from("company").select("id, name, ifs_pdf_id").is("deleted_at", null).limit(5000);
+      const byNorm = new Map<string, { id: string; name: string }[]>();
+      for (const c of companies ?? []) { const k = normaliseName(String(c.name)); if (!k) continue; (byNorm.get(k) ?? byNorm.set(k, []).get(k)!).push({ id: String(c.id), name: String(c.name) }); }
+      const linked: { file: string; company: string }[] = [], ambiguous: { file: string; companies: string[] }[] = [], unmatched: string[] = [];
+      for (const f of files) {
+        const k = normaliseName(f.name);
+        let hits = byNorm.get(k) ?? [];
+        if (!hits.length && k.length >= 6) for (const [n, cs] of byNorm) if (n.length >= 6 && (n.includes(k) || k.includes(n))) hits = hits.concat(cs);
+        hits = [...new Map(hits.map((h) => [h.id, h])).values()];
+        if (hits.length === 1) {
+          const { error } = await db.from("company").update({ ifs_pdf: f.name, ifs_pdf_id: f.id, ifs_pdf_url: f.webViewLink }).eq("id", hits[0].id);
+          if (error) throw needs0053(error.message) ? new HttpError(503, "Run CRM migration 0053 first — the Drive link has nowhere to live yet.") : new HttpError(500, error.message);
+          linked.push({ file: f.name, company: hits[0].name });
+        } else if (hits.length > 1) ambiguous.push({ file: f.name, companies: hits.map((h) => h.name) });
+        else unmatched.push(f.name);
+      }
+      return NextResponse.json({ ok: true, folder: used, pdfs: files.length, linked, ambiguous, unmatched });
+    }
+
+    if (body.action === "import_pdf") {
+      if (!me.isOwner) throw new HttpError(403, "Raghu's hand alone.");
+      const out = await importPdf(db, cid, me.email);
+      return NextResponse.json({ ok: true, ...out });
+    }
+
+    /** Every company with a linked report and no summary yet — in one pass. */
+    if (body.action === "import_all") {
+      if (!me.isOwner) throw new HttpError(403, "Raghu's hand alone.");
+      const { data: todo } = await db.from("company").select("id, name").not("ifs_pdf_id", "is", null).is("ifs_summary", null).limit(Number(body.limit) || 25);
+      const done: string[] = [], failed: { name: string; error: string }[] = [];
+      for (const c of todo ?? []) {
+        try { await importPdf(db, String(c.id), me.email); done.push(String(c.name)); }
+        catch (e) { failed.push({ name: String(c.name), error: e instanceof Error ? e.message : String(e) }); }
+      }
+      const { count } = await db.from("company").select("id", { count: "exact", head: true }).not("ifs_pdf_id", "is", null).is("ifs_summary", null);
+      return NextResponse.json({ ok: true, done, failed, remaining: count ?? 0 });
+    }
+
     if (body.action === "find_cin") {
       const { data: cfgRow2 } = await db.from("integration_setting").select("config").eq("key", "instafinancials").maybeSingle();
       const cfg2 = (cfgRow2?.config || {}) as Record<string, string>;
@@ -186,7 +275,8 @@ export async function POST(req: Request) {
     } catch { /* the summary is the purchase; contacts are the bonus */ }
 
     const now = new Date().toISOString();
-    const { error } = await db.from("company").update({ cin, ifs_summary: j, ifs_at: now, ifs_by: me.email }).eq("id", cid);
+    let { error } = await db.from("company").update({ cin, ifs_summary: j, ifs_at: now, ifs_by: me.email, ifs_source: "api" }).eq("id", cid);
+    if (error && needs0053(error.message)) ({ error } = await db.from("company").update({ cin, ifs_summary: j, ifs_at: now, ifs_by: me.email }).eq("id", cid));
     if (error) {
       if (/ifs_summary|cin|schema cache/i.test(error.message))
         throw new HttpError(503, "Run CRM migration 0042 first — the summary has nowhere to live yet.");

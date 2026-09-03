@@ -405,7 +405,7 @@ export const DOCTYPES: Doctype[] = [
       { name: "website", label: "Website", type: "text" },
       { name: "domain_name", label: "Email domain", type: "text", help: "nandan.co.in, not https://. Matches inbound mail to this account." },
       { name: "indiamart_glid", label: "IndiaMART GLID", type: "text" },
-      { name: "cin", label: "CIN", type: "text" },
+      { name: "cin", label: "CIN", type: "text", inList: true, help: "Corporate Identification Number — found by InstaFinancials, or read off the Drive report." },
       { name: "erp_name", label: "ERP name", type: "text", help: "The ERPNext key, so the link survives a rename on either side." },
       { name: "notes", label: "Notes", type: "textarea" },
     ],

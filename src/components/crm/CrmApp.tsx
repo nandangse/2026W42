@@ -3845,6 +3845,13 @@ function RecordModal({
               )}
               {/* the quote's STATUS lives in the header, always and in colour
                   (Dr Raghu, 30 Aug 2026: "show status live here") */}
+              {/* THE CIN ON THE FIRST PAGE (Dr Raghu, 4 Sep 2026: "also put
+                  the CIN number here and also on the first page") */}
+              {dt.name === "company" && !!row.cin && (
+                <span title="Corporate Identification Number" className="tnum font-bold rounded px-1.5" style={{ background: "rgba(255,255,255,.12)", color: "#fff", letterSpacing: 0.3 }}>
+                  CIN {String(row.cin)}
+                </span>
+              )}
               {dt.name === "quotation" && !!row.status && (() => {
                 const st = String(row.status);
                 const tint: Record<string, string> = {
@@ -6305,10 +6312,14 @@ function IfsTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <span className="text-sm font-bold" style={{ color: NAVY }}>₹ InstaFinancials Summary</span>
         {row.ifs_at != null && <span className="text-xs" style={{ color: MUTED }}>bought {String(row.ifs_at).slice(0, 10).split("-").reverse().join("/")} by {String(row.ifs_by ?? "")}</span>}
+        {!!row.cin && <span className="tnum text-xs font-bold rounded px-1.5" style={{ background: "#EEF1FA", color: NAVY }} title="Corporate Identification Number">CIN {String(row.cin)}</span>}
+        {row.ifs_source === "pdf" && <span className="text-xs" style={{ color: MUTED }}>· read from the Drive report</span>}
         {row.ifs_pdf != null && String(row.ifs_pdf) && (
-          <span className="text-xs" title={String(row.ifs_pdf)} style={{ color: "#2C5B82" }}>
-            📄 report PDF on Drive: {String(row.ifs_pdf).split("/").pop()}
-          </span>
+          row.ifs_pdf_url
+            ? <a href={String(row.ifs_pdf_url)} target="_blank" rel="noreferrer" className="text-xs hover:underline" title={String(row.ifs_pdf)} style={{ color: "#2C5B82", fontWeight: 600 }}>
+                📄 report PDF on Drive: {String(row.ifs_pdf).split("/").pop()} ↗
+              </a>
+            : <span className="text-xs" title={String(row.ifs_pdf)} style={{ color: "#2C5B82" }}>📄 report PDF on Drive: {String(row.ifs_pdf).split("/").pop()} <i style={{ color: MUTED }}>(scan the folder to link it)</i></span>
         )}
         {isRaghu ? (
           <>
@@ -6322,6 +6333,54 @@ function IfsTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
             <button onClick={() => void buy()} disabled={busy}
               className="rounded px-3 py-1.5 text-xs font-bold text-white" style={{ background: busy ? "#B9BEC4" : "#0D7A3F" }}>
               {busy ? "Buying…" : data ? "🪙 Buy fresh (75 credits)" : "🪙 Buy InstaFinancial Summary"}
+            </button>
+            {/* THE DRIVE ROAD (Dr Raghu, 4 Sep 2026: "when we have the
+                instafinancials then pl put it here"). Read the report already
+                in Drive instead of buying it again — 0 credits. Raghu's hand,
+                like the buy. */}
+            {!!row.ifs_pdf_id && (
+              <button onClick={async () => {
+                setBusy(true); setErr("");
+                try {
+                  const r = await fetch("/api/crm/ifs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ company_id: rid, action: "import_pdf" }) });
+                  const j = await r.json(); if (!r.ok) throw new Error(j.error || "Could not read the report");
+                  const rr = await (await fetch(`/api/crm/company?id=${encodeURIComponent(rid)}`, { cache: "no-store" })).json();
+                  if (rr?.row) onSaved(rr.row as Row);
+                } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+                setBusy(false);
+              }} disabled={busy} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#2C5B82", color: "#fff" }}
+                title="Read the Drive report into the summary and the CIN — no credits">
+                {busy ? "Reading…" : data ? "⬇ Re-read from the Drive report" : "⬇ Import from the Drive report (0 credits)"}
+              </button>
+            )}
+            <button onClick={async () => {
+              setBusy(true); setErr("");
+              try {
+                const r = await fetch("/api/crm/ifs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ company_id: rid, action: "scan_drive" }) });
+                const j = await r.json(); if (!r.ok) throw new Error(j.error || "Scan failed");
+                window.alert(`Scanned ${j.pdfs} PDFs.\nLinked: ${j.linked.length}\nAmbiguous (not linked): ${j.ambiguous.length}\nNo company matched: ${j.unmatched.length}` + (j.ambiguous.length ? `\n\nAmbiguous:\n${j.ambiguous.slice(0, 8).map((a: { file: string; companies: string[] }) => `• ${a.file} → ${a.companies.join(" / ")}`).join("\n")}` : "") + (j.unmatched.length ? `\n\nUnmatched:\n${j.unmatched.slice(0, 12).map((f: string) => `• ${f}`).join("\n")}${j.unmatched.length > 12 ? `\n…and ${j.unmatched.length - 12} more` : ""}` : ""));
+                const rr = await (await fetch(`/api/crm/company?id=${encodeURIComponent(rid)}`, { cache: "no-store" })).json();
+                if (rr?.row) onSaved(rr.row as Row);
+              } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+              setBusy(false);
+            }} disabled={busy} className="text-xs font-bold rounded px-3 py-1.5 border" style={{ borderColor: "#2C5B82", color: "#2C5B82", background: "#fff" }}
+              title="Match every PDF in the Drive folder 'All Instafinancial downloads' to its company — Raghu">
+              🗂 Scan the Drive folder
+            </button>
+            <button onClick={async () => {
+              if (!window.confirm("Read EVERY linked Drive report that has no summary yet — 25 at a time? Each costs one AI read, no InstaFinancials credits.")) return;
+              setBusy(true); setErr("");
+              try {
+                const r = await fetch("/api/crm/ifs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ company_id: rid, action: "import_all" }) });
+                const j = await r.json(); if (!r.ok) throw new Error(j.error || "Import failed");
+                window.alert(`Read ${j.done.length} report(s).${j.failed.length ? `\nFailed ${j.failed.length}: ${j.failed.slice(0, 5).map((f: { name: string; error: string }) => `${f.name} — ${f.error}`).join("; ")}` : ""}\n${j.remaining} still to read — press again for the next batch.`);
+                const rr = await (await fetch(`/api/crm/company?id=${encodeURIComponent(rid)}`, { cache: "no-store" })).json();
+                if (rr?.row) onSaved(rr.row as Row);
+              } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+              setBusy(false);
+            }} disabled={busy} className="text-xs font-bold rounded px-3 py-1.5 border" style={{ borderColor: BORDER, color: MUTED, background: "#fff" }}
+              title="Every company with a linked report and no summary — 25 per press, Raghu">
+              ⬇ Import all linked reports
             </button>
           </>
         ) : !data && <span className="text-xs" style={{ color: MUTED }}>Only Dr Raghu can buy this summary — ask him.</span>}

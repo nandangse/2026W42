@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.3.1",
+    date: "2026-09-04",
+    module: "The InstaFinancials reports already in Drive come into the CRM",
+    items: [
+      "\"when we have the instafinancials then pl put it here. Put the link from drive as well as put in the summary here. Also put the CIN number here and also on the first page\" (Dr Raghu, 4 Sep 2026) \u2014 the folder All Instafinancial downloads.",
+      "SCAN THE DRIVE FOLDER matches every PDF in it to a company by name \u2014 the file is called InstaSummary Report of <company>_date.pdf \u2014 and writes the Drive link on the company, so the report is one click away on the IFS tab. A name that matches two companies, or none, is REPORTED, not guessed: a report linked to the wrong company is a wrong CIN on a quotation.",
+      "IMPORT FROM THE DRIVE REPORT reads the PDF into the SAME shape the bought summary uses \u2014 the MCA profile, the years of financials, the directors, the ratings \u2014 so the IFS tab draws it with the code it already has, and a company looks the same whichever road its summary came by. Zero InstaFinancials credits. The row says which road: ifs_source = pdf or api.",
+      "THE CIN IS FOUND BY PATTERN, NOT BY THE MODEL. Twenty-one characters, L or U, a fixed grammar: a regex on the report's text outranks anything the reader thinks it saw, because a model can misread a digit and a regex cannot. It lands on the company, shows on the IFS tab, in the list, and as a chip in the header band on the first page.",
+      "Import all linked reports reads every company with a link and no summary, twenty-five a press. All three are Raghu's hand, like the buy.",
+      "NEEDS CRM MIGRATION 0053, and the Drive folder shared with the service account as Viewer \u2014 the scan names the email if it cannot see the folder.",
+    ],
+  },
+  {
     v: "4.4.3.0",
     date: "2026-09-04",
     module: "Meetings — Zoom calls arrive in the CRM by themselves",

@@ -228,3 +228,43 @@ export async function uploadToFolder(
   if (!res.ok || !j.id) throw new Error(j.error?.message || `Drive refused the file (${res.status})`);
   return { id: j.id, link: j.webViewLink ?? null };
 }
+
+/* ------------------------------------------------------------------ reads */
+/**
+ * READING FROM DRIVE (Dr Raghu, 4 Sep 2026: the InstaFinancials reports
+ * already sitting in "All Instafinancial downloads"). The service account
+ * has the full drive scope; it sees a folder the moment somebody shares
+ * that folder with its email. When it cannot, the error names the email,
+ * because "share the folder with X" is the fix and the message should say
+ * so.
+ */
+export interface DriveFile { id: string; name: string; mimeType: string; webViewLink: string; modifiedTime: string; size: number }
+
+export async function listFolder(cfg: DriveConfig, folderId: string, opts: { pdfOnly?: boolean } = {}): Promise<DriveFile[]> {
+  const token = await accessToken(cfg);
+  const out: DriveFile[] = [];
+  let pageToken = "";
+  do {
+    const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
+    const r = await fetch(`${DRIVE}/files?q=${q}&fields=nextPageToken,files(id,name,mimeType,webViewLink,modifiedTime,size)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${pageToken ? `&pageToken=${pageToken}` : ""}`,
+      { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(30000) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(`Drive refused the folder (${j.error?.message || r.status}) — share it with ${cfg.email} as Viewer.`);
+    for (const f of (j.files ?? []) as Record<string, unknown>[]) {
+      const isPdf = /pdf/i.test(String(f.mimeType)) || /\.pdf$/i.test(String(f.name));
+      if (opts.pdfOnly && !isPdf) continue;
+      out.push({ id: String(f.id), name: String(f.name), mimeType: String(f.mimeType), webViewLink: String(f.webViewLink || ""), modifiedTime: String(f.modifiedTime || ""), size: Number(f.size) || 0 });
+    }
+    pageToken = String(j.nextPageToken || "");
+  } while (pageToken);
+  return out;
+}
+
+export async function downloadFile(cfg: DriveConfig, fileId: string): Promise<Buffer> {
+  const token = await accessToken(cfg);
+  const r = await fetch(`${DRIVE}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
+    { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(60000) });
+  if (!r.ok) throw new Error(`Drive would not hand over the file (${r.status}) — share it with ${cfg.email}.`);
+  return Buffer.from(await r.arrayBuffer());
+}
+
