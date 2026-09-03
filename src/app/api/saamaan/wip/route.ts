@@ -94,6 +94,54 @@ export async function GET() {
       if (error && !notInstalled(error.message)) throw new Error(error.message);
     }
 
+    // 3b — kitted and pending, from the RBOM and the issues the MRP ticks
+    //      made: kitted = items whose full RBOM quantity has gone into the
+    //      job's WIP, pending = the rest; the values at the RBOM's rates.
+    //      Not stored — derived on every read, so they can never go stale.
+    const kitting = new Map<string, { nos_kitted: number; value_kitted: number; nos_pending: number; value_pending: number; kitting_value_pct: number | null }>();
+    try {
+      const rbomIds = [...new Set([...rbomOf.values()])].filter(Boolean);
+      const lines: Doc[] = [];
+      for (let a = 0; rbomIds.length && a < 100000; a += 1000) {
+        const { data, error } = await admin.from("material_rbom_item").select("rbom_id, item_code, qty, rate").in("rbom_id", rbomIds).order("id").range(a, a + 999);
+        if (error) throw error;
+        lines.push(...((data ?? []) as Doc[]));
+        if (!data || data.length < 1000) break;
+      }
+      const jobIds = rows.map((r) => r.job_no);
+      const issued: Doc[] = [];
+      for (let a = 0; jobIds.length && a < 100000; a += 1000) {
+        const { data, error } = await admin.from("material_issue").select("job_no, item_code, qty, amount").in("job_no", jobIds).order("id").range(a, a + 999);
+        if (error) throw error;
+        issued.push(...((data ?? []) as Doc[]));
+        if (!data || data.length < 1000) break;
+      }
+      const gone = new Map<string, { qty: number; amount: number }>();
+      for (const i of issued) {
+        const k = `${S(i.job_no)}|${S(i.item_code)}`;
+        const o = gone.get(k) ?? { qty: 0, amount: 0 };
+        o.qty += Number(i.qty) || 0; o.amount += Number(i.amount) || 0; gone.set(k, o);
+      }
+      const byRbom = new Map<string, Doc[]>();
+      for (const l of lines) (byRbom.get(S(l.rbom_id)) ?? byRbom.set(S(l.rbom_id), []).get(S(l.rbom_id))!).push(l);
+      for (const r of rows) {
+        const ls = byRbom.get(r.rbom_no) ?? [];
+        if (!ls.length) continue;
+        let nk = 0, vk = 0, np = 0, vp = 0, total = 0;
+        for (const l of ls) {
+          const q = Number(l.qty) || 0, rate = Number(l.rate) || 0;
+          const g = gone.get(`${r.job_no}|${S(l.item_code)}`);
+          const gq = Math.min(q, g?.qty ?? 0);
+          total += q * rate; vk += gq * rate; vp += (q - gq) * rate;
+          if (q > 0 && gq >= q) nk++; else np++;
+        }
+        kitting.set(r.job_no, { nos_kitted: nk, value_kitted: vk, nos_pending: np, value_pending: vp, kitting_value_pct: total > 0 ? (vk / total) * 100 : null });
+      }
+    } catch (e) {
+      // Before 0123 / 0126 there is nothing to derive from; the columns stay dots.
+      if (!notInstalled(String((e as { message?: string })?.message || e))) throw e;
+    }
+
     // 4 — read back with Genie's own columns, and hand the board row along.
     let table: Doc[] = rows;
     if (installed) {
@@ -105,8 +153,10 @@ export async function GET() {
     const out = table.map((w) => {
       const j = jobBy.get(S(w.job_no)) ?? {};
       const own = S(j.own).toUpperCase();
+      const k = kitting.get(S(w.job_no));
       return {
         ...w,
+        ...(k ? { nos_kitted: k.nos_kitted, value_kitted: k.value_kitted, nos_pending: k.nos_pending, value_pending: k.value_pending, kitting_value_pct: k.kitting_value_pct } : {}),
         kitting_owner_name: nameOf.get(S(w.kitting_owner).toUpperCase()) ?? "",
         job: {
           id: S(j.id), tag: S(j.tag), cust: S(j.cust), fam: S(j.fam), tdd: j.tdd ?? null, otd: j.otd ?? null, stat: S(j.stat),

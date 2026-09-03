@@ -77,7 +77,7 @@ export default function SaamaanApp({
       case "projects": return <Projects summary={summary} />;
       case "bom": return <Bom summary={summary} />;
       case "wip": return <Wip erpBase={summary.erpBase} role={role} summary={summary} />;
-      case "mrp": return <Mrp />;
+      case "mrp": return <Mrp role={role} email={email} />;
       case "masters": return <Masters />;
       case "pull": return <Pull summary={summary} isOwner={isOwner} onDone={reloadSummary} />;
       default: return <Dashboard summary={summary} go={go} />;

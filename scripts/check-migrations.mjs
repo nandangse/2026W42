@@ -112,6 +112,9 @@ const PROBES = [
   ["genie", "0123 Saamaan RBOM lines", "material_rbom_item?select=source_bom"],
   ["genie", "0124 Saamaan warehouses", "material_warehouse?select=kind"],
   ["genie", "0125 Saamaan WIP", "material_wip?select=warehouse"],
+  ["genie", "0126 Saamaan MRP runs", "material_mrp?select=mrp_no"],
+  ["genie", "0126 Saamaan MRP jobs", "material_mrp_job?select=job_no"],
+  ["genie", "0126 Saamaan issues (WIP entries)", "material_issue?select=warehouse"],
 ];
 
 let missing = 0;

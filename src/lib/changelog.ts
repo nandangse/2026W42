@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.1.9",
+    date: "2026-09-03",
+    module: "Saamaan — MRP: a run, its jobs, the grid, and the tick that issues into WIP",
+    items: [
+      "MRP as Dr Raghu laid it out (3 Sep 2026). ON TOP: the MRP no, the run's name, the date, and who made it — MRP-0001 onwards, one up each time. JOBS TO ADD opens a lightbox of every project on the board with its live jobs under it, Select all and Unselect all, or ticks one by one; the set is saved with the run, \"a one time effort\", and the last run opens by itself next time.",
+      "THE JOBS SIT AS BUTTONS — hover for two lines (tag and customer; project, TDD, value, the RBOM), click for the same job lightbox every Genie app opens. A job whose project has no RBOM yet shows amber and says so.",
+      "GENERATE sums the Real BOMs of every chosen job into a grid: item groups on the left, collapsible, the items under each; across the top the project, and under it the job no, TDD, kitted, pending and kitting % — or the job no alone, one tick folds the rest. \"Each job one\": a cell is the RBOM line's quantity and UOM. Draft lines come too, marked D.",
+      "THE TICK. A number box sits beside it, blank meaning all that remains; the tick makes one entry in that job's WIP warehouse — that quantity, that date, that person — never more than the RBOM still owes. The cell turns green with the date; hover shows how much went, in how many entries, last by whom. A partial shows amber with what has gone, and the box and tick stay for the rest.",
+      "\"BY VALUE, kitting %; count for kitted and pending.\" The job headers carry kitted and pending as item counts and kitting % by value; the strip on top carries items added, pending, kitting % by value, the valuation kitted and the valuation of the whole. WIP's own columns — Nos kitted, Value kitted, Nos pending, Value pending — now fill from the same issues, derived on every read.",
+      "STOCK IS NOT REDUCED by an issue. \"That will be the next step in the issue.\" Three tables, all Genie's own: material_mrp, material_mrp_job, material_issue. Migration 0126.",
+    ],
+  },
+  {
     v: "4.4.1.8",
     date: "2026-09-03",
     module: "Phase 7 lands — the group warehouses had no type",
