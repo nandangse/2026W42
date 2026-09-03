@@ -36,7 +36,7 @@ interface Cell {
   qty: number; uom: string; rate: number | null; value: number | null; status: string; source: string;
   issued: number; issued_value: number; issues: number; last_by: string; last_at: string;
 }
-interface Item { item_code: string; item_name: string; item_group: string; cells: Record<string, Cell>; stock: number | null; ordered: number | null; order_qty: number | null }
+interface Item { item_code: string; item_name: string; item_group: string; cells: Record<string, Cell>; stock: number | null; ordered: number | null; blocked: number | null; order_qty: number | null }
 interface Grid { run: Run; jobs: Col[]; items: Item[]; issues: number; stockLive: boolean }
 interface Person { email: string; display_name: string | null; initials: string | null }
 
@@ -52,7 +52,8 @@ function plan(it: Item) {
   let required = 0, kitted = 0, rate: number | null = null;
   for (const c of Object.values(it.cells)) { required += c.qty; kitted += Math.min(c.qty, c.issued); if (rate === null && c.rate !== null) rate = c.rate; }
   const needed = required - kitted;
-  const balance = it.stock === null || it.ordered === null ? null : it.stock + it.ordered - needed;
+  // "order — blocked!": what the ERP holds reserved against other orders comes off the balance.
+  const balance = it.stock === null || it.ordered === null ? null : it.stock - (it.blocked ?? 0) + it.ordered - needed;
   const toOrder = balance === null ? null : Math.max(0, -balance);
   const reqValue = rate === null ? null : required * rate;
   const orderValue = rate === null || it.order_qty === null ? null : it.order_qty * rate;
@@ -296,6 +297,7 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
         case "kitted": return pl.kitted;
         case "needed": return pl.needed;
         case "ordered": return it.ordered ?? -1;
+        case "blocked": return it.blocked ?? -1;
         case "balance": return pl.balance ?? -Infinity;
         case "toorder": return pl.toOrder ?? -1;
         case "box": return it.order_qty ?? -1;
@@ -474,7 +476,7 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
             </table>
           </div>
           <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
-            Planning: stock is the Stock warehouses only, live from the ERP; in order is what is on purchase orders; balance is stock + in order − needed, signed; to order is the shortfall. The order box keeps itself as you leave it.
+            Planning: stock is the Stock warehouses only, live from the ERP; in order is what is on purchase orders; blocked is what the ERP holds reserved against other orders; balance is stock − blocked + in order − needed, signed; to order is the shortfall. The order box keeps itself as you leave it.
             A cell is the RBOM&apos;s quantity of that item for that job — each job one unit. Tick to issue it all into the job&apos;s WIP; type a smaller number first for a partial.
             Green is fully issued, with the date; hover for who and how much. <span style={{ color: AMBER }}>D</span> marks a Draft line. Kitted and pending are counts; % is by value. Stock is not reduced by an issue — that comes next.
           </div>
@@ -576,7 +578,8 @@ const PLAN_COLS: { key: string; label: string; hint: string; w: number }[] = [
   { key: "kitted", label: "Kitted", hint: "what has gone into the jobs' WIPs", w: 60 },
   { key: "needed", label: "Needed", hint: "required less kitted", w: 60 },
   { key: "ordered", label: "In order", hint: "on purchase orders, not yet received — every warehouse", w: 64 },
-  { key: "balance", label: "Balance", hint: "stock + in order − needed; negative is short", w: 64 },
+  { key: "blocked", label: "Blocked", hint: "reserved on the ERP against other orders, in the Stock warehouses — taken off the balance", w: 64 },
+  { key: "balance", label: "Balance", hint: "stock − blocked + in order − needed; negative is short", w: 64 },
   { key: "toorder", label: "To order", hint: "the shortfall, never below nothing", w: 64 },
   { key: "box", label: "Order qty", hint: "yours to type — filled from To order by the button; keeps itself", w: 80 },
   { key: "value", label: "Value", hint: "the order quantity at the RBOM rate", w: 84 },
@@ -618,6 +621,7 @@ function ItemRows({ items, jobs, boxes, setBoxes, busy, canEdit, onIssue, onUnis
               <td className="px-1.5 py-1 text-right tnum" style={{ ...cellCss, color: pl.kitted ? GREEN : MUTED }}>{qtyFmt(pl.kitted)}</td>
               <td className="px-1.5 py-1 text-right tnum" style={cellCss}>{qtyFmt(pl.needed)}</td>
               <td className="px-1.5 py-1 text-right tnum" style={cellCss}>{num(it.ordered)}</td>
+              <td className="px-1.5 py-1 text-right tnum" style={{ ...cellCss, color: it.blocked ? AMBER : MUTED }}>{num(it.blocked)}</td>
               <td className="px-1.5 py-1 text-right tnum font-bold" style={{ ...cellCss, color: pl.balance === null ? MUTED : pl.balance < 0 ? RED : GREEN }}>{pl.balance === null ? "·" : `${pl.balance > 0 ? "+" : ""}${qtyFmt(pl.balance)}`}</td>
               <td className="px-1.5 py-1 text-right tnum font-bold" style={{ ...cellCss, color: pl.toOrder ? RED : MUTED }}>{num(pl.toOrder)}</td>
               <td className="px-1 py-1 text-right" style={cellCss}>

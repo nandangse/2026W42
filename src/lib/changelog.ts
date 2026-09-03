@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.5",
+    date: "2026-09-03",
+    module: "MRP plan — Blocked, after In order",
+    items: [
+      "\"order — blocked! add another column after in order\" (Dr Raghu, 3 Sep 2026). Blocked is what the ERP holds reserved against other orders in the Stock warehouses — its reserved quantity, live — and it comes off the balance: stock − blocked + in order − needed.",
+    ],
+  },
+  {
     v: "4.4.2.4",
     date: "2026-09-03",
     module: "MRP plan — value beside required, sortable, filtered by group, searched by item",

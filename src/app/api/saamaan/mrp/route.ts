@@ -66,7 +66,7 @@ async function nextNo(admin: ReturnType<typeof adminClient>): Promise<string> {
  * to get the latest stock from": here. Null map when the ERP is not
  * reachable, which the screen shows as dots, never as zero.
  */
-async function liveStock(admin: ReturnType<typeof adminClient>, codes: string[]): Promise<Map<string, { stock: number; ordered: number }> | null> {
+async function liveStock(admin: ReturnType<typeof adminClient>, codes: string[]): Promise<Map<string, { stock: number; ordered: number; blocked: number }> | null> {
   if (!codes.length) return new Map();
   try {
     if (!crmConfigured()) return null;
@@ -76,16 +76,16 @@ async function liveStock(admin: ReturnType<typeof adminClient>, codes: string[])
     const base = cfg.url.replace(/\/+$/, ""), H = { authorization: `token ${cfg.api_key}:${cfg.api_secret}` };
     const { data: kinds } = await admin.from("material_warehouse").select("warehouse, kind").limit(500);
     const kindOf = new Map((kinds ?? []).map((k) => [S(k.warehouse), S(k.kind)]));
-    const out = new Map<string, { stock: number; ordered: number }>();
-    for (const c of codes) out.set(c, { stock: 0, ordered: 0 });
+    const out = new Map<string, { stock: number; ordered: number; blocked: number }>();
+    for (const c of codes) out.set(c, { stock: 0, ordered: 0, blocked: 0 });
     for (let i = 0; i < codes.length; i += 200) {
       const slice = codes.slice(i, i + 200);
       const r = await fetch(`${base}/api/resource/Bin?filters=${encodeURIComponent(JSON.stringify([["item_code", "in", slice]]))}`
-        + `&fields=${encodeURIComponent(JSON.stringify(["item_code", "warehouse", "actual_qty", "ordered_qty"]))}&limit_page_length=5000`, { headers: H, signal: AbortSignal.timeout(15000) });
+        + `&fields=${encodeURIComponent(JSON.stringify(["item_code", "warehouse", "actual_qty", "ordered_qty", "reserved_qty"]))}&limit_page_length=5000`, { headers: H, signal: AbortSignal.timeout(15000) });
       if (!r.ok) return null;
       for (const b of ((await r.json()) as { data?: Doc[] }).data ?? []) {
         const o = out.get(S(b.item_code)); if (!o) continue;
-        if (kindOf.get(S(b.warehouse)) === "Stock") o.stock += Number(b.actual_qty) || 0;
+        if (kindOf.get(S(b.warehouse)) === "Stock") { o.stock += Number(b.actual_qty) || 0; o.blocked += Number(b.reserved_qty) || 0; }
         o.ordered += Number(b.ordered_qty) || 0;
       }
     }
@@ -198,7 +198,7 @@ async function grid(admin: ReturnType<typeof adminClient>, mrpId: string) {
   if (!planRes.error) for (const p of planRes.data ?? []) planOf.set(S(p.item_code), N(p.order_qty));
   const withPlan = items.map((i) => {
     const st = stock?.get(i.item_code);
-    return { ...i, stock: st ? st.stock : null, ordered: st ? st.ordered : null, order_qty: planOf.has(i.item_code) ? planOf.get(i.item_code) : null };
+    return { ...i, stock: st ? st.stock : null, ordered: st ? st.ordered : null, blocked: st ? st.blocked : null, order_qty: planOf.has(i.item_code) ? planOf.get(i.item_code) : null };
   });
   return { run, jobs, items: withPlan, issues: issues.length, stockLive: stock !== null };
 }
