@@ -81,7 +81,15 @@ const isProjectRef = (id: string) => /^NGSE-PROJ-/i.test(String(id));
  */
 export async function POST(req: Request) {
   try {
-    const user = await requirePlanner();
+    // THE HOURLY HAND (Dr Raghu, 4 Sep 2026: "All the changes made in the
+    // Genie push to the ERP and the changes made in ERP push here"). The
+    // cron signs with CRON_SECRET, as Vercel's own crons do, and pushes as
+    // "cron" -- the ledger shows whose hand it was.
+    const secret = process.env.CRON_SECRET;
+    const fromCron = !!secret && (req.headers.get("authorization") || "") === `Bearer ${secret}`;
+    const user = fromCron
+      ? ({ initials: "cron", displayName: "hourly cron", email: "cron@genie" } as Awaited<ReturnType<typeof requirePlanner>>)
+      : await requirePlanner();
     const body = await req.json();
     const admin = adminClient();
     const who = user.initials || user.displayName || user.email.split("@")[0];

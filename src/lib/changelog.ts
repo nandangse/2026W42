@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.3.4",
+    date: "2026-09-04",
+    module: "Genie and the ERP keep each other current, every hour",
+    items: [
+      "\"run the cron every hour. All the changes made in the Genie push to the ERP and the changes made in ERP push here. currently people are working in ERP and then they will work in the Genie only from saturday\" (Dr Raghu, 4 Sep 2026).",
+      "PUSH FIRST, THEN PULL, at five past every hour. The order is the whole safety of it: what Genie changed goes up before what the ERP holds comes down, so a date moved in Genie at 10:40 is in Jobmaster by 11:05 and the 11:05 pull brings it back unchanged. Pull first and the ERP's older date would overwrite the edit before it ever travelled \u2014 the fault chased on 2 September, now impossible by construction.",
+      "AND IF THE PUSH FAILS, THERE IS NO PULL. A pull over unpushed edits is exactly that clobber; better an hour behind than an hour wrong. The ledger records the skipped hour and why.",
+      "THE SATURDAY RULE, as one date in one line: until 6 September 2026 a field that differs on both sides goes the ERP's way; from that day it goes Genie's. The flip is a fact in the code, not a memory in someone's head, and every hour's ledger entry names the winner it used.",
+      "The cron pushes through the same road as the button and signs as \"cron\", so the queue and the Drive record show whose hand moved each line. The CRM's own hourly pull of opportunities was already running at a quarter past; it still does.",
+    ],
+  },
+  {
     v: "4.4.3.3",
     date: "2026-09-04",
     module: "The Zoom card tells the truth, and proves it",
