@@ -16,21 +16,14 @@ import Anthropic from "@anthropic-ai/sdk";
 export const CIN_RE = /\b[LU]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}\b/;
 
 /**
- * The text layer, when the parser can load. pdf-parse carries a native
- * binary; if it will not load where this runs, the model still reads the PDF
- * itself (it is sent whole, below) and this returns "". The import must
- * never fail for want of a text layer that was only ever a cross-check.
+ * NO PDF PARSER ON THE SERVER (4 Sep 2026). pdf-parse 2.x carries a native
+ * binary that builds on this Mac and not on Vercel's Linux, and two deploys
+ * in a row went nowhere with it in the bundle. The model reads the PDF
+ * whole -- it is sent as a document, below -- so a text layer was only ever
+ * a cross-check. The CIN keeps its guard another way: the model's reading
+ * is accepted only if it has the exact 21-character grammar.
  */
-export async function pdfText(buf: Buffer): Promise<string> {
-  try {
-    const mod = (await import("pdf-parse")) as unknown as { PDFParse: new (o: { data: Uint8Array }) => { getText: () => Promise<{ text?: string }>; destroy: () => Promise<void> } };
-    const parser = new mod.PDFParse({ data: new Uint8Array(buf) });
-    try { return String((await parser.getText()).text || ""); }
-    finally { await parser.destroy().catch(() => null); }
-  } catch {
-    return "";
-  }
-}
+export async function pdfText(_buf: Buffer): Promise<string> { return ""; }
 
 const SHAPE = `{
   "InstaSummary": {
