@@ -1,5 +1,4 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { PDFParse } from "pdf-parse";
 
 /**
  * AN INSTAFINANCIALS REPORT, READ OFF ITS PDF (Dr Raghu, 4 Sep 2026).
@@ -16,13 +15,20 @@ import { PDFParse } from "pdf-parse";
  */
 export const CIN_RE = /\b[LU]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}\b/;
 
+/**
+ * The text layer, when the parser can load. pdf-parse carries a native
+ * binary; if it will not load where this runs, the model still reads the PDF
+ * itself (it is sent whole, below) and this returns "". The import must
+ * never fail for want of a text layer that was only ever a cross-check.
+ */
 export async function pdfText(buf: Buffer): Promise<string> {
-  const parser = new PDFParse({ data: new Uint8Array(buf) });
   try {
-    const r = await parser.getText();
-    return String(r.text || "");
-  } finally {
-    await parser.destroy().catch(() => null);
+    const mod = (await import("pdf-parse")) as unknown as { PDFParse: new (o: { data: Uint8Array }) => { getText: () => Promise<{ text?: string }>; destroy: () => Promise<void> } };
+    const parser = new mod.PDFParse({ data: new Uint8Array(buf) });
+    try { return String((await parser.getText()).text || ""); }
+    finally { await parser.destroy().catch(() => null); }
+  } catch {
+    return "";
   }
 }
 
@@ -37,7 +43,7 @@ const SHAPE = `{
 
 export async function structureReport(buf: Buffer, companyName: string): Promise<{ json: Record<string, unknown>; cin: string | null; chars: number }> {
   const text = await pdfText(buf);
-  const cin = (text.match(CIN_RE) || [])[0] ?? null;
+  const cinFromText = (text.match(CIN_RE) || [])[0] ?? null;
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set — the report can be linked but not read.");
   const anthropic = new Anthropic({ apiKey: key });
@@ -49,7 +55,7 @@ export async function structureReport(buf: Buffer, companyName: string): Promise
       role: "user",
       content: [
         { type: "document", source: { type: "base64", media_type: "application/pdf", data: buf.toString("base64") } },
-        { type: "text", text: `Company as Genie knows it: ${companyName}${cin ? ` · CIN found on the report: ${cin}` : ""}\n\nExtracted text (for reference):\n${text.slice(0, 60000)}` },
+        { type: "text", text: `Company as Genie knows it: ${companyName}${cinFromText ? ` · CIN found on the report: ${cinFromText}` : ""}${text ? `\n\nExtracted text (for reference):\n${text.slice(0, 60000)}` : ""}` },
       ],
     }],
   });
@@ -58,9 +64,12 @@ export async function structureReport(buf: Buffer, companyName: string): Promise
   if (start < 0 || end < 0) throw new Error("The report could not be read into a summary.");
   const json = JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>;
   const master = ((json.InstaSummary as Record<string, unknown> | undefined)?.CompanyMasterSummary ?? {}) as Record<string, unknown>;
-  // the regex CIN outranks the model's reading of it
+  // The regex over the text layer outranks the model's reading. Without a
+  // text layer the model's CIN is accepted only if it has the exact grammar.
+  const modelCin = String(master.CompanyCIN || "").toUpperCase().replace(/\s+/g, "");
+  const cin = cinFromText ?? (CIN_RE.test(modelCin) ? modelCin : null);
   if (cin) master.CompanyCIN = cin;
-  return { json, cin: cin ?? (CIN_RE.test(String(master.CompanyCIN || "")) ? String(master.CompanyCIN) : null), chars: text.length };
+  return { json, cin, chars: text.length };
 }
 
 /** "InstaSummary Report of Ideaforge technology private limited_18-07-2021.pdf" → "ideaforge technology" */

@@ -18,7 +18,15 @@ const nextConfig = {
      * PDF failed: no quotation could go to a client at all. Externalizing it
      * keeps the folder whole. puppeteer-core rides along for the same reason.
      */
-    serverComponentsExternalPackages: ["xlsx", "@sparticuz/chromium", "puppeteer-core"],
+    serverComponentsExternalPackages: [
+      "xlsx", "@sparticuz/chromium", "puppeteer-core",
+      // pdf-parse 2.x is the same shape of problem (4 Sep 2026): it pulls
+      // pdfjs-dist with a worker file, and @napi-rs/canvas, a NATIVE binary
+      // that differs per platform. Bundled, the darwin build passes here and
+      // the linux build on Vercel does not. External keeps the folders whole;
+      // the tracing entry below makes sure they travel.
+      "pdf-parse", "pdfjs-dist", "@napi-rs/canvas",
+    ],
     // the bundled Sales Regrow playbook and the My Sales Plan sources are read
     // from disk at runtime — make sure Vercel's file tracing packages them
     outputFileTracingIncludes: {
@@ -33,6 +41,9 @@ const nextConfig = {
       // shipped without the 50 MB of Chromium it unpacks at runtime.
       // ANY ROUTE THAT CALLS pressPdf BELONGS HERE.
       "/api/month-plan": ["./node_modules/@sparticuz/chromium/bin/**"],
+      // The IFS import reads a PDF on the server. ANY ROUTE THAT IMPORTS
+      // pdf-parse BELONGS HERE — same lesson as Chromium.
+      "/api/crm/ifs": ["./node_modules/pdf-parse/**", "./node_modules/pdfjs-dist/**", "./node_modules/@napi-rs/**"],
       "/api/sales/html": ["./src/sales-regrow/*.html"],
       "/api/sales/plan": [
         "./src/sales-plan/*",
