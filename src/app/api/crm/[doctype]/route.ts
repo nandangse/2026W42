@@ -28,6 +28,7 @@ import { requireCrm, type CrmUser } from "@/crm/auth";
 import { advanceNewToHandled } from "@/crm/stageflow";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
 import { doctypeBySlug, linkTargets, type Doctype, type Field } from "@/crm/doctypes";
+import { meetingFromInteraction, syncInteraction } from "@/lib/zoom";
 
 /**
  * THE LIST SEARCH (Dr Raghu, 31 Aug 2026: "its there but in search not
@@ -612,6 +613,8 @@ export async function POST(req: Request, { params }: { params: { doctype: string
     if (d.name === "interaction" && data.opportunity_id) {
       await advanceNewToHandled(db, String(data.opportunity_id));
     }
+    // A Video Call or Zoom Meeting logged by hand is a meeting (4 Sep 2026).
+    if (d.name === "interaction") await meetingFromInteraction(db, data as Record<string, unknown>).catch(() => null);
 
     return NextResponse.json({ row: data });
   } catch (e) {
@@ -730,6 +733,10 @@ export async function PATCH(req: Request, { params }: { params: { doctype: strin
       entity: d.table, entity_id: String(id), action: "update",
       before, after: data, by_user: user.profileId,
     });
+    // keep the meeting in step with its interaction, and a Zoom meeting's
+    // tags in step with its timeline entry (4 Sep 2026)
+    if (d.name === "interaction") await meetingFromInteraction(db, data as Record<string, unknown>).catch(() => null);
+    if (d.name === "meeting") await syncInteraction(db, String(data.id)).catch(() => null);
 
     return NextResponse.json({ row: data });
   } catch (e) {

@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.3.2",
+    date: "2026-09-04",
+    module: "Meetings has two doors, and the minutes are rich text",
+    items: [
+      "\"i want to sync all the interactions in the meetings here where its Video call or meeting. the Minutes should be rich text\" (Dr Raghu, 4 Sep 2026).",
+      "THE OTHER DOOR. Every interaction logged as a Video Call or Zoom Meeting is a meeting, so it appears in Meetings \u2014 from now on the moment it is saved, and for everything logged before there was a Meetings section, one press of \u21bb Sync from interactions. The interaction stays the master for the remark and the deal links; the meeting row carries the minutes, seeded from the remark so nobody starts from a blank page.",
+      "AND THE DOORS DO NOT FIGHT. A Zoom-born meeting writes its timeline entry; an interaction-born meeting never writes back \u2014 a topic derived from a remark must not overwrite the remark a person typed.",
+      "Minutes of meeting are RICH TEXT \u2014 the CRM's own live editor, bold, lists, the lot \u2014 the same one the quotation templates use.",
+      "Also this morning: the InstaFinancials PDF import shipped only once pdf-parse came OUT of the server bundle. Two deploys went nowhere with it in \u2014 a native binary that builds on a Mac and not on Vercel's Linux, the Chromium lesson in a new coat. The model reads the PDF whole, so the parser was only ever a cross-check; the CIN keeps its guard as a grammar check on what was read.",
+    ],
+  },
+  {
     v: "4.4.3.1",
     date: "2026-09-04",
     module: "The InstaFinancials reports already in Drive come into the CRM",

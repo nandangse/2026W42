@@ -188,6 +188,10 @@ export async function attachRecording(crm: SupabaseClient, uuid: string, mid: st
 export async function syncInteraction(crm: SupabaseClient, meetingId: string): Promise<void> {
   const { data: m } = await crm.from("meeting").select("*").eq("id", meetingId).maybeSingle();
   if (!m) return;
+  // A meeting born FROM an interaction has the interaction as its master --
+  // writing back would overwrite the remark a person typed with a topic
+  // derived from it. Only Zoom-born meetings write their interaction.
+  if (!m.zoom_uuid) return;
   const remark = [S(m.topic), S(m.summary).split("\n")[0]].filter(Boolean).join(" — ").slice(0, 2000) || "Zoom meeting";
   const body: Doc = {
     kind: "Zoom Meeting",
@@ -204,3 +208,46 @@ export async function syncInteraction(crm: SupabaseClient, meetingId: string): P
   const { data: made } = await crm.from("interaction").insert({ ...body, created_by: m.host_id || null }).select("id").single();
   if (made) await crm.from("meeting").update({ interaction_id: made.id }).eq("id", meetingId);
 }
+
+/** The interaction kinds that are meetings (Dr Raghu, 4 Sep 2026: "where its Video call or meeting"). */
+export const MEETING_KINDS = ["Video Call", "Zoom Meeting"];
+
+/**
+ * THE OTHER DOOR: an interaction logged by hand as a Video Call or Zoom
+ * Meeting becomes a meeting row, so Meetings holds every meeting and not
+ * only the ones Zoom reported. The interaction stays the master for the
+ * remark and the deal links; the meeting row carries the minutes. Idempotent
+ * on interaction_id. Returns the meeting id, or null when the kind is not a
+ * meeting (a Follow Up Call is not one).
+ */
+export async function meetingFromInteraction(crm: SupabaseClient, ix: Doc): Promise<string | null> {
+  if (!MEETING_KINDS.includes(S(ix.kind))) return null;
+  const id = S(ix.id); if (!id) return null;
+  const remark = S(ix.remark).trim();
+  const topic = (remark.split(/\n/)[0] || `${S(ix.kind)}${ix.person_name ? ` with ${S(ix.person_name)}` : ""}`).slice(0, 200);
+  let host_email: string | null = null;
+  if (ix.by_id) { const { data: p } = await crm.from("profile").select("email").eq("id", S(ix.by_id)).maybeSingle(); host_email = p ? S(p.email) : null; }
+  const row: Doc = {
+    interaction_id: id,
+    topic, host_email, host_id: ix.by_id || null,
+    started_at: ix.happened_at || ix.created_at || new Date().toISOString(),
+    attendee_names: S(ix.person_name) || null,
+    attendees: S(ix.person_name) ? [{ name: S(ix.person_name), email: null }] : [],
+    company_id: ix.company_id || null, opportunity_id: ix.opportunity_id || null, quotation_id: ix.quotation_id || null,
+    updated_at: new Date().toISOString(),
+  };
+  const { data: have } = await crm.from("meeting").select("id, mom").eq("interaction_id", id).maybeSingle();
+  if (have) {
+    const { error } = await crm.from("meeting").update(row).eq("id", have.id);
+    if (error) throw new Error(error.message);
+    return S(have.id);
+  }
+  // the remark seeds the minutes, as a paragraph -- a person rewrites from there
+  row.mom = remark ? `<p>${remark.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\n/g, "<br>")}</p>` : null;
+  row.status = ix.company_id ? "tagged" : "new";
+  row.raw = { interaction: ix };
+  const { data: made, error } = await crm.from("meeting").insert(row).select("id").single();
+  if (error) throw new Error(error.message);
+  return S(made.id);
+}
+

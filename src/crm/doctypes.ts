@@ -362,7 +362,7 @@ export const DOCTYPES: Doctype[] = [
     name: "meeting", label: "Meeting", plural: "Meetings", table: "meeting",
     titleField: "topic", group: "Funnel", icon: "📹",
     orderBy: { column: "started_at", ascending: false },
-    blurb: "Every Zoom call, as it happened: who was in the room, the date, Zoom's own summary, the recording — and the MoM in your hand. Tag it to the deal; it then sits on that deal's timeline as an interaction.",
+    blurb: "Every meeting, from two doors: Zoom calls arrive by themselves with who was in the room, the summary and the recording; and every interaction logged as a Video Call or Zoom Meeting appears here too. Write the minutes in rich text; tag it to the deal and it sits on that deal's timeline.",
     fields: [
       { name: "topic", label: "Meeting", type: "text", inList: true },
       { name: "started_at", label: "Date", type: "date", inList: true },
@@ -372,7 +372,7 @@ export const DOCTYPES: Doctype[] = [
       { name: "opportunity_id", label: "Opportunity", type: "link", link: "opportunity", inList: true },
       { name: "quotation_id", label: "Quotation", type: "link", link: "quotation" },
       { name: "status", label: "Status", type: "select", inList: true, options: ["new", "tagged", "done"], help: "new = Genie could not tell the deal; tagged = it is on a deal; done = MoM written and circulated." },
-      { name: "mom", label: "Minutes of meeting", type: "textarea", big: true, help: "Your hand. Zoom's summary sits below it, untouched." },
+      { name: "mom", label: "Minutes of meeting", type: "textarea", big: true, rich: true, help: "Your hand — rich text. Zoom's summary sits below it, untouched." },
       { name: "summary", label: "Zoom AI summary", type: "textarea", big: true },
       { name: "recording_url", label: "Recording", type: "text", help: "Zoom's play link — opens in Zoom, with the account's passcode." },
       { name: "recording_drive_url", label: "Recording in Drive", type: "text" },

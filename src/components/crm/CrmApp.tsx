@@ -721,6 +721,27 @@ export default function CrmApp({
             >
               {adding ? "Cancel" : `+ Add ${dt.label}`}
             </button>
+            {/* THE OTHER DOOR INTO MEETINGS (Dr Raghu, 4 Sep 2026): every
+                interaction logged as a Video Call or Zoom Meeting, brought
+                in. New ones come by themselves on save; this walks the past. */}
+            {dt.name === "meeting" && (
+              <button
+                onClick={async () => {
+                  try {
+                    const r = await fetch("/api/crm/meeting-sync", { method: "POST" });
+                    const j = await r.json();
+                    if (!r.ok) throw new Error(j.error || "Sync failed");
+                    window.alert(`${j.interactions} Video Call / Zoom Meeting interactions found.\nBrought in: ${j.made} · refreshed: ${j.updated}${j.failed?.length ? `\nFailed: ${j.failed.length}` : ""}`);
+                    void load();
+                  } catch (e) { window.alert(e instanceof Error ? e.message : String(e)); }
+                }}
+                className="px-3 py-1.5 rounded text-sm font-semibold border"
+                style={{ borderColor: NAVY, color: NAVY, background: "#fff" }}
+                title="Bring every interaction logged as a Video Call or Zoom Meeting into Meetings"
+              >
+                ⟳ Sync from interactions
+              </button>
+            )}
             <input
               value={qLive}
               onChange={(e) => setQLive(e.target.value)}
