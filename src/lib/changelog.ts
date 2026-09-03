@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.1.3",
+    date: "2026-09-03",
+    module: "Saamaan — the Stock Register, live from the ERP",
+    items: [
+      "\"Stock Register in the ERP can you know where it is?\" (Dr Raghu, 3 Sep 2026), pointing at the Stock module. It is the Stock Ledger: a Stock Entry is the document a person makes, and on submission the ERP writes one line per item per warehouse into the Stock Ledger Entry — as do Purchase Receipts and Delivery Notes. 412,158 lines on the day. Bin holds the balance now, per item per warehouse.",
+      "\"I want to know where can i get the transactions of in and out of each item … dont give me balance, i want to see the first report with every transaction — in and out.\" So THE STOCK REGISTER TAB on an item is the Stock Ledger report for that item and nothing else: every movement newest first, in or out, the balance after it, the rate, the voucher that caused it opening on the ERP, the project it was booked against, and who made it.",
+      "READ LIVE, NOT MIRRORED. The ledger grows by thousands of lines a day; an item's slice is read when the tab opens, in about a second, and is exactly as current as the ERP. The footer says when it was read. An item with no movement says so — N000454, the one on his screen, has never moved.",
+    ],
+  },
+  {
     v: "4.4.1.2",
     date: "2026-09-03",
     module: "Saamaan — three rooms on an item",

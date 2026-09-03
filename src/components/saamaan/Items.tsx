@@ -287,9 +287,89 @@ const show = (k: string, v: unknown) => {
  */
 const TABS: { key: string; label: string; built: boolean }[] = [
   { key: "erp", label: "ERP Data", built: true },
-  { key: "stock", label: "Stock Register", built: false },
+  { key: "stock", label: "Stock Register", built: true },
   { key: "intel", label: "Intelligence", built: false },
 ];
+
+// ================================================= the stock register, live
+interface Sle {
+  name: string; posting_date: string; posting_time: string; warehouse: string; actual_qty: number; qty_after_transaction: number;
+  incoming_rate: number; valuation_rate: number; stock_value: number; voucher_type: string; voucher_no: string; project: string | null; modified_by: string;
+}
+interface Stock { erpBase: string; readAt: string; ledger: Sle[]; ledgerTotal: number | null; ledgerShown: number }
+
+const qtyFmt = (n: unknown) => (n === null || n === undefined ? "·" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 3 }));
+/** The ERP's form for the voucher — Stock Entry → /app/stock-entry/STE-28936. */
+const voucherUrl = (base: string, type: string, no: string) => `${base}/app/${type.toLowerCase().replace(/\s+/g, "-")}/${encodeURIComponent(no)}`;
+
+/**
+ * An item's stock register, read live off the ERP when the tab opens:
+ * every movement, in and out, newest first — the ERP's own Stock Ledger
+ * report for one item, and only that ("dont give me balance, i want to
+ * see the first report with every transaction — in and out", Dr Raghu,
+ * 3 Sep 2026).
+ */
+function StockRegister({ code, base }: { code: string; base: string }) {
+  const [data, setData] = useState<Stock | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    fetch(`/api/saamaan/stock?code=${encodeURIComponent(code)}`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || `The server answered ${r.status}.`); return j; })
+      .then(setData)
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [code]);
+  const erp = data?.erpBase || base;
+  if (err) return <Note kind="error">{err}</Note>;
+  if (!data) return <div className="text-sm" style={{ color: MUTED }}>Reading the ERP&apos;s stock ledger…</div>;
+  return (
+    <div className="text-sm" style={{ color: INK }}>
+      <div className="flex items-baseline gap-2 mb-1">
+        <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: 0.6 }}>Every transaction, in and out — the ERP&apos;s stock ledger, newest first</div>
+        <span className="text-xs tnum" style={{ color: MUTED }}>
+          {data.ledgerTotal === null ? `${data.ledgerShown} shown` : data.ledgerTotal > data.ledgerShown ? `${data.ledgerShown} of ${data.ledgerTotal.toLocaleString("en-IN")} shown` : `${data.ledgerTotal} in all`}
+        </span>
+      </div>
+      {data.ledger.length ? (
+        <div className="rounded border overflow-auto" style={{ borderColor: BORDER, background: "#fff", maxHeight: "50vh" }}>
+          <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 900 }}>
+            <thead><tr style={{ background: NAVY, color: "#fff", position: "sticky", top: 0 }}>
+              <th className="px-2 py-1 text-left">Date</th><th className="px-2 py-1 text-left">Warehouse</th><th className="px-2 py-1 text-right">In</th><th className="px-2 py-1 text-right">Out</th>
+              <th className="px-2 py-1 text-right">Balance</th><th className="px-2 py-1 text-right">Rate</th><th className="px-2 py-1 text-right">Balance value</th>
+              <th className="px-2 py-1 text-left">Voucher</th><th className="px-2 py-1 text-left">Project</th><th className="px-2 py-1 text-left">By</th>
+            </tr></thead>
+            <tbody>{data.ledger.map((l, i) => {
+              const q = Number(l.actual_qty) || 0;
+              return (
+                <tr key={l.name} style={{ background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <td className="px-2 py-1 tnum whitespace-nowrap" style={{ borderBottom: `1px solid ${BORDER}` }}>{fmtD(l.posting_date)} <span style={{ color: MUTED }}>{S(l.posting_time).slice(0, 5)}</span></td>
+                  <td className="px-2 py-1" style={{ borderBottom: `1px solid ${BORDER}` }}>{l.warehouse}</td>
+                  <td className="px-2 py-1 text-right tnum font-bold" style={{ borderBottom: `1px solid ${BORDER}`, color: GREEN }}>{q > 0 ? qtyFmt(q) : ""}</td>
+                  <td className="px-2 py-1 text-right tnum font-bold" style={{ borderBottom: `1px solid ${BORDER}`, color: "#B3261E" }}>{q < 0 ? qtyFmt(-q) : ""}</td>
+                  <td className="px-2 py-1 text-right tnum" style={{ borderBottom: `1px solid ${BORDER}` }}>{qtyFmt(l.qty_after_transaction)}</td>
+                  <td className="px-2 py-1 text-right tnum" style={{ borderBottom: `1px solid ${BORDER}` }} title={`incoming ${money(l.incoming_rate)}`}>{money(l.valuation_rate)}</td>
+                  <td className="px-2 py-1 text-right tnum" style={{ borderBottom: `1px solid ${BORDER}` }}>{money(l.stock_value)}</td>
+                  <td className="px-2 py-1 whitespace-nowrap" style={{ borderBottom: `1px solid ${BORDER}` }}>
+                    <a href={voucherUrl(erp, l.voucher_type, l.voucher_no)} target="_blank" rel="noreferrer" className="font-bold hover:underline" style={{ color: NAVY, textDecoration: "none" }} title={l.voucher_type}>{l.voucher_no}</a>
+                    <span style={{ color: MUTED }}> {l.voucher_type}</span>
+                  </td>
+                  <td className="px-2 py-1 whitespace-nowrap" style={{ borderBottom: `1px solid ${BORDER}`, color: MUTED }}>{S(l.project).replace(/^NGSE-PROJ-/, "") || "·"}</td>
+                  <td className="px-2 py-1" style={{ borderBottom: `1px solid ${BORDER}`, color: MUTED }}>{S(l.modified_by).split("@")[0] || "·"}</td>
+                </tr>
+              );
+            })}</tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="rounded border p-3 text-sm" style={{ borderColor: BORDER, background: "#fff", color: MUTED }}>
+          No movement on the ERP, ever — no Stock Entry, Purchase Receipt or Delivery Note has carried {code}.
+        </div>
+      )}
+      <div className="text-xs mt-2" style={{ color: MUTED }}>
+        Read live from the ERP at {new Date(data.readAt).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })} — not mirrored. Each voucher opens on the ERP.
+      </div>
+    </div>
+  );
+}
 
 function Detail({ code, base, onClose }: { code: string; base: string; onClose: () => void }) {
   const [item, setItem] = useState<Row | null>(null);
@@ -331,13 +411,7 @@ function Detail({ code, base, onClose }: { code: string; base: string; onClose: 
         </div>
       )}
 
-      {item && tab === "stock" && (
-        <div className="rounded border p-6 text-sm" style={{ borderColor: BORDER, background: "#fff", color: MUTED, lineHeight: 1.7 }}>
-          <div className="font-bold mb-1" style={{ color: INK }}>Stock Register — to build</div>
-          What {code} has in the stores and where: opening, receipts, issues, the balance, by warehouse — from the ERP&apos;s stock ledger, or Genie&apos;s own.
-          Say what this room should hold and it will be built.
-        </div>
-      )}
+      {item && tab === "stock" && <StockRegister code={code} base={base} />}
       {item && tab === "intel" && (
         <div className="rounded border p-6 text-sm" style={{ borderColor: BORDER, background: "#fff", color: MUTED, lineHeight: 1.7 }}>
           <div className="font-bold mb-1" style={{ color: INK }}>Intelligence — to build</div>
