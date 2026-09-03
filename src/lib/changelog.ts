@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.1.1",
+    date: "2026-09-03",
+    module: "Saamaan — the RBOM, the Real BOM",
+    items: [
+      "\"we will make a seperate BOM now in the Genie. This BOM will be the last BOM that is submitted in the system, eg for project no 1637, BOM-N050184-005 is shown in the system. Replicate them into a BOM in our Genie called BOM-N050184-100. Put in all the contents of BOM-N050184-005 and change the bom_status for each item to 'Released'. Then look if there is BOM-N050184-006 and see what all items in that are added that were not in previous version. Take those items into BOM-N050184-100 also and mark them 'Draft'. Mention in the table also as 'RBOM'\" (Dr Raghu, 3 Sep 2026). \"RBOM is Real BOM.\"",
+      "BUILD RBOM, on the BOM front beside each live project's submitted BOM, and Build RBOMs — all live on top. The rule per project: every line of the highest-numbered SUBMITTED revision comes in as Released; then every DRAFT revision of the same item numbered above it, in order, and any item in it that the RBOM does not yet hold comes in as Draft, with the draft it came from on the line. Genie's number is the item's with revision 100.",
+      "THE RBOM IS GENIE'S ONCE BUILT — \"maintaining the details in one place\". A second build only ADDS lines whose item is not yet there; it never edits or removes a line that exists. When the ERP moves on — a newer submitted revision, a draft not yet merged — the front says \"ERP moved on — add new\" in red beside the RBOM, and that is all the click does.",
+      "The RBOM opens in its own lightbox, marked RBOM · the Real BOM, the same twelve columns, each line saying which ERP revision it was copied from, Released and Draft as chips. The first material_ tables that are not a mirror: migration 0123.",
+      "On the day: five live projects carry a draft newer than their submitted BOM; two carry a second product's BOM besides, which the RBOM does not follow — one RBOM per project, of the product the submitted BOM makes.",
+    ],
+  },
+  {
     v: "4.4.1.0",
     date: "2026-09-03",
     module: "Saamaan — the BOM front: live projects, the BOM's value",

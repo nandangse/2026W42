@@ -26,6 +26,9 @@ export const dynamic = "force-dynamic";
  *                            latest SUBMITTED BOM, that BOM's line count
  *                            (pulled for live projects only), its value as
  *                            the ERP costs it, who and when.
+ *   ?mode=rbom&rbom=&status=&q=&page=&size=
+ *                          — a page of Genie's own RBOM lines, joined the
+ *                            same way, with the ERP BOM each came from.
  *   ?mode=bom&project=&bom=&status=&q=&page=&size=
  *                          — a page of BOM lines from the working set (live
  *                            BOMs on projects in process), each line joined
@@ -189,6 +192,27 @@ export async function GET(req: Request) {
         for (const l of light) linesPer.set(String(l.bom_id), (linesPer.get(String(l.bom_id)) ?? 0) + 1);
         const { data: lastPull } = await admin.from("material_pull").select("at").eq("phase", "bom_items").order("at", { ascending: false }).limit(1).maybeSingle();
 
+        // Genie's own RBOM per project, where one has been built. Before
+        // migration 0123 there is no table, which is "none built", not an error.
+        const rbomBy = new Map<string, Record<string, unknown>>();
+        const rbomCounts = new Map<string, { released: number; draft: number; other: number }>();
+        let rbomReady = true;
+        try {
+          const heads = await all("material_rbom", "rbom_id, project_id, base_bom, draft_boms, built_at, refreshed_at", (s) => s.order("rbom_id"));
+          for (const h of heads) rbomBy.set(String(h.project_id), h);
+          const lines = heads.length ? await all("material_rbom_item", "rbom_id, bom_status", (s) => s.order("id")) : [];
+          for (const l of lines) {
+            const c = rbomCounts.get(String(l.rbom_id)) ?? { released: 0, draft: 0, other: 0 };
+            const st = String(l.bom_status || "").toLowerCase();
+            if (st === "released") c.released++; else if (st === "draft") c.draft++; else c.other++;
+            rbomCounts.set(String(l.rbom_id), c);
+          }
+        } catch (e) {
+          const m = String((e as { message?: string })?.message || e);
+          if (!notInstalled(m)) throw e;
+          rbomReady = false;
+        }
+
         // "The BOM No should be the latest number that is submitted" — the
         // highest-numbered submitted BOM on the project. BOM-N052488-003
         // beats -001; the number is the ERP's own revision serial.
@@ -201,7 +225,20 @@ export async function GET(req: Request) {
           const latest = submitted[0] ?? null;
           const drafts = mine.filter((b) => Number(b.docstatus) === 0).length;
           const live = liveIds.has(String(p.project_id));
+          const rb = rbomBy.get(String(p.project_id));
+          const rc = rb ? rbomCounts.get(String(rb.rbom_id)) : undefined;
           return {
+            rbom_id: rb ? String(rb.rbom_id) : "",
+            rbom_base: rb ? String(rb.base_bom) : "",
+            rbom_released: rc?.released ?? 0,
+            rbom_draft: rc?.draft ?? 0,
+            rbom_other: rc?.other ?? 0,
+            // The ERP has a newer submitted revision than the RBOM was built from.
+            rbom_behind: !!(rb && latest && String(rb.base_bom) !== String(latest.bom_id)),
+            // The ERP has drafts the RBOM has not merged.
+            rbom_new_drafts: rb
+              ? mine.filter((b) => Number(b.docstatus) === 0 && String(b.item_code) === String(latest?.item_code ?? "") && num(b.bom_id, String(rb.base_bom)) > 0 && !((rb.draft_boms as string[] | null) ?? []).includes(String(b.bom_id))).length
+              : 0,
             project_id: p.project_id,
             project_name: p.project_name,
             customer: p.customer,
@@ -221,13 +258,71 @@ export async function GET(req: Request) {
             erp_modified_by: latest ? String(latest.erp_modified_by) : "",
           };
         });
-        return NextResponse.json({ installed: true, erpBase: base, rows, lastPulledAt: lastPull?.at ?? null });
+        return NextResponse.json({ installed: true, erpBase: base, rows, lastPulledAt: lastPull?.at ?? null, rbomReady });
       } catch (e) {
         const m = e instanceof Error ? e.message : String((e as { message?: string })?.message || e);
         if (/material_bom_item/i.test(m) && notInstalled(m))
           return NextResponse.json({ error: "Run migration 0121 first — the BOM lines table doesn't exist yet." }, { status: 503 });
         if (notInstalled(m))
           return NextResponse.json({ error: "Run migration 0119 first — Saamaan's project tables don't exist yet." }, { status: 503 });
+        throw new Error(m);
+      }
+    }
+
+    if (mode === "rbom") {
+      const rbomId = String(p.get("rbom") || "").trim();
+      if (!rbomId) throw new HttpError(400, "rbom required");
+      const status = p.get("status");
+      const q = safe(String(p.get("q") || ""));
+      const size = Math.min(500, Math.max(20, Number(p.get("size") || 200) || 200));
+      const page = Math.max(0, Number(p.get("page") || 0) || 0);
+      try {
+        const { data: head, error: hErr } = await admin.from("material_rbom").select("*").eq("rbom_id", rbomId).maybeSingle();
+        if (hErr) throw hErr;
+        if (!head) throw new HttpError(404, `No RBOM ${rbomId} — build it from the BOM front.`);
+        const { data: proj } = await admin.from("material_project").select("project_id, project_name").eq("project_id", String(head.project_id)).maybeSingle();
+        let sel = admin.from("material_rbom_item")
+          .select("id, rbom_id, idx, item_code, item_name, item_group, qty, uom, rate, amount, description, bom_status, bom_remark, bom_no, is_sub_assembly, source_bom, added_by, added_at, updated_by, updated_at", { count: "exact" })
+          .eq("rbom_id", rbomId);
+        if (status !== null && status !== "") sel = sel.eq("bom_status", status);
+        if (q) sel = sel.or(`item_code.ilike.%${q}%,item_name.ilike.%${q}%,bom_remark.ilike.%${q}%,description.ilike.%${q}%`);
+        const r = await sel.order("idx").range(page * size, page * size + size - 1);
+        if (r.error) throw r.error;
+        const rows = (r.data ?? []) as unknown as Record<string, unknown>[];
+        const { data: st } = await admin.from("material_rbom_item").select("bom_status").eq("rbom_id", rbomId).limit(10000);
+        const statuses = [...new Set((st ?? []).map((x) => String(x.bom_status ?? "")))].sort();
+        const codes = [...new Set(rows.map((x) => String(x.item_code)).filter(Boolean))];
+        const items = new Map<string, Record<string, unknown>>();
+        if (codes.length) {
+          const { data: its } = await admin.from("material_item").select("item_code, description, item_group, children").in("item_code", codes);
+          for (const it of its ?? []) items.set(String(it.item_code), it as Record<string, unknown>);
+        }
+        const out = rows.map((x) => {
+          const it = items.get(String(x.item_code));
+          const sup = ((it?.children as Record<string, Record<string, unknown>[]> | undefined)?.supplier_items ?? []).map((s) => String(s.supplier || "")).filter(Boolean);
+          return {
+            ...x,
+            row_id: x.id,
+            bom_id: rbomId,
+            // For an RBOM line "modified" is Genie's own record of it.
+            erp_modified: x.updated_at ?? x.added_at ?? null,
+            erp_modified_by: String(x.updated_by ?? x.added_by ?? ""),
+            item_description: it ? String(it.description ?? "") : null,
+            item_group_of_item: it ? String(it.item_group ?? "") : "",
+            suppliers: [...new Set(sup)],
+            in_mirror: !!it,
+            project_id: String(head.project_id),
+            project_name: proj ? String(proj.project_name) : "",
+          };
+        });
+        return NextResponse.json({
+          installed: true, erpBase: base, rows: out, total: r.count ?? 0, page, size, statuses,
+          pickers: { projects: [], boms: [] }, lastPulledAt: head.built_at, head,
+        });
+      } catch (e) {
+        if (e instanceof HttpError) throw e;
+        const m = e instanceof Error ? e.message : String((e as { message?: string })?.message || e);
+        if (notInstalled(m)) return NextResponse.json({ error: "Run migration 0123 first — the RBOM tables don't exist yet." }, { status: 503 });
         throw new Error(m);
       }
     }

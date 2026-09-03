@@ -3,6 +3,9 @@
 /**
  * BOM — the jobs in process, and their bills (Dr Raghu, 2 Sep 2026).
  *
+ * RBOM is the REAL BOM (Dr Raghu, 3 Sep 2026): Genie's own copy of the
+ * submitted revision plus what later drafts added, maintained here.
+ *
  * THE FRONT: "show only the BOM Front specific: Project - Project Name -
  * Item Group - BOM No - No of items - Last Modified by - Modified Date.
  * Then clicking will take it deeper as BOM detailed in a fresh lightbox.
@@ -24,11 +27,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import GenieTable from "@/components/GenieTable";
-import { Screen, Btn, Note, Chip, Modal, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, S, statusColour, useLoad } from "@/components/ims/ui";
+import { Screen, Btn, Note, Chip, Modal, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, RED, S, statusColour, useLoad, post } from "@/components/ims/ui";
 import type { Summary } from "./Dashboard";
 
 interface Line {
   row_id: string; bom_id: string; idx: number; item_code: string; item_name: string; item_group: string;
+  /** RBOM lines only: the ERP BOM the line was copied from. */
+  source_bom?: string;
   qty: number | null; uom: string; rate: number | null; amount: number | null; description: string;
   bom_status: string; bom_remark: string; bom_no: string; is_sub_assembly: boolean;
   erp_modified: string | null; erp_modified_by: string;
@@ -40,7 +45,7 @@ interface Pickers {
   projects: { project_id: string; project_name: string; boms: number }[];
   boms: { bom_id: string; project_id: string; item_name: string; docstatus: number; lines: number }[];
 }
-interface Answer { installed: boolean; erpBase: string; rows: Line[]; total: number; page: number; size: number; pickers: Pickers; lastPulledAt: string | null; statuses: string[] }
+interface Answer { installed: boolean; erpBase: string; rows: Line[]; total: number; page: number; size: number; pickers: Pickers; lastPulledAt: string | null; statuses: string[]; head?: Record<string, unknown> }
 
 const money = (n: unknown) => (n === null || n === undefined || n === "" ? "·" : `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`);
 const qty = (n: unknown) => (n === null || n === undefined || n === "" ? "·" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 3 }));
@@ -55,6 +60,7 @@ const plain = (html: string) => S(html).replace(/<[^>]+>/g, " ").replace(/&nbsp;
 /** The line's status, coloured by its meaning on the shop floor. */
 const lineColour = (s: string) => {
   const t = s.toLowerCase();
+  if (t === "draft") return AMBER;
   if (/receiv/.test(t) && !/partial/.test(t)) return GREEN;
   if (/partial/.test(t)) return AMBER;
   if (/order/.test(t)) return "#1B6B93";
@@ -67,23 +73,55 @@ interface Front {
   project_id: string; project_name: string; customer: string; status: string; live: boolean; item_group: string;
   bom_id: string; bom_item_code: string; bom_item_name: string; lines: number | null; bom_value: number | null; submitted: number; drafts: number;
   erp_modified: string | null; erp_modified_by: string;
+  /** Genie's own RBOM, where built. */
+  rbom_id: string; rbom_base: string; rbom_released: number; rbom_draft: number; rbom_other: number; rbom_behind: boolean; rbom_new_drafts: number;
 }
-interface FrontAnswer { installed: boolean; erpBase: string; rows: Front[]; lastPulledAt: string | null }
+interface FrontAnswer { installed: boolean; erpBase: string; rows: Front[]; lastPulledAt: string | null; rbomReady: boolean }
+type Open = { kind: "bom" | "rbom"; id: string; title: string };
 
 export default function Bom({ summary }: { summary: Summary }) {
   const [data, busy, reload, err] = useLoad<FrontAnswer>("/api/saamaan/items?mode=bom_front");
-  const [open, setOpen] = useState<Front | null>(null);
+  const [open, setOpen] = useState<Open | null>(null);
   const [withBom, setWithBom] = useState(false);
   const [liveOnly, setLiveOnly] = useState(true);
+  const [building, setBuilding] = useState("");
+  const [msg, setMsg] = useState("");
   const base = data?.erpBase || summary.erpBase;
   const rows = useMemo(() => (data?.rows ?? []).filter((r) => (!withBom || r.bom_id) && (!liveOnly || r.live)), [data, withBom, liveOnly]);
+
+  const openBom = (r: Front) => r.bom_id && setOpen({ kind: "bom", id: r.bom_id, title: `${r.bom_id} — ${r.project_id} · ${r.project_name}` });
+  const openRbom = (r: Front) => r.rbom_id && setOpen({ kind: "rbom", id: r.rbom_id, title: `${r.rbom_id} · Real BOM — ${r.project_id} · ${r.project_name}` });
+
+  /** Build, or refresh, Genie's RBOM for one project — or every live one. */
+  const build = async (projectId?: string) => {
+    setBuilding(projectId ?? "*");
+    setMsg("");
+    const r = await post("/api/saamaan/rbom", projectId ? { action: "build", project_id: projectId } : { action: "build_all" });
+    setBuilding("");
+    if (!r.ok) { setMsg(r.error || "Could not build."); return; }
+    const outs = (r.outcomes as { project_id: string; rbom_id: string; released: number; draft: number; added: number; existed: number; skipped?: string }[]) ?? [];
+    const built = outs.filter((o) => !o.skipped);
+    const skipped = outs.filter((o) => o.skipped);
+    setMsg(
+      built.map((o) => `${o.rbom_id}: ${o.existed ? `${o.added} added to ${o.existed}` : `${o.released} released, ${o.draft} draft`}`).join(" · ")
+      + (skipped.length ? ` · skipped ${skipped.length}: ${skipped.slice(0, 3).map((o) => `${o.project_id.replace(/^NGSE-PROJ-/, "")} (${o.skipped})`).join(", ")}${skipped.length > 3 ? "…" : ""}` : ""),
+    );
+    reload();
+  };
 
   return (
     <Screen
       title="BOM"
-      blurb="Each project with its latest submitted BOM. Click a row for the bill itself. Filled by the ERP pull; nothing here is typed."
-      action={<Btn onClick={reload} disabled={busy}>↻ Re-read</Btn>}>
+      blurb="Each project with its latest submitted BOM on the ERP, and Genie's own RBOM beside it. Click a number for the bill itself."
+      action={<>
+        <Btn onClick={() => build()} disabled={!!building || !data?.rbomReady} title="Build the RBOM for every live project that has a submitted BOM and none yet; add what is new to those that have one">
+          {building === "*" ? "Building…" : "Build RBOMs — all live"}
+        </Btn>
+        <Btn onClick={reload} disabled={busy}>↻ Re-read</Btn>
+      </>}>
       {err && <Note kind="error">{err}</Note>}
+      {msg && <Note kind="info">{msg}</Note>}
+      {data && !data.rbomReady && <Note kind="warn">Run migration 0123 first — the RBOM tables don&apos;t exist yet.</Note>}
       {data && !data.lastPulledAt && (
         <Note kind="warn">BOM lines have not been pulled yet — open ERP pull and run it once; phase 6 brings them.</Note>
       )}
@@ -104,10 +142,10 @@ export default function Bom({ summary }: { summary: Summary }) {
         </>}
         columns={[
           { key: "project", label: "Project", align: "left", sort: (r) => r.project_id,
-            render: (r) => <button onClick={() => r.bom_id && setOpen(r)} className={`font-bold ${r.bom_id ? "hover:underline" : ""}`} style={{ color: r.bom_id ? NAVY : MUTED }} title={r.bom_id ? "Open the bill" : "No submitted BOM on this project"}>{r.project_id}</button> },
+            render: (r) => <button onClick={() => openBom(r)} className={`font-bold ${r.bom_id ? "hover:underline" : ""}`} style={{ color: r.bom_id ? NAVY : MUTED }} title={r.bom_id ? "Open the ERP bill" : "No submitted BOM on this project"}>{r.project_id}</button> },
           { key: "name", label: "Project Name", align: "left", sort: (r) => r.project_name,
             render: (r) => (
-              <button onClick={() => r.bom_id && setOpen(r)} className="font-semibold text-left" title={`${r.project_name}${r.live ? "" : `\n${r.status}`}`}
+              <button onClick={() => openBom(r)} className="font-semibold text-left" title={`${r.project_name}${r.live ? "" : `\n${r.status}`}`}
                 style={{ color: r.live ? INK : MUTED, whiteSpace: "normal", width: 220, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.3 }}>
                 {r.project_name || "·"}
               </button>
@@ -116,12 +154,33 @@ export default function Bom({ summary }: { summary: Summary }) {
             render: (r) => <span style={{ color: MUTED }} title="The project's Product Family — an Item Group on the ERP">{r.item_group || "·"}</span> },
           { key: "bom", label: "BOM No", align: "left", sort: (r) => r.bom_id,
             render: (r) => r.bom_id ? (
-              <button onClick={() => setOpen(r)} className="rounded px-1.5 py-0.5 text-xs font-bold hover:underline" style={{ background: NAVY, color: "#fff" }}
+              <button onClick={() => openBom(r)} className="rounded px-1.5 py-0.5 text-xs font-bold hover:underline" style={{ background: NAVY, color: "#fff" }}
                 title={`${r.bom_item_code} — ${r.bom_item_name}
 the latest submitted BOM${r.submitted > 1 ? ` of ${r.submitted}` : ""}${r.drafts ? `; ${r.drafts} draft${r.drafts === 1 ? "" : "s"} besides` : ""}`}>
                 {r.bom_id}
               </button>
             ) : <span style={{ color: MUTED }} title={r.drafts ? `${r.drafts} draft BOM${r.drafts === 1 ? "" : "s"}, none submitted` : "no BOM on the ERP"}>{r.drafts ? "draft only" : "·"}</span> },
+          { key: "rbom", label: "RBOM — Real BOM", align: "left", sort: (r) => r.rbom_id,
+            render: (r) => r.rbom_id ? (
+              <span className="inline-flex items-center gap-1 flex-wrap">
+                <button onClick={() => openRbom(r)} className="rounded px-1.5 py-0.5 text-xs font-bold hover:underline" style={{ background: "#0F766E", color: "#fff" }}
+                  title={`The Real BOM — Genie's own, built from ${r.rbom_base}\n${r.rbom_released} released · ${r.rbom_draft} draft${r.rbom_other ? ` · ${r.rbom_other} other` : ""}`}>
+                  {r.rbom_id} <span style={{ opacity: 0.8, fontWeight: 500 }}>· Real BOM</span>
+                </button>
+                <span className="text-xs tnum" style={{ color: MUTED }}>{r.rbom_released}<span style={{ color: GREEN }}>●</span> {r.rbom_draft}<span style={{ color: AMBER }}>●</span></span>
+                {(r.rbom_behind || r.rbom_new_drafts > 0) && (
+                  <button onClick={() => build(r.project_id)} disabled={!!building} className="text-xs font-bold hover:underline" style={{ color: RED }}
+                    title={`${r.rbom_behind ? `The ERP's latest submitted is ${r.bom_id}, the RBOM was built from ${r.rbom_base}. ` : ""}${r.rbom_new_drafts ? `${r.rbom_new_drafts} newer draft${r.rbom_new_drafts === 1 ? "" : "s"} not yet merged. ` : ""}Add what is new — nothing already in the RBOM is touched.`}>
+                    {building === r.project_id ? "adding…" : "ERP moved on — add new"}
+                  </button>
+                )}
+              </span>
+            ) : r.bom_id && r.live ? (
+              <button onClick={() => build(r.project_id)} disabled={!!building || !data?.rbomReady} className="rounded border px-1.5 py-0.5 text-xs font-bold" style={{ borderColor: BORDER, color: "#0F766E", background: "#fff" }}
+                title={`Copy ${r.bom_id} into ${`BOM-${r.bom_item_code}-100`} as Released, and any newer draft's additions as Draft`}>
+                {building === r.project_id ? "building…" : "Build RBOM"}
+              </button>
+            ) : <span style={{ color: MUTED }} title={r.bom_id ? "RBOMs are built for live projects" : "nothing submitted to build from"}>·</span> },
           { key: "n", label: "No of items", align: "right", sort: (r) => r.lines ?? -1,
             render: (r) => <span className="tnum" title={r.lines === null && r.bom_id ? "lines are pulled for live projects only" : ""}>{r.lines === null ? <span style={{ color: MUTED }}>·</span> : r.lines.toLocaleString("en-IN")}</span> },
           { key: "value", label: "BOM value (ERP)", align: "right", sort: (r) => r.bom_value ?? -1,
@@ -132,11 +191,12 @@ the latest submitted BOM${r.submitted > 1 ? ` of ${r.submitted}` : ""}${r.drafts
       />
       <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
         BOM No is the highest-numbered submitted BOM on the project; BOM value is the ERP&apos;s Total Cost on it; Last Modified is that BOM&apos;s. Item Group is the project&apos;s Product Family.
-        Lines are pulled for live projects only — untick the first box to see every project&apos;s BOM and value, greyed. Click anywhere on a row to open the bill.
+        <b> RBOM</b> is the Real BOM — Genie&apos;s own bill, numbered -100: every line of the submitted BOM as <span style={{ color: GREEN }}>●</span> Released, and what a later draft added as <span style={{ color: AMBER }}>●</span> Draft. Once built it is Genie&apos;s — a rebuild only adds what is new and never touches a line already there.
+        Lines are pulled for live projects only — untick the first box to see every project&apos;s BOM and value, greyed.
       </div>
       {open && (
-        <Modal onClose={() => setOpen(null)} title={`${open.bom_id} — ${open.project_id} · ${open.project_name}`} width={1500}>
-          <BomLines bom={open.bom_id} base={base} summary={summary} />
+        <Modal onClose={() => setOpen(null)} title={open.title} width={1500}>
+          <BomLines kind={open.kind} bom={open.id} base={base} summary={summary} />
         </Modal>
       )}
     </Screen>
@@ -144,7 +204,7 @@ the latest submitted BOM${r.submitted > 1 ? ` of ${r.submitted}` : ""}${r.drafts
 }
 
 // ============================================================ the lightbox
-function BomLines({ bom, base: baseIn }: { bom: string; base: string; summary: Summary }) {
+function BomLines({ kind, bom, base: baseIn }: { kind: "bom" | "rbom"; bom: string; base: string; summary: Summary }) {
   const project = "";
   const [status, setStatus] = useState("");
   const [typed, setTyped] = useState("");
@@ -159,12 +219,14 @@ function BomLines({ bom, base: baseIn }: { bom: string; base: string; summary: S
 
   const load = useCallback(() => {
     setErr("");
-    const u = `/api/saamaan/items?mode=bom&project=${encodeURIComponent(project)}&bom=${encodeURIComponent(bom)}&status=${encodeURIComponent(status)}&q=${encodeURIComponent(q)}&page=${page}&size=${SIZE}`;
+    const u = kind === "rbom"
+      ? `/api/saamaan/items?mode=rbom&rbom=${encodeURIComponent(bom)}&status=${encodeURIComponent(status)}&q=${encodeURIComponent(q)}&page=${page}&size=${SIZE}`
+      : `/api/saamaan/items?mode=bom&project=${encodeURIComponent(project)}&bom=${encodeURIComponent(bom)}&status=${encodeURIComponent(status)}&q=${encodeURIComponent(q)}&page=${page}&size=${SIZE}`;
     fetch(u, { cache: "no-store" })
       .then(async (r) => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || `The server answered ${r.status}.`); return j; })
       .then(setData)
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
-  }, [project, bom, status, q, page]);
+  }, [kind, project, bom, status, q, page]);
   useEffect(() => { load(); }, [load]);
 
   const total = data?.total ?? 0;
@@ -207,7 +269,9 @@ function BomLines({ bom, base: baseIn }: { bom: string; base: string; summary: S
     <div>
       {err && <Note kind="error">{err}</Note>}
       <div className="flex items-center gap-2 mb-2 flex-wrap">
-        <a href={erpForm(base, "BOM", bom)} target="_blank" rel="noreferrer" className="text-xs font-bold" style={{ color: NAVY }}>Open on the ERP ↗</a>
+        {kind === "rbom"
+          ? <span className="rounded px-1.5 py-0.5 text-xs font-bold" style={{ background: "#0F766E", color: "#fff" }} title={data?.head ? `built from ${S(data.head.base_bom)}${(data.head.draft_boms as string[] | undefined)?.length ? ` + ${(data.head.draft_boms as string[]).join(", ")}` : ""}` : ""}>RBOM · the Real BOM{data?.head ? ` · from ${S(data.head.base_bom)}` : ""}</span>
+          : <a href={erpForm(base, "BOM", bom)} target="_blank" rel="noreferrer" className="text-xs font-bold" style={{ color: NAVY }}>Open on the ERP ↗</a>}
         <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }}
           className="px-2 py-1.5 rounded border text-sm bg-white" style={{ borderColor: status ? NAVY : BORDER }}>
           <option value="">Any status</option>
@@ -227,10 +291,14 @@ function BomLines({ bom, base: baseIn }: { bom: string; base: string; summary: S
         rows={rows}
         minWidth={1400}
         maxHeight="62vh"
-        empty={data?.lastPulledAt ? "No line here — lines are pulled for live projects only; loosen the filters, or open the BOM on the ERP." : "Nothing here yet — run the ERP pull."}
+        empty={kind === "rbom" ? "No line matches." : data?.lastPulledAt ? "No line here — lines are pulled for live projects only; loosen the filters, or open the BOM on the ERP." : "Nothing here yet — run the ERP pull."}
         columns={[
-          { key: "bom", label: "BOM No", align: "left", sort: (r) => `${r.bom_id}#${String(r.idx).padStart(4, "0")}`,
-            render: (r) => (
+          { key: "bom", label: kind === "rbom" ? "RBOM No" : "BOM No", align: "left", sort: (r) => `${r.bom_id}#${String(r.idx).padStart(4, "0")}`,
+            render: (r) => kind === "rbom" ? (
+              <span className="font-bold" style={{ color: "#0F766E" }} title={`${r.project_id} · ${r.project_name}\nline ${r.idx}\ncopied from ${r.source_bom || "—"}`}>
+                {r.bom_id} <span className="text-xs" style={{ color: MUTED, fontWeight: 500 }}>← {S(r.source_bom).replace(/^BOM-[^-]+-/, "rev ")}</span>
+              </span>
+            ) : (
               <a href={erpForm(base, "BOM", r.bom_id)} target="_blank" rel="noreferrer" className="font-bold hover:underline" style={{ color: NAVY, textDecoration: "none" }}
                 title={`${r.project_id} · ${r.project_name}\nline ${r.idx}`}>{r.bom_id}</a>
             ) },
@@ -262,8 +330,8 @@ function BomLines({ bom, base: baseIn }: { bom: string; base: string; summary: S
             render: (r) => <span style={{ whiteSpace: "normal", display: "inline-block", maxWidth: 200 }}>{r.bom_remark || <span style={{ color: MUTED }}>·</span>}</span> },
           { key: "status", label: "Status", align: "left", sort: (r) => r.bom_status,
             render: (r) => r.bom_status ? <Chip text={r.bom_status} colour={lineColour(r.bom_status)} /> : <span style={{ color: MUTED }}>·</span> },
-          { key: "by", label: "Last Modified by", align: "left", sort: (r) => who(r.erp_modified_by), render: (r) => <span>{who(r.erp_modified_by)}</span> },
-          { key: "on", label: "Modified Date", align: "right", sort: (r) => S(r.erp_modified), render: (r) => <span className="tnum">{fmtAt(r.erp_modified)}</span> },
+          { key: "by", label: kind === "rbom" ? "Added / edited by" : "Last Modified by", align: "left", sort: (r) => who(r.erp_modified_by), render: (r) => <span>{who(r.erp_modified_by)}</span> },
+          { key: "on", label: kind === "rbom" ? "On" : "Modified Date", align: "right", sort: (r) => S(r.erp_modified), render: (r) => <span className="tnum">{fmtAt(r.erp_modified)}</span> },
           { key: "sup", label: "Supplier", align: "left", sort: (r) => r.suppliers.join(", "),
             render: (r) => r.suppliers.length
               ? <span style={{ whiteSpace: "normal", display: "inline-block", maxWidth: 220 }}>{r.suppliers.join(", ")}</span>
