@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.10",
+    date: "2026-09-03",
+    module: "MRP plan — the job detail rows freeze too",
+    items: [
+      "\"when details are chosen the light blue row also freezes\" (Dr Raghu, 3 Sep 2026). The TDD, kitted · pending and kitting % rows now stay under the job number as the grid scrolls, the way the project and job rows already did.",
+    ],
+  },
+  {
     v: "4.4.2.9",
     date: "2026-09-03",
     module: "Issue slip print — one sheet, not a blank second",

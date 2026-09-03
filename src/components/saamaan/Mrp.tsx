@@ -462,14 +462,15 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
                   {grid.jobs.map((j) => <th key={j.job_no} className="px-2 py-1 text-center tnum" style={{ position: "sticky", top: 25, zIndex: 2, background: NAVY, borderLeft: "1px solid #2B3A7A" }}><button onClick={() => setOpenJob(j)} className="hover:underline">{j.job_no}</button></th>)}
                 </tr>
                 {fullHead && (<>
+                  {/* The three detail rows freeze with the two above them ("when details are chosen the light blue row also freezes", 3 Sep 2026). */}
                   <tr style={{ background: NAVY_SOFT, color: INK }}>
-                    {grid.jobs.map((j) => <th key={j.job_no} className="px-2 py-0.5 text-center font-semibold tnum" style={{ borderLeft: `1px solid ${BORDER}` }} title="TDD">{fmtD(j.tdd)}</th>)}
+                    {grid.jobs.map((j) => <th key={j.job_no} className="px-2 py-0.5 text-center font-semibold tnum" style={{ position: "sticky", top: 50, zIndex: 2, background: NAVY_SOFT, borderLeft: `1px solid ${BORDER}` }} title="TDD">{fmtD(j.tdd)}</th>)}
                   </tr>
                   <tr style={{ background: NAVY_SOFT, color: INK }}>
-                    {grid.jobs.map((j) => { const o = perJob.get(j.job_no)!; return <th key={j.job_no} className="px-2 py-0.5 text-center font-semibold tnum" style={{ borderLeft: `1px solid ${BORDER}` }} title="kitted · pending (items)"><span style={{ color: GREEN }}>{o.done}</span> <span style={{ color: MUTED }}>·</span> <span style={{ color: o.cells - o.done ? AMBER : MUTED }}>{o.cells - o.done}</span></th>; })}
+                    {grid.jobs.map((j) => { const o = perJob.get(j.job_no)!; return <th key={j.job_no} className="px-2 py-0.5 text-center font-semibold tnum" style={{ position: "sticky", top: 70, zIndex: 2, background: NAVY_SOFT, borderLeft: `1px solid ${BORDER}` }} title="kitted · pending (items)"><span style={{ color: GREEN }}>{o.done}</span> <span style={{ color: MUTED }}>·</span> <span style={{ color: o.cells - o.done ? AMBER : MUTED }}>{o.cells - o.done}</span></th>; })}
                   </tr>
                   <tr style={{ background: NAVY_SOFT, color: INK }}>
-                    {grid.jobs.map((j) => { const o = perJob.get(j.job_no)!; return <th key={j.job_no} className="px-2 py-0.5 text-center font-bold tnum" style={{ borderLeft: `1px solid ${BORDER}` }} title="kitting %, by value">{pct(o.issued, o.value)}</th>; })}
+                    {grid.jobs.map((j) => { const o = perJob.get(j.job_no)!; return <th key={j.job_no} className="px-2 py-0.5 text-center font-bold tnum" style={{ position: "sticky", top: 90, zIndex: 2, background: NAVY_SOFT, borderLeft: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}` }} title="kitting %, by value">{pct(o.issued, o.value)}</th>; })}
                   </tr>
                 </>)}
               </thead>
