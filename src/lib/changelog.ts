@@ -75,7 +75,7 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
-    v: "4.4.0.1",
+    v: "4.4.2.12",
     date: "2026-09-03",
     module: "Saamaan shows the value of stock, live",
     items: [
