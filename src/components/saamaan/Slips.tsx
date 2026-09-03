@@ -37,7 +37,7 @@ export default function Slips({ mrp }: { mrp?: string } = {}) {
   const [open, setOpen] = useState<Slip | null>(null);
   const rows = data?.rows ?? [];
   return (
-    <Screen title="Issue slips" blurb="From one person to one person: what the store is to release, by project, then item group. A slip left open climbs the ladder a day at a time — project manager, COO, Raghu — each step a task."
+    <Screen title="Issue slips" blurb="Kitting slips to the store and purchase requisitions, from one person to one person, by project then item group. A slip left open climbs the ladder a day at a time — project manager, COO, Raghu — each step a task."
       action={<Btn onClick={reload} disabled={busy}>↻ Re-read</Btn>}>
       {err && <Note kind="error">{err}</Note>}
       <GenieTable<Slip>
@@ -48,7 +48,7 @@ export default function Slips({ mrp }: { mrp?: string } = {}) {
         empty="No slip yet — Submit to store on the MRP."
         columns={[
           { key: "no", label: "Slip", align: "left", sort: (r) => r.slip_no, render: (r) => <button onClick={() => setOpen(r)} className="font-bold hover:underline" style={{ color: NAVY }}>{r.slip_no}</button> },
-          { key: "kind", label: "To", align: "left", sort: (r) => r.kind, render: (r) => <span>{r.kind === "purchase" ? "Purchase" : "Store"} · <b>{who(r.to_email)}</b></span> },
+          { key: "kind", label: "To", align: "left", sort: (r) => r.kind, render: (r) => <span>{r.kind === "purchase" ? "Requisition · purchase" : "Kitting · store"} · <b>{who(r.to_email)}</b></span> },
           { key: "from", label: "From", align: "left", sort: (r) => who(r.from_email), render: (r) => who(r.from_email) },
           { key: "date", label: "Raised", align: "left", sort: (r) => r.created_at, render: (r) => <span className="tnum">{fmtD(r.created_at)}</span> },
           { key: "proj", label: "Projects", align: "left", render: (r) => <span style={{ color: MUTED }}>{r.projects.map((p) => p.replace(/^NGSE-PROJ-/, "")).join(", ") || "·"}</span> },
@@ -98,7 +98,7 @@ export function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void })
     g.lines.push(l);
   }
   return (
-    <Modal onClose={onClose} title={`${s.slip_no} — ${s.kind === "purchase" ? "purchase" : "issue"} slip · ${who(s.from_email)} → ${who(s.to_email)}`} width={1100}>
+    <Modal onClose={onClose} title={`${s.slip_no} — ${s.kind === "purchase" ? "purchase requisition" : "issue slip, kitting"} · ${who(s.from_email)} → ${who(s.to_email)}`} width={1100}>
       {err && <Note kind="error">{err}</Note>}
       {msg && <Note kind="error">{msg}</Note>}
       <div className="flex items-center gap-3 mb-3 text-xs flex-wrap" style={{ color: MUTED }}>

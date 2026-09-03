@@ -409,15 +409,15 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
             {canEdit && (
               <span className="ml-auto flex items-center gap-1 flex-wrap">
                 <select value={toStore} onChange={(e) => setToStore(e.target.value)} className="rounded border px-1.5 py-1 text-xs bg-white" style={{ borderColor: BORDER, maxWidth: 170 }} title="the store keeper — set the default in Masters">
-                  <option value="">store → who?</option>
+                  <option value="">store keeper → who?</option>
                   {people.map((p) => <option key={p.email} value={p.email}>{p.display_name || p.email.split("@")[0]}</option>)}
                 </select>
-                <Btn kind="primary" onClick={() => submit("store")} disabled={busy === "store" || !toStore} title="Every tick on these jobs not yet on a slip becomes one issue slip">Submit to store →</Btn>
+                <Btn kind="primary" onClick={() => submit("store")} disabled={busy === "store" || !toStore} title="Kitting: every tick on these jobs not yet on a slip becomes one issue slip to the store">Submit to store · kitting →</Btn>
                 <select value={toPurchase} onChange={(e) => setToPurchase(e.target.value)} className="rounded border px-1.5 py-1 text-xs bg-white" style={{ borderColor: BORDER, maxWidth: 170 }} title="purchase — set the default in Masters">
-                  <option value="">purchase → who?</option>
+                  <option value="">requisition → who?</option>
                   {people.map((p) => <option key={p.email} value={p.email}>{p.display_name || p.email.split("@")[0]}</option>)}
                 </select>
-                <Btn kind="primary" onClick={() => submit("purchase")} disabled={busy === "purchase" || !toPurchase} title="The order boxes become one purchase slip">Submit to purchase →</Btn>
+                <Btn kind="primary" onClick={() => submit("purchase")} disabled={busy === "purchase" || !toPurchase} title="Requisition: the order boxes become one purchase requisition">Submit to purchase · requisition →</Btn>
               </span>
             )}
           </div>

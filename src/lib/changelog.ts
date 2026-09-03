@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.6",
+    date: "2026-09-03",
+    module: "MRP — store is kitting, purchase is the requisition",
+    items: [
+      "\"submit to store is for the kitting; submit to purchase is the requisition\" (Dr Raghu, 3 Sep 2026). That is what each does — the ticks go to the store, the order boxes go to purchase — and the buttons now say so: Submit to store · kitting, Submit to purchase · requisition. A purchase slip is called a requisition wherever it shows, and keeps its PR number.",
+    ],
+  },
+  {
     v: "4.4.2.5",
     date: "2026-09-03",
     module: "MRP plan — Blocked, after In order",

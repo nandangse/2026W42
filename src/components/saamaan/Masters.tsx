@@ -38,7 +38,7 @@ function Routing() {
   };
   const ROWS: [string, string, string][] = [
     ["store_email", "Store keeper", "issue slips go here by default; releases the material"],
-    ["purchase_email", "Purchase", "purchase slips go here by default"],
+    ["purchase_email", "Purchase", "purchase requisitions go here by default"],
     ["coo_email", "COO", "second step of the ladder — a slip not done after two days"],
   ];
   return (
