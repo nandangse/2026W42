@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.1.8",
+    date: "2026-09-03",
+    module: "Phase 7 lands — the group warehouses had no type",
+    items: [
+      "The first run of phase 7 failed: \"null value in column kind violates not-null constraint\". The group warehouses (the folders the working ones sit under) were sent without a type, and a batch where some rows lack a column is written with null there. Every new row now carries a type — blank for a group, a guess from the name for a working warehouse.",
+    ],
+  },
+  {
     v: "4.4.1.7",
     date: "2026-09-03",
     module: "Saamaan — the RBOM opens from WIP; the MRP door",

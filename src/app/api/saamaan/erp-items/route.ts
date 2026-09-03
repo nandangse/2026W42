@@ -527,8 +527,11 @@ export async function POST(req: Request) {
           erp_modified: T(d.modified),
           pulled_at: startedAt,
         };
-        if (!known.has(name) && !B(d.is_group)) {
-          const k = guess(name);
+        // A NEW row always carries kind and remarks — blank for a group
+        // warehouse, a guess for a working one — because a batch where some
+        // rows lack a column is sent with null there, and kind refuses null.
+        if (!known.has(name)) {
+          const k = B(d.is_group) ? "" : guess(name);
           row.kind = k;
           row.remarks = k ? "type guessed from the name — check" : "";
         }
