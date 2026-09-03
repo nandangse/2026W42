@@ -235,6 +235,16 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
     void cell;
   };
 
+  /** The un-tick (Dr Raghu, 3 Sep 2026: "once clicked keep provision to unclick also"). */
+  const unissue = async (job_no: string, item_code: string) => {
+    const key = `${job_no}|${item_code}`;
+    setBusy(key); setMsg("");
+    const r = await post("/api/saamaan/mrp", { action: "unissue", id: runId, job_no, item_code });
+    setBusy("");
+    if (!r.ok) { setMsg(r.error || "Could not take it back."); return; }
+    await loadRun(runId);
+  };
+
   // ------------------------------------------------------------ the sums
   const totals = useMemo(() => {
     let cells = 0, done = 0, value = 0, issued = 0, runValue = 0, toOrderValue = 0;
@@ -416,7 +426,7 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
               <tbody>
                 {groups.map(([g, items]) => (
                   <GroupRows key={g} group={g} items={items} jobs={grid.jobs} folded={folded.has(g)} onFold={() => toggleFold(g)}
-                    boxes={boxes} setBoxes={setBoxes} busy={busy} canEdit={canEdit} onIssue={issue}
+                    boxes={boxes} setBoxes={setBoxes} busy={busy} canEdit={canEdit} onIssue={issue} onUnissue={unissue}
                     showPlan={showPlan} orderBox={orderBox} setOrderBox={setOrderBox} onKeep={(code, q) => keepPlan([{ item_code: code, order_qty: q }])} />
                 ))}
               </tbody>
@@ -531,10 +541,10 @@ const PLAN_COLS: { key: string; label: string; hint: string; w: number }[] = [
 ];
 
 // ============================================================ the rows
-function GroupRows({ group, items, jobs, folded, onFold, boxes, setBoxes, busy, canEdit, onIssue, showPlan, orderBox, setOrderBox, onKeep }: {
+function GroupRows({ group, items, jobs, folded, onFold, boxes, setBoxes, busy, canEdit, onIssue, onUnissue, showPlan, orderBox, setOrderBox, onKeep }: {
   group: string; items: Item[]; jobs: Col[]; folded: boolean; onFold: () => void;
   boxes: Record<string, string>; setBoxes: (f: (b: Record<string, string>) => Record<string, string>) => void;
-  busy: string; canEdit: boolean; onIssue: (job: string, item: string, cell: Cell) => void;
+  busy: string; canEdit: boolean; onIssue: (job: string, item: string, cell: Cell) => void; onUnissue: (job: string, item: string) => void;
   showPlan: boolean; orderBox: Record<string, string>; setOrderBox: (f: (b: Record<string, string>) => Record<string, string>) => void; onKeep: (code: string, q: number | null) => void;
 }) {
   const num = (n: number | null) => (n === null ? "·" : qtyFmt(n));
@@ -589,15 +599,21 @@ function GroupRows({ group, items, jobs, folded, onFold, boxes, setBoxes, busy, 
             const full = c.qty > 0 && c.issued >= c.qty;
             const remaining = Math.max(0, c.qty - c.issued);
             return (
-              <td key={j.job_no} className="px-1 py-1 text-center" style={{ borderBottom: `1px solid ${BORDER}`, borderLeft: `1px solid ${BORDER}`, background: full ? "#E6F4EC" : c.issued > 0 ? "#FEF3C7" : undefined }}
+              <td key={j.job_no} className="px-1 py-1 text-center" style={{ position: "relative", borderBottom: `1px solid ${BORDER}`, borderLeft: `1px solid ${BORDER}`, background: full ? "#E6F4EC" : c.issued > 0 ? "#FEF3C7" : undefined }}
                 title={`${qtyFmt(c.qty)} ${c.uom} per the RBOM${c.rate !== null ? ` @ ₹${c.rate.toLocaleString("en-IN")}` : ""}${c.status === "Draft" ? ` · DRAFT line from ${c.source}` : ""}${c.issued ? `\nissued ${qtyFmt(c.issued)} ${c.uom} in ${c.issues} entr${c.issues === 1 ? "y" : "ies"} · last ${fmtAt(c.last_at)} by ${who(c.last_by)}` : ""}`}>
                 <div className="flex items-center justify-center gap-1">
                   <span className="tnum" style={{ color: full ? GREEN : INK, fontWeight: 700 }}>{qtyFmt(c.qty)} <span style={{ color: MUTED, fontWeight: 500 }}>{c.uom}</span></span>
                   {c.status === "Draft" && <span className="text-xs font-bold" style={{ color: AMBER }}>D</span>}
                 </div>
-                {full ? (
+                {full ? (<>
                   <div className="text-xs tnum" style={{ color: GREEN }}>✓ {fmtD(c.last_at.slice(0, 10))}</div>
-                ) : canEdit ? (
+                  {/* "make a small x at the corner to redo this" — the un-tick. */}
+                  {canEdit && (
+                    <button onClick={() => onUnissue(j.job_no, it.item_code)} disabled={busy === key} aria-label="Un-tick"
+                      style={{ position: "absolute", top: 1, right: 2, width: 14, height: 14, lineHeight: "12px", fontSize: 11, fontWeight: 700, borderRadius: 7, color: "#fff", background: "#9CA3AF", border: "none", padding: 0, cursor: "pointer" }}
+                      title="Un-tick: take the issue back out of the WIP. Not once it is on a slip to the store — cancel the slip first.">×</button>
+                  )}
+                </>) : canEdit ? (
                   <div className="flex items-center justify-center gap-1 mt-0.5">
                     <input value={boxes[key] ?? ""} placeholder={qtyFmt(remaining)} inputMode="decimal"
                       onChange={(e) => setBoxes((b) => ({ ...b, [key]: e.target.value }))}
@@ -605,6 +621,11 @@ function GroupRows({ group, items, jobs, folded, onFold, boxes, setBoxes, busy, 
                     <button onClick={() => onIssue(j.job_no, it.item_code, c)} disabled={busy === key}
                       className="rounded px-1.5 py-0.5 text-xs font-bold" style={{ background: busy === key ? MUTED : GREEN, color: "#fff" }} title={`issue into WIP_${j.job_no}`}>✓</button>
                     {c.issued > 0 && <span className="text-xs tnum" style={{ color: "#92400E" }}>{qtyFmt(c.issued)} gone</span>}
+                    {c.issued > 0 && (
+                      <button onClick={() => onUnissue(j.job_no, it.item_code)} disabled={busy === key} aria-label="Un-tick"
+                        style={{ position: "absolute", top: 1, right: 2, width: 14, height: 14, lineHeight: "12px", fontSize: 11, fontWeight: 700, borderRadius: 7, color: "#fff", background: "#9CA3AF", border: "none", padding: 0, cursor: "pointer" }}
+                        title="Un-tick: take back what has gone, unless a slip carries it">×</button>
+                    )}
                   </div>
                 ) : c.issued > 0 ? <div className="text-xs tnum" style={{ color: "#92400E" }}>{qtyFmt(c.issued)} of {qtyFmt(c.qty)}</div> : null}
               </td>

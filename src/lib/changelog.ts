@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.3",
+    date: "2026-09-03",
+    module: "MRP — the un-tick",
+    items: [
+      "\"once clicked keep provision to unclick also … make a small x at the corner\" (Dr Raghu, 3 Sep 2026). A ticked cell carries a small × in its corner; it takes the issue back out of the job's WIP and the cell goes white again. A partial has the × too.",
+      "NOT ONCE A SLIP CARRIES IT. An issue already submitted to the store stays put and the × says to cancel the slip first — the store may be walking to the shelf on it.",
+    ],
+  },
+  {
     v: "4.4.2.2",
     date: "2026-09-03",
     module: "Saamaan — the MRP list, a run on its own page, and a frozen frame",

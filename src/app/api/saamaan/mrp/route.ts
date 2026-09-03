@@ -26,6 +26,10 @@ export const dynamic = "force-dynamic";
  *          item group and item.
  *   POST { action: "submit_purchase", id, to_email }
  *        — the order boxes become one purchase slip.
+ *   POST { action: "unissue", id, job_no, item_code }
+ *        — the un-tick: takes back every issue of that item to that job
+ *          that no slip has carried yet. One already on a slip stays;
+ *          cancel the slip first.
  *   POST { action: "issue", id, job_no, item_code, qty }
  *        — the tick: one row into material_issue, the entry in that job's
  *          WIP warehouse, that quantity, that date, that person. Never more
@@ -344,6 +348,16 @@ export async function POST(req: Request) {
           return NextResponse.json({ ok: true, slip, lines: lines.length });
         }
         throw new HttpError(409, "Two slips were numbered at once — try again.");
+      }
+      if (action === "unissue") {
+        const job_no = S(body.job_no), item_code = S(body.item_code);
+        if (!job_no || !item_code) throw new HttpError(400, "job_no and item_code required");
+        const { data: onSlip } = await admin.from("material_issue").select("id, slip_id").eq("job_no", job_no).eq("item_code", item_code).not("slip_id", "is", null).limit(1);
+        const { count, error } = await admin.from("material_issue").delete({ count: "exact" }).eq("job_no", job_no).eq("item_code", item_code).is("slip_id", null);
+        if (error) throw error;
+        if (!count && onSlip?.length) throw new HttpError(400, "This issue is already on a slip to the store — cancel the slip to take it back.");
+        if (!count) throw new HttpError(400, "Nothing to take back.");
+        return NextResponse.json({ ok: true, removed: count, keptOnSlip: onSlip?.length ? true : false });
       }
       if (action === "issue") {
         const job_no = S(body.job_no), item_code = S(body.item_code);
