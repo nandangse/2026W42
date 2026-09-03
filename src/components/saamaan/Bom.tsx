@@ -204,7 +204,7 @@ the latest submitted BOM${r.submitted > 1 ? ` of ${r.submitted}` : ""}${r.drafts
 }
 
 // ============================================================ the lightbox
-function BomLines({ kind, bom, base: baseIn }: { kind: "bom" | "rbom"; bom: string; base: string; summary: Summary }) {
+export function BomLines({ kind, bom, base: baseIn }: { kind: "bom" | "rbom"; bom: string; base: string; summary: Summary }) {
   const project = "";
   const [status, setStatus] = useState("");
   const [typed, setTyped] = useState("");

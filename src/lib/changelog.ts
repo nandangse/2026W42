@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.1.7",
+    date: "2026-09-03",
+    module: "Saamaan — the RBOM opens from WIP; the MRP door",
+    items: [
+      "\"Make the RBOM come in the lightbox\" (Dr Raghu, 3 Sep 2026) — on WIP, the RBOM No pill now opens the Real BOM in the same lightbox the BOM front uses, titled with the project, the job and its tag.",
+      "\"we will begin MRP now — Material Resource Planning. make a new app inside after WIP.\" An MRP section sits after WIP, open and empty on purpose: it lists what it will stand on — items with closing stock, the RBOM, the WIP per job, the warehouse types — and asks how he wants it cut. What it plans is his to say next.",
+    ],
+  },
+  {
     v: "4.4.1.6",
     date: "2026-09-03",
     module: "Saamaan — WIP, one warehouse per live job",

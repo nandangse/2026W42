@@ -18,8 +18,10 @@
 
 import { useMemo, useState } from "react";
 import GenieTable from "@/components/GenieTable";
-import { Screen, Btn, Note, Chip, INK, MUTED, BORDER, NAVY, GREEN, AMBER, S, useLoad } from "@/components/ims/ui";
+import { Screen, Btn, Note, Chip, Modal, INK, MUTED, BORDER, NAVY, GREEN, AMBER, S, useLoad } from "@/components/ims/ui";
 import { JobLightbox, type WipJob } from "@/components/JobsInProgress";
+import { BomLines } from "./Bom";
+import type { Summary } from "./Dashboard";
 
 interface Row {
   job_no: string; warehouse: string; customer_tag: string; project_id: string; customer: string; product_family: string;
@@ -39,9 +41,11 @@ const num = (n: unknown) => (n === null || n === undefined ? "·" : Number(n).to
 const erpForm = (base: string, doctype: string, name: string) =>
   `${base}/app/${doctype.toLowerCase().replace(/\s+/g, "-")}/${encodeURIComponent(name)}`;
 
-export default function Wip({ erpBase, role }: { erpBase: string; role: string }) {
+export default function Wip({ erpBase, role, summary }: { erpBase: string; role: string; summary: Summary }) {
   const [data, busy, reload, err] = useLoad<Answer>("/api/saamaan/wip");
   const [picked, setPicked] = useState<Row | null>(null);
+  /** "Make the RBOM come in the lightbox" — the same one the BOM front opens. */
+  const [rbomOpen, setRbomOpen] = useState<Row | null>(null);
   const canEdit = ["admin", "planner", "project_owner"].includes(role);
   const rows = data?.rows ?? [];
   const totals = useMemo(() => ({
@@ -93,7 +97,9 @@ export default function Wip({ erpBase, role }: { erpBase: string; role: string }
           { key: "bom", label: "BOM No (ERP)", align: "left", sort: (r) => r.bom_no_erp,
             render: (r) => r.bom_no_erp ? <a href={erpForm(erpBase, "BOM", r.bom_no_erp)} target="_blank" rel="noreferrer" className="text-xs font-bold hover:underline" style={{ color: NAVY, textDecoration: "none" }}>{r.bom_no_erp}</a> : <span style={{ color: MUTED }}>·</span> },
           { key: "rbom", label: "RBOM No", align: "left", sort: (r) => r.rbom_no,
-            render: (r) => r.rbom_no ? <span className="rounded px-1.5 py-0.5 text-xs font-bold" style={{ background: "#0F766E", color: "#fff" }}>{r.rbom_no}</span> : <span style={{ color: MUTED }} title="no RBOM built for the project yet — BOM section">·</span> },
+            render: (r) => r.rbom_no
+              ? <button onClick={() => setRbomOpen(r)} className="rounded px-1.5 py-0.5 text-xs font-bold hover:underline" style={{ background: "#0F766E", color: "#fff" }} title="Open the Real BOM">{r.rbom_no}</button>
+              : <span style={{ color: MUTED }} title="no RBOM built for the project yet — BOM section">·</span> },
           { key: "val", label: "Value", align: "right", sort: (r) => Number(r.value ?? -1), render: (r) => <span className="tnum font-bold">{cr(r.value)}</span> },
           { key: "nk", label: "Nos kitted", align: "right", sort: (r) => Number(r.nos_kitted ?? -1), render: (r) => <span className="tnum" style={{ color: r.nos_kitted === null ? MUTED : INK }}>{num(r.nos_kitted)}</span> },
           { key: "vk", label: "Value kitted", align: "right", sort: (r) => Number(r.value_kitted ?? -1), render: (r) => <span className="tnum" style={{ color: r.value_kitted === null ? MUTED : INK }}>{cr(r.value_kitted)}</span> },
@@ -113,6 +119,11 @@ export default function Wip({ erpBase, role }: { erpBase: string; role: string }
         {data?.refreshedAt ? ` Refreshed ${new Date(data.refreshedAt).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })}.` : ""}
       </div>
 
+      {rbomOpen && (
+        <Modal onClose={() => setRbomOpen(null)} title={`${rbomOpen.rbom_no} · Real BOM — ${rbomOpen.project_id} · job ${rbomOpen.job_no} · ${rbomOpen.customer_tag}`} width={1500}>
+          <BomLines kind="rbom" bom={rbomOpen.rbom_no} base={erpBase} summary={summary} />
+        </Modal>
+      )}
       {picked && (
         <JobLightbox
           job={picked.job}
