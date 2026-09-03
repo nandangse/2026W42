@@ -27,6 +27,7 @@ import { JobLightbox, type WipJob } from "@/components/JobsInProgress";
 import GenieTable from "@/components/GenieTable";
 import Slips from "./Slips";
 import Kitting from "./Kitting";
+import { GroupPicker } from "./Items";
 
 interface Run { id: string; mrp_no: string; name: string; run_date: string; by: string | null; created_at: string; generated_at: string | null; jobs?: number; value?: number; kitted_value?: number }
 interface BoardJob { job_no: string; tag: string; cust: string; fam: string; project_id: string; project_name: string; tdd: string | null; val: number | null; stat: string }
@@ -53,7 +54,9 @@ function plan(it: Item) {
   const needed = required - kitted;
   const balance = it.stock === null || it.ordered === null ? null : it.stock + it.ordered - needed;
   const toOrder = balance === null ? null : Math.max(0, -balance);
-  return { required, kitted, needed, balance, toOrder, rate };
+  const reqValue = rate === null ? null : required * rate;
+  const orderValue = rate === null || it.order_qty === null ? null : it.order_qty * rate;
+  return { required, kitted, needed, balance, toOrder, rate, reqValue, orderValue };
 }
 
 const CR = 1e7;
@@ -147,7 +150,10 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [openJob, setOpenJob] = useState<Col | null>(null);
   const [fullHead, setFullHead] = useState(true);
-  const [folded, setFolded] = useState<Set<string>>(new Set());
+  const [groupPick, setGroupPick] = useState<string[]>([]);
+  const [itemQ, setItemQ] = useState("");
+  const [sortKey, setSortKey] = useState("group");
+  const [sortDir, setSortDir] = useState<1 | -1>(1);
   const [boxes, setBoxes] = useState<Record<string, string>>({});
   const [showPlan, setShowPlan] = useState(true);
   const [orderBox, setOrderBox] = useState<Record<string, string>>({});
@@ -270,11 +276,37 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
     }
     return m;
   }, [grid]);
-  const groups = useMemo(() => {
-    const g = new Map<string, Item[]>();
-    for (const it of grid?.items ?? []) (g.get(it.item_group) ?? g.set(it.item_group, []).get(it.item_group)!).push(it);
-    return [...g.entries()];
+  /** The groups on this run, with counts, for the picker. */
+  const groupCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const it of grid?.items ?? []) m.set(it.item_group, (m.get(it.item_group) ?? 0) + 1);
+    return [...m.entries()].map(([item_group, n]) => ({ item_group, n })).sort((a, b) => a.item_group.localeCompare(b.item_group));
   }, [grid]);
+  /** Filtered by group and search, then sorted — value by default falls to the biggest first. */
+  const visible = useMemo(() => {
+    const q = itemQ.trim().toLowerCase();
+    let out = (grid?.items ?? []).filter((it) => (!groupPick.length || groupPick.includes(it.item_group)) && (!q || `${it.item_code} ${it.item_name}`.toLowerCase().includes(q)));
+    const key = (it: Item): string | number => {
+      const pl = plan(it);
+      switch (sortKey) {
+        case "item": return it.item_code;
+        case "stock": return it.stock ?? -1;
+        case "required": return pl.required;
+        case "reqvalue": return pl.reqValue ?? -1;
+        case "kitted": return pl.kitted;
+        case "needed": return pl.needed;
+        case "ordered": return it.ordered ?? -1;
+        case "balance": return pl.balance ?? -Infinity;
+        case "toorder": return pl.toOrder ?? -1;
+        case "box": return it.order_qty ?? -1;
+        case "value": return pl.orderValue ?? -1;
+        default: return `${it.item_group}|${it.item_code}`;
+      }
+    };
+    out = [...out].sort((a, b) => { const x = key(a), y = key(b); return sortDir * (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))); });
+    return out;
+  }, [grid, groupPick, itemQ, sortKey, sortDir]);
+  const sortBy = (k: string) => { if (sortKey === k) setSortDir((d) => (d === 1 ? -1 : 1)); else { setSortKey(k); setSortDir(/value|required|needed|toorder|balance|stock|ordered|kitted|box/.test(k) ? -1 : 1); } };
   const projectSpans = useMemo(() => {
     const out: { project_id: string; project_name: string; n: number }[] = [];
     for (const j of grid?.jobs ?? []) {
@@ -290,7 +322,6 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
   }, [board]);
 
   const run = grid?.run ?? null;
-  const toggleFold = (g: string) => setFolded((f) => { const n = new Set(f); if (n.has(g)) n.delete(g); else n.add(g); return n; });
 
   return (
     <div style={{ maxWidth: "100%" }}>
@@ -388,19 +419,30 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3 mb-1 text-xs" style={{ color: MUTED }}>
-            <label className="flex items-center gap-1"><input type="checkbox" checked={fullHead} onChange={(e) => setFullHead(e.target.checked)} /> full job headers (TDD, kitted, pending, %)</label>
-            <button onClick={() => setFolded(new Set())} style={{ color: NAVY }}>expand all groups</button>
-            <button onClick={() => setFolded(new Set(groups.map(([g]) => g)))} style={{ color: NAVY }}>fold all</button>
-            <span className="ml-auto tnum">{grid.items.length} items · {grid.jobs.length} jobs · {grid.issues} issues so far</span>
+          <div className="flex items-center gap-2 mb-1 text-xs flex-wrap" style={{ color: MUTED }}>
+            <GroupPicker all={groupCounts} value={groupPick} onChange={setGroupPick} />
+            <input value={itemQ} onChange={(e) => setItemQ(e.target.value)} placeholder="🔍 item code or name"
+              className="px-2 py-1.5 rounded border text-sm" style={{ borderColor: BORDER, minWidth: 220 }} />
+            <span className="ml-auto tnum">{visible.length}{visible.length !== grid.items.length ? ` of ${grid.items.length}` : ""} items · {grid.jobs.length} jobs · {grid.issues} issues so far · sorted by {sortKey}{sortDir === -1 ? " ↓" : " ↑"}</span>
           </div>
           <div className="rounded-lg border overflow-auto" style={{ borderColor: BORDER, background: "#fff", maxHeight: "70vh" }}>
             <table className="text-xs" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 420 + grid.jobs.length * 150 }}>
               <thead>
                 <tr style={{ background: "#14224F", color: "#fff" }}>
-                  <th rowSpan={fullHead ? 5 : 2} className="px-2 py-1 text-left" style={{ position: "sticky", left: 0, top: 0, zIndex: 3, background: "#14224F", width: 200, minWidth: 200, maxWidth: 200, verticalAlign: "bottom" }}>Item</th>
+                  <th rowSpan={fullHead ? 5 : 2} className="px-2 py-1 text-left" style={{ position: "sticky", left: 0, top: 0, zIndex: 3, background: "#14224F", width: 120, minWidth: 120, maxWidth: 120, verticalAlign: "bottom" }}>
+                    <button onClick={() => sortBy("group")} className="hover:underline">Item group{sortKey === "group" ? (sortDir === 1 ? " ↑" : " ↓") : ""}</button>
+                  </th>
+                  <th rowSpan={fullHead ? 5 : 2} className="px-2 py-1 text-left" style={{ position: "sticky", left: 120, top: 0, zIndex: 3, background: "#14224F", width: 200, minWidth: 200, maxWidth: 200, verticalAlign: "bottom", borderRight: "2px solid #2B3A7A" }}>
+                    <div className="flex items-end justify-between gap-1">
+                      <button onClick={() => sortBy("item")} className="hover:underline">Item{sortKey === "item" ? (sortDir === 1 ? " ↑" : " ↓") : ""}</button>
+                      {/* "make the details of the job collapsible — clicking on an arrow down will uncollapse" */}
+                      <button onClick={() => setFullHead((v) => !v)} className="rounded px-1.5 text-xs font-bold" style={{ background: "#2B3A7A", color: "#fff" }}
+                        title={fullHead ? "Fold the job details — TDD, kitted, pending, %" : "Unfold the job details"}>{fullHead ? "▴ details" : "▾ details"}</button>
+                    </div>
+                  </th>
                   {showPlan && PLAN_COLS.map((c) => (
-                    <th key={c.key} rowSpan={fullHead ? 5 : 2} className="px-1.5 py-1 text-right" style={{ position: "sticky", top: 0, zIndex: 2, background: "#0F766E", verticalAlign: "bottom", minWidth: c.w }} title={c.hint}>{c.label}</th>
+                    <th key={c.key} rowSpan={fullHead ? 5 : 2} className="px-1.5 py-1 text-right" style={{ position: "sticky", top: 0, zIndex: 2, background: "#0F766E", verticalAlign: "bottom", minWidth: c.w, cursor: "pointer" }} title={`${c.hint} — click to sort`}
+                      onClick={() => sortBy(c.key)}>{c.label}{sortKey === c.key ? (sortDir === 1 ? " ↑" : " ↓") : ""}</th>
                   ))}
                   {projectSpans.map((p) => (
                     <th key={p.project_id} colSpan={p.n} className="px-2 py-1 text-center" style={{ position: "sticky", top: 0, zIndex: 2, background: "#14224F", borderLeft: "1px solid #2B3A7A" }} title={p.project_name}>
@@ -424,11 +466,10 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
                 </>)}
               </thead>
               <tbody>
-                {groups.map(([g, items]) => (
-                  <GroupRows key={g} group={g} items={items} jobs={grid.jobs} folded={folded.has(g)} onFold={() => toggleFold(g)}
-                    boxes={boxes} setBoxes={setBoxes} busy={busy} canEdit={canEdit} onIssue={issue} onUnissue={unissue}
-                    showPlan={showPlan} orderBox={orderBox} setOrderBox={setOrderBox} onKeep={(code, q) => keepPlan([{ item_code: code, order_qty: q }])} />
-                ))}
+                <ItemRows items={visible} jobs={grid.jobs}
+                  boxes={boxes} setBoxes={setBoxes} busy={busy} canEdit={canEdit} onIssue={issue} onUnissue={unissue}
+                  showPlan={showPlan} orderBox={orderBox} setOrderBox={setOrderBox} onKeep={(code, q) => keepPlan([{ item_code: code, order_qty: q }])} />
+                {visible.length === 0 && <tr><td colSpan={2 + (showPlan ? PLAN_COLS.length : 0) + grid.jobs.length} className="px-3 py-4 text-sm" style={{ color: MUTED }}>No item matches — loosen the group filter or the search.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -531,6 +572,7 @@ function Released({ mrp }: { mrp: string }) {
 const PLAN_COLS: { key: string; label: string; hint: string; w: number }[] = [
   { key: "stock", label: "Stock", hint: "current stock in the Stock warehouses, live from the ERP", w: 64 },
   { key: "required", label: "Required", hint: "the RBOM quantity, summed over the chosen jobs", w: 64 },
+  { key: "reqvalue", label: "Req. value", hint: "required at the RBOM rate", w: 84 },
   { key: "kitted", label: "Kitted", hint: "what has gone into the jobs' WIPs", w: 60 },
   { key: "needed", label: "Needed", hint: "required less kitted", w: 60 },
   { key: "ordered", label: "In order", hint: "on purchase orders, not yet received — every warehouse", w: 64 },
@@ -541,8 +583,8 @@ const PLAN_COLS: { key: string; label: string; hint: string; w: number }[] = [
 ];
 
 // ============================================================ the rows
-function GroupRows({ group, items, jobs, folded, onFold, boxes, setBoxes, busy, canEdit, onIssue, onUnissue, showPlan, orderBox, setOrderBox, onKeep }: {
-  group: string; items: Item[]; jobs: Col[]; folded: boolean; onFold: () => void;
+function ItemRows({ items, jobs, boxes, setBoxes, busy, canEdit, onIssue, onUnissue, showPlan, orderBox, setOrderBox, onKeep }: {
+  items: Item[]; jobs: Col[];
   boxes: Record<string, string>; setBoxes: (f: (b: Record<string, string>) => Record<string, string>) => void;
   busy: string; canEdit: boolean; onIssue: (job: string, item: string, cell: Cell) => void; onUnissue: (job: string, item: string) => void;
   showPlan: boolean; orderBox: Record<string, string>; setOrderBox: (f: (b: Record<string, string>) => Record<string, string>) => void; onKeep: (code: string, q: number | null) => void;
@@ -550,18 +592,15 @@ function GroupRows({ group, items, jobs, folded, onFold, boxes, setBoxes, busy, 
   const num = (n: number | null) => (n === null ? "·" : qtyFmt(n));
   return (
     <>
-      <tr style={{ background: "#F1F3F9" }}>
-        <td colSpan={1 + (showPlan ? PLAN_COLS.length : 0) + jobs.length} className="px-2 py-1 font-bold" style={{ color: INK, borderTop: `1px solid ${BORDER}` }}>
-          <button onClick={onFold} className="flex items-center gap-2">
-            <span style={{ width: 12, display: "inline-block" }}>{folded ? "▸" : "▾"}</span>{group.replace(/^RM - /, "")} <span style={{ color: MUTED, fontWeight: 500 }}>· {items.length} item{items.length === 1 ? "" : "s"}</span>
-          </button>
-        </td>
-      </tr>
-      {!folded && items.map((it, i) => (
+      {items.map((it, i) => (
         <tr key={it.item_code} style={{ background: i % 2 ? "#FAF9F5" : "#fff" }}>
+          <td className="px-2 py-1 text-xs" title={it.item_group}
+            style={{ position: "sticky", left: 0, background: i % 2 ? "#FAF9F5" : "#fff", borderBottom: `1px solid ${BORDER}`, zIndex: 1, width: 120, minWidth: 120, maxWidth: 120, color: MUTED, whiteSpace: "normal", lineHeight: 1.2 }}>
+            {it.item_group.replace(/^RM - /, "")}
+          </td>
           {/* 200px, frozen on the left (Dr Raghu, 3 Sep 2026: "make it narrow and frozen — approx 200 px"); the name wraps to two lines, whole on hover. */}
           <td className="px-2 py-1" title={`${it.item_code} — ${it.item_name}`}
-            style={{ position: "sticky", left: 0, background: i % 2 ? "#FAF9F5" : "#fff", borderBottom: `1px solid ${BORDER}`, borderRight: `2px solid ${BORDER}`, zIndex: 1, width: 200, minWidth: 200, maxWidth: 200 }}>
+            style={{ position: "sticky", left: 120, background: i % 2 ? "#FAF9F5" : "#fff", borderBottom: `1px solid ${BORDER}`, borderRight: `2px solid ${BORDER}`, zIndex: 1, width: 200, minWidth: 200, maxWidth: 200 }}>
             <b style={{ color: INK }}>{it.item_code}</b>
             <div style={{ color: MUTED, whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25, fontSize: 11 }}>{it.item_name}</div>
           </td>
@@ -575,6 +614,7 @@ function GroupRows({ group, items, jobs, folded, onFold, boxes, setBoxes, busy, 
             return (<>
               <td className="px-1.5 py-1 text-right tnum" style={cellCss}>{num(it.stock)}</td>
               <td className="px-1.5 py-1 text-right tnum font-bold" style={cellCss}>{qtyFmt(pl.required)}</td>
+              <td className="px-1.5 py-1 text-right tnum" style={{ ...cellCss, color: pl.reqValue ? INK : MUTED }}>{pl.reqValue === null ? "·" : money(pl.reqValue)}</td>
               <td className="px-1.5 py-1 text-right tnum" style={{ ...cellCss, color: pl.kitted ? GREEN : MUTED }}>{qtyFmt(pl.kitted)}</td>
               <td className="px-1.5 py-1 text-right tnum" style={cellCss}>{qtyFmt(pl.needed)}</td>
               <td className="px-1.5 py-1 text-right tnum" style={cellCss}>{num(it.ordered)}</td>

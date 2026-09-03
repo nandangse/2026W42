@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.4",
+    date: "2026-09-03",
+    module: "MRP plan — value beside required, sortable, filtered by group, searched by item",
+    items: [
+      "\"required then show value; make it sortable by value also\" (Dr Raghu, 3 Sep 2026) — Req. value sits right after Required, the required quantity at the RBOM rate; every planning header sorts on a click, values falling biggest first, and the toolbar says what the sort is.",
+      "\"item group – Item, then a filter for item group with multiple selections, and search for item\" — the group headers are gone; each row carries its Item group and its Item as two frozen columns on the left, the same typable multi-select group picker as on Items, and a search on code or name.",
+      "\"make the details of the job collapsible — clicking on an arrow will uncollapse\" — the ▴ details / ▾ details arrow in the Item header folds the TDD, kitted, pending and % rows to the job number alone, and back.",
+    ],
+  },
+  {
     v: "4.4.2.3",
     date: "2026-09-03",
     module: "MRP — the un-tick",

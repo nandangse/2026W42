@@ -197,7 +197,7 @@ export default function Items({ summary, initialGroup }: { summary: Summary; ini
  * tick as many as the question needs; the ticked ones stay on top so what
  * is on never scrolls out of sight. Enter ticks the one group left showing.
  */
-function GroupPicker({ all, value, onChange }: {
+export function GroupPicker({ all, value, onChange }: {
   all: { item_group: string; n: number }[]; value: string[]; onChange: (v: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
