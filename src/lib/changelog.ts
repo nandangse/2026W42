@@ -75,6 +75,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.3.0",
+    date: "2026-09-04",
+    module: "Meetings — Zoom calls arrive in the CRM by themselves",
+    items: [
+      "\"after every zoom call the summary and the recording ... pulled into genie in a section called meetings. This zoom is basically a meeting so the attendees, date, MoM and then tagging it to a deal will be useful\" (Dr Raghu, 4 Sep 2026) \u2014 and \"yes go ahead\". Drop one of three.",
+      "ZOOM TELLS GENIE; GENIE DOES NOT POLL. A Server-to-Server OAuth app, its credentials in CRM \u2192 Integrations like every other key, and Zoom's webhooks at /api/zoom/webhook: meeting.ended files the meeting and who was in the room; recording.completed puts the recording on it; meeting.summary_completed puts Zoom's AI Companion summary on it. Every call is verified against the app's Secret Token and refused if it does not sign \u2014 the caller is Zoom or nobody. An hourly sweep walks the last two days for anything a webhook missed.",
+      "A MEETING IS AN INTERACTION. The CRM already logs calls and visits against a company, a person, an opportunity, a quotation \u2014 so every meeting also becomes an interaction of kind Zoom Meeting, and the deal tag lives where every other tag lives: on the deal's timeline.",
+      "WHO WAS IN THE ROOM DECIDES THE DEAL. Attendee emails are matched to CRM contacts, contacts to their company, the company to its one open opportunity when it has exactly one. Where Genie cannot tell, the meeting stays NEW for a person to tag \u2014 a guessed deal written into a timeline is worse than a blank, because it gets believed. Re-runs never overwrite a tag a person has set.",
+      "THE SKIPPED HOP: Zoom \u2192 Drive \u2192 Genie was the ask. Zoom cannot write to Drive without a third party in the middle of every meeting, and Genie already talks to both \u2014 so Zoom \u2192 Genie, with Drive as the archive, as every other attachment already is. Drop two brings the recording into that archive and the Consult chair onto the meeting.",
+      "NEEDS CRM MIGRATION 0052, and the Zoom credentials in Integrations. Nothing arrives until both are in.",
+    ],
+  },
+  {
     v: "4.4.2.14",
     date: "2026-09-03",
     module: "The sales plan is rich text, and carries its files",

@@ -331,7 +331,7 @@ export const DOCTYPES: Doctype[] = [
     blurb: "Phone calls and visits, logged against anything — a lead, a person, a company, a quote, a sales order. The Warmer/Colder read is the pulse of the deal.",
     fields: [
       { name: "kind", label: "Type", type: "select", inList: true, default: "Follow Up Call",
-        options: ["Follow Up Call", "Cold call", "Follow Up Visit", "Cold Visit", "Existing Customer Visit", "Video Call", "SMS or Whatsapp", "Mail", "Internal"] },
+        options: ["Follow Up Call", "Cold call", "Follow Up Visit", "Cold Visit", "Existing Customer Visit", "Video Call", "Zoom Meeting", "SMS or Whatsapp", "Mail", "Internal"] },
       { name: "result", label: "Result", type: "select", inList: true,
         options: ["Warmer", "Colder", "Status Quo", "Closed Lost", "Closed Won"] },
       // logging a call starts on TODAY, BY the person logging it
@@ -349,6 +349,35 @@ export const DOCTYPES: Doctype[] = [
       { name: "opportunity_id", label: "Opportunity", type: "link", link: "opportunity" },
       { name: "quotation_id", label: "Quotation", type: "link", link: "quotation" },
       { name: "sales_order_id", label: "Sales Order", type: "link", link: "sales_order" },
+    ],
+  },
+
+  /**
+   * MEETINGS (Dr Raghu, 4 Sep 2026). Born from Zoom, never typed: the
+   * webhook files the meeting, its people, Zoom's summary and the recording;
+   * a person tags the deal and writes the MoM. Each one is also an
+   * interaction of kind "Zoom Meeting" on the deal's timeline.
+   */
+  {
+    name: "meeting", label: "Meeting", plural: "Meetings", table: "meeting",
+    titleField: "topic", group: "Funnel", icon: "📹",
+    orderBy: { column: "started_at", ascending: false },
+    blurb: "Every Zoom call, as it happened: who was in the room, the date, Zoom's own summary, the recording — and the MoM in your hand. Tag it to the deal; it then sits on that deal's timeline as an interaction.",
+    fields: [
+      { name: "topic", label: "Meeting", type: "text", inList: true },
+      { name: "started_at", label: "Date", type: "date", inList: true },
+      { name: "attendee_names", label: "Attendees", type: "text", inList: true, help: "As Zoom saw them — matched to CRM contacts by email where it could." },
+      { name: "duration_min", label: "Minutes", type: "number", inList: true },
+      { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
+      { name: "opportunity_id", label: "Opportunity", type: "link", link: "opportunity", inList: true },
+      { name: "quotation_id", label: "Quotation", type: "link", link: "quotation" },
+      { name: "status", label: "Status", type: "select", inList: true, options: ["new", "tagged", "done"], help: "new = Genie could not tell the deal; tagged = it is on a deal; done = MoM written and circulated." },
+      { name: "mom", label: "Minutes of meeting", type: "textarea", big: true, help: "Your hand. Zoom's summary sits below it, untouched." },
+      { name: "summary", label: "Zoom AI summary", type: "textarea", big: true },
+      { name: "recording_url", label: "Recording", type: "text", help: "Zoom's play link — opens in Zoom, with the account's passcode." },
+      { name: "recording_drive_url", label: "Recording in Drive", type: "text" },
+      { name: "host_email", label: "Host", type: "text" },
+      { name: "zoom_meeting_id", label: "Zoom meeting id", type: "readonly" },
     ],
   },
 
