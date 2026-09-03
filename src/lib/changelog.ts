@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.14",
+    date: "2026-09-03",
+    module: "The sales plan is rich text, and carries its files",
+    items: [
+      "\"this isn to be rich text. Also have a place to attach file. it can also be a google drive. I have given Oauth\" (Dr Raghu, 3 Sep 2026).",
+      "THE PLAN IS RICH TEXT \u2014 bold, italic, lists \u2014 the same editor HRMS uses, so there is one editor in Genie, not two that drift. It saves by itself when focus leaves the box; a Save button to forget is a plan that never got written down. The server strips anything that could execute, and Dr Raghu's chair and Genie's garnish read the WORDS, never the tags.",
+      "FILES ON THE PLAN. A territory map, a target-account sheet, last year's review \u2014 things that live in files, not a text box. Attach one and it goes to the CRM's storage and the Drive archive behind it, like every attachment. Or paste a Google Drive link: it is kept as the link and NAMED through the person's own OAuth, so a plan reads \"FY27 territory map\" and not a 33-character id. Removing a file from the plan does not delete the file.",
+      "Taking Genie's garnish into the plan now lands as formatted paragraphs, bold kept, rather than a wall of text.",
+      "NEEDS CRM MIGRATION 0051. Without it the words and the numbers work; the files say so rather than swallowing the upload.",
+    ],
+  },
+  {
     v: "4.4.2.13",
     date: "2026-09-03",
     module: "The salesperson's own plan, with Dr Raghu's chair and Genie's garnish beside it",

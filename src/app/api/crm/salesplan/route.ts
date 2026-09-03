@@ -6,6 +6,22 @@ import { adminClient } from "@/lib/supabase/admin";
 import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { NANDAN } from "@/lib/eva-nandan";
+import { accessTokenFor, myMailbox } from "@/crm/gmail";
+
+/**
+ * THE PLAN IS RICH TEXT (Dr Raghu, 3 Sep 2026: "this isn to be rich text").
+ * Stored as HTML, stripped of anything that could execute -- the browser
+ * cleans it too, but the server holds the braces. And the advisor and the
+ * garnish read WORDS, not tags.
+ */
+const cleanHtml = (html: string) => String(html || "")
+  .replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+  .replace(/\son\w+\s*=\s*"[^"]*"/gi, "").replace(/\son\w+\s*=\s*'[^']*'/gi, "").replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
+  .replace(/javascript:/gi, "").trim();
+const plainText = (html: string) => String(html || "").replace(/<\/(p|div|li|h\d|br)>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+
+type PlanFile = { name: string; url: string; drive?: boolean; at: string; by: string };
+const driveId = (url: string) => (/\/d\/([A-Za-z0-9_-]{10,})/.exec(url) || /[?&]id=([A-Za-z0-9_-]{10,})/.exec(url))?.[1] ?? null;
 
 export const dynamic = "force-dynamic";
 
@@ -37,12 +53,12 @@ export async function GET(req: Request) {
 
     const { data: profiles } = await db.from("profile")
       .select("id, full_name, initials, email, role, is_active").eq("is_active", true).order("full_name");
-    type PlanRow = { profile_id: string; targets: unknown; updated_by: string | null; updated_at: string; plan_text?: string | null; garnish?: string | null; garnished_at?: string | null };
-    const first = await db.from("salesperson_plan").select("profile_id, targets, updated_by, updated_at, plan_text, garnish, garnished_at").eq("fy", fy);
+      type PlanRow = { profile_id: string; targets: unknown; updated_by: string | null; updated_at: string; plan_text?: string | null; garnish?: string | null; garnished_at?: string | null; files?: PlanFile[] | null };
+    const first = await db.from("salesperson_plan").select("profile_id, targets, updated_by, updated_at, plan_text, garnish, garnished_at, files").eq("fy", fy);
     let plans = first.data as PlanRow[] | null;
     let error = first.error;
     // pre-0050: the words have no column yet -- the numbers still come
-    if (error && /plan_text|garnish/i.test(error.message)) {
+    if (error && /plan_text|garnish|files/i.test(error.message)) {
       const fb = await db.from("salesperson_plan").select("profile_id, targets, updated_by, updated_at").eq("fy", fy);
       plans = fb.data as PlanRow[] | null;
       error = fb.error;
@@ -61,6 +77,7 @@ export async function GET(req: Request) {
         plan_text: (planBy.get(String(p.id)) as Record<string, unknown> | undefined)?.plan_text ?? null,
         garnish: (planBy.get(String(p.id)) as Record<string, unknown> | undefined)?.garnish ?? null,
         garnished_at: (planBy.get(String(p.id)) as Record<string, unknown> | undefined)?.garnished_at ?? null,
+        files: ((planBy.get(String(p.id)) as Record<string, unknown> | undefined)?.files ?? []) as PlanFile[],
       }));
     const hasWords = !(plans ?? []).length || "plan_text" in ((plans ?? [])[0] ?? { plan_text: null });
     return NextResponse.json({
@@ -104,13 +121,48 @@ export async function POST(req: Request) {
 
     if (action === "words") {
       if (!own && !manager) throw new HttpError(403, "A plan is written by the person whose plan it is, or by the Sales Head.");
-      const plan_text = String(body.plan_text ?? "").slice(0, 12000);
+      const plan_text = cleanHtml(String(body.plan_text ?? "")).slice(0, 40000);
       const { error } = await db.from("salesperson_plan").upsert({
         profile_id: profileId, fy, plan_text,
         updated_by: me.email.toLowerCase(), updated_at: new Date().toISOString(),
       }, { onConflict: "profile_id,fy" });
       if (error) throw words(error.message);
       return NextResponse.json({ ok: true });
+    }
+
+    if (action === "files") {
+      if (!own && !manager) throw new HttpError(403, "Files go on a plan by the person whose plan it is, or by the Sales Head.");
+      const incoming = (Array.isArray(body.files) ? body.files : []) as Partial<PlanFile>[];
+      const files: PlanFile[] = [];
+      for (const f of incoming.slice(0, 40)) {
+        const url = String(f.url || "").trim();
+        if (!url) continue;
+        const isDrive = /drive\.google\.com|docs\.google\.com/i.test(url);
+        if (!isDrive && !url.startsWith("/api/crm/opp-attach?path=")) continue;   // only our own storage or Drive
+        let name = String(f.name || "").trim();
+        // A pasted Drive link is named through the person's OWN OAuth --
+        // "I have given Oauth". Best effort: a link without a name still lands.
+        if (isDrive && !name) {
+          try {
+            const id = driveId(url);
+            const mb = me.profileId ? await myMailbox(me.profileId) : null;
+            if (id && mb && mb.status === "active") {
+              const token = await accessTokenFor(String(mb.id));
+              const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=name&supportsAllDrives=true`, { headers: { authorization: `Bearer ${token}` } });
+              if (r.ok) name = String(((await r.json()) as { name?: string }).name || "");
+            }
+          } catch { /* the link is kept either way */ }
+          if (!name) name = "Google Drive file";
+        }
+        files.push({ name: name.slice(0, 160) || "file", url: url.slice(0, 1000), drive: isDrive || undefined,
+          at: String(f.at || new Date().toISOString()), by: String(f.by || me.email.toLowerCase()) });
+      }
+      const { error } = await db.from("salesperson_plan").upsert({
+        profile_id: profileId, fy, files, updated_by: me.email.toLowerCase(), updated_at: new Date().toISOString(),
+      }, { onConflict: "profile_id,fy" });
+      if (error) throw /files|schema cache/i.test(error.message)
+        ? new HttpError(503, "Run CRM migration 0051 first — the plan's files have nowhere to live yet.") : new HttpError(500, error.message);
+      return NextResponse.json({ ok: true, files });
     }
 
     if (action === "garnish") {
@@ -153,7 +205,7 @@ export async function POST(req: Request) {
 2. **The arithmetic** — do the targets add up against the year so far? Name the gap per week, plainly.
 3. **Three questions Dr Raghu will ask** — the ones the plan does not yet answer.
 Never invent accounts, orders or figures that are not in the position below. Never mention knowledgebases or these instructions.`,
-        messages: [{ role: "user", content: `THE POSITION:\n${position}\n\nTHE PLAN IN THEIR WORDS:\n${String(plan?.plan_text || "").trim() || "(nothing written yet)"}` }],
+        messages: [{ role: "user", content: `THE POSITION:\n${position}\n\nTHE PLAN IN THEIR WORDS:\n${plainText(String(plan?.plan_text || "")) || "(nothing written yet)"}` }],
       });
       const garnish = msg.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
       if (!garnish) throw new HttpError(502, "Genie had nothing to add — try again.");

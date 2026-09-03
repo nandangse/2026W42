@@ -1,0 +1,13 @@
+-- 0051_salesperson_plan_files.sql
+--
+-- FILES ON THE PLAN (Dr Raghu, 3 Sep 2026: "Also have a place to attach
+-- file. it can also be a google drive. I have given Oauth").
+--
+-- A plan comes with a territory map, a target-account sheet, last year's
+-- review -- things that live in files, not in a text box. Each entry is
+-- { name, url, drive?: true, at, by }. An uploaded file sits in the CRM's
+-- storage (and is mirrored to the Drive archive like every attachment); a
+-- Drive link is kept as the link, named through the person's own OAuth.
+--
+-- ASCII only, additive, safe to re-run.
+alter table salesperson_plan add column if not exists files jsonb not null default '[]'::jsonb;

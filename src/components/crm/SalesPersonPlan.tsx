@@ -14,14 +14,17 @@
  * actually promised. The numbers are the Sales Head's to set; the words are
  * the salesperson's to write.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import RichText, { RichTextView, isEmptyHtml } from "@/components/hrms/RichText";
 import { NAVY, NAVY_SOFT, INK, MUTED, BORDER, GREEN, ORANGE, ORANGE_SOFT } from "./palette";
 
 interface Row {
   profile_id: string; name: string; initials: string | null; role: string;
   targets: Record<string, number>;
   plan_text?: string | null; garnish?: string | null; garnished_at?: string | null;
+  files?: PlanFile[];
 }
+interface PlanFile { name: string; url: string; drive?: boolean; at: string; by: string }
 interface Me { profile_id: string | null; name: string; role: string }
 
 const COLS: { key: string; label: string; money?: boolean; unit: string }[] = [
@@ -37,6 +40,9 @@ const COLS: { key: string; label: string; money?: boolean; unit: string }[] = [
 ];
 
 const fmtL = (n: number) => (n >= 1e7 ? `${(n / 1e7).toFixed(1)}Cr` : n >= 1e5 ? `${(n / 1e5).toFixed(1)}L` : String(n));
+/** Genie's garnish arrives as plain text with Markdown bones; the plan is HTML. */
+const toHtml = (t: string) => t.split(/\n{2,}/).map((para) =>
+  `<p>${para.trim().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>")}</p>`).join("");
 const possessive = (name: string) => { const f = name.trim().split(/\s+/)[0] || name; return /s$/i.test(f) ? `${f}'` : `${f}'s`; };
 
 export default function SalesPersonPlan({ onConsult }: { onConsult?: (profileId: string, title: string) => void }) {
@@ -55,6 +61,9 @@ export default function SalesPersonPlan({ onConsult }: { onConsult?: (profileId:
   const [words, setWords] = useState("");
   const [wordsDirty, setWordsDirty] = useState(false);
   const [garnishing, setGarnishing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [driveLink, setDriveLink] = useState("");
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback((f?: string) => {
     fetch(`/api/crm/salesplan${f ? `?fy=${encodeURIComponent(f)}` : ""}`).then(async (r) => {
@@ -88,12 +97,42 @@ export default function SalesPersonPlan({ onConsult }: { onConsult?: (profileId:
     catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     setBusy(null);
   };
-  const saveWords = async () => {
+  const saveWords = async (html?: string) => {
     if (!person) return;
+    const body = html ?? words;
     setBusy("words"); setErr("");
-    try { await post({ action: "words", profile_id: person.profile_id, plan_text: words }); setWordsDirty(false); load(fy); }
+    try { await post({ action: "words", profile_id: person.profile_id, plan_text: body }); setWords(body); setWordsDirty(false); load(fy); }
     catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     setBusy(null);
+  };
+  /** FILES ON THE PLAN — an upload goes to the CRM's storage (and the Drive
+   *  archive behind it); a pasted Drive link is kept as the link, named
+   *  through the person's own OAuth. Either way the list lives on the plan. */
+  const setFiles = async (files: PlanFile[]) => {
+    if (!person) return;
+    setErr("");
+    try { await post({ action: "files", profile_id: person.profile_id, files }); load(fy); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+  };
+  const upload = async (f: File) => {
+    if (!person) return;
+    setUploading(true); setErr("");
+    try {
+      const fd = new FormData();
+      fd.set("target_type", "sales_plan"); fd.set("target_id", person.profile_id); fd.set("file", f);
+      const r = await fetch("/api/crm/opp-attach", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Upload failed");
+      await setFiles([...(person.files || []), { name: String(j.name), url: String(j.url), at: new Date().toISOString(), by: me?.name || "" }]);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+  const addDrive = async () => {
+    const url = driveLink.trim();
+    if (!person || !/drive\.google\.com|docs\.google\.com/i.test(url)) { setErr("Paste a Google Drive or Docs link."); return; }
+    setDriveLink("");
+    await setFiles([...(person.files || []), { name: "", url, drive: true, at: new Date().toISOString(), by: me?.name || "" }]);
   };
   const garnish = async () => {
     if (!person) return;
@@ -187,18 +226,55 @@ export default function SalesPersonPlan({ onConsult }: { onConsult?: (profileId:
                   <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: .5 }}>The plan, in {manage && person.profile_id !== me?.profile_id ? `${possessive(person.name)}` : "my"} own words</div>
                   <div className="text-xs" style={{ color: MUTED }}>which accounts and families carry the number · what you walk away from · the weekly rhythm</div>
                 </div>
-                <textarea value={words} disabled={!mayWrite || needsWords} rows={9}
-                  onChange={(e) => { setWords(e.target.value); setWordsDirty(true); }}
-                  placeholder={mayWrite ? "Write the plan here. Then press Consult Dr Raghu — he will ask the questions it has to answer." : "Only the person whose plan this is, or the Sales Head, writes here."}
-                  className="w-full mt-2 rounded border p-2 text-sm" style={{ borderColor: BORDER, color: INK, lineHeight: 1.55, fontFamily: "inherit" }} />
-                {mayWrite && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <button onClick={saveWords} disabled={!wordsDirty || busy === "words" || needsWords}
-                      className="rounded px-3 py-1.5 text-sm font-bold" style={{ background: wordsDirty ? GREEN : BORDER, color: wordsDirty ? "#fff" : MUTED }}>
-                      {busy === "words" ? "Saving…" : wordsDirty ? "Save my plan" : "Saved"}
-                    </button>
+                {/* RICH TEXT (Dr Raghu, 3 Sep 2026: "this isn to be rich text").
+                    It saves when focus leaves the box, so there is no Save
+                    to forget -- and Genie garnishes what is saved. */}
+                {mayWrite && !needsWords ? (
+                  <div className="mt-2">
+                    <RichText value={words} rows={9} onSave={(html) => void saveWords(html)}
+                      placeholder="Write the plan here. Then press Consult Dr Raghu — he will ask the questions it has to answer." />
+                    <div className="text-xs mt-1" style={{ color: MUTED }}>{busy === "words" ? "Saving…" : "Saves by itself when you click away."}</div>
                   </div>
+                ) : (
+                  <div className="mt-2"><RichTextView html={words} /></div>
                 )}
+
+                {/* FILES (Dr Raghu, 3 Sep 2026: "Also have a place to attach
+                    file. it can also be a google drive. I have given Oauth") */}
+                <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${BORDER}` }}>
+                  <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: .5 }}>Attached to the plan</div>
+                  {(person.files || []).length === 0 && <div className="text-xs mt-1" style={{ color: "#C9CDD6" }}>Nothing attached yet — a territory map, a target-account sheet, last year&apos;s review.</div>}
+                  <ul className="mt-1">
+                    {(person.files || []).map((f, i) => (
+                      <li key={i} className="flex items-center gap-2 text-sm py-0.5">
+                        <a href={f.url} target="_blank" rel="noreferrer" className="hover:underline" style={{ color: NAVY, fontWeight: 600 }}>
+                          {f.drive ? "🗂 " : "📎 "}{f.name || "file"}
+                        </a>
+                        <span className="text-xs" style={{ color: MUTED }}>{f.by}{f.at ? ` · ${new Date(f.at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" })}` : ""}</span>
+                        {mayWrite && (
+                          <button onClick={() => { if (window.confirm(`Remove "${f.name || "this file"}" from the plan?`)) void setFiles((person.files || []).filter((_, k) => k !== i)); }}
+                            title="Remove from the plan (the file itself is not deleted)" style={{ color: "#B3261E", fontWeight: 700 }}>×</button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {mayWrite && !needsWords && (
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <input ref={fileRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); }} />
+                      <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                        className="rounded px-3 py-1.5 text-xs font-bold border" style={{ borderColor: NAVY, color: NAVY, background: "#fff" }}>
+                        {uploading ? "Uploading…" : "📎 Attach a file"}
+                      </button>
+                      <input value={driveLink} onChange={(e) => setDriveLink(e.target.value)} placeholder="…or paste a Google Drive link"
+                        onKeyDown={(e) => { if (e.key === "Enter") void addDrive(); }}
+                        className="rounded border px-2 py-1.5 text-xs" style={{ borderColor: BORDER, minWidth: 280, flex: 1 }} />
+                      <button onClick={() => void addDrive()} disabled={!driveLink.trim()}
+                        className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: driveLink.trim() ? NAVY : BORDER, color: driveLink.trim() ? "#fff" : MUTED }}>
+                        🗂 Add from Drive
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Genie's garnish -- kept apart, taken by choice */}
@@ -211,11 +287,11 @@ export default function SalesPersonPlan({ onConsult }: { onConsult?: (profileId:
                   <div className="text-sm mt-2" style={{ color: INK, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{person.garnish}</div>
                   {mayWrite && (
                     <div className="flex gap-2 mt-2 flex-wrap">
-                      <button onClick={() => { setWords(String(person.garnish || "")); setWordsDirty(true); }}
+                      <button onClick={() => void saveWords(toHtml(String(person.garnish || "")))}
                         className="rounded px-3 py-1.5 text-xs font-bold text-white" style={{ background: NAVY }}>
                         Take this into my plan
                       </button>
-                      <button onClick={() => { setWords((w) => (w.trim() ? `${w.trim()}\n\n— Genie's garnish —\n${person.garnish}` : String(person.garnish || ""))); setWordsDirty(true); }}
+                      <button onClick={() => void saveWords((isEmptyHtml(words) ? "" : words + "<p><b>— Genie's garnish —</b></p>") + toHtml(String(person.garnish || "")))}
                         className="rounded px-3 py-1.5 text-xs font-bold border" style={{ borderColor: NAVY, color: NAVY, background: "#fff" }}>
                         Append below my words
                       </button>
@@ -257,7 +333,8 @@ export default function SalesPersonPlan({ onConsult }: { onConsult?: (profileId:
                         <b style={{ color: INK }}>{row.name}</b>
                       </button>
                       <span style={{ fontSize: 10, color: MUTED }}> · {row.role}</span>
-                      {row.plan_text ? <span title="Has a plan in words" style={{ fontSize: 10, color: GREEN }}> ●</span> : null}
+                      {row.plan_text && !isEmptyHtml(row.plan_text) ? <span title="Has a plan in words" style={{ fontSize: 10, color: GREEN }}> ●</span> : null}
+                      {(row.files || []).length ? <span title={`${row.files!.length} file(s) attached`} style={{ fontSize: 10, color: MUTED }}> 📎{row.files!.length}</span> : null}
                     </td>
                     {COLS.map((c) => (
                       <td key={c.key} className="px-2 py-1.5 text-right">

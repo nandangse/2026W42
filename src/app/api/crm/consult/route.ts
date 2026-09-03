@@ -83,7 +83,7 @@ async function planBrief(db: ReturnType<typeof crmDb>, profileId: string): Promi
     `Video calls: ${wk("video", "video_calls_wk")}`,
     `Opportunities/week promised: ${num(t.opps_wk) || "none"}`,
     "",
-    `THE PLAN IN THEIR OWN WORDS:\n${String(plan.data?.plan_text || "").trim() || "(nothing written yet -- help them write it)"}`,
+    `THE PLAN IN THEIR OWN WORDS:\n${String(plan.data?.plan_text || "").replace(/<\/(p|div|li|h\d|br)>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim() || "(nothing written yet -- help them write it)"}`,
   ].join("\n");
 }
 
