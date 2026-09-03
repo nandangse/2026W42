@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.1",
+    date: "2026-09-03",
+    module: "Masters — a Finished goods warehouse type",
+    items: [
+      "\"add one more type of warehouse — Delivered items, Finished goods\" (Dr Raghu, 3 Sep 2026). Finished goods joins Stock, WIP and Vendor as a type: delivered items, product rather than material. It does not count towards closing stock; only Stock does.",
+      "The three warehouses named Finished Goods that nobody had typed are set to it by the migration, marked \"guessed from the name — check\" like the rest; the name guess on a pull knows the word now too. Migration 0128.",
+    ],
+  },
+  {
     v: "4.4.2.0",
     date: "2026-09-03",
     module: "Saamaan — material planning on the MRP, the kitting register, issue slips and the ladder",

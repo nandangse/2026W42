@@ -20,8 +20,8 @@ interface Wh {
   warehouse: string; warehouse_name: string; company: string; parent_warehouse: string; is_group: boolean; disabled: boolean;
   kind: string; remarks: string; kind_by: string | null; kind_at: string | null;
 }
-const KINDS = ["", "Stock", "WIP", "Vendor"];
-const kindColour = (k: string) => (k === "Stock" ? GREEN : k === "WIP" ? AMBER : k === "Vendor" ? "#1B6B93" : MUTED);
+const KINDS = ["", "Stock", "WIP", "Vendor", "Finished goods"];
+const kindColour = (k: string) => (k === "Stock" ? GREEN : k === "WIP" ? AMBER : k === "Vendor" ? "#1B6B93" : k === "Finished goods" ? "#6D28D9" : MUTED);
 
 /** Who the slips go to, and who sits on the ladder (Dr Raghu, 3 Sep 2026). */
 function Routing() {
@@ -129,7 +129,7 @@ export default function Masters() {
       />
       <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
         Change the type and it saves at once; a remark saves when you leave the box. <b style={{ color: NAVY }}>Only Stock counts</b> towards closing stock on an item —
-        WIP is material already in the works, Vendor is material out at a sub-vendor. {S(rows.find((w) => /guessed/i.test(w.remarks))?.remarks) ? "Types marked “guessed from the name” were set by the first pull and are yours to correct." : ""}
+        WIP is material already in the works, Vendor is material out at a sub-vendor, Finished goods is delivered items — product, not material. {S(rows.find((w) => /guessed/i.test(w.remarks))?.remarks) ? "Types marked “guessed from the name” were set by the first pull and are yours to correct." : ""}
       </div>
     </Screen>
   );

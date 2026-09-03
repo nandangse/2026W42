@@ -120,6 +120,7 @@ const PROBES = [
   ["genie", "0127 Saamaan slip lines", "material_slip_line?select=released_qty"],
   ["genie", "0127 Saamaan settings", "material_setting?select=key"],
   ["genie", "0127 issue.slip_id", "material_issue?select=slip_id&limit=1"],
+  ["genie", "0128 Finished goods type", "material_warehouse?select=kind&kind=eq.Finished%20goods&limit=1"],
 ];
 
 let missing = 0;

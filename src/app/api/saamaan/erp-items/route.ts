@@ -514,7 +514,7 @@ export async function POST(req: Request) {
       // A first guess from the name, for a warehouse nobody has typed yet.
       // Shown as a guess in Masters; Genie's word once somebody sets it.
       const guess = (n: string) =>
-        /sub-?ve|vendor|transit/i.test(n) ? "Vendor" : /work in pro|wip|kitting/i.test(n) ? "WIP" : /\bstore|stock\b/i.test(n) ? "Stock" : "";
+        /sub-?ve|vendor|transit/i.test(n) ? "Vendor" : /work in pro|wip|kitting/i.test(n) ? "WIP" : /finished goods/i.test(n) ? "Finished goods" : /\bstore|stock\b/i.test(n) ? "Stock" : "";
       const rows = docs.filter((d) => S(d.name)).map((d) => {
         const name = S(d.name);
         const row: Doc = {

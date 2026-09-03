@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  *          remark are Genie's and survive every pull.
  */
 
-const KINDS = ["", "Stock", "WIP", "Vendor"] as const;
+const KINDS = ["", "Stock", "WIP", "Vendor", "Finished goods"] as const;
 const notInstalled = (m: string) => /does not exist|schema cache/i.test(m);
 
 export async function GET() {
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     const patch: Record<string, unknown> = {};
     if ("kind" in body) {
       const kind = String(body.kind ?? "").trim();
-      if (!(KINDS as readonly string[]).includes(kind)) throw new HttpError(400, "Type is Stock, WIP or Vendor — or blank.");
+      if (!(KINDS as readonly string[]).includes(kind)) throw new HttpError(400, "Type is Stock, WIP, Vendor or Finished goods — or blank.");
       patch.kind = kind;
       patch.kind_by = me.email;
       patch.kind_at = new Date().toISOString();
