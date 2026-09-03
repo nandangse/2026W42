@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.1.2",
+    date: "2026-09-03",
+    module: "Saamaan — three rooms on an item",
+    items: [
+      "\"in this item have a tab on the top which is ERP Data - default shown, Stock Register - To Build, Intelligence - To Build\" (Dr Raghu, 3 Sep 2026). The item lightbox now has the three tabs; ERP Data opens first and is the record as it was.",
+      "Stock Register and Intelligence are marked \"to build\" on the tab itself and open onto a sentence saying what each is for, so nobody mistakes an empty room for a finished one.",
+    ],
+  },
+  {
     v: "4.4.1.1",
     date: "2026-09-03",
     module: "Saamaan — the RBOM, the Real BOM",

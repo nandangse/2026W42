@@ -279,11 +279,24 @@ const show = (k: string, v: unknown) => {
   return S(v);
 };
 
+/**
+ * The three rooms of an item (Dr Raghu, 3 Sep 2026: "have a tab on the
+ * top which is ERP Data - default shown, Stock Register - To Build,
+ * Intelligence - To Build"). The first is the ERP's record, as it is; the
+ * other two are Genie's to fill, and say so until they are.
+ */
+const TABS: { key: string; label: string; built: boolean }[] = [
+  { key: "erp", label: "ERP Data", built: true },
+  { key: "stock", label: "Stock Register", built: false },
+  { key: "intel", label: "Intelligence", built: false },
+];
+
 function Detail({ code, base, onClose }: { code: string; base: string; onClose: () => void }) {
   const [item, setItem] = useState<Row | null>(null);
   const [files, setFiles] = useState<FileRow[]>([]);
   const [err, setErr] = useState("");
   const [every, setEvery] = useState(false);
+  const [tab, setTab] = useState("erp");
 
   useEffect(() => {
     fetch(`/api/saamaan/items?mode=one&code=${encodeURIComponent(code)}`, { cache: "no-store" })
@@ -300,7 +313,40 @@ function Detail({ code, base, onClose }: { code: string; base: string; onClose: 
     <Modal onClose={onClose} title={`${code}${item ? ` — ${S(item.item_name)}` : ""}`} width={920}>
       {err && <Note kind="error">{err}</Note>}
       {!item && !err && <div className="text-sm" style={{ color: MUTED }}>Reading…</div>}
+
+      {/* --------------------------------------------------------- the tabs */}
       {item && (
+        <div className="flex gap-1 mb-3" style={{ borderBottom: `1px solid ${BORDER}` }}>
+          {TABS.map((t) => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className="px-3 py-2 text-sm font-bold"
+              style={{
+                color: tab === t.key ? NAVY : t.built ? INK : MUTED,
+                borderBottom: `3px solid ${tab === t.key ? NAVY : "transparent"}`,
+                marginBottom: -1,
+              }}>
+              {t.label}{!t.built && <span className="ml-1 text-xs font-semibold" style={{ color: MUTED }}>· to build</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {item && tab === "stock" && (
+        <div className="rounded border p-6 text-sm" style={{ borderColor: BORDER, background: "#fff", color: MUTED, lineHeight: 1.7 }}>
+          <div className="font-bold mb-1" style={{ color: INK }}>Stock Register — to build</div>
+          What {code} has in the stores and where: opening, receipts, issues, the balance, by warehouse — from the ERP&apos;s stock ledger, or Genie&apos;s own.
+          Say what this room should hold and it will be built.
+        </div>
+      )}
+      {item && tab === "intel" && (
+        <div className="rounded border p-6 text-sm" style={{ borderColor: BORDER, background: "#fff", color: MUTED, lineHeight: 1.7 }}>
+          <div className="font-bold mb-1" style={{ color: INK }}>Intelligence — to build</div>
+          What Genie knows about {code} beyond the ERP: where it is used, which BOMs carry it, who supplies it and at what price over time, what has gone wrong with it.
+          Say what this room should hold and it will be built.
+        </div>
+      )}
+
+      {item && tab === "erp" && (
         <div className="text-sm" style={{ color: INK }}>
           {/* ------------------------------------------------ the top line */}
           <div className="flex items-center gap-2 flex-wrap mb-3">
