@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.1.4",
+    date: "2026-09-03",
+    module: "Stock Register — a reconciliation shows its movement",
+    items: [
+      "Seen on N030925 the moment the tab was opened: two Stock Reconciliation lines with nothing under In or Out while the balance went from 55 to 48. The ERP records a reconciliation as a SET balance, not a movement — actual_qty 0, new balance written — so shown as-is it reads as nothing happened.",
+      "The movement is now worked out from the previous line in the same warehouse, one running balance per warehouse, and shown with ≈ so a derived figure is never mistaken for a recorded one. The earliest line in the window has nothing before it and stays a dot.",
+    ],
+  },
+  {
     v: "4.4.1.3",
     date: "2026-09-03",
     module: "Saamaan — the Stock Register, live from the ERP",

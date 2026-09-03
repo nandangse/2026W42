@@ -319,6 +319,29 @@ function StockRegister({ code, base }: { code: string; base: string }) {
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
   }, [code]);
   const erp = data?.erpBase || base;
+  /**
+   * A Stock Reconciliation SETS a balance rather than moving a quantity:
+   * the ERP writes it with actual_qty 0 and the new balance. Shown as-is
+   * it reads as nothing happened while the balance jumps. So the movement
+   * is worked out from the previous line in the same warehouse — oldest
+   * first, one running balance per warehouse. The earliest line in the
+   * window has nothing before it and stays a dot.
+   */
+  const moves = useMemo(() => {
+    const out = new Map<string, number | null>();
+    if (!data) return out;
+    const asc = [...data.ledger].sort((a, b) => `${a.posting_date} ${a.posting_time}`.localeCompare(`${b.posting_date} ${b.posting_time}`));
+    const prev = new Map<string, number>();
+    for (const l of asc) {
+      const q = Number(l.actual_qty) || 0;
+      const after = Number(l.qty_after_transaction);
+      if (q !== 0) out.set(l.name, q);
+      else if (/reconcil/i.test(l.voucher_type)) out.set(l.name, prev.has(l.warehouse) ? after - prev.get(l.warehouse)! : null);
+      else out.set(l.name, 0);
+      prev.set(l.warehouse, after);
+    }
+    return out;
+  }, [data]);
   if (err) return <Note kind="error">{err}</Note>;
   if (!data) return <div className="text-sm" style={{ color: MUTED }}>Reading the ERP&apos;s stock ledger…</div>;
   return (
@@ -338,13 +361,15 @@ function StockRegister({ code, base }: { code: string; base: string }) {
               <th className="px-2 py-1 text-left">Voucher</th><th className="px-2 py-1 text-left">Project</th><th className="px-2 py-1 text-left">By</th>
             </tr></thead>
             <tbody>{data.ledger.map((l, i) => {
-              const q = Number(l.actual_qty) || 0;
+              const q = moves.get(l.name) ?? 0;
+              const reco = /reconcil/i.test(l.voucher_type);
+              const unknown = reco && moves.get(l.name) === null;
               return (
                 <tr key={l.name} style={{ background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   <td className="px-2 py-1 tnum whitespace-nowrap" style={{ borderBottom: `1px solid ${BORDER}` }}>{fmtD(l.posting_date)} <span style={{ color: MUTED }}>{S(l.posting_time).slice(0, 5)}</span></td>
                   <td className="px-2 py-1" style={{ borderBottom: `1px solid ${BORDER}` }}>{l.warehouse}</td>
-                  <td className="px-2 py-1 text-right tnum font-bold" style={{ borderBottom: `1px solid ${BORDER}`, color: GREEN }}>{q > 0 ? qtyFmt(q) : ""}</td>
-                  <td className="px-2 py-1 text-right tnum font-bold" style={{ borderBottom: `1px solid ${BORDER}`, color: "#B3261E" }}>{q < 0 ? qtyFmt(-q) : ""}</td>
+                  <td className="px-2 py-1 text-right tnum font-bold" style={{ borderBottom: `1px solid ${BORDER}`, color: GREEN }} title={reco ? "a reconciliation set the balance; the movement is the difference from the line before" : ""}>{q > 0 ? `${qtyFmt(q)}${reco ? "≈" : ""}` : unknown ? "·" : ""}</td>
+                  <td className="px-2 py-1 text-right tnum font-bold" style={{ borderBottom: `1px solid ${BORDER}`, color: "#B3261E" }} title={reco ? "a reconciliation set the balance; the movement is the difference from the line before" : ""}>{q < 0 ? `${qtyFmt(-q)}${reco ? "≈" : ""}` : ""}</td>
                   <td className="px-2 py-1 text-right tnum" style={{ borderBottom: `1px solid ${BORDER}` }}>{qtyFmt(l.qty_after_transaction)}</td>
                   <td className="px-2 py-1 text-right tnum" style={{ borderBottom: `1px solid ${BORDER}` }} title={`incoming ${money(l.incoming_rate)}`}>{money(l.valuation_rate)}</td>
                   <td className="px-2 py-1 text-right tnum" style={{ borderBottom: `1px solid ${BORDER}` }}>{money(l.stock_value)}</td>
@@ -366,6 +391,7 @@ function StockRegister({ code, base }: { code: string; base: string }) {
       )}
       <div className="text-xs mt-2" style={{ color: MUTED }}>
         Read live from the ERP at {new Date(data.readAt).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })} — not mirrored. Each voucher opens on the ERP.
+        A Stock Reconciliation sets the balance rather than moving a quantity; its In or Out is worked out from the line before and marked ≈.
       </div>
     </div>
   );
