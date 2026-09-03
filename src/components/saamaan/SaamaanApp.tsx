@@ -26,6 +26,7 @@ import Pull from "./Pull";
 import Projects from "./Projects";
 import Bom from "./Bom";
 import Masters from "./Masters";
+import Wip from "./Wip";
 import { LOGO } from "@/lib/logo";
 
 const SECTIONS: { key: string; label: string; icon: string }[] = [
@@ -33,6 +34,7 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "items", label: "Items", icon: "📦" },
   { key: "projects", label: "Projects", icon: "🏗" },
   { key: "bom", label: "BOM", icon: "🧾" },
+  { key: "wip", label: "WIP", icon: "🏭" },
   { key: "masters", label: "Masters", icon: "⚙" },
   { key: "pull", label: "ERP pull", icon: "⇣" },
 ];
@@ -72,6 +74,7 @@ export default function SaamaanApp({
       case "items": return <Items summary={summary} initialGroup={groupPick} />;
       case "projects": return <Projects summary={summary} />;
       case "bom": return <Bom summary={summary} />;
+      case "wip": return <Wip erpBase={summary.erpBase} role={role} />;
       case "masters": return <Masters />;
       case "pull": return <Pull summary={summary} isOwner={isOwner} onDone={reloadSummary} />;
       default: return <Dashboard summary={summary} go={go} />;

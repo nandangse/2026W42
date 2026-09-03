@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.1.6",
+    date: "2026-09-03",
+    module: "Saamaan — WIP, one warehouse per live job",
+    items: [
+      "\"Make a side app called WIP. In this each Live Job Number will be a wip. Create a table WIP_jobnumber — this is the warehouse where the WIP will be kept. This currently doesn't need to be confused with the ERP WIP. This is separate. I'll explain what this does!\" (Dr Raghu, 3 Sep 2026). A WIP section in Saamaan: every live job on the board — active, not delivered — is a row, and the row is the warehouse WIP_<job number>.",
+      "THE FOURTEEN COLUMNS HE NAMED, IN HIS ORDER: Job No, Customer tag, Project No, BOM No (ERP), RBOM No, Value, Nos kitted, Value kitted, Nos pending, Value pending, TVC %, Throughput (calc), Throughput (ERP), Kitting Owner. \"Pull as much data from our Genie as possible\" — the starred ones and the BOM, RBOM and value come from Genie's own board and mirrors, refreshed on every read; the BOM is the latest submitted on the project, the RBOM Genie's Real BOM where built. Kitted, pending, TVC and Throughput (calc) are Genie's to fill when he explains, and read a dot until then — a dot, not a zero.",
+      "\"For job no give the same lightbox as before in the other genie apps\" — it is the board's own job lightbox, the one Job Commercials and On Floor open, with the same fields and the same road to the ERP for a correction.",
+      "A job that leaves the board keeps its WIP row, marked not live, never dropped: its warehouse may still hold things. Migration 0125.",
+    ],
+  },
+  {
     v: "4.4.1.5",
     date: "2026-09-03",
     module: "Saamaan — closing stock on the item, warehouses in Masters, the header",
