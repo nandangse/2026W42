@@ -27,7 +27,7 @@ import Projects from "./Projects";
 import Bom from "./Bom";
 import Masters from "./Masters";
 import Wip from "./Wip";
-import Mrp from "./Mrp";
+import Mrp, { MrpRun } from "./Mrp";
 import Kitting from "./Kitting";
 import Slips from "./Slips";
 import { LOGO } from "@/lib/logo";
@@ -46,9 +46,9 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
 ];
 
 export default function SaamaanApp({
-  section, email, displayName, initials, role, isOwner,
+  section, email, displayName, initials, role, isOwner, mrpId,
 }: {
-  section: string; email: string; displayName: string | null; initials: string | null; role: string; isOwner: boolean;
+  section: string; email: string; displayName: string | null; initials: string | null; role: string; isOwner: boolean; mrpId?: string;
 }) {
   const [here, setHere] = useState(SECTIONS.some((s) => s.key === section) ? section : "dashboard");
   /** A group picked on the dashboard opens Items already filtered to it. */
@@ -59,6 +59,9 @@ export default function SaamaanApp({
   const go = (k: string, group?: string) => {
     setHere(k);
     if (group !== undefined) setGroupPick(group);
+    // From a run's own page the sections are real navigations, so the
+    // address always says where you are.
+    if (mrpId) { window.location.href = `/saamaan/${k}`; return; }
     window.history.replaceState(null, "", `/saamaan/${k}`);
   };
   useEffect(() => { document.title = "Nandan Saamaan Genie"; }, []);
@@ -81,7 +84,7 @@ export default function SaamaanApp({
       case "projects": return <Projects summary={summary} />;
       case "bom": return <Bom summary={summary} />;
       case "wip": return <Wip erpBase={summary.erpBase} role={role} summary={summary} />;
-      case "mrp": return <Mrp role={role} email={email} />;
+      case "mrp": return mrpId ? <MrpRun id={mrpId} role={role} email={email} /> : <Mrp />;
       case "kitting": return <Kitting />;
       case "slips": return <Slips />;
       case "masters": return <Masters />;
@@ -96,8 +99,9 @@ export default function SaamaanApp({
           Dr Raghu, 3 Sep 2026: "in the header also put the logo. Call it
           there NANDAN SAAMAAN. dont need to write the other details! Keep
           version no on the left — Nandan Genie · <version> in small." */}
+      {/* Frozen (Dr Raghu, 3 Sep 2026: "keep top header of the menu and side menu frozen"). */}
       <div className="flex items-center gap-3 px-3 py-2"
-        style={{ background: NAVY_DARK, borderBottom: `1px solid ${NAVY}` }}>
+        style={{ background: NAVY_DARK, borderBottom: `1px solid ${NAVY}`, position: "sticky", top: 0, zIndex: 40 }}>
         <span className="rounded px-1.5 py-1 flex items-center" style={{ background: "#fff" }}>
           <img src={LOGO} alt="Nandan GSE" style={{ height: 26, display: "block" }} />
         </span>
@@ -114,7 +118,7 @@ export default function SaamaanApp({
 
       <div className="flex" style={{ alignItems: "flex-start" }}>
         {/* -------------------------------------------------------- the rail */}
-        <nav className="hidden md:block" style={{ width: 208, flexShrink: 0, borderRight: `1px solid ${BORDER}`, background: "#fff", minHeight: "calc(100vh - 41px)" }}>
+        <nav className="hidden md:block" style={{ width: 208, flexShrink: 0, borderRight: `1px solid ${BORDER}`, background: "#fff", minHeight: "calc(100vh - 43px)", position: "sticky", top: 43, alignSelf: "flex-start", maxHeight: "calc(100vh - 43px)", overflowY: "auto" }}>
           {SECTIONS.map((s) => (
             <button key={s.key} onClick={() => go(s.key)}
               className="w-full text-left px-3 py-2.5 text-sm font-bold flex items-center gap-2"

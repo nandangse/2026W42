@@ -19,8 +19,8 @@ const money = (n: unknown) => (n === null || n === undefined ? "·" : `₹${Numb
 const fmtAt = (s: string) => new Date(s).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
 const who = (s: string | null) => (S(s).includes("@") ? S(s).split("@")[0] : S(s)) || "·";
 
-export default function Kitting() {
-  const [data, busy, reload, err] = useLoad<{ ok: boolean; rows: Issue[] }>("/api/saamaan/slip?mode=kitting");
+export default function Kitting({ mrp }: { mrp?: string } = {}) {
+  const [data, busy, reload, err] = useLoad<{ ok: boolean; rows: Issue[] }>(`/api/saamaan/slip?mode=kitting${mrp ? `&mrp=${encodeURIComponent(mrp)}` : ""}`);
   const rows = data?.rows ?? [];
   const total = rows.reduce((a, r) => a + (Number(r.amount) || 0), 0);
   const unslipped = rows.filter((r) => !r.slip_no).length;

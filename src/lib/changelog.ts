@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.2",
+    date: "2026-09-03",
+    module: "Saamaan — the MRP list, a run on its own page, and a frozen frame",
+    items: [
+      "\"keep top header of the menu and side menu frozen\" (Dr Raghu, 3 Sep 2026) — the NANDAN SAAMAAN bar and the left rail now stay put while the page scrolls.",
+      "\"keep this in MRP as a page where all MRP will be listed; clicking on that will go to a fresh page\" — MRP is a list: number, name, date, who, jobs, the value of the run, the kitted value, when generated. A run opens at its own address, /saamaan/mrp/<run>, so a link to it means something tomorrow.",
+      "\"Show the MRP header for sure — MRP no, who, when, value etc on the top, then the tabs. Up to here frozen.\" The run's head — number, name, date, by, jobs, valuation, kitted and %, value of run — and the five tabs sit frozen under the app bar; only what is below them scrolls.",
+      "\"this item make it narrow and frozen — approx 200 px width\" — the Item column on the plan is 200 pixels, frozen on the left with a rule beside it; the name wraps to two lines and shows whole on hover.",
+      "THE FIVE TABS as named: Jobs (add them, see them, GENERATE), MRP plan (the strip, the planning block and the grid), Kitted items (this run's ticks), Store issue items (this run's slips, opening to release), Items released (every line the store has released against this run's slips, who and when).",
+    ],
+  },
+  {
     v: "4.4.2.1",
     date: "2026-09-03",
     module: "Masters — a Finished goods warehouse type",

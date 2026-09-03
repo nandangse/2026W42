@@ -17,7 +17,7 @@ import { useState } from "react";
 import GenieTable from "@/components/GenieTable";
 import { Screen, Btn, Note, Chip, Modal, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, RED, S, fmtD, useLoad, post } from "@/components/ims/ui";
 
-interface Slip {
+export interface Slip {
   id: string; slip_no: string; kind: string; mrp_id: string | null; from_email: string | null; to_email: string | null; status: string;
   escalation_level: number; escalated_at: string | null; escalation_note: string; created_at: string; done_at: string | null; note: string;
   lines: number; qty: number; released: number; amount: number; projects: string[];
@@ -32,8 +32,8 @@ const qtyFmt = (n: unknown) => Number(n ?? 0).toLocaleString("en-IN", { maximumF
 const statusColour = (s: string, level: number) => (s === "done" ? GREEN : s === "cancelled" ? "#5A6672" : level >= 3 ? RED : level > 0 ? AMBER : NAVY);
 const LADDER = ["", "project manager", "COO", "Raghu"];
 
-export default function Slips() {
-  const [data, busy, reload, err] = useLoad<{ ok: boolean; rows: Slip[] }>("/api/saamaan/slip?mode=slips");
+export default function Slips({ mrp }: { mrp?: string } = {}) {
+  const [data, busy, reload, err] = useLoad<{ ok: boolean; rows: Slip[] }>(`/api/saamaan/slip?mode=slips${mrp ? `&mrp=${encodeURIComponent(mrp)}` : ""}`);
   const [open, setOpen] = useState<Slip | null>(null);
   const rows = data?.rows ?? [];
   return (
@@ -64,7 +64,7 @@ export default function Slips() {
   );
 }
 
-function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void }) {
+export function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void }) {
   const [data, busy, reload, err] = useLoad<{ ok: boolean; slip: Slip; lines: Line[] }>(`/api/saamaan/slip?mode=slip&id=${encodeURIComponent(slip.id)}`);
   const [boxes, setBoxes] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState("");

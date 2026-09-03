@@ -211,20 +211,34 @@ export async function GET(req: Request) {
         if (!id) throw new HttpError(400, "id required");
         return NextResponse.json({ ok: true, ...(await grid(admin, id)) });
       }
-      const [runs, board, counts] = await Promise.all([
+      const [runs, board, counts, plans, kitted] = await Promise.all([
         admin.from("material_mrp").select("*").order("created_at", { ascending: false }).limit(200),
         liveJobs(admin),
         admin.from("material_mrp_job").select("mrp_id").limit(20000),
+        admin.from("material_mrp_plan").select("mrp_id, item_code, order_qty").limit(50000).then((r) => (r.error ? [] : r.data ?? [])),
+        admin.from("material_issue").select("mrp_id, amount").limit(50000).then((r) => (r.error ? [] : r.data ?? [])),
       ]);
       if (runs.error) throw runs.error;
       const per = new Map<string, number>();
       for (const c of counts.data ?? []) per.set(S(c.mrp_id), (per.get(S(c.mrp_id)) ?? 0) + 1);
+      // The value of each run: its order boxes at the RBOM rate of the item
+      // (the first rate on record for it); the kitted value: its issues.
+      const codes = [...new Set(plans.map((x) => S(x.item_code)))];
+      const rateOf = new Map<string, number>();
+      for (let i = 0; i < codes.length; i += 500) {
+        const { data } = await admin.from("material_rbom_item").select("item_code, rate").in("item_code", codes.slice(i, i + 500)).not("rate", "is", null).limit(20000);
+        for (const r of data ?? []) if (!rateOf.has(S(r.item_code))) rateOf.set(S(r.item_code), Number(r.rate) || 0);
+      }
+      const valueOf = new Map<string, number>();
+      for (const x of plans) valueOf.set(S(x.mrp_id), (valueOf.get(S(x.mrp_id)) ?? 0) + (Number(x.order_qty) || 0) * (rateOf.get(S(x.item_code)) ?? 0));
+      const kittedOf = new Map<string, number>();
+      for (const k of kitted) if (k.mrp_id) kittedOf.set(S(k.mrp_id), (kittedOf.get(S(k.mrp_id)) ?? 0) + (Number(k.amount) || 0));
       const projIds = [...new Set(board.map((j) => S(j.proj)).filter(Boolean))];
       const { data: projects } = projIds.length ? await admin.from("material_project").select("project_id, project_name").in("project_id", projIds) : { data: [] };
       const projName = new Map(((projects ?? []) as Doc[]).map((x) => [S(x.project_id), S(x.project_name)]));
       return NextResponse.json({
         ok: true,
-        runs: (runs.data ?? []).map((r) => ({ ...r, jobs: per.get(S(r.id)) ?? 0 })),
+        runs: (runs.data ?? []).map((r) => ({ ...r, jobs: per.get(S(r.id)) ?? 0, value: valueOf.get(S(r.id)) ?? 0, kitted_value: kittedOf.get(S(r.id)) ?? 0 })),
         board: board.map((j) => ({ job_no: S(j.id), tag: S(j.tag), cust: S(j.cust), fam: S(j.fam), project_id: S(j.proj), project_name: projName.get(S(j.proj)) ?? "", tdd: j.tdd ?? null, val: N(j.val), stat: S(j.stat) })),
       });
     } catch (e) {

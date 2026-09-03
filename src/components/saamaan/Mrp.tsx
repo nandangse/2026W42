@@ -24,8 +24,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Screen, Btn, Note, Modal, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, RED, S, fmtD, post } from "@/components/ims/ui";
 import { JobLightbox, type WipJob } from "@/components/JobsInProgress";
+import GenieTable from "@/components/GenieTable";
+import Slips from "./Slips";
+import Kitting from "./Kitting";
 
-interface Run { id: string; mrp_no: string; name: string; run_date: string; by: string | null; created_at: string; generated_at: string | null; jobs?: number }
+interface Run { id: string; mrp_no: string; name: string; run_date: string; by: string | null; created_at: string; generated_at: string | null; jobs?: number; value?: number; kitted_value?: number }
 interface BoardJob { job_no: string; tag: string; cust: string; fam: string; project_id: string; project_name: string; tdd: string | null; val: number | null; stat: string }
 interface Col extends BoardJob { live: boolean; rbom_id: string }
 interface Cell {
@@ -65,15 +68,81 @@ const toWip = (j: Col): WipJob => ({
   tpv: 0, tpp: 0, kit: 0, pct: 0, note: "", escalation: null, amtNeeded: null, payOnDelivery: null, mandays: null, ownerInitials: null, ownerName: null,
 });
 
-export default function Mrp({ role, email }: { role: string; email: string }) {
+// ================================================================ the list
+/**
+ * MRP — every run on one page (Dr Raghu, 3 Sep 2026: "keep this in MRP as
+ * a page where all MRP will be listed; clicking on that will go to a fresh
+ * page"). A new run is made here and opens on its own page at once.
+ */
+export default function Mrp() {
   const [runs, setRuns] = useState<Run[] | null>(null);
+  const [err, setErr] = useState("");
+  const [msg, setMsg] = useState("");
+  const [newName, setNewName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = async () => {
+    const r = await fetch("/api/saamaan/mrp?mode=list", { cache: "no-store" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { setErr(j.error || `The server answered ${r.status}.`); setRuns([]); return; }
+    setRuns(j.runs || []);
+  };
+  useEffect(() => { load(); }, []);
+  const create = async () => {
+    if (!newName.trim()) { setMsg("Give the run a name."); return; }
+    setBusy(true); setMsg("");
+    const r = await post("/api/saamaan/mrp", { action: "create", name: newName.trim() });
+    setBusy(false);
+    if (!r.ok) { setMsg(r.error || "Could not create."); return; }
+    window.location.href = `/saamaan/mrp/${(r.run as Run).id}`;
+  };
+  const open = (id: string) => { window.location.href = `/saamaan/mrp/${id}`; };
+  return (
+    <Screen title="MRP — Material Resource Planning" blurb="Every run. Click one to open it on its own page: its jobs, the plan, what is kitted, what the store is to issue, what has been released."
+      action={<>
+        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="new run — a name" onKeyDown={(e) => { if (e.key === "Enter") create(); }}
+          className="rounded border px-2 py-2 text-sm" style={{ borderColor: BORDER, minWidth: 200 }} />
+        <Btn kind="primary" onClick={create} disabled={busy}>+ New run</Btn>
+      </>}>
+      {err && <Note kind="error">{err}</Note>}
+      {msg && <Note kind="warn">{msg}</Note>}
+      <GenieTable<Run>
+        rows={runs}
+        minWidth={900}
+        search={(r, q) => [r.mrp_no, r.name, r.by].join(" ").toLowerCase().includes(q)}
+        searchPlaceholder="🔍 run, name, who"
+        empty="No run yet — name one on the right."
+        columns={[
+          { key: "no", label: "MRP No", align: "left", sort: (r) => r.mrp_no, render: (r) => <button onClick={() => open(r.id)} className="font-bold hover:underline" style={{ color: NAVY }}>{r.mrp_no}</button> },
+          { key: "name", label: "Run", align: "left", sort: (r) => r.name, render: (r) => <button onClick={() => open(r.id)} className="font-semibold text-left" style={{ color: INK }}>{r.name}</button> },
+          { key: "date", label: "Date", align: "left", sort: (r) => r.run_date, render: (r) => <span className="tnum">{fmtD(r.run_date)}</span> },
+          { key: "by", label: "By", align: "left", sort: (r) => who(r.by), render: (r) => who(r.by) },
+          { key: "jobs", label: "Jobs", align: "right", sort: (r) => r.jobs ?? 0, render: (r) => <span className="tnum">{r.jobs ?? 0}</span> },
+          { key: "value", label: "Value of run", align: "right", sort: (r) => r.value ?? 0, render: (r) => <span className="tnum">{money(r.value ?? 0)}</span> },
+          { key: "kitted", label: "Kitted value", align: "right", sort: (r) => r.kitted_value ?? 0, render: (r) => <span className="tnum" style={{ color: r.kitted_value ? GREEN : MUTED }}>{money(r.kitted_value ?? 0)}</span> },
+          { key: "gen", label: "Generated", align: "right", sort: (r) => S(r.generated_at), render: (r) => <span className="tnum" style={{ color: MUTED }}>{r.generated_at ? fmtAt(r.generated_at) : "·"}</span> },
+        ]}
+      />
+    </Screen>
+  );
+}
+
+// ================================================================ one run
+const TABS: { key: string; label: string }[] = [
+  { key: "jobs", label: "Jobs" },
+  { key: "plan", label: "MRP plan" },
+  { key: "kitted", label: "Kitted items" },
+  { key: "store", label: "Store issue items" },
+  { key: "released", label: "Items released" },
+];
+
+export function MrpRun({ id, role, email }: { id: string; role: string; email: string }) {
+  const runId = id;
   const [board, setBoard] = useState<BoardJob[]>([]);
-  const [runId, setRunId] = useState("");
+  const [tab, setTab] = useState("jobs");
   const [grid, setGrid] = useState<Grid | null>(null);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState("");
-  const [newName, setNewName] = useState("");
   const [picker, setPicker] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [openJob, setOpenJob] = useState<Col | null>(null);
@@ -120,13 +189,9 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
   };
 
   const loadList = async () => {
-    setErr("");
     const r = await fetch("/api/saamaan/mrp?mode=list", { cache: "no-store" });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) { setErr(j.error || `The server answered ${r.status}.`); setRuns([]); return; }
-    setRuns(j.runs || []); setBoard(j.board || []);
-    // The last run opens by itself — "saved next time he logs in".
-    if (!runId && j.runs?.length) setRunId(j.runs[0].id);
+    if (r.ok) setBoard(j.board || []);
   };
   const loadRun = async (id: string) => {
     if (!id) { setGrid(null); return; }
@@ -140,16 +205,6 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
   useEffect(() => { loadList(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadRun(runId); }, [runId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const create = async () => {
-    if (!newName.trim()) { setMsg("Give the run a name."); return; }
-    setBusy("create"); setMsg("");
-    const r = await post("/api/saamaan/mrp", { action: "create", name: newName.trim() });
-    setBusy("");
-    if (!r.ok) { setMsg(r.error || "Could not create."); return; }
-    setNewName("");
-    await loadList();
-    setRunId(String((r.run as Run).id));
-  };
   const saveJobs = async () => {
     setBusy("jobs"); setMsg("");
     const r = await post("/api/saamaan/mrp", { action: "jobs", id: runId, job_nos: [...picked] });
@@ -224,37 +279,45 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
     return [...g.entries()].sort((a, b) => b[0].localeCompare(a[0], undefined, { numeric: true }));
   }, [board]);
 
-  const run = grid?.run ?? runs?.find((r) => r.id === runId) ?? null;
+  const run = grid?.run ?? null;
   const toggleFold = (g: string) => setFolded((f) => { const n = new Set(f); if (n.has(g)) n.delete(g); else n.add(g); return n; });
 
   return (
-    <Screen
-      title="MRP — Material Resource Planning"
-      blurb="A run picks its jobs once; GENERATE sums their Real BOMs into items by jobs; a tick issues an item into the job's WIP. Stock is not reduced yet."
-      action={<>
-        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="new run — a name" onKeyDown={(e) => { if (e.key === "Enter") create(); }}
-          className="rounded border px-2 py-2 text-sm" style={{ borderColor: BORDER, minWidth: 200 }} />
-        <Btn kind="primary" onClick={create} disabled={busy === "create"}>+ New run</Btn>
-      </>}>
+    <div style={{ maxWidth: "100%" }}>
+      {/* ---------------------------------- the run head and the tabs, frozen */}
+      <div style={{ position: "sticky", top: 43, zIndex: 30, background: "#F7F8FC", margin: "-12px -12px 12px", padding: "12px 12px 0" }}>
+        <div className="flex items-center gap-4 flex-wrap px-3 py-2 rounded-lg border" style={{ borderColor: BORDER, background: "#fff" }}>
+          <a href="/saamaan/mrp" className="text-xs font-bold" style={{ color: NAVY }}>← MRP</a>
+          {run ? (<>
+            <span className="font-bold" style={{ color: INK, fontSize: 16 }}>{run.mrp_no}</span>
+            <span className="font-semibold" style={{ color: INK }}>{run.name}</span>
+            <span className="text-xs" style={{ color: MUTED }}>Date <b className="tnum" style={{ color: INK }}>{fmtD(run.run_date)}</b></span>
+            <span className="text-xs" style={{ color: MUTED }}>By <b style={{ color: INK }}>{who(run.by) === "·" ? who(email) : who(run.by)}</b></span>
+            <span className="text-xs" style={{ color: MUTED }}>Jobs <b className="tnum" style={{ color: INK }}>{grid?.jobs.length ?? 0}</b></span>
+            <span className="text-xs" style={{ color: MUTED }}>Valuation <b className="tnum" style={{ color: INK }}>{money(totals.value)}</b></span>
+            <span className="text-xs" style={{ color: MUTED }}>Kitted <b className="tnum" style={{ color: totals.issued ? GREEN : INK }}>{money(totals.issued)}</b> · {pct(totals.issued, totals.value)}</span>
+            <span className="text-xs" style={{ color: MUTED }}>Value of run <b className="tnum" style={{ color: INK }}>{money(totals.runValue)}</b></span>
+            {run.generated_at && <span className="text-xs" style={{ color: MUTED }}>generated <span className="tnum">{fmtAt(run.generated_at)}</span></span>}
+          </>) : <span className="text-sm" style={{ color: MUTED }}>Reading the run…</span>}
+        </div>
+        <div className="flex gap-1 mt-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
+          {TABS.map((t) => (
+            <button key={t.key} onClick={() => setTab(t.key)} className="px-3 py-2 text-sm font-bold"
+              style={{ color: tab === t.key ? NAVY : INK, borderBottom: `3px solid ${tab === t.key ? NAVY : "transparent"}`, marginBottom: -1 }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {err && <Note kind="error">{err}</Note>}
       {msg && <Note kind="warn">{msg}</Note>}
 
-      {/* ------------------------------------------------------ the run head */}
-      <div className="rounded-lg border p-3 mb-3 flex items-center gap-4 flex-wrap" style={{ borderColor: BORDER, background: "#fff" }}>
-        <select value={runId} onChange={(e) => setRunId(e.target.value)} className="rounded border px-2 py-1.5 text-sm font-bold bg-white" style={{ borderColor: BORDER, minWidth: 260 }}>
-          {!runs?.length && <option value="">— no run yet — make one on the right —</option>}
-          {(runs ?? []).map((r) => <option key={r.id} value={r.id}>{r.mrp_no} · {r.name} ({r.jobs ?? 0} jobs)</option>)}
-        </select>
-        {run && (<>
-          <span className="text-xs" style={{ color: MUTED }}>MRP no <b style={{ color: INK }}>{run.mrp_no}</b></span>
-          <span className="text-xs" style={{ color: MUTED }}>Run <b style={{ color: INK }}>{run.name}</b></span>
-          <span className="text-xs" style={{ color: MUTED }}>Date <b className="tnum" style={{ color: INK }}>{fmtD(run.run_date)}</b></span>
-          <span className="text-xs" style={{ color: MUTED }}>By <b style={{ color: INK }}>{who(run.by) === "·" ? who(email) : who(run.by)}</b></span>
-          {run.generated_at && <span className="text-xs" style={{ color: MUTED }}>generated <span className="tnum">{fmtAt(run.generated_at)}</span></span>}
-        </>)}
-      </div>
+      {run && tab === "kitted" && <Kitting mrp={runId} />}
+      {run && tab === "store" && <Slips mrp={runId} />}
+      {run && tab === "released" && <Released mrp={runId} />}
 
-      {run && (<>
+      {run && tab === "jobs" && (<>
         {/* ---------------------------------------------------- the jobs */}
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           <Btn onClick={() => setPicker(true)}>Jobs to add</Btn>
@@ -266,10 +329,13 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
             </button>
           ))}
           {grid && grid.jobs.length > 0 && (
-            <Btn kind="primary" onClick={generate} disabled={busy === "generate"}>{busy === "generate" ? "Generating…" : "GENERATE"}</Btn>
+            <Btn kind="primary" onClick={async () => { await generate(); setTab("plan"); }} disabled={busy === "generate"}>{busy === "generate" ? "Generating…" : "GENERATE"}</Btn>
           )}
         </div>
+        {grid && grid.jobs.length === 0 && <Note kind="info">Add jobs to the run, then GENERATE.</Note>}
+      </>)}
 
+      {run && tab === "plan" && (<>
         {/* ------------------------------------------------ the top strip */}
         {grid && grid.items.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-3">
@@ -322,7 +388,7 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
             <table className="text-xs" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 420 + grid.jobs.length * 150 }}>
               <thead>
                 <tr style={{ background: "#14224F", color: "#fff" }}>
-                  <th rowSpan={fullHead ? 5 : 2} className="px-2 py-1 text-left" style={{ position: "sticky", left: 0, top: 0, zIndex: 3, background: "#14224F", minWidth: 300, verticalAlign: "bottom" }}>Item</th>
+                  <th rowSpan={fullHead ? 5 : 2} className="px-2 py-1 text-left" style={{ position: "sticky", left: 0, top: 0, zIndex: 3, background: "#14224F", width: 200, minWidth: 200, maxWidth: 200, verticalAlign: "bottom" }}>Item</th>
                   {showPlan && PLAN_COLS.map((c) => (
                     <th key={c.key} rowSpan={fullHead ? 5 : 2} className="px-1.5 py-1 text-right" style={{ position: "sticky", top: 0, zIndex: 2, background: "#0F766E", verticalAlign: "bottom", minWidth: c.w }} title={c.hint}>{c.label}</th>
                   ))}
@@ -363,8 +429,9 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
           </div>
         </>)}
         {grid && grid.jobs.length > 0 && grid.items.length === 0 && (
-          <Note kind="warn">The chosen jobs have no RBOM lines yet. Build the RBOMs on the BOM front, then GENERATE.</Note>
+          <Note kind="warn">The chosen jobs have no RBOM lines yet. Build the RBOMs on the BOM front, then GENERATE on the Jobs tab.</Note>
         )}
+        {grid && grid.jobs.length === 0 && <Note kind="info">No jobs on this run yet — the Jobs tab.</Note>}
       </>)}
 
       {/* ---------------------------------------------------- the picker */}
@@ -410,7 +477,44 @@ export default function Mrp({ role, email }: { role: string; email: string }) {
           onClose={() => setOpenJob(null)} onOpenPlan={() => { const id = openJob.job_no; setOpenJob(null); window.open(`/?job=${encodeURIComponent(id)}`, "_blank"); }}
           onSaved={async () => { await loadRun(runId); }} />
       )}
-    </Screen>
+    </div>
+  );
+}
+
+// ======================================================= items released
+interface ReleasedLine {
+  id: string; slip_no: string; slip_kind: string; released_to: string; project_id: string; job_no: string; item_group: string; item_code: string; item_name: string;
+  qty: number; uom: string; released_qty: number; released_at: string | null; released_by: string | null; amount: number | null;
+}
+function Released({ mrp }: { mrp: string }) {
+  const [data, setData] = useState<{ rows: ReleasedLine[] } | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    fetch(`/api/saamaan/slip?mode=released&mrp=${encodeURIComponent(mrp)}`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || `The server answered ${r.status}.`); return j; })
+      .then(setData).catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [mrp]);
+  return (
+    <div>
+      {err && <Note kind="error">{err}</Note>}
+      <GenieTable<ReleasedLine>
+        rows={data ? data.rows : null}
+        minWidth={1000}
+        search={(r, q) => [r.slip_no, r.job_no, r.item_code, r.item_name, r.released_by].join(" ").toLowerCase().includes(q)}
+        searchPlaceholder="🔍 slip, job, item, who"
+        empty="Nothing released yet — the store releases against a slip on Store issue items."
+        columns={[
+          { key: "at", label: "Released", align: "left", sort: (r) => S(r.released_at), render: (r) => <span className="tnum">{r.released_at ? fmtAt(r.released_at) : "·"}</span> },
+          { key: "slip", label: "Slip", align: "left", sort: (r) => r.slip_no, render: (r) => <b style={{ color: NAVY }}>{r.slip_no}</b> },
+          { key: "job", label: "Job", align: "left", sort: (r) => r.job_no, render: (r) => <span className="tnum">{r.job_no || "·"}</span> },
+          { key: "item", label: "Item", align: "left", sort: (r) => r.item_code, render: (r) => <span><b style={{ color: INK }}>{r.item_code}</b> <span style={{ color: MUTED }}>{r.item_name}</span></span> },
+          { key: "q", label: "Released", align: "right", sort: (r) => Number(r.released_qty), render: (r) => <span className="tnum font-bold" style={{ color: GREEN }}>{qtyFmt(Number(r.released_qty))} <span style={{ color: MUTED, fontWeight: 500 }}>{r.uom}</span></span> },
+          { key: "of", label: "Of", align: "right", sort: (r) => Number(r.qty), render: (r) => <span className="tnum" style={{ color: MUTED }}>{qtyFmt(Number(r.qty))}</span> },
+          { key: "by", label: "By", align: "left", sort: (r) => who(r.released_by), render: (r) => who(r.released_by) },
+          { key: "to", label: "Slip to", align: "left", render: (r) => <span style={{ color: MUTED }}>{who(r.released_to)}</span> },
+        ]}
+      />
+    </div>
   );
 }
 
@@ -437,7 +541,7 @@ function GroupRows({ group, items, jobs, folded, onFold, boxes, setBoxes, busy, 
   return (
     <>
       <tr style={{ background: "#F1F3F9" }}>
-        <td colSpan={1 + (showPlan ? PLAN_COLS.length : 0) + jobs.length} className="px-2 py-1 font-bold" style={{ color: INK, position: "sticky", left: 0, borderTop: `1px solid ${BORDER}` }}>
+        <td colSpan={1 + (showPlan ? PLAN_COLS.length : 0) + jobs.length} className="px-2 py-1 font-bold" style={{ color: INK, borderTop: `1px solid ${BORDER}` }}>
           <button onClick={onFold} className="flex items-center gap-2">
             <span style={{ width: 12, display: "inline-block" }}>{folded ? "▸" : "▾"}</span>{group.replace(/^RM - /, "")} <span style={{ color: MUTED, fontWeight: 500 }}>· {items.length} item{items.length === 1 ? "" : "s"}</span>
           </button>
@@ -445,8 +549,11 @@ function GroupRows({ group, items, jobs, folded, onFold, boxes, setBoxes, busy, 
       </tr>
       {!folded && items.map((it, i) => (
         <tr key={it.item_code} style={{ background: i % 2 ? "#FAF9F5" : "#fff" }}>
-          <td className="px-2 py-1" style={{ position: "sticky", left: 0, background: i % 2 ? "#FAF9F5" : "#fff", borderBottom: `1px solid ${BORDER}`, zIndex: 1 }}>
-            <b style={{ color: INK }}>{it.item_code}</b> <span style={{ color: MUTED, whiteSpace: "normal" }}>{it.item_name}</span>
+          {/* 200px, frozen on the left (Dr Raghu, 3 Sep 2026: "make it narrow and frozen — approx 200 px"); the name wraps to two lines, whole on hover. */}
+          <td className="px-2 py-1" title={`${it.item_code} — ${it.item_name}`}
+            style={{ position: "sticky", left: 0, background: i % 2 ? "#FAF9F5" : "#fff", borderBottom: `1px solid ${BORDER}`, borderRight: `2px solid ${BORDER}`, zIndex: 1, width: 200, minWidth: 200, maxWidth: 200 }}>
+            <b style={{ color: INK }}>{it.item_code}</b>
+            <div style={{ color: MUTED, whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25, fontSize: 11 }}>{it.item_name}</div>
           </td>
           {showPlan && (() => {
             const pl = plan(it);

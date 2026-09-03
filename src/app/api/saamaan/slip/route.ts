@@ -45,10 +45,24 @@ export async function GET(req: Request) {
         for (const s of settings ?? []) set[S(s.key)] = S(s.value);
         return NextResponse.json({ ok: true, people: people ?? [], settings: set });
       }
+      if (mode === "released") {
+        const mrp = S(p.get("mrp"));
+        let sq = admin.from("material_slip").select("id, slip_no, kind, to_email").limit(500);
+        if (mrp) sq = sq.eq("mrp_id", mrp);
+        const { data: slips } = await sq;
+        const ids = (slips ?? []).map((s) => S(s.id));
+        const { data: lines, error } = ids.length
+          ? await admin.from("material_slip_line").select("*").in("slip_id", ids).gt("released_qty", 0).order("released_at", { ascending: false }).limit(5000)
+          : { data: [], error: null };
+        if (error) throw error;
+        const slipOf = new Map(((slips ?? []) as Doc[]).map((s) => [S(s.id), s]));
+        return NextResponse.json({ ok: true, rows: (lines ?? []).map((l) => ({ ...l, slip_no: S(slipOf.get(S(l.slip_id))?.slip_no), slip_kind: S(slipOf.get(S(l.slip_id))?.kind), released_to: S(slipOf.get(S(l.slip_id))?.to_email) })) });
+      }
       if (mode === "kitting") {
-        const job = S(p.get("job"));
+        const job = S(p.get("job")), mrp = S(p.get("mrp"));
         let q = admin.from("material_issue").select("*").order("issued_at", { ascending: false }).limit(2000);
         if (job) q = q.eq("job_no", job);
+        if (mrp) q = q.eq("mrp_id", mrp);
         const { data, error } = await q;
         if (error) throw error;
         const slipIds = [...new Set((data ?? []).map((i) => S(i.slip_id)).filter(Boolean))];
@@ -70,7 +84,10 @@ export async function GET(req: Request) {
         return NextResponse.json({ ok: true, slip, lines: (lines ?? []).map((l) => ({ ...l, project_name: projName.get(S(l.project_id)) ?? "" })) });
       }
       // slips
-      const { data: slips, error } = await admin.from("material_slip").select("*").order("created_at", { ascending: false }).limit(500);
+      const mrp = S(p.get("mrp"));
+      let sq = admin.from("material_slip").select("*").order("created_at", { ascending: false }).limit(500);
+      if (mrp) sq = sq.eq("mrp_id", mrp);
+      const { data: slips, error } = await sq;
       if (error) throw error;
       const ids = (slips ?? []).map((s) => S(s.id));
       const { data: lines } = ids.length ? await admin.from("material_slip_line").select("slip_id, qty, released_qty, project_id, amount").in("slip_id", ids).limit(20000) : { data: [] };
