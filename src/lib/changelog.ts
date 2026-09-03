@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.2.11",
+    date: "2026-09-03",
+    module: "Software Description — Saamaan written in",
+    items: [
+      "\"please write the description to the software description and close this\" (Dr Raghu, 3 Sep 2026). Saamaan is now in the Software Description: a Space of its own, three module cards — the Items mirror, BOM with the Real BOM and WIP, and MRP with kitting and issue slips — and a Materials data domain listing all eighteen material_ tables with the rule that the mirrors are the ERP's word and the rest Genie's. The prose date moves to 3 September 2026.",
+    ],
+  },
+  {
     v: "4.4.2.10",
     date: "2026-09-03",
     module: "MRP plan — the job detail rows freeze too",

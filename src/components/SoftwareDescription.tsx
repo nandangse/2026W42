@@ -32,7 +32,7 @@
 import { APP_VERSION, UPDATES, EFFORT } from "@/lib/changelog";
 
 /** Last hand-revision of the prose on this page. Bump it when you edit. */
-const DOC_REVISED = "27 August 2026";
+const DOC_REVISED = "3 September 2026";
 
 const NAVY = "#16232F";
 const INK = "#22303C";
@@ -340,6 +340,42 @@ const MODULES: ModuleSpec[] = [
     ai: "None.",
   },
   {
+    name: "Saamaan — Items, the ERP mirror",
+    space: "Saamaan",
+    since: "4.4.0.0",
+    purpose: "Every RM item as the ERP holds it — the whole document, child tables, drawings and attachments, the rich description — with closing stock live from the ERP, ERP's count and Genie's (Stock warehouses only) side by side.",
+    who: "Granted individuals only; the owner implicit.",
+    gate: "requireSaamaan() on the page and every route; material_access, ticked on Admin → module access; RLS on with no policies",
+    screens: ["Items", "Item — ERP Data", "Item — Stock Register (live ledger)", "Item — Intelligence (to build)", "Projects", "Masters — warehouses & routing", "ERP pull (7 phases)"],
+    data: ["material_access", "material_item", "material_item_file", "material_project", "material_bom", "material_warehouse", "material_setting", "material_pull"],
+    api: ["/api/saamaan/items", "/api/saamaan/stock", "/api/saamaan/erp-items", "/api/saamaan/warehouse"],
+    ai: "None. Reads only — nothing in Saamaan writes to the ERP.",
+  },
+  {
+    name: "Saamaan — BOM, the Real BOM and WIP",
+    space: "Saamaan",
+    since: "4.4.0.4",
+    purpose: "The latest submitted BOM per live project, and Genie's own copy of it — the RBOM, revision 100, Released lines plus what later drafts added as Draft — and one WIP warehouse per live job on the board.",
+    who: "Granted individuals only.",
+    gate: "requireSaamaan(); a live project is one with a job on the board, never the project's status field",
+    screens: ["BOM front", "Bill in a lightbox", "Build RBOM / ERP moved on", "WIP — one row per live job"],
+    data: ["material_bom", "material_bom_item", "material_rbom", "material_rbom_item", "material_wip"],
+    api: ["/api/saamaan/items?mode=bom", "/api/saamaan/rbom", "/api/saamaan/wip"],
+    ai: "None.",
+  },
+  {
+    name: "Saamaan — MRP, kitting and issue slips",
+    space: "Saamaan",
+    since: "4.4.1.9",
+    purpose: "A run picks its jobs once; GENERATE sums their RBOMs into items by jobs; a tick issues an item into the job's WIP; the planning block says stock, required, kitted, needed, in order, blocked, balance, to order, and what to order; Submit to store raises an issue slip, Submit to purchase a requisition; a slip left open climbs a ladder a day at a time.",
+    who: "Granted individuals only; editing needs a planner role; the ERP pull and the Build are the owner's.",
+    gate: "requireSaamaan(); the escalation cron by CRON_SECRET or a signed-in hand",
+    screens: ["MRP list", "Run — Jobs", "Run — MRP plan", "Run — Kitted items", "Run — Store issue items", "Run — Items released", "Kitting register", "Issue slips (A5 print, a project a sheet)"],
+    data: ["material_mrp", "material_mrp_job", "material_mrp_plan", "material_issue", "material_slip", "material_slip_line", "manual_tasks (escalations)"],
+    api: ["/api/saamaan/mrp", "/api/saamaan/slip", "/api/cron/saamaan-escalate"],
+    ai: "None. Stock is not yet reduced by an issue — the stated next step.",
+  },
+  {
     name: "Notifications",
     space: "Cross-cutting",
     since: "2.x",
@@ -374,6 +410,7 @@ const SPACES: SpaceSpec[] = [
   { icon: "📜", name: "Principles", what: "How decisions are meant to be reached, and the documents behind that.", who: "Everyone except the uploader.", how: "Role — any reader." },
   { icon: "👤", name: "HRMS", what: "The employee master and directory, at its own URL: records, contact details, next of kin, and the history of every change.", who: "Three named accounts — the owner, one director, HR.", how: "Explicit grant — hrms_access, ticked by the owner alone." },
   { icon: "🤝", name: "CRM", what: "The funnel at its own URL: the whole opportunity book since 2015, quotations, the Deal Board, mail and WhatsApp from each person's own accounts, EVA company briefs. A second database entirely.", who: "Everyone the grant admits.", how: "Explicit grant — crm_access; one Genie login, bridged on email." },
+  { icon: "📦", name: "Saamaan", what: "Materials, at its own URL: the ERP's Item master mirrored with live stock, projects and BOMs, the Real BOM, a WIP per live job, MRP runs with planning, kitting into WIP, issue slips to the store and requisitions to purchase with a daily escalation ladder. Every table wears the material_ prefix; every ERP call is a read.", who: "Everyone the grant admits; the owner implicit.", how: "Explicit grant — material_access, ticked by the owner alone." },
   { icon: "👤", name: "Account menu", what: "The tools for the few: Morning Update, Update to ERP, Feature Request, Admin.", who: "Each gated on its own right.", how: "Role or grant, per tool." },
 ];
 
@@ -392,6 +429,7 @@ const DATA_DOMAINS: [string, string, string[]][] = [
   ["Company voice", "Principles, quotes, moods, requests and notifications.", ["principles", "principle_doc", "principle_file", "image_quote", "day_mood", "feature_request", "feature_file", "notifications"]],
   ["HR (isolated)", "Personnel data. Every table carries the hrms_ prefix, RLS is on with NO policies and anon/authenticated hold no grants — the service role is the only way in, and only behind requireHrms(). See migration 0048.", ["hrms_employees", "hrms_employee_edits", "hrms_employee_edit_log", "hrms_access"]],
   ["CRM (a second database)", "The funnel lives in its OWN Supabase project — not these tables at all. RLS enabled and forced with no policies; the service key behind requireCrm() is the only door; Gmail credentials sit in Vault; sixteen migrations of its own under supabase-crm/. One profile row per Genie account, bridged on email.", ["company", "person", "opportunity (22k+)", "quotation", "sales_order", "sales_invoice (6.8k)", "interaction (74k)", "message", "mailbox", "email_template", "whatsapp_template", "stage", "crm_audit", "…"]],
+  ["Materials (material_)", "Saamaan's tables, every one prefixed material_ so a glance down the list says whose row it is. The mirrors (items, files, projects, BOMs, BOM lines, warehouses) are the ERP's word, refreshed by the seven-phase pull and never hand-edited; the rest (the RBOM and its lines, WIP, MRP runs, plans, issues, slips, settings) are Genie's own. RLS on with no policies; the service role behind requireSaamaan() is the only door. Migrations 0118–0128.", ["material_access", "material_item", "material_item_file", "material_project", "material_bom", "material_bom_item", "material_warehouse", "material_rbom", "material_rbom_item", "material_wip", "material_mrp", "material_mrp_job", "material_mrp_plan", "material_issue", "material_slip", "material_slip_line", "material_setting", "material_pull"]],
   ["Configuration", "App identity and the settings singleton.", ["app_settings", "settings"]],
 ];
 
