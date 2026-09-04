@@ -292,9 +292,14 @@ export async function erpSync(
   const genieKeeps = (kind: string, id: string, field: string, next?: Record<string, unknown>, prev?: Record<string, unknown>) => {
     const w = decisions[decisionKey(kind, id, field)] ?? fallback;
     if (w !== "latest") return w === "genie";
-    const erpT = erpWhen(next?._erp_modified);
-    const gT = new Date(genieTouched.get(`${id}:${field}`) ?? S(prev?.updated_at) ?? 0).getTime() || 0;
-    return gT > erpT;
+    // Genie's "entry" on a field is a CORRECTION someone made -- the queue
+    // has it, with its time. A row's updated_at is not that: every pull
+    // stamps it, so reading it as a touch let Genie keep an EMPTY GST on
+    // 73 jobs the last sync had merely written (found 4 Sep 2026). Where
+    // there is no correction, the ERP's entry is the only entry.
+    const gRaw = genieTouched.get(`${id}:${field}`);
+    if (!gRaw) return false;
+    return new Date(gRaw).getTime() > erpWhen(next?._erp_modified);
   };
 
   /** Fields Genie kept that the ERP can be told about — queued below. */
