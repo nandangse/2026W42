@@ -13,7 +13,8 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ALL_FIELDS, fieldSpec, hrmsTables, type FieldSpec } from "@/lib/hrms";
-import { employeeVars, payrollVars, renderTemplate } from "@/lib/hrms-template";
+import { employeeVars, payrollVars, renderTemplate, MONTHS } from "@/lib/hrms-template";
+import { musterVars, OPTIONAL_MUSTER_VARS, type MusterRow } from "@/lib/muster";
 import { crmDb } from "@/crm/db";
 import { periskopeConfig, throttleState, periskopeSend } from "@/crm/periskope";
 
@@ -64,12 +65,21 @@ export async function people(admin: SupabaseClient, ids?: string[]): Promise<Per
   });
 }
 
-export interface Sheet { id: string; month: number; year: number; status: string; rows: unknown }
+export interface Sheet { id: string; month: number; year: number; status: string; rows: unknown; muster?: { rows?: { employee_id: string }[] } | null }
 
+/** The month's salary sheet — with its uploaded muster, when the run has one, so the attendance lines can be filled. */
 export async function sheetFor(admin: SupabaseClient, month?: number, year?: number): Promise<Sheet | null> {
-  let q = admin.from("hrms_salary_sheet").select("id, month, year, status, rows").order("year", { ascending: false }).order("month", { ascending: false }).limit(1);
-  if (month && year) q = admin.from("hrms_salary_sheet").select("id, month, year, status, rows").eq("month", month).eq("year", year).limit(1);
-  const { data } = await q;
+  const cols = "id, month, year, status, rows, muster";
+  let q = admin.from("hrms_salary_sheet").select(cols).order("year", { ascending: false }).order("month", { ascending: false }).limit(1);
+  if (month && year) q = admin.from("hrms_salary_sheet").select(cols).eq("month", month).eq("year", year).limit(1);
+  let { data, error } = await q;
+  if (error && /muster/i.test(error.message)) {
+    // pre-0133
+    const cols2 = "id, month, year, status, rows";
+    let q2 = admin.from("hrms_salary_sheet").select(cols2).order("year", { ascending: false }).order("month", { ascending: false }).limit(1);
+    if (month && year) q2 = admin.from("hrms_salary_sheet").select(cols2).eq("month", month).eq("year", year).limit(1);
+    ({ data, error } = await q2);
+  }
   return (data && (data[0] as Sheet)) || null;
 }
 
@@ -78,12 +88,15 @@ export interface Rendered { id: string; name: string; phone: string; text: strin
 /** The template, filled for each person. `missing` names the variables that came out blank. */
 export function renderFor(p: Person, template: string, sheet: Sheet | null, extra: Record<string, string> = {}, phoneOverride?: string | null): Rendered {
   // {{employee_id}} is the four-digit number (Dr Raghu, 4 Sep 2026) — the record's id, not a field
-  const vars = { ...employeeVars(p.value, { employee_id: p.id }), ...payrollVars(sheet, p.id), ...extra };
+  // the run's muster, when there is one, fills the attendance lines for this person
+  const m = sheet?.muster?.rows?.find((x) => String(x.employee_id) === String(p.id)) as MusterRow | undefined;
+  const monthLabel = sheet ? `${MONTHS[(sheet.month || 1) - 1] || sheet.month} ${sheet.year}` : "";
+  const vars = { ...employeeVars(p.value, { employee_id: p.id }), ...payrollVars(sheet, p.id), ...(m ? musterVars(m, monthLabel) : {}), ...extra };
   const phone = String(phoneOverride || p.phone || "").replace(/\D/g, "");
   const text = renderTemplate(template, vars);
   const norm = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, "");
   const known = new Map(Object.entries(vars).map(([k, v]) => [norm(k), v]));
-  const missing = [...new Set([...String(template).matchAll(/\{\{\s*([a-zA-Z_]\w*)\s*\}\}/g)].map((m) => m[1]).filter((k) => !known.get(norm(k))))];
+  const missing = [...new Set([...String(template).matchAll(/\{\{\s*([a-zA-Z_]\w*)\s*\}\}/g)].map((m) => m[1]).filter((k) => !known.get(norm(k)) && !OPTIONAL_MUSTER_VARS.has(norm(k))))];
   return { id: p.id, name: p.name, phone: phone.length <= 10 && phone ? `91${phone}` : phone, text, missing };
 }
 

@@ -36,7 +36,12 @@ export default function WhatsAppBroadcast({ who }: { who: string }) {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    try { const j = await api.get("/api/hrms/whatsapp"); setSt(j); if (!sheet && j.sheets?.[0]) setSheet(`${j.sheets[0].year}-${j.sheets[0].month}`); }
+    try {
+      const j = await api.get("/api/hrms/whatsapp"); setSt(j);
+      if (!sheet && j.sheets?.[0]) setSheet(`${j.sheets[0].year}-${j.sheets[0].month}`);
+      const def = (j.templates || []).find((t: Tpl) => t.key === "attendance_monthly");
+      if (!tpl && def) { setTpl(def.key); setBodyTxt(def.body); }
+    }
     catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
