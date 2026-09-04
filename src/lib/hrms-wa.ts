@@ -72,15 +72,16 @@ export async function sheetFor(admin: SupabaseClient, month?: number, year?: num
   const cols = "id, month, year, status, rows, muster";
   let q = admin.from("hrms_salary_sheet").select(cols).order("year", { ascending: false }).order("month", { ascending: false }).limit(1);
   if (month && year) q = admin.from("hrms_salary_sheet").select(cols).eq("month", month).eq("year", year).limit(1);
-  let { data, error } = await q;
-  if (error && /muster/i.test(error.message)) {
+  const first = await q;
+  let data = first.data as Sheet[] | null;
+  if (first.error && /muster/i.test(first.error.message)) {
     // pre-0133
     const cols2 = "id, month, year, status, rows";
     let q2 = admin.from("hrms_salary_sheet").select(cols2).order("year", { ascending: false }).order("month", { ascending: false }).limit(1);
     if (month && year) q2 = admin.from("hrms_salary_sheet").select(cols2).eq("month", month).eq("year", year).limit(1);
-    ({ data, error } = await q2);
+    data = (await q2).data as Sheet[] | null;
   }
-  return (data && (data[0] as Sheet)) || null;
+  return (data && data[0]) || null;
 }
 
 export interface Rendered { id: string; name: string; phone: string; text: string; missing: string[] }
