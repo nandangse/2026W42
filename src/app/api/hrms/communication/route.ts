@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
+import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { ALL_FIELDS, fieldSpec, hrmsTables, type FieldSpec } from "@/lib/hrms";
 import { employeeVars, renderTemplate } from "@/lib/hrms-template";
@@ -16,9 +16,9 @@ export const maxDuration = 120;
  *
  * The body is a template: {{name}}, {{designation}} and the rest are filled
  * from each person's record before the mail goes. preview renders without
- * sending. Sending goes out from Raghu's own Gmail (the CRM's connected
- * mailbox) with his name on it -- so the sender is Raghu alone; anyone with
- * HRMS may preview, or log a message that went by another route.
+ * sending. Sending goes out from the SENDER's own connected Gmail with their
+ * name on it; somebody without a connected mailbox can preview, or log a
+ * message that went by another route.
  *
  * Every send, good or bad, lands in hrms_communication: the tab shows what
  * was said and what the mail server answered, never a cheerful "sent".
@@ -108,16 +108,17 @@ export async function POST(req: Request) {
 
     if (preview) return NextResponse.json({ people });
 
-    // who may actually send: the owner, from his own Gmail
+    // "i want him to send emails from HRMS using the same oauth" (Dr Raghu,
+    // 4 Sep 2026): the mail goes from the SENDER's own connected Gmail, with
+    // their name on it — whoever in HRMS is writing. No mailbox, no send.
     let token = "", fromEmail = "";
+    const fromName = me.displayName || me.email.split("@")[0];
     if (!logOnly) {
-      if (me.email.toLowerCase() !== RAGHU_EMAIL) throw new HttpError(403, "Mail from HRMS goes out from Raghu's own Gmail — the owner sends. You can preview, or log a message sent another way.");
       const { crmDb } = await import("@/crm/db");
-      const { data: rp } = await crmDb().from("profile").select("id").eq("email", RAGHU_EMAIL).maybeSingle();
-      if (!rp?.id) throw new HttpError(503, "Raghu has no profile in the CRM to hang a mailbox on.");
+      const { data: rp } = await crmDb().from("profile").select("id").eq("email", me.email.toLowerCase()).maybeSingle();
       const { myMailbox, accessTokenFor } = await import("@/crm/gmail");
-      const box = await myMailbox(String(rp.id));
-      if (!box) throw new HttpError(503, "Raghu's Gmail is not connected in the CRM.");
+      const box = rp?.id ? await myMailbox(String(rp.id)) : null;
+      if (!box) throw new HttpError(403, `Your Gmail is not connected yet — open the account menu → Connect Gmail (an admin ticks ✉ OAuth on your account first). Until then you can preview, or log a message sent another way.`);
       token = await accessTokenFor(String(box.id));
       fromEmail = String(box.email_address);
     }
@@ -131,7 +132,7 @@ export async function POST(req: Request) {
       else if (!p.to) err = `no ${toKind} email on the record`;
       else {
         try {
-          await gmailSend(token, fromEmail, p.to, p.subject || "(no subject)", isHtml ? p.body : textToHtml(esc(p.body)), undefined, undefined, "Raghunandan Jagdish");
+          await gmailSend(token, fromEmail, p.to, p.subject || "(no subject)", isHtml ? p.body : textToHtml(esc(p.body)), undefined, undefined, fromName);
           ok = true;
         } catch (e) { err = e instanceof Error ? e.message : String(e); }
       }

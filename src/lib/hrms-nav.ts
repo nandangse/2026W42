@@ -219,8 +219,8 @@ export const NAV: NavSection[] = [
     key: "fnf",
     label: "Full and Final Settlements",
     icon: "🧾",
-    blurb: "The reckoning that ends one. Awaiting Dr Raghu's description before it is built.",
-    built: false,
+    blurb: "The reckoning that ends one: the dates, the money, the closing checklist, and the six papers — resignation, its acceptance, the relieving letter, the checklist, the statement and the settlement letter.",
+    built: true,
   },
   {
     key: "policy",

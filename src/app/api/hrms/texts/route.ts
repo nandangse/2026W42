@@ -71,7 +71,7 @@ export async function POST(req: Request) {
 }
 
 /** The two built-in texts stay; a template somebody added can be removed. */
-const BUILT_IN = new Set(["offer_covering_letter", "terms_of_employment"]);
+const BUILT_IN = new Set(["offer_covering_letter", "terms_of_engagement"]);
 
 export async function DELETE(req: Request) {
   try {

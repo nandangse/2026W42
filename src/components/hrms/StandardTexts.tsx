@@ -26,7 +26,7 @@ interface Text { key: string; title: string; body: string; note: string | null; 
 
 /** The covering note is plain text — it becomes the body of a mail, not a page. E-mail templates are the same. */
 const PLAIN = new Set(["offer_covering_letter"]);
-const BUILT_IN = new Set(["offer_covering_letter", "terms_of_employment"]);
+const BUILT_IN = new Set(["offer_covering_letter", "terms_of_engagement"]);
 const isPlain = (t: Text) => PLAIN.has(t.key) || t.kind === "email";
 
 const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);

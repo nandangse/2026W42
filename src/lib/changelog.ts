@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.4.0",
+    date: "2026-09-04",
+    module: "HRMS — Full and Final Settlements",
+    items: [
+      "\"lets build the full and final settlement in HRMS NOW. Page 1 will have the table. Then have add new.\" (Dr Raghu, 4 Sep 2026). Full and Final Settlements is built: the table of every settlement with its dates, the money and how far the checklist has got; Add new picks the person from the roll and takes the eight things HR knows \u2014 Done On, Resignation Letter Date, Exit Date, Calling for F&F Date, Loan closing balance, Pending Expenses, TDS of the year, Advance paid and to be paid \u2014 and pulls the rest (gross, Basic & DA, leave balance, years for gratuity) from the record. Migration 0130.",
+      "IT CREATES THE SIX PAPERS: 1 Resignation, 2 Resignation acceptance, 3 Relieving letter, 4 Checklist of closing activities with remarks, 5 Full and final calculation, 6 Full and final letter with payment details. Each opens on its own page laid out for paper, letterhead on every sheet, like the offer letter. The three letters' wording is editable on the row and kept as issued.",
+      "THE ARITHMETIC is the compensation sheet's: a day is gross \u00f7 26; leave encashed on the balance; gratuity 15/26 of Basic & DA per year from five years; bonus 10% of Basic & DA for the months of the year served; notice shortfall recovered per day; PF and PT pro-rata, none for Management or contract types. Every computed line can be overridden, and the statement then says \"as entered\" beside it.",
+      "The closing checklist is twenty-three lines with a tick, a remark and who ticked it. Opening a settlement puts the person on Notice Period with the leaving date; closing it marks them Left \u2014 both as record edits awaiting RJ's approval like any other.",
+      "COMMUNICATION on the settlement: every mail HRMS sent the person, the loan rows, and \"check his personal mobile and pull all communication with HR\" \u2014 a Pull WhatsApp button that reads the thread on the personal number through Periskope, when Periskope is connected.",
+    ],
+  },
+  {
     v: "4.4.3.6",
     date: "2026-09-04",
     module: "Users is an app; HRMS writes to people; the wall filters by type",

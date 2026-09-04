@@ -7,9 +7,9 @@
  * it went to, what it said with the variables filled in, who sent it and
  * what the mail server answered. Above, a composer: pick an e-mail template
  * from Masters → Standard Texts or write from scratch, choose the personal
- * or the work address, see it rendered for THIS person, and send. Sending is
- * the owner's (it goes from Raghu's own Gmail with his name on it); anyone
- * with HRMS can preview, or log a message that went by another route.
+ * or the work address, see it rendered for THIS person, and send. The mail
+ * goes from the sender's own connected Gmail with their name on it; without
+ * a mailbox one can still preview, or log a message sent another way.
  */
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -19,7 +19,7 @@ import { C } from "./RecordFields";
 interface Row { id: string; channel: string; to_address: string | null; subject: string | null; body: string; template_key: string | null; status: string; error: string | null; sent_by: string | null; sent_at: string }
 interface Tpl { key: string; title: string; body: string; kind?: string | null; subject?: string | null }
 
-export function Communication({ employeeId, name, personalEmail, workEmail, isOwner }: {
+export function Communication({ employeeId, name, personalEmail, workEmail }: {
   employeeId: string; name: string; personalEmail: string | null; workEmail: string | null; isOwner: boolean;
 }) {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -64,7 +64,7 @@ export function Communication({ employeeId, name, personalEmail, workEmail, isOw
   const send = async (logOnly: boolean) => {
     if (!body.trim()) { setMsg("Nothing to send."); return; }
     if (!logOnly && !address) { setMsg(`No ${to} email on the record.`); return; }
-    if (!logOnly && !window.confirm(`Send this to ${name} at ${address}, from Raghu's Gmail?`)) return;
+    if (!logOnly && !window.confirm(`Send this to ${name} at ${address}, from your Gmail?`)) return;
     setMsg(""); setBusy(true);
     try {
       const j = await api.post("/api/hrms/communication", { employee_ids: [employeeId], subject, body, to, template_key: tpl || null, log_only: logOnly, channel: logOnly ? "note" : "email" });
@@ -83,7 +83,7 @@ export function Communication({ employeeId, name, personalEmail, workEmail, isOw
       <div className="rounded p-2 mb-2" style={{ background: "#F4F2EC", fontSize: 11, color: C.dim, lineHeight: 1.6 }}>
         Every mail HRMS has sent {name.split(" ")[0] || "this person"}, and a place to write the next one. Templates come from
         Masters → Standard Texts; {"{{name}}"}, {"{{designation}}"} and the other variables are filled from this record.
-        {isOwner ? " Mail goes out from your own Gmail, with your name on it." : " Sending is the owner's; you can preview, or log a message sent another way."}
+        {" Mail goes out from your own connected Gmail, with your name on it."}
       </div>
       {needs && <div className="rounded p-2 mb-2" style={{ background: "#FFF7E6", border: "1px solid #F5D9A8", fontSize: 12, color: "#8A5B00" }}>Run migration 0129 — messages have nowhere to be kept yet. Sending still works; the record of it does not.</div>}
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</div>}
@@ -115,7 +115,7 @@ export function Communication({ employeeId, name, personalEmail, workEmail, isOw
         )}
         <div className="flex gap-2 mt-2 flex-wrap">
           <button onClick={doPreview} disabled={busy || !body.trim()} className="text-xs font-semibold rounded border px-3 py-1.5 bg-white" style={{ borderColor: C.line, color: "#1B3A5C" }}>👁 Preview for {name.split(" ")[0]}</button>
-          {isOwner && <button onClick={() => send(false)} disabled={busy || !body.trim()} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: C.orange, color: "#fff", opacity: busy ? 0.6 : 1 }}>✉ Send from my Gmail</button>}
+          <button onClick={() => send(false)} disabled={busy || !body.trim()} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: C.orange, color: "#fff", opacity: busy ? 0.6 : 1 }}>✉ Send from my Gmail</button>
           <button onClick={() => send(true)} disabled={busy || !body.trim()} className="text-xs font-semibold rounded border px-3 py-1.5 bg-white" style={{ borderColor: C.line, color: C.dim }} title="Keep a record of something said by phone, WhatsApp or in person">📝 Log only</button>
         </div>
       </div>
