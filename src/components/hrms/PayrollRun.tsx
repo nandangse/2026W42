@@ -190,16 +190,16 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflow: "auto", maxHeight: "calc(100vh - 300px)" }}>
             <table style={{ fontSize: 11.5, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
               <thead><tr style={{ color: C.faint, fontSize: 10 }}>
-                <th className="px-2 py-1.5 text-left" style={{ position: "sticky", left: 0, top: 0, background: "#fff", zIndex: 3 }}>Emp</th>
-                <th className="px-2 py-1.5 text-left" style={{ position: "sticky", left: 44, top: 0, background: "#fff", zIndex: 3, minWidth: 160 }}>Name</th>
+                <th className="px-2 py-1.5 text-left" style={{ position: "sticky", left: 0, top: 0, background: "#fff", zIndex: 3, minWidth: 60, width: 60 }}>Emp</th>
+                <th className="px-2 py-1.5 text-left" style={{ position: "sticky", left: 60, top: 0, background: "#fff", zIndex: 3, minWidth: 160 }}>Name</th>
                 {Array.from({ length: d.muster.days }, (_, i) => <th key={i} className="px-1 py-1.5" style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, minWidth: 22, textAlign: "center" }}>{i + 1}</th>)}
                 {["P", "A", "WO", "MO", "Pay", "OT", "Adv", "Loan", "Cat", "Mobile"].map((h) => <th key={h} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, textAlign: "right" }}>{h}</th>)}
               </tr></thead>
               <tbody>
                 {musterRows.map((m) => (
                   <tr key={m.employee_id} style={{ borderTop: "1px solid #EEECE6" }}>
-                    <td className="px-2 py-1 tnum" style={{ position: "sticky", left: 0, background: "#fff", zIndex: 1 }}>{m.employee_id}</td>
-                    <td className="px-2 py-1 font-semibold" style={{ position: "sticky", left: 44, background: "#fff", zIndex: 1 }}>{m.name}{m.status !== "Active" && <span className="ml-1" style={{ color: C.red, fontSize: 10 }}>{m.status}</span>}</td>
+                    <td className="px-2 py-1 tnum" style={{ position: "sticky", left: 0, background: "#fff", zIndex: 1, minWidth: 60, width: 60 }}>{m.employee_id}</td>
+                    <td className="px-2 py-1 font-semibold" style={{ position: "sticky", left: 60, background: "#fff", zIndex: 1 }}>{m.name}{m.status !== "Active" && <span className="ml-1" style={{ color: C.red, fontSize: 10 }}>{m.status}</span>}</td>
                     {m.days.map((v, i) => { const t = mark(v); return <td key={i} className="text-center" style={{ background: t.bg, color: t.c, fontWeight: 700, fontSize: 10 }}>{v}</td>; })}
                     <td className="px-2 text-right tnum">{m.present}</td><td className="px-2 text-right tnum" style={{ color: m.absent ? C.red : undefined }}>{m.absent}</td><td className="px-2 text-right tnum">{m.wo}</td><td className="px-2 text-right tnum">{m.mo_st}</td><td className="px-2 text-right tnum font-bold">{m.pay_days}</td>
                     <td className="px-2 text-right tnum">{m.ot ?? ""}</td><td className="px-2 text-right tnum">{m.advance ?? ""}</td><td className="px-2 text-right tnum">{m.loan_ded ?? ""}</td><td className="px-2 text-right" style={{ color: C.faint }}>{m.category}</td><td className="px-2 text-right tnum" style={{ color: C.faint }}>{m.mobile}</td>
@@ -217,14 +217,14 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
             <table style={{ fontSize: 12, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
               <thead><tr style={{ color: C.faint, fontSize: 10 }}>
                 {["Emp", "Name", "Type", "Pay days", "Rate (gross)", "Basic & DA", "HRA", "Fixed", "Conv", "Medical", "Site/OT", "Arrears", "Earned", "PF", "PT", "Loan", "Advance", "TDS", "Other", "Deductions", "Net", "Rate from"].map((h, i) => (
-                  <th key={h} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, textAlign: i < 3 ? "left" : "right", ...(i === 0 ? { left: 0, zIndex: 3 } : i === 1 ? { left: 44, zIndex: 3 } : {}) }}>{h}</th>
+                  <th key={h} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#fff", textAlign: i < 3 ? "left" : "right", zIndex: i < 2 ? 3 : 2, ...(i === 0 ? { left: 0, minWidth: 60, width: 60 } : i === 1 ? { left: 60 } : {}) }}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
                 {regRows.map((x) => (
                   <tr key={x.employee_id} style={{ borderTop: "1px solid #EEECE6", opacity: x.hold ? 0.6 : 1 }}>
-                    <td className="px-2 py-1 tnum" style={{ position: "sticky", left: 0, background: "#fff" }}>{x.employee_id}</td>
-                    <td className="px-2 py-1 font-semibold" style={{ position: "sticky", left: 44, background: "#fff" }}>{x.name}{x.hold && <span className="ml-1" style={{ color: C.red, fontSize: 10 }}>hold</span>}</td>
+                    <td className="px-2 py-1 tnum" style={{ position: "sticky", left: 0, background: "#fff", minWidth: 60, width: 60 }}>{x.employee_id}</td>
+                    <td className="px-2 py-1 font-semibold" style={{ position: "sticky", left: 60, background: "#fff" }}>{x.name}{x.hold && <span className="ml-1" style={{ color: C.red, fontSize: 10 }}>hold</span>}</td>
                     <td className="px-2 py-1" style={{ color: C.faint }}>{x.type || ""}</td>
                     {[x.paid_days, x.gross, x.basic_da, x.hra, x.fixed_allowance, x.conveyance, x.medical, x.site_allowance, x.arrears, x.earned, x.pf, x.pt, x.loan, x.advance, x.tds, x.other_ded, x.deductions, x.net].map((v, i) => (
                       <td key={i} className="px-2 py-1 text-right tnum" style={i === 9 || i === 17 ? { fontWeight: 700 } : undefined}>{inr(v)}</td>
