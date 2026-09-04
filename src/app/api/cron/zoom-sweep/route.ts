@@ -33,6 +33,10 @@ export async function GET(req: Request) {
   try {
     const secret = process.env.CRON_SECRET;
     const fromCron = !!secret && (req.headers.get("authorization") || "") === `Bearer ${secret}`;
+    // beat BEFORE the door: a cron that fires and is refused must show as
+    // exactly that (4 Sep 2026 -- this is how CRON_SECRET's absence was found)
+    if (!fromCron && req.headers.get("user-agent")?.includes("vercel-cron"))
+      await beat("zoom-sweep", "failed", { error: secret ? "cron call did not carry the CRON_SECRET" : "CRON_SECRET is not set on Vercel" });
     if (!fromCron) {
       const u = await currentUser();
       if (!u || u.disabled || !u.isOwner) throw new HttpError(401, "The hourly cron, or Raghu.");
