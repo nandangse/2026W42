@@ -75,6 +75,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.4.1",
+    date: "2026-09-04",
+    module: "HRMS — HR Queries, the form",
+    items: [
+      "\"HR Queries to be also in this. Check this [Google Form] and recreate a form like this for the guy who will be logged in. HR can also fill in. Have two buttons: HR Queries for self and HR query for others.\" (Dr Raghu, 4 Sep 2026). HR Queries is built: the \"How can we help you? / हम आपकी किस प्रकार मदद कर सकते हैं?\" form line for line, in both languages \u2014 attendance and OT, advances and loans, PF and UAN, Aadhaar, the salary slip, anything else, the Khalapur move \u2014 with the three free-text questions and the contact block. Migration 0131.",
+      "TWO BUTTONS. For myself: the contact block fills from the person's own record. For others (HRMS only): HR picks the person and it fills from theirs. Every submission is one query \u2014 the ticks kept whole \u2014 with a thread and HR's answer, which closes it.",
+      "The form has its own door at /hrms/query behind the plain Genie login, so somebody who cannot open HRMS can still put a question to HR; they see their own queries there. Inside HRMS, HR sees all of them.",
+    ],
+  },
+  {
     v: "4.4.4.0",
     date: "2026-09-04",
     module: "HRMS — Full and Final Settlements",

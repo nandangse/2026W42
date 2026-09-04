@@ -43,6 +43,7 @@ import StatutoryRecords from "./hrms/StatutoryRecords";
 import Offers from "./hrms/Offers";
 import StandardTexts from "./hrms/StandardTexts";
 import Fnf from "./hrms/Fnf";
+import HrQueries from "./hrms/HrQueries";
 
 export default function Hrms({
   email, initials, displayName, role, isOwner,
@@ -245,6 +246,8 @@ export default function Hrms({
           <IdpRecords who={who} />
         ) : nav.key === "offers" ? (
           <Offers who={who} isOwner={isOwner} />
+        ) : nav.key === "queries" ? (
+          <HrQueries who={who} />
         ) : nav.key === "fnf" ? (
           <Fnf who={who} isOwner={isOwner} />
         ) : nav.key === "texts" ? (

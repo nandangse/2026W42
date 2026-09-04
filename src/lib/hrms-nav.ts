@@ -151,8 +151,8 @@ export const NAV: NavSection[] = [
     key: "queries",
     label: "HR Queries",
     icon: "❓",
-    blurb: "A question put to HR, and the answer it got. Raised by anybody, owned by somebody, closed with a reply — and once closed, worth publishing so the next person does not have to ask.",
-    built: false,
+    blurb: "The \"How can we help you?\" form, in Genie: raise a query for yourself, or HR raises it for someone; talked through in the thread; closed with HR's answer. Anyone signed in can also reach it at /hrms/query.",
+    built: true,
     source: "HR Queries (tab 48) in the Main Salary Sheet. Answered ones become Policy → HR Queries Solved.",
   },
   {
