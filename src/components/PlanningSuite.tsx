@@ -11,6 +11,7 @@ import { APP_VERSION, UPDATES, EFFORT } from "@/lib/changelog";
 import SoftwareDescription from "./SoftwareDescription";
 import NextThirtyDays from "./NextThirtyDays";
 import JobCommercials from "./JobCommercials";
+import UsersApp from "./UsersApp";
 import { TRADES, zeroCrew, templateFor, type Crew } from "@/lib/templates";
 import {
   today,
@@ -39,7 +40,7 @@ import {
   type Plan,
   type PlanMilestone,
 } from "@/lib/schedule";
-import { GROUPS, normaliseGroups, isLC, isStratcom } from "@/lib/groups";
+import { isLC, isStratcom } from "@/lib/groups";
 import RunRate, { useRunRatePayload, type Payload } from "./RunRate";
 import { runRate } from "@/lib/run-rate";
 import { deliveryReportHtml } from "@/lib/delivery-report";
@@ -358,16 +359,6 @@ interface AdminUser {
   saamaan_access: boolean;
   saamaan_implicit: boolean;
 }
-
-const ROLE_OPTIONS: { value: string; label: string; hint: string }[] = [
-  { value: "admin", label: "Admin", hint: "Everything, plus the Admin page" },
-  { value: "planner", label: "Planner", hint: "All boards and editing" },
-  { value: "project_owner", label: "Planning Owner", hint: "Owns jobs — the boards filter by these people. The Jobmaster calls this the Project Owner; it is the same person." },
-  { value: "user", label: "User", hint: "Works tasks assigned to them" },
-  { value: "sales", label: "Sales team", hint: "Sales Genie by default, plus the boards" },
-  { value: "viewer", label: "Viewer", hint: "Read-only" },
-  { value: "uploader", label: "Uploader", hint: "Morning Update page only" },
-];
 
 interface ErpLogEntry {
   id: string;
@@ -720,11 +711,14 @@ export default function PlanningSuite({
   // The department list rides along with the users payload — the picker in
   // Admin needs names, and it is the same query either way.
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  // who may change users on the Users app — the server's word (Raghu and Vishwas)
+  const [usersMeta, setUsersMeta] = useState<{ mayEdit: boolean; editors: string[] }>({ mayEdit: false, editors: [] });
   const loadUsers = useCallback(async () => {
     try {
       const r = await api.get("/api/admin/users");
       setUsers(r.users || []);
       setDepartments(r.departments || []);
+      setUsersMeta({ mayEdit: !!r.mayEdit, editors: (r.editors || []).map((e: string) => String(e).toLowerCase()) });
     } catch {
       setUsers([]);
     }
@@ -1226,7 +1220,7 @@ export default function PlanningSuite({
       {workspace === "suite" && tab === "plan" && <JobPlan isAdmin={isAdmin} board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} canPush={role === "admin" || role === "planner"} />}
       {workspace === "suite" && tab === "upload" && canUpload && <MorningUpload email={email} embedded />}
-      {workspace === "suite" && tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} departments={departments} isOwner={isRaghu} appSettings={appSettings} loadAppSettings={loadAppSettings} />}
+      {workspace === "suite" && tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} departments={departments} isOwner={isRaghu} meEmail={me.email} usersMeta={usersMeta} appSettings={appSettings} loadAppSettings={loadAppSettings} />}
       {/* Mounted on first visit and then kept (hidden) — the tree is a slow
           payload (auth + 10 queries + live metrics), so re-fetching it on
           every workspace switch made Goals feel sluggish. Its own load()
@@ -6467,51 +6461,6 @@ function ReportPanel() {
  * rest: who is in the room is not a secret, and a column that appears only for
  * one person is a column nobody else can ask about.
  */
-function GroupTicks({
-  u,
-  isOwner,
-  onSet,
-}: {
-  u: { id: string; email: string; lc?: boolean; stratcom?: boolean; management?: boolean };
-  isOwner: boolean;
-  onSet: (id: string, next: { lc: boolean; stratcom: boolean; management: boolean }) => void;
-}) {
-  // The owner is in all three implicitly and has no stored row to tick.
-  const owner = u.email.toLowerCase() === OWNER_EMAIL;
-  const cur = { lc: !!u.lc, stratcom: !!u.stratcom, management: !!u.management };
-  const on = (k: "lc" | "stratcom" | "management") => (owner ? true : cur[k]);
-
-  return (
-    <div className="flex gap-2 whitespace-nowrap">
-      {GROUPS.map((g) => {
-        const checked = on(g.key);
-        // Un-ticking LC would silently drop Stratcom too, so say so on the box
-        // rather than letting the other tick vanish without explanation.
-        const willDrop = g.key === "lc" && checked && cur.stratcom;
-        return (
-          <label
-            key={g.key}
-            className="flex items-center gap-1"
-            style={{ cursor: isOwner && !owner ? "pointer" : "default", opacity: owner ? 0.55 : 1 }}
-            title={owner ? "The owner is in all three already" : willDrop ? `${g.title} — un-ticking this drops Stratcom as well` : g.title}
-          >
-            <input
-              type="checkbox"
-              checked={checked}
-              disabled={!isOwner || owner}
-              onChange={(e) => onSet(u.id, { ...cur, [g.key]: e.target.checked })}
-              style={{ accentColor: "#1B3A5C", width: 13, height: 13, cursor: isOwner && !owner ? "pointer" : "default" }}
-            />
-            <span style={{ fontSize: 10.5, color: checked ? "#1B3A5C" : "#8A94A0", fontWeight: checked ? 700 : 400 }}>
-              {g.label}
-            </span>
-          </label>
-        );
-      })}
-    </div>
-  );
-}
-
 function AdminTabs({ tab, setTab, owner }: { tab: AdminTab; setTab: (t: AdminTab) => void; owner?: boolean }) {
   return (
     <div className="flex gap-1 rounded p-1 bg-white border flex-wrap" style={{ borderColor: "#E2E0DA", width: "fit-content" }}>
@@ -6595,15 +6544,13 @@ function Updates() {
 }
 
 function Admin({
-  board, reload, users, loadUsers, departments, isOwner, appSettings, loadAppSettings,
+  board, reload, users, loadUsers, departments, isOwner, meEmail, usersMeta, appSettings, loadAppSettings,
 }: {
   departments: { id: string; name: string }[];
   board: Board; reload: () => Promise<Board | null>; users: AdminUser[] | null; loadUsers: () => Promise<void>; isOwner: boolean;
+  meEmail: string; usersMeta: { mayEdit: boolean; editors: string[] };
   appSettings: { app_name: string; theme_name: string }; loadAppSettings: () => void;
 }) {
-  /** Who this admin may act on: never the owner, and other admins only if owner. */
-  const mayManage = (u: AdminUser) =>
-    u.email.toLowerCase() !== OWNER_EMAIL && (isOwner || u.role !== "admin");
 
   // ---- app identity: logo (fixed), app name + theme name (editable) ----
   const [idForm, setIdForm] = useState({ app_name: appSettings.app_name, theme_name: appSettings.theme_name });
@@ -6663,68 +6610,6 @@ function Admin({
     finally { setTBusy(false); }
   };
 
-  // ---- user management (list state lives in the parent so the tab doesn't flicker) ----
-  const [uForm, setUForm] = useState({ email: "", pw: "", role: "planner", name: "", initials: "" });
-  const [uMsg, setUMsg] = useState("");
-
-  const createUser = async () => {
-    if (!uForm.email || !uForm.pw) return;
-    setUMsg("");
-    try {
-      const r = await api.post("/api/admin/users", {
-        action: "create",
-        email: uForm.email,
-        password: uForm.pw,
-        role: uForm.role,
-        display_name: uForm.name,
-        initials: uForm.initials,
-      });
-      setUForm({ email: "", pw: "", role: "planner", name: "", initials: "" });
-      setUMsg(`User created ✓ — initials ${r.initials || "not set"}`);
-      await loadUsers();
-    } catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
-  };
-  const saveProfile = async (id: string, patch: Record<string, string | null>) => {
-    setUMsg("");
-    try { await api.post("/api/admin/users", { action: "profile", id, ...patch }); await loadUsers(); }
-    catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
-  };
-  // Optimistic role change: the select shows the chosen value immediately and a
-  // small pending mark while the server confirms. Without this it snapped back
-  // to the old role for a beat, which read as "didn't take" and invited
-  // repeated clicking.
-  const [rolePending, setRolePending] = useState<Record<string, string>>({});
-  const setRole = async (id: string, role: string) => {
-    setUMsg("");
-    setRolePending((p) => ({ ...p, [id]: role }));
-    try {
-      await api.post("/api/admin/users", { action: "role", id, role });
-      await loadUsers();
-    } catch (e) {
-      setUMsg(e instanceof Error ? e.message : String(e));
-    } finally {
-      setRolePending((p) => { const { [id]: _, ...rest } = p; return rest; });
-    }
-  };
-  const setDisabled = async (id: string, disabled: boolean, email: string) => {
-    // disabling blocks sign-in entirely — confirm it, since this is a one-click toggle
-    if (disabled && !window.confirm(`Disable ${email}?\n\nThey will no longer be able to sign in until re-enabled.`)) return;
-    setUMsg("");
-    try { await api.post("/api/admin/users", { action: "disable", id, disabled }); await loadUsers(); }
-    catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
-  };
-  const resetPw = async (id: string, email: string) => {
-    const pw = window.prompt(`New password for ${email} (min 8 characters):`);
-    if (!pw) return;
-    try { await api.post("/api/admin/users", { action: "password", id, password: pw }); setUMsg(`Password updated for ${email} ✓`); }
-    catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
-  };
-  const removeUser = async (id: string, email: string) => {
-    if (!window.confirm(`Remove ${email}?\n\nThey will no longer be able to sign in. Their plans, comments and edits remain in the app.`)) return;
-    try { await api.post("/api/admin/users", { action: "delete", id }); setUMsg(`${email} removed`); await loadUsers(); }
-    catch (e) { setUMsg(e instanceof Error ? e.message : String(e)); }
-  };
-
   // ---- goals access ----
   type GoalAccessRow = {
     id: string; email: string; initials: string | null; name: string | null;
@@ -6737,97 +6622,6 @@ function Admin({
     api.get("/api/admin/goal-access").then((r) => setGaRows(r.users)).catch(() => setGaRows([]));
   }, []);
   useEffect(() => { loadAccess(); }, [loadAccess]);
-  /**
-   * The three group ticks. Owner only, and Stratcom drags LC with it.
-   *
-   * The whole row is sent every time rather than the one box that changed:
-   * the rule that Stratcom implies LC means one tick can move two values, and
-   * a PATCH of the single changed field would have the server and the screen
-   * disagreeing about the other one until the next reload.
-   */
-  const setGroups = async (id: string, next: { lc: boolean; stratcom: boolean; management: boolean }) => {
-    setGaMsg("");
-    try {
-      const g = normaliseGroups(next);
-      await api.post("/api/admin/users", { action: "groups", id, ...g });
-      loadUsers();
-    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
-  };
-
-  /**
-   * HRMS access, from the same row. Owner only, like the group ticks.
-   *
-   * The grant is stored against the EMAIL (migration 0047), so this tick and
-   * a grant made before the account existed are the same row.
-   */
-  const setHrms = async (id: string, grant: boolean) => {
-    setGaMsg("");
-    try {
-      await api.post("/api/admin/users", { action: "hrms_access", id, grant });
-      loadUsers();
-    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
-  };
-
-  /** The CRM grant, beside HRMS. Owner only, same as HRMS. */
-  const setCrm = async (id: string, grant: boolean) => {
-    setGaMsg("");
-    try {
-      await api.post("/api/admin/users", { action: "crm_access", id, grant });
-      loadUsers();
-    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
-  };
-
-  /** Accounts, the fourth tick. Owner only, same as the other two. */
-  const setAccounts = async (id: string, grant: boolean) => {
-    setGaMsg("");
-    try {
-      await api.post("/api/admin/users", { action: "accounts_access", id, grant });
-      loadUsers();
-    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
-  };
-
-  /** Vishwakarma, the fifth. Owner only, same as the rest. */
-  const setVishwakarma = async (id: string, grant: boolean) => {
-    setGaMsg("");
-    try {
-      await api.post("/api/admin/users", { action: "vishwakarma_access", id, grant });
-      loadUsers();
-    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
-  };
-
-  /** Seva, the sixth. Owner only, same as the rest. */
-  const setSeva = async (id: string, grant: boolean) => {
-    setGaMsg("");
-    try {
-      await api.post("/api/admin/users", { action: "seva_access", id, grant });
-      loadUsers();
-    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
-  };
-
-  /** IMS, the seventh. Owner only, same as the rest. */
-  const setIms = async (id: string, grant: boolean) => {
-    setGaMsg("");
-    try {
-      await api.post("/api/admin/users", { action: "ims_access", id, grant });
-      loadUsers();
-    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
-  };
-
-  /** Saamaan, the eighth. Owner only, same as the rest. */
-  const setSaamaan = async (id: string, grant: boolean) => {
-    setGaMsg("");
-    try {
-      await api.post("/api/admin/users", { action: "saamaan_access", id, grant });
-      loadUsers();
-    } catch (e) { setGaMsg(e instanceof Error ? e.message : String(e)); }
-  };
-
-  /** Goals access from inside the Users table. Reloads both lists. */
-  const setGoalsLevel = async (id: string, level: string) => {
-    const who = (users ?? []).find((x) => x.id === id);
-    await setAccess(id, level, who?.display_name || who?.email || "user");
-    loadUsers();
-  };
   const setAccess = async (id: string, level: string, who: string) => {
     setGaMsg("");
     try {
@@ -6912,10 +6706,6 @@ function Admin({
   // only place a grant can be revoked, so it is hidden rather than removed —
   // a page nobody can reach is a permission nobody can take back.
   const [showGoalsAccess, setShowGoalsAccess] = useState(false);
-  // one row one person: frozen first columns, frozen sortable header (Dr Raghu, 30 Aug 2026)
-  const [uSort, setUSort] = useState<{ k: string; d: 1 | -1 }>({ k: "display_name", d: 1 });
-  const [uLog, setULog] = useState<{ at: string; by_email: string; action: string; target: string }[] | null>(null);
-  const [showULog, setShowULog] = useState(false);
 
   if (adminTab === "updates") {
     return (
@@ -7063,372 +6853,10 @@ function Admin({
 
       {/* ── who can open the two apps that are not Genie ── */}
       {adminTab === "users" && (
-        <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
-          <div className="font-bold text-sm mb-1">
-            🗝 App access <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— the two applications that are not Genie</span>
-          </div>
-          <div className="text-xs mb-3 rounded p-2" style={{ background: "#F4F2EC", color: "#5A6672", lineHeight: 1.5 }}>
-            <b>CRM</b> (genie.nandan.co.in/crm) and <b>HRMS</b> (genie.nandan.co.in/hrms) are separate applications
-            reached with the same login. Both are granted per person and to <b>nobody by default</b>, and only{" "}
-            {OWNER_EMAIL} may tick them — HRMS holds dates of birth, home addresses and next of kin, and the CRM holds
-            the pipeline. Somebody with no tick simply never sees the door.
-          </div>
-          {gaMsg && <div className="text-xs font-semibold mb-2" style={{ color: gaMsg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{gaMsg}</div>}
-          <div className="overflow-x-auto">
-            <table className="text-xs w-full" style={{ minWidth: 520 }}>
-              <thead>
-                <tr style={{ color: "#8A94A0" }}>
-                  <th className="text-left py-1 font-semibold">Person</th>
-                  <th className="text-left py-1 font-semibold">Email</th>
-                  <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/crm">💼 CRM</th>
-                  <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/hrms — people records">👤 HRMS</th>
-                  <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/kuber — Kuber, the accounts module">💰 Kuber</th>
-                  <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/vishwakarma — Vishwakarma, the design module">🛠 Vishwakarma</th>
-                  <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/seva — Seva, the customer-service module">🛎 Seva</th>
-                  <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/ims — the Integrated Management System">📐 IMS</th>
-                  <th className="text-center py-1 font-semibold" title="genie.nandan.co.in/saamaan — Saamaan, the materials module">📦 Saamaan</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(users ?? []).filter((u) => !u.disabled).map((u) => (
-                  <tr key={u.id} style={{ borderTop: "1px solid #EEECE6" }}>
-                    <td className="py-1.5">{u.display_name || u.email.split("@")[0]}</td>
-                    <td className="py-1.5" style={{ color: "#8A94A0" }}>{u.email}</td>
-                    <td className="py-1.5 text-center">
-                      <input type="checkbox" checked={!!u.crm_access} disabled={!isOwner || u.crm_implicit}
-                        onChange={(e) => setCrm(u.id, e.target.checked)}
-                        style={{ accentColor: "#1B3A5C", width: 14, height: 14, cursor: isOwner && !u.crm_implicit ? "pointer" : "default" }}
-                        title={u.crm_implicit ? "The owner holds it already" : isOwner ? "Open the CRM" : `Only ${OWNER_EMAIL} may grant this`} />
-                    </td>
-                    <td className="py-1.5 text-center">
-                      <input type="checkbox" checked={!!u.hrms_access} disabled={!isOwner || u.hrms_implicit}
-                        onChange={(e) => setHrms(u.id, e.target.checked)}
-                        style={{ accentColor: "#E8600A", width: 14, height: 14, cursor: isOwner && !u.hrms_implicit ? "pointer" : "default" }}
-                        title={u.hrms_implicit ? "The owner holds it already" : isOwner ? "Open HRMS — people records" : `Only ${OWNER_EMAIL} may grant this`} />
-                    </td>
-                    <td className="py-1.5 text-center">
-                      <input type="checkbox" checked={!!u.accounts_access} disabled={!isOwner || u.accounts_implicit}
-                        onChange={(e) => setAccounts(u.id, e.target.checked)}
-                        style={{ accentColor: "#0D7A3F", width: 14, height: 14, cursor: isOwner && !u.accounts_implicit ? "pointer" : "default" }}
-                        title={u.accounts_implicit ? "The owner holds it already" : isOwner ? "Open Kuber — the accounts module" : `Only ${OWNER_EMAIL} may grant this`} />
-                    </td>
-                    <td className="py-1.5 text-center">
-                      <input type="checkbox" checked={!!u.vishwakarma_access} disabled={!isOwner || u.vishwakarma_implicit}
-                        onChange={(e) => setVishwakarma(u.id, e.target.checked)}
-                        style={{ accentColor: "#7C3AED", width: 14, height: 14, cursor: isOwner && !u.vishwakarma_implicit ? "pointer" : "default" }}
-                        title={u.vishwakarma_implicit ? "The owner holds it already" : isOwner ? "Open Vishwakarma — the design module" : `Only ${OWNER_EMAIL} may grant this`} />
-                    </td>
-                    <td className="py-1.5 text-center">
-                      <input type="checkbox" checked={!!u.seva_access} disabled={!isOwner || u.seva_implicit}
-                        onChange={(e) => setSeva(u.id, e.target.checked)}
-                        style={{ accentColor: "#0F766E", width: 14, height: 14, cursor: isOwner && !u.seva_implicit ? "pointer" : "default" }}
-                        title={u.seva_implicit ? "The owner holds it already" : isOwner ? "Open Seva — the customer-service module" : `Only ${OWNER_EMAIL} may grant this`} />
-                    </td>
-                    <td className="py-1.5 text-center">
-                      <input type="checkbox" checked={!!u.ims_access} disabled={!isOwner || u.ims_implicit}
-                        onChange={(e) => setIms(u.id, e.target.checked)}
-                        style={{ accentColor: "#1B2D6B", width: 14, height: 14, cursor: isOwner && !u.ims_implicit ? "pointer" : "default" }}
-                        title={u.ims_implicit ? "The owner holds it already" : isOwner ? "Open the IMS — the Integrated Management System" : `Only ${OWNER_EMAIL} may grant this`} />
-                    </td>
-                    <td className="py-1.5 text-center">
-                      <input type="checkbox" checked={!!u.saamaan_access} disabled={!isOwner || u.saamaan_implicit}
-                        onChange={(e) => setSaamaan(u.id, e.target.checked)}
-                        style={{ accentColor: "#B45309", width: 14, height: 14, cursor: isOwner && !u.saamaan_implicit ? "pointer" : "default" }}
-                        title={u.saamaan_implicit ? "The owner holds it already" : isOwner ? "Open Saamaan — the materials module" : `Only ${OWNER_EMAIL} may grant this`} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="text-xs mt-2" style={{ color: "#8A94A0", lineHeight: 1.6 }}>
-            The grants are held against the <b>email address</b>, so somebody can be granted before their Genie
-            account exists — the grant waits for the account. Anyone granted here can edit as well as read.
-          </div>
-        </div>
+        <UsersApp users={users} departments={departments} loadUsers={loadUsers}
+          canEdit={usersMeta.mayEdit} isOwner={isOwner} ownerEmail={OWNER_EMAIL} meEmail={meEmail.toLowerCase()}
+          editors={usersMeta.editors} unlinkedOwners={board.unlinkedOwners || []} />
       )}
-
-      {adminTab === "users" && (<>
-      {/* ---- users ---- */}
-      <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
-        <div className="font-bold text-sm mb-2">User management <span className="font-normal text-xs" style={{ color: "#8A94A0" }}>— initials are the key used to assign tasks and filter the boards</span></div>
-        <div className="flex gap-1 mb-2 flex-wrap items-center">
-          <input placeholder="email" value={uForm.email} onChange={(e) => setUForm({ ...uForm, email: e.target.value })} className="text-xs border rounded px-2 py-1 flex-1" style={{ borderColor: "#E2E0DA", minWidth: 170 }} />
-          <input placeholder="full name" value={uForm.name} onChange={(e) => setUForm({ ...uForm, name: e.target.value })} className="text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA", width: 130 }} />
-          <input placeholder="ABC" maxLength={3} value={uForm.initials} onChange={(e) => setUForm({ ...uForm, initials: e.target.value.toUpperCase() })} className="text-xs border rounded px-2 py-1 text-center font-bold" style={{ borderColor: "#E2E0DA", width: 52 }} title="Two or three letters — leave blank to auto-generate" />
-          <input placeholder="password (min 8)" value={uForm.pw} onChange={(e) => setUForm({ ...uForm, pw: e.target.value })} className="text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA", width: 130 }} />
-          <select value={uForm.role} onChange={(e) => setUForm({ ...uForm, role: e.target.value })} className="text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
-            {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
-          </select>
-          <button onClick={createUser} className="text-xs font-bold rounded px-2 py-1" style={{ background: "#E8600A", color: "#fff" }}>+ Add user</button>
-        </div>
-        {uMsg && <div className="text-xs font-semibold mb-2" style={{ color: uMsg.includes("✓") || uMsg.includes("removed") ? "#0D7A3F" : "#B3261E" }}>{uMsg}</div>}
-        {(() => {
-          const deptName = (id?: string | null) => departments.find((d) => d.id === id)?.name ?? "";
-          const personName = (id?: string | null) => (users ?? []).find((p) => p.id === id)?.display_name ?? "";
-          const sortVal = (u2: NonNullable<typeof users>[number]): string => {
-            switch (uSort.k) {
-              case "initials": return u2.initials || "";
-              case "email": return u2.email;
-              case "erp": return u2.erp_owner || "";
-              case "dept": return deptName(u2.department_id);
-              case "desig": return u2.designation || "";
-              case "reports": return personName(u2.reports_to);
-              case "role": return u2.role;
-              case "goals": return u2.goals_level || "";
-              case "seen": return String(u2.last_sign_in_at || "");
-              case "status": return u2.disabled ? "1" : "0";
-              default: return u2.display_name || u2.email;
-            }
-          };
-          const sorted = [...(users ?? [])].sort((a, b) => sortVal(a).localeCompare(sortVal(b), "en", { sensitivity: "base", numeric: true }) * uSort.d);
-          const HSort = ({ k, label, sticky, title, right }: { k?: string; label: string; sticky?: React.CSSProperties; title?: string; right?: boolean }) => (
-            <th className={`${right ? "text-right" : "text-left"} py-1 font-semibold`} title={title}
-              onClick={k ? () => setUSort((c) => ({ k, d: c.k === k ? (c.d === 1 ? -1 : 1) : 1 })) : undefined}
-              style={{ position: "sticky", top: 0, background: "#fff", zIndex: sticky ? 5 : 4, whiteSpace: "nowrap", cursor: k ? "pointer" : "default", boxShadow: "inset 0 -2px 0 #E2E0DA", ...(sticky || {}) }}>
-              {label}{k && uSort.k === k ? (uSort.d === 1 ? " ▲" : " ▼") : ""}
-            </th>
-          );
-          const L0 = { left: 0, minWidth: 58 } as React.CSSProperties;
-          const L1 = { left: 58, minWidth: 148 } as React.CSSProperties;
-          const L2 = { left: 206, minWidth: 220, boxShadow: "inset -1px 0 0 #E2E0DA, inset 0 -2px 0 #E2E0DA" } as React.CSSProperties;
-          const C0 = { position: "sticky" as const, left: 0, background: "#fff", zIndex: 2, minWidth: 58 };
-          const C1 = { position: "sticky" as const, left: 58, background: "#fff", zIndex: 2, minWidth: 148 };
-          const C2 = { position: "sticky" as const, left: 206, background: "#fff", zIndex: 2, minWidth: 220, boxShadow: "inset -1px 0 0 #E2E0DA" };
-          return (
-        <div style={{ overflow: "auto", maxHeight: "calc(100vh - 300px)" }}>
-        <table className="text-xs w-full" style={{ minWidth: 1500, whiteSpace: "nowrap" }}>
-          <thead>
-            <tr style={{ color: "#8A94A0" }}>
-              <HSort k="initials" label="Initials" sticky={L0} />
-              <HSort label="Name" k="name" sticky={L1} />
-              <HSort k="email" label="Email" sticky={L2} />
-              <HSort k="erp" label="ERP User" title="The Planning Owner / Project Owner text as it appears in the Jobmaster — links this login to its jobs" />
-              <HSort k="dept" label="Department" title="Read by Goals — departmental goals, and who a department's head can edit" />
-              <HSort k="desig" label="Designation" title="Job title, shown on Goals and the org view" />
-              <HSort k="reports" label="Reports to" title="Their line manager — drives “tasks of people reporting to me” in Nandan Tasking" />
-              <HSort k="role" label="Role" title="Sales Genie access comes with the role now: Sales team, Admins and the owner" />
-              <HSort k="goals" label="Goals" title="Goals access is granted per person, not by role" />
-              <HSort label="HRMS" title="HRMS — the employee records at /hrms. Granted per person by the owner alone." />
-              <HSort label="Groups" title="Which room they are in. Not a role — only what they may see. Only the owner may tick these." />
-              <HSort k="seen" label="Last seen" title="When this account last signed in" />
-              <HSort k="status" label="Status" />
-              <HSort label="Actions" right />
-            </tr>
-          </thead>
-          <tbody>
-            {users === null && (
-              // skeleton rows — keeps the table height stable while loading
-              [0, 1, 2].map((i) => (
-                <tr key={"sk" + i} style={{ borderTop: "1px solid #EEECE6" }}>
-                  <td className="py-2" colSpan={9}>
-                    <div className="rounded" style={{ height: 12, width: `${60 - i * 10}%`, background: "#EFEDE7" }} />
-                  </td>
-                </tr>
-              ))
-            )}
-            {users?.length === 0 && (
-              <tr><td className="py-3" colSpan={9} style={{ color: "#8A94A0" }}>No users found.</td></tr>
-            )}
-            {sorted.map((u) => (
-              <tr key={u.id} style={{ borderTop: "1px solid #EEECE6" }}>
-                <td className="py-1.5" style={C0}>
-                  <input
-                    defaultValue={u.initials || ""}
-                    maxLength={3}
-                    placeholder="—"
-                    onBlur={(e) => { const v = e.target.value.toUpperCase(); if (v !== (u.initials || "")) saveProfile(u.id, { initials: v }); }}
-                    className="text-xs border rounded px-1 py-0.5 text-center font-bold w-12"
-                    style={{ borderColor: u.initials ? "#E2E0DA" : "#E8600A", color: "#E8600A" }}
-                    title="Two or three letters, unique across everyone — press Tab to save"
-                  />
-                </td>
-                <td className="py-1.5" style={C1}>
-                  <input
-                    defaultValue={u.display_name || ""}
-                    placeholder="—"
-                    onBlur={(e) => { if (e.target.value !== (u.display_name || "")) saveProfile(u.id, { display_name: e.target.value }); }}
-                    className="text-xs border rounded px-1 py-0.5 w-32"
-                    style={{ borderColor: "#E2E0DA" }}
-                  />
-                </td>
-                <td className="py-1.5" style={C2}>
-                  {u.email}
-                  {u.email.toLowerCase() === OWNER_EMAIL && (
-                    <span className="ml-1 rounded px-1 font-bold" style={{ background: "#FFF3E8", color: "#E8600A", fontSize: 9 }} title="Owner — governs the other admins and cannot be demoted, disabled or removed">
-                      OWNER
-                    </span>
-                  )}
-                </td>
-                <td className="py-1.5">
-                  <input
-                    defaultValue={u.erp_owner || ""}
-                    placeholder="e.g. ravi.k"
-                    onBlur={(e) => { if (e.target.value !== (u.erp_owner || "")) saveProfile(u.id, { erp_owner: e.target.value }); }}
-                    className="text-xs border rounded px-1 py-0.5 w-28"
-                    style={{ borderColor: "#E2E0DA" }}
-                    title="Must match the Planning Owner / Project Owner value in the Jobmaster export"
-                  />
-                </td>
-                <td className="py-1.5">
-                  <select
-                    value={u.department_id || ""}
-                    onChange={(e) => saveProfile(u.id, { department_id: e.target.value || null })}
-                    className="text-xs border rounded px-1 py-0.5 bg-white"
-                    style={{ borderColor: "#E2E0DA", maxWidth: 130 }}
-                    title="Read by Goals — departmental goals, and what a department head may edit"
-                  >
-                    <option value="">— none —</option>
-                    {departments.map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
-                  </select>
-                </td>
-                <td className="py-1.5">
-                  <input
-                    defaultValue={u.designation || ""}
-                    placeholder="—"
-                    onBlur={(e) => { if (e.target.value !== (u.designation || "")) saveProfile(u.id, { designation: e.target.value }); }}
-                    className="text-xs border rounded px-1 py-0.5 w-28"
-                    style={{ borderColor: "#E2E0DA" }}
-                    title="Job title, e.g. Head - Works"
-                  />
-                </td>
-                <td className="py-1.5">
-                  <select
-                    value={u.reports_to || ""}
-                    onChange={(e) => saveProfile(u.id, { reports_to: e.target.value })}
-                    className="text-xs border rounded px-1 py-0.5 bg-white"
-                    style={{ borderColor: "#E2E0DA", maxWidth: 130 }}
-                    title="Their line manager. Tasking's “tasks of people reporting to me” reads this."
-                  >
-                    <option value="">— nobody —</option>
-                    {(users ?? [])
-                      .filter((p) => p.id !== u.id && !p.disabled)
-                      .map((p) => (<option key={p.id} value={p.id}>{p.display_name || p.email.split("@")[0]}</option>))}
-                  </select>
-                </td>
-                <td className="py-1.5">
-                  {rolePending[u.id] && <span className="mr-1" title="Saving…">⏳</span>}
-                  <select value={rolePending[u.id] ?? u.role} onChange={(e) => setRole(u.id, e.target.value)} disabled={!mayManage(u) || !!rolePending[u.id]} className="text-xs border rounded px-1" style={{ borderColor: rolePending[u.id] ? "#E8600A" : "#E2E0DA", background: mayManage(u) ? "#fff" : "#F4F2EC", color: mayManage(u) ? "#22303C" : "#8A94A0", opacity: rolePending[u.id] ? 0.7 : 1 }} title={rolePending[u.id] ? "Saving…" : mayManage(u) ? ROLE_OPTIONS.find((r) => r.value === u.role)?.hint : `Only ${OWNER_EMAIL} may change this account`}>
-                    {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
-                  </select>
-                </td>
-                <td className="py-1.5">
-                  <select
-                    value={u.goals_level || "none"}
-                    onChange={(e) => setGoalsLevel(u.id, e.target.value)}
-                    className="text-xs border rounded px-1 py-0.5 bg-white font-semibold"
-                    style={{ borderColor: "#E2E0DA", color: u.goals_level === "edit" ? "#0D7A3F" : u.goals_level === "view" ? "#1B3A5C" : "#8A94A0" }}
-                    disabled={u.email.toLowerCase() === OWNER_EMAIL || (u.role === "admin" && !isOwner)}
-                    title="Seeing the goal tree is granted per person. Work assigned to someone reaches them on My Week either way."
-                  >
-                    <option value="none">no access</option>
-                    <option value="view">can view</option>
-                    <option value="edit">can edit</option>
-                  </select>
-                </td>
-                <td className="py-1.5">
-                  <input
-                    type="checkbox"
-                    checked={!!u.hrms_access}
-                    disabled={!isOwner || u.hrms_implicit}
-                    onChange={(e) => setHrms(u.id, e.target.checked)}
-                    style={{ accentColor: "#E8600A", width: 13, height: 13, cursor: isOwner && !u.hrms_implicit ? "pointer" : "default" }}
-                    title={u.hrms_implicit ? "The owner holds HRMS already" : isOwner ? "Open /hrms — the employee master, contact details and next of kin" : `Only ${OWNER_EMAIL} may grant HRMS`}
-                  />
-                </td>
-                <td className="py-1.5">
-                  <div className="flex items-center gap-2" style={{ flexWrap: "nowrap", whiteSpace: "nowrap" }}>
-                    <GroupTicks u={u} isOwner={isOwner} onSet={setGroups} />
-                    <label className="flex items-center gap-1 whitespace-nowrap text-xs"
-                      title="Marks this person ready to connect Gmail — the connect itself happens with an administrator in tow"
-                      style={{ cursor: "pointer", color: "#5A6672" }}>
-                      <input
-                        type="checkbox"
-                        checked={!!(u as { oauth_available?: boolean }).oauth_available}
-                        onChange={async (e) => {
-                          try {
-                            await api.post("/api/admin/users", { action: "profile", id: u.id, oauth_available: e.target.checked });
-                            await loadUsers();
-                          } catch (err) {
-                            window.alert(err instanceof Error ? err.message : String(err));
-                            await loadUsers();
-                          }
-                        }}
-                      />
-                      ✉ OAuth
-                    </label>
-                  </div>
-                </td>
-                <td className="py-1.5 tnum" style={{ color: "#8A94A0" }}>
-                  {u.last_sign_in_at ? fmtFull(String(u.last_sign_in_at)) : "never"}
-                </td>
-                <td className="py-1.5">
-                  <button onClick={() => setDisabled(u.id, !u.disabled, u.email)} disabled={!mayManage(u)} className="rounded px-2 py-0.5 font-semibold" style={{ background: u.disabled ? "#B3261E" : "#E6F4EA", color: u.disabled ? "#fff" : "#0D7A3F", opacity: mayManage(u) ? 1 : 0.5, cursor: mayManage(u) ? "pointer" : "not-allowed" }} title={mayManage(u) ? (u.disabled ? "Click to re-enable sign-in" : "Click to disable sign-in") : `Only ${OWNER_EMAIL} may change this account`}>{u.disabled ? "disabled" : "active"}</button>
-                </td>
-                <td className="py-1.5 text-right whitespace-nowrap">
-                  {mayManage(u) ? (
-                    <>
-                      <button onClick={() => resetPw(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold mr-1" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Set a new password">🔑</button>
-                      <button onClick={() => removeUser(u.id, u.email)} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FBEDEA", color: "#B3261E" }} title="Remove this account">✕</button>
-                    </>
-                  ) : (
-                    <span style={{ color: "#B8B5AC" }} title={u.email.toLowerCase() === OWNER_EMAIL ? "The owner account is protected" : `Only ${OWNER_EMAIL} may change another admin`}>🔒</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
-          );
-        })()}
-        <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>
-          Initials and names save when you click away from the field. Jobs are filtered by <b>Planning Owners</b>; tasks are assigned to <b>Users</b> — both lists come only from accounts created here, never from raw spreadsheet text.
-        </div>
-
-        {/* "we should log it" (Dr Raghu, 30 Aug 2026) — every change of hands, kept */}
-        <div className="mt-3">
-          <button onClick={async () => {
-            const next = !showULog; setShowULog(next);
-            if (next && uLog === null) {
-              try { setULog(((await api.get("/api/admin/users?log=1")) as { log?: { at: string; by_email: string; action: string; target: string }[] }).log ?? []); }
-              catch { setULog([]); }
-            }
-          }} className="text-xs font-bold rounded border px-2 py-1" style={{ borderColor: "#E2E0DA", background: "#fff", color: "#5A6672" }}>
-            {showULog ? "▾" : "▸"} Change log — who changed what
-          </button>
-          {showULog && (
-            <div className="rounded border p-2 mt-1" style={{ borderColor: "#E2E0DA", maxHeight: 220, overflowY: "auto" }}>
-              {uLog === null && <div className="text-xs" style={{ color: "#8A94A0" }}>reading…</div>}
-              {uLog !== null && uLog.length === 0 && <div className="text-xs" style={{ color: "#8A94A0" }}>Nothing logged yet — run Genie migration 0105 if this stays empty after a change.</div>}
-              {(uLog ?? []).map((e, i) => (
-                <div key={i} className="text-xs py-0.5" style={{ borderTop: i ? "1px solid #F0F1F6" : "none" }}>
-                  <span className="tnum" style={{ color: "#8A94A0" }}>{fmtFull(e.at)}</span> · <b>{e.by_email.split("@")[0]}</b> → {e.action} <b>{e.target ? e.target.split("@")[0] : ""}</b>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* the bridge between Jobmaster text and accounts */}
-        {(board.unlinkedOwners || []).length > 0 && (
-          <div className="mt-3 rounded p-2" style={{ background: "#FFF7E6", border: "1px solid #F5B32B" }}>
-            <div className="text-xs font-bold mb-1" style={{ color: "#8A5B00" }}>
-              ⚠ {board.unlinkedOwners.length} owner name{board.unlinkedOwners.length === 1 ? "" : "s"} in the Jobmaster match no account
-            </div>
-            <div className="flex gap-1 flex-wrap mb-1">
-              {board.unlinkedOwners.map((o) => (
-                <span key={o} className="rounded px-1.5 py-0.5 text-xs font-semibold" style={{ background: "#fff", border: "1px solid #E2E0DA" }}>{o}</span>
-              ))}
-            </div>
-            <div className="text-xs" style={{ color: "#8A5B00" }}>
-              Their jobs show as <b>Unassigned</b>. To link them, create a <b>Project Owner</b> account above and paste the exact name into its <b>ERP owner name</b> field.
-            </div>
-          </div>
-        )}
-      </div>
-      </>)}
-
 
       {adminTab === "users" && (
         <button onClick={() => setShowGoalsAccess((v) => !v)} className="text-xs font-bold rounded px-3 py-1.5"

@@ -50,14 +50,37 @@ export async function POST(req: Request) {
       title: String(body.title || key).slice(0, 200),
       body: scrub(String(body.body ?? "")),
       note: String(body.note || "").slice(0, 2000) || null,
+      // "keep a provision to add template" (Dr Raghu, 4 Sep 2026): kind
+      // 'email' carries a subject and is offered when writing to a person.
+      ...(body.kind ? { kind: body.kind === "email" ? "email" : "text" } : {}),
+      ...("subject" in body ? { subject: String(body.subject || "").slice(0, 300) || null } : {}),
       version: (prev?.version || 0) + 1,
       updated_by: stamp, updated_at: new Date().toISOString(),
     }, { onConflict: "key" });
     if (error) {
       if (/hrms_text_master|schema cache|does not exist/i.test(error.message))
         throw new HttpError(503, "Run migration 0068 first — the standard texts have nowhere to live yet.");
+      if (/kind|subject/i.test(error.message) && /column/i.test(error.message))
+        throw new HttpError(503, "Run migration 0129 first — templates need their kind and subject columns.");
       throw new Error(error.message);
     }
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return errJson(e);
+  }
+}
+
+/** The two built-in texts stay; a template somebody added can be removed. */
+const BUILT_IN = new Set(["offer_covering_letter", "terms_of_employment"]);
+
+export async function DELETE(req: Request) {
+  try {
+    await requireHrms();
+    const key = String(new URL(req.url).searchParams.get("key") || "").trim();
+    if (!key) throw new HttpError(400, "Which text?");
+    if (BUILT_IN.has(key)) throw new HttpError(400, "That one the letters depend on — edit it, don't remove it.");
+    const { error } = await adminClient().from("hrms_text_master").delete().eq("key", key);
+    if (error) throw new Error(error.message);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return errJson(e);

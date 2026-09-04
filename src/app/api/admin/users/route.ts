@@ -8,6 +8,15 @@ export const dynamic = "force-dynamic";
 
 const ROLES: Role[] = ["admin", "planner", "project_owner", "user", "sales", "viewer", "uploader"];
 
+/**
+ * "For now will only give this to Raghu and Vishwas. Other admins can see it."
+ * (Dr Raghu, 4 Sep 2026). Every change on the Users app is theirs; the rest
+ * of the admins get the table read-only. The owner row stays untouchable
+ * and the admin role stays the owner's alone to give, as before.
+ */
+const USER_EDITORS = new Set<string>([RAGHU_EMAIL, "vishwas@nandan.co.in"]);
+const mayEditUsers = (u: { email: string; isOwner: boolean }) => u.isOwner || USER_EDITORS.has(u.email.toLowerCase());
+
 /** Normalise a 2-letter initials key, or null. Throws on a bad value. */
 function normInitials(v: unknown): string | null {
   const s = String(v ?? "").trim().toUpperCase();
@@ -155,8 +164,11 @@ export async function GET(req: Request) {
       /* pre-0010 */
     }
 
+    const caller = await requireAdmin();
     return NextResponse.json({
       departments,
+      mayEdit: mayEditUsers(caller),
+      editors: [...USER_EDITORS],
       users: (data || []).map((u) => ({
         ...u,
         sales_access: salesIds.has(u.id) || String(u.email || "").toLowerCase() === RAGHU_EMAIL,
@@ -214,6 +226,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const caller = await requireAdmin();
+    if (!mayEditUsers(caller))
+      throw new HttpError(403, "Only Dr Raghu and Vishwas may change users here. Other admins may look.");
     const admin = adminClient();
     const body = await req.json();
 
@@ -236,7 +250,7 @@ export async function POST(req: Request) {
         if (!(caller.isOwner && body.action === "profile"))
           throw new HttpError(403, "The owner account cannot be changed here.");
       }
-      if (t.role === "admin" && !caller.isOwner)
+      if (t.role === "admin" && !mayEditUsers(caller))
         throw new HttpError(
           403,
           `Only ${RAGHU_EMAIL} may change another admin. Ask them to make this change.`,
@@ -344,8 +358,8 @@ export async function POST(req: Request) {
      * page cannot edit could never be taken off again.
      */
     if (body.action === "groups") {
-      if (!caller.isOwner)
-        throw new HttpError(403, `Only ${RAGHU_EMAIL} may set LC, Stratcom or Management.`);
+      if (!mayEditUsers(caller))
+        throw new HttpError(403, `Only Dr Raghu and Vishwas may set LC, Stratcom or Management.`);
       if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
       const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
       if (String(t?.email || "").toLowerCase() === RAGHU_EMAIL)
@@ -429,8 +443,8 @@ export async function POST(req: Request) {
      * who may read that is not an ordinary admin's decision.
      */
     if (body.action === "hrms_access") {
-      if (!caller.isOwner)
-        throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant HRMS.`);
+      if (!mayEditUsers(caller))
+        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant HRMS.`);
       if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
       const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
       const target = String(t?.email || "").toLowerCase();
@@ -458,8 +472,8 @@ export async function POST(req: Request) {
 
     /** { action: "vishwakarma_access", id, grant } — owner only, as with HRMS. */
     if (body.action === "vishwakarma_access") {
-      if (!caller.isOwner)
-        throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant Vishwakarma.`);
+      if (!mayEditUsers(caller))
+        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant Vishwakarma.`);
       if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
       const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
       const target = String(t?.email || "").toLowerCase();
@@ -482,8 +496,8 @@ export async function POST(req: Request) {
 
     /** { action: "seva_access", id, grant } — owner only, as with HRMS. */
     if (body.action === "seva_access") {
-      if (!caller.isOwner)
-        throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant Seva.`);
+      if (!mayEditUsers(caller))
+        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant Seva.`);
       if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
       const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
       const target = String(t?.email || "").toLowerCase();
@@ -506,8 +520,8 @@ export async function POST(req: Request) {
 
     /** { action: "ims_access", id, grant } — owner only, as with HRMS. */
     if (body.action === "ims_access") {
-      if (!caller.isOwner)
-        throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant the IMS.`);
+      if (!mayEditUsers(caller))
+        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant the IMS.`);
       if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
       const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
       const target = String(t?.email || "").toLowerCase();
@@ -530,8 +544,8 @@ export async function POST(req: Request) {
 
     /** { action: "saamaan_access", id, grant } — owner only, as with HRMS. */
     if (body.action === "saamaan_access") {
-      if (!caller.isOwner)
-        throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant Saamaan.`);
+      if (!mayEditUsers(caller))
+        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant Saamaan.`);
       if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
       const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
       const target = String(t?.email || "").toLowerCase();
@@ -554,8 +568,8 @@ export async function POST(req: Request) {
 
     /** { action: "accounts_access", id, grant } — owner only, as with HRMS. */
     if (body.action === "accounts_access") {
-      if (!caller.isOwner)
-        throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant Accounts.`);
+      if (!mayEditUsers(caller))
+        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant Accounts.`);
       if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
       const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
       const target = String(t?.email || "").toLowerCase();
@@ -578,8 +592,8 @@ export async function POST(req: Request) {
 
     /** { action: "crm_access", id, grant } — owner only, as with HRMS. */
     if (body.action === "crm_access") {
-      if (!caller.isOwner)
-        throw new HttpError(403, `Only ${RAGHU_EMAIL} may grant the CRM.`);
+      if (!mayEditUsers(caller))
+        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant the CRM.`);
       if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
       const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
       const target = String(t?.email || "").toLowerCase();

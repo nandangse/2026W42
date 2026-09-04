@@ -24,6 +24,7 @@ import { fmtFull } from "@/lib/schedule";
 import { FIELD_GROUPS, ALL_FIELDS, onRoll, tenure, splitMulti, joinMulti, type FieldSpec, type HrmsEmployee } from "@/lib/hrms";
 import { C, type GenieUser } from "./RecordFields";
 import { RoleClarity, PersonCompetency } from "./PersonRoleAndCompetency";
+import { Communication } from "./Communication";
 
 interface HistoryRow {
   id: string; field: string; label: string;
@@ -190,6 +191,11 @@ export default function EmployeeRecord({
           style={tab === "__competency__" ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
           Competency
         </button>
+        <button onClick={() => setTab("__comm__")}
+          className="text-xs font-bold rounded px-2.5 py-1.5"
+          style={tab === "__comm__" ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
+          Communication
+        </button>
         <button onClick={() => setTab("history")}
           className="text-xs font-bold rounded px-2.5 py-1.5"
           style={tab === "history" ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
@@ -233,6 +239,10 @@ export default function EmployeeRecord({
         )}
 
         {tab === "__competency__" && <PersonCompetency employeeId={id} />}
+
+        {tab === "__comm__" && e && (
+          <Communication employeeId={id} name={String(e.value.name || "")} personalEmail={e.value.personal_email || null} workEmail={e.value.email || null} isOwner={isOwner} />
+        )}
 
         {tab === "history" && (
           <>

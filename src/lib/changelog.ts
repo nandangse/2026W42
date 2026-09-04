@@ -75,6 +75,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.3.6",
+    date: "2026-09-04",
+    module: "Users is an app; HRMS writes to people; the wall filters by type",
+    items: [
+      "\"lets change the users app: Initials - Name - Email - Apps - Edit - Delete - Reset Password. Select all - Deselect all. Edit Selected, and in that can give mass commands! On clicking the user a lightbox opens and all the settings are available in editable way.\" (Dr Raghu, 4 Sep 2026). Admin \u2192 Users is that: one flat table with the seven doors as chips on each row, a tick per row, Edit selected for one command across every ticked account (grant or take away any app, role, department, manager, goals, rooms, sign-in, a reset link), and a lightbox per person holding everything Genie keeps about them.",
+      "\"For now will only give this to Raghu and Vishwas. Other admins can see it.\" The server decides: every change on the Users app is theirs; the other admins get the same table read-only. The owner row stays untouchable and the admin role stays the owner's to give.",
+      "Reset password sends the person a link to their own inbox; nobody handles the password. Setting one by hand stays in the lightbox for whoever cannot reach their mail.",
+      "HRMS \u2014 \"in this put another tab communication\": the record has a Communication tab \u2014 every mail HRMS sent this person, what it said with the variables filled in, and what the mail server answered \u2014 and a composer that writes to their personal or work address from a template or from scratch. Mail goes out from Raghu's own Gmail with his name on it. Migration 0129.",
+      "HRMS \u2014 \"in masters keep a provision to add template. Have a list of variables in the side.\" Masters \u2192 Standard Texts takes new templates (a letter paragraph or an e-mail with a subject), and the variables \u2014 {{name}}, {{designation}}, {{doj}} and the rest of the record \u2014 sit down the side; click one to copy it.",
+      "HRMS \u2014 the appraisal wall shows the increase per month as its own tile, and \"have a drop down... show the types of the employees. I will of course keep management off\": a type dropdown on the wall; every number on it counts only the ticked types.",
+      "Jobmaster owner \"Pankaj Vikas Sutar\" linked to Pankaj Sutar's account; his eight jobs no longer read Unassigned.",
+    ],
+  },
+  {
     v: "4.4.3.5",
     date: "2026-09-04",
     module: "Latest entry wins; the meeting is a page; the recording is kept safely",

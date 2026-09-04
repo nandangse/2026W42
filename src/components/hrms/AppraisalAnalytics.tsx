@@ -37,12 +37,24 @@ function eff(r: Row): { gross: number | null; pct: number | null; indicative: bo
 }
 
 export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string; onOpenPerson: (id: string) => void }) {
-  const [rows, setRows] = useState<Row[] | null>(null);
+  const [rawRows, setRows] = useState<Row[] | null>(null);
   const [msg, setMsg] = useState("");
   useEffect(() => {
     api.get("/api/hrms/idp?table=1").then((j) => setRows(j.rows || []))
       .catch((e) => { setMsg(e instanceof Error ? e.message : String(e)); setRows([]); });
   }, []);
+
+  /**
+   * "have a drop down... show the types of the employees. I will of course
+   * keep management off" (Dr Raghu, 4 Sep 2026). Every number on the wall is
+   * computed from the ticked types only; all are ticked to begin with.
+   */
+  const allTypes = useMemo(() => [...new Set((rawRows || []).map((r) => r.type || "(no type)"))].sort(), [rawRows]);
+  const [off, setOff] = useState<Set<string>>(new Set());
+  const [typesOpen, setTypesOpen] = useState(false);
+  const rows = useMemo(() => rawRows === null ? null : rawRows.filter((r) => !off.has(r.type || "(no type)")), [rawRows, off]);
+  const typeCount = (t: string) => (rawRows || []).filter((r) => (r.type || "(no type)") === t).length;
+  const typeLabel = off.size === 0 ? "All employee types" : `${allTypes.length - off.size} of ${allTypes.length} types`;
 
   const P = ({ r, bold }: { r: Row; bold?: boolean }) => (
     <button onClick={() => onOpenPerson(r.id)} className={`text-left ${bold ? "font-bold" : "font-semibold"}`}
@@ -124,13 +136,41 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
       {rows === null && <div className="text-sm py-6 text-center" style={{ color: C.faint }}>reading the cycle…</div>}
       {rows !== null && (
         <>
+          {/* ── who is on the wall ── */}
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setTypesOpen((v) => !v)} className="text-xs font-semibold rounded border px-2.5 py-1.5 bg-white"
+                style={{ borderColor: off.size ? C.orange ?? "#E8600A" : C.line, color: "#1B3A5C" }} title="Tick the employee types the wall should count">
+                👥 {typeLabel} {typesOpen ? "▴" : "▾"}
+              </button>
+              {typesOpen && (
+                <div className="rounded border bg-white shadow-lg p-2" style={{ position: "absolute", top: "110%", left: 0, zIndex: 30, minWidth: 240, borderColor: C.line }}>
+                  {allTypes.map((t) => (
+                    <label key={t} className="flex items-center gap-2 text-xs py-1 px-1 rounded" style={{ cursor: "pointer" }}>
+                      <input type="checkbox" checked={!off.has(t)} style={{ accentColor: "#1B3A5C" }}
+                        onChange={(e) => setOff((o) => { const n = new Set(o); if (e.target.checked) n.delete(t); else n.add(t); return n; })} />
+                      <span className="flex-1" style={{ color: off.has(t) ? C.faint : "#16232F" }}>{t}</span>
+                      <span className="tnum" style={{ color: C.faint }}>{typeCount(t)}</span>
+                    </label>
+                  ))}
+                  <div className="flex gap-2 mt-1 pt-1" style={{ borderTop: `1px solid ${C.line}` }}>
+                    <button onClick={() => setOff(new Set())} className="text-xs font-semibold" style={{ color: "#1B3A5C" }}>All</button>
+                    <button onClick={() => setOff(new Set(allTypes))} className="text-xs font-semibold" style={{ color: C.faint }}>None</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            {off.size > 0 && <span className="text-xs" style={{ color: C.faint }}>leaving out {[...off].join(", ")}</span>}
+          </div>
+
           {/* ── the money, first ── */}
           <div className="flex gap-2 flex-wrap mb-3">
             <Big n={String(S.all.length)} l="On the roll" />
             <Big n={String(S.spoken.length)} l="Increments on the table" sub={indicativeN ? `${indicativeN} still manager-indicative` : "all Final"} />
             <Big n={lakh(S.payNow)} l="Payroll today / month" />
             <Big n={lakh(S.payNew)} l="Payroll after / month" green />
-            <Big n={lakh((S.payNew - S.payNow) * 12)} l="Cost of the cycle / year" sub={`${lakh(S.payNew - S.payNow)} per month`} />
+            <Big n={lakh(S.payNew - S.payNow)} l="Increase / month" sub={`${pct(S.payNow ? (S.payNew - S.payNow) / S.payNow * 100 : 0)} of today's payroll`} green />
+            <Big n={lakh((S.payNew - S.payNow) * 12)} l="Cost of the cycle / year" />
             <Big n={pct(S.mean)} l="Average increase" sub={`median ${pct(S.median)} · 2026 was +13.25%`} green />
           </div>
 

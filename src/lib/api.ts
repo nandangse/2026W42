@@ -47,4 +47,7 @@ export const api = {
   async get(path: string) {
     return jsonOrThrow(await fetch(path, { cache: "no-store" }));
   },
+  async del(path: string) {
+    return jsonOrThrow(await fetch(path, { method: "DELETE" }));
+  },
 };
