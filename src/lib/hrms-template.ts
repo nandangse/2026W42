@@ -62,11 +62,19 @@ export function employeeVars(value: Record<string, string | null>, extra: Record
   return { ...out, ...extra };
 }
 
-/** {{key}} and <key> both replaced; unknown ones left visible. */
+/**
+ * {{key}} and <key> both replaced; unknown ones left visible. Keys are
+ * matched loosely — {{employeeid}}, {{employee_id}} and {{EmployeeID}} are
+ * the same variable ("its employeeid", Dr Raghu, 4 Sep 2026).
+ */
+const loose = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, "");
 export function renderTemplate(tpl: string, vars: Record<string, string>): string {
+  const byLoose = new Map<string, string>();
+  for (const [k, v] of Object.entries(vars)) byLoose.set(loose(k), v);
+  const find = (k: string) => (k in vars ? vars[k] : byLoose.get(loose(k)));
   return String(tpl || "")
-    .replace(/\{\{\s*([a-zA-Z_][\w]*)\s*\}\}/g, (m, k: string) => (k in vars ? vars[k] : m))
-    .replace(/<\s*([a-zA-Z_][\w]*)\s*>/g, (m, k: string) => (k in vars && !/^(p|b|i|u|br|em|strong|div|span|ol|ul|li|h3|h4|tr|td|table|a)$/i.test(k) ? vars[k] : m));
+    .replace(/\{\{\s*([a-zA-Z_][\w]*)\s*\}\}/g, (m, k: string) => { const v = find(k); return v === undefined ? m : v; })
+    .replace(/<\s*([a-zA-Z_][\w]*)\s*>/g, (m, k: string) => { if (/^(p|b|i|u|br|em|strong|div|span|ol|ul|li|h3|h4|tr|td|table|a)$/i.test(k)) return m; const v = find(k); return v === undefined ? m : v; });
 }
 
 /** Every variable a template mentions, known or not. */

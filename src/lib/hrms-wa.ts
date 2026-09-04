@@ -81,7 +81,9 @@ export function renderFor(p: Person, template: string, sheet: Sheet | null, extr
   const vars = { ...employeeVars(p.value, { employee_id: p.id }), ...payrollVars(sheet, p.id), ...extra };
   const phone = String(phoneOverride || p.phone || "").replace(/\D/g, "");
   const text = renderTemplate(template, vars);
-  const missing = [...new Set([...String(template).matchAll(/\{\{\s*([a-zA-Z_]\w*)\s*\}\}/g)].map((m) => m[1]).filter((k) => !(k in vars) || !vars[k]))];
+  const norm = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const known = new Map(Object.entries(vars).map(([k, v]) => [norm(k), v]));
+  const missing = [...new Set([...String(template).matchAll(/\{\{\s*([a-zA-Z_]\w*)\s*\}\}/g)].map((m) => m[1]).filter((k) => !known.get(norm(k))))];
   return { id: p.id, name: p.name, phone: phone.length <= 10 && phone ? `91${phone}` : phone, text, missing };
 }
 
