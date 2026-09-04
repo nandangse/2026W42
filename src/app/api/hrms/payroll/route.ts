@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { driveConfig, uploadToFolder, trashFile } from "@/lib/drive";
-import { parseMuster, parseRates, generateRegister, musterVars, type Muster, type Rates } from "@/lib/muster";
+import { parseMuster, parseRates, generateRegister, musterVars, OPTIONAL_MUSTER_VARS, type Muster, type Rates } from "@/lib/muster";
 import { totalsFor } from "@/lib/salary-sheet";
 import { MONTHS } from "@/lib/hrms-template";
 import { people, renderFor, queueMessages, queueStatuses } from "@/lib/hrms-wa";
@@ -234,8 +234,13 @@ export async function POST(req: Request) {
       if (!muster?.rows?.length) throw new HttpError(400, "Upload the muster first — the message is built from it.");
       const month = Number(r.month), year = Number(r.year);
       let template = String(body.body || "");
-      const key = String(body.template_key || "attendance_whatsapp");
-      if (!template.trim()) { const { data: t } = await admin.from("hrms_text_master").select("body").eq("key", key).maybeSingle(); template = String(t?.body || ""); }
+      // "the whatsapp message needs template name - Attendance monthly" (Dr Raghu, 4 Sep 2026)
+      let key = String(body.template_key || "attendance_monthly");
+      if (!template.trim()) {
+        const { data: t } = await admin.from("hrms_text_master").select("body").eq("key", key).maybeSingle();
+        template = String(t?.body || "");
+        if (!template.trim() && key === "attendance_monthly") { key = "attendance_whatsapp"; const { data: t2 } = await admin.from("hrms_text_master").select("body").eq("key", key).maybeSingle(); template = String(t2?.body || ""); }
+      }
       if (!template.trim()) throw new HttpError(400, "No template — Masters → Standard Texts, kind WhatsApp.");
       const only = new Set<string>((body.ids || []).map(String));
       const lines = muster.rows.filter((m) => (only.size ? only.has(m.employee_id) : true) && !/resign|terminat|left/i.test(m.status));
@@ -247,8 +252,8 @@ export async function POST(req: Request) {
       });
       if (action === "wa_preview") {
         const blanks: Record<string, number> = {};
-        for (const x of rendered) for (const k of x.missing) blanks[k] = (blanks[k] || 0) + 1;
-        return NextResponse.json({ count: rendered.length, noPhone: rendered.filter((x) => !x.phone || x.phone.length < 8).length, blanks, sample: rendered.slice(0, 5), template });
+        for (const x of rendered) for (const k of x.missing) if (!OPTIONAL_MUSTER_VARS.has(k)) blanks[k] = (blanks[k] || 0) + 1;
+        return NextResponse.json({ count: rendered.length, noPhone: rendered.filter((x) => !x.phone || x.phone.length < 8).length, blanks, sample: rendered.slice(0, 5), template, template_key: key });
       }
       let crmProfileId: string | null = null;
       try { const { crmDb } = await import("@/crm/db"); const { data: rp } = await crmDb().from("profile").select("id").ilike("email", me.email).maybeSingle(); crmProfileId = rp?.id ? String(rp.id) : null; } catch { /* fine */ }

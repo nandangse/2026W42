@@ -235,7 +235,7 @@ export function generateRegister(
 
 /** The muster's lines as template variables — the attendance message. */
 export function musterVars(m: MusterRow | undefined, monthLabel: string): Record<string, string> {
-  const s = (v: number | null | undefined) => (v == null ? "-" : String(v));
+  const s = (v: number | null | undefined) => (v == null ? "" : String(v));
   return {
     month: monthLabel,
     category: m?.category || "", present_days: s(m?.present), absent_days: s(m?.absent), week_off: s(m?.wo), mo_st: s(m?.mo_st),
@@ -243,3 +243,6 @@ export function musterVars(m: MusterRow | undefined, monthLabel: string): Record
     advance: s(m?.advance), leave_encash: s(m?.leave_encash), loan_deduction: s(m?.loan_ded), loan_taken: s(m?.loan_taken), site_allowance: s(m?.site_allowance),
   };
 }
+
+/** Lines the muster often leaves empty — blank in the message, not a missing variable. */
+export const OPTIONAL_MUSTER_VARS = new Set(["compoff", "ot", "late_marks", "lunch", "advance", "leave_encash", "loan_deduction", "loan_taken", "site_allowance"]);

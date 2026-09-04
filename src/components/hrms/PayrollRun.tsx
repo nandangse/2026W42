@@ -76,7 +76,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
   const waQueue = async () => {
     if (!wa) return;
     if (!window.confirm(`Queue ${wa.count - wa.noPhone} WhatsApp messages for ${MONTHS[(d?.run.month || 1) - 1]} ${d?.run.year}?\n\nThey go out from the WhatsApp queue through Periskope's default number, within the ceilings. Release them from HRMS → WhatsApp — send to all → Send.`)) return;
-    await act({ action: "wa_queue", template_key: "attendance_whatsapp" }, (j) => `${j.queued} queued${(j.skipped as unknown[])?.length ? ` · ${(j.skipped as unknown[]).length} skipped (no mobile)` : ""}`);
+    await act({ action: "wa_queue", template_key: "attendance_monthly" }, (j) => `${j.queued} queued${(j.skipped as unknown[])?.length ? ` · ${(j.skipped as unknown[]).length} skipped (no mobile)` : ""}`);
     setWaOpen(false); setWa(null); setTab("comms");
   };
 
@@ -115,7 +115,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
             <div className="font-bold text-sm">Attendance message — {wa.count} people, {wa.noPhone} without a mobile</div>
             {Object.keys(wa.blanks).length > 0 && <span className="text-xs" style={{ color: C.red }}>blank: {Object.entries(wa.blanks).map(([k, n]) => `{{${k}}} ×${n}`).join(", ")}</span>}
             <span style={{ flex: 1 }} />
-            <span className="text-xs" style={{ color: C.faint }}>Template: Masters → Standard Texts → Attendance of the month (WhatsApp)</span>
+            <span className="text-xs" style={{ color: C.faint }}>Template: Masters → Standard Texts → Attendance monthly</span>
           </div>
           <div className="grid gap-2 mt-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
             {wa.sample.map((s) => (
