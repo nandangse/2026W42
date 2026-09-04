@@ -17,6 +17,7 @@ export interface TemplateVar { key: string; label: string; group: string }
 
 /** Which record fields make sense in a letter — the confidential groups stay out. */
 export const TEMPLATE_VARS: TemplateVar[] = [
+  { key: "employee_id", label: "Employee ID (four digits)", group: "Letter" },
   { key: "first_name", label: "First name", group: "Letter" },
   { key: "today", label: "Today's date", group: "Letter" },
   { key: "cycle", label: "Appraisal cycle", group: "Letter" },

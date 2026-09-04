@@ -238,6 +238,7 @@ export function musterVars(m: MusterRow | undefined, monthLabel: string): Record
   const s = (v: number | null | undefined) => (v == null ? "" : String(v));
   return {
     month: monthLabel,
+    employee_id: m?.employee_id || "",
     category: m?.category || "", present_days: s(m?.present), absent_days: s(m?.absent), week_off: s(m?.wo), mo_st: s(m?.mo_st),
     paid_days: s(m?.pay_days), attendance_days: s(m?.present), compoff: s(m?.compoff), ot: s(m?.ot), late_marks: s(m?.late), lunch: s(m?.lunch),
     advance: s(m?.advance), leave_encash: s(m?.leave_encash), loan_deduction: s(m?.loan_ded), loan_taken: s(m?.loan_taken), site_allowance: s(m?.site_allowance),

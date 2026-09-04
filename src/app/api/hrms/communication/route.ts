@@ -144,7 +144,7 @@ export async function POST(req: Request) {
       const value: Record<string, string | null> = {};
       for (const f of ALL_FIELDS) value[f.key] = baseValue(r, f);
       for (const [k, v] of overrides.get(r.id) || []) if (fieldSpec(k)) value[k] = v;
-      const vars = employeeVars(value);
+      const vars = employeeVars(value, { employee_id: r.id });
       const to = toKind === "work" ? (value.email || "") : (value.personal_email || "");
       return {
         id: r.id, name: r.name, to: String(to || "").trim(),

@@ -77,7 +77,8 @@ export interface Rendered { id: string; name: string; phone: string; text: strin
 
 /** The template, filled for each person. `missing` names the variables that came out blank. */
 export function renderFor(p: Person, template: string, sheet: Sheet | null, extra: Record<string, string> = {}, phoneOverride?: string | null): Rendered {
-  const vars = { ...employeeVars(p.value), ...payrollVars(sheet, p.id), ...extra };
+  // {{employee_id}} is the four-digit number (Dr Raghu, 4 Sep 2026) — the record's id, not a field
+  const vars = { ...employeeVars(p.value, { employee_id: p.id }), ...payrollVars(sheet, p.id), ...extra };
   const phone = String(phoneOverride || p.phone || "").replace(/\D/g, "");
   const text = renderTemplate(template, vars);
   const missing = [...new Set([...String(template).matchAll(/\{\{\s*([a-zA-Z_]\w*)\s*\}\}/g)].map((m) => m[1]).filter((k) => !(k in vars) || !vars[k]))];
