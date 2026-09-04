@@ -165,25 +165,44 @@ export function parseRates(grid: unknown[][]): Rates {
 /**
  * GENERATE: muster × rates → the month's register, one line per person.
  *
- * Earned = the monthly rate × payable days ÷ days in the month, component
- * by component (Basic & DA, HRA, fixed, conveyance, medical). Rates come
- * from the rate list where uploaded, else from the person's record (the
- * same fields the Appraisal card reads). Statutory deductions follow
- * src/lib/salary.ts — PF 12% of earned Basic capped at 1,800, PT by the
- * Maharashtra slab, neither for the exempt types. The muster's own money
- * lines (OT amount as site allowance, advance, loan deduction, arrears,
- * TDS, other deductions) ride through as the sheet carries them.
+ * THE RULES, as Dr Raghu gave them on 4 Sep 2026 after the August sheet was
+ * read line by line:
+ *
+ *   · Pay days: the calendar month for Staff and Management, 26 for Labour
+ *     and contract types. Days due = present + week offs + MO/ST (the muster).
+ *   · Leave: earned this month = present ÷ 10 (Staff) or ÷ 20 (workers);
+ *     none for Management and contract types. Comp off is ADDED to the leave
+ *     balance first. A shortfall against pay days is filled from the balance
+ *     (leave first, when the balance is at or above the 15 / 8 minimum, then
+ *     comp off); what comp off is left is encashed at the per-day rate.
+ *   · Per day = (gross + allowances, WITHOUT conveyance) ÷ 26, for everyone.
+ *     Leave encashment and comp off are paid at it.
+ *   · Earned basic = rate × payment days ÷ pay days.
+ *   · HRA = 20% of earned basic for Staff and for workers alike. For workers
+ *     it is the first part of their OT: OT pay = hours × basic ÷ 208, always
+ *     single; the balance above the HRA is Site Allowance (with any flat site
+ *     amount the muster carries); a shortfall below it is an Other Deduction.
+ *   · Fixed allowance in full at 7 or more days present, else pro rata.
+ *     Conveyance = rate × present ÷ 26. Medical = the rate, flat.
+ *   · PF 12% of earned basic capped at 1,800; PT by the slab; ESI never
+ *     deducted (the company bears it); advance, loan, TDS, lunch and the
+ *     late deduction (late marks × per day) as the muster carries them.
  */
+export interface Ledger { leave_ob: number; loan_ob: number }
 export interface RegisterRow {
   employee_id: string; name: string; type: string | null;
-  present: number; absent: number; wo: number; mo_st: number; paid_days: number; attendance: number; ot: number | null;
-  gross: number; basic_da: number; hra: number; fixed_allowance: number; conveyance: number; medical: number;
-  site_allowance: number; arrears: number; earned: number;
-  pf: number; pt: number; loan: number; advance: number; tds: number; other_ded: number; deductions: number; net: number;
+  present: number; absent: number; wo: number; mo_st: number; days_due: number; pay_days: number; paid_days: number; attendance: number; ot: number | null;
+  per_day: number; gross: number; basic_da: number; hra: number; fixed_allowance: number; conveyance: number; medical: number;
+  ot_pay: number; site_allowance: number; compoff_amt: number; encash_amt: number; arrears: number; earned: number;
+  pf: number; pt: number; loan: number; advance: number; tds: number; lunch: number; late_ded: number; other_ded: number; deductions: number; net: number; to_pay: number;
+  leave_ob: number; leave_earned: number; compoff_days: number; leave_used: number; leave_encashed: number; leave_cb: number;
   hold: boolean; rate_from: "rates" | "record" | "none"; mobile: string | null;
 }
+const r2 = (n: number) => Math.round(n * 100) / 100;
 export function generateRegister(
-  muster: Muster, rates: Rates | null, record: (id: string) => { type: string | null; get: (k: string) => unknown; name: string | null } | null, daysInMonth: number,
+  muster: Muster, rates: Rates | null,
+  record: (id: string) => { type: string | null; get: (k: string) => unknown; name: string | null } | null,
+  daysInMonth: number, ledger: (id: string) => Ledger | null = () => null,
 ): { rows: RegisterRow[]; warnings: string[] } {
   const rateOf = new Map((rates?.rows || []).map((r) => [r.employee_id, r]));
   const warnings: string[] = [];
@@ -191,41 +210,77 @@ export function generateRegister(
   const rows = muster.rows.map((m) => {
     const rec = record(m.employee_id);
     const type = m.category || rec?.type || null;
+    const t = String(type || "");
+    const worker = /labour/i.test(t);
+    const contractish = /contract|management/i.test(t);
+    const payDays = worker || /contract/i.test(t) ? 26 : daysInMonth;
     const rr = rateOf.get(m.employee_id);
-    let basic = 0, hra = 0, fixed = 0, conv = 0, med = 0, gross = 0, from: RegisterRow["rate_from"] = "none";
+    let basic = 0, fixed = 0, conv = 0, med = 0, from: RegisterRow["rate_from"] = "none";
     if (rr && (rr.gross || rr.basic_da || rr.per_day)) {
       from = "rates";
-      basic = rr.basic_da ?? 0; hra = rr.hra ?? 0; fixed = rr.fixed ?? 0; conv = rr.conveyance ?? 0; med = rr.medical ?? 0;
-      gross = rr.gross ?? (basic + hra + fixed + conv + med);
-      if (!basic && gross) basic = gross - hra - fixed - conv - med;
-      if (rr.per_day && !gross) { gross = rr.per_day * daysInMonth; basic = gross; }
+      basic = rr.basic_da ?? 0; fixed = rr.fixed ?? 0; conv = rr.conveyance ?? 0; med = rr.medical ?? 0;
+      if (!basic && rr.gross) basic = rr.gross - (rr.hra ?? 0) - fixed - conv - med;
+      if (rr.per_day && !basic) basic = rr.per_day * 26;
     } else if (rec) {
-      const t = salaryTable(rec.get, type);
-      if (t) {
-        from = "record";
-        basic = num(rec.get("Basic and DA")); hra = NO_STATUTORY.has(String(type)) || /labour/i.test(String(type)) ? 0 : num(rec.get("HRA"));
-        fixed = num(rec.get("Fixed Allowance")); conv = num(rec.get("Conveyance")); med = /labour/i.test(String(type)) ? 0 : num(rec.get("Medical Allowance"));
-        gross = t.gross;
-      }
+      basic = num(rec.get("Basic and DA")); fixed = num(rec.get("Fixed Allowance")); conv = num(rec.get("Conveyance")); med = worker ? 0 : num(rec.get("Medical Allowance"));
+      if (basic) from = "record";
     }
     if (from === "none") noRate++;
-    const f = daysInMonth > 0 ? Math.max(0, m.pay_days) / daysInMonth : 0;
-    const E = (v: number) => Math.round(v * f);
-    const eBasic = E(basic), eHra = E(hra), eFixed = E(fixed), eConv = E(conv), eMed = E(med);
-    const site = m.site_allowance ?? 0, arrears = m.arrears ?? 0;
-    const earned = eBasic + eHra + eFixed + eConv + eMed + site + arrears;
-    const exempt = NO_STATUTORY.has(String(type || ""));
+    const hraRate = contractish ? 0 : basic * 0.2;
+    const gross = basic + (worker ? 0 : hraRate) + fixed + conv + med;      // the rate as the sheet states it
+    const perDay = (basic + (worker ? 0 : hraRate) + fixed + med) / 26;        // conveyance does not count
+
+    // ── leave and payment days ──
+    const led = ledger(m.employee_id);
+    const leaveOb = led?.leave_ob ?? num(rec?.get("Leave as on 31st june 2026"));
+    const earnsLeave = !contractish;
+    const leaveEarned = earnsLeave ? r2(m.present / (worker ? 20 : 10)) : 0;
+    const compDays = m.compoff ?? 0;
+    const minBal = worker ? 8 : 15;
+    const due = m.pay_days;
+    let shortfall = Math.max(0, payDays - due);
+    const available = leaveOb + leaveEarned;
+    let leaveUsed = 0;
+    if (shortfall > 0 && earnsLeave && available >= minBal) { leaveUsed = Math.min(shortfall, available); shortfall -= leaveUsed; }
+    let compUsed = 0;
+    if (shortfall > 0 && compDays > 0) { compUsed = Math.min(shortfall, compDays); shortfall -= compUsed; }
+    const compEncash = compDays - compUsed;
+    const encashDays = (m.leave_encash ?? 0) + compEncash;
+    const paidDays = Math.min(payDays, due + leaveUsed + compUsed);
+    const leaveCb = r2(leaveOb + leaveEarned + compDays - leaveUsed - compUsed - compEncash - (m.leave_encash ?? 0));
+
+    // ── earnings ──
+    const f = payDays > 0 ? paidDays / payDays : 0;
+    const eBasic = Math.round(basic * f);
+    const hra = contractish ? 0 : Math.round(eBasic * 0.2);
+    const eFixed = m.present >= 7 ? fixed : Math.round(fixed * m.present / 26);
+    const eConv = Math.round(conv * m.present / 26);
+    const eMed = med;
+    const otPay = worker ? Math.round((m.ot ?? 0) * basic / 208) : 0;
+    const siteFlat = m.site_allowance ?? 0;
+    const site = worker ? siteFlat + Math.max(0, otPay - hra) : siteFlat;
+    const otShort = worker && otPay < hra ? hra - otPay : 0;
+    const compAmt = Math.round(compEncash * perDay);
+    const encashAmt = Math.round((m.leave_encash ?? 0) * perDay);
+    const arrears = m.arrears ?? 0;
+    const earned = eBasic + hra + eFixed + eConv + eMed + site + compAmt + encashAmt + arrears;
+
+    // ── deductions ──
+    const exempt = NO_STATUTORY.has(t);
     const pf = !exempt && eBasic > 0 ? Math.min(Math.round(eBasic * 0.12), 1800) : 0;
-    const eGross = eBasic + eHra + eFixed + eConv + eMed;
-    const pt = exempt ? 0 : eGross > 10000 ? 200 : eGross >= 7500 ? 175 : 0;
-    const loan = m.loan_ded ?? 0, advance = m.advance ?? 0, tds = m.tds ?? 0, other = m.other_ded ?? 0;
-    const deductions = pf + pt + loan + advance + tds + other;
+    const pt = exempt ? 0 : earned > 10000 ? 200 : earned >= 7500 ? 175 : 0;
+    const loan = m.loan_ded ?? 0, advance = m.advance ?? 0, tds = m.tds ?? 0, lunch = m.lunch ?? 0;
+    const lateDed = Math.round((m.late ?? 0) * perDay);
+    const other = (m.other_ded ?? 0) + otShort;
+    const deductions = pf + pt + loan + advance + tds + lunch + lateDed + other;
+    const net = earned - deductions;
     return {
       employee_id: m.employee_id, name: m.name || rec?.name || m.employee_id, type,
-      present: m.present, absent: m.absent, wo: m.wo, mo_st: m.mo_st, paid_days: m.pay_days, attendance: m.attendance ?? m.present, ot: m.ot,
-      gross, basic_da: eBasic, hra: eHra, fixed_allowance: eFixed, conveyance: eConv, medical: eMed,
-      site_allowance: site, arrears, earned,
-      pf, pt, loan, advance, tds, other_ded: other, deductions, net: earned - deductions,
+      present: m.present, absent: m.absent, wo: m.wo, mo_st: m.mo_st, days_due: due, pay_days: payDays, paid_days: r2(paidDays), attendance: m.attendance ?? m.present, ot: m.ot,
+      per_day: Math.round(perDay), gross: Math.round(gross), basic_da: eBasic, hra, fixed_allowance: eFixed, conveyance: eConv, medical: eMed,
+      ot_pay: otPay, site_allowance: site, compoff_amt: compAmt, encash_amt: encashAmt, arrears, earned,
+      pf, pt, loan, advance, tds, lunch, late_ded: lateDed, other_ded: other, deductions, net, to_pay: Math.ceil(net),
+      leave_ob: r2(leaveOb), leave_earned: leaveEarned, compoff_days: compDays, leave_used: r2(leaveUsed + compUsed), leave_encashed: r2(encashDays), leave_cb: leaveCb,
       hold: /hold/i.test(m.status) || /f ?& ?f|resign|terminat/i.test(m.status), rate_from: from, mobile: m.mobile,
     };
   });
@@ -247,3 +302,39 @@ export function musterVars(m: MusterRow | undefined, monthLabel: string): Record
 
 /** Lines the muster often leaves empty — blank in the message, not a missing variable. */
 export const OPTIONAL_MUSTER_VARS = new Set(["compoff", "ot", "late_marks", "lunch", "advance", "leave_encash", "loan_deduction", "loan_taken", "site_allowance"]);
+
+/** The rules Generate runs on, in the words the screen shows beside the register (Dr Raghu, 4 Sep 2026). */
+export const PAYROLL_RULES: { head: string; lines: string[] }[] = [
+  { head: "Days", lines: [
+    "Pay days: the calendar month for Staff and Management; 26 for Labour and contract types.",
+    "Days due = present + week offs + MO/ST, from the muster.",
+    "Paid days = days due + leave used + comp off used, up to pay days.",
+  ] },
+  { head: "Leave", lines: [
+    "Earned this month = present ÷ 10 for Staff, ÷ 20 for workers. None for Management and contract types.",
+    "Comp off is added to the leave balance first.",
+    "A shortfall against pay days is filled from leave, when the balance is at or above the minimum (15 Staff, 8 workers), then from comp off.",
+    "Comp off not used is encashed at the per-day rate. Leave encashment likewise.",
+    "Closing balance = opening + earned + comp off − used − encashed. Opening comes from last month's register, else the record.",
+  ] },
+  { head: "Per day", lines: [
+    "Per day = (gross + allowances, without conveyance) ÷ 26, for everyone.",
+  ] },
+  { head: "Earnings", lines: [
+    "Basic & DA = rate × paid days ÷ pay days.",
+    "HRA = 20% of earned basic, Staff and workers alike; none for Management and contract types.",
+    "Workers' OT = hours × basic ÷ 208, always single. The HRA is the first part of it; the balance is Site Allowance, with any flat site amount from the muster. OT below the HRA is an Other Deduction.",
+    "Fixed allowance in full at 7 or more days present, else pro rata.",
+    "Conveyance = rate × present ÷ 26.",
+    "Medical = the rate, flat.",
+    "Arrears as the muster carries them.",
+  ] },
+  { head: "Deductions", lines: [
+    "PF = 12% of earned basic, capped at ₹1,800. Not for Management and contract types.",
+    "PT: ₹200 above ₹10,000 earnings, ₹175 from ₹7,500. Not for the exempt types.",
+    "ESI is never deducted from workers; the company bears it.",
+    "Advance, loan deduction, TDS and lunch as the muster carries them.",
+    "Late deduction = late marks × per day.",
+    "To pay = net, rounded up to the rupee.",
+  ] },
+];

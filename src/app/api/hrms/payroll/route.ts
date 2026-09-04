@@ -210,15 +210,24 @@ export async function POST(req: Request) {
       const ppl = await people(admin, muster.rows.map((m) => m.employee_id));
       const byId = new Map(ppl.map((p) => [p.id, p]));
       const HEADERS: Record<string, string> = { "Basic and DA": "Basic and DA", HRA: "HRA", "Fixed Allowance": "Fixed Allowance", Conveyance: "Conveyance", "Medical Allowance": "Medical Allowance", "Gross Salary": "Gross Salary" };
+      // last month's register closes the leave and loan ledgers this one opens
+      const pm = month === 1 ? 12 : month - 1, py = month === 1 ? year - 1 : year;
+      const { data: prevSheet } = await admin.from("hrms_salary_sheet").select("rows").eq("month", pm).eq("year", py).maybeSingle();
+      const prevRows = new Map<string, { leave_cb?: number; loan_cb?: number }>(((prevSheet?.rows as { employee_id?: string; leave_cb?: number; loan_cb?: number }[] | null) || []).map((x) => [String(x.employee_id), x]));
       const { rows, warnings } = generateRegister(muster, rates, (eid) => {
         const p = byId.get(eid); if (!p) return null;
         // the record's pay fields live under the sheet's own headers in extra — read through the catalogue's keys
         const get = (k: string) => {
-          const key = ({ "Basic and DA": "basic_da", HRA: "hra", "Fixed Allowance": "fixed_allowance", Conveyance: "conveyance", "Medical Allowance": "medical_allowance", "Gross Salary": "gross_salary" } as Record<string, string>)[k] || k;
+          const key = ({ "Basic and DA": "basic_da", HRA: "hra", "Fixed Allowance": "fixed_allowance", Conveyance: "conveyance", "Medical Allowance": "medical_allowance", "Gross Salary": "gross_salary", "Leave as on 31st june 2026": "leave_as_on" } as Record<string, string>)[k] || k;
           return p.value[key] ?? p.value[HEADERS[k] || k] ?? null;
         };
         return { type: p.type || null, name: p.name, get };
-      }, daysIn(month, year));
+      }, daysIn(month, year), (eid) => {
+        const prev = prevRows.get(eid);
+        if (prev && prev.leave_cb != null) return { leave_ob: Number(prev.leave_cb) || 0, loan_ob: Number(prev.loan_cb) || 0 };
+        const p = byId.get(eid);
+        return p ? { leave_ob: Number(String(p.value.leave_as_on || "").replace(/[^0-9.]/g, "")) || 0, loan_ob: Number(String(p.value.loan_as_on || "").replace(/[^0-9.]/g, "")) || 0 } : null;
+      });
       const typeOf = (eid: string | null) => (eid ? byId.get(eid)?.type || null : null);
       const totals = totalsFor(rows.map((x) => ({ employee_id: x.employee_id, name: x.name, type: x.type, earned: x.earned, deductions: x.deductions, net: x.net, attendance: x.attendance, paid_days: x.paid_days, gross: x.gross, basic_da: x.basic_da, hra: x.hra, fixed_allowance: x.fixed_allowance, conveyance: x.conveyance, site_allowance: x.site_allowance, pf: x.pf, pt: x.pt, other_ded: x.other_ded, loan: x.loan, advance: x.advance, tds: x.tds, arrears: x.arrears, hold: x.hold })), typeOf);
       const { error } = await admin.from("hrms_salary_sheet").update({ rows, ...totals, generated_at: now, generated_by: stamp, updated_at: now, mapping: { source: "generated", muster: muster.columns, rates: rates?.columns || null, warnings: [...muster.warnings, ...(rates?.warnings || []), ...warnings] } }).eq("id", id);

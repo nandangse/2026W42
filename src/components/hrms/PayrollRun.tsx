@@ -216,7 +216,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflow: "auto", maxHeight: "calc(100vh - 300px)" }}>
             <table style={{ fontSize: 12, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
               <thead><tr style={{ color: C.faint, fontSize: 10 }}>
-                {["Emp", "Name", "Type", "Pay days", "Rate (gross)", "Basic & DA", "HRA", "Fixed", "Conv", "Medical", "Site/OT", "Arrears", "Earned", "PF", "PT", "Loan", "Advance", "TDS", "Other", "Deductions", "Net", "Rate from"].map((h, i) => (
+                {["Emp", "Name", "Type", "Due", "Leave OB", "Earned lv", "Comp off", "Lv used", "Encashed", "Leave CB", "Paid days", "Per day", "Basic & DA", "HRA", "Fixed", "Conv", "Medical", "OT pay", "Site", "Comp off ₹", "Encash ₹", "Arrears", "Earned", "PF", "PT", "Loan", "Advance", "TDS", "Lunch", "Late", "Other", "Deductions", "Net", "To pay", "Rate from"].map((h, i) => (
                   <th key={h} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#fff", textAlign: i < 3 ? "left" : "right", zIndex: i < 2 ? 3 : 2, ...(i === 0 ? { left: 0, minWidth: 60, width: 60 } : i === 1 ? { left: 60 } : {}) }}>{h}</th>
                 ))}
               </tr></thead>
@@ -226,8 +226,11 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                     <td className="px-2 py-1 tnum" style={{ position: "sticky", left: 0, background: "#fff", minWidth: 60, width: 60 }}>{x.employee_id}</td>
                     <td className="px-2 py-1 font-semibold" style={{ position: "sticky", left: 60, background: "#fff" }}>{x.name}{x.hold && <span className="ml-1" style={{ color: C.red, fontSize: 10 }}>hold</span>}</td>
                     <td className="px-2 py-1" style={{ color: C.faint }}>{x.type || ""}</td>
-                    {[x.paid_days, x.gross, x.basic_da, x.hra, x.fixed_allowance, x.conveyance, x.medical, x.site_allowance, x.arrears, x.earned, x.pf, x.pt, x.loan, x.advance, x.tds, x.other_ded, x.deductions, x.net].map((v, i) => (
-                      <td key={i} className="px-2 py-1 text-right tnum" style={i === 9 || i === 17 ? { fontWeight: 700 } : undefined}>{inr(v)}</td>
+                    {[x.days_due, x.leave_ob, x.leave_earned, x.compoff_days, x.leave_used, x.leave_encashed, x.leave_cb, x.paid_days].map((v, i) => (
+                      <td key={"l" + i} className="px-2 py-1 text-right tnum" style={{ color: i === 6 ? "#1B3A5C" : C.dim, fontWeight: i === 6 || i === 7 ? 700 : 400 }}>{v == null ? "—" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td>
+                    ))}
+                    {[x.per_day, x.basic_da, x.hra, x.fixed_allowance, x.conveyance, x.medical, x.ot_pay, x.site_allowance, x.compoff_amt, x.encash_amt, x.arrears, x.earned, x.pf, x.pt, x.loan, x.advance, x.tds, x.lunch, x.late_ded, x.other_ded, x.deductions, x.net, x.to_pay].map((v, i) => (
+                      <td key={i} className="px-2 py-1 text-right tnum" style={i === 11 || i === 21 || i === 22 ? { fontWeight: 700 } : undefined}>{inr(v)}</td>
                     ))}
                     <td className="px-2 py-1 text-right" style={{ color: x.rate_from === "none" ? C.red : C.faint, fontSize: 10 }}>{x.rate_from}</td>
                   </tr>
@@ -235,8 +238,8 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
               </tbody>
               <tfoot><tr style={{ borderTop: `2px solid ${C.line}`, fontWeight: 700 }}>
                 <td className="px-2 py-1.5" colSpan={3} style={{ position: "sticky", left: 0, background: "#fff" }}>{regRows.length} people</td>
-                {["paid_days", "gross", "basic_da", "hra", "fixed_allowance", "conveyance", "medical", "site_allowance", "arrears", "earned", "pf", "pt", "loan", "advance", "tds", "other_ded", "deductions", "net"].map((k) => (
-                  <td key={k} className="px-2 py-1.5 text-right tnum">{k === "paid_days" ? "" : inr(regRows.reduce((a, x) => a + (Number((x as unknown as Record<string, unknown>)[k]) || 0), 0))}</td>
+                {["days_due", "leave_ob", "leave_earned", "compoff_days", "leave_used", "leave_encashed", "leave_cb", "paid_days", "per_day", "basic_da", "hra", "fixed_allowance", "conveyance", "medical", "ot_pay", "site_allowance", "compoff_amt", "encash_amt", "arrears", "earned", "pf", "pt", "loan", "advance", "tds", "lunch", "late_ded", "other_ded", "deductions", "net", "to_pay"].map((k) => (
+                  <td key={k} className="px-2 py-1.5 text-right tnum">{["days_due", "leave_ob", "leave_earned", "compoff_days", "leave_used", "leave_encashed", "leave_cb", "paid_days", "per_day"].includes(k) ? "" : inr(regRows.reduce((a, x) => a + (Number((x as unknown as Record<string, unknown>)[k]) || 0), 0))}</td>
                 ))}
                 <td />
               </tr></tfoot>
