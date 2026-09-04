@@ -46,6 +46,8 @@ export default function Wip({ erpBase, role, summary }: { erpBase: string; role:
   const [picked, setPicked] = useState<Row | null>(null);
   /** "Make the RBOM come in the lightbox" — the same one the BOM front opens. */
   const [rbomOpen, setRbomOpen] = useState<Row | null>(null);
+  /** "keep the WIP warehouse clickable. Open a lightbox" — what has gone in, when, with what remarks; what is still to go. */
+  const [whOpen, setWhOpen] = useState<Row | null>(null);
   const canEdit = ["admin", "planner", "project_owner"].includes(role);
   const rows = data?.rows ?? [];
   const totals = useMemo(() => ({
@@ -89,7 +91,8 @@ export default function Wip({ erpBase, role, summary }: { erpBase: string; role:
         columns={[
           { key: "job", label: "Job No *", align: "left", sort: (r) => r.job_no,
             render: (r) => <button onClick={() => setPicked(r)} className="font-bold hover:underline" style={{ color: NAVY }} title={`${r.warehouse} — open the job`}>{r.job_no}</button> },
-          { key: "wh", label: "WIP warehouse", align: "left", sort: (r) => r.warehouse, render: (r) => <span className="text-xs font-bold" style={{ color: "#0F766E" }}>{r.warehouse}</span> },
+          { key: "wh", label: "WIP warehouse", align: "left", sort: (r) => r.warehouse,
+            render: (r) => <button onClick={() => setWhOpen(r)} className="text-xs font-bold hover:underline" style={{ color: "#0F766E" }} title="Open the warehouse — kitted, pending, remarks">{r.warehouse}</button> },
           { key: "tag", label: "Customer tag *", align: "left", sort: (r) => r.customer_tag,
             render: (r) => <span className="font-semibold" style={{ color: INK, whiteSpace: "normal", display: "inline-block", maxWidth: 260 }}>{r.customer_tag || "·"}</span> },
           { key: "proj", label: "Project No *", align: "left", sort: (r) => r.project_id,
@@ -124,6 +127,11 @@ export default function Wip({ erpBase, role, summary }: { erpBase: string; role:
           <BomLines kind="rbom" bom={rbomOpen.rbom_no} base={erpBase} summary={summary} />
         </Modal>
       )}
+      {whOpen && (
+        <Modal onClose={() => setWhOpen(null)} title={`${whOpen.warehouse} · ${whOpen.customer_tag}`} width={1300}>
+          <WarehouseBox jobNo={whOpen.job_no} />
+        </Modal>
+      )}
       {picked && (
         <JobLightbox
           job={picked.job}
@@ -136,5 +144,68 @@ export default function Wip({ erpBase, role, summary }: { erpBase: string; role:
         />
       )}
     </Screen>
+  );
+}
+
+interface WhItem { item_code: string; item_name: string; item_group: string; qty: number; uom: string; rate: number | null; value: number | null; issued: number; pending: number; status: "kitted" | "partial" | "pending"; kitted_at: string; kitted_by: string; issues: { qty: number; at: string; by: string; note: string }[]; remarks: string[]; bom_status: string }
+interface WhAnswer { job: { job_no: string; warehouse: string; project_id: string; tag: string; customer: string; family: string; value: number | null; kitting_owner: string; rbom_id: string }; items: WhItem[]; totals: { lines: number; kitted: number; partial: number; pending: number; value: number; value_kitted: number; value_pending: number; issues: number; last_issue: string } }
+
+const when = (iso: string) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : "·");
+const rs = (n: number | null | undefined) => (n === null || n === undefined ? "·" : `₹${Math.round(n).toLocaleString("en-IN")}`);
+
+/** One WIP warehouse: what is kitted (with the date and remarks), what is pending. */
+function WarehouseBox({ jobNo }: { jobNo: string }) {
+  const [data, busy, , err] = useLoad<WhAnswer>(`/api/saamaan/wip?job=${encodeURIComponent(jobNo)}`);
+  const [show, setShow] = useState<"all" | "kitted" | "pending">("all");
+  const [q, setQ] = useState("");
+  if (err) return <Note kind="error">{err}</Note>;
+  if (!data) return <div className="text-sm p-4" style={{ color: MUTED }}>{busy ? "reading the warehouse…" : "·"}</div>;
+  const t = data.totals;
+  const list = data.items.filter((i) => (show === "all" ? true : show === "kitted" ? i.status !== "pending" : i.status !== "kitted") && (!q || `${i.item_code} ${i.item_name} ${i.item_group}`.toLowerCase().includes(q.toLowerCase())));
+  const tone = (s: WhItem["status"]) => (s === "kitted" ? { bg: "#E6F4EA", c: GREEN } : s === "partial" ? { bg: "#FFF3E8", c: AMBER } : { bg: "#F4F2EC", c: MUTED });
+  return (
+    <div>
+      <div className="text-xs mb-2" style={{ color: MUTED }}>
+        {data.job.project_id.replace(/^NGSE-PROJ-/, "project ")} · {data.job.customer || "·"} · {data.job.family || "·"}{data.job.rbom_id ? ` · ${data.job.rbom_id}` : " · no RBOM built for the project yet"}{data.job.kitting_owner ? ` · kitting ${data.job.kitting_owner}` : ""}
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
+        {[["Items on the RBOM", String(t.lines), rs(t.value)], ["Kitted", String(t.kitted), rs(t.value_kitted)], ["Partly kitted", String(t.partial), ""], ["Pending", String(t.pending), rs(t.value_pending)], ["Issues made", String(t.issues), t.last_issue ? `last ${when(t.last_issue)}` : "none yet"]].map(([a, b, c]) => (
+          <div key={a} className="bg-white rounded-lg border p-2" style={{ borderColor: BORDER }}>
+            <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: 0.5 }}>{a}</div>
+            <div className="tnum" style={{ fontSize: 18, fontWeight: 800, color: INK }}>{b}</div>
+            <div className="text-xs" style={{ color: MUTED }}>{c}</div>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-1.5 mb-2 items-center flex-wrap">
+        {(["all", "kitted", "pending"] as const).map((k) => <button key={k} onClick={() => setShow(k)} className="rounded px-2.5 py-1 text-xs font-bold" style={{ background: show === k ? NAVY : "#fff", color: show === k ? "#fff" : INK, border: `1px solid ${show === k ? NAVY : BORDER}` }}>{k === "all" ? "Everything" : k === "kitted" ? "Kitted, incl. partly" : "Pending, incl. partly"}</button>)}
+        <span style={{ flex: 1 }} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="find an item" className="text-xs rounded px-2 py-1" style={{ border: `1px solid ${BORDER}`, width: 200 }} />
+      </div>
+      <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, overflow: "auto", maxHeight: "60vh" }}>
+        <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+          <thead><tr style={{ color: MUTED, fontSize: 10.5 }}>
+            {["Item", "Group", "RBOM qty", "Issued", "Pending", "Value", "Status", "Kitted on", "By", "Remarks"].map((h, i) => <th key={h} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#fff", textAlign: i >= 2 && i <= 5 ? "right" : "left", borderBottom: `1px solid ${BORDER}` }}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {!list.length && <tr><td colSpan={10} className="px-2 py-4 text-xs" style={{ color: MUTED }}>{data.items.length ? "Nothing matches." : "Nothing on this warehouse yet — no RBOM line, no issue."}</td></tr>}
+            {list.map((i) => { const c = tone(i.status); return (
+              <tr key={i.item_code} style={{ borderTop: "1px solid #EEECE6" }}>
+                <td className="px-2 py-1"><div className="font-semibold" style={{ color: INK }}>{i.item_code}</div><div className="text-xs" style={{ color: MUTED, whiteSpace: "normal", maxWidth: 320 }}>{i.item_name}</div></td>
+                <td className="px-2 py-1 text-xs" style={{ color: MUTED }}>{i.item_group}</td>
+                <td className="px-2 py-1 text-right tnum">{i.qty ? `${i.qty.toLocaleString("en-IN")} ${i.uom}` : "·"}</td>
+                <td className="px-2 py-1 text-right tnum" style={{ color: i.issued ? GREEN : MUTED }}>{i.issued ? i.issued.toLocaleString("en-IN") : "·"}</td>
+                <td className="px-2 py-1 text-right tnum" style={{ color: i.pending ? AMBER : MUTED, fontWeight: i.pending ? 700 : 400 }}>{i.pending ? i.pending.toLocaleString("en-IN") : "·"}</td>
+                <td className="px-2 py-1 text-right tnum">{rs(i.value)}</td>
+                <td className="px-2 py-1"><span className="rounded px-1.5 py-0.5 text-xs font-bold" style={{ background: c.bg, color: c.c }}>{i.status}</span></td>
+                <td className="px-2 py-1 text-xs tnum" title={i.issues.map((x) => `${when(x.at)} · ${x.qty} · ${x.by}${x.note ? ` · ${x.note}` : ""}`).join("\n")}>{i.kitted_at ? when(i.kitted_at) : "·"}{i.issues.length > 1 ? <span style={{ color: MUTED }}> ×{i.issues.length}</span> : null}</td>
+                <td className="px-2 py-1 text-xs" style={{ color: MUTED }}>{i.kitted_by ? i.kitted_by.split("·")[0].trim() : "·"}</td>
+                <td className="px-2 py-1 text-xs" style={{ color: INK, whiteSpace: "normal", maxWidth: 260 }}>{i.remarks.length ? i.remarks.join(" · ") : <span style={{ color: MUTED }}>·</span>}</td>
+              </tr>); })}
+          </tbody>
+        </table>
+      </div>
+      <div className="text-xs mt-2" style={{ color: MUTED }}>Kitted = the full RBOM quantity has been issued into this warehouse from the MRP; partly = some of it; pending = none yet. Kitted on is the last issue&apos;s date; hover it for every issue. Remarks are the RBOM line&apos;s and each issue&apos;s note.</div>
+    </div>
   );
 }

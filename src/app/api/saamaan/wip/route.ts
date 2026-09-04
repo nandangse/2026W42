@@ -29,10 +29,65 @@ const N = (v: unknown) => (v === null || v === undefined || v === "" ? null : Nu
 const rev = (id: string) => Number((id.match(/-(\d+)$/) ?? [])[1] ?? 0);
 const notInstalled = (m: string) => /does not exist|schema cache/i.test(m);
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await requireSaamaan();
     const admin = adminClient();
+
+    /**
+     * ?job=<no> — one WIP warehouse opened (Dr Raghu, 4 Sep 2026: "keep
+     * the WIP warehouse clickable. Open a lightbox. Show items kitted and
+     * kitted date, any remarks, items pending."). Every RBOM line of the
+     * job's project with what the MRP's ticks have issued into WIP_<job>:
+     * kitted when the full quantity has gone, partial when some, pending
+     * when none; the date is the last issue's; the remarks are the RBOM
+     * line's and every issue's note.
+     */
+    const jobNo = S(new URL(req.url).searchParams.get("job"));
+    if (jobNo) {
+      const { data: job } = await admin.from("jobs").select("id, proj, tag, cust, fam, val, kitting_owner").eq("id", jobNo).maybeSingle();
+      const proj = S(job?.proj);
+      const { data: rb } = proj ? await admin.from("material_rbom").select("rbom_id").eq("project_id", proj).maybeSingle() : { data: null };
+      const rbomId = S(rb?.rbom_id);
+      const lines: Doc[] = [];
+      for (let a = 0; rbomId && a < 100000; a += 1000) {
+        const { data, error } = await admin.from("material_rbom_item").select("id, idx, item_code, item_name, item_group, qty, uom, rate, amount, bom_status, bom_remark, description").eq("rbom_id", rbomId).order("idx").range(a, a + 999);
+        if (error) throw new Error(error.message);
+        lines.push(...((data ?? []) as Doc[]));
+        if (!data || data.length < 1000) break;
+      }
+      const { data: iss } = await admin.from("material_issue").select("item_code, item_name, qty, uom, rate, amount, issued_by, issued_at, note, warehouse").eq("job_no", jobNo).order("issued_at");
+      const issues = (iss ?? []) as Doc[];
+      const byCode = new Map<string, Doc[]>();
+      for (const i of issues) (byCode.get(S(i.item_code)) ?? byCode.set(S(i.item_code), []).get(S(i.item_code))!).push(i);
+      const items = lines.map((l) => {
+        const code = S(l.item_code), q = Number(l.qty) || 0, rate = N(l.rate);
+        const mine = byCode.get(code) ?? [];
+        const got = mine.reduce((a, i) => a + (Number(i.qty) || 0), 0);
+        const last = mine[mine.length - 1];
+        const status = q > 0 && got >= q ? "kitted" : got > 0 ? "partial" : "pending";
+        const remarks = [S(l.bom_remark), ...mine.map((i) => S(i.note))].filter(Boolean);
+        return {
+          item_code: code, item_name: S(l.item_name), item_group: S(l.item_group), qty: q, uom: S(l.uom), rate, value: rate === null ? null : q * rate,
+          issued: got, pending: Math.max(0, q - got), status, kitted_at: last ? S(last.issued_at) : "", kitted_by: last ? S(last.issued_by) : "",
+          issues: mine.map((i) => ({ qty: Number(i.qty) || 0, at: S(i.issued_at), by: S(i.issued_by), note: S(i.note) })),
+          remarks, bom_status: S(l.bom_status), description: S(l.description),
+        };
+      });
+      // issues that no RBOM line names — still in the warehouse, still shown
+      const named = new Set(items.map((i) => i.item_code));
+      for (const [code, mine] of byCode) if (!named.has(code)) {
+        const got = mine.reduce((a, i) => a + (Number(i.qty) || 0), 0); const last = mine[mine.length - 1];
+        items.push({ item_code: code, item_name: S(mine[0].item_name), item_group: "(not on the RBOM)", qty: 0, uom: S(mine[0].uom), rate: N(mine[0].rate), value: null, issued: got, pending: 0, status: "kitted", kitted_at: S(last.issued_at), kitted_by: S(last.issued_by), issues: mine.map((i) => ({ qty: Number(i.qty) || 0, at: S(i.issued_at), by: S(i.issued_by), note: S(i.note) })), remarks: mine.map((i) => S(i.note)).filter(Boolean), bom_status: "", description: "" });
+      }
+      const sum = (f: (x: typeof items[number]) => number) => items.reduce((a, x) => a + f(x), 0);
+      return NextResponse.json({
+        job: { job_no: jobNo, warehouse: `WIP_${jobNo}`, project_id: proj, tag: S(job?.tag), customer: S(job?.cust), family: S(job?.fam), value: N(job?.val), kitting_owner: S(job?.kitting_owner), rbom_id: rbomId },
+        items,
+        totals: { lines: items.length, kitted: items.filter((i) => i.status === "kitted").length, partial: items.filter((i) => i.status === "partial").length, pending: items.filter((i) => i.status === "pending").length,
+          value: sum((i) => i.value ?? 0), value_kitted: sum((i) => (i.rate ?? 0) * Math.min(i.qty || i.issued, i.issued)), value_pending: sum((i) => (i.rate ?? 0) * i.pending), issues: issues.length, last_issue: issues.length ? S(issues[issues.length - 1].issued_at) : "" },
+      });
+    }
 
     // 1 — the board: every live job, whole.
     const { data: jobs, error: jErr } = await admin.from("jobs").select("*")
