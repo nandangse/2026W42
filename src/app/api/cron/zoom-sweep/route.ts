@@ -3,6 +3,20 @@ import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { zoomConfig, zoomGet, ingestMeeting, attachRecording, attachSummary, uuidPath } from "@/lib/zoom";
 import { beat } from "@/lib/cron-beat";
+import { driveConfig, uploadToFolder } from "@/lib/drive";
+import { zoomToken } from "@/lib/zoom";
+
+/**
+ * THE RECORDING, KEPT SAFELY (Dr Raghu, 4 Sep 2026: "the zoom recording
+ * link is to be taken, the file downloaded and then uploaded into the
+ * Uploaded files as Zoom meetings ... inside this save it to keep it
+ * safely"). His folder; a "Zoom meetings" subfolder inside it; one MP4 per
+ * meeting, named by date and topic. Two a run, under 300 MB each -- a
+ * function has a memory ceiling, and a recording that will not fit is
+ * reported rather than half-uploaded.
+ */
+const ZOOM_DRIVE_FOLDER = "1_Ozi1VkCmi51Yraywksq7RagbRLWOyuA";
+const MAX_BYTES = 300 * 1024 * 1024;
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -54,8 +68,31 @@ export async function GET(req: Request) {
         }
       }
     }
-    await beat("zoom-sweep", "done", { users: users.length, seen, made, filled });
-    return NextResponse.json({ ok: true, users: users.length, seen, made, filled });
+    // the recordings not yet in Drive -- two a run
+    let archived = 0; const archiveNotes: string[] = [];
+    const dcfg = driveConfig();
+    if (dcfg) {
+      const { data: todo } = await crm.from("meeting").select("id, topic, started_at, recording_download")
+        .not("recording_download", "is", null).is("recording_drive_url", null).order("started_at", { ascending: false }).limit(2);
+      for (const m of todo ?? []) {
+        try {
+          const token = await zoomToken(cfg);
+          const r = await fetch(`${m.recording_download}${String(m.recording_download).includes("?") ? "&" : "?"}access_token=${encodeURIComponent(token)}`, { redirect: "follow", signal: AbortSignal.timeout(240000) });
+          if (!r.ok) throw new Error(`Zoom would not hand over the file (${r.status})`);
+          const len = Number(r.headers.get("content-length") || 0);
+          if (len > MAX_BYTES) throw new Error(`recording is ${(len / 1048576).toFixed(0)} MB — over the 300 MB ceiling`);
+          const bytes = await r.arrayBuffer();
+          if (bytes.byteLength > MAX_BYTES) throw new Error(`recording is ${(bytes.byteLength / 1048576).toFixed(0)} MB — over the 300 MB ceiling`);
+          const day = String(m.started_at || "").slice(0, 10) || "undated";
+          const name = `${day} ${String(m.topic || "Zoom meeting").replace(/[^A-Za-z0-9 ._-]+/g, " ").trim().slice(0, 80)}.mp4`;
+          const up = await uploadToFolder(dcfg, ZOOM_DRIVE_FOLDER, "Zoom meetings", bytes, name, "video/mp4");
+          await crm.from("meeting").update({ recording_drive_url: up.link || `https://drive.google.com/file/d/${up.id}/view`, updated_at: new Date().toISOString() }).eq("id", m.id);
+          archived++;
+        } catch (e) { archiveNotes.push(`${m.topic}: ${e instanceof Error ? e.message : e}`); }
+      }
+    }
+    await beat("zoom-sweep", "done", { users: users.length, seen, made, filled, archived, archiveNotes });
+    return NextResponse.json({ ok: true, users: users.length, seen, made, filled, archived, archiveNotes });
   } catch (e) {
     return errJson(e);
   }

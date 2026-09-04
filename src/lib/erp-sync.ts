@@ -136,7 +136,7 @@ const N = (v: unknown) => {
 
 export const PROJECT_FIELDS = [
   "name", "custom_project_director", "customer_committed_delivery_",
-  "expected_end_date", "project_stage", "sales_order", "jobnumberslist", "status",
+  "expected_end_date", "project_stage", "sales_order", "jobnumberslist", "status", "modified",
   // Dr Raghu, 2 Sep 2026: "Short Summary Description - ERP / Description -
   // Genie / Projects please mapp for the import and export too." The ERP has
   // carried this all along -- the model, the platform, the max height -- and
@@ -160,6 +160,8 @@ export const JOB_FIELDS = [
   // Dr Raghu, 2 Sep 2026: the GST rate is already on Jobmaster, so nobody
   // types it 112 times.
   "custom_gst_rate",
+  // when the ERP last touched the row -- "latest entry wins" needs it
+  "modified",
 ];
 
 /**
@@ -223,7 +225,13 @@ export interface SyncResult {
  * appear, because asking somebody to adjudicate two identical values is how
  * a review screen teaches people to click through without reading.
  */
-export type Winner = "erp" | "genie";
+/**
+ * "latest" (Dr Raghu, 4 Sep 2026: "whichever is a later entry sync it"):
+ * the side that touched the field LAST wins it. The ERP's word on when is
+ * Jobmaster.modified; Genie's is the correction queue's changed_at for that
+ * field, else the row's updated_at.
+ */
+export type Winner = "erp" | "genie" | "latest";
 export const decisionKey = (kind: string, id: string, field: string) => `${kind}:${id}:${field}`;
 
 export interface SyncOptions {
@@ -261,9 +269,33 @@ export async function erpSync(
   const began = Date.now();
   const changes: FieldChange[] = [];
 
-  /** Genie keeps this field when the radio said so, or when the default does. */
-  const genieKeeps = (kind: string, id: string, field: string) =>
-    (decisions[decisionKey(kind, id, field)] ?? fallback) === "genie";
+  /**
+   * When Genie last touched each field: the correction queue keeps one line
+   * per job and field with its changed_at, whether or not it has travelled.
+   * Loaded once; only consulted when the winner is "latest".
+   */
+  const genieTouched = new Map<string, string>();
+  if (fallback === "latest" || Object.values(decisions).includes("latest")) {
+    for (let from = 0; ; from += 1000) {
+      const { data } = await genie.from("erp_update").select("job_id, field, changed_at").range(from, from + 999);
+      for (const r of (data ?? []) as { job_id: string; field: string; changed_at: string }[]) {
+        const k = `${r.job_id}:${r.field}`;
+        if (!genieTouched.has(k) || genieTouched.get(k)! < r.changed_at) genieTouched.set(k, r.changed_at);
+      }
+      if ((data ?? []).length < 1000) break;
+    }
+  }
+  /** ERP's "modified" is IST wall-clock without a zone; read it as IST. */
+  const erpWhen = (v: unknown) => { const t = S(v).replace(" ", "T"); return t ? new Date(t + "+05:30").getTime() : 0; };
+
+  /** Genie keeps this field when the radio said so, when the default does, or when Genie touched it last. */
+  const genieKeeps = (kind: string, id: string, field: string, next?: Record<string, unknown>, prev?: Record<string, unknown>) => {
+    const w = decisions[decisionKey(kind, id, field)] ?? fallback;
+    if (w !== "latest") return w === "genie";
+    const erpT = erpWhen(next?._erp_modified);
+    const gT = new Date(genieTouched.get(`${id}:${field}`) ?? S(prev?.updated_at) ?? 0).getTime() || 0;
+    return gT > erpT;
+  };
 
   /** Fields Genie kept that the ERP can be told about — queued below. */
   const toQueue: { job_id: string; field: string; label: string; old_value: string; new_value: string }[] = [];
@@ -307,6 +339,7 @@ export async function erpSync(
     stat: S(j.job_status),
     own: S(j.planning_owner),
     gst: j.custom_gst_rate == null || j.custom_gst_rate === "" ? null : N(j.custom_gst_rate),
+    _erp_modified: S(j.modified),
   })).filter((j) => j.id);
 
   // ---------------- projects ----------------
@@ -327,6 +360,7 @@ export async function erpSync(
       cust: S(p.customer),
       description: S(p.short_summary_description),
       job_numbers: S(p.jobnumberslist).split(/[,\s]+/).filter(Boolean),
+      _erp_modified: S(p.modified),
     }))
     .filter((p) => p.id);
 
@@ -415,7 +449,7 @@ export async function erpSync(
       // The radio button, or the standing default, wins here: where Genie is
       // to keep a field, the ERP's answer is simply not applied.
       if (kind && k in WATCHED && String(prev[k] ?? "") !== String(v ?? "")
-          && genieKeeps(kind, String(next.id), k)) {
+          && genieKeeps(kind, String(next.id), k, next, prev)) {
         out[k] = prev[k];
         // and tell the ERP, where the ERP can hear it
         const pushLabel = kind === "job" ? ERP_PUSHABLE[k]
@@ -438,7 +472,8 @@ export async function erpSync(
   };
 
   let projWritten = 0;
-  const projFinal = projRows.map((p) => keepFilled(p, projPrev.get(p.id), "project"));
+  const strip = <T extends Record<string, unknown>>(r: T): T => { const o = { ...r } as Record<string, unknown>; delete o._erp_modified; return o as T; };
+  const projFinal = projRows.map((p) => strip(keepFilled(p, projPrev.get(p.id), "project")));
   for (let i = 0; i < projFinal.length; i += 200) {
     const slice = projFinal.slice(i, i + 200);
     const { error } = await genie.from("projects").upsert(slice, { onConflict: "id" });
@@ -452,7 +487,7 @@ export async function erpSync(
   let jobWritten = 0;
   for (const j of jobRows) {
     const prev = jobPrev.get(j.id);
-    const mapped = keepFilled(j, prev, "job");
+    const mapped = strip(keepFilled(j, prev, "job"));
     const payload = prev
       ? { ...mapped, active: true, archived_at: null, updated_at: new Date().toISOString() }
       : { ...mapped, active: true, archived_at: null, pct: 0, kit: 0, tp: 0, tpv: 0, tpp: 0, updated_at: new Date().toISOString() };

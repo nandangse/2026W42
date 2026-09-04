@@ -28,8 +28,13 @@ export const maxDuration = 300;
  * goes Genie's. One date, one line, so the flip is a fact and not a
  * memory.
  */
+/**
+ * SUPERSEDED THE SAME DAY: "right now sync all. whichever is a later entry
+ * sync it" (Dr Raghu, 4 Sep 2026). The winner is no longer a date on the
+ * calendar but the clock on each field -- see Winner "latest" in erp-sync.
+ * The Saturday constant stays as the radio's default on the manual screen.
+ */
 const GENIE_WINS_FROM = "2026-09-06";
-const istToday = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
 
 export async function GET(req: Request) {
   try {
@@ -44,7 +49,7 @@ export async function GET(req: Request) {
     const cfg = await erpConfig(crmDb());
     if ("error" in cfg) return NextResponse.json({ ok: false, note: cfg.error });
     const genie = adminClient();
-    const fallback: Winner = istToday() >= GENIE_WINS_FROM ? "genie" : "erp";
+    const fallback: Winner = "latest";
 
     // 1. PUSH — the button's own road, signed as the cron
     let push: Record<string, unknown> = {};

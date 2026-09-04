@@ -75,6 +75,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.3.5",
+    date: "2026-09-04",
+    module: "Latest entry wins; the meeting is a page; the recording is kept safely",
+    items: [
+      "\"right now sync all. whichever is a later entry sync it\" (Dr Raghu, 4 Sep 2026). The winner on a difference is no longer a side but a clock: the ERP's word is Jobmaster's modified, Genie's is the correction queue's changed_at for that very field \u2014 and the later touch wins. The hourly cron runs on it; the Saturday date stays only as the manual screen's default.",
+      "SYNCED ALL, NOW, from this desk: the twenty-six corrections waiting since the 2nd pushed up first, then the pull with latest-wins. The ledger shows the run.",
+      "\"make this visually more appealing! the minutes is rich text. Recording make a tab so link can be put and also an embed to play it live there.\" The generic grid drew a meeting as thirteen cells and printed the minutes as raw markup. A meeting now reads as a page: the room and the deal at the top, then Minutes (rich, saving on blur), Recording, Zoom's summary with its next steps, and who and when.",
+      "THE RECORDING PLAYS ON THE PAGE. Zoom's own share page refuses to be framed; the Drive copy plays inline \u2014 one more reason the copy exists. Paste either link in the Recording pane; Zoom-born recordings get their Drive copy by themselves.",
+      "\"the zoom recording link is to be taken, the file downloaded and then uploaded into the Uploaded files as Zoom meetings ... to keep it safely\" \u2014 the hourly sweep downloads each recording from Zoom and files it as an MP4 under Zoom meetings inside his folder, named by date and topic. Two a run, under 300 MB each; a recording that will not fit is reported, not half-uploaded. Needs the folder shared with the service account, and the cloud_recording scope the Test button already names.",
+    ],
+  },
+  {
     v: "4.4.3.4",
     date: "2026-09-04",
     module: "Genie and the ERP keep each other current, every hour",

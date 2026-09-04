@@ -4079,7 +4079,9 @@ function RecordModal({
 
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {mode === "view" ? (
-          !hasTabs || tab === "details" ? (
+          dt.name === "meeting" && (!hasTabs || tab === "details") ? (
+            <MeetingTab row={row} onSaved={onSaved} />
+          ) : !hasTabs || tab === "details" ? (
             dt.name === "product" ? (
               <ProductBasicTab row={row} onSaved={onSaved} />
             ) : (
@@ -6515,6 +6517,152 @@ function IfsTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
             </div>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * THE MEETING, AS A PAGE (Dr Raghu, 4 Sep 2026: "make this visually more
+ * appealing! the minutes is rich text. Recording make a tab so link can be
+ * put and also an embed to play it live there").
+ *
+ * The generic grid drew a meeting as thirteen labelled cells and printed the
+ * minutes as raw markup. A meeting reads as a page: the room and the deal at
+ * the top; then four panes -- Minutes (rich text, saved on blur), Recording
+ * (the Zoom link, the Drive copy, and the Drive copy PLAYING right here),
+ * Zoom's summary, and the who/when. The Edit button above still opens every
+ * field the old way.
+ */
+function MeetingTab({ row, onSaved }: { row: Row; onSaved: (r?: Row) => void }) {
+  const rid = String(row.id ?? "");
+  const [pane, setPane] = useState<"minutes" | "recording" | "summary" | "people">("minutes");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [zoomLink, setZoomLink] = useState(String(row.recording_url ?? ""));
+  const [driveLink, setDriveLink] = useState(String(row.recording_drive_url ?? ""));
+  useEffect(() => { setZoomLink(String(row.recording_url ?? "")); setDriveLink(String(row.recording_drive_url ?? "")); }, [row]);
+
+  const patch = async (fields: Record<string, unknown>) => {
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch(`/api/crm/meeting?id=${encodeURIComponent(rid)}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(fields) });
+      const j = await r.json(); if (!r.ok) throw new Error(j.error || "Could not save");
+      onSaved(j.row as Row);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+  const driveId = (u: string) => (/\/d\/([A-Za-z0-9_-]{10,})/.exec(u) || /[?&]id=([A-Za-z0-9_-]{10,})/.exec(u))?.[1] ?? null;
+  const dId = driveId(driveLink);
+  const attendees = (Array.isArray(row.attendees) ? row.attendees : []) as { name?: string; email?: string | null }[];
+  const when = row.started_at ? new Date(String(row.started_at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  const Chip = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="rounded-lg border px-3 py-2" style={{ borderColor: BORDER, background: "#fff", minWidth: 150 }}>
+      <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: .5 }}>{label}</div>
+      <div className="text-sm font-semibold mt-0.5" style={{ color: INK }}>{value}</div>
+    </div>
+  );
+  const linkTo = (dtName: string, id: unknown, label: unknown) => id
+    ? <a href={`/crm/${dtName}/${encodeURIComponent(String(id))}`} className="hover:underline" style={{ color: NAVY }}>{String(label || id)}</a>
+    : <span style={{ color: "#C9CDD6" }}>not tagged</span>;
+  const panes: [typeof pane, string][] = [["minutes", "📝 Minutes"], ["recording", "▶ Recording"], ["summary", "✨ Zoom summary"], ["people", "👥 Who & when"]];
+
+  return (
+    <div className="p-4">
+      {/* the room and the deal, at a glance */}
+      <div className="flex gap-2 flex-wrap mb-3">
+        <Chip label="When" value={when} />
+        <Chip label="Minutes long" value={row.duration_min ? `${row.duration_min} min` : "—"} />
+        <Chip label="Attendees" value={attendees.length ? attendees.map((a) => a.name || a.email).filter(Boolean).join(", ") : String(row.attendee_names || "—")} />
+        <Chip label="Company" value={linkTo("company", row.company_id, row.company_id ? String((row as Record<string, unknown>).company_name || "") || "open" : "")} />
+        <Chip label="Opportunity" value={linkTo("opportunity", row.opportunity_id, "open")} />
+        <Chip label="Status" value={<span className="rounded px-1.5 font-bold" style={{ fontSize: 11, background: row.status === "done" ? "#E6F4EB" : row.status === "tagged" ? "#EEF1FA" : "#FFF7E6", color: row.status === "done" ? "#1A7F4E" : row.status === "tagged" ? NAVY : "#8A5B00" }}>{String(row.status || "new")}</span>} />
+      </div>
+      {err && <div className="text-xs font-semibold mb-2" style={{ color: "#B3261E" }}>{err}</div>}
+
+      <div className="flex gap-1 mb-3 flex-wrap">
+        {panes.map(([k, l]) => (
+          <button key={k} onClick={() => setPane(k)} className="rounded-full px-3 py-1 text-xs font-bold border"
+            style={pane === k ? { background: NAVY, color: "#fff", borderColor: NAVY } : { color: NAVY, borderColor: BORDER, background: "#fff" }}>{l}</button>
+        ))}
+      </div>
+
+      {pane === "minutes" && (
+        <div className="rounded-lg border p-3" style={{ borderColor: BORDER, background: "#fff" }}>
+          <div className="text-xs font-bold uppercase mb-1" style={{ color: MUTED, letterSpacing: .5 }}>Minutes of meeting — your hand · saves when you click away</div>
+          <RichTextEditor live initial={String(row.mom ?? "")} onChangeHtml={(v) => { if (v !== String(row.mom ?? "")) void patch({ mom: v }); }} minHeight={260} />
+        </div>
+      )}
+
+      {pane === "recording" && (
+        <div className="rounded-lg border p-3" style={{ borderColor: BORDER, background: "#fff" }}>
+          <div className="grid gap-2 md:grid-cols-2">
+            <div>
+              <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: .5 }}>Zoom link</div>
+              <div className="flex gap-1 mt-1">
+                <input value={zoomLink} onChange={(e) => setZoomLink(e.target.value)} placeholder="https://zoom.us/rec/share/…" className="flex-1 rounded border px-2 py-1 text-sm" style={{ borderColor: BORDER }} />
+                <button onClick={() => void patch({ recording_url: zoomLink || null })} disabled={busy} className="rounded px-2 text-xs font-bold text-white" style={{ background: NAVY }}>Save</button>
+                {!!row.recording_url && <a href={String(row.recording_url)} target="_blank" rel="noreferrer" className="rounded px-2 text-xs font-bold border flex items-center" style={{ borderColor: BORDER, color: NAVY }}>open ↗</a>}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: .5 }}>Copy in Drive · Uploaded files / Zoom meetings</div>
+              <div className="flex gap-1 mt-1">
+                <input value={driveLink} onChange={(e) => setDriveLink(e.target.value)} placeholder="https://drive.google.com/file/d/…" className="flex-1 rounded border px-2 py-1 text-sm" style={{ borderColor: BORDER }} />
+                <button onClick={() => void patch({ recording_drive_url: driveLink || null })} disabled={busy} className="rounded px-2 text-xs font-bold text-white" style={{ background: NAVY }}>Save</button>
+                {!!row.recording_drive_url && <a href={String(row.recording_drive_url)} target="_blank" rel="noreferrer" className="rounded px-2 text-xs font-bold border flex items-center" style={{ borderColor: BORDER, color: NAVY }}>open ↗</a>}
+              </div>
+              <div className="text-xs mt-1" style={{ color: MUTED }}>Zoom-born recordings are copied here by themselves, within the hour.</div>
+            </div>
+          </div>
+          {/* PLAY IT HERE. Zoom's own share page refuses to be framed; the
+              Drive copy plays inline, which is one more reason the copy exists. */}
+          {dId ? (
+            <div className="mt-3 rounded overflow-hidden border" style={{ borderColor: BORDER, background: "#000", aspectRatio: "16 / 9" }}>
+              <iframe src={`https://drive.google.com/file/d/${dId}/preview`} allow="autoplay; fullscreen" style={{ width: "100%", height: "100%", border: 0 }} title="Recording" />
+            </div>
+          ) : (
+            <div className="mt-3 rounded border p-6 text-center text-sm" style={{ borderColor: BORDER, color: MUTED, borderStyle: "dashed" }}>
+              {row.recording_url ? "The recording plays here once its copy is in Drive — paste the Drive link above, or wait for the hourly copy." : "No recording on this meeting yet."}
+            </div>
+          )}
+        </div>
+      )}
+
+      {pane === "summary" && (
+        <div className="rounded-lg border p-3" style={{ borderColor: BORDER, background: "#FBFAFE" }}>
+          <div className="text-xs font-bold uppercase mb-1" style={{ color: MUTED, letterSpacing: .5 }}>Zoom AI Companion — as it came</div>
+          {String(row.summary || "").trim()
+            ? <div className="text-sm" style={{ color: INK, whiteSpace: "pre-wrap", lineHeight: 1.65 }}>{String(row.summary)}</div>
+            : <div className="text-sm" style={{ color: MUTED }}>No summary from Zoom on this meeting.</div>}
+          {Array.isArray(row.next_steps) && (row.next_steps as unknown[]).length > 0 && (
+            <div className="mt-3">
+              <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: .5 }}>Next steps Zoom heard</div>
+              <ul className="text-sm mt-1" style={{ paddingLeft: 18, listStyle: "disc", color: INK, lineHeight: 1.6 }}>
+                {(row.next_steps as unknown[]).map((x, i) => <li key={i}>{String(x)}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {pane === "people" && (
+        <div className="rounded-lg border p-3" style={{ borderColor: BORDER, background: "#fff" }}>
+          <div className="text-xs font-bold uppercase mb-1" style={{ color: MUTED, letterSpacing: .5 }}>In the room</div>
+          {attendees.length ? (
+            <table className="text-sm" style={{ borderCollapse: "collapse" }}>
+              <tbody>{attendees.map((a, i) => (
+                <tr key={i} style={{ borderTop: "1px solid #F2F4F8" }}>
+                  <td className="py-1 pr-4 font-semibold" style={{ color: INK }}>{a.name || "—"}</td>
+                  <td className="py-1 pr-4" style={{ color: MUTED }}>{a.email || ""}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          ) : <div className="text-sm" style={{ color: MUTED }}>{String(row.attendee_names || "Nobody recorded.")}</div>}
+          <div className="text-xs mt-3" style={{ color: MUTED }}>
+            Host {String(row.host_email || "—")}{row.zoom_meeting_id ? ` · Zoom meeting ${String(row.zoom_meeting_id)}` : ""}{row.interaction_id ? " · on the deal's timeline as an interaction" : ""}
+          </div>
+        </div>
       )}
     </div>
   );
