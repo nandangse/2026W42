@@ -170,6 +170,8 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                 <span style={{ color: C.faint }}>{f.size ? `${Math.round(f.size / 1024)} KB` : ""} · {who(f.uploaded_by)} · {fmtFull(String(f.uploaded_at))}</span>
                 <span style={{ flex: 1 }} />
                 {f.drive_link ? <a href={f.drive_link} target="_blank" rel="noreferrer" style={{ color: "#1B3A5C" }}>Drive ↗</a> : <span style={{ color: "#8A5B00" }}>not filed in Drive</span>}
+                <button onClick={() => { if (window.confirm(`Remove ${f.name} from this run?${f.drive_link ? "\n\nThe Drive copy goes to the bin as well." : ""}${f.kind !== "other" ? "\nThe run falls back to the newest remaining " + (f.kind === "muster" ? "muster" : "rate list") + ", if any." : ""}`)) act({ action: "remove_file", file_id: f.id }, () => `${f.name} removed`); }}
+                  disabled={busy} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FBEDEA", color: C.red }} title="Remove this upload">✕</button>
               </div>
             ))}
           </div>

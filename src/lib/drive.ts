@@ -268,3 +268,12 @@ export async function downloadFile(cfg: DriveConfig, fileId: string): Promise<Bu
   return Buffer.from(await r.arrayBuffer());
 }
 
+
+/** Move a file to Drive's bin — the run's copy goes when the upload is removed. */
+export async function trashFile(cfg: DriveConfig, fileId: string): Promise<void> {
+  const token = await accessToken(cfg);
+  const r = await fetch(`${DRIVE}/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`, {
+    method: "PATCH", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ trashed: true }),
+  });
+  if (!r.ok) throw new Error(`Drive would not bin the file: ${r.status}`);
+}

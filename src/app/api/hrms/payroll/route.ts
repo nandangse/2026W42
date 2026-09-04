@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { driveConfig, uploadToFolder } from "@/lib/drive";
+import { driveConfig, uploadToFolder, trashFile } from "@/lib/drive";
 import { parseMuster, parseRates, generateRegister, musterVars, type Muster, type Rates } from "@/lib/muster";
 import { totalsFor } from "@/lib/salary-sheet";
 import { MONTHS } from "@/lib/hrms-template";
@@ -173,6 +173,24 @@ export async function POST(req: Request) {
       const { error } = await admin.from("hrms_salary_sheet").update(patch).eq("id", id);
       if (error) { if (/approved_by/i.test(error.message)) throw new HttpError(503, "Run migration 0132 first — approval has nowhere to be kept yet."); throw new Error(error.message); }
       return NextResponse.json({ ok: true });
+    }
+
+    /** REMOVE an upload — the row goes, the Drive copy is binned, and the run's muster or rates fall back to the newest remaining file of that kind. */
+    if (action === "remove_file") {
+      const id = String(body.id || ""), fileId = String(body.file_id || "");
+      if (!fileId) throw new HttpError(400, "Which file?");
+      const { data: f } = await admin.from("hrms_payroll_file").select("id, kind, drive_id, sheet_id").eq("id", fileId).eq("sheet_id", id).maybeSingle();
+      if (!f) throw new HttpError(404, "No such upload on this run.");
+      const { error } = await admin.from("hrms_payroll_file").delete().eq("id", fileId);
+      if (error) throw new Error(error.message);
+      let binned = false;
+      if (f.drive_id) { const cfg = driveConfig(); if (cfg) { try { await trashFile(cfg, String(f.drive_id)); binned = true; } catch { /* the row is gone; the Drive copy can be binned by hand */ } } }
+      if (f.kind === "muster" || f.kind === "rates") {
+        const { data: rest } = await admin.from("hrms_payroll_file").select("parsed").eq("sheet_id", id).eq("kind", f.kind).not("parsed", "is", null).order("uploaded_at", { ascending: false }).limit(1);
+        const next = rest && rest[0] ? rest[0].parsed : null;
+        await admin.from("hrms_salary_sheet").update({ [f.kind]: next, updated_at: now }).eq("id", id);
+      }
+      return NextResponse.json({ ok: true, binned });
     }
 
     if (action === "note") {
