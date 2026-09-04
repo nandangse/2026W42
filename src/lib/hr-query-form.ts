@@ -103,7 +103,6 @@ export const SECTIONS: FormSection[] = [
 export const FREE_TEXT = [
   { key: "other_issue", en: "If there is any other issue where HR can assist and that is not listed above, please mention it here.", hi: "यदि कोई अन्य समस्या है जिसमें एचआर सहायता कर सकता है और जो ऊपर सूचीबद्ध नहीं है, कृपया यहाँ बताएं।" },
   { key: "suggestions", en: "Any suggestions for improving your employment at Nandan GSE", hi: "नंदन जीएसई में आपके रोज़गार को बेहतर बनाने के लिए कोई सुझाव" },
-  { key: "khalapur_note", en: "Questions or queries about the move to the Khalapur factory — write in detail, in any language", hi: "खालापुर फैक्ट्री में स्थानांतरण के बारे में प्रश्न — किसी भी भाषा में विस्तार से लिखें" },
 ];
 
 export interface HrQueryForm {

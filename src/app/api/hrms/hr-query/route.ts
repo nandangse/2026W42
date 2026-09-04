@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser, errJson, HttpError } from "@/lib/auth";
+import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, resolveHrmsAccess } from "@/lib/hrms";
 import { formToText, type HrQueryForm } from "@/lib/hr-query-form";
@@ -49,10 +49,13 @@ const contactOf = (r: Emp | null, email: string) => ({
 
 export async function GET(req: Request) {
   try {
-    const me = await requireUser();
+    const me = await currentUser();
     const admin = adminClient();
-    const hr = await resolveHrmsAccess(admin, me.email, me.isOwner);
     const url = new URL(req.url);
+    // "will this be visible open?" (Dr Raghu, 4 Sep 2026) — yes: without a
+    // login the form is there to fill; the list of one's own queries needs one.
+    if (!me || me.disabled) return NextResponse.json({ anon: true, hr: false, rows: [], me: contactOf(null, "") });
+    const hr = await resolveHrmsAccess(admin, me.email, me.isOwner);
 
     if (url.searchParams.get("people")) {
       if (!hr) throw new HttpError(403, "HRMS only.");
@@ -94,22 +97,25 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const me = await requireUser();
+    const me = await currentUser();
     const admin = adminClient();
-    const hr = await resolveHrmsAccess(admin, me.email, me.isOwner);
+    const hr = me ? await resolveHrmsAccess(admin, me.email, me.isOwner) : false;
     const body = await req.json();
     const action = String(body.action || "");
-    const stamp = me.initials ? `${me.initials} · ${me.email}` : me.email;
     const now = new Date().toISOString();
 
     if (action === "raise") {
       const forSelf = body.for_self !== false;
       if (!forSelf && !hr) throw new HttpError(403, "Only HRMS may raise a query for someone else.");
+      // the open form: no login, the person is who the contact block says
+      const anonEmail = String((body.form?.contact?.personal_email) || "").trim().toLowerCase();
+      const stamp = me ? (me.initials ? `${me.initials} · ${me.email}` : me.email) : `open form · ${anonEmail || String(body.form?.contact?.mobile || "").trim() || "no contact"}`;
+      const raisedEmail = me ? me.email.toLowerCase() : anonEmail || null;
       const form = (body.form || {}) as HrQueryForm;
       form.ticks = form.ticks || {}; form.other = form.other || {}; form.text = form.text || {};
       const given = (form.contact || {}) as Partial<HrQueryForm["contact"]>;
       form.contact = { employee_id: given.employee_id || "", name: given.name || "", mobile: given.mobile || "", personal_email: given.personal_email || "", stay_location: given.stay_location || "" };
-      const rec = forSelf ? await myRecord(me.email) : null;
+      const rec = forSelf && me ? await myRecord(me.email) : null;
       const employeeId = String(body.employee_id || form.contact.employee_id || rec?.id || "").trim() || null;
       if (!form.contact.name.trim()) throw new HttpError(400, "Name is needed.");
       if (!form.contact.mobile.trim()) throw new HttpError(400, "Personal mobile is needed.");
@@ -117,7 +123,7 @@ export async function POST(req: Request) {
       if (!count) throw new HttpError(400, "Tick at least one line, or write what the issue is.");
       const { error } = await admin.from("hrms_query").insert({
         employee_id: employeeId, subject, question, topic: "HR Query", status: "Open",
-        raised_by: stamp, raised_email: me.email.toLowerCase(), for_self: forSelf, form, updated_at: now,
+        raised_by: stamp, raised_email: raisedEmail, for_self: forSelf, form, updated_at: now,
       });
       if (error) {
         if (/hrms_query|schema cache|does not exist/i.test(error.message)) throw new HttpError(503, "Run migration 0065 first — a query has nowhere to live yet.");
@@ -127,6 +133,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, subject });
     }
 
+    if (!me) throw new HttpError(401, "Sign in for that.");
+    const stamp = me.initials ? `${me.initials} · ${me.email}` : me.email;
     const id = String(body.id || "");
     if (!id) throw new HttpError(400, "id required");
     const { data: row } = await admin.from("hrms_query").select("id, thread, raised_email, employee_id").eq("id", id).maybeSingle();

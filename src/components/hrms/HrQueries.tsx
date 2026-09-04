@@ -33,6 +33,7 @@ const emptyForm = (): HrQueryForm => ({ ticks: {}, other: {}, text: {}, contact:
 export default function HrQueries({ who: me, standalone }: { who: string; standalone?: boolean }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [hr, setHr] = useState(false);
+  const [anon, setAnon] = useState(false);
   const [mine, setMine] = useState<Contact | null>(null);
   const [needs, setNeeds] = useState(false);
   const [msg, setMsg] = useState("");
@@ -41,7 +42,7 @@ export default function HrQueries({ who: me, standalone }: { who: string; standa
   const [open, setOpen] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    try { const j = await api.get("/api/hrms/hr-query"); setRows(j.rows || []); setHr(!!j.hr); setMine(j.me || null); setNeeds(!!j.needsMigration); }
+    try { const j = await api.get("/api/hrms/hr-query"); setRows(j.rows || []); setHr(!!j.hr); setAnon(!!j.anon); setMine(j.me || null); setNeeds(!!j.needsMigration); }
     catch (e) { setMsg(e instanceof Error ? e.message : String(e)); setRows([]); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -62,14 +63,15 @@ export default function HrQueries({ who: me, standalone }: { who: string; standa
           <div className="text-xs mt-1" style={{ color: C.faint, lineHeight: 1.6, maxWidth: 760 }}>{INTRO_HI}</div>
           <div className="flex gap-2 mt-3 flex-wrap">
             <button onClick={() => setMode("self")} className="rounded px-4 py-2.5 font-bold" style={{ background: C.orange, color: "#fff", fontSize: 14 }}>🙋 HR query for myself</button>
-            {hr && <button onClick={() => setMode("other")} className="rounded px-4 py-2.5 font-bold" style={{ background: "#1B3A5C", color: "#fff", fontSize: 14 }}>👥 HR query for others</button>}
+            {hr && !standalone && <button onClick={() => setMode("other")} className="rounded px-4 py-2.5 font-bold" style={{ background: "#1B3A5C", color: "#fff", fontSize: 14 }}>👥 HR query for others</button>}
           </div>
-          {!hr && <div className="text-xs mt-2" style={{ color: C.faint }}>Raising for somebody else is HR&apos;s — this button shows for HRMS logins.</div>}
+          {anon && <div className="text-xs mt-2" style={{ color: C.faint }}>No login needed. Fill the contact block at the end so HR knows who to answer.</div>}
         </div>
       )}
       {mode && <QueryForm mode={mode} mine={mine} onClose={() => setMode("")} onDone={(s) => { setMode(""); setMsg(`Sent to HR ✓ — ${s}`); load(); }} />}
 
-      {/* the queries */}
+      {/* the queries — one's own need a login */}
+      {!anon && <>
       <div className="flex gap-1.5 mb-2 no-print flex-wrap items-center">
         <span className="text-xs font-bold" style={{ color: C.faint }}>{hr ? "ALL QUERIES" : "MY QUERIES"}</span>
         {(["open", "answered"] as const).map((t) => (
@@ -81,6 +83,8 @@ export default function HrQueries({ who: me, standalone }: { who: string; standa
       {rows === null ? <div className="text-sm py-6 text-center" style={{ color: C.faint }}>loading…</div>
         : !shown.length ? <div className="bg-white rounded-lg border p-4 text-xs" style={{ borderColor: C.line, color: C.dim }}>{tab === "open" ? "Nothing open." : "Nothing answered yet."}</div>
         : shown.map((r) => <QueryCard key={r.id} r={r} hr={hr} expanded={open === r.id} onToggle={() => setOpen(open === r.id ? null : r.id)} onChanged={load} />)}
+      </>}
+      {anon && <div className="text-xs" style={{ color: C.faint }}>Sign in to Genie to see your earlier queries and HR&apos;s answers.</div>}
     </>
   );
 
