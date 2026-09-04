@@ -48,7 +48,8 @@ export default function Handbook({ who: me, standalone }: { who: string; standal
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { try { const h = window.location.hash.replace("#", ""); if (h) setCur(h); } catch { /* */ } }, []);
+  useEffect(() => { if (!standalone) return; try { const h = window.location.hash.replace("#", ""); if (h) setCur(h); } catch { /* */ } }, [standalone]);
+  const goTo = (slug: string) => { setCur(slug); setEdit(false); if (standalone) { try { window.location.hash = slug; } catch { /* */ } } try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* */ } };
 
   const act = async (body: Record<string, unknown>, ok: string) => {
     setBusy(true); setMsg("");
@@ -58,6 +59,16 @@ export default function Handbook({ who: me, standalone }: { who: string; standal
   };
 
   const sec = st?.sections.find((s) => s.slug === cur) || st?.sections[0] || null;
+  const idx = sec && st ? st.sections.findIndex((s) => s.slug === sec.slug) : -1;
+  const prev = idx > 0 && st ? st.sections[idx - 1] : null;
+  const next = st && idx >= 0 && idx < st.sections.length - 1 ? st.sections[idx + 1] : null;
+  const Nav = () => (
+    <div className="flex items-center gap-2 px-5 py-2" style={{ borderTop: `1px solid ${C.line}`, background: "#fff" }}>
+      {prev ? <button onClick={() => goTo(prev.slug)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#F4F2EC", color: "#1B3A5C" }}>← {prev.ord}. {prev.title}</button> : <span />}
+      <span style={{ flex: 1 }} />
+      {next ? <button onClick={() => goTo(next.slug)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#16232F", color: "#fff" }}>{next.ord}. {next.title} →</button> : <span className="text-xs" style={{ color: C.faint }}>end of the handbook</span>}
+    </div>
+  );
   const qs = useMemo(() => (st?.questions || []).filter((x) => x.section === sec?.slug), [st, sec]);
   const hits = useMemo(() => {
     const n = q.trim().toLowerCase(); if (!n || !st) return [];
@@ -82,7 +93,7 @@ export default function Handbook({ who: me, standalone }: { who: string; standal
             const n = (st?.questions || []).filter((x) => x.section === s.slug && (x.published || x.mine)).length;
             const on = sec?.slug === s.slug, hit = hits.includes(s.slug);
             return (
-              <button key={s.slug} onClick={() => { setCur(s.slug); setEdit(false); try { window.location.hash = s.slug; } catch { /* */ } }} className="block w-full text-left rounded px-2 py-1.5 text-xs"
+              <button key={s.slug} onClick={() => goTo(s.slug)} className="block w-full text-left rounded px-2 py-1.5 text-xs"
                 style={{ background: on ? "#16232F" : hit ? "#FFF3E8" : "transparent", color: on ? "#fff" : C.ink, fontWeight: on || hit ? 700 : 500, opacity: s.published ? 1 : 0.55 }}>
                 <span style={{ color: on ? "#8FA1B3" : C.faint, marginRight: 6 }}>{s.ord}</span>{s.title}{!s.published && <span className="ml-1" style={{ fontSize: 9, color: on ? "#F5B32B" : "#8A5B00" }}>draft</span>}{n > 0 && <span className="ml-1 rounded px-1" style={{ fontSize: 9, background: on ? "rgba(255,255,255,0.15)" : "#F4F2EC", color: on ? "#fff" : C.faint }}>{n} Q</span>}
               </button>
@@ -98,7 +109,9 @@ export default function Handbook({ who: me, standalone }: { who: string; standal
             <div className="bg-white rounded-lg border" style={{ borderColor: C.line }}>
               <div className="px-5 pt-4 pb-3" style={{ borderBottom: `1px solid ${C.line}` }}>
                 <div className="flex items-baseline gap-2 flex-wrap">
-                  <div className="text-xs font-bold" style={{ color: C.faint }}>SECTION {sec.ord}</div>
+                  <div className="text-xs font-bold" style={{ color: C.faint }}>SECTION {sec.ord} OF {st?.sections.length}</div>
+                  {prev && <button onClick={() => goTo(prev.slug)} className="text-xs font-semibold" style={{ color: "#1B3A5C" }} title={prev.title}>← back</button>}
+                  {next && <button onClick={() => goTo(next.slug)} className="text-xs font-semibold" style={{ color: "#1B3A5C" }} title={next.title}>next →</button>}
                   <span style={{ flex: 1 }} />
                   <span className="text-xs" style={{ color: C.faint }}>v{sec.version}{sec.updated_by && sec.updated_by !== "system" ? ` · ${who(sec.updated_by)} · ${fmtFull(String(sec.updated_at))}` : ""}</span>
                   {st?.hr && <button onClick={() => setEdit((v) => !v)} className="text-xs font-bold rounded px-2.5 py-1" style={{ background: edit ? "#fff" : C.orange, color: edit ? C.dim : "#fff", border: `1px solid ${edit ? C.line : C.orange}` }}>{edit ? "✕ Close editor" : "✎ Edit"}</button>}
@@ -113,6 +126,7 @@ export default function Handbook({ who: me, standalone }: { who: string; standal
                 )}
               </div>
               {!edit && <div className="hb px-5 py-3"><RichTextView html={sec.body} /></div>}
+              {!edit && <Nav />}
 
               {/* ── questions under the section ── */}
               <div className="px-5 py-4" style={{ background: "#FBFAF7", borderTop: `1px solid ${C.line}` }}>
