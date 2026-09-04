@@ -106,29 +106,12 @@ export async function GET(req: Request) {
       const phone = String(rec?.value.phone || "").replace(/\D/g, "");
       if (!phone) return NextResponse.json({ messages: [], why: "No personal mobile on the record." });
       const { crmDb } = await import("@/crm/db");
-      const { periskopeConfig, chatId } = await import("@/crm/periskope");
+      const { periskopeConfig, periskopeMessages } = await import("@/crm/periskope");
       const cfg = await periskopeConfig(crmDb());
       if ("error" in cfg) return NextResponse.json({ messages: [], why: cfg.error, phone });
       const full = phone.length <= 10 ? `91${phone}` : phone;
-      const H = { authorization: `Bearer ${cfg.apiKey}`, "x-phone": cfg.phone };
-      const tries = [`${cfg.base}/messages?chat_id=${encodeURIComponent(chatId(full))}&limit=200`, `${cfg.base}/message?chat_id=${encodeURIComponent(chatId(full))}&limit=200`];
-      let why = "";
-      for (const u of tries) {
-        try {
-          const res = await fetch(u, { headers: H });
-          const j = await res.json().catch(() => null) as unknown;
-          if (!res.ok) { why = `Periskope answered ${res.status}${j && typeof j === "object" && "message" in j ? `: ${(j as { message: string }).message}` : ""}`; continue; }
-          const list = Array.isArray(j) ? j : (j && typeof j === "object" && ("data" in j || "messages" in j)) ? ((j as { data?: unknown[]; messages?: unknown[] }).data || (j as { messages?: unknown[] }).messages || []) : [];
-          const messages = (list as Record<string, unknown>[]).map((m) => ({
-            at: String(m.timestamp || m.created_at || m.sent_at || ""),
-            from_me: !!(m.from_me ?? m.fromMe ?? (m.direction === "outbound")),
-            text: String(m.body || m.message || m.text || ""),
-            status: m.status ? String(m.status) : null,
-          })).filter((m) => m.text);
-          return NextResponse.json({ messages, phone: full });
-        } catch (e) { why = e instanceof Error ? e.message : String(e); }
-      }
-      return NextResponse.json({ messages: [], why: why || "Periskope did not answer.", phone: full });
+      const got = await periskopeMessages(cfg, full);
+      return NextResponse.json({ messages: got.messages, why: got.error, phone: full });
     }
 
     const [{ data: comms }, { data: loans }, rec] = await Promise.all([

@@ -120,6 +120,37 @@ export async function throttleState(db: SupabaseClient, cfg: PeriskopeCfg): Prom
 /** A phone as Periskope wants it for a one-to-one chat. */
 export const chatId = (phone: string) => `${String(phone).replace(/\D/g, "")}@c.us`;
 
+export interface WaMessage { at: string; from_me: boolean; text: string; status: string | null; id: string }
+
+/**
+ * The WhatsApp thread with one number, newest first — what HRMS reads when
+ * F&F asks to "pull all communication with HR" (4 Sep 2026). Periskope's
+ * route is GET /chats/{chat_id}/messages; the two guessed paths before it
+ * answered "Invalid route". ack: 1 sent · 2 delivered · 3 read.
+ */
+export async function periskopeMessages(cfg: PeriskopeCfg, phone: string, limit = 200): Promise<{ messages: WaMessage[]; error?: string }> {
+  const digits = String(phone).replace(/\D/g, "");
+  const full = digits.length <= 10 ? `91${digits}` : digits;
+  try {
+    const r = await fetch(`${cfg.base}/chats/${encodeURIComponent(chatId(full))}/messages?limit=${limit}`, {
+      headers: { authorization: `Bearer ${cfg.apiKey}`, "x-phone": cfg.phone },
+    });
+    const j = await r.json().catch(() => null) as { messages?: Record<string, unknown>[]; message?: string } | null;
+    if (!r.ok) return { messages: [], error: `Periskope answered ${r.status}${j?.message ? `: ${j.message}` : ""}` };
+    const ACK: Record<string, string> = { "0": "pending", "1": "sent", "2": "delivered", "3": "read", "4": "played" };
+    const messages = (j?.messages || []).map((m) => ({
+      id: String(m.message_id || m.id || ""),
+      at: String(m.timestamp || ""),
+      from_me: !!m.from_me,
+      text: String(m.body || (m.has_media ? `[${String(m.message_type || "media")}]` : "")),
+      status: m.ack != null ? ACK[String(m.ack)] || String(m.ack) : null,
+    })).filter((m) => m.text);
+    return { messages };
+  } catch (e) {
+    return { messages: [], error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export interface SendResult { ok: boolean; uniqueId?: string; error?: string }
 
 /** Hand one message to Periskope. Their "queued" means accepted, not arrived. */

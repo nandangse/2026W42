@@ -75,6 +75,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.4.2",
+    date: "2026-09-04",
+    module: "HRMS — the WhatsApp thread really pulls",
+    items: [
+      "\"does the periskope integration work for HRMS?\" (Dr Raghu, 4 Sep 2026). It was wired but not working: F&F asked Periskope for a number's messages on two routes that answer \"Invalid route\". Periskope's real one is /chats/{number}/messages; the pull now uses it, newest first, with read/delivered/sent against each line. Tested against the connected number.",
+      "The reader lives in the CRM's Periskope helper, so the record's Communication tab can use the same one next.",
+    ],
+  },
+  {
     v: "4.4.4.1",
     date: "2026-09-04",
     module: "HRMS — HR Queries, the form",
