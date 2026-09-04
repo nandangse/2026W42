@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 import { MONTHS } from "@/lib/hrms-template";
-import type { MusterRow, RegisterRow } from "@/lib/muster";
+import { PAYROLL_RULES, type MusterRow, type RegisterRow } from "@/lib/muster";
 import { C } from "./RecordFields";
 
 interface Run { id: string; month: number; year: number; status: string; uploaded_by: string | null; uploaded_at: string | null; approved_by: string | null; approved_at: string | null; run_note: string | null; generated_at: string | null; generated_by: string | null; wa_batch_id: string | null; drive_folder_link: string | null; total_count: number | null; net_payable: number | null; earned_pay: number | null; deductions: number | null; mapping: { warnings?: string[] } | null }
@@ -140,11 +140,14 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
       </div>
 
       {tab === "overview" && (
-        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+        <div className="flex gap-3 items-start" style={{ flexWrap: "wrap" }}>
+        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", flex: "1 1 520px" }}>
           <Card title="Uploads">{d.files.length ? <>{d.files.length} file{d.files.length === 1 ? "" : "s"} · muster {d.muster ? "✓" : "—"} · rate list {d.rates ? "✓" : "—"}</> : "Nothing uploaded yet."}{r.drive_folder_link && <div className="mt-1"><a href={r.drive_folder_link} target="_blank" rel="noreferrer" style={{ color: "#1B3A5C" }}>Drive folder ↗</a></div>}</Card>
           <Card title="Generated">{r.generated_at ? <>{d.register.length} lines · earned ₹{inr(r.earned_pay)} · deductions ₹{inr(r.deductions)} · net ₹{inr(r.net_payable)}</> : "Not generated yet — upload the muster and press Generate on the Uploads tab."}</Card>
           <Card title="WhatsApp">{d.messages.length ? Object.entries(d.counts).map(([k, v]) => <span key={k} className="mr-2" style={{ color: tone(k) }}><b>{v}</b> {k}</span>) : "No message sent from this run yet."}</Card>
           {(r.mapping?.warnings || []).length > 0 && <Card title="Warnings"><ul className="text-xs" style={{ color: "#8A5B00", paddingLeft: 16 }}>{(r.mapping?.warnings || []).map((w, i) => <li key={i}>{w}</li>)}</ul></Card>}
+        </div>
+        <Rules />
         </div>
       )}
 
@@ -213,7 +216,8 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
 
       {tab === "register" && (
         !d.register.length ? <div className="text-xs" style={{ color: C.faint }}>Not generated yet — Uploads → Generate.</div> : (
-          <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflow: "auto", maxHeight: "calc(100vh - 300px)" }}>
+          <div className="flex gap-3 items-start" style={{ flexWrap: "wrap" }}>
+          <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflow: "auto", maxHeight: "calc(100vh - 300px)", flex: "1 1 700px", minWidth: 0 }}>
             <table style={{ fontSize: 12, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
               <thead><tr style={{ color: C.faint, fontSize: 10 }}>
                 {["Emp", "Name", "Type", "Due", "Leave OB", "Earned lv", "Comp off", "Lv used", "Encashed", "Leave CB", "Paid days", "Per day", "Basic & DA", "HRA", "Fixed", "Conv", "Medical", "OT pay", "Site", "Comp off ₹", "Encash ₹", "Arrears", "Earned", "PF", "PT", "Loan", "Advance", "TDS", "Lunch", "Late", "Other", "Deductions", "Net", "To pay", "Rate from"].map((h, i) => (
@@ -245,6 +249,8 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
               </tr></tfoot>
             </table>
           </div>
+          <Rules />
+          </div>
         )
       )}
 
@@ -273,6 +279,24 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/** The rules Generate runs on, beside the numbers — "in the right side show the rules we are using" (Dr Raghu, 4 Sep 2026). */
+function Rules() {
+  return (
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line, flex: "0 0 300px", position: "sticky", top: 8, maxHeight: "calc(100vh - 120px)", overflowY: "auto" }}>
+      <div className="text-xs font-bold mb-1" style={{ color: C.faint, letterSpacing: 0.5 }}>THE RULES WE ARE USING</div>
+      <div className="text-xs mb-2" style={{ color: C.faint }}>What Generate does with the muster and the rate list. As given on 4 Sep 2026.</div>
+      {PAYROLL_RULES.map((g) => (
+        <div key={g.head} className="mb-2">
+          <div className="text-xs font-bold" style={{ color: "#16232F" }}>{g.head}</div>
+          <ul style={{ paddingLeft: 14, margin: "2px 0" }}>
+            {g.lines.map((l, i) => <li key={i} className="text-xs" style={{ color: C.dim, lineHeight: 1.5, marginBottom: 2 }}>{l}</li>)}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }
