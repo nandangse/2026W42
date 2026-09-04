@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.4.4",
+    date: "2026-09-04",
+    module: "HRMS — the payroll run is a document; the queue drains itself",
+    items: [
+      "\"On creating a new payroll run a new document will open up: Month Year in bold, run by, run date. Upload Documents, multiple, saved in the Drive folder HR-Payroll run-Month Year: the Muster, the salary rate list. Press Generate. Salary register. Attendance muster. Then send messages to people.\" (Dr Raghu, 4 Sep 2026). Run Monthly Payroll opens each run as that document. Uploads are read the moment they land \u2014 the muster's day columns, its totals and its money lines by their own headers, typos and all \u2014 and filed in Drive. Generate makes the register: rate \u00d7 payable days \u00f7 days in the month, component by component, PF and PT by the rules, the muster's advance, loan, TDS and arrears riding through. Migration 0133.",
+      "SEND WHATSAPP MESSAGE, at the top of the run: the attendance message for everybody on the muster, to the muster's own mobile number, previewed five at a time, then queued. The template is the one HR was pasting by hand in the sheet, with Genie's own query form in place of the Google Form \u2014 Masters \u2192 Standard Texts \u2192 Attendance of the month (WhatsApp). His to reword.",
+      "\"This message is to be kept in the communications tab which will be in the side as well as with each employee and also with the payroll runs. Any replies given by them is to be also pulled and kept.\" Communications is a screen in the menu; every line sits there, on the person's record, and on the run. Pull replies on a run asks Periskope for what each number answered after the message went and keeps it once.",
+      "\"send 10, 20, 30, 40, 50 progressively every hour onwards.\" A cron every ten minutes drains the HRMS queue on a warm-up: 10 in the first hour messages go out, 20 in the second, up to 50 an hour from the fifth \u2014 never above the Periskope card's own per-hour ceiling, and always the set gap apart. The Send button uses the same rule.",
+    ],
+  },
+  {
     v: "4.4.4.3",
     date: "2026-09-04",
     module: "HRMS — WhatsApp to everybody through the queue; the payroll runs table",

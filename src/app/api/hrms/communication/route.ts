@@ -49,11 +49,24 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export async function GET(req: Request) {
   try {
     await requireHrms();
-    const id = new URL(req.url).searchParams.get("id");
-    if (!id) throw new HttpError(400, "id required");
-    const { data, error } = await adminClient().from("hrms_communication")
-      .select("id, channel, to_address, subject, body, template_key, status, error, sent_by, sent_at")
-      .eq("employee_id", id).order("sent_at", { ascending: false }).limit(200);
+    const u = new URL(req.url);
+    const id = u.searchParams.get("id");
+    const all = !!u.searchParams.get("all");
+    if (!id && !all) throw new HttpError(400, "id required");
+    let q = adminClient().from("hrms_communication")
+      .select("id, employee_id, channel, direction, to_address, subject, body, template_key, status, error, sent_by, sent_at, run_id")
+      .order("sent_at", { ascending: false }).limit(all ? 2000 : 200);
+    if (id) q = q.eq("employee_id", id);
+    const first = await q;
+    let data = first.data as Record<string, unknown>[] | null;
+    let error = first.error;
+    if (error && /direction|run_id/i.test(error.message)) {
+      // pre-0133
+      let q2 = adminClient().from("hrms_communication").select("id, employee_id, channel, to_address, subject, body, template_key, status, error, sent_by, sent_at").order("sent_at", { ascending: false }).limit(all ? 2000 : 200);
+      if (id) q2 = q2.eq("employee_id", id);
+      const second = await q2;
+      data = second.data as Record<string, unknown>[] | null; error = second.error;
+    }
     if (error) {
       if (/hrms_communication|schema cache|does not exist/i.test(error.message))
         return NextResponse.json({ rows: [], needsMigration: true });
@@ -72,6 +85,26 @@ export async function GET(req: Request) {
         const q = live.get(qidOf.get(String(r.id)) || "");
         if (q) { r.status = q.status; if (q.error) r.error = q.error; }
       }
+    }
+    if (all) {
+      // names and run labels, so the side screen reads as people and months
+      const admin = adminClient();
+      const { hrmsTables } = await import("@/lib/hrms");
+      const T = await hrmsTables(admin);
+      const ids = [...new Set(rows.map((r) => String(r.employee_id || "")).filter(Boolean))];
+      const names = new Map<string, string>();
+      for (let i = 0; i < ids.length; i += 200) {
+        const { data: emps } = await admin.from(T.employees).select("id, name").in("id", ids.slice(i, i + 200));
+        for (const e of emps || []) names.set(String(e.id), String(e.name));
+      }
+      const runIds = [...new Set(rows.map((r) => String(r.run_id || "")).filter(Boolean))];
+      const runs = new Map<string, string>();
+      if (runIds.length) {
+        const { data: rs } = await admin.from("hrms_salary_sheet").select("id, month, year").in("id", runIds);
+        const { MONTHS } = await import("@/lib/hrms-template");
+        for (const r of rs || []) runs.set(String(r.id), `${MONTHS[Number(r.month) - 1]} ${r.year}`);
+      }
+      for (const r of rows) { r.name = names.get(String(r.employee_id)) || r.employee_id; r.run_label = r.run_id ? runs.get(String(r.run_id)) || null : null; r.direction = r.direction || "out"; }
     }
     return NextResponse.json({ rows });
   } catch (e) { return errJson(e); }

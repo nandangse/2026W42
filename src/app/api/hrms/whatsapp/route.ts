@@ -3,7 +3,7 @@ import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { people, sheetFor, renderFor, queueMessages, type Person } from "@/lib/hrms-wa";
 import { crmDb } from "@/crm/db";
-import { periskopeConfig, throttleState, periskopeSend, periskopeStatus } from "@/crm/periskope";
+import { periskopeConfig, throttleState, periskopeStatus } from "@/crm/periskope";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -99,36 +99,9 @@ export async function POST(req: Request) {
     }
 
     if (action === "send") {
-      const crm = crmDb();
-      const cfg = await periskopeConfig(crm);
-      if ("error" in cfg) throw new HttpError(400, cfg.error);
-      const n = Math.max(1, Math.min(25, Number(body.n) || 10));
-      const { data: rows } = await crm.from("wa_queue").select("id, phone, body, ref").eq("source", "hrms").eq("status", "queued").order("queued_at", { ascending: true }).limit(n);
-      const results: { id: string; ref: string; ok: boolean; error?: string }[] = [];
-      let stopped: string | null = null;
-      for (const row of rows || []) {
-        const t = await throttleState(crm, cfg);
-        if (t.blocked) {
-          if (t.waitSeconds && t.waitSeconds <= 30) { await new Promise((r) => setTimeout(r, (t.waitSeconds + 1) * 1000)); }
-          else { stopped = t.blocked; break; }
-        }
-        const { data: claimed } = await crm.from("wa_queue").update({ status: "sending" }).eq("id", row.id).eq("status", "queued").select("id").maybeSingle();
-        if (!claimed) continue;
-        const res = await periskopeSend(cfg, String(row.phone), String(row.body));
-        if (!res.ok) {
-          await crm.from("wa_queue").update({ status: "failed", error: String(res.error || "").slice(0, 500) }).eq("id", row.id);
-          results.push({ id: String(row.id), ref: String(row.ref || ""), ok: false, error: res.error });
-        } else {
-          await crm.from("wa_queue").update({ status: "sent", external_id: res.uniqueId ?? null, sent_at: new Date().toISOString(), error: "" }).eq("id", row.id);
-          results.push({ id: String(row.id), ref: String(row.ref || ""), ok: true });
-        }
-        // mirror on the record
-        try {
-          await admin.from("hrms_communication").update({ status: res.ok ? "sent" : "failed", error: res.ok ? null : String(res.error || "").slice(0, 500) }).eq("channel", "whatsapp").contains("meta", { queue_id: String(row.id) });
-        } catch { /* best effort */ }
-      }
-      const after = await throttleState(crm, cfg);
-      return NextResponse.json({ ok: true, sent: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok).length, stopped, throttle: after, results });
+      const { drainHrmsQueue } = await import("@/lib/hrms-wa");
+      const r = await drainHrmsQueue(admin, { n: Math.max(1, Math.min(25, Number(body.n) || 10)) });
+      return NextResponse.json({ ok: true, ...r });
     }
 
     if (action === "check") {

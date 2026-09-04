@@ -13,6 +13,7 @@ import { fmtFull } from "@/lib/schedule";
 import { MONTHS } from "@/lib/hrms-template";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
+import PayrollRun from "./PayrollRun";
 
 interface Run { id: string; month: number; year: number; status: string; file_name: string | null; uploaded_by: string | null; uploaded_at: string | null; frozen_by: string | null; frozen_at: string | null; approved_by: string | null; approved_at: string | null; run_note: string | null; total_count: number | null; total_salary: number | null; net_payable: number | null; paid_to_bank: number | null; created_at: string }
 
@@ -24,6 +25,7 @@ export default function Payroll({ who: me, isOwner }: { who: string; isOwner: bo
   const [needs, setNeeds] = useState(false);
   const [msg, setMsg] = useState("");
   const [adding, setAdding] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
   const now = new Date();
   const [nf, setNf] = useState({ month: String(now.getMonth() + 1), year: String(now.getFullYear()), note: "" });
 
@@ -39,10 +41,18 @@ export default function Payroll({ who: me, isOwner }: { who: string; isOwner: bo
     catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   };
 
+  if (openId) {
+    return (
+      <Pane title="Run Monthly Payroll" who={me} blurb="The run as a document: uploads, the attendance muster, the salary register, and every message sent from it.">
+        <PayrollRun id={openId} isOwner={isOwner} onBack={() => { setOpenId(null); load(); }} />
+      </Pane>
+    );
+  }
+
   return (
     <Pane title="Run Monthly Payroll" who={me} print
       blurb="Every month's run on one table: when it was run and by whom, whether the sheet is frozen, and Raghu's approval against it. The sheet itself is under Finalized Salary Sheets."
-      tools={<button onClick={() => setAdding((v) => !v)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: C.orange, color: "#fff" }}>{adding ? "✕ Cancel" : "+ Record a run"}</button>}>
+      tools={<button onClick={() => setAdding((v) => !v)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: C.orange, color: "#fff" }}>{adding ? "✕ Cancel" : "+ New payroll run"}</button>}>
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</div>}
       {needs && <div className="rounded p-2 mb-2" style={{ background: "#FFF7E6", border: "1px solid #F5D9A8", fontSize: 12.5, color: "#8A5B00" }}>Run migration 0132 — approval has nowhere to be kept yet.</div>}
 
@@ -59,7 +69,11 @@ export default function Payroll({ who: me, isOwner }: { who: string; isOwner: bo
           <label className="text-xs" style={{ color: C.dim, flex: 1, minWidth: 200 }}>Note
             <input value={nf.note} onChange={(e) => setNf({ ...nf, note: e.target.value })} placeholder="e.g. run on Tally, sheet to follow" className="block w-full rounded px-2 py-1.5 mt-0.5" style={{ border: `1px solid ${C.line}`, fontSize: 13 }} />
           </label>
-          <button onClick={async () => { await act({ action: "record", month: Number(nf.month), year: Number(nf.year), note: nf.note }, "Run recorded"); setAdding(false); }} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: C.green, color: "#fff" }}>Record</button>
+          <button onClick={async () => {
+            setMsg("");
+            try { const j = await api.post("/api/hrms/payroll", { action: "record", month: Number(nf.month), year: Number(nf.year), note: nf.note }); setAdding(false); await load(); if (j.id) setOpenId(String(j.id)); }
+            catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+          }} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: C.green, color: "#fff" }}>Create & open</button>
         </div>
       )}
 
@@ -75,7 +89,7 @@ export default function Payroll({ who: me, isOwner }: { who: string; isOwner: bo
             {rows?.length === 0 && <tr><td colSpan={10} className="px-2 py-4" style={{ color: C.faint }}>No runs yet — upload a sheet under Finalized Salary Sheets, or record one here.</td></tr>}
             {rows?.map((r) => (
               <tr key={r.id} style={{ borderTop: "1px solid #EEECE6" }}>
-                <td className="px-2 py-1.5 font-semibold">{MONTHS[r.month - 1]}</td>
+                <td className="px-2 py-1.5 font-semibold"><button onClick={() => setOpenId(r.id)} style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2 }} title="Open the run">{MONTHS[r.month - 1]}</button></td>
                 <td className="px-2 py-1.5">{r.year}</td>
                 <td className="px-2 py-1.5">{r.uploaded_at ? fmtFull(String(r.uploaded_at)) : fmtFull(String(r.created_at))}</td>
                 <td className="px-2 py-1.5">{who(r.uploaded_by)}</td>
@@ -87,7 +101,8 @@ export default function Payroll({ who: me, isOwner }: { who: string; isOwner: bo
                 <td className="px-2 py-1.5 text-right tnum">{lakh(r.net_payable)}</td>
                 <td className="px-2 py-1.5">{r.approved_by ? <span className="font-bold" style={{ color: C.green }}>✓ {who(r.approved_by)}</span> : <span style={{ color: "#8A5B00" }}>awaiting Raghu</span>}</td>
                 <td className="px-2 py-1.5" style={{ color: C.faint }}>{r.approved_at ? fmtFull(String(r.approved_at)) : "—"}</td>
-                <td className="px-2 py-1.5 text-right">
+                <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                  <button onClick={() => setOpenId(r.id)} className="text-xs font-semibold rounded border px-2 py-0.5 bg-white mr-1" style={{ borderColor: C.line, color: "#1B3A5C" }}>open</button>
                   {isOwner && (r.approved_by
                     ? <button onClick={() => act({ action: "unapprove", id: r.id }, "Approval withdrawn")} className="text-xs font-semibold rounded border px-2 py-0.5 bg-white" style={{ borderColor: C.line, color: C.dim }}>withdraw</button>
                     : <button onClick={() => { if (window.confirm(`Approve the ${MONTHS[r.month - 1]} ${r.year} payroll run?`)) act({ action: "approve", id: r.id }, `${MONTHS[r.month - 1]} ${r.year} approved`); }} className="text-xs font-bold rounded px-2.5 py-1" style={{ background: C.green, color: "#fff" }}>✓ Approve</button>)}

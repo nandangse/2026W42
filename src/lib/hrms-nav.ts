@@ -156,6 +156,14 @@ export const NAV: NavSection[] = [
     source: "HR Queries (tab 48) in the Main Salary Sheet. Answered ones become Policy → HR Queries Solved.",
   },
   {
+    key: "communications",
+    label: "Communications",
+    icon: "📨",
+    blurb: "Everything HRMS has sent and everything that came back — e-mail and WhatsApp out, WhatsApp replies in — by person and by payroll run.",
+    built: true,
+    source: "New. The same lines sit on each record's Communication tab and on each payroll run.",
+  },
+  {
     key: "whatsapp",
     label: "WhatsApp — send to all",
     icon: "💬",
