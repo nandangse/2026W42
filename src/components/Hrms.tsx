@@ -48,6 +48,7 @@ import WhatsAppBroadcast from "./hrms/WhatsAppBroadcast";
 import Payroll from "./hrms/Payroll";
 import Communications from "./hrms/Communications";
 import Handbook from "./hrms/Handbook";
+import SalaryRates from "./hrms/SalaryRates";
 
 export default function Hrms({
   email, initials, displayName, role, isOwner,
@@ -280,6 +281,8 @@ export default function Hrms({
           <RolesRegister who={who} isOwner={isOwner} />
         ) : nav.key === "masters" ? (
           <ModuleMasters who={who} />
+        ) : nav.key === "master.rates" ? (
+          <SalaryRates who={who} isOwner={isOwner} />
         ) : nav.key.startsWith("master.") ? (
           <EmployeeMaster
             view={nav.key.split(".")[1] as MasterView}

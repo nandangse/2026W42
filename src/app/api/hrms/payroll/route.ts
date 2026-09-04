@@ -205,7 +205,15 @@ export async function POST(req: Request) {
       const r = await runRow(admin, id);
       const muster = r.muster as Muster | null;
       if (!muster?.rows?.length) throw new HttpError(400, "Upload the muster first — there is nothing to generate from.");
-      const rates = (r.rates as Rates | null) || null;
+      let rates = (r.rates as Rates | null) || null;
+      // no rate list uploaded → the Live salary structure (HRIS → Salary Rate List) is the rate list
+      if (!rates || !rates.rows?.length) {
+        const { data: live } = await admin.from("hrms_salary_structure").select("id, title").eq("status", "Live").maybeSingle();
+        if (live) {
+          const { data: lr } = await admin.from("hrms_salary_rate").select("employee_id, name, type, basic_da, hra, fixed_allowance, conveyance, medical_allowance, gross, per_day").eq("structure_id", live.id);
+          rates = { rows: (lr || []).map((x) => ({ employee_id: String(x.employee_id), name: x.name, type: x.type, gross: Number(x.gross), basic_da: Number(x.basic_da), hra: Number(x.hra), fixed: Number(x.fixed_allowance), conveyance: Number(x.conveyance), medical: Number(x.medical_allowance), site: null, per_day: Number(x.per_day) })), columns: { source: String(live.title) }, warnings: [] };
+        }
+      }
       const month = Number(r.month), year = Number(r.year);
       const ppl = await people(admin, muster.rows.map((m) => m.employee_id));
       const byId = new Map(ppl.map((p) => [p.id, p]));

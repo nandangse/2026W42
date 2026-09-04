@@ -66,6 +66,12 @@ export const NAV: NavSection[] = [
         blurb: "No longer on the roll. Kept, never deleted.",
         built: true,
       },
+      {
+        key: "master.rates",
+        label: "Salary Rate List",
+        blurb: "Dated sheets of rates for the whole roll — Salary Structure 2025-06 (Overwritten), 2026-09 (Live). The payroll run reads the Live one.",
+        built: true,
+      },
     ],
   },
   {
