@@ -75,6 +75,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "4.4.4.3",
+    date: "2026-09-04",
+    module: "HRMS — WhatsApp to everybody through the queue; the payroll runs table",
+    items: [
+      "\"Add the queue called WhatsApp and let it send from there. Any WhatsApp sending will happen through Periskope for now ... there's a default number. Let it go with that.\" (Dr Raghu, 4 Sep 2026). HRMS sends WhatsApp through the CRM's queue and nothing else: a message is personalised per person, parked with source hrms and the employee id, and released from the queue within Periskope's ceilings on the default number. CRM migration 0054.",
+      "\"send one message to everybody with a template ... I would like to send the attendance of this month to them. Set up the piping.\" HRMS \u2192 WhatsApp \u2014 send to all: pick a template, the month whose salary sheet fills {{month}}, {{attendance_days}}, {{paid_days}}, {{gross}} and {{net_pay}}, tick the types, Preview five as they will read, Queue, then Send ten at a time and Check delivery. A SYSTEM template, Attendance of the month (WhatsApp), is seeded to show the shape \u2014 the words are his to replace. Migration 0132.",
+      "The record's Communication tab has a WhatsApp channel beside e-mail: it queues to the personal mobile and shows the queue's own word \u2014 queued, sent, delivered, failed \u2014 against the line.",
+      "\"make a table of the payroll: Month, Year, Date run, run by, approved by. Approval is by Raghu.\" Run Monthly Payroll is that table \u2014 the month's salary sheet is the run \u2014 with Approve for the owner alone, and a way to record a month before its sheet arrives.",
+    ],
+  },
+  {
     v: "4.4.4.2",
     date: "2026-09-04",
     module: "HRMS — the WhatsApp thread really pulls",

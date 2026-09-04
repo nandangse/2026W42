@@ -27,7 +27,7 @@ interface Text { key: string; title: string; body: string; note: string | null; 
 /** The covering note is plain text — it becomes the body of a mail, not a page. E-mail templates are the same. */
 const PLAIN = new Set(["offer_covering_letter"]);
 const BUILT_IN = new Set(["offer_covering_letter", "terms_of_engagement"]);
-const isPlain = (t: Text) => PLAIN.has(t.key) || t.kind === "email";
+const isPlain = (t: Text) => PLAIN.has(t.key) || t.kind === "email" || t.kind === "whatsapp";
 
 const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
 
@@ -60,7 +60,7 @@ export default function StandardTexts({ who }: { who: string }) {
     if (!key) { setMsg("The title needs a letter or two."); return; }
     if (rows?.some((r) => r.key === key)) { setMsg(`"${title}" is already here — open it below.`); return; }
     try {
-      const body = nf.kind === "email" ? `Dear {{first_name}},\n\n\n\nRaghu` : `<p>Dear {{name}},</p><p></p>`;
+      const body = nf.kind === "text" ? `<p>Dear {{name}},</p><p></p>` : nf.kind === "whatsapp" ? `Dear {{first_name}},\n\n\n\n- Nandan GSE HR` : `Dear {{first_name}},\n\n\n\nRaghu`;
       await api.post("/api/hrms/texts", { key, title, body, note: nf.note.trim() || null, kind: nf.kind, subject: nf.kind === "email" ? nf.subject.trim() : null });
       setMsg(`${title} added ✓ — write it below.`); setAdding(false); setNf({ title: "", kind: "email", subject: "", note: "" });
       await load(); setOpen(key);
@@ -104,6 +104,7 @@ export default function StandardTexts({ who }: { who: string }) {
                 <label className="text-xs" style={{ color: C.dim }}>Kind
                   <select value={nf.kind} onChange={(e) => setNf({ ...nf, kind: e.target.value })} className="w-full rounded px-2 py-1.5 mt-0.5 bg-white" style={{ border: `1px solid ${C.line}`, fontSize: 13 }}>
                     <option value="email">E-mail (plain, with a subject)</option>
+                    <option value="whatsapp">WhatsApp message (plain)</option>
                     <option value="text">Letter paragraph (rich text)</option>
                   </select>
                 </label>
@@ -129,7 +130,8 @@ export default function StandardTexts({ who }: { who: string }) {
                 <div className="flex items-baseline gap-2 flex-wrap">
                   <span className="font-bold" style={{ fontSize: 14 }}>{t.title}</span>
                   <span className="rounded px-1.5 py-0.5" style={{ fontSize: 10, background: "#F4F2EC", color: C.faint }}>v{t.version}</span>
-                  <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: t.kind === "email" ? "#DCE8F5" : "#FFF3E8", color: t.kind === "email" ? "#1B3A5C" : C.orange }}>{t.kind === "email" ? "✉ e-mail" : "¶ letter text"}</span>
+                  <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: t.kind === "email" ? "#DCE8F5" : t.kind === "whatsapp" ? "#E6F4EA" : "#FFF3E8", color: t.kind === "email" ? "#1B3A5C" : t.kind === "whatsapp" ? C.green : C.orange }}>{t.kind === "email" ? "✉ e-mail" : t.kind === "whatsapp" ? "💬 WhatsApp" : "¶ letter text"}</span>
+                  {t.updated_by === "system" && <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#F4F2EC", color: C.faint }} title="Seeded by Genie to show the shape — edit the words, keep the variables">SYSTEM</span>}
                   <div style={{ flex: 1 }} />
                   <span style={{ fontSize: 11, color: C.faint }}>
                     {t.updated_by ? `${String(t.updated_by).split("·")[0].trim()} · ${t.updated_at ? fmtFull(String(t.updated_at)) : ""}` : "not edited yet"}

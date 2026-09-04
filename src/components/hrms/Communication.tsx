@@ -27,6 +27,7 @@ export function Communication({ employeeId, name, personalEmail, workEmail }: {
   const [tpls, setTpls] = useState<Tpl[]>([]);
   const [tpl, setTpl] = useState("");
   const [to, setTo] = useState<"personal" | "work">(personalEmail ? "personal" : "work");
+  const [channel, setChannel] = useState<"email" | "whatsapp">("email");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [preview, setPreview] = useState<{ subject: string; body: string; to: string } | null>(null);
@@ -40,7 +41,7 @@ export function Communication({ employeeId, name, personalEmail, workEmail }: {
   }, [employeeId]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    api.get("/api/hrms/texts").then((j) => setTpls((j.texts || []).filter((t: Tpl) => t.kind === "email"))).catch(() => setTpls([]));
+    api.get("/api/hrms/texts").then((j) => setTpls((j.texts || []).filter((t: Tpl) => t.kind === "email" || t.kind === "whatsapp"))).catch(() => setTpls([]));
   }, []);
 
   const pick = (key: string) => {
@@ -63,13 +64,14 @@ export function Communication({ employeeId, name, personalEmail, workEmail }: {
 
   const send = async (logOnly: boolean) => {
     if (!body.trim()) { setMsg("Nothing to send."); return; }
-    if (!logOnly && !address) { setMsg(`No ${to} email on the record.`); return; }
-    if (!logOnly && !window.confirm(`Send this to ${name} at ${address}, from your Gmail?`)) return;
+    if (!logOnly && channel === "email" && !address) { setMsg(`No ${to} email on the record.`); return; }
+    if (!logOnly && channel === "email" && !window.confirm(`Send this to ${name} at ${address}, from your Gmail?`)) return;
+    if (!logOnly && channel === "whatsapp" && !window.confirm(`Queue this WhatsApp for ${name}?\n\nIt goes out from the WhatsApp queue (HRMS → WhatsApp — send to all → Send) through Periskope's default number.`)) return;
     setMsg(""); setBusy(true);
     try {
-      const j = await api.post("/api/hrms/communication", { employee_ids: [employeeId], subject, body, to, template_key: tpl || null, log_only: logOnly, channel: logOnly ? "note" : "email" });
+      const j = await api.post("/api/hrms/communication", { employee_ids: [employeeId], subject, body, to, template_key: tpl || null, log_only: logOnly, channel: logOnly ? "note" : channel });
       const r = (j.results || [])[0];
-      if (r?.ok) { setMsg(logOnly ? "Logged ✓" : `Sent to ${r.to} ✓`); setPreview(null); if (!logOnly) { setBody(""); setSubject(""); setTpl(""); } }
+      if (r?.ok) { setMsg(logOnly ? "Logged ✓" : channel === "whatsapp" ? `Queued for WhatsApp ✓ — release it from WhatsApp — send to all` : `Sent to ${r.to} ✓`); setPreview(null); if (!logOnly) { setBody(""); setSubject(""); setTpl(""); } }
       else setMsg(r?.error || "Not sent.");
       await load();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
@@ -90,6 +92,13 @@ export function Communication({ employeeId, name, personalEmail, workEmail }: {
 
       {/* ── composer ── */}
       <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: C.line }}>
+        <div className="flex gap-1.5 mb-2">
+          {(["email", "whatsapp"] as const).map((c) => (
+            <button key={c} onClick={() => { setChannel(c); setPreview(null); }} className="rounded px-3 py-1 text-xs font-bold" style={{ background: channel === c ? "#16232F" : "#fff", color: channel === c ? "#fff" : C.dim, border: `1px solid ${channel === c ? "#16232F" : C.line}` }}>
+              {c === "email" ? "✉ E-mail" : "💬 WhatsApp"}
+            </button>
+          ))}
+        </div>
         <div className="flex gap-2 flex-wrap items-end mb-2">
           <label className="text-xs" style={{ color: C.dim, flex: "1 1 220px" }}>Template
             <select value={tpl} onChange={(e) => pick(e.target.value)} className="w-full rounded px-2 py-1.5 mt-0.5 bg-white" style={{ border: `1px solid ${C.line}`, fontSize: 13 }}>
@@ -97,14 +106,15 @@ export function Communication({ employeeId, name, personalEmail, workEmail }: {
               {tpls.map((t) => <option key={t.key} value={t.key}>{t.title}</option>)}
             </select>
           </label>
-          <label className="text-xs" style={{ color: C.dim, flex: "1 1 260px" }}>To
+          {channel === "email" && <label className="text-xs" style={{ color: C.dim, flex: "1 1 260px" }}>To
             <select value={to} onChange={(e) => { setTo(e.target.value as "personal" | "work"); setPreview(null); }} className="w-full rounded px-2 py-1.5 mt-0.5 bg-white" style={{ border: `1px solid ${C.line}`, fontSize: 13 }}>
               <option value="personal">Personal — {personalEmail || "none on record"}</option>
               <option value="work">Work — {workEmail || "none on record"}</option>
             </select>
-          </label>
+          </label>}
+          {channel === "whatsapp" && <div className="text-xs" style={{ color: C.dim, flex: "1 1 260px" }}>To the personal mobile on the record, through the WhatsApp queue.</div>}
         </div>
-        <input value={subject} onChange={(e) => { setSubject(e.target.value); setPreview(null); }} placeholder="Subject" className="w-full rounded px-2 py-1.5 mb-1 font-semibold" style={{ border: `1px solid ${C.line}`, fontSize: 13 }} />
+        {channel === "email" && <input value={subject} onChange={(e) => { setSubject(e.target.value); setPreview(null); }} placeholder="Subject" className="w-full rounded px-2 py-1.5 mb-1 font-semibold" style={{ border: `1px solid ${C.line}`, fontSize: 13 }} />}
         <textarea value={body} rows={8} onChange={(e) => { setBody(e.target.value); setPreview(null); }} placeholder={"Dear {{first_name}},\n\n…\n\nRaghu"} className="w-full rounded px-2 py-1.5" style={{ border: `1px solid ${C.line}`, fontSize: 13, lineHeight: 1.6 }} />
         {preview && (
           <div className="rounded p-2 mt-2" style={{ background: "#FBFAF7", border: `1px dashed ${C.line}`, fontSize: 12.5 }}>
@@ -115,7 +125,7 @@ export function Communication({ employeeId, name, personalEmail, workEmail }: {
         )}
         <div className="flex gap-2 mt-2 flex-wrap">
           <button onClick={doPreview} disabled={busy || !body.trim()} className="text-xs font-semibold rounded border px-3 py-1.5 bg-white" style={{ borderColor: C.line, color: "#1B3A5C" }}>👁 Preview for {name.split(" ")[0]}</button>
-          <button onClick={() => send(false)} disabled={busy || !body.trim()} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: C.orange, color: "#fff", opacity: busy ? 0.6 : 1 }}>✉ Send from my Gmail</button>
+          <button onClick={() => send(false)} disabled={busy || !body.trim()} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: channel === "whatsapp" ? C.green : C.orange, color: "#fff", opacity: busy ? 0.6 : 1 }}>{channel === "whatsapp" ? "💬 Queue WhatsApp" : "✉ Send from my Gmail"}</button>
           <button onClick={() => send(true)} disabled={busy || !body.trim()} className="text-xs font-semibold rounded border px-3 py-1.5 bg-white" style={{ borderColor: C.line, color: C.dim }} title="Keep a record of something said by phone, WhatsApp or in person">📝 Log only</button>
         </div>
       </div>
@@ -131,7 +141,7 @@ export function Communication({ employeeId, name, personalEmail, workEmail }: {
                 <div className="text-xs flex gap-2 items-baseline flex-wrap" style={{ lineHeight: 1.6 }}>
                   <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: tone(r.status), color: "#fff", fontSize: 10 }}>{r.status}</span>
                   <span className="font-semibold" style={{ color: C.ink }}>{r.subject || "(no subject)"}</span>
-                  <span style={{ color: C.faint }}>{r.channel === "email" ? `→ ${r.to_address || "?"}` : r.channel}</span>
+                  <span style={{ color: C.faint }}>{r.channel === "email" ? `→ ${r.to_address || "?"}` : r.channel === "whatsapp" ? `💬 → ${r.to_address || "?"}` : r.channel}</span>
                   <span style={{ flex: 1 }} />
                   <span style={{ color: C.faint }}>{fmtFull(String(r.sent_at))} · {String(r.sent_by || "").split("·")[0].trim() || "—"}</span>
                   <span style={{ color: C.faint }}>{openRow === r.id ? "▲" : "▼"}</span>

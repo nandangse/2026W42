@@ -156,11 +156,19 @@ export const NAV: NavSection[] = [
     source: "HR Queries (tab 48) in the Main Salary Sheet. Answered ones become Policy → HR Queries Solved.",
   },
   {
+    key: "whatsapp",
+    label: "WhatsApp — send to all",
+    icon: "💬",
+    blurb: "One message to everybody from a template — the attendance of the month, a notice — queued and sent through Periskope's default number within the ceilings.",
+    built: true,
+    source: "New. Templates come from Masters → Standard Texts (kind WhatsApp); the queue is the CRM's.",
+  },
+  {
     key: "payroll",
     label: "Run Monthly Payroll",
     icon: "▶️",
-    blurb: "The month's run: days paid, the deductions each Type attracts, and the sheet that comes out of it. What Type says decides what is deducted — employed types carry PF, ESIC and MLWF; contract types carry 2% TDS.",
-    built: false,
+    blurb: "Every month's run on one table — date run, run by, and Raghu's approval. The sheet itself lives under Finalized Salary Sheets.",
+    built: true,
     source: "Salary Processing Checklist (tab 16) and the monthly Salary Sheets (tab 14). The pay and statutory fields on every record already hold what a run needs.",
   },
   {

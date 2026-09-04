@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       note: String(body.note || "").slice(0, 2000) || null,
       // "keep a provision to add template" (Dr Raghu, 4 Sep 2026): kind
       // 'email' carries a subject and is offered when writing to a person.
-      ...(body.kind ? { kind: body.kind === "email" ? "email" : "text" } : {}),
+      ...(body.kind ? { kind: ["email", "whatsapp"].includes(String(body.kind)) ? String(body.kind) : "text" } : {}),
       ...("subject" in body ? { subject: String(body.subject || "").slice(0, 300) || null } : {}),
       version: (prev?.version || 0) + 1,
       updated_by: stamp, updated_at: new Date().toISOString(),

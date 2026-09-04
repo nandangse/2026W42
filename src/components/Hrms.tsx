@@ -44,6 +44,8 @@ import Offers from "./hrms/Offers";
 import StandardTexts from "./hrms/StandardTexts";
 import Fnf from "./hrms/Fnf";
 import HrQueries from "./hrms/HrQueries";
+import WhatsAppBroadcast from "./hrms/WhatsAppBroadcast";
+import Payroll from "./hrms/Payroll";
 
 export default function Hrms({
   email, initials, displayName, role, isOwner,
@@ -248,6 +250,10 @@ export default function Hrms({
           <Offers who={who} isOwner={isOwner} />
         ) : nav.key === "queries" ? (
           <HrQueries who={who} />
+        ) : nav.key === "whatsapp" ? (
+          <WhatsAppBroadcast who={who} />
+        ) : nav.key === "payroll" ? (
+          <Payroll who={who} isOwner={isOwner} />
         ) : nav.key === "fnf" ? (
           <Fnf who={who} isOwner={isOwner} />
         ) : nav.key === "texts" ? (

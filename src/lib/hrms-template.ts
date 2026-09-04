@@ -20,6 +20,12 @@ export const TEMPLATE_VARS: TemplateVar[] = [
   { key: "first_name", label: "First name", group: "Letter" },
   { key: "today", label: "Today's date", group: "Letter" },
   { key: "cycle", label: "Appraisal cycle", group: "Letter" },
+  // from the chosen month's salary sheet — the WhatsApp attendance message
+  { key: "month", label: "Month of the sheet (e.g. August 2026)", group: "Payroll" },
+  { key: "attendance_days", label: "Days present", group: "Payroll" },
+  { key: "paid_days", label: "Days paid", group: "Payroll" },
+  { key: "gross", label: "Gross for the month", group: "Payroll" },
+  { key: "net_pay", label: "Net paid", group: "Payroll" },
   ...FIELD_GROUPS.filter((g) => !g.confidential).flatMap((g) =>
     g.fields.filter((f) => !/^doc_|^drive_|^notes$|^file_name$/.test(f.key)).map((f) => ({ key: f.key, label: f.label, group: g.label })),
   ),
@@ -54,4 +60,22 @@ export function templateVars(tpl: string): string[] {
   const s = new Set<string>();
   for (const m of String(tpl || "").matchAll(/\{\{\s*([a-zA-Z_][\w]*)\s*\}\}/g)) s.add(m[1]);
   return [...s];
+}
+
+/** Month names as a message would say them. */
+export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** The payroll variables for one person from a salary sheet's rows. */
+export function payrollVars(sheet: { month: number; year: number; rows: unknown } | null, employeeId: string): Record<string, string> {
+  if (!sheet) return { month: "", attendance_days: "", paid_days: "", gross: "", net_pay: "" };
+  const rows = (Array.isArray(sheet.rows) ? sheet.rows : []) as Record<string, unknown>[];
+  const r = rows.find((x) => String(x.employee_id || "") === String(employeeId));
+  const n = (v: unknown) => (v == null || v === "" ? "" : Number(v).toLocaleString("en-IN"));
+  return {
+    month: `${MONTHS[(sheet.month || 1) - 1] || sheet.month} ${sheet.year}`,
+    attendance_days: r ? n(r.attendance) : "",
+    paid_days: r ? n(r.paid_days) : "",
+    gross: r ? n(r.gross) : "",
+    net_pay: r ? n(r.net) : "",
+  };
 }

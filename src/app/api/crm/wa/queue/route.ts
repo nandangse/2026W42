@@ -41,7 +41,7 @@ export async function GET(req: Request) {
     const status = String(u.searchParams.get("status") || "");
 
     let qy = db.from("wa_queue")
-      .select("id, phone, person_id, company_id, opportunity_id, template_name, body, status, error, external_id, batch_id, queued_by, queued_at, sent_at, delivered_at")
+      .select("id, phone, person_id, company_id, opportunity_id, template_name, body, status, error, external_id, batch_id, queued_by, queued_at, sent_at, delivered_at, source, ref")
       .order("queued_at", { ascending: false }).limit(500);
     if (status && status !== "all") qy = qy.eq("status", status);
     // Everyone sees their own; the bosses see the whole queue.

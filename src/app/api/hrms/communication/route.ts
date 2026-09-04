@@ -59,7 +59,21 @@ export async function GET(req: Request) {
         return NextResponse.json({ rows: [], needsMigration: true });
       throw new Error(error.message);
     }
-    return NextResponse.json({ rows: data || [] });
+    // WhatsApp rows: the queue's live word beats the log's (the log says
+    // "queued" until the queue sends; the queue knows delivered/failed).
+    const rows = (data || []) as Record<string, unknown>[];
+    const wa = rows.filter((r) => r.channel === "whatsapp");
+    if (wa.length) {
+      const { data: full } = await adminClient().from("hrms_communication").select("id, meta").in("id", wa.map((r) => String(r.id)));
+      const qidOf = new Map((full || []).map((r) => [String(r.id), String((r.meta as { queue_id?: string } | null)?.queue_id || "")]));
+      const { queueStatuses } = await import("@/lib/hrms-wa");
+      const live = await queueStatuses([...qidOf.values()].filter(Boolean));
+      for (const r of wa) {
+        const q = live.get(qidOf.get(String(r.id)) || "");
+        if (q) { r.status = q.status; if (q.error) r.error = q.error; }
+      }
+    }
+    return NextResponse.json({ rows });
   } catch (e) { return errJson(e); }
 }
 
@@ -107,6 +121,22 @@ export async function POST(req: Request) {
     });
 
     if (preview) return NextResponse.json({ people });
+
+    // WhatsApp (4 Sep 2026): "let it send from there" — the message is
+    // personalised here and parked in the WhatsApp queue; the queue sends.
+    if (!logOnly && body.channel === "whatsapp") {
+      const { people: load, renderFor, sheetFor, queueMessages } = await import("@/lib/hrms-wa");
+      const persons = await load(admin, ids);
+      const sheet = await sheetFor(admin);
+      const rendered = persons.map((p) => renderFor(p, bodyT, sheet));
+      const stampW = me.initials ? `${me.initials} · ${me.email}` : me.email;
+      let crmProfileId: string | null = null;
+      try { const { crmDb } = await import("@/crm/db"); const { data: rp } = await crmDb().from("profile").select("id").ilike("email", me.email).maybeSingle(); crmProfileId = rp?.id ? String(rp.id) : null; } catch { /* fine */ }
+      const res = await queueMessages(admin, rendered, { templateKey: body.template_key ? String(body.template_key) : null, by: stampW, crmProfileId });
+      const skipped = new Map(res.skipped.map((x) => [x.id, x.why]));
+      const results = rendered.map((r) => ({ id: r.id, name: r.name, to: r.phone, ok: !skipped.has(r.id), error: skipped.get(r.id) }));
+      return NextResponse.json({ ok: results.every((r) => r.ok), sent: 0, queued: res.queued, results });
+    }
 
     // "i want him to send emails from HRMS using the same oauth" (Dr Raghu,
     // 4 Sep 2026): the mail goes from the SENDER's own connected Gmail, with
