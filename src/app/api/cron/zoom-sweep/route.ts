@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { zoomConfig, zoomGet, ingestMeeting, attachRecording, attachSummary, uuidPath } from "@/lib/zoom";
+import { beat } from "@/lib/cron-beat";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -22,6 +23,7 @@ export async function GET(req: Request) {
       const u = await currentUser();
       if (!u || u.disabled || !u.isOwner) throw new HttpError(401, "The hourly cron, or Raghu.");
     }
+    await beat("zoom-sweep", "fired", { fromCron });
     if (!crmConfigured()) return NextResponse.json({ ok: false, note: "CRM not configured." });
     const crm = crmDb();
     const cfg = await zoomConfig(crm);
@@ -52,6 +54,7 @@ export async function GET(req: Request) {
         }
       }
     }
+    await beat("zoom-sweep", "done", { users: users.length, seen, made, filled });
     return NextResponse.json({ ok: true, users: users.length, seen, made, filled });
   } catch (e) {
     return errJson(e);

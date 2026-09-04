@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { crmDb, crmConfigured } from "@/crm/db";
+import { beat } from "@/lib/cron-beat";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -27,6 +28,7 @@ export async function GET(req: Request) {
       const u = await currentUser();
       if (!u || u.disabled) throw new HttpError(401, "The hourly cron, or a signed-in hand.");
     }
+    await beat("erp-pull", "fired", { fromCron });
     if (!crmConfigured()) return NextResponse.json({ ok: false, note: "CRM not configured." });
     const db = crmDb();
 
@@ -184,12 +186,14 @@ export async function GET(req: Request) {
 
     // move both cursors only past what we actually walked
     await db.from("integration_setting").update({ config: { ...cfg, last_pull: maxCreation, jm_cursor: jmCursorNew } }).eq("key", "erpnext");
+    await beat("erp-pull", "done", { last_pull: maxCreation });
     await db.from("crm_audit").insert({
       entity: "opportunity", entity_id: null, action: "erp_pull",
       after: { pulled, skippedExisting, noCompany, cursor: maxCreation }, by_user: null,
     }).then(() => null, () => null);
     return NextResponse.json({ ok: true, pulled, skippedExisting, noCompany, deliveredSynced: djSynced, cursor: maxCreation, jmCursor: jmCursorNew, more: rows.length === 300 });
   } catch (e) {
+    await beat("erp-pull", "failed", { error: String(e instanceof Error ? e.message : e).slice(0, 300) });
     return errJson(e);
   }
 }

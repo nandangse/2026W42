@@ -3,6 +3,7 @@ import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { erpConfig, erpSync, type Winner } from "@/lib/erp-sync";
+import { beat } from "@/lib/cron-beat";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -38,6 +39,7 @@ export async function GET(req: Request) {
       const u = await currentUser();
       if (!u || u.disabled || !u.isOwner) throw new HttpError(401, "The hourly cron, or Raghu.");
     }
+    await beat("erp-sync", "fired", { fromCron });
     if (!crmConfigured()) return NextResponse.json({ ok: false, note: "CRM (and the ERP keys) not configured." });
     const cfg = await erpConfig(crmDb());
     if ("error" in cfg) return NextResponse.json({ ok: false, note: cfg.error });
@@ -54,6 +56,7 @@ export async function GET(req: Request) {
     push = (await pr.json().catch(() => ({}))) as Record<string, unknown>;
     if (!pr.ok) {
       await genie.from("erp_sync_log").insert({ by: "cron", dry: false, ok: false, error: `push failed (${pr.status}) — pull skipped: ${String(push.error || "").slice(0, 300)}` }).then(() => null, () => null);
+      await beat("erp-sync", "failed", { step: "push", status: pr.status });
       return NextResponse.json({ ok: false, step: "push", push, note: "Push failed, so the pull was skipped — a pull over unpushed edits would overwrite them." }, { status: 502 });
     }
 
@@ -67,9 +70,11 @@ export async function GET(req: Request) {
         deliv_new: out.delivered.created, deliv_changed: out.delivered.changed,
         changes: out.changes, notes: [...(out.notes || []), `winner on a difference: ${fallback}`], seconds: out.seconds,
       }).then(() => null, () => null);
+      await beat("erp-sync", "done", { fallback, pushed: push.pushed, rejected: push.rejected, jobs_changed: out.jobs.changed, proj_changed: out.projects.changed, seconds: out.seconds });
       return NextResponse.json({ ok: true, fallback, push: { pushed: push.pushed, rejected: push.rejected, notInErp: push.notInErp }, pull: { jobs: out.jobs, projects: out.projects, delivered: out.delivered, seconds: out.seconds } });
     } catch (e) {
       await genie.from("erp_sync_log").insert({ by: "cron", dry: false, ok: false, error: `pull: ${String(e instanceof Error ? e.message : e).slice(0, 400)}` }).then(() => null, () => null);
+      await beat("erp-sync", "failed", { step: "pull", error: String(e instanceof Error ? e.message : e).slice(0, 300) });
       throw e;
     }
   } catch (e) {
