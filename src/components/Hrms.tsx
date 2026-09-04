@@ -47,6 +47,7 @@ import HrQueries from "./hrms/HrQueries";
 import WhatsAppBroadcast from "./hrms/WhatsAppBroadcast";
 import Payroll from "./hrms/Payroll";
 import Communications from "./hrms/Communications";
+import Handbook from "./hrms/Handbook";
 
 export default function Hrms({
   email, initials, displayName, role, isOwner,
@@ -255,6 +256,8 @@ export default function Hrms({
           <WhatsAppBroadcast who={who} />
         ) : nav.key === "communications" ? (
           <Communications who={who} />
+        ) : nav.key === "policy.handbook" || nav.key === "policy.solved" || nav.key === "policy" ? (
+          <Handbook who={who} />
         ) : nav.key === "payroll" ? (
           <Payroll who={who} isOwner={isOwner} />
         ) : nav.key === "fnf" ? (

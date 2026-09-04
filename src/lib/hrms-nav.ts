@@ -243,12 +243,12 @@ export const NAV: NavSection[] = [
     label: "Policy",
     icon: "📗",
     items: [
-      { key: "policy.handbook", label: "Employee Handbook", blurb: "Editable, versioned and acknowledged. The first module that needs a rich-text editor.", built: false,
+      { key: "policy.handbook", label: "Employee Handbook", blurb: "Edition 14, rebuilt from v13.0: readable, one section at a time, versioned per section, acknowledged per edition. Every section takes questions; HR answers and publishes. Every login can read it at /hrms/handbook.", built: true,
         source: "Employee Handbook v 13.0 (tab 46)." },
       { key: "policy.faqs", label: "FAQs", blurb: "The questions that come up every month, answered once.", built: false,
         source: "FAQ (tab 13)." },
-      { key: "policy.solved", label: "HR Queries Solved", blurb: "Closed queries, published. A query answered privately helps one person; the same answer here helps everyone who was going to ask it next.", built: false,
-        source: "Fed by HR Queries above." },
+      { key: "policy.solved", label: "HR Queries Solved", blurb: "The handbook questions HR answered and published, under their sections — a query answered privately helps one person; the same answer there helps everyone who was going to ask it next.", built: true,
+        source: "Fed by the handbook's Ask HR and by HR Queries." },
     ],
   },
   {
