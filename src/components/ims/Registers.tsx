@@ -20,7 +20,7 @@ type Column = {
   key: string; label: string; type: string; options?: string[]; required?: boolean;
   product?: string[]; level_of?: string;
 };
-const TYPES = ["text", "short", "number", "date", "select", "bool", "user", "file"];
+const TYPES = ["text", "short", "number", "date", "select", "bool", "user", "file", "link"];
 
 const lead = (v: unknown): number | null => {
   const m = String(v ?? "").match(/^\s*(\d+(?:\.\d+)?)/);
@@ -101,6 +101,7 @@ function RegisterView({ slug, boot, onBack }: { slug: string; boot: Boot; onBack
   const draw = (c: Column, v: unknown) => {
     if (v === null || v === undefined || v === "") return <span style={{ color: MUTED }}>—</span>;
     if (c.level_of) return <Chip text={String(v)} colour={LEVEL_COLOUR[String(v)] ?? "#6B7280"} />;
+    if (c.type === "link") return <a href={String(v)} target="_blank" rel="noreferrer" className="font-bold hover:underline" style={{ color: "#1B2D6B" }} onClick={(e) => e.stopPropagation()}>open ↗</a>;
     if (c.type === "bool") return <Chip text={v ? "Yes" : "No"} colour={v ? "#1A7F4E" : "#6B7280"} />;
     if (c.type === "date") return fmtD(v);
     if (c.type === "user") return boot.people.find((p) => p.id === v)?.full_name ?? String(v);

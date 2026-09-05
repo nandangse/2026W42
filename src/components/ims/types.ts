@@ -39,6 +39,9 @@ export const DOC_TYPE: Record<string, string> = {
   FRM: "FRM — Format / register template",
   CHK: "CHK — Checklist",
   PLN: "PLN — Plan",
+  REG: "REG — Register",
+  LST: "LST — List",
+  POL: "POL — Policy / objectives",
 };
 export const CERT_KIND: Record<string, string> = {
   certification: "Certification",

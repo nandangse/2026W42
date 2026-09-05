@@ -32,17 +32,23 @@ export default function Documents({ boot }: { boot: Boot }) {
   const [fSys, setFSys] = useState("");
   const [fType, setFType] = useState("");
   const [fStatus, setFStatus] = useState("");
+  const [fDept, setFDept] = useState("");
+  const [q, setQ] = useState("");
   const [list, busy, reload, err] = useLoad<{ installed: boolean; rows: Row[]; canEdit: boolean }>("/api/ims/document");
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState<Record<string, string> | null>(null);
   const [msg, setMsg] = useState("");
 
   const mayWrite = isHead(boot.role);
+  const depts = Array.from(new Set((list?.rows ?? []).map((d) => String(d.department || "")).filter(Boolean))).sort();
+  const needle = q.trim().toLowerCase();
   const rows = (list?.rows ?? []).filter(
     (d) =>
       (!fSys || d.sys === fSys) &&
       (!fType || d.doc_type === fType) &&
-      (!fStatus || d.status === fStatus),
+      (!fStatus || d.status === fStatus) &&
+      (!fDept || d.department === fDept) &&
+      (!needle || [d.title, d.doc_no, d.ref_no, d.owner_name, d.expectation, d.remarks].some((x) => String(x ?? "").toLowerCase().includes(needle))),
   );
 
   const create = async () => {
@@ -69,6 +75,10 @@ export default function Documents({ boot }: { boot: Boot }) {
             <Select value={fStatus} onChange={setFStatus} blank="Every status"
               options={["draft", "in_review", "approved", "obsolete"]} />
           </div>
+          <div style={{ minWidth: 150 }}>
+            <Select value={fDept} onChange={setFDept} blank="Every department" options={depts} />
+          </div>
+          <div style={{ minWidth: 180 }}><Text value={q} onChange={setQ} placeholder="Search title, number, owner" /></div>
           {mayWrite && <Btn kind="primary" onClick={() => { setCreating({ ...BLANK }); setMsg(""); }}>+ New</Btn>}
         </>
       }
@@ -83,22 +93,24 @@ export default function Documents({ boot }: { boot: Boot }) {
             : "Nothing matches those filters."}
         </Empty>
       ) : (
-        <TableBox min={760}>
+        <TableBox min={980}>
           <thead>
-            <tr><Th>Doc no.</Th><Th>Title</Th><Th>Sys</Th><Th>Type</Th><Th>Department</Th><Th>Owner</Th><Th>Status</Th></tr>
+            <tr><Th>Doc no.</Th><Th>Title</Th><Th>Sys</Th><Th>Type</Th><Th>Department</Th><Th>Owner</Th><Th>Status</Th><Th>Where</Th><Th>Next review</Th></tr>
           </thead>
           <tbody>
             {rows.map((d) => {
               const owner = boot.people.find((p) => p.id === d.owner_id);
               return (
                 <tr key={d.id} onClick={() => { setOpenId(d.id); setMsg(""); }} style={{ cursor: "pointer" }}>
-                  <Td><span style={{ fontWeight: 700, color: INK }}>{String(d.doc_no ?? "—")}</span></Td>
+                  <Td><span style={{ fontWeight: 700, color: INK }}>{String(d.ref_no || d.doc_no || "—")}</span></Td>
                   <Td wrap>{String(d.title ?? "")}</Td>
                   <Td>{String(d.sys ?? "")}</Td>
                   <Td>{String(d.doc_type ?? "")}</Td>
                   <Td>{String(d.department || "—")}</Td>
-                  <Td>{owner?.full_name ?? "—"}</Td>
+                  <Td>{owner?.full_name ?? String(d.owner_name || "—")}</Td>
                   <Td><Chip text={String(d.status).replace("_", " ")} colour={statusColour(String(d.status))} /></Td>
+                  <Td>{d.external_url ? <a href={String(d.external_url)} target="_blank" rel="noreferrer" className="font-bold hover:underline" style={{ color: "#1B2D6B" }} onClick={(e) => e.stopPropagation()}>{String(d.doc_kind || "open")} ↗</a> : <span style={{ color: MUTED }}>{String(d.doc_kind || "—")}</span>}</Td>
+                  <Td>{fmtD(d.next_review)}</Td>
                 </tr>
               );
             })}
@@ -222,14 +234,27 @@ function DocumentDetail({ id, boot, onClose }: { id: string; boot: Boot; onClose
       <div className="flex gap-2 items-center flex-wrap mb-3">
         <Chip text={String(doc.status).replace("_", " ")} colour={statusColour(String(doc.status))} />
         <span className="text-xs" style={{ color: MUTED }}>
-          {String(doc.sys)}/{String(doc.doc_type)}{doc.department ? ` · ${String(doc.department)}` : ""}
+          {String(doc.sys)}/{String(doc.doc_type)}{doc.department ? ` · ${String(doc.department)}` : ""}{doc.ref_no && doc.ref_no !== doc.doc_no ? ` · Genie no. ${String(doc.doc_no)}` : ""}
         </span>
+        {doc.external_url ? <a href={String(doc.external_url)} target="_blank" rel="noreferrer" className="text-xs font-bold hover:underline" style={{ color: "#1B2D6B" }}>Open the {String(doc.doc_kind || "document")} ↗</a> : null}
         <Btn onClick={print}>Print / PDF</Btn>
         {mayWrite && !working && <Btn onClick={() => act({ action: "new_revision", change_summary: summary })}>Open new revision</Btn>}
         {mayWrite && isAdmin(boot.role) && String(doc.status) === "approved" && (
           <Btn kind="danger" onClick={() => act({ action: "obsolete" })}>Make obsolete</Btn>
         )}
       </div>
+
+      {(doc.expectation || doc.approved_by_name || doc.reviewed_by_name || doc.next_review || doc.remarks || doc.owner_name) ? (
+        <div className="rounded border p-3 mb-3 text-xs" style={{ borderColor: BORDER, color: INK, lineHeight: 1.7 }}>
+          {doc.source_type ? <div><span style={{ color: MUTED }}>On the register as: </span>{String(doc.source_type)}{doc.issue_no ? ` · issue ${String(doc.issue_no)}` : ""}</div> : null}
+          {doc.owner_name ? <div><span style={{ color: MUTED }}>Owner: </span>{String(doc.owner_name)}</div> : null}
+          {doc.expectation ? <div><span style={{ color: MUTED }}>Expectation: </span>{String(doc.expectation)}</div> : null}
+          {doc.approved_by_name ? <div><span style={{ color: MUTED }}>Approved by: </span>{String(doc.approved_by_name)}{doc.approved_on ? ` on ${fmtD(doc.approved_on)}` : ""}</div> : null}
+          {doc.reviewed_by_name ? <div><span style={{ color: MUTED }}>Reviewed by: </span>{String(doc.reviewed_by_name)}{doc.reviewed_on ? ` on ${fmtD(doc.reviewed_on)}` : ""}</div> : null}
+          {doc.next_review ? <div><span style={{ color: MUTED }}>Next review: </span>{fmtD(doc.next_review)}</div> : null}
+          {doc.remarks ? <div><span style={{ color: MUTED }}>Remarks: </span>{String(doc.remarks)}</div> : null}
+        </div>
+      ) : null}
 
       {/* ---------------------------------------------- the working revision */}
       {working && mayWrite && (
