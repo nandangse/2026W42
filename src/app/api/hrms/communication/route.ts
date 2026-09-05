@@ -171,19 +171,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: results.every((r) => r.ok), sent: 0, queued: res.queued, results });
     }
 
-    // "i want him to send emails from HRMS using the same oauth" (Dr Raghu,
-    // 4 Sep 2026): the mail goes from the SENDER's own connected Gmail, with
-    // their name on it — whoever in HRMS is writing. No mailbox, no send.
-    let token = "", fromEmail = "";
-    const fromName = me.displayName || me.email.split("@")[0];
+    // "From HRMS, all the mails will have to go from Vinay's mail ID." (Dr
+    // Raghu, 5 Sep 2026) — Vinay's connected Gmail, whoever pressed Send;
+    // the sender's own only when his is not connected, and the screen says so.
+    let token = "", fromEmail = "", fromName = me.displayName || me.email.split("@")[0], fromNote: string | null = null;
     if (!logOnly) {
-      const { crmDb } = await import("@/crm/db");
-      const { data: rp } = await crmDb().from("profile").select("id").eq("email", me.email.toLowerCase()).maybeSingle();
-      const { myMailbox, accessTokenFor } = await import("@/crm/gmail");
-      const box = rp?.id ? await myMailbox(String(rp.id)) : null;
-      if (!box) throw new HttpError(403, `Your Gmail is not connected yet — open the account menu → Connect Gmail (an admin ticks ✉ OAuth on your account first). Until then you can preview, or log a message sent another way.`);
-      token = await accessTokenFor(String(box.id));
-      fromEmail = String(box.email_address);
+      const { hrmsSender } = await import("@/lib/hrms-mail-from");
+      try { const snd = await hrmsSender(me); token = snd.token; fromEmail = snd.fromEmail; fromName = snd.fromName; fromNote = snd.note; }
+      catch (e) { throw new HttpError(403, e instanceof Error ? e.message : String(e)); }
     }
     const { gmailSend } = await import("@/crm/gmail");
     const stamp = me.initials ? `${me.initials} · ${me.email}` : me.email;
@@ -211,6 +206,6 @@ export async function POST(req: Request) {
       }
       results.push({ id: p.id, name: p.name, to: p.to, ok, error: err || undefined });
     }
-    return NextResponse.json({ ok: results.every((r) => r.ok), sent: results.filter((r) => r.ok).length, results });
+    return NextResponse.json({ ok: results.every((r) => r.ok), sent: results.filter((r) => r.ok).length, results, from: fromEmail || null, from_note: fromNote });
   } catch (e) { return errJson(e); }
 }

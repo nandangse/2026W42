@@ -65,7 +65,8 @@ export async function GET(req: Request) {
     }
 
     const rec = await myRecord(me.email);
-    let q = admin.from("hrms_query").select("*").eq("topic", "HR Query").order("raised_at", { ascending: false }).limit(500);
+    // applications from the employee's own sheet (0142) sit beside the queries
+    let q = admin.from("hrms_query").select("*").in("topic", ["HR Query", "Application"]).order("raised_at", { ascending: false }).limit(500);
     if (!hr) q = q.or(`raised_email.eq.${me.email.toLowerCase()}${rec ? `,employee_id.eq.${rec.id}` : ""}`);
     const { data, error } = await q;
     if (error) {

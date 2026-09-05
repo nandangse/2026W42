@@ -214,6 +214,7 @@ function QueryCard({ r, hr, expanded, onToggle, onChanged }: { r: Row; hr: boole
     <div className="bg-white rounded-lg border mb-2" style={{ borderColor: C.line, borderLeft: `4px solid ${answered ? "#0D7A3F" : "#E8600A"}` }}>
       <button onClick={onToggle} className="w-full text-left px-3 py-2.5">
         <div className="flex items-baseline gap-2 flex-wrap">
+          {String(r.subject || "").startsWith("Application") && <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#E6F0FA", color: "#1B3A5C", fontSize: 10 }}>APPLICATION</span>}
           <span className="font-bold" style={{ fontSize: 13.5 }}>{r.subject}</span>
           {(r.person || c?.name) && <span style={{ fontSize: 12, color: C.faint }}>· {r.employee_id || c?.employee_id} {r.person || c?.name}</span>}
           {!r.for_self && <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#DCE8F5", color: "#1B3A5C" }}>raised by HR</span>}

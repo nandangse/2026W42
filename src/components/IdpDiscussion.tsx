@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import WhatsAppFab from "@/components/WhatsAppFab";
+import MySheet from "@/components/MySheet";
 import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
 import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, CONSENT_TEXT, WATCHED_TEXT, LOOM_EMBED, isComplete, bandIndex } from "@/lib/idp";
@@ -111,58 +112,26 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
       catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
       setBusy(false);
     };
+    // THE SHEET (Dr Raghu, 5 Sep 2026): once the IDP is done, this is the
+    // employee's own page — no other header, footer, nothing. The IDP itself,
+    // with its Go back and edit and a leader's team reviews, sits under IDP Results.
     return (
-      <Shell initials={initials} name={name}>
-        <div className="mx-auto px-4 py-6 md:py-8" style={{ maxWidth: 760 }}>
-          <div className="rounded-lg p-4" style={{ background: "#E6F4EA", border: "1px solid #9AD3AE" }}>
-            <div className="font-bold" style={{ fontSize: 18, color: C.green }}>Thank you, {name}. Your IDP is done.</div>
-            <div className="mt-2" style={{ fontSize: 14, color: C.dim, lineHeight: 1.7 }}>
-              Completed on{" "}
-              {new Date(last.submitted_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}.
-              It is on your record and your HoD, HR and Management can read it.
+      <>
+        <MySheet name={name}>
+          <div className="rounded-lg p-3 mb-2" style={{ background: "#E6F4EA", border: "1px solid #9AD3AE" }}>
+            <div className="font-bold text-sm" style={{ color: C.green }}>Your IDP is done — completed {new Date(last.submitted_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}.</div>
+            <div className="text-xs mt-1" style={{ color: C.dim, lineHeight: 1.6 }}>It is on your record and your HoD, HR and Management can read it.</div>
+            <div className="flex items-center gap-2 flex-wrap mt-2">
+              <button onClick={reopen} disabled={busy} className="rounded font-bold text-sm" style={{ background: C.orange, color: "#fff", padding: "8px 14px" }}>{busy ? "Opening…" : "✎ Go back and edit it"}</button>
+              <span style={{ fontSize: 12, color: C.faint }}>Allowed while this is new. Nothing starts again.</span>
             </div>
+            {msg && <div className="mt-2 text-sm font-semibold" style={{ color: C.red }}>{msg}</div>}
           </div>
-
-          <div className="flex items-center gap-2 flex-wrap mt-4">
-            <button onClick={reopen} disabled={busy} className="rounded font-bold"
-              style={{ background: C.orange, color: "#fff", padding: "10px 18px", fontSize: 14 }}>
-              {busy ? "Opening…" : "✎ Go back and edit it"}
-            </button>
-            <span style={{ fontSize: 12, color: C.faint, lineHeight: 1.5 }}>
-              Allowed while this is new. Everything you wrote is still there — nothing starts again.
-            </span>
-          </div>
-          {msg && <div className="mt-3 text-sm font-semibold" style={{ color: C.red }}>{msg}</div>}
-
           <TeamList onOpen={setReviewRow} />
           {reviewRow && <TeamReview row={reviewRow} onClose={() => { setReviewRow(null); }} />}
-
-          <div className="mt-6">
-            {IDP_SECTIONS.filter((sec) => !sec.leadersOnly || state.isLeader).map((sec) => (
-              <div key={sec.key} className="mb-5">
-                <h2 className="font-bold" style={{ fontSize: 17 }}>{sec.title}</h2>
-                {sec.questions.map((q) => (
-                  <div key={q.id} className="rounded-lg p-3 mt-2" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
-                    <div className="font-semibold" style={{ fontSize: 14 }}>{q.label}</div>
-                    <div style={{ fontSize: 14, color: C.dim, whiteSpace: "pre-wrap", lineHeight: 1.7, marginTop: 4 }}>
-                      {last.answers?.[q.id] || "—"}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))}
-            <h2 className="font-bold" style={{ fontSize: 17 }}>How I rated myself</h2>
-            <div className="rounded-lg mt-2" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
-              {IDP_RATINGS.map((d, i) => (
-                <div key={d.key} className="px-3 py-2 flex items-center gap-3" style={{ borderTop: i ? "1px solid #EEECE6" : undefined }}>
-                  <div style={{ fontSize: 14, flex: 1 }}>{d.key}</div>
-                  <div className="tnum" style={{ fontSize: 18, fontWeight: 700, color: C.orange }}>{last.ratings?.[d.key] || "—"}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Shell>
+        </MySheet>
+        <WhatsAppFab name={name} form="My sheet" />
+      </>
     );
   }
 
