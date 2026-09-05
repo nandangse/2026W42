@@ -41,13 +41,13 @@ interface Sheet {
   kinds: Record<string, { label: string; fields: Field[] }>;
   today: string;
 }
-type Tab = "records" | "slips" | "leave" | "loan" | "idp" | "learning" | "handbook" | "queries";
-const TABS: [Tab, string][] = [["records", "HRIS Records"], ["slips", "Payslips"], ["leave", "Leave Register"], ["loan", "Loan Register"], ["idp", "IDP Results"], ["learning", "Learning Goals"], ["handbook", "Employee Handbook"], ["queries", "HR Queries"]];
+type Tab = "home" | "idpform" | "records" | "slips" | "leave" | "loan" | "idp" | "learning" | "handbook" | "queries";
+const TABS: [Tab, string][] = [["home", "Home"], ["idpform", "IDP"], ["records", "HRIS Records"], ["slips", "Payslips"], ["leave", "Leave Register"], ["loan", "Loan Register"], ["idp", "IDP Results"], ["learning", "Learning Goals"], ["handbook", "Employee Handbook"], ["queries", "HR Queries"]];
 const APPLY: [string, string][] = [["leave", "Apply for Leave"], ["advance", "Apply for Advance"], ["loan", "Apply for Loan"], ["encashment", "Apply for Leave Encashment"], ["uniform", "Apply for Uniform"], ["shoes", "Apply for Shoes"], ["other", "Apply for Other Things"]];
 
-export default function MySheet({ name, children, teamBox }: { name: string; children?: React.ReactNode; teamBox?: React.ReactNode }) {
+export default function MySheet({ name, children, teamBox, embedded, dashboard, idpPanel, idpStatus }: { name: string; children?: React.ReactNode; teamBox?: React.ReactNode; embedded?: boolean; dashboard?: React.ReactNode; idpPanel?: React.ReactNode; idpStatus?: "done" | "open" | "none" }) {
   const [d, setD] = useState<Sheet | null>(null);
-  const [tab, setTab] = useState<Tab>("records");
+  const [tab, setTab] = useState<Tab>("home");
   const [msg, setMsg] = useState("");
   const [apply, setApply] = useState<string | null>(null);
   const load = useCallback(async () => { try { setD(await api.get("/api/my/sheet")); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); } }, []);
@@ -62,11 +62,21 @@ export default function MySheet({ name, children, teamBox }: { name: string; chi
 
   return (
     <div style={{ minHeight: "100vh", background: C.paper, color: C.ink, fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {/* ── the head ── */}
+      {/* ── the tabs ── */}
+      <div className="flex gap-1 px-2 py-1.5 overflow-x-auto" style={{ position: "sticky", top: embedded ? 54 : 0, zIndex: 30, background: C.paper, borderBottom: `1px solid ${C.line}`, scrollbarWidth: "none" }}>
+        {TABS.map(([k, l]) => (
+          <button key={k} onClick={() => setTab(k)} className="text-xs font-bold rounded px-3 py-2 whitespace-nowrap flex-shrink-0" style={{ background: tab === k ? C.navy : "transparent", color: tab === k ? "#fff" : C.dim }}>{k === "idpform" && idpStatus === "done" ? "IDP ✓" : k === "idpform" && idpStatus === "open" ? "IDP · open" : l}{k === "queries" && d.linked && d.queries.some((q) => q.status === "Open") ? ` · ${d.queries.filter((q) => q.status === "Open").length}` : ""}</button>
+        ))}
+      </div>
+      {msg && <div className="px-4 pt-3 text-sm font-semibold" style={{ color: msg.endsWith("✓") ? C.green : C.red }}>{msg}</div>}
+
+      <div className="px-3 py-3" style={{ maxWidth: 760, margin: "0 auto" }}>
+        {tab === "home" ? (
+          <div style={{ margin: "-12px -12px 0" }}>      {/* ── the head ── */}
       <div className="px-4 pt-4 pb-3" style={{ background: "#fff", borderBottom: `1px solid ${C.line}` }}>
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={LOGO} alt="Nandan GSE" style={{ height: 30 }} />
+          {!embedded && <img src={LOGO} alt="Nandan GSE" style={{ height: 30 }} />}
           <span style={{ flex: 1 }} />
           <span className="text-xs" style={{ color: C.faint }}>{d.today}</span>
         </div>
@@ -83,6 +93,7 @@ export default function MySheet({ name, children, teamBox }: { name: string; chi
             </div>
             {pending.length > 0 && <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: "#FFF7E6", border: "1px solid #F5B32B", color: "#8A5B00" }}><b>Waiting on you:</b> {pending.join(" · ")}</div>}
             {teamBox}
+            {dashboard}
           </>
         )}
         {/* ── the buttons ── */}
@@ -92,18 +103,10 @@ export default function MySheet({ name, children, teamBox }: { name: string; chi
           ))}
           <a href="/hrms/query" target="_blank" rel="noreferrer" className="text-xs font-bold rounded-full px-3 py-2 whitespace-nowrap flex-shrink-0" style={{ background: C.orange, color: "#fff", textDecoration: "none" }}>HR Queries ↗</a>
         </div>
-      </div>
-
-      {/* ── the tabs ── */}
-      <div className="flex gap-1 px-2 py-1.5 overflow-x-auto" style={{ position: "sticky", top: 0, zIndex: 30, background: C.paper, borderBottom: `1px solid ${C.line}`, scrollbarWidth: "none" }}>
-        {TABS.map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className="text-xs font-bold rounded px-3 py-2 whitespace-nowrap flex-shrink-0" style={{ background: tab === k ? C.navy : "transparent", color: tab === k ? "#fff" : C.dim }}>{l}{k === "queries" && d.linked && d.queries.some((q) => q.status === "Open") ? ` · ${d.queries.filter((q) => q.status === "Open").length}` : ""}</button>
-        ))}
-      </div>
-      {msg && <div className="px-4 pt-3 text-sm font-semibold" style={{ color: msg.endsWith("✓") ? C.green : C.red }}>{msg}</div>}
-
-      <div className="px-3 py-3" style={{ maxWidth: 760, margin: "0 auto" }}>
-        {!d.linked ? null : tab === "records" ? (
+      </div></div>
+        ) : tab === "idpform" ? (
+          <>{idpPanel ?? <Empty>The IDP is not open on this page.</Empty>}</>
+        ) : !d.linked ? null : tab === "records" ? (
           <>
             <Note>Your record as HR holds it. Spot a mistake? <a href="/hrms/query" target="_blank" rel="noreferrer" style={{ color: C.orange, fontWeight: 700 }}>Tell HR through HR Queries</a> and it is corrected on the record, not here.</Note>
             {d.record.map((g) => (

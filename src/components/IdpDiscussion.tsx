@@ -113,26 +113,38 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
       catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
       setBusy(false);
     };
-    // THE SHEET (Dr Raghu, 5 Sep 2026): once the IDP is done, this is the
-    // employee's own page — no other header, footer, nothing. The IDP itself,
-    // with its Go back and edit and a leader's team reviews, sits under IDP Results.
-    return (
+    // THE FRAME, once the IDP is done: header frozen, tabs frozen under it,
+    // Home the dashboard, the IDP tab the done notice with Go back and edit,
+    // and a leader's team list beneath it.
+    const donePanel = (
       <>
-        <MySheet name={name} teamBox={<TeamBox onOpen={setReviewRow} />}>
-          <div className="rounded-lg p-3 mb-2" style={{ background: "#E6F4EA", border: "1px solid #9AD3AE" }}>
-            <div className="font-bold text-sm" style={{ color: C.green }}>Your IDP is done — completed {new Date(last.submitted_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}.</div>
-            <div className="text-xs mt-1" style={{ color: C.dim, lineHeight: 1.6 }}>It is on your record and your HoD, HR and Management can read it.</div>
-            <div className="flex items-center gap-2 flex-wrap mt-2">
-              <button onClick={reopen} disabled={busy} className="rounded font-bold text-sm" style={{ background: C.orange, color: "#fff", padding: "8px 14px" }}>{busy ? "Opening…" : "✎ Go back and edit it"}</button>
-              <span style={{ fontSize: 12, color: C.faint }}>Allowed while this is new. Nothing starts again.</span>
-            </div>
-            {msg && <div className="mt-2 text-sm font-semibold" style={{ color: C.red }}>{msg}</div>}
+        <div className="rounded-lg p-3 mb-2" style={{ background: "#E6F4EA", border: "1px solid #9AD3AE" }}>
+          <div className="font-bold text-sm" style={{ color: C.green }}>Your IDP is done — completed {new Date(last.submitted_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}.</div>
+          <div className="text-xs mt-1" style={{ color: C.dim, lineHeight: 1.6 }}>It is on your record and your HoD, HR and Management can read it. What you wrote, and what came back, is under IDP Results.</div>
+          <div className="flex items-center gap-2 flex-wrap mt-2">
+            <button onClick={reopen} disabled={busy} className="rounded font-bold text-sm" style={{ background: C.orange, color: "#fff", padding: "8px 14px" }}>{busy ? "Opening…" : "✎ Go back and edit it"}</button>
+            <span style={{ fontSize: 12, color: C.faint }}>Allowed while this is new. Nothing starts again.</span>
           </div>
-          <TeamList onOpen={setReviewRow} />
-          {reviewRow && <TeamReview row={reviewRow} onClose={() => { setReviewRow(null); }} />}
-        </MySheet>
-        <WhatsAppFab name={name} form="My sheet" />
+          {msg && <div className="mt-2 text-sm font-semibold" style={{ color: C.red }}>{msg}</div>}
+        </div>
+        <TeamList onOpen={setReviewRow} />
       </>
+    );
+    const doneDashboard = (
+      <>
+        <TeamBox onOpen={setReviewRow} />
+        <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-3 hover:opacity-90" style={{ background: "#16232F", color: "#fff", textDecoration: "none" }}>
+          <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
+          <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>Read it, ask HR under any section, and acknowledge the edition at the end.</div>
+        </a>
+      </>
+    );
+    return (
+      <Shell initials={initials} name={name}>
+        <MySheet name={name} embedded dashboard={doneDashboard} idpPanel={donePanel} idpStatus="done" />
+        {reviewRow && <TeamReview row={reviewRow} onClose={() => { setReviewRow(null); }} />}
+        <WhatsAppFab name={name} form="My sheet" />
+      </Shell>
     );
   }
 
@@ -167,8 +179,25 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     );
   }
 
-  return (
-    <Shell initials={initials} name={name}>
+  const dashboard = (
+    <>
+      {/* "for the ones who did not fill the IDP show them a BIG RED BOX" (Dr Raghu, 5 Sep 2026) */}
+      {!state.done.length && state.idpDue !== false && (
+        <div className="rounded-lg p-4 mt-4" style={{ background: "#B3261E", color: "#fff", border: "3px solid #7F1A14" }}>
+          <div className="font-bold" style={{ fontSize: 22, lineHeight: 1.2 }}>⚠ You have not submitted your IDP</div>
+          <div className="mt-1" style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.95 }}>{state.open ? "It is started but not submitted. Finish it and press Submit — until then it is not an IDP." : "Your Individual Development Plan is due. Set aside an hour and start below."}</div>
+        </div>
+      )}
+      <TeamBox onOpen={setReviewRow} />
+      {/* THE HANDBOOK, WHERE EVERY EMPLOYEE ALREADY COMES (Dr Raghu, 5 Sep 2026) */}
+      <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "#16232F", color: "#fff", textDecoration: "none" }}>
+        <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
+        <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>How things work at Nandan GSE: hours, leave, pay, conduct, safety, leaving. Read it, ask HR under any section, and acknowledge the edition at the end.</div>
+      </a>
+    </>
+  );
+  const welcomePanel = (
+    <>
       <div className="mx-auto px-4 py-6 md:py-8" style={{ maxWidth: 720 }}>
         {msg && <div className="rounded p-2 mb-4 text-xs font-semibold" style={{ background: "#FBEDEA", color: C.red }}>{msg}</div>}
         {state.needsMigration && (
@@ -178,20 +207,8 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
         )}
 
         <h1 className="font-bold" style={{ fontSize: 23, lineHeight: 1.25 }}>Welcome {name}</h1>
-        {/* "for the ones who did not fill the IDP show them a BIG RED BOX" (Dr Raghu, 5 Sep 2026) */}
-        {!state.done.length && state.idpDue !== false && (
-          <div className="rounded-lg p-4 mt-4" style={{ background: "#B3261E", color: "#fff", border: "3px solid #7F1A14" }}>
-            <div className="font-bold" style={{ fontSize: 22, lineHeight: 1.2 }}>⚠ You have not submitted your IDP</div>
-            <div className="mt-1" style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.95 }}>{state.open ? "It is started but not submitted. Finish it and press Submit — until then it is not an IDP." : "Your Individual Development Plan is due. Set aside an hour and start below."}</div>
-          </div>
-        )}
-        <TeamBox onOpen={setReviewRow} />
-        {reviewRow && <TeamReview row={reviewRow} onClose={() => { setReviewRow(null); }} />}
-        {/* THE HANDBOOK, WHERE EVERY EMPLOYEE ALREADY COMES (Dr Raghu, 5 Sep 2026) */}
-        <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "#16232F", color: "#fff", textDecoration: "none" }}>
-          <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
-          <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>How things work at Nandan GSE: hours, leave, pay, conduct, safety, leaving. Read it, ask HR under any section, and acknowledge the edition at the end.</div>
-        </a>
+
+
         <p className="mt-4" style={{ fontSize: 16, lineHeight: 1.7, color: C.ink }}>
           Would you like to fill up the IDP?
         </p>
@@ -327,6 +344,17 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
           </div>
         )}
       </div>
+    </>
+  );
+  // THE FRAME (Dr Raghu, 5 Sep 2026): "freeze the top end as the IDP ... and
+  // back to Genie ... Below that, put all these tabs ... a sub-frozen thing at
+  // the top ... the boxes can be seen in a dashboard." The IDP header stays,
+  // the tab strip freezes under it, Home is the dashboard, IDP is this welcome.
+  return (
+    <Shell initials={initials} name={name}>
+      <MySheet name={name} embedded dashboard={dashboard} idpPanel={welcomePanel} idpStatus={state.open ? "open" : "none"} />
+      {reviewRow && <TeamReview row={reviewRow} onClose={() => { setReviewRow(null); }} />}
+      <WhatsAppFab name={name} form="IDP" />
     </Shell>
   );
 }
