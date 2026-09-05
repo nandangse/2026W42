@@ -20,7 +20,11 @@ export const PERISKOPE_BASE = "https://api.periskope.app/v1";
 /** His ceilings, and the numbers used when the boxes are left empty. */
 export const THROTTLE_DEFAULTS = { per_hour: 100, per_day: 500, gap_seconds: 10 };
 
+/** "ok the whatsapp is restricted now!" (Dr Raghu, 5 Sep 2026) — one switch on the card that stops every send, cron or hand. */
+export const isPaused = (cfg: { paused?: string | boolean | null }) => /^(yes|true|1|on)$/i.test(String(cfg.paused ?? "").trim());
+
 export interface PeriskopeCfg {
+  paused?: string;
   base: string;
   apiKey: string;
   phone: string;
@@ -54,6 +58,7 @@ export async function periskopeConfig(db: SupabaseClient): Promise<PeriskopeCfg 
     return n > 0 ? n : fallback;
   };
   return {
+    paused: String(cfg.paused ?? ""),
     base: String(cfg.base_url || PERISKOPE_BASE).replace(/\/+$/, ""),
     apiKey: String(cfg.api_key),
     phone: String(cfg.phone).replace(/\D/g, ""),

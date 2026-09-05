@@ -3,7 +3,7 @@ import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
 import { variableValues, renderTemplate } from "@/crm/variables";
-import { periskopeConfig, throttleState, periskopeSend, periskopeStatus } from "@/crm/periskope";
+import { periskopeConfig, throttleState, periskopeSend, periskopeStatus, isPaused } from "@/crm/periskope";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -143,6 +143,7 @@ export async function POST(req: Request) {
       if (!id) throw new HttpError(400, "Which message?");
       const cfg = await periskopeConfig(db);
       if ("error" in cfg) throw new HttpError(400, cfg.error);
+      if (isPaused(cfg)) throw new HttpError(423, "WhatsApp sending is paused on the Periskope card (paused = yes). Nothing goes out until it is cleared.");
 
       const t = await throttleState(db, cfg);
       if (t.blocked) return NextResponse.json({ ok: false, throttled: true, reason: t.blocked, throttle: t }, { status: 429 });

@@ -16,7 +16,7 @@ import { ALL_FIELDS, fieldSpec, hrmsTables, type FieldSpec } from "@/lib/hrms";
 import { employeeVars, payrollVars, renderTemplate, MONTHS } from "@/lib/hrms-template";
 import { musterVars, OPTIONAL_MUSTER_VARS, type MusterRow } from "@/lib/muster";
 import { crmDb } from "@/crm/db";
-import { periskopeConfig, throttleState, periskopeSend } from "@/crm/periskope";
+import { periskopeConfig, throttleState, periskopeSend, isPaused } from "@/crm/periskope";
 
 export interface EmpRow {
   id: string; name: string; email: string | null; dob: string | null; doj: string | null;
@@ -179,6 +179,7 @@ export async function drainHrmsQueue(admin: SupabaseClient, opts: { n?: number; 
   const crm = crmDb();
   const cfg = await periskopeConfig(crm);
   if ("error" in cfg) throw new Error(cfg.error);
+  if (isPaused(cfg)) return { sent: 0, failed: 0, stage: 0, quota: 0, tried: 0, stopped: "WhatsApp sending is PAUSED on the Periskope card (paused = yes).", left: 0 };
   const { stage, quota } = await warmupQuota(cfg.perHour);
   const n = opts.n ? Math.max(1, Math.min(opts.n, quota)) : Math.max(1, Math.ceil(quota / (opts.perRunFraction || 6)));
   const { data: rows } = await crm.from("wa_queue").select("id, phone, body, ref").eq("source", "hrms").eq("status", "queued").order("queued_at", { ascending: true }).limit(n);
