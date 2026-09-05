@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import Handbook from "@/components/hrms/Handbook";
 import { LOGO } from "@/lib/logo";
+import { adminClient } from "@/lib/supabase/admin";
+import { people } from "@/lib/hrms-wa";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Employee Handbook · Nandan GSE" };
@@ -23,6 +25,12 @@ export default async function HandbookPage() {
       </div>
     );
   }
+  // Labour reads Hindi first (Dr Raghu, 5 Sep 2026); everyone can switch.
+  let defaultLang: "en" | "hi" = "en";
+  try {
+    const me = (await people(adminClient())).find((p) => String((p as { email?: string | null }).email || "").toLowerCase() === user.email.toLowerCase());
+    if (me && /labour/i.test(String(me.type || ""))) defaultLang = "hi";
+  } catch { /* the record is optional here */ }
   return (
     <div className="min-h-screen" style={{ background: "#F1EFE9" }}>
       <div className="px-4 py-3 flex items-center gap-3" style={{ background: "#16232F", color: "#fff" }}>
@@ -32,7 +40,7 @@ export default async function HandbookPage() {
         <span style={{ flex: 1 }} />
         <span className="text-xs" style={{ color: "#8FA1B3" }}>{user.displayName || user.email}</span>
       </div>
-      <Handbook who={user.displayName || user.email} standalone />
+      <Handbook who={user.displayName || user.email} standalone defaultLang={defaultLang} />
     </div>
   );
 }

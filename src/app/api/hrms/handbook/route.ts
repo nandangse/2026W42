@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAiOn } from "@/lib/ai-gate";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { resolveHrmsAccess, hrmsTables } from "@/lib/hrms";
@@ -35,7 +36,11 @@ async function seedIfEmpty(admin: ReturnType<typeof adminClient>) {
   return ie;
 }
 
-export async function GET() {
+export const maxDuration = 300;
+
+const LANGS: Record<string, string> = { hi: "Hindi (Devanagari)", mr: "Marathi (Devanagari)" };
+
+export async function GET(req: Request) {
   try {
     const me = await requireUser();
     const admin = adminClient();
@@ -45,8 +50,25 @@ export async function GET() {
     if (se) throw new Error(se.message);
     let q = admin.from("hrms_handbook").select("*").order("ord");
     if (!hr) q = q.eq("published", true);
-    const { data: sections, error } = await q;
+    const { data: rawSections, error } = await q;
     if (error) throw new Error(error.message);
+
+    // THE LANGUAGE (0141): Hindi or Marathi swaps in the translated words
+    // where a translation exists for this version of the English; the rest
+    // stay English and are counted as pending, so HR can see what to run.
+    const lang = String(new URL(req.url).searchParams.get("lang") || "en");
+    let sections = (rawSections || []) as Record<string, unknown>[];
+    let pending = 0;
+    if (LANGS[lang]) {
+      const { data: tr } = await admin.from("hrms_handbook_translation").select("slug, title, summary, body, source_version, translated_at").eq("lang", lang);
+      const by = new Map((tr || []).map((t) => [String(t.slug), t]));
+      sections = sections.map((sec) => {
+        const t = by.get(String(sec.slug));
+        const fresh = !!t && Number(t.source_version) >= Number(sec.version);
+        if (!fresh && sec.published) pending++;
+        return fresh ? { ...sec, title: t!.title, summary: t!.summary, body: t!.body, translated: true, translated_at: t!.translated_at, en_title: sec.title } : { ...sec, translated: false, en_title: sec.title };
+      });
+    }
 
     // questions: published ones for everyone, plus the reader's own; HR sees all
     let qq = admin.from("hrms_query").select("id, subject, question, answer, status, published, raised_by, raised_email, raised_at, answered_by, answered_at, form").eq("topic", "Handbook").order("raised_at", { ascending: false }).limit(500);
@@ -59,7 +81,7 @@ export async function GET() {
     let ackCount = 0;
     if (hr) { try { const { count } = await admin.from("hrms_handbook_ack").select("id", { count: "exact", head: true }).eq("edition", HANDBOOK_EDITION); ackCount = count || 0; } catch { /* */ } }
 
-    return NextResponse.json({ sections: sections || [], questions, hr, edition: HANDBOOK_EDITION, acknowledged, ackCount, me: { email: me.email, name: me.displayName } });
+    return NextResponse.json({ sections, questions, hr, edition: HANDBOOK_EDITION, acknowledged, ackCount, lang: LANGS[lang] ? lang : "en", pending, me: { email: me.email, name: me.displayName } });
   } catch (e) { return errJson(e); }
 }
 
@@ -72,6 +94,50 @@ export async function POST(req: Request) {
     const action = String(body.action || "");
     const stamp = me.initials ? `${me.initials} · ${me.email}` : me.email;
     const now = new Date().toISOString();
+
+    /**
+     * TRANSLATE (0141) — Genie renders up to `limit` pending sections into
+     * Hindi or Marathi; the screen calls again until nothing is pending. HTML
+     * in, HTML out; names, numbers and [CHECK] marks stay as they are.
+     */
+    if (action === "translate") {
+      if (!hr) throw new HttpError(403, "HRMS only.");
+      const lang = String(body.lang || "");
+      if (!LANGS[lang]) throw new HttpError(400, "Which language — hi or mr?");
+      await assertAiOn();
+      const key = process.env.ANTHROPIC_API_KEY;
+      if (!key) throw new HttpError(503, "ANTHROPIC_API_KEY is not set.");
+      const limit = Math.max(1, Math.min(6, Number(body.limit) || 3));
+      const { data: secs } = await admin.from("hrms_handbook").select("slug, title, summary, body, version, published").eq("published", true).order("ord");
+      const { data: tr, error: te } = await admin.from("hrms_handbook_translation").select("slug, source_version").eq("lang", lang);
+      if (te && /hrms_handbook_translation|schema cache|does not exist/i.test(te.message)) throw new HttpError(503, "Run migration 0141 first — the translations have nowhere to be kept yet.");
+      const have = new Map((tr || []).map((t) => [String(t.slug), Number(t.source_version)]));
+      const todo = (secs || []).filter((x) => (have.get(String(x.slug)) ?? -1) < Number(x.version));
+      const wanted = body.slug ? todo.filter((x) => x.slug === body.slug) : todo;
+      let done = 0;
+      for (const sec of wanted.slice(0, limit)) {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({
+            model: "claude-sonnet-5",
+            max_tokens: 8000,
+            system: `You translate Nandan GSE's Employee Handbook from English into ${LANGS[lang]} for factory staff and workers in Maharashtra. Natural, respectful, plain ${lang === "hi" ? "Hindi" : "Marathi"} of the kind used at work — not literary, not machine-stiff. Keep every HTML tag and its structure exactly; translate only the text inside. Keep numbers, amounts, dates, e-mail addresses, URLs, and the marker [CHECK] exactly. Keep proper nouns as they are: Nandan GSE, Genie, IDP, HR, PF, ESI, PT, MLWF, Khalapur, Turbhe, names of people. Where an English term is what people say on the floor (leave, comp off, muster, salary slip), give the ${lang === "hi" ? "Hindi" : "Marathi"} word and the English in brackets the first time. Reply with JSON only: {"title": "...", "summary": "...", "body": "<html...>"}.`,
+            messages: [{ role: "user", content: JSON.stringify({ title: sec.title, summary: sec.summary || "", body: sec.body }) }],
+          }),
+        });
+        const j = await res.json();
+        if (!res.ok) throw new HttpError(502, j?.error?.message || `Anthropic returned ${res.status}`);
+        const text = (j.content || []).filter((c: { type: string }) => c.type === "text").map((c: { text: string }) => c.text).join("\n").trim();
+        let out: { title?: string; summary?: string; body?: string } = {};
+        try { out = JSON.parse(text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "")); } catch { throw new HttpError(502, `Genie's translation of "${sec.title}" did not come back as JSON — try again.`); }
+        if (!out.body || !out.title) throw new HttpError(502, `Genie's translation of "${sec.title}" came back incomplete — try again.`);
+        const { error } = await admin.from("hrms_handbook_translation").upsert({ slug: sec.slug, lang, title: out.title, summary: out.summary || "", body: out.body, source_version: sec.version, translated_at: now, translated_by: stamp }, { onConflict: "slug,lang" });
+        if (error) throw new Error(error.message);
+        done++;
+      }
+      return NextResponse.json({ ok: true, done, pending: Math.max(0, wanted.length - done) });
+    }
 
     if (action === "ask") {
       const section = String(body.section || "").trim();

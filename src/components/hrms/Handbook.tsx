@@ -17,9 +17,9 @@ import RichText, { RichTextView } from "./RichText";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
 
-interface Section { slug: string; ord: number; title: string; summary: string | null; body: string; audience: string; published: boolean; version: number; updated_by: string | null; updated_at: string }
+interface Section { slug: string; ord: number; title: string; summary: string | null; body: string; audience: string; published: boolean; version: number; updated_by: string | null; updated_at: string; translated?: boolean; translated_at?: string | null; en_title?: string }
 interface Q { id: string; subject: string; question: string; answer: string | null; status: string; published: boolean; raised_by: string | null; raised_at: string; answered_by: string | null; answered_at: string | null; section: string | null; mine: boolean }
-interface State { sections: Section[]; questions: Q[]; hr: boolean; edition: string; acknowledged: string | null; ackCount: number; needsMigration?: boolean; me: { email: string; name: string | null } }
+interface State { sections: Section[]; questions: Q[]; hr: boolean; edition: string; acknowledged: string | null; ackCount: number; needsMigration?: boolean; lang?: string; pending?: number; me: { email: string; name: string | null } }
 
 const who = (s: string | null) => (s ? String(s).split("·")[0].trim() : "HR");
 const CSS = `
@@ -33,7 +33,11 @@ const CSS = `
 .hb .check{background:#FFF7E6;border-left:3px solid #F5B32B;padding:6px 10px;color:#8A5B00;font-size:12.5px}
 `;
 
-export default function Handbook({ who: me, standalone }: { who: string; standalone?: boolean }) {
+export type HandbookLang = "en" | "hi" | "mr";
+const LANG_NAMES: Record<HandbookLang, string> = { en: "English", hi: "हिन्दी", mr: "मराठी" };
+
+export default function Handbook({ who: me, standalone, defaultLang = "en" }: { who: string; standalone?: boolean; defaultLang?: HandbookLang }) {
+  const [lang, setLang] = useState<HandbookLang>(defaultLang);
   const [st, setSt] = useState<State | null>(null);
   const [msg, setMsg] = useState("");
   const [cur, setCur] = useState<string>("");
@@ -43,10 +47,27 @@ export default function Handbook({ who: me, standalone }: { who: string; standal
   const [q, setQ] = useState("");
 
   const load = useCallback(async () => {
-    try { const j = await api.get("/api/hrms/handbook"); setSt(j); if (!cur && j.sections?.[0]) setCur(j.sections[0].slug); }
+    try { const j = await api.get(`/api/hrms/handbook${lang !== "en" ? `?lang=${lang}` : ""}`); setSt(j); if (!cur && j.sections?.[0]) setCur(j.sections[0].slug); }
     catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [lang]);
+
+  // TRANSLATE (Dr Raghu, 5 Sep 2026): Genie renders the pending sections a
+  // few at a time until none are left; the count on the button is what remains.
+  const [translating, setTranslating] = useState<number | null>(null);
+  const translateAll = async () => {
+    if (lang === "en") return;
+    setTranslating(st?.pending ?? 0); setMsg("");
+    try {
+      for (let guard = 0; guard < 12; guard++) {
+        const j = await api.post("/api/hrms/handbook", { action: "translate", lang, limit: 3 });
+        setTranslating(Number(j.pending) || 0);
+        if (!j.pending) break;
+      }
+      setMsg(`${LANG_NAMES[lang]} ready ✓`);
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setTranslating(null); await load(); }
+  };
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (!standalone) return; try { const h = window.location.hash.replace("#", ""); if (h) setCur(h); } catch { /* */ } }, [standalone]);
   const goTo = (slug: string) => { setCur(slug); setEdit(false); if (standalone) { try { window.location.hash = slug; } catch { /* */ } } try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* */ } };
@@ -87,6 +108,23 @@ export default function Handbook({ who: me, standalone }: { who: string; standal
           <div className="px-2 pt-1 pb-2">
             <div className="font-bold" style={{ fontSize: 14 }}>Employee Handbook</div>
             <div className="text-xs" style={{ color: C.faint }}>Edition {st?.edition || "…"}</div>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-xs" style={{ color: C.faint }}>🌐</span>
+              <select value={lang} onChange={(e) => { setLang(e.target.value as HandbookLang); setEdit(false); }} className="text-xs rounded px-2 py-1 bg-white flex-1" style={{ border: `1px solid ${C.line}` }} title="Read the handbook in English, Hindi or Marathi">
+                {(Object.keys(LANG_NAMES) as HandbookLang[]).map((k) => <option key={k} value={k}>{LANG_NAMES[k]}</option>)}
+              </select>
+            </div>
+            {lang !== "en" && (
+              <div className="text-xs mt-1.5" style={{ color: C.faint, lineHeight: 1.5 }}>
+                {lang === "hi" ? "Genie ने अंग्रेज़ी से अनुवाद किया है; मतभेद होने पर अंग्रेज़ी मान्य है।" : "Genie ने इंग्रजीतून भाषांतर केले आहे; फरक असल्यास इंग्रजी ग्राह्य धरली जाईल."}
+                {st?.pending ? ` · ${st.pending} section${st.pending === 1 ? "" : "s"} still in English` : ""}
+              </div>
+            )}
+            {st?.hr && lang !== "en" && (st.pending || 0) > 0 && (
+              <button onClick={translateAll} disabled={busy || translating != null} className="mt-1.5 w-full text-xs font-bold rounded px-2 py-1.5" style={{ background: C.orange, color: "#fff", opacity: translating != null ? 0.7 : 1 }}>
+                {translating != null ? `Translating… ${translating} left` : `✨ Translate ${st.pending} section${st.pending === 1 ? "" : "s"} to ${LANG_NAMES[lang]}`}
+              </button>
+            )}
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search the handbook" className="w-full rounded px-2 py-1 mt-2 text-xs" style={{ border: `1px solid ${C.line}` }} />
           </div>
           {(st?.sections || []).map((s) => {
@@ -114,7 +152,8 @@ export default function Handbook({ who: me, standalone }: { who: string; standal
                   {next && <button onClick={() => goTo(next.slug)} className="text-xs font-semibold" style={{ color: "#1B3A5C" }} title={next.title}>next →</button>}
                   <span style={{ flex: 1 }} />
                   <span className="text-xs" style={{ color: C.faint }}>v{sec.version}{sec.updated_by && sec.updated_by !== "system" ? ` · ${who(sec.updated_by)} · ${fmtFull(String(sec.updated_at))}` : ""}</span>
-                  {st?.hr && <button onClick={() => setEdit((v) => !v)} className="text-xs font-bold rounded px-2.5 py-1" style={{ background: edit ? "#fff" : C.orange, color: edit ? C.dim : "#fff", border: `1px solid ${edit ? C.line : C.orange}` }}>{edit ? "✕ Close editor" : "✎ Edit"}</button>}
+                  {st?.hr && lang !== "en" && <span className="text-xs" style={{ color: C.faint }}>Edit in English — the translation follows</span>}
+                  {st?.hr && lang === "en" && <button onClick={() => setEdit((v) => !v)} className="text-xs font-bold rounded px-2.5 py-1" style={{ background: edit ? "#fff" : C.orange, color: edit ? C.dim : "#fff", border: `1px solid ${edit ? C.line : C.orange}` }}>{edit ? "✕ Close editor" : "✎ Edit"}</button>}
                 </div>
                 {!edit ? (
                   <>
