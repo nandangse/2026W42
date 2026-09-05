@@ -45,7 +45,7 @@ async function whoAreThey(email: string) {
   const T = await hrmsTables(admin);
   try {
     const { data: emps } = await admin
-      .from(T.employees).select("id, name, designation, department").ilike("email", email).limit(1);
+      .from(T.employees).select("id, name, designation, department, extra").ilike("email", email).limit(1);
     let emp: { id: string; name: string; designation: string | null; department: string | null } | null =
       ((emps || [])[0] as { id: string; name: string; designation: string | null; department: string | null } | undefined) ?? null;
     if (!emp) {
@@ -54,7 +54,7 @@ async function whoAreThey(email: string) {
         .from(T.edits).select("employee_id").eq("field", "user_email").ilike("value", email).limit(1);
       if (link?.length) {
         const { data: e2 } = await admin
-          .from(T.employees).select("id, name, designation, department").eq("id", link[0].employee_id).maybeSingle();
+          .from(T.employees).select("id, name, designation, department, extra").eq("id", link[0].employee_id).maybeSingle();
         emp = (e2 as typeof emp) ?? null;
       }
     }
@@ -101,7 +101,11 @@ async function whoAreThey(email: string) {
     const { data: full } = await admin.from(T.employees).select("extra").eq("id", emp.id).maybeSingle();
     const lc = String(((full?.extra || {}) as Record<string, string>)["In LC"] || "").toLowerCase();
     const isLeader = lc.includes("leader") || lc === "yes" || lc === "y";
-    return { employee: emp, role: roleNames.join(" · ") || roleName, roleSummary, roleDocs, isLeader };
+    // "I will of course keep management off" (Dr Raghu): Management does not
+    // fill an IDP, so the not-submitted warning must not shout at them.
+    const empType = String(((emp as unknown as { extra?: Record<string, string> | null }).extra || {})["Type"] || "");
+    const idpDue = !/management/i.test(empType);
+    return { employee: { id: emp.id, name: emp.name, designation: emp.designation, department: emp.department }, role: roleNames.join(" · ") || roleName, roleSummary, roleDocs, isLeader, idpDue };
   } catch {
     return { employee: null, role: null, roleSummary: null, roleDocs: [], isLeader: false };
   }

@@ -48,6 +48,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     role: string | null; roleSummary: string | null; roleDocs: RoleDoc[]; needsMigration?: boolean;
     employee: { id: string; name: string } | null;
     isLeader?: boolean;
+    idpDue?: boolean;
     myRecord: MyRecord | null;
     options: Record<string, string[]>;
     salary: Salary;
@@ -76,7 +77,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
   const load = useCallback(async () => {
     try {
       const j = await api.get("/api/idp");
-      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, roleDocs: j.roleDocs ?? [], needsMigration: j.needsMigration, employee: j.employee ?? null, isLeader: !!j.isLeader, myRecord: j.myRecord ?? null, options: j.options || {}, salary: j.salary ?? null, serverStt: !!j.serverStt });
+      setState({ open: j.open, done: j.done || [], role: j.role, roleSummary: j.roleSummary, roleDocs: j.roleDocs ?? [], needsMigration: j.needsMigration, employee: j.employee ?? null, isLeader: !!j.isLeader, idpDue: j.idpDue !== false, myRecord: j.myRecord ?? null, options: j.options || {}, salary: j.salary ?? null, serverStt: !!j.serverStt });
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -178,7 +179,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
 
         <h1 className="font-bold" style={{ fontSize: 23, lineHeight: 1.25 }}>Welcome {name}</h1>
         {/* "for the ones who did not fill the IDP show them a BIG RED BOX" (Dr Raghu, 5 Sep 2026) */}
-        {!state.done.length && (
+        {!state.done.length && state.idpDue !== false && (
           <div className="rounded-lg p-4 mt-4" style={{ background: "#B3261E", color: "#fff", border: "3px solid #7F1A14" }}>
             <div className="font-bold" style={{ fontSize: 22, lineHeight: 1.2 }}>⚠ You have not submitted your IDP</div>
             <div className="mt-1" style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.95 }}>{state.open ? "It is started but not submitted. Finish it and press Submit — until then it is not an IDP." : "Your Individual Development Plan is due. Set aside an hour and start below."}</div>
