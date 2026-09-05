@@ -14,7 +14,7 @@ import { MONTHS } from "@/lib/hrms-template";
 import { PAYROLL_RULES, type MusterRow, type RegisterRow } from "@/lib/muster";
 import { C } from "./RecordFields";
 
-interface Run { id: string; month: number; year: number; status: string; uploaded_by: string | null; uploaded_at: string | null; approved_by: string | null; approved_at: string | null; run_note: string | null; generated_at: string | null; generated_by: string | null; wa_batch_id: string | null; drive_folder_link: string | null; total_count: number | null; net_payable: number | null; earned_pay: number | null; deductions: number | null; mapping: { warnings?: string[] } | null }
+interface Run { id: string; month: number; year: number; status: string; uploaded_by: string | null; uploaded_at: string | null; approved_by: string | null; approved_at: string | null; run_note: string | null; working_days: number | null; generated_at: string | null; generated_by: string | null; wa_batch_id: string | null; drive_folder_link: string | null; total_count: number | null; net_payable: number | null; earned_pay: number | null; deductions: number | null; mapping: { warnings?: string[] } | null }
 interface FileRow { id: string; kind: string; name: string; size: number | null; drive_link: string | null; uploaded_by: string | null; uploaded_at: string }
 interface Msg { id: string; employee_id: string; name: string; channel: string; direction: string; to_address: string | null; subject: string | null; body: string; status: string; error: string | null; sent_by: string | null; sent_at: string }
 interface Detail { run: Run; files: FileRow[]; muster: { month: number | null; year: number | null; days: number; columns: Record<string, string>; unmapped: string[]; warnings: string[]; rows: MusterRow[] } | null; rates: { rows: number; warnings: string[] } | null; register: RegisterRow[]; messages: Msg[]; counts: Record<string, number> }
@@ -144,6 +144,9 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
         <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", flex: "1 1 520px" }}>
           <Card title="Uploads">{d.files.length ? <>{d.files.length} file{d.files.length === 1 ? "" : "s"} · muster {d.muster ? "✓" : "—"} · rate list {d.rates ? "✓" : "—"}</> : "Nothing uploaded yet."}{r.drive_folder_link && <div className="mt-1"><a href={r.drive_folder_link} target="_blank" rel="noreferrer" style={{ color: "#1B3A5C" }}>Drive folder ↗</a></div>}</Card>
           <Card title="Generated">{r.generated_at ? <>{d.register.length} lines · earned ₹{inr(r.earned_pay)} · deductions ₹{inr(r.deductions)} · net ₹{inr(r.net_payable)}</> : "Not generated yet — upload the muster and press Generate on the Uploads tab."}</Card>
+          <Card title="Working days this month">
+            <WorkingDays run={r} onSave={(n) => act({ action: "working_days", id: r.id, working_days: n }, () => "Working days saved — press Generate again for the conveyance to follow.")} />
+          </Card>
           <Card title="WhatsApp">{d.messages.length ? Object.entries(d.counts).map(([k, v]) => <span key={k} className="mr-2" style={{ color: tone(k) }}><b>{v}</b> {k}</span>) : "No message sent from this run yet."}</Card>
           {(r.mapping?.warnings || []).length > 0 && <Card title="Warnings"><ul className="text-xs" style={{ color: "#8A5B00", paddingLeft: 16 }}>{(r.mapping?.warnings || []).map((w, i) => <li key={i}>{w}</li>)}</ul></Card>}
         </div>
@@ -297,6 +300,31 @@ function Rules() {
           </ul>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Conveyance runs on the company's working days for the month — calendar
+ * days less Sundays and the third Saturday — not on the individual's days
+ * (Dr Raghu, 5 Sep 2026). HR sets it here when a statutory holiday takes a
+ * day out; blank goes back to the default.
+ */
+function WorkingDays({ run, onSave }: { run: Run; onSave: (n: number | null) => void }) {
+  const days = new Date(Date.UTC(run.year, run.month, 0)).getUTCDate();
+  let sundays = 0, sats = 0, third = 0;
+  for (let d = 1; d <= days; d++) { const w = new Date(Date.UTC(run.year, run.month - 1, d)).getUTCDay(); if (w === 0) sundays++; if (w === 6) { sats++; if (sats === 3) third = 1; } }
+  const dflt = days - sundays - third;
+  const [v, setV] = useState(run.working_days != null ? String(run.working_days) : "");
+  const cur = run.working_days ?? dflt;
+  return (
+    <div className="text-xs">
+      <div><b style={{ fontSize: 16 }}>{cur}</b> working days · conveyance = rate × present ÷ {cur}</div>
+      <div style={{ color: "#8A8A8A" }}>Default {dflt}: {days} days less {sundays} Sundays and the third Saturday. Set it when a statutory holiday falls in the month; clear it to go back to the default.</div>
+      <div className="flex gap-1 items-center mt-1">
+        <input type="number" min={1} max={31} value={v} onChange={(e) => setV(e.target.value)} placeholder={String(dflt)} className="rounded px-2 py-1" style={{ border: "1px solid #E2E0DA", width: 70 }} />
+        <button onClick={() => onSave(v.trim() ? Number(v) : null)} className="font-bold rounded px-2 py-1" style={{ background: "#1B3A5C", color: "#fff" }}>Save</button>
+      </div>
     </div>
   );
 }

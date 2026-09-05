@@ -183,7 +183,10 @@ export function parseRates(grid: unknown[][]): Rates {
  *     single; the balance above the HRA is Site Allowance (with any flat site
  *     amount the muster carries); a shortfall below it is an Other Deduction.
  *   · Fixed allowance in full at 7 or more days present, else pro rata.
- *     Conveyance = rate × present ÷ 26. Medical = the rate, flat.
+ *     Conveyance = rate × present ÷ the company's working days that month
+ *     (calendar days less Sundays and the third Saturday, or what HR set on
+ *     the run) — so a day worked beyond them earns conveyance too (Dr Raghu,
+ *     5 Sep 2026). Medical = the rate, flat.
  *   · PF 12% of earned basic capped at 1,800; PT by the slab; ESI never
  *     deducted (the company bears it); advance, loan, TDS, lunch and the
  *     late deduction (late marks × per day) as the muster carries them.
@@ -199,10 +202,27 @@ export interface RegisterRow {
   hold: boolean; rate_from: "rates" | "record" | "none"; mobile: string | null;
 }
 const r2 = (n: number) => Math.round(n * 100) / 100;
+/**
+ * The company's working days in a month: the calendar days less the Sundays
+ * and the third Saturday (the paid holiday). Statutory holidays are not known
+ * here — HR sets the figure on the run when one falls in the month.
+ */
+export function workingDaysFor(month: number, year: number): number {
+  const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  let sundays = 0, saturdays = 0, thirdSat = 0;
+  for (let d = 1; d <= days; d++) {
+    const w = new Date(Date.UTC(year, month - 1, d)).getUTCDay();
+    if (w === 0) sundays++;
+    if (w === 6) { saturdays++; if (saturdays === 3) thirdSat = 1; }
+  }
+  return days - sundays - thirdSat;
+}
+
 export function generateRegister(
   muster: Muster, rates: Rates | null,
   record: (id: string) => { type: string | null; get: (k: string) => unknown; name: string | null } | null,
   daysInMonth: number, ledger: (id: string) => Ledger | null = () => null,
+  workingDays: number = 26,
 ): { rows: RegisterRow[]; warnings: string[] } {
   const rateOf = new Map((rates?.rows || []).map((r) => [r.employee_id, r]));
   const warnings: string[] = [];
@@ -254,7 +274,7 @@ export function generateRegister(
     const eBasic = Math.round(basic * f);
     const hra = contractish ? 0 : Math.round(eBasic * 0.2);
     const eFixed = m.present >= 7 ? fixed : Math.round(fixed * m.present / 26);
-    const eConv = Math.round(conv * m.present / 26);
+    const eConv = workingDays > 0 ? Math.round(conv * m.present / workingDays) : 0;   // extra days earn extra conveyance
     const eMed = med;
     const otPay = worker ? Math.round((m.ot ?? 0) * basic / 208) : 0;
     const siteFlat = m.site_allowance ?? 0;
@@ -325,7 +345,7 @@ export const PAYROLL_RULES: { head: string; lines: string[] }[] = [
     "HRA = 20% of earned basic, Staff and workers alike; none for Management and contract types.",
     "Workers' OT = hours × basic ÷ 208, always single. The HRA is the first part of it; the balance is Site Allowance, with any flat site amount from the muster. OT below the HRA is an Other Deduction.",
     "Fixed allowance in full at 7 or more days present, else pro rata.",
-    "Conveyance = rate × present ÷ 26.",
+    "Conveyance = rate × present ÷ the company's working days that month (calendar days less Sundays and the third Saturday, or what HR set on the run). A day worked beyond them earns conveyance too.",
     "Medical = the rate, flat.",
     "Arrears as the muster carries them.",
   ] },
