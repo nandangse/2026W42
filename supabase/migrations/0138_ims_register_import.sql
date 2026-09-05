@@ -22,7 +22,9 @@
 --   List of Clause to implement (24 rows)      -> core_task, one task each, open.
 --
 -- Every imported row carries an import key so a re-run adds nothing twice and
--- never overwrites what somebody has since edited. ASCII only, additive.
+-- never overwrites what somebody has since edited. The import-key indexes are
+-- full unique indexes, not partial: ON CONFLICT (import_key) cannot use a
+-- partial one, and a unique index lets any number of blanks through. ASCII only, additive.
 
 -- ------------------------------------------------------------ A. columns
 alter table ims_document add column if not exists ref_no text;
@@ -39,7 +41,8 @@ alter table ims_document add column if not exists reviewed_on date;
 alter table ims_document add column if not exists next_review date;
 alter table ims_document add column if not exists remarks text not null default '';
 alter table ims_document add column if not exists import_key text;
-create unique index if not exists ims_document_import_key_idx on ims_document (import_key) where import_key is not null;
+drop index if exists ims_document_import_key_idx;
+create unique index if not exists ims_document_import_key_idx on ims_document (import_key);
 -- Registers, lists and policies are document types of their own on the sheet.
 alter table ims_document drop constraint if exists ims_document_doc_type_check;
 alter table ims_document add constraint ims_document_doc_type_check
@@ -47,7 +50,8 @@ alter table ims_document add constraint ims_document_doc_type_check
 
 alter table ims_certificate add column if not exists external_url text;
 alter table ims_certificate add column if not exists import_key text;
-create unique index if not exists ims_certificate_import_key_idx on ims_certificate (import_key) where import_key is not null;
+drop index if exists ims_certificate_import_key_idx;
+create unique index if not exists ims_certificate_import_key_idx on ims_certificate (import_key);
 
 alter table ims_clause_evidence_note add column if not exists requirement text not null default '';
 alter table ims_clause_evidence_note add column if not exists evidence text not null default '';
@@ -60,7 +64,8 @@ alter table ims_clause_evidence_note add column if not exists ai_draft text not 
 alter table ims_clause_evidence_note add column if not exists ai_drafted_at timestamptz;
 
 alter table core_task add column if not exists import_key text;
-create unique index if not exists core_task_import_key_idx on core_task (import_key) where import_key is not null;
+drop index if exists core_task_import_key_idx;
+create unique index if not exists core_task_import_key_idx on core_task (import_key);
 
 
 -- ------------------------------------------------------------ B. documents (the tracker)
