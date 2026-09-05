@@ -186,7 +186,8 @@ export function parseRates(grid: unknown[][]): Rates {
  *     Conveyance = rate × present ÷ the company's working days that month
  *     (calendar days less Sundays and the third Saturday, or what HR set on
  *     the run) — so a day worked beyond them earns conveyance too (Dr Raghu,
- *     5 Sep 2026). Medical = the rate, flat.
+ *     5 Sep 2026). Medical, like fixed: in full at 7 or more days present,
+ *     else pro rata (Dr Raghu, 5 Sep 2026).
  *   · PF 12% of earned basic capped at 1,800; PT by the slab; ESI never
  *     deducted (the company bears it); advance, loan, TDS, lunch and the
  *     late deduction (late marks × per day) as the muster carries them.
@@ -275,7 +276,7 @@ export function generateRegister(
     const hra = contractish ? 0 : Math.round(eBasic * 0.2);
     const eFixed = m.present >= 7 ? fixed : Math.round(fixed * m.present / 26);
     const eConv = workingDays > 0 ? Math.round(conv * m.present / workingDays) : 0;   // extra days earn extra conveyance
-    const eMed = med;
+    const eMed = m.present >= 7 ? med : Math.round(med * m.present / 26);   // like fixed: full from 7 days, else pro rata
     const otPay = worker ? Math.round((m.ot ?? 0) * basic / 208) : 0;
     const siteFlat = m.site_allowance ?? 0;
     const site = worker ? siteFlat + Math.max(0, otPay - hra) : siteFlat;
@@ -346,7 +347,7 @@ export const PAYROLL_RULES: { head: string; lines: string[] }[] = [
     "Workers' OT = hours × basic ÷ 208, always single. The HRA is the first part of it; the balance is Site Allowance, with any flat site amount from the muster. OT below the HRA is an Other Deduction.",
     "Fixed allowance in full at 7 or more days present, else pro rata.",
     "Conveyance = rate × present ÷ the company's working days that month (calendar days less Sundays and the third Saturday, or what HR set on the run). A day worked beyond them earns conveyance too.",
-    "Medical = the rate, flat.",
+    "Medical, like fixed: in full at 7 or more days present, else pro rata.",
     "Arrears as the muster carries them.",
   ] },
   { head: "Deductions", lines: [
