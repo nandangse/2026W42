@@ -145,6 +145,13 @@ export function extractSlips(grid: unknown[][]): Slip[] {
     // Encashment without it and the leave line without the days. Comp off is
     // added to leave and taken out again when encashed, at the per-day rate —
     // so it appears in both places, and the closing balance is unchanged.
+    // "Leave encashment = actual leave encashment applied + comp off earned"
+    // (Dr Raghu, 5 Sep 2026). The sheet's slip export carries the comp-off
+    // DAYS but not always the amount column; comp off is paid at the per-day
+    // rate, so days × per day is the amount when the column is absent.
+    const perDay0 = slip.per_day || (slip.gross_rate ? slip.gross_rate / 26 : 0);
+    if ((slip.compoff_amt == null || slip.compoff_amt === 0) && (slip.compoff_days ?? 0) > 0 && perDay0)
+      slip.compoff_amt = Math.round((slip.compoff_days ?? 0) * perDay0);
     const compAmt = slip.compoff_amt ?? 0;
     if (compAmt || slip.compoff_days) {
       slip.leave_encash_amt = slip.leave_encash ?? 0;
