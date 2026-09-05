@@ -103,6 +103,9 @@ const HEADERS: [keyof Slip, string[]][] = [
   ["round_up", ["roundup", "roundoff"]],
   ["leave_encashed", ["leaveencashed"]],
   ["loan_added", ["loanadded"]],
+  // the sheet's comp off: days given (Comp Of_m) and the amount paid (Comp. Off Amt.)
+  ["compoff_days", ["compofm", "compoff", "compoffdays"]],
+  ["compoff_amt", ["compoffamt", "compoffamount"]],
 ];
 
 const TEXT_FIELDS = new Set<keyof Slip>([
@@ -137,6 +140,19 @@ export function extractSlips(grid: unknown[][]): Slip[] {
     }
     slip.hold = /hold|^yes$|^y$/i.test(String(raw("hold") ?? "").trim());
     slip.name = slip.name || id;
+    // COMP OFF ON THE SLIP (Dr Raghu, 5 Sep 2026): the sheet pays comp off as
+    // its own amount and the total carries it, but the slip showed Leave
+    // Encashment without it and the leave line without the days. Comp off is
+    // added to leave and taken out again when encashed, at the per-day rate —
+    // so it appears in both places, and the closing balance is unchanged.
+    const compAmt = slip.compoff_amt ?? 0;
+    if (compAmt || slip.compoff_days) {
+      slip.leave_encash_amt = slip.leave_encash ?? 0;
+      slip.leave_encash = (slip.leave_encash ?? 0) + compAmt;
+      const perDay = slip.per_day || (slip.gross_rate ? slip.gross_rate / 26 : 0);
+      slip.compoff_encashed_days = perDay ? Math.round((compAmt / perDay) * 100) / 100 : (slip.compoff_days ?? 0);
+      slip.leave_encashed = (slip.leave_encashed ?? 0) + (slip.compoff_encashed_days ?? 0);
+    }
     out.push(slip);
   }
   return out;
