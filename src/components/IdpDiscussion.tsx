@@ -13,6 +13,7 @@
  * session is not an IDP and is never read as one.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import WhatsAppFab from "@/components/WhatsAppFab";
 import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
 import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, CONSENT_TEXT, WATCHED_TEXT, LOOM_EMBED, isComplete, bandIndex } from "@/lib/idp";
@@ -86,11 +87,11 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     setBusy(false);
   };
 
-  if (!state) return <Shell initials={initials}><div className="p-6 text-sm" style={{ color: C.faint }}>Loading…</div></Shell>;
+  if (!state) return <Shell initials={initials} name={name}><div className="p-6 text-sm" style={{ color: C.faint }}>Loading…</div></Shell>;
 
   if (state.open && !showIntro)
     return (
-      <Shell initials={initials} startedAt={(state.open as unknown as { started_at?: string }).started_at ?? null}>
+      <Shell initials={initials} name={name} startedAt={(state.open as unknown as { started_at?: string }).started_at ?? null}>
         <Filling open={state.open} roleDocs={state.roleDocs} isLeader={!!state.isLeader}
           myRecord={state.myRecord} options={state.options} salary={state.salary}
           serverStt={!!state.serverStt}
@@ -111,7 +112,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
       setBusy(false);
     };
     return (
-      <Shell initials={initials}>
+      <Shell initials={initials} name={name}>
         <div className="mx-auto px-4 py-6 md:py-8" style={{ maxWidth: 760 }}>
           <div className="rounded-lg p-4" style={{ background: "#E6F4EA", border: "1px solid #9AD3AE" }}>
             <div className="font-bold" style={{ fontSize: 18, color: C.green }}>Thank you, {name}. Your IDP is done.</div>
@@ -171,7 +172,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
   // would fail at the last step.
   if (!state.employee && !state.needsMigration) {
     return (
-      <Shell initials={initials}>
+      <Shell initials={initials} name={name}>
         <div className="mx-auto px-4 py-8 md:py-10" style={{ maxWidth: 620 }}>
           <h1 className="font-bold" style={{ fontSize: 24 }}>Welcome {name}</h1>
           {/* THE HANDBOOK, WHERE EVERY EMPLOYEE ALREADY COMES (Dr Raghu, 5 Sep 2026) */}
@@ -197,7 +198,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
   }
 
   return (
-    <Shell initials={initials}>
+    <Shell initials={initials} name={name}>
       <div className="mx-auto px-4 py-6 md:py-8" style={{ maxWidth: 720 }}>
         {msg && <div className="rounded p-2 mb-4 text-xs font-semibold" style={{ background: "#FBEDEA", color: C.red }}>{msg}</div>}
         {state.needsMigration && (
@@ -803,9 +804,10 @@ function SittingTimer({ startedAt }: { startedAt: string }) {
   );
 }
 
-function Shell({ children, initials, startedAt }: { children: React.ReactNode; initials: string | null; startedAt?: string | null }) {
+function Shell({ children, initials, startedAt, name }: { children: React.ReactNode; initials: string | null; startedAt?: string | null; name?: string }) {
   return (
     <div className="min-h-screen idp" style={{ background: "#F1EFE9", color: C.ink }}>
+      {name ? <WhatsAppFab name={name} form="IDP Discussion" /> : null}
       <div style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0, zIndex: 40 }}>
         <div className="px-3 py-2 flex items-center gap-2.5">
           <div className="rounded bg-white px-1.5 py-1 flex-shrink-0">

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import Handbook from "@/components/hrms/Handbook";
 import { LOGO } from "@/lib/logo";
+import WhatsAppFab from "@/components/WhatsAppFab";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Employee Handbook · Nandan GSE" };
@@ -38,6 +39,7 @@ export default async function IdpHandbookPage() {
         <span className="text-xs" style={{ color: "#8FA1B3" }}>{user.displayName || user.email}</span>
       </div>
       <Handbook who={user.displayName || user.email} standalone />
+      <WhatsAppFab name={user.displayName || user.email} form="Employee Handbook" />
     </div>
   );
 }
