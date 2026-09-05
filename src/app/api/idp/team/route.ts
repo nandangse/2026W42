@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { assertAiOn } from "@/lib/ai-gate";
 import { requireUser, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
+import { hrmsTables } from "@/lib/hrms";
 import { teamOf } from "@/lib/team";
 import { IDP_SECTIONS } from "@/lib/idp";
 import { IDP_RATINGS } from "@/lib/idp";
@@ -49,6 +50,53 @@ async function gate(u: { email: string; id: string }) {
     ? people.filter((p) => String(p.email).toLowerCase() !== u.email.toLowerCase()).map((p) => ({ id: String(p.id), depth: 1 }))
     : teamOf(people.map((p) => ({ id: String(p.id), reports_to: p.reports_to ? String(p.reports_to) : null })), u.id);
   const byId = new Map(people.map((p) => [String(p.id), p]));
+
+  // THE RECORD'S REPORTING MANAGER COUNTS TOO (Dr Raghu, 5 Sep 2026: "Suresh
+  // says he's not able to see his people"). Only 23 logins carry reports_to;
+  // the employee master names a Reporting Manager on every record. So the
+  // team is the union: the profile chain, plus everyone whose record names
+  // this person — and their people in turn — matched to logins by e-mail.
+  if (!isOwner) {
+    try {
+      const byEmail = new Map(people.map((p) => [String(p.email).toLowerCase(), p]));
+      const T = await hrmsTables(admin);
+      const [{ data: emps }, { data: links }] = await Promise.all([
+        admin.from(T.employees).select("id, name, email, active, extra"),
+        admin.from(T.edits).select("employee_id, value").eq("field", "user_email"),
+      ]);
+      const loginOf = new Map<string, string>();
+      for (const l of links || []) if (l.value) loginOf.set(String(l.employee_id), String(l.value).trim().toLowerCase());
+      const rows = (emps || []).map((e) => ({
+        id: String(e.id), name: String(e.name || "").trim(), active: e.active !== false,
+        login: loginOf.get(String(e.id)) || String(e.email || "").trim().toLowerCase(),
+        rm: String(((e.extra || {}) as Record<string, string>)["Reporting Manager"] || "").trim().toLowerCase(),
+      }));
+      const mine = rows.find((r) => r.login === u.email.toLowerCase());
+      if (mine) {
+        const have = new Map(below.map((m) => [m.id, m.depth]));
+        const seen = new Set<string>([mine.id]);
+        let frontier = [{ name: mine.name.toLowerCase(), depth: 0 }];
+        while (frontier.length) {
+          const next: { name: string; depth: number }[] = [];
+          for (const f of frontier) {
+            for (const r of rows) {
+              if (!r.active || seen.has(r.id) || !f.name || r.rm !== f.name) continue;
+              seen.add(r.id);
+              const prof = r.login ? byEmail.get(r.login) : undefined;
+              if (prof) {
+                const d = f.depth + 1;
+                if (!have.has(String(prof.id)) || have.get(String(prof.id))! > d) have.set(String(prof.id), d);
+              }
+              next.push({ name: r.name.toLowerCase(), depth: f.depth + 1 });
+            }
+          }
+          frontier = next;
+        }
+        below.length = 0;
+        for (const [id, depth] of have) if (id !== u.id) below.push({ id, depth });
+      }
+    } catch { /* the profile chain alone, as before */ }
+  }
   return { admin, isOwner, members: below.map((m) => ({ ...byId.get(m.id)!, depth: (m as { depth: number }).depth })) };
 }
 
