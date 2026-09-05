@@ -2130,7 +2130,7 @@ where s.code = 'AS9100D' and c.clause_no = '8.2.3'
 on conflict (clause_id) do nothing;
 
 insert into ims_clause_evidence_note (clause_id, requirement, evidence, compliance, links, updated_by)
-select c.id, 'When appropriate, the organization shall divide the design and development effort into distinct activities and, for
+select c.id, 'When appropriate, the organization shall divide the design and development effort into ' || 'distinct activities and, for
 each activity, define the tasks, necessary resources, responsibilities, design content, and inputs and outputs.
 Design and development planning shall consider the ability to provide, verify, test and maintain products and
 services (reference output of 8.1 a).', 'Project card', 'WIP', $j$[]$j$::jsonb, 'import:ims-sheet'
