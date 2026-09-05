@@ -7,7 +7,7 @@
  * at the top, through the queue; every message and every reply kept on the
  * run's Communications tab.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 import { MONTHS } from "@/lib/hrms-template";
@@ -17,11 +17,22 @@ import { C } from "./RecordFields";
 interface Run { id: string; month: number; year: number; status: string; uploaded_by: string | null; uploaded_at: string | null; approved_by: string | null; approved_at: string | null; run_note: string | null; working_days: number | null; generated_at: string | null; generated_by: string | null; wa_batch_id: string | null; drive_folder_link: string | null; total_count: number | null; net_payable: number | null; earned_pay: number | null; deductions: number | null; mapping: { warnings?: string[] } | null }
 interface FileRow { id: string; kind: string; name: string; size: number | null; drive_link: string | null; uploaded_by: string | null; uploaded_at: string }
 interface Msg { id: string; employee_id: string; name: string; channel: string; direction: string; to_address: string | null; subject: string | null; body: string; status: string; error: string | null; sent_by: string | null; sent_at: string }
-interface Detail { run: Run; files: FileRow[]; muster: { month: number | null; year: number | null; days: number; columns: Record<string, string>; unmapped: string[]; warnings: string[]; rows: MusterRow[] } | null; rates: { rows: number; warnings: string[] } | null; register: RegisterRow[]; messages: Msg[]; counts: Record<string, number> }
+interface InputRow { key: string; submitted_by: string | null; submitted_at: string | null; note: string }
+interface Detail { run: Run; files: FileRow[]; inputs: InputRow[]; live_rates: { title: string; count: number } | null; muster: { month: number | null; year: number | null; days: number; columns: Record<string, string>; unmapped: string[]; warnings: string[]; rows: MusterRow[] } | null; rates: { rows: number; warnings: string[] } | null; register: RegisterRow[]; messages: Msg[]; counts: Record<string, number> }
 
 const who = (s: string | null) => (s ? String(s).split("·")[0].trim() : "—");
 const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
-const KINDS = [["muster", "Attendance muster"], ["rates", "Salary rate list"], ["other", "Other document"]] as const;
+const KINDS = [["essl", "ESSL attendance"], ["muster", "Attendance muster"], ["rates", "Salary rate list"], ["advance", "Advance (Tally)"], ["loan", "Loan (Tally)"], ["other", "Other document"]] as const;
+/** The run's inputs, one form each (Dr Raghu, 5 Sep 2026) — who brings it, how it comes, whether a file is expected. */
+const INPUTS: { key: string; label: string; by: string; how: string; upload: boolean; needFile: boolean; accept: string }[] = [
+  { key: "essl", label: "ESSL attendance output", by: "Vishwas", how: "the biometric export, Excel or CSV", upload: true, needFile: true, accept: ".csv,.xlsx,.xls,.txt" },
+  { key: "rates", label: "Salary rates", by: "Vinay", how: "from the Appraisals — the Live salary structure; a rate list can be uploaded to override", upload: true, needFile: false, accept: ".csv,.xlsx,.xls" },
+  { key: "muster", label: "Muster sheet", by: "HR", how: "CSV — attendance, leave encashment, loan, advance, lunch, site allowance", upload: true, needFile: true, accept: ".csv,.xlsx,.xls" },
+  { key: "advance", label: "Advance", by: "Suresh", how: "PDF from Tally, sent on the 1st to Vinay", upload: true, needFile: true, accept: ".pdf,.csv,.xlsx,.xls" },
+  { key: "loan", label: "Loan", by: "Suresh", how: "PDF from Tally, sent on the 1st to Vinay", upload: true, needFile: true, accept: ".pdf,.csv,.xlsx,.xls" },
+  { key: "lunch", label: "Lunch", by: "HR", how: "in the muster — check and submit", upload: false, needFile: false, accept: "" },
+  { key: "site", label: "Site allowance", by: "HR", how: "in the muster — check and submit", upload: false, needFile: false, accept: "" },
+];
 type Tab = "overview" | "uploads" | "muster" | "register" | "comms";
 
 export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwner: boolean; onBack: () => void }) {
@@ -29,8 +40,8 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
   const [tab, setTab] = useState<Tab>("overview");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
-  const [kind, setKind] = useState<string>("muster");
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [pick, setPick] = useState<Record<string, FileList | null>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const [wa, setWa] = useState<{ count: number; noPhone: number; blanks: Record<string, number>; sample: { id: string; name: string; phone: string; text: string }[]; template: string } | null>(null);
   const [waOpen, setWaOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -48,8 +59,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
     finally { setBusy(false); }
   };
 
-  const upload = async () => {
-    const files = fileRef.current?.files;
+  const upload = async (kind: string, files: FileList | null | undefined) => {
     if (!files || !files.length) { setMsg("Choose one or more files first."); return; }
     setBusy(true); setMsg("");
     try {
@@ -61,7 +71,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
       const lines = (j.files as { name: string; parsed: string | null; warnings: string[]; drive_link: string | null }[]).map((f) => `${f.name}${f.parsed ? ` — ${f.parsed}` : ""}${f.drive_link ? " · filed in Drive" : ""}${f.warnings.length ? ` · ${f.warnings.join("; ")}` : ""}`);
       setMsg(`Uploaded ✓ ${lines.join(" | ")}`);
-      if (fileRef.current) fileRef.current.value = "";
+      setPick((p) => ({ ...p, [kind]: null }));
       await load();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
@@ -156,30 +166,64 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
 
       {tab === "uploads" && (
         <>
-          <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: C.line }}>
-            <div className="font-bold text-sm">Upload documents</div>
-            <div className="text-xs mb-2" style={{ color: C.dim }}>Upload the <b>Muster</b> and the <b>salary rate list</b> here (CSV or Excel). They are read at once and filed in Drive under <b>HR-Payroll run-{title}</b>. Then press Generate.</div>
-            <div className="flex gap-2 items-center flex-wrap">
-              <select value={kind} onChange={(e) => setKind(e.target.value)} className="text-xs rounded px-2 py-1.5 bg-white" style={{ border: `1px solid ${C.line}` }}>{KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
-              <input ref={fileRef} type="file" multiple accept=".csv,.xlsx,.xls,.pdf,text/csv" className="block" style={{ fontSize: 12 }} />
-              <button onClick={upload} disabled={busy} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: C.orange, color: "#fff", opacity: busy ? 0.6 : 1 }}>{busy ? "Working…" : "⬆ Upload"}</button>
-              <span style={{ flex: 1 }} />
-              <button onClick={() => act({ action: "generate" }, (j) => `Generated ${j.lines} lines${(j.warnings as string[])?.length ? ` · ${(j.warnings as string[]).join("; ")}` : ""}`)} disabled={busy || !d.muster} className="text-xs font-bold rounded px-4 py-2" style={{ background: d.muster ? C.green : "#E2E0DA", color: d.muster ? "#fff" : C.faint }} title={d.muster ? "Muster × rates → the salary register" : "Upload the muster first"}>▶ Generate</button>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg border" style={{ borderColor: C.line }}>
-            {!d.files.length && <div className="p-3 text-xs" style={{ color: C.faint }}>No uploads yet.</div>}
-            {d.files.map((f, i) => (
-              <div key={f.id} className="px-3 py-2 flex gap-2 items-baseline text-xs flex-wrap" style={{ borderTop: i ? "1px solid #EEECE6" : undefined }}>
-                <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#F4F2EC", color: C.dim, fontSize: 10 }}>{KINDS.find(([k]) => k === f.kind)?.[1] || f.kind}</span>
-                <span className="font-semibold">{f.name}</span>
-                <span style={{ color: C.faint }}>{f.size ? `${Math.round(f.size / 1024)} KB` : ""} · {who(f.uploaded_by)} · {fmtFull(String(f.uploaded_at))}</span>
-                <span style={{ flex: 1 }} />
-                {f.drive_link ? <a href={f.drive_link} target="_blank" rel="noreferrer" style={{ color: "#1B3A5C" }}>Drive ↗</a> : <span style={{ color: "#8A5B00" }}>not filed in Drive</span>}
-                <button onClick={() => { if (window.confirm(`Remove ${f.name} from this run?${f.drive_link ? "\n\nThe Drive copy goes to the bin as well." : ""}${f.kind !== "other" ? "\nThe run falls back to the newest remaining " + (f.kind === "muster" ? "muster" : "rate list") + ", if any." : ""}`)) act({ action: "remove_file", file_id: f.id }, () => `${f.name} removed`); }}
-                  disabled={busy} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FBEDEA", color: C.red }} title="Remove this upload">✕</button>
+          <div className="text-xs mb-2" style={{ color: C.dim }}>Seven inputs, one form each. Upload what comes as a file, check what the muster carries, and press <b>Submit</b> to sign it — who and when stay on the run. Then Generate.</div>
+          {INPUTS.map((inp) => {
+            const files = d.files.filter((f) => f.kind === inp.key);
+            const sub = d.inputs.find((x) => x.key === inp.key);
+            const signed = !!sub?.submitted_at;
+            const m = d.muster;
+            const sum = (k: keyof MusterRow) => m ? m.rows.reduce((a, r) => a + (Number(r[k]) || 0), 0) : 0;
+            const cnt = (k: keyof MusterRow) => m ? m.rows.filter((r) => Number(r[k]) > 0).length : 0;
+            const fromMuster = (k: keyof MusterRow, label: string) => m ? `${label}: ₹${inr(sum(k))} across ${cnt(k)} people, from the muster` : `${label}: the muster is not uploaded yet`;
+            const carried = inp.key === "advance" ? fromMuster("advance", "Advance")
+              : inp.key === "loan" ? `${fromMuster("loan_ded", "Loan deduction")}${m ? ` · loans taken ₹${inr(sum("loan_taken"))}` : ""}`
+              : inp.key === "lunch" ? fromMuster("lunch", "Lunch")
+              : inp.key === "site" ? fromMuster("site_allowance", "Site allowance")
+              : inp.key === "muster" ? (m ? `${m.rows.length} people over ${m.days} days · leave encashment ₹${inr(sum("leave_encash"))} · advance ₹${inr(sum("advance"))} · loan ₹${inr(sum("loan_ded"))} · lunch ₹${inr(sum("lunch"))} · site ₹${inr(sum("site_allowance"))}` : "Not uploaded yet.")
+              : inp.key === "rates" ? (d.rates ? `Rate list uploaded on this run: ${d.rates.rows} rates (overrides the Live structure).` : d.live_rates ? `Live structure: ${d.live_rates.title}, ${d.live_rates.count} rates — Generate reads it.` : "No Live salary structure — set one in HRIS → Salary Rate List, or upload a rate list here.")
+              : (files.length ? `${files.length} file${files.length === 1 ? "" : "s"} filed as evidence. Attendance itself is read from the muster.` : "Not uploaded yet. Attendance itself is read from the muster.");
+            return (
+              <div key={inp.key} className="bg-white rounded-lg border mb-2" style={{ borderColor: signed ? "#BFE3C9" : C.line }}>
+                <div className="px-3 py-2 flex gap-2 items-baseline flex-wrap">
+                  <span className="font-bold text-sm">{inp.label}</span>
+                  <span className="text-xs" style={{ color: C.dim }}>{inp.by} · {inp.how}</span>
+                  <span style={{ flex: 1 }} />
+                  {signed
+                    ? <span className="text-xs font-bold" style={{ color: C.green }}>✓ Submitted by {who(sub!.submitted_by)} on {fmtFull(String(sub!.submitted_at))}</span>
+                    : <span className="text-xs font-bold" style={{ color: "#8A5B00" }}>Not submitted</span>}
+                </div>
+                <div className="px-3 pb-2 text-xs" style={{ color: C.dim }}>{carried}</div>
+                {files.map((f) => (
+                  <div key={f.id} className="px-3 py-1.5 flex gap-2 items-baseline text-xs flex-wrap" style={{ borderTop: "1px solid #EEECE6" }}>
+                    <span className="font-semibold">{f.name}</span>
+                    <span style={{ color: C.faint }}>{f.size ? `${Math.round(f.size / 1024)} KB` : ""} · {who(f.uploaded_by)} · {fmtFull(String(f.uploaded_at))}</span>
+                    <span style={{ flex: 1 }} />
+                    {f.drive_link ? <a href={f.drive_link} target="_blank" rel="noreferrer" style={{ color: "#1B3A5C" }}>Drive ↗</a> : <span style={{ color: "#8A5B00" }}>not filed in Drive</span>}
+                    {!signed && <button onClick={() => { if (window.confirm(`Remove ${f.name} from this run?${f.drive_link ? "\n\nThe Drive copy goes to the bin as well." : ""}`)) act({ action: "remove_file", file_id: f.id }, () => `${f.name} removed`); }}
+                      disabled={busy} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FBEDEA", color: C.red }} title="Remove this upload">✕</button>}
+                  </div>
+                ))}
+                <div className="px-3 py-2 flex gap-2 items-center flex-wrap" style={{ borderTop: "1px solid #EEECE6" }}>
+                  {inp.upload && !signed && (
+                    <>
+                      <input type="file" multiple accept={inp.accept} className="block" style={{ fontSize: 12 }} onChange={(e) => setPick({ ...pick, [inp.key]: e.target.files })} />
+                      <button onClick={() => upload(inp.key, pick[inp.key])} disabled={busy || !pick[inp.key]?.length} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: C.orange, color: "#fff", opacity: busy || !pick[inp.key]?.length ? 0.5 : 1 }}>⬆ Upload</button>
+                    </>
+                  )}
+                  {!signed && <input value={notes[inp.key] ?? ""} onChange={(e) => setNotes({ ...notes, [inp.key]: e.target.value })} placeholder="Note (optional)" className="text-xs rounded px-2 py-1.5" style={{ border: `1px solid ${C.line}`, minWidth: 200, flex: "1 1 200px" }} />}
+                  {signed && sub?.note && <span className="text-xs" style={{ color: C.dim }}>Note: {sub.note}</span>}
+                  <span style={{ flex: 1 }} />
+                  {signed
+                    ? <button onClick={() => act({ action: "unsubmit_input", key: inp.key, note: sub?.note || "" }, () => `${inp.label} reopened`)} disabled={busy} className="text-xs font-semibold rounded px-3 py-1.5" style={{ background: "#F4F2EC", color: C.dim }}>Reopen</button>
+                    : <button onClick={() => act({ action: "submit_input", key: inp.key, note: notes[inp.key] || "" }, () => `${inp.label} submitted`)} disabled={busy || (inp.upload && inp.needFile && !files.length)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: inp.upload && inp.needFile && !files.length ? "#E2E0DA" : C.green, color: inp.upload && inp.needFile && !files.length ? C.faint : "#fff" }} title={inp.upload && inp.needFile && !files.length ? "Upload the file first" : "Sign this input as received and checked"}>✓ Submit</button>}
+                </div>
               </div>
-            ))}
+            );
+          })}
+          <div className="bg-white rounded-lg border p-3 flex gap-2 items-center flex-wrap" style={{ borderColor: C.line }}>
+            <div className="text-xs" style={{ color: C.dim }}>{d.inputs.filter((x) => x.submitted_at).length} of {INPUTS.length} inputs submitted.{d.files.filter((f) => !INPUTS.some((i) => i.key === f.kind)).length ? ` ${d.files.filter((f) => !INPUTS.some((i) => i.key === f.kind)).length} other file(s) on the run.` : ""}</div>
+            <span style={{ flex: 1 }} />
+            <button onClick={() => act({ action: "generate" }, (j) => `Generated ${j.lines} lines${(j.warnings as string[])?.length ? ` · ${(j.warnings as string[]).join("; ")}` : ""}`)} disabled={busy || !d.muster} className="text-xs font-bold rounded px-4 py-2" style={{ background: d.muster ? C.green : "#E2E0DA", color: d.muster ? "#fff" : C.faint }} title={d.muster ? "Muster × rates → the salary register" : "Upload the muster first"}>▶ Generate</button>
           </div>
           {d.muster && (
             <div className="text-xs mt-2" style={{ color: C.faint }}>

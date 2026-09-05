@@ -55,10 +55,19 @@ export async function GET(req: Request) {
 
     if (id) {
       const r = await runRow(admin, id);
-      const [{ data: files }, { data: comms }] = await Promise.all([
+      const [{ data: files }, { data: comms }, inputsQ, { data: liveStruct }] = await Promise.all([
         admin.from("hrms_payroll_file").select("id, kind, name, mime, size, drive_id, drive_link, uploaded_by, uploaded_at").eq("sheet_id", id).order("uploaded_at", { ascending: false }),
         admin.from("hrms_communication").select("id, employee_id, channel, direction, to_address, subject, body, status, error, sent_by, sent_at, meta, external_id").eq("run_id", id).order("sent_at", { ascending: false }).limit(1000),
+        admin.from("hrms_payroll_input").select("key, submitted_by, submitted_at, note").eq("sheet_id", id),
+        admin.from("hrms_salary_structure").select("id, title, effective_from").eq("status", "Live").maybeSingle(),
       ]);
+      // pre-0140 the inputs table is not there yet; the forms still show, unsigned
+      const inputs = inputsQ.error ? [] : inputsQ.data || [];
+      let liveRates: { title: string; count: number } | null = null;
+      if (liveStruct) {
+        const { count } = await admin.from("hrms_salary_rate").select("id", { count: "exact", head: true }).eq("structure_id", liveStruct.id);
+        liveRates = { title: String(liveStruct.title), count: count || 0 };
+      }
       // the queue's live word on each outbound WhatsApp line
       const rows = (comms || []) as Record<string, unknown>[];
       const qids = rows.map((c) => String((c.meta as { queue_id?: string } | null)?.queue_id || "")).filter(Boolean);
@@ -80,6 +89,8 @@ export async function GET(req: Request) {
         register: register || [],
         messages: rows.map((c) => ({ ...c, name: names.get(String(c.employee_id)) || c.employee_id })),
         counts,
+        inputs,
+        live_rates: liveRates,
       });
     }
 
@@ -191,6 +202,23 @@ export async function POST(req: Request) {
         await admin.from("hrms_salary_sheet").update({ [f.kind]: next, updated_at: now }).eq("id", id);
       }
       return NextResponse.json({ ok: true, binned });
+    }
+
+    /** SUBMIT AN INPUT — the signature on one of the run's forms (0140). */
+    if (action === "submit_input" || action === "unsubmit_input") {
+      const key = String(body.key || "");
+      if (!/^(essl|rates|muster|advance|loan|lunch|site)$/.test(key)) throw new HttpError(400, "Which input?");
+      const sheetId = String(body.id || "");
+      await runRow(admin, sheetId);
+      const signed = action === "submit_input";
+      const row: { sheet_id: string; key: string; submitted_by: string | null; submitted_at: string | null; note: string; updated_at: string } =
+        { sheet_id: sheetId, key, submitted_by: signed ? stamp : null, submitted_at: signed ? now : null, note: String(body.note || "").slice(0, 500), updated_at: now };
+      const { error } = await admin.from("hrms_payroll_input").upsert(row, { onConflict: "sheet_id,key" });
+      if (error) {
+        if (/hrms_payroll_input|schema cache|does not exist/i.test(error.message)) throw new HttpError(503, "Run migration 0140 first — the inputs have nowhere to be signed yet.");
+        throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
     }
 
     if (action === "working_days") {
