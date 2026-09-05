@@ -16,8 +16,28 @@ import { SYS, isAdmin, isHead, type Boot, type Row } from "./types";
  * manifest is filling in a form, not a deploy — which is the whole reason the
  * design insisted on one engine rather than fourteen screens.
  */
-type Column = { key: string; label: string; type: string; options?: string[]; required?: boolean };
-const TYPES = ["text", "number", "date", "select", "bool", "user", "file"];
+type Column = {
+  key: string; label: string; type: string; options?: string[]; required?: boolean;
+  product?: string[]; level_of?: string;
+};
+const TYPES = ["text", "short", "number", "date", "select", "bool", "user", "file"];
+
+const lead = (v: unknown): number | null => {
+  const m = String(v ?? "").match(/^\s*(\d+(?:\.\d+)?)/);
+  return m ? Number(m[1]) : null;
+};
+const band = (n: number) => (n <= 4 ? "Low" : n <= 9 ? "Medium" : n <= 15 ? "High" : "Extreme");
+/** Inherent risk = impact x probability, the aspect score = Q x I x O x C x D, the level bands — worked out as you type; the server does the same. */
+function derive(cols: Column[], data: Record<string, unknown>) {
+  const d = { ...data };
+  for (const c of cols) if (c.product?.length) {
+    const parts = c.product.map((k) => lead(d[k]));
+    d[c.key] = parts.every((n) => n !== null) ? parts.reduce((a, n) => a * (n as number), 1) : null;
+  }
+  for (const c of cols) if (c.level_of) { const n = lead(d[c.level_of]); d[c.key] = n === null ? null : band(n); }
+  return d;
+}
+const LEVEL_COLOUR: Record<string, string> = { Low: "#1A7F4E", Medium: "#B7791F", High: "#C2410C", Extreme: "#B3261E" };
 
 export default function Registers({ boot }: { boot: Boot }) {
   const [slug, setSlug] = useState<string | null>(null);
@@ -61,13 +81,26 @@ function RegisterView({ slug, boot, onBack }: { slug: string; boot: Boot; onBack
   const [editId, setEditId] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [defining, setDefining] = useState(false);
+  const [q, setQ] = useState("");
+  const [pick, setPick] = useState("");
 
   const def = d?.definition;
   const cols = ((def?.columns as Column[]) ?? []);
-  const entries = d?.entries ?? [];
+  const all = d?.entries ?? [];
+  // The first select column (Scope on the HIRA, Assessment on the aspects) is
+  // the natural filter; the search box reads every value.
+  const pickCol = cols.find((c) => c.type === "select");
+  const needle = q.trim().toLowerCase();
+  const entries = all.filter((e) => {
+    const data = (e.data as Record<string, unknown>) ?? {};
+    if (pick && pickCol && String(data[pickCol.key] ?? "") !== pick) return false;
+    if (!needle) return true;
+    return Object.values(data).some((v) => String(v ?? "").toLowerCase().includes(needle));
+  });
 
   const draw = (c: Column, v: unknown) => {
     if (v === null || v === undefined || v === "") return <span style={{ color: MUTED }}>—</span>;
+    if (c.level_of) return <Chip text={String(v)} colour={LEVEL_COLOUR[String(v)] ?? "#6B7280"} />;
     if (c.type === "bool") return <Chip text={v ? "Yes" : "No"} colour={v ? "#1A7F4E" : "#6B7280"} />;
     if (c.type === "date") return fmtD(v);
     if (c.type === "user") return boot.people.find((p) => p.id === v)?.full_name ?? String(v);
@@ -119,7 +152,14 @@ function RegisterView({ slug, boot, onBack }: { slug: string; boot: Boot; onBack
       }
     >
       {msg && <Note kind="error">{msg}</Note>}
-      {entries.length === 0 ? <Empty>Nothing recorded in this register yet.</Empty> : (
+      {all.length > 0 && (
+        <div className="flex gap-2 items-center flex-wrap mb-2">
+          {pickCol && <div style={{ minWidth: 220 }}><Select value={pick} onChange={setPick} blank={`All — ${pickCol.label}`} options={pickCol.options ?? []} /></div>}
+          <div style={{ minWidth: 220 }}><Text value={q} onChange={setQ} placeholder="Search this register" /></div>
+          <div className="text-xs font-bold" style={{ color: MUTED }}>{entries.length} of {all.length}</div>
+        </div>
+      )}
+      {all.length === 0 ? <Empty>Nothing recorded in this register yet.</Empty> : entries.length === 0 ? <Empty>Nothing matches.</Empty> : (
         <TableBox min={Math.max(560, 140 * cols.length)}>
           <thead>
             <tr>
@@ -150,12 +190,14 @@ function RegisterView({ slug, boot, onBack }: { slug: string; boot: Boot; onBack
           <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
             {cols.map((c) => {
               const data = edit.data as Record<string, unknown>;
-              const set = (v: unknown) => setEdit({ ...edit, data: { ...data, [c.key]: v } });
+              const set = (v: unknown) => setEdit({ ...edit, data: derive(cols, { ...data, [c.key]: v }) });
               const val = data[c.key];
+              const computed = !!(c.product?.length || c.level_of);
               return (
                 <div key={c.key} style={{ gridColumn: c.type === "text" ? "1/-1" : undefined }}>
-                  <Label>{c.label}{c.required ? " *" : ""}</Label>
-                  {c.type === "select" ? <Select value={String(val ?? "")} onChange={set} options={c.options ?? []} />
+                  <Label>{c.label}{c.required ? " *" : ""}{computed ? " (worked out)" : ""}</Label>
+                  {computed ? <div className="text-sm font-bold py-1.5" style={{ color: INK }}>{c.level_of && val ? <Chip text={String(val)} colour={LEVEL_COLOUR[String(val)] ?? "#6B7280"} /> : String(val ?? "—")}</div>
+                    : c.type === "select" ? <Select value={String(val ?? "")} onChange={set} options={c.options ?? []} />
                     : c.type === "user" ? <Select value={String(val ?? "")} onChange={set} options={boot.people.map((p) => ({ value: p.id, label: p.full_name }))} />
                     : c.type === "bool" ? <Select value={val === true ? "true" : val === false ? "false" : ""} onChange={(v) => set(v === "true")} options={[{ value: "true", label: "Yes" }, { value: "false", label: "No" }]} />
                     : c.type === "date" ? <Text type="date" value={String(val ?? "").slice(0, 10)} onChange={set} />
@@ -240,6 +282,8 @@ function ColumnBuilder({ definition, onClose, onSaved }: {
             <div><Label>Key</Label><Text value={c.key} onChange={(v) => set(i, { key: v.toLowerCase().replace(/[^a-z0-9_]/g, "_") })} /></div>
             <div><Label>Label</Label><Text value={c.label} onChange={(v) => set(i, { label: v })} /></div>
             <div><Label>Type</Label><Select value={c.type} onChange={(v) => set(i, { type: v })} blank="text" options={TYPES} /></div>
+            {c.product?.length ? <div className="text-xs" style={{ color: MUTED, gridColumn: "1/-1" }}>Worked out: {c.product.join(" x ")}</div> : null}
+            {c.level_of ? <div className="text-xs" style={{ color: MUTED, gridColumn: "1/-1" }}>Worked out: band of {c.level_of} (1-4 Low, 5-9 Medium, 10-15 High, 16+ Extreme)</div> : null}
             {c.type === "select" && (
               <div style={{ gridColumn: "1/-1" }}>
                 <Label>Options (comma separated)</Label>

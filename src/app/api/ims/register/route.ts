@@ -19,7 +19,38 @@ export const dynamic = "force-dynamic";
  * `columns` is dropped rather than stored: a JSONB blob that accepts anything
  * is a JSONB blob nobody can report on a year later.
  */
-type Column = { key: string; label: string; type: string; options?: string[]; required?: boolean };
+type Column = {
+  key: string; label: string; type: string; options?: string[]; required?: boolean;
+  /** Multiply the leading numbers of these columns ("4 - Very High" counts 4). */
+  product?: string[];
+  /** Band the named number: 1-4 Low, 5-9 Medium, 10-15 High, 16+ Extreme. */
+  level_of?: string;
+};
+
+const lead = (v: unknown): number | null => {
+  const m = String(v ?? "").match(/^\s*(\d+(?:\.\d+)?)/);
+  return m ? Number(m[1]) : null;
+};
+const band = (n: number) => (n <= 4 ? "Low" : n <= 9 ? "Medium" : n <= 15 ? "High" : "Extreme");
+
+/**
+ * The computed columns are worked out here, never trusted from the client:
+ * inherent risk is impact x probability whatever the form sent.
+ */
+function derive(columns: Column[], data: Record<string, unknown>) {
+  for (const c of columns) {
+    if (c.product?.length) {
+      const parts = c.product.map((k) => lead(data[k]));
+      data[c.key] = parts.every((n) => n !== null) ? parts.reduce((a, n) => a * (n as number), 1) : null;
+    }
+  }
+  for (const c of columns) {
+    if (c.level_of) {
+      const n = lead(data[c.level_of]);
+      data[c.key] = n === null ? null : band(n);
+    }
+  }
+}
 
 /** Coerce one value to its declared type. A date column never holds "". */
 function coerce(col: Column, v: unknown): unknown {
@@ -174,6 +205,7 @@ export async function POST(req: Request) {
     const data: Record<string, unknown> = {};
     const src = (body.data ?? {}) as Record<string, unknown>;
     for (const c of columns) data[c.key] = coerce(c, src[c.key]);
+    derive(columns, data);
     for (const c of columns)
       if (c.required && (data[c.key] === null || data[c.key] === ""))
         throw new HttpError(400, `${c.label} is required.`);
