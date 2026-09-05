@@ -2,9 +2,9 @@
 --
 -- THE IMS MASTER REGISTER, CONVERTED (Dr Raghu, 5 Sep 2026): "Take this
 -- document [Nandan IMS Master Register_2025-26 W11_PS.xlsx] ... Ensure that
--- all of these go into the relevant place ... If there are links, put the
+-- all of these go into ' || 'the relevant place ... If there are links, put the
 -- links in. If there is a document, make sure that is attached ... convert
--- all of these into the IMS register." And on Standards: "editable document
+-- all of these into ' || 'the IMS register." And on Standards: "editable document
 -- ... Make it better ... Fully compliant / WIP / Pending / Risk ... plus sign
 -- for a task."
 --
