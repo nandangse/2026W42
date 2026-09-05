@@ -174,6 +174,11 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
       <Shell initials={initials}>
         <div className="mx-auto px-4 py-8 md:py-10" style={{ maxWidth: 620 }}>
           <h1 className="font-bold" style={{ fontSize: 24 }}>Welcome {name}</h1>
+          {/* THE HANDBOOK, WHERE EVERY EMPLOYEE ALREADY COMES (Dr Raghu, 5 Sep 2026) */}
+          <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "#16232F", color: "#fff", textDecoration: "none" }}>
+            <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
+            <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>How things work at Nandan GSE: hours, leave, pay, conduct, safety, leaving. Read it, ask HR under any section, and acknowledge the edition at the end.</div>
+          </a>
           <div className="rounded-lg p-4 mt-5" style={{ background: "#FFF7E6", border: "1px solid #F5B32B" }}>
             <div className="font-bold" style={{ fontSize: 15, color: "#8A5B00" }}>
               Your login is not linked to your employee record yet
@@ -202,6 +207,11 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
         )}
 
         <h1 className="font-bold" style={{ fontSize: 23, lineHeight: 1.25 }}>Welcome {name}</h1>
+        {/* THE HANDBOOK, WHERE EVERY EMPLOYEE ALREADY COMES (Dr Raghu, 5 Sep 2026) */}
+        <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "#16232F", color: "#fff", textDecoration: "none" }}>
+          <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
+          <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>How things work at Nandan GSE: hours, leave, pay, conduct, safety, leaving. Read it, ask HR under any section, and acknowledge the edition at the end.</div>
+        </a>
         <p className="mt-4" style={{ fontSize: 16, lineHeight: 1.7, color: C.ink }}>
           Would you like to fill up the IDP?
         </p>
