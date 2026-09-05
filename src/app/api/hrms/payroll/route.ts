@@ -244,7 +244,7 @@ export async function POST(req: Request) {
         if (prev && prev.leave_cb != null) return { leave_ob: Number(prev.leave_cb) || 0, loan_ob: Number(prev.loan_cb) || 0 };
         const p = byId.get(eid);
         return p ? { leave_ob: Number(String(p.value.leave_as_on || "").replace(/[^0-9.]/g, "")) || 0, loan_ob: Number(String(p.value.loan_as_on || "").replace(/[^0-9.]/g, "")) || 0 } : null;
-      }, workingDays);
+      }, workingDays, month);
       const typeOf = (eid: string | null) => (eid ? byId.get(eid)?.type || null : null);
       const totals = totalsFor(rows.map((x) => ({ employee_id: x.employee_id, name: x.name, type: x.type, earned: x.earned, deductions: x.deductions, net: x.net, attendance: x.attendance, paid_days: x.paid_days, gross: x.gross, basic_da: x.basic_da, hra: x.hra, fixed_allowance: x.fixed_allowance, conveyance: x.conveyance, site_allowance: x.site_allowance, pf: x.pf, pt: x.pt, other_ded: x.other_ded, loan: x.loan, advance: x.advance, tds: x.tds, arrears: x.arrears, hold: x.hold })), typeOf);
       const { error } = await admin.from("hrms_salary_sheet").update({ rows, ...totals, generated_at: now, generated_by: stamp, updated_at: now, mapping: { source: "generated", muster: muster.columns, rates: rates?.columns || null, warnings: [...muster.warnings, ...(rates?.warnings || []), ...warnings] } }).eq("id", id);

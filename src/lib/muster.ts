@@ -188,7 +188,8 @@ export function parseRates(grid: unknown[][]): Rates {
  *     the run) — so a day worked beyond them earns conveyance too (Dr Raghu,
  *     5 Sep 2026). Medical, like fixed: in full at 7 or more days present,
  *     else pro rata (Dr Raghu, 5 Sep 2026).
- *   · PF 12% of earned basic capped at 1,800; PT by the slab; ESI never
+ *   · PF 12% of earned basic capped at 1,800; PT by the slab, and ₹300 in
+ *     February for the top slab (Dr Raghu, 5 Sep 2026); ESI never
  *     deducted (the company bears it); advance, loan, TDS, lunch and the
  *     late deduction (late marks × per day) as the muster carries them.
  */
@@ -223,7 +224,7 @@ export function generateRegister(
   muster: Muster, rates: Rates | null,
   record: (id: string) => { type: string | null; get: (k: string) => unknown; name: string | null } | null,
   daysInMonth: number, ledger: (id: string) => Ledger | null = () => null,
-  workingDays: number = 26,
+  workingDays: number = 26, month: number = 0,
 ): { rows: RegisterRow[]; warnings: string[] } {
   const rateOf = new Map((rates?.rows || []).map((r) => [r.employee_id, r]));
   const warnings: string[] = [];
@@ -289,7 +290,7 @@ export function generateRegister(
     // ── deductions ──
     const exempt = NO_STATUTORY.has(t);
     const pf = !exempt && eBasic > 0 ? Math.min(Math.round(eBasic * 0.12), 1800) : 0;
-    const pt = exempt ? 0 : earned > 10000 ? 200 : earned >= 7500 ? 175 : 0;
+    const pt = exempt ? 0 : earned > 10000 ? (month === 2 ? 300 : 200) : earned >= 7500 ? 175 : 0;   // Maharashtra: the top slab pays 300 in February
     const loan = m.loan_ded ?? 0, advance = m.advance ?? 0, tds = m.tds ?? 0, lunch = m.lunch ?? 0;
     const lateDed = Math.round((m.late ?? 0) * perDay);
     const other = (m.other_ded ?? 0) + otShort;
@@ -352,7 +353,7 @@ export const PAYROLL_RULES: { head: string; lines: string[] }[] = [
   ] },
   { head: "Deductions", lines: [
     "PF = 12% of earned basic, capped at ₹1,800. Not for Management and contract types.",
-    "PT: ₹200 above ₹10,000 earnings, ₹175 from ₹7,500. Not for the exempt types.",
+    "PT: ₹200 above ₹10,000 earnings (₹300 in February), ₹175 from ₹7,500. Not for the exempt types.",
     "ESI is never deducted from workers; the company bears it.",
     "Advance, loan deduction, TDS and lunch as the muster carries them.",
     "Late deduction = late marks × per day.",
