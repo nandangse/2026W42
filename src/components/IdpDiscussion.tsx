@@ -177,6 +177,13 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
         )}
 
         <h1 className="font-bold" style={{ fontSize: 23, lineHeight: 1.25 }}>Welcome {name}</h1>
+        {/* "for the ones who did not fill the IDP show them a BIG RED BOX" (Dr Raghu, 5 Sep 2026) */}
+        {!state.done.length && (
+          <div className="rounded-lg p-4 mt-4" style={{ background: "#B3261E", color: "#fff", border: "3px solid #7F1A14" }}>
+            <div className="font-bold" style={{ fontSize: 22, lineHeight: 1.2 }}>⚠ You have not submitted your IDP</div>
+            <div className="mt-1" style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.95 }}>{state.open ? "It is started but not submitted. Finish it and press Submit — until then it is not an IDP." : "Your Individual Development Plan is due. Set aside an hour and start below."}</div>
+          </div>
+        )}
         {/* THE HANDBOOK, WHERE EVERY EMPLOYEE ALREADY COMES (Dr Raghu, 5 Sep 2026) */}
         <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "#16232F", color: "#fff", textDecoration: "none" }}>
           <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
