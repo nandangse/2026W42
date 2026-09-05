@@ -25,6 +25,32 @@ export interface TeamRow {
   depth: number; submitted_at: string | null; review: { submitted_at: string | null } | null;
 }
 
+/**
+ * "for people who have reporting people under them, show them a box saying
+ * show IDP of reporting staff" (Dr Raghu, 5 Sep 2026). The box appears only
+ * when the person has reportees; a tap opens the team list beneath it.
+ */
+export function TeamBox({ onOpen }: { onOpen: (r: TeamRow) => void }) {
+  const [rows, setRows] = useState<TeamRow[] | null>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => { api.get("/api/idp/team").then((j) => setRows(j.noTeam ? [] : (j.team || []))).catch(() => setRows([])); }, []);
+  if (!rows || rows.length === 0) return null;
+  const reviewable = rows.filter((r) => r.submitted_at);
+  const doneCount = reviewable.filter((r) => r.review?.submitted_at).length;
+  const waiting = reviewable.length - doneCount;
+  return (
+    <div className="mt-3">
+      <button onClick={() => setOpen((v) => !v)} className="w-full text-left rounded-lg p-3" style={{ background: "#16232F", color: "#fff", border: waiting ? "3px solid #E8600A" : "3px solid #0D7A3F" }}>
+        <div className="font-bold" style={{ fontSize: 17, lineHeight: 1.2 }}>👥 Show IDP of reporting staff</div>
+        <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>
+          {rows.length} report{rows.length === 1 ? "s" : ""} to you · {reviewable.length} submitted · {doneCount} feedback{doneCount === 1 ? "" : "s"} given{waiting ? ` · ${waiting} waiting for you` : reviewable.length ? " · all done 🎉" : ""} · tap to {open ? "hide" : "open"}
+        </div>
+      </button>
+      {open && <TeamList onOpen={onOpen} />}
+    </div>
+  );
+}
+
 export function TeamList({ onOpen }: { onOpen: (r: TeamRow) => void }) {
   const [rows, setRows] = useState<TeamRow[] | null>(null);
   const [gateMsg, setGateMsg] = useState("");

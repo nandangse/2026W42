@@ -45,7 +45,7 @@ type Tab = "records" | "slips" | "leave" | "loan" | "idp" | "learning" | "handbo
 const TABS: [Tab, string][] = [["records", "HRIS Records"], ["slips", "Payslips"], ["leave", "Leave Register"], ["loan", "Loan Register"], ["idp", "IDP Results"], ["learning", "Learning Goals"], ["handbook", "Employee Handbook"], ["queries", "HR Queries"]];
 const APPLY: [string, string][] = [["leave", "Apply for Leave"], ["advance", "Apply for Advance"], ["loan", "Apply for Loan"], ["encashment", "Apply for Leave Encashment"], ["uniform", "Apply for Uniform"], ["shoes", "Apply for Shoes"], ["other", "Apply for Other Things"]];
 
-export default function MySheet({ name, children }: { name: string; children?: React.ReactNode }) {
+export default function MySheet({ name, children, teamBox }: { name: string; children?: React.ReactNode; teamBox?: React.ReactNode }) {
   const [d, setD] = useState<Sheet | null>(null);
   const [tab, setTab] = useState<Tab>("records");
   const [msg, setMsg] = useState("");
@@ -82,6 +82,7 @@ export default function MySheet({ name, children }: { name: string; children?: R
               <Tile label="Last net pay" value={`₹${inr(latest?.net)}`} hint={latest ? `${MONTHS[latest.month - 1].slice(0, 3)} ${latest.year}` : "—"} onClick={() => setTab("slips")} />
             </div>
             {pending.length > 0 && <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: "#FFF7E6", border: "1px solid #F5B32B", color: "#8A5B00" }}><b>Waiting on you:</b> {pending.join(" · ")}</div>}
+            {teamBox}
           </>
         )}
         {/* ── the buttons ── */}

@@ -21,7 +21,7 @@ import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, CONSENT_TEXT, WA
 import DictateBox from "./DictateBox";
 import IdpMyRecord, { type MyRecord } from "./IdpMyRecord";
 import IdpFinal, { type SalaryRow, type SalaryInfo, type Attachment } from "./IdpFinal";
-import { TeamList, TeamReview, type TeamRow } from "./IdpTeamReview";
+import { TeamBox, TeamList, TeamReview, type TeamRow } from "./IdpTeamReview";
 import { RichTextView } from "./hrms/RichText";
 
 const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
@@ -117,7 +117,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     // with its Go back and edit and a leader's team reviews, sits under IDP Results.
     return (
       <>
-        <MySheet name={name}>
+        <MySheet name={name} teamBox={<TeamBox onOpen={setReviewRow} />}>
           <div className="rounded-lg p-3 mb-2" style={{ background: "#E6F4EA", border: "1px solid #9AD3AE" }}>
             <div className="font-bold text-sm" style={{ color: C.green }}>Your IDP is done — completed {new Date(last.submitted_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}.</div>
             <div className="text-xs mt-1" style={{ color: C.dim, lineHeight: 1.6 }}>It is on your record and your HoD, HR and Management can read it.</div>
@@ -184,6 +184,8 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
             <div className="mt-1" style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.95 }}>{state.open ? "It is started but not submitted. Finish it and press Submit — until then it is not an IDP." : "Your Individual Development Plan is due. Set aside an hour and start below."}</div>
           </div>
         )}
+        <TeamBox onOpen={setReviewRow} />
+        {reviewRow && <TeamReview row={reviewRow} onClose={() => { setReviewRow(null); }} />}
         {/* THE HANDBOOK, WHERE EVERY EMPLOYEE ALREADY COMES (Dr Raghu, 5 Sep 2026) */}
         <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "#16232F", color: "#fff", textDecoration: "none" }}>
           <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
