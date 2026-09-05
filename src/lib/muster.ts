@@ -202,6 +202,7 @@ export interface RegisterRow {
   ot_pay: number; site_allowance: number; compoff_amt: number; encash_amt: number; arrears: number; earned: number;
   pf: number; pt: number; loan: number; advance: number; tds: number; lunch: number; late_ded: number; other_ded: number; deductions: number; net: number; to_pay: number;
   leave_ob: number; leave_earned: number; compoff_days: number; leave_used: number; leave_encashed: number; leave_cb: number;
+  loan_ob: number; loan_taken: number; loan_cb: number;
   hold: boolean; rate_from: "rates" | "record" | "none"; mobile: string | null;
 }
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -256,6 +257,7 @@ export function generateRegister(
     // ── leave and payment days ──
     const led = ledger(m.employee_id);
     const leaveOb = led?.leave_ob ?? num(rec?.get("Leave as on 31st june 2026"));
+    const loanOb = led?.loan_ob ?? num(rec?.get("Loan as on 31st June 2026"));
     const earnsLeave = !contractish;
     const leaveEarned = earnsLeave ? r2(m.present / (worker ? 20 : 10)) : 0;
     const compDays = m.compoff ?? 0;
@@ -304,7 +306,7 @@ export function generateRegister(
       per_day: Math.round(perDay), gross: Math.round(gross), basic_da: eBasic, hra, fixed_allowance: eFixed, conveyance: eConv, medical: eMed,
       ot_pay: otPay, site_allowance: site, compoff_amt: compAmt, encash_amt: encashAmt, arrears, earned,
       pf, pt, loan, advance, tds, lunch, late_ded: lateDed, other_ded: other, deductions, net, to_pay: Math.ceil(net),
-      leave_ob: r2(leaveOb), leave_earned: leaveEarned, compoff_days: compDays, leave_used: r2(leaveUsed + compUsed), leave_encashed: r2(encashDays), leave_cb: leaveCb,
+      leave_ob: r2(leaveOb), leave_earned: leaveEarned, compoff_days: compDays, leave_used: r2(leaveUsed + compUsed), leave_encashed: r2(encashDays), leave_cb: leaveCb, loan_ob: Math.round(loanOb), loan_taken: m.loan_taken ?? 0, loan_cb: Math.round(loanOb + (m.loan_taken ?? 0) - loan),
       hold: /hold/i.test(m.status) || /f ?& ?f|resign|terminat/i.test(m.status), rate_from: from, mobile: m.mobile,
     };
   });

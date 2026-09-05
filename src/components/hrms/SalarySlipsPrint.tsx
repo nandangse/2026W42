@@ -127,7 +127,7 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
                   ["Conveyance", s.conv_rate, s.conveyance, "ESIC", s.esi],
                   ["Fixed Allowance", s.fixed_rate, s.fixed, "Advance", s.advance],
                   ["Medical Allowance", s.med_rate, s.medical, "Loan EMI", s.loan_ded],
-                  ["Leave Encashment", null, s.leave_encash, "TDS Deduction", s.tds],
+                  [s.compoff_amt ? `Leave Encashment (leave ${inr(s.leave_encash_amt)} + comp off ${inr(s.compoff_amt)})` : "Leave Encashment", null, s.leave_encash, "TDS Deduction", s.tds],
                   ["Site Allowance", null, s.site, "Other Deductions", s.other_ded],
                   ["Interim Bonus", null, s.bonus, "Lunch", s.lunch],
                   ["Arrears", null, s.arrears, "", null],
@@ -169,7 +169,7 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
                 <tr>
                   <td style={{ width: "18%" }}><b>Leave Details</b></td>
                   <td>
-                    OB: {s.leave_ob ?? "—"} + Added: {s.leave_added ?? "—"} − Used: {s.leave_used ?? "—"} − Encashed: {s.leave_encashed ?? "—"} = <b>Closing: {s.leave_cb ?? "—"}</b>
+                    OB: {s.leave_ob ?? "—"} + Earned: {s.leave_added ?? "—"}{s.compoff_days != null ? <> + Comp off: {s.compoff_days}</> : null} − Used: {s.leave_used ?? "—"} − Encashed: {s.leave_encashed ?? "—"}{s.compoff_days != null && s.compoff_encashed_days ? <> (of which comp off {s.compoff_encashed_days})</> : null} = <b>Closing: {s.leave_cb ?? "—"}</b>
                   </td>
                 </tr>
                 <tr>
