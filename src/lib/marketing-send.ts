@@ -53,11 +53,11 @@ async function viaResend(ch: Channel, to: string, subject: string, html: string)
 }
 
 /** Mailercloud's Email API (apidoc.mailercloud.com): POST https://email-api.mailercloud.com/email, the key bare in Authorization. */
-async function viaMailercloud(ch: Channel, to: string, subject: string, html: string): Promise<void> {
+async function viaMailercloud(ch: Channel, to: string, subject: string, html: string, name?: string | null, messageId?: string): Promise<void> {
   if (!ch.api_key) throw new Error("no Mailercloud API key on the channel");
   const r = await fetch("https://email-api.mailercloud.com/email", {
     method: "POST", headers: { "content-type": "application/json", authorization: ch.api_key },
-    body: JSON.stringify({ version: "1.0", email: { from: ch.email, fromName: ch.label || "Nandan GSE", replyTo: [ch.email], subject, html, text: html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(), recipients: { to: [{ email: to }] } }, metadata: { campaignType: "marketing" } }) });
+    body: JSON.stringify({ version: "1.0", email: { from: ch.email, fromName: ch.label || "Nandan GSE", replyTo: [ch.email], subject, html, text: html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(), recipients: { to: [{ email: to, ...(name ? { name } : {}) }] } }, metadata: { campaignType: "marketing", ...(messageId ? { messageId } : {}) } }) });
   if (!r.ok) throw new Error(`Mailercloud ${r.status}: ${(await r.text()).slice(0, 160)}`);
   const j = await r.json().catch(() => null) as { status?: string; message?: string } | null;
   if (j && j.status && j.status !== "SUCCESS") throw new Error(`Mailercloud: ${j.message || j.status}`);
@@ -118,7 +118,7 @@ export async function drain(db: SupabaseClient, opts: { campaignId?: string; max
         + `<img src="${SITE}/api/marketing/t/${r.token}" width="1" height="1" alt="" />`;
       try {
         if (ch.kind === "resend") await viaResend(ch, to, subject, bodyHtml);
-        else if (ch.kind === "mailercloud") await viaMailercloud(ch, to, subject, bodyHtml);
+        else if (ch.kind === "mailercloud") await viaMailercloud(ch, to, subject, bodyHtml, p?.full_name || null, `genie-${r.token}`);
         else await viaGmail(db, ch, to, subject, bodyHtml);
         await db.from("mk_send").update({ status: "sent", sent_at: new Date().toISOString(), channel_id: ch.id, error: null }).eq("id", r.id);
         rm.ch.sent_today += 1; rm.ch.sent_this_hour += 1;

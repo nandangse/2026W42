@@ -78,6 +78,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.2.1",
+    date: "2026-09-06",
+    module: "Marketing — Mailercloud, to the letter of its reference",
+    items: [
+      "Dr Raghu sent Mailercloud's send-email reference (6 Sep 2026). Checked line by line: the bare key in Authorization, version 1.0, from and subject and one recipient required, name optional — as built. Two things taken from the page: each recipient now carries their name, and the send's own token goes as Mailercloud's messageId, so a retry after a hiccup cannot send the same mail twice inside their 24-hour window.",
+    ],
+  },
+  {
     v: "5.0.2.0",
     date: "2026-09-06",
     module: "Marketing — the ninth door",
