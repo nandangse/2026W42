@@ -19,7 +19,7 @@
  * what the dashboard is missing, and they will be loaded from these files.
  */
 import { useCallback, useEffect, useState } from "react";
-import { driveToken, driveUpload } from "@/components/kuber/drive-leg";
+import { driveToken, driveUpload, driveReady } from "@/components/kuber/drive-leg";
 import { swallow } from "@/lib/swallow";
 
 type YearFile = { id: string; fy: string; month: number | null; kind: string; name: string; bytes: number | null; drive_link: string | null; note: string | null; by_email: string; initials: string | null; at: string };
@@ -53,6 +53,15 @@ export default function YearFiles({ email, googleClientId }: { email?: string; g
   const [msg, setMsg] = useState("");
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [showAll, setShowAll] = useState(false);
+  const [stage, setStage] = useState("");
+  const [drive, setDrive] = useState(driveReady());
+  // Connect on a plain click: the browser trusts the gesture, Google's window
+  // opens, and every upload after it needs no window at all.
+  const connect = async () => {
+    setMsg("");
+    try { if (!googleClientId) throw new Error("no Google client configured on the server"); await driveToken(googleClientId, email); setDrive(true); setMsg("Google Drive connected ✓ — upload away."); }
+    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  };
 
   const load = useCallback(() => {
     fetch("/api/kuber/years", { cache: "no-store" }).then((r) => r.json())
@@ -71,14 +80,16 @@ export default function YearFiles({ email, googleClientId }: { email?: string; g
   const put = async (fy: string, kind: string, file: File | null, m: number | null) => {
     if (!file || busy) return;
     const key = `${fy}|${kind}`;
-    setBusy(key); setPct(0); setMsg("");
+    setBusy(key); setPct(0); setMsg(""); setStage("asking Google…");
     try {
       if (!googleClientId) throw new Error("no Google client configured on the server — the Drive leg cannot run");
       const tok = await driveToken(googleClientId, email);
+      setDrive(true); setStage("uploading…");
       const label = KINDS.find((k) => k.key === kind)?.label || kind;
       const folder = `FY ${fy}`;
       const stamp = m ? ` (${MONTHS[(m + 8) % 12]} ${fy})` : "";
       const up = await driveUpload(tok, folder, file, `${label}${stamp}`, setPct);
+      setStage("registering…");
       const r = await fetch("/api/kuber/years", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ fy, kind, month: m ?? undefined, name: file.name, bytes: file.size, drive_id: up.id || undefined, drive_link: up.link || undefined }),
@@ -90,7 +101,7 @@ export default function YearFiles({ email, googleClientId }: { email?: string; g
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
     } finally {
-      setBusy("");
+      setBusy(""); setStage("");
     }
   };
 
@@ -112,7 +123,7 @@ export default function YearFiles({ email, googleClientId }: { email?: string; g
         )}
         {mayUpload && (
           <label className="inline-block mt-1 text-xs font-bold rounded px-2 py-0.5" style={{ background: running ? "#F4F2EC" : "var(--navy)", color: running ? "var(--dim)" : "#fff", cursor: busy ? "default" : "pointer", opacity: busy && !running ? 0.5 : 1 }}>
-            {running ? `${Math.round(pct * 100)}%…` : f ? "⬆ replace" : "⬆ upload"}
+            {running ? (stage === "uploading…" ? `${Math.round(pct * 100)}%…` : stage) : f ? "⬆ replace" : "⬆ upload"}
             <input type="file" accept={kind.accept} className="hidden" disabled={!!busy} onChange={(e) => { put(fy, kind.key, e.target.files?.[0] ?? null, m ?? null); e.target.value = ""; }} />
           </label>
         )}
@@ -133,6 +144,12 @@ export default function YearFiles({ email, googleClientId }: { email?: string; g
         {mayUpload ? " You may upload." : " Dr Raghu and Suresh upload; everyone with Kuber reads."}
         {!installed && <span style={{ color: "var(--red)" }}> Run migration 0145 first — the register does not exist yet.</span>}
       </div>
+      {mayUpload && (
+        <div className="flex items-center gap-2 mb-2 text-xs">
+          <button onClick={connect} className="rounded px-3 py-1.5 font-bold" style={{ background: drive ? "var(--green)" : "var(--navy)", color: "#fff" }}>{drive ? "✓ Google Drive connected" : "Connect Google Drive first"}</button>
+          <span style={{ color: "var(--muted)" }}>{drive ? "Files go to Drive without another window." : "One click opens Google's window; after that every upload is silent. If nothing opens, allow pop-ups for genie.nandan.co.in."}</span>
+        </div>
+      )}
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: msg.includes("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
       {mayUpload && (
         <div className="flex items-center gap-2 mb-2 text-xs">

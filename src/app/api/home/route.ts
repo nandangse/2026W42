@@ -5,6 +5,7 @@ import { hrmsTables } from "@/lib/hrms";
 import { mayUseCrm } from "@/crm/auth";
 import { hasGrant } from "@/lib/grant";
 import { resolveGoalAccess } from "@/lib/goal-access";
+import { mayUseMarketing } from "@/lib/marketing";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export async function GET() {
 
     const kind: "labour" | "staff" = /labour/i.test(String(employee?.type || "")) && u.role !== "admin" ? "labour" : "staff";
 
-    const [crm, hrms, accounts, vishwakarma, seva, ims, saamaan, goals] = await Promise.all([
+    const [crm, hrms, accounts, vishwakarma, seva, ims, saamaan, goals, marketing] = await Promise.all([
       mayUseCrm(),
       hasGrant(admin, "hrms_access", email, u.isOwner),
       hasGrant(admin, "accounts_access", email, u.isOwner),
@@ -46,10 +47,11 @@ export async function GET() {
       hasGrant(admin, "ims_access", email, u.isOwner),
       hasGrant(admin, "material_access", email, u.isOwner),
       resolveGoalAccess(admin, u.id, u.isOwner).catch(() => ({ see: false, edit: false })),
+      mayUseMarketing(email, u.isOwner),
     ]);
     return NextResponse.json({
       kind, employee,
-      doors: { main: kind === "staff", crm, hrms, ims, lms: true, accounts, vishwakarma, saamaan },
+      doors: { main: kind === "staff", crm, marketing, hrms, ims, lms: true, accounts, vishwakarma, saamaan },
       goals: goals.see,
       me: { email: u.email, displayName: u.displayName, initials: u.initials, role: u.role, isOwner: u.isOwner },
     });

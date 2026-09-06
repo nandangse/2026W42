@@ -51,6 +51,22 @@ import { meetingFromInteraction, syncInteraction } from "@/lib/zoom";
  * Numbers and dates stay out of it deliberately: ilike against a numeric
  * column is an error in Postgres, not a miss.
  */
+
+/**
+ * THE APOLLO IMPORTS STAY OUT OF THE CRM (Dr Raghu, 6 Sep 2026: "all the
+ * Apollo imports don't need to clog my Company"). Marketing's imports carry
+ * source = apollo; the CRM's Company and People lists show source = crm.
+ * The column arrives with CRM migration 0055; until then nothing is filtered.
+ */
+let SOURCE_COL: boolean | null = null;
+async function hasSourceColumn(db: ReturnType<typeof crmDb>): Promise<boolean> {
+  if (SOURCE_COL !== null) return SOURCE_COL;
+  const { error } = await db.from("company").select("source").limit(1);
+  SOURCE_COL = !error;
+  return SOURCE_COL;
+}
+const CRM_ONLY = new Set(["company", "person"]);
+
 const LINK_CAP = 500;
 
 function likeValue(q: string): string {
@@ -285,6 +301,8 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
     const indFilter = u.searchParams.get("f_company_industry");
     const wantsInd = !!indFilter && !isCompany && d.fields.some((f) => f.name === "company_id");
 
+    const hideApollo = CRM_ONLY.has(d.name) && (await hasSourceColumn(db));
+
     const select = isCompany ? COMPANY_SELECT
       : isOpp ? (wantsInd ? "*, company_join:company_id!inner(industry_id, industry:industry_id(name))" : OPP_SELECT)
       : wantsInd ? "*, company_join:company_id!inner(industry_id)" : "*";
@@ -303,6 +321,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       // the mail composer's To-picker needs the address beside the name
       let pq = db.from(d.table).select(d.name === "person" ? `id, ${d.titleField}, primary_email` : `id, ${d.titleField}`);
       if (["company", "person", "opportunity", "product"].includes(d.name)) pq = pq.is("deleted_at", null);
+      if (hideApollo) pq = pq.neq("source", "apollo");
       for (const f of d.fields) {
         if (f.virtual) continue;
         const v = u.searchParams.get(`f_${f.name}`);
@@ -404,6 +423,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       const buildAgg = () => {
         let qy = db.from(d.table).select(aggSelect);
         if (["company", "person", "opportunity", "product"].includes(d.name)) qy = qy.is("deleted_at", null);
+        if (hideApollo) qy = qy.neq("source", "apollo");
         if (wantsInd) qy = (String(indFilter).includes(",") ? qy.in("company_join.industry_id", String(indFilter).split(",")) : qy.eq("company_join.industry_id", indFilter));
         for (const f of d.fields) {
           if (f.virtual) continue;
@@ -491,6 +511,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       let qy = db.from(d.table).select(select, withCount ? { count: "exact" as const } : undefined);
       // Merged and soft-deleted rows stay in the ledger, not on the screens.
       if (["company", "person", "opportunity", "product"].includes(d.name)) qy = qy.is("deleted_at", null);
+      if (hideApollo) qy = qy.neq("source", "apollo");
       if (tagIds) qy = qy.in("id", tagIds.length ? tagIds.slice(0, 2000) : ["00000000-0000-0000-0000-000000000000"]);
       if (wantsInd) qy = (String(indFilter).includes(",") ? qy.in("company_join.industry_id", String(indFilter).split(",")) : qy.eq("company_join.industry_id", indFilter));
       for (const f of d.fields) {

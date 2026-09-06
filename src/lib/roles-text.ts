@@ -74,6 +74,10 @@ export const DOOR_TEXT: Record<string, { means: string; limits: string }> = {
     means: "Saamaan at /saamaan: items, warehouses, RBOMs, MRPs, kitting, slips, purchase orders and suppliers pulled from the ERP.",
     limits: "The ERP stays the master for items, POs and suppliers — Saamaan pulls, it does not push. Issuing on a slip does not yet reduce stock.",
   },
+  marketing: {
+    means: "Marketing at /marketing: leads (people and companies, the Apollo imports included), lists, e-mail campaigns with templates and Genie on the message, sending channels, the unsubscribe list.",
+    limits: "A member sees only the records they made or were assigned; sales people and managers see all. Opportunities, deals and Eva briefs are not in Marketing at all. Notes and sends are of self only. Channels are set by sales and managers; Apollo imports never appear in the CRM's own Company list.",
+  },
   goals: {
     means: "The goal tree at Planning → Goals: see it (view) or shape it (edit).",
     limits: "Work assigned to a person reaches them on My Week whether or not they hold this; the grant only governs seeing the tree. Nobody but the owner holds it by default, admins included.",
@@ -85,7 +89,7 @@ export const DOOR_TEXT: Record<string, { means: string; limits: string }> = {
 /** The whole story for one person, as paragraphs. */
 export function accessStory(u: {
   role: string; lc?: boolean; stratcom?: boolean; management?: boolean; goals_level?: string;
-  crm_access?: boolean; hrms_access?: boolean; accounts_access?: boolean; vishwakarma_access?: boolean; seva_access?: boolean; ims_access?: boolean; saamaan_access?: boolean;
+  crm_access?: boolean; marketing_access?: boolean; hrms_access?: boolean; accounts_access?: boolean; vishwakarma_access?: boolean; seva_access?: boolean; ims_access?: boolean; saamaan_access?: boolean;
   isOwner?: boolean;
 }): { title: string; means: string; limits: string }[] {
   const out: { title: string; means: string; limits: string }[] = [];
@@ -93,8 +97,8 @@ export function accessStory(u: {
   const r = ROLE_TEXT[u.role]; if (r) out.push({ title: `Role: ${u.role.replace("_", " ")}`, ...r });
   for (const k of ["lc", "stratcom", "management"] as const) if (u[k]) out.push({ title: `Room: ${k === "lc" ? "Leadership Circle" : k[0].toUpperCase() + k.slice(1)}`, ...ROOM_TEXT[k] });
   if (u.goals_level && u.goals_level !== "none") out.push({ title: `Goals: can ${u.goals_level}`, ...DOOR_TEXT.goals });
-  for (const k of ["crm", "hrms", "accounts", "vishwakarma", "seva", "ims", "saamaan"] as const)
-    if (u[`${k}_access`] || u.isOwner) out.push({ title: `Door: ${k === "accounts" ? "Kuber" : k.toUpperCase() === "CRM" || k === "ims" ? k.toUpperCase() : k[0].toUpperCase() + k.slice(1)}`, ...DOOR_TEXT[k] });
+  for (const k of ["crm", "marketing", "hrms", "accounts", "vishwakarma", "seva", "ims", "saamaan"] as const)
+    if (u[`${k}_access`] || u.isOwner) out.push({ title: `Door: ${k === "accounts" ? "Kuber" : k === "crm" || k === "ims" ? k.toUpperCase() : k[0].toUpperCase() + k.slice(1)}`, ...DOOR_TEXT[k] });
   out.push({ title: "Always: LMS and their own sheet", means: `${DOOR_TEXT.lms.means} ${DOOR_TEXT.idp.means}`, limits: `${DOOR_TEXT.lms.limits} ${DOOR_TEXT.idp.limits}` });
   return out;
 }

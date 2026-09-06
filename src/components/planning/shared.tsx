@@ -316,6 +316,8 @@ export interface AdminUser {
   /** Saamaan, materials, at /saamaan (0118, material_access). Same arrangement. */
   saamaan_access: boolean;
   saamaan_implicit: boolean;
+  marketing_access: boolean;
+  marketing_implicit: boolean;
 }
 
 export interface ErpLogEntry {

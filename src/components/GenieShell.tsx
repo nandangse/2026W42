@@ -19,11 +19,12 @@ import { LOGO } from "@/lib/logo";
 import { APP_VERSION } from "@/lib/version";
 import { swallow } from "@/lib/swallow";
 
-export type ShellModule = "main" | "crm" | "hrms" | "accounts" | "vishwakarma" | "seva" | "ims" | "saamaan" | "lms" | "idp";
+export type ShellModule = "main" | "crm" | "marketing" | "hrms" | "accounts" | "vishwakarma" | "seva" | "ims" | "saamaan" | "lms" | "idp";
 
 export const MODULES: { key: ShellModule; label: string; icon: string; href: string; blurb: string }[] = [
   { key: "main", label: "Planning", icon: "🧞", href: "/", blurb: "jobs, milestones, the floor" },
   { key: "crm", label: "CRM", icon: "🤝", href: "/crm", blurb: "enquiries to orders" },
+  { key: "marketing", label: "Marketing", icon: "📣", href: "/marketing", blurb: "leads, lists, campaigns" },
   { key: "hrms", label: "HRMS", icon: "👤", href: "/hrms", blurb: "people, pay, appraisals" },
   { key: "ims", label: "IMS", icon: "📐", href: "/ims", blurb: "standards, audits, documents" },
   { key: "lms", label: "LMS", icon: "📚", href: "/lms", blurb: "learning" },

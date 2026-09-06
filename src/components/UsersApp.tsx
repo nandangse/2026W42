@@ -49,6 +49,7 @@ export interface UserRow {
   seva_access: boolean; seva_implicit: boolean;
   ims_access: boolean; ims_implicit: boolean;
   saamaan_access: boolean; saamaan_implicit: boolean;
+  marketing_access: boolean; marketing_implicit: boolean;
 }
 
 /** The seven doors that are not Main Genie, in the order the menus show them. */

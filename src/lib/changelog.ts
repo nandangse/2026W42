@@ -78,6 +78,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.2.0",
+    date: "2026-09-06",
+    module: "Marketing — the ninth door",
+    items: [
+      "\"lets build a new module called Marketing. The database is the same as CRM ... something I can give access to an intern ... Role — show assigned records or created records only. When Sales person log into this they can see all.\" (Dr Raghu, 6 Sep 2026). Marketing is at /marketing, a tick on Admin → Users (migration 0146). A member sees the leads, lists and campaigns they made or were assigned; the owner, the CRM's sales people and managers see all. Opportunities, deals and the Eva brief are not in it. Notes and sends are of self only.",
+      "LEADS. People and Companies on the CRM's own tables (CRM migration 0055). A company can be marked as a lead. Anyone can add a person or a company; sales assign records by e-mail. \"All the Apollo imports don't need to clog my Company\": Import Apollo CSV reads the export in the browser, matches people on e-mail and companies on domain then name, and brings the new ones in as source = apollo — companies tagged Apollo and Leads, people tagged Apollo — and the CRM's Company and People lists never show source = apollo.",
+      "LISTS. Named lists of people. Tick people on Leads and choose a list; an import can go straight onto one. Lists feed campaigns.",
+      "EMAIL MARKETING. A campaign walks the steps you named: Campaign → Lists & people → Check list (reach, no e-mail, duplicates, unsubscribed) → Message (templates with {{first_name}}, {{company}} and the CRM's variables; ✨ Genie magic rewrites subject and body for the inbox and shows the deliverability score before and after) → Check message (subject length, trigger words, links, images, a name in the mail — a score out of 100) → Unsubscribes → Speed (mails an hour) → Send. The from-addresses are ticked per campaign. A cron takes a pass every ten minutes at the campaign's speed, within each channel's hourly and daily limits, round-robin across the ticked addresses; every mail carries an open pixel and an unsubscribe link.",
+      "SENDING CHANNELS. An e-mail id, its sender name, its limits, and the API that carries it: Gmail (the mailbox connected under CRM → Integrations), Resend, or Mailercloud (\"mailing considering Mailercloud\" — its Email API, the key on the channel). Each channel counts what it sent this hour and today.",
+      "UNSUBSCRIBES, kept meticulously: every click on the link, every bounce or complaint Resend reports through its webhook, and whatever is pasted in. Every campaign skips them at send time.",
+      "KUBER — \"is this uploading and saving in Drive? ... it's still stuck at 0%\" (Dr Raghu, 6 Sep 2026). The year-wise upload waited on Google's sign-in window, which the browser can block without a word. Now a Connect Google Drive button opens that window on a plain click and keeps the token; every upload after it is silent. If the window never answers, the upload says so after 45 seconds instead of sitting at 0%. Yes: a file that reaches 100% is on Drive under FY <year> in the Tally folder, and only then is its row written.",
+    ],
+  },
+  {
     v: "5.0.1.3",
     date: "2026-09-06",
     module: "Kuber — the year-wise files",

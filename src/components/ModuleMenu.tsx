@@ -18,11 +18,12 @@
 import { useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
-export type ModuleKey = "main" | "crm" | "hrms" | "accounts" | "vishwakarma" | "seva" | "ims" | "saamaan";
+export type ModuleKey = "main" | "crm" | "marketing" | "hrms" | "accounts" | "vishwakarma" | "seva" | "ims" | "saamaan";
 
 const MODULES: { key: ModuleKey; label: string; icon: string; href: string }[] = [
   { key: "main", label: "Main Genie", icon: "🧞", href: "/" },
   { key: "crm", label: "CRM", icon: "🤝", href: "/crm" },
+  { key: "marketing", label: "Marketing", icon: "📣", href: "/marketing" },
   { key: "hrms", label: "HRMS", icon: "👤", href: "/hrms" },
   { key: "accounts", label: "Kuber", icon: "💰", href: "/kuber" },
   { key: "vishwakarma", label: "Vishwakarma", icon: "🛠", href: "/vishwakarma" },

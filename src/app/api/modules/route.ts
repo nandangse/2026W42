@@ -8,6 +8,7 @@ import { resolveVishwakarmaAccess } from "@/lib/vishwakarma";
 import { resolveSevaAccess } from "@/lib/seva";
 import { resolveImsAccess } from "@/ims/auth";
 import { resolveSaamaanAccess } from "@/lib/saamaan";
+import { mayUseMarketing } from "@/lib/marketing";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +25,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const u = await currentUser();
   if (!u || u.disabled)
-    return NextResponse.json({ main: false, crm: false, hrms: false, accounts: false, vishwakarma: false, seva: false, ims: false, saamaan: false });
+    return NextResponse.json({ main: false, crm: false, marketing: false, hrms: false, accounts: false, vishwakarma: false, seva: false, ims: false, saamaan: false });
 
   const admin = adminClient();
-  const [crm, hrms, accounts, vishwakarma, seva, ims, saamaan] = await Promise.all([
+  const [crm, hrms, accounts, vishwakarma, seva, ims, saamaan, marketing] = await Promise.all([
     mayUseCrm(),
     resolveHrmsAccess(admin, u.email, u.isOwner),
     resolveAccountsAccess(admin, u.email, u.isOwner),
@@ -35,6 +36,7 @@ export async function GET() {
     resolveSevaAccess(admin, u.email, u.isOwner),
     resolveImsAccess(admin, u.email, u.isOwner),
     resolveSaamaanAccess(admin, u.email, u.isOwner),
+    mayUseMarketing(u.email, u.isOwner),
   ]);
-  return NextResponse.json({ main: true, crm, hrms, accounts, vishwakarma, seva, ims, saamaan });
+  return NextResponse.json({ main: true, crm, marketing, hrms, accounts, vishwakarma, seva, ims, saamaan });
 }

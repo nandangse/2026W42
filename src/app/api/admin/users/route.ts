@@ -16,6 +16,7 @@ const DOORS: Record<string, { table: string; label: string; migration: string }>
   saamaan_access: { table: "material_access", label: "Saamaan", migration: "0118" },
   accounts_access: { table: "accounts_access", label: "Kuber", migration: "0073" },
   crm_access: { table: "crm_access", label: "the CRM", migration: "0055" },
+  marketing_access: { table: "marketing_access", label: "Marketing", migration: "0146" },
 };
 
 export const dynamic = "force-dynamic";
@@ -187,6 +188,12 @@ export async function GET(req: Request) {
       for (const r of g || []) goalGrant.set(r.person_id as string, !!r.can_edit);
     } catch (e) { swallow("admin/users", e); /* pre-0010 */ }
 
+    const mkEmails = new Set<string>();
+    try {
+      const { data: mg } = await admin.from("marketing_access").select("email");
+      for (const g of mg || []) mkEmails.add(String(g.email || "").toLowerCase());
+    } catch (e) { swallow("admin/users", e); /* pre-0146 */ }
+
     const caller = await requireAdmin();
     return NextResponse.json({
       departments,
@@ -230,6 +237,8 @@ export async function GET(req: Request) {
           saamaanEmails.has(String(u.email || "").toLowerCase()) ||
           String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         saamaan_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        marketing_access: mkEmails.has(String(u.email || "").toLowerCase()) || String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        marketing_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         goals_level:
           String(u.email || "").toLowerCase() === RAGHU_EMAIL
             ? "edit"

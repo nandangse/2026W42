@@ -22,6 +22,9 @@ declare global {
  */
 let cachedTok: { t: string; exp: number } | null = null;
 
+/** True when a Drive token is already in hand — no window will open. */
+export function driveReady(): boolean { return !!cachedTok && Date.now() < cachedTok.exp; }
+
 export async function driveToken(clientId: string, hint?: string): Promise<string> {
   if (cachedTok && Date.now() < cachedTok.exp) return cachedTok.t;
   await new Promise<void>((res, rej) => {
@@ -33,18 +36,22 @@ export async function driveToken(clientId: string, hint?: string): Promise<strin
     document.head.appendChild(s);
   });
   return new Promise((res, rej) => {
+    // Google's window that never answers — blocked by the browser, or closed
+    // without the callback firing — used to hang the upload at 0% for good.
+    const timer = setTimeout(() => rej(new Error("Google's sign-in window did not answer in 45 seconds. Allow pop-ups for genie.nandan.co.in (the icon at the right of the address bar), press Connect Google Drive, and try the file again.")), 45_000);
     const tc = window.google!.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: "https://www.googleapis.com/auth/drive",
       ...(hint ? { login_hint: hint } : {}),
       prompt: "",
       callback: (t: { access_token?: string; error?: string; expires_in?: number }) => {
+        clearTimeout(timer);
         if (t.access_token) {
           cachedTok = { t: t.access_token, exp: Date.now() + (Number(t.expires_in ?? 3300) - 120) * 1000 };
           res(t.access_token);
         } else rej(new Error(t.error || "Google did not grant access"));
       },
-      error_callback: (e: { message?: string }) => rej(new Error(e.message || "Google sign-in was closed")),
+      error_callback: (e: { message?: string; type?: string }) => { clearTimeout(timer); rej(new Error(e.type === "popup_failed_to_open" ? "The browser blocked Google's window — allow pop-ups for genie.nandan.co.in and try again." : e.message || "Google sign-in was closed")); },
     } as object);
     tc.requestAccessToken();
   });
@@ -66,7 +73,7 @@ export async function driveUpload(token: string, folderName: string, file: File,
   }
   // resumable session, then 16 MB slices with honest progress
   const init = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true", {
-    method: "POST", headers: { ...H, "content-type": "application/json", "x-upload-content-type": "text/xml" },
+    method: "POST", headers: { ...H, "content-type": "application/json", "x-upload-content-type": file.type || "application/octet-stream" },
     body: JSON.stringify({ name: `${kindLabel} - ${file.name}`, parents: [sub] }),
   });
   const session = init.headers.get("location");
