@@ -20,6 +20,7 @@ import { fmtAt } from "@/lib/fmt";
 import { CompanyBox, PersonBox, Modal, type Person, type Company } from "@/components/marketing/LeadBoxes";
 import RichTextEditor from "@/components/RichTextEditor";
 import ApolloLeads from "@/components/marketing/ApolloLeads";
+import LandingPages, { uploadPublic } from "@/components/marketing/LandingPages";
 
 type List = { id: string; name: string; description: string | null; created_by_email: string; created_at: string; count: number };
 type Campaign = { id: string; name: string; status: string; subject: string | null; body_html?: string | null; list_ids: string[]; person_ids: string[]; channel_ids: string[]; speed_per_hour: number; created_by_email: string; created_at: string; started_at: string | null; done_at: string | null; counts: Record<string, number> | null; checklist?: Record<string, number | string> | null; deliverability?: { score: number; issues: string[] } | null };
@@ -28,7 +29,7 @@ type Template = { id: string; name: string; subject: string | null; body_html: s
 
 const SECTIONS = [
   { key: "leads", label: "Leads", icon: "🎯" }, { key: "apollo", label: "Apollo Leads", icon: "🛰" }, { key: "lists", label: "Lists", icon: "📋" }, { key: "campaigns", label: "Email Marketing", icon: "✉️" },
-  { key: "templates", label: "Templates", icon: "📝" }, { key: "channels", label: "Sending Channels", icon: "📡" }, { key: "unsubscribes", label: "Unsubscribes", icon: "🚫" },
+  { key: "templates", label: "Templates", icon: "📝" }, { key: "landing", label: "Landing pages", icon: "🌐" }, { key: "channels", label: "Sending Channels", icon: "📡" }, { key: "unsubscribes", label: "Unsubscribes", icon: "🚫" },
 ];
 const INK = "var(--ink)", MUTED = "var(--muted)", LINE = "var(--line)", ACCENT = "var(--accent)", GREEN = "var(--green)", RED = "var(--red)", NAVY = "var(--navy)";
 const inp: React.CSSProperties = { border: `1px solid #E2E0DA`, borderRadius: 6, padding: "6px 8px", fontSize: 13, background: "#fff", color: "#22303C", width: "100%" };
@@ -70,12 +71,20 @@ export default function MarketingApp({ email, displayName, initials, role, marke
           {section === "lists" && <Lists />}
           {section === "campaigns" && <Campaigns seesAll={seesAll} />}
           {section === "templates" && <Templates />}
+          {section === "landing" && <LandingSection />}
           {section === "channels" && <Channels seesAll={seesAll} />}
           {section === "unsubscribes" && <Unsubscribes seesAll={seesAll} />}
         </div>
       </div>
     </GenieShell>
   );
+}
+
+/** The landing pages need the mailing lists, so a lead can join one. */
+function LandingSection() {
+  const [lists, setLists] = useState<List[]>([]);
+  useEffect(() => { api<{ lists: List[] }>("/api/marketing/lists").then((j) => setLists(j.lists || [])).catch(() => setLists([])); }, []);
+  return <LandingPages lists={lists} />;
 }
 
 /** Apollo Leads needs the mailing lists, so a promotion can land on one. */
@@ -532,7 +541,7 @@ function MessageEditor({ subject, body, onSubject, onBody, variables, disabled, 
         </label>
         <div className="text-xs font-semibold mt-2 mb-1" style={{ color: "var(--dim)" }}>Body</div>
         <div ref={boxRef} onFocusCapture={() => { last.current = "body"; }} style={{ opacity: disabled ? 0.6 : 1, pointerEvents: disabled ? "none" : "auto" }}>
-          <RichTextEditor initial={body} live onChangeHtml={onBody} minHeight={minHeight} placeholder="Write the mail. Click a variable on the right to drop it where the cursor is." />
+          <RichTextEditor initial={body} live onChangeHtml={onBody} onUploadImage={uploadPublic} minHeight={minHeight} placeholder="Write the mail. Click a variable on the right to drop it where the cursor is; a picture you paste is hosted by Genie." />
         </div>
       </div>
       <div className="rounded border p-2" style={{ borderColor: LINE, background: "#FBFAF7", alignSelf: "start", position: "sticky", top: 60 }}>

@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.4.0",
+    date: "2026-09-07",
+    module: "Marketing — landing pages, and Genie hosts its own pictures",
+    items: [
+      "\"it has to be hosted in a public place through the Genie itself!\" (Dr Raghu, 6 Sep 2026). A picture pasted into a mail or a page is uploaded to Genie's own public bucket and comes back with a plain address every mail reader can fetch — Gmail and Outlook cannot sign in, so this is the one public bucket in Genie and it is for outward-facing pictures and PDFs only. 20 MB a file, the path randomised so it cannot be guessed. Migration 0147.",
+      "\"We will have a landing page creator at nandangse.com/<lpname>. That's the stuff that will be linked.\" Marketing → Landing pages writes one: a big line, the line under it, a top picture, a rich body, one of three looks, and the ask — which of name, e-mail, phone, company and what-they-need to collect, what the button says, the thank-you line. Publish opens it. Migration 0056.",
+      "WHERE IT ANSWERS. Always at genie.nandan.co.in/lp/<address>. At <b>nandangse.com/<address></b> too, the moment that domain is added to the Vercel project and its DNS points here — Genie maps the bare address to the page itself, and the domain's root goes to a page called home. Search engines are told to stay away unless the page's own tick says otherwise; the rest of Genie stays hidden as always.",
+      "WHAT A VISITOR BECOMES. The form needs an e-mail or a phone, and carries a trap field bots fill and people never see. What comes in becomes a person — and a company when they name one — matched so nothing duplicates, tagged (Landing page by default, your word if you change it), and put on a mailing list if the page names one. Every submission is kept beside the page, with how many have seen it and how many filled it in.",
+    ],
+  },
+  {
     v: "5.0.3.0",
     date: "2026-09-06",
     module: "Marketing — Apollo Leads, the pool",

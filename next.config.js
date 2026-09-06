@@ -64,7 +64,13 @@ const nextConfig = {
         ],
       },
       {
-        source: "/(.*)",
+        /**
+         * Everything but the landing pages. A landing page is written to be
+         * found — whether search engines may index it is the page's own tick
+         * (CRM migration 0056), and the page emits that itself. The rest of
+         * the block still applies to it, below.
+         */
+        source: "/((?!lp/).*)",
         headers: [
           /**
            * NOT INDEXED. Anywhere. By anything. Including /login.
@@ -96,6 +102,16 @@ const nextConfig = {
            */
           { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=()" },
           // HTTPS only (Vercel serves HTTPS; pin it for a year)
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+        ],
+      },
+      {
+        // the landing pages: the same protections, minus the blanket noindex
+        source: "/lp/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
         ],
       },
