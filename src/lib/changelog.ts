@@ -78,6 +78,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.1.2",
+    date: "2026-09-06",
+    module: "Planning wears the one header too",
+    items: [
+      "\"looks same to me!\" (Dr Raghu, 6 Sep 2026, on the Planning page). It did: 5.0.1.0 gave the seven other doors the one header and left Planning's old one in place. Planning now wears the same bar — logo, Nandan Genie with the theme name under it, the last-updated stamp, the quote, the value toggle, the bell, and the name menu with Modules, My sheet, and Planning's own rows: Update to ERP, Upload Files, Feature Request, Operations Playbook, Admin, Profile, Change Password, Reload, Logout. The workspace row and the tabs sit under it as before.",
+      "\"make the buttons better also! not like number cards — show the larger icon and text. The description is not needed. It can be on mouseover\" (Dr Raghu, 6 Sep 2026). The door tiles are buttons: a large icon and the name in the door's colour, the description only on hover, the one you are on filled in.",
+      "\"lms doesn't have header\" (Dr Raghu, 6 Sep 2026). The LMS at /lms wears the one header too, in place of its bare ← Genie link.",
+      "\"kuber is garbled!\" (Dr Raghu, 6 Sep 2026). The table class from 5.0.1.1 forced every cell onto one line, and Kuber's upload log ran over itself. Cells wrap again; a table that wants one line says so.",
+      "The morning greeting read twice on My Week — once from the new Home block, once from My Week itself. My Week's line stays; the door tiles sit under it.",
+    ],
+  },
+  {
     v: "5.0.1.1",
     date: "2026-09-06",
     module: "Genie 5 — the two giants split, tabs load when opened, one colour voice, the table standard everywhere (items 14–16)",

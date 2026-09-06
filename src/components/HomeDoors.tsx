@@ -56,23 +56,33 @@ export function Greeting({ d }: { d: HomeData | null }) {
   );
 }
 
-/** The doors that open for this login, as tiles. Nothing shows for a door they do not hold. */
+/**
+ * The doors that open for this login, as buttons (Dr Raghu, 6 Sep 2026:
+ * "make the buttons better also! not like number cards — show the larger
+ * icon and text. The description is not needed. It can be on mouseover").
+ */
 export function DoorTiles({ d, current, onGo }: { d: HomeData | null; current?: string; onGo?: (key: string) => boolean }) {
   if (!d) return null;
   const mine = DOORS.filter((x) => d.doors[x.key]);
   if (mine.length <= 1 && current === "main") return null;
   return (
-    <div className="grid gap-2 mb-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
-      {mine.map((x) => (
-        <a key={x.key} href={x.href}
-          onClick={(e) => { if (onGo && onGo(x.key)) e.preventDefault(); }}
-          className="rounded-lg p-3 flex flex-col gap-1"
-          style={{ background: x.key === current ? "var(--paper)" : "#fff", border: `1px solid ${x.key === current ? x.color : "var(--line)"}`, borderTop: `3px solid ${x.color}`, textDecoration: "none", color: "var(--navy)", minHeight: 78 }}>
-          <div className="flex items-center gap-2 font-bold" style={{ fontSize: 15 }}><span>{x.icon}</span>{x.label}</div>
-          <div className="text-xs" style={{ color: "var(--dim)" }}>{x.blurb}</div>
-          {x.key === current && <div className="text-xs font-semibold mt-auto" style={{ color: "var(--green)" }}>you are here</div>}
-        </a>
-      ))}
+    <div className="flex gap-2 flex-wrap mb-4">
+      {mine.map((x) => {
+        const here = x.key === current;
+        return (
+          <a key={x.key} href={x.href} title={`${x.label} — ${x.blurb}`}
+            onClick={(e) => { if (onGo && onGo(x.key)) e.preventDefault(); }}
+            className="flex items-center gap-2 rounded-lg font-bold"
+            style={{
+              padding: "10px 16px 10px 12px", fontSize: 16, textDecoration: "none",
+              background: here ? x.color : "#fff", color: here ? "#fff" : x.color,
+              border: `2px solid ${x.color}`, boxShadow: here ? "none" : "0 1px 2px rgba(0,0,0,.06)",
+            }}>
+            <span style={{ fontSize: 26, lineHeight: 1 }}>{x.icon}</span>
+            <span>{x.label}</span>
+          </a>
+        );
+      })}
     </div>
   );
 }

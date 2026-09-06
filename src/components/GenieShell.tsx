@@ -71,7 +71,7 @@ function useHeartbeat() {
 }
 
 export default function GenieShell({
-  module, title, tagline, user, tools, leading, onNotif, children,
+  module, title, tagline, user, tools, leading, onNotif, menu, children,
 }: {
   module: ShellModule;
   /** The app's name, right of the logo: "Nandan HRMS". */
@@ -85,6 +85,8 @@ export default function GenieShell({
   leading?: React.ReactNode;
   /** The app's own way to open a notification; the default opens the task on Planning. */
   onNotif?: (n: Notif) => void;
+  /** The app's own rows in the account menu, given a close() to call after a click. */
+  menu?: (close: () => void) => React.ReactNode;
   children?: React.ReactNode;
 }) {
   const isAdmin = user.role === "admin";
@@ -106,7 +108,7 @@ export default function GenieShell({
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {tools}
             <Bell onOpen={onNotif} />
-            <AccountMenu module={module} user={user} isAdmin={isAdmin} />
+            <AccountMenu module={module} user={user} isAdmin={isAdmin} menu={menu} />
           </div>
         </div>
       </header>
@@ -180,7 +182,7 @@ function Bell({ onOpen }: { onOpen?: (n: Notif) => void }) {
 
 /* ───────────────────────── the account menu ───────────────────────── */
 
-function AccountMenu({ module, user, isAdmin }: { module: ShellModule; user: ShellUser; isAdmin: boolean }) {
+function AccountMenu({ module, user, isAdmin, menu }: { module: ShellModule; user: ShellUser; isAdmin: boolean; menu?: (close: () => void) => React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [mods, setMods] = useState(false);
   const [may, setMay] = useState<Record<string, boolean> | null>(null);
@@ -241,6 +243,7 @@ function AccountMenu({ module, user, isAdmin }: { module: ShellModule; user: She
               )}
             </div>
             <a href="/idp" className="block px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, textDecoration: "none", borderBottom: "1px solid #EEECE6" }}>🪪 My sheet &amp; IDP</a>
+            {menu && <div className="genie-menu-extra" style={{ borderBottom: "1px solid #EEECE6" }}>{menu(() => setOpen(false))}</div>}
             <button onClick={() => window.location.reload()} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, borderBottom: "1px solid #EEECE6" }} title="Same screen, fresh code">⟳ Reload</button>
             <button onClick={logout} className="w-full text-left px-3 py-2 text-sm font-bold hover:bg-gray-50" style={{ color: ORANGE }}>⎋ Logout</button>
             {isAdmin && (

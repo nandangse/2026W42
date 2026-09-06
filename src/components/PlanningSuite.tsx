@@ -8,7 +8,7 @@ import dynamic from "next/dynamic";
 const TabLoading = () => <div className="text-sm p-6" style={{ color: "var(--muted)" }}>Opening…</div>;
 
 import { supabaseBrowser } from "@/lib/supabase/browser";
-import { ModuleLinks, ReloadRow } from "@/components/ModuleMenu";
+import GenieShell from "@/components/GenieShell";
 import PlaybookScreen from "@/components/Playbook";
 import { LOGO } from "@/lib/logo";
 
@@ -504,248 +504,47 @@ export default function PlanningSuite({
       {/* ===== frozen header ===== */}
       <div
         ref={hdrRef}
-        className="px-4 py-2.5"
+        className="pb-2"
         style={{ background: "var(--navy)", position: "sticky", top: 0, zIndex: 45 }}
       >
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="rounded bg-white px-2 py-1">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={LOGO} alt="Nandan GSE" style={{ height: 34 }} />
-            </div>
-            <div>
-              <div className="text-xs tracking-widest font-bold" style={{ color: "var(--accent)" }}>
-                NANDAN GENIE
-                {isAdmin && (
-                  <span style={{ background: "var(--accent)", color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6 }} title="See Admin → Updates for what changed">
-                    V {APP_VERSION}
-                  </span>
-                )}
-              </div>
-              <h1 className="text-lg font-bold text-white leading-tight">
-                {appSettings.theme_name}
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            {role === "viewer" && (
-              <span className="text-xs rounded px-2 py-1.5 font-bold" style={{ background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }} title="Your account is read-only">
-                👁 Read-only
-              </span>
-            )}
-            {/* What matters at a glance is how fresh the data is, not how many
-                files landed — the upload count belongs on Morning Update, which
-                now lives in the account menu. */}
-            <span className="text-xs rounded px-2 py-1.5 font-bold"
-              style={{ background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }}
-              title="When the Jobmaster export was last loaded into Genie">
-              🕒 Last Updated {stamp(board.lastUpdated)}
-            </span>
-            {/* bell renders only once the notifications table exists */}
-            {notifs?.installed && (
-              <span className="relative">
-                <button
-                  onClick={() => setNotifOpen((o) => !o)}
-                  className="text-xs rounded px-2 py-1.5 font-bold"
-                  style={{ background: "#0D161F", color: notifs.unread ? "var(--amber)" : "#8FA1B3", border: "1px solid #22303C" }}
-                  title="Notifications"
-                >
-                  🔔{notifs.unread > 0 && (
-                    <span className="ml-1 rounded-full px-1.5 font-bold tnum" style={{ background: "var(--red)", color: "#fff", fontSize: 10 }}>
-                      {notifs.unread}
-                    </span>
-                  )}
-                </button>
-                {notifOpen && (
-                  <>
-                    <div className="fixed inset-0" style={{ zIndex: 58 }} role="button" tabIndex={0} onClick={() => setNotifOpen(false)} />
-                    <div className="absolute rounded-lg border bg-white" style={{ top: "calc(100% + 6px)", right: 0, width: 330, maxHeight: 420, overflowY: "auto", borderColor: "var(--line)", boxShadow: "0 12px 30px rgba(0,0,0,.25)", zIndex: 59 }}>
-                      <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: "1px solid #EEECE6" }}>
-                        <span className="text-xs font-bold" style={{ color: "var(--navy)" }}>Notifications</span>
-                        {notifs.unread > 0 && (
-                          <button onClick={markAllRead} className="text-xs font-bold" style={{ color: "var(--accent)" }}>Mark all read</button>
-                        )}
-                      </div>
-                      {notifs.items.length === 0 && (
-                        <div className="text-xs text-center py-6" style={{ color: "var(--muted)" }}>Nothing yet — you&apos;ll hear when a task is assigned to you.</div>
-                      )}
-                      {notifs.items.map((n) => {
-                        // Which job this is about, resolved through the task it
-                        // points at. The notification stores no job of its own,
-                        // and deriving it beats copying it: a job retagged after
-                        // the notification was written still reads correctly.
-                        const nt = n.ref_id ? (board?.tasks || []).find((x) => x.id === n.ref_id && x.kind === n.ref_kind) : undefined;
-                        const nj = nt ? (board?.jobs || []).find((j) => j.id === nt.j) : undefined;
-                        return (
-                          <div
-                            key={n.id}
-                            role="button" tabIndex={0} onClick={() => openNotif(n)}
-                            className="px-3 py-2 cursor-pointer"
-                            style={{ borderBottom: "1px solid #F4F2EC", background: n.read_at ? "#fff" : "#FFF7E6" }}
-                            title={n.ref_kind === "goal" ? "Open Goals" : "Open the task"}
-                          >
-                            <div className="flex items-start gap-2">
-                              {!n.read_at && <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: "var(--accent)", marginTop: 5 }} />}
-                              <div className="min-w-0 flex-1">
-                                <div className="text-xs font-bold" style={{ color: "var(--navy)" }}>{n.title}</div>
-                                {n.body && <div className="text-xs truncate" style={{ color: "var(--dim)" }}>{n.body}</div>}
-                                {nj && (
-                                  <div className="text-xs truncate" style={{ color: "var(--blue)", fontWeight: 600 }} title={nj.tag || undefined}>
-                                    JOB {jobNo(nj.id)}{nj.tag ? ` · ${nj.tag}` : ""}
-                                  </div>
-                                )}
-                                <div className="tnum" style={{ fontSize: 10, color: "var(--muted)" }}>{stamp(n.created_at)}</div>
-                              </div>
-                              <span className="flex-shrink-0" style={{ color: "#B8B5AC", fontSize: 12, marginTop: 2 }}>›</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </span>
-            )}
-            <button
-              onClick={() => setQuoteTrigger((n) => n + 1)}
-              className="text-xs rounded px-2 py-1.5 font-bold"
-              style={{ background: "#0D161F", color: "var(--amber)", border: "1px solid #22303C" }}
-              title="Show today's quote"
-            >
-              ☀ Quote
-            </button>
-            {mayValue && (
-              <select
-                value={showVal ? "with" : "without"}
-                onChange={(e) => setShowVal(e.target.value === "with")}
-                className="text-xs rounded px-2 py-1.5 font-semibold"
-                style={{ background: "#0D161F", color: "var(--amber)", border: "1px solid #22303C" }}
-              >
-                <option value="with">With value ₹</option>
-                <option value="without">Without value</option>
-              </select>
-            )}
-            {/* account: initials only, everything else behind the dropdown */}
-            <span className="relative">
-              <button
-                onClick={() => setUserOpen((o) => !o)}
-                className="flex items-center gap-1 rounded px-1.5 py-1"
-                style={{ background: "#0D161F", border: "1px solid #22303C" }}
-                title={`${displayName || email} · ${role.replace("_", " ")}`}
-                aria-haspopup="menu"
-                aria-expanded={userOpen}
-              >
-                <span
-                  className="rounded-full font-bold flex items-center justify-center"
-                  style={{
-                    width: 26,
-                    height: 26,
-                    fontSize: 11,
-                    letterSpacing: 0.3,
-                    background: initials ? "var(--accent)" : "var(--red)",
-                    color: "#fff",
-                  }}
-                >
-                  {initials || "??"}
-                </span>
-                <span style={{ color: "#8FA1B3", fontSize: 9 }}>▼</span>
-              </button>
-              {userOpen && (
-                <>
-                  <div className="fixed inset-0" style={{ zIndex: 58 }} role="button" tabIndex={0} onClick={() => setUserOpen(false)} />
-                  <div
-                    className="absolute rounded-lg border bg-white"
-                    style={{ top: "calc(100% + 6px)", right: 0, width: 232, borderColor: "var(--line)", boxShadow: "0 12px 30px rgba(0,0,0,.25)", zIndex: 59 }}
-                  >
-                    <div className="px-3 py-2.5" style={{ borderBottom: "1px solid #EEECE6" }}>
-                      <div className="text-sm font-bold truncate" style={{ color: "var(--navy)" }}>{displayName || email.split("@")[0]}</div>
-                      <div className="text-xs truncate" style={{ color: "var(--muted)" }}>{email}</div>
-                      <div className="text-xs mt-1 font-semibold" style={{ color: "var(--dim)" }}>
-                        {role.replace("_", " ")}
-                        {!initials && <span style={{ color: "var(--red)" }}> · no initials set</span>}
-                      </div>
-                    </div>
-                    <ModuleLinks current="main" />
-                    <ReloadRow />
-                    {canEdit && (
-                      <button
-                        onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("erp"); }}
-                        className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
-                        style={{ color: "var(--navy)", borderBottom: "1px solid #EEECE6" }}
-                        title="Changes waiting to be pushed back to the ERP"
-                      >
-                        ↗ Update to ERP{queued ? ` (${queued})` : ""}
-                      </button>
-                    )}
-                    {canUpload && (
-                      <button
-                        onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("upload"); }}
-                        className="w-full text-left px-3 py-2 text-sm font-bold hover:bg-gray-50"
-                        style={{ color: "var(--accent)" }}
-                        title="Load the morning files — Jobs, Projects, ToDo, the Employee Master, or the full PRE workbook. Excel or CSV."
-                      >
-                        ⬆ Upload Files {loadedCount}/3
-                      </button>
-                    )}
-                    <button
-                      onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("feature"); }}
-                      className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
-                      style={{ color: "var(--navy)", borderBottom: "1px solid #EEECE6" }}
-                      title="Ask for something in Genie — anyone can, and everyone can read the rest"
-                    >
-                      💡 Feature Request
-                    </button>
-                    <button
-                      onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("opsbook"); }}
-                      className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
-                      style={{ color: "var(--navy)", borderBottom: "1px solid #EEECE6" }}
-                      title="Documents in, one living wiki out — compiled at midnight or on the button"
-                    >
-                      📖 Operations Playbook
-                    </button>
-                    {isAdmin && (
-                      <button
-                        onClick={() => { setUserOpen(false); setWorkspace("suite"); setTab("admin"); }}
-                        className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
-                        style={{ color: "var(--navy)", borderBottom: "1px solid #EEECE6" }}
-                      >
-                        ⚙ Admin
-                      </button>
-                    )}
-                    <button
-                      onClick={() => { setUserOpen(false); setProfileOpen(true); }}
-                      className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
-                      style={{ color: "var(--navy)" }}
-                    >
-                      👤 Profile
-                    </button>
-                    <button
-                      onClick={() => { setUserOpen(false); setPwOpen(true); }}
-                      className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
-                      style={{ color: "var(--navy)" }}
-                    >
-                      🔑 Change Password
-                    </button>
-                    <button
-                      onClick={() => { setUserOpen(false); logout(); }}
-                      className="w-full text-left px-3 py-2 text-sm font-bold hover:bg-gray-50"
-                      style={{ color: "var(--accent)", borderTop: "1px solid #EEECE6" }}
-                    >
-                      ⎋ Logout
-                    </button>
-                  </div>
-                </>
+        <GenieShell module="main" title="Nandan Genie" tagline={appSettings.theme_name} user={{ email, displayName, initials, role }}
+          onNotif={(n) => openNotif(n as unknown as Parameters<typeof openNotif>[0])}
+          tools={
+            <>
+              {role === "viewer" && (
+                <span className="genie-tagline text-xs rounded px-2 font-bold" style={{ height: 32, lineHeight: "30px", background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }} title="Your account is read-only">👁 Read-only</span>
               )}
-            </span>
-          </div>
-        </div>
+              <span className="genie-tagline text-xs rounded px-2 font-bold" style={{ height: 32, lineHeight: "30px", background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }} title="When the Jobmaster export was last loaded into Genie">
+                🕒 {stamp(board.lastUpdated)}
+              </span>
+              <button onClick={() => setQuoteTrigger((n) => n + 1)} className="text-xs rounded px-2 font-bold" style={{ height: 32, background: "#0D161F", color: "var(--amber)", border: "1px solid #22303C" }} title="Show today's quote">☀</button>
+              {mayValue && (
+                <select value={showVal ? "with" : "without"} onChange={(e) => setShowVal(e.target.value === "with")} className="text-xs rounded px-1 font-semibold" style={{ height: 32, background: "#0D161F", color: "var(--amber)", border: "1px solid #22303C" }}>
+                  <option value="with">With value ₹</option>
+                  <option value="without">Without value</option>
+                </select>
+              )}
+            </>
+          }
+          menu={(close) => (
+            <>
+              {canEdit && <button onClick={() => { close(); setWorkspace("suite"); setTab("erp"); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }} title="Changes waiting to be pushed back to the ERP">↗ Update to ERP{queued ? ` (${queued})` : ""}</button>}
+              {canUpload && <button onClick={() => { close(); setWorkspace("suite"); setTab("upload"); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--accent)", fontWeight: 700 }} title="Load the morning files">⬆ Upload Files {loadedCount}/3</button>}
+              <button onClick={() => { close(); setWorkspace("suite"); setTab("feature"); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }} title="Ask for something in Genie">💡 Feature Request</button>
+              <button onClick={() => { close(); setWorkspace("suite"); setTab("opsbook"); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }} title="Documents in, one living wiki out">📖 Operations Playbook</button>
+              {isAdmin && <button onClick={() => { close(); setWorkspace("suite"); setTab("admin"); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }}>⚙ Admin</button>}
+              <button onClick={() => { close(); setProfileOpen(true); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }}>👤 Profile{!initials && <span style={{ color: "var(--red)" }}> · no initials set</span>}</button>
+              <button onClick={() => { close(); setPwOpen(true); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }}>🔑 Change Password</button>
+            </>
+          )}
+        />
 
         {/* Workspace row always occupies its own line, at every width, so the
             header never reflows between one and two lines. On narrow screens
             it scrolls sideways rather than wrapping, keeping the header
             height fixed within a workspace. */}
         <div
-          className="flex gap-1 rounded p-1 mt-2"
+          className="flex gap-1 rounded p-1 mt-2 mx-3"
           style={{ background: "#0D161F", overflowX: "auto", scrollbarWidth: "thin" }}
         >
           <button

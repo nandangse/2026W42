@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import type { Metadata } from "next";
 import LMS from "@/components/LMS";
+import GenieShell from "@/components/GenieShell";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Nandan Learning" };
@@ -23,8 +24,8 @@ export default async function LmsPage({ params }: { params: { key?: string[] } }
   const key = (params.key?.[0] || "").slice(0, 60) || null;
   return (
     <div style={{ minHeight: "100vh", background: "#F4F2EC" }}>
+      <GenieShell module="lms" title="Nandan LMS" tagline="What you are building into yourself" user={{ email: user.email, displayName: user.displayName, initials: user.initials, role: user.role }} />
       <div className="mx-auto px-4 py-4" style={{ maxWidth: 1240 }}>
-        <a href="/" className="text-xs font-bold" style={{ color: "var(--dim)" }}>← Genie</a>
         <LMS initialKey={key} />
       </div>
     </div>
