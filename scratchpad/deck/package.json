@@ -1,5 +1,0 @@
-{
- "name": "genie-deck",
- "private": true,
- "description": "Deck generator. Its own package root so npm never walks up into the app."
-}

@@ -22,13 +22,6 @@ const INSTALLATION_STATUSES = new Set([
   "I: Installation Completed",
 ]);
 
-export function jobState(job: { delivered?: boolean | null; stat?: string | null }): JobState {
-  const stat = String(job.stat || "").trim();
-  if (INSTALLATION_STATUSES.has(stat)) return "installation";
-  if (job.delivered) return "delivered";
-  return "live";
-}
-
 /**
  * 423 Locked if this job has been delivered.
  *

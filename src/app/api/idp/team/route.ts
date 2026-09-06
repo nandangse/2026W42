@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import { requireUser, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -95,7 +98,7 @@ async function gate(u: { email: string; id: string }) {
         below.length = 0;
         for (const [id, depth] of have) if (id !== u.id) below.push({ id, depth });
       }
-    } catch { /* the profile chain alone, as before */ }
+    } catch (e) { swallow("idp/team", e); /* the profile chain alone, as before */ }
   }
   return { admin, isOwner, members: below.map((m) => ({ ...byId.get(m.id)!, depth: (m as { depth: number }).depth })) };
 }
@@ -269,7 +272,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, url: sgn?.signedUrl ?? null, seconds });
     }
 
-    const body = await req.json();
+    const body = await readBody(req, {});
     const idpId = String(body.idpId || "");
     const rv = await ensureMine(idpId);
 
@@ -309,7 +312,7 @@ export async function POST(req: Request) {
             method: "POST",
             headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
             body: JSON.stringify({
-              model: "claude-sonnet-5",
+              model: AI.FRONT,
               max_tokens: 2500,
               system:
                 "You are the CHRO of an Indian MSME engineering company, writing a one-page growth note about one " +
@@ -343,7 +346,7 @@ export async function POST(req: Request) {
             const t = j?.content?.[0]?.text;
             if (typeof t === "string" && t.trim()) analysis = t.trim();
           }
-        } catch { /* the review stands; the analysis can be written again */ }
+        } catch (e) { swallow("idp/team", e); /* the review stands; the analysis can be written again */ }
       }
 
       const { error } = await admin.from("hrms_idp_review").update({

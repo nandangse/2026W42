@@ -8,6 +8,7 @@
  * the role's Changes, audio and all.
  */
 import { useRef, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import { C } from "./RecordFields";
 
 interface RoleLike {
@@ -51,9 +52,9 @@ export default function VoiceNote({ r, reload, onSaved }: { r: RoleLike; reload:
   const stop = () => {
     // the recorder first: onend checks its state to decide whether dictation
     // stopped by itself or because somebody pressed Stop
-    try { mediaRef.current?.stop(); } catch { /* already stopped */ }
+    try { mediaRef.current?.stop(); } catch (e) { swallow("hrms/RoleVoiceNote", e); /* already stopped */ }
     if (srRef.current) srRef.current.onend = null;
-    try { srRef.current?.stop(); } catch { /* dictation may not be running */ }
+    try { srRef.current?.stop(); } catch (e) { swallow("hrms/RoleVoiceNote", e); /* dictation may not be running */ }
     setRec(false);
   };
 
@@ -125,7 +126,7 @@ export default function VoiceNote({ r, reload, onSaved }: { r: RoleLike; reload:
           sr.onend = () => {
             // still recording? then it stopped by itself — start it again
             if (mediaRef.current && mediaRef.current.state === "recording") {
-              try { startSR(); } catch { /* the recording still stands */ }
+              try { startSR(); } catch (e) { swallow("hrms/RoleVoiceNote", e); /* the recording still stands */ }
             }
           };
           sr.start();

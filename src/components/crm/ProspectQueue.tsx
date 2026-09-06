@@ -9,6 +9,7 @@
  * queue is also its own record of calls made.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import { NAVY, NAVY_SOFT, INK, MUTED, BORDER, ORANGE, GREEN } from "./palette";
 
 interface Item {
@@ -43,7 +44,7 @@ export default function ProspectQueue({ onOpen, compact = false }: { onOpen: (ta
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "reorder", ids: next.map((x) => x.id) }),
       });
-    } catch { /* the next load re-reads the truth */ }
+    } catch (e) { swallow("crm/ProspectQueue", e); /* the next load re-reads the truth */ }
   };
   const dragProps = (i: number) => ({
     draggable: true,

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireUser, errJson, HttpError, type AuthedUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { resolveGoalAccess } from "@/lib/goal-access";
@@ -99,9 +101,7 @@ async function notifyAssignee(actor: Caller, itemId: string, personId: string | 
       ref_id: itemId,
       created_by: label(actor),
     });
-  } catch {
-    /* a notification failure must never break the assignment */
-  }
+  } catch (e) { swallow("goals-v2", e); /* a notification failure must never break the assignment */ }
 }
 
 export async function POST(req: Request) {
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
     const user = await resolveCaller();
     if (!user.see) throw new HttpError(403, "The Goals section has not been shared with this account.");
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
 
     const requireAdminHere = () => {

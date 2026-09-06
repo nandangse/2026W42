@@ -1,5 +1,6 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { supabaseBrowser } from "@/lib/supabase/browser";
@@ -7,7 +8,8 @@ import { ModuleLinks, ReloadRow } from "@/components/ModuleMenu";
 import PlaybookScreen from "@/components/Playbook";
 import { LOGO } from "@/lib/logo";
 import { GenieUsagePanel, ConsultRaghuPanel } from "./ConsultRaghu";
-import { APP_VERSION, UPDATES, EFFORT } from "@/lib/changelog";
+import { APP_VERSION } from "@/lib/version";
+import type { UpdateEntry, Effort } from "@/lib/changelog";
 import SoftwareDescription from "./SoftwareDescription";
 import NextThirtyDays from "./NextThirtyDays";
 import JobCommercials from "./JobCommercials";
@@ -476,7 +478,7 @@ export default function PlanningSuite({
       const v = localStorage.getItem("genie.workspace");
       if (v && ["lms", "suite", "delivered", "goals", "tasking", "sales", "consult", "principles"].includes(v))
         return v as "suite";
-    } catch { /* fine */ }
+    } catch (e) { swallow("PlanningSuite", e); /* fine */ }
     return "suite";
   });
   // Sales-team members' home is the CRM now — Sales Genie's panes moved there.
@@ -509,14 +511,14 @@ export default function PlanningSuite({
       if (asked && OK.includes(asked)) return asked as "home";
       const v = localStorage.getItem("genie.tab");
       if (v && OK.includes(v)) return v as "home";
-    } catch { /* fine */ }
+    } catch (e) { swallow("PlanningSuite", e); /* fine */ }
     return "home";
   });
   useEffect(() => {
     try {
       localStorage.setItem("genie.workspace", workspace);
       localStorage.setItem("genie.tab", tab);
-    } catch { /* fine */ }
+    } catch (e) { swallow("PlanningSuite", e); /* fine */ }
   }, [workspace, tab]);
 
   // ---- browser back/forward navigates within the app, not out of it ----
@@ -648,10 +650,10 @@ export default function PlanningSuite({
     return () => clearInterval(t);
   }, [loadNotifs]);
   const markAllRead = async () => {
-    try { await api.post("/api/notifications", { action: "read_all" }); loadNotifs(); } catch { /* bell is best-effort */ }
+    try { await api.post("/api/notifications", { action: "read_all" }); loadNotifs(); } catch (e) { swallow("PlanningSuite", e); /* bell is best-effort */ }
   };
   const markRead = async (id: string) => {
-    try { await api.post("/api/notifications", { action: "read", ids: [id] }); loadNotifs(); } catch { /* ditto */ }
+    try { await api.post("/api/notifications", { action: "read", ids: [id] }); loadNotifs(); } catch (e) { swallow("PlanningSuite", e); /* ditto */ }
   };
 
   /**
@@ -685,7 +687,7 @@ export default function PlanningSuite({
       const fresh = (await api.get("/api/board")) as Board;
       const t = find(fresh?.tasks || []);
       if (t) { setNotifTask(t); setBoard(fresh); return; }
-    } catch { /* fall through to the honest answer */ }
+    } catch (e) { swallow("PlanningSuite", e); /* fall through to the honest answer */ }
     setNotifGone(n.title);
   };
 
@@ -728,16 +730,34 @@ export default function PlanningSuite({
     if (isAdmin) loadUsers();
   }, [isAdmin, loadUsers]);
 
-  const reload = async () => {
-    try {
-      const b = await api.board();
-      setBoard(b);
-      setErr("");
-      return b as Board;
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-      return null;
-    }
+  /**
+   * ONE FETCH AT A TIME (Genie 5.0.0.2). Thirty-nine places call reload()
+   * after a save, and a burst of saves used to mean a burst of whole-board
+   * fetches racing each other, the last to land winning. Now a reload in
+   * flight is shared: callers that ask while it runs get the same promise,
+   * and a call that lands during a fetch schedules exactly one more so the
+   * board still ends on the latest state.
+   */
+  const inFlight = useRef<Promise<Board | null> | null>(null);
+  const again = useRef(false);
+  const reload = async (): Promise<Board | null> => {
+    if (inFlight.current) { again.current = true; return inFlight.current; }
+    const run = async (): Promise<Board | null> => {
+      try {
+        const b = (await api.board()) as Board;
+        setBoard(b);
+        setErr("");
+        return b;
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+        return null;
+      } finally {
+        inFlight.current = null;
+        if (again.current) { again.current = false; void reload(); }
+      }
+    };
+    inFlight.current = run();
+    return inFlight.current;
   };
   useEffect(() => {
     reload();
@@ -3512,9 +3532,7 @@ function GenieHint({ jobId, jobLabel }: { jobId: string; jobLabel: string }) {
           setHint(r.hint);
           setMeta({ builtBy: r.builtBy ?? null, builtAt: r.builtAt ?? null, stale: !!r.stale });
         }
-      } catch {
-        /* silent: the brief is a companion to the page, never a gate on it */
-      }
+      } catch (e) { swallow("PlanningSuite", e); /* silent: the brief is a companion to the page, never a gate on it */ }
     })();
     return () => { live = false; };
   }, [jobId]);
@@ -6485,6 +6503,14 @@ function AdminTabs({ tab, setTab, owner }: { tab: AdminTab; setTab: (t: AdminTab
  * header and this page can never disagree — they are the same list.
  */
 function Updates() {
+  // The log is fetched, not bundled: it is read on this one screen and
+  // weighed 536 KB on every other (Genie 5.0.0.1).
+  const [log, setLog] = useState<{ updates: UpdateEntry[]; effort: Effort } | null>(null);
+  useEffect(() => {
+    api.get("/api/updates").then(setLog).catch(() => setLog({ updates: [], effort: { measuredTo: "", commits: 0, days: 0, windowHours: 0, raghuLow: 0, raghuHigh: 0 } }));
+  }, []);
+  if (!log) return <div className="text-sm p-3" style={{ color: "#8A94A0" }}>Loading the release log…</div>;
+  const { updates: UPDATES, effort: EFFORT } = log;
   return (
     <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
       <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
@@ -10257,8 +10283,8 @@ function VoiceNotes({
   const textRef = useRef("");
 
   const stop = () => {
-    try { mediaRef.current?.stop(); } catch { /* already stopped */ }
-    try { srRef.current?.stop(); } catch { /* dictation may not be running */ }
+    try { mediaRef.current?.stop(); } catch (e) { swallow("PlanningSuite", e); /* already stopped */ }
+    try { srRef.current?.stop(); } catch (e) { swallow("PlanningSuite", e); /* dictation may not be running */ }
     setRec(false);
   };
 

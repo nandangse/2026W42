@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
+import { inr } from "@/lib/fmt";
 
 interface Row {
   id: string; name: string; department: string | null; designation: string | null; type: string | null;
@@ -23,7 +24,7 @@ interface Row {
   stage: string; selfAvg: number | null; mgrAvg: number | null; askGross: number | null; mgrProposed: number | null;
 }
 
-const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
+
 const lakh = (n: number) => (n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹${(n / 1e5).toFixed(2)} L` : `₹${inr(n)}`);
 const pct = (n: number | null | undefined, sign = true) => (n == null ? "—" : `${sign && n > 0 ? "+" : ""}${n.toFixed(1)}%`);
 

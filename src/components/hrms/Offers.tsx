@@ -16,8 +16,9 @@ import RichText, { RichTextView } from "./RichText";
 import { LOGO } from "@/lib/logo";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
+import { inr } from "@/lib/fmt";
 
-const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
+
 const day = (s: string | null) => (s ? fmtFull(String(s)) : "—");
 
 interface Row {

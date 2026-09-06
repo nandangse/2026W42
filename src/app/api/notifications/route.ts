@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requireUser, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
   try {
     await requireUser();
     const db = supabaseServer(); // RLS means you can only mark your own
-    const body = await req.json();
+    const body = await readBody(req, {});
     const now = new Date().toISOString();
 
     if (body.action === "read" && Array.isArray(body.ids) && body.ids.length) {

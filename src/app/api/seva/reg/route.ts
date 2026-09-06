@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSeva } from "@/lib/seva";
@@ -57,7 +58,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await requireSeva();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const k = spec(String(body.kind || ""));
     const admin = adminClient();
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { requireIms, requireImsAdmin } from "@/ims/auth";
 import { imsDb, notInstalled } from "@/ims/db";
@@ -47,7 +48,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const me = await requireImsAdmin();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
     const db = imsDb();
 

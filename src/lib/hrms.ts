@@ -16,6 +16,7 @@
  *   use the same overlay table, so there is one mechanism rather than two.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { hasGrant } from "@/lib/grant";
 
 export type FieldKind =
   | "text" | "date" | "email" | "tel" | "bool" | "long" | "money" | "number"
@@ -89,7 +90,7 @@ export interface FieldGroup {
  * neither — somebody serving notice is still on the roll, and so is a doubtful
  * case, but neither is simply "active".
  */
-export const STATUS_OPTIONS = [
+const STATUS_OPTIONS = [
   "Active",
   "Resigned",
   "Terminated",
@@ -99,7 +100,7 @@ export const STATUS_OPTIONS = [
 ] as const;
 
 /** Which of the six count as still employed. */
-export const ON_ROLL = new Set<string>(["Active", "Doubtful", "Notice Period"]);
+const ON_ROLL = new Set<string>(["Active", "Doubtful", "Notice Period"]);
 
 /**
  * Is this person on the roll?
@@ -166,7 +167,7 @@ export const TYPE_OPTIONS = [
   "Staff - Contract",
 ] as const;
 
-export const TYPE_NOTES: Record<string, string> = {
+const TYPE_NOTES: Record<string, string> = {
   Management: "Employed by the company. Full statutory deductions.",
   Staff: "Company staff, permanent. PF, ESIC, MLWF and the rest apply.",
   Labour:
@@ -178,12 +179,6 @@ export const TYPE_NOTES: Record<string, string> = {
     "Staff engaged on a contract. 2% TDS is deducted instead of the statutory set.",
   Trainee: "An intern or trainee.",
 };
-
-/** Types the company employs directly — the ones carrying PF/ESIC/MLWF. */
-export const EMPLOYED_TYPES = new Set<string>(["Management", "Staff", "Labour"]);
-
-/** Types paid against a contract, with TDS rather than statutory deductions. */
-export const CONTRACT_TYPES = new Set<string>(["Contractor", "Labour - Contract", "Staff - Contract"]);
 
 /* ── helpers for the derived fields ─────────────────────────────────────── */
 
@@ -446,11 +441,6 @@ export const FIELD_GROUPS: FieldGroup[] = [
 
 export const ALL_FIELDS: FieldSpec[] = FIELD_GROUPS.flatMap((g) => g.fields);
 
-/** The columns a directory listing and a routine CSV should carry. */
-export const SAFE_KEYS = new Set(
-  FIELD_GROUPS.filter((g) => !g.confidential).flatMap((g) => g.fields.map((f) => f.key)),
-);
-
 /** A "multi" value is one entry per line. Empty lines are not entries. */
 export const splitMulti = (v: string | null | undefined): string[] =>
   String(v || "").split("\n").map((x) => x.trim()).filter(Boolean);
@@ -494,25 +484,8 @@ export interface HrmsEmployee {
  *
  * A missing table reads as "nobody", which is the right way for a gate to fail.
  */
-export async function resolveHrmsAccess(
-  admin: SupabaseClient,
-  email: string,
-  isOwner: boolean,
-): Promise<boolean> {
-  if (isOwner) return true;
-  const e = String(email || "").trim().toLowerCase();
-  if (!e) return false;
-  try {
-    const { data } = await admin
-      .from("hrms_access")
-      .select("email")
-      .eq("email", e)
-      .maybeSingle();
-    return !!data;
-  } catch {
-    return false;
-  }
-}
+export const resolveHrmsAccess = (admin: SupabaseClient, email: string, isOwner: boolean) =>
+  hasGrant(admin, "hrms_access", email, isOwner);
 
 /** Tenure in whole years and months, for a person card. */
 export function tenure(doj: string | null | undefined, today = new Date()): string {

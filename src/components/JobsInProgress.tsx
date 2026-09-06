@@ -19,6 +19,7 @@ import { api } from "@/lib/api";
 import { runRate } from "@/lib/run-rate";
 import AnticipatedFY, { type Anticipated } from "./AnticipatedFY";
 import { fmt, fmtFull, jobNo, otdColor } from "@/lib/schedule";
+import { monthKey, monthLabel } from "@/lib/fmt";
 
 const C = {
   ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC",
@@ -73,9 +74,8 @@ const PALETTE = [
  * than a shape.
  */
 const MONTHS_AHEAD = 6;
-const monthKey = (iso: string) => iso.slice(0, 7);
-const monthLabel = (k: string) =>
-  new Date(k + "-01T00:00:00Z").toLocaleDateString("en-IN", { month: "short", year: "2-digit", timeZone: "UTC" });
+
+
 
 /** The jobs behind one bar of the delivery chart. */
 function jobsInBucket(jobs: WipJob[], key: string, today: string, rows: { key: string }[]): WipJob[] {

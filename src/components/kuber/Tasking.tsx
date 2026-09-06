@@ -10,6 +10,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { swallow } from "@/lib/swallow";
+import { addDays, istToday } from "@/lib/fmt";
 
 const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A", RED = "#B3261E", GREEN = "#0D7A3F";
 
@@ -23,12 +25,8 @@ const LANES: { key: string; label: string; colour: string }[] = [
 ];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const istToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-const addDays = (iso: string, d: number) => {
-  const t = new Date(iso + "T00:00:00Z");
-  t.setUTCDate(t.getUTCDate() + d);
-  return t.toISOString().slice(0, 10);
-};
+
+
 const mondayOf = (iso: string) => {
   const t = new Date(iso + "T00:00:00Z");
   return addDays(iso, -((t.getUTCDay() + 6) % 7));
@@ -102,7 +100,7 @@ export default function KuberTasking() {
         setPeople(new Set(arr));
         return;
       }
-    } catch { /* fine */ }
+    } catch (e) { swallow("kuber/Tasking", e); /* fine */ }
     const DEFAULTS = /suresh|sandeep|raghu|^s\.?l\.?$|^s\.?u\.?$|^r\.?j\.?$/i;
     setPeople(new Set(assignees.filter((a) => DEFAULTS.test(a) || DEFAULTS.test(a.split(" ")[0] || ""))));
   }, [assignees, people]);
@@ -111,7 +109,7 @@ export default function KuberTasking() {
     setPeople((c) => {
       const next = new Set(c ?? []);
       if (next.has(w)) next.delete(w); else next.add(w);
-      try { localStorage.setItem("kuber.tasking.people", JSON.stringify([...next])); } catch { /* fine */ }
+      try { localStorage.setItem("kuber.tasking.people", JSON.stringify([...next])); } catch (e) { swallow("kuber/Tasking", e); /* fine */ }
       return next;
     });
   };

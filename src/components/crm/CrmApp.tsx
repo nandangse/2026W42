@@ -21,6 +21,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import ModuleMenu from "@/components/ModuleMenu";
 import PlaybookScreen from "@/components/Playbook";
 import { DOCTYPES, PIPELINES, doctypeBySlug, type Doctype, type Field } from "@/crm/doctypes";
@@ -146,7 +147,7 @@ export default function CrmApp({
     try {
       const kept = localStorage.getItem(`crm.dateview.${slug}`);
       if (kept) { setDateView(JSON.parse(kept)); return; }
-    } catch { /* fine */ }
+    } catch (e) { swallow("crm/CrmApp", e); /* fine */ }
     setDateView({ field: fld, preset: "ytd", from: "", to: "" });
   }, [slug]);
   const applyDateView = (v: DateView | null) => {
@@ -154,7 +155,7 @@ export default function CrmApp({
     try {
       if (v) localStorage.setItem(`crm.dateview.${slug}`, JSON.stringify(v));
       else localStorage.removeItem(`crm.dateview.${slug}`);
-    } catch { /* fine */ }
+    } catch (e) { swallow("crm/CrmApp", e); /* fine */ }
   };
   const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" } | null>(null);
   const [cols, setCols] = useState<string[] | null>(null);   // null = registry default
@@ -183,7 +184,7 @@ export default function CrmApp({
       dragRef.current = null;
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
-      setColWidths((cur) => { try { localStorage.setItem(`crmColWidths.${slug}`, JSON.stringify(cur)); } catch { /* fine */ } return cur; });
+      setColWidths((cur) => { try { localStorage.setItem(`crmColWidths.${slug}`, JSON.stringify(cur)); } catch (e) { swallow("crm/CrmApp", e); /* fine */ } return cur; });
     };
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
@@ -200,7 +201,7 @@ export default function CrmApp({
   });
   const toggleNav = () => {
     setNavOpen((v) => {
-      try { localStorage.setItem("crmNavOpen", v ? "0" : "1"); } catch { /* fine */ }
+      try { localStorage.setItem("crmNavOpen", v ? "0" : "1"); } catch (e) { swallow("crm/CrmApp", e); /* fine */ }
       return !v;
     });
   };
@@ -228,7 +229,7 @@ export default function CrmApp({
       setColW(Number(localStorage.getItem(`crmW.${slug}`)) || 280);
       setColWidths(JSON.parse(localStorage.getItem(`crmColWidths.${slug}`) || "{}"));
     } catch { setCols(null); setPin(0); setColW(280); setColWidths({}); }
-    try { window.history.replaceState(null, "", `/crm/${URL_OF[slug] ?? slug}`); } catch { /* SSR */ }
+    try { window.history.replaceState(null, "", `/crm/${URL_OF[slug] ?? slug}`); } catch (e) { swallow("crm/CrmApp", e); /* SSR */ }
   }, [slug]);
 
   useEffect(() => {
@@ -238,7 +239,7 @@ export default function CrmApp({
 
   // remember the view as it changes — reloads and tomorrow both find it
   useEffect(() => {
-    try { localStorage.setItem(`crmView.${slug}`, JSON.stringify({ q, filters, sort, tag: tagQ })); } catch { /* fine */ }
+    try { localStorage.setItem(`crmView.${slug}`, JSON.stringify({ q, filters, sort, tag: tagQ })); } catch (e) { swallow("crm/CrmApp", e); /* fine */ }
   }, [slug, q, filters, sort, tagQ]);
 
   /** Multi-select for the bulk Edit — checked row ids. */
@@ -350,15 +351,15 @@ export default function CrmApp({
     try {
       if (next) localStorage.setItem(`crmCols.${slug}`, JSON.stringify(next));
       else localStorage.removeItem(`crmCols.${slug}`);
-    } catch { /* private mode -- layout just won't stick */ }
+    } catch (e) { swallow("crm/CrmApp", e); /* private mode -- layout just won't stick */ }
   };
   const saveColW = (n: number) => {
     setColW(n);
-    try { localStorage.setItem(`crmW.${slug}`, String(n)); } catch { /* fine */ }
+    try { localStorage.setItem(`crmW.${slug}`, String(n)); } catch (e) { swallow("crm/CrmApp", e); /* fine */ }
   };
   const savePin = (n: number) => {
     setPin(n);
-    try { localStorage.setItem(`crmPin.${slug}`, String(n)); } catch { /* ditto */ }
+    try { localStorage.setItem(`crmPin.${slug}`, String(n)); } catch (e) { swallow("crm/CrmApp", e); /* ditto */ }
   };
 
   const toggleSort = (col: string) =>
@@ -389,7 +390,7 @@ export default function CrmApp({
             .filter((g) => g.key !== "")
             .sort((a, b) => a.label.localeCompare(b.label))
             .map((g) => ({ id: g.key, label: `${g.label} (${g.count})` }));
-        } catch { /* the filter simply stays empty */ }
+        } catch (e) { swallow("crm/CrmApp", e); /* the filter simply stays empty */ }
       }
       if (!dead) setDistinctOpts(out);
     })();
@@ -872,7 +873,7 @@ export default function CrmApp({
                 <button onClick={() => {
                   setQ(""); setQLive(""); setFilters({}); setSort(null); setTagQ("");
                   applyDateView(null);
-                  try { localStorage.removeItem(`crmView.${slug}`); } catch { /* fine */ }
+                  try { localStorage.removeItem(`crmView.${slug}`); } catch (e) { swallow("crm/CrmApp", e); /* fine */ }
                 }}
                   className="text-xs font-bold rounded px-2 py-1 text-white" style={{ background: "#B3261E" }}
                   title="Clear every filter, the search, the tag, the sort and the date view — see all">
@@ -2485,7 +2486,7 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
     try {
       const j = await (await fetch(`/api/crm/quotation?id=${encodeURIComponent(qid)}`, { cache: "no-store" })).json();
       if (j?.row) { setQ(j.row as Row); onSaved(j.row as Row); }
-    } catch { /* stale totals heal on the next move */ }
+    } catch (e) { swallow("crm/CrmApp", e); /* stale totals heal on the next move */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qid]);
   const reloadLines = useCallback(async () => {
@@ -2524,12 +2525,12 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
           const j = await (await fetch(`/api/crm/address?id=${encodeURIComponent(String(q.address_id))}`, { cache: "no-store" })).json();
           const st = String(j?.row?.state ?? "").toLowerCase();
           if (st) { known = true; inMaha = st.includes("maharashtra"); }
-        } catch { /* fall to the default */ }
+        } catch (e) { swallow("crm/CrmApp", e); /* fall to the default */ }
       }
       const pick = known
         ? taxes.find((t) => (inMaha ? /cgst/i.test(t.name) : /igst/i.test(t.name)))
         : taxes.find((t) => t.is_default);
-      if (pick) { try { await patchQuote({ tax_id: pick.id }); } catch { /* hand can pick */ } }
+      if (pick) { try { await patchQuote({ tax_id: pick.id }); } catch (e) { swallow("crm/CrmApp", e); /* hand can pick */ } }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taxes, q.tax_id, q.address_id]);
@@ -2753,7 +2754,7 @@ function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => v
                           item_group: g.item_group || String(p.item_group ?? ""),
                           unit_price: g.unit_price || (p.approved_price_inr != null ? String(p.approved_price_inr) : ""),
                         }));
-                      } catch { /* type it by hand */ }
+                      } catch (e) { swallow("crm/CrmApp", e); /* type it by hand */ }
                     }} />
                   </div>
                 </td>
@@ -3070,7 +3071,7 @@ function AddressSelect({ companyId, value, onPick }: {
           id: String(r.id),
           label: [r.label, r.line1, r.city].filter(Boolean).join(" · ") || String(r.id),
         })));
-      } catch { /* the quote can still save without one */ }
+      } catch (e) { swallow("crm/CrmApp", e); /* the quote can still save without one */ }
     })();
     return () => { dead = true; };
   }, [companyId]);
@@ -3268,7 +3269,7 @@ function SubmitQuoteModal({ row, mode, onClose, onSent }: {
           try {
             const j = await (await fetch(`/api/crm/person?id=${encodeURIComponent(pid)}`, { cache: "no-store" })).json();
             if (j?.row?.primary_email) emails.push(String(j.row.primary_email));
-          } catch { /* skip */ }
+          } catch (e) { swallow("crm/CrmApp", e); /* skip */ }
         }
         return emails.join(", ");
       };
@@ -3419,14 +3420,14 @@ function QuoteRecipients({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
         try {
           const j = await (await fetch(`/api/crm/person?f_company_id=${encodeURIComponent(companyId)}&limit=200`, { cache: "no-store" })).json();
           for (const p of (j.rows ?? []) as P[]) m.set(String(p.id), p);
-        } catch { /* chips heal below */ }
+        } catch (e) { swallow("crm/CrmApp", e); /* chips heal below */ }
       }
       for (const pid of [...to, ...cc, ...bcc]) {
         if (m.has(pid)) continue;
         try {
           const j = await (await fetch(`/api/crm/person?id=${encodeURIComponent(pid)}`, { cache: "no-store" })).json();
           if (j?.row) m.set(pid, j.row as P);
-        } catch { /* an unresolvable chip still shows its ✕ */ }
+        } catch (e) { swallow("crm/CrmApp", e); /* an unresolvable chip still shows its ✕ */ }
       }
       if (!dead) setBook(m);
     })();
@@ -3442,7 +3443,7 @@ function QuoteRecipients({ row, onSaved }: { row: Row; onSaved: (r?: Row) => voi
       });
       const j = await r.json();
       if (r.ok) onSaved(j.row as Row);
-    } catch { /* typed again, saved again */ }
+    } catch (e) { swallow("crm/CrmApp", e); /* typed again, saved again */ }
   };
   const save = async (kind: "mail_to" | "mail_cc" | "mail_bcc", ids: string[]) => {
     setBusy(true); setErr("");
@@ -3723,7 +3724,7 @@ function RecordModal({
     let t0 = "details";
     try {
       if (dt.name === "person" && window.sessionStorage.getItem("crm.apollo.auto") === String(row.id)) t0 = "card";
-    } catch { /* details it is */ }
+    } catch (e) { swallow("crm/CrmApp", e); /* details it is */ }
     setTab(t0); setApolloMsg("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id]);
@@ -3984,7 +3985,7 @@ function RecordModal({
                     ? "Fills the company's empty fields, brings in up to 10 people as contacts, and files the rest into Notes."
                     : "Looks this contact up — you tick which suggestions to apply on the Visiting Card tab."}`)) return;
                   if (dt.name === "person") {
-                    try { window.sessionStorage.setItem("crm.apollo.auto", rid); } catch { /* fine */ }
+                    try { window.sessionStorage.setItem("crm.apollo.auto", rid); } catch (e) { swallow("crm/CrmApp", e); /* fine */ }
                     setTab("card");
                     return;
                   }
@@ -4394,7 +4395,7 @@ function RelatedTab({
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!window.confirm("Enrich this contact with Apollo? APOLLO CREDITS WILL BE CONSUMED.\n\nOpens the contact on the Visiting Card tab where the suggestions apply.")) return;
-                      try { window.sessionStorage.setItem("crm.apollo.auto", String(r.id)); } catch { /* fine */ }
+                      try { window.sessionStorage.setItem("crm.apollo.auto", String(r.id)); } catch (e) { swallow("crm/CrmApp", e); /* fine */ }
                       onOpenLink(slug, String(r.id));
                     }}
                     style={{ fontSize: 13, opacity: 0.75 }}>🔎</button>
@@ -4452,7 +4453,7 @@ function LinkAutocomplete({
       if (!r.ok) throw new Error(j.error || "Could not add it");
       onPick(String(j.row.id));
       setOpen(false);
-    } catch { /* the typed text stays; picking again retries */ }
+    } catch (e) { swallow("crm/CrmApp", e); /* the typed text stays; picking again retries */ }
     finally { setBusy(false); }
   };
 
@@ -5880,7 +5881,7 @@ function PersonTypeAhead({
       if (!r.ok) throw new Error(j.error || "Could not add the contact");
       onPick(String(j.row.id));
       setOpen(false);
-    } catch { /* the field keeps the typed text; picking again retries */ }
+    } catch (e) { swallow("crm/CrmApp", e); /* the field keeps the typed text; picking again retries */ }
     finally { setBusy(false); }
   };
 
@@ -6022,7 +6023,7 @@ function RecordForm({
           ...(String(f.unit_price ?? "") === "" && p.approved_price_inr != null ? { unit_price: String(p.approved_price_inr) } : {}),
           ...(String(f.description ?? "") === "" && p.name ? { description: String(p.name) } : {}),
         }));
-      } catch { /* the hand can still type a price */ }
+      } catch (e) { swallow("crm/CrmApp", e); /* the hand can still type a price */ }
     })();
   }, [productPick]);
 

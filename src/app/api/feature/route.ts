@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requireReader, requireUser, requireOwner, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -127,7 +128,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const user = await requireOwner();
-    const body = await req.json();
+    const body = await readBody(req, {});
     if (!body.id) throw new HttpError(400, "id required");
     if (!["open", "planned", "done", "declined"].includes(String(body.status)))
       throw new HttpError(400, "Unknown status");

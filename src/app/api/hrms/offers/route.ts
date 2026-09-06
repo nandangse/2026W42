@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -117,7 +119,7 @@ async function readResume(buf: Buffer, mime: string, filename: string): Promise<
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: "claude-sonnet-5",
+        model: AI.FRONT,
         max_tokens: 1200,
         system: RESUME_SYSTEM,
         tools: [{ name: "candidate", description: "The candidate's details, exactly as the resume gives them.", input_schema: RESUME_SCHEMA }],
@@ -192,7 +194,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, path, filename: file.name, read: tidy, why, doc });
     }
 
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
 
     /* ── create ── */

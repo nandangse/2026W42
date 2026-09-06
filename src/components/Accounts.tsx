@@ -12,7 +12,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { APP_VERSION } from "@/lib/changelog";
+import { swallow } from "@/lib/swallow";
+import { APP_VERSION } from "@/lib/version";
 import ModuleMenu from "@/components/ModuleMenu";
 import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
@@ -126,16 +127,16 @@ export default function Accounts({
   // holding the open screen opens itself; choices are remembered.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   useEffect(() => {
-    try { setNavOpen(localStorage.getItem("kuber.nav") !== "0"); } catch { /* fine */ }
-    try { setOpenGroups(JSON.parse(localStorage.getItem("kuber.nav.groups") || "{}")); } catch { /* fine */ }
+    try { setNavOpen(localStorage.getItem("kuber.nav") !== "0"); } catch (e) { swallow("Accounts", e); /* fine */ }
+    try { setOpenGroups(JSON.parse(localStorage.getItem("kuber.nav.groups") || "{}")); } catch (e) { swallow("Accounts", e); /* fine */ }
   }, []);
   const toggleGroup = (h: string) => setOpenGroups((g) => {
     const next = { ...g, [h]: !g[h] };
-    try { localStorage.setItem("kuber.nav.groups", JSON.stringify(next)); } catch { /* fine */ }
+    try { localStorage.setItem("kuber.nav.groups", JSON.stringify(next)); } catch (e) { swallow("Accounts", e); /* fine */ }
     return next;
   });
   const toggleNav = () => setNavOpen((v) => {
-    try { localStorage.setItem("kuber.nav", v ? "0" : "1"); } catch { /* fine */ }
+    try { localStorage.setItem("kuber.nav", v ? "0" : "1"); } catch (e) { swallow("Accounts", e); /* fine */ }
     return !v;
   });
 
@@ -151,7 +152,7 @@ export default function Accounts({
   }, []);
   const go = (key: string) => {
     setOpenKey(key);
-    try { window.history.replaceState(null, "", `#${key}`); } catch { /* SSR */ }
+    try { window.history.replaceState(null, "", `#${key}`); } catch (e) { swallow("Accounts", e); /* SSR */ }
   };
 
   return (

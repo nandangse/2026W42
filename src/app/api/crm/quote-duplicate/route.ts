@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
     const me = await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const qid = String((await req.json()).quotation_id ?? "");
+    const qid = String((await readBody(req, {})).quotation_id ?? "");
     if (!qid) throw new HttpError(400, "Which quotation?");
 
     const { data: src } = await db.from("quotation").select("*").eq("id", qid).maybeSingle();

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
@@ -81,7 +83,7 @@ export async function POST(req: Request) {
     const me = await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
 
     /**
@@ -114,7 +116,7 @@ export async function POST(req: Request) {
             opportunityId: r.opportunity_id ?? null, quotationId: r.quotation_id ?? null,
           });
           text = renderTemplate(raw, vals);
-        } catch { /* an unresolvable variable must not lose the message */ }
+        } catch (e) { swallow("crm/wa/queue", e); /* an unresolvable variable must not lose the message */ }
         rows.push({
           phone, body: text,
           template_name: String(body.template || "").slice(0, 120),

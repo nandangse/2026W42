@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb } from "@/crm/db";
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
     const mb = user.profileId ? await myMailbox(user.profileId) : null;
     if (!mb || mb.status !== "active")
       throw new HttpError(400, "Connect your Gmail first — Profile → Gmail connection.");
-    const b = await req.json();
+    const b = await readBody(req, {});
     const db = crmDb();
     // EVERY contact on the record is searched, not just the point of
     // contact (Dr Raghu, 26 Aug 2026): the opportunity's people are its

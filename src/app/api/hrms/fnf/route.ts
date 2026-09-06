@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { ALL_FIELDS, fieldSpec, hrmsTables, type FieldSpec } from "@/lib/hrms";
@@ -55,7 +57,7 @@ async function record(id: string): Promise<{ row: EmpRow; value: Record<string, 
   try {
     const { data: eds } = await admin.from(T.edits).select("field, value").eq("employee_id", id);
     for (const e of eds || []) if (fieldSpec(String(e.field))) value[String(e.field)] = e.value == null ? null : String(e.value);
-  } catch { /* pre-0047 */ }
+  } catch (e) { swallow("hrms/fnf", e); /* pre-0047 */ }
   return { row, value };
 }
 
@@ -131,7 +133,7 @@ export async function POST(req: Request) {
   try {
     const me = await requireHrms();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const stamp = stampOf(me);
 
     if (body.action === "create") {
@@ -167,7 +169,7 @@ export async function POST(req: Request) {
         const T = await hrmsTables(admin);
         const patches: [string, string | null][] = [["status", "Notice Period"], ["leaving_date", exit], ["leaving_reason", row.reason]];
         for (const [field, value] of patches) if (value) await admin.from(T.edits).upsert({ employee_id: employeeId, field, value, edited_by: me.email, edited_at: new Date().toISOString(), approved_at: null, approved_by: null }, { onConflict: "employee_id,field" });
-      } catch { /* the settlement stands without it */ }
+      } catch (e) { swallow("hrms/fnf", e); /* the settlement stands without it */ }
       return NextResponse.json({ ok: true, id: data.id });
     }
 
@@ -213,7 +215,7 @@ export async function POST(req: Request) {
           const T = await hrmsTables(admin);
           await admin.from(T.edits).upsert({ employee_id: cur.employee_id, field: "status", value: "Left", edited_by: me.email, edited_at: new Date().toISOString(), approved_at: null, approved_by: null }, { onConflict: "employee_id,field" });
           await admin.from(T.edits).upsert({ employee_id: cur.employee_id, field: "left_date", value: cur.exit_date, edited_by: me.email, edited_at: new Date().toISOString(), approved_at: null, approved_by: null }, { onConflict: "employee_id,field" });
-        } catch { /* the settlement closes regardless */ }
+        } catch (e) { swallow("hrms/fnf", e); /* the settlement closes regardless */ }
       }
       const { error } = await admin.from("hrms_fnf").update(patch).eq("id", id);
       if (error) throw new Error(error.message);

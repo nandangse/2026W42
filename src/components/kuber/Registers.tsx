@@ -9,15 +9,14 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import { useMoneyFmt } from "./money";
+import { dmy as fmtD } from "@/lib/fmt";
+export { fmtD };
 
 const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A";
 
-export const fmtD = (d: string | null | undefined) => {
-  if (!d) return "—";
-  const [y, m, dd] = String(d).slice(0, 10).split("-");
-  return `${dd}-${m}-${y}`;
-};
+
 const TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
 type Field = { key: string; label: string; type: "text" | "money" | "date" | "select" | "number" | "tick"; options?: string[]; hint?: string };
@@ -197,10 +196,10 @@ export default function RegisterScreen({ kind }: { kind: string }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [totalsOpen, setTotalsOpen] = useState(false);
   useEffect(() => {
-    try { setTotalsOpen(localStorage.getItem(`kuber.totals.${kind}`) !== "0"); } catch { /* fine */ }
+    try { setTotalsOpen(localStorage.getItem(`kuber.totals.${kind}`) !== "0"); } catch (e) { swallow("kuber/Registers", e); /* fine */ }
   }, [kind]);
   const toggleTotals = () => setTotalsOpen((v) => {
-    try { localStorage.setItem(`kuber.totals.${kind}`, v ? "0" : "1"); } catch { /* fine */ }
+    try { localStorage.setItem(`kuber.totals.${kind}`, v ? "0" : "1"); } catch (e) { swallow("kuber/Registers", e); /* fine */ }
     return !v;
   });
 

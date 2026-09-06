@@ -17,6 +17,7 @@ import { useMemo, useState } from "react";
 import GenieTable from "@/components/GenieTable";
 import { Screen, Btn, Note, INK, MUTED, NAVY, GREEN, AMBER, S, useLoad } from "@/components/ims/ui";
 import type { Summary } from "./Dashboard";
+import { fmtAt } from "@/lib/fmt";
 
 interface Bom { bom_id: string; item_code: string; item_name: string; project_id: string; is_active: boolean; is_default: boolean; docstatus: number; erp_modified: string | null; erp_modified_by: string }
 interface Project {
@@ -29,8 +30,7 @@ const erpForm = (base: string, doctype: string, name: string) =>
   `${base}/app/${doctype.toLowerCase().replace(/\s+/g, "-")}/${encodeURIComponent(name)}`;
 
 /** dd-mm-yyyy hh:mm in Kolkata, or a dot. */
-const fmtAt = (s: string | null) =>
-  s ? new Date(s).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "") : "·";
+
 /** The person, not the address — shailaja rather than shailaja@nandan.co.in. */
 const who = (s: string) => (S(s).includes("@") ? S(s).split("@")[0] : S(s)) || "·";
 

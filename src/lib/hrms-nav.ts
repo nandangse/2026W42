@@ -314,7 +314,7 @@ NAV.push({
 });
 
 /** Flattened, for the router. */
-export const NAV_ITEMS: { key: string; label: string; section: string; item?: NavItem; sec: NavSection }[] =
+const NAV_ITEMS: { key: string; label: string; section: string; item?: NavItem; sec: NavSection }[] =
   NAV.flatMap((s) =>
     s.items
       ? s.items.map((i) => ({ key: i.key, label: i.label, section: s.label, item: i, sec: s }))

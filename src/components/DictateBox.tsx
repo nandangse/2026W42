@@ -27,6 +27,7 @@
  * in one breath.
  */
 import { useEffect, useRef, useState } from "react";
+import { swallow } from "@/lib/swallow";
 
 const C = { line: "#E2E0DA", dim: "#5A6672", faint: "#8A94A0", orange: "#E8600A", red: "#B3261E", green: "#0D7A3F" };
 
@@ -141,7 +142,7 @@ export default function DictateBox({
           }
           onRecorded?.({ url: j.url ?? null, seconds: j.seconds ?? null, at: new Date().toISOString(), transcript: said || j.transcript || null });
         }
-      } catch { /* the words are saved; the audio is the bonus */ }
+      } catch (e) { swallow("DictateBox", e); /* the words are saved; the audio is the bonus */ }
     }
     setBusy(false);
   };
@@ -150,7 +151,7 @@ export default function DictateBox({
     runningRef.current = false;
     if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
     if (srRef.current) { srRef.current.onend = null; srRef.current.onerror = null; }
-    try { srRef.current?.stop(); } catch { /* not running */ }
+    try { srRef.current?.stop(); } catch (e) { swallow("DictateBox", e); /* not running */ }
     setRec(false);
     /**
      * THE LAST SENTENCE ARRIVES AFTER STOP IS PRESSED. The recogniser
@@ -160,7 +161,7 @@ export default function DictateBox({
      */
     const secondsNow = Math.max(1, Math.round((Date.now() - startedRef.current) / 1000));
     const mr = mediaRef.current;
-    if (mr && mr.state !== "inactive") { try { mr.stop(); } catch { /* already stopped */ } }
+    if (mr && mr.state !== "inactive") { try { mr.stop(); } catch (e) { swallow("DictateBox", e); /* already stopped */ } }
     else setTimeout(() => finish(null, secondsNow), 600);
   };
 
@@ -186,7 +187,7 @@ export default function DictateBox({
             if (MediaRecorder.isTypeSupported(t)) { mime = t; break; }
           }
         }
-      } catch { /* let the browser choose */ }
+      } catch (e) { swallow("DictateBox", e); /* let the browser choose */ }
       const mr = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
       chunksRef.current = [];
       mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };

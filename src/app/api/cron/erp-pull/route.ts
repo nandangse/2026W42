@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { swallow } from "@/lib/swallow";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { beat } from "@/lib/cron-beat";
@@ -186,7 +187,7 @@ export async function GET(req: Request) {
           if (!ue2 && upd?.length) djSynced++;
         }
       }
-    } catch { /* the ledger sync is best-effort — the pull above still stands */ }
+    } catch (e) { swallow("cron/erp-pull", e); /* the ledger sync is best-effort — the pull above still stands */ }
 
     // move both cursors only past what we actually walked
     await db.from("integration_setting").update({ config: { ...cfg, last_pull: maxCreation, jm_cursor: jmCursorNew } }).eq("key", "erpnext");

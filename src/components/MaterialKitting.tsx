@@ -16,6 +16,7 @@
 // Two records that look alike are not the problem. Two that drift are, and the
 // mirror is what stops it.
 import { useCallback, useEffect, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import { api } from "@/lib/api";
 import { fmtFull, today } from "@/lib/schedule";
 
@@ -195,7 +196,7 @@ export function MatBox({
       setComments((r.comments || []).filter((c: { material_id: string }) => c.material_id === mat.id));
       const row = (r.materials || []).find((m: { id: string }) => m.id === mat.id);
       setTask(row?.task_id ? (r.tasks || []).find((t: { id: string }) => t.id === row.task_id) ?? null : null);
-    } catch { /* the box still edits without its history */ }
+    } catch (e) { swallow("MaterialKitting", e); /* the box still edits without its history */ }
   }, [jobId, mat.id]);
   useEffect(() => { load(); }, [load]);
 

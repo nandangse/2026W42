@@ -18,11 +18,12 @@
  * pulling the same few hundred records again on every click.
  */
 import ModuleMenu from "@/components/ModuleMenu";
+import { swallow } from "@/lib/swallow";
 import PlaybookScreen from "@/components/Playbook";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
-import { APP_VERSION } from "@/lib/changelog";
+import { APP_VERSION } from "@/lib/version";
 import type { HrmsEmployee } from "@/lib/hrms";
 import { NAV, findNav, DEFAULT_KEY } from "@/lib/hrms-nav";
 import EmployeeMaster, { type MasterView } from "./hrms/EmployeeMaster";
@@ -232,7 +233,7 @@ export default function Hrms({
         ) : nav.key === "appraisal.summary" ? (
           <AppraisalAnalytics who={who}
             onOpenPerson={(id) => {
-              try { window.sessionStorage.setItem("hrms.appraisal.person", id); } catch { /* fine */ }
+              try { window.sessionStorage.setItem("hrms.appraisal.person", id); } catch (e) { swallow("Hrms", e); /* fine */ }
               go("appraisal.card");
             }} />
         ) : nav.key === "appraisal.interviews" ? (
@@ -242,7 +243,7 @@ export default function Hrms({
             onOpenPerson={(id) => {
               // the table is the index; the card is the page. Hand the person
               // across and switch — one click from the row to the discussion.
-              try { window.sessionStorage.setItem("hrms.appraisal.person", id); } catch { /* fine */ }
+              try { window.sessionStorage.setItem("hrms.appraisal.person", id); } catch (e) { swallow("Hrms", e); /* fine */ }
               go("appraisal.card");
             }} />
         ) : nav.key === "appraisal.card" ? (

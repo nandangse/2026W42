@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Nandan Works Planning Suite",
-  description: "Milestones · Load · Tasking · Delivery — standalone planning app",
+  title: "Nandan Genie",
+  description: "Nandan GSE's own software — one login for every door",
   // src/app/icon.svg is picked up automatically for the browser tab; this also
   // covers the home-screen icon when the board is pinned on a phone.
   icons: {

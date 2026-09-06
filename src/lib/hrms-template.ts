@@ -77,13 +77,6 @@ export function renderTemplate(tpl: string, vars: Record<string, string>): strin
     .replace(/<\s*([a-zA-Z_][\w]*)\s*>/g, (m, k: string) => { if (/^(p|b|i|u|br|em|strong|div|span|ol|ul|li|h3|h4|tr|td|table|a)$/i.test(k)) return m; const v = find(k); return v === undefined ? m : v; });
 }
 
-/** Every variable a template mentions, known or not. */
-export function templateVars(tpl: string): string[] {
-  const s = new Set<string>();
-  for (const m of String(tpl || "").matchAll(/\{\{\s*([a-zA-Z_][\w]*)\s*\}\}/g)) s.add(m[1]);
-  return [...s];
-}
-
 /** Month names as a message would say them. */
 export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 

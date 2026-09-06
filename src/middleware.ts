@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { env } from "@/lib/env";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
 // Keeps the Supabase auth session fresh on every navigation so server
@@ -6,8 +7,8 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next({ request: { headers: req.headers } });
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    env("NEXT_PUBLIC_SUPABASE_URL"),
+    env("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
     {
       cookies: {
         get: (name: string) => req.cookies.get(name)?.value,

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { swallow } from "@/lib/swallow";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import { requireReader, requireTasker, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -115,7 +117,7 @@ export async function POST(req: Request) {
           method: "POST",
           headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
           body: JSON.stringify({
-            model: "claude-sonnet-4-5-20250929",
+            model: AI.BACKGROUND,
             max_tokens: 120,
             system:
               "Summarise a shop-floor voice note in ONE line, under 140 characters. " +
@@ -127,7 +129,7 @@ export async function POST(req: Request) {
         const j = await r.json();
         const t = (j.content || []).filter((c: { type: string }) => c.type === "text").map((c: { text: string }) => c.text).join("").trim();
         if (t) summary = t.slice(0, 200);
-      } catch { /* the note matters more than its summary */ }
+      } catch (e) { swallow("voice-note", e); /* the note matters more than its summary */ }
     }
 
     const { error } = await admin.from("job_voice_note").insert({
@@ -224,7 +226,7 @@ export async function POST(req: Request) {
             method: "POST",
             headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
             body: JSON.stringify({
-              model: "claude-sonnet-4-5-20250929",
+              model: AI.BACKGROUND,
               max_tokens: 700,
               system:
                 "You are Genie, writing the standing read on a job at Nandan GSE — the way Dr Raghu Nandan would put it to the planning team.\n\n" +
@@ -246,7 +248,7 @@ export async function POST(req: Request) {
           const t = (jr.content || []).filter((c: { type: string }) => c.type === "text").map((c: { text: string }) => c.text).join("").trim();
           if (t) floor = t.slice(0, 1200);
         }
-      } catch { /* the notes matter more than the paragraph over them */ }
+      } catch (e) { swallow("voice-note", e); /* the notes matter more than the paragraph over them */ }
     }
     if (floor) {
       // A missing column means 0043 has not run. The notes are already saved.
@@ -275,7 +277,7 @@ export async function POST(req: Request) {
           method: "POST",
           headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
           body: JSON.stringify({
-            model: "claude-sonnet-4-5-20250929",
+            model: AI.BACKGROUND,
             max_tokens: 600,
             system:
               "You read shop-floor voice notes at Nandan GSE and pull out what somebody now has to DO.\n\n" +
@@ -308,7 +310,7 @@ export async function POST(req: Request) {
           const { error: pe } = await admin.from("task_proposal").insert(rows);
           if (!pe) proposed = rows.length;
         }
-      } catch { /* a note is worth keeping even when nothing could be pulled from it */ }
+      } catch (e) { swallow("voice-note", e); /* a note is worth keeping even when nothing could be pulled from it */ }
     }
 
     return NextResponse.json({ ok: true, summary, floor, proposed });

@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
-import { APP_VERSION } from "@/lib/changelog";
+import { APP_VERSION } from "@/lib/version";
 import { fmtFull } from "@/lib/schedule";
 import { FIELD_GROUPS, ALL_FIELDS, onRoll, tenure, splitMulti, joinMulti, type FieldSpec, type HrmsEmployee } from "@/lib/hrms";
 import { C, type GenieUser } from "./RecordFields";

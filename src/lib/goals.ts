@@ -162,10 +162,6 @@ export function descendants(nodes: NodeMap, id: string, out: string[] = []): str
   return out;
 }
 
-/** Ordered children of a node. */
-export const childrenOf = (nodes: NodeMap, id: string): string[] =>
-  (nodes[id]?.kids || []).filter((k) => nodes[k]);
-
 /** Past its ORIGINAL commitment — the only thing that earns red. */
 export function isLate(n: GoalNode, today: string): boolean {
   if (n.status === "done") return false;
@@ -178,15 +174,4 @@ export function carriedDays(n: GoalNode, today: string): number {
   if (!n.start_date) return 0;
   const ms = Date.parse(today + "T00:00:00Z") - Date.parse(n.start_date + "T00:00:00Z");
   return Math.max(0, Math.round(ms / 86400000));
-}
-
-/**
- * The To-Do rule: a node is live once its start date has arrived and it is not
- * closed. It keeps presenting as today's item — the original date is what
- * carries the memory of the commitment, not the display.
- */
-export function isLive(n: GoalNode, today: string): boolean {
-  if (n.status === "done") return false;
-  if (n.node_type !== "tactic" && n.node_type !== "key_result") return false;
-  return !!n.start_date && n.start_date <= today;
 }

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, MASTERS, ALL_FIELDS } from "@/lib/hrms";
@@ -94,7 +96,7 @@ export async function POST(req: Request) {
     const me = await requireHrms();
     const admin = adminClient();
     const T = await hrmsTables(admin);
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
     const kind = String(body.kind || "");
     if (!KINDS.has(kind)) throw new HttpError(400, `"${kind}" is not a master HRIS keeps`);
@@ -146,7 +148,7 @@ export async function POST(req: Request) {
               old_value: value, new_value: next,
               edited_by: stamp,
             });
-          } catch { /* the move matters more than the line about it */ }
+          } catch (e) { swallow("hrms/masters", e); /* the move matters more than the line about it */ }
           moved++;
         }
       }

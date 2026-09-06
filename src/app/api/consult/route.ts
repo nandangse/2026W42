@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import { requireReader, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -20,7 +22,7 @@ export const maxDuration = 60;
  * invention about a delivery date is worse than no answer at all, because it
  * will be repeated to a customer.
  */
-const MODEL = "claude-sonnet-4-5-20250929";
+const MODEL = AI.FRONT;
 
 export async function POST(req: Request) {
   try {
@@ -30,7 +32,7 @@ export async function POST(req: Request) {
     if (!key)
       throw new HttpError(503, "ANTHROPIC_API_KEY is not set, so Consult cannot answer yet.");
 
-    const body = await req.json();
+    const body = await readBody(req, {});
     const question = String(body.question || "").trim();
     if (question.length < 3) throw new HttpError(400, "Ask a question.");
 

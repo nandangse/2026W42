@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { ALL_FIELDS, fieldSpec, hrmsTables, type FieldSpec } from "@/lib/hrms";
 import { employeeVars, renderTemplate } from "@/lib/hrms-template";
+import { esc } from "@/lib/fmt";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -44,7 +47,7 @@ function baseValue(row: EmpRow, f: FieldSpec): string | null {
 const textToHtml = (t: string) =>
   `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#22303C">${
     String(t).split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("")}</div>`;
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
 
 export async function GET(req: Request) {
   try {
@@ -114,7 +117,7 @@ export async function POST(req: Request) {
   try {
     const me = await requireHrms();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const ids: string[] = Array.isArray(body.employee_ids) ? body.employee_ids.map(String) : body.employee_id ? [String(body.employee_id)] : [];
     if (!ids.length) throw new HttpError(400, "Who is this for?");
     const subjectT = String(body.subject || "").slice(0, 300);
@@ -138,7 +141,7 @@ export async function POST(req: Request) {
         if (!overrides.has(k)) overrides.set(k, new Map());
         overrides.get(k)!.set(String(e.field), e.value == null ? null : String(e.value));
       }
-    } catch { /* pre-0047 */ }
+    } catch (e) { swallow("hrms/communication", e); /* pre-0047 */ }
 
     const people = ((rows || []) as EmpRow[]).map((r) => {
       const value: Record<string, string | null> = {};
@@ -164,7 +167,7 @@ export async function POST(req: Request) {
       const rendered = persons.map((p) => renderFor(p, bodyT, sheet));
       const stampW = me.initials ? `${me.initials} · ${me.email}` : me.email;
       let crmProfileId: string | null = null;
-      try { const { crmDb } = await import("@/crm/db"); const { data: rp } = await crmDb().from("profile").select("id").ilike("email", me.email).maybeSingle(); crmProfileId = rp?.id ? String(rp.id) : null; } catch { /* fine */ }
+      try { const { crmDb } = await import("@/crm/db"); const { data: rp } = await crmDb().from("profile").select("id").ilike("email", me.email).maybeSingle(); crmProfileId = rp?.id ? String(rp.id) : null; } catch (e) { swallow("hrms/communication", e); /* fine */ }
       const res = await queueMessages(admin, rendered, { templateKey: body.template_key ? String(body.template_key) : null, by: stampW, crmProfileId });
       const skipped = new Map(res.skipped.map((x) => [x.id, x.why]));
       const results = rendered.map((r) => ({ id: r.id, name: r.name, to: r.phone, ok: !skipped.has(r.id), error: skipped.get(r.id) }));

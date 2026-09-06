@@ -28,6 +28,8 @@ import GenieTable from "@/components/GenieTable";
 import Slips from "./Slips";
 import Kitting from "./Kitting";
 import { GroupPicker } from "./Items";
+import { rupee } from "@/lib/fmt";
+const money = (n: number | null) => rupee(n, "·");
 
 interface Run { id: string; mrp_no: string; name: string; run_date: string; by: string | null; created_at: string; generated_at: string | null; jobs?: number; value?: number; kitted_value?: number }
 interface BoardJob { job_no: string; tag: string; cust: string; fam: string; project_id: string; project_name: string; tdd: string | null; val: number | null; stat: string }
@@ -62,7 +64,7 @@ function plan(it: Item) {
 
 const CR = 1e7;
 const cr = (n: number) => `₹${(n / CR).toFixed(2)} Cr`;
-const money = (n: number | null) => (n === null ? "·" : `₹${Math.round(n).toLocaleString("en-IN")}`);
+
 const qtyFmt = (n: number) => Number(n).toLocaleString("en-IN", { maximumFractionDigits: 3 });
 const pct = (num: number, den: number) => (den > 0 ? `${Math.round((num / den) * 100)}%` : "·");
 const who = (s: string | null) => (S(s).includes("@") ? S(s).split("@")[0] : S(s)) || "·";

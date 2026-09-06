@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
@@ -33,7 +35,7 @@ export async function POST(req: Request) {
         { status: 503 },
       );
 
-    const body = await req.json();
+    const body = await readBody(req, {});
     const c = body.company;
     if (!c?.name) return NextResponse.json({ error: "company.name is required" }, { status: 400 });
 
@@ -84,7 +86,7 @@ Rules:
 - No preamble, no closing summary, no offer to help further. Start at "**Who they are**".`;
 
     const params: Anthropic.MessageCreateParams = {
-      model: "claude-opus-5",
+      model: AI.FRONT,
       max_tokens: 8000,
       system: NANDAN,
       output_config: { effort: "high" },

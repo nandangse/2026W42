@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requirePlanner, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -10,7 +11,7 @@ export async function POST(req: Request) {
   try {
     await requirePlanner();
     const supabase = supabaseServer();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const order: string[] = Array.isArray(body.order) ? body.order : [];
     const { error } = await supabase
       .from("settings")

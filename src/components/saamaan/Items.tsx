@@ -19,13 +19,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GenieTable from "@/components/GenieTable";
 import { Screen, Modal, Btn, Note, Chip, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, S, fmtD, statusColour } from "@/components/ims/ui";
 import type { Summary } from "./Dashboard";
+import { rupee, numFmt } from "@/lib/fmt";
+const money = (n: unknown) => rupee(n, "·", 2);
+const num = (n: unknown) => numFmt(n);
 
 type Row = Record<string, unknown> & { item_code: string };
 interface FileRow { file_id: string; file_name: string; file_url: string; is_private: boolean; attached_to_field: string; file_size: number | null }
 
-const money = (n: unknown) =>
-  n === null || n === undefined || n === "" ? "·" : `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-const num = (n: unknown) => (n === null || n === undefined || n === "" ? "·" : Number(n).toLocaleString("en-IN"));
+
+
 const qtyFmt = (n: unknown) => (n === null || n === undefined ? "·" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 3 }));
 
 /** An ERP path (/files/x.png, /file/abc/y.pdf) → a link that opens. As-is otherwise. */

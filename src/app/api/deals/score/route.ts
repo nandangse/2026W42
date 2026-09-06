@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
@@ -61,7 +63,7 @@ export async function POST(req: Request) {
         { status: 503 },
       );
 
-    const body = await req.json();
+    const body = await readBody(req, {});
     const d = body.deal;
     if (!d?.name) return NextResponse.json({ error: "deal.name is required" }, { status: 400 });
 
@@ -94,7 +96,7 @@ Use it as a reference point, and depart from it where the status note and histor
 
     const anthropic = new Anthropic();
     const response = await anthropic.messages.create({
-      model: "claude-opus-5",
+      model: AI.FRONT,
       max_tokens: 2000,
       system: SYSTEM,
       output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },

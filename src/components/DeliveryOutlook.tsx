@@ -25,6 +25,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { today } from "@/lib/schedule";
+import { monthKey, monthLabel } from "@/lib/fmt";
 
 const C = {
   ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC",
@@ -56,9 +57,8 @@ const METRICS: { key: Metric; label: string; color: string }[] = [
 
 const MONTHS_AHEAD = 12;
 
-const monthKey = (iso: string) => iso.slice(0, 7);
-const monthLabel = (key: string) =>
-  new Date(key + "-01T00:00:00Z").toLocaleDateString("en-IN", { month: "short", year: "2-digit", timeZone: "UTC" });
+
+
 
 interface Bucket {
   key: string;

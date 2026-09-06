@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import { requireReader, requireOwner, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -6,7 +8,7 @@ import { adminClient } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const MODEL = "claude-sonnet-4-5-20250929";
+const MODEL = AI.FRONT;
 
 /**
  * The shape Genie must return.
@@ -72,7 +74,7 @@ export async function POST(req: Request) {
     await assertAiOn();
     const user = await requireOwner();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const raw = String(body.raw || "").trim();
     if (raw.length < 20) throw new HttpError(400, "Write a little more — a line or two at least.");
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { swallow } from "@/lib/swallow";
 import { redirect } from "next/navigation";
 import * as XLSX from "xlsx";
 import { currentUser } from "@/lib/auth";
@@ -65,7 +66,7 @@ export default async function MySlipPage({ params }: { params: { id: string } })
       last_at: new Date().toISOString(), opens: (prev?.opens || 0) + 1,
       ...(prev ? {} : { first_at: new Date().toISOString() }),
     }, { onConflict: "sheet_id,employee_id" });
-  } catch { /* pre-0072 — the slip still shows; the stamp waits for the table */ }
+  } catch (e) { swallow("my/salary-slips/[id]/page", e); /* pre-0072 — the slip still shows; the stamp waits for the table */ }
 
   return <SalarySlipsPrint month={sheet.month} year={sheet.year} picked={[{ label: null, slip }]} total={1} />;
 }

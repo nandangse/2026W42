@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireKuber } from "@/lib/accounts";
@@ -50,7 +52,7 @@ export async function GET() {
       try {
         const { data: st } = await admin.from("app_settings").select("kuber_review_link").eq("id", true).maybeSingle();
         reviewLink = (st?.kuber_review_link as string) ?? null;
-      } catch { /* pre-0077 */ }
+      } catch (e) { swallow("kuber/upload", e); /* pre-0077 */ }
     }
     const uploads = await Promise.all(
       (data || []).map(async (u) => {
@@ -69,7 +71,7 @@ export async function GET() {
 export async function PATCH(req: Request) {
   try {
     const user = await requireKuber();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const link = String(body.review_link ?? "").trim().slice(0, 500);
     if (link && !/^https:\/\//.test(link)) throw new HttpError(400, "Paste the full https:// link.");
     const admin2 = adminClient();

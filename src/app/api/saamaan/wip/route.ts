@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody, type AnyBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
@@ -232,7 +233,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     await requireSaamaan();
-    const body = await req.json().catch(() => ({}));
+    const body = await readBody(req, {}).catch((): AnyBody => ({}));
     const job = S(body.job_no);
     if (!job) throw new HttpError(400, "job_no required");
     const allowed = ["nos_kitted", "value_kitted", "nos_pending", "value_pending", "tvc_pct", "throughput_calc", "note"];

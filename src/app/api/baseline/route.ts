@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requirePlanner, errJson } from "@/lib/auth";
 import { assertJobEditable } from "@/lib/job-state";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
   try {
     await requirePlanner();
     const supabase = supabaseServer();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const jobId: string = body.job_id;
     if (!jobId) return NextResponse.json({ error: "job_id required" }, { status: 400 });
     await assertJobEditable(supabase, jobId);

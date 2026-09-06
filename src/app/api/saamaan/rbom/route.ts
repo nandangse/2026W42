@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody, type AnyBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
@@ -146,7 +147,7 @@ async function buildOne(admin: ReturnType<typeof adminClient>, projectId: string
 export async function POST(req: Request) {
   try {
     const me = await requireSaamaan();
-    const body = await req.json().catch(() => ({}));
+    const body = await readBody(req, {}).catch((): AnyBody => ({}));
     const admin = adminClient();
     const action = String(body.action || "build");
 

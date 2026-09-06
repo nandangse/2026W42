@@ -29,6 +29,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import GenieTable from "@/components/GenieTable";
 import { Screen, Btn, Note, Chip, Modal, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, RED, S, statusColour, useLoad, post } from "@/components/ims/ui";
 import type { Summary } from "./Dashboard";
+import { fmtAt, rupee } from "@/lib/fmt";
+const money = (n: unknown) => rupee(n, "·", 2);
 
 interface Line {
   row_id: string; bom_id: string; idx: number; item_code: string; item_name: string; item_group: string;
@@ -47,10 +49,9 @@ interface Pickers {
 }
 interface Answer { installed: boolean; erpBase: string; rows: Line[]; total: number; page: number; size: number; pickers: Pickers; lastPulledAt: string | null; statuses: string[]; head?: Record<string, unknown> }
 
-const money = (n: unknown) => (n === null || n === undefined || n === "" ? "·" : `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`);
+
 const qty = (n: unknown) => (n === null || n === undefined || n === "" ? "·" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 3 }));
-const fmtAt = (s: string | null) =>
-  s ? new Date(s).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "") : "·";
+
 const who = (s: string) => (S(s).includes("@") ? S(s).split("@")[0] : S(s)) || "·";
 const erpForm = (base: string, doctype: string, name: string) =>
   `${base}/app/${doctype.toLowerCase().replace(/\s+/g, "-")}/${encodeURIComponent(name)}`;

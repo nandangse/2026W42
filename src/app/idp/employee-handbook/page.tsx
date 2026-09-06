@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { swallow } from "@/lib/swallow";
 import { currentUser } from "@/lib/auth";
 import Handbook from "@/components/hrms/Handbook";
 import { LOGO } from "@/lib/logo";
@@ -35,7 +36,7 @@ export default async function IdpHandbookPage() {
   try {
     const me = (await people(adminClient())).find((p) => String((p as { email?: string | null }).email || "").toLowerCase() === user.email.toLowerCase());
     if (me && /labour/i.test(String(me.type || ""))) defaultLang = "hi";
-  } catch { /* the record is optional here */ }
+  } catch (e) { swallow("idp/employee-handbook/page", e); /* the record is optional here */ }
   return (
     <div className="min-h-screen" style={{ background: "#F1EFE9" }}>
       <div className="px-4 py-3 flex items-center gap-3" style={{ background: "#16232F", color: "#fff" }}>

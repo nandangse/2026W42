@@ -1,3 +1,4 @@
+import { APP_VERSION } from "./version";
 /**
  * Genie version + release log.
  *
@@ -52,7 +53,9 @@
  * and last commit. The band was raised by a quarter on his own instruction,
  * which is the only evidence available for the part no clock sees.
  */
-export const EFFORT = {
+export interface Effort { measuredTo: string; commits: number; days: number; windowHours: number; raghuLow: number; raghuHigh: number }
+
+export const EFFORT: Effort = {
   measuredTo: "2026-08-30",
   commits: 451,
   days: 26,
@@ -74,6 +77,26 @@ export interface UpdateEntry {
 
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
+  {
+    v: "5.0.0.1",
+    date: "2026-09-06",
+    module: "Genie 5 — the audit's first sweep: hygiene and compactness (items 1–4, 7–12, 17–20)",
+    items: [
+      "\"Act as a software tester and code debugger. Look at the entire codebase ... what lacunae exist ... more compact and dependable\" (Dr Raghu, 6 Sep 2026), then item by item: \"solve it\". This release is the first sweep — nothing a person sees has changed yet; what runs underneath has.",
+      "THE LOG IS OFF THE WIRE. Every module's header badge imported the version from the release log, and because the version was the log's top entry, all 5,000 lines of it rode into a 536 KB script on every page. The version now lives on its own in src/lib/version.ts; the log is served by GET /api/updates only to Admin → Updates and the Software Description; and the log refuses to load if its top entry disagrees with the version file, so the two still cannot drift.",
+      "STRAYS OUT. An old copy of the changelog, the 316 KB V1.9 prototype (now under docs/archive), the generated all-migrations file, the scratchpad folder and two Google Drive duplicates inside .git itself are no longer tracked; the 2 MB Consult Raghu portrait is 388 KB.",
+      "A MIGRATION LEDGER. Migration 0143 creates genie_migration and seeds it with every file applied to date; from here each migration writes its own name as its last statement (0136–0138 already do), so \"is it in?\" is a query, not a hand-kept list. 0072, 0073 and 0074 were each used twice; the ledger is what stops the next collision.",
+      "LINT EXISTS. ESLint with the Next rules is configured and installed; it had never been run.",
+      "EVERY ENVIRONMENT KEY IN ONE PLACE. src/lib/env.ts names all nineteen with the feature each powers, .env.example documents them, GET /api/health (admin) lists the ones missing, and the six bare `!` assertions on keys are gone.",
+      "REQUEST BODIES ARE CHECKED. Every one of the 126 routes that read a JSON body now goes through src/lib/validate.ts: a body that is not JSON is a 400 naming the problem, not a 500; declared fields are typed and refused with a sentence when wrong; undeclared ones pass through unchanged, so routes tighten field by field.",
+      "NOTHING IS SWALLOWED SILENTLY. 219 empty catch blocks — 136 on the server, 83 in the browser — now log one warn line naming where the error was ignored. What the code does next is unchanged.",
+      "ONE MODULE DOOR. Saamaan, Seva, Vishwakarma, Kuber, HRMS and the IMS each carried the same forty lines of grant-table check; src/lib/module-door.ts is the one copy and the six call it. On Admin → Users the seven module-grant actions were seven copies of twenty lines; they are one table-driven block.",
+      "ONE FORMATTER. The rupee formatter was written eighteen times, HTML escaping seven, dd-mm-yyyy seven, today-in-India three. src/lib/fmt.ts holds each once; fifty-one local copies are gone.",
+      "ONE BOARD FETCH AT A TIME. Thirty-nine places reload the whole board after a save; a reload in flight is now shared and a call that lands mid-flight schedules exactly one more, so a burst of saves is two fetches, not nine.",
+      "ONE PLACE TO NAME THE MODEL. \"optimize my token usage also. Background work can be done by cron jobs. Click and front end jobs can be with opus.\" src/lib/ai.ts: FRONT is Claude Opus 5 for anything a person is waiting on; BACKGROUND is Claude Sonnet 5 for the playbook compile and voice-note transcripts. Nine call sites that still named a dated Sonnet 4.5 build are on current models.",
+      "Forty exported functions nobody imported are removed or made private. The stray pdf-parse dependency is out of package.json for good.",
+    ],
+  },
   {
     v: "5.0.0.0",
     date: "2026-09-06",
@@ -5376,5 +5399,12 @@ export const UPDATES: UpdateEntry[] = [
   },
 ];
 
-/** The version shown in the header badge. */
-export const APP_VERSION = UPDATES[0].v;
+/**
+ * The badge reads src/lib/version.ts; this file only proves it is right.
+ * A drift between the two breaks GET /api/version — which is checked after
+ * every deploy — rather than a screen.
+ */
+if (UPDATES[0].v !== APP_VERSION) {
+  throw new Error(`src/lib/version.ts says ${APP_VERSION} but the top changelog entry is ${UPDATES[0].v}`);
+}
+export { APP_VERSION };

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { hasGrant, moduleDoor } from "@/lib/module-door";
 import { currentUser, HttpError, type AuthedUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -8,31 +9,8 @@ import { adminClient } from "@/lib/supabase/admin";
  * Same arrangement as every module door: a grant per email, owner implicit,
  * "no" for everyone else until migration 0076 exists.
  */
-export async function resolveVishwakarmaAccess(
-  admin: SupabaseClient,
-  email: string,
-  isOwner: boolean,
-): Promise<boolean> {
-  if (isOwner) return true;
-  const e = String(email || "").trim().toLowerCase();
-  if (!e) return false;
-  try {
-    const { data } = await admin
-      .from("vishwakarma_access")
-      .select("email")
-      .eq("email", e)
-      .maybeSingle();
-    return !!data;
-  } catch {
-    return false;
-  }
-}
+export const resolveVishwakarmaAccess = (admin: SupabaseClient, email: string, isOwner: boolean) =>
+  hasGrant(admin, "vishwakarma_access", email, isOwner);
 
 /** The one door check every /api/vishwakarma route uses. */
-export async function requireVishwakarma(): Promise<AuthedUser> {
-  const u = await currentUser();
-  if (!u || u.disabled) throw new HttpError(401, "Sign in first.");
-  if (!(await resolveVishwakarmaAccess(adminClient(), u.email, u.isOwner)))
-    throw new HttpError(403, "Vishwakarma is granted per person — the tick on Admin → module access.");
-  return u;
-}
+export const requireVishwakarma = moduleDoor("vishwakarma_access", "Vishwakarma");

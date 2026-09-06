@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
@@ -169,7 +170,7 @@ export async function POST(req: Request) {
     const me = await requireCrm();
     if (!MANAGE.has(me.crmRole)) throw new HttpError(403, "Weights and targets are the Sales Head's to set.");
     const db = crmDb();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const cfg = await readConfig(db);
     if (body.weights && typeof body.weights === "object") cfg.weights = { ...cfg.weights, ...body.weights };
     if (body.targets && typeof body.targets === "object") cfg.targets = { ...cfg.targets, ...body.targets };

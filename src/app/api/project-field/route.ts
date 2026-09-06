@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requirePlanner, errJson } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   try {
     await requirePlanner();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const id = String(body.id || "");
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
     const { error } = await adminClient()

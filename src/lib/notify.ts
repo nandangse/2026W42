@@ -2,6 +2,7 @@
 // NEVER break the action that triggered it — every write here swallows its
 // own errors (including "table not there yet" before migration 0012 runs).
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { swallow } from "@/lib/swallow";
 
 export interface PersonRow {
   id: string;
@@ -67,9 +68,7 @@ export async function notify(
       ref_id: n.ref_id ?? null,
       created_by: n.created_by ?? null,
     });
-  } catch {
-    /* never let a notification break the assignment itself */
-  }
+  } catch (e) { swallow("lib/notify", e); /* never let a notification break the assignment itself */ }
 }
 
 /**
@@ -97,9 +96,7 @@ export async function notifyTaskAssignment(
     try {
       const { data } = await admin.from("jobs").select("tag").eq("id", opts.jobId).maybeSingle();
       if (data?.tag) jobTag = ` · ${data.tag}`;
-    } catch {
-      /* tag is decoration */
-    }
+    } catch (e) { swallow("lib/notify", e); /* tag is decoration */ }
   }
 
   await notify(admin, {

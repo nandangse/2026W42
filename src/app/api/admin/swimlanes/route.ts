@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requireAdmin, errJson } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
   try {
     await requireAdmin();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
 
     if (body.action === "create") {
       const name = String(body.name || "").trim();

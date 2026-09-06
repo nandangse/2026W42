@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { APP_VERSION } from "@/lib/changelog";
+import { APP_VERSION } from "@/lib/changelog"; // the checked one — a drift throws here, loudly
 
 export const dynamic = "force-dynamic";
 

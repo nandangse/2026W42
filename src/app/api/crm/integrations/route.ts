@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
@@ -124,7 +125,7 @@ export async function POST(req: Request) {
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     if (!mayManage(String(me.crmRole))) throw new HttpError(403, "Integrations are managed by the CEO, the Sales Head and admin.");
     const db = crmDb();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const key = String(body.key || "");
     const known = KNOWN.find((k) => k.key === key);
     if (!known) throw new HttpError(400, "Unknown integration.");

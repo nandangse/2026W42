@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
@@ -25,7 +27,7 @@ export async function POST(req: Request) {
     const me = await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const qid = String(body.quotation_id ?? "");
     const mode = body.mode === "review" ? "review" : "client";
     if (!qid) throw new HttpError(400, "Which quotation?");
@@ -138,7 +140,7 @@ export async function POST(req: Request) {
       const { error: upErr } = await db.storage.from("cards")
         .upload(path, Buffer.from(pdfB64, "base64"), { contentType: "application/pdf" });
       if (!upErr) pdfLink = { name: `${safeNo}.pdf`, url: `/api/crm/opp-attach?path=${encodeURIComponent(path)}` };
-    } catch { /* the copy is a convenience; the send already happened */ }
+    } catch (e) { swallow("crm/quote-submit", e); /* the copy is a convenience; the send already happened */ }
 
     try {
       await db.from("message").insert({
@@ -155,7 +157,7 @@ export async function POST(req: Request) {
         company_id: q.company_id, person_id: q.contact_id ?? null,
         opportunity_id: q.opportunity_id,
       });
-    } catch { /* never let the ledger break a send that already went */ }
+    } catch (e) { swallow("crm/quote-submit", e); /* never let the ledger break a send that already went */ }
 
     await db.from("interaction").insert({
       kind: "Email", happened_at: now,

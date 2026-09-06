@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { APP_VERSION } from "@/lib/changelog";
+import { APP_VERSION } from "@/lib/version";
 import ModuleMenu from "@/components/ModuleMenu";
 import { BORDER, INK, MUTED, NAVY, NAVY_DARK, NAVY_SOFT, PAPER, ORANGE, Note, Empty, useLoad } from "@/components/ims/ui";
 import Dashboard, { type Summary } from "./Dashboard";

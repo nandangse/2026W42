@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import { requireUser, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -262,7 +265,7 @@ export async function GET(req: Request) {
           : null;
         const { data: m } = await admin.from("hrms_master").select("kind, value").order("sort_order");
         for (const r of m || []) (options[String(r.kind)] ||= []).push(String(r.value));
-      } catch { /* the step simply shows nothing editable */ }
+      } catch (e) { swallow("idp", e); /* the step simply shows nothing editable */ }
     }
 
     const open = rows.find((r) => !r.submitted_at) ?? null;
@@ -319,7 +322,7 @@ async function polishSpoken(email: string, text: string): Promise<string> {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: "claude-sonnet-5",
+        model: AI.FRONT,
         max_tokens: 8000,
         system:
           "Somebody at an Indian engineering company is speaking an answer for their own development plan (IDP). " +
@@ -466,7 +469,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, url: sgn?.signedUrl ?? null, seconds });
     }
 
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
 
     /**
@@ -518,7 +521,7 @@ export async function POST(req: Request) {
         await admin.from(T2.log).insert({
           employee_id: who.employee.id, field, old_value: null, new_value: v, edited_by: stamp,
         });
-      } catch { /* the correction matters more than the line about it */ }
+      } catch (e) { swallow("idp", e); /* the correction matters more than the line about it */ }
       return NextResponse.json({ ok: true, value: v });
     }
 

@@ -1,4 +1,6 @@
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
+import { readBody, type AnyBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, ALL_FIELDS, FIELD_GROUPS, fieldSpec } from "@/lib/hrms";
 import * as XLSX from "xlsx";
@@ -27,7 +29,7 @@ export async function POST(req: Request) {
     const me = await requireHrms();
     const admin = adminClient();
     const T = await hrmsTables(admin);
-    const body = await req.json().catch(() => ({}));
+    const body = await readBody(req, {}).catch((): AnyBody => ({}));
     const scope = body.scope === "all" ? "all" : "filtered";
     const ids: string[] = Array.isArray(body.ids) ? body.ids.map(String) : [];
     if (scope === "filtered" && !ids.length)
@@ -50,7 +52,7 @@ export async function POST(req: Request) {
         if (!ovr.has(id)) ovr.set(id, new Map());
         ovr.get(id)!.set(String(e.field), e.value == null ? null : String(e.value));
       }
-    } catch { /* none yet */ }
+    } catch (e) { swallow("hrms/export", e); /* none yet */ }
 
     const cell = (r: Record<string, unknown>, key: string): string => {
       const f = fieldSpec(key);
@@ -105,7 +107,7 @@ export async function POST(req: Request) {
         new_value: `${scope === "all" ? "Export All" : "Export filtered"} — ${rows.length} records`,
         edited_by: me.email,
       });
-    } catch { /* the log must not stop the export */ }
+    } catch (e) { swallow("hrms/export", e); /* the log must not stop the export */ }
 
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
     return new Response(new Uint8Array(buf), {

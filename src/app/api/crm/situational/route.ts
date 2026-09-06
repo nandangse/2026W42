@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { errJson, HttpError } from "@/lib/auth";
@@ -27,7 +29,7 @@ export async function POST(req: Request) {
       throw new HttpError(503, "Server is missing ANTHROPIC_API_KEY — add it in the Vercel env vars.");
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const qid = String((await req.json()).quotation_id ?? "");
+    const qid = String((await readBody(req, {})).quotation_id ?? "");
     if (!qid) throw new HttpError(400, "Which quotation?");
 
     const { data: qt } = await db.from("quotation")
@@ -73,7 +75,7 @@ export async function POST(req: Request) {
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const msg = await anthropic.messages.create({
-      model: "claude-opus-5",
+      model: AI.FRONT,
       max_tokens: 2000,
       output_config: { effort: "low" },
       system: `You write the Situational Details section of a NANDAN GSE sales quotation — the one-page story that makes the customer feel understood. About Nandan:\n${NANDAN.slice(0, 2000)}\n\nRespond with HTML only (no markdown, no preamble): exactly these six sections. Each section is EXACTLY this shape — the heading alone on its own line in bold, the text starting on the NEXT line, and one empty line before the next section: <p><b>Heading:</b></p><p>the text, 2-4 sentences</p><p><br></p>. Never run the text on the same line as the heading. Headings, in order: ${HEADINGS.map((h) => h + ":").join(" · ")}. Write in confident, plain business English — specific to THIS customer and THIS quote, never generic filler. If the CRM knows too little for a section, write one honest sentence rather than inventing facts.`,

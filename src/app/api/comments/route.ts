@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requireTasker, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -11,7 +12,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireTasker();
     const supabase = supabaseServer();
-    const body = await req.json();
+    const body = await readBody(req, {});
     if (!body.task_id || !body.body)
       return NextResponse.json({ error: "task_id and body required" }, { status: 400 });
     const { data, error } = await supabase

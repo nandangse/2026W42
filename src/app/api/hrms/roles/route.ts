@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -49,7 +52,7 @@ async function summarise(transcript: string): Promise<{ text: string | null; why
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: "claude-sonnet-5",
+        model: AI.FRONT,
         max_tokens: 500,
         system:
           "You summarise a spoken note from the Managing Director of an Indian engineering company, " +
@@ -184,7 +187,7 @@ export async function GET(req: Request) {
         if (!needed.has(id)) needed.set(id, []);
         needed.get(id)!.push({ competency: String(r.competency), level: Number(r.level) });
       }
-    } catch { /* pre-0056 */ }
+    } catch (e) { swallow("hrms/roles", e); /* pre-0056 */ }
 
     const roles = await Promise.all(
       (data || []).map(async (r) => {
@@ -282,7 +285,7 @@ export async function POST(req: Request) {
           old_audio: prev?.voice_path ?? null,
           changed_by: stamp,
         });
-      } catch { /* the recording matters more than the line about it */ }
+      } catch (e) { swallow("hrms/roles", e); /* the recording matters more than the line about it */ }
 
       return NextResponse.json({
         ok: true,
@@ -292,7 +295,7 @@ export async function POST(req: Request) {
     }
 
     // ---- the fields ----
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
 
     if (action === "create") {
@@ -359,7 +362,7 @@ export async function POST(req: Request) {
               changed_by: stamp,
             })),
           );
-        } catch { /* a lost history line must not fail the edit */ }
+        } catch (e) { swallow("hrms/roles", e); /* a lost history line must not fail the edit */ }
       }
       return NextResponse.json({ ok: true, pending: changes.length > 0 });
     }
@@ -404,7 +407,7 @@ export async function POST(req: Request) {
           new_value: body.remove ? null : `${name} — level ${Math.max(1, Math.min(5, Number(body.level) || 3))}`,
           changed_by: stamp,
         });
-      } catch { /* the change matters more than the line about it */ }
+      } catch (e) { swallow("hrms/roles", e); /* the change matters more than the line about it */ }
       return NextResponse.json({ ok: true });
     }
 
@@ -434,7 +437,7 @@ export async function POST(req: Request) {
         await admin.from("hrms_role_change").insert({
           role_id: body.id, field: "(approved)", old_value: null, new_value: "changes approved", changed_by: stamp,
         });
-      } catch { /* as above */ }
+      } catch (e) { swallow("hrms/roles", e); /* as above */ }
       return NextResponse.json({ ok: true });
     }
 

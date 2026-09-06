@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
@@ -46,7 +48,7 @@ async function readCard(buf: Buffer, mime: string): Promise<{ read: Record<strin
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: "claude-sonnet-5",
+        model: AI.FRONT,
         max_tokens: 900,
         system:
           "You read ONE visiting card from a photograph and return only what is printed on it. " +
@@ -163,7 +165,7 @@ export async function POST(req: Request) {
     }
 
     /* ── the records, as checked by the human ── */
-    const body = await req.json();
+    const body = await readBody(req, {});
 
     /** { action: "save" } — the scan on file, no CRM records yet. */
     if (String(body.action) === "save") {

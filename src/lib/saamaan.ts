@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { hasGrant, moduleDoor } from "@/lib/module-door";
 import { currentUser, HttpError, type AuthedUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -13,31 +14,8 @@ import { adminClient } from "@/lib/supabase/admin";
  * `material_` — that prefix is the distinction Dr Raghu asked for between
  * Saamaan's rows and the rest of Genie's, inside the one database.
  */
-export async function resolveSaamaanAccess(
-  admin: SupabaseClient,
-  email: string,
-  isOwner: boolean,
-): Promise<boolean> {
-  if (isOwner) return true;
-  const e = String(email || "").trim().toLowerCase();
-  if (!e) return false;
-  try {
-    const { data } = await admin
-      .from("material_access")
-      .select("email")
-      .eq("email", e)
-      .maybeSingle();
-    return !!data;
-  } catch {
-    return false;
-  }
-}
+export const resolveSaamaanAccess = (admin: SupabaseClient, email: string, isOwner: boolean) =>
+  hasGrant(admin, "material_access", email, isOwner);
 
 /** The one door check every /api/saamaan route uses. */
-export async function requireSaamaan(): Promise<AuthedUser> {
-  const u = await currentUser();
-  if (!u || u.disabled) throw new HttpError(401, "Sign in first.");
-  if (!(await resolveSaamaanAccess(adminClient(), u.email, u.isOwner)))
-    throw new HttpError(403, "Saamaan is granted per person — the tick on Admin → module access.");
-  return u;
-}
+export const requireSaamaan = moduleDoor("material_access", "Saamaan");

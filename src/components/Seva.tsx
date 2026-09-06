@@ -13,8 +13,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { APP_VERSION } from "@/lib/changelog";
+import { swallow } from "@/lib/swallow";
+import { APP_VERSION } from "@/lib/version";
 import ModuleMenu from "@/components/ModuleMenu";
+import { dmy as fmtD, rupee } from "@/lib/fmt";
+const money = (n: unknown) => rupee(n);
 
 const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A", RED = "#B3261E", GREEN = "#0D7A3F", TEAL = "#0F766E";
 
@@ -30,13 +33,9 @@ type Row = Record<string, unknown> & { id: string };
 type Master = { id: string; kind: string; label: string; sort_order: number };
 
 const S = (v: unknown) => String(v ?? "");
-const fmtD = (d: unknown) => {
-  const s = S(d).slice(0, 10);
-  return /^\d{4}/.test(s) ? `${s.slice(8, 10)}-${s.slice(5, 7)}-${s.slice(0, 4)}` : "—";
-};
+
 const TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-const money = (n: unknown) =>
-  n == null || n === "" ? "—" : `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+
 /** Days from today to a date — negative means it has already gone by. */
 const daysTo = (d: unknown) => {
   const s = S(d).slice(0, 10);
@@ -1018,7 +1017,7 @@ export default function Seva({
   const [openKey, setOpenKey] = useState("dashboard");
   const [navOpen, setNavOpen] = useState(true);
   useEffect(() => {
-    try { setNavOpen(localStorage.getItem("seva.nav") !== "0"); } catch { /* fine */ }
+    try { setNavOpen(localStorage.getItem("seva.nav") !== "0"); } catch (e) { swallow("Seva", e); /* fine */ }
   }, []);
   useEffect(() => {
     const apply = () => {
@@ -1031,10 +1030,10 @@ export default function Seva({
   }, []);
   const go = (key: string) => {
     setOpenKey(key);
-    try { window.history.replaceState(null, "", `#${key}`); } catch { /* SSR */ }
+    try { window.history.replaceState(null, "", `#${key}`); } catch (e) { swallow("Seva", e); /* SSR */ }
   };
   const toggleNav = () => setNavOpen((v) => {
-    try { localStorage.setItem("seva.nav", v ? "0" : "1"); } catch { /* fine */ }
+    try { localStorage.setItem("seva.nav", v ? "0" : "1"); } catch (e) { swallow("Seva", e); /* fine */ }
     return !v;
   });
 

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { errJson, HttpError } from "@/lib/auth";
@@ -24,7 +26,7 @@ export async function POST(req: Request) {
     const user = await requireCrm();
     if (!process.env.ANTHROPIC_API_KEY)
       throw new HttpError(503, "Server is missing ANTHROPIC_API_KEY — add it in the Vercel env vars.");
-    const b = await req.json();
+    const b = await readBody(req, {});
     const companyId = String(b.company_id ?? "");
     if (!companyId) throw new HttpError(400, "Which company? eva-brief needs company_id.");
 
@@ -145,7 +147,7 @@ keep it short. No preamble. Start at "**Who they are**".`;
 
     const anthropic = new Anthropic();
     const params: Anthropic.MessageCreateParams = {
-      model: "claude-opus-5",
+      model: AI.FRONT,
       max_tokens: 8000,
       system: NANDAN,
       output_config: { effort: "high" },

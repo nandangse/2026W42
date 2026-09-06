@@ -18,7 +18,7 @@
 //      "insufficient history" instead of printing the number.
 
 /** The financial year runs 1 April → 31 March. */
-export const FY_START_MONTH = 4;
+const FY_START_MONTH = 4;
 
 export interface DeliveredJob {
   id: string;
@@ -89,7 +89,7 @@ export function fyLabel(on: string): string {
  * 1st of the current financial quarter. Q1 Apr–Jun, Q2 Jul–Sep, Q3 Oct–Dec,
  * Q4 Jan–Mar — the Indian financial year, not the calendar one.
  */
-export function fqStart(on: string): string {
+function fqStart(on: string): string {
   const d = parse(on);
   const m = d.getUTCMonth(); // 0-based
   // months since April, wrapping January–March onto the previous year
@@ -107,7 +107,7 @@ export function fqLabel(on: string): string {
 export const monthStart = (on: string) => on.slice(0, 7) + "-01";
 
 /** `back` whole months before `on`, e.g. 12 months back from 2026-08-17. */
-export function monthsBefore(on: string, back: number): string {
+function monthsBefore(on: string, back: number): string {
   const d = parse(on);
   const dd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - back, d.getUTCDate()));
   return iso(dd);
@@ -198,7 +198,7 @@ export interface Totals {
 
 const zero = (): Totals => ({ nos: 0, value: 0, throughput: 0 });
 
-export const inRange = (j: DeliveredJob, from: string, to: string): boolean =>
+const inRange = (j: DeliveredJob, from: string, to: string): boolean =>
   !!j.delivered_on && j.delivered_on >= from && j.delivered_on <= to;
 
 export function totalsOf(rows: DeliveredJob[]): Totals {
@@ -346,7 +346,7 @@ export function byCustomer(rows: DeliveredJob[], from: string, to: string): Buck
  * Only rows holding both dates can answer this, so the count is returned too —
  * "62% on time" over 8 of 300 jobs is not a statistic.
  */
-export function onTime(rows: DeliveredJob[], from: string, to: string): { onTime: number; measurable: number; pct: number | null } {
+function onTime(rows: DeliveredJob[], from: string, to: string): { onTime: number; measurable: number; pct: number | null } {
   const m = within(rows, from, to).filter((r) => r.tdd && r.delivered_on);
   const ok = m.filter((r) => (r.delivered_on as string) <= (r.tdd as string)).length;
   return { onTime: ok, measurable: m.length, pct: m.length ? (ok / m.length) * 100 : null };
@@ -414,37 +414,3 @@ export interface Otd {
 }
 
 const days = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse(b)) / 86400000);
-
-/**
- * On-Time Delivery for a period.
- *
- *   OTD% = jobs delivered on or before their promised date
- *          ÷ jobs delivered in the period that carry a promised date
- *
- * The promise is the OTD Date — the commitment given to the customer — with
- * the Committed Delivery Date as the fallback where OTD Date is blank.
- *
- * A job with no promise date is NOT counted as late. It is reported separately
- * as unjudgeable, because scoring an unmeasurable job as a miss would drag the
- * figure down for a record-keeping gap rather than a delivery failure. This
- * matters here more than usual: only 305 of 2,728 rows carry an OTD Date.
- */
-export function otdFor(rows: DeliveredJob[], from: string, to: string, basis: OtdBasis = "otd"): Otd {
-  const delivered = within(rows, from, to);
-  const promiseOf = (r: DeliveredJob) => (basis === "otd" ? r.otd || r.tdd : r.tdd || r.otd);
-
-  const m = delivered.filter((r) => promiseOf(r));
-  const late = m.filter((r) => (r.delivered_on as string) > (promiseOf(r) as string));
-  const ok = m.length - late.length;
-  const slip = late.map((r) => days(r.delivered_on as string, promiseOf(r) as string));
-
-  return {
-    onTime: ok,
-    late: late.length,
-    measurable: m.length,
-    unjudgeable: delivered.length - m.length,
-    pct: m.length ? (ok / m.length) * 100 : null,
-    avgDaysLate: slip.length ? Math.round(slip.reduce((s, d) => s + d, 0) / slip.length) : null,
-    basis,
-  };
-}

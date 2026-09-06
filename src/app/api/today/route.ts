@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { swallow } from "@/lib/swallow";
 import { requireUser, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
@@ -72,7 +73,7 @@ export async function GET() {
         const { data } = await admin.from("goal_item").select("id, title, scope").in("id", rootIds);
         for (const g of data || [])
           goalNames[g.id as string] = `${SCOPE_TAG[g.scope as string] ?? ""}${g.title || "Goal"}`;
-      } catch { /* pre-0019: no goals layer, names stay empty */ }
+      } catch (e) { swallow("today", e); /* pre-0019: no goals layer, names stay empty */ }
     }
 
     if (erpRows.error) throw new Error(erpRows.error.message);

@@ -376,10 +376,8 @@ export const RATING_MEANING: Record<number, string> = {
   10: "10 — the best here",
 };
 
-export const ALL_QUESTIONS = IDP_SECTIONS.flatMap((s) => s.questions);
-
 /** What THIS person has to answer — the leaders' four only if they are one. */
-export const questionsFor = (isLeader: boolean) =>
+const questionsFor = (isLeader: boolean) =>
   IDP_SECTIONS.filter((s) => !s.leadersOnly || isLeader).flatMap((s) => s.questions);
 
 /** The exact words consented to. Stored with the tick — see migration 0053. */

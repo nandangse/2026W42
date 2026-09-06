@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { swallow } from "@/lib/swallow";
 import { requireOwner, errJson } from "@/lib/auth";
 import { crmDb, crmConfigured } from "@/crm/db";
 
@@ -99,7 +100,7 @@ export async function GET() {
           byUser.set(key, r);
         }
       }
-    } catch { /* pre-0044 — nothing to count yet */ }
+    } catch (e) { swallow("genie-usage", e); /* pre-0044 — nothing to count yet */ }
 
     const rows = [...byUser.values()].sort((x, y) => y.last30 - x.last30);
     const totals = rows.reduce((t, r) => ({

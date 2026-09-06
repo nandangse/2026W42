@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import * as XLSX from "xlsx";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -47,7 +49,7 @@ export async function GET(req: Request) {
     }
     // counts per structure, so the tabs read as sheets
     const counts: Record<string, number> = {};
-    try { const { data: c } = await admin.from("hrms_salary_rate").select("structure_id"); for (const r of c || []) counts[String(r.structure_id)] = (counts[String(r.structure_id)] || 0) + 1; } catch { /* */ }
+    try { const { data: c } = await admin.from("hrms_salary_rate").select("structure_id"); for (const r of c || []) counts[String(r.structure_id)] = (counts[String(r.structure_id)] || 0) + 1; } catch (e) { swallow("hrms/rates", e); /* */ }
     return NextResponse.json({ structures: (structures || []).map((s) => ({ ...s, lines: counts[String(s.id)] || 0 })), current: cur?.id || null, rates });
   } catch (e) { return errJson(e); }
 }
@@ -89,7 +91,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, lines: rows.length });
     }
 
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
 
     if (action === "seed_old") {

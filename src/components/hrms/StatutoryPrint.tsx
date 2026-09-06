@@ -8,8 +8,9 @@
 import { LOGO } from "@/lib/logo";
 import { MONTHS } from "@/lib/salary-sheet";
 import type { Slip } from "@/lib/salary-slip";
+import { inr } from "@/lib/fmt";
 
-const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
+
 
 interface Col { label: string; get: (s: Slip) => string | number | null; money?: boolean }
 

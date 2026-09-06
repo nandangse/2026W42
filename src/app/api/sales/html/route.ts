@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { swallow } from "@/lib/swallow";
 import { promises as fs } from "fs";
 import path from "path";
 import { requireUser, requireAdmin, errJson, HttpError } from "@/lib/auth";
@@ -33,9 +34,7 @@ export async function GET() {
         .limit(1)
         .maybeSingle();
       html = data?.html ?? null;
-    } catch {
-      /* table missing → bundled fallback below */
-    }
+    } catch (e) { swallow("sales/html", e); /* table missing → bundled fallback below */ }
     if (!html) html = await fs.readFile(BUNDLED, "utf8");
 
     // Genie's chrome is the only header — hide the artifact's own masthead bar

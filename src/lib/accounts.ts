@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { hasGrant, moduleDoor } from "@/lib/module-door";
 import { currentUser, HttpError, type AuthedUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -9,31 +10,8 @@ import { adminClient } from "@/lib/supabase/admin";
  * the owner is implicit. Before migration 0073 the table does not exist and
  * the answer is simply "no" for everybody but the owner.
  */
-export async function resolveAccountsAccess(
-  admin: SupabaseClient,
-  email: string,
-  isOwner: boolean,
-): Promise<boolean> {
-  if (isOwner) return true;
-  const e = String(email || "").trim().toLowerCase();
-  if (!e) return false;
-  try {
-    const { data } = await admin
-      .from("accounts_access")
-      .select("email")
-      .eq("email", e)
-      .maybeSingle();
-    return !!data;
-  } catch {
-    return false;
-  }
-}
+export const resolveAccountsAccess = (admin: SupabaseClient, email: string, isOwner: boolean) =>
+  hasGrant(admin, "accounts_access", email, isOwner);
 
 /** The one door check every /api/kuber route uses. */
-export async function requireKuber(): Promise<AuthedUser> {
-  const u = await currentUser();
-  if (!u || u.disabled) throw new HttpError(401, "Sign in first.");
-  if (!(await resolveAccountsAccess(adminClient(), u.email, u.isOwner)))
-    throw new HttpError(403, "Kuber is granted per person — the tick on Admin → module access.");
-  return u;
-}
+export const requireKuber = moduleDoor("accounts_access", "Kuber");

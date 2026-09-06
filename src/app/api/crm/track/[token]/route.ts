@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { swallow } from "@/lib/swallow";
 import { crmDb, crmConfigured } from "@/crm/db";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export async function GET(_req: Request, { params }: { params: { token: string }
         }).eq("id", data.id);
       }
     }
-  } catch { /* the pixel never errors at the reader */ }
+  } catch (e) { swallow("crm/track/[token]", e); /* the pixel never errors at the reader */ }
   return new NextResponse(GIF, {
     headers: {
       "content-type": "image/gif",

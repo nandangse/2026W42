@@ -1,6 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  /**
+   * Lint is a separate step (`npm run lint`), never part of the build.
+   * ESLint over 117,000 lines takes more than ten minutes on this Google
+   * Drive mount and would push every Vercel build the same way; the build's
+   * job is the type-check and the bundle (6 Sep 2026).
+   */
+  eslint: { ignoreDuringBuilds: true },
   poweredByHeader: false, // don't advertise the framework
   experimental: {
     /**

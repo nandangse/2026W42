@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import { swallow } from "@/lib/swallow";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -121,7 +122,7 @@ export async function ingestMeeting(crm: SupabaseClient, cfg: ZoomCfg, obj: Doc,
       }
       attendees = [...seen.values()];
     }
-  } catch { /* the meeting still lands without its roll-call */ }
+  } catch (e) { swallow("lib/zoom", e); /* the meeting still lands without its roll-call */ }
 
   // 3. the deal -- attendee emails → people → company → its one open opportunity
   let company_id: string | null = null, opportunity_id: string | null = null;

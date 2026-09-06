@@ -9,9 +9,10 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { dmy as fmtD } from "@/lib/fmt";
 
 const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A", RED = "#B3261E", GREEN = "#0D7A3F";
-const fmtD = (d: string) => (/^\d{4}/.test(d) ? `${d.slice(8, 10)}-${d.slice(5, 7)}-${d.slice(0, 4)}` : d);
+
 
 interface CRow { id: string; name: string; grp: string; frequency: string; due_day: number | null; due_note: string }
 interface CEntry { compliance_id: string; month: string; done_on: string | null; link: string; note: string }

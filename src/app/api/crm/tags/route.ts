@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb } from "@/crm/db";
@@ -97,7 +98,7 @@ export async function POST(req: Request) {
   try {
     const me = await requireCrm();
     const db = crmDb();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
     const entity = String(body.entity || "");
     const id = String(body.id || "");

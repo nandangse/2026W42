@@ -7,6 +7,7 @@
 // Adding a resolver is the whole contract — register it here, set the node's
 // metric_source to its key, and the number goes live.
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { swallow } from "@/lib/swallow";
 
 export interface MetricResult {
   current: number;
@@ -134,7 +135,7 @@ export const METRICS: MetricDef[] = [
   },
 ];
 
-export const METRIC_BY_KEY = new Map(METRICS.map((m) => [m.key, m]));
+const METRIC_BY_KEY = new Map(METRICS.map((m) => [m.key, m]));
 
 /**
  * Resolve every metric a tree actually uses, once each. Failures are swallowed
@@ -150,9 +151,7 @@ export async function resolveMetrics(
     wanted.map(async (k) => {
       try {
         out[k] = await METRIC_BY_KEY.get(k)!.resolve(db);
-      } catch {
-        /* leave unresolved; the node falls back to its stored current_no */
-      }
+      } catch (e) { swallow("lib/goal-metrics", e); /* leave unresolved; the node falls back to its stored current_no */ }
     }),
   );
   return out;

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { errJson, HttpError } from "@/lib/auth";
@@ -44,7 +46,7 @@ export async function POST(req: Request) {
     if (!process.env.ANTHROPIC_API_KEY)
       return NextResponse.json({ read: null, missing: "ANTHROPIC_API_KEY is not set on the server." });
     const db = crmDb();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const type = String(body.type || "");
     const id = String(body.id || "");
     const TABLES: Record<string, string> = {
@@ -93,7 +95,7 @@ export async function POST(req: Request) {
     // ---- the read -------------------------------------------------------
     const anthropic = new Anthropic();
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-5",
+      model: AI.FRONT,
       max_tokens: 400,
       system: SYSTEM,
       messages: [{

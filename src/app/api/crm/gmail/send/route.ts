@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb } from "@/crm/db";
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
     const mb = user.profileId ? await myMailbox(user.profileId) : null;
     if (!mb || mb.status !== "active")
       throw new HttpError(400, "Connect your Gmail first — Profile → Gmail connection.");
-    const b = await req.json();
+    const b = await readBody(req, {});
     const to = String(b.to ?? "").trim();
     const cc = String(b.cc ?? "").trim();
     const bcc = String(b.bcc ?? "").trim();

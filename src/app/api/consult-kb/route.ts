@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireOwner, errJson, HttpError } from "@/lib/auth";
@@ -70,7 +72,7 @@ export async function POST(req: Request) {
       }
       if (pasted.trim()) incoming = incoming ? `${incoming}\n\n---\n\n${pasted}` : pasted;
     } else {
-      const body = await req.json();
+      const body = await readBody(req, {});
       section = String(body.section || "");
       incoming = String(body.text || "");
     }
@@ -85,7 +87,7 @@ export async function POST(req: Request) {
     // OPUS, THE LIBRARIAN: weave the drop into the one large document.
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const stream = anthropic.messages.stream({
-      model: "claude-opus-5",
+      model: AI.FRONT,
       max_tokens: 64000,
       system: `You are the librarian of Dr Raghunandan Jagdish's ${SECTION_LABEL[section]} knowledgebase at NANDAN GSE — the intelligence layer his Consult Raghu advisor will stand on. You maintain ONE large, beautifully organized Markdown document.
 

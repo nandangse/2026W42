@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
@@ -21,7 +23,7 @@ async function notifyGoalOwners(
   try {
     const { data } = await admin.from("goal_node").select("what, node_type").eq("id", nodeId).maybeSingle();
     if (data) what = `${LEVEL_LABEL[data.node_type as NodeType].toLowerCase()} "${data.what}"`;
-  } catch { /* description is decoration */ }
+  } catch (e) { swallow("goals", e); /* description is decoration */ }
   for (const pid of fresh) {
     await notify(admin, {
       person_id: pid,
@@ -78,7 +80,7 @@ export async function POST(req: Request) {
     const user = await requireUser();
     const access = await resolveGoalAccess(adminClient(), user.id, user.isOwner);
     const db = supabaseServer();
-    const body = await req.json();
+    const body = await readBody(req, {});
 
     // owners may always act on their own node, even without a tree grant
     const ownsNode = async (id: string) => {

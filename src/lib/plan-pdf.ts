@@ -11,14 +11,12 @@
  * signature.
  */
 import { LOGO } from "@/lib/logo";
+import { esc, dmy } from "@/lib/fmt";
 
 const CR = 1e7;
 const cr = (n: number) => `₹${((Number(n) || 0) / CR).toFixed(2)} Cr`;
-const esc = (x: unknown) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const dmy = (iso: unknown) => {
-  const s = String(iso || "").slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.split("-").reverse().join("-") : "—";
-};
+
+
 
 export type PlanState = "draft" | "frozen" | "approved";
 

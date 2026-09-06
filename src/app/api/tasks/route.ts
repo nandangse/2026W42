@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireTasker, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
@@ -16,7 +18,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireTasker();
     const supabase = supabaseServer();
-    const body = await req.json();
+    const body = await readBody(req, {});
 
     if (body.action === "create") {
       if (!body.title) return NextResponse.json({ error: "title required" }, { status: 400 });
@@ -145,9 +147,7 @@ export async function POST(req: Request) {
               .from("materials")
               .update({ status: body.done ? "Received" : "Yet to receive", updated_at: new Date().toISOString() })
               .eq("id", mat.id);
-        } catch {
-          /* migration 0030 not run yet — the task still toggles */
-        }
+        } catch (e) { swallow("tasks", e); /* migration 0030 not run yet — the task still toggles */ }
       }
       return NextResponse.json({ ok: true });
     }
@@ -196,9 +196,7 @@ export async function POST(req: Request) {
               by: user.initials || user.displayName || user.email.split("@")[0],
             });
           }
-        } catch {
-          /* 0032 not run yet — the date still moves, it is just not recorded */
-        }
+        } catch (e) { swallow("tasks", e); /* 0032 not run yet — the date still moves, it is just not recorded */ }
       }
 
       // read the old assignee first, so a reassignment can be detected after

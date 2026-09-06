@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { mayUseCrm, requireCrm } from "@/crm/auth";
-import { UPDATES } from "@/lib/changelog";
+import { APP_VERSION } from "@/lib/version";
 import CrmApp from "@/components/crm/CrmApp";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ export default async function CrmPage() {
       displayName={user.displayName}
       initials={user.initials ?? null}
       role={user.role ?? "user"}
-      version={UPDATES[0].v}
+      version={APP_VERSION}
       initialSlug="dashboard"
       profileId={(await requireCrm().catch(() => null))?.profileId ?? null}
     />

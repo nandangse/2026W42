@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requireAdmin, errJson, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
   try {
     const caller = await requireAdmin();
     const admin = adminClient();
-    const { person_id, level } = await req.json();
+    const { person_id, level } = await readBody(req, {});
     if (!person_id || !["none", "view", "edit"].includes(level))
       return NextResponse.json({ error: "person_id and a valid level required" }, { status: 400 });
 

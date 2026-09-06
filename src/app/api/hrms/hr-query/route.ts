@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, resolveHrmsAccess } from "@/lib/hrms";
@@ -36,7 +38,7 @@ async function myRecord(email: string): Promise<Emp | null> {
       const { data: r } = await admin.from(T.employees).select("id, name, email, department, designation, active, extra").eq("id", String(ed[0].employee_id)).maybeSingle();
       return (r as Emp) || null;
     }
-  } catch { /* pre-0047 */ }
+  } catch (e) { swallow("hrms/hr-query", e); /* pre-0047 */ }
   return null;
 }
 const contactOf = (r: Emp | null, email: string) => ({
@@ -101,7 +103,7 @@ export async function POST(req: Request) {
     const me = await currentUser();
     const admin = adminClient();
     const hr = me ? await resolveHrmsAccess(admin, me.email, me.isOwner) : false;
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
     const now = new Date().toISOString();
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb } from "@/crm/db";
@@ -20,7 +21,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   try {
     const user = await requireCrm();
-    const b = await req.json();
+    const b = await readBody(req, {});
     const digits = String(b.phone ?? "").replace(/\D/g, "");
     if (digits.length < 8) throw new HttpError(400, `${b.phone || "(empty)"} is not a phone number.`);
     const rawBody = String(b.body ?? "").trim();

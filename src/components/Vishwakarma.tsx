@@ -13,9 +13,11 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { APP_VERSION } from "@/lib/changelog";
+import { swallow } from "@/lib/swallow";
+import { APP_VERSION } from "@/lib/version";
 import ModuleMenu from "@/components/ModuleMenu";
 import PlaybookScreen from "@/components/Playbook";
+import { dmy as fmtD } from "@/lib/fmt";
 
 const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A", RED = "#B3261E", GREEN = "#0D7A3F", VIOLET = "#7C3AED";
 
@@ -30,10 +32,7 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
 ];
 
 type Row = Record<string, unknown> & { id: string };
-const fmtD = (d: unknown) => {
-  const s2 = String(d || "").slice(0, 10);
-  return /^\d{4}/.test(s2) ? `${s2.slice(8, 10)}-${s2.slice(5, 7)}-${s2.slice(0, 4)}` : "—";
-};
+
 const ago = (at: unknown) => new Date(String(at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 const TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
@@ -1126,7 +1125,7 @@ export default function Vishwakarma({
   const [openKey, setOpenKey] = useState("dashboard");
   const [navOpen, setNavOpen] = useState(true);
   useEffect(() => {
-    try { setNavOpen(localStorage.getItem("vishwakarma.nav") !== "0"); } catch { /* fine */ }
+    try { setNavOpen(localStorage.getItem("vishwakarma.nav") !== "0"); } catch (e) { swallow("Vishwakarma", e); /* fine */ }
   }, []);
   useEffect(() => {
     const apply = () => {
@@ -1139,10 +1138,10 @@ export default function Vishwakarma({
   }, []);
   const go = (key: string) => {
     setOpenKey(key);
-    try { window.history.replaceState(null, "", `#${key}`); } catch { /* SSR */ }
+    try { window.history.replaceState(null, "", `#${key}`); } catch (e) { swallow("Vishwakarma", e); /* SSR */ }
   };
   const toggleNav = () => setNavOpen((v) => {
-    try { localStorage.setItem("vishwakarma.nav", v ? "0" : "1"); } catch { /* fine */ }
+    try { localStorage.setItem("vishwakarma.nav", v ? "0" : "1"); } catch (e) { swallow("Vishwakarma", e); /* fine */ }
     return !v;
   });
 

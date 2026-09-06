@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requireStratcom, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { TRADES } from "@/lib/templates";
@@ -31,7 +32,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const user = await requireStratcom();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const rows = TRADES.map((t) => {
       const n = Number((body.rates || {})[t.key]);
       if (!Number.isFinite(n) || n < 0 || n > 100000)

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -61,7 +63,7 @@ export async function POST(req: Request) {
     await assertAiOn();
     const user = await requireUser();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
     const kind = String(body.kind || "");
 
@@ -112,7 +114,7 @@ export async function POST(req: Request) {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-5-20250929", max_tokens: 3000,
+          model: AI.BACKGROUND, max_tokens: 3000,
           messages: [{
             role: "user",
             content: [

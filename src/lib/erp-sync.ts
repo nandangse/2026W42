@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { swallow } from "@/lib/swallow";
 
 /**
  * THE ERP IMPORT — Projects and Jobmaster, straight off nandanerp
@@ -41,7 +42,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * them.
  */
 
-export const JOB_ACTIVE_STATUS = "Jobs in Process";
+const JOB_ACTIVE_STATUS = "Jobs in Process";
 
 /**
  * KEEPING GENIE'S ANSWER MUST TELL THE ERP (Dr Raghu, 2 Sep 2026, of the
@@ -59,7 +60,7 @@ export const JOB_ACTIVE_STATUS = "Jobs in Process";
  * Only these fields can be received; a decision on anything else still holds
  * in Genie and is reported as unable to travel, rather than silently pretending.
  */
-export const ERP_PUSHABLE: Record<string, string> = {
+const ERP_PUSHABLE: Record<string, string> = {
   tdd: "Target Delivery Date Current",
   stat: "Job Status",
   kit: "Kitting percentage",
@@ -81,7 +82,7 @@ export async function erpConfig(crm: SupabaseClient): Promise<ErpCfg | { error: 
 }
 
 /** Every row of a doctype, paged past Frappe's 1000-row habit. */
-export async function erpAll(
+async function erpAll(
   cfg: ErpCfg, doctype: string, fields: string[], filters?: unknown[],
 ): Promise<Record<string, unknown>[]> {
   const out: Record<string, unknown>[] = [];
@@ -134,7 +135,7 @@ const N = (v: unknown) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export const PROJECT_FIELDS = [
+const PROJECT_FIELDS = [
   "name", "custom_project_director", "customer_committed_delivery_",
   "expected_end_date", "project_stage", "sales_order", "jobnumberslist", "status", "modified",
   // Dr Raghu, 2 Sep 2026: "Short Summary Description - ERP / Description -
@@ -149,11 +150,11 @@ export const PROJECT_FIELDS = [
  * there. Jobs have had this since 29 Aug; projects had nothing, so a
  * description written in Genie stayed in Genie.
  */
-export const PROJECT_PUSHABLE: Record<string, string> = {
+const PROJECT_PUSHABLE: Record<string, string> = {
   description: "Short Summary Description",
 };
 
-export const JOB_FIELDS = [
+const JOB_FIELDS = [
   "name", "customer_tag", "product_family", "customer", "value",
   "target_delivery_date_current", "custom_otd_date", "job_start_date",
   "project", "job_status", "planning_owner", "status",
@@ -177,12 +178,12 @@ export const JOB_FIELDS = [
  * delivery is a fact that happened, and a job the ERP later stops returning
  * must not vanish from the history.
  */
-export const DELIVERED_FIELDS = [
+const DELIVERED_FIELDS = [
   "name", "customer_tag", "product_family", "customer", "value",
   "actual_delivery_date", "target_delivery_date_current", "custom_otd_date",
   "job_start_date", "project", "job_status", "planning_owner", "status",
 ];
-export const JOB_DELIVERED_STATUS = "Delivered";
+const JOB_DELIVERED_STATUS = "Delivered";
 
 /** One field that moved, in the words the morning needs to read it. */
 export interface FieldChange {
@@ -232,7 +233,7 @@ export interface SyncResult {
  * field, else the row's updated_at.
  */
 export type Winner = "erp" | "genie" | "latest";
-export const decisionKey = (kind: string, id: string, field: string) => `${kind}:${id}:${field}`;
+const decisionKey = (kind: string, id: string, field: string) => `${kind}:${id}:${field}`;
 
 export interface SyncOptions {
   dry?: boolean;
@@ -564,7 +565,7 @@ export async function erpSync(
         );
         if (!error) queued = fresh.length;
       }
-    } catch { /* the board is right either way */ }
+    } catch (e) { swallow("lib/erp-sync", e); /* the board is right either way */ }
     notes.push(queued
       ? `${queued} field(s) Genie kept are queued for the ERP — send them with ⬆ Update to ERP.`
       : "The fields Genie kept were already waiting in the ERP queue.");

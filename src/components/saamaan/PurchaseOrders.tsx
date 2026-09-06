@@ -15,13 +15,15 @@
 import React, { useCallback, useEffect, useState } from "react";
 import GenieTable from "@/components/GenieTable";
 import { Screen, Btn, Note, Chip, Modal, INK, MUTED, BORDER, NAVY, GREEN, AMBER, RED } from "@/components/ims/ui";
+import { rupee } from "@/lib/fmt";
+const inr = (n: number | null | undefined) => rupee(n, "·");
 
 interface Po { name: string; supplier: string; supplier_name: string; status: string; docstatus: number; transaction_date: string | null; schedule_date: string | null; grand_total: number | null; net_total: number | null; currency: string; project: string; per_received: number | null; per_billed: number | null; advance_paid: number | null; set_warehouse: string; owner: string; erp_modified: string | null }
 interface PoItem { row_name: string; idx: number; item_code: string; item_name: string; qty: number | null; uom: string; rate: number | null; amount: number | null; received_qty: number | null; billed_amt: number | null; warehouse: string; schedule_date: string | null; project: string }
 interface Sup { name: string; supplier_name: string; supplier_group: string; supplier_type: string; gst_no: string; country: string; mobile_no: string; email_id: string; primary_address: string; primary_contact: string; status_of_supplier: string; rating_percentage: number | null; disabled: boolean; on_hold: boolean; erp_modified: string | null; n: number; value: number; open: number }
 interface Pull { modified?: string; at?: string; items_modified?: string; items_at?: string; suppliers_at?: string; by?: string }
 
-const inr = (n: number | null | undefined) => (n == null ? "·" : `₹${Math.round(n).toLocaleString("en-IN")}`);
+
 const d = (s: string | null | undefined) => (s ? new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }) : "·");
 const statusColour = (s: string) => (/Completed/.test(s) ? GREEN : /Cancelled|Closed/.test(s) ? MUTED : /Draft/.test(s) ? AMBER : /Receive|Bill/.test(s) ? NAVY : RED);
 const erpForm = (base: string, doctype: string, name: string) => `${base}/app/${doctype.toLowerCase().replace(/\s+/g, "-")}/${encodeURIComponent(name)}`;

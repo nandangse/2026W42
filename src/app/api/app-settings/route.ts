@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireUser, requireAdmin, requireOwner, errJson } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -27,7 +29,7 @@ export async function GET() {
     try {
       const { data: ap } = await adminClient().from("app_settings").select("ai_paused").eq("id", true).maybeSingle();
       ai_paused = !!(ap as { ai_paused?: boolean } | null)?.ai_paused;
-    } catch { /* pre-0106 */ }
+    } catch (e) { swallow("app-settings", e); /* pre-0106 */ }
     return NextResponse.json({
       ai_paused,
       app_name: data?.app_name || "Genie",
@@ -44,7 +46,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const user = await requireAdmin();
-    const body = await req.json();
+    const body = await readBody(req, {});
     // the AI master switch is the owner's hand alone (Dr Raghu, 30 Aug 2026)
     if ("ai_paused" in body) await requireOwner();
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString(), updated_by: user.id };

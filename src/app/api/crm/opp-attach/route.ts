@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { swallow } from "@/lib/swallow";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
       const { driveConfig, archiveUpload } = await import("@/lib/drive");
       const dCfg = driveConfig();
       if (dCfg) void archiveUpload(dCfg, buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer, file.name, "crm").catch(() => null);
-    } catch { /* the archive is a mirror, never the master */ }
+    } catch (e) { swallow("crm/opp-attach", e); /* the archive is a mirror, never the master */ }
     return NextResponse.json({ ok: true, name: file.name, url: `/api/crm/opp-attach?path=${encodeURIComponent(path)}` });
   } catch (e) {
     return errJson(e);

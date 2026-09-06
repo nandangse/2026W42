@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -20,7 +22,7 @@ export const maxDuration = 60;
  * POST { mode: "review", kind, id, question } — CONSULT RAGHU reviews the
  *   item in Dr Raghu's own house style and files it on the review bench.
  */
-const MODEL = "claude-sonnet-4-5-20250929";
+const MODEL = AI.FRONT;
 
 async function ask(key: string, system: string, content: string): Promise<string> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -56,7 +58,7 @@ export async function POST(req: Request) {
     const key = process.env.ANTHROPIC_API_KEY;
     if (!key) throw new HttpError(503, "ANTHROPIC_API_KEY is not set — Genie cannot answer yet.");
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const mode = String(body.mode || "");
     const id = String(body.id || "");
     if (!id) throw new HttpError(400, "id required");

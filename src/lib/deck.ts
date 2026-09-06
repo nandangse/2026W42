@@ -1,4 +1,5 @@
-/**
+
+import { esc } from "@/lib/fmt";/**
  * The review deck — eight 16:9 pages, rendered as HTML and printed by the
  * browser.
  *
@@ -132,8 +133,7 @@ const MON = (k: string) => {
 const MONTH_FULL = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
 const MONF = (k: string) => MONTH_FULL[+k.split("-")[1] - 1] || "";
-const esc = (s: unknown) =>
-  String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string);
+
 const dd = (s: string | null | undefined) => (s ? s.slice(8) + "-" + s.slice(5, 7) : "—");
 const cut = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 

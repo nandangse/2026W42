@@ -1,4 +1,5 @@
 import { HttpError } from "@/lib/auth";
+import { swallow } from "@/lib/swallow";
 import { adminClient } from "@/lib/supabase/admin";
 
 /**
@@ -13,6 +14,6 @@ export async function assertAiOn(): Promise<void> {
   try {
     const { data } = await adminClient().from("app_settings").select("ai_paused").eq("id", true).maybeSingle();
     paused = !!(data as { ai_paused?: boolean } | null)?.ai_paused;
-  } catch { /* pre-0106 — the switch does not exist yet */ }
+  } catch (e) { swallow("lib/ai-gate", e); /* pre-0106 — the switch does not exist yet */ }
   if (paused) throw new HttpError(503, "Genie's AI is paused by Dr Raghu. Settings → Genie holds the switch.");
 }

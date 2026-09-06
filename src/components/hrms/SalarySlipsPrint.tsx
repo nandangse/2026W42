@@ -13,8 +13,9 @@
 import { LOGO } from "@/lib/logo";
 import { MONTHS } from "@/lib/salary-sheet";
 import type { Slip } from "@/lib/salary-slip";
+import { inr } from "@/lib/fmt";
 
-const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
+
 const dashless = (v: string | null) => (v && v !== "N/A" ? v : "—");
 
 export default function SalarySlipsPrint({ month, year, picked, total, draft = false }: {

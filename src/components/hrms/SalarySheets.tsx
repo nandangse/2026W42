@@ -17,6 +17,7 @@ import { fmtFull } from "@/lib/schedule";
 import { MONTHS } from "@/lib/salary-sheet";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
+import { inr } from "@/lib/fmt";
 
 interface Sheet {
   id: string; month: number; year: number;
@@ -33,7 +34,7 @@ interface Sheet {
 }
 interface Line { employee_id: string | null; name: string | null; type: string | null; earned: number; deductions: number; net: number }
 
-const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
+
 const lakh = (n: number | null | undefined) => (n == null ? "—" : n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹${(n / 1e5).toFixed(2)} L` : `₹${inr(n)}`);
 const day = (iso: string | null) => (iso ? fmtFull(String(iso)) : "—");
 const who = (s: string | null) => String(s || "—").split("·")[0].trim();

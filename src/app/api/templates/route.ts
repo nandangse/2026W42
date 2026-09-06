@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requireAdmin, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -10,7 +11,7 @@ export async function POST(req: Request) {
   try {
     await requireAdmin();
     const supabase = supabaseServer();
-    const body = await req.json();
+    const body = await readBody(req, {});
     if (!body.family) return NextResponse.json({ error: "family required" }, { status: 400 });
     const { error } = await supabase
       .from("family_templates")

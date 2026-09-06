@@ -134,7 +134,7 @@ function fyOf(iso: string): string {
  * filename so Drive's own name sort is chronological, and so that uploading
  * the same export twice in a day cannot overwrite the first one.
  */
-export function archivePath(kind: string, when: Date) {
+function archivePath(kind: string, when: Date) {
   // the archive files by the IST calendar — a 00:30 IST upload belongs to
   // today's folder, not yesterday's UTC date
   const iso = new Date(when.getTime() + 330 * 60000).toISOString().slice(0, 10);

@@ -14,6 +14,7 @@ import { MONTHS } from "@/lib/salary-sheet";
 import DataTable, { type Column } from "./DataTable";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
+import { inr } from "@/lib/fmt";
 
 interface Row {
   sheet_id: string; month: number; year: number;
@@ -22,7 +23,7 @@ interface Row {
   first_at: string | null; last_at: string | null; opens: number;
 }
 
-const inr = (n: number) => Math.round(n).toLocaleString("en-IN");
+
 
 export default function SalarySlipsTable({ who }: { who: string }) {
   const [rows, setRows] = useState<Row[] | null>(null);

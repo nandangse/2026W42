@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { swallow } from "@/lib/swallow";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
@@ -170,7 +171,7 @@ export async function GET(req: Request) {
         const t = (pRow.targets || {}) as Record<string, number>;
         for (const [k, v] of Object.entries(t)) targets[k] = (targets[k] || 0) + (Number(v) || 0);
       }
-    } catch { /* pre-0020 */ }
+    } catch (e) { swallow("crm/dashboard", e); /* pre-0020 */ }
 
     return NextResponse.json({
       scope, allowedTeam, weeks: Math.round(weeks * 10) / 10, metrics,

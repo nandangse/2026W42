@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, fieldSpec } from "@/lib/hrms";
@@ -54,9 +56,7 @@ export async function GET() {
         }
         people = [...byId.values()].sort((a, b) => String(b.last).localeCompare(String(a.last)));
       }
-    } catch {
-      /* pre-0052 — the column does not exist yet, so nothing is pending */
-    }
+    } catch (e) { swallow("hrms/approvals", e); /* pre-0052 — the column does not exist yet, so nothing is pending */ }
 
     // ---- roles ----
     let roles: { id: string; role: string; department: string | null; by: string | null; since: string | null }[] = [];
@@ -70,7 +70,7 @@ export async function GET() {
         id: String(r.id), role: String(r.role), department: r.department ?? null,
         by: r.pending_by ?? null, since: r.pending_since ?? null,
       }));
-    } catch { /* pre-0051 */ }
+    } catch (e) { swallow("hrms/approvals", e); /* pre-0051 */ }
 
     /**
      * ---- what has already been agreed ----
@@ -105,7 +105,7 @@ export async function GET() {
         approved: p.approved_at ? String(p.approved_at) : null,
         by: p.edited_by ?? null, approvedBy: p.approved_by ?? null,
       }));
-    } catch { /* pre-0052 */ }
+    } catch (e) { swallow("hrms/approvals", e); /* pre-0052 */ }
     try {
       const { data: doneRoles } = await admin
         .from("hrms_role")
@@ -120,7 +120,7 @@ export async function GET() {
           approved: r.approved_at ? String(r.approved_at) : null,
           by: r.updated_by ?? null, approvedBy: r.approved_by ?? null,
         });
-    } catch { /* pre-0051 */ }
+    } catch (e) { swallow("hrms/approvals", e); /* pre-0051 */ }
     done.sort((a, b) => String(b.approved).localeCompare(String(a.approved)));
 
     return NextResponse.json({ people, roles, done });
@@ -147,7 +147,7 @@ export async function POST(req: Request) {
       throw new HttpError(403, `Only ${RAGHU_EMAIL} may approve a change to a record.`);
     const admin = adminClient();
     const T = await hrmsTables(admin);
-    const body = await req.json();
+    const body = await readBody(req, {});
     const stamp = me.initials ? `${me.initials} · ${me.email}` : me.email;
     const now = new Date().toISOString();
 

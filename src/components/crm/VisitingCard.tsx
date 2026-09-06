@@ -11,6 +11,7 @@
  * because enrichment is a claim by an outside service, not a fact.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import { NAVY, NAVY_SOFT, INK, MUTED, BORDER, ORANGE, GREEN } from "./palette";
 
 interface Read {
@@ -453,7 +454,7 @@ export function PersonCardPanel({ personId, personRow, onSaved }: {
         window.sessionStorage.removeItem("crm.apollo.auto");
         void lookup();
       }
-    } catch { /* fine */ }
+    } catch (e) { swallow("crm/VisitingCard", e); /* fine */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personId]);
 

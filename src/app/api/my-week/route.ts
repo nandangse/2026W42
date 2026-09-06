@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { hrmsTables } from "@/lib/hrms";
 import { adminClient } from "@/lib/supabase/admin";
@@ -165,7 +166,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
-    const body = await req.json();
+    const body = await readBody(req, {});
     if (String(body.action || "") !== "mood") throw new HttpError(400, "Unknown action");
     const mood = String(body.mood || "") as Mood;
     if (!VALID_MOODS.includes(mood)) throw new HttpError(400, "That is not one of the five");

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
@@ -108,7 +109,7 @@ export async function POST(req: Request) {
   try {
     const me = await requireSaamaan();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const phase = S(body.phase);
     const cfg = await erp();
     const now = new Date().toISOString();

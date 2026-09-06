@@ -12,6 +12,7 @@
 // offers and its controls cannot be replaced, so the panel says so rather than
 // pretending the same rules apply.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import { clock, type VideoRef } from "@/lib/lms";
 
 const C = {
@@ -105,7 +106,7 @@ function YouTubePlayer({ id }: { id: string }) {
     // the lesson resumes where it was left (Dr Raghu, 29 Aug 2026) — the
     // position is kept per device, cued before play so nothing autostarts
     let resumeAt = 0;
-    try { resumeAt = Math.floor(Number(window.localStorage.getItem(`lms.pos.${id}`) || 0)); } catch { /* fine */ }
+    try { resumeAt = Math.floor(Number(window.localStorage.getItem(`lms.pos.${id}`) || 0)); } catch (e) { swallow("LmsVideo", e); /* fine */ }
     if (resumeAt < 15) resumeAt = 0;
 
     loadYouTubeApi().then(() => {
@@ -125,7 +126,7 @@ function YouTubePlayer({ id }: { id: string }) {
             // the lesson must be HEARD — whatever muted the embed (YouTube
             // remembers mute per-site) is undone the moment the player is ours
             // (Dr Raghu, 29 Aug 2026: "this goal movie is muted — check this")
-            try { e.target.unMute?.(); e.target.setVolume?.(100); } catch { /* fine */ }
+            try { e.target.unMute?.(); e.target.setVolume?.(100); } catch (e) { swallow("LmsVideo", e); /* fine */ }
             setMuted(!!e.target.isMuted?.());
             if (resumeAt) setAt(resumeAt);
             // one clock for the whole player, cleared on unmount — it also
@@ -142,7 +143,7 @@ function YouTubePlayer({ id }: { id: string }) {
                   if (d && now > d - 60) window.localStorage.removeItem(`lms.pos.${id}`);
                   else if (now > 15) window.localStorage.setItem(`lms.pos.${id}`, String(Math.floor(now)));
                 }
-              } catch { /* private mode — the clock still runs */ }
+              } catch (e) { swallow("LmsVideo", e); /* private mode — the clock still runs */ }
             }, 500);
           },
           onStateChange: (e: any) => {
@@ -157,7 +158,7 @@ function YouTubePlayer({ id }: { id: string }) {
     return () => {
       dead = true;
       if (tick) clearInterval(tick);
-      try { player.current?.destroy?.(); } catch { /* already gone */ }
+      try { player.current?.destroy?.(); } catch (e) { swallow("LmsVideo", e); /* already gone */ }
       player.current = null;
     };
   }, [id]);

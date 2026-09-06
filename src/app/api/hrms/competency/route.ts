@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, splitMulti } from "@/lib/hrms";
@@ -27,7 +29,7 @@ export async function GET(req: Request) {
       const { data } = await admin
         .from("hrms_competency").select("name, definition, category, sort_order").order("sort_order").order("name");
       master = (data || []).map((c) => ({ name: String(c.name), definition: String(c.definition), category: c.category ?? null }));
-    } catch { /* pre-0056 */ }
+    } catch (e) { swallow("hrms/competency", e); /* pre-0056 */ }
 
     if (!empId) return NextResponse.json({ master });
 
@@ -68,7 +70,7 @@ export async function GET(req: Request) {
         competency: String(a.competency), level: Number(a.level),
         reason: a.reason ?? null, added_by: a.added_by ?? null,
       }));
-    } catch { /* pre-0058 */ }
+    } catch (e) { swallow("hrms/competency", e); /* pre-0058 */ }
 
     const addedBy = new Map(added.map((a) => [a.competency, a]));
     const names = new Set<string>([...fromRole.keys(), ...addedBy.keys()]);
@@ -108,7 +110,7 @@ export async function POST(req: Request) {
   try {
     const me = await requireHrms();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const stampEarly = me.initials ? `${me.initials} · ${me.email}` : me.email;
 
     /**
@@ -197,7 +199,7 @@ export async function POST(req: Request) {
         new_value: body.remove ? null : `${competency} — level ${Math.max(1, Math.min(5, Number(body.level) || 3))}`,
         edited_by: stamp,
       });
-    } catch { /* the change matters more than the line about it */ }
+    } catch (e) { swallow("hrms/competency", e); /* the change matters more than the line about it */ }
 
     return NextResponse.json({ ok: true });
   } catch (e) {

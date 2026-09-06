@@ -19,6 +19,7 @@
  */
 import { LOGO } from "@/lib/logo";
 import { NO_STATUTORY, CONTRACT_TYPES_SET } from "@/lib/salary";
+import { esc } from "@/lib/fmt";
 
 export const FNF_STATUS = ["Open", "Calculated", "Letters issued", "Paid", "Closed"] as const;
 export type FnfStatus = (typeof FNF_STATUS)[number];
@@ -78,7 +79,7 @@ export interface FnfRow {
 export const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 export const rupees = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
 export const inr = (n: number | null | undefined) => (n == null ? "—" : `₹${rupees(n)}`);
-const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
 export const dmy = (s: string | null | undefined) => {
   if (!s) return "—";
   const d = new Date(String(s).slice(0, 10) + "T00:00:00");

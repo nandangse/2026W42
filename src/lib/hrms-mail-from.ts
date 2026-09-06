@@ -7,8 +7,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * not connected, the sender's own is used and the screen says so — a mail
  * that did not go is worse than one from the wrong name.
  */
-export const HRMS_MAIL_FROM = "vinaym@nandan.co.in";
-export const HRMS_MAIL_FROM_NAME = "Vinay Mande · Nandan GSE HR";
+const HRMS_MAIL_FROM = "vinaym@nandan.co.in";
+const HRMS_MAIL_FROM_NAME = "Vinay Mande · Nandan GSE HR";
 
 export async function hrmsSender(me: { email: string; displayName?: string | null }, _admin?: SupabaseClient): Promise<{ token: string; fromEmail: string; fromName: string; note: string | null }> {
   const { crmDb } = await import("@/crm/db");

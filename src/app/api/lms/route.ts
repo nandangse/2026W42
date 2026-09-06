@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { teamOf } from "@/lib/team";
@@ -99,7 +101,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireUser();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
     const isAdmin = user.role === "admin" || user.isOwner;
     const needAuthor = () => {
@@ -218,7 +220,7 @@ export async function POST(req: Request) {
             const c = String(1000 + Math.floor(Math.random() * 9000));
             if (!have.has(c)) return c;
           }
-        } catch { /* pre-0101 — the column waits */ }
+        } catch (e) { swallow("lms", e); /* pre-0101 — the column waits */ }
         return null;
       };
 

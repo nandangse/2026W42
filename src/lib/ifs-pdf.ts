@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { AI } from "@/lib/ai";
 
 /**
  * AN INSTAFINANCIALS REPORT, READ OFF ITS PDF (Dr Raghu, 4 Sep 2026).
@@ -23,7 +24,7 @@ export const CIN_RE = /\b[LU]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}\b/;
  * a cross-check. The CIN keeps its guard another way: the model's reading
  * is accepted only if it has the exact 21-character grammar.
  */
-export async function pdfText(_buf: Buffer): Promise<string> { return ""; }
+async function pdfText(_buf: Buffer): Promise<string> { return ""; }
 
 const SHAPE = `{
   "InstaSummary": {
@@ -41,7 +42,7 @@ export async function structureReport(buf: Buffer, companyName: string): Promise
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set — the report can be linked but not read.");
   const anthropic = new Anthropic({ apiKey: key });
   const msg = await anthropic.messages.create({
-    model: "claude-opus-5",
+    model: AI.FRONT,
     max_tokens: 6000,
     system: `You turn an InstaFinancials "InstaSummary" report for an Indian company into ONE JSON object of exactly this shape — same keys, same nesting — and nothing else:\n${SHAPE}\n\nRules:\n- Money in RUPEES as plain numbers (the report may print lakhs or crores — convert; 1 lakh = 100000, 1 crore = 10000000). Unknown → 0 for numbers, "" for strings.\n- Dates as the report prints them.\n- One FinancialsYearWise entry per year the report shows, newest first. Every director listed as current. Every rating shown.\n- Copy names and numbers exactly; never invent a value the report does not carry.\n- Output the JSON object only — no prose, no code fence.`,
     messages: [{

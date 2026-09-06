@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import {
@@ -73,7 +75,7 @@ export async function GET(req: Request) {
           pending: (e as { approved_at?: string | null }).approved_at == null,
         });
       }
-    } catch { /* pre-0047 */ }
+    } catch (e) { swallow("hrms/employees", e); /* pre-0047 */ }
 
     const employees: HrmsEmployee[] = rows.map((r) => {
       const ov = overrides.get(r.id);
@@ -118,7 +120,7 @@ export async function GET(req: Request) {
           initials: x.initials ?? null,
           role: String(x.role || ""),
         }));
-    } catch { /* the picker simply has no options */ }
+    } catch (e) { swallow("hrms/employees", e); /* the picker simply has no options */ }
 
     return NextResponse.json({ employees, users });
   } catch (e) {
@@ -144,7 +146,7 @@ export async function POST(req: Request) {
     const me = await requireHrms();
     const admin = adminClient();
     const T = await hrmsTables(admin);
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
 
     if (action === "edit" || action === "clear") {
@@ -269,7 +271,7 @@ export async function POST(req: Request) {
             employee_id: id, field, old_value: before, new_value: after,
             edited_by: me.initials ? `${me.initials} · ${me.email}` : me.email,
           });
-        } catch { /* a lost history line must not fail the edit */ }
+        } catch (e) { swallow("hrms/employees", e); /* a lost history line must not fail the edit */ }
       }
       return NextResponse.json({ ok: true, value: after });
     }
@@ -302,7 +304,7 @@ export async function POST(req: Request) {
           new_value: `created in HRIS as "${name}"`,
           edited_by: me.initials ? `${me.initials} · ${me.email}` : me.email,
         });
-      } catch { /* as above */ }
+      } catch (e) { swallow("hrms/employees", e); /* as above */ }
       return NextResponse.json({ ok: true, id });
     }
 

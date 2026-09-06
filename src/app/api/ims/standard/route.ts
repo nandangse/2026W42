@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { errJson, HttpError } from "@/lib/auth";
 import { assertAiOn } from "@/lib/ai-gate";
 import { isHead, requireIms, requireImsAdmin } from "@/ims/auth";
@@ -84,7 +86,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const me = await requireIms();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
     const db = imsDb();
 
@@ -193,7 +195,7 @@ export async function POST(req: Request) {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
-          model: "claude-sonnet-5",
+          model: AI.FRONT,
           max_tokens: 1500,
           system: "You are the Management Representative's drafting hand at Nandan GSE Pvt. Ltd., an Indian maker of aircraft ground support equipment certified to ISO 9001, 14001, 45001, AS 9100D, ZED Gold and EN 1090-2. You write the evidence statement an external auditor reads for one clause. Plain English, second person absent, no marketing. Cite ONLY documents, registers and certificates listed in the material given; give their numbers and links exactly. Never invent a document. Where the material does not show the clause is met, say so under 'Gaps'.",
           messages: [{

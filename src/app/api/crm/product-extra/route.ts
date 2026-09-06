@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
@@ -90,7 +92,7 @@ export async function POST(req: Request) {
     const me = await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
 
     if (action === "price_add") {
@@ -155,7 +157,7 @@ export async function POST(req: Request) {
         if (fr.ok) attachments = (((await fr.json()) as { data?: { file_name?: string; file_url?: string }[] }).data ?? [])
           .filter((f) => f.file_url)
           .map((f) => ({ name: String(f.file_name || f.file_url), url: String(f.file_url).startsWith("/") ? cfg.base + String(f.file_url) : String(f.file_url) }));
-      } catch { /* files are a bonus, never the blocker */ }
+      } catch (e) { swallow("crm/product-extra", e); /* files are a bonus, never the blocker */ }
       const img = String(it.image || "") || attachments.find((a) => /\.(png|jpe?g|webp|gif)$/i.test(a.url))?.url || null;
       const patch: Record<string, unknown> = {
         name: String(it.item_name || prod.sku).slice(0, 300),
@@ -342,7 +344,7 @@ export async function POST(req: Request) {
             fd.append("docname", sku);
             const ur = await fetch(`${cfg.base}/api/method/upload_file`, { method: "POST", headers: cfg.H, body: fd });
             if (ur.ok) sent++;
-          } catch { /* one file failing must not stop the rest */ }
+          } catch (e) { swallow("crm/product-extra", e); /* one file failing must not stop the rest */ }
         }
         if (sent) done.push(`${sent} attachment${sent === 1 ? "" : "s"}`);
         else if (ours.length) failed.push({ field: "attachments", why: "The ERP took none of them." });

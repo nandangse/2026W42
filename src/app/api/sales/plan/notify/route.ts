@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody, type AnyBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { resolveSalesAccess } from "@/lib/sales-access";
@@ -19,7 +21,7 @@ export async function POST(req: Request) {
     if (!(await resolveSalesAccess(admin, user.id, user.isOwner, user.role)))
       throw new HttpError(403, "Sales Genie has not been shared with this account");
 
-    const body = await req.json().catch(() => ({}));
+    const body = await readBody(req, {}).catch((): AnyBody => ({}));
     const assignee = String(body.assignee || "").trim();
     const text = String(body.text || "").trim();
     if (!assignee || !text) return NextResponse.json({ ok: true, skipped: "empty" });
@@ -34,7 +36,7 @@ export async function POST(req: Request) {
         .ilike("display_name", assignee)
         .maybeSingle();
       person = data;
-    } catch { /* fall through */ }
+    } catch (e) { swallow("sales/plan/notify", e); /* fall through */ }
     if (!person) person = await resolvePersonByHandle(admin, assignee);
     if (!person || person.id === user.id) return NextResponse.json({ ok: true, skipped: "self-or-unknown" });
 

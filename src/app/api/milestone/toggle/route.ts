@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requirePlanner, errJson } from "@/lib/auth";
 import { assertJobEditable } from "@/lib/job-state";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -12,7 +13,7 @@ export async function POST(req: Request) {
   try {
     await requirePlanner();
     const supabase = supabaseServer();
-    const { job_id, idx, done } = await req.json();
+    const { job_id, idx, done } = await readBody(req, { job_id: "string", idx: "number", done: "boolean" });
     if (!job_id || idx == null)
       return NextResponse.json({ error: "job_id and idx required" }, { status: 400 });
     await assertJobEditable(supabase, job_id);

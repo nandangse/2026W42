@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody, type AnyBody } from "@/lib/validate";
 import { currentUser, errJson } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
   try {
     const u = await currentUser();
     if (!u || u.disabled) return NextResponse.json({ ok: true });
-    const b = await req.json().catch(() => ({}));
+    const b = await readBody(req, {}).catch((): AnyBody => ({}));
     const feature = String(b.feature || "").slice(0, 80);
     if (!feature) return NextResponse.json({ ok: true });
     await adminClient().from("feature_click").insert({

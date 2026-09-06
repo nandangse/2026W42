@@ -4,6 +4,7 @@
 // stored in the database. Everyone sees the same quote on a given day, and the
 // collection cycles fully before anything repeats.
 import { useEffect, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import { QUOTES } from "@/lib/quotes-data";
 
 const KEY = "nps-quote-hide-until";
@@ -78,9 +79,7 @@ export default function QuoteOfDay({ trigger = 0 }: { trigger?: number }) {
   const hideToday = () => {
     try {
       localStorage.setItem(KEY, today);
-    } catch {
-      /* private mode — just close */
-    }
+    } catch (e) { swallow("QuoteOfDay", e); /* private mode — just close */ }
     setShow(false);
   };
 

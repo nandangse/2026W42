@@ -12,6 +12,7 @@
  * whether the message was queued from the CRM or from here.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { swallow } from "@/lib/swallow";
 import { ALL_FIELDS, fieldSpec, hrmsTables, type FieldSpec } from "@/lib/hrms";
 import { employeeVars, payrollVars, renderTemplate, MONTHS } from "@/lib/hrms-template";
 import { musterVars, OPTIONAL_MUSTER_VARS, type MusterRow } from "@/lib/muster";
@@ -56,7 +57,7 @@ export async function people(admin: SupabaseClient, ids?: string[]): Promise<Per
       if (!overrides.has(k)) overrides.set(k, new Map());
       overrides.get(k)!.set(String(x.field), x.value == null ? null : String(x.value));
     }
-  } catch { /* pre-0047 */ }
+  } catch (e) { swallow("lib/hrms-wa", e); /* pre-0047 */ }
   return rows.map((r) => {
     const value: Record<string, string | null> = {};
     for (const f of ALL_FIELDS) value[f.key] = baseValue(r, f);
@@ -145,7 +146,7 @@ export async function queueStatuses(ids: string[]): Promise<Map<string, { status
   try {
     const { data } = await crmDb().from("wa_queue").select("id, status, error, sent_at, delivered_at").in("id", ids);
     for (const r of data || []) out.set(String(r.id), { status: String(r.status), error: String(r.error || ""), sent_at: r.sent_at, delivered_at: r.delivered_at });
-  } catch { /* the CRM is not reachable — the log's own status stands */ }
+  } catch (e) { swallow("lib/hrms-wa", e); /* the CRM is not reachable — the log's own status stands */ }
   return out;
 }
 
@@ -155,7 +156,7 @@ export async function queueStatuses(ids: string[]): Promise<Map<string, { status
  * 5. The hour's quota is (stage + 1) × 10 for the hour now beginning, or
  * stage × 10 once this hour already has sends in it.
  */
-export async function warmupQuota(perHour: number): Promise<{ stage: number; quota: number }> {
+async function warmupQuota(perHour: number): Promise<{ stage: number; quota: number }> {
   const crm = crmDb();
   const since = new Date(Date.now() - 3 * 86400000).toISOString();
   const { data } = await crm.from("wa_queue").select("sent_at").eq("source", "hrms").not("sent_at", "is", null).gte("sent_at", since);
@@ -196,7 +197,7 @@ export async function drainHrmsQueue(admin: SupabaseClient, opts: { n?: number; 
     const res = await periskopeSend(cfg, String(row.phone), String(row.body));
     if (!res.ok) { failed++; await crm.from("wa_queue").update({ status: "failed", error: String(res.error || "").slice(0, 500) }).eq("id", row.id); }
     else { sent++; await crm.from("wa_queue").update({ status: "sent", external_id: res.uniqueId ?? null, sent_at: new Date().toISOString(), error: "" }).eq("id", row.id); }
-    try { await admin.from("hrms_communication").update({ status: res.ok ? "sent" : "failed", error: res.ok ? null : String(res.error || "").slice(0, 500) }).eq("channel", "whatsapp").contains("meta", { queue_id: String(row.id) }); } catch { /* best effort */ }
+    try { await admin.from("hrms_communication").update({ status: res.ok ? "sent" : "failed", error: res.ok ? null : String(res.error || "").slice(0, 500) }).eq("channel", "whatsapp").contains("meta", { queue_id: String(row.id) }); } catch (e) { swallow("lib/hrms-wa", e); /* best effort */ }
   }
   const { count } = await crm.from("wa_queue").select("id", { count: "exact", head: true }).eq("source", "hrms").eq("status", "queued");
   return { sent, failed, stage, quota, tried, stopped, left: count || 0 };

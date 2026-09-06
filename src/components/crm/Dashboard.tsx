@@ -12,6 +12,7 @@
  * Head and admin — a salesperson's dashboard is a mirror, not a leaderboard.
  */
 import { useCallback, useEffect, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import { NAVY, NAVY_SOFT, INK, MUTED, BORDER, ORANGE, GREEN } from "./palette";
 import { DateRangeBar, DEFAULT_RANGE, type DateRange } from "./DateRange";
 import ProspectQueue from "./ProspectQueue";
@@ -240,7 +241,7 @@ function FollowUps({ onOpen }: { onOpen: (target: string, id: string) => void })
       const r = await fetch("/api/crm/outbound", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "send", id }) });
       const j = await r.json().catch(() => ({}));
       if (j.url) window.open(j.url, "_blank", "noopener");
-    } catch { /* the queue screen carries the errors */ }
+    } catch (e) { swallow("crm/Dashboard", e); /* the queue screen carries the errors */ }
     setBusy(null); load();
   };
   const cancel = async (id: string) => {
@@ -292,12 +293,12 @@ function ChipPanel({ title, storageKey, groups, onChip }: {
 }) {
   const [lines, setLines] = useState(4);
   useEffect(() => {
-    try { const v = Number(window.localStorage.getItem(storageKey)); if (v >= 1 && v <= 12) setLines(v); } catch { /* fine */ }
+    try { const v = Number(window.localStorage.getItem(storageKey)); if (v >= 1 && v <= 12) setLines(v); } catch (e) { swallow("crm/Dashboard", e); /* fine */ }
   }, [storageKey]);
   const bump = (d: number) => {
     const v = Math.min(12, Math.max(1, lines + d));
     setLines(v);
-    try { window.localStorage.setItem(storageKey, String(v)); } catch { /* fine */ }
+    try { window.localStorage.setItem(storageKey, String(v)); } catch (e) { swallow("crm/Dashboard", e); /* fine */ }
   };
   const total = groups.reduce((a, g) => a + g.chips.length, 0);
   const CHIP_LINE = 30; // one wrapped row of chips, in px

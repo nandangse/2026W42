@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
@@ -107,7 +108,7 @@ export async function POST(req: Request) {
     const user = await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const type = String(body.type || "");
     const keep = String(body.keep_id || "");
     const drop = String(body.drop_id || "");

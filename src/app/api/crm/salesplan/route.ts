@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
+import { AI } from "@/lib/ai";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
@@ -109,7 +112,7 @@ export async function POST(req: Request) {
     const me = await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const profileId = String(body.profile_id || "");
     const fy = String(body.fy || currentFy());
     const action = String(body.action || "");
@@ -151,7 +154,7 @@ export async function POST(req: Request) {
               const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=name&supportsAllDrives=true`, { headers: { authorization: `Bearer ${token}` } });
               if (r.ok) name = String(((await r.json()) as { name?: string }).name || "");
             }
-          } catch { /* the link is kept either way */ }
+          } catch (e) { swallow("crm/salesplan", e); /* the link is kept either way */ }
           if (!name) name = "Google Drive file";
         }
         files.push({ name: name.slice(0, 160) || "file", url: url.slice(0, 1000), drive: isDrive || undefined,
@@ -194,10 +197,10 @@ export async function POST(req: Request) {
       try {
         const { data: kbRows } = await adminClient().from("consult_kb").select("section, content").in("section", ["general_voice", "sales"]);
         kb = (kbRows ?? []).map((r) => String(r.content || "").slice(0, 12000)).join("\n\n---\n\n").slice(0, 24000);
-      } catch { /* garnish stands on Nandan alone until the kb exists */ }
+      } catch (e) { swallow("crm/salesplan", e); /* garnish stands on Nandan alone until the kb exists */ }
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const msg = await anthropic.messages.create({
-        model: "claude-opus-5",
+        model: AI.FRONT,
         max_tokens: 1400,
         output_config: { effort: "low" },
         system: `You are GENIE GARNISH at NANDAN GSE — you take a salesperson's plan and hand it back sharper. About Nandan:\n${NANDAN.slice(0, 1500)}\n\n${kb ? `DR RAGHU'S OWN RULES (his words -- the plan must obey them):\n${kb}\n\n` : ""}What you return, in plain Markdown, under 350 words:

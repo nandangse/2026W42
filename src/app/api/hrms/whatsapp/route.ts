@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { people, sheetFor, renderFor, queueMessages, type Person } from "@/lib/hrms-wa";
@@ -68,7 +70,7 @@ export async function POST(req: Request) {
   try {
     const me = await requireHrms();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
     const stamp = me.initials ? `${me.initials} · ${me.email}` : me.email;
 
@@ -82,7 +84,7 @@ export async function POST(req: Request) {
       if (!template.trim()) throw new HttpError(400, "Nothing to send — pick a template or write the message.");
       const sheet = await sheetFor(admin, Number(body.month) || undefined, Number(body.year) || undefined);
       const all = await people(admin);
-      const chosen = pick(all, body);
+      const chosen = pick(all, body as { types?: string[]; departments?: string[]; ids?: string[] });
       if (!chosen.length) throw new HttpError(400, "Nobody matches that audience.");
       const rendered = chosen.map((p) => renderFor(p, template, sheet));
       if (action === "preview") {
@@ -93,7 +95,7 @@ export async function POST(req: Request) {
       }
       // the CRM profile of the sender, so the queue knows whose it is
       let crmProfileId: string | null = null;
-      try { const { data: rp } = await crmDb().from("profile").select("id").ilike("email", me.email).maybeSingle(); crmProfileId = rp?.id ? String(rp.id) : null; } catch { /* fine */ }
+      try { const { data: rp } = await crmDb().from("profile").select("id").ilike("email", me.email).maybeSingle(); crmProfileId = rp?.id ? String(rp.id) : null; } catch (e) { swallow("hrms/whatsapp", e); /* fine */ }
       const res = await queueMessages(admin, rendered, { templateKey: key, by: stamp, crmProfileId });
       return NextResponse.json({ ok: true, ...res, sheet: sheet ? { month: sheet.month, year: sheet.year } : null });
     }
@@ -112,8 +114,8 @@ export async function POST(req: Request) {
       let delivered = 0, failed = 0;
       for (const row of rows || []) {
         const st = await periskopeStatus(cfg, String(row.external_id));
-        if (st.failed) { failed++; await crm.from("wa_queue").update({ status: "failed", error: `Periskope: ${st.status}` }).eq("id", row.id); try { await admin.from("hrms_communication").update({ status: "failed", error: `Periskope: ${st.status}` }).eq("channel", "whatsapp").contains("meta", { queue_id: String(row.id) }); } catch { /* */ } }
-        else if (st.delivered) { delivered++; await crm.from("wa_queue").update({ status: "delivered", delivered_at: new Date().toISOString() }).eq("id", row.id); try { await admin.from("hrms_communication").update({ status: "delivered" }).eq("channel", "whatsapp").contains("meta", { queue_id: String(row.id) }); } catch { /* */ } }
+        if (st.failed) { failed++; await crm.from("wa_queue").update({ status: "failed", error: `Periskope: ${st.status}` }).eq("id", row.id); try { await admin.from("hrms_communication").update({ status: "failed", error: `Periskope: ${st.status}` }).eq("channel", "whatsapp").contains("meta", { queue_id: String(row.id) }); } catch (e) { swallow("hrms/whatsapp", e); /* */ } }
+        else if (st.delivered) { delivered++; await crm.from("wa_queue").update({ status: "delivered", delivered_at: new Date().toISOString() }).eq("id", row.id); try { await admin.from("hrms_communication").update({ status: "delivered" }).eq("channel", "whatsapp").contains("meta", { queue_id: String(row.id) }); } catch (e) { swallow("hrms/whatsapp", e); /* */ } }
       }
       return NextResponse.json({ ok: true, checked: (rows || []).length, delivered, failed });
     }

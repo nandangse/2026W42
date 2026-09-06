@@ -1,4 +1,5 @@
 import { crmDb, crmConfigured } from "@/crm/db";
+import { swallow } from "@/lib/swallow";
 
 /**
  * A HEARTBEAT FOR EVERY CRON (4 Sep 2026).
@@ -17,5 +18,5 @@ export async function beat(name: string, action: "fired" | "done" | "failed", af
   try {
     if (!crmConfigured()) return;
     await crmDb().from("crm_audit").insert({ entity: "cron", entity_id: name, action, after: after ?? null });
-  } catch { /* never the reason a cron fails */ }
+  } catch (e) { swallow("lib/cron-beat", e); /* never the reason a cron fails */ }
 }

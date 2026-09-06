@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireReader, errJson, HttpError } from "@/lib/auth";
@@ -86,7 +89,7 @@ const SCHEMA = {
  * threw the lot away. That is precisely why it read as "somebody has to click
  * it again for each person". One row per job is one cache for everybody.
  */
-const MODEL = "claude-opus-5";
+const MODEL = AI.FRONT;
 
 /**
  * A brief goes stale when the JOB changes, not when a clock runs out. The
@@ -207,7 +210,7 @@ export async function POST(req: Request) {
     // and generating is MC and Stratcom's alone while Genie is paused.
     if (!(await mayGenerate(user.id, user.isOwner)))
       throw new HttpError(403, "Genie is paused — MC and Stratcom generate the job reads for now.");
-    const body = await req.json();
+    const body = await readBody(req, {});
     const jobId = String(body.job_id || "");
     if (!jobId) throw new HttpError(400, "job_id is required");
     const admin = adminClient();
@@ -224,9 +227,7 @@ export async function POST(req: Request) {
         const row = hintRes.data;
         if (row && row.model === MODEL && !isStale(row.built_at, jobRes.data?.updated_at ?? null))
           return NextResponse.json({ ...(row.hint as object), cached: true, builtBy: row.built_by, builtAt: row.built_at });
-      } catch {
-        /* migration 0026 not run yet — fall through and generate */
-      }
+      } catch (e) { swallow("genie-hint", e); /* migration 0026 not run yet — fall through and generate */ }
     }
 
     if (!process.env.ANTHROPIC_API_KEY)
@@ -395,9 +396,7 @@ Carrying open tasks: ${assignees.length ? assignees.map(nameFor).join(", ") : "n
       await admin
         .from("job_hint")
         .upsert({ job_id: jobId, hint, built_at: new Date().toISOString(), built_by: builtBy, model: MODEL }, { onConflict: "job_id" });
-    } catch {
-      /* the cache is an optimisation, never the answer */
-    }
+    } catch (e) { swallow("genie-hint", e); /* the cache is an optimisation, never the answer */ }
     return NextResponse.json({ ...hint, cached: false, builtBy, builtAt: hint.at });
   } catch (e) {
     if (e instanceof HttpError) return errJson(e);

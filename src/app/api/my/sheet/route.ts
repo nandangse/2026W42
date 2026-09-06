@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import * as XLSX from "xlsx";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -100,7 +102,7 @@ export async function GET() {
             const grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", blankrows: false }) as unknown[][];
             slip = extractSlips(grid).find((x) => x.id === p.id) || null;
           }
-        } catch { /* the month shows without its ledger */ }
+        } catch (e) { swallow("my/sheet", e); /* the month shows without its ledger */ }
       }
       months.push({ id: String(s.id), month: Number(s.month), year: Number(s.year), status: String(s.status), net: slip?.net ?? (row.net != null ? Number(row.net) : null), slip, frozen: String(s.status) === "Frozen" });
     }
@@ -120,7 +122,7 @@ export async function GET() {
 
     // ---- learning ----
     let learning: { note: string; at: string; id: string }[] = [];
-    try { const { data } = await admin.from("hrms_learning_log").select("id, note, at").eq("employee_id", p.id).order("at", { ascending: false }).limit(100); learning = (data || []) as typeof learning; } catch { /* pre-0142 */ }
+    try { const { data } = await admin.from("hrms_learning_log").select("id, note, at").eq("employee_id", p.id).order("at", { ascending: false }).limit(100); learning = (data || []) as typeof learning; } catch (e) { swallow("my/sheet", e); /* pre-0142 */ }
 
     // ---- queries and applications ----
     const { data: qs } = await admin.from("hrms_query").select("id, subject, question, topic, status, answer, raised_at, answered_at, answered_by, form")
@@ -128,7 +130,7 @@ export async function GET() {
 
     // ---- the handbook ----
     let acknowledged: string | null = null;
-    try { const { data: a } = await admin.from("hrms_handbook_ack").select("acknowledged_at").eq("email", u.email.toLowerCase()).eq("edition", HANDBOOK_EDITION).maybeSingle(); acknowledged = a?.acknowledged_at || null; } catch { /* */ }
+    try { const { data: a } = await admin.from("hrms_handbook_ack").select("acknowledged_at").eq("email", u.email.toLowerCase()).eq("edition", HANDBOOK_EDITION).maybeSingle(); acknowledged = a?.acknowledged_at || null; } catch (e) { swallow("my/sheet", e); /* */ }
 
     return NextResponse.json({
       linked: true,
@@ -146,7 +148,7 @@ export async function POST(req: Request) {
   try {
     const u = await requireUser();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
     const now = new Date().toISOString();
     const p = await me(u.email);

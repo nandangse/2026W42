@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requirePlanner, errJson } from "@/lib/auth";
 import { assertJobEditable } from "@/lib/job-state";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
     const user = await requirePlanner();
     const supabase = supabaseServer();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
 
     // add/seed carry job_id; everything else identifies a row instead, so
     // resolve the job from the material itself — otherwise the delivered-job

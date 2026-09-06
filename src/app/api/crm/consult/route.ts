@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { errJson, HttpError } from "@/lib/auth";
@@ -119,7 +122,7 @@ async function recordBrief(db: ReturnType<typeof crmDb>, tt: string, tid: string
       const r = await pick("product", "name, sku, item_group, approved_price_inr");
       return r ? `Product ${r.sku}: ${r.name} · ${r.item_group ?? ""}${r.approved_price_inr ? ` · approved ₹${Number(r.approved_price_inr).toLocaleString("en-IN")}` : ""}` : "";
     }
-  } catch { /* the chair works even blind */ }
+  } catch (e) { swallow("crm/consult", e); /* the chair works even blind */ }
   return "";
 }
 
@@ -234,7 +237,7 @@ export async function PATCH(req: Request) {
     const me = await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     if (me.email.toLowerCase() !== "raghu@nandan.co.in") throw new HttpError(403, "Dr Raghu's hand alone.");
-    const body = await req.json();
+    const body = await readBody(req, {});
     const chatId = String(body.chat_id || "");
     if (!chatId) throw new HttpError(400, "Which conversation?");
     const { error } = await crmDb().from("consult_chat")
@@ -256,7 +259,7 @@ export async function POST(req: Request) {
     if (!process.env.ANTHROPIC_API_KEY) throw new HttpError(503, "Server is missing ANTHROPIC_API_KEY.");
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const tt = String(body.target_type || "");
     const tid = String(body.target_id || "");
     if (!TARGETS.includes(tt) || !tid) throw new HttpError(400, "Which record?");
@@ -291,7 +294,7 @@ export async function POST(req: Request) {
       const bySec = new Map((kbRows ?? []).map((r) => [String(r.section), String(r.content || "")]));
       kb = [bySec.get("general_voice"), bySec.get("sales")].filter(Boolean)
         .map((t) => String(t).slice(0, 15000)).join("\n\n---\n\n").slice(0, 30000);
-    } catch { /* the advisor stands on Nandan alone until the kb exists */ }
+    } catch (e) { swallow("crm/consult", e); /* the advisor stands on Nandan alone until the kb exists */ }
 
     const brief = await recordBrief(db, tt, tid);
     const { data: history } = await db.from("consult_msg").select("role, content")
@@ -321,7 +324,7 @@ ${buf.toString("utf8").slice(0, 20000)}` });
     const firstName = String(me.displayName || me.email.split("@")[0]).trim().split(/\s+/)[0];
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const msg = await anthropic.messages.create({
-      model: "claude-opus-5",
+      model: AI.FRONT,
       max_tokens: 1000,
       output_config: { effort: "low" },
       system: `You are CONSULT DR RAGHU — the advisory voice of Dr Raghunandan Jagdish, MD and CEO of NANDAN GSE, sitting across the desk from his salesperson. About Nandan:\n${NANDAN.slice(0, 1500)}\n\n${kb ? `DR RAGHU'S OWN KNOWLEDGE (his words, his rules — this is your spine):\n${kb}\n\n` : ""}How you speak:
@@ -381,7 +384,7 @@ The record on the desk: ${brief || "(none loaded)"}`,
           }
         }
       }
-    } catch { /* pre-0045, or a notes hiccup — the chat itself is untouched */ }
+    } catch (e) { swallow("crm/consult", e); /* pre-0045, or a notes hiccup — the chat itself is untouched */ }
 
     return NextResponse.json({ chat_id: chatId, reply });
   } catch (e) {

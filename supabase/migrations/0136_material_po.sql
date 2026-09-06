@@ -94,3 +94,7 @@ create table if not exists public.material_supplier (
 );
 alter table public.material_supplier enable row level security;
 revoke all on public.material_supplier from anon, authenticated;
+
+-- ledger (0143): this migration records itself, whichever runs first
+create table if not exists public.genie_migration (name text primary key, applied_at timestamptz not null default now());
+insert into public.genie_migration (name) values ('0136_material_po') on conflict (name) do nothing;

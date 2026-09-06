@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -37,7 +38,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const raw = String(body.whatsapp_no ?? "").trim();
     // E.164, or empty to clear. A number typed four ways is four numbers.
     const digits = raw.replace(/[^\d+]/g, "");

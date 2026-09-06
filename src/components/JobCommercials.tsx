@@ -41,6 +41,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { fmt, fmtFull, jobNo, parseISO, addDays } from "@/lib/schedule";
 import { JobLightbox, type WipJob } from "./JobsInProgress";
+import { monthKey, monthLabel } from "@/lib/fmt";
 
 const C = { navy: "#1B3A5C", ink: "#16232F", sub: "#8A94A0", line: "#E2E0DA", green: "#0D7A3F", accent: "#E8600A", amber: "#B26A00", red: "#B3261E" };
 
@@ -87,9 +88,8 @@ const toWip = (j: CommJob): WipJob => ({
   ownerName: j.ownerName ?? null,
 });
 
-const monthKey = (iso: string) => iso.slice(0, 7);
-const monthLabel = (k: string) =>
-  parseISO(k + "-01").toLocaleDateString("en-IN", { month: "short", year: "numeric", timeZone: "UTC" });
+
+
 
 export default function JobCommercials({
   jobs, canEdit, reload, today,

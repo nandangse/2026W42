@@ -1,4 +1,5 @@
 import { LOGO } from "./logo";
+import { esc, dmySlash as dmy } from "@/lib/fmt";
 /**
  * Offer letters — the vocabulary, the numbering, and the standard words.
  *
@@ -150,17 +151,11 @@ export const RESUME_SYSTEM =
  * draws, so the two cannot say different things.
  * ───────────────────────────────────────────────────────────────────────── */
 
-const esc = (s: unknown) =>
-  String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+
 
 const rupees = (n: unknown) => (n == null || n === "" ? "—" : Math.round(Number(n)).toLocaleString("en-IN"));
 
-const dmy = (s: unknown) => {
-  if (!s) return "—";
-  const d = new Date(String(s).slice(0, 10) + "T00:00:00");
-  if (Number.isNaN(d.getTime())) return String(s);
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-};
+
 
 /** Plain text (the covering note) into paragraphs a mail client will honour. */
 export function textToHtml(t: string): string {

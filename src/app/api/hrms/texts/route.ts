@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
   try {
     const me = await requireHrms();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const key = String(body.key || "").trim();
     if (!key) throw new HttpError(400, "Which text?");
     const stamp = me.initials ? `${me.initials} · ${me.email}` : me.email;

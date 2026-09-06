@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody, type AnyBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
@@ -65,7 +67,7 @@ export async function POST(req: Request) {
     await assertAiOn();
     const user = await requireUser();
     const admin = adminClient();
-    const body = await req.json().catch(() => ({}));
+    const body = await readBody(req, {}).catch((): AnyBody => ({}));
 
     // A plan is written for yourself. A manager wanting one for somebody else
     // is a different feature with a different conversation attached to it.
@@ -145,7 +147,7 @@ ${library}`;
 
     const anthropic = new Anthropic();
     const response = await anthropic.messages.create({
-      model: "claude-opus-5",
+      model: AI.FRONT,
       max_tokens: 4000,
       system: SYSTEM,
       output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },

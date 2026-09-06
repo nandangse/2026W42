@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
@@ -49,7 +51,7 @@ export async function POST(req: Request) {
       throw new HttpError(403, "InstaFinancials credits are Raghu's to spend — ask him to buy this summary.");
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const cid = String(body.company_id ?? "");
     if (!cid) throw new HttpError(400, "Which company?");
 
@@ -149,7 +151,7 @@ export async function POST(req: Request) {
           }
         };
         walk(JSON.parse(text2), "");
-      } catch { /* fall through to the raw scan */ }
+      } catch (e) { swallow("crm/ifs", e); /* fall through to the raw scan */ }
       if (!candidates.length) {
         for (const m of text2.toUpperCase().matchAll(/[LUF]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}/g)) {
           if (!candidates.some((c) => c.cin === m[0])) candidates.push({ cin: m[0], name: "" });
@@ -272,7 +274,7 @@ export async function POST(req: Request) {
           }).then(() => null, () => null);
         }
       }
-    } catch { /* the summary is the purchase; contacts are the bonus */ }
+    } catch (e) { swallow("crm/ifs", e); /* the summary is the purchase; contacts are the bonus */ }
 
     const now = new Date().toISOString();
     let { error } = await db.from("company").update({ cin, ifs_summary: j, ifs_at: now, ifs_by: me.email, ifs_source: "api" }).eq("id", cid);

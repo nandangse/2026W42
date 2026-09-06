@@ -29,7 +29,9 @@
  * secret lives, never what it is.
  */
 
-import { APP_VERSION, UPDATES, EFFORT } from "@/lib/changelog";
+import { APP_VERSION } from "@/lib/version";
+import type { Effort } from "@/lib/changelog";
+import { useEffect, useState } from "react";
 
 /** Last hand-revision of the prose on this page. Bump it when you edit. */
 const DOC_REVISED = "3 September 2026";
@@ -450,7 +452,7 @@ interface ControlRow {
   state: "in place" | "partial" | "gap";
 }
 
-const CONTROLS: ControlRow[] = [
+const controlsFor = (releases: number): ControlRow[] => [
   { ref: "A.5.15", control: "Access control", evidence: "Six roles plus an owner tier, two explicit grants and three group flags. Every /api route resolves the caller through src/lib/auth.ts before doing anything; hiding a tab is never the gate.", state: "in place" },
   { ref: "A.5.16", control: "Identity management", evidence: "One identity per person in Supabase Auth, mirrored in profiles with a unique two-letter initials key. No shared logins except the single uploader account, which is a named person.", state: "in place" },
   { ref: "A.5.17", control: "Authentication information", evidence: "Passwords are held and verified by Supabase Auth; Genie never stores or sees one. Password reset is an admin action, and admin-on-admin changes are the owner's alone.", state: "in place" },
@@ -468,7 +470,7 @@ const CONTROLS: ControlRow[] = [
   { ref: "A.8.25", control: "Secure development lifecycle", evidence: "Numbered, idempotent, additive migrations; server-side gates on every route; one aggregated GET per surface. Conventions are written down in HANDOVER.md and in the header comment of every file.", state: "in place" },
   { ref: "A.8.28", control: "Secure coding", evidence: "TypeScript throughout, typecheck in the build, no dynamic SQL from user input (PostgREST and RPC only), and the parser for the morning workbook is a fixed, tested port that is extended rather than rewritten.", state: "in place" },
   { ref: "A.8.31", control: "Separation of environments", evidence: "One Supabase project serves development and production. The destructive acceptance test is documented as scratch-database-only, which is a convention rather than a technical separation.", state: "gap" },
-  { ref: "A.8.32", control: "Change management", evidence: "Every shipped change is a numbered release in src/lib/changelog.ts, which is also what the header badge reads — the log and the running version cannot disagree. " + UPDATES.length + " releases across " + SIZE.commits + " commits.", state: "in place" },
+  { ref: "A.8.32", control: "Change management", evidence: "Every shipped change is a numbered release in src/lib/changelog.ts, which is also what the header badge reads — the log and the running version cannot disagree. " + releases + " releases across " + SIZE.commits + " commits.", state: "in place" },
   { ref: "A.5.34", control: "Privacy and protection of PII", evidence: "Personal data held: name, work email, initials, department, designation, role, last login, learning progress, daily mood, voice recordings and photographs from the shop floor. No customer personal data beyond business contact records in Sales Genie.", state: "partial" },
   { ref: "A.5.31", control: "Legal and regulatory requirements", evidence: "Application compute currently executes in Vercel's US-East region while every user and data subject is in India. This is a decision to take, not a defect — it is recorded here so it is taken deliberately.", state: "gap" },
 ];
@@ -558,7 +560,17 @@ const TD: React.CSSProperties = {
 
 /* ════════════════════════════════ the page ═════════════════════════════════ */
 
+const NO_EFFORT: Effort = { measuredTo: "", commits: 0, days: 0, windowHours: 0, raghuLow: 0, raghuHigh: 0 };
+
 export default function SoftwareDescription() {
+  // the release log stays on the server (Genie 5.0.0.1); only its size and the effort figures are read here
+  const [log, setLog] = useState<{ releases: number; effort: Effort }>({ releases: 0, effort: NO_EFFORT });
+  useEffect(() => {
+    fetch("/api/updates", { cache: "no-store" }).then((r) => r.json())
+      .then((j) => setLog({ releases: (j.updates || []).length, effort: j.effort || NO_EFFORT })).catch(() => {});
+  }, []);
+  const EFFORT = log.effort;
+  const CONTROLS = controlsFor(log.releases);
   const gaps = CONTROLS.filter((c) => c.state === "gap").length;
   const partial = CONTROLS.filter((c) => c.state === "partial").length;
 
@@ -575,7 +587,7 @@ export default function SoftwareDescription() {
               Genie — architecture, modules and controls
             </h2>
             <div className="text-xs mt-1" style={{ color: "#9FB0C0" }}>
-              Running version <b style={{ color: AMBER }}>{APP_VERSION}</b> · {UPDATES.length} releases logged · prose last revised {DOC_REVISED}
+              Running version <b style={{ color: AMBER }}>{APP_VERSION}</b> · {log.releases} releases logged · prose last revised {DOC_REVISED}
             </div>
           </div>
           <button
@@ -867,7 +879,7 @@ export default function SoftwareDescription() {
       >
         <div style={{ maxWidth: "92ch" }}>
           <KV k="Versioning" v={<>MAJOR.MINOR.BATCH.PATCH, counted from the right. The last digit is today; the second-last is a new day; the third-last is a new week or a new module; the first moves only on the owner&apos;s instruction. Currently <b style={{ color: ORANGE }}>{APP_VERSION}</b>.</>} />
-          <KV k="The release log" v={`Every shipped change is an entry in src/lib/changelog.ts, in the words of somebody who has to use it. The header badge and Admin → Updates both read that list, so the running version and the log cannot drift apart. ${UPDATES.length} releases are logged.`} />
+          <KV k="The release log" v={`Every shipped change is an entry in src/lib/changelog.ts, in the words of somebody who has to use it. The header badge and Admin → Updates both read that list, so the running version and the log cannot drift apart. ${log.releases} releases are logged.`} />
           <KV k="Deployment" v="Push to main; the host builds and deploys in a minute or two. There is no manual step and therefore no undocumented one." />
           <KV k="Rollback" v="Migrations are numbered, idempotent and additive — which is precisely what makes a rollback a code revert with no database change." />
           <KV k="History kept in the data" v="import_batches records who uploaded and when; task_date_log every date move and where it moved from; erp_update every field correction with its old and new value; task_closeout why something was escalated and what would prevent it." />

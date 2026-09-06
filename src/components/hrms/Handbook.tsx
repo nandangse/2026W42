@@ -11,6 +11,7 @@
  * acknowledges the edition at the foot.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 import RichText, { RichTextView } from "./RichText";
@@ -69,8 +70,8 @@ export default function Handbook({ who: me, standalone, defaultLang = "en" }: { 
     finally { setTranslating(null); await load(); }
   };
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { if (!standalone) return; try { const h = window.location.hash.replace("#", ""); if (h) setCur(h); } catch { /* */ } }, [standalone]);
-  const goTo = (slug: string) => { setCur(slug); setEdit(false); if (standalone) { try { window.location.hash = slug; } catch { /* */ } } try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* */ } };
+  useEffect(() => { if (!standalone) return; try { const h = window.location.hash.replace("#", ""); if (h) setCur(h); } catch (e) { swallow("hrms/Handbook", e); /* */ } }, [standalone]);
+  const goTo = (slug: string) => { setCur(slug); setEdit(false); if (standalone) { try { window.location.hash = slug; } catch (e) { swallow("hrms/Handbook", e); /* */ } } try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { swallow("hrms/Handbook", e); /* */ } };
 
   const act = async (body: Record<string, unknown>, ok: string) => {
     setBusy(true); setMsg("");

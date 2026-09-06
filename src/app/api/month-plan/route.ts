@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireUser, errJson, HttpError, RAGHU_EMAIL, type AuthedUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { periodWords as periodName } from "@/lib/plan-pdf";
+import { esc, dmy, istToday } from "@/lib/fmt";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -70,14 +73,11 @@ const FROZEN_CC = [
   "pankajs@nandan.co.in", "planning@nandan.co.in", "dosianil@yahoo.co.in",
 ];
 
-const istToday = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
+
 const cr = (n: number) => `₹${(n / 1e7).toFixed(2)} Cr`;
 /** 2026-09-01 → 01-09-2026, the way a plan is read aloud here. */
-const esc = (x: unknown) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const dmy = (iso: string) => {
-  const s2 = String(iso || "").slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(s2) ? s2.split("-").reverse().join("-") : "—";
-};
+
+
 
 /**
  * YTD joins MTD and QTD (Dr Raghu, 1 Sep 2026: "also in that make a button
@@ -154,7 +154,7 @@ async function voicesFor(admin: ReturnType<typeof adminClient>, ids: string[]) {
         belief: Number(r.belief_pct) || 0, comment: c,
       });
     }
-  } catch { /* the document still prints without them */ }
+  } catch (e) { swallow("month-plan", e); /* the document still prints without them */ }
   return out;
 }
 
@@ -191,7 +191,7 @@ async function planPeople(
       seen.add(who);
       (r.is_draft ? drafts : signed).push({ ...r, email: who });
     }
-  } catch { /* the document still prints */ }
+  } catch (e) { swallow("month-plan", e); /* the document still prints */ }
 
   // Everybody with an open task on these jobs, who has not answered at all.
   const notViewed: { email: string }[] = [];
@@ -211,7 +211,7 @@ async function planPeople(
         else if (nm && [...named].some((n) => n.toLowerCase() === nm.toLowerCase())) notViewed.push({ email: em });
       }
     }
-  } catch { /* an empty third block is honest enough */ }
+  } catch (e) { swallow("month-plan", e); /* an empty third block is honest enough */ }
 
   // names for all three
   const all = [...signed, ...drafts, ...notViewed].map((r) => String((r as { email: string }).email));
@@ -221,7 +221,7 @@ async function planPeople(
       const { data: profs } = await admin.from("profiles").select("email, display_name").in("email", all);
       for (const pr of profs || []) nm.set(String(pr.email).toLowerCase(), String(pr.display_name || ""));
     }
-  } catch { /* fall back to the address */ }
+  } catch (e) { swallow("month-plan", e); /* fall back to the address */ }
   const dress = (r: Record<string, unknown>) => ({
     email: String(r.email),
     name: nm.get(String(r.email)) || String(r.email).split("@")[0],
@@ -581,7 +581,7 @@ export async function GET(req: Request) {
           const nm = new Map((profs || []).map((pr) => [String(pr.email).toLowerCase(), String(pr.display_name || "")]));
           room = room.map((r) => ({ ...r, name: nm.get(String(r.by_email).toLowerCase()) || String(r.by_email).split("@")[0] }));
         }
-      } catch { /* the initials still stand */ }
+      } catch (e) { swallow("month-plan", e); /* the initials still stand */ }
     } catch { room = []; }
 
     return NextResponse.json({ installed: true, window: w, today: T, jobs, done, doneFy, entries, signoff, room, voices, canEdit: mayPlan(u), canSeeRoom: u.isOwner, me: { name: u.displayName || u.email.split("@")[0], email: u.email } });
@@ -594,7 +594,7 @@ export async function POST(req: Request) {
   try {
     const u = await requireUser();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
     const me = u.email.toLowerCase();
 

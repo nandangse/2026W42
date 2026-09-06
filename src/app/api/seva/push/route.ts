@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSeva } from "@/lib/seva";
@@ -41,7 +43,7 @@ export async function GET(req: Request) {
           email: String(p.email),
           name: String(p.display_name || p.email).concat(p.initials ? ` (${p.initials})` : ""),
         }));
-    } catch { /* the picker falls back to a typed address */ }
+    } catch (e) { swallow("seva/push", e); /* the picker falls back to a typed address */ }
 
     let q = admin.from("seva_push").select("*").order("at", { ascending: false }).limit(500);
     // A push about one record shows only that record's thread.
@@ -79,7 +81,7 @@ export async function POST(req: Request) {
   try {
     const me = await requireSeva();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const mine = me.email.toLowerCase();
     const now = new Date().toISOString();
 
@@ -96,7 +98,7 @@ export async function POST(req: Request) {
       try {
         const { data: p } = await admin.from("profiles").select("id").eq("email", to).maybeSingle();
         toId = p?.id ?? null;
-      } catch { /* the row is the record either way */ }
+      } catch (e) { swallow("seva/push", e); /* the row is the record either way */ }
 
       const row = {
         from_email: mine,
@@ -170,7 +172,7 @@ export async function POST(req: Request) {
             created_by: mine,
           });
         }
-      } catch { /* the reply stands whether or not the bell rings */ }
+      } catch (e) { swallow("seva/push", e); /* the reply stands whether or not the bell rings */ }
       return NextResponse.json({ ok: true });
     }
 

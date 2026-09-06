@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { textToHtml } from "@/lib/offer";
 
@@ -38,7 +40,7 @@ export async function GET() {
           headers: { authorization: `Bearer ${key}` },
         });
         if (one.ok) records = (await one.json())?.records ?? null;
-      } catch { /* the reason above still stands without them */ }
+      } catch (e) { swallow("hrms/mail", e); /* the reason above still stands without them */ }
       return NextResponse.json({
         canSend: false,
         why: `nandan.co.in is "${nandan.status}", not verified — Resend will refuse to send from it until these DNS records are added and it turns verified.`,
@@ -58,7 +60,7 @@ export async function POST(req: Request) {
     const key = process.env.RESEND_API_KEY;
     if (!key) throw new HttpError(503, "RESEND_API_KEY is not set on this deploy — nothing can be sent.");
 
-    const b = await req.json();
+    const b = await readBody(req, {});
 
     /**
      * { action: "verify" } — ask Resend to re-read the DNS.

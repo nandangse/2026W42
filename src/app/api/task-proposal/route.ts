@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireReader, requireTasker, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { notifyTaskAssignment } from "@/lib/notify";
@@ -48,7 +50,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireTasker();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const id = String(body.id || "");
     if (!id) throw new HttpError(400, "id required");
 
@@ -140,7 +142,7 @@ export async function POST(req: Request) {
           refKind: "manual",
           refId: String(made.id),
         });
-      } catch { /* the task exists; the bell is a courtesy */ }
+      } catch (e) { swallow("task-proposal", e); /* the task exists; the bell is a courtesy */ }
     }
 
     return NextResponse.json({ ok: true, task_id: made?.id ?? null, who: who || null });

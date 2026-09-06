@@ -3,13 +3,14 @@
 // that user's JWT and RLS policies apply. This is the client the board reads
 // and the planning-layer writes go through.
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { env } from "@/lib/env";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export function supabaseServer(): SupabaseClient {
   const cookieStore = cookies();
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const url = env("NEXT_PUBLIC_SUPABASE_URL");
+  const anon = env("NEXT_PUBLIC_SUPABASE_ANON_KEY");
   return createServerClient(url, anon, {
     cookies: {
       get(name: string) {

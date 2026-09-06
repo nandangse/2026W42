@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
@@ -21,7 +23,7 @@ export async function POST(req: Request) {
     const me = await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const oppId = String((await req.json()).opportunity_id ?? "");
+    const oppId = String((await readBody(req, {})).opportunity_id ?? "");
     if (!oppId) throw new HttpError(400, "Which opportunity?");
 
     const { data: cfgRow } = await db.from("integration_setting").select("config").eq("key", "erpnext").maybeSingle();
@@ -114,7 +116,7 @@ export async function POST(req: Request) {
     try {
       const secret = process.env.CRON_SECRET;
       if (secret) void fetch(new URL("/api/cron/erp-pull", req.url), { headers: { authorization: `Bearer ${secret}` } }).catch(() => null);
-    } catch { /* the hourly walk still covers it */ }
+    } catch (e) { swallow("crm/erp-create-enquiry", e); /* the hourly walk still covers it */ }
     return NextResponse.json({ ok: true, erp_name: erpName, customer, made_customer: madeCustomer, contact, made_contact: madeContact });
   } catch (e) {
     return errJson(e);

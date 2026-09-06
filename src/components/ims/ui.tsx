@@ -13,6 +13,8 @@
  * and a table that needs a mouse is a table he will not open.
  */
 import { useEffect, useState } from "react";
+import { dmy as fmtD } from "@/lib/fmt";
+export { fmtD };
 
 export const PAPER = "#F7F8FC";
 export const NAVY = "#1B2D6B";
@@ -31,10 +33,7 @@ export const S = (v: unknown) => String(v ?? "");
 export const TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
 /** dd-mm-yyyy, or an em dash. Never "Invalid Date", never 01-01-1970. */
-export const fmtD = (d: unknown) => {
-  const s = S(d).slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s.slice(8, 10)}-${s.slice(5, 7)}-${s.slice(0, 4)}` : "—";
-};
+
 
 /** Days from today to a date; negative means it has already gone by. */
 export const daysTo = (d: unknown): number | null => {

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireKuber } from "@/lib/accounts";
+import { addDays } from "@/lib/fmt";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -31,11 +34,7 @@ const SIDE: Record<string, string[]> = {
   transactions: ["kuber_voucher", "kuber_voucher_line", "kuber_bill_alloc", "kuber_voucher_item"],
 };
 
-const addDays = (iso: string, d: number) => {
-  const t = new Date(iso + "T00:00:00Z");
-  t.setUTCDate(t.getUTCDate() + d);
-  return t.toISOString().slice(0, 10);
-};
+
 
 export async function GET(req: Request) {
   try {
@@ -52,7 +51,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireKuber();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
 
     if (body.action === "begin") {
       const tables = SIDE[String(body.kind)];
@@ -203,7 +202,7 @@ export async function POST(req: Request) {
       try {
         const { error } = await admin.from("kuber_upload").insert({ ...row, taken_in: `${takenIn} → ${open.length.toLocaleString("en-IN")} open bills stand` });
         if (error) await admin.from("kuber_upload").insert(row); // pre-0078: the row still lands
-      } catch { /* pre-0075 — the parse still stands */ }
+      } catch (e) { swallow("kuber/ingest", e); /* pre-0075 — the parse still stands */ }
       return NextResponse.json({ ok: true, bills: open.length });
     }
 

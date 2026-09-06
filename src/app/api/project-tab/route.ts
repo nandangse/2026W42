@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody, type AnyBody } from "@/lib/validate";
 import { requireUser, errJson, HttpError, type AuthedUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
   try {
     const u = await requireUser();
     if (!mayEdit(u)) throw new HttpError(403, "The project's room is written by planning and the project owners.");
-    const b = await req.json().catch(() => ({}));
+    const b = await readBody(req, {}).catch((): AnyBody => ({}));
     const id = projectId(String(b.project_id || ""));
     if (!id) throw new HttpError(400, "Which project?");
     const admin = adminClient();

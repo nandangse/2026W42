@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { errJson, HttpError } from "@/lib/auth";
@@ -30,7 +33,7 @@ export async function POST(req: Request) {
       throw new HttpError(503, "Server is missing ANTHROPIC_API_KEY — add it in the Vercel env vars.");
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const oppId = String((await req.json()).opportunity_id ?? "");
+    const oppId = String((await readBody(req, {})).opportunity_id ?? "");
     if (!oppId) throw new HttpError(400, "Which opportunity?");
 
     const { data: opp } = await db.from("opportunity")
@@ -88,7 +91,7 @@ export async function POST(req: Request) {
         const lines = (ns || []).map((n) => `- ${String(n.created_at).slice(0, 10)}: ${String(n.body).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 240)}`);
         if (lines.length) teamNotes = lines.join("\n");
       }
-    } catch { /* notes are optional context */ }
+    } catch (e) { swallow("crm/opp-brief", e); /* notes are optional context */ }
 
     // industry credibility — what we have made for this industry before
     let industryScope = "The company carries no industry in the CRM.";
@@ -130,7 +133,7 @@ Write in Markdown, exactly these sections:
 
     const anthropic = new Anthropic();
     const response = await anthropic.messages.create({
-      model: "claude-opus-5",
+      model: AI.FRONT,
       max_tokens: 1500,
       system: NANDAN,
       output_config: { effort: "low" },

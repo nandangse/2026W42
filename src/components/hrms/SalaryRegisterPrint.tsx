@@ -12,6 +12,7 @@
 import { useMemo } from "react";
 import { LOGO } from "@/lib/logo";
 import { MONTHS, REGISTER_COLUMNS, otOf, type SheetRow } from "@/lib/salary-sheet";
+import { inr } from "@/lib/fmt";
 
 interface Sheet {
   id: string; month: number; year: number; status: string;
@@ -25,7 +26,7 @@ interface Sheet {
   mapping: { columns: Record<string, string>; warnings: string[] } | null;
 }
 
-const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
+
 const lakh = (n: number) => (n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹${(n / 1e5).toFixed(2)} L` : `₹${inr(n)}`);
 const who = (s: string | null) => String(s || "—").split("·")[0].trim();
 

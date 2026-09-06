@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import * as XLSX from "xlsx";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -163,7 +165,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, files: out });
     }
 
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
 
     if (action === "record") {
@@ -195,7 +197,7 @@ export async function POST(req: Request) {
       const { error } = await admin.from("hrms_payroll_file").delete().eq("id", fileId);
       if (error) throw new Error(error.message);
       let binned = false;
-      if (f.drive_id) { const cfg = driveConfig(); if (cfg) { try { await trashFile(cfg, String(f.drive_id)); binned = true; } catch { /* the row is gone; the Drive copy can be binned by hand */ } } }
+      if (f.drive_id) { const cfg = driveConfig(); if (cfg) { try { await trashFile(cfg, String(f.drive_id)); binned = true; } catch (e) { swallow("hrms/payroll", e); /* the row is gone; the Drive copy can be binned by hand */ } } }
       if (f.kind === "muster" || f.kind === "rates") {
         const { data: rest } = await admin.from("hrms_payroll_file").select("parsed").eq("sheet_id", id).eq("kind", f.kind).not("parsed", "is", null).order("uploaded_at", { ascending: false }).limit(1);
         const next = rest && rest[0] ? rest[0].parsed : null;
@@ -310,7 +312,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ count: rendered.length, noPhone: rendered.filter((x) => !x.phone || x.phone.length < 8).length, blanks, sample: rendered.slice(0, 5), template, template_key: key });
       }
       let crmProfileId: string | null = null;
-      try { const { crmDb } = await import("@/crm/db"); const { data: rp } = await crmDb().from("profile").select("id").ilike("email", me.email).maybeSingle(); crmProfileId = rp?.id ? String(rp.id) : null; } catch { /* fine */ }
+      try { const { crmDb } = await import("@/crm/db"); const { data: rp } = await crmDb().from("profile").select("id").ilike("email", me.email).maybeSingle(); crmProfileId = rp?.id ? String(rp.id) : null; } catch (e) { swallow("hrms/payroll", e); /* fine */ }
       const res = await queueMessages(admin, rendered, { templateKey: key, by: stamp, crmProfileId, runId: id });
       await admin.from("hrms_salary_sheet").update({ wa_batch_id: res.batch_id, updated_at: now }).eq("id", id);
       return NextResponse.json({ ok: true, ...res });

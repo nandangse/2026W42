@@ -18,9 +18,10 @@ import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
 import { MONTHS } from "@/lib/salary-sheet";
 import { IDP_SECTIONS, IDP_RATINGS } from "@/lib/idp";
+import { inr } from "@/lib/fmt";
 
 const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E", navy: "#16232F", paper: "#F1EFE9" };
-const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(Number(n)).toLocaleString("en-IN"));
+
 const d1 = (n: number | null | undefined) => (n == null ? "—" : String(Math.round(Number(n) * 10) / 10));
 const when = (s: string | null | undefined) => (s ? new Date(s).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric" }) : "—");
 

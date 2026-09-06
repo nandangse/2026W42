@@ -17,6 +17,8 @@ import { useState } from "react";
 import GenieTable from "@/components/GenieTable";
 import { Screen, Btn, Note, Chip, Modal, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, RED, S, fmtD, useLoad, post } from "@/components/ims/ui";
 import { LOGO } from "@/lib/logo";
+import { rupee } from "@/lib/fmt";
+const money = (n: unknown) => rupee(n, "·");
 
 type JobInfo = { tag: string; production_owner: string; owner_name: string };
 
@@ -30,7 +32,7 @@ interface Line {
   qty: number; uom: string; rate: number | null; amount: number | null; released_qty: number; released_at: string | null; released_by: string | null;
 }
 const who = (s: string | null) => (S(s).includes("@") ? S(s).split("@")[0] : S(s)) || "·";
-const money = (n: unknown) => (n === null || n === undefined ? "·" : `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`);
+
 const qtyFmt = (n: unknown) => Number(n ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 3 });
 const statusColour = (s: string, level: number) => (s === "done" ? GREEN : s === "cancelled" ? "#5A6672" : level >= 3 ? RED : level > 0 ? AMBER : NAVY);
 const LADDER = ["", "project manager", "COO", "Raghu"];

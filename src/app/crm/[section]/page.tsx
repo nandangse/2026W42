@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { mayUseCrm, requireCrm } from "@/crm/auth";
-import { UPDATES } from "@/lib/changelog";
+import { APP_VERSION } from "@/lib/version";
 import CrmApp from "@/components/crm/CrmApp";
 import { doctypeBySlug } from "@/crm/doctypes";
 
@@ -79,7 +79,7 @@ export default async function CrmSectionPage({ params }: { params: { section: st
     <CrmApp
       email={user.email}
       displayName={user.displayName}
-      version={UPDATES[0].v}
+      version={APP_VERSION}
       initialSlug={slug}
       initials={user.initials ?? null}
       role={user.role ?? "user"}

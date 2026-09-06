@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { AI } from "@/lib/ai";
 import { HttpError } from "@/lib/auth";
 
 /**
@@ -8,7 +9,7 @@ import { HttpError } from "@/lib/auth";
  * last digit, a new day bumps the middle, the first digit is Dr Raghu's.
  */
 
-const MODEL = "claude-sonnet-4-5-20250929";
+const MODEL = AI.BACKGROUND;
 
 const bump = (v: string, lastAt: string | null): string => {
   const [a, b, c] = v.split(".").map((x) => Number(x) || 0);

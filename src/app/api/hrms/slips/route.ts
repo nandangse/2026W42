@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { swallow } from "@/lib/swallow";
 import { requireHrms, errJson } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import type { SheetRow } from "@/lib/salary-sheet";
@@ -32,7 +33,7 @@ export async function GET() {
     try {
       const { data: a } = await admin.from("hrms_slip_ack").select("sheet_id, employee_id, first_at, last_at, opens");
       acks = (a || []) as typeof acks;
-    } catch { /* pre-0072 */ }
+    } catch (e) { swallow("hrms/slips", e); /* pre-0072 */ }
     const ackBy = new Map(acks.map((a) => [`${a.sheet_id}:${a.employee_id}`, a]));
 
     const rows = (sheets || []).flatMap((s) =>

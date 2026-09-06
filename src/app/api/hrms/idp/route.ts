@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { NextResponse as NR } from "next/server";
@@ -58,7 +61,7 @@ export async function GET(req: Request) {
       try {
         const { data: ap } = await admin.from("hrms_appraisal").select("employee_id, new_gross, prev_gross, approved_at").eq("cycle", CYCLE_TBL);
         appr = (ap || []) as typeof appr;
-      } catch { /* pre-0061 */ }
+      } catch (e) { swallow("hrms/idp", e); /* pre-0061 */ }
 
       const ovBy = new Map<string, Map<string, string | null>>();
       for (const e of eds || []) {
@@ -274,7 +277,7 @@ export async function GET(req: Request) {
         const { data: ap } = await admin
           .from("hrms_appraisal").select("*").eq("employee_id", person).eq("cycle", "2026-27").maybeSingle();
         appraisal = ap ?? null;
-      } catch { /* pre-0061 */ }
+      } catch (e) { swallow("hrms/idp", e); /* pre-0061 */ }
 
       // the person's frame (Dr Raghu, 29 Aug 2026): age, years in the
       // company, who they report to — and their ROLE from the register,
@@ -312,14 +315,14 @@ export async function GET(req: Request) {
         const { data: aps } = await admin.from("hrms_appraisal")
           .select("cycle, new_gross, prev_gross").eq("employee_id", person);
         cycles = (aps || []) as typeof cycles;
-      } catch { /* pre-0061 */ }
+      } catch (e) { swallow("hrms/idp", e); /* pre-0061 */ }
       // the Employee Master's own history (0097) speaks first for each year
       let hist: { fy: string; gross: number }[] = [];
       try {
         const { data: hh } = await admin.from("hrms_salary_history")
           .select("fy, gross").eq("employee_id", person);
         hist = ((hh || []) as { fy: string; gross: number }[]);
-      } catch { /* pre-0097 */ }
+      } catch (e) { swallow("hrms/idp", e); /* pre-0097 */ }
       const histOf = (y: number) => hist.find((h) => String(h.fy).startsWith(String(y)));
       for (let y = 2019; y <= 2027; y++) {
         const hh = histOf(y);
@@ -421,7 +424,7 @@ export async function POST(req: Request) {
     await assertAiOn();
     const me = await requireHrms();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     // RAGHU'S BRIEF (29 Aug 2026): click-only AI pointers before the
     // sit-down — the role, the work in their own words, what to affirm,
     // what to raise — grounded in the record, kept on the cycle row.
@@ -468,7 +471,7 @@ export async function POST(req: Request) {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-5-20250929", max_tokens: 1400,
+          model: AI.FRONT, max_tokens: 1400,
           system: "You brief Dr Raghu Nandan, MD of Nandan GSE, for an appraisal interview — five minutes' read, plain simple language. " +
             "Sections, each 2-5 short pointers: WHO THEY ARE (one line); THE ROLE IN ONE LINE; WHAT THEY ACTUALLY DO (from their own IDP words); " +
             "WORTH AFFIRMING; WORTH RAISING (concerns, gaps between role and reality); THREE QUESTIONS WORTH ASKING; " +
@@ -635,7 +638,7 @@ export async function POST(req: Request) {
         old_value: `submitted ${row.submitted_at}`, new_value: "reopened for a proper pass",
         edited_by: me.initials ? `${me.initials} · ${me.email}` : me.email,
       });
-    } catch { /* the reopen matters more than the line about it */ }
+    } catch (e) { swallow("hrms/idp", e); /* the reopen matters more than the line about it */ }
     return NR.json({ ok: true });
   } catch (e) {
     return errJson(e);

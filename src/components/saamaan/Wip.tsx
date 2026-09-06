@@ -22,6 +22,8 @@ import { Screen, Btn, Note, Chip, Modal, INK, MUTED, BORDER, NAVY, GREEN, AMBER,
 import { JobLightbox, type WipJob } from "@/components/JobsInProgress";
 import { BomLines } from "./Bom";
 import type { Summary } from "./Dashboard";
+import { numFmt } from "@/lib/fmt";
+const num = (n: unknown) => numFmt(n);
 
 interface Row {
   job_no: string; warehouse: string; customer_tag: string; project_id: string; customer: string; product_family: string;
@@ -37,7 +39,7 @@ const CR = 1e7;
 /** Money the board's way — ₹ crore to two places, a dot for nothing. */
 const cr = (n: unknown) => (n === null || n === undefined ? "·" : `${(Number(n) / CR).toFixed(2)} Cr`);
 const pct = (n: unknown) => (n === null || n === undefined ? "·" : `${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 1 })}%`);
-const num = (n: unknown) => (n === null || n === undefined ? "·" : Number(n).toLocaleString("en-IN"));
+
 const erpForm = (base: string, doctype: string, name: string) =>
   `${base}/app/${doctype.toLowerCase().replace(/\s+/g, "-")}/${encodeURIComponent(name)}`;
 

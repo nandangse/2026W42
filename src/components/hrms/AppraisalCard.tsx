@@ -14,14 +14,16 @@
  * why neither side sees this screen.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 import { IDP_SECTIONS, IDP_RATINGS } from "@/lib/idp";
 import { NO_HRA_NO_MEDICAL, salaryTable, type SalaryRow, type ExtraRow } from "@/lib/salary";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
+import { inr } from "@/lib/fmt";
 
-const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
+
 
 interface ListRow { idpId: string; employee_id: string | null; name: string; submitted_at: string | null }
 interface Rec { url: string | null; seconds: number | null; transcript: string | null }
@@ -64,7 +66,7 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
     try {
       const handed = window.sessionStorage.getItem("hrms.appraisal.person");
       if (handed) { window.sessionStorage.removeItem("hrms.appraisal.person"); setPick(handed); }
-    } catch { /* fine */ }
+    } catch (e) { swallow("hrms/AppraisalCard", e); /* fine */ }
   }, []);
 
   const load = useCallback(async (emp: string) => {

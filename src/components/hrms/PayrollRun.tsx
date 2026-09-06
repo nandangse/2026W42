@@ -13,6 +13,7 @@ import { fmtFull } from "@/lib/schedule";
 import { MONTHS } from "@/lib/hrms-template";
 import { PAYROLL_RULES, type MusterRow, type RegisterRow } from "@/lib/muster";
 import { C } from "./RecordFields";
+import { inr } from "@/lib/fmt";
 
 interface Run { id: string; month: number; year: number; status: string; uploaded_by: string | null; uploaded_at: string | null; approved_by: string | null; approved_at: string | null; run_note: string | null; working_days: number | null; generated_at: string | null; generated_by: string | null; wa_batch_id: string | null; drive_folder_link: string | null; total_count: number | null; net_payable: number | null; earned_pay: number | null; deductions: number | null; mapping: { warnings?: string[] } | null }
 interface FileRow { id: string; kind: string; name: string; size: number | null; drive_link: string | null; uploaded_by: string | null; uploaded_at: string }
@@ -21,7 +22,7 @@ interface InputRow { key: string; submitted_by: string | null; submitted_at: str
 interface Detail { run: Run; files: FileRow[]; inputs: InputRow[]; live_rates: { title: string; count: number } | null; muster: { month: number | null; year: number | null; days: number; columns: Record<string, string>; unmapped: string[]; warnings: string[]; rows: MusterRow[] } | null; rates: { rows: number; warnings: string[] } | null; register: RegisterRow[]; messages: Msg[]; counts: Record<string, number> }
 
 const who = (s: string | null) => (s ? String(s).split("·")[0].trim() : "—");
-const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).toLocaleString("en-IN"));
+
 const KINDS = [["essl", "ESSL attendance"], ["muster", "Attendance muster"], ["rates", "Salary rate list"], ["advance", "Advance (Tally)"], ["loan", "Loan (Tally)"], ["other", "Other document"]] as const;
 /** The run's inputs, one form each (Dr Raghu, 5 Sep 2026) — who brings it, how it comes, whether a file is expected. */
 const INPUTS: { key: string; label: string; by: string; how: string; upload: boolean; needFile: boolean; accept: string }[] = [

@@ -23,6 +23,8 @@
  *               merging is how the book gets clean without losing links.
  */
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm, type CrmUser } from "@/crm/auth";
 import { advanceNewToHandled } from "@/crm/stageflow";
@@ -90,7 +92,7 @@ async function searchClause(
         .ilike(ld.titleField, `%${q.replace(/[%_]/g, "\\$&")}%`).limit(LINK_CAP);
       const ids = (data ?? []).map((r) => String((r as { id: unknown }).id)).filter(Boolean);
       if (ids.length) parts.push(`${f.name}.in.(${ids.join(",")})`);
-    } catch { /* one unsearchable link must not blind the whole box */ }
+    } catch (e) { swallow("crm/[doctype]", e); /* one unsearchable link must not blind the whole box */ }
   }
   return parts.length ? parts.join(",") : null;
 }
@@ -559,7 +561,7 @@ export async function POST(req: Request, { params }: { params: { doctype: string
     guardConfigured();
     const db = crmDb();
 
-    const body = (await req.json()) as Record<string, unknown>;
+    const body = (await readBody(req, {})) as Record<string, unknown>;
     const row: Record<string, unknown> = {};
     for (const f of d.fields) {
       if (f.type === "readonly" || f.virtual) continue;   // the database fills these
@@ -666,7 +668,7 @@ export async function PATCH(req: Request, { params }: { params: { doctype: strin
     const id = new URL(req.url).searchParams.get("id");
     if (!id) throw new HttpError(400, "Which record? PATCH needs ?id=");
 
-    const body = (await req.json()) as Record<string, unknown>;
+    const body = (await readBody(req, {})) as Record<string, unknown>;
     const row: Record<string, unknown> = {};
     // Only the fields the browser actually sent -- a partial edit must not
     // blank the columns the form did not show.

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody, type AnyBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
@@ -212,7 +213,7 @@ export async function POST(req: Request) {
   try {
     const me = await requireSaamaan();
     if (!me.isOwner) throw new HttpError(403, "The ERP door is Raghu's to use, for now.");
-    const body = await req.json().catch(() => ({}));
+    const body = await readBody(req, {}).catch((): AnyBody => ({}));
     const phase = String(body.phase || "items");
     const { base, H } = await erpConfig();
     const admin = adminClient();

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireReader, requireOwner, errJson, RAGHU_EMAIL } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
@@ -85,9 +87,7 @@ export async function GET() {
         .select("id", { count: "exact", head: true })
         .is("delivered_on", null);
       undated = count ?? 0;
-    } catch {
-      /* the caveat is context, never the point */
-    }
+    } catch (e) { swallow("run-rate", e); /* the caveat is context, never the point */ }
 
     /**
      * What the pending book says is still to come this financial year.
@@ -192,7 +192,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const user = await requireOwner();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const fy = String(body.fy || fyLabel(today())).trim();
     if (!/^FY\d{4}-\d{2}$/.test(fy))
       return NextResponse.json({ error: `"${fy}" is not a financial year, e.g. FY2026-27` }, { status: 400 });

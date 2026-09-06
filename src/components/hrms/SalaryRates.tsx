@@ -12,11 +12,12 @@ import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
+import { inr } from "@/lib/fmt";
 
 interface Structure { id: string; code: string; title: string; status: string; effective_from: string | null; note: string | null; created_by: string | null; created_at: string; updated_at: string; lines: number }
 interface Rate { id: string; employee_id: string; name: string | null; type: string | null; department: string | null; designation: string | null; reporting_manager: string | null; basic_da: number; hra: number; fixed_allowance: number; conveyance: number; medical_allowance: number; gross: number; per_day: number; note: string | null; updated_by: string | null; updated_at: string }
 
-const inr = (n: number | null | undefined) => (n == null ? "—" : Math.round(Number(n)).toLocaleString("en-IN"));
+
 const MONEY: (keyof Rate)[] = ["basic_da", "hra", "fixed_allowance", "conveyance", "medical_allowance"];
 const TEXT: (keyof Rate)[] = ["name", "type", "department", "designation", "reporting_manager"];
 const tone = (s: string) => (s === "Live" ? { bg: "#E6F4EA", c: C.green } : s === "Overwritten" ? { bg: "#F4F2EC", c: C.faint } : { bg: "#FFF3E8", c: "#8A5B00" });

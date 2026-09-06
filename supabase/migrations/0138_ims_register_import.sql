@@ -2352,3 +2352,7 @@ insert into core_task (module, title, description, source_type, source_key, prio
 insert into core_task (module, title, description, source_type, source_key, priority, status, import_key, created_by) values ('IMS', 'ISMS: BCP-DR', 'From the IMS Master Register, List of Clause to implement (ISMS). Google for all staff but what about design & Account ?', 'manual', 'sheet:todo:25', 'normal', 'open', 'sheet:todo:25', 'import:ims-sheet') on conflict (import_key) do nothing;
 
 insert into core_task (module, title, description, source_type, source_key, priority, status, import_key, created_by) values ('IMS', 'ISMS: Network diagrams', 'From the IMS Master Register, List of Clause to implement (ISMS).', 'manual', 'sheet:todo:26', 'normal', 'open', 'sheet:todo:26', 'import:ims-sheet') on conflict (import_key) do nothing;
+
+-- ledger (0143): this migration records itself, whichever runs first
+create table if not exists public.genie_migration (name text primary key, applied_at timestamptz not null default now());
+insert into public.genie_migration (name) values ('0138_ims_register_import') on conflict (name) do nothing;

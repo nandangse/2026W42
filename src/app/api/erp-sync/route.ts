@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody, type AnyBody } from "@/lib/validate";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { crmDb, crmConfigured } from "@/crm/db";
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
     if (!u || u.disabled) throw new HttpError(401, "Sign in first.");
     const mayRun = u.isOwner || ["admin", "planner", "uploader", "project_owner"].includes(String(u.role));
     if (!mayRun) throw new HttpError(403, "Synchronise belongs to the people who run the morning update.");
-    const body = await req.json().catch(() => ({}));
+    const body = await readBody(req, {}).catch((): AnyBody => ({}));
     // The radio buttons come back as kind:id:field → "genie" | "erp", and
     // `fallback` is what an unadjudicated difference does: the ERP wins while
     // records are still born there, Genie wins from October.

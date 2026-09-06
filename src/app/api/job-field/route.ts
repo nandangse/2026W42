@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requirePlanner, errJson, RAGHU_EMAIL } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
@@ -74,7 +76,7 @@ const show = (v: unknown): string => (v == null || v === "" ? "" : String(v));
 export async function POST(req: Request) {
   try {
     const user = await requirePlanner();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const field: string = body.field;
     const meta = FIELDS[field];
     if (!body.job_id || !meta)
@@ -159,9 +161,7 @@ export async function POST(req: Request) {
           await admin.from("erp_update").insert(row);
         }
         queued = true;
-      } catch {
-        /* 0031 not run yet — the local edit still stands */
-      }
+      } catch (e) { swallow("job-field", e); /* 0031 not run yet — the local edit still stands */ }
     }
 
     return NextResponse.json({ ok: true, changed, queued, label: meta.label });

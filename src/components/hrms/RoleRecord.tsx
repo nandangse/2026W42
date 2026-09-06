@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
-import { APP_VERSION } from "@/lib/changelog";
+import { APP_VERSION } from "@/lib/version";
 import { fmtFull } from "@/lib/schedule";
 import RichText from "./RichText";
 import VoiceNote from "./RoleVoiceNote";

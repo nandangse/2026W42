@@ -1,8 +1,21 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireAdmin, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { normaliseGroups } from "@/lib/groups";
 import type { Role } from "@/lib/types";
+
+/** The e-mail-keyed module doors an owner can tick on Admin → Users. */
+const DOORS: Record<string, { table: string; label: string; migration: string }> = {
+  hrms_access: { table: "hrms_access", label: "HRMS", migration: "0047" },
+  vishwakarma_access: { table: "vishwakarma_access", label: "Vishwakarma", migration: "0076" },
+  seva_access: { table: "seva_access", label: "Seva", migration: "0107" },
+  ims_access: { table: "ims_access", label: "the IMS", migration: "0111" },
+  saamaan_access: { table: "material_access", label: "Saamaan", migration: "0118" },
+  accounts_access: { table: "accounts_access", label: "Kuber", migration: "0073" },
+  crm_access: { table: "crm_access", label: "the CRM", migration: "0055" },
+};
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +94,7 @@ export async function GET(req: Request) {
     try {
       const { data: grants } = await admin.from("sales_access").select("person_id");
       for (const g of grants || []) salesIds.add(g.person_id as string);
-    } catch { /* pre-0013 */ }
+    } catch (e) { swallow("admin/users", e); /* pre-0013 */ }
 
     // HRMS grants. Keyed by EMAIL rather than by id (migration 0047), so a
     // grant can be written before the account exists -- hr@nandan.co.in was
@@ -90,42 +103,42 @@ export async function GET(req: Request) {
     try {
       const { data: hg } = await admin.from("hrms_access").select("email");
       for (const g of hg || []) hrmsEmails.add(String(g.email || "").toLowerCase());
-    } catch { /* pre-0047 */ }
+    } catch (e) { swallow("admin/users", e); /* pre-0047 */ }
 
     // CRM grants, keyed by email for the same reason as HRMS (0055).
     const crmEmails = new Set<string>();
     try {
       const { data: cg } = await admin.from("crm_access").select("email");
       for (const g of cg || []) crmEmails.add(String(g.email || "").toLowerCase());
-    } catch { /* pre-0055 */ }
+    } catch (e) { swallow("admin/users", e); /* pre-0055 */ }
 
     // Accounts grants — the fourth module, same arrangement (0073).
     const accEmails = new Set<string>();
     try {
       const { data: ag } = await admin.from("accounts_access").select("email");
       for (const g of ag || []) accEmails.add(String(g.email || "").toLowerCase());
-    } catch { /* pre-0073 */ }
+    } catch (e) { swallow("admin/users", e); /* pre-0073 */ }
 
     // Vishwakarma grants — the fifth, design (0076).
     const vishEmails = new Set<string>();
     try {
       const { data: vg } = await admin.from("vishwakarma_access").select("email");
       for (const g of vg || []) vishEmails.add(String(g.email || "").toLowerCase());
-    } catch { /* pre-0076 */ }
+    } catch (e) { swallow("admin/users", e); /* pre-0076 */ }
 
     // Seva grants — the sixth, customer service (0107).
     const sevaEmails = new Set<string>();
     try {
       const { data: sg } = await admin.from("seva_access").select("email");
       for (const g of sg || []) sevaEmails.add(String(g.email || "").toLowerCase());
-    } catch { /* pre-0107 */ }
+    } catch (e) { swallow("admin/users", e); /* pre-0107 */ }
 
     // IMS grants — the seventh, the Integrated Management System (0111).
     const imsEmails = new Set<string>();
     try {
       const { data: ig } = await admin.from("ims_access").select("email");
       for (const g of ig || []) imsEmails.add(String(g.email || "").toLowerCase());
-    } catch { /* pre-0111 */ }
+    } catch (e) { swallow("admin/users", e); /* pre-0111 */ }
 
     // Saamaan grants — the eighth, materials (0118). The table is
     // material_access: every Saamaan table wears the material_ prefix.
@@ -133,7 +146,7 @@ export async function GET(req: Request) {
     try {
       const { data: mg } = await admin.from("material_access").select("email");
       for (const g of mg || []) saamaanEmails.add(String(g.email || "").toLowerCase());
-    } catch { /* pre-0118 */ }
+    } catch (e) { swallow("admin/users", e); /* pre-0118 */ }
 
     // Last sign-in lives in auth.users, not profiles, so it comes from the
     // admin auth API. Failure here must not take the page down — the column
@@ -142,27 +155,21 @@ export async function GET(req: Request) {
     try {
       const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
       for (const u of list?.users || []) lastSeen.set(u.id, u.last_sign_in_at ?? null);
-    } catch {
-      /* leave the column empty */
-    }
+    } catch (e) { swallow("admin/users", e); /* leave the column empty */ }
 
     // Departments, so the picker has names rather than uuids.
     let departments: { id: string; name: string }[] = [];
     try {
       const { data: d } = await admin.from("departments").select("id,name").order("sort_order");
       departments = d || [];
-    } catch {
-      /* pre-0019 */
-    }
+    } catch (e) { swallow("admin/users", e); /* pre-0019 */ }
 
     // Goals access, merged in so it is one row per person rather than two tables
     const goalGrant = new Map<string, boolean>();
     try {
       const { data: g } = await admin.from("goal_access").select("person_id, can_edit");
       for (const r of g || []) goalGrant.set(r.person_id as string, !!r.can_edit);
-    } catch {
-      /* pre-0010 */
-    }
+    } catch (e) { swallow("admin/users", e); /* pre-0010 */ }
 
     const caller = await requireAdmin();
     return NextResponse.json({
@@ -229,7 +236,7 @@ export async function POST(req: Request) {
     if (!mayEditUsers(caller))
       throw new HttpError(403, "Only Dr Raghu and Vishwas may change users here. Other admins may look.");
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, { action: "string", grant: "boolean?" });
 
     /**
      * The owner sits above the admin tier:
@@ -276,7 +283,7 @@ export async function POST(req: Request) {
       await admin.from("admin_audit").insert({
         by_email: String((caller as { email?: string }).email || ""), action: String(body.action || ""), target, detail: clean,
       });
-    } catch { /* pre-0105, or a ledger hiccup */ }
+    } catch (e) { swallow("admin/users", e); /* pre-0105, or a ledger hiccup */ }
 
     if (body.action === "create") {
       const email = String(body.email || "").trim().toLowerCase();
@@ -434,181 +441,35 @@ export async function POST(req: Request) {
     }
 
     /**
-     * { action: "hrms_access", id, grant } — owner only.
+     * { action: "<module>_access", id, grant } — owner only.
      *
-     * Not routed through guardTarget() for the same reason "groups" is not:
-     * the owner check below is the stricter of the two, and the people most
-     * likely to be given HR access are admins, whom guardTarget would refuse
-     * to touch. HRMS holds dates of birth, home addresses and next of kin --
-     * who may read that is not an ordinary admin's decision.
+     * One handler for the seven e-mail-keyed doors (Genie 5.0.0.2; it was
+     * seven copies of the same twenty lines). Not routed through
+     * guardTarget() for the same reason "groups" is not: the owner check is
+     * the stricter of the two, and the people most likely to be given a
+     * module are admins, whom guardTarget would refuse to touch. HRMS holds
+     * dates of birth, home addresses and next of kin -- who may read that is
+     * not an ordinary admin's decision, and the same hand holds every door.
      */
-    if (body.action === "hrms_access") {
+    const door = DOORS[String(body.action)];
+    if (door) {
       if (!mayEditUsers(caller))
-        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant HRMS.`);
+        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant ${door.label}.`);
       if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
       const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
       const target = String(t?.email || "").toLowerCase();
       if (!target) return NextResponse.json({ error: "no such user" }, { status: 404 });
       if (target === RAGHU_EMAIL)
-        return NextResponse.json(
-          { error: "The owner holds HRMS implicitly — there is nothing to tick." },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: `The owner holds ${door.label} implicitly — there is nothing to tick.` }, { status: 400 });
       if (body.grant) {
-        const { error } = await admin
-          .from("hrms_access")
-          .upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
+        const { error } = await admin.from(door.table).upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
         if (error) {
-          if (/hrms_access|schema cache|does not exist/i.test(error.message))
-            return NextResponse.json({ error: "Run migration 0047 first — the HRMS tables don't exist yet" }, { status: 400 });
+          if (new RegExp(`${door.table}|schema cache|does not exist`, "i").test(error.message))
+            return NextResponse.json({ error: `Run migration ${door.migration} first — the ${door.label} grant table doesn't exist yet` }, { status: 400 });
           throw new Error(error.message);
         }
       } else {
-        const { error } = await admin.from("hrms_access").delete().eq("email", target);
-        if (error) throw new Error(error.message);
-      }
-      return NextResponse.json({ ok: true });
-    }
-
-    /** { action: "vishwakarma_access", id, grant } — owner only, as with HRMS. */
-    if (body.action === "vishwakarma_access") {
-      if (!mayEditUsers(caller))
-        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant Vishwakarma.`);
-      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
-      const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
-      const target = String(t?.email || "").toLowerCase();
-      if (!target) return NextResponse.json({ error: "no such user" }, { status: 404 });
-      if (target === RAGHU_EMAIL)
-        return NextResponse.json({ error: "The owner holds Vishwakarma implicitly." }, { status: 400 });
-      if (body.grant) {
-        const { error } = await admin.from("vishwakarma_access").upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
-        if (error) {
-          if (/vishwakarma_access|schema cache|does not exist/i.test(error.message))
-            return NextResponse.json({ error: "Run migration 0076 first — the Vishwakarma grant table doesn't exist yet" }, { status: 400 });
-          throw new Error(error.message);
-        }
-      } else {
-        const { error } = await admin.from("vishwakarma_access").delete().eq("email", target);
-        if (error) throw new Error(error.message);
-      }
-      return NextResponse.json({ ok: true });
-    }
-
-    /** { action: "seva_access", id, grant } — owner only, as with HRMS. */
-    if (body.action === "seva_access") {
-      if (!mayEditUsers(caller))
-        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant Seva.`);
-      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
-      const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
-      const target = String(t?.email || "").toLowerCase();
-      if (!target) return NextResponse.json({ error: "no such user" }, { status: 404 });
-      if (target === RAGHU_EMAIL)
-        return NextResponse.json({ error: "The owner holds Seva implicitly." }, { status: 400 });
-      if (body.grant) {
-        const { error } = await admin.from("seva_access").upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
-        if (error) {
-          if (/seva_access|schema cache|does not exist/i.test(error.message))
-            return NextResponse.json({ error: "Run migration 0107 first — the Seva grant table doesn't exist yet" }, { status: 400 });
-          throw new Error(error.message);
-        }
-      } else {
-        const { error } = await admin.from("seva_access").delete().eq("email", target);
-        if (error) throw new Error(error.message);
-      }
-      return NextResponse.json({ ok: true });
-    }
-
-    /** { action: "ims_access", id, grant } — owner only, as with HRMS. */
-    if (body.action === "ims_access") {
-      if (!mayEditUsers(caller))
-        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant the IMS.`);
-      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
-      const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
-      const target = String(t?.email || "").toLowerCase();
-      if (!target) return NextResponse.json({ error: "no such user" }, { status: 404 });
-      if (target === RAGHU_EMAIL)
-        return NextResponse.json({ error: "The owner holds the IMS implicitly." }, { status: 400 });
-      if (body.grant) {
-        const { error } = await admin.from("ims_access").upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
-        if (error) {
-          if (/ims_access|schema cache|does not exist/i.test(error.message))
-            return NextResponse.json({ error: "Run migration 0111 first — the IMS grant table doesn't exist yet" }, { status: 400 });
-          throw new Error(error.message);
-        }
-      } else {
-        const { error } = await admin.from("ims_access").delete().eq("email", target);
-        if (error) throw new Error(error.message);
-      }
-      return NextResponse.json({ ok: true });
-    }
-
-    /** { action: "saamaan_access", id, grant } — owner only, as with HRMS. */
-    if (body.action === "saamaan_access") {
-      if (!mayEditUsers(caller))
-        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant Saamaan.`);
-      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
-      const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
-      const target = String(t?.email || "").toLowerCase();
-      if (!target) return NextResponse.json({ error: "no such user" }, { status: 404 });
-      if (target === RAGHU_EMAIL)
-        return NextResponse.json({ error: "The owner holds Saamaan implicitly." }, { status: 400 });
-      if (body.grant) {
-        const { error } = await admin.from("material_access").upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
-        if (error) {
-          if (/material_access|schema cache|does not exist/i.test(error.message))
-            return NextResponse.json({ error: "Run migration 0118 first — the Saamaan grant table doesn't exist yet" }, { status: 400 });
-          throw new Error(error.message);
-        }
-      } else {
-        const { error } = await admin.from("material_access").delete().eq("email", target);
-        if (error) throw new Error(error.message);
-      }
-      return NextResponse.json({ ok: true });
-    }
-
-    /** { action: "accounts_access", id, grant } — owner only, as with HRMS. */
-    if (body.action === "accounts_access") {
-      if (!mayEditUsers(caller))
-        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant Accounts.`);
-      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
-      const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
-      const target = String(t?.email || "").toLowerCase();
-      if (!target) return NextResponse.json({ error: "no such user" }, { status: 404 });
-      if (target === RAGHU_EMAIL)
-        return NextResponse.json({ error: "The owner holds Accounts implicitly." }, { status: 400 });
-      if (body.grant) {
-        const { error } = await admin.from("accounts_access").upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
-        if (error) {
-          if (/accounts_access|schema cache|does not exist/i.test(error.message))
-            return NextResponse.json({ error: "Run migration 0073 first — the Accounts grant table doesn't exist yet" }, { status: 400 });
-          throw new Error(error.message);
-        }
-      } else {
-        const { error } = await admin.from("accounts_access").delete().eq("email", target);
-        if (error) throw new Error(error.message);
-      }
-      return NextResponse.json({ ok: true });
-    }
-
-    /** { action: "crm_access", id, grant } — owner only, as with HRMS. */
-    if (body.action === "crm_access") {
-      if (!mayEditUsers(caller))
-        throw new HttpError(403, `Only Dr Raghu and Vishwas may grant the CRM.`);
-      if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
-      const { data: t } = await admin.from("profiles").select("email").eq("id", body.id).maybeSingle();
-      const target = String(t?.email || "").toLowerCase();
-      if (!target) return NextResponse.json({ error: "no such user" }, { status: 404 });
-      if (target === RAGHU_EMAIL)
-        return NextResponse.json({ error: "The owner holds the CRM implicitly." }, { status: 400 });
-      if (body.grant) {
-        const { error } = await admin.from("crm_access").upsert({ email: target, granted_by: caller.email }, { onConflict: "email" });
-        if (error) {
-          if (/crm_access|schema cache|does not exist/i.test(error.message))
-            return NextResponse.json({ error: "Run migration 0055 first — the CRM grant table doesn't exist yet" }, { status: 400 });
-          throw new Error(error.message);
-        }
-      } else {
-        const { error } = await admin.from("crm_access").delete().eq("email", target);
+        const { error } = await admin.from(door.table).delete().eq("email", target);
         if (error) throw new Error(error.message);
       }
       return NextResponse.json({ ok: true });

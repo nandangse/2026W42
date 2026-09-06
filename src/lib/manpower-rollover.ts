@@ -22,16 +22,15 @@
  */
 import { adminClient } from "@/lib/supabase/admin";
 import { TRADES } from "@/lib/templates";
+import { addDays, istToday } from "@/lib/fmt";
+export { istToday };
 
-export const ROLLOVER_AUTHOR = "rollover@genie";
+const ROLLOVER_AUTHOR = "rollover@genie";
 
 /** The factory's date, whatever timezone the server wakes up in. */
-export function istToday(): string {
-  return new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
-}
 
-const addDays = (iso: string, n: number): string =>
-  new Date(new Date(iso + "T00:00:00Z").getTime() + n * 86400000).toISOString().slice(0, 10);
+
+
 
 /** Sundays always; Saturdays only the third one — twelve days a year. */
 export function isWorkHoliday(iso: string): boolean {

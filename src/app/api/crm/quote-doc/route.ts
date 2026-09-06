@@ -4,6 +4,7 @@ import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
 import { LOGO } from "@/lib/logo";
 import { cleanDesc } from "@/lib/desc-clean";
 import { quoteVars, fillQuoteVars } from "@/crm/quote-vars";
+import { esc } from "@/lib/fmt";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -23,7 +24,7 @@ export const maxDuration = 60;
 const ORDER = ["cover", "letter", "situational", "items", "items_split", "terms", "about", "back"] as const;
 const CHARS_PER_PAGE = 1750;
 
-const esc = (x: unknown) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
 const dIN = (v: unknown) => (v ? String(v).slice(0, 10).split("-").reverse().join("/") : "");
 const money = (v: unknown, cur: string, dec: boolean) => {
   const n = Number(v) || 0;

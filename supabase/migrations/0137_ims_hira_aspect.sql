@@ -523,3 +523,7 @@ from ims_register_definition d where d.slug = 'aspect-impact' and not exists (se
 insert into ims_register_entry (register_id, data, status, created_by)
 select d.id, $j${"assessment": "Original register (Rev 0, 15/07/2023)", "output": "Distribustion of electric power to all utilites", "aspect": "Fire /Explosion in transformer", "condition": "Emergency", "impact": "Chances of Accident & pollution soil & Air", "impact_on": "Human & air", "concern": "LC - Legal concern; IPC - Interested party concern", "direct_indirect": "Direct", "quantity": "1 - Insignificant", "impact_rating": "4 - Irreversible damage to many people and local environment", "occurrence": "1 - Rarely", "control": "1 - Effective control exists", "detectable": "1 - Detectable", "score": 4, "significance": "Significant", "sr_no": 15, "import_key": "sheet:aspect:82"}$j$::jsonb, 'open', 'import:ims-sheet'
 from ims_register_definition d where d.slug = 'aspect-impact' and not exists (select 1 from ims_register_entry e where e.register_id = d.id and e.data->>'import_key' = 'sheet:aspect:82');
+
+-- ledger (0143): this migration records itself, whichever runs first
+create table if not exists public.genie_migration (name text primary key, applied_at timestamptz not null default now());
+insert into public.genie_migration (name) values ('0137_ims_hira_aspect') on conflict (name) do nothing;

@@ -23,11 +23,11 @@ export interface AuthedUser {
 }
 
 /** Tiers, mirroring the SQL helpers in migration 0008. */
-export const READER_ROLES: Role[] = ["admin", "planner", "project_owner", "user", "sales", "viewer"];
+const READER_ROLES: Role[] = ["admin", "planner", "project_owner", "user", "sales", "viewer"];
 /** May write the planning layer (plans, milestones, materials, priority). */
-export const EDITOR_ROLES: Role[] = ["admin", "planner", "project_owner"];
+const EDITOR_ROLES: Role[] = ["admin", "planner", "project_owner"];
 /** May write tasks & comments — editors plus rank-and-file users. */
-export const TASKER_ROLES: Role[] = ["admin", "planner", "project_owner", "user", "sales"];
+const TASKER_ROLES: Role[] = ["admin", "planner", "project_owner", "user", "sales"];
 
 export const RAGHU_EMAIL = (
   process.env.RAGHU_EMAIL || "raghu@nandan.co.in"
@@ -88,7 +88,7 @@ export async function requireUser(): Promise<AuthedUser> {
   return u;
 }
 
-export async function requireRole(...roles: Role[]): Promise<AuthedUser> {
+async function requireRole(...roles: Role[]): Promise<AuthedUser> {
   const u = await requireUser();
   if (!roles.includes(u.role)) throw new HttpError(403, "Forbidden");
   return u;

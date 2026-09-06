@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireReader, requirePlanner, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { crmDb } from "@/crm/db";
@@ -90,7 +92,7 @@ export async function POST(req: Request) {
     const user = fromCron
       ? ({ initials: "cron", displayName: "hourly cron", email: "cron@genie" } as Awaited<ReturnType<typeof requirePlanner>>)
       : await requirePlanner();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const admin = adminClient();
     const who = user.initials || user.displayName || user.email.split("@")[0];
 
@@ -187,7 +189,7 @@ export async function POST(req: Request) {
           await archiveUpload(dCfg, new TextEncoder().encode(csv).buffer as ArrayBuffer, "erp-push-record.csv", "erp");
           recordFiled = true;
         }
-      } catch { /* the record is a mirror, never the push */ }
+      } catch (e) { swallow("erp-update", e); /* the record is a mirror, never the push */ }
 
       // AND THE PULL COMES STRAIGHT BACK: what the ERP now says returns to
       // Genie at once, not at a quarter past — the same walk the cron makes.
@@ -198,7 +200,7 @@ export async function POST(req: Request) {
           const r2 = await fetch(new URL("/api/cron/erp-pull", req.url), { headers: { authorization: `Bearer ${secret}` } });
           pulledBack = r2.ok;
         }
-      } catch { /* the hourly walk still covers it */ }
+      } catch (e) { swallow("erp-update", e); /* the hourly walk still covers it */ }
 
       return NextResponse.json({ ok: true, jobs: byJob.size, pushed, rejected, notInErp, recordFiled, pulledBack });
     }

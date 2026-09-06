@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireKuber } from "@/lib/accounts";
+import { addDays } from "@/lib/fmt";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -20,11 +23,7 @@ export const maxDuration = 60;
  */
 
 const IST_TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-const addDays = (iso: string, d: number) => {
-  const t = new Date(iso + "T00:00:00Z");
-  t.setUTCDate(t.getUTCDate() + d);
-  return t.toISOString().slice(0, 10);
-};
+
 /** Monday of the week holding `iso`. */
 const mondayOf = (iso: string) => {
   const t = new Date(iso + "T00:00:00Z");
@@ -270,7 +269,7 @@ export async function GET(req: Request) {
           r.n += 1;
           vol.set(v.party, r);
         }
-      } catch { /* vouchers not loaded yet */ }
+      } catch (e) { swallow("kuber/books", e); /* vouchers not loaded yet */ }
       // the headline stats Dr Raghu asked for (28 Aug 2026): total O/S in
       // numbers and value, the rupee-weighted average AGE of what is open,
       // and how much stands beyond its credit period (= overdue, since the
@@ -376,13 +375,13 @@ export async function GET(req: Request) {
         }
         payments.sort((x, y) => String(y.date || "").localeCompare(String(x.date || "")));
         invoices.sort((x, y) => String(y.date || "").localeCompare(String(x.date || "")));
-      } catch { /* allocs absent — the card stands without them */ }
+      } catch (e) { swallow("kuber/books", e); /* allocs absent — the card stands without them */ }
       // planned payments for this party — the cash flow's own decisions
       let plans: { plan_date: string; amount: number; status: string; purpose: string; bill_ref: string }[] = [];
       try {
         const { data: pl } = await admin.from("kuber_payment_plan").select("plan_date, amount, status, purpose, bill_ref").eq("party", party).neq("status", "dropped").order("plan_date");
         plans = (pl || []) as typeof plans;
-      } catch { /* pre-0076 */ }
+      } catch (e) { swallow("kuber/books", e); /* pre-0076 */ }
       // items supplied — the goods on this party's vouchers (0081)
       let items: { item: string; times: number; total: number; qty: string; last: string | null }[] = [];
       try {
@@ -405,12 +404,12 @@ export async function GET(req: Request) {
         items = [...byItem.entries()]
           .map(([item, r]) => ({ item, times: r.times, total: r.total, qty: r.qtys.slice(-1)[0] || "", last: r.last }))
           .sort((a, b2) => b2.total - a.total);
-      } catch { /* pre-0081 or masters-only */ }
+      } catch (e) { swallow("kuber/books", e); /* pre-0081 or masters-only */ }
       let vouchers = 0;
       try {
         const { count } = await admin.from("kuber_voucher").select("id", { count: "exact", head: true }).eq("party", party);
         vouchers = count ?? 0;
-      } catch { /* fine */ }
+      } catch (e) { swallow("kuber/books", e); /* fine */ }
       const oldest = overdueB.reduce<string | null>((s, b) => (!s || (b.due_date as string) < s ? (b.due_date as string) : s), null);
       return NextResponse.json({
         party, today, net, gross, unadjusted, overdue,
@@ -450,7 +449,7 @@ export async function GET(req: Request) {
       try {
         const { data } = await admin.from("kuber_payment_plan").select("plan_date, party, amount, status").neq("status", "dropped").neq("status", "paid");
         plans = (data || []) as typeof plans;
-      } catch { /* pre-0076 */ }
+      } catch (e) { swallow("kuber/books", e); /* pre-0076 */ }
       const plannedParties = new Set(plans.map((p) => p.party));
       for (const p of plans) {
         const i = weekIdx(p.plan_date);
@@ -476,7 +475,7 @@ export async function GET(req: Request) {
             if (i >= 0) (it.direction === "in" ? flows.other_in : flows.other_out)[i] += Number(it.amount) || 0;
           }
         }
-      } catch { /* pre-0076 */ }
+      } catch (e) { swallow("kuber/books", e); /* pre-0076 */ }
       const net = zero(), cumulative = zero();
       let run = 0;
       for (let i = 0; i < 13; i++) {
@@ -1081,7 +1080,7 @@ export async function GET(req: Request) {
             if (String(e.done_on) > due) compAmber++;
           }
         }
-      } catch { /* calendar not installed yet */ }
+      } catch (e) { swallow("kuber/books", e); /* calendar not installed yet */ }
 
       // the loan clock
       const { data: loans } = await admin.from("kuber_loan").select("outstanding, emi, status").limit(500).then((r) => ({ data: r.error ? [] : r.data }));
@@ -1220,7 +1219,7 @@ export async function GET(req: Request) {
         if (isBankParent(String(l.parent || ""))) { bankCash += Number(l.opening) || 0; bankSet.add(String(l.name)); }
       }
       for (const l of world.lines) if (bankSet.has(String(l.ledger))) bankCash += Number(l.amount) || 0;
-    } catch { /* books not loaded yet */ }
+    } catch (e) { swallow("kuber/books", e); /* books not loaded yet */ }
     const bills = await allBills(admin);
     const rec = bills.filter((b) => b.kind === "receivable");
     const pay = bills.filter((b) => b.kind === "payable");
@@ -1232,7 +1231,7 @@ export async function GET(req: Request) {
     try {
       const { data } = await admin.from("kuber_bill").select("loaded_at").limit(1);
       loadedAt = data?.[0]?.loaded_at ?? null;
-    } catch { /* absent */ }
+    } catch (e) { swallow("kuber/books", e); /* absent */ }
     const reg = async (table: string, dateCol: string, amountCol: string, days: number) => {
       try {
         const { data } = await admin.from(table).select("*").limit(1000);
@@ -1266,7 +1265,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await requireKuber();
-    const body = await req.json();
+    const body = await readBody(req, {});
     if (String(body.action) === "set_mis_input") {
       const key = String(body.key || "");
       if (!["opening_stock", "closing_stock"].includes(key)) throw new HttpError(400, "key must be opening_stock or closing_stock");

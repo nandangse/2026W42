@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables } from "@/lib/hrms";
@@ -144,7 +145,7 @@ export async function POST(req: Request) {
     }
 
     /* ── the decisions ── */
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
     const id = String(body.id || "");
     if (!id) throw new HttpError(400, "Which sheet?");

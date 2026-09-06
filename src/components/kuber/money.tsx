@@ -10,6 +10,7 @@
  */
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { swallow } from "@/lib/swallow";
 
 export type MoneyUnit = "rs" | "lakh" | "cr";
 const KEY = "kuber.moneyUnit";
@@ -22,11 +23,11 @@ export function MoneyProvider({ children }: { children: React.ReactNode }) {
     try {
       const v = localStorage.getItem(KEY);
       if (v === "rs" || v === "lakh" || v === "cr") setUnitState(v);
-    } catch { /* fine */ }
+    } catch (e) { swallow("kuber/money", e); /* fine */ }
   }, []);
   const setUnit = (u: MoneyUnit) => {
     setUnitState(u);
-    try { localStorage.setItem(KEY, u); } catch { /* fine */ }
+    try { localStorage.setItem(KEY, u); } catch (e) { swallow("kuber/money", e); /* fine */ }
   };
   return <Ctx.Provider value={{ unit, setUnit }}>{children}</Ctx.Provider>;
 }

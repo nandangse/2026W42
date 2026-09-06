@@ -18,6 +18,7 @@
 // The library is small and shared, so it comes down in one payload and every
 // view of it is computed in memory.
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import { api } from "@/lib/api";
 import LmsText from "./LmsText";
 import LmsVideo from "./LmsVideo";
@@ -780,7 +781,7 @@ function TeamTab({ ctx }: { ctx: Ctx }) {
     if (!id) return;
     setBusy(true);
     try { setRec(await api.get(`/api/lms?person=${encodeURIComponent(id)}`)); }
-    catch { /* the manager view is a read; a failure says nothing rather than shouting */ }
+    catch (e) { swallow("LMS", e); /* the manager view is a read; a failure says nothing rather than shouting */ }
     finally { setBusy(false); }
   };
 

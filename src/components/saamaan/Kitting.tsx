@@ -10,12 +10,14 @@
 
 import GenieTable from "@/components/GenieTable";
 import { Screen, Btn, Note, Chip, INK, MUTED, NAVY, GREEN, AMBER, S, useLoad } from "@/components/ims/ui";
+import { rupee } from "@/lib/fmt";
+const money = (n: unknown) => rupee(n, "·");
 
 interface Issue {
   id: string; job_no: string; warehouse: string; item_code: string; item_name: string; qty: number; uom: string; rate: number | null; amount: number | null;
   rbom_id: string; issued_by: string | null; issued_at: string; slip_no: string; slip_status: string;
 }
-const money = (n: unknown) => (n === null || n === undefined ? "·" : `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`);
+
 const fmtAt = (s: string) => new Date(s).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
 const who = (s: string | null) => (S(s).includes("@") ? S(s).split("@")[0] : S(s)) || "·";
 

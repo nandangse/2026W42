@@ -22,6 +22,7 @@
  * publish a procedure nobody approved.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { hasGrant } from "@/lib/grant";
 import { currentUser, HttpError, type AuthedUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -32,21 +33,8 @@ export type ImsRole = "ims_admin" | "dept_head" | "auditor" | "member";
  * email so a grant can be made before the account exists. A missing table
  * reads as "nobody but the owner" — the right way for a gate to fail.
  */
-export async function resolveImsAccess(
-  admin: SupabaseClient,
-  email: string,
-  isOwner: boolean,
-): Promise<boolean> {
-  if (isOwner) return true;
-  const e = String(email || "").trim().toLowerCase();
-  if (!e) return false;
-  try {
-    const { data } = await admin.from("ims_access").select("email").eq("email", e).maybeSingle();
-    return !!data;
-  } catch {
-    return false;
-  }
-}
+export const resolveImsAccess = (admin: SupabaseClient, email: string, isOwner: boolean) =>
+  hasGrant(admin, "ims_access", email, isOwner);
 
 export interface ImsUser extends AuthedUser {
   imsRole: ImsRole;

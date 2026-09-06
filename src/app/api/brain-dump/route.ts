@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireUser();
     const db = supabaseServer();
-    const body = await req.json();
+    const body = await readBody(req, {});
 
     if (body.action === "create") {
       const title = String(body.title || "").trim();

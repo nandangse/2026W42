@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb } from "@/crm/db";
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
     const me = await requireCrm();
     if (!me.isOwner) throw new HttpError(403, "The ERP door is Raghu's to use, for now.");
     const db = crmDb();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const action = String(body.action || "");
 
     const { data: row } = await db.from("integration_setting").select("config").eq("key", "erpnext").maybeSingle();

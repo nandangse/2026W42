@@ -18,6 +18,7 @@
  * and every change is on the record's own History tab.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { swallow } from "@/lib/swallow";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 import { FIELD_GROUPS, ALL_FIELDS, onRoll, tenure, splitMulti, type HrmsEmployee } from "@/lib/hrms";
@@ -70,12 +71,12 @@ export default function EmployeeMaster({
     try {
       const saved = window.localStorage.getItem("hrms.master.columns");
       if (saved) setExtraCols(JSON.parse(saved));
-    } catch { /* a browser that refuses storage simply forgets */ }
+    } catch (e) { swallow("hrms/EmployeeMaster", e); /* a browser that refuses storage simply forgets */ }
   }, []);
   const toggleCol = (key: string) => {
     setExtraCols((prev) => {
       const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
-      try { window.localStorage.setItem("hrms.master.columns", JSON.stringify(next)); } catch { /* as above */ }
+      try { window.localStorage.setItem("hrms.master.columns", JSON.stringify(next)); } catch (e) { swallow("hrms/EmployeeMaster", e); /* as above */ }
       return next;
     });
   };
@@ -357,7 +358,7 @@ export default function EmployeeMaster({
                 Tick to add, untick to remove. Remembered on this browser.
               </div>
               {extraCols.length > 0 && (
-                <button onClick={() => { setExtraCols([]); try { window.localStorage.removeItem("hrms.master.columns"); } catch {} }}
+                <button onClick={() => { setExtraCols([]); try { window.localStorage.removeItem("hrms.master.columns"); } catch (e) { swallow("hrms/EmployeeMaster", e); } }}
                   className="text-xs font-bold rounded px-2 py-0.5 ml-auto" style={{ background: "#F4F2EC", color: C.dim }}>
                   clear all {extraCols.length}
                 </button>

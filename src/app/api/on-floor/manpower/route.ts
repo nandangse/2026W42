@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireReader, requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { today } from "@/lib/schedule";
@@ -46,7 +48,7 @@ export async function GET(req: Request) {
     // the missing days fill themselves in — back-dated correctly — the first
     // time anyone looks. Cheap when there is nothing to do.
     if (day === istToday()) {
-      try { await ensureManpowerRollover(); } catch { /* read still answers */ }
+      try { await ensureManpowerRollover(); } catch (e) { swallow("on-floor/manpower", e); /* read still answers */ }
     }
     const { data, error } = await admin
       .from("job_manpower").select("job_id, day, crew, noted_by, updated_at").eq("day", day);
@@ -65,7 +67,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireUser();
     const admin = adminClient();
-    const body = await req.json();
+    const body = await readBody(req, {});
     const jobId = String(body.job_id || "");
     if (!jobId) throw new HttpError(400, "Which job?");
     const day = String(body.day || today()).slice(0, 10);

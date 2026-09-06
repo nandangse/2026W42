@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 import { requireUser, HttpError, errJson } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { seedJobToday, zeroJobToday } from "@/lib/manpower-rollover";
@@ -23,7 +25,7 @@ export async function POST(req: Request) {
     const user = await requireUser();
     if (!(user.isOwner || user.stratcom || user.role === "planner" || user.role === "admin"))
       throw new HttpError(403, "Only Stratcom, planners and admins may tick On Floor.");
-    const body = await req.json();
+    const body = await readBody(req, {});
     const jobId = String(body.job_id || "");
     if (!jobId) return NextResponse.json({ error: "job_id required" }, { status: 400 });
     const on = !!body.on;
@@ -55,7 +57,7 @@ export async function POST(req: Request) {
     try {
       if (on) await seedJobToday(jobId);
       else await zeroJobToday(jobId, user.email);
-    } catch { /* the ledger catches up on the next rollover pass */ }
+    } catch (e) { swallow("on-floor", e); /* the ledger catches up on the next rollover pass */ }
 
     return NextResponse.json({ ok: true, on });
   } catch (e) {

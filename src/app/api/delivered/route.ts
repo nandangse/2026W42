@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { swallow } from "@/lib/swallow";
 import { requireStratcom, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
@@ -59,9 +60,7 @@ export async function GET() {
         .limit(1)
         .maybeSingle();
       lastUpload = b?.uploaded_at ?? null;
-    } catch {
-      /* the stamp is context, never the point */
-    }
+    } catch (e) { swallow("delivered", e); /* the stamp is context, never the point */ }
 
     const dateSources = [...new Set(rows.map((r) => r.date_source).filter(Boolean))] as string[];
 
@@ -79,7 +78,7 @@ export async function GET() {
       pipeline = (act || []).map((j) => ({
         ...j, val: Number(j.val) || 0, tp: Number(j.tp) || 0, tpv: Number(j.tpv) || 0,
       }));
-    } catch { /* the board is optional context here */ }
+    } catch (e) { swallow("delivered", e); /* the board is optional context here */ }
 
     // INSTALLATION STAGE (Dr Raghu, 30 Aug 2026): delivered from the factory,
     // standing at site — the ledger names them, the live board lends their
@@ -105,7 +104,7 @@ export async function GET() {
           status: String(j?.client_update || "").replace(/[#*|]/g, " ").replace(/\s+/g, " ").trim().slice(0, 220) || null,
         };
       });
-    } catch { /* the board is optional context here */ }
+    } catch (e) { swallow("delivered", e); /* the board is optional context here */ }
 
     // the monthly TARGET the run-rate box measures against — from settings
     // once 0102 is in; the stated numbers (10 Cr value, 4 Cr throughput,
@@ -116,7 +115,7 @@ export async function GET() {
       const t = (st?.delivered_targets ?? null) as { value_cr?: number; tp_cr?: number; nos?: number } | null;
       if (t && (Number(t.value_cr) || Number(t.tp_cr)))
         targets = { value_cr: Number(t.value_cr) || 10, tp_cr: Number(t.tp_cr) || 4, nos: Number(t.nos) || null };
-    } catch { /* pre-0102 — the defaults stand */ }
+    } catch (e) { swallow("delivered", e); /* pre-0102 — the defaults stand */ }
 
     return NextResponse.json({
       pipeline,

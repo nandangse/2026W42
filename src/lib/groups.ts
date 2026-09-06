@@ -42,10 +42,6 @@ export const isLC = (p: GroupFlags | null | undefined): boolean =>
 export const isStratcom = (p: GroupFlags | null | undefined): boolean =>
   owner(p) || !!p?.stratcom;
 
-/** Management. Independent of the other two. */
-export const isManagement = (p: GroupFlags | null | undefined): boolean =>
-  owner(p) || !!p?.management;
-
 /**
  * Apply rule 1 to a pair of tick boxes on their way to the database.
  *

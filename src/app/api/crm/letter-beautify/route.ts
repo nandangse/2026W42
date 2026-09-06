@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readBody } from "@/lib/validate";
+import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import Anthropic from "@anthropic-ai/sdk";
 import { errJson, HttpError } from "@/lib/auth";
@@ -24,7 +26,7 @@ export async function POST(req: Request) {
       throw new HttpError(503, "Server is missing ANTHROPIC_API_KEY — add it in the Vercel env vars.");
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const qid = String((await req.json()).quotation_id ?? "");
+    const qid = String((await readBody(req, {})).quotation_id ?? "");
     if (!qid) throw new HttpError(400, "Which quotation?");
 
     const { data: qt } = await db.from("quotation")
@@ -51,7 +53,7 @@ export async function POST(req: Request) {
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const msg = await anthropic.messages.create({
-      model: "claude-opus-5",
+      model: AI.FRONT,
       max_tokens: 1200,
       output_config: { effort: "low" },
       system: `You polish the covering letter of a NANDAN GSE sales quotation. About Nandan:\n${NANDAN.slice(0, 1500)}\n\nTHE DRAFT IS THE LETTER (Dr Raghu, 30 Aug 2026: "consider the content that is already there — add masala, don't disregard it"). Every point, fact, promise and paragraph intent in the draft SURVIVES into your output — you sharpen the sentences, warm the tone, add the masala; you never replace the letter with your own. Keep its salutation, its sign-off, its flavour (${String(qt.letter_template || "Standard")}). Weave in the customer and quote specifics where they strengthen what is already said. Do not invent facts, prices or dates.\n\nRespond with HTML only (no markdown, no preamble): the same letter, better — <p> paragraphs.`,
