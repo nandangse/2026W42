@@ -75,6 +75,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.0.0",
+    date: "2026-09-06",
+    module: "Genie 5 \u2014 the main digit, on Dr Raghu\u2019s word",
+    items: [
+      "\"lets make the version 5.0 now. We will move a major version as I will complete most things inside and then start real simplifications\" (Dr Raghu, 6 Sep 2026). The main digit moves only when he says so, and he has: Genie 4 closes at 4.4.5.0 with eight module doors standing \u2014 Main, CRM, HRMS, Kuber, Vishwakarma, Seva, IMS, Saamaan. Genie 5 is the release in which what is inside each is finished, and then made simpler. Nothing else changes with this number; every entry after it takes the digits by the same four rules.",
+    ],
+  },
+  {
     v: "4.4.5.0",
     date: "2026-09-04",
     module: "HRMS — the Employee Handbook, edition 14, published",
