@@ -200,7 +200,11 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
       </div>
       <input ref={fileInput} type="file" accept="image/*" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadAndInsert(f); e.target.value = ""; }} />
-      <div ref={ref} contentEditable suppressContentEditableWarning onPaste={onPaste} role="button" tabIndex={0} onClick={pickImg}
+      {/* An editor is not a button. The 5.0.1.0 keyboard pass marked every
+          clickable box role="button"; on a contentEditable that made Enter a
+          press rather than a new line (Dr Raghu, 6 Sep 2026: "the enter is
+          not working in the text box"). */}
+      <div ref={ref} contentEditable suppressContentEditableWarning onPaste={onPaste} onClick={pickImg}
         onInput={live && onChangeHtml ? () => onChangeHtml(ref.current?.innerHTML || "") : undefined}
         data-placeholder={placeholder || ""}
         className="w-full rounded border p-3 text-sm rich-html"

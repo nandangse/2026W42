@@ -13,6 +13,9 @@ export default function A11y() {
       if (e.key !== "Enter" && e.key !== " ") return;
       const el = e.target as HTMLElement | null;
       if (!el || el.tagName === "BUTTON" || el.tagName === "A" || el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT") return;
+      // Never inside something being typed into: on a contentEditable, Enter
+      // is a new line and Space is a space (6 Sep 2026).
+      if (el.isContentEditable || el.closest("[contenteditable='true'], [contenteditable='']")) return;
       if (el.getAttribute("role") !== "button") return;
       e.preventDefault();
       el.click();

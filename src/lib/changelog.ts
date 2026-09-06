@@ -78,6 +78,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.2.4",
+    date: "2026-09-06",
+    module: "Enter works again in every rich box",
+    items: [
+      "\"the enter is not working in the text box\" (Dr Raghu, 6 Sep 2026). Mine: the keyboard pass in 5.0.1.0 marked every clickable box as a button so it could be reached by keyboard, and the rich text editor's writing area was one of them — after which Enter counted as pressing a button, and the line never broke. The editor is no longer a button, and the keyboard helper now keeps its hands off anything being typed into. Every rich box in Genie is affected: the CRM's notes, IMS evidence, Marketing's templates and messages.",
+    ],
+  },
+  {
     v: "5.0.2.3",
     date: "2026-09-06",
     module: "Marketing — the message is rich text, the variables beside it",
