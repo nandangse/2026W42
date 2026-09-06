@@ -244,8 +244,8 @@ function ApplyBox({ kind, spec, onClose, onDone }: { kind: string; spec: { label
     finally { setBusy(false); }
   };
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={onClose}>
-      <div className="w-full p-4" style={{ background: "#fff", borderRadius: "14px 14px 0 0", maxWidth: 640, maxHeight: "88vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }} role="button" tabIndex={0} onClick={onClose}>
+      <div className="w-full p-4" style={{ background: "#fff", borderRadius: "14px 14px 0 0", maxWidth: 640, maxHeight: "88vh", overflowY: "auto" }} role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
         <div className="font-bold" style={{ fontSize: 18 }}>Apply for {spec.label}</div>
         <div className="text-xs mt-1" style={{ color: C.faint }}>Goes to HR as an application under HR Queries. You see the answer there.</div>
         {err && <div className="text-sm font-semibold mt-2" style={{ color: C.red }}>{err}</div>}

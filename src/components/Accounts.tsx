@@ -12,9 +12,8 @@
  */
 
 import { useEffect, useState } from "react";
+import GenieShell from "@/components/GenieShell";
 import { swallow } from "@/lib/swallow";
-import { APP_VERSION } from "@/lib/version";
-import ModuleMenu from "@/components/ModuleMenu";
 import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
 import KuberTasking from "@/components/kuber/Tasking";
@@ -159,31 +158,7 @@ export default function Accounts({
     <MoneyProvider>
     <div className="min-h-screen" style={{ background: "#F1EFE9", color: "#22303C" }}>
       {/* ═══════════════════ header ═══════════════════ */}
-      <div style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0, zIndex: 40 }}>
-        <div className="px-3 py-2 flex items-center gap-2.5">
-          {/* the company's own mark leads (Dr Raghu, 28 Aug 2026), the HRMS way */}
-          <div className="rounded bg-white px-1.5 py-1 flex-shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={LOGO} alt="Nandan GSE" style={{ height: 22, display: "block" }} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-bold tracking-widest" style={{ fontSize: 11, color: "#F5B32B" }}>
-                KUBER GENIE
-              </span>
-              <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 9, background: "#22303C", color: "#8FA1B3" }}>
-                V {APP_VERSION}
-              </span>
-            </div>
-            <div className="font-bold text-white leading-tight" style={{ fontSize: 13 }}>
-              The books, the bank and the balances
-            </div>
-          </div>
-          <span className="ml-auto" />
-          <UnitPicker />
-          <ModuleMenu current="accounts" email={email} displayName={displayName} initials={initials} role={role} />
-        </div>
-      </div>
+      <GenieShell module="accounts" title="Nandan Kuber" tagline="The books, the bank and the balances" user={{ email, displayName, initials, role }} tools={<UnitPicker />} />
 
       <div style={{ display: "flex", alignItems: "stretch", minHeight: "calc(100vh - 46px)" }}>
         {/* ═══════════════════ left navbar — folds to an icon rail ═══════════════════ */}

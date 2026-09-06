@@ -17,6 +17,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 import { GROUPS, normaliseGroups } from "@/lib/groups";
+import { accessStory } from "@/lib/roles-text";
+import AccessLog from "@/components/users/AccessLog";
 
 export interface UserRow {
   id: string;
@@ -31,6 +33,11 @@ export interface UserRow {
   department_id: string | null;
   last_sign_in_at: string | null;
   goals_level: "none" | "view" | "edit";
+  kind?: "employee" | "consultant" | "intern";
+  emp_type?: string | null;
+  emp_id?: string | null;
+  emp_phone?: string | null;
+  emp_active?: boolean | null;
   lc?: boolean;
   stratcom?: boolean;
   management?: boolean;
@@ -100,6 +107,13 @@ export default function UsersApp({
   const [showLog, setShowLog] = useState(false);
   const [log, setLog] = useState<{ at: string; by_email: string; action: string; target: string }[] | null>(null);
   const [showGone, setShowGone] = useState(false);
+  // Active / Inactive (default Active); Employees / Consultant / Intern (default Employees) — Dr Raghu, 6 Sep 2026
+  const [status, setStatusF] = useState<"active" | "inactive" | "all">("active");
+  const [kindF, setKindF] = useState<"employee" | "consultant" | "intern" | "all">("employee");
+  /** Click an app above the table to see who holds it. */
+  const [appF, setAppF] = useState<AppKey | "goals" | null>(null);
+  const [showId, setShowId] = useState(false);
+  const [prov, setProv] = useState(false);
 
   const deptName = (id?: string | null) => departments.find((d) => d.id === id)?.name ?? "";
   const personName = (id?: string | null) => (users ?? []).find((p) => p.id === id)?.display_name ?? "";
@@ -110,7 +124,11 @@ export default function UsersApp({
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const list = (users ?? []).filter((u) => showGone || !u.disabled).filter((u) => {
+    const list = (users ?? [])
+      .filter((u) => status === "all" ? true : status === "active" ? !u.disabled : u.disabled)
+      .filter((u) => kindF === "all" ? true : (u.kind || "employee") === kindF)
+      .filter((u) => appF === null ? true : appF === "goals" ? (u.goals_level || "none") !== "none" : hasApp(u, appF))
+      .filter((u) => {
       if (!needle) return true;
       const hay = [u.initials, u.display_name, u.email, u.erp_owner, u.designation, deptName(u.department_id), roleLabel(u.role)].join(" ").toLowerCase();
       return hay.includes(needle);
@@ -126,7 +144,7 @@ export default function UsersApp({
     };
     return list.sort((a, b) => val(a).localeCompare(val(b), "en", { sensitivity: "base", numeric: true }) * sort.d);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [users, q, sort, showGone, departments]);
+  }, [users, q, sort, showGone, departments, status, kindF, appF]);
 
   const allPicked = rows.length > 0 && rows.every((u) => picked.has(u.id));
   const selectAll = () => setPicked(new Set(rows.map((u) => u.id)));
@@ -180,10 +198,33 @@ export default function UsersApp({
           </div>
         </div>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search name, email, role, department…" className="text-xs" style={{ ...inp, width: 250 }} />
-        <label className="text-xs flex items-center gap-1" style={{ color: DIM, cursor: "pointer" }}>
-          <input type="checkbox" checked={showGone} onChange={(e) => setShowGone(e.target.checked)} /> show disabled
+        <select value={status} onChange={(e) => setStatusF(e.target.value as typeof status)} className="text-xs" style={{ ...inp, width: 110 }} title="Active or inactive logins">
+          <option value="active">Active</option><option value="inactive">Inactive</option><option value="all">All</option>
+        </select>
+        <select value={kindF} onChange={(e) => setKindF(e.target.value as typeof kindF)} className="text-xs" style={{ ...inp, width: 130 }} title="Employees, consultants or interns — set on each person">
+          <option value="employee">Employees</option><option value="consultant">Consultants</option><option value="intern">Interns</option><option value="all">Everyone</option>
+        </select>
+        <label className="text-xs flex items-center gap-1" style={{ color: DIM, cursor: "pointer" }} title="Show the HRMS type, employee id and login id">
+          <input type="checkbox" checked={showId} onChange={(e) => setShowId(e.target.checked)} /> show ID
         </label>
+        {isOwner && <button onClick={() => setProv(true)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#16232F", color: "#fff" }} title="Make a login for every active employee on the HRMS roll">👥 Logins for the roll</button>}
         {canEdit && <button onClick={() => setAdding(true)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: ORANGE, color: "#fff" }}>+ Add user</button>}
+      </div>
+
+      {/* ── the apps: click one to see who holds it (Dr Raghu, 6 Sep 2026) ── */}
+      <div className="px-3 py-1.5 flex items-center gap-1.5 flex-wrap text-xs" style={{ background: "#fff", borderBottom: `1px solid ${LINE}` }}>
+        <span className="font-bold mr-1" style={{ color: FAINT }}>WHO HAS</span>
+        {[...APPS.map((a) => ({ key: a.key as AppKey | "goals", label: a.label, icon: a.icon, color: a.color })), { key: "goals" as const, label: "Goals", icon: "🎯", color: "#8A5B00" }].map((a) => {
+          const n = (users ?? []).filter((u) => !u.disabled && (a.key === "goals" ? (u.goals_level || "none") !== "none" : hasApp(u, a.key as AppKey))).length;
+          const on = appF === a.key;
+          return (
+            <button key={a.key} onClick={() => setAppF(on ? null : a.key)} className="rounded px-2 py-1 font-semibold"
+              style={{ border: `1px solid ${on ? a.color : LINE}`, background: on ? a.color : "#fff", color: on ? "#fff" : a.color }} title={`${n} active login${n === 1 ? "" : "s"} hold ${a.label} — click to list them and give or take`}>
+              {a.icon} {a.label} <span className="tnum" style={{ opacity: 0.8 }}>{n}</span>
+            </button>
+          );
+        })}
+        {appF && <button onClick={() => setAppF(null)} className="ml-1 font-semibold" style={{ color: DIM }}>✕ everyone</button>}
       </div>
 
       {/* ── selection bar ── */}
@@ -209,6 +250,7 @@ export default function UsersApp({
               {th("initials", "Initials")}
               {th("name", "Name")}
               {th("email", "Email")}
+              {showId && th(null, "Type · ID")}
               {th("apps", "Apps")}
               {th(null, "Edit", { textAlign: "center" })}
               {th(null, "Delete", { textAlign: "center" })}
@@ -217,9 +259,9 @@ export default function UsersApp({
           </thead>
           <tbody>
             {users === null && [0, 1, 2].map((i) => (
-              <tr key={"sk" + i} style={{ borderTop: `1px solid #EEECE6` }}><td className="py-2 px-2" colSpan={8}><div className="rounded" style={{ height: 12, width: `${60 - i * 10}%`, background: "#EFEDE7" }} /></td></tr>
+              <tr key={"sk" + i} style={{ borderTop: `1px solid #EEECE6` }}><td className="py-2 px-2" colSpan={9}><div className="rounded" style={{ height: 12, width: `${60 - i * 10}%`, background: "#EFEDE7" }} /></td></tr>
             ))}
-            {users !== null && rows.length === 0 && <tr><td className="py-4 px-2" colSpan={8} style={{ color: FAINT }}>Nobody matches.</td></tr>}
+            {users !== null && rows.length === 0 && <tr><td className="py-4 px-2" colSpan={9} style={{ color: FAINT }}>Nobody matches.</td></tr>}
             {rows.map((u) => {
               const owner = u.email.toLowerCase() === ownerEmail;
               const on = picked.has(u.id);
@@ -241,6 +283,14 @@ export default function UsersApp({
                     {u.disabled && <span className="ml-1 rounded px-1 font-bold" style={{ background: "#FBEDEA", color: RED, fontSize: 9 }}>DISABLED</span>}
                   </td>
                   <td className="py-1.5 px-2" style={{ color: DIM }}>{u.email}</td>
+                  {showId && (
+                    <td className="py-1.5 px-2 text-xs" style={{ color: DIM }}>
+                      <span className="rounded px-1 font-bold" style={{ background: /labour/i.test(u.emp_type || "") ? "#FFF3E8" : /contract/i.test(u.emp_type || "") ? "#EEF2FF" : "#E6F4EA", color: INK, fontSize: 10 }}>{u.emp_type || "no HRMS record"}</span>
+                      {u.emp_id && <span className="ml-1 tnum">{u.emp_id}</span>}
+                      {u.emp_phone && <span className="ml-1 tnum" style={{ color: FAINT }} title="the mobile the first password was made from">📱 {u.emp_phone}</span>}
+                      <span className="ml-1 rounded px-1" style={{ background: "#F4F2EC", fontSize: 10 }}>{u.kind || "employee"}</span>
+                    </td>
+                  )}
                   <td className="py-1.5 px-2">
                     <div className="flex gap-1 flex-wrap">
                       {APPS.map((a) => {
@@ -254,6 +304,17 @@ export default function UsersApp({
                           </button>
                         );
                       })}
+                      {(() => {
+                        const lvl = u.goals_level || "none"; const has = lvl !== "none"; const can = mayTouch(u);
+                        const next = lvl === "none" ? "view" : lvl === "view" ? "edit" : "none";
+                        return (
+                          <button onClick={can ? () => run(`Goals: ${nameOf(u)} can ${next === "none" ? "no longer see the tree" : next}`, () => api.post("/api/admin/goal-access", { person_id: u.id, level: next })) : undefined}
+                            className="rounded px-1.5 font-semibold" style={{ fontSize: 10.5, lineHeight: "18px", border: `1px solid ${has ? "#8A5B00" : LINE}`, background: has ? "#8A5B00" : "#fff", color: has ? "#fff" : FAINT, cursor: can ? "pointer" : "default" }}
+                            title={`Goals · ${lvl === "none" ? "no access" : "can " + lvl} — click to cycle none → view → edit`}>
+                            🎯 Goals{has ? ` · ${lvl}` : ""}
+                          </button>
+                        );
+                      })()}
                     </div>
                   </td>
                   <td className="py-1.5 px-2 text-center">
@@ -305,6 +366,7 @@ export default function UsersApp({
           ownerEmail={ownerEmail} isOwner={isOwner} meEmail={meEmail} onClose={() => setOpen(null)} reload={loadUsers} />
       )}
       {adding && <AddUser departments={departments} isOwner={isOwner} onClose={() => setAdding(false)} reload={loadUsers} />}
+      {prov && <Provision onClose={() => setProv(false)} reload={loadUsers} />}
       {mass && pickedRows.length > 0 && (
         <MassEdit rows={pickedRows} users={users ?? []} departments={departments} ownerEmail={ownerEmail} isOwner={isOwner} meEmail={meEmail}
           onClose={() => setMass(false)} reload={async () => { await loadUsers(); }} onDone={(n) => { setMsg(`Applied to ${n} ✓`); }} />
@@ -380,6 +442,11 @@ function UserLightbox({ u, users, departments, canEdit, ownerEmail, isOwner, meE
   const profOk = canEdit || (isOwner && owner);
   const dis = !canEdit || busy;
   const groups = { lc: !!u.lc, stratcom: !!u.stratcom, management: !!u.management };
+  const [tab, setTab] = useState<"settings" | "access" | "log">("settings");
+  const story = accessStory({ ...u, isOwner: owner });
+  const tabBtn = (k: typeof tab, label: string) => (
+    <button onClick={() => setTab(k)} className="px-3 py-1.5 text-xs font-bold rounded-t" style={{ background: tab === k ? "#fff" : "transparent", color: tab === k ? INK : "#8FA1B3", borderBottom: tab === k ? "2px solid #E8600A" : "2px solid transparent" }}>{label}</button>
+  );
 
   return (
     <Shell onClose={onClose} width={820}
@@ -387,8 +454,25 @@ function UserLightbox({ u, users, departments, canEdit, ownerEmail, isOwner, meE
       title={<>{u.display_name || u.email.split("@")[0]} {owner && <span className="rounded px-1.5 font-bold ml-1" style={{ background: "#FFF3E8", color: ORANGE, fontSize: 10 }}>OWNER</span>}</>}
       sub={<>{u.email} · {roleLabel(u.role)} · {u.disabled ? "disabled" : "active"} · last seen {u.last_sign_in_at ? fmtFull(String(u.last_sign_in_at)) : "never"}{!canEdit && " · read-only for you"}</>}>
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: msg.includes("✓") ? GREEN : RED }}>{msg}</div>}
+      <div className="flex gap-1 mb-3" style={{ borderBottom: `1px solid ${LINE}` }}>
+        {tabBtn("settings", "⚙ Settings")}{tabBtn("access", "🔐 Roles & access")}{tabBtn("log", "📅 Access log")}
+      </div>
 
-      <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
+      {tab === "access" && (
+        <div>
+          <div className="text-xs mb-3" style={{ color: DIM }}>What this login opens, in English — and, under each, what it still does not let them do.</div>
+          {story.map((p) => (
+            <div key={p.title} className="rounded border p-3 mb-2" style={{ borderColor: LINE, background: "#FBFAF7" }}>
+              <div className="font-bold text-sm mb-1" style={{ color: INK }}>{p.title}</div>
+              <div className="text-sm" style={{ color: "#22303C", lineHeight: 1.5 }}>{p.means}</div>
+              <div className="text-sm mt-1.5 rounded px-2 py-1.5" style={{ background: "#FFF7E6", color: "#8A5B00", lineHeight: 1.5 }}><b>Limits:</b> {p.limits}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {tab === "log" && <AccessLog userId={u.id} />}
+
+      <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr", display: tab === "settings" ? "grid" : "none" }}>
         <Section title="Identity">
           <div className="grid gap-2" style={{ gridTemplateColumns: "80px 1fr" }}>
             <Field label="Initials" hint="Two or three letters, unique — the key tasks are assigned by">
@@ -411,6 +495,11 @@ function UserLightbox({ u, users, departments, canEdit, ownerEmail, isOwner, meE
               </select>
             </Field>
           </div>
+          <div className="mt-2"><Field label="Kind" hint="Employee, consultant or intern — the Users filter reads this; default employee">
+            <select value={u.kind || "employee"} disabled={!profOk || busy} onChange={(e) => profile({ kind: e.target.value }, "Kind saved")} style={inp}>
+              <option value="employee">Employee</option><option value="consultant">Consultant</option><option value="intern">Intern</option>
+            </select>
+          </Field></div>
           <div className="mt-2"><Field label="Reports to" hint="Their line manager — Tasking's “people reporting to me” reads this">
             <select value={u.reports_to || ""} disabled={!profOk || busy} onChange={(e) => profile({ reports_to: e.target.value }, "Manager saved")} style={inp}>
               <option value="">— nobody —</option>
@@ -465,7 +554,7 @@ function UserLightbox({ u, users, departments, canEdit, ownerEmail, isOwner, meE
         </div>
       </div>
 
-      <Section title="Account">
+      {tab === "settings" && <Section title="Account">
         <div className="flex gap-2 flex-wrap items-center text-xs">
           <button disabled={dis || owner || u.email.toLowerCase() === meEmail} onClick={() => { if (!u.disabled && !window.confirm(`Disable ${u.email}?\n\nThey will no longer be able to sign in until re-enabled.`)) return; act(u.disabled ? "Sign-in enabled" : "Sign-in disabled", { action: "disable", id: u.id, disabled: !u.disabled }); }}
             className="rounded px-3 py-1.5 font-bold" style={{ background: u.disabled ? RED : "#E6F4EA", color: u.disabled ? "#fff" : GREEN, opacity: dis || owner ? 0.5 : 1 }}>
@@ -476,7 +565,62 @@ function UserLightbox({ u, users, departments, canEdit, ownerEmail, isOwner, meE
           <span style={{ flex: 1 }} />
           <button disabled={dis || owner || u.email.toLowerCase() === meEmail} onClick={async () => { if (!window.confirm(`Remove ${u.email}?\n\nThey will no longer be able to sign in. Their plans, comments and edits remain in the app.`)) return; await act(`${u.email} removed`, { action: "delete", id: u.id }); onClose(); }} className="rounded px-3 py-1.5 font-bold" style={{ background: "#FBEDEA", color: RED, opacity: dis || owner ? 0.5 : 1 }}>✕ Remove account</button>
         </div>
-      </Section>
+      </Section>}
+    </Shell>
+  );
+}
+
+/* ───────────────────────── logins for the roll ───────────────────────── */
+
+function Provision({ onClose, reload }: { onClose: () => void; reload: () => Promise<void> }) {
+  const [types, setTypes] = useState<Record<string, boolean>>({ staff: true, labour: true, contractors: false });
+  const [plan, setPlan] = useState<{ name: string; employee_id: string | null; type: string | null; login: string | null; password: string | null; why: string }[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const chosen = Object.keys(types).filter((k) => types[k]);
+  const preview = async () => {
+    setBusy(true); setMsg("");
+    try { setPlan(((await post({ action: "provision", preview: true, types: chosen })) as { plan: typeof plan }).plan); }
+    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  const go = async () => {
+    const n = (plan ?? []).filter((p) => p.why === "will be made").length;
+    if (!n || !window.confirm(`Make ${n} login${n === 1 ? "" : "s"} now?\n\nLogin id = personal e-mail (or the official one); first password = the mobile number's digits. They can also sign in with a code by e-mail.`)) return;
+    setBusy(true); setMsg("");
+    try { const r = (await post({ action: "provision", types: chosen })) as { made: number; failed: string[] }; setMsg(`${r.made} made${r.failed.length ? ` · ${r.failed.length} failed: ${r.failed.join("; ")}` : ""} ✓`); await reload(); setPlan(null); }
+    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Shell onClose={onClose} width={860} title="Logins for the roll" sub="Every active employee on the HRMS master gets a Genie login — id from the personal e-mail, first password from the mobile number.">
+      <div className="flex gap-3 flex-wrap items-center text-xs mb-3">
+        {(["staff", "labour", "contractors"] as const).map((k) => (
+          <label key={k} className="flex items-center gap-1 font-semibold" style={{ color: INK, cursor: "pointer" }}>
+            <input type="checkbox" checked={!!types[k]} onChange={(e) => setTypes({ ...types, [k]: e.target.checked })} /> {k[0].toUpperCase() + k.slice(1)}
+          </label>
+        ))}
+        <button onClick={preview} disabled={busy || !chosen.length} className="rounded px-3 py-1.5 font-bold" style={{ background: "#1B3A5C", color: "#fff" }}>{busy ? "…" : "Preview who would be made"}</button>
+        {plan && <button onClick={go} disabled={busy} className="rounded px-3 py-1.5 font-bold" style={{ background: ORANGE, color: "#fff" }}>Make {(plan ?? []).filter((p) => p.why === "will be made").length} logins</button>}
+        {msg && <span className="font-semibold" style={{ color: msg.includes("✓") ? GREEN : RED }}>{msg}</span>}
+      </div>
+      {plan && (
+        <div className="genie-scroll" style={{ maxHeight: "60vh" }}>
+          <table className="genie-table">
+            <thead><tr><th>Name</th><th>ID</th><th>Type</th><th>Login id</th><th>First password</th><th>Outcome</th></tr></thead>
+            <tbody>
+              {plan.map((p, i) => (
+                <tr key={i}>
+                  <td>{p.name}</td><td className="tnum">{p.employee_id || "·"}</td><td>{p.type || "·"}</td><td>{p.login || <span style={{ color: RED }}>none</span>}</td>
+                  <td className="tnum">{p.password || "·"}</td>
+                  <td style={{ color: p.why === "will be made" ? GREEN : p.why === "already has a login" ? FAINT : "#8A5B00", fontWeight: 600 }}>{p.why}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {!plan && <div className="text-xs" style={{ color: FAINT }}>Nothing is created until you press Make. Preview first; it lists every person and says why each will or will not get a login.</div>}
     </Shell>
   );
 }

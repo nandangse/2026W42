@@ -315,7 +315,7 @@ export default function MailComposer({ ctx, onClose, onSent }: {
             </button>
             {varOpen && (
               <>
-                <div className="fixed inset-0" style={{ zIndex: 4 }} onClick={() => setVarOpen(false)} />
+                <div className="fixed inset-0" style={{ zIndex: 4 }} role="button" tabIndex={0} onClick={() => setVarOpen(false)} />
                 <div className="absolute rounded border bg-white" style={{ bottom: "calc(100% + 6px)", right: 0, zIndex: 5, borderColor: BORDER, boxShadow: "0 8px 24px rgba(0,0,0,.15)", maxHeight: 240, overflow: "auto", minWidth: 180 }}>
                   {vars.map((v) => (
                     <button key={v} onClick={() => insertVar(v)} className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50" style={{ color: INK }}>

@@ -182,7 +182,7 @@ export default function DataTable<T>({
             return (
               <tr
                 key={k}
-                onClick={onRowClick ? () => onRowClick(r) : undefined}
+                role="button" tabIndex={0} onClick={onRowClick ? () => onRowClick(r) : undefined}
                 className={onRowClick ? "cursor-pointer" : undefined}
                 style={{ borderTop: "1px solid #EEECE6", background: active ? "#FFF7F0" : "#fff" }}
               >

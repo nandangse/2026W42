@@ -89,9 +89,9 @@ export function RichContent({ text, legacy, thumbs }: { text: string; legacy: (s
   const clean = cleanDesc(text);
   if (looksHtml(clean)) {
     return <div className={"rich-html" + (thumbs ? " rich-thumbs" : "")} style={{ lineHeight: 1.6 }}
-      onClick={thumbs ? expand : undefined} dangerouslySetInnerHTML={{ __html: sanitizeRich(clean) }} />;
+      role="button" tabIndex={0} onClick={thumbs ? expand : undefined} dangerouslySetInnerHTML={{ __html: sanitizeRich(clean) }} />;
   }
-  return <div className={thumbs ? "rich-thumbs" : undefined} onClick={thumbs ? expand : undefined}>{legacy(clean)}</div>;
+  return <div className={thumbs ? "rich-thumbs" : undefined} role="button" tabIndex={0} onClick={thumbs ? expand : undefined}>{legacy(clean)}</div>;
 }
 
 const COLORS = ["#16232F", "#B3261E", "#E8600A", "#0D7A3F", "#1B3A5C", "#7C3AED"];
@@ -200,7 +200,7 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
       </div>
       <input ref={fileInput} type="file" accept="image/*" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadAndInsert(f); e.target.value = ""; }} />
-      <div ref={ref} contentEditable suppressContentEditableWarning onPaste={onPaste} onClick={pickImg}
+      <div ref={ref} contentEditable suppressContentEditableWarning onPaste={onPaste} role="button" tabIndex={0} onClick={pickImg}
         onInput={live && onChangeHtml ? () => onChangeHtml(ref.current?.innerHTML || "") : undefined}
         data-placeholder={placeholder || ""}
         className="w-full rounded border p-3 text-sm rich-html"

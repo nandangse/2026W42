@@ -13,9 +13,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import GenieShell from "@/components/GenieShell";
 import { swallow } from "@/lib/swallow";
-import { APP_VERSION } from "@/lib/version";
-import ModuleMenu from "@/components/ModuleMenu";
 import PlaybookScreen from "@/components/Playbook";
 import { dmy as fmtD } from "@/lib/fmt";
 
@@ -123,7 +122,7 @@ function ProblemsScreen() {
         <tbody>
           {rows?.length === 0 && (<tr><td colSpan={6} className="px-3 py-5 text-center" style={{ color: MUTED }}>No problems raised — when one appears on the floor, it belongs here within the hour.</td></tr>)}
           {(rows || []).map((r, i) => (
-            <tr key={r.id} className="border-t" onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+            <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
               <td className="px-2 py-1.5"><StatusChip s={String(r.status)} palette={PROBLEM_STATUS} /></td>
               <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{String(r.title)}</td>
               <td className="px-2 py-1.5" style={{ color: MUTED }}>{String(r.job || "")} {String(r.machine || "")}</td>
@@ -242,7 +241,7 @@ function IdeasScreen() {
         <tbody>
           {rows?.length === 0 && (<tr><td colSpan={5} className="px-3 py-5 text-center" style={{ color: MUTED }}>No ideas caught yet — the first one is a two-line note away.</td></tr>)}
           {(rows || []).map((r, i) => (
-            <tr key={r.id} className="border-t" onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+            <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
               <td className="px-2 py-1.5"><StatusChip s={String(r.status)} palette={IDEA_STATUS} /></td>
               <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 340, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{String(r.title)}</td>
               <td className="px-2 py-1.5" style={{ color: MUTED }}>{String(r.by || "").split("@")[0]}</td>
@@ -326,7 +325,7 @@ function ReferencesScreen() {
         <tbody>
           {shown.length === 0 && (<tr><td colSpan={5} className="px-3 py-5 text-center" style={{ color: MUTED }}>The library is empty — the first standard someone reaches for twice belongs here.</td></tr>)}
           {shown.map((r, i) => (
-            <tr key={r.id} className="border-t" onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+            <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
               <td className="px-2 py-1.5 font-semibold">{String(r.title)}</td>
               <td className="px-2 py-1.5" style={{ color: MUTED }}>{String(r.category || "—")}</td>
               <td className="px-2 py-1.5" style={{ color: MUTED }}>{String(r.tags || "—")}</td>
@@ -1033,7 +1032,7 @@ function ReviewsScreen({ me }: { me: string }) {
         <tbody>
           {rows?.length === 0 && (<tr><td colSpan={6} className="px-3 py-5 text-center" style={{ color: MUTED }}>The bench is clear — 🪷 Send to Consult Raghu from any problem or idea puts it here.</td></tr>)}
           {(rows || []).map((r, i) => (
-            <tr key={r.id} className="border-t" onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+            <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
               <td className="px-2 py-1.5"><StatusChip s={String(r.status)} palette={{ waiting: "#D97706", reviewed: GREEN }} /></td>
               <td className="px-2 py-1.5 font-bold" style={{ color: MUTED }}>{String(r.source_kind)}</td>
               <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{String(r.title)}</td>
@@ -1147,25 +1146,7 @@ export default function Vishwakarma({
 
   return (
     <div className="min-h-screen" style={{ background: "#F1EFE9", color: "#22303C" }}>
-      <div style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0, zIndex: 40 }}>
-        <div className="px-3 py-2 flex items-center gap-2.5">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-bold tracking-widest" style={{ fontSize: 11, color: "#F5B32B" }}>
-                🛠 NANDAN VISHWAKARMA GENIE
-              </span>
-              <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 9, background: "#22303C", color: "#8FA1B3" }}>
-                V {APP_VERSION}
-              </span>
-            </div>
-            <div className="font-bold text-white leading-tight" style={{ fontSize: 13 }}>
-              The design team&apos;s workroom — problems to root cause, ideas to proof
-            </div>
-          </div>
-          <span className="ml-auto" />
-          <ModuleMenu current="vishwakarma" email={email} displayName={displayName} initials={initials} role={role} />
-        </div>
-      </div>
+      <GenieShell module="vishwakarma" title="Nandan Vishwakarma" tagline="The design team's workroom — problems to root cause, ideas to proof" user={{ email, displayName, initials, role }} />
 
       <div style={{ display: "flex", alignItems: "stretch", minHeight: "calc(100vh - 46px)" }}>
         <nav style={{ width: navOpen ? 236 : 54, flexShrink: 0, background: "#fff", borderRight: "1px solid #E2E0DA", padding: "10px 6px", transition: "width .15s ease" }}>

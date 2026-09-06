@@ -277,7 +277,7 @@ function JobListBox({
             </thead>
             <tbody>
               {rows.map((j) => (
-                <tr key={j.id} onClick={() => onPick(j)} style={{ borderBottom: `1px solid ${C.line}`, cursor: "pointer" }}>
+                <tr key={j.id} role="button" tabIndex={0} onClick={() => onPick(j)} style={{ borderBottom: `1px solid ${C.line}`, cursor: "pointer" }}>
                   <td className="px-3 py-1.5 font-bold tnum" style={{ color: C.navy }}>{jobNo(j.id)}</td>
                   <td className="px-2 py-1.5 truncate" style={{ color: C.body, maxWidth: 190 }}>{j.cust}</td>
                   <td className="px-2 py-1.5 truncate" style={{ color: C.sub, maxWidth: 170 }}>{j.tag}</td>

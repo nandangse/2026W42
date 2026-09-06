@@ -72,7 +72,7 @@ export default function Fnf({ who, isOwner }: { who: string; isOwner: boolean })
             {shown.map((r) => {
               const tone = STATUS_TONE[r.status] || STATUS_TONE.Open;
               return (
-                <tr key={r.id} style={{ borderTop: "1px solid #EEECE6", cursor: "pointer" }} onClick={() => setOpen(r.id)}>
+                <tr key={r.id} style={{ borderTop: "1px solid #EEECE6", cursor: "pointer" }} role="button" tabIndex={0} onClick={() => setOpen(r.id)}>
                   <td className="px-2 py-1.5" style={{ color: C.faint }}>{r.fnf_no || "—"}</td>
                   <td className="px-2 py-1.5"><b style={{ color: "#1B3A5C" }}>{r.name}</b><br /><span style={{ fontSize: 11, color: C.faint }}>{r.employee_id} · {r.designation || "—"} · {r.department || "—"}</span></td>
                   <td className="px-2 py-1.5">{day(r.done_on)}</td>

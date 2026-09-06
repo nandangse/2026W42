@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { currentUser, RAGHU_EMAIL } from "@/lib/auth";
 import PlanningSuite from "@/components/PlanningSuite";
 import MorningUpload from "@/components/MorningUpload";
+import LabourHome from "@/components/LabourHome";
+import { adminClient } from "@/lib/supabase/admin";
+import { hrmsTables } from "@/lib/hrms";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +17,20 @@ export default async function Home() {
 
   if (user.role === "uploader") {
     return <MorningUpload email={user.email} />;
+  }
+
+  // Labour lands on their own sheet's door, not the planning boards
+  // (Dr Raghu, 6 Sep 2026). The HRMS record's type decides; admins never
+  // count as labour.
+  if (user.role !== "admin") {
+    try {
+      const admin = adminClient();
+      const t = await hrmsTables(admin);
+      const e = user.email.toLowerCase();
+      const { data } = await admin.from(t.employees).select("type").or(`user_email.eq.${e},email.eq.${e}`).eq("active", true).limit(1).maybeSingle();
+      if (/labour/i.test(String(data?.type || "")))
+        return <LabourHome email={user.email} displayName={user.displayName} initials={user.initials} role={user.role} />;
+    } catch { /* no HRMS yet: the suite */ }
   }
 
   return (

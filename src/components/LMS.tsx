@@ -492,7 +492,7 @@ function LessonDrawer({ ctx, lesson, onClose }: { ctx: Ctx; lesson: Lesson; onCl
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,0.45)", zIndex: 60, display: "flex", justifyContent: "flex-end" }}
-      onClick={onClose}>
+      role="button" tabIndex={0} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()}
         style={{ width: "min(760px, 100%)", background: "#F1EFE9", height: "100%", overflowY: "auto", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }}>
         <div className="px-4 py-3 flex items-start gap-3" style={{ background: C.ink, position: "sticky", top: 0, zIndex: 2 }}>
@@ -1060,7 +1060,7 @@ function LessonEditor({ ctx, id, onClose }: { ctx: Ctx; id?: string; onClose: ()
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,0.45)", zIndex: 60, display: "flex", justifyContent: "flex-end" }} onClick={onClose}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,0.45)", zIndex: 60, display: "flex", justifyContent: "flex-end" }} role="button" tabIndex={0} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()}
         style={{ width: "min(720px, 100%)", background: "#fff", height: "100%", overflowY: "auto", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }}>
         <div className="px-4 py-3 flex items-center gap-3" style={{ background: C.ink, position: "sticky", top: 0, zIndex: 2 }}>

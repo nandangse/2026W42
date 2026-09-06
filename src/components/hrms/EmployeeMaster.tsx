@@ -462,8 +462,8 @@ function PersonCard({ e, frozen, onClose }: { e: HrmsEmployee; frozen?: boolean;
   const edit = () => window.open(`/hrms/employee/${encodeURIComponent(e.id)}`, "_blank", "noopener");
 
   return (
-    <div className="fixed inset-0 flex justify-end no-print" style={{ background: "rgba(13,22,31,0.35)", zIndex: 60 }} onClick={onClose}>
-      <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(620px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} onClick={(ev) => ev.stopPropagation()}>
+    <div className="fixed inset-0 flex justify-end no-print" style={{ background: "rgba(13,22,31,0.35)", zIndex: 60 }} role="button" tabIndex={0} onClick={onClose}>
+      <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(620px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} role="button" tabIndex={0} onClick={(ev) => ev.stopPropagation()}>
         <div className="px-4 py-3 sticky top-0" style={{ background: "#16232F", color: "#fff", zIndex: 2 }}>
           <div className="flex items-start gap-2">
             <div style={{ minWidth: 0 }}>

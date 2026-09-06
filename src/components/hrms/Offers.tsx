@@ -917,8 +917,8 @@ function LetterPreview({ d }: { d: Offer }) {
 /* ── small parts ── */
 function Modal({ title, sub, chip, onClose, width, children }: { title: string; sub?: string; chip?: React.ReactNode; onClose: () => void; width: number; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3" style={{ background: "rgba(15,23,32,.55)" }} onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl flex flex-col" style={{ width: `min(${width}px,96vw)`, maxHeight: "94vh" }} onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3" style={{ background: "rgba(15,23,32,.55)" }} role="button" tabIndex={0} onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl flex flex-col" style={{ width: `min(${width}px,96vw)`, maxHeight: "94vh" }} role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${C.line}` }}>
           <div className="flex items-baseline gap-2 flex-wrap">
             <div className="font-bold" style={{ fontSize: 15.5 }}>{title}</div>

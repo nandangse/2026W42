@@ -191,10 +191,10 @@ export function TeamReview({ row, onClose }: { row: TeamRow; onClose: () => void
   };
 
   return (
-    <div className="fixed inset-0 no-print" style={{ background: "rgba(13,22,31,0.5)", zIndex: 70 }} onClick={onClose}>
+    <div className="fixed inset-0 no-print" style={{ background: "rgba(13,22,31,0.5)", zIndex: 70 }} role="button" tabIndex={0} onClick={onClose}>
       <div className="mx-auto my-3 md:my-6 rounded-lg overflow-y-auto"
         style={{ maxWidth: 860, maxHeight: "calc(100vh - 30px)", background: "#F1EFE9" }}
-        onClick={(e) => e.stopPropagation()}>
+        role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
         <div className="px-4 py-3 sticky top-0 flex items-start gap-2" style={{ background: "#16232F", color: "#fff", zIndex: 2 }}>
           <div>
             <div className="font-bold">{row.name}</div>

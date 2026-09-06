@@ -154,7 +154,7 @@ export default function ForecastView() {
               return (
                 <Fragment key={g}>
                   <tr style={{ background: "#F3F1EB", borderTop: `2px solid ${BORDER}`, cursor: "pointer" }}
-                    onClick={() => setFolded((f) => ({ ...f, [g]: !f[g] }))}>
+                    role="button" tabIndex={0} onClick={() => setFolded((f) => ({ ...f, [g]: !f[g] }))}>
                     <td className="px-3 py-2 font-bold" style={{ position: "sticky", left: 0, background: "#F3F1EB", color: NAVY }}>
                       <span style={{ display: "inline-block", width: 14 }}>{isFolded ? "▸" : "▾"}</span>
                       {g === "opportunity" ? "OPPORTUNITY" : "QUOTATIONS"}

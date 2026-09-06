@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import A11y from "@/components/A11y";
 
 export const metadata: Metadata = {
   title: "Nandan Genie",
@@ -47,7 +48,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><A11y />{children}</body>
     </html>
   );
 }

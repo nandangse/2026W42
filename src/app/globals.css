@@ -189,3 +189,54 @@ input[type="date"] {
   .jobplan-picker { position: static !important; }
   .job-top { position: static !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   GENIE 5 — the common layer (6 Sep 2026)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* The meaning colours from the Genie Table Standard, as variables so a
+   screen can say var(--red) instead of a hex it has to remember. */
+:root {
+  --ink: #22303c; --navy: #16232f; --navy-dark: #0d161f; --paper: #f1efe9;
+  --line: #e2e0da; --line-soft: #efede7; --muted: #8a94a0; --dim: #5a6672;
+  --accent: #e8600a; --amber: #f5b32b; --red: #b3261e; --warn: #d97706; --green: #0d7a3f; --blue: #1b3a5c;
+}
+
+/* ---- the standard table, as one class for the hand-rolled ones ----
+   <div class="genie-scroll"><table class="genie-table">… gets the sticky
+   navy header, zebra rows, right-aligned numbers via .tnum, and horizontal
+   scroll inside its own box on a phone — never the page. */
+.genie-scroll { overflow: auto; max-height: 72vh; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.genie-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+.genie-table thead th { position: sticky; top: 0; z-index: 2; background: var(--navy); color: #fff; font-weight: 700; text-align: left; padding: 8px 10px; }
+.genie-table thead th.num, .genie-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.genie-table tbody tr:nth-child(even) { background: #faf9f5; }
+.genie-table tbody td { padding: 6px 10px; border-top: 1px solid var(--line-soft); vertical-align: top; }
+.genie-table tbody tr:hover { background: #f3f6fa; }
+
+/* ---- responsive: every screen, one rule set ----
+   Tables and wide grids scroll inside their own container; the page body
+   never scrolls sideways. Fixed-width panels give way below 720px. */
+html, body { overflow-x: hidden; }
+img, video, canvas, svg { max-width: 100%; }
+@media (max-width: 720px) {
+  .genie-tagline, .genie-who { display: none !important; }
+  .genie-pop { width: min(92vw, 330px) !important; }
+  /* any hand-rolled table wider than the phone scrolls in place */
+  table { display: block; overflow-x: auto; max-width: 100%; }
+  table.genie-table { display: table; }
+  /* two-column grids collapse to one */
+  .grid[style*="1fr 1fr"] { grid-template-columns: 1fr !important; }
+  /* side rails become a top strip */
+  nav[style*="width: 208px"], nav[style*="width:208px"] { width: 100% !important; border-right: 0 !important; display: flex !important; overflow-x: auto; }
+  nav[style*="width: 208px"] > button, nav[style*="width:208px"] > button { white-space: nowrap; width: auto !important; }
+  .hidden.md\:block { display: block !important; }
+  /* modals sit on the whole screen */
+  .genie-modal { width: 100vw !important; max-height: 100vh !important; border-radius: 0 !important; }
+}
+
+/* ---- keyboard: anything that acts like a button can be reached ----
+   A click handler on a div is given role="button" and tabindex by a
+   codemod; this makes the focus visible and the cursor honest. */
+[role="button"] { cursor: pointer; }
+[role="button"]:focus-visible, button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

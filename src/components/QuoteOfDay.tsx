@@ -87,10 +87,10 @@ export default function QuoteOfDay({ trigger = 0 }: { trigger?: number }) {
     <div
       className="fixed inset-0 flex items-center justify-center p-4"
       style={{ background: "rgba(13,22,31,0.7)", zIndex: 90 }}
-      onClick={() => setShow(false)}
+      role="button" tabIndex={0} onClick={() => setShow(false)}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
+        role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-lg p-5 w-full"
         style={{ maxWidth: 460, borderTop: "5px solid #E8600A" }}
       >

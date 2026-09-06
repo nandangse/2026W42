@@ -292,8 +292,8 @@ function SheetBox({ id, onClose }: { id: string; onClose: () => void }) {
   }, [id]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3" style={{ background: "rgba(15,23,32,.55)" }} onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl flex flex-col" style={{ width: "min(940px,96vw)", maxHeight: "92vh" }} onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3" style={{ background: "rgba(15,23,32,.55)" }} role="button" tabIndex={0} onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl flex flex-col" style={{ width: "min(940px,96vw)", maxHeight: "92vh" }} role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${C.line}` }}>
           <div>
             <div className="font-bold" style={{ fontSize: 15 }}>{d ? `${MONTHS[d.month - 1]} ${d.year}` : "Salary sheet"}</div>

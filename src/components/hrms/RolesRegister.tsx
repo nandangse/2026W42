@@ -235,8 +235,8 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
       />
 
       {current && (
-        <div className="fixed inset-0 flex justify-end no-print" style={{ background: "rgba(13,22,31,0.35)", zIndex: 60 }} onClick={() => setOpen(null)}>
-          <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(1180px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 flex justify-end no-print" style={{ background: "rgba(13,22,31,0.35)", zIndex: 60 }} role="button" tabIndex={0} onClick={() => setOpen(null)}>
+          <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(1180px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 sticky top-0 flex items-start gap-2" style={{ background: "#16232F", color: "#fff", zIndex: 2 }}>
               <div style={{ minWidth: 0 }}>
                 <div className="font-bold">{current.role}</div>

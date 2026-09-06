@@ -106,7 +106,7 @@ export default function ComplianceCalendar() {
                 )}
                 {(data?.rows || []).filter((r) => r.grp === g).map((row) => (
                   <tr key={row.id} className="border-t" style={{ borderColor: "#EFEDE7" }}>
-                    <td className="px-2 py-1.5 font-semibold" onClick={() => setMaster(row)}
+                    <td className="px-2 py-1.5 font-semibold" role="button" tabIndex={0} onClick={() => setMaster(row)}
                       style={{ position: "sticky", left: 0, background: "#fff", zIndex: 1, cursor: "pointer", boxShadow: "2px 0 4px rgba(22,35,47,0.05)" }}
                       title="Edit this compliance">
                       {row.name}
@@ -116,7 +116,7 @@ export default function ComplianceCalendar() {
                     {(data?.months || []).map((m) => {
                       const e = entryOf(row.id, m);
                       return (
-                        <td key={m} onClick={() => setEdit({ row, month: m, e })}
+                        <td key={m} role="button" tabIndex={0} onClick={() => setEdit({ row, month: m, e })}
                           className="px-1.5 py-1.5 text-center" style={{ ...cellStyle(row, m, e), cursor: "pointer", borderLeft: "1px solid #EFEDE7" }}>
                           {e?.done_on ? (
                             e.link

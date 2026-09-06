@@ -166,7 +166,7 @@ export default function KuberTasking() {
           </button>
           {pickerOpen && (
             <>
-              <div className="fixed inset-0" style={{ zIndex: 48 }} onClick={() => setPickerOpen(false)} />
+              <div className="fixed inset-0" style={{ zIndex: 48 }} role="button" tabIndex={0} onClick={() => setPickerOpen(false)} />
               <div className="absolute rounded-lg border bg-white p-1" style={{ top: "calc(100% + 4px)", right: 0, zIndex: 49, borderColor: BORDER, boxShadow: "0 10px 28px rgba(0,0,0,.18)", minWidth: 220, maxHeight: 300, overflow: "auto" }}>
                 {assignees.length === 0 && <div className="px-3 py-2 text-xs" style={{ color: MUTED }}>Nobody holds a tagged task yet.</div>}
                 {assignees.map((w) => (

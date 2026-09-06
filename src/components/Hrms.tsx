@@ -17,13 +17,12 @@
  * Every module in the list keys off a person, so a fetch per pane would mean
  * pulling the same few hundred records again on every click.
  */
-import ModuleMenu from "@/components/ModuleMenu";
 import { swallow } from "@/lib/swallow";
+import GenieShell from "@/components/GenieShell";
 import PlaybookScreen from "@/components/Playbook";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
-import { APP_VERSION } from "@/lib/version";
 import type { HrmsEmployee } from "@/lib/hrms";
 import { NAV, findNav, DEFAULT_KEY } from "@/lib/hrms-nav";
 import EmployeeMaster, { type MasterView } from "./hrms/EmployeeMaster";
@@ -105,46 +104,25 @@ export default function Hrms({
   return (
     <div className="min-h-screen" style={{ background: "#F1EFE9", color: "#22303C" }}>
       {/* ═══════════════════ header ═══════════════════ */}
-      <div className="no-print" style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0, zIndex: 40 }}>
-        <div className="px-3 py-2 flex items-center gap-2.5">
-          <button
-            onClick={() => (window.innerWidth < 860 ? setMobileNav((v) => !v) : setCollapsed((v) => !v))}
-            className="rounded px-2 py-1.5 text-sm"
-            style={{ background: "#22303C", color: "#8FA1B3" }}
-            title={collapsed ? "Show the menu" : "Collapse the menu"}
-            aria-label="Toggle navigation"
-          >
-            ☰
-          </button>
-          <div className="rounded bg-white px-1.5 py-1 flex-shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={LOGO} alt="Nandan GSE" style={{ height: 22, display: "block" }} />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>
-              HRMS
-              <span
-                style={{ background: "#E8600A", color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6, letterSpacing: 0 }}
-                title="Genie's version. HRMS is part of Genie and carries its number — it has none of its own."
-              >
-                V {APP_VERSION}
-              </span>
-            </div>
-            <div className="font-bold text-white leading-tight" style={{ fontSize: 13 }}>
-              Employee master &amp; people records
-            </div>
-          </div>
-
-          <span className="ml-auto hidden sm:block flex-shrink-0" style={{ fontSize: 11, color: "#8FA1B3" }}>{who}</span>
-          {/* the account menu — modules, Reload, Logout — same as the main header's */}
-          <ModuleMenu current="hrms" email={email} displayName={displayName} initials={initials} role={role} />
-        </div>
+      <div className="no-print">
+        <GenieShell module="hrms" title="Nandan HRMS" tagline="Employee master & people records" user={{ email, displayName, initials, role }}
+          leading={
+            <button
+              onClick={() => (window.innerWidth < 860 ? setMobileNav((v) => !v) : setCollapsed((v) => !v))}
+              className="rounded px-2 py-1.5 text-sm"
+              style={{ background: "#22303C", color: "#8FA1B3" }}
+              title={collapsed ? "Show the menu" : "Collapse the menu"}
+              aria-label="Toggle navigation"
+            >
+              ☰
+            </button>
+          } />
       </div>
 
       <div style={{ display: "flex", alignItems: "stretch", minHeight: "calc(100vh - 46px)" }}>
         {/* ═══════════════════ left navbar ═══════════════════ */}
         {mobileNav && (
-          <div className="fixed inset-0 no-print" style={{ background: "rgba(13,22,31,.4)", zIndex: 35 }} onClick={() => setMobileNav(false)} />
+          <div className="fixed inset-0 no-print" style={{ background: "rgba(13,22,31,.4)", zIndex: 35 }} role="button" tabIndex={0} onClick={() => setMobileNav(false)} />
         )}
         <nav
           className="no-print"

@@ -124,7 +124,7 @@ export default function ModuleMenu({
       </button>
       {open && (
         <>
-          <div className="fixed inset-0" style={{ zIndex: 58 }} onClick={() => setOpen(false)} />
+          <div className="fixed inset-0" style={{ zIndex: 58 }} role="button" tabIndex={0} onClick={() => setOpen(false)} />
           <div className="absolute rounded-lg border bg-white"
             style={{ top: "calc(100% + 6px)", right: 0, width: 232, borderColor: "#E2E0DA", boxShadow: "0 12px 30px rgba(0,0,0,.25)", zIndex: 59 }}>
             <div className="px-3 py-2.5" style={{ borderBottom: "1px solid #EEECE6" }}>

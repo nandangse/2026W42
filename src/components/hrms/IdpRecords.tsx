@@ -107,8 +107,8 @@ export default function IdpRecords({ who }: { who: string }) {
         empty={rows === null ? "loading…" : "Nobody has started an IDP yet."} />
 
       {openId && (
-        <div className="fixed inset-0 flex justify-end no-print" style={{ background: "rgba(13,22,31,0.35)", zIndex: 60 }} onClick={() => setOpenId(null)}>
-          <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(860px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 flex justify-end no-print" style={{ background: "rgba(13,22,31,0.35)", zIndex: 60 }} role="button" tabIndex={0} onClick={() => setOpenId(null)}>
+          <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(860px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
             {!full ? (
               <div className="p-4 text-xs" style={{ color: C.faint }}>loading…</div>
             ) : (

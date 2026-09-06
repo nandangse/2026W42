@@ -481,10 +481,10 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, salary, name, se
 
       {/* the brief, when asked for */}
       {briefOpen && (
-        <div className="fixed inset-0" style={{ background: "rgba(13,22,31,0.45)", zIndex: 60 }} onClick={() => setBriefOpen(false)}>
+        <div className="fixed inset-0" style={{ background: "rgba(13,22,31,0.45)", zIndex: 60 }} role="button" tabIndex={0} onClick={() => setBriefOpen(false)}>
           <div className="mx-auto my-4 md:my-8 rounded-lg overflow-y-auto"
             style={{ maxWidth: 760, maxHeight: "calc(100vh - 40px)", background: "#F1EFE9", padding: 14 }}
-            onClick={(e) => e.stopPropagation()}>
+            role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-2">
               <div className="font-bold" style={{ fontSize: 16 }}>Role &amp; Responsibility assigned to me</div>
               <button onClick={() => setBriefOpen(false)} className="ml-auto text-sm font-bold rounded px-2.5 py-1"

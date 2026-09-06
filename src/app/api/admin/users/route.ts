@@ -3,6 +3,7 @@ import { readBody } from "@/lib/validate";
 import { swallow } from "@/lib/swallow";
 import { requireAdmin, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
+import { hrmsTables } from "@/lib/hrms";
 import { normaliseGroups } from "@/lib/groups";
 import type { Role } from "@/lib/types";
 
@@ -82,11 +83,26 @@ export async function GET(req: Request) {
       return NextResponse.json({ log: data ?? [] });
     }
     const admin = adminClient();
-    const { data, error } = await admin
-      .from("profiles")
-      .select("id, email, role, disabled, initials, display_name, erp_owner, reports_to, designation, department_id, lc, stratcom, management, oauth_available, created_at")
-      .order("created_at", { ascending: true });
+    const COLS = "id, email, role, disabled, initials, display_name, erp_owner, reports_to, designation, department_id, lc, stratcom, management, oauth_available, created_at";
+    // `kind` arrives with migration 0144; until it has run the column is absent and everyone is an employee
+    type Rows = { data: Record<string, unknown>[] | null; error: { message: string } | null };
+    let q = (await admin.from("profiles").select(COLS + ", kind").order("created_at", { ascending: true })) as unknown as Rows;
+    if (q.error && /kind/i.test(q.error.message)) q = (await admin.from("profiles").select(COLS).order("created_at", { ascending: true })) as unknown as Rows;
+    const { data, error } = q;
     if (error) throw new Error(error.message);
+
+    // The HRMS record behind each login, by e-mail: the type (Staff /
+    // Labour / Contractor …), the employee id, the phone and personal
+    // e-mail the login was or would be made from (5.0.1.0).
+    const emp = new Map<string, { type: string | null; employee_id: string | null; phone: string | null; personal_email: string | null; active: boolean }>();
+    try {
+      const t = await hrmsTables(admin);
+      const { data: rows } = await admin.from(t.employees).select("email, user_email, personal_email, type, employee_id, phone, active");
+      for (const r of rows || []) {
+        const rec = { type: r.type ?? null, employee_id: r.employee_id ?? null, phone: r.phone ?? null, personal_email: r.personal_email ?? null, active: !!r.active };
+        for (const k of [r.user_email, r.email, r.personal_email]) if (k) emp.set(String(k).toLowerCase(), rec);
+      }
+    } catch (e) { swallow("admin/users", e); /* no HRMS yet */ }
 
     // Sales Genie grants — default NO for everyone; absent table (pre-0013)
     // simply reads as nobody granted.
@@ -178,9 +194,14 @@ export async function GET(req: Request) {
       editors: [...USER_EDITORS],
       users: (data || []).map((u) => ({
         ...u,
-        sales_access: salesIds.has(u.id) || String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        kind: (u.kind as string | undefined) || "employee",
+        emp_type: emp.get(String(u.email || "").toLowerCase())?.type ?? null,
+        emp_id: emp.get(String(u.email || "").toLowerCase())?.employee_id ?? null,
+        emp_phone: emp.get(String(u.email || "").toLowerCase())?.phone ?? null,
+        emp_active: emp.get(String(u.email || "").toLowerCase())?.active ?? null,
+        sales_access: salesIds.has(String(u.id)) || String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         sales_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
-        last_sign_in_at: lastSeen.get(u.id) ?? null,
+        last_sign_in_at: lastSeen.get(String(u.id)) ?? null,
         hrms_access:
           hrmsEmails.has(String(u.email || "").toLowerCase()) ||
           String(u.email || "").toLowerCase() === RAGHU_EMAIL,
@@ -212,8 +233,8 @@ export async function GET(req: Request) {
         goals_level:
           String(u.email || "").toLowerCase() === RAGHU_EMAIL
             ? "edit"
-            : goalGrant.has(u.id)
-              ? goalGrant.get(u.id)
+            : goalGrant.has(String(u.id))
+              ? goalGrant.get(String(u.id))
                 ? "edit"
                 : "view"
               : "none",
@@ -402,6 +423,11 @@ export async function POST(req: Request) {
       // itself happens with an administrator in tow (comms build).
       if ("oauth_available" in body) patch.oauth_available = !!body.oauth_available;
       if ("department_id" in body) patch.department_id = body.department_id || null;
+      if ("kind" in body) {
+        const k = String(body.kind || "employee");
+        if (!["employee", "consultant", "intern"].includes(k)) throw new HttpError(400, "kind must be employee, consultant or intern");
+        patch.kind = k;
+      }
       if ("reports_to" in body) {
         // the line manager, which Tasking's "people reporting to me" reads.
         // Nobody reports to themselves — that would make them their own report
@@ -473,6 +499,59 @@ export async function POST(req: Request) {
         if (error) throw new Error(error.message);
       }
       return NextResponse.json({ ok: true });
+    }
+
+    /**
+     * { action: "provision", preview?: true, types?: string[] } — owner only.
+     *
+     * "there will be users made of ALL the active employees where they will
+     * get a login id and password based on their personal mobile no and
+     * personal email address" (Dr Raghu, 6 Sep 2026). The login id is the
+     * personal e-mail, or the official one when there is none; the first
+     * password is the mobile number's digits. Preview lists who would be
+     * made and who cannot be (no e-mail at all); the real run creates them
+     * confirmed, so the code-by-email sign-in works at once.
+     */
+    if (body.action === "provision") {
+      if (!caller.isOwner) throw new HttpError(403, "Only the owner may make logins for the roll.");
+      const want = new Set((Array.isArray(body.types) ? body.types : []).map((t: unknown) => String(t).toLowerCase()));
+      const t = await hrmsTables(admin);
+      const { data: rows, error: e1 } = await admin.from(t.employees).select("id, name, email, user_email, personal_email, phone, type, employee_id, active").eq("active", true);
+      if (e1) throw new Error(e1.message);
+      const { data: profs } = await admin.from("profiles").select("id, email");
+      const have = new Set((profs || []).map((p) => String(p.email || "").toLowerCase()));
+      const plan: { name: string; employee_id: string | null; type: string | null; login: string | null; password: string | null; why: string }[] = [];
+      for (const r of rows || []) {
+        const type = String(r.type || "");
+        const bucket = /labour/i.test(type) ? "labour" : /contract/i.test(type) ? "contractors" : "staff";
+        if (want.size && !want.has(bucket)) continue;
+        const login = String(r.personal_email || r.user_email || r.email || "").trim().toLowerCase() || null;
+        const digits = String(r.phone || "").replace(/\D/g, "");
+        const password = digits.length >= 8 ? digits.slice(-10) : null;
+        let why = "will be made";
+        if (!login) why = "no e-mail on the record";
+        else if (have.has(login)) why = "already has a login";
+        else if (!password) why = "no mobile number on the record — the code-by-email sign-in still works";
+        plan.push({ name: r.name, employee_id: r.employee_id ?? null, type: r.type ?? null, login, password: password ? "•••" + password.slice(-4) : null, why });
+      }
+      if (body.preview) return NextResponse.json({ plan });
+      let made = 0; const failed: string[] = [];
+      for (const r of rows || []) {
+        const login = String(r.personal_email || r.user_email || r.email || "").trim().toLowerCase();
+        if (!login || have.has(login)) continue;
+        const type = String(r.type || "");
+        const bucket = /labour/i.test(type) ? "labour" : /contract/i.test(type) ? "contractors" : "staff";
+        if (want.size && !want.has(bucket)) continue;
+        const digits = String(r.phone || "").replace(/\D/g, "");
+        const password = digits.length >= 8 ? digits.slice(-10) : undefined;
+        const initials = String(r.name || "").split(/\s+/).map((w) => w[0]).join("").slice(0, 3).toUpperCase() || null;
+        const { data: created, error } = await admin.auth.admin.createUser({ email: login, password, email_confirm: true, user_metadata: { display_name: r.name, initials } });
+        if (error || !created.user) { failed.push(`${r.name}: ${error?.message || "?"}`); continue; }
+        await admin.from("profiles").upsert({ id: created.user.id, email: login, role: "user", display_name: r.name, initials, disabled: false }, { onConflict: "id" });
+        await admin.from("admin_audit").insert({ by_email: caller.email, action: "provision", target: login }).then(() => null, () => null);
+        have.add(login); made++;
+      }
+      return NextResponse.json({ ok: true, made, failed });
     }
 
     if (body.action === "password") {

@@ -14,8 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { APP_VERSION } from "@/lib/version";
-import ModuleMenu from "@/components/ModuleMenu";
+import GenieShell from "@/components/GenieShell";
 import { BORDER, INK, MUTED, NAVY, NAVY_DARK, NAVY_SOFT, Note, PAPER, ORANGE, Empty } from "./ui";
 import type { Boot } from "./types";
 import Dashboard from "./Dashboard";
@@ -102,24 +101,8 @@ export default function ImsApp({
   return (
     <div style={{ minHeight: "100vh", background: PAPER, fontFamily: "Arial, Helvetica, sans-serif" }}>
       {/* ------------------------------------------------------------ header */}
-      <div className="flex items-center gap-2 px-3 py-2 flex-wrap"
-        style={{ background: NAVY_DARK, borderBottom: `1px solid ${NAVY}` }}>
-        <span className="font-bold text-white" style={{ fontSize: 15, letterSpacing: 0.3 }}>
-          📐 Nandan IMS
-        </span>
-        <span className="text-xs" style={{ color: "#8FA1B3" }}>
-          Integrated Management System
-        </span>
-        <span className="ml-auto flex items-center gap-2">
-          {boot?.installed && (
-            <span className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: NAVY, color: "#CBD5E1" }}>
-              {ROLE_WORDS[boot.role] ?? boot.role}
-            </span>
-          )}
-          <span className="text-xs" style={{ color: "#5F7183" }}>v{APP_VERSION}</span>
-          <ModuleMenu current="ims" email={email} displayName={displayName} initials={initials} role={role} />
-        </span>
-      </div>
+      <GenieShell module="ims" title="Nandan IMS" tagline="Integrated Management System" user={{ email, displayName, initials, role }}
+        tools={boot?.installed ? <span className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: NAVY, color: "#CBD5E1" }}>{ROLE_WORDS[boot.role] ?? boot.role}</span> : null} />
 
       <div className="flex" style={{ alignItems: "flex-start" }}>
         {/* -------------------------------------------------------- the rail */}

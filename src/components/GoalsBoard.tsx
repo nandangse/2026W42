@@ -337,7 +337,7 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
                         const late = isLate(n, TODAY);
                         const goalNum = n.goal_id ? nodes[n.goal_id]?.goal_num : n.goal_num;
                         return (
-                          <div key={n.id} onClick={() => setInspect(n.id)}
+                          <div key={n.id} role="button" tabIndex={0} onClick={() => setInspect(n.id)}
                             className="rounded border mb-1.5 cursor-pointer p-2 bg-white"
                             style={{ borderColor: "#E2E0DA", borderLeft: `3px solid ${st.color}` }}>
                             <div className="flex items-center gap-1 mb-1">
@@ -410,7 +410,7 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
               const late = isLate(n, TODAY);
               const sel = path[col.depth] === k;
               return (
-                <div key={k} onClick={() => select(col.depth, k)}
+                <div key={k} role="button" tabIndex={0} onClick={() => select(col.depth, k)}
                   className="rounded border mb-1.5 cursor-pointer p-2"
                   style={{ background: sel ? "#FFF3E8" : "#fff", borderColor: sel ? "#E8600A" : "#E2E0DA", borderLeft: `3px solid ${st.color}` }}>
                   <div className="text-xs font-semibold" style={{

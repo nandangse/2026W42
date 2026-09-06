@@ -22,7 +22,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { swallow } from "@/lib/swallow";
-import ModuleMenu from "@/components/ModuleMenu";
+import GenieShell from "@/components/GenieShell";
 import PlaybookScreen from "@/components/Playbook";
 import { DOCTYPES, PIPELINES, doctypeBySlug, type Doctype, type Field } from "@/crm/doctypes";
 import { LOGO } from "@/lib/logo";
@@ -470,38 +470,10 @@ export default function CrmApp({
 
   return (
     <div style={{ minHeight: "100vh", background: PAPER, color: INK }}>
-      {/* ---------- header — Sales Genie's: white, orange rule, navy title ---------- */}
-      <header
-        style={{ background: "#fff", borderBottom: `3px solid ${ORANGE}`, position: "sticky", top: 0, zIndex: 40 }}
-        className="px-4 py-2.5"
-      >
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-baseline gap-3">
-            <div className="font-extrabold tracking-wide flex items-center gap-2" style={{ color: NAVY, fontSize: 16 }}>
-              {/* the Genie logo, same asset the planning header wears */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={LOGO} alt="Nandan GSE" style={{ height: 30, width: "auto" }} />
-              <span style={{ color: ORANGE }}>CRM</span>
-              <span
-                title="One Genie version number, across every module — the CRM does not version on its own."
-                style={{ background: ORANGE, color: "#fff", borderRadius: 4, padding: "1px 6px", marginLeft: 8, fontSize: 11, fontWeight: 700, verticalAlign: "middle" }}
-              >
-                {version}
-              </span>
-            </div>
-            <h1 className="font-bold" style={{ fontSize: 15, lineHeight: 1.2, color: INK }}>
-              {special?.label ?? dt?.plural ?? "CRM"}
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* the way home, visible — not only behind the account menu
-                (Dr Raghu, 29 Aug 2026: "back to genie button has disappeared") */}
-            <a href="/" className="rounded-full border px-3 flex items-center gap-1 font-bold flex-shrink-0"
-              title="Back to Main Genie"
-              style={{ height: 34, borderColor: BORDER, background: "#fff", color: NAVY, fontSize: 12.5, textDecoration: "none" }}>
-              🧞 Genie
-            </a>
-            {/* the Prospecting Queue, folded into the top bar like a bell */}
+      <GenieShell module="crm" title="Nandan CRM" tagline={special?.label ?? dt?.plural ?? "enquiries to orders"} user={{ email, displayName, initials, role }}
+        tools={
+          <>
+            <span className="genie-tagline text-xs font-bold px-2" style={{ color: "#F5B32B" }}>{special?.label ?? dt?.plural ?? ""}</span>
             <div style={{ position: "relative" }}>
               <button
                 onClick={() => { setQueueTray((v) => !v); if (!queueTray) refreshQueueCount(); }}
@@ -510,7 +482,7 @@ export default function CrmApp({
                 className="rounded-full border"
                 style={{
                   width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
-                  borderColor: queueTray ? ORANGE : BORDER, background: queueTray ? "#FFF3EC" : "#fff",
+                  borderColor: queueTray ? ORANGE : "#22303C", background: queueTray ? "#FFF3EC" : "#0D161F", color: "#fff",
                   fontSize: 15, cursor: "pointer", position: "relative",
                 }}
               >
@@ -537,14 +509,8 @@ export default function CrmApp({
                 </>
               )}
             </div>
-            <span className="text-xs" style={{ color: MUTED }}>
-              {displayName || email}
-            </span>
-            {/* the account menu — modules, Reload, Logout — same as the main header's */}
-            <ModuleMenu current="crm" email={email} displayName={displayName} initials={initials} role={role} />
-          </div>
-        </div>
-      </header>
+          </>
+        } />
 
       <div className="flex" style={{ alignItems: "flex-start" }}>
         {/* ---------- doctype nav ---------- */}
@@ -1049,7 +1015,7 @@ export default function CrmApp({
 
           {adding && (
             <div
-              onClick={() => setAdding(false)}
+              role="button" tabIndex={0} onClick={() => setAdding(false)}
               style={{
                 position: "fixed", inset: 0, zIndex: 60, background: "rgba(27,45,107,.45)",
                 display: "flex", alignItems: "flex-start", justifyContent: "center",
@@ -1171,7 +1137,7 @@ export default function CrmApp({
                   {rows.map((r, i) => (
                     <tr
                       key={String(r.id ?? i)}
-                      onClick={() => setView({ dt, row: r, links, mode: "view" })}
+                      role="button" tabIndex={0} onClick={() => setView({ dt, row: r, links, mode: "view" })}
                       style={{ cursor: "pointer" }}
                       className="crm-row"
                     >
@@ -3829,7 +3795,7 @@ function RecordModal({
 
   return (
     <div
-      onClick={onClose}
+      role="button" tabIndex={0} onClick={onClose}
       style={{
         position: "fixed", inset: 0, zIndex: 60, background: "rgba(22,35,47,.45)",
         display: "flex", alignItems: "stretch", justifyContent: "center",
@@ -3837,7 +3803,7 @@ function RecordModal({
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
+        role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}
         className="rounded"
         style={{
           background: "#fff", width: hasTabs ? "min(1080px, 100%)" : "min(880px, 100%)",
@@ -4367,7 +4333,7 @@ function RelatedTab({
           {shown.map((r, i) => (
             <tr
               key={String(r.id ?? i)}
-              onClick={() => onOpenLink(slug, String(r.id))}
+              role="button" tabIndex={0} onClick={() => onOpenLink(slug, String(r.id))}
               style={{ cursor: "pointer" }}
             >
               {fields.map((f) => (

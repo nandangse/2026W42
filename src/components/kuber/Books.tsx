@@ -311,7 +311,7 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
             {rows.map((r, i) => (
               <>
                 <tr key={r.party} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}
-                  onClick={() => setOpen(open === r.party ? null : r.party)}>
+                  role="button" tabIndex={0} onClick={() => setOpen(open === r.party ? null : r.party)}>
                   <td className="px-2 py-1.5 font-semibold" style={{ color: INK, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.party}>
                     {open === r.party ? "▾ " : "▸ "}{r.party}
                   </td>
@@ -440,7 +440,7 @@ export function ReportCardScreen() {
               );
             })()}
             {rows.map((r, i) => (
-              <tr key={r.party} className="border-t" onClick={() => setOpenParty(r.party)}
+              <tr key={r.party} className="border-t" role="button" tabIndex={0} onClick={() => setOpenParty(r.party)}
                 style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}
                 title="Open this supplier's report card">
                 <td className="px-2 py-1.5"><span className="rounded px-2 py-0.5 font-bold text-white" style={{ background: gradeColor[r.grade] }}>{r.grade}</span></td>
@@ -936,7 +936,7 @@ function DrillTree({ secs, abs, fmtMoney, onLedger }: { secs: TreeSec[]; abs?: b
                 <span className="tnum font-semibold">{v(g.total)}</span>
               </div>
               {open[s2.root + "|" + g.name] && g.ledgers.map((l) => (
-                <div key={l.name} onClick={() => onLedger(l.name)}
+                <div key={l.name} role="button" tabIndex={0} onClick={() => onLedger(l.name)}
                   className="flex items-center justify-between px-3 py-0.5 text-xs" style={{ paddingLeft: 42, cursor: "pointer" }}>
                   <span style={{ color: "#2C5B82", textDecoration: "underline" }}>{l.name}</span>
                   <span className="tnum" style={{ color: MUTED }}>{v(l.amount)}</span>
@@ -1080,7 +1080,7 @@ export function PnLScreen() {
                   const openable = !!l.tree?.length;
                   return (
                     <FragRow key={l.key}>
-                      <tr className="border-t" onClick={() => openable && setOpenLine(openLine === l.key ? null : l.key)}
+                      <tr className="border-t" role="button" tabIndex={0} onClick={() => openable && setOpenLine(openLine === l.key ? null : l.key)}
                         style={{ borderColor: "#EFEDE7", background: TINT[l.key] || "#fff", cursor: openable ? "pointer" : "default" }}>
                         <td className="px-3 py-1.5" style={{ fontWeight: BOLD.has(l.key) ? 800 : 500, color: INK }}>
                           {openable && <span style={{ display: "inline-block", width: 14 }}>{openLine === l.key ? "▾" : "▸"}</span>}
@@ -1351,7 +1351,7 @@ export function ExpensesScreen({ mode }: { mode: "all" | "tvc" | "oe" }) {
                 {rows.length === 0 && (<tr><td colSpan={4} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing in the period.</td></tr>)}
                 {rows.map((r, i) => (
                   <tr key={r.ledger} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
-                    <td className="px-2 py-1.5 font-semibold" onClick={() => setDrill(r.ledger)} style={{ cursor: "pointer", color: "#2C5B82", textDecoration: "underline" }} title="Open this ledger's vouchers">{r.ledger}</td>
+                    <td className="px-2 py-1.5 font-semibold" role="button" tabIndex={0} onClick={() => setDrill(r.ledger)} style={{ cursor: "pointer", color: "#2C5B82", textDecoration: "underline" }} title="Open this ledger's vouchers">{r.ledger}</td>
                     <td className="px-2 py-1.5" style={{ color: MUTED }}>{r.group}</td>
                     <td className="px-2 py-1.5">
                       <select value={r.cls} onChange={(e) => void flip(r.ledger, e.target.value)}

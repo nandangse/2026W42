@@ -81,7 +81,7 @@ export default function Standards({ boot }: { boot: Boot }) {
             background: depth === 0 ? NAVY_SOFT : undefined, cursor: "pointer",
             fontSize: depth === 2 ? 12 : 13, color: depth === 2 ? MUTED : INK, fontWeight: depth === 0 ? 700 : 400,
           }}
-          onClick={() => setOpen(c)}
+          role="button" tabIndex={0} onClick={() => setOpen(c)}
           title="Open the evidence for this clause"
         >
           <span style={{ display: "inline-block", minWidth: 60, fontWeight: 700, color: depth === 0 ? INK : MUTED }}>{c.clause_no}</span>

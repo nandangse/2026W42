@@ -101,7 +101,7 @@ export default function Documents({ boot }: { boot: Boot }) {
             {rows.map((d) => {
               const owner = boot.people.find((p) => p.id === d.owner_id);
               return (
-                <tr key={d.id} onClick={() => { setOpenId(d.id); setMsg(""); }} style={{ cursor: "pointer" }}>
+                <tr key={d.id} role="button" tabIndex={0} onClick={() => { setOpenId(d.id); setMsg(""); }} style={{ cursor: "pointer" }}>
                   <Td><span style={{ fontWeight: 700, color: INK }}>{String(d.ref_no || d.doc_no || "—")}</span></Td>
                   <Td wrap>{String(d.title ?? "")}</Td>
                   <Td>{String(d.sys ?? "")}</Td>

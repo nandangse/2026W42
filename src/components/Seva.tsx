@@ -13,9 +13,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import GenieShell from "@/components/GenieShell";
 import { swallow } from "@/lib/swallow";
-import { APP_VERSION } from "@/lib/version";
-import ModuleMenu from "@/components/ModuleMenu";
 import { dmy as fmtD, rupee } from "@/lib/fmt";
 const money = (n: unknown) => rupee(n);
 
@@ -182,7 +181,7 @@ function IssuesScreen() {
             const late = daysTo(r.due);
             const overdue = late != null && late < 0 && !closedish(S(r.status));
             return (
-              <tr key={r.id} className="border-t" onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+              <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
                 <td className="px-2 py-1.5"><Chip s={S(r.status)} colour={statusColour(S(r.status))} /></td>
                 <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{S(r.title)}</td>
                 <td className="px-2 py-1.5">{S(r.customer) || "—"}</td>
@@ -304,7 +303,7 @@ function AmcScreen() {
             const ending = left != null && left >= 0 && left <= 60;
             const gone = left != null && left < 0;
             return (
-              <tr key={r.id} className="border-t" onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+              <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
                 <td className="px-2 py-1.5"><Chip s={S(r.status)} colour={statusColour(S(r.status))} /></td>
                 <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{S(r.customer)}</td>
                 <td className="px-2 py-1.5" style={{ color: MUTED }}>{S(r.machine)}{r.serial_no ? ` · ${S(r.serial_no)}` : ""}</td>
@@ -706,7 +705,7 @@ function PushScreen() {
             {tab === "inbox" ? "Nothing has been pushed to you." : "You have pushed nothing yet — ⇢ Push to someone hands one person one thing."}</td></tr>)}
           {!data && (<tr><td colSpan={6} className="px-3 py-5 text-center" style={{ color: MUTED }}>loading…</td></tr>)}
           {rows.map((p, i) => (
-            <tr key={p.id} className="border-t" onClick={() => setOpen(p)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+            <tr key={p.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(p)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
               <td className="px-2 py-1.5"><Chip s={p.status} colour={PUSH_COLOUR[p.status] || MUTED} /></td>
               <td className="px-2 py-1.5">{(tab === "inbox" ? p.from_email : p.to_email).split("@")[0]}</td>
               <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -1039,25 +1038,7 @@ export default function Seva({
 
   return (
     <div className="min-h-screen" style={{ background: "#F1EFE9", color: "#22303C" }}>
-      <div style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0, zIndex: 40 }}>
-        <div className="px-3 py-2 flex items-center gap-2.5">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-bold tracking-widest" style={{ fontSize: 11, color: "#F5B32B" }}>
-                🛎 NANDAN SEVA GENIE
-              </span>
-              <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 9, background: "#22303C", color: "#8FA1B3" }}>
-                V {APP_VERSION}
-              </span>
-            </div>
-            <div className="font-bold text-white leading-tight" style={{ fontSize: 13 }}>
-              Customer service — every issue owned, every contract kept
-            </div>
-          </div>
-          <span className="ml-auto" />
-          <ModuleMenu current="seva" email={email} displayName={displayName} initials={initials} role={role} />
-        </div>
-      </div>
+      <GenieShell module="seva" title="Nandan Seva" tagline="Customer service — every issue owned, every contract kept" user={{ email, displayName, initials, role }} />
 
       <div style={{ display: "flex", alignItems: "stretch", minHeight: "calc(100vh - 46px)" }}>
         <nav style={{ width: navOpen ? 236 : 54, flexShrink: 0, background: "#fff", borderRight: "1px solid #E2E0DA", padding: "10px 6px", transition: "width .15s ease" }}>

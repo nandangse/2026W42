@@ -283,7 +283,7 @@ function DiscussionsPanel() {
             <tbody>
               {chats.map((c) => (
                 <tr key={c.id} style={{ borderTop: `1px solid ${BORDER}`, cursor: "pointer" }}
-                  onClick={() => void read(c)}
+                  role="button" tabIndex={0} onClick={() => void read(c)}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#FAF9F5"; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}>
                   <td className="py-1.5 pr-3 tnum" style={{ whiteSpace: "nowrap" }}>{d(c.started_at)}</td>
@@ -292,7 +292,7 @@ function DiscussionsPanel() {
                   <td className="py-1.5 pr-3 font-semibold">{c.target}</td>
                   <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{c.minutes || "—"}</td>
                   <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{c.letters.toLocaleString("en-IN")}</td>
-                  <td className="py-1.5" onClick={(e) => e.stopPropagation()}>
+                  <td className="py-1.5" role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
                     <input value={remark[c.id] ?? ""} placeholder="—"
                       onChange={(e) => setRemark((m) => ({ ...m, [c.id]: e.target.value }))}
                       onBlur={() => void saveRemark(c.id)}

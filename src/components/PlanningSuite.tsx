@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { swallow } from "@/lib/swallow";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { Greeting, DoorTiles, useHome } from "@/components/HomeDoors";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { ModuleLinks, ReloadRow } from "@/components/ModuleMenu";
 import PlaybookScreen from "@/components/Playbook";
@@ -892,10 +893,12 @@ export default function PlanningSuite({
             </div>
             <div>
               <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>
-                {appSettings.app_name.toUpperCase()}
-                <span style={{ background: "#E8600A", color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6 }} title="See Admin → Updates for what changed">
-                  V {APP_VERSION}
-                </span>
+                NANDAN GENIE
+                {isAdmin && (
+                  <span style={{ background: "#E8600A", color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6 }} title="See Admin → Updates for what changed">
+                    V {APP_VERSION}
+                  </span>
+                )}
               </div>
               <h1 className="text-lg font-bold text-white leading-tight">
                 {appSettings.theme_name}
@@ -933,7 +936,7 @@ export default function PlanningSuite({
                 </button>
                 {notifOpen && (
                   <>
-                    <div className="fixed inset-0" style={{ zIndex: 58 }} onClick={() => setNotifOpen(false)} />
+                    <div className="fixed inset-0" style={{ zIndex: 58 }} role="button" tabIndex={0} onClick={() => setNotifOpen(false)} />
                     <div className="absolute rounded-lg border bg-white" style={{ top: "calc(100% + 6px)", right: 0, width: 330, maxHeight: 420, overflowY: "auto", borderColor: "#E2E0DA", boxShadow: "0 12px 30px rgba(0,0,0,.25)", zIndex: 59 }}>
                       <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: "1px solid #EEECE6" }}>
                         <span className="text-xs font-bold" style={{ color: "#16232F" }}>Notifications</span>
@@ -954,7 +957,7 @@ export default function PlanningSuite({
                         return (
                           <div
                             key={n.id}
-                            onClick={() => openNotif(n)}
+                            role="button" tabIndex={0} onClick={() => openNotif(n)}
                             className="px-3 py-2 cursor-pointer"
                             style={{ borderBottom: "1px solid #F4F2EC", background: n.read_at ? "#fff" : "#FFF7E6" }}
                             title={n.ref_kind === "goal" ? "Open Goals" : "Open the task"}
@@ -1027,7 +1030,7 @@ export default function PlanningSuite({
               </button>
               {userOpen && (
                 <>
-                  <div className="fixed inset-0" style={{ zIndex: 58 }} onClick={() => setUserOpen(false)} />
+                  <div className="fixed inset-0" style={{ zIndex: 58 }} role="button" tabIndex={0} onClick={() => setUserOpen(false)} />
                   <div
                     className="absolute rounded-lg border bg-white"
                     style={{ top: "calc(100% + 6px)", right: 0, width: 232, borderColor: "#E2E0DA", boxShadow: "0 12px 30px rgba(0,0,0,.25)", zIndex: 59 }}
@@ -1600,6 +1603,7 @@ function MyWeek({
   goLms: () => void;
   isAdmin: boolean;
 }) {
+  const home = useHome();
   const isAdminHere = isAdmin;
   const weekEnd = addDays(TODAY, 7);
   // mood, learning, participation, birthdays and the image quote — one fetch
@@ -1679,6 +1683,8 @@ function MyWeek({
 
   return (
     <div className="p-4">
+      <Greeting d={home} />
+      <DoorTiles d={home} current="main" />
       <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
         <h2 className="text-xl font-bold" style={{ color: "#16232F" }}>
           {greeting()}, {who}
@@ -1742,7 +1748,7 @@ function MyWeek({
               {[...overdue, ...dueToday, ...laterThisWeek].map((t) => {
                 const job = board.jobs.find((j) => j.id === t.j);
                 return (
-                  <div key={t.id} onClick={() => setLightbox(t)} className="rounded p-2 mb-1.5 cursor-pointer border relative" style={{ ...dueStyle(t.due), borderColor: "rgba(0,0,0,0.08)" }}>
+                  <div key={t.id} role="button" tabIndex={0} onClick={() => setLightbox(t)} className="rounded p-2 mb-1.5 cursor-pointer border relative" style={{ ...dueStyle(t.due), borderColor: "rgba(0,0,0,0.08)" }}>
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
@@ -1855,7 +1861,7 @@ function MyWeek({
             <div className="text-sm py-4 text-center" style={{ color: "#8A94A0" }}>No milestones due on your jobs this week.</div>
           )}
           {myMilestones.week.map((m, i) => (
-            <div key={i} onClick={() => onOpen(m.job.id)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ background: "#DDE6EE", borderColor: "#B9C7D4" }}>
+            <div key={i} role="button" tabIndex={0} onClick={() => onOpen(m.job.id)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ background: "#DDE6EE", borderColor: "#B9C7D4" }}>
               <div className="text-xs font-bold" style={{ color: "#1B3A5C" }}>⚑ M{m.idx} · {m.name}</div>
               <div className="text-xs flex justify-between mt-0.5" style={{ color: "#5A6672" }}>
                 <span>JOB {jobNo(m.job.id)} · {m.job.tag}</span>
@@ -1867,7 +1873,7 @@ function MyWeek({
             <>
               <div className="text-xs font-bold mt-2 mb-1" style={{ color: "#8A94A0", letterSpacing: 0.8 }}>FURTHER OUT</div>
               {myMilestones.later.map((m, i) => (
-                <div key={i} onClick={() => onOpen(m.job.id)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ background: "#F4F2EC", borderColor: "#E2E0DA" }}>
+                <div key={i} role="button" tabIndex={0} onClick={() => onOpen(m.job.id)} className="rounded p-2 mb-1.5 cursor-pointer border" style={{ background: "#F4F2EC", borderColor: "#E2E0DA" }}>
                   <div className="text-xs font-bold" style={{ color: "#5A6672" }}>⚑ M{m.idx} · {m.name}</div>
                   <div className="text-xs flex justify-between mt-0.5" style={{ color: "#8A94A0" }}>
                     <span>JOB {jobNo(m.job.id)} · {m.job.tag}</span>
@@ -2030,7 +2036,7 @@ function ProjectsInProgress({
                   <tr
                     className="border-t"
                     style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}
-                    onClick={() => setOpen(open === r.id ? null : r.id)}
+                    role="button" tabIndex={0} onClick={() => setOpen(open === r.id ? null : r.id)}
                     title="Show the jobs on this project"
                   >
                     <td className="px-2 py-1.5 font-bold whitespace-nowrap" style={{ color: "#1B3A5C" }}>
@@ -2521,7 +2527,7 @@ function DeliveryBoard({
         <div
           className="bg-white rounded-lg border px-3 py-1.5 mb-3 flex items-center gap-3 flex-wrap"
           style={{ borderColor: "#E2E0DA", cursor: "pointer" }}
-          onClick={() => setCardsOpen(true)}
+          role="button" tabIndex={0} onClick={() => setCardsOpen(true)}
           title="Show the totals and the run rate"
         >
           <span className="text-xs font-bold" style={{ color: "#8A94A0" }}>THE BOOK</span>
@@ -2749,7 +2755,7 @@ function DeliveryBoard({
                                      click deeper"). The calendar was the last
                                      place still jumping straight to the full
                                      job. */
-                                  onClick={() => setPicked(j)}
+                                  role="button" tabIndex={0} onClick={() => setPicked(j)}
                                   draggable={canDragTdd}
                                   onDragStart={(ev) => { setDragJob(j); ev.dataTransfer.effectAllowed = "move"; }}
                                   onDragEnd={() => { setDragJob(null); setDropDay(null); }}
@@ -2955,7 +2961,7 @@ function DeliveryBoard({
                 </div>
                 <div className="rounded-b-lg p-2" style={{ background: "#E9E6DD" }}>
                   {ojobs.map((j) => (
-                    <div key={j.id} onClick={() => onOpen(j.id)} className="rounded p-2 mb-1.5 cursor-pointer bg-white border" style={{ borderColor: "#E2E0DA", borderLeft: `4px solid ${otdColor(j.otd)}` }}>
+                    <div key={j.id} role="button" tabIndex={0} onClick={() => onOpen(j.id)} className="rounded p-2 mb-1.5 cursor-pointer bg-white border" style={{ borderColor: "#E2E0DA", borderLeft: `4px solid ${otdColor(j.otd)}` }}>
                       <div className="flex justify-between items-baseline">
                         <span className="font-bold text-xs" style={{ color: "#1B3A5C" }}>JOB {jobNo(j.id)}</span>
                         <span className="text-xs font-bold" style={{ color: j.tdd && j.tdd < TODAY ? "#B3261E" : "#5A6672" }}>TDD {fmt(j.tdd)}</span>
@@ -3233,7 +3239,7 @@ function LoadBoard({ board, byTDD }: { board: Board; byTDD: Job[] }) {
                     {shownTrades.map((tr, ti) => (
                       <tr key={`${ri}-${ti}`} style={{ borderTop: ti === 0 ? "2px solid #22303C" : "1px solid #F1EFE9" }}>
                         {ti === 0 && (
-                          <td rowSpan={r.trades.length + 1} onClick={() => toggleCollapse(r.job.id)} className="px-3 py-2 font-semibold sticky left-0 bg-white align-top cursor-pointer" style={{ color: "#22303C", borderRight: "1px solid #EFEDE7", width: 150, minWidth: 150, zIndex: 2 }}>
+                          <td rowSpan={r.trades.length + 1} role="button" tabIndex={0} onClick={() => toggleCollapse(r.job.id)} className="px-3 py-2 font-semibold sticky left-0 bg-white align-top cursor-pointer" style={{ color: "#22303C", borderRight: "1px solid #EFEDE7", width: 150, minWidth: 150, zIndex: 2 }}>
                             JOB {jobNo(r.job.id)}
                             <div className="font-normal" style={{ color: "#8A94A0", maxWidth: 140 }}>{r.job.tag.slice(0, 34)}</div>
                             <div className="mt-1" style={{ color: "#E8600A", fontSize: 10 }}>▾ collapse</div>
@@ -3335,7 +3341,7 @@ function MilestoneSpanner({
       </button>
       {shown && (
         <>
-          {pinned && <div className="fixed inset-0" style={{ zIndex: 58 }} onClick={() => setPinned(false)} />}
+          {pinned && <div className="fixed inset-0" style={{ zIndex: 58 }} role="button" tabIndex={0} onClick={() => setPinned(false)} />}
           <div
             onMouseEnter={() => setHover(true)}
             onMouseLeave={() => setHover(false)}
@@ -8617,7 +8623,7 @@ function Principles({ isOwner }: { isOwner: boolean }) {
                 return (
                   <div
                     key={key}
-                    onClick={() => setOpen(isOpen ? null : key)}
+                    role="button" tabIndex={0} onClick={() => setOpen(isOpen ? null : key)}
                     className="rounded-lg border"
                     style={{
                       borderColor: isOpen ? tone.line : "#E2E0DA",
@@ -9931,7 +9937,7 @@ function WorkList({
           {sorted.map((t) => (
             <div
               key={t.kind + t.id}
-              onClick={() => canTask && setEditing(t)}
+              role="button" tabIndex={0} onClick={() => canTask && setEditing(t)}
               className="rounded border p-2 mb-1.5"
               style={{
                 borderColor: "#E2E0DA", borderLeft: `3px solid ${escalated(t.esc) ? "#B3261E" : "#1B3A5C"}`,
@@ -11517,12 +11523,12 @@ function ThankYou({
 
   return (
     <div
-      onClick={onClose}
+      role="button" tabIndex={0} onClick={onClose}
       className="fixed inset-0 flex items-center justify-center p-4"
       style={{ background: "rgba(13,22,31,.55)", zIndex: 70 }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
+        role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}
         className="rounded-lg"
         style={{ background: "#fff", maxWidth: 470, width: "100%", overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.35)" }}
       >

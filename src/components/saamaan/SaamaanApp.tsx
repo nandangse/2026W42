@@ -17,8 +17,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { APP_VERSION } from "@/lib/version";
-import ModuleMenu from "@/components/ModuleMenu";
+import GenieShell from "@/components/GenieShell";
 import { BORDER, INK, MUTED, NAVY, NAVY_DARK, NAVY_SOFT, PAPER, ORANGE, Note, Empty, useLoad } from "@/components/ims/ui";
 import Dashboard, { type Summary } from "./Dashboard";
 import Items from "./Items";
@@ -103,21 +102,7 @@ export default function SaamaanApp({
           there NANDAN SAAMAAN. dont need to write the other details! Keep
           version no on the left — Nandan Genie · <version> in small." */}
       {/* Frozen (Dr Raghu, 3 Sep 2026: "keep top header of the menu and side menu frozen"). */}
-      <div className="flex items-center gap-3 px-3 py-2"
-        style={{ background: NAVY_DARK, borderBottom: `1px solid ${NAVY}`, position: "sticky", top: 0, zIndex: 40 }}>
-        <span className="rounded px-1.5 py-1 flex items-center" style={{ background: "#fff" }}>
-          <img src={LOGO} alt="Nandan GSE" style={{ height: 26, display: "block" }} />
-        </span>
-        <span className="font-bold text-white" style={{ fontSize: 16, letterSpacing: 1.2 }}>
-          NANDAN SAAMAAN
-        </span>
-        <span className="text-xs" style={{ color: "#8FA1B3" }} title="Genie's one version number — Saamaan is numbered as Genie">
-          Nandan Genie · v{APP_VERSION}
-        </span>
-        <span className="ml-auto flex items-center gap-2">
-          <ModuleMenu current="saamaan" email={email} displayName={displayName} initials={initials} role={role} />
-        </span>
-      </div>
+      <GenieShell module="saamaan" title="Nandan Saamaan" tagline="Materials — items, kitting, purchase orders, suppliers" user={{ email, displayName, initials, role }} />
 
       <div className="flex" style={{ alignItems: "flex-start" }}>
         {/* -------------------------------------------------------- the rail */}
