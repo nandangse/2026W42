@@ -18,6 +18,7 @@ import GenieTable from "@/components/GenieTable";
 import { swallow } from "@/lib/swallow";
 import { fmtAt } from "@/lib/fmt";
 import { CompanyBox, PersonBox, Modal, type Person, type Company } from "@/components/marketing/LeadBoxes";
+import RichTextEditor from "@/components/RichTextEditor";
 
 type List = { id: string; name: string; description: string | null; created_by_email: string; created_at: string; count: number };
 type Campaign = { id: string; name: string; status: string; subject: string | null; body_html?: string | null; list_ids: string[]; person_ids: string[]; channel_ids: string[]; speed_per_hour: number; created_by_email: string; created_at: string; started_at: string | null; done_at: string | null; counts: Record<string, number> | null; checklist?: Record<string, number | string> | null; deliverability?: { score: number; issues: string[] } | null };
@@ -372,6 +373,7 @@ function CampaignWizard({ c, seesAll, onClose }: { c: Campaign | null; seesAll: 
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const [pplQ, setPplQ] = useState(""); const [pplHits, setPplHits] = useState<Person[]>([]);
+  const [editorKey, setEditorKey] = useState(0); // remounts the editor when a template or Genie replaces the body
 
   useEffect(() => {
     api<{ lists: List[] }>("/api/marketing/lists").then((j) => setLists(j.lists || [])).catch(() => null);
@@ -449,15 +451,12 @@ function CampaignWizard({ c, seesAll, onClose }: { c: Campaign | null; seesAll: 
       {step === 3 && (
         <div>
           <div className="flex gap-2 flex-wrap mb-2 text-xs items-center">
-            <span style={{ color: MUTED }}>Template:</span>
-            <select onChange={(e) => { const t = templates.find((x) => x.id === e.target.value); if (t) setF({ ...f, subject: t.subject || "", body_html: t.body_html || "" }); }} defaultValue="" style={{ ...inp, width: 240 }}><option value="">— pick one —</option>{templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-            <span style={{ color: MUTED }}>Variables:</span>
-            {variables.map((v) => <button key={v.key} onClick={() => setF({ ...f, body_html: f.body_html + `{{${v.key}}}` })} className="rounded px-1.5 py-0.5 font-mono" style={{ background: "#F4F2EC", color: INK }} title={v.description}>{`{{${v.key}}}`}</button>)}
+            <span style={{ color: MUTED }}>Start from a template:</span>
+            <select onChange={(e) => { const t = templates.find((x) => x.id === e.target.value); if (t) { setF({ ...f, subject: t.subject || "", body_html: t.body_html || "" }); setEditorKey((k) => k + 1); } }} defaultValue="" style={{ ...inp, width: 260 }}><option value="">— pick one —</option>{templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
           </div>
-          <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Subject<input value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} disabled={sending} style={inp} /></label>
-          <label className="text-xs font-semibold block mt-2" style={{ color: "var(--dim)" }}>Body (HTML or plain text; {"{{first_name}}"} and the rest are filled per person)
-            <textarea value={f.body_html} onChange={(e) => setF({ ...f, body_html: e.target.value })} rows={12} disabled={sending} style={{ ...inp, fontFamily: "monospace", fontSize: 12.5 }} />
-          </label>
+          <div key={editorKey}>
+            <MessageEditor subject={f.subject} body={f.body_html} onSubject={(v) => setF((x) => ({ ...x, subject: v }))} onBody={(h) => setF((x) => ({ ...x, body_html: h }))} variables={variables} disabled={sending} minHeight={280} />
+          </div>
           <div className="flex gap-2 mt-2 items-center flex-wrap">
             <button onClick={doMagic} disabled={!!busy || sending} style={btn("#6D28D9")}>{busy === "magic" ? "Genie is thinking…" : "✨ Genie magic — improve subject & message"}</button>
             <span className="text-xs" style={{ color: MUTED }}>Rewrites for the inbox: shorter subject, no trigger words, one ask, variables kept. You choose whether to use it.</span>
@@ -468,7 +467,7 @@ function CampaignWizard({ c, seesAll, onClose }: { c: Campaign | null; seesAll: 
               <div className="text-sm font-semibold">{magic.subject}</div>
               <div className="text-sm mt-1 rounded bg-white p-2" style={{ maxHeight: 220, overflow: "auto" }} dangerouslySetInnerHTML={{ __html: magic.body_html }} />
               <ul className="text-xs mt-2" style={{ color: "var(--dim)", paddingLeft: 18, listStyle: "disc" }}>{magic.why.map((w, i) => <li key={i}>{w}</li>)}</ul>
-              <div className="flex gap-2 mt-2"><button onClick={() => { setF({ ...f, subject: magic.subject, body_html: magic.body_html }); setMagic(null); }} style={btn("#6D28D9")}>Use this</button><button onClick={() => setMagic(null)} style={btn("#fff", "var(--dim)")}>Keep mine</button></div>
+              <div className="flex gap-2 mt-2"><button onClick={() => { setF({ ...f, subject: magic.subject, body_html: magic.body_html }); setMagic(null); setEditorKey((k) => k + 1); }} style={btn("#6D28D9")}>Use this</button><button onClick={() => setMagic(null)} style={btn("#fff", "var(--dim)")}>Keep mine</button></div>
             </div>
           )}
         </div>
@@ -541,6 +540,60 @@ function CampaignWizard({ c, seesAll, onClose }: { c: Campaign | null; seesAll: 
   );
 }
 
+
+/* ───────────────────────────── the message editor ─────────────────────────────
+   Rich text for the body, the subject above it, and the variables down the
+   side to click straight into wherever the caret is (Dr Raghu, 6 Sep 2026:
+   "template to be rich text; should show variables in the side to copy
+   paste"). */
+function MessageEditor({ subject, body, onSubject, onBody, variables, disabled, minHeight = 320 }: {
+  subject: string; body: string; onSubject: (s: string) => void; onBody: (h: string) => void;
+  variables: { key: string; description: string }[]; disabled?: boolean; minHeight?: number;
+}) {
+  const boxRef = React.useRef<HTMLDivElement | null>(null);
+  const subjRef = React.useRef<HTMLInputElement | null>(null);
+  const last = React.useRef<"subject" | "body">("body");
+  const insert = (key: string) => {
+    const token = `{{${key}}}`;
+    if (last.current === "subject" && subjRef.current) {
+      const el = subjRef.current; const a = el.selectionStart ?? el.value.length, b = el.selectionEnd ?? a;
+      const next = el.value.slice(0, a) + token + el.value.slice(b); onSubject(next);
+      requestAnimationFrame(() => { el.focus(); el.setSelectionRange(a + token.length, a + token.length); });
+      return;
+    }
+    const ed = boxRef.current?.querySelector('[contenteditable="true"]') as HTMLElement | null;
+    if (!ed) return;
+    if (document.activeElement !== ed) { ed.focus(); const r = document.createRange(); r.selectNodeContents(ed); r.collapse(false); const sel = window.getSelection(); sel?.removeAllRanges(); sel?.addRange(r); }
+    document.execCommand("insertText", false, token);
+  };
+  const copy = (key: string) => { try { navigator.clipboard.writeText(`{{${key}}}`); } catch (e) { swallow("marketing/copy", e); } };
+  return (
+    <div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0, 1fr) 230px" }}>
+      <div className="min-w-0">
+        <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Subject
+          <input ref={subjRef} value={subject} disabled={disabled} onFocus={() => { last.current = "subject"; }} onChange={(e) => onSubject(e.target.value)} style={{ ...inp, fontSize: 14 }} />
+        </label>
+        <div className="text-xs font-semibold mt-2 mb-1" style={{ color: "var(--dim)" }}>Body</div>
+        <div ref={boxRef} onFocusCapture={() => { last.current = "body"; }} style={{ opacity: disabled ? 0.6 : 1, pointerEvents: disabled ? "none" : "auto" }}>
+          <RichTextEditor initial={body} live onChangeHtml={onBody} minHeight={minHeight} placeholder="Write the mail. Click a variable on the right to drop it where the cursor is." />
+        </div>
+      </div>
+      <div className="rounded border p-2" style={{ borderColor: LINE, background: "#FBFAF7", alignSelf: "start", position: "sticky", top: 60 }}>
+        <div className="text-xs font-bold mb-1" style={{ color: MUTED }}>VARIABLES — click to insert, ⧉ to copy</div>
+        <div style={{ maxHeight: minHeight + 60, overflowY: "auto" }}>
+          {variables.map((v) => (
+            <div key={v.key} className="flex items-center gap-1 py-0.5">
+              <button onMouseDown={(e) => e.preventDefault()} onClick={() => insert(v.key)} className="flex-1 text-left rounded px-1.5 py-0.5 font-mono text-xs" style={{ background: "#fff", border: `1px solid ${LINE}`, color: INK }} title={v.description}>{`{{${v.key}}}`}</button>
+              <button onClick={() => copy(v.key)} className="text-xs" style={{ color: MUTED }} title="copy">⧉</button>
+            </div>
+          ))}
+        </div>
+        <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.5 }}>Filled per person at send: name, title, company, city from the record; the rest from the CRM's variables.</div>
+      </div>
+    </div>
+  );
+}
+
 /* ───────────────────────────── Templates ───────────────────────────── */
 
 function Templates() {
@@ -564,12 +617,11 @@ function Templates() {
           { key: "x", label: "", render: (r) => <button onClick={async () => { if (window.confirm(`Delete "${r.name}"?`)) { await api("/api/marketing/templates", { action: "delete", id: r.id }); load(); } }} className="text-xs" style={{ color: RED }}>delete</button> },
         ]} />
       {open && (
-        <Modal title={open === "new" ? "New template" : open.name} onClose={() => setOpen(null)} width={760}>
-          <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Name<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} style={inp} /></label>
-          <label className="text-xs font-semibold block mt-2" style={{ color: "var(--dim)" }}>Subject<input value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} style={inp} /></label>
-          <label className="text-xs font-semibold block mt-2" style={{ color: "var(--dim)" }}>Body<textarea value={f.body_html} onChange={(e) => setF({ ...f, body_html: e.target.value })} rows={12} style={{ ...inp, fontFamily: "monospace", fontSize: 12.5 }} /></label>
+        <Modal title={open === "new" ? "New template" : open.name} onClose={() => setOpen(null)} width={1100}>
+          <label className="text-xs font-semibold block mb-2" style={{ color: "var(--dim)", maxWidth: 480 }}>Template name<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Intro — GSE for airports" style={inp} /></label>
+          <MessageEditor subject={f.subject} body={f.body_html} onSubject={(v) => setF((x) => ({ ...x, subject: v }))} onBody={(h) => setF((x) => ({ ...x, body_html: h }))} variables={vars} />
           {msg && <div className="text-xs mt-2" style={{ color: RED }}>{msg}</div>}
-          <button onClick={save} className="mt-3" style={btn(ACCENT)}>Save</button>
+          <button onClick={save} className="mt-3" style={btn(ACCENT)}>Save template</button>
         </Modal>
       )}
     </div>

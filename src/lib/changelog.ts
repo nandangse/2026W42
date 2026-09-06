@@ -78,6 +78,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.2.3",
+    date: "2026-09-06",
+    module: "Marketing — the message is rich text, the variables beside it",
+    items: [
+      "\"template to be rich text; should show variables in the side to copy paste\" (Dr Raghu, 6 Sep 2026). Templates and the campaign's Message step use Genie's rich text editor — bold, lists, links, pictures, tables, colour — with the variables down the right: click one and it drops where the cursor is, in the subject or the body; ⧉ copies it. A template picked into a campaign, or Genie's rewrite taken, lands in the editor whole.",
+    ],
+  },
+  {
     v: "5.0.2.2",
     date: "2026-09-06",
     module: "Marketing — the company opened wide; filters; select all; who belongs in the CRM",
