@@ -97,7 +97,7 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
           {!done.length
             ? <div className="p-4 text-sm" style={{ color: C.faint }}>Nothing has been approved yet. Once you approve something, it is kept here with both dates.</div>
             : (
-              <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+              <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
                 <thead><tr style={{ color: C.faint, fontSize: 11 }}>
                   {["What", "Who / which", "Change", "Asked date", "Approved date", "Changed by", "Approved by"].map((h) => (
                     <th key={h} className="text-left px-2 py-1.5" style={{ borderBottom: `1px solid ${C.line}` }}>{h}</th>))}
@@ -106,7 +106,7 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
                   {done.map((r, i) => (
                     <tr key={`${r.kind}${r.id}${i}`} style={{ borderBottom: "1px solid #F2F0EA" }}>
                       <td className="px-2 py-1.5">
-                        <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: r.kind === "Role" ? "#EDE7F6" : "#DCE8F5", color: r.kind === "Role" ? "#5B3FA8" : "#1B3A5C" }}>{r.kind}</span>
+                        <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: r.kind === "Role" ? "#EDE7F6" : "#DCE8F5", color: r.kind === "Role" ? "#5B3FA8" : "var(--blue)" }}>{r.kind}</span>
                       </td>
                       <td className="px-2 py-1.5 font-semibold">{r.kind === "Record" ? `${r.id} · ${r.name}` : r.name}</td>
                       <td className="px-2 py-1.5">{r.what}</td>
@@ -144,13 +144,13 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
         <>
           <div className="flex items-center gap-2 flex-wrap mb-2 no-print">
             <label className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: C.dim, cursor: "pointer" }}>
-              <input type="checkbox" checked={allOn} onChange={toggleAll} style={{ accentColor: "#E8600A", width: 14, height: 14 }} />
+              <input type="checkbox" checked={allOn} onChange={toggleAll} style={{ accentColor: "var(--accent)", width: 14, height: 14 }} />
               Select all ({total})
             </label>
             <button onClick={() => approve({ employeeIds: chosen, roleIds: chosenRoles }, "Approved")}
               disabled={!isOwner || busy || !picked}
               className="text-xs font-bold rounded px-3 py-1.5"
-              style={{ background: isOwner && picked ? "#0D7A3F" : "#E2E0DA", color: isOwner && picked ? "#fff" : "#8A94A0", cursor: isOwner && picked ? "pointer" : "not-allowed" }}>
+              style={{ background: isOwner && picked ? "var(--green)" : "var(--line)", color: isOwner && picked ? "#fff" : "var(--muted)", cursor: isOwner && picked ? "pointer" : "not-allowed" }}>
               ✓ Approve selected{picked ? ` (${picked})` : ""}
             </button>
             <button onClick={() => { if (window.confirm(`Approve everything waiting — ${total} record${total === 1 ? "" : "s"}?`)) approve({ all: true }, "Approved everything"); }}
@@ -173,7 +173,7 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
                   <div key={p.id} style={{ borderTop: i ? "1px solid #EEECE6" : undefined }}>
                     <div className="px-3 py-2 flex items-center gap-2 flex-wrap">
                       <input type="checkbox" checked={!!pick[p.id]} onChange={(e) => setPick((s) => ({ ...s, [p.id]: e.target.checked }))}
-                        style={{ accentColor: "#E8600A", width: 14, height: 14 }} />
+                        style={{ accentColor: "var(--accent)", width: 14, height: 14 }} />
                       <span className="text-xs tnum font-bold" style={{ minWidth: 64 }}>{p.id}</span>
                       <span className="text-xs font-semibold" style={{ minWidth: 180, flex: 1 }}>{p.name}</span>
                       <button onClick={() => setOpenId(openId === p.id ? null : p.id)}
@@ -189,11 +189,11 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
                         {initialsOf(p.by)} · {p.last ? fmtFull(String(p.last)) : ""}
                       </span>
                       <a href={`/hrms/employee/${encodeURIComponent(p.id)}`} target="_blank" rel="noopener noreferrer"
-                        className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#DCE8F5", color: "#1B3A5C" }}
+                        className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#DCE8F5", color: "var(--blue)" }}
                         title="Open the record in a new tab">open ↗</a>
                       {isOwner && (
                         <button onClick={() => approve({ employeeIds: [p.id] }, `${p.name} approved`)} disabled={busy}
-                          className="text-xs font-bold rounded px-2.5 py-1" style={{ background: "#0D7A3F", color: "#fff" }}>
+                          className="text-xs font-bold rounded px-2.5 py-1" style={{ background: "var(--green)", color: "#fff" }}>
                           ✓
                         </button>
                       )}
@@ -224,17 +224,17 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
                 {roles.map((r, i) => (
                   <div key={r.id} className="px-3 py-2 flex items-center gap-2 flex-wrap" style={{ borderTop: i ? "1px solid #EEECE6" : undefined }}>
                     <input type="checkbox" checked={!!rolePick[r.id]} onChange={(e) => setRolePick((s) => ({ ...s, [r.id]: e.target.checked }))}
-                      style={{ accentColor: "#E8600A", width: 14, height: 14 }} />
+                      style={{ accentColor: "var(--accent)", width: 14, height: 14 }} />
                     <span className="text-xs font-semibold" style={{ minWidth: 220, flex: 1 }}>{r.role}</span>
                     <span className="text-xs" style={{ color: C.dim, minWidth: 140 }}>{r.department || "—"}</span>
                     <span className="text-xs" style={{ color: C.faint, minWidth: 150 }}>
                       {initialsOf(r.by)} · {r.since ? fmtFull(String(r.since)) : ""}
                     </span>
                     <a href={`/hrms/role/${encodeURIComponent(r.id)}`} target="_blank" rel="noopener noreferrer"
-                      className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#DCE8F5", color: "#1B3A5C" }}>open ↗</a>
+                      className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#DCE8F5", color: "var(--blue)" }}>open ↗</a>
                     {isOwner && (
                       <button onClick={() => approve({ roleIds: [r.id] }, `${r.role} approved`)} disabled={busy}
-                        className="text-xs font-bold rounded px-2.5 py-1" style={{ background: "#0D7A3F", color: "#fff" }}>✓</button>
+                        className="text-xs font-bold rounded px-2.5 py-1" style={{ background: "var(--green)", color: "#fff" }}>✓</button>
                     )}
                   </div>
                 ))}

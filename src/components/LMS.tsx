@@ -30,9 +30,9 @@ import {
 import { today, fmtFull } from "@/lib/schedule";
 
 const C = {
-  ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC",
-  line: "#E2E0DA", panel: "#F4F2EC", accent: "#E8600A", navy: "#1B3A5C",
-  green: "#0D7A3F", amber: "#D97706", red: "#B3261E", violet: "#7C3AED",
+  ink: "var(--navy)", body: "var(--ink)", sub: "var(--dim)", mute: "var(--muted)", faint: "#B8B5AC",
+  line: "var(--line)", panel: "#F4F2EC", accent: "var(--accent)", navy: "var(--blue)",
+  green: "var(--green)", amber: "var(--warn)", red: "var(--red)", violet: "#7C3AED",
 };
 
 const TABS = [
@@ -289,7 +289,7 @@ function GoalsTab({ ctx }: { ctx: Ctx }) {
                 <span className="font-bold text-sm" style={{ color: C.ink, lineHeight: 1.25 }}>{b.name}</span>
               </div>
               {b.blurb && <div className="text-xs mt-1" style={{ color: C.sub, lineHeight: 1.45 }}>{b.blurb}</div>}
-              <div className="mt-2" style={{ height: 5, background: "#EFEDE7", borderRadius: 2, overflow: "hidden" }}>
+              <div className="mt-2" style={{ height: 5, background: "var(--line-soft)", borderRadius: 2, overflow: "hidden" }}>
                 <div style={{ width: `${pct}%`, height: 5, background: b.color }} />
               </div>
               <div className="text-xs mt-1" style={{ color: total ? C.faint : C.amber }}>
@@ -494,7 +494,7 @@ function LessonDrawer({ ctx, lesson, onClose }: { ctx: Ctx; lesson: Lesson; onCl
     <div style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,0.45)", zIndex: 60, display: "flex", justifyContent: "flex-end" }}
       role="button" tabIndex={0} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()}
-        style={{ width: "min(760px, 100%)", background: "#F1EFE9", height: "100%", overflowY: "auto", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }}>
+        style={{ width: "min(760px, 100%)", background: "var(--paper)", height: "100%", overflowY: "auto", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }}>
         <div className="px-4 py-3 flex items-start gap-3" style={{ background: C.ink, position: "sticky", top: 0, zIndex: 2 }}>
           <div style={{ flex: 1 }}>
             <div className="text-xs font-bold" style={{ color: "#8FA1B3", letterSpacing: 1.2 }}>LESSON</div>
@@ -503,13 +503,13 @@ function LessonDrawer({ ctx, lesson, onClose }: { ctx: Ctx; lesson: Lesson; onCl
               {books.map((b) => (
                 <span key={b.id} className="text-xs font-bold rounded px-1.5" style={{ background: b.color, color: "#fff" }}>{b.name}</span>
               ))}
-              {lesson.minutes > 0 && <span className="text-xs rounded px-1.5" style={{ background: "#22303C", color: "#8FA1B3" }}>{lesson.minutes} min</span>}
+              {lesson.minutes > 0 && <span className="text-xs rounded px-1.5" style={{ background: "var(--ink)", color: "#8FA1B3" }}>{lesson.minutes} min</span>}
             </div>
           </div>
           {shareUrl && (
             <button onClick={share} className="rounded font-bold flex items-center gap-1"
               title={`Copy this lesson's URL — ${shareUrl}`} aria-label="Copy the lesson's URL"
-              style={{ background: copied ? "#0D7A3F" : "#22303C", color: "#fff", fontSize: 12, padding: "5px 9px", flexShrink: 0 }}>
+              style={{ background: copied ? "var(--green)" : "var(--ink)", color: "#fff", fontSize: 12, padding: "5px 9px", flexShrink: 0 }}>
               {copied ? "✓ Copied" : "🔗 Share"}
             </button>
           )}
@@ -566,7 +566,7 @@ function LessonDrawer({ ctx, lesson, onClose }: { ctx: Ctx; lesson: Lesson; onCl
               className="w-full text-sm border rounded p-2"
               style={{ borderColor: canComplete ? C.green : C.line, lineHeight: 1.55, resize: "vertical" }}
             />
-            <div className="mt-1" style={{ height: 5, background: "#EFEDE7", borderRadius: 2, overflow: "hidden" }}>
+            <div className="mt-1" style={{ height: 5, background: "var(--line-soft)", borderRadius: 2, overflow: "hidden" }}>
               <div style={{ width: `${Math.min(100, (words / MIN_LEARNING_WORDS) * 100)}%`, height: 5, background: canComplete ? C.green : C.amber }} />
             </div>
 
@@ -925,7 +925,7 @@ function BooksPanel({ ctx }: { ctx: Ctx }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
-  const blank = { isNew: true, name: "", icon: "", color: "#1B3A5C", blurb: "", sort_order: (ctx.d.books.length + 1) * 10 };
+  const blank = { isNew: true, name: "", icon: "", color: "var(--blue)", blurb: "", sort_order: (ctx.d.books.length + 1) * 10 };
 
   const save = async () => {
     if (!edit?.name?.trim()) { setMsg("A book needs a name"); return; }
@@ -989,7 +989,7 @@ function BooksPanel({ ctx }: { ctx: Ctx }) {
                 </div>
                 <div>
                   <div className="text-xs font-semibold mb-0.5" style={{ color: C.mute }}>Colour</div>
-                  <input type="color" value={edit.color || "#1B3A5C"} onChange={(e) => setEdit({ ...edit, color: e.target.value })}
+                  <input type="color" value={edit.color || "var(--blue)"} onChange={(e) => setEdit({ ...edit, color: e.target.value })}
                     className="border rounded" style={{ borderColor: C.line, width: 48, height: 32, padding: 2 }} />
                 </div>
                 <div>

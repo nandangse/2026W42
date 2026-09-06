@@ -17,7 +17,7 @@ import { fmtFull } from "@/lib/schedule";
 import { IDP_SECTIONS, IDP_RATINGS, RATING_MEANING, RATING_MAX, bandIndex } from "@/lib/idp";
 import DictateBox, { type Recording } from "./DictateBox";
 
-const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
+const C = { ink: "var(--ink)", dim: "var(--dim)", faint: "var(--muted)", line: "var(--line)", orange: "var(--accent)", green: "var(--green)", red: "var(--red)" };
 const inr = (n: number) => n.toLocaleString("en-IN");
 
 export interface TeamRow {
@@ -40,7 +40,7 @@ export function TeamBox({ onOpen }: { onOpen: (r: TeamRow) => void }) {
   const waiting = reviewable.length - doneCount;
   return (
     <div className="mt-3">
-      <button onClick={() => setOpen((v) => !v)} className="w-full text-left rounded-lg p-3" style={{ background: "#16232F", color: "#fff", border: waiting ? "3px solid #E8600A" : "3px solid #0D7A3F" }}>
+      <button onClick={() => setOpen((v) => !v)} className="w-full text-left rounded-lg p-3" style={{ background: "var(--navy)", color: "#fff", border: waiting ? "3px solid #E8600A" : "3px solid #0D7A3F" }}>
         <div className="font-bold" style={{ fontSize: 17, lineHeight: 1.2 }}>👥 Show IDP of reporting staff</div>
         <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>
           {rows.length} report{rows.length === 1 ? "s" : ""} to you · {reviewable.length} submitted · {doneCount} feedback{doneCount === 1 ? "" : "s"} given{waiting ? ` · ${waiting} waiting for you` : reviewable.length ? " · all done 🎉" : ""} · tap to {open ? "hide" : "open"}
@@ -107,7 +107,7 @@ export function TeamList({ onOpen }: { onOpen: (r: TeamRow) => void }) {
               <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#FFF3E8", color: "#8A5B00" }}>pending</span>
             )}
             {r.submitted_at && (
-              <button onClick={() => onOpen(r)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#16232F", color: "#fff" }}>
+              <button onClick={() => onOpen(r)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--navy)", color: "#fff" }}>
                 {r.review?.submitted_at ? "See the review" : "Review →"}
               </button>
             )}
@@ -193,9 +193,9 @@ export function TeamReview({ row, onClose }: { row: TeamRow; onClose: () => void
   return (
     <div className="fixed inset-0 no-print" style={{ background: "rgba(13,22,31,0.5)", zIndex: 70 }} role="button" tabIndex={0} onClick={onClose}>
       <div className="mx-auto my-3 md:my-6 rounded-lg overflow-y-auto"
-        style={{ maxWidth: 860, maxHeight: "calc(100vh - 30px)", background: "#F1EFE9" }}
+        style={{ maxWidth: 860, maxHeight: "calc(100vh - 30px)", background: "var(--paper)" }}
         role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
-        <div className="px-4 py-3 sticky top-0 flex items-start gap-2" style={{ background: "#16232F", color: "#fff", zIndex: 2 }}>
+        <div className="px-4 py-3 sticky top-0 flex items-start gap-2" style={{ background: "var(--navy)", color: "#fff", zIndex: 2 }}>
           <div>
             <div className="font-bold">{row.name}</div>
             <div style={{ fontSize: 11, color: "#8FA1B3" }}>
@@ -203,7 +203,7 @@ export function TeamReview({ row, onClose }: { row: TeamRow; onClose: () => void
             </div>
           </div>
           {locked && <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#E6F4EA", color: C.green }}>reviewed</span>}
-          <button onClick={onClose} className="ml-auto text-sm font-bold rounded px-2.5 py-1" style={{ background: "#22303C", color: "#8FA1B3" }}>✕</button>
+          <button onClick={onClose} className="ml-auto text-sm font-bold rounded px-2.5 py-1" style={{ background: "var(--ink)", color: "#8FA1B3" }}>✕</button>
         </div>
 
         <div className="p-4">
@@ -255,7 +255,7 @@ export function TeamReview({ row, onClose }: { row: TeamRow; onClose: () => void
                 {d.person.attachments.length > 0 && (
                   <div className="mt-2">
                     {d.person.attachments.map((a) => (
-                      <div key={a.name} style={{ fontSize: 12.5 }}>📄 {a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ color: "#1B3A5C" }}>{a.name}</a> : a.name}</div>
+                      <div key={a.name} style={{ fontSize: 12.5 }}>📄 {a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--blue)" }}>{a.name}</a> : a.name}</div>
                     ))}
                   </div>
                 )}
@@ -295,7 +295,7 @@ export function TeamReview({ row, onClose }: { row: TeamRow; onClose: () => void
                     </div>
                     <button onClick={reveal} disabled={!allRated || busy}
                       className="mt-2 rounded font-bold px-3 py-2"
-                      style={{ background: allRated ? "#16232F" : "#E2E0DA", color: allRated ? "#fff" : "#8A94A0", fontSize: 13, cursor: allRated ? "pointer" : "not-allowed" }}>
+                      style={{ background: allRated ? "var(--navy)" : "var(--line)", color: allRated ? "#fff" : "var(--muted)", fontSize: 13, cursor: allRated ? "pointer" : "not-allowed" }}>
                       {allRated ? "Show their current salary" : `Rate all eleven first (${IDP_RATINGS.filter((x) => ratings[x.key]).length}/11)`}
                     </button>
                   </div>
@@ -338,8 +338,8 @@ export function TeamReview({ row, onClose }: { row: TeamRow; onClose: () => void
                   <button onClick={submit} disabled={busy || !allRated || !voice.length}
                     className="rounded font-bold"
                     style={{
-                      background: allRated && voice.length ? C.green : "#E2E0DA",
-                      color: allRated && voice.length ? "#fff" : "#8A94A0",
+                      background: allRated && voice.length ? C.green : "var(--line)",
+                      color: allRated && voice.length ? "#fff" : "var(--muted)",
                       padding: "13px 22px", fontSize: 15, width: "100%", maxWidth: 340,
                       cursor: allRated && voice.length ? "pointer" : "not-allowed",
                     }}>

@@ -31,7 +31,7 @@ export default function Communications({ who }: { who: string }) {
   useEffect(() => { load(); }, [load]);
 
   const shown = (rows || []).filter((r) => (!channel || r.channel === channel) && (!dir || r.direction === dir) && (!q || `${r.name} ${r.employee_id} ${r.subject || ""} ${r.body}`.toLowerCase().includes(q.toLowerCase())));
-  const tone = (s: string) => (s === "delivered" || s === "received" ? C.green : s === "failed" ? C.red : s === "sent" ? "#1B3A5C" : C.dim);
+  const tone = (s: string) => (s === "delivered" || s === "received" ? C.green : s === "failed" ? C.red : s === "sent" ? "var(--blue)" : C.dim);
   const counts: Record<string, number> = {};
   for (const r of rows || []) { const k = r.direction === "in" ? "replies" : r.status; counts[k] = (counts[k] || 0) + 1; }
 
@@ -55,7 +55,7 @@ export default function Communications({ who }: { who: string }) {
               <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: r.direction === "in" ? "#E6F4EA" : "#F4F2EC", color: tone(r.status), fontSize: 10 }}>{r.direction === "in" ? "↩ reply" : r.status}</span>
               <span className="font-semibold">{r.name}</span>
               <span style={{ color: C.faint }}>{r.channel === "whatsapp" ? "💬" : r.channel === "email" ? "✉" : "📝"} {r.to_address || ""}{r.subject && r.channel === "email" ? ` · ${r.subject}` : ""}</span>
-              {r.run_label && <span className="rounded px-1.5 py-0.5" style={{ background: "#DCE8F5", color: "#1B3A5C", fontSize: 10 }}>run {r.run_label}</span>}
+              {r.run_label && <span className="rounded px-1.5 py-0.5" style={{ background: "#DCE8F5", color: "var(--blue)", fontSize: 10 }}>run {r.run_label}</span>}
               <span style={{ flex: 1 }} />
               <span style={{ color: C.faint }}>{fmtFull(String(r.sent_at))} · {String(r.sent_by || "").split("·")[0].trim()}</span>
               {r.error && <span style={{ color: C.red }} title={r.error}>!</span>}

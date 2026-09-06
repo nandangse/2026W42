@@ -23,7 +23,7 @@ export default function VariableHelp({ compact }: { compact?: boolean }) {
       <div className="text-sm font-bold mb-1" style={{ color: NAVY }}>
         The variables you can type
       </div>
-      <div className="text-xs mb-2" style={{ color: "#5A6672", lineHeight: 1.6 }}>
+      <div className="text-xs mb-2" style={{ color: "var(--dim)", lineHeight: 1.6 }}>
         Write them in double braces — <code>{"{{name}}"}</code>. Spaces inside are fine.
         A name that is <b>not</b> on this list is left exactly as typed, so a spelling mistake
         shows up on your screen rather than on a customer&apos;s phone.
@@ -32,7 +32,7 @@ export default function VariableHelp({ compact }: { compact?: boolean }) {
         {VARIABLE_CATALOGUE.map((v) => (
           <div key={v.key} className="text-xs" style={{ lineHeight: 1.7 }}>
             <code style={{ color: NAVY, fontWeight: 700 }}>{`{{${v.key}}}`}</code>
-            <span style={{ color: "#5A6672" }}> — {v.what}</span>
+            <span style={{ color: "var(--dim)" }}> — {v.what}</span>
             {v.needs !== "nothing" && (
               <span style={{ color: MUTED }}> · needs {v.needs}</span>
             )}

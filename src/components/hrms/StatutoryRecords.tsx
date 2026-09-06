@@ -59,7 +59,7 @@ export default function StatutoryRecords({ who }: { who: string }) {
           </div>
           {RETURNS.map(([k, label]) => (
             <a key={k} href={`/hrms/statutory/${s.id}/print?kind=${k}`} target="_blank" rel="noopener noreferrer"
-              className="rounded px-2.5 py-1.5 font-bold" style={{ background: "#F4F2EC", color: "#1B3A5C", fontSize: 12 }}>
+              className="rounded px-2.5 py-1.5 font-bold" style={{ background: "#F4F2EC", color: "var(--blue)", fontSize: 12 }}>
               {label}
             </a>
           ))}

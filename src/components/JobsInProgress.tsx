@@ -22,9 +22,9 @@ import { fmt, fmtFull, jobNo, otdColor } from "@/lib/schedule";
 import { monthKey, monthLabel } from "@/lib/fmt";
 
 const C = {
-  ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC",
-  line: "#E2E0DA", panel: "#F4F2EC", accent: "#E8600A", navy: "#1B3A5C",
-  green: "#0D7A3F", amber: "#D97706", red: "#B3261E", violet: "#7C3AED",
+  ink: "var(--navy)", body: "var(--ink)", sub: "var(--dim)", mute: "var(--muted)", faint: "#B8B5AC",
+  line: "var(--line)", panel: "#F4F2EC", accent: "var(--accent)", navy: "var(--blue)",
+  green: "var(--green)", amber: "var(--warn)", red: "var(--red)", violet: "#7C3AED",
 };
 
 /** Only what the charts read, so this never has to track the Job type. */
@@ -59,8 +59,8 @@ const cr = (v: number) => (v / CR).toFixed(2);
  * the same colour every time the page is opened.
  */
 const PALETTE = [
-  "#E8600A", "#1B3A5C", "#0D7A3F", "#7C3AED", "#0D9488",
-  "#B3261E", "#D97706", "#5A6672", "#C2185B", "#00838F",
+  "var(--accent)", "var(--blue)", "var(--green)", "#7C3AED", "#0D9488",
+  "var(--red)", "var(--warn)", "var(--dim)", "#C2185B", "#00838F",
   "#6D4C41", "#2E7D32",
 ];
 
@@ -264,7 +264,7 @@ function JobListBox({
           <button onClick={onClose} className="font-bold" style={{ color: "#8FA1B3", fontSize: 20, lineHeight: 1 }}>✕</button>
         </div>
         <div style={{ overflowY: "auto" }}>
-          <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+          <table className="w-full text-xs genie-table" style={{ borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ color: C.mute, borderBottom: `1px solid ${C.line}`, position: "sticky", top: 0, background: "#fff" }}>
                 <th className="text-left px-3 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>JOB</th>
@@ -413,7 +413,7 @@ function PlannedDeliveries({
 
         {/* ---- right: the table, totals first ---- */}
         <div style={{ overflowX: "auto" }}>
-          <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+          <table className="w-full text-xs genie-table" style={{ borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ color: C.mute, borderBottom: `1px solid ${C.line}` }}>
                 <th className="text-left px-2 py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>MONTH</th>
@@ -430,7 +430,7 @@ function PlannedDeliveries({
                 style={{ background: C.ink, cursor: "pointer" }} title="Every pending job">
                 <td className="px-2 py-1.5 font-bold" style={{ color: "#fff" }}>TOTAL</td>
                 <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: "#fff" }}>{months.totals.nos}</td>
-                <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: "#F5B32B" }}>{crV(months.totals.val)}</td>
+                <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: "var(--amber)" }}>{crV(months.totals.val)}</td>
                 <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: "#7BC67E" }}>{crV(months.totals.tp)}</td>
               </tr>
               {months.late.nos > 0 && <Row r={months.late} tone="#FBEDEA" />}
@@ -504,7 +504,7 @@ function ByFamily({
                 <span style={{ width: 10, height: 10, borderRadius: 2, background: colourOf(f.fam), flexShrink: 0 }} />
                 <span className="text-xs font-semibold truncate" style={{ color: C.body, width: 150, flexShrink: 0 }}>{f.fam}</span>
                 <span className="tnum text-xs" style={{ color: C.sub, width: 30, textAlign: "right", flexShrink: 0 }}>{f.nos}</span>
-                <span style={{ flex: 1, height: 10, background: "#EFEDE7", borderRadius: 2, minWidth: 40 }}>
+                <span style={{ flex: 1, height: 10, background: "var(--line-soft)", borderRadius: 2, minWidth: 40 }}>
                   <span style={{ display: "block", width: `${((f.tp || f.val) / max) * 100}%`, height: 10, background: colourOf(f.fam), borderRadius: 2 }} />
                 </span>
                 <span className="tnum text-xs" style={{ color: C.accent, width: 72, textAlign: "right", flexShrink: 0 }}>{V(f.val)}</span>

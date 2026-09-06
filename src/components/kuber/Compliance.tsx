@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { dmy as fmtD } from "@/lib/fmt";
 
-const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A", RED = "#B3261E", GREEN = "#0D7A3F";
+const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", ORANGE = "var(--accent)", RED = "var(--red)", GREEN = "var(--green)";
 
 
 interface CRow { id: string; name: string; grp: string; frequency: string; due_day: number | null; due_note: string }
@@ -72,7 +72,7 @@ export default function ComplianceCalendar() {
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>Compliance Calendar</div>
-          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 680 }}>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 680 }}>
             The colour is judged from the date, never typed: <span className="rounded px-1.5 font-bold" style={{ background: "#CDEFCF" }}>done by the due day</span>{" "}
             <span className="rounded px-1.5 font-bold" style={{ background: "#FCF0CE" }}>done late</span>{" "}
             <span className="rounded px-1.5 font-bold" style={{ background: "#F7C6C0" }}>past and not done</span>.
@@ -87,12 +87,12 @@ export default function ComplianceCalendar() {
       </div>
 
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "74vh" }}>
-        <table className="text-xs" style={{ minWidth: 1250, borderCollapse: "separate", borderSpacing: 0 }}>
-          <thead><tr style={{ background: "#22303C", color: "#fff" }}>
-            <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, left: 0, background: "#22303C", zIndex: 3, minWidth: 210 }}>Compliance</th>
-            <th className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, background: "#22303C", zIndex: 2 }}>Due</th>
+        <table className="text-xs genie-table" style={{ minWidth: 1250, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+            <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, left: 0, background: "var(--ink)", zIndex: 3, minWidth: 210 }}>Compliance</th>
+            <th className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, background: "var(--ink)", zIndex: 2 }}>Due</th>
             {(data?.months || []).map((m) => (
-              <th key={m} className="px-2 py-2 text-center whitespace-nowrap" style={{ position: "sticky", top: 0, background: "#22303C", zIndex: 2, minWidth: 92 }}>{mLabel(m)}</th>
+              <th key={m} className="px-2 py-2 text-center whitespace-nowrap" style={{ position: "sticky", top: 0, background: "var(--ink)", zIndex: 2, minWidth: 92 }}>{mLabel(m)}</th>
             ))}
           </tr></thead>
           <tbody>
@@ -101,11 +101,11 @@ export default function ComplianceCalendar() {
               <FragK key={g || "misc"}>
                 {g && (
                   <tr style={{ background: "#F3F1EB" }}>
-                    <td colSpan={14} className="px-2 py-1 font-bold" style={{ color: "#5A6672", position: "sticky", left: 0, letterSpacing: 0.6 }}>{g}</td>
+                    <td colSpan={14} className="px-2 py-1 font-bold" style={{ color: "var(--dim)", position: "sticky", left: 0, letterSpacing: 0.6 }}>{g}</td>
                   </tr>
                 )}
                 {(data?.rows || []).filter((r) => r.grp === g).map((row) => (
-                  <tr key={row.id} className="border-t" style={{ borderColor: "#EFEDE7" }}>
+                  <tr key={row.id} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
                     <td className="px-2 py-1.5 font-semibold" role="button" tabIndex={0} onClick={() => setMaster(row)}
                       style={{ position: "sticky", left: 0, background: "#fff", zIndex: 1, cursor: "pointer", boxShadow: "2px 0 4px rgba(22,35,47,0.05)" }}
                       title="Edit this compliance">

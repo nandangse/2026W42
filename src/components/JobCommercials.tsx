@@ -43,7 +43,7 @@ import { fmt, fmtFull, jobNo, parseISO, addDays } from "@/lib/schedule";
 import { JobLightbox, type WipJob } from "./JobsInProgress";
 import { monthKey, monthLabel } from "@/lib/fmt";
 
-const C = { navy: "#1B3A5C", ink: "#16232F", sub: "#8A94A0", line: "#E2E0DA", green: "#0D7A3F", accent: "#E8600A", amber: "#B26A00", red: "#B3261E" };
+const C = { navy: "var(--blue)", ink: "var(--navy)", sub: "var(--muted)", line: "var(--line)", green: "var(--green)", accent: "var(--accent)", amber: "#B26A00", red: "var(--red)" };
 
 /** The four collection buckets, and how long after the TDD each one lands. */
 const BUCKETS: { key: "payPctOn" | "payPct30" | "payPct60" | "payPct90"; col: string; days: number; label: string }[] = [
@@ -241,22 +241,22 @@ export default function JobCommercials({
       </div>
 
       <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: C.line }}>
-        <table className="text-xs" style={{ minWidth: 1900, borderCollapse: "separate", borderSpacing: 0 }}>
+        <table className="text-xs genie-table" style={{ minWidth: 1900, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
-            <tr style={{ background: "#22303C", color: "#fff" }}>
+            <tr style={{ background: "var(--ink)", color: "#fff" }}>
               {["Job", "", "Customer tag", "Product type", "Value", "T %", "Throughput", "Material",
                 "Kit %", "Invested", "WIP labour", "Prod %", "GST %", "Advance", "Balance due",
                 "TDD", "Manager"].map((h) => (
                 <th key={h} className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0 }}>{h}</th>
               ))}
               {BUCKETS.map((b) => (
-                <th key={b.col} className="px-2 py-2 text-center whitespace-nowrap" style={{ background: "#16232F" }}>
+                <th key={b.col} className="px-2 py-2 text-center whitespace-nowrap" style={{ background: "var(--navy)" }}>
                   {b.label}<div style={{ fontSize: 9, opacity: .7, fontWeight: 400 }}>TDD +{b.days}d</div>
                 </th>
               ))}
               {/* Dr Raghu, 2 Sep 2026: "should total 100%". A job whose terms
                   do not is a job whose cash is either invented or lost. */}
-              <th className="px-2 py-2 text-center whitespace-nowrap" style={{ background: "#16232F" }}>Σ</th>
+              <th className="px-2 py-2 text-center whitespace-nowrap" style={{ background: "var(--navy)" }}>Σ</th>
               {months.map((m) => (
                 <th key={m} className="px-2 py-2 text-center whitespace-nowrap" style={{ background: "#0D3B24" }}>{monthLabel(m)}</th>
               ))}
@@ -278,7 +278,7 @@ export default function JobCommercials({
                       title={editing === j.id ? "Done editing this row" : "Edit this job's commercials"}
                       className="rounded px-1.5 py-0.5 text-xs font-bold"
                       style={editing === j.id
-                        ? { background: "#0D7A3F", color: "#fff" }
+                        ? { background: "var(--green)", color: "#fff" }
                         : { color: C.navy, border: `1px solid ${C.line}`, background: "#fff" }}>
                       {editing === j.id ? "Done" : "✎"}
                     </button>
@@ -333,7 +333,7 @@ export default function JobCommercials({
             )}
           </tbody>
           <tfoot>
-            <tr style={{ background: "#16232F", color: "#F5B32B" }} className="font-bold">
+            <tr style={{ background: "var(--navy)", color: "var(--amber)" }} className="font-bold">
               <td className="px-2 py-2" colSpan={4}>TOTAL · {rows.length} jobs</td>
               <td className="px-2 py-2 whitespace-nowrap tnum">{cr(sum((r) => Number(r.j.val || 0)))}</td>
               <td />
@@ -380,7 +380,7 @@ function Big({ n, l, c }: { n: string; l: string; c: string }) {
   return (
     <div>
       <div className="tnum" style={{ fontSize: 19, fontWeight: 800, color: c, lineHeight: 1.1 }}>{n}</div>
-      <div className="text-xs" style={{ color: "#8A94A0" }}>{l}</div>
+      <div className="text-xs" style={{ color: "var(--muted)" }}>{l}</div>
     </div>
   );
 }
@@ -392,14 +392,14 @@ function Money({ v, canEdit, busy, onSave }: {
   const [edit, setEdit] = useState(false);
   const [t, setT] = useState(v == null ? "" : String(v));
   useEffect(() => { setT(v == null ? "" : String(v)); }, [v]);
-  if (!canEdit) return <td className="px-2 py-1 whitespace-nowrap tnum" style={{ color: v == null ? "#D5D2C9" : "#16232F" }}>{v == null ? "—" : cr(v)}</td>;
+  if (!canEdit) return <td className="px-2 py-1 whitespace-nowrap tnum" style={{ color: v == null ? "#D5D2C9" : "var(--navy)" }}>{v == null ? "—" : cr(v)}</td>;
   return (
-    <td className="px-2 py-1 whitespace-nowrap tnum" style={{ color: v == null ? "#D5D2C9" : "#16232F", opacity: busy ? .5 : 1 }}>
+    <td className="px-2 py-1 whitespace-nowrap tnum" style={{ color: v == null ? "#D5D2C9" : "var(--navy)", opacity: busy ? .5 : 1 }}>
       {edit ? (
         <input autoFocus type="number" value={t} onChange={(e) => setT(e.target.value)}
           onBlur={() => { setEdit(false); if (t !== (v == null ? "" : String(v))) void onSave(t); }}
           onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { setT(v == null ? "" : String(v)); setEdit(false); } }}
-          className="w-24 rounded border px-1 py-0.5 text-xs" style={{ borderColor: "#E2E0DA" }} />
+          className="w-24 rounded border px-1 py-0.5 text-xs" style={{ borderColor: "var(--line)" }} />
       ) : (
         <span onClick={() => setEdit(true)} className="cursor-text" title="Click to change">{v == null ? "—" : cr(v)}</span>
       )}
@@ -415,7 +415,7 @@ function Pct({ v, canEdit, busy, warn, onSave }: {
   const [t, setT] = useState(v == null ? "" : String(v));
   useEffect(() => { setT(v == null ? "" : String(v)); }, [v]);
   const shown = v == null ? "·" : `${Number(v)}%`;
-  const col = warn ? "#B3261E" : v ? "#1B3A5C" : "#D5D2C9";
+  const col = warn ? "var(--red)" : v ? "var(--blue)" : "#D5D2C9";
   if (!canEdit) return <td className="px-2 py-1 text-center tnum" style={{ color: col }}>{shown}</td>;
   return (
     <td className="px-2 py-1 text-center tnum" style={{ color: col, opacity: busy ? .5 : 1 }}
@@ -424,7 +424,7 @@ function Pct({ v, canEdit, busy, warn, onSave }: {
         <input autoFocus type="number" value={t} onChange={(e) => setT(e.target.value)}
           onBlur={() => { setEdit(false); if (t !== (v == null ? "" : String(v))) void onSave(t); }}
           onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { setT(v == null ? "" : String(v)); setEdit(false); } }}
-          className="w-14 rounded border px-1 py-0.5 text-xs text-center" style={{ borderColor: "#E2E0DA" }} />
+          className="w-14 rounded border px-1 py-0.5 text-xs text-center" style={{ borderColor: "var(--line)" }} />
       ) : (
         <span onClick={() => setEdit(true)} className="cursor-text" title="Click to change">{shown}</span>
       )}

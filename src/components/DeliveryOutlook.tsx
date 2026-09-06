@@ -28,9 +28,9 @@ import { today } from "@/lib/schedule";
 import { monthKey, monthLabel } from "@/lib/fmt";
 
 const C = {
-  ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC",
-  line: "#E2E0DA", panel: "#F4F2EC", accent: "#E8600A", navy: "#1B3A5C",
-  green: "#0D7A3F", amber: "#D97706", red: "#B3261E", violet: "#7C3AED",
+  ink: "var(--navy)", body: "var(--ink)", sub: "var(--dim)", mute: "var(--muted)", faint: "#B8B5AC",
+  line: "var(--line)", panel: "#F4F2EC", accent: "var(--accent)", navy: "var(--blue)",
+  green: "var(--green)", amber: "var(--warn)", red: "var(--red)", violet: "#7C3AED",
 };
 
 /** Only the fields the outlook reads — so this never has to track the Job type. */
@@ -422,7 +422,7 @@ function HeatMap({ jobs, V, onOpen }: { jobs: OutlookJob[]; V: (n: number) => st
             <button onClick={() => setSel(null)} className="ml-2 font-bold" style={{ color: C.accent }}>✕ clear</button>
           </div>
           <div style={{ maxHeight: 240, overflowY: "auto" }}>
-            <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+            <table className="w-full text-xs genie-table" style={{ borderCollapse: "collapse" }}>
               <tbody>
                 {[...selCell.jobs].sort((a, b) => b.tpv - a.tpv).map((j) => (
                   <tr key={j.id} style={{ borderTop: `1px solid ${C.line}` }}>

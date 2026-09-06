@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fmtD } from "./Registers";
 import { useMoneyFmt } from "./money";
 
-const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", RED = "#B3261E", GREEN = "#0D7A3F", ORANGE = "#E8600A";
+const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", RED = "var(--red)", GREEN = "var(--green)", ORANGE = "var(--accent)";
 
 function useBooks<T>(view: string, extra = ""): [T | null, () => void] {
   const [data, setData] = useState<T | null>(null);
@@ -88,12 +88,12 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
 
       {/* money owed and owing — gross first, advances named as what they are */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
-        <Card label="RECEIVABLES — DUE TO COME" value={fmtMoney(s.receivable.gross)} sub={`${s.receivable.parties} customers · real invoices only — proformas are not considered`} color="#1B3A5C" />
+        <Card label="RECEIVABLES — DUE TO COME" value={fmtMoney(s.receivable.gross)} sub={`${s.receivable.parties} customers · real invoices only — proformas are not considered`} color="var(--blue)" />
         <Card label="MONEY HELD FROM CUSTOMERS" value={fmtMoney(-s.receivable.unadjusted)} sub="advances + receipts not yet tied to bills in Tally (Agst Ref)" color="#1B6B93" />
         <Card label="NET RECEIVABLE" value={fmtMoney(s.receivable.total)} sub="bills less every rupee held — small while receipts sit untied" />
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
-        <Card label="PAYABLES — TO PAY" value={fmtMoney(s.payable.gross)} sub={`${s.payable.parties} suppliers · gross bills`} color="#1B3A5C" />
+        <Card label="PAYABLES — TO PAY" value={fmtMoney(s.payable.gross)} sub={`${s.payable.parties} suppliers · gross bills`} color="var(--blue)" />
         <Card label="ADVANCES PAID TO SUPPLIERS" value={fmtMoney(-s.payable.unadjusted)} sub="money out, goods awaited" color="#1B6B93" />
         <Card label="NET PAYABLE" value={fmtMoney(s.payable.total)} sub="bills less advances" />
       </div>
@@ -114,21 +114,21 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
           {(["7", "30", "90", "mtd", "qtd", "ytd"] as const).map((k) => (
             <button key={k} onClick={() => setPeriod(k)}
               className="rounded-full border px-2.5 py-0.5 text-xs font-bold"
-              style={period === k ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
+              style={period === k ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
               {k === "ytd" ? "YTD" : k === "mtd" ? "MTD" : k === "qtd" ? "QTD" : `${k} days`}
             </button>
           ))}
           <input type="range" min={1} max={365} value={/^\d+$/.test(period) ? Number(period) : days}
             onChange={(e) => setPeriod(e.target.value)}
-            style={{ width: 160, accentColor: "#E8600A" }}
+            style={{ width: 160, accentColor: "var(--accent)" }}
             title="Slide for any number of days" />
           <span className="text-xs tnum font-bold" style={{ color: INK }}>
             {period === "ytd" ? `since 1 April (${days} days)` : period === "mtd" ? `this month (${days} days)` : period === "qtd" ? `this quarter (${days} days)` : `last ${period} days`}
           </span>
         </div>
-        <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+        <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
-            <tr style={{ background: "#22303C", color: "#fff" }}>
+            <tr style={{ background: "var(--ink)", color: "#fff" }}>
               <th className="px-2 py-2 text-left">Flow</th>
               <th className="px-2 py-2 text-right">Value</th>
               <th className="px-2 py-2 text-right">Vouchers</th>
@@ -140,7 +140,7 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
             {FLOW_ROWS.map(([k, label, src], i) => {
               const f = s.flows?.[k] ?? { value: 0, count: 0 };
               return (
-                <tr key={k} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                <tr key={k} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   <td className="px-2 py-1.5 font-bold" style={{ color: k === "collections" || k === "money_in" ? GREEN : k === "supplier_payments" || k === "money_out" ? RED : INK }}>{label}</td>
                   <td className="px-2 py-1.5 text-right tnum font-bold">{f.value ? fmtMoney(f.value) : "·"}</td>
                   <td className="px-2 py-1.5 text-right tnum">{f.count || "·"}</td>
@@ -160,22 +160,22 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
 
       {/* the instruments, verified right today */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
-        <Card label="BGs LIVE" value={`${s.bg.count} · ${fmtMoney(s.bg.amount)}`} sub={s.bg.expiring ? `${s.bg.expiring} expiring in 60 days` : "none expiring soon"} color={s.bg.expiring ? "#D97706" : INK} />
+        <Card label="BGs LIVE" value={`${s.bg.count} · ${fmtMoney(s.bg.amount)}`} sub={s.bg.expiring ? `${s.bg.expiring} expiring in 60 days` : "none expiring soon"} color={s.bg.expiring ? "var(--warn)" : INK} />
         <Card label="FDs LIVE" value={`${s.fd.count} · ${fmtMoney(s.fd.amount)}`} sub={s.fd.expiring ? `${s.fd.expiring} maturing in 60 days` : "none maturing soon"} />
-        <Card label="INSURANCE LIVE" value={`${s.insurance.count} policies`} sub={s.insurance.expiring ? `${s.insurance.expiring} expiring in 60 days` : "none expiring soon"} color={s.insurance.expiring ? "#D97706" : INK} />
+        <Card label="INSURANCE LIVE" value={`${s.insurance.count} policies`} sub={s.insurance.expiring ? `${s.insurance.expiring} expiring in 60 days` : "none expiring soon"} color={s.insurance.expiring ? "var(--warn)" : INK} />
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <button onClick={() => go("cashflow")} className="bg-white rounded-lg border p-3 text-left hover:shadow" style={{ borderColor: BORDER }}>
           <div className="text-xs font-bold mb-1" style={{ color: MUTED }}>13-WEEK CASH FLOW</div>
-          <div className="text-sm font-bold" style={{ color: "#1B3A5C" }}>Open the plan →</div>
+          <div className="text-sm font-bold" style={{ color: "var(--blue)" }}>Open the plan →</div>
         </button>
         <button onClick={() => go("payplan")} className="bg-white rounded-lg border p-3 text-left hover:shadow" style={{ borderColor: BORDER }}>
           <div className="text-xs font-bold mb-1" style={{ color: MUTED }}>PAYMENT PLANNING</div>
-          <div className="text-sm font-bold" style={{ color: "#1B3A5C" }}>Decide the week →</div>
+          <div className="text-sm font-bold" style={{ color: "var(--blue)" }}>Decide the week →</div>
         </button>
         <button onClick={() => go("reportcard")} className="bg-white rounded-lg border p-3 text-left hover:shadow" style={{ borderColor: BORDER }}>
           <div className="text-xs font-bold mb-1" style={{ color: MUTED }}>SUPPLIER REPORT CARD</div>
-          <div className="text-sm font-bold" style={{ color: "#1B3A5C" }}>Read the grades →</div>
+          <div className="text-sm font-bold" style={{ color: "var(--blue)" }}>Read the grades →</div>
         </button>
       </div>
     </div>
@@ -205,12 +205,12 @@ function DayRatios({ receivableNet, payableNet }: { receivableNet: number; payab
     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
       <Card label={`CUSTOMER RECEIVABLE DAYS — UPTO ${fmtD(upto)}`} value={dd(dso)}
         sub={`net receivables ÷ per-day billing, 1 Apr → ${fmtD(upto)} (${fmtMoney(perDaySales)}/day)`}
-        color={dso != null && dso > 90 ? "#D97706" : INK} />
+        color={dso != null && dso > 90 ? "var(--warn)" : INK} />
       <Card label={`SUPPLIER PAYABLE DAYS — UPTO ${fmtD(upto)}`} value={dd(dpo)}
         sub={`net payables ÷ per-day purchases, 1 Apr → ${fmtD(upto)} (${fmtMoney(perDayPurch)}/day)`} />
       <Card label={`WORKING CAPITAL DAYS — UPTO ${fmtD(upto)}`} value={dd(wcd)}
         sub="receivable days − payable days; inventory days join when stock is typed on the P&L"
-        color={wcd != null && wcd > 0 ? "#D97706" : GREEN} />
+        color={wcd != null && wcd > 0 ? "var(--warn)" : GREEN} />
     </div>
   );
 }
@@ -267,24 +267,24 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
       {/* gross first — the money truly due; advances named as what they are.
           No overdue tile: the buckets below already track it (28 Aug 2026). */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
-        <Card label={words.bills.toUpperCase() + (rec ? " — DUE TO COME" : " — TO PAY")} value={fmtMoney(data.gross)} sub={`${data.count} open bills`} color="#1B3A5C" />
+        <Card label={words.bills.toUpperCase() + (rec ? " — DUE TO COME" : " — TO PAY")} value={fmtMoney(data.gross)} sub={`${data.count} open bills`} color="var(--blue)" />
         <Card label={words.adv.toUpperCase()} value={fmtMoney(-data.unadjusted)} sub={rec ? "a liability — work owed against money held" : "money out, goods awaited"} color="#1B6B93" />
         <Card label={words.net.toUpperCase()} value={fmtMoney(data.total)} sub="bills less advances" color={INK} />
       </div>
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "70vh" }}>
-        <table className="w-full text-xs" style={{ minWidth: 1100, borderCollapse: "separate", borderSpacing: 0 }}>
+        <table className="w-full text-xs genie-table" style={{ minWidth: 1100, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
-            <tr style={{ background: "#22303C", color: "#fff" }}>
+            <tr style={{ background: "var(--ink)", color: "#fff" }}>
               {COLS.map((c, i) => (
                 <th key={c.key}
                   className={`px-2 py-2 ${i === 0 ? "text-left" : "text-right"} whitespace-nowrap`}
-                  style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}
+                  style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer" }}
                   onClick={() => clickSort(c.key)}
                   title="Click to sort — again to flip, a third time to clear">
                   {c.label}{sortKey === c.key ? (dir === -1 ? " ▼" : " ▲") : ""}
                 </th>
               ))}
-              <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "#22303C" }} />
+              <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "var(--ink)" }} />
             </tr>
           </thead>
           <tbody>
@@ -300,7 +300,7 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
                   <td className="px-2 py-1.5 text-right tnum" style={cellCss}>{fmtMoney(sum((r) => r.total))}</td>
                   <td className="px-2 py-1.5 text-right tnum" style={{ ...cellCss, color: MUTED }}>{fmtMoney(sum((r) => r.not_due))}</td>
                   <td className="px-2 py-1.5 text-right tnum" style={cellCss}>{fmtMoney(sum((r) => r.d0_30))}</td>
-                  <td className="px-2 py-1.5 text-right tnum" style={{ ...cellCss, color: "#D97706" }}>{fmtMoney(sum((r) => r.d31_90))}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={{ ...cellCss, color: "var(--warn)" }}>{fmtMoney(sum((r) => r.d31_90))}</td>
                   <td className="px-2 py-1.5 text-right tnum" style={{ ...cellCss, color: RED }}>{fmtMoney(sum((r) => r.d91_180))}</td>
                   <td className="px-2 py-1.5 text-right tnum" style={{ ...cellCss, color: RED }}>{fmtMoney(sum((r) => r.d180p))}</td>
                   <td className="px-2 py-1.5 text-right" style={{ ...cellCss, color: MUTED }}>{rows.reduce((s2, r) => s2 + r.bills.length, 0)}</td>
@@ -310,7 +310,7 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
             {rows.length === 0 && (<tr><td colSpan={10} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing here — upload the Tally files first.</td></tr>)}
             {rows.map((r, i) => (
               <>
-                <tr key={r.party} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}
+                <tr key={r.party} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}
                   role="button" tabIndex={0} onClick={() => setOpen(open === r.party ? null : r.party)}>
                   <td className="px-2 py-1.5 font-semibold" style={{ color: INK, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.party}>
                     {open === r.party ? "▾ " : "▸ "}{r.party}
@@ -320,7 +320,7 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
                   <td className="px-2 py-1.5 text-right tnum font-bold">{fmtMoney(r.total)}</td>
                   <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{r.not_due ? fmtMoney(r.not_due) : "·"}</td>
                   <td className="px-2 py-1.5 text-right tnum">{r.d0_30 ? fmtMoney(r.d0_30) : "·"}</td>
-                  <td className="px-2 py-1.5 text-right tnum" style={{ color: "#D97706" }}>{r.d31_90 ? fmtMoney(r.d31_90) : "·"}</td>
+                  <td className="px-2 py-1.5 text-right tnum" style={{ color: "var(--warn)" }}>{r.d31_90 ? fmtMoney(r.d31_90) : "·"}</td>
                   <td className="px-2 py-1.5 text-right tnum" style={{ color: RED }}>{r.d91_180 ? fmtMoney(r.d91_180) : "·"}</td>
                   <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: RED }}>{r.d180p ? fmtMoney(r.d180p) : "·"}</td>
                   <td className="px-2 py-1.5 text-right" style={{ color: MUTED }}>{r.bills.length}</td>
@@ -331,7 +331,7 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
                     : null;
                   return (
                     <tr key={r.party + j} style={{ background: "#F4F6F9" }}>
-                      <td className="px-2 py-1 pl-7" style={{ color: "#5A6672" }}>{b.bill}</td>
+                      <td className="px-2 py-1 pl-7" style={{ color: "var(--dim)" }}>{b.bill}</td>
                       <td className="px-2 py-1 text-right tnum" style={{ color: MUTED }} title={kind === "receivable" ? "Original bill amount" : "Original invoice amount"}>
                         {b.original ? fmtMoney(b.original) : "·"}
                       </td>
@@ -364,7 +364,7 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
 // ---------------- Supplier report card ----------------
 interface CardRow { party: string; outstanding: number; overdue: number; oldest: string | null; nbills: number; vouchers: number; avg_delay_days: number; overdue_pct: number; grade: string }
 interface CardStats { net: number; gross: number; nbills: number; parties: number; avg_age_days: number; overdue: number; overdue_pct: number }
-const gradeColor: Record<string, string> = { A: GREEN, B: "#7A8A1E", C: "#D97706", D: RED };
+const gradeColor: Record<string, string> = { A: GREEN, B: "#7A8A1E", C: "var(--warn)", D: RED };
 
 export function ReportCardScreen() {
   const [data] = useBooks<{ rows: CardRow[]; stats: CardStats; today: string }>("reportcard");
@@ -396,7 +396,7 @@ export function ReportCardScreen() {
     <div style={{ maxWidth: 1100 }}>
       {st && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-          <Card label="TOTAL O/S — NET" value={fmtMoney(st.net)} sub={`${st.nbills} open bills · ${st.parties} suppliers`} color="#1B3A5C" />
+          <Card label="TOTAL O/S — NET" value={fmtMoney(st.net)} sub={`${st.nbills} open bills · ${st.parties} suppliers`} color="var(--blue)" />
           <Card label="GROSS OPEN BILLS" value={fmtMoney(st.gross)} sub="before unadjusted credits" />
           <Card label="AVERAGE AGE OF O/S" value={`${st.avg_age_days} days`} sub="rupee-weighted, since bill date" color={st.avg_age_days > 90 ? RED : INK} />
           <Card label="BEYOND CREDIT PERIOD" value={fmtMoney(st.overdue)} sub={`${st.overdue_pct}% of gross`} color={st.overdue ? RED : GREEN} />
@@ -411,12 +411,12 @@ export function ReportCardScreen() {
           className="px-2 py-1 rounded border text-sm ml-auto" style={{ borderColor: BORDER }} />
       </div>
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "72vh" }}>
-        <table className="w-full text-xs" style={{ minWidth: 860, borderCollapse: "separate", borderSpacing: 0 }}>
+        <table className="w-full text-xs genie-table" style={{ minWidth: 860, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
-            <tr style={{ background: "#22303C", color: "#fff" }}>
+            <tr style={{ background: "var(--ink)", color: "#fff" }}>
               {([["grade", "Grade"], ["party", "Supplier"], ["outstanding", "Outstanding"], ["overdue", "Overdue"], ["pct", "Overdue %"], ["delay", "Weighted delay"], ["oldest", "Oldest due"], ["nbills", "Open bills"], ["vouchers", "Vouchers FY"]] as const).map(([k, h], i) => (
                 <th key={k} className={`px-2 py-2 ${i <= 1 ? "text-left" : "text-right"} whitespace-nowrap`}
-                  style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}
+                  style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer" }}
                   onClick={() => clickSort(k)}
                   title="Click to sort — again to flip, a third time to clear">
                   {h}{sortKey === k ? (dir === -1 ? " ▼" : " ▲") : ""}
@@ -441,10 +441,10 @@ export function ReportCardScreen() {
             })()}
             {rows.map((r, i) => (
               <tr key={r.party} className="border-t" role="button" tabIndex={0} onClick={() => setOpenParty(r.party)}
-                style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}
+                style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}
                 title="Open this supplier's report card">
                 <td className="px-2 py-1.5"><span className="rounded px-2 py-0.5 font-bold text-white" style={{ background: gradeColor[r.grade] }}>{r.grade}</span></td>
-                <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#1B3A5C" }} title={r.party}>{r.party}</td>
+                <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--blue)" }} title={r.party}>{r.party}</td>
                 <td className="px-2 py-1.5 text-right tnum font-bold">{fmtMoney(r.outstanding)}</td>
                 <td className="px-2 py-1.5 text-right tnum" style={{ color: r.overdue ? RED : GREEN }}>{fmtMoney(r.overdue)}</td>
                 <td className="px-2 py-1.5 text-right tnum">{r.overdue_pct}%</td>
@@ -524,9 +524,9 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
     <div><div className="text-xs font-bold" style={{ color: MUTED }}>{k}</div><div className="text-sm font-bold tnum" style={{ color: c || INK }}>{v}</div></div>
   );
   const MiniTable = ({ head, children }: { head: string[]; children: React.ReactNode }) => (
-    <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
-      <thead><tr style={{ background: "#22303C", color: "#fff" }}>
-        {head.map((h, i) => (<th key={h} className={`px-2 py-1.5 text-${i === head.length - 1 ? "right" : "left"}`} style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>))}
+    <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+      <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+        {head.map((h, i) => (<th key={h} className={`px-2 py-1.5 text-${i === head.length - 1 ? "right" : "left"}`} style={{ position: "sticky", top: 0, background: "var(--ink)" }}>{h}</th>))}
       </tr></thead>
       <tbody>{children}</tbody>
     </table>
@@ -539,7 +539,7 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
   return (
     <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-3" style={{ background: "rgba(0,0,0,0.45)", zIndex: 60 }}>
       <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full" style={{ maxWidth: 920, height: "calc(100vh - 40px)", display: "flex", flexDirection: "column" }}>
-        <div className="flex items-center gap-3 px-4 py-3" style={{ background: "#22303C", borderRadius: "8px 8px 0 0" }}>
+        <div className="flex items-center gap-3 px-4 py-3" style={{ background: "var(--ink)", borderRadius: "8px 8px 0 0" }}>
           <span className="rounded px-2 py-0.5 font-bold text-white" style={{ background: gradeColor[grade] ?? MUTED }}>{grade}</span>
           <div className="font-bold text-white" style={{ fontSize: 15 }}>{party}</div>
           <button onClick={onClose} className="ml-auto" style={{ color: "#8FA1B3" }}>✕</button>
@@ -547,7 +547,7 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
         <div className="flex gap-1 px-3 pt-2 flex-wrap" style={{ borderBottom: `1px solid ${BORDER}` }}>
           {TABS.map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} className="px-3 py-1.5 text-xs font-bold rounded-t"
-              style={tab === k ? { background: "#22303C", color: "#fff" } : { color: MUTED }}>
+              style={tab === k ? { background: "var(--ink)", color: "#fff" } : { color: MUTED }}>
               {l}
             </button>
           ))}
@@ -558,7 +558,7 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
               {tab === "overview" && (
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                    <Fact k="O/S — NET" v={fmtMoney(d.net)} c="#1B3A5C" />
+                    <Fact k="O/S — NET" v={fmtMoney(d.net)} c="var(--blue)" />
                     <Fact k="TO PAY NOW (BEYOND CREDIT)" v={`${fmtMoney(d.overdue)} · ${d.overdue_pct}%`} c={d.overdue ? RED : GREEN} />
                     <Fact k="WEIGHTED DELAY" v={d.weighted_delay ? `${d.weighted_delay} days` : "—"} />
                     <Fact k="CREDIT PERIOD (HIS BILLS)" v={d.credit_days != null ? `${d.credit_days} days` : "—"} />
@@ -571,7 +571,7 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
                   <div className="flex gap-2 flex-wrap mb-3">
                     {FINE_LABELS.map(([k, l]) => (
                       <span key={k} className="rounded border px-2 py-1 text-xs font-semibold"
-                        style={{ borderColor: BORDER, color: ["d91_120", "d121_180"].includes(k) ? "#D97706" : ["d181_240", "d241_360", "d360p"].includes(k) ? RED : INK }}>
+                        style={{ borderColor: BORDER, color: ["d91_120", "d121_180"].includes(k) ? "var(--warn)" : ["d181_240", "d241_360", "d360p"].includes(k) ? RED : INK }}>
                         {l}: <b className="tnum">{d.buckets[k] ? fmtMoney(d.buckets[k]) : "·"}</b>
                       </span>
                     ))}
@@ -582,7 +582,7 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
                     )}
                   </div>
                   {d.plans.length > 0 && (
-                    <div className="rounded p-2 text-xs font-semibold" style={{ background: "#E9F5EC", color: "#0D7A3F" }}>
+                    <div className="rounded p-2 text-xs font-semibold" style={{ background: "#E9F5EC", color: "var(--green)" }}>
                       Planned in the cash flow: {d.plans.map((pl) => `${fmtD(pl.plan_date)} — ${fmtMoney(pl.amount)} (${pl.status})`).join(" · ")}
                     </div>
                   )}
@@ -592,7 +592,7 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
               {tab === "bills" && (
                 <MiniTable head={["Bill", "Billed", "Due", "Amount"]}>
                   {d.bills.map((b, i) => (
-                    <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                    <tr key={i} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                       <td className="px-2 py-1">{b.bill}</td>
                       <td className="px-2 py-1 tnum">{fmtD(b.bill_date)}</td>
                       <td className="px-2 py-1 tnum" style={{ color: b.due_date && b.due_date < d.today ? RED : MUTED }}>{fmtD(b.due_date)}</td>
@@ -606,7 +606,7 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
                 <MiniTable head={["Date", "Bill / Ref", "Voucher", "Amount"]}>
                   {d.invoices.length === 0 && (<tr><td colSpan={4} className="px-3 py-4" style={{ color: MUTED }}>No invoices inside this book&apos;s window.</td></tr>)}
                   {d.invoices.map((x, i) => (
-                    <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                    <tr key={i} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                       <td className="px-2 py-1 tnum">{fmtD(x.date)}</td>
                       <td className="px-2 py-1">{x.bill}</td>
                       <td className="px-2 py-1" style={{ color: MUTED }}>{x.vtype} {x.vno}</td>
@@ -620,7 +620,7 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
                 <MiniTable head={["Date", "Against bill", "Voucher", "Amount"]}>
                   {d.payments.length === 0 && (<tr><td colSpan={4} className="px-3 py-4" style={{ color: MUTED }}>No payments inside this book&apos;s window.</td></tr>)}
                   {d.payments.map((x, i) => (
-                    <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                    <tr key={i} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                       <td className="px-2 py-1 tnum">{fmtD(x.date)}</td>
                       <td className="px-2 py-1">{x.bill}</td>
                       <td className="px-2 py-1" style={{ color: MUTED }}>{x.vtype} {x.vno}</td>
@@ -638,7 +638,7 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
                   <MiniTable head={["Pay on", "Purpose", "Bill ref", "Status", "Amount"]}>
                     {d.plans.length === 0 && (<tr><td colSpan={5} className="px-3 py-4" style={{ color: MUTED }}>Nothing planned for this supplier yet.</td></tr>)}
                     {d.plans.map((x, i) => (
-                      <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                      <tr key={i} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                         <td className="px-2 py-1 tnum">{fmtD(x.plan_date)}</td>
                         <td className="px-2 py-1">{x.purpose || "—"}</td>
                         <td className="px-2 py-1" style={{ color: MUTED }}>{x.bill_ref || "—"}</td>
@@ -669,7 +669,7 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
                 <MiniTable head={["Item", "Times", "Last supplied", "Last qty", "Total value"]}>
                   {d.items.length === 0 && (<tr><td colSpan={5} className="px-3 py-4" style={{ color: MUTED }}>No item lines on his vouchers in this book — service and expense suppliers show nothing here (run migration 0081 and re-upload Transactions once, if not done).</td></tr>)}
                   {d.items.map((x, i) => (
-                    <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                    <tr key={i} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                       <td className="px-2 py-1 font-semibold">{x.item}</td>
                       <td className="px-2 py-1 tnum">{x.times}</td>
                       <td className="px-2 py-1 tnum">{fmtD(x.last)}</td>
@@ -697,7 +697,7 @@ function RecoLine({ row, zebra, onSave, fmtMoney }: {
   const diff = (Number(f.our_closing) || 0) - (Number(f.their_closing) || 0);
   const has = f.our_closing != null || f.their_closing != null || f.status;
   return (
-    <tr className="border-t" style={{ borderColor: "#EFEDE7", background: zebra ? "#FAF9F5" : "#fff" }}>
+    <tr className="border-t" style={{ borderColor: "var(--line-soft)", background: zebra ? "#FAF9F5" : "#fff" }}>
       <td className="px-2 py-1 font-bold">{f.fy}</td>
       <td className="px-2 py-1"><input type="number" value={f.our_closing ?? ""} onChange={(e) => setF({ ...f, our_closing: e.target.value === "" ? null : Number(e.target.value) })} className="border rounded px-1 py-0.5 text-right tnum w-28" style={{ borderColor: BORDER }} /></td>
       <td className="px-2 py-1"><input type="number" value={f.their_closing ?? ""} onChange={(e) => setF({ ...f, their_closing: e.target.value === "" ? null : Number(e.target.value) })} className="border rounded px-1 py-0.5 text-right tnum w-28" style={{ borderColor: BORDER }} /></td>
@@ -705,7 +705,7 @@ function RecoLine({ row, zebra, onSave, fmtMoney }: {
       <td className="px-2 py-1"><input value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })} placeholder="Reco till… / Mismatch / Not received" className="border rounded px-1 py-0.5 w-44" style={{ borderColor: BORDER }} /></td>
       <td className="px-2 py-1"><input type="date" value={f.upto ?? ""} onChange={(e) => setF({ ...f, upto: e.target.value || null })} className="border rounded px-1 py-0.5" style={{ borderColor: BORDER }} /></td>
       <td className="px-2 py-1 text-right">
-        {dirty && <button onClick={() => onSave(f)} className="text-xs font-bold rounded px-2 py-0.5 text-white" style={{ background: "#E8600A" }}>💾</button>}
+        {dirty && <button onClick={() => onSave(f)} className="text-xs font-bold rounded px-2 py-0.5 text-white" style={{ background: "var(--accent)" }}>💾</button>}
       </td>
     </tr>
   );
@@ -740,15 +740,15 @@ export function CashFlowScreen({ go }: { go: (key: string) => void }) {
       </div>
       <div className="text-xs mb-2" style={{ color: MUTED, lineHeight: 1.5 }}>
         Figures in {label}. Overdue money sits in week 1. A party planned in{" "}
-        <button onClick={() => go("payplan")} className="font-bold" style={{ color: "#1B3A5C" }}>Payment Planning</button> replaces its raw bills —
+        <button onClick={() => go("payplan")} className="font-bold" style={{ color: "var(--blue)" }}>Payment Planning</button> replaces its raw bills —
         the plan is the decision. Salaries, EMIs and statutory ride{" "}
-        <button onClick={() => go("cashitem")} className="font-bold" style={{ color: "#1B3A5C" }}>Cash Flow Items</button>.
+        <button onClick={() => go("cashitem")} className="font-bold" style={{ color: "var(--blue)" }}>Cash Flow Items</button>.
       </div>
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER }}>
-        <table className="text-xs" style={{ minWidth: 1150, borderCollapse: "separate", borderSpacing: 0 }}>
+        <table className="text-xs genie-table" style={{ minWidth: 1150, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
-            <tr style={{ background: "#22303C", color: "#fff" }}>
-              <th className="px-2 py-2 text-left" style={{ position: "sticky", left: 0, background: "#22303C", minWidth: 230 }}>{label}</th>
+            <tr style={{ background: "var(--ink)", color: "#fff" }}>
+              <th className="px-2 py-2 text-left" style={{ position: "sticky", left: 0, background: "var(--ink)", minWidth: 230 }}>{label}</th>
               {data.weeks.map((w, i) => (
                 <th key={w} className="px-2 py-2 text-right whitespace-nowrap">
                   W{i + 1}<div style={{ fontWeight: 400, fontSize: 10, color: "#8FA1B3" }}>{wk(w)}</div>
@@ -758,14 +758,14 @@ export function CashFlowScreen({ go }: { go: (key: string) => void }) {
           </thead>
           <tbody>
             {ROWS.map((r) => (
-              <tr key={r.key} className="border-t" style={{ borderColor: "#EFEDE7" }}>
+              <tr key={r.key} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
                 <td className="px-2 py-1.5 font-semibold" style={{ position: "sticky", left: 0, background: "#fff", color: r.dir > 0 ? GREEN : RED }}>
                   {r.dir > 0 ? "+ " : "− "}{r.label}
                 </td>
                 {F[r.key].map((v, i) => (<td key={i} className="px-2 py-1.5 text-right">{cell(v, r.dir < 0)}</td>))}
               </tr>
             ))}
-            <tr className="border-t" style={{ borderColor: "#22303C", background: "#F7F5EF" }}>
+            <tr className="border-t" style={{ borderColor: "var(--ink)", background: "#F7F5EF" }}>
               <td className="px-2 py-1.5 font-bold" style={{ position: "sticky", left: 0, background: "#F7F5EF", color: INK }}>Net cash generation</td>
               {data.net.map((v, i) => (
                 <td key={i} className="px-2 py-1.5 text-right tnum font-bold" style={{ color: v < 0 ? RED : GREEN }}>{num(v)}</td>
@@ -774,7 +774,7 @@ export function CashFlowScreen({ go }: { go: (key: string) => void }) {
             <tr style={{ background: "#F7F5EF" }}>
               <td className="px-2 py-1.5 font-bold" style={{ position: "sticky", left: 0, background: "#F7F5EF", color: INK }}>Cumulative</td>
               {data.cumulative.map((v, i) => (
-                <td key={i} className="px-2 py-1.5 text-right tnum font-bold" style={{ color: v < 0 ? RED : "#1B3A5C" }}>{num(v)}</td>
+                <td key={i} className="px-2 py-1.5 text-right tnum font-bold" style={{ color: v < 0 ? RED : "var(--blue)" }}>{num(v)}</td>
               ))}
             </tr>
           </tbody>
@@ -802,11 +802,11 @@ export function LedgerBrowser() {
         <span className="text-xs" style={{ color: MUTED }}>first 500 — search to narrow</span>
       </div>
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "72vh" }}>
-        <table className="w-full text-xs" style={{ minWidth: 700, borderCollapse: "separate", borderSpacing: 0 }}>
-          <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+        <table className="w-full text-xs genie-table" style={{ minWidth: 700, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
             {(["name", "parent", "opening", "closing"] as const).map((k, i) => (
               <th key={k} className={`px-2 py-2 ${i <= 1 ? "text-left" : "text-right"}`}
-                style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}
+                style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer" }}
                 onClick={() => { if (sortKey === k) { if (dir === 1) setDir(-1); else { setSortKey(""); setDir(1); } } else { setSortKey(k); setDir(1); } }}>
                 {["Ledger", "Group", "Opening", "Closing"][i]}{sortKey === k ? (dir === 1 ? " ▲" : " ▼") : ""}
               </th>
@@ -818,7 +818,7 @@ export function LedgerBrowser() {
               const x = a[sortKey as "name"], y = b[sortKey as "name"];
               return dir * (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y)));
             }).map((l, i) => (
-              <tr key={l.name + i} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+              <tr key={l.name + i} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                 <td className="px-2 py-1.5">{l.name}</td>
                 <td className="px-2 py-1.5" style={{ color: MUTED }}>{l.parent}</td>
                 <td className="px-2 py-1.5 text-right tnum">{l.opening ? fmtMoney(Math.abs(l.opening)) + (l.opening < 0 ? " Dr" : " Cr") : "·"}</td>
@@ -843,13 +843,13 @@ export function VoucherBrowser() {
         <span className="text-xs" style={{ color: MUTED }}>latest 500 — search to narrow</span>
       </div>
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "72vh" }}>
-        <table className="w-full text-xs" style={{ minWidth: 860, borderCollapse: "separate", borderSpacing: 0 }}>
-          <thead><tr style={{ background: "#22303C", color: "#fff" }}>
-            {["Date", "Type", "No", "Party", "Narration"].map((h) => (<th key={h} className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>))}
+        <table className="w-full text-xs genie-table" style={{ minWidth: 860, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+            {["Date", "Type", "No", "Party", "Narration"].map((h) => (<th key={h} className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>{h}</th>))}
           </tr></thead>
           <tbody>
             {(data?.rows || []).map((v, i) => (
-              <tr key={v.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+              <tr key={v.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                 <td className="px-2 py-1.5 tnum whitespace-nowrap">{fmtD(v.date)}</td>
                 <td className="px-2 py-1.5 font-semibold whitespace-nowrap">{v.vtype}</td>
                 <td className="px-2 py-1.5" style={{ color: MUTED }}>{v.vno}</td>
@@ -889,16 +889,16 @@ function DrillModal({ ledger, from, to, onClose }: { ledger: string; from: strin
           {fmtD(from)} → {fmtD(to)} · net movement <b className="tnum" style={{ color: INK }}>{fmtMoney(total)}</b> · credit positive, debit negative — Tally&apos;s own signs
         </div>
         {!rows ? <div className="text-sm" style={{ color: MUTED }}>reading the vouchers…</div> : (
-          <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
-            <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+          <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+            <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
               {["Date", "Type", "No", "Party / narration", "Amount"].map((h, i) => (
-                <th key={h} className={`px-2 py-1.5 text-${i === 4 ? "right" : "left"} whitespace-nowrap`} style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
+                <th key={h} className={`px-2 py-1.5 text-${i === 4 ? "right" : "left"} whitespace-nowrap`} style={{ position: "sticky", top: 0, background: "var(--ink)" }}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
               {rows.length === 0 && (<tr><td colSpan={5} className="px-3 py-4 text-center" style={{ color: MUTED }}>No vouchers in the period.</td></tr>)}
               {rows.map((r, i) => (
-                <tr key={i} className="border-t align-top" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                <tr key={i} className="border-t align-top" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   <td className="px-2 py-1 tnum whitespace-nowrap">{fmtD(r.date)}</td>
                   <td className="px-2 py-1 whitespace-nowrap">{r.vtype}</td>
                   <td className="px-2 py-1 whitespace-nowrap">{r.vno}</td>
@@ -923,7 +923,7 @@ function DrillTree({ secs, abs, fmtMoney, onLedger }: { secs: TreeSec[]; abs?: b
   return (
     <>
       {secs.map((s2) => (
-        <div key={s2.root} className="border-t" style={{ borderColor: "#EFEDE7" }}>
+        <div key={s2.root} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
           <div onClick={() => setOpen((o) => ({ ...o, [s2.root]: !o[s2.root] }))} className="flex items-center justify-between px-3 py-1.5" style={{ cursor: "pointer" }}>
             <span className="font-bold text-sm" style={{ color: INK }}>{open[s2.root] ? "▾" : "▸"} {s2.root}</span>
             <span className="font-bold tnum text-sm">{v(s2.total)}</span>
@@ -932,7 +932,7 @@ function DrillTree({ secs, abs, fmtMoney, onLedger }: { secs: TreeSec[]; abs?: b
             <div key={g.name}>
               <div onClick={() => setOpen((o) => ({ ...o, [s2.root + "|" + g.name]: !o[s2.root + "|" + g.name] }))}
                 className="flex items-center justify-between px-3 py-1 text-xs" style={{ cursor: "pointer", paddingLeft: 26 }}>
-                <span className="font-semibold" style={{ color: "#5A6672" }}>{open[s2.root + "|" + g.name] ? "▾" : "▸"} {g.name}</span>
+                <span className="font-semibold" style={{ color: "var(--dim)" }}>{open[s2.root + "|" + g.name] ? "▾" : "▸"} {g.name}</span>
                 <span className="tnum font-semibold">{v(g.total)}</span>
               </div>
               {open[s2.root + "|" + g.name] && g.ledgers.map((l) => (
@@ -964,7 +964,7 @@ function PeriodBar({ from, to, setFrom, setTo }: { from: string; to: string; set
       {([["YTD", fyStart], ["QTD", qtdStart], ["MTD", mtdStart]] as [string, string][]).map(([lbl, start]) => (
         <button key={lbl} onClick={() => { setFrom(start); setTo(today); }}
           className="rounded-full border px-2.5 py-0.5 font-bold"
-          style={from === start && to === today ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
+          style={from === start && to === today ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
           {lbl}
         </button>
       ))}
@@ -991,7 +991,7 @@ function FinSection({ s, flip, fmtMoney }: { s: FinSec; flip: boolean; fmtMoney:
   const [openGrp, setOpenGrp] = useState<string | null>(null);
   const v = (n: number) => fmtMoney(flip ? -n : n);
   return (
-    <div className="border-t" style={{ borderColor: "#EFEDE7" }}>
+    <div className="border-t" style={{ borderColor: "var(--line-soft)" }}>
       <div onClick={() => setOpen(!open)} className="flex items-center justify-between px-3 py-2" style={{ cursor: "pointer" }}>
         <span className="font-bold text-sm" style={{ color: INK }}>{open ? "▾" : "▸"} {s.root}</span>
         <span className="font-bold tnum text-sm">{v(s.total)}</span>
@@ -1000,7 +1000,7 @@ function FinSection({ s, flip, fmtMoney }: { s: FinSec; flip: boolean; fmtMoney:
         <div key={g.name}>
           <div onClick={() => setOpenGrp(openGrp === g.name ? null : g.name)}
             className="flex items-center justify-between px-3 py-1 text-xs" style={{ cursor: "pointer", paddingLeft: 26 }}>
-            <span className="font-semibold" style={{ color: "#5A6672" }}>{g.name}</span>
+            <span className="font-semibold" style={{ color: "var(--dim)" }}>{g.name}</span>
             <span className="tnum font-semibold">{v(g.total)}</span>
           </div>
           {openGrp === g.name && g.ledgers.map((l) => (
@@ -1057,7 +1057,7 @@ export function PnLScreen() {
       <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>Statement of Profit &amp; Loss</div>
-          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 640 }}>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 640 }}>
             The MIS shape — upto <b>{data ? fmtD(data.to) : "…"}</b> (last month&apos;s last day by default), {data?.months ?? "…"} months.
             Every head opens to its ledgers and their vouchers.
           </div>
@@ -1067,12 +1067,12 @@ export function PnLScreen() {
       {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : (
         <>
           <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER }}>
-            <table className="w-full text-xs" style={{ minWidth: 760, borderCollapse: "separate", borderSpacing: 0 }}>
-              <thead><tr style={{ background: "#22303C", color: "#fff" }}>
-                <th className="px-3 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>Particulars</th>
-                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }}>Period</th>
-                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }}>% of Sales</th>
-                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }}>Avg Monthly</th>
+            <table className="w-full text-xs genie-table" style={{ minWidth: 760, borderCollapse: "separate", borderSpacing: 0 }}>
+              <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+                <th className="px-3 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Particulars</th>
+                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Period</th>
+                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>% of Sales</th>
+                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Avg Monthly</th>
               </tr></thead>
               <tbody>
                 {data.lines.map((l) => {
@@ -1081,7 +1081,7 @@ export function PnLScreen() {
                   return (
                     <FragRow key={l.key}>
                       <tr className="border-t" role="button" tabIndex={0} onClick={() => openable && setOpenLine(openLine === l.key ? null : l.key)}
-                        style={{ borderColor: "#EFEDE7", background: TINT[l.key] || "#fff", cursor: openable ? "pointer" : "default" }}>
+                        style={{ borderColor: "var(--line-soft)", background: TINT[l.key] || "#fff", cursor: openable ? "pointer" : "default" }}>
                         <td className="px-3 py-1.5" style={{ fontWeight: BOLD.has(l.key) ? 800 : 500, color: INK }}>
                           {openable && <span style={{ display: "inline-block", width: 14 }}>{openLine === l.key ? "▾" : "▸"}</span>}
                           {l.label}
@@ -1094,7 +1094,7 @@ export function PnLScreen() {
                               onClick={(e) => e.stopPropagation()}
                               onChange={(e) => setStockDraft((d) => ({ ...d, [l.key]: e.target.value.replace(/[^0-9.]/g, "") }))}
                               onBlur={(e) => { if (Number(e.target.value) !== l.amount) void saveStock(l.key, e.target.value); }}
-                              className="border rounded px-1.5 py-0.5 text-right tnum" style={{ borderColor: data.stocksTyped ? BORDER : "#E8600A", width: 120 }} />
+                              className="border rounded px-1.5 py-0.5 text-right tnum" style={{ borderColor: data.stocksTyped ? BORDER : "var(--accent)", width: 120 }} />
                           ) : fmtMoney(l.amount)}
                         </td>
                         <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{l.pct == null ? "—" : `${l.pct.toFixed(2)}%`}</td>
@@ -1160,7 +1160,7 @@ export function RatioScreen() {
       <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>Ratio Analysis</div>
-          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 640 }}>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 640 }}>
             Trial balance {data ? `${fmtD(data.from)} → ${fmtD(data.to)}` : "…"} — upto last month&apos;s last day by default.
             Every ratio states its own formula; targets are yours to type. A dash is an honest &quot;the input isn&apos;t in yet&quot;, never a guess.
           </div>
@@ -1170,8 +1170,8 @@ export function RatioScreen() {
       {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : GROUPS.map(([title, keys]) => (
         <div key={title} className="bg-white rounded-lg border mb-3 overflow-auto" style={{ borderColor: BORDER }}>
           <div className="px-3 py-2 text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>{title}</div>
-          <table className="w-full text-xs" style={{ minWidth: 640, borderCollapse: "separate", borderSpacing: 0 }}>
-            <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+          <table className="w-full text-xs genie-table" style={{ minWidth: 640, borderCollapse: "separate", borderSpacing: 0 }}>
+            <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
               <th className="px-3 py-1.5 text-left">Particulars</th>
               <th className="px-2 py-1.5 text-right">Reporting</th>
               <th className="px-2 py-1.5 text-right">Target</th>
@@ -1182,14 +1182,14 @@ export function RatioScreen() {
                 const r = data.ratios.find((x) => x.key === k);
                 if (!r) return null;
                 return (
-                  <tr key={k} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <tr key={k} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                     <td className="px-3 py-1.5 font-semibold">{r.label}</td>
                     <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: r.value == null ? MUTED : INK }}>{show(r)}</td>
                     <td className="px-2 py-1.5 text-right">
                       <input value={drafts[k] ?? r.target} placeholder="—"
                         onChange={(e) => setDrafts((d) => ({ ...d, [k]: e.target.value }))}
                         onBlur={(e) => { if (e.target.value !== r.target) void saveTarget(k, e.target.value); }}
-                        className="border rounded px-1.5 py-0.5 text-right tnum" style={{ borderColor: (drafts[k] ?? r.target) ? BORDER : "#EFEDE7", width: 76 }} />
+                        className="border rounded px-1.5 py-0.5 text-right tnum" style={{ borderColor: (drafts[k] ?? r.target) ? BORDER : "var(--line-soft)", width: 76 }} />
                     </td>
                     <td className="px-3 py-1.5" style={{ color: MUTED }}>{r.formula}</td>
                   </tr>
@@ -1214,7 +1214,7 @@ export function BalanceSheetScreen() {
       <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>Balance Sheet</div>
-          <div className="text-sm" style={{ color: "#5A6672" }}>Every ledger&apos;s opening plus every line to the date — as-of, not a snapshot typed in.</div>
+          <div className="text-sm" style={{ color: "var(--dim)" }}>Every ledger&apos;s opening plus every line to the date — as-of, not a snapshot typed in.</div>
         </div>
         <div className="flex gap-2 items-center text-xs font-semibold" style={{ color: MUTED }}>
           as of <input type="date" value={asof} onChange={(e) => setAsof(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
@@ -1233,7 +1233,7 @@ export function BalanceSheetScreen() {
             <div className="bg-white rounded-lg border" style={{ borderColor: BORDER }}>
               <div className="px-3 py-2 text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>LIABILITIES</div>
               {data.bs.liabilities.map((s) => (<FinSection key={s.root} s={s} flip={false} fmtMoney={fmtMoney} />))}
-              <div className="flex items-center justify-between px-3 py-2 border-t text-sm font-bold" style={{ borderColor: "#22303C" }}>
+              <div className="flex items-center justify-between px-3 py-2 border-t text-sm font-bold" style={{ borderColor: "var(--ink)" }}>
                 <span>Profit &amp; Loss (to date)</span><span className="tnum" style={{ color: data.bs.profit >= 0 ? GREEN : RED }}>{fmtMoney(data.bs.profit)}</span>
               </div>
             </div>
@@ -1301,7 +1301,7 @@ export function ExpensesScreen({ mode }: { mode: "all" | "tvc" | "oe" }) {
   const Hd = ({ k, children, right }: { k: typeof sortK; children: React.ReactNode; right?: boolean }) => (
     <th className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap`}
       onClick={() => { if (sortK === k) setDir((d) => (d === 1 ? -1 : 1)); else { setSortK(k); setDir(k === "amount" ? -1 : 1); } }}
-      style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}>
+      style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer" }}>
       {children}{sortK === k ? (dir === 1 ? " ▲" : " ▼") : ""}
     </th>
   );
@@ -1311,13 +1311,13 @@ export function ExpensesScreen({ mode }: { mode: "all" | "tvc" | "oe" }) {
       <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>{title}</div>
-          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 640, lineHeight: 1.5 }}>{blurb}</div>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 640, lineHeight: 1.5 }}>{blurb}</div>
         </div>
         <div className="flex gap-2 items-center text-xs font-semibold flex-wrap" style={{ color: MUTED }}>
           {([["YTD", fyStart], ["QTD", qtdStart], ["MTD", mtdStart]] as [string, string][]).map(([lbl, start]) => (
             <button key={lbl} onClick={() => { setFrom(start); setTo(today); }}
               className="rounded-full border px-2.5 py-0.5 font-bold"
-              style={from === start && to === today ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
+              style={from === start && to === today ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
               {lbl}
             </button>
           ))}
@@ -1335,11 +1335,11 @@ export function ExpensesScreen({ mode }: { mode: "all" | "tvc" | "oe" }) {
             <Card label="NET (T − OE)" value={fmtMoney(t!.net)} sub="ties to the P&L" color={t!.net >= 0 ? GREEN : RED} />
           </div>
           <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "62vh" }}>
-            <table className="w-full text-xs" style={{ minWidth: 680, borderCollapse: "separate", borderSpacing: 0 }}>
+            <table className="w-full text-xs genie-table" style={{ minWidth: 680, borderCollapse: "separate", borderSpacing: 0 }}>
               <thead>
-                <tr style={{ background: "#22303C", color: "#fff" }}>
+                <tr style={{ background: "var(--ink)", color: "#fff" }}>
                   <Hd k="ledger">Ledger</Hd><Hd k="group">Group</Hd>
-                  <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>Class</th>
+                  <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Class</th>
                   <Hd k="amount" right>Amount</Hd>
                 </tr>
                 <tr style={{ background: "#F3F1EB" }}>
@@ -1350,7 +1350,7 @@ export function ExpensesScreen({ mode }: { mode: "all" | "tvc" | "oe" }) {
               <tbody>
                 {rows.length === 0 && (<tr><td colSpan={4} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing in the period.</td></tr>)}
                 {rows.map((r, i) => (
-                  <tr key={r.ledger} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <tr key={r.ledger} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                     <td className="px-2 py-1.5 font-semibold" role="button" tabIndex={0} onClick={() => setDrill(r.ledger)} style={{ cursor: "pointer", color: "#2C5B82", textDecoration: "underline" }} title="Open this ledger's vouchers">{r.ledger}</td>
                     <td className="px-2 py-1.5" style={{ color: MUTED }}>{r.group}</td>
                     <td className="px-2 py-1.5">
@@ -1398,7 +1398,7 @@ export function ActualCashFlowScreen() {
       <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>Actual Cash Flow</div>
-          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 640 }}>What actually moved through bank and cash in the period, head by head — every voucher touching a bank or cash ledger, read from its other side.</div>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 640 }}>What actually moved through bank and cash in the period, head by head — every voucher touching a bank or cash ledger, read from its other side.</div>
         </div>
         <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
       </div>
@@ -1446,7 +1446,7 @@ export function FundFlowScreen() {
       <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>Fund Flow</div>
-          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 640 }}>Where the money CAME FROM and WHERE IT WENT between the two dates — every balance-sheet head&apos;s change, sources against applications, with operations&apos; own funds on top.</div>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 640 }}>Where the money CAME FROM and WHERE IT WENT between the two dates — every balance-sheet head&apos;s change, sources against applications, with operations&apos; own funds on top.</div>
         </div>
         <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
       </div>
@@ -1461,7 +1461,7 @@ export function FundFlowScreen() {
             <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, flex: 1, minWidth: 340 }}>
               <div className="px-3 py-2 text-xs font-bold" style={{ color: GREEN, letterSpacing: 0.8 }}>SOURCES — LIABILITIES RAISED · ASSETS RELEASED</div>
               {data.operations > 0 && (
-                <div className="flex items-center justify-between px-3 py-1.5 border-t text-sm font-bold" style={{ borderColor: "#EFEDE7" }}>
+                <div className="flex items-center justify-between px-3 py-1.5 border-t text-sm font-bold" style={{ borderColor: "var(--line-soft)" }}>
                   <span>Funds from operations</span><span className="tnum" style={{ color: GREEN }}>{fmtMoney(data.operations)}</span>
                 </div>
               )}
@@ -1470,7 +1470,7 @@ export function FundFlowScreen() {
             <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, flex: 1, minWidth: 340 }}>
               <div className="px-3 py-2 text-xs font-bold" style={{ color: RED, letterSpacing: 0.8 }}>APPLICATIONS — ASSETS BUILT · LIABILITIES REPAID</div>
               {data.operations < 0 && (
-                <div className="flex items-center justify-between px-3 py-1.5 border-t text-sm font-bold" style={{ borderColor: "#EFEDE7" }}>
+                <div className="flex items-center justify-between px-3 py-1.5 border-t text-sm font-bold" style={{ borderColor: "var(--line-soft)" }}>
                   <span>Operations consumed</span><span className="tnum" style={{ color: RED }}>{fmtMoney(-data.operations)}</span>
                 </div>
               )}
@@ -1557,7 +1557,7 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
     <div style={{ maxWidth: 980 }}>
       <div className="mb-3">
         <div className="text-lg font-bold" style={{ color: INK }}>The CFO Note</div>
-        <div className="text-sm" style={{ color: "#5A6672", maxWidth: 700 }}>
+        <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 700 }}>
           The Saturday read — computed fresh from the books each time it opens, nothing typed.
           Trends first, then the things to do. It will grow sharper as the books grow cleaner.
         </div>
@@ -1568,7 +1568,7 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
           <Card label="NET RECEIVABLE" value={fmtMoney(s.receivable.total)} sub={`${s.receivable.parties} customers`} />
           <Card label="NET PAYABLE" value={fmtMoney(s.payable.total)} sub={`${s.payable.parties} suppliers`} />
           <Card label="BANK & CASH" value={fmtMoney(s.bankCash || 0)} color={(s.bankCash || 0) >= 0 ? GREEN : RED} />
-          <Card label="OVERDUE TO COLLECT" value={fmtMoney(a.overdueReceivable)} color={a.overdueReceivable > 0 ? "#D97706" : GREEN} />
+          <Card label="OVERDUE TO COLLECT" value={fmtMoney(a.overdueReceivable)} color={a.overdueReceivable > 0 ? "var(--warn)" : GREEN} />
         </div>
       )}
 
@@ -1577,7 +1577,7 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
           <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>
             MONEY IN — billing vs collections · billing {dir(d.series.billing)}, collections {dir(d.series.collections)}
           </div>
-          <TrendChart months={d.months} a={d.series.billing} b={d.series.collections} la="Billing" lb="Collections" ca="#1B3A5C" cb={GREEN} />
+          <TrendChart months={d.months} a={d.series.billing} b={d.series.collections} la="Billing" lb="Collections" ca="var(--blue)" cb={GREEN} />
         </div>
         <div className="bg-white rounded-lg border p-3" style={{ borderColor: BORDER, flex: 1, minWidth: 340 }}>
           <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>
@@ -1588,11 +1588,11 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
       </div>
 
       <div className="bg-white rounded-lg border p-3" style={{ borderColor: BORDER }}>
-        <div className="text-xs font-bold mb-2" style={{ color: "#1B3A5C", letterSpacing: 0.8 }}>THE SATURDAY LIST — DO THESE, IN THIS ORDER</div>
+        <div className="text-xs font-bold mb-2" style={{ color: "var(--blue)", letterSpacing: 0.8 }}>THE SATURDAY LIST — DO THESE, IN THIS ORDER</div>
         {todo.length === 0 && <div className="text-sm" style={{ color: GREEN, fontWeight: 700 }}>Nothing stands against you this week — the books are clean. Rare; enjoy it.</div>}
         {todo.map((t, i) => (
-          <div key={i} className="flex gap-2 border-t py-2" style={{ borderColor: "#EFEDE7" }}>
-            <b className="tnum" style={{ color: "#1B3A5C", width: 20, flexShrink: 0 }}>{i + 1}.</b>
+          <div key={i} className="flex gap-2 border-t py-2" style={{ borderColor: "var(--line-soft)" }}>
+            <b className="tnum" style={{ color: "var(--blue)", width: 20, flexShrink: 0 }}>{i + 1}.</b>
             <div style={{ minWidth: 0 }}>
               <div className="text-sm font-bold" style={{ color: INK }}>{t.title}</div>
               <div className="text-xs" style={{ color: MUTED, lineHeight: 1.5 }}>{t.detail}{t.goKey && <> · <button onClick={() => go(t.goKey!)} style={{ color: ORANGE, fontWeight: 700 }}>open →</button></>}</div>
@@ -1632,7 +1632,7 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
   const Hd = ({ k, children, right }: { k: typeof sortK; children: React.ReactNode; right?: boolean }) => (
     <th className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap`}
       onClick={() => { if (sortK === k) setDir((d2) => (d2 === 1 ? -1 : 1)); else { setSortK(k); setDir(k === "amount" ? -1 : k === "date" ? -1 : 1); } }}
-      style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}>
+      style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer" }}>
       {children}{sortK === k ? (dir === 1 ? " ▲" : " ▼") : ""}
     </th>
   );
@@ -1641,7 +1641,7 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
       <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>{kind === "sales" ? "Sales Register" : "Purchase Register"}</div>
-          <div className="text-sm" style={{ color: "#5A6672" }}>
+          <div className="text-sm" style={{ color: "var(--dim)" }}>
             Every {kind === "sales" ? "GST Sales voucher" : "purchase-family voucher (Purchase · Cap-Ex · Import)"} in the period, straight from the books.
           </div>
         </div>
@@ -1655,11 +1655,11 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
               className="border rounded px-2 py-1.5 text-sm ml-auto" style={{ borderColor: needle ? ORANGE : BORDER, width: 240, alignSelf: "center" }} />
           </div>
           <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "64vh" }}>
-            <table className="w-full text-xs" style={{ minWidth: 720, borderCollapse: "separate", borderSpacing: 0 }}>
+            <table className="w-full text-xs genie-table" style={{ minWidth: 720, borderCollapse: "separate", borderSpacing: 0 }}>
               <thead>
-                <tr style={{ background: "#22303C", color: "#fff" }}>
+                <tr style={{ background: "var(--ink)", color: "#fff" }}>
                   <Hd k="date">Date</Hd><Hd k="vno">No</Hd><Hd k="party">Party</Hd>
-                  <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>Narration</th>
+                  <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Narration</th>
                   <Hd k="amount" right>Amount</Hd>
                 </tr>
                 <tr style={{ background: "#F3F1EB" }}>
@@ -1670,7 +1670,7 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
               <tbody>
                 {rows.length === 0 && (<tr><td colSpan={5} className="px-3 py-4 text-center" style={{ color: MUTED }}>Nothing in the period.</td></tr>)}
                 {rows.map((r, i) => (
-                  <tr key={r.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <tr key={r.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                     <td className="px-2 py-1 tnum whitespace-nowrap">{fmtD(r.date)}</td>
                     <td className="px-2 py-1 whitespace-nowrap">{r.vno}</td>
                     <td className="px-2 py-1 font-semibold">{r.party || "—"}</td>

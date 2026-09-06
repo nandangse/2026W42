@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { parseMastersInBrowser, parseTransactionsInBrowser, type Row } from "@/lib/kuber-tally-browser";
 
-const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A", GREEN = "#0D7A3F";
+const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", ORANGE = "var(--accent)", GREEN = "var(--green)";
 const TODAY_IST = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 /** The Drive folder Dr Raghu linked for the Tally XMLs. */
 const DRIVE_FOLDER = "1V3zIjPvz9DSHGlJCAuSSWk-iG5Tfnnev";
@@ -247,7 +247,7 @@ export default function UploadFiles({ email }: { email?: string }) {
     <div>
       <div className="bg-white rounded-lg border p-4 mb-3" style={{ borderColor: BORDER, maxWidth: 780 }}>
         <div className="text-lg font-bold mb-1" style={{ color: INK }}>⬆ Upload Files</div>
-        <div className="text-sm mb-3" style={{ color: "#5A6672", lineHeight: 1.6 }}>
+        <div className="text-sm mb-3" style={{ color: "var(--dim)", lineHeight: 1.6 }}>
           The file stays with the browser, goes straight to <b>Google Drive</b> under a <b>date – initials</b> folder,
           and is then read into Kuber's books right here — the 400&nbsp;MB never touches the app's servers, only the rows do.
           One file at a time.
@@ -274,9 +274,9 @@ export default function UploadFiles({ email }: { email?: string }) {
                   <span style={{ width: 16 }}>
                     {st.state === "done" ? "✅" : st.state === "run" ? "▶" : st.state === "skip" ? "↷" : st.state === "fail" ? "✕" : "·"}
                   </span>
-                  <span className="font-semibold" style={{ color: st.state === "fail" ? "#B3261E" : INK }}>{st.name}</span>
+                  <span className="font-semibold" style={{ color: st.state === "fail" ? "var(--red)" : INK }}>{st.name}</span>
                   {st.state === "run" && <span className="tnum font-bold" style={{ color: ORANGE }}>{Math.round(st.pct * 100)}%</span>}
-                  {st.note && <span style={{ color: st.state === "fail" ? "#B3261E" : MUTED }}>— {st.note}</span>}
+                  {st.note && <span style={{ color: st.state === "fail" ? "var(--red)" : MUTED }}>— {st.note}</span>}
                 </div>
                 {(st.state === "run" || st.state === "done") && (
                   <div className="rounded mt-1" style={{ height: 5, background: "#EAE7DF", overflow: "hidden" }}>
@@ -297,7 +297,7 @@ export default function UploadFiles({ email }: { email?: string }) {
           <>
             {reviewLink ? (
               <>
-                <a href={reviewLink} target="_blank" rel="noreferrer" className="text-sm font-bold" style={{ color: "#1B3A5C" }}>
+                <a href={reviewLink} target="_blank" rel="noreferrer" className="text-sm font-bold" style={{ color: "var(--blue)" }}>
                   Open the sheet ↗
                 </a>
                 {reviewWho && <span className="text-xs" style={{ color: MUTED }}>{reviewWho}</span>}
@@ -326,15 +326,15 @@ export default function UploadFiles({ email }: { email?: string }) {
             <button onClick={() => { setLinkEdit(null); setLinkMsg(""); }} className="text-xs" style={{ color: MUTED }}>Cancel</button>
           </>
         )}
-        {linkMsg && <span className="text-xs font-bold" style={{ color: "#B3261E" }}>{linkMsg}</span>}
+        {linkMsg && <span className="text-xs font-bold" style={{ color: "var(--red)" }}>{linkMsg}</span>}
       </div>
 
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxWidth: 950, maxHeight: "46vh" }}>
-        <table className="w-full text-xs" style={{ minWidth: 640, borderCollapse: "separate", borderSpacing: 0 }}>
+        <table className="w-full text-xs genie-table" style={{ minWidth: 640, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
-            <tr style={{ background: "#22303C", color: "#fff" }}>
+            <tr style={{ background: "var(--ink)", color: "#fff" }}>
               {["Date", "Kind", "File", "Data taken in", "By", "Uploaded", "On Drive"].map((h) => (
-                <th key={h} className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
+                <th key={h} className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -342,13 +342,13 @@ export default function UploadFiles({ email }: { email?: string }) {
             {rows === null && (<tr><td colSpan={7} className="px-3 py-4" style={{ color: MUTED }}>Loading…</td></tr>)}
             {rows?.length === 0 && (<tr><td colSpan={7} className="px-3 py-4" style={{ color: MUTED }}>Nothing uploaded yet — the first pair starts the ledger.</td></tr>)}
             {(rows || []).map((r, i) => (
-              <tr key={r.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+              <tr key={r.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                 <td className="px-2 py-1.5 tnum whitespace-nowrap">{r.for_date}</td>
-                <td className="px-2 py-1.5 font-bold" style={{ color: r.kind === "masters" ? "#1B3A5C" : GREEN }}>
+                <td className="px-2 py-1.5 font-bold" style={{ color: r.kind === "masters" ? "var(--blue)" : GREEN }}>
                   {r.kind === "masters" ? "Masters" : "Transactions"}
                 </td>
                 <td className="px-2 py-1.5">
-                  {r.url ? <a href={r.url} target="_blank" rel="noreferrer" style={{ color: "#1B3A5C", textDecoration: "underline" }}>{r.name}</a> : r.name}
+                  {r.url ? <a href={r.url} target="_blank" rel="noreferrer" style={{ color: "var(--blue)", textDecoration: "underline" }}>{r.name}</a> : r.name}
                   {r.bytes != null && <span style={{ color: MUTED }}> · {(r.bytes / 1024 / 1024).toFixed(1)} MB</span>}
                 </td>
                 <td className="px-2 py-1.5 font-semibold" style={{ color: r.taken_in ? GREEN : MUTED, maxWidth: 240 }}>

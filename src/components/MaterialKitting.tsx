@@ -21,16 +21,16 @@ import { api } from "@/lib/api";
 import { fmtFull, today } from "@/lib/schedule";
 
 const C = {
-  ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC",
-  line: "#E2E0DA", panel: "#F4F2EC", accent: "#E8600A", navy: "#1B3A5C",
-  green: "#0D7A3F", amber: "#D97706", red: "#B3261E", violet: "#7C3AED",
+  ink: "var(--navy)", body: "var(--ink)", sub: "var(--dim)", mute: "var(--muted)", faint: "#B8B5AC",
+  line: "var(--line)", panel: "#F4F2EC", accent: "var(--accent)", navy: "var(--blue)",
+  green: "var(--green)", amber: "var(--warn)", red: "var(--red)", violet: "#7C3AED",
 };
 
 export type MatStatus = "Yet to receive" | "Received" | "QC Defective";
 
 export const STATUS_META: Record<MatStatus, { label: string; color: string; bg: string }> = {
-  "Yet to receive": { label: "⏳ Yet to receive", color: "#B3261E", bg: "#FBEDEA" },
-  Received: { label: "✓ Received", color: "#0D7A3F", bg: "#E6F4EA" },
+  "Yet to receive": { label: "⏳ Yet to receive", color: "var(--red)", bg: "#FBEDEA" },
+  Received: { label: "✓ Received", color: "var(--green)", bg: "#E6F4EA" },
   // Amber, not green: it is on site and cannot be used, which for the job is
   // the same position as not having it.
   "QC Defective": { label: "⚠ QC Defective", color: "#8A5A00", bg: "#FFF7E6" },
@@ -86,9 +86,9 @@ export default function MaterialKitting({
   return (
     <>
       <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflowX: "auto" }}>
-        <table className="w-full text-sm" style={{ minWidth: 760 }}>
+        <table className="w-full text-sm genie-table" style={{ minWidth: 760 }}>
           <thead>
-            <tr style={{ background: "#22303C", color: "#fff" }} className="text-xs">
+            <tr style={{ background: "var(--ink)", color: "#fff" }} className="text-xs">
               <th className="px-3 py-2 text-left">#</th>
               <th className="px-3 py-2 text-left">Material / kit item</th>
               <th className="px-3 py-2 text-left">Qty</th>
@@ -104,7 +104,7 @@ export default function MaterialKitting({
               const meta = STATUS_META[st];
               const late = m.due && m.due < T && st !== "Received";
               return (
-                <tr key={m.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                <tr key={m.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   <td className="px-3 py-1.5" style={{ color: C.mute }}>{i + 1}</td>
                   <td className="px-3 py-1.5 font-medium">
                     <button onClick={() => setOpen(m.id)} className="text-left" style={{ color: C.ink }} title="Open this line">

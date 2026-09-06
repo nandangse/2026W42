@@ -90,7 +90,7 @@ export default function ProspectQueue({ onOpen, compact = false }: { onOpen: (ta
       </div>
 
       {needs && <div className="px-3 py-2 text-xs" style={{ color: "#8A5B00", background: "#FFF7E6" }}>Run CRM migration 0017 — the queue has nowhere to live yet.</div>}
-      {err && <div className="px-3 py-2 text-xs font-semibold" style={{ color: "#B3261E" }}>{err}</div>}
+      {err && <div className="px-3 py-2 text-xs font-semibold" style={{ color: "var(--red)" }}>{err}</div>}
 
       {items !== null && items.length === 0 && !needs && (
         <div className="px-3 py-5 text-sm" style={{ color: MUTED }}>
@@ -116,7 +116,7 @@ export default function ProspectQueue({ onOpen, compact = false }: { onOpen: (ta
               <a href={`tel:${it.phone.replace(/[^+0-9]/g, "")}`} className="font-bold tnum" title={it.phone_person ? `Rings ${it.phone_person}` : "Dial"}
                 style={{ color: GREEN, fontSize: 11, textDecoration: "none" }}>📞 {it.phone}</a>
             ) : (
-              <span style={{ fontSize: 10, color: "#B3261E", fontWeight: 700 }} title="Add a phone on the contact record">no number</span>
+              <span style={{ fontSize: 10, color: "var(--red)", fontWeight: 700 }} title="Add a phone on the contact record">no number</span>
             )}
             {it.phone_person && <span style={{ fontSize: 10, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.phone_person}</span>}
           </div>
@@ -140,7 +140,7 @@ export default function ProspectQueue({ onOpen, compact = false }: { onOpen: (ta
               📞 {it.phone}
             </a>
           ) : (
-            <span className="rounded px-2 py-1 font-bold" style={{ background: "#FBEAE8", color: "#B3261E", fontSize: 11 }}
+            <span className="rounded px-2 py-1 font-bold" style={{ background: "#FBEAE8", color: "var(--red)", fontSize: 11 }}
               title="No person with a phone number on this company — add one on the contact record">
               no number on record
             </span>

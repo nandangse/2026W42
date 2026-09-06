@@ -13,7 +13,7 @@ import { fmtFull, jobNo } from "@/lib/schedule";
 import ModuleMenu from "@/components/ModuleMenu";
 import ProjectTabs from "@/components/ProjectTabs";
 
-const C = { navy: "#1B3A5C", ink: "#16232F", sub: "#8A94A0", line: "#E2E0DA", green: "#0D7A3F", accent: "#E8600A" };
+const C = { navy: "var(--blue)", ink: "var(--navy)", sub: "var(--muted)", line: "var(--line)", green: "var(--green)", accent: "var(--accent)" };
 
 type Row = Record<string, unknown>;
 type Job = {
@@ -48,7 +48,7 @@ export default function ProjectPage({
   }, [id]);
 
   const shell = { email, displayName, initials, role };
-  if (err) return <Shell {...shell}><div className="p-6" style={{ color: "#B3261E" }}>{err}</div></Shell>;
+  if (err) return <Shell {...shell}><div className="p-6" style={{ color: "var(--red)" }}>{err}</div></Shell>;
   if (!d) return <Shell {...shell}><div className="p-6" style={{ color: C.sub }}>Reading the project…</div></Shell>;
 
   const e = d.erp || {};
@@ -84,9 +84,9 @@ export default function ProjectPage({
             {done.length > 0 && <> · <span style={{ color: C.green }}>{done.length} delivered</span></>}
             {live.length > 0 && <> · {live.length} still to go</>}
           </div>
-          <table className="w-full text-xs" style={{ minWidth: 820 }}>
+          <table className="w-full text-xs genie-table" style={{ minWidth: 820 }}>
             <thead>
-              <tr style={{ background: "#22303C", color: "#fff" }}>
+              <tr style={{ background: "var(--ink)", color: "#fff" }}>
                 {["Job", "Customer tag", "Family", "Value", "TDD", "Kit %", "Prod %", "Status"].map((h) => (
                   <th key={h} className="px-2 py-2 text-left whitespace-nowrap">{h}</th>
                 ))}
@@ -189,7 +189,7 @@ export default function ProjectPage({
           </button>
           {all && (
             <div className="rounded-lg border bg-white mt-2 overflow-x-auto" style={{ borderColor: C.line }}>
-              <table className="w-full text-xs">
+              <table className="w-full text-xs genie-table">
                 <tbody>
                   {fields.map(([k, v], i) => (
                     <tr key={k} style={{ borderTop: "1px solid #EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>

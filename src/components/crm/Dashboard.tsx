@@ -89,7 +89,7 @@ export default function Dashboard({ onOpen }: { onOpen: (target: string, id: str
           </div>
         )}
       </div>
-      {err && <div className="text-xs font-semibold mb-2" style={{ color: "#B3261E" }}>{err}</div>}
+      {err && <div className="text-xs font-semibold mb-2" style={{ color: "var(--red)" }}>{err}</div>}
 
       {/* ── the top strip ── */}
       <div className="flex gap-2 mb-4" style={{ flexWrap: "wrap" }}>
@@ -121,7 +121,7 @@ export default function Dashboard({ onOpen }: { onOpen: (target: string, id: str
                 </div>
               )}
               {req != null && tWk != null && (
-                <div className="tnum" style={{ fontSize: 10, fontWeight: 800, whiteSpace: "nowrap", color: req > tWk * 1.05 ? "#B3261E" : GREEN }}
+                <div className="tnum" style={{ fontSize: 10, fontWeight: 800, whiteSpace: "nowrap", color: req > tWk * 1.05 ? "var(--red)" : GREEN }}
                   title={`Still owed ÷ the ${data?.weeksLeft} weeks to ${data?.fyEnd} — red when the pace needed now exceeds the planned pace`}>
                   Req {fmt(req)}/wk
                 </div>
@@ -177,9 +177,9 @@ export default function Dashboard({ onOpen }: { onOpen: (target: string, id: str
                 <button key={t.id} onClick={() => setOpenTask(t)} className="w-full text-left px-3 py-2"
                   title="Open the detail" style={{ borderBottom: "1px solid #F2F4F8", display: "block" }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: INK, lineHeight: 1.35 }}>
-                    {t.esc !== "None" && <span style={{ color: "#B3261E" }}>⚑ </span>}{t.title}
+                    {t.esc !== "None" && <span style={{ color: "var(--red)" }}>⚑ </span>}{t.title}
                   </div>
-                  <div style={{ fontSize: 10.5, color: late ? "#B3261E" : MUTED }}>
+                  <div style={{ fontSize: 10.5, color: late ? "var(--red)" : MUTED }}>
                     {t.job ? `JOB ${t.job} · ` : ""}{t.due ? `due ${t.due}${late ? " · late" : ""}` : "no date"}
                   </div>
                 </button>
@@ -201,7 +201,7 @@ export default function Dashboard({ onOpen }: { onOpen: (target: string, id: str
             </div>
             <div className="p-4">
               <div style={{ fontSize: 15, fontWeight: 800, color: INK, lineHeight: 1.4 }}>
-                {openTask.esc !== "None" && <span style={{ color: "#B3261E" }}>⚑ {openTask.esc} · </span>}{openTask.title}
+                {openTask.esc !== "None" && <span style={{ color: "var(--red)" }}>⚑ {openTask.esc} · </span>}{openTask.title}
               </div>
               <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>
                 {openTask.job ? `JOB ${openTask.job} · ` : ""}{openTask.due ? `due ${openTask.due}` : "no date"}

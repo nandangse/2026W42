@@ -115,9 +115,9 @@ export default function DataTable<T>({
   return (
     <div
       className="bg-white rounded-lg border hrms-table-wrap"
-      style={{ borderColor: "#E2E0DA", overflow: "auto", maxHeight }}
+      style={{ borderColor: "var(--line)", overflow: "auto", maxHeight }}
     >
-      <table className="text-xs" style={{ minWidth: minWidth ?? columns.reduce((s, c) => s + c.width, 0), width: "100%" }}>
+      <table className="text-xs genie-table" style={{ minWidth: minWidth ?? columns.reduce((s, c) => s + c.width, 0), width: "100%" }}>
         <thead>
           <tr>
             {columns.map((c, i) => {
@@ -136,7 +136,7 @@ export default function DataTable<T>({
                     borderBottom: "1px solid #E2E0DA",
                     textAlign: c.align || "left",
                     padding: "6px 8px",
-                    color: "#5A6672",
+                    color: "var(--dim)",
                     fontWeight: 700,
                     whiteSpace: "nowrap",
                     ...stick(i, true),
@@ -146,7 +146,7 @@ export default function DataTable<T>({
                     <button
                       onClick={() => click(c.key)}
                       className="flex items-center gap-1"
-                      style={{ color: on ? "#E8600A" : "#5A6672", fontWeight: 700 }}
+                      style={{ color: on ? "var(--accent)" : "var(--dim)", fontWeight: 700 }}
                       title="Click to sort — again to reverse, a third time to clear"
                     >
                       {c.label}
@@ -171,7 +171,7 @@ export default function DataTable<T>({
         <tbody>
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={columns.length} className="px-3 py-6" style={{ color: "#8A94A0" }}>
+              <td colSpan={columns.length} className="px-3 py-6" style={{ color: "var(--muted)" }}>
                 {empty}
               </td>
             </tr>

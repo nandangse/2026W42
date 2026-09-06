@@ -81,7 +81,7 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
   const DED_PARTS: [string, string][] = [
     ["pf", "PF"], ["pt", "PT"], ["loan", "Loan"], ["advance", "Advance"], ["tds", "TDS"], ["other_ded", "Other"],
   ];
-  const PART_COLORS = ["#1B3A5C", "#3E6A96", "#7FA3C5", "#0D6E39", "#7FB89A", "#8A5B00"];
+  const PART_COLORS = ["var(--blue)", "#3E6A96", "#7FA3C5", "#0D6E39", "#7FB89A", "#8A5B00"];
   const DED_COLORS = ["#B3392E", "#D9838B", "#8A5B00", "#C79A3B", "#5B3FA8", "#8B8F87"];
 
   // net-pay spread, in the sheet's own numbers
@@ -143,12 +143,12 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
         }
       `}</style>
 
-      <div className="no-print" style={{ background: "#16232F", color: "#fff", padding: "10px 16px", display: "flex", gap: 12, alignItems: "center", fontSize: 13, position: "sticky", top: 0, zIndex: 10 }}>
+      <div className="no-print" style={{ background: "var(--navy)", color: "#fff", padding: "10px 16px", display: "flex", gap: 12, alignItems: "center", fontSize: 13, position: "sticky", top: 0, zIndex: 10 }}>
         <b>Salary Register — {title}</b>
         <span style={{ opacity: .7 }}>{rows.length} lines · {sheet.status}</span>
-        {absent.length > 0 && <span style={{ fontSize: 11, color: "#F5B32B" }}>{absent.length} column{absent.length === 1 ? "" : "s"} not in this sheet</span>}
+        {absent.length > 0 && <span style={{ fontSize: 11, color: "var(--amber)" }}>{absent.length} column{absent.length === 1 ? "" : "s"} not in this sheet</span>}
         <span style={{ flex: 1 }} />
-        <button onClick={() => window.print()} style={{ background: "#E8600A", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>
+        <button onClick={() => window.print()} style={{ background: "var(--accent)", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>
           Save as PDF / Print
         </button>
       </div>
@@ -169,16 +169,16 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
 
         <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "nowrap" }}>
           {([
-            ["EMPLOYEES", String(sheet.total_count ?? rows.length), `${sheet.staff_count ?? "—"} staff · ${sheet.labour_count ?? "—"} labour`, "#1B3A5C"],
+            ["EMPLOYEES", String(sheet.total_count ?? rows.length), `${sheet.staff_count ?? "—"} staff · ${sheet.labour_count ?? "—"} labour`, "var(--blue)"],
             ["EARNED PAY", lakh(sheet.earned_pay || 0), "as the sheet gives it", "#0D6E39"],
             ["TOTAL DEDUCTIONS", lakh(sheet.deductions || 0), "", "#B3392E"],
-            ["NET PAYABLE", lakh(sheet.net_payable || 0), "", "#16232F"],
+            ["NET PAYABLE", lakh(sheet.net_payable || 0), "", "var(--navy)"],
             ["SALARIES ON HOLD", String(held.length),
-              held.length ? `${lakh(held.reduce((a, r) => a + (r.net || r.earned || 0), 0))} withheld` : "none held", held.length ? "#B3261E" : "#0D6E39"],
+              held.length ? `${lakh(held.reduce((a, r) => a + (r.net || r.earned || 0), 0))} withheld` : "none held", held.length ? "var(--red)" : "#0D6E39"],
             ["PAID TO BANK", sheet.paid_to_bank == null ? "—" : lakh(sheet.paid_to_bank),
               sheet.paid_to_bank != null && sheet.net_payable != null && Math.abs(sheet.paid_to_bank - sheet.net_payable) >= 1
                 ? `${sheet.paid_to_bank > sheet.net_payable ? "+" : "−"}₹${inr(Math.abs(sheet.paid_to_bank - sheet.net_payable))} vs net`
-                : "", "#E8600A"],
+                : "", "var(--accent)"],
           ] as const).map(([l, v, sub, c]) => (
             <div key={l} style={{ border: "1px solid #DCD8CC", borderTop: `3px solid ${c}`, borderRadius: 6, padding: "6px 10px", flex: "1 1 0", minWidth: 0 }}>
               <div style={{ fontSize: 8.5, letterSpacing: ".05em", color: "#8B8F87", fontWeight: 700 }}>{l}</div>
@@ -201,7 +201,7 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
 
         <div style={{ marginBottom: 14 }}>
           <b style={{ fontSize: 12 }}>BY TYPE — nos, earned, deductions, net paid</b>
-          <table style={{ borderCollapse: "collapse", fontSize: 10.5, marginTop: 5, minWidth: 560 }}>
+          <table className="genie-table" style={{ borderCollapse: "collapse", fontSize: 10.5, marginTop: 5, minWidth: 560 }}>
             <thead><tr style={{ background: "#F4F2EC" }}>
               {["Type", "Nos", "On hold", "Earned", "Deductions", "Net Paid"].map((h, i) => (
                 <th key={h} style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: i ? "right" : "left" }}>{h}</th>))}
@@ -211,7 +211,7 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
                 <tr key={t}>
                   <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", fontWeight: 600 }}>{t}</td>
                   <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{c.n}</td>
-                  <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: c.hold ? "#B3261E" : "#C9C6BD", fontWeight: c.hold ? 700 : 400 }}>{c.hold || "—"}</td>
+                  <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: c.hold ? "var(--red)" : "#C9C6BD", fontWeight: c.hold ? 700 : 400 }}>{c.hold || "—"}</td>
                   <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{inr(c.earned)}</td>
                   <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{inr(c.ded)}</td>
                   <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{inr(c.net)}</td>
@@ -220,7 +220,7 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
               <tr style={{ background: "#FFF9C4", fontWeight: 700 }}>
                 <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px" }}>TOTAL</td>
                 <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right" }}>{rows.length}</td>
-                <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", color: held.length ? "#B3261E" : undefined }}>{held.length || "—"}</td>
+                <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right", color: held.length ? "var(--red)" : undefined }}>{held.length || "—"}</td>
                 <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right" }}>{inr(byType.reduce((a, [, c]) => a + c.earned, 0))}</td>
                 <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right" }}>{inr(byType.reduce((a, [, c]) => a + c.ded, 0))}</td>
                 <td style={{ border: "1px solid #DCD8CC", padding: "2.5px 8px", textAlign: "right" }}>{inr(byType.reduce((a, [, c]) => a + c.net, 0))}</td>
@@ -243,7 +243,7 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
                 const h = (b.n / buckets.maxN) * 84;
                 return (
                   <g key={i}>
-                    <rect x={10 + i * bw + 2} y={100 - h} width={bw - 4} height={h} rx={2} fill="#1B3A5C" opacity={0.85} />
+                    <rect x={10 + i * bw + 2} y={100 - h} width={bw - 4} height={h} rx={2} fill="var(--blue)" opacity={0.85} />
                     {b.n > 0 && <text x={10 + i * bw + bw / 2} y={96 - h} textAnchor="middle" fontSize="9" fill="#46545F">{b.n}</text>}
                     <text x={10 + i * bw + bw / 2} y={113} textAnchor="middle" fontSize="8" fill="#8B8F87">
                       {b.lo >= 100000 ? `${(b.lo / 100000).toFixed(0)}L` : `${b.lo / 1000}k`}
@@ -264,10 +264,10 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
         <div className="pagebreak" />
 
         {/* ═══ the register ═══ */}
-        <table className="reg" style={{ fontSize: 8.6 }}>
+        <table className="reg genie-table" style={{ fontSize: 8.6 }}>
           <thead>
             <tr>
-              <th colSpan={2 + REGISTER_COLUMNS.length} style={{ background: "#16232F", color: "#fff", textAlign: "left", padding: "4px 6px", fontSize: 10 }}>
+              <th colSpan={2 + REGISTER_COLUMNS.length} style={{ background: "var(--navy)", color: "#fff", textAlign: "left", padding: "4px 6px", fontSize: 10 }}>
                 SALARY REGISTER — {title.toUpperCase()} · Nandan GSE Private Limited · {rows.length} employees
               </th>
             </tr>
@@ -282,8 +282,8 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} style={{ background: r.hold ? "#FBEAE8" : i % 2 ? "#FBFAF6" : "#fff" }}>
-                <td style={{ fontWeight: 700, whiteSpace: "nowrap", color: r.hold ? "#B3261E" : undefined }}>{r.employee_id || "—"}</td>
-                <td style={{ color: r.hold ? "#B3261E" : undefined }}>{r.name || "—"}{r.hold ? <b style={{ fontSize: 7.5 }}> · HOLD</b> : ""}</td>
+                <td style={{ fontWeight: 700, whiteSpace: "nowrap", color: r.hold ? "var(--red)" : undefined }}>{r.employee_id || "—"}</td>
+                <td style={{ color: r.hold ? "var(--red)" : undefined }}>{r.name || "—"}{r.hold ? <b style={{ fontSize: 7.5 }}> · HOLD</b> : ""}</td>
                 {REGISTER_COLUMNS.map((c) => {
                   const v = r[c.key];
                   return (

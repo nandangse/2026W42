@@ -111,7 +111,7 @@ export default function ModuleMasters({ who }: { who: string }) {
             <button key={m.kind} onClick={() => { setKind(m.kind); setMsg(""); }}
               className="w-full text-left px-3 py-1.5 text-xs flex items-center gap-2"
               style={{
-                background: kind === m.kind ? "#16232F" : undefined,
+                background: kind === m.kind ? "var(--navy)" : undefined,
                 color: kind === m.kind ? "#fff" : C.dim,
                 fontWeight: kind === m.kind ? 700 : 500,
                 borderTop: "1px solid #EEECE6",
@@ -143,7 +143,7 @@ export default function ModuleMasters({ who }: { who: string }) {
                 style={{ border: `1px solid ${C.line}` }} />
               <button onClick={add} disabled={busy || !adding.trim()}
                 className="text-xs font-bold rounded px-3 py-1.5"
-                style={{ background: "#E8600A", color: "#fff", opacity: busy || !adding.trim() ? 0.5 : 1 }}>
+                style={{ background: "var(--accent)", color: "#fff", opacity: busy || !adding.trim() ? 0.5 : 1 }}>
                 + Add
               </button>
             </div>
@@ -164,7 +164,7 @@ export default function ModuleMasters({ who }: { who: string }) {
                       {n ? `${n} in use` : "unused"}
                     </div>
                     <button onClick={() => rename(l.value)} disabled={busy}
-                      className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#DCE8F5", color: "#1B3A5C" }}
+                      className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#DCE8F5", color: "var(--blue)" }}
                       title="Rename — everybody holding it moves with it">✎</button>
                     <button onClick={() => remove(l.value)} disabled={busy}
                       className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#FBEDEA", color: C.red }}

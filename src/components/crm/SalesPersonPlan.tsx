@@ -160,7 +160,7 @@ export default function SalesPersonPlan({ onConsult }: { onConsult?: (profileId:
       </div>
       {needs && <div className="text-xs rounded border p-2 mb-3" style={{ borderColor: "#F5D9A8", background: "#FFF7E6", color: "#8A5B00" }}>Run CRM migration 0020 — the plan has nowhere to live yet.</div>}
       {!needs && needsWords && tab === "mine" && <div className="text-xs rounded border p-2 mb-3" style={{ borderColor: "#F5D9A8", background: "#FFF7E6", color: "#8A5B00" }}>Run CRM migration 0050 — the plan&apos;s words and Genie garnish have nowhere to live yet. The numbers still work.</div>}
-      {err && <div className="text-xs font-semibold mb-2" style={{ color: "#B3261E" }}>{err}</div>}
+      {err && <div className="text-xs font-semibold mb-2" style={{ color: "var(--red)" }}>{err}</div>}
 
       {tab === "mine" && (
         <div>
@@ -253,7 +253,7 @@ export default function SalesPersonPlan({ onConsult }: { onConsult?: (profileId:
                         <span className="text-xs" style={{ color: MUTED }}>{f.by}{f.at ? ` · ${new Date(f.at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" })}` : ""}</span>
                         {mayWrite && (
                           <button onClick={() => { if (window.confirm(`Remove "${f.name || "this file"}" from the plan?`)) void setFiles((person.files || []).filter((_, k) => k !== i)); }}
-                            title="Remove from the plan (the file itself is not deleted)" style={{ color: "#B3261E", fontWeight: 700 }}>×</button>
+                            title="Remove from the plan (the file itself is not deleted)" style={{ color: "var(--red)", fontWeight: 700 }}>×</button>
                         )}
                       </li>
                     ))}
@@ -314,7 +314,7 @@ export default function SalesPersonPlan({ onConsult }: { onConsult?: (profileId:
             opportunity targets are PER WEEK. {manage ? "Type and Save per row." : "Your own row, as agreed in review — the Sales Head sets it."}
           </p>
           <div className="rounded-lg border" style={{ borderColor: BORDER, background: "#fff", overflowX: "auto" }}>
-            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
+            <table className="genie-table" style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
               <thead>
                 <tr style={{ background: "#F4F6FA" }}>
                   <th className="text-left px-3 py-2" style={{ borderBottom: `1px solid ${BORDER}`, minWidth: 160 }}>Salesperson</th>

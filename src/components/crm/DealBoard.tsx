@@ -270,8 +270,8 @@ function Board({ onOpen }: { onOpen: (target: string, id: string) => void }) {
                                 position: "absolute", right: 4, bottom: 3, width: 20, height: 20,
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 borderRadius: 5, lineHeight: 1, cursor: "pointer", fontSize: 11,
-                                border: `1px solid ${inQueue ? "#B3261E" : handled ? GREEN : BORDER}`,
-                                background: inQueue ? "#B3261E" : handled ? GREEN : "#F7F8FB",
+                                border: `1px solid ${inQueue ? "var(--red)" : handled ? GREEN : BORDER}`,
+                                background: inQueue ? "var(--red)" : handled ? GREEN : "#F7F8FB",
                                 color: inQueue || handled ? "#fff" : NAVY,
                               }}
                             >
@@ -299,7 +299,7 @@ function Board({ onOpen }: { onOpen: (target: string, id: string) => void }) {
       </p>
       {toast && (
         <div style={{
-          position: "fixed", bottom: 18, right: 18, zIndex: 60, background: "#16232F", color: "#fff",
+          position: "fixed", bottom: 18, right: 18, zIndex: 60, background: "var(--navy)", color: "#fff",
           borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600, boxShadow: "0 4px 18px rgba(0,0,0,.25)",
         }}>{toast}</div>
       )}
@@ -349,7 +349,7 @@ function FlowTable() {
                   <div className="font-bold" style={{ fontSize: 15 }}>{l.title}</div>
                   <div className="text-xs" style={{ color: MUTED }}>{l.note}</div>
                 </div>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <table className="genie-table" style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr>
                       {["STAGE", "CAME IN", "WENT OUT", "SITTING"].map((h, i) => (
@@ -366,7 +366,7 @@ function FlowTable() {
                         <td style={{ padding: "7px 16px", fontSize: 13, borderBottom: "1px solid #F0F1F6" }}>
                           <span style={{
                             display: "inline-block", width: 9, height: 9, borderRadius: 2,
-                            background: r.colour || "#8A94A0", marginRight: 8,
+                            background: r.colour || "var(--muted)", marginRight: 8,
                           }} />
                           {r.name}
                         </td>

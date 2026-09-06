@@ -37,7 +37,7 @@ function derive(cols: Column[], data: Record<string, unknown>) {
   for (const c of cols) if (c.level_of) { const n = lead(d[c.level_of]); d[c.key] = n === null ? null : band(n); }
   return d;
 }
-const LEVEL_COLOUR: Record<string, string> = { Low: "#1A7F4E", Medium: "#B7791F", High: "#C2410C", Extreme: "#B3261E" };
+const LEVEL_COLOUR: Record<string, string> = { Low: "#1A7F4E", Medium: "#B7791F", High: "#C2410C", Extreme: "var(--red)" };
 
 export default function Registers({ boot }: { boot: Boot }) {
   const [slug, setSlug] = useState<string | null>(null);
@@ -297,7 +297,7 @@ function ColumnBuilder({ definition, onClose, onSaved }: {
               <input type="checkbox" checked={!!c.required} onChange={(e) => set(i, { required: e.target.checked })} />
               Required
             </label>
-            <button onClick={() => setCols(cols.filter((_, j) => j !== i))} className="text-xs font-bold" style={{ color: "#B3261E" }}>
+            <button onClick={() => setCols(cols.filter((_, j) => j !== i))} className="text-xs font-bold" style={{ color: "var(--red)" }}>
               Remove column
             </button>
           </div>

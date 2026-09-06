@@ -49,20 +49,20 @@ export function ModuleLinks({ current }: { current: ModuleKey }) {
 
   return (
     <div style={{ borderBottom: "1px solid #EEECE6" }}>
-      <div className="px-3 pt-2 pb-1 text-xs font-bold" style={{ color: "#8A94A0", letterSpacing: 1 }}>
+      <div className="px-3 pt-2 pb-1 text-xs font-bold" style={{ color: "var(--muted)", letterSpacing: 1 }}>
         MODULES
       </div>
       {rows.map((m) =>
         m.key === current ? (
           <div key={m.key} className="px-3 py-1.5 text-sm font-bold flex items-center gap-2"
-            style={{ color: "#16232F", background: "#F7F5EF" }}>
+            style={{ color: "var(--navy)", background: "#F7F5EF" }}>
             <span>{m.icon}</span> {m.label}
-            <span className="ml-auto text-xs font-semibold" style={{ color: "#0D7A3F" }}>you are here</span>
+            <span className="ml-auto text-xs font-semibold" style={{ color: "var(--green)" }}>you are here</span>
           </div>
         ) : (
           <a key={m.key} href={m.href}
             className="block px-3 py-1.5 text-sm font-semibold hover:bg-gray-50 flex items-center gap-2"
-            style={{ color: "#16232F", textDecoration: "none" }}>
+            style={{ color: "var(--navy)", textDecoration: "none" }}>
             <span>{m.icon}</span> {m.label}
           </a>
         ),
@@ -77,7 +77,7 @@ export function ReloadRow() {
     <button
       onClick={() => window.location.reload()}
       className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
-      style={{ color: "#16232F", borderBottom: "1px solid #EEECE6" }}
+      style={{ color: "var(--navy)", borderBottom: "1px solid #EEECE6" }}
       title="Reload the page — you come back to the same screen, not the front door"
     >
       ⟳ Reload
@@ -117,7 +117,7 @@ export default function ModuleMenu({
         aria-expanded={open}
       >
         <span className="rounded-full font-bold flex items-center justify-center"
-          style={{ width: 26, height: 26, fontSize: 11, letterSpacing: 0.3, background: initials ? "#E8600A" : "#B3261E", color: "#fff" }}>
+          style={{ width: 26, height: 26, fontSize: 11, letterSpacing: 0.3, background: initials ? "var(--accent)" : "var(--red)", color: "#fff" }}>
           {initials || "??"}
         </span>
         <span style={{ color: "#8FA1B3", fontSize: 9 }}>▼</span>
@@ -126,17 +126,17 @@ export default function ModuleMenu({
         <>
           <div className="fixed inset-0" style={{ zIndex: 58 }} role="button" tabIndex={0} onClick={() => setOpen(false)} />
           <div className="absolute rounded-lg border bg-white"
-            style={{ top: "calc(100% + 6px)", right: 0, width: 232, borderColor: "#E2E0DA", boxShadow: "0 12px 30px rgba(0,0,0,.25)", zIndex: 59 }}>
+            style={{ top: "calc(100% + 6px)", right: 0, width: 232, borderColor: "var(--line)", boxShadow: "0 12px 30px rgba(0,0,0,.25)", zIndex: 59 }}>
             <div className="px-3 py-2.5" style={{ borderBottom: "1px solid #EEECE6" }}>
-              <div className="text-sm font-bold truncate" style={{ color: "#16232F" }}>{who}</div>
-              <div className="text-xs truncate" style={{ color: "#8A94A0" }}>{email}</div>
-              <div className="text-xs mt-1 font-semibold" style={{ color: "#5A6672" }}>{role.replace("_", " ")}</div>
+              <div className="text-sm font-bold truncate" style={{ color: "var(--navy)" }}>{who}</div>
+              <div className="text-xs truncate" style={{ color: "var(--muted)" }}>{email}</div>
+              <div className="text-xs mt-1 font-semibold" style={{ color: "var(--dim)" }}>{role.replace("_", " ")}</div>
             </div>
             <ModuleLinks current={current} />
             <ReloadRow />
             <button onClick={logout}
               className="w-full text-left px-3 py-2 text-sm font-bold hover:bg-gray-50"
-              style={{ color: "#E8600A" }}>
+              style={{ color: "var(--accent)" }}>
               ⎋ Logout
             </button>
           </div>

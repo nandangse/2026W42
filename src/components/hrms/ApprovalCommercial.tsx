@@ -78,7 +78,7 @@ export default function ApprovalCommercial({ who: me, isOwner }: { who: string; 
             note="Proposed by HR on the Individual Report Card. The number is already in the record; approving is what makes it the agreed figure.">
             {!d?.salaryWaiting.length ? <Empty t="No salary decision is waiting." /> : (
               <>
-                <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+                <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
                   <thead><tr style={{ color: C.faint, fontSize: 11 }}>
                     {["", "Person", "Department", "Previous", "New", "Increase", "Asked date", "By", ""].map((h, i) => (
                       <th key={i} className="text-left px-1.5 py-1" style={{ borderBottom: `1px solid ${C.line}` }}>{h}</th>))}
@@ -106,7 +106,7 @@ export default function ApprovalCommercial({ who: me, isOwner }: { who: string; 
                 {isOwner && (
                   <div className="flex gap-2 mt-2 no-print">
                     <button onClick={() => act({ action: "salary-approve", ids: sChosen }, "Finalised")} disabled={busy || !sChosen.length}
-                      className="rounded px-3 py-1.5 font-bold" style={{ background: sChosen.length ? C.green : "#E2E0DA", color: sChosen.length ? "#fff" : "#8A94A0", fontSize: 12.5 }}>
+                      className="rounded px-3 py-1.5 font-bold" style={{ background: sChosen.length ? C.green : "var(--line)", color: sChosen.length ? "#fff" : "var(--muted)", fontSize: 12.5 }}>
                       ✓ Finalise ticked ({sChosen.length})
                     </button>
                     <button onClick={() => { if (window.confirm(`Finalise every waiting salary decision — ${d.salaryWaiting.length}?`)) act({ action: "salary-approve", all: true }, "Finalised everything"); }} disabled={busy}
@@ -123,7 +123,7 @@ export default function ApprovalCommercial({ who: me, isOwner }: { who: string; 
             note="A loan or salary advance asked for by, or on behalf of, one person. Approving fixes the amount and the repayment.">
             {!d?.loansWaiting.length ? <Empty t="No loan request is waiting." /> : (
               <>
-                <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+                <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
                   <thead><tr style={{ color: C.faint, fontSize: 11 }}>
                     {["", "Person", "Kind", "Amount", "Repay over", "From", "Reason", "Asked date", "By", ""].map((h, i) => (
                       <th key={i} className="text-left px-1.5 py-1" style={{ borderBottom: `1px solid ${C.line}` }}>{h}</th>))}
@@ -163,7 +163,7 @@ export default function ApprovalCommercial({ who: me, isOwner }: { who: string; 
       ) : (
         <Block title="Completed" note="What was decided, when it was asked, and when it was agreed.">
           {!(d?.salaryDone.length || d?.loansDone.length) ? <Empty t="Nothing has been decided on this desk yet." /> : (
-            <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+            <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
               <thead><tr style={{ color: C.faint, fontSize: 11 }}>
                 {["What", "Person", "Amount", "Asked date", "Approved date", "Raised by", "Approved by"].map((h) => (
                   <th key={h} className="text-left px-1.5 py-1" style={{ borderBottom: `1px solid ${C.line}` }}>{h}</th>))}
@@ -171,7 +171,7 @@ export default function ApprovalCommercial({ who: me, isOwner }: { who: string; 
               <tbody>
                 {(d?.salaryDone || []).map((r) => (
                   <tr key={`s${r.id}`} style={{ borderBottom: "1px solid #F2F0EA" }}>
-                    <td className="px-1.5 py-1"><Chip t="Salary" c="#1B3A5C" /></td>
+                    <td className="px-1.5 py-1"><Chip t="Salary" c="var(--blue)" /></td>
                     <td className="px-1.5 py-1 font-semibold">{r.id} · {r.name}</td>
                     <td className="px-1.5 py-1 tnum">₹{inr(r.prev)} → <b style={{ color: C.green }}>₹{inr(r.next)}</b></td>
                     <td className="px-1.5 py-1">{day(r.asked)}</td>

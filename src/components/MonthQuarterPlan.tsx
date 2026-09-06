@@ -18,8 +18,8 @@ import { JobLightbox, type WipJob } from "./JobsInProgress";
 import NextThirtyDays from "./NextThirtyDays";
 
 const C = {
-  ink: "#16232F", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC", line: "#E2E0DA",
-  panel: "#F4F2EC", accent: "#E8600A", navy: "#1B3A5C", green: "#0D7A3F", red: "#B3261E", violet: "#7C3AED",
+  ink: "var(--navy)", sub: "var(--dim)", mute: "var(--muted)", faint: "#B8B5AC", line: "var(--line)",
+  panel: "#F4F2EC", accent: "var(--accent)", navy: "var(--blue)", green: "var(--green)", red: "var(--red)", violet: "#7C3AED",
 };
 const BELIEFS = [0, 10, 25, 50, 75, 90, 100];
 
@@ -197,7 +197,7 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
               sight merely because its date falls outside this month. */}
           {(["mtd", "qtd", "ytd"] as const).map((k) => (
             <button key={k} onClick={() => setKind(k)} className="rounded-full border px-3 py-1 text-xs font-bold"
-              style={kind === k ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: C.mute, borderColor: C.line, background: "#fff" }}
+              style={kind === k ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" } : { color: C.mute, borderColor: C.line, background: "#fff" }}
               title={k === "ytd" ? "The whole financial year — every job the year carries" : undefined}>
               {k === "mtd" ? "Months Plan" : k === "qtd" ? "Quarter Plan" : "YTD — all"}
             </button>
@@ -319,7 +319,7 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
               </div>
               <div className="text-xs mt-0.5" style={{ color: C.mute }}>
                 on your dates, weighted by your belief · {V(Math.round(wb.pod))} receivable ·{" "}
-                <b style={{ color: share >= 75 ? C.green : share >= 50 ? "#D97706" : C.red }}>{share}%</b> of the money on the table
+                <b style={{ color: share >= 75 ? C.green : share >= 50 ? "var(--warn)" : C.red }}>{share}%</b> of the money on the table
                 {moved.length > 0 && (
                   <div style={{ color: C.violet, fontWeight: 700 }}>
                     {moved.length} job{moved.length === 1 ? "" : "s"} moved out of {d.window.label} by your own dates — not counted here
@@ -372,21 +372,21 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
           separate borders, because a collapsed border does not travel with a
           sticky row and the heading would lose its edge on the way down. */}
       <div className="rounded-lg border bg-white mb-3" style={{ borderColor: C.line, overflow: "auto", maxHeight: "68vh" }}>
-        <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 1180 }}>
+        <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 1180 }}>
           <thead>
-            <tr style={{ background: "#22303C", color: "#fff", position: "sticky", top: 0, zIndex: 2 }}>
-              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C", width: 210 }}>Job</th>
-              <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }}>Value</th>
-              <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }}>TP</th>
-              <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#22303C" }} title="Falls due when this job is delivered — the cash the month actually brings in">Receivable</th>
-              <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "#22303C" }}>TDD</th>
-              <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "#22303C" }} title="Kitting — how much of the material is in">Kit %</th>
-              <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "#22303C" }} title="Production completion">Prod %</th>
-              <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "#22303C" }}>My best estimate</th>
-              <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "#22303C" }}>My belief</th>
-              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>What I believe needs to HAPPEN</th>
+            <tr style={{ background: "var(--ink)", color: "#fff", position: "sticky", top: 0, zIndex: 2 }}>
+              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)", width: 210 }}>Job</th>
+              <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Value</th>
+              <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>TP</th>
+              <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }} title="Falls due when this job is delivered — the cash the month actually brings in">Receivable</th>
+              <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>TDD</th>
+              <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "var(--ink)" }} title="Kitting — how much of the material is in">Kit %</th>
+              <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "var(--ink)" }} title="Production completion">Prod %</th>
+              <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>My best estimate</th>
+              <th className="px-2 py-2 text-center" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>My belief</th>
+              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>What I believe needs to HAPPEN</th>
               {d.canSeeRoom && (
-                <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}
+                <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}
                   title="What everybody else said about this job — verbatim">The room says</th>
               )}
             </tr>
@@ -435,9 +435,9 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
                       a date is easier than believing it beside a job that is
                       20% kitted, which is the point of putting them here. */}
                   <td className="px-2 py-1.5 text-center tnum font-bold whitespace-nowrap"
-                    style={{ color: j.kit >= 90 ? C.green : j.kit >= 50 ? "#D97706" : C.red }}>{j.kit}%</td>
+                    style={{ color: j.kit >= 90 ? C.green : j.kit >= 50 ? "var(--warn)" : C.red }}>{j.kit}%</td>
                   <td className="px-2 py-1.5 text-center tnum font-bold whitespace-nowrap"
-                    style={{ color: j.pct >= 90 ? C.green : j.pct >= 50 ? "#D97706" : C.red }}>{j.pct}%</td>
+                    style={{ color: j.pct >= 90 ? C.green : j.pct >= 50 ? "var(--warn)" : C.red }}>{j.pct}%</td>
                   <td className="px-2 py-1.5 text-center">
                     {/*
                       THE DATE ON THIS DESK IS THE REAL ONE (Dr Raghu, 2 Sep
@@ -462,7 +462,7 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
                   <td className="px-2 py-1.5 text-center">
                     <select value={r.belief} onChange={(e) => saveRow(j.id, { ...r, belief: Number(e.target.value) })}
                       className="text-xs border rounded px-1 py-0.5 font-bold"
-                      style={{ borderColor: C.line, color: r.belief >= 75 ? C.green : r.belief >= 50 ? "#D97706" : C.red, background: "#fff" }}>
+                      style={{ borderColor: C.line, color: r.belief >= 75 ? C.green : r.belief >= 50 ? "var(--warn)" : C.red, background: "#fff" }}>
                       {BELIEFS.map((b) => <option key={b} value={b}>{b}%</option>)}
                     </select>
                   </td>
@@ -491,7 +491,7 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
                         : ((d.voices || {})[j.id] || []).map((vv, n) => (
                             <div key={n} style={{ whiteSpace: "normal" }}>
                               <b style={{ color: C.ink }}>{vv.initials}</b>{" "}
-                              <b style={{ color: vv.belief >= 75 ? C.green : vv.belief >= 50 ? "#D97706" : C.red }}>{vv.belief}%</b>
+                              <b style={{ color: vv.belief >= 75 ? C.green : vv.belief >= 50 ? "var(--warn)" : C.red }}>{vv.belief}%</b>
                               <span style={{ color: C.mute }}> : </span>
                               <span style={{ color: C.sub }}>{vv.comment}</span>
                             </div>
@@ -590,7 +590,7 @@ export default function MonthQuarterPlan({ V }: { V: (rupees: number) => string 
                   <span key={r.by_email} className="rounded px-2.5 py-1.5"
                     style={{
                       background: !here ? "#FAF9F5" : signed ? "#E8F3EC" : "#F4F2EC",
-                      border: `1px solid ${!here ? "#EFEDE7" : signed ? "#B7DFC8" : C.line}`,
+                      border: `1px solid ${!here ? "var(--line-soft)" : signed ? "#B7DFC8" : C.line}`,
                       lineHeight: 1.35, opacity: here ? 1 : 0.75,
                     }}>
                     {/* the cursive stands in until real signature images arrive */}

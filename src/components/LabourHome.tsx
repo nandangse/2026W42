@@ -18,7 +18,7 @@ export default function LabourHome({ email, displayName, initials, role }: { ema
     <GenieShell module="main" title="Nandan Genie" tagline="Your sheet, your IDP, your day" user={{ email, displayName, initials, role }}>
       <div className="p-3 mx-auto" style={{ maxWidth: 720 }}>
         <Greeting d={d} />
-        <a href="/idp" className="block rounded-lg p-4 mb-3" style={{ background: "#16232F", color: "#fff", textDecoration: "none", borderLeft: "5px solid #E8600A" }}>
+        <a href="/idp" className="block rounded-lg p-4 mb-3" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none", borderLeft: "5px solid #E8600A" }}>
           <div className="font-bold" style={{ fontSize: 18 }}>🪪 My sheet &amp; IDP →</div>
           <div className="text-sm mt-1" style={{ color: "#CBD5E1" }}>Your record, pay slips, leave and loan registers, your IDP, the handbook, and a word to HR.</div>
         </a>

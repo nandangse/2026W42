@@ -32,7 +32,7 @@ interface Run {
   changes: Change[]; notes: string[]; seconds: number | null;
 }
 
-const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A", GREEN = "#0D7A3F", NAVY = "#1B3A5C";
+const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", ORANGE = "var(--accent)", GREEN = "var(--green)", NAVY = "var(--blue)";
 const when = (v: unknown) =>
   v ? new Date(String(v)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 
@@ -91,7 +91,7 @@ export default function ErpSyncPanel() {
       <div className="flex items-start justify-between gap-3 flex-wrap mb-2">
         <div>
           <div className="font-bold text-sm" style={{ color: INK }}>↻ Synchronise with the ERP</div>
-          <div className="text-xs mt-0.5" style={{ color: "#5A6672", lineHeight: 1.6, maxWidth: 640 }}>
+          <div className="text-xs mt-0.5" style={{ color: "var(--dim)", lineHeight: 1.6, maxWidth: 640 }}>
             Jobs, Projects and Delivered Jobs come straight from nandanerp — <b>these three sheets no longer
             need loading</b>. Press it whenever you want the boards current; it is safe to press twice.
             Genie&apos;s own columns are never touched: the Management Target Date, kitting and production
@@ -142,9 +142,9 @@ export default function ErpSyncPanel() {
 
       {/* THE SUMMARY — a day, a week, a month */}
       <div className="overflow-x-auto">
-        <table className="text-xs" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 620 }}>
+        <table className="text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 620 }}>
           <thead>
-            <tr style={{ background: "#22303C", color: "#fff" }}>
+            <tr style={{ background: "var(--ink)", color: "#fff" }}>
               <th className="px-2 py-1.5 text-left">What changed</th>
               <th className="px-2 py-1.5 text-right">Jobs in</th>
               <th className="px-2 py-1.5 text-right">Jobs changed</th>
@@ -162,7 +162,7 @@ export default function ErpSyncPanel() {
               </td></tr>
             )}
             {wins.map((w, i) => (
-              <tr key={w.days} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+              <tr key={w.days} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                 <td className="px-2 py-1.5 font-semibold">{label(w.days)}</td>
                 <td className="px-2 py-1.5 text-right tnum" style={{ color: w.jobs_new ? GREEN : MUTED }}>{w.jobs_new || "·"}</td>
                 <td className="px-2 py-1.5 text-right tnum" style={{ color: w.jobs_changed ? INK : MUTED }}>{w.jobs_changed || "·"}</td>
@@ -180,7 +180,7 @@ export default function ErpSyncPanel() {
       <div className="text-xs mt-2 flex items-center gap-2 flex-wrap" style={{ color: MUTED }}>
         {data?.lastRun
           ? <>Last synchronised {when(data.lastRun.at)} by {String(data.lastRun.by || "—").split("@")[0]}
-              {data.lastRun.ok ? "" : <span style={{ color: "#B3261E", fontWeight: 700 }}> · that run FAILED: {data.lastRun.error}</span>}</>
+              {data.lastRun.ok ? "" : <span style={{ color: "var(--red)", fontWeight: 700 }}> · that run FAILED: {data.lastRun.error}</span>}</>
           : "Never synchronised."}
         {changes.length > 0 && (
           <button onClick={() => setShowChanges((v) => !v)} style={{ color: NAVY, fontWeight: 700 }}>
@@ -227,7 +227,7 @@ export default function ErpSyncPanel() {
             </div>
           )}
           <div className="mt-2 border rounded overflow-auto" style={{ borderColor: BORDER, maxHeight: 300 }}>
-            <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+            <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
               <thead><tr style={{ background: "#F3F1EB", color: MUTED }}>
                 <th className="px-2 py-1 text-left">What</th><th className="px-2 py-1 text-left">Job / project</th>
                 <th className="px-2 py-1 text-left">Field</th>
@@ -239,7 +239,7 @@ export default function ErpSyncPanel() {
                   const k = dKey(c);
                   const who: Winner = pick[k] ?? fallback;
                   return (
-                    <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7" }}>
+                    <tr key={i} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
                       <td className="px-2 py-1" style={{ color: MUTED }}>{c.kind}</td>
                       <td className="px-2 py-1"><b>{c.id}</b>{c.label && c.label !== c.id ? ` · ${c.label}` : ""}</td>
                       <td className="px-2 py-1 font-semibold">{c.field}</td>

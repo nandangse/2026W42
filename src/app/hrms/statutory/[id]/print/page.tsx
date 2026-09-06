@@ -42,7 +42,7 @@ export default async function StatutoryPage({ params, searchParams }: {
     return (
       <div style={{ padding: 40, fontFamily: "system-ui", maxWidth: 560 }}>
         <h2 style={{ fontSize: 18 }}>{MONTHS[sheet.month - 1]} {sheet.year} is not frozen.</h2>
-        <p style={{ color: "#5A6672" }}>A return filed off numbers that can still move is a correction waiting to be filed. Freeze the month in Salary Sheets first.</p>
+        <p style={{ color: "var(--dim)" }}>A return filed off numbers that can still move is a correction waiting to be filed. Freeze the month in Salary Sheets first.</p>
       </div>
     );
 

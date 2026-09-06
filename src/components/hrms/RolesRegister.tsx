@@ -178,7 +178,7 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
             onKeyDown={(e) => { if (e.key === "Enter" && adding.trim()) { run({ action: "create", role: adding.trim() }, `Added “${adding.trim()}”`); setAdding(""); } }}
             placeholder="New role…" className="text-xs rounded px-2 py-1.5" style={{ border: `1px solid ${C.line}`, width: 170 }} />
           <button onClick={() => { if (adding.trim()) { run({ action: "create", role: adding.trim() }, `Added “${adding.trim()}”`); setAdding(""); } }}
-            className="text-xs font-bold rounded px-2.5 py-1.5" style={{ background: "#E8600A", color: "#fff" }}>+ Add role</button>
+            className="text-xs font-bold rounded px-2.5 py-1.5" style={{ background: "var(--accent)", color: "#fff" }}>+ Add role</button>
         </>
       }>
       {needsMigration && (
@@ -217,7 +217,7 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
         {([["jd", "Job Description"], ["deliverable", "Deliverable"], ["metric", "Measurement Metric"], ["comp", "Competencies"], ["people", "People Active"]] as const).map(([k, label]) => (
           <button key={k} onClick={() => setCols((c) => ({ ...c, [k]: !c[k] }))}
             className="text-xs font-semibold rounded px-2 py-1"
-            style={cols[k] ? { background: "#16232F", color: "#fff" } : { background: "#fff", border: `1px solid ${C.line}`, color: C.dim }}
+            style={cols[k] ? { background: "var(--navy)", color: "#fff" } : { background: "#fff", border: `1px solid ${C.line}`, color: C.dim }}
             title={cols[k] ? "Collapse this column" : "Show this column"}>
             {cols[k] ? "▾" : "▸"} {label}
           </button>
@@ -236,8 +236,8 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
 
       {current && (
         <div className="fixed inset-0 flex justify-end no-print" style={{ background: "rgba(13,22,31,0.35)", zIndex: 60 }} role="button" tabIndex={0} onClick={() => setOpen(null)}>
-          <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(1180px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
-            <div className="px-4 py-3 sticky top-0 flex items-start gap-2" style={{ background: "#16232F", color: "#fff", zIndex: 2 }}>
+          <div className="h-full overflow-y-auto" style={{ background: "var(--paper)", width: "min(1180px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 sticky top-0 flex items-start gap-2" style={{ background: "var(--navy)", color: "#fff", zIndex: 2 }}>
               <div style={{ minWidth: 0 }}>
                 <div className="font-bold">{current.role}</div>
                 <div style={{ fontSize: 11, color: "#8FA1B3" }}>
@@ -250,7 +250,7 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
                 background: current.stage === "Final" ? "#E6F4EA" : "#FFF3E8",
                 color: current.stage === "Final" ? C.green : "#8A5B00",
               }}>{current.stage}</span>
-              <button onClick={() => setOpen(null)} className="text-sm font-bold rounded px-2 py-1" style={{ background: "#22303C", color: "#8FA1B3" }}>✕</button>
+              <button onClick={() => setOpen(null)} className="text-sm font-bold rounded px-2 py-1" style={{ background: "var(--ink)", color: "#8FA1B3" }}>✕</button>
             </div>
             <RoleView r={current} />
           </div>
@@ -262,7 +262,7 @@ export default function RolesRegister({ who, isOwner }: { who: string; isOwner: 
 
 function Stat({ n, l, hint, warn }: { n: number; l: string; hint?: string; warn?: boolean }) {
   return (
-    <div className="bg-white rounded-lg border px-3 py-2" style={{ borderColor: warn ? "#F5B32B" : C.line, minWidth: 130 }} title={hint}>
+    <div className="bg-white rounded-lg border px-3 py-2" style={{ borderColor: warn ? "var(--amber)" : C.line, minWidth: 130 }} title={hint}>
       <div className="font-bold tnum" style={{ fontSize: 21, lineHeight: 1.1, color: warn ? "#8A5B00" : C.ink }}>{n}</div>
       <div style={{ fontSize: 11, color: C.faint }}>{l}</div>
     </div>
@@ -290,15 +290,15 @@ function RoleView({ r }: { r: Role }) {
         <Fact label="Location" value={r.location} />
         <Fact label="Nos Active" value={String(r.activeCount)} />
         <span className="ml-auto flex items-center gap-2">
-          <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#22303C", color: "#8FA1B3" }}>
+          <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "var(--ink)", color: "#8FA1B3" }}>
             VIEW ONLY
           </span>
           {r.pending_since && (
-            <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#F5B32B", color: "#4A3300" }}>
+            <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "var(--amber)", color: "#4A3300" }}>
               awaiting RJ
             </span>
           )}
-          <button onClick={edit} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}
+          <button onClick={edit} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--accent)", color: "#fff" }}
             title="Opens this role in its own tab, where it can be changed. Any change goes to Dr Raghu for approval.">
             ✎ Edit ↗
           </button>

@@ -95,7 +95,7 @@ export default function Offers({ who, isOwner }: { who: string; isOwner: boolean
       </div>
 
       <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflowX: "auto" }}>
-        <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse", minWidth: 960 }}>
+        <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse", minWidth: 960 }}>
           <thead><tr style={{ color: C.faint, fontSize: 10.5, background: "#F4F2EC" }}>
             {["Offer No", "Name", "Designation", "Reporting to", "Offer date", "Joining date", "Gross", "Status", "Where it stands"].map((h) => (
               <th key={h} className="text-left px-2 py-1.5" style={{ borderBottom: `1px solid ${C.line}` }}>{h}</th>))}
@@ -110,12 +110,12 @@ export default function Offers({ who, isOwner }: { who: string; isOwner: boolean
               return (
                 <tr key={r.id} style={{ borderBottom: "1px solid #F2F0EA" }}>
                   <td className="px-2 py-1.5 mono" style={{ fontSize: 11.5 }}>
-                    <button onClick={() => setOpenId(r.id)} className="font-semibold" style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2 }}>
+                    <button onClick={() => setOpenId(r.id)} className="font-semibold" style={{ color: "var(--blue)", textDecoration: "underline", textUnderlineOffset: 2 }}>
                       {r.offer_no || "(new)"}
                     </button>
                   </td>
                   <td className="px-2 py-1.5 font-bold">
-                    <button onClick={() => setOpenId(r.id)} className="text-left" style={{ color: "#1B3A5C" }}>{r.name || "(unnamed)"}</button>
+                    <button onClick={() => setOpenId(r.id)} className="text-left" style={{ color: "var(--blue)" }}>{r.name || "(unnamed)"}</button>
                     {r.email && <div style={{ fontSize: 10.5, color: C.faint, fontWeight: 400 }}>{r.email}</div>}
                   </td>
                   <td className="px-2 py-1.5">{r.designation || "—"}</td>
@@ -200,11 +200,11 @@ function NewOffer({ boot, onClose, onMade }: { boot: Boot | null; onClose: () =>
         <div className="font-bold mb-1" style={{ fontSize: 13 }}>The resume</div>
         <div className="flex gap-2 items-center flex-wrap">
           <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.txt" style={{ fontSize: 12, maxWidth: 280 }} />
-          <button onClick={upload} disabled={busy} className="rounded px-3 py-1.5 font-bold" style={{ background: "#1B3A5C", color: "#fff", fontSize: 12.5 }}>
+          <button onClick={upload} disabled={busy} className="rounded px-3 py-1.5 font-bold" style={{ background: "var(--blue)", color: "#fff", fontSize: 12.5 }}>
             {busy ? "Reading…" : "Upload and read"}
           </button>
         </div>
-        {note && <div className="mt-2" style={{ fontSize: 12, color: resume?.read ? "#0D7A3F" : "#8A5B00" }}>{note}</div>}
+        {note && <div className="mt-2" style={{ fontSize: 12, color: resume?.read ? "var(--green)" : "#8A5B00" }}>{note}</div>}
       </div>
 
       <label className="block mb-2" style={{ fontSize: 11.5, color: C.faint }}>Name
@@ -308,7 +308,7 @@ function OfferBuilder({ id, boot, isOwner, onClose }: { id: string; boot: Boot |
         <button onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}
           className="rounded px-3 py-1.5 font-bold" style={{ background: "#fff", color: step === 0 ? "#C9C6BD" : C.dim, border: `1px solid ${C.line}`, fontSize: 12.5 }}>← Back</button>
         <button onClick={() => setStep((s) => Math.min(OFFER_STEPS.length - 1, s + 1))} disabled={step === OFFER_STEPS.length - 1}
-          className="rounded px-3 py-1.5 font-bold" style={{ background: step === OFFER_STEPS.length - 1 ? "#E2E0DA" : "#1B3A5C", color: step === OFFER_STEPS.length - 1 ? "#8A94A0" : "#fff", fontSize: 12.5 }}>Next →</button>
+          className="rounded px-3 py-1.5 font-bold" style={{ background: step === OFFER_STEPS.length - 1 ? "var(--line)" : "var(--blue)", color: step === OFFER_STEPS.length - 1 ? "var(--muted)" : "#fff", fontSize: 12.5 }}>Next →</button>
         <span style={{ fontSize: 11.5, color: C.faint }}>{OFFER_STEPS[step].hint} · saved as you type</span>
       </div>
     </Modal>
@@ -339,7 +339,7 @@ function PagePerson({ d, boot, save, locked }: { d: Offer; boot: Boot | null; sa
         {d.resume_name && (
           <div style={{ fontSize: 11.5, color: C.faint, marginTop: 6 }}>
             Resume: {d.resumeUrl
-              ? <a href={d.resumeUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1B3A5C", textDecoration: "underline" }}>{d.resume_name}</a>
+              ? <a href={d.resumeUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--blue)", textDecoration: "underline" }}>{d.resume_name}</a>
               : d.resume_name}
             {d.resume_read && <span> · read automatically, corrected by hand where needed</span>}
           </div>
@@ -353,7 +353,7 @@ function PagePerson({ d, boot, save, locked }: { d: Offer; boot: Boot | null; sa
           {(boot?.roles || []).map((r) => (
             <button key={r.id} disabled={locked} onClick={() => toggleRole(r.role)}
               className="rounded px-1.5 py-0.5 font-semibold"
-              style={{ fontSize: 11, border: `1px solid ${roles.includes(r.role) ? C.green : C.line}`, background: roles.includes(r.role) ? "#E6F4EA" : "#fff", color: roles.includes(r.role) ? "#0D7A3F" : C.dim }}>
+              style={{ fontSize: 11, border: `1px solid ${roles.includes(r.role) ? C.green : C.line}`, background: roles.includes(r.role) ? "#E6F4EA" : "#fff", color: roles.includes(r.role) ? "var(--green)" : C.dim }}>
               {roles.includes(r.role) ? "✓ " : ""}{r.role}
             </button>
           ))}
@@ -441,7 +441,7 @@ function PageRole({ d, boot, save, locked }: { d: Offer; boot: Boot | null; save
     <>
       <div className="flex items-center gap-2 mb-2 flex-wrap no-print">
         <button onClick={pullFromRegister} disabled={locked || !chosenRoles.length}
-          className="rounded px-3 py-1.5 font-bold" style={{ background: chosenRoles.length ? "#1B3A5C" : "#E2E0DA", color: chosenRoles.length ? "#fff" : "#8A94A0", fontSize: 12 }}>
+          className="rounded px-3 py-1.5 font-bold" style={{ background: chosenRoles.length ? "var(--blue)" : "var(--line)", color: chosenRoles.length ? "#fff" : "var(--muted)", fontSize: 12 }}>
           ↻ Re-pull {chosenRoles.length ? chosenRoles.join(" + ") : "the role"} from the register
         </button>
         <span style={{ fontSize: 11.5, color: C.faint }}>
@@ -599,7 +599,7 @@ function CompBox({ label, value, locked, onSave }: { label: string; value: numbe
 function SalaryTable({ rows, ctc }: { rows: SalaryRow[]; ctc: string }) {
   return (
     <div>
-      <table style={{ fontSize: 12.5, width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }}>
+      <table className="genie-table" style={{ fontSize: 12.5, width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }}>
         <thead><tr>
           <th className="text-left px-1.5 py-1" style={{ border: `1px solid ${C.line}`, width: "48%" }}>Components of Compensation</th>
           <th className="text-right px-1.5 py-1" style={{ border: `1px solid ${C.line}`, width: "24%" }}>Monthly (Rs.)</th>
@@ -700,11 +700,11 @@ function PageReview({ d, save, setStatus, busy, isOwner }: { d: Offer; save: (p:
             }}
             disabled={sending || !to || d.status !== "Draft"}
             className="rounded px-3 py-1.5 font-bold"
-            style={{ background: d.status === "Draft" && to ? C.green : "#E2E0DA", color: d.status === "Draft" && to ? "#fff" : "#8A94A0", fontSize: 12.5 }}>
+            style={{ background: d.status === "Draft" && to ? C.green : "var(--line)", color: d.status === "Draft" && to ? "#fff" : "var(--muted)", fontSize: 12.5 }}>
             {sending ? "Sending…" : "✉ Send it now"}
           </button>
           <a href={`/hrms/offer/${d.id}/print`} target="_blank" rel="noopener noreferrer"
-            className="rounded px-3 py-1.5 font-bold" style={{ background: "#1B3A5C", color: "#fff", fontSize: 12.5 }}>
+            className="rounded px-3 py-1.5 font-bold" style={{ background: "var(--blue)", color: "#fff", fontSize: 12.5 }}>
             📄 Open the PDF — logo, DRAFT watermark, page numbers
           </a>
           <a href={gmail} target="_blank" rel="noopener noreferrer" className="rounded px-3 py-1.5 font-bold" style={{ background: "#fff", color: C.dim, border: `1px solid ${C.line}`, fontSize: 12.5 }}>✉ Open a Gmail draft instead</a>
@@ -719,7 +719,7 @@ function PageReview({ d, save, setStatus, busy, isOwner }: { d: Offer; save: (p:
 
       <Card title="Where it stands" note="Draft → Sent → Accepted → Joined. On joining it becomes the appointment letter.">
         <div className="flex gap-2 flex-wrap items-center no-print">
-          {d.status === "Draft" && <B onClick={() => setStatus("Sent")} busy={busy} bg="#1B3A5C">Mark as Sent</B>}
+          {d.status === "Draft" && <B onClick={() => setStatus("Sent")} busy={busy} bg="var(--blue)">Mark as Sent</B>}
           {d.status === "Sent" && <>
             <B onClick={() => setStatus("Accepted")} busy={busy} bg={C.green}>Accepted</B>
             <B onClick={() => setStatus("Declined")} busy={busy} bg="#fff" fg={C.red} border>Declined</B>
@@ -744,8 +744,8 @@ function PageReview({ d, save, setStatus, busy, isOwner }: { d: Offer; save: (p:
 
 /* ── page 7 ── */
 const KIND_TONE: Record<string, string> = {
-  "Resume": "#1B3A5C", "Interview notes": "#8A5B00", "Offer letter": "#0D7A3F",
-  "Appointment letter": "#0D7A3F", "Acceptance": "#5B3FA8", "ID proof": "#46545F",
+  "Resume": "var(--blue)", "Interview notes": "#8A5B00", "Offer letter": "var(--green)",
+  "Appointment letter": "var(--green)", "Acceptance": "#5B3FA8", "ID proof": "#46545F",
   "Certificate": "#46545F", "Other": "#8B8F87",
 };
 const size = (n: number) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
@@ -806,7 +806,7 @@ function PageDocuments({ d, reload, locked }: { d: Offer; reload: () => void; lo
       <Card title={`On file (${docs.length})`}
         note="When this person joins, these flow into their Drive folder — “Active - 6001 - Name” — together with the offer and appointment letters. The kind decides what goes where, which is why it is worth labelling correctly.">
         {!docs.length ? <div className="text-sm" style={{ color: C.faint }}>Nothing on file yet. The resume lands here automatically when an offer is started from one.</div> : (
-          <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+          <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
             <thead><tr style={{ color: C.faint, fontSize: 11 }}>
               {["Kind", "File", "Size", "Added", "By", ""].map((h) => (
                 <th key={h} className="text-left px-1.5 py-1" style={{ borderBottom: `1px solid ${C.line}` }}>{h}</th>))}
@@ -824,7 +824,7 @@ function PageDocuments({ d, reload, locked }: { d: Offer; reload: () => void; lo
                   </td>
                   <td className="px-1.5 py-1.5">
                     {doc.url
-                      ? <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2 }}>{doc.name}</a>
+                      ? <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--blue)", textDecoration: "underline", textUnderlineOffset: 2 }}>{doc.name}</a>
                       : doc.name}
                     {doc.note && <div style={{ fontSize: 10.5, color: C.faint }}>{doc.note}</div>}
                   </td>

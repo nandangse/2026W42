@@ -14,7 +14,7 @@ import { useMoneyFmt } from "./money";
 import { dmy as fmtD } from "@/lib/fmt";
 export { fmtD };
 
-const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A";
+const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", ORANGE = "var(--accent)";
 
 
 const TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
@@ -251,7 +251,7 @@ export default function RegisterScreen({ kind }: { kind: string }) {
       <div className="flex items-start justify-between gap-3 mb-2 flex-wrap" style={{ maxWidth: 980 }}>
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>{cfg.title}</div>
-          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 640, lineHeight: 1.5 }}>{cfg.blurb}</div>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 640, lineHeight: 1.5 }}>{cfg.blurb}</div>
         </div>
         <button onClick={() => setEditing("new")} className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: ORANGE }}>
           + Add
@@ -262,7 +262,7 @@ export default function RegisterScreen({ kind }: { kind: string }) {
           Run migration 0076 first — this register has nowhere to live yet.
         </div>
       )}
-      {msg && <div className="text-xs font-bold mb-2" style={{ color: "#B3261E" }}>{msg}</div>}
+      {msg && <div className="text-xs font-bold mb-2" style={{ color: "var(--red)" }}>{msg}</div>}
 
       {/* ---- totals, ON TOP, in words — and foldable ---- */}
       {statusField && (
@@ -282,7 +282,7 @@ export default function RegisterScreen({ kind }: { kind: string }) {
                   <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>
                     TOTAL {amountLabel.toUpperCase()} — {word(t.st).toUpperCase()}
                   </div>
-                  <div className="text-lg font-bold tnum" style={{ color: t.st === "live" || t.st === "in force" || t.st === "in effect" ? "#0D7A3F" : t.st === "expired" ? "#B3261E" : INK }}>{fmtMoney(t.v)}</div>
+                  <div className="text-lg font-bold tnum" style={{ color: t.st === "live" || t.st === "in force" || t.st === "in effect" ? "var(--green)" : t.st === "expired" ? "var(--red)" : INK }}>{fmtMoney(t.v)}</div>
                   <div className="text-xs" style={{ color: MUTED }}>{t.n} entries</div>
                 </div>
               ))}
@@ -296,12 +296,12 @@ export default function RegisterScreen({ kind }: { kind: string }) {
         <div className="flex items-center gap-1.5 mb-2 flex-wrap">
           <span className="text-xs font-bold" style={{ color: MUTED }}>SHOW</span>
           <button onClick={() => setStatusFilter("all")} className="rounded-full border px-2.5 py-0.5 text-xs font-bold"
-            style={statusFilter === "all" ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
+            style={statusFilter === "all" ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
             all
           </button>
           {(statusField.options || []).map((st) => (
             <button key={st} onClick={() => setStatusFilter(st)} className="rounded-full border px-2.5 py-0.5 text-xs font-bold"
-              style={statusFilter === st ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
+              style={statusFilter === st ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
               {word(st)}
             </button>
           ))}
@@ -309,18 +309,18 @@ export default function RegisterScreen({ kind }: { kind: string }) {
       )}
 
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxWidth: 1100, maxHeight: "68vh" }}>
-        <table className="w-full text-xs" style={{ minWidth: 760, borderCollapse: "separate", borderSpacing: 0 }}>
+        <table className="w-full text-xs genie-table" style={{ minWidth: 760, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
-            <tr style={{ background: "#22303C", color: "#fff" }}>
+            <tr style={{ background: "var(--ink)", color: "#fff" }}>
               {cols.map((f) => (
                 <th key={f.key} className="px-2 py-2 text-left whitespace-nowrap"
-                  style={{ position: "sticky", top: 0, background: "#22303C", cursor: "pointer" }}
+                  style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer" }}
                   onClick={() => clickSort(f.key)}
                   title="Click to sort — again to flip, a third time to clear">
                   {f.label}{sortKey === f.key ? (dir === 1 ? " ▲" : " ▼") : ""}
                 </th>
               ))}
-              <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "#22303C" }} />
+              <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "var(--ink)" }} />
             </tr>
           </thead>
           <tbody>
@@ -352,10 +352,10 @@ export default function RegisterScreen({ kind }: { kind: string }) {
                 d <= new Date(new Date(today).getTime() + cfg.warnDays * 86400000).toISOString().slice(0, 10);
               const past = d && d < today && /^(live|in force|in effect)?$/.test(String(r.status ?? ""));
               return (
-                <tr key={r.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                <tr key={r.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   {cols.map((f) => (
                     <td key={f.key} className="px-2 py-1.5 whitespace-nowrap"
-                      style={f.key === cfg.dateKey ? { color: past ? "#B3261E" : soon ? "#D97706" : INK, fontWeight: past || soon ? 700 : 400 } : { color: INK }}>
+                      style={f.key === cfg.dateKey ? { color: past ? "var(--red)" : soon ? "var(--warn)" : INK, fontWeight: past || soon ? 700 : 400 } : { color: INK }}>
                       {f.type === "money" ? fmtMoney(r[f.key] as number)
                         : f.type === "date" ? fmtD(r[f.key] as string)
                         : f.type === "tick" ? (r[f.key] ? "every week" : "once")
@@ -363,7 +363,7 @@ export default function RegisterScreen({ kind }: { kind: string }) {
                     </td>
                   ))}
                   <td className="px-2 py-1.5 text-right whitespace-nowrap">
-                    <button onClick={() => setEditing(r)} className="font-bold" style={{ color: "#1B3A5C" }}>✎</button>
+                    <button onClick={() => setEditing(r)} className="font-bold" style={{ color: "var(--blue)" }}>✎</button>
                   </td>
                 </tr>
               );
@@ -458,7 +458,7 @@ function EditBox({ cfg, row, kind, onClose, onSaved, onError }: {
           <button onClick={save} disabled={busy} className="flex-1 rounded py-1.5 text-sm font-bold text-white" style={{ background: busy ? "#B9BEC4" : ORANGE }}>
             {busy ? "Saving…" : "💾 Save"}
           </button>
-          {row && <button onClick={remove} className="rounded px-3 text-sm font-bold" style={{ color: "#B3261E" }}>🗑</button>}
+          {row && <button onClick={remove} className="rounded px-3 text-sm font-bold" style={{ color: "var(--red)" }}>🗑</button>}
           <button onClick={onClose} className="rounded px-3 text-sm" style={{ color: MUTED }}>Cancel</button>
         </div>
       </div>

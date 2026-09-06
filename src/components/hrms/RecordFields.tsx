@@ -7,8 +7,8 @@ import { fmtFull } from "@/lib/schedule";
 import type { FieldSpec, HrmsEmployee } from "@/lib/hrms";
 
 export const C = {
-  ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA",
-  orange: "#E8600A", green: "#0D7A3F", red: "#B3261E",
+  ink: "var(--ink)", dim: "var(--dim)", faint: "var(--muted)", line: "var(--line)",
+  orange: "var(--accent)", green: "var(--green)", red: "var(--red)",
 };
 
 export interface GenieUser { email: string; name: string | null; initials: string | null; role: string }
@@ -34,7 +34,7 @@ export function ReadField({ f, e }: { f: FieldSpec; e: HrmsEmployee }) {
       <div className="text-xs" style={{ wordBreak: "break-word", flex: 1 }}>
         {!v && <span style={{ color: "#C9C6BD" }}>—</span>}
         {v && f.kind === "url" && /^https?:\/\//i.test(v) ? (
-          <a href={v} target="_blank" rel="noopener noreferrer" style={{ color: "#1B3A5C", fontWeight: 600 }}>
+          <a href={v} target="_blank" rel="noopener noreferrer" style={{ color: "var(--blue)", fontWeight: 600 }}>
             open ↗
           </a>
         ) : (

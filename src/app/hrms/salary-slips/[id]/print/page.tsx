@@ -67,7 +67,7 @@ export default async function SalarySlipsPage({ params, searchParams }: {
     return (
       <div style={{ padding: 40, fontFamily: "system-ui, sans-serif", maxWidth: 560 }}>
         <h2 style={{ fontSize: 18 }}>This month is not frozen yet.</h2>
-        <p style={{ color: "#5A6672", lineHeight: 1.6 }}>
+        <p style={{ color: "var(--dim)", lineHeight: 1.6 }}>
           The full slip run is printed only after RJ freezes the month — it is the file that goes into every
           employee&apos;s folder, and a draft can still change under it. Use <b>Draft samples</b> to eyeball
           a few slips meanwhile.

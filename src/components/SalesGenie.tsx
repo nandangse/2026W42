@@ -74,7 +74,7 @@ export default function SalesGenie({
     <button
       onClick={() => open(p)}
       className="text-xs font-bold rounded px-3 py-1.5"
-      style={pane === p ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}
+      style={pane === p ? { background: "var(--navy)", color: "#fff" } : { color: "#5B6B7A" }}
     >
       {label}
     </button>
@@ -91,10 +91,10 @@ export default function SalesGenie({
             onChange={(e) => onSearch(e.target.value)}
             placeholder="Search companies, deals, people, locations…"
             className="text-xs rounded px-2.5 py-1.5 ml-auto"
-            style={{ border: "1px solid #DCD9D1", background: "#fff", color: "#22303C", width: "100%", maxWidth: 360 }}
+            style={{ border: "1px solid #DCD9D1", background: "#fff", color: "var(--ink)", width: "100%", maxWidth: 360 }}
           />
         )}
-        <span className="text-xs flex-shrink-0" style={{ color: "#8A94A0", marginLeft: pane === "plan" ? 8 : "auto" }}>
+        <span className="text-xs flex-shrink-0" style={{ color: "var(--muted)", marginLeft: pane === "plan" ? 8 : "auto" }}>
           {pane === "plan" ? "Auto-saves · live" : "Reference — never edited in place"}
         </span>
       </div>
@@ -116,15 +116,15 @@ export default function SalesGenie({
       <div className="relative" style={{ display: pane === "playbook" ? "flex" : "none", flexDirection: "column", flex: 1, minHeight: 0 }}>
         {isAdmin && (
           <div className="flex items-center gap-2 px-4 py-1.5 flex-wrap" style={{ background: "#F4F2EC", borderBottom: "1px solid #E2E0DA" }}>
-            <span className="text-xs font-bold" style={{ color: "#8A94A0" }}>ADMIN</span>
-            <button onClick={downloadCurrent} className="text-xs font-bold rounded px-2 py-1" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Download the playbook exactly as served — keep this as your backup">
+            <span className="text-xs font-bold" style={{ color: "var(--muted)" }}>ADMIN</span>
+            <button onClick={downloadCurrent} className="text-xs font-bold rounded px-2 py-1" style={{ background: "#DCE8F5", color: "var(--blue)" }} title="Download the playbook exactly as served — keep this as your backup">
               ⬇ Download backup
             </button>
             <input ref={fileRef} type="file" accept=".html,.htm" style={{ display: "none" }} onChange={(e) => { importBackup(e.target.files?.[0] || null); e.target.value = ""; }} />
-            <button onClick={() => fileRef.current?.click()} disabled={busy} className="text-xs font-bold rounded px-2 py-1" style={{ background: "#E8600A", color: "#fff", opacity: busy ? 0.6 : 1 }} title="Restore the playbook from a backed-up HTML file — previous versions stay recoverable">
+            <button onClick={() => fileRef.current?.click()} disabled={busy} className="text-xs font-bold rounded px-2 py-1" style={{ background: "var(--accent)", color: "#fff", opacity: busy ? 0.6 : 1 }} title="Restore the playbook from a backed-up HTML file — previous versions stay recoverable">
               {busy ? "Importing…" : "⬆ Import backup"}
             </button>
-            {msg && <span className="text-xs font-semibold" style={{ color: msg.includes("✓") ? "#0D7A3F" : "#B3261E" }}>{msg}</span>}
+            {msg && <span className="text-xs font-semibold" style={{ color: msg.includes("✓") ? "var(--green)" : "var(--red)" }}>{msg}</span>}
             <span className="text-xs ml-auto" style={{ color: "#B8B5AC" }}>The playbook itself is never edited here — import replaces it whole.</span>
           </div>
         )}

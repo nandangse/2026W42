@@ -258,7 +258,7 @@ export function BomLines({ kind, bom, base: baseIn }: { kind: "bom" | "rbom"; bo
     </style></head><body>
       <h1>📦 Nandan Saamaan — BOM</h1>
       <div class="sub">${esc(filt)} · rows ${from}–${to} of ${total.toLocaleString("en-IN")} · printed ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</div>
-      <table><thead><tr><th>BOM No</th><th>Item ID</th><th>Item Group</th><th>Item</th><th class="n">Qty UOM</th><th class="n">Rate</th><th>Description</th><th>Remarks</th><th>Status</th><th>Last Modified by</th><th class="n">Modified Date</th><th>Supplier</th></tr></thead>
+      <table className="genie-table"><thead><tr><th>BOM No</th><th>Item ID</th><th>Item Group</th><th>Item</th><th class="n">Qty UOM</th><th class="n">Rate</th><th>Description</th><th>Remarks</th><th>Status</th><th>Last Modified by</th><th class="n">Modified Date</th><th>Supplier</th></tr></thead>
       <tbody>${body}</tbody></table>
     </body></html>`);
     w.document.close();

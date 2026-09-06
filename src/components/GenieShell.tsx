@@ -41,7 +41,7 @@ export interface ShellUser {
 
 type Notif = { id: string; title: string; body: string | null; read_at: string | null; created_at: string; ref_kind?: string | null; ref_id?: string | null };
 
-const NAVY = "#16232F", NAVY_DARK = "#0D161F", LINE_DARK = "#22303C", ORANGE = "#E8600A", MUTED = "#8FA1B3";
+const NAVY = "var(--navy)", NAVY_DARK = "#0D161F", LINE_DARK = "var(--ink)", ORANGE = "var(--accent)", MUTED = "#8FA1B3";
 
 /**
  * The heartbeat behind the access log: once a minute while the tab is
@@ -147,26 +147,26 @@ function Bell({ onOpen }: { onOpen?: (n: Notif) => void }) {
   return (
     <span className="relative">
       <button onClick={() => setOpen((o) => !o)} className="rounded px-2 font-bold" aria-label="Notifications" title="Notifications"
-        style={{ height: 32, background: NAVY_DARK, color: state.unread ? "#F5B32B" : MUTED, border: `1px solid ${LINE_DARK}`, fontSize: 13 }}>
-        🔔{state.unread > 0 && <span className="ml-1 rounded-full px-1.5 font-bold tnum" style={{ background: "#B3261E", color: "#fff", fontSize: 10 }}>{state.unread}</span>}
+        style={{ height: 32, background: NAVY_DARK, color: state.unread ? "var(--amber)" : MUTED, border: `1px solid ${LINE_DARK}`, fontSize: 13 }}>
+        🔔{state.unread > 0 && <span className="ml-1 rounded-full px-1.5 font-bold tnum" style={{ background: "var(--red)", color: "#fff", fontSize: 10 }}>{state.unread}</span>}
       </button>
       {open && (
         <>
           <div className="fixed inset-0" style={{ zIndex: 58 }} role="button" tabIndex={0} onClick={() => setOpen(false)} />
-          <div className="absolute rounded-lg border bg-white genie-pop" style={{ top: "calc(100% + 6px)", right: 0, width: 330, maxHeight: 420, overflowY: "auto", borderColor: "#E2E0DA", boxShadow: "0 12px 30px rgba(0,0,0,.25)", zIndex: 59 }}>
+          <div className="absolute rounded-lg border bg-white genie-pop" style={{ top: "calc(100% + 6px)", right: 0, width: 330, maxHeight: 420, overflowY: "auto", borderColor: "var(--line)", boxShadow: "0 12px 30px rgba(0,0,0,.25)", zIndex: 59 }}>
             <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: "1px solid #EEECE6" }}>
               <span className="text-xs font-bold" style={{ color: NAVY }}>Notifications</span>
               {state.unread > 0 && <button onClick={markAll} className="text-xs font-bold" style={{ color: ORANGE }}>Mark all read</button>}
             </div>
-            {state.items.length === 0 && <div className="text-xs text-center py-6" style={{ color: "#8A94A0" }}>Nothing yet — you will hear when something is assigned to you.</div>}
+            {state.items.length === 0 && <div className="text-xs text-center py-6" style={{ color: "var(--muted)" }}>Nothing yet — you will hear when something is assigned to you.</div>}
             {state.items.map((n) => (
               <button key={n.id} onClick={() => openOne(n)} className="w-full text-left px-3 py-2" style={{ borderBottom: "1px solid #F4F2EC", background: n.read_at ? "#fff" : "#FFF7E6" }}>
                 <div className="flex items-start gap-2">
                   {!n.read_at && <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: ORANGE, marginTop: 5 }} />}
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-bold" style={{ color: NAVY }}>{n.title}</div>
-                    {n.body && <div className="text-xs truncate" style={{ color: "#5A6672" }}>{n.body}</div>}
-                    <div className="tnum" style={{ fontSize: 10, color: "#8A94A0" }}>{new Date(n.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                    {n.body && <div className="text-xs truncate" style={{ color: "var(--dim)" }}>{n.body}</div>}
+                    <div className="tnum" style={{ fontSize: 10, color: "var(--muted)" }}>{new Date(n.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
                   </div>
                 </div>
               </button>
@@ -206,7 +206,7 @@ function AccountMenu({ module, user, isAdmin }: { module: ShellModule; user: She
     <span className="relative flex-shrink-0">
       <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 rounded pl-1 pr-2" aria-haspopup="menu" aria-expanded={open}
         style={{ height: 32, background: NAVY_DARK, border: `1px solid ${LINE_DARK}` }} title={`${who} · ${user.role.replace("_", " ")}`}>
-        <span className="rounded-full font-bold flex items-center justify-center" style={{ width: 24, height: 24, fontSize: 10.5, background: user.initials ? ORANGE : "#B3261E", color: "#fff" }}>
+        <span className="rounded-full font-bold flex items-center justify-center" style={{ width: 24, height: 24, fontSize: 10.5, background: user.initials ? ORANGE : "var(--red)", color: "#fff" }}>
           {user.initials || "??"}
         </span>
         <span className="genie-who text-white font-semibold truncate" style={{ fontSize: 12, maxWidth: 140 }}>{who}</span>
@@ -215,11 +215,11 @@ function AccountMenu({ module, user, isAdmin }: { module: ShellModule; user: She
       {open && (
         <>
           <div className="fixed inset-0" style={{ zIndex: 58 }} role="button" tabIndex={0} onClick={() => setOpen(false)} />
-          <div className="absolute rounded-lg border bg-white genie-pop" role="menu" style={{ top: "calc(100% + 6px)", right: 0, width: 250, borderColor: "#E2E0DA", boxShadow: "0 12px 30px rgba(0,0,0,.25)", zIndex: 59 }}>
+          <div className="absolute rounded-lg border bg-white genie-pop" role="menu" style={{ top: "calc(100% + 6px)", right: 0, width: 250, borderColor: "var(--line)", boxShadow: "0 12px 30px rgba(0,0,0,.25)", zIndex: 59 }}>
             <div className="px-3 py-2.5" style={{ borderBottom: "1px solid #EEECE6" }}>
               <div className="text-sm font-bold truncate" style={{ color: NAVY }}>{who}</div>
-              <div className="text-xs truncate" style={{ color: "#8A94A0" }}>{user.email}</div>
-              <div className="text-xs mt-0.5 font-semibold" style={{ color: "#5A6672" }}>{user.role.replace("_", " ")}</div>
+              <div className="text-xs truncate" style={{ color: "var(--muted)" }}>{user.email}</div>
+              <div className="text-xs mt-0.5 font-semibold" style={{ color: "var(--dim)" }}>{user.role.replace("_", " ")}</div>
             </div>
             <div onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
               <button onClick={() => setMods((m) => !m)} className="w-full text-left px-3 py-2 text-sm font-bold flex items-center justify-between hover:bg-gray-50" style={{ color: NAVY, borderBottom: "1px solid #EEECE6" }}>
@@ -228,15 +228,15 @@ function AccountMenu({ module, user, isAdmin }: { module: ShellModule; user: She
               {mods && (
                 <div style={{ background: "#FBFAF7", borderBottom: "1px solid #EEECE6" }}>
                   {allowed.map((m) => m.key === module ? (
-                    <div key={m.key} className="px-3 py-1.5 text-sm font-bold flex items-center gap-2" style={{ color: NAVY, background: "#F1EFE9" }}>
-                      <span>{m.icon}</span> {m.label} <span className="ml-auto text-xs font-semibold" style={{ color: "#0D7A3F" }}>you are here</span>
+                    <div key={m.key} className="px-3 py-1.5 text-sm font-bold flex items-center gap-2" style={{ color: NAVY, background: "var(--paper)" }}>
+                      <span>{m.icon}</span> {m.label} <span className="ml-auto text-xs font-semibold" style={{ color: "var(--green)" }}>you are here</span>
                     </div>
                   ) : (
                     <a key={m.key} href={m.href} className="px-3 py-1.5 text-sm font-semibold flex items-center gap-2 hover:bg-white" style={{ color: NAVY, textDecoration: "none" }}>
-                      <span>{m.icon}</span> {m.label} <span className="ml-auto text-xs" style={{ color: "#8A94A0" }}>{m.blurb}</span>
+                      <span>{m.icon}</span> {m.label} <span className="ml-auto text-xs" style={{ color: "var(--muted)" }}>{m.blurb}</span>
                     </a>
                   ))}
-                  {may === null && <div className="px-3 py-1 text-xs" style={{ color: "#8A94A0" }}>checking your doors…</div>}
+                  {may === null && <div className="px-3 py-1 text-xs" style={{ color: "var(--muted)" }}>checking your doors…</div>}
                 </div>
               )}
             </div>
@@ -244,7 +244,7 @@ function AccountMenu({ module, user, isAdmin }: { module: ShellModule; user: She
             <button onClick={() => window.location.reload()} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, borderBottom: "1px solid #EEECE6" }} title="Same screen, fresh code">⟳ Reload</button>
             <button onClick={logout} className="w-full text-left px-3 py-2 text-sm font-bold hover:bg-gray-50" style={{ color: ORANGE }}>⎋ Logout</button>
             {isAdmin && (
-              <div className="px-3 py-1.5 text-xs tnum" style={{ color: "#8A94A0", borderTop: "1px solid #EEECE6" }} title="Genie's version — Admin → Updates says what changed">
+              <div className="px-3 py-1.5 text-xs tnum" style={{ color: "var(--muted)", borderTop: "1px solid #EEECE6" }} title="Genie's version — Admin → Updates says what changed">
                 Genie {APP_VERSION}
               </div>
             )}

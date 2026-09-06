@@ -18,7 +18,7 @@ import { swallow } from "@/lib/swallow";
 import PlaybookScreen from "@/components/Playbook";
 import { dmy as fmtD } from "@/lib/fmt";
 
-const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A", RED = "#B3261E", GREEN = "#0D7A3F", VIOLET = "#7C3AED";
+const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", ORANGE = "var(--accent)", RED = "var(--red)", GREEN = "var(--green)", VIOLET = "#7C3AED";
 
 const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: "◧" },
@@ -61,7 +61,7 @@ const StatusChip = ({ s: st, palette }: { s: string; palette: Record<string, str
   <span className="rounded px-2 py-0.5 text-xs font-bold text-white" style={{ background: palette[st] ?? MUTED }}>{st.replace("_", " ")}</span>
 );
 const Th = ({ children, right }: { children: React.ReactNode; right?: boolean }) => (
-  <th className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap`} style={{ position: "sticky", top: 0, background: "#22303C" }}>{children}</th>
+  <th className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap`} style={{ position: "sticky", top: 0, background: "var(--ink)" }}>{children}</th>
 );
 const Shell = ({ title, blurb, onAdd, addLabel = "+ Add", children, installed }: {
   title: string; blurb: string; onAdd?: () => void; addLabel?: string; children: React.ReactNode; installed: boolean;
@@ -70,7 +70,7 @@ const Shell = ({ title, blurb, onAdd, addLabel = "+ Add", children, installed }:
     <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
       <div>
         <div className="text-lg font-bold" style={{ color: INK }}>{title}</div>
-        <div className="text-sm" style={{ color: "#5A6672", maxWidth: 680, lineHeight: 1.5 }}>{blurb}</div>
+        <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 680, lineHeight: 1.5 }}>{blurb}</div>
       </div>
       {onAdd && <button onClick={onAdd} className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: ORANGE }}>{addLabel}</button>}
     </div>
@@ -84,7 +84,7 @@ const Shell = ({ title, blurb, onAdd, addLabel = "+ Add", children, installed }:
 );
 const Box = ({ children, wide }: { children: React.ReactNode; wide?: boolean }) => (
   <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "70vh", maxWidth: wide ? 1050 : 950 }}>
-    <table className="w-full text-xs" style={{ minWidth: 720, borderCollapse: "separate", borderSpacing: 0 }}>{children}</table>
+    <table className="w-full text-xs genie-table" style={{ minWidth: 720, borderCollapse: "separate", borderSpacing: 0 }}>{children}</table>
   </div>
 );
 const Modal = ({ onClose, children, width = 640 }: { onClose: () => void; children: React.ReactNode; width?: number }) => (
@@ -108,7 +108,7 @@ const Counsel = ({ title, text, colour }: { title: string; text: string; colour:
 );
 
 // ============================ PROBLEMS ============================
-const PROBLEM_STATUS = { open: RED, analysing: "#D97706", countermeasure: "#1B6B93", verified: "#7A8A1E", closed: GREEN };
+const PROBLEM_STATUS = { open: RED, analysing: "var(--warn)", countermeasure: "#1B6B93", verified: "#7A8A1E", closed: GREEN };
 function ProblemsScreen() {
   const [rows, jobs, installed, load] = useReg("problem");
   const [open, setOpen] = useState<Row | "new" | null>(null);
@@ -116,13 +116,13 @@ function ProblemsScreen() {
     <Shell installed={installed} title="Problems & Root Causes" onAdd={() => setOpen("new")} addLabel="+ Raise a problem"
       blurb="A problem is not solved until its root cause is named and its countermeasure is verified. The Five Whys walk you down; Genie works the causes; Consult Raghu reviews the answer.">
       <Box>
-        <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+        <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
           <Th>Status</Th><Th>Problem</Th><Th>Job / machine</Th><Th>Owner</Th><Th>Root cause</Th><Th>Raised</Th>
         </tr></thead>
         <tbody>
           {rows?.length === 0 && (<tr><td colSpan={6} className="px-3 py-5 text-center" style={{ color: MUTED }}>No problems raised — when one appears on the floor, it belongs here within the hour.</td></tr>)}
           {(rows || []).map((r, i) => (
-            <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+            <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
               <td className="px-2 py-1.5"><StatusChip s={String(r.status)} palette={PROBLEM_STATUS} /></td>
               <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{String(r.title)}</td>
               <td className="px-2 py-1.5" style={{ color: MUTED }}>{String(r.job || "")} {String(r.machine || "")}</td>
@@ -235,13 +235,13 @@ function IdeasScreen() {
     <Shell installed={installed} title="Ideas" onAdd={() => setOpen("new")} addLabel="+ Catch an idea"
       blurb="Caught raw in two lines, grown deliberately: Genie prices the worth, names the risks and designs the cheapest experiment that proves or kills it.">
       <Box>
-        <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+        <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
           <Th>Status</Th><Th>Idea</Th><Th>By</Th><Th>Caught</Th><Th>Genie</Th>
         </tr></thead>
         <tbody>
           {rows?.length === 0 && (<tr><td colSpan={5} className="px-3 py-5 text-center" style={{ color: MUTED }}>No ideas caught yet — the first one is a two-line note away.</td></tr>)}
           {(rows || []).map((r, i) => (
-            <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+            <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
               <td className="px-2 py-1.5"><StatusChip s={String(r.status)} palette={IDEA_STATUS} /></td>
               <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 340, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{String(r.title)}</td>
               <td className="px-2 py-1.5" style={{ color: MUTED }}>{String(r.by || "").split("@")[0]}</td>
@@ -319,17 +319,17 @@ function ReferencesScreen() {
       blurb="The library the drawings lean on — standards, proven details, supplier catalogues, past designs. A link and two honest lines each.">
       <div className="mb-2"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 title, category or tag" className="px-2 py-1 rounded border text-sm" style={{ ...inputCss, minWidth: 260 }} /></div>
       <Box>
-        <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+        <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
           <Th>Reference</Th><Th>Category</Th><Th>Tags</Th><Th>Link</Th><Th>By</Th>
         </tr></thead>
         <tbody>
           {shown.length === 0 && (<tr><td colSpan={5} className="px-3 py-5 text-center" style={{ color: MUTED }}>The library is empty — the first standard someone reaches for twice belongs here.</td></tr>)}
           {shown.map((r, i) => (
-            <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+            <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
               <td className="px-2 py-1.5 font-semibold">{String(r.title)}</td>
               <td className="px-2 py-1.5" style={{ color: MUTED }}>{String(r.category || "—")}</td>
               <td className="px-2 py-1.5" style={{ color: MUTED }}>{String(r.tags || "—")}</td>
-              <td className="px-2 py-1.5">{r.link ? <a href={String(r.link)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="font-bold" style={{ color: "#1B3A5C" }}>open ↗</a> : "—"}</td>
+              <td className="px-2 py-1.5">{r.link ? <a href={String(r.link)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="font-bold" style={{ color: "var(--blue)" }}>open ↗</a> : "—"}</td>
               <td className="px-2 py-1.5" style={{ color: MUTED }}>{String(r.by || "").split("@")[0]}</td>
             </tr>
           ))}
@@ -460,7 +460,7 @@ function PlansScreen() {
       <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>Design Plans</div>
-          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 720, lineHeight: 1.5 }}>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 720, lineHeight: 1.5 }}>
             One row per live project. The order is YOURS — the arrows move a row, nothing else sorts it.
             Issues come from the Tasking where the project&apos;s jobs carry a design point.
           </div>
@@ -499,19 +499,19 @@ function PlansScreen() {
             {stripOpen ? "▾" : "▸"} DESIGN ENGINEER — GAD · BOM · MANUF · AS BUILT
           </button>
           {stripOpen && (
-          <table className="text-xs" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 420 }}>
-            <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+          <table className="text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 420 }}>
+            <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
               <th className="px-2 py-1.5 text-left">Design Engineer</th>
               {STAGE_BUCKETS.map(([lbl]) => (<th key={lbl} className="px-2 py-1.5 text-right">{lbl}</th>))}
             </tr></thead>
             <tbody>
               {strip.map(([eng, arr], i) => (
-                <tr key={eng} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                <tr key={eng} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   <td className="px-2 py-1 font-semibold">{eng}</td>
                   {arr.map((n, j) => (<td key={j} className="px-2 py-1 text-right tnum">{n || "·"}</td>))}
                 </tr>
               ))}
-              <tr className="border-t font-bold" style={{ borderColor: "#22303C", background: "#F3F1EB" }}>
+              <tr className="border-t font-bold" style={{ borderColor: "var(--ink)", background: "#F3F1EB" }}>
                 <td className="px-2 py-1">TOTAL</td>
                 {stripTotals.map((n, j) => (<td key={j} className="px-2 py-1 text-right tnum">{n || "·"}</td>))}
               </tr>
@@ -524,11 +524,11 @@ function PlansScreen() {
       <div className="flex gap-3 items-start flex-wrap">
         {/* ------------ the grid ------------ */}
         <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "70vh", flex: "1 1 720px", minWidth: 0 }}>
-          <table className="w-full text-xs" style={{ minWidth: 1200, borderCollapse: "separate", borderSpacing: 0 }}>
-            <thead><tr style={{ background: "#22303C", color: "#fff" }}>
-              <th className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, left: 0, background: "#22303C", zIndex: 3, minWidth: 260 }}>Project</th>
+          <table className="w-full text-xs genie-table" style={{ minWidth: 1200, borderCollapse: "separate", borderSpacing: 0 }}>
+            <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+              <th className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, left: 0, background: "var(--ink)", zIndex: 3, minWidth: 260 }}>Project</th>
               {["Jobs", "Design Plan", "Next Milestone", "Issues to Design", "Design Support", "BOM %", "Manuf Drg %", "Order"].map((h) => (
-                <th key={h} className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, background: "#22303C", zIndex: 2 }}>{h}</th>
+                <th key={h} className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, background: "var(--ink)", zIndex: 2 }}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
@@ -539,7 +539,7 @@ function PlansScreen() {
               {rows.map((p, i) => {
                 const openIssues = p.issues.filter((x) => x.open);
                 return (
-                  <tr key={p.id} className="border-t align-top" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <tr key={p.id} className="border-t align-top" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                     {/* FROZEN (Dr Raghu, 28 Aug 2026): the project always in
                         sight — number, PM, designer, stage, and the ONE
                         SENTENCE that says what it is and where it goes. */}
@@ -712,7 +712,7 @@ function WeekPanel({ week, owners, projects, onChanged, calOpen, onToggleCal }: 
       </div>
       {shown.length === 0 && <div className="text-sm mb-1" style={{ color: MUTED }}>Nothing yet — the first record starts the week.</div>}
       {shown.map((w) => (
-        <div key={w.id} className="border-t py-1.5 text-sm" style={{ borderColor: "#EFEDE7" }}>
+        <div key={w.id} className="border-t py-1.5 text-sm" style={{ borderColor: "var(--line-soft)" }}>
           <div className="flex items-center gap-2">
             <b className="tnum" style={{ fontSize: 11 }}>{fmtD(w.on_date)}</b>
             <span className="font-semibold" style={{ color: "#1B6B93" }}>{w.designer || "—"}</span>
@@ -785,9 +785,9 @@ function LoadCalendar({ week, owners, projects, onChanged }: { week: WeekRow[]; 
         <button onClick={() => setWeekStart(monday)} className="rounded border px-2 py-0.5 text-xs font-bold" style={{ borderColor: weekStart === monday ? VIOLET : BORDER, color: weekStart === monday ? VIOLET : INK }}>this week</button>
         <button onClick={() => setWeekStart(addD(weekStart, 7))} className="rounded border px-2 py-0.5 text-xs font-bold" style={{ borderColor: BORDER, color: INK }}>next ›</button>
       </div>
-      <table className="text-xs" style={{ minWidth: 980, borderCollapse: "separate", borderSpacing: 0, width: "100%" }}>
-        <thead><tr style={{ background: "#22303C", color: "#fff" }}>
-          <th className="px-2 py-2 text-left" style={{ position: "sticky", left: 0, background: "#22303C", minWidth: 120 }}>Designer</th>
+      <table className="text-xs genie-table" style={{ minWidth: 980, borderCollapse: "separate", borderSpacing: 0, width: "100%" }}>
+        <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+          <th className="px-2 py-2 text-left" style={{ position: "sticky", left: 0, background: "var(--ink)", minWidth: 120 }}>Designer</th>
           {days.map((d) => (
             <th key={d} className="px-2 py-2 text-left whitespace-nowrap" style={{ minWidth: 118, opacity: d === today ? 1 : 0.85, borderBottom: d === today ? `2px solid ${ORANGE}` : undefined }}>{dayLabel(d)}</th>
           ))}
@@ -795,14 +795,14 @@ function LoadCalendar({ week, owners, projects, onChanged }: { week: WeekRow[]; 
         <tbody>
           {designers.length === 0 && (<tr><td colSpan={8} className="px-3 py-4 text-center" style={{ color: MUTED }}>No designers yet.</td></tr>)}
           {designers.map((eng, i) => (
-            <tr key={eng} className="border-t align-top" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+            <tr key={eng} className="border-t align-top" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
               <td className="px-2 py-1.5 font-bold" style={{ position: "sticky", left: 0, background: i % 2 ? "#FAF9F5" : "#fff", color: INK }}>{eng}</td>
               {days.map((d) => (
                 <td key={d} className="px-1.5 py-1.5" style={{ verticalAlign: "top" }}>
                   {cell(eng, d).map((w) => (
                     <div key={w.id} className="rounded border px-1.5 py-1 mb-1" style={{ borderColor: VIOLET, background: "#F5F0FE", lineHeight: 1.3 }} title={w.work}>
                       <div className="font-bold" style={{ color: VIOLET, fontSize: 10 }}>{w.project_id ? w.project_id.replace("NGSE-PROJ-", "P-") : "—"}{w.stage ? ` · ${w.stage}` : ""}</div>
-                      {w.work && <div style={{ fontSize: 9.5, color: "#5A6672", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{w.work}</div>}
+                      {w.work && <div style={{ fontSize: 9.5, color: "var(--dim)", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{w.work}</div>}
                     </div>
                   ))}
                   <button onClick={() => { setAdding({ designer: eng, on_date: d }); setF({ project_id: "", stage: "", work: "" }); }}
@@ -948,7 +948,7 @@ function ProjectPlanBox({ p, onClose, onSaved }: { p: ProjRow; onClose: () => vo
             <span style={{ width: 128 }}>Start</span><span style={{ width: 128 }}>End</span><span style={{ width: 52, textAlign: "right" }}>Days</span><span style={{ width: 14 }} />
           </div>
           {stages.map((st, i) => (
-            <div key={i} className="flex items-center gap-2 py-1 border-t" style={{ borderColor: "#EFEDE7" }}>
+            <div key={i} className="flex items-center gap-2 py-1 border-t" style={{ borderColor: "var(--line-soft)" }}>
               <input type="checkbox" checked={st.done} onChange={(e) => set(i, { done: e.target.checked })} style={{ accentColor: GREEN }} title="Done" />
               <input value={st.title} onChange={(e) => set(i, { title: e.target.value })}
                 className="flex-1 border rounded px-2 py-1 text-sm" style={{ borderColor: BORDER, textDecoration: st.done ? "line-through" : "none", color: st.done ? MUTED : INK, minWidth: 0 }} />
@@ -1026,14 +1026,14 @@ function ReviewsScreen({ me }: { me: string }) {
     <Shell installed={installed} title="Consult Raghu — the review bench"
       blurb="Anything sent up from a problem, an idea or a plan lands here with Consult Raghu's read already written. The verdict is signed by a human — the AI advises, it never decides.">
       <Box>
-        <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+        <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
           <Th>Status</Th><Th>What</Th><Th>Item</Th><Th>Sent by</Th><Th>When</Th><Th>Verdict</Th>
         </tr></thead>
         <tbody>
           {rows?.length === 0 && (<tr><td colSpan={6} className="px-3 py-5 text-center" style={{ color: MUTED }}>The bench is clear — 🪷 Send to Consult Raghu from any problem or idea puts it here.</td></tr>)}
           {(rows || []).map((r, i) => (
-            <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
-              <td className="px-2 py-1.5"><StatusChip s={String(r.status)} palette={{ waiting: "#D97706", reviewed: GREEN }} /></td>
+            <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+              <td className="px-2 py-1.5"><StatusChip s={String(r.status)} palette={{ waiting: "var(--warn)", reviewed: GREEN }} /></td>
               <td className="px-2 py-1.5 font-bold" style={{ color: MUTED }}>{String(r.source_kind)}</td>
               <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{String(r.title)}</td>
               <td className="px-2 py-1.5" style={{ color: MUTED }}>{String(r.by || "").split("@")[0]}</td>
@@ -1057,7 +1057,7 @@ function ReviewBox({ row, me, onClose, onSaved }: { row: Row; me: string; onClos
         <button onClick={onClose} style={{ color: MUTED }}>✕</button>
       </div>
       {String(row.question || "") && (
-        <div className="text-sm mb-2" style={{ color: "#5A6672" }}><b>The team asked:</b> {String(row.question)}</div>
+        <div className="text-sm mb-2" style={{ color: "var(--dim)" }}><b>The team asked:</b> {String(row.question)}</div>
       )}
       <Counsel title="🪷 CONSULT RAGHU — THE READ" text={String(row.ai_review || "—")} colour="#8A6D1A" />
       <div className="mt-3"><L>The verdict — a human signs it{row.verdict_by ? ` (signed by ${String(row.verdict_by)})` : ""}</L>
@@ -1099,11 +1099,11 @@ function VishwaDashboard({ go }: { go: (k: string) => void }) {
         <Card2 label="OPEN PROBLEMS" value={String(openProblems.length)} sub={`${openProblems.filter((r) => !r.root_cause).length} without a root cause yet`} colour={openProblems.length ? RED : GREEN} onClick={() => go("problems")} />
         <Card2 label="IDEAS ALIVE" value={String((ideas || []).filter((r) => r.status === "raw" || r.status === "exploring").length)} sub={`${(ideas || []).filter((r) => r.status === "adopted").length} adopted so far`} colour="#1B6B93" onClick={() => go("ideas")} />
         <Card2 label="DELIVERABLES LATE" value={String(lateP.length)} sub={`${(plans || []).filter((r) => r.status !== "done").length} open in all`} colour={lateP.length ? RED : GREEN} onClick={() => go("plans")} />
-        <Card2 label="REVIEWS WAITING" value={String(waiting.length)} sub="Consult Raghu has read them; a signature is owed" colour={waiting.length ? "#D97706" : GREEN} onClick={() => go("reviews")} />
+        <Card2 label="REVIEWS WAITING" value={String(waiting.length)} sub="Consult Raghu has read them; a signature is owed" colour={waiting.length ? "var(--warn)" : GREEN} onClick={() => go("reviews")} />
       </div>
       <div className="bg-white rounded-lg border p-4" style={{ borderColor: BORDER, maxWidth: 720 }}>
         <div className="text-sm font-bold mb-2" style={{ color: INK }}>How this room works</div>
-        <div className="text-sm" style={{ color: "#5A6672", lineHeight: 1.7 }}>
+        <div className="text-sm" style={{ color: "var(--dim)", lineHeight: 1.7 }}>
           A problem from the floor goes into <b>Problems</b> and is walked down the Five Whys.
           <b> ✨ Genie</b> works the causes and solutions with you. What deserves a second pair of eyes goes
           <b> 🪷 to Consult Raghu</b> — his read arrives on the bench, and a human signs the verdict.
@@ -1145,7 +1145,7 @@ export default function Vishwakarma({
   });
 
   return (
-    <div className="min-h-screen" style={{ background: "#F1EFE9", color: "#22303C" }}>
+    <div className="min-h-screen" style={{ background: "var(--paper)", color: "var(--ink)" }}>
       <GenieShell module="vishwakarma" title="Nandan Vishwakarma" tagline="The design team's workroom — problems to root cause, ideas to proof" user={{ email, displayName, initials, role }} />
 
       <div style={{ display: "flex", alignItems: "stretch", minHeight: "calc(100vh - 46px)" }}>
@@ -1158,7 +1158,7 @@ export default function Vishwakarma({
             <button key={s2.key} onClick={() => go(s2.key)}
               className="w-full text-left rounded px-2 py-2 text-sm font-semibold flex items-center gap-2 mb-0.5"
               title={navOpen ? undefined : s2.label}
-              style={openKey === s2.key ? { background: "#16232F", color: "#fff" } : { color: "#5A6672" }}>
+              style={openKey === s2.key ? { background: "var(--navy)", color: "#fff" } : { color: "var(--dim)" }}>
               <span style={{ width: 18, textAlign: "center", flexShrink: 0 }}>{s2.icon}</span>
               {navOpen && s2.label}
             </button>

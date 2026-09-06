@@ -18,7 +18,7 @@ import { swallow } from "@/lib/swallow";
 import { dmy as fmtD, rupee } from "@/lib/fmt";
 const money = (n: unknown) => rupee(n);
 
-const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A", RED = "#B3261E", GREEN = "#0D7A3F", TEAL = "#0F766E";
+const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", ORANGE = "var(--accent)", RED = "var(--red)", GREEN = "var(--green)", TEAL = "#0F766E";
 
 const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: "◧" },
@@ -69,7 +69,7 @@ const pick = (masters: Master[], kind: string) =>
 
 // ---------------------------------------------------------------- furniture
 const Th = ({ children, right }: { children: React.ReactNode; right?: boolean }) => (
-  <th className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap`} style={{ position: "sticky", top: 0, background: "#22303C" }}>{children}</th>
+  <th className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap`} style={{ position: "sticky", top: 0, background: "var(--ink)" }}>{children}</th>
 );
 const Shell = ({ title, blurb, onAdd, addLabel = "+ Add", extra, children, installed }: {
   title: string; blurb: string; onAdd?: () => void; addLabel?: string;
@@ -79,7 +79,7 @@ const Shell = ({ title, blurb, onAdd, addLabel = "+ Add", extra, children, insta
     <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
       <div>
         <div className="text-lg font-bold" style={{ color: INK }}>{title}</div>
-        <div className="text-sm" style={{ color: "#5A6672", maxWidth: 720, lineHeight: 1.5 }}>{blurb}</div>
+        <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 720, lineHeight: 1.5 }}>{blurb}</div>
       </div>
       <div className="flex gap-2 items-center">
         {extra}
@@ -96,7 +96,7 @@ const Shell = ({ title, blurb, onAdd, addLabel = "+ Add", extra, children, insta
 );
 const Box = ({ children, min = 900 }: { children: React.ReactNode; min?: number }) => (
   <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "70vh" }}>
-    <table className="w-full text-xs" style={{ minWidth: min, borderCollapse: "separate", borderSpacing: 0 }}>{children}</table>
+    <table className="w-full text-xs genie-table" style={{ minWidth: min, borderCollapse: "separate", borderSpacing: 0 }}>{children}</table>
   </div>
 );
 const Modal = ({ onClose, children, width = 640 }: { onClose: () => void; children: React.ReactNode; width?: number }) => (
@@ -119,12 +119,12 @@ const statusColour = (s: string) => {
   // The ERP's own AMC words first — they are what the register actually says.
   if (/valid|paid/.test(t)) return GREEN;
   if (/lapse|expired/.test(t)) return RED;
-  if (/cancelled/.test(t)) return "#5A6672";
+  if (/cancelled/.test(t)) return "var(--dim)";
   if (/warranty/.test(t)) return "#1B6B93";
-  if (/chargable|chargeable/.test(t)) return "#D97706";
+  if (/chargable|chargeable/.test(t)) return "var(--warn)";
   if (/closed|resolved|complete|done/.test(t)) return GREEN;
   if (/progress|active/.test(t)) return "#1B6B93";
-  if (/waiting|hold|renewal|due/.test(t)) return "#D97706";
+  if (/waiting|hold|renewal|due/.test(t)) return "var(--warn)";
   if (/open|breakdown/.test(t)) return RED;
   return MUTED;
 };
@@ -170,7 +170,7 @@ function IssuesScreen() {
         </>
       }>
       <Box min={1020}>
-        <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+        <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
           <Th>Status</Th><Th>Issue</Th><Th>Customer</Th><Th>Machine / serial</Th><Th>Category</Th><Th>Owner</Th><Th>Due</Th><Th>Logged</Th>
         </tr></thead>
         <tbody>
@@ -181,7 +181,7 @@ function IssuesScreen() {
             const late = daysTo(r.due);
             const overdue = late != null && late < 0 && !closedish(S(r.status));
             return (
-              <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+              <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
                 <td className="px-2 py-1.5"><Chip s={S(r.status)} colour={statusColour(S(r.status))} /></td>
                 <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{S(r.title)}</td>
                 <td className="px-2 py-1.5">{S(r.customer) || "—"}</td>
@@ -285,13 +285,13 @@ function AmcScreen() {
       extra={
         <>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 customer, serial, contract…" className="border rounded px-2 py-1.5 text-sm" style={{ borderColor: needle ? ORANGE : BORDER, width: 220 }} />
-          <button onClick={() => setPulling(true)} className="rounded border px-3 py-1.5 text-sm font-bold" style={{ borderColor: "#1B3A5C", color: "#1B3A5C" }}
+          <button onClick={() => setPulling(true)} className="rounded border px-3 py-1.5 text-sm font-bold" style={{ borderColor: "var(--blue)", color: "var(--blue)" }}
             title="Read the Annual Maintenance Contracts straight off nandanerp">⇩ Pull from ERP</button>
           <button onClick={() => setImporting(true)} className="rounded border px-3 py-1.5 text-sm font-bold" style={{ borderColor: TEAL, color: TEAL }}>⇪ Import</button>
         </>
       }>
       <Box min={1180}>
-        <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+        <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
           <Th>Status</Th><Th>Customer</Th><Th>Machine / serial</Th><Th>Contract</Th><Th>From</Th><Th>To</Th><Th right>Visits</Th><Th right>Value</Th><Th>Engineer</Th>
         </tr></thead>
         <tbody>
@@ -303,7 +303,7 @@ function AmcScreen() {
             const ending = left != null && left >= 0 && left <= 60;
             const gone = left != null && left < 0;
             return (
-              <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+              <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
                 <td className="px-2 py-1.5"><Chip s={S(r.status)} colour={statusColour(S(r.status))} /></td>
                 <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{S(r.customer)}</td>
                 <td className="px-2 py-1.5" style={{ color: MUTED }}>{S(r.machine)}{r.serial_no ? ` · ${S(r.serial_no)}` : ""}</td>
@@ -391,7 +391,7 @@ function AmcBox({ row, masters, onClose, onSaved }: { row: Row | null; masters: 
             <input value={f.territory} onChange={(e) => set({ territory: e.target.value })} className="w-full border rounded px-2 py-1.5 text-sm" style={inputCss} /></div>
         </div>
         {row?.erp_name != null && S(row.erp_name) !== "" && (
-          <div className="text-xs rounded p-2" style={{ background: "#F4F2EC", color: "#5A6672", lineHeight: 1.5 }}>
+          <div className="text-xs rounded p-2" style={{ background: "#F4F2EC", color: "var(--dim)", lineHeight: 1.5 }}>
             From the ERP as <b>{S(row.erp_name)}</b>{row.pulled_at ? `, last read ${stamp(row.pulled_at)}` : ""}.
             {row.dates_derived ? " Its end date is ≈ — one year from the contract date, because the ERP holds none." : ""}
             {" "}A re-pull refreshes the ERP&apos;s own columns; the visits made, notes, serial and location stay yours.
@@ -457,7 +457,7 @@ function AmcErpPull({ onClose, onDone }: { onClose: () => void; onDone: () => vo
       {!survey && !err && <div className="text-sm" style={{ color: MUTED }}>Counting what the ERP holds…</div>}
       {survey && !done && (
         <>
-          <div className="text-xs mb-2 rounded p-2" style={{ background: "#F4F2EC", color: "#5A6672", lineHeight: 1.6 }}>
+          <div className="text-xs mb-2 rounded p-2" style={{ background: "#F4F2EC", color: "var(--dim)", lineHeight: 1.6 }}>
             <b>{survey.total}</b> Annual Maintenance Contracts stand on nandanerp. Pick which to bring.
             The ERP is <b>read only</b> — nothing there is touched. A contract already here is refreshed rather
             than duplicated, and the visits made, notes, serial and location your team typed are left alone.
@@ -478,7 +478,7 @@ function AmcErpPull({ onClose, onDone }: { onClose: () => void; onDone: () => vo
           {err && <div className="text-xs font-bold mt-2" style={{ color: RED }}>{err}</div>}
           <div className="flex gap-2 mt-3">
             <button onClick={run} disabled={busy || !chosen.length} className="rounded px-4 py-1.5 text-sm font-bold text-white"
-              style={{ background: busy || !chosen.length ? "#B9BEC4" : "#1B3A5C" }}>
+              style={{ background: busy || !chosen.length ? "#B9BEC4" : "var(--blue)" }}>
               {busy ? "Reading the ERP…" : `⇩ Pull ${picked} contract${picked === 1 ? "" : "s"}`}
             </button>
             <button onClick={onClose} className="rounded px-3 py-1.5 text-sm font-bold" style={{ color: MUTED }}>Cancel</button>
@@ -588,7 +588,7 @@ function AmcImport({ onClose, onDone }: { onClose: () => void; onDone: () => voi
         <div className="font-bold text-sm" style={{ color: INK }}>Import annual maintenance</div>
         <button onClick={onClose} style={{ color: MUTED }}>✕</button>
       </div>
-      <div className="text-xs mb-2 rounded p-2" style={{ background: "#F4F2EC", color: "#5A6672", lineHeight: 1.6 }}>
+      <div className="text-xs mb-2 rounded p-2" style={{ background: "#F4F2EC", color: "var(--dim)", lineHeight: 1.6 }}>
         Copy the sheet in Excel — <b>including the header row</b> — and paste it below. Columns are matched by
         name, in any order: Customer, Machine, Serial, Contract, Location, Start, End, Visits, Visits done,
         Value, Engineer, Status, Notes. A row with no customer is skipped. Nothing is written until you press Import.
@@ -604,13 +604,13 @@ function AmcImport({ onClose, onDone }: { onClose: () => void; onDone: () => voi
             {parsed.unknown.length > 0 && <span style={{ color: "#B26A00" }}> · ignored: {parsed.unknown.join(", ")}</span>}
           </div>
           <div className="border rounded overflow-auto" style={{ borderColor: BORDER, maxHeight: 200 }}>
-            <table className="text-xs w-full" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
-              <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+            <table className="text-xs w-full genie-table" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+              <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
                 {parsed.matched.map((c) => (<th key={c} className="px-2 py-1 text-left whitespace-nowrap">{c}</th>))}
               </tr></thead>
               <tbody>
                 {parsed.rows.slice(0, 20).map((r, i) => (
-                  <tr key={i} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <tr key={i} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                     {parsed.matched.map((c) => (<td key={c} className="px-2 py-1 whitespace-nowrap">{r[c] || "—"}</td>))}
                   </tr>
                 ))}
@@ -647,7 +647,7 @@ type Push = {
   ref_kind: string; ref_id: string | null; priority: string; status: string;
   reply: string; seen_at: string | null; replied_at: string | null; at: string;
 };
-const PUSH_COLOUR: Record<string, string> = { sent: RED, seen: "#D97706", replied: "#1B6B93", closed: GREEN };
+const PUSH_COLOUR: Record<string, string> = { sent: RED, seen: "var(--warn)", replied: "#1B6B93", closed: GREEN };
 const stamp = (at: unknown) =>
   at ? new Date(S(at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 
@@ -687,17 +687,17 @@ function PushScreen() {
       extra={
         <div className="flex rounded border overflow-hidden" style={{ borderColor: BORDER }}>
           <button onClick={() => setTab("inbox")} className="px-3 py-1.5 text-sm font-bold"
-            style={tab === "inbox" ? { background: INK, color: "#fff" } : { color: "#5A6672", background: "#fff" }}>
+            style={tab === "inbox" ? { background: INK, color: "#fff" } : { color: "var(--dim)", background: "#fff" }}>
             To me{awaiting > 0 ? ` · ${awaiting}` : ""}
           </button>
           <button onClick={() => setTab("sent")} className="px-3 py-1.5 text-sm font-bold"
-            style={tab === "sent" ? { background: INK, color: "#fff" } : { color: "#5A6672", background: "#fff" }}>
+            style={tab === "sent" ? { background: INK, color: "#fff" } : { color: "var(--dim)", background: "#fff" }}>
             From me{unanswered > 0 ? ` · ${unanswered}` : ""}
           </button>
         </div>
       }>
       <Box min={880}>
-        <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+        <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
           <Th>Status</Th><Th>{tab === "inbox" ? "From" : "To"}</Th><Th>Subject</Th><Th>About</Th><Th>Pushed</Th><Th>Answered</Th>
         </tr></thead>
         <tbody>
@@ -705,7 +705,7 @@ function PushScreen() {
             {tab === "inbox" ? "Nothing has been pushed to you." : "You have pushed nothing yet — ⇢ Push to someone hands one person one thing."}</td></tr>)}
           {!data && (<tr><td colSpan={6} className="px-3 py-5 text-center" style={{ color: MUTED }}>loading…</td></tr>)}
           {rows.map((p, i) => (
-            <tr key={p.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(p)} style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
+            <tr key={p.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(p)} style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
               <td className="px-2 py-1.5"><Chip s={p.status} colour={PUSH_COLOUR[p.status] || MUTED} /></td>
               <td className="px-2 py-1.5">{(tab === "inbox" ? p.from_email : p.to_email).split("@")[0]}</td>
               <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -760,7 +760,7 @@ function PushBox({ people, ref_, onClose, onSent }: {
         <div><L>The detail</L>
           <textarea value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} rows={4} className="w-full border rounded px-2 py-1.5 text-sm" style={inputCss} /></div>
         {ref_ && <div className="text-xs" style={{ color: MUTED }}>Attached to {ref_.kind === "issue" ? "this issue" : "this contract"} — the push opens beside it.</div>}
-        <div className="text-xs rounded p-2" style={{ background: "#F4F2EC", color: "#5A6672", lineHeight: 1.5 }}>
+        <div className="text-xs rounded p-2" style={{ background: "#F4F2EC", color: "var(--dim)", lineHeight: 1.5 }}>
           It rings their bell at once, and their answer rings yours. If they have no Genie account yet, the push
           waits on their name until they sign in.
         </div>
@@ -906,7 +906,7 @@ function SettingsScreen() {
               <div className="text-xs mb-2" style={{ color: MUTED }}>{mk.blurb}</div>
               {list.length === 0 && <div className="text-xs mb-2" style={{ color: MUTED }}>Empty — the field stays free text until something stands here.</div>}
               {list.map((r, i) => (
-                <div key={r.id} className="flex items-center gap-1 border-t py-1" style={{ borderColor: "#EFEDE7" }}>
+                <div key={r.id} className="flex items-center gap-1 border-t py-1" style={{ borderColor: "var(--line-soft)" }}>
                   <span className="text-sm flex-1">{S(r.label)}</span>
                   <button onClick={() => void move(r, -1)} disabled={i === 0} title="Move up" style={{ color: i === 0 ? "#D5D2C8" : INK, fontWeight: 700 }}>↑</button>
                   <button onClick={() => void move(r, 1)} disabled={i === list.length - 1} title="Move down" style={{ color: i === list.length - 1 ? "#D5D2C8" : INK, fontWeight: 700 }}>↓</button>
@@ -965,7 +965,7 @@ function SevaDashboard({ go }: { go: (k: string) => void }) {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
         <Card label="PUSHED TO YOU" value={String(owed.length)} sub="waiting on your answer, by name" colour={owed.length ? RED : GREEN} onClick={() => go("push")} />
         <Card label="OPEN ISSUES" value={String(openIssues.length)} sub={`${overdue.length} past their due date`} colour={openIssues.length ? RED : GREEN} onClick={() => go("issues")} />
-        <Card label="AMC EXPIRING" value={String(expiring.length)} sub="within 60 days — renewal talks start here" colour={expiring.length ? "#D97706" : GREEN} onClick={() => go("amc")} />
+        <Card label="AMC EXPIRING" value={String(expiring.length)} sub="within 60 days — renewal talks start here" colour={expiring.length ? "var(--warn)" : GREEN} onClick={() => go("amc")} />
         <Card label="AMC EXPIRED" value={String(expired.length)} sub="past their end date, not yet closed off" colour={expired.length ? RED : GREEN} onClick={() => go("amc")} />
         <Card label="VISITS OWED" value={String(visitsOwed)} sub={`across ${(amcs || []).length} contracts`} colour={TEAL} onClick={() => go("amc")} />
       </div>
@@ -973,14 +973,14 @@ function SevaDashboard({ go }: { go: (k: string) => void }) {
       {expiring.length > 0 && (
         <div className="bg-white rounded-lg border mb-3 overflow-auto" style={{ borderColor: BORDER, maxWidth: 760 }}>
           <div className="px-3 py-2 text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>RENEWALS INSIDE 60 DAYS</div>
-          <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
-            <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+          <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+            <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
               <th className="px-2 py-1.5 text-left">Customer</th><th className="px-2 py-1.5 text-left">Machine</th>
               <th className="px-2 py-1.5 text-left">Ends</th><th className="px-2 py-1.5 text-right">Days</th>
             </tr></thead>
             <tbody>
               {expiring.sort((a, b) => S(a.end_date).localeCompare(S(b.end_date))).slice(0, 10).map((r, i) => (
-                <tr key={r.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                <tr key={r.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   <td className="px-2 py-1 font-semibold">{S(r.customer)}</td>
                   <td className="px-2 py-1" style={{ color: MUTED }}>{S(r.machine) || "—"}</td>
                   <td className="px-2 py-1 tnum">{fmtD(r.end_date)}</td>
@@ -994,7 +994,7 @@ function SevaDashboard({ go }: { go: (k: string) => void }) {
 
       <div className="bg-white rounded-lg border p-4" style={{ borderColor: BORDER, maxWidth: 760 }}>
         <div className="text-sm font-bold mb-2" style={{ color: INK }}>How this room works</div>
-        <div className="text-sm" style={{ color: "#5A6672", lineHeight: 1.7 }}>
+        <div className="text-sm" style={{ color: "var(--dim)", lineHeight: 1.7 }}>
           A customer calls, and it goes into <b>Issues</b> the same hour — with a name against it and a date it is
           owed by. <b>Annual Maintenance</b> holds every contract: what is covered, until when, and how many visits
           are still owed; the Excel comes in once through ⇪ Import and lives here after that.
@@ -1037,7 +1037,7 @@ export default function Seva({
   });
 
   return (
-    <div className="min-h-screen" style={{ background: "#F1EFE9", color: "#22303C" }}>
+    <div className="min-h-screen" style={{ background: "var(--paper)", color: "var(--ink)" }}>
       <GenieShell module="seva" title="Nandan Seva" tagline="Customer service — every issue owned, every contract kept" user={{ email, displayName, initials, role }} />
 
       <div style={{ display: "flex", alignItems: "stretch", minHeight: "calc(100vh - 46px)" }}>
@@ -1050,7 +1050,7 @@ export default function Seva({
             <button key={s.key} onClick={() => go(s.key)}
               className="w-full text-left rounded px-2 py-2 text-sm font-semibold flex items-center gap-2 mb-0.5"
               title={navOpen ? undefined : s.label}
-              style={openKey === s.key ? { background: "#16232F", color: "#fff" } : { color: "#5A6672" }}>
+              style={openKey === s.key ? { background: "var(--navy)", color: "#fff" } : { color: "var(--dim)" }}>
               <span style={{ width: 18, textAlign: "center", flexShrink: 0 }}>{s.icon}</span>
               {navOpen && s.label}
             </button>

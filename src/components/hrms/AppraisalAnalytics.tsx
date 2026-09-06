@@ -59,7 +59,7 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
 
   const P = ({ r, bold }: { r: Row; bold?: boolean }) => (
     <button onClick={() => onOpenPerson(r.id)} className={`text-left ${bold ? "font-bold" : "font-semibold"}`}
-      style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2 }} title={`${r.id} · open the Report Card`}>
+      style={{ color: "var(--blue)", textDecoration: "underline", textUnderlineOffset: 2 }} title={`${r.id} · open the Report Card`}>
       {r.name}
     </button>
   );
@@ -141,21 +141,21 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <div style={{ position: "relative" }}>
               <button onClick={() => setTypesOpen((v) => !v)} className="text-xs font-semibold rounded border px-2.5 py-1.5 bg-white"
-                style={{ borderColor: off.size ? C.orange ?? "#E8600A" : C.line, color: "#1B3A5C" }} title="Tick the employee types the wall should count">
+                style={{ borderColor: off.size ? C.orange ?? "var(--accent)" : C.line, color: "var(--blue)" }} title="Tick the employee types the wall should count">
                 👥 {typeLabel} {typesOpen ? "▴" : "▾"}
               </button>
               {typesOpen && (
                 <div className="rounded border bg-white shadow-lg p-2" style={{ position: "absolute", top: "110%", left: 0, zIndex: 30, minWidth: 240, borderColor: C.line }}>
                   {allTypes.map((t) => (
                     <label key={t} className="flex items-center gap-2 text-xs py-1 px-1 rounded" style={{ cursor: "pointer" }}>
-                      <input type="checkbox" checked={!off.has(t)} style={{ accentColor: "#1B3A5C" }}
+                      <input type="checkbox" checked={!off.has(t)} style={{ accentColor: "var(--blue)" }}
                         onChange={(e) => setOff((o) => { const n = new Set(o); if (e.target.checked) n.delete(t); else n.add(t); return n; })} />
-                      <span className="flex-1" style={{ color: off.has(t) ? C.faint : "#16232F" }}>{t}</span>
+                      <span className="flex-1" style={{ color: off.has(t) ? C.faint : "var(--navy)" }}>{t}</span>
                       <span className="tnum" style={{ color: C.faint }}>{typeCount(t)}</span>
                     </label>
                   ))}
                   <div className="flex gap-2 mt-1 pt-1" style={{ borderTop: `1px solid ${C.line}` }}>
-                    <button onClick={() => setOff(new Set())} className="text-xs font-semibold" style={{ color: "#1B3A5C" }}>All</button>
+                    <button onClick={() => setOff(new Set())} className="text-xs font-semibold" style={{ color: "var(--blue)" }}>All</button>
                     <button onClick={() => setOff(new Set(allTypes))} className="text-xs font-semibold" style={{ color: C.faint }}>None</button>
                   </div>
                 </div>
@@ -179,7 +179,7 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
 
           {/* ── departments ── */}
           <Card title="Department wise" note="Decided money where Final; the manager's proposal where not — that part can still move.">
-            <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+            <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
               <thead><tr style={{ color: C.faint, fontSize: 11 }}>
                 {["Department", "People", "Payroll now", "Payroll after", "Cost / month", "Avg increase", "Avg manager rating", ""].map((h, i) => (
                   <th key={h + i} className="text-left px-1.5 py-1" style={{ borderBottom: `1px solid ${C.line}`, textAlign: i > 1 ? "right" : "left" }}>{h}</th>
@@ -197,7 +197,7 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
                     <td className="px-1.5 py-1 text-right tnum">{d.avgRating != null ? `${d.avgRating.toFixed(1)} / 10` : "—"}</td>
                     <td className="px-1.5 py-1" style={{ width: 130 }}>
                       {d.avgPct != null && <div style={{ height: 7, background: "#F2F0EA", borderRadius: 4 }}>
-                        <div style={{ height: 7, width: `${Math.min(100, Math.max(2, d.avgPct * 4))}%`, background: "#0D7A3F", borderRadius: 4 }} />
+                        <div style={{ height: 7, width: `${Math.min(100, Math.max(2, d.avgPct * 4))}%`, background: "var(--green)", borderRadius: 4 }} />
                       </div>}
                     </td>
                   </tr>
@@ -223,7 +223,7 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
           <Card title={`People to sit down with — the PIP screen (${pip.length})`} tone="#B3392E"
             note="Screened, not sentenced: manager rating ≤ 4/10, or ≤ 5/10 with an increment of 2% or less. Each of these deserves a deliberate conversation — improvement plan, role change, or exit — decided in the room, not by this list.">
             {!pip.length ? <div className="text-sm" style={{ color: C.faint }}>Nobody screens in yet — the list fills as managers submit.</div> : (
-              <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+              <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
                 <thead><tr style={{ color: C.faint, fontSize: 11 }}>
                   {["Name", "Department", "Manager rating", "Self rating", "Increase", "Why on this list"].map((h) => (
                     <th key={h} className="text-left px-1.5 py-1" style={{ borderBottom: `1px solid ${C.line}` }}>{h}</th>))}
@@ -278,7 +278,7 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
                     <span style={{ width: 84, color: C.dim }}>{b.band}</span>
                     <span className="tnum" style={{ width: 34, color: C.faint }}>{b.n}</span>
                     <div style={{ flex: 1, height: 8, background: "#F2F0EA", borderRadius: 4 }}>
-                      {b.avg != null && <div style={{ height: 8, width: `${Math.min(100, Math.max(2, b.avg * 4))}%`, background: "#1B3A5C", borderRadius: 4 }} />}
+                      {b.avg != null && <div style={{ height: 8, width: `${Math.min(100, Math.max(2, b.avg * 4))}%`, background: "var(--blue)", borderRadius: 4 }} />}
                     </div>
                     <b className="tnum" style={{ width: 52, textAlign: "right" }}>{pct(b.avg)}</b>
                   </div>
@@ -321,9 +321,9 @@ function BellCurve({ pcts, mean, sd }: { pcts: number[]; mean: number; sd: numbe
             return (
               <g key={i}>
                 <rect x={X(b.x0) + 1.5} y={H - padB - h} width={bw - 3} height={h} rx={3}
-                  fill={b.x0 < 0 ? "#D9838B" : b.x0 < mean - sd ? "#C9C6BD" : b.x0 > mean + sd ? "#7FB89A" : "#1B3A5C"} opacity={0.85} />
+                  fill={b.x0 < 0 ? "#D9838B" : b.x0 < mean - sd ? "#C9C6BD" : b.x0 > mean + sd ? "#7FB89A" : "var(--blue)"} opacity={0.85} />
                 {b.n > 0 && <text x={X(b.x0) + bw / 2} y={H - padB - h - 4} textAnchor="middle" fontSize="9.5" fill="#5A6572">{b.n}</text>}
-                <text x={X(b.x0) + bw / 2} y={H - 8} textAnchor="middle" fontSize="9" fill="#8A94A0">{b.x0}%</text>
+                <text x={X(b.x0) + bw / 2} y={H - 8} textAnchor="middle" fontSize="9" fill="var(--muted)">{b.x0}%</text>
               </g>
             );
           })}
@@ -349,7 +349,7 @@ function Big({ n, l, sub, green }: { n: string; l: string; sub?: string; green?:
 
 function Card({ title, note, tone, flush, children }: { title: string; note?: string; tone?: string; flush?: boolean; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-lg border mb-3" style={{ borderColor: C.line, borderTop: `3px solid ${tone || "#16232F"}` }}>
+    <div className="bg-white rounded-lg border mb-3" style={{ borderColor: C.line, borderTop: `3px solid ${tone || "var(--navy)"}` }}>
       <div className="px-3 pt-2.5 pb-1.5">
         <div className="font-bold" style={{ fontSize: 13.5, color: tone || C.ink }}>{title}</div>
         {note && <div style={{ fontSize: 11, color: C.faint, lineHeight: 1.5 }}>{note}</div>}

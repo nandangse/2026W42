@@ -96,20 +96,20 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
   const title = `${MONTHS[r.month - 1]} ${r.year}`;
   const musterRows = (d.muster?.rows || []).filter((m) => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.employee_id.includes(q));
   const regRows = (d.register || []).filter((m) => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.employee_id.includes(q));
-  const tone = (s: string) => (s === "delivered" || s === "received" ? C.green : s === "failed" ? C.red : s === "sent" ? "#1B3A5C" : C.dim);
-  const mark = (v: string) => ({ P: { bg: "#E6F4EA", c: C.green }, A: { bg: "#FBEDEA", c: C.red }, WO: { bg: "#F4F2EC", c: C.faint }, MO: { bg: "#DCE8F5", c: "#1B3A5C" }, S: { bg: "#FFF3E8", c: C.orange } }[v] || { bg: "transparent", c: C.dim });
+  const tone = (s: string) => (s === "delivered" || s === "received" ? C.green : s === "failed" ? C.red : s === "sent" ? "var(--blue)" : C.dim);
+  const mark = (v: string) => ({ P: { bg: "#E6F4EA", c: C.green }, A: { bg: "#FBEDEA", c: C.red }, WO: { bg: "#F4F2EC", c: C.faint }, MO: { bg: "#DCE8F5", c: "var(--blue)" }, S: { bg: "#FFF3E8", c: C.orange } }[v] || { bg: "transparent", c: C.dim });
 
   return (
     <div>
       {/* ── head ── */}
-      <div className="rounded-lg px-4 py-3 mb-3 flex items-start gap-3 flex-wrap" style={{ background: "#16232F", color: "#fff" }}>
+      <div className="rounded-lg px-4 py-3 mb-3 flex items-start gap-3 flex-wrap" style={{ background: "var(--navy)", color: "#fff" }}>
         <button onClick={onBack} className="text-xs font-bold rounded px-2 py-1" style={{ background: "rgba(255,255,255,0.12)", color: "#D7DEE6" }}>← Runs</button>
         <div style={{ flex: 1, minWidth: 240 }}>
           <div className="font-bold" style={{ fontSize: 20 }}>{title} <span className="font-normal text-xs" style={{ color: "#8FA1B3" }}>payroll run</span></div>
           <div className="text-xs" style={{ color: "#8FA1B3" }}>
             Run by <b style={{ color: "#D7DEE6" }}>{who(r.uploaded_by)}</b> · run date <b style={{ color: "#D7DEE6" }}>{r.uploaded_at ? fmtFull(String(r.uploaded_at)) : "—"}</b>
             {r.generated_at && <> · generated <b style={{ color: "#D7DEE6" }}>{fmtFull(String(r.generated_at))}</b> by {who(r.generated_by)}</>}
-            {" · "}{r.approved_by ? <span style={{ color: "#7BD389" }}>✓ approved by {who(r.approved_by)} on {fmtFull(String(r.approved_at))}</span> : <span style={{ color: "#F5B32B" }}>awaiting Raghu&apos;s approval</span>}
+            {" · "}{r.approved_by ? <span style={{ color: "#7BD389" }}>✓ approved by {who(r.approved_by)} on {fmtFull(String(r.approved_at))}</span> : <span style={{ color: "var(--amber)" }}>awaiting Raghu&apos;s approval</span>}
           </div>
         </div>
         <button onClick={waPreview} disabled={busy || !d.muster} className="text-xs font-bold rounded px-3 py-2" style={{ background: d.muster ? "#25D366" : "rgba(255,255,255,0.12)", color: d.muster ? "#0B3D1E" : "#8FA1B3" }} title={d.muster ? "The attendance message to everybody on the muster, through the WhatsApp queue" : "Upload the muster first"}>💬 Send WhatsApp message</button>
@@ -145,7 +145,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
       {/* ── tabs ── */}
       <div className="flex gap-1 flex-wrap mb-2">
         {([["overview", "Overview"], ["uploads", `Uploads (${d.files.length})`], ["muster", `Attendance muster${d.muster ? ` (${d.muster.rows.length})` : ""}`], ["register", `Salary register${d.register.length ? ` (${d.register.length})` : ""}`], ["comms", `Communications (${d.messages.length})`]] as [Tab, string][]).map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className="text-xs font-bold rounded px-2.5 py-1.5" style={tab === k ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A", background: "#EAE7DF" }}>{l}</button>
+          <button key={k} onClick={() => setTab(k)} className="text-xs font-bold rounded px-2.5 py-1.5" style={tab === k ? { background: "var(--navy)", color: "#fff" } : { color: "#5B6B7A", background: "#EAE7DF" }}>{l}</button>
         ))}
         {(tab === "muster" || tab === "register" || tab === "comms") && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="find a person" className="text-xs rounded px-2 py-1 ml-auto" style={{ border: `1px solid ${C.line}`, width: 180 }} />}
       </div>
@@ -153,7 +153,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
       {tab === "overview" && (
         <div className="flex gap-3 items-start" style={{ flexWrap: "wrap" }}>
         <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", flex: "1 1 520px" }}>
-          <Card title="Uploads">{d.files.length ? <>{d.files.length} file{d.files.length === 1 ? "" : "s"} · muster {d.muster ? "✓" : "—"} · rate list {d.rates ? "✓" : "—"}</> : "Nothing uploaded yet."}{r.drive_folder_link && <div className="mt-1"><a href={r.drive_folder_link} target="_blank" rel="noreferrer" style={{ color: "#1B3A5C" }}>Drive folder ↗</a></div>}</Card>
+          <Card title="Uploads">{d.files.length ? <>{d.files.length} file{d.files.length === 1 ? "" : "s"} · muster {d.muster ? "✓" : "—"} · rate list {d.rates ? "✓" : "—"}</> : "Nothing uploaded yet."}{r.drive_folder_link && <div className="mt-1"><a href={r.drive_folder_link} target="_blank" rel="noreferrer" style={{ color: "var(--blue)" }}>Drive folder ↗</a></div>}</Card>
           <Card title="Generated">{r.generated_at ? <>{d.register.length} lines · earned ₹{inr(r.earned_pay)} · deductions ₹{inr(r.deductions)} · net ₹{inr(r.net_payable)}</> : "Not generated yet — upload the muster and press Generate on the Uploads tab."}</Card>
           <Card title="Working days this month">
             <WorkingDays run={r} onSave={(n) => act({ action: "working_days", id: r.id, working_days: n }, () => "Working days saved — press Generate again for the conveyance to follow.")} />
@@ -199,7 +199,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                     <span className="font-semibold">{f.name}</span>
                     <span style={{ color: C.faint }}>{f.size ? `${Math.round(f.size / 1024)} KB` : ""} · {who(f.uploaded_by)} · {fmtFull(String(f.uploaded_at))}</span>
                     <span style={{ flex: 1 }} />
-                    {f.drive_link ? <a href={f.drive_link} target="_blank" rel="noreferrer" style={{ color: "#1B3A5C" }}>Drive ↗</a> : <span style={{ color: "#8A5B00" }}>not filed in Drive</span>}
+                    {f.drive_link ? <a href={f.drive_link} target="_blank" rel="noreferrer" style={{ color: "var(--blue)" }}>Drive ↗</a> : <span style={{ color: "#8A5B00" }}>not filed in Drive</span>}
                     {!signed && <button onClick={() => { if (window.confirm(`Remove ${f.name} from this run?${f.drive_link ? "\n\nThe Drive copy goes to the bin as well." : ""}`)) act({ action: "remove_file", file_id: f.id }, () => `${f.name} removed`); }}
                       disabled={busy} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#FBEDEA", color: C.red }} title="Remove this upload">✕</button>}
                   </div>
@@ -216,7 +216,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                   <span style={{ flex: 1 }} />
                   {signed
                     ? <button onClick={() => act({ action: "unsubmit_input", key: inp.key, note: sub?.note || "" }, () => `${inp.label} reopened`)} disabled={busy} className="text-xs font-semibold rounded px-3 py-1.5" style={{ background: "#F4F2EC", color: C.dim }}>Reopen</button>
-                    : <button onClick={() => act({ action: "submit_input", key: inp.key, note: notes[inp.key] || "" }, () => `${inp.label} submitted`)} disabled={busy || (inp.upload && inp.needFile && !files.length)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: inp.upload && inp.needFile && !files.length ? "#E2E0DA" : C.green, color: inp.upload && inp.needFile && !files.length ? C.faint : "#fff" }} title={inp.upload && inp.needFile && !files.length ? "Upload the file first" : "Sign this input as received and checked"}>✓ Submit</button>}
+                    : <button onClick={() => act({ action: "submit_input", key: inp.key, note: notes[inp.key] || "" }, () => `${inp.label} submitted`)} disabled={busy || (inp.upload && inp.needFile && !files.length)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: inp.upload && inp.needFile && !files.length ? "var(--line)" : C.green, color: inp.upload && inp.needFile && !files.length ? C.faint : "#fff" }} title={inp.upload && inp.needFile && !files.length ? "Upload the file first" : "Sign this input as received and checked"}>✓ Submit</button>}
                 </div>
               </div>
             );
@@ -224,7 +224,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           <div className="bg-white rounded-lg border p-3 flex gap-2 items-center flex-wrap" style={{ borderColor: C.line }}>
             <div className="text-xs" style={{ color: C.dim }}>{d.inputs.filter((x) => x.submitted_at).length} of {INPUTS.length} inputs submitted.{d.files.filter((f) => !INPUTS.some((i) => i.key === f.kind)).length ? ` ${d.files.filter((f) => !INPUTS.some((i) => i.key === f.kind)).length} other file(s) on the run.` : ""}</div>
             <span style={{ flex: 1 }} />
-            <button onClick={() => act({ action: "generate" }, (j) => `Generated ${j.lines} lines${(j.warnings as string[])?.length ? ` · ${(j.warnings as string[]).join("; ")}` : ""}`)} disabled={busy || !d.muster} className="text-xs font-bold rounded px-4 py-2" style={{ background: d.muster ? C.green : "#E2E0DA", color: d.muster ? "#fff" : C.faint }} title={d.muster ? "Muster × rates → the salary register" : "Upload the muster first"}>▶ Generate</button>
+            <button onClick={() => act({ action: "generate" }, (j) => `Generated ${j.lines} lines${(j.warnings as string[])?.length ? ` · ${(j.warnings as string[]).join("; ")}` : ""}`)} disabled={busy || !d.muster} className="text-xs font-bold rounded px-4 py-2" style={{ background: d.muster ? C.green : "var(--line)", color: d.muster ? "#fff" : C.faint }} title={d.muster ? "Muster × rates → the salary register" : "Upload the muster first"}>▶ Generate</button>
           </div>
           {d.muster && (
             <div className="text-xs mt-2" style={{ color: C.faint }}>
@@ -239,7 +239,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
       {tab === "muster" && (
         !d.muster ? <div className="text-xs" style={{ color: C.faint }}>No muster uploaded yet.</div> : (
           <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflow: "auto", maxHeight: "calc(100vh - 300px)" }}>
-            <table style={{ fontSize: 11.5, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+            <table className="genie-table" style={{ fontSize: 11.5, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
               <thead><tr style={{ color: C.faint, fontSize: 10 }}>
                 <th className="px-2 py-1.5 text-left" style={{ position: "sticky", left: 0, top: 0, background: "#fff", zIndex: 3, minWidth: 60, width: 60 }}>Emp</th>
                 <th className="px-2 py-1.5 text-left" style={{ position: "sticky", left: 60, top: 0, background: "#fff", zIndex: 3, minWidth: 160 }}>Name</th>
@@ -266,7 +266,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
         !d.register.length ? <div className="text-xs" style={{ color: C.faint }}>Not generated yet — Uploads → Generate.</div> : (
           <div className="flex gap-3 items-start" style={{ flexWrap: "wrap" }}>
           <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflow: "auto", maxHeight: "calc(100vh - 300px)", flex: "1 1 700px", minWidth: 0 }}>
-            <table style={{ fontSize: 12, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+            <table className="genie-table" style={{ fontSize: 12, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
               <thead><tr style={{ color: C.faint, fontSize: 10 }}>
                 {["Emp", "Name", "Type", "Due", "Leave OB", "Earned lv", "Comp off", "Lv used", "Encashed", "Leave CB", "Paid days", "Per day", "Basic & DA", "HRA", "Fixed", "Conv", "Medical", "OT pay", "Site", "Comp off ₹", "Encash ₹", "Arrears", "Earned", "PF", "PT", "Loan", "Advance", "TDS", "Lunch", "Late", "Other", "Deductions", "Net", "To pay", "Rate from"].map((h, i) => (
                   <th key={h} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#fff", textAlign: i < 3 ? "left" : "right", zIndex: i < 2 ? 3 : 2, ...(i === 0 ? { left: 0, minWidth: 60, width: 60 } : i === 1 ? { left: 60 } : {}) }}>{h}</th>
@@ -279,7 +279,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                     <td className="px-2 py-1 font-semibold" style={{ position: "sticky", left: 60, background: "#fff" }}>{x.name}{x.hold && <span className="ml-1" style={{ color: C.red, fontSize: 10 }}>hold</span>}</td>
                     <td className="px-2 py-1" style={{ color: C.faint }}>{x.type || ""}</td>
                     {[x.days_due, x.leave_ob, x.leave_earned, x.compoff_days, x.leave_used, x.leave_encashed, x.leave_cb, x.paid_days].map((v, i) => (
-                      <td key={"l" + i} className="px-2 py-1 text-right tnum" style={{ color: i === 6 ? "#1B3A5C" : C.dim, fontWeight: i === 6 || i === 7 ? 700 : 400 }}>{v == null ? "—" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td>
+                      <td key={"l" + i} className="px-2 py-1 text-right tnum" style={{ color: i === 6 ? "var(--blue)" : C.dim, fontWeight: i === 6 || i === 7 ? 700 : 400 }}>{v == null ? "—" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td>
                     ))}
                     {[x.per_day, x.basic_da, x.hra, x.fixed_allowance, x.conveyance, x.medical, x.ot_pay, x.site_allowance, x.compoff_amt, x.encash_amt, x.arrears, x.earned, x.pf, x.pt, x.loan, x.advance, x.tds, x.lunch, x.late_ded, x.other_ded, x.deductions, x.net, x.to_pay].map((v, i) => (
                       <td key={i} className="px-2 py-1 text-right tnum" style={i === 11 || i === 21 || i === 22 ? { fontWeight: 700 } : undefined}>{inr(v)}</td>
@@ -307,7 +307,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           <div className="flex gap-2 mb-2 flex-wrap items-center text-xs">
             {Object.entries(d.counts).map(([k, v]) => <span key={k} className="rounded px-2 py-0.5 font-bold" style={{ background: "#F4F2EC", color: tone(k) }}>{k} {v}</span>)}
             <span style={{ flex: 1 }} />
-            <button onClick={() => act({ action: "pull_replies" }, (j) => `Pulled ${j.pulled} repl${Number(j.pulled) === 1 ? "y" : "ies"} from ${j.checked} number${Number(j.checked) === 1 ? "" : "s"}${j.why ? ` — ${j.why}` : ""}`)} disabled={busy} className="font-semibold rounded border px-3 py-1.5 bg-white" style={{ borderColor: C.line, color: "#1B3A5C" }}>⟳ Pull replies from WhatsApp</button>
+            <button onClick={() => act({ action: "pull_replies" }, (j) => `Pulled ${j.pulled} repl${Number(j.pulled) === 1 ? "y" : "ies"} from ${j.checked} number${Number(j.checked) === 1 ? "" : "s"}${j.why ? ` — ${j.why}` : ""}`)} disabled={busy} className="font-semibold rounded border px-3 py-1.5 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }}>⟳ Pull replies from WhatsApp</button>
           </div>
           <div className="bg-white rounded-lg border" style={{ borderColor: C.line }}>
             {!d.messages.length && <div className="p-3 text-xs" style={{ color: C.faint }}>Nothing sent from this run yet. Send WhatsApp message at the top builds the attendance message for everybody on the muster.</div>}
@@ -339,7 +339,7 @@ function Rules() {
       <div className="text-xs mb-2" style={{ color: C.faint }}>What Generate does with the muster and the rate list. As given on 4 Sep 2026.</div>
       {PAYROLL_RULES.map((g) => (
         <div key={g.head} className="mb-2">
-          <div className="text-xs font-bold" style={{ color: "#16232F" }}>{g.head}</div>
+          <div className="text-xs font-bold" style={{ color: "var(--navy)" }}>{g.head}</div>
           <ul style={{ paddingLeft: 14, margin: "2px 0" }}>
             {g.lines.map((l, i) => <li key={i} className="text-xs" style={{ color: C.dim, lineHeight: 1.5, marginBottom: 2 }}>{l}</li>)}
           </ul>
@@ -368,7 +368,7 @@ function WorkingDays({ run, onSave }: { run: Run; onSave: (n: number | null) => 
       <div style={{ color: "#8A8A8A" }}>Default {dflt}: {days} days less {sundays} Sundays and the third Saturday. Set it when a statutory holiday falls in the month; clear it to go back to the default.</div>
       <div className="flex gap-1 items-center mt-1">
         <input type="number" min={1} max={31} value={v} onChange={(e) => setV(e.target.value)} placeholder={String(dflt)} className="rounded px-2 py-1" style={{ border: "1px solid #E2E0DA", width: 70 }} />
-        <button onClick={() => onSave(v.trim() ? Number(v) : null)} className="font-bold rounded px-2 py-1" style={{ background: "#1B3A5C", color: "#fff" }}>Save</button>
+        <button onClick={() => onSave(v.trim() ? Number(v) : null)} className="font-bold rounded px-2 py-1" style={{ background: "var(--blue)", color: "#fff" }}>Save</button>
       </div>
     </div>
   );

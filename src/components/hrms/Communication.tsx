@@ -94,7 +94,7 @@ export function Communication({ employeeId, name, personalEmail, workEmail }: {
       <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: C.line }}>
         <div className="flex gap-1.5 mb-2">
           {(["email", "whatsapp"] as const).map((c) => (
-            <button key={c} onClick={() => { setChannel(c); setPreview(null); }} className="rounded px-3 py-1 text-xs font-bold" style={{ background: channel === c ? "#16232F" : "#fff", color: channel === c ? "#fff" : C.dim, border: `1px solid ${channel === c ? "#16232F" : C.line}` }}>
+            <button key={c} onClick={() => { setChannel(c); setPreview(null); }} className="rounded px-3 py-1 text-xs font-bold" style={{ background: channel === c ? "var(--navy)" : "#fff", color: channel === c ? "#fff" : C.dim, border: `1px solid ${channel === c ? "var(--navy)" : C.line}` }}>
               {c === "email" ? "✉ E-mail" : "💬 WhatsApp"}
             </button>
           ))}
@@ -124,7 +124,7 @@ export function Communication({ employeeId, name, personalEmail, workEmail }: {
           </div>
         )}
         <div className="flex gap-2 mt-2 flex-wrap">
-          <button onClick={doPreview} disabled={busy || !body.trim()} className="text-xs font-semibold rounded border px-3 py-1.5 bg-white" style={{ borderColor: C.line, color: "#1B3A5C" }}>👁 Preview for {name.split(" ")[0]}</button>
+          <button onClick={doPreview} disabled={busy || !body.trim()} className="text-xs font-semibold rounded border px-3 py-1.5 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }}>👁 Preview for {name.split(" ")[0]}</button>
           <button onClick={() => send(false)} disabled={busy || !body.trim()} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: channel === "whatsapp" ? C.green : C.orange, color: "#fff", opacity: busy ? 0.6 : 1 }}>{channel === "whatsapp" ? "💬 Queue WhatsApp" : "✉ Send from my Gmail"}</button>
           <button onClick={() => send(true)} disabled={busy || !body.trim()} className="text-xs font-semibold rounded border px-3 py-1.5 bg-white" style={{ borderColor: C.line, color: C.dim }} title="Keep a record of something said by phone, WhatsApp or in person">📝 Log only</button>
         </div>

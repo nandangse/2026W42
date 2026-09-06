@@ -8,7 +8,7 @@ import { LOGO } from "@/lib/logo";
 
 export default function WrongPage({ kind, detail, onRetry }: { kind: "missing" | "broken"; detail?: string; onRetry?: () => void }) {
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "#16232F", color: "#fff" }}>
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "var(--navy)", color: "#fff" }}>
       <div className="w-full text-center" style={{ maxWidth: 440 }}>
         <div className="inline-flex items-center gap-3 rounded bg-white px-3 py-2 mb-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -27,9 +27,9 @@ export default function WrongPage({ kind, detail, onRetry }: { kind: "missing" |
         </p>
         {detail && <div className="mt-3 text-xs rounded px-3 py-2 text-left" style={{ background: "#0D161F", color: "#CBD5E1", fontFamily: "monospace", wordBreak: "break-word" }}>{detail}</div>}
         <div className="flex gap-2 justify-center mt-6 flex-wrap">
-          {onRetry && <button onClick={onRetry} className="rounded px-4 py-2 font-bold text-sm" style={{ background: "#E8600A", color: "#fff" }}>⟳ Try again</button>}
-          <a href="/" className="rounded px-4 py-2 font-bold text-sm" style={{ background: "#fff", color: "#16232F", textDecoration: "none" }}>🏠 Home</a>
-          <a href="/login" className="rounded px-4 py-2 font-bold text-sm" style={{ background: "#22303C", color: "#fff", textDecoration: "none" }}>Sign in</a>
+          {onRetry && <button onClick={onRetry} className="rounded px-4 py-2 font-bold text-sm" style={{ background: "var(--accent)", color: "#fff" }}>⟳ Try again</button>}
+          <a href="/" className="rounded px-4 py-2 font-bold text-sm" style={{ background: "#fff", color: "var(--navy)", textDecoration: "none" }}>🏠 Home</a>
+          <a href="/login" className="rounded px-4 py-2 font-bold text-sm" style={{ background: "var(--ink)", color: "#fff", textDecoration: "none" }}>Sign in</a>
         </div>
         <div className="mt-8 text-xs" style={{ color: "#5F7183" }}>Nandan Genie · Nandan GSE</div>
       </div>

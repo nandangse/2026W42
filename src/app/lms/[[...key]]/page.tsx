@@ -24,7 +24,7 @@ export default async function LmsPage({ params }: { params: { key?: string[] } }
   return (
     <div style={{ minHeight: "100vh", background: "#F4F2EC" }}>
       <div className="mx-auto px-4 py-4" style={{ maxWidth: 1240 }}>
-        <a href="/" className="text-xs font-bold" style={{ color: "#5A6672" }}>← Genie</a>
+        <a href="/" className="text-xs font-bold" style={{ color: "var(--dim)" }}>← Genie</a>
         <LMS initialKey={key} />
       </div>
     </div>

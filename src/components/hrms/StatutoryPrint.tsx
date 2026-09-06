@@ -90,14 +90,14 @@ export default function StatutoryPrint({ kind, month, year, slips, frozenBy }: {
         @media print { html, body { background: #fff; } .no-print { display: none !important; } .paper { max-width: none; margin: 0; padding: 0; box-shadow: none; } }
       `}</style>
 
-      <div className="no-print" style={{ background: "#16232F", color: "#fff", padding: "10px 16px", display: "flex", gap: 12, alignItems: "center", fontSize: 13, position: "sticky", top: 0, zIndex: 10 }}>
+      <div className="no-print" style={{ background: "var(--navy)", color: "#fff", padding: "10px 16px", display: "flex", gap: 12, alignItems: "center", fontSize: 13, position: "sticky", top: 0, zIndex: 10 }}>
         <b>{R.title} — {period}</b>
         <span style={{ opacity: .7 }}>{rows.length} people</span>
         <span style={{ flex: 1 }} />
         {Object.keys(RETURNS).map((k) => (
           <a key={k} href={`?kind=${k}`} style={{ color: k === kind ? "#fff" : "#8FA1B3", fontWeight: 700, fontSize: 12, textDecoration: k === kind ? "underline" : "none" }}>{k.toUpperCase()}</a>
         ))}
-        <button onClick={() => window.print()} style={{ background: "#E8600A", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>
+        <button onClick={() => window.print()} style={{ background: "var(--accent)", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>
           Save as PDF / Print
         </button>
       </div>
@@ -111,9 +111,9 @@ export default function StatutoryPrint({ kind, month, year, slips, frozenBy }: {
             <div style={{ fontSize: 10, color: "#8B8F87" }}>frozen month · {String(frozenBy).split("·")[0].trim()} · figures from the salary sheet alone</div>
           </div>
         </div>
-        <div style={{ fontSize: 10.5, color: "#5A6672", marginBottom: 8 }}>{R.note}</div>
+        <div style={{ fontSize: 10.5, color: "var(--dim)", marginBottom: 8 }}>{R.note}</div>
 
-        <table>
+        <table className="genie-table">
           <thead>
             <tr style={{ background: "#F4F2EC", fontWeight: 700 }}>
               <th style={{ textAlign: "left" }}>Emp ID</th>

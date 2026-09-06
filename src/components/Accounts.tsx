@@ -156,7 +156,7 @@ export default function Accounts({
 
   return (
     <MoneyProvider>
-    <div className="min-h-screen" style={{ background: "#F1EFE9", color: "#22303C" }}>
+    <div className="min-h-screen" style={{ background: "var(--paper)", color: "var(--ink)" }}>
       {/* ═══════════════════ header ═══════════════════ */}
       <GenieShell module="accounts" title="Nandan Kuber" tagline="The books, the bank and the balances" user={{ email, displayName, initials, role }} tools={<UnitPicker />} />
 
@@ -165,7 +165,7 @@ export default function Accounts({
         <nav style={{ width: navOpen ? 220 : 54, flexShrink: 0, background: "#fff", borderRight: "1px solid #E2E0DA", padding: "10px 6px", transition: "width .15s ease" }}>
           <button onClick={toggleNav}
             className="w-full rounded px-2 py-1.5 text-xs font-bold mb-1 text-left"
-            style={{ color: "#8A94A0" }}
+            style={{ color: "var(--muted)" }}
             title={navOpen ? "Fold the sidebar to icons" : "Open the sidebar"}>
             {navOpen ? "« fold" : "»"}
           </button>
@@ -177,7 +177,7 @@ export default function Accounts({
               {g.header && navOpen && (
                 <button onClick={() => toggleGroup(g.header!)}
                   className="w-full text-left px-2.5 pt-2 pb-1 text-xs font-bold"
-                  style={{ color: "#1B3A5C", letterSpacing: 1 }}>
+                  style={{ color: "var(--blue)", letterSpacing: 1 }}>
                   {folded ? "▸ " : "▾ "}{g.header}
                 </button>
               )}
@@ -185,7 +185,7 @@ export default function Accounts({
                 <button key={s.key} onClick={() => go(s.key)}
                   className="w-full text-left rounded px-2 py-1.5 text-sm font-semibold flex items-center gap-2 mb-0.5"
                   title={navOpen ? undefined : s.label}
-                  style={openKey === s.key ? { background: "#16232F", color: "#fff" } : { color: "#5A6672" }}>
+                  style={openKey === s.key ? { background: "var(--navy)", color: "#fff" } : { color: "var(--dim)" }}>
                   <span style={{ width: 18, textAlign: "center", flexShrink: 0 }}>{s.icon}</span>
                   {navOpen && s.label}
                 </button>
@@ -221,8 +221,8 @@ export default function Accounts({
           {openKey === "purchreg" && <VoucherRegister kind="purchase" key="p" />}
           {["bg", "fd", "insurance", "payplan", "cashitem", "loan", "bounce", "release"].includes(openKey) && <RegisterScreen kind={openKey} key={openKey} />}
           {openKey in STUBS && (
-            <div className="bg-white rounded-lg border p-6" style={{ borderColor: "#E2E0DA", maxWidth: 720 }}>
-              <div className="text-sm" style={{ color: "#5A6672", lineHeight: 1.6 }}>{STUBS[openKey]}</div>
+            <div className="bg-white rounded-lg border p-6" style={{ borderColor: "var(--line)", maxWidth: 720 }}>
+              <div className="text-sm" style={{ color: "var(--dim)", lineHeight: 1.6 }}>{STUBS[openKey]}</div>
             </div>
           )}
         </main>

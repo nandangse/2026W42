@@ -160,7 +160,7 @@ export default function EmployeeRecord({
           </span>
           {isOwner ? (
             <button onClick={approveAll} className="text-xs font-bold rounded px-3 py-1.5 ml-auto"
-              style={{ background: "#0D7A3F", color: "#fff" }}>
+              style={{ background: "var(--green)", color: "#fff" }}>
               ✓ Approve
             </button>
           ) : (
@@ -176,29 +176,29 @@ export default function EmployeeRecord({
         {FIELD_GROUPS.map((g) => (
           <button key={g.key} onClick={() => setTab(g.key)}
             className="text-xs font-bold rounded px-2.5 py-1.5"
-            style={tab === g.key ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
+            style={tab === g.key ? { background: "var(--navy)", color: "#fff" } : { color: "#5B6B7A" }}>
             {g.label}
-            {g.confidential && <span style={{ marginLeft: 4, color: tab === g.key ? "#F5B32B" : "#B3261E" }}>•</span>}
+            {g.confidential && <span style={{ marginLeft: 4, color: tab === g.key ? "var(--amber)" : "var(--red)" }}>•</span>}
           </button>
         ))}
         <button onClick={() => setTab("__clarity__")}
           className="text-xs font-bold rounded px-2.5 py-1.5"
-          style={tab === "__clarity__" ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
+          style={tab === "__clarity__" ? { background: "var(--navy)", color: "#fff" } : { color: "#5B6B7A" }}>
           Role Clarity Document
         </button>
         <button onClick={() => setTab("__competency__")}
           className="text-xs font-bold rounded px-2.5 py-1.5"
-          style={tab === "__competency__" ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
+          style={tab === "__competency__" ? { background: "var(--navy)", color: "#fff" } : { color: "#5B6B7A" }}>
           Competency
         </button>
         <button onClick={() => setTab("__comm__")}
           className="text-xs font-bold rounded px-2.5 py-1.5"
-          style={tab === "__comm__" ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
+          style={tab === "__comm__" ? { background: "var(--navy)", color: "#fff" } : { color: "#5B6B7A" }}>
           Communication
         </button>
         <button onClick={() => setTab("history")}
           className="text-xs font-bold rounded px-2.5 py-1.5"
-          style={tab === "history" ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
+          style={tab === "history" ? { background: "var(--navy)", color: "#fff" } : { color: "#5B6B7A" }}>
           History
         </button>
         <span className="text-xs ml-auto self-center" style={{ color: msg.includes("✓") ? C.green : msg ? C.red : C.faint }}>
@@ -256,7 +256,7 @@ export default function EmployeeRecord({
               {(history || []).map((h, i) => (
                 <div key={h.id} className="px-3 py-2" style={{ borderTop: i ? "1px solid #EEECE6" : undefined }}>
                   <div className="text-xs" style={{ lineHeight: 1.6 }}>
-                    <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#E8600A", color: "#fff", fontSize: 10 }}>
+                    <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "var(--accent)", color: "#fff", fontSize: 10 }}>
                       {h.by_initials || "—"}
                     </span>{" "}
                     <span style={{ color: C.faint }}>
@@ -291,17 +291,17 @@ function Shell({
   title?: string; sub?: string; idLine?: string;
 }) {
   return (
-    <div className="min-h-screen" style={{ background: "#F1EFE9", color: C.ink }}>
-      <div style={{ background: "#16232F", color: "#fff" }}>
+    <div className="min-h-screen" style={{ background: "var(--paper)", color: C.ink }}>
+      <div style={{ background: "var(--navy)", color: "#fff" }}>
         <div className="px-3 py-2 flex items-center gap-2.5">
           <div className="rounded bg-white px-1.5 py-1 flex-shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={LOGO} alt="Nandan GSE" style={{ height: 22, display: "block" }} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>
+            <div className="text-xs tracking-widest font-bold" style={{ color: "var(--accent)" }}>
               HRIS
-              <span style={{ background: "#E8600A", color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6, letterSpacing: 0 }}>
+              <span style={{ background: "var(--accent)", color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6, letterSpacing: 0 }}>
                 V {APP_VERSION}
               </span>
             </div>
@@ -312,9 +312,9 @@ function Shell({
           </div>
           {idLine && <span className="hidden md:block" style={{ fontSize: 11, color: "#8FA1B3" }}>{idLine}</span>}
           <a href="/hrms" className="ml-auto text-xs font-semibold rounded px-2.5 py-1.5 flex-shrink-0"
-            style={{ background: "#22303C", color: "#8FA1B3" }}>← HRMS</a>
+            style={{ background: "var(--ink)", color: "#8FA1B3" }}>← HRMS</a>
           <span className="rounded-full font-bold flex items-center justify-center flex-shrink-0"
-            style={{ width: 26, height: 26, fontSize: 11, background: initials ? "#E8600A" : "#B3261E", color: "#fff" }}
+            style={{ width: 26, height: 26, fontSize: 11, background: initials ? "var(--accent)" : "var(--red)", color: "#fff" }}
             title={who}>
             {initials || "??"}
           </span>
@@ -403,7 +403,7 @@ function EditField({
               <>
                 <select value={current} onChange={(ev) => onSave(ev.target.value)}
                   className="text-xs rounded px-2 py-1 bg-white"
-                  style={{ border: `1px solid ${orphan ? "#F5B32B" : C.line}`, minWidth: 170 }}>
+                  style={{ border: `1px solid ${orphan ? "var(--amber)" : C.line}`, minWidth: 170 }}>
                   <option value="">— not set —</option>
                   {/* what it says today, even if the master no longer offers it */}
                   {orphan && <option value={current}>{current} (not on the list)</option>}
@@ -453,7 +453,7 @@ function EditField({
         )}
 
         {f.kind === "url" && current && /^https?:\/\//i.test(current) && (
-          <a href={current} target="_blank" rel="noopener noreferrer" className="text-xs font-bold" style={{ color: "#1B3A5C" }}>open ↗</a>
+          <a href={current} target="_blank" rel="noopener noreferrer" className="text-xs font-bold" style={{ color: "var(--blue)" }}>open ↗</a>
         )}
       </div>
       {f.optionNotes && current && f.optionNotes[current] && (
@@ -466,7 +466,7 @@ function EditField({
           {overridden && (
             <>
               {e.edited[f.key].pending && (
-                <span className="rounded px-1 font-bold" style={{ background: "#F5B32B", color: "#4A3300", fontSize: 10, marginRight: 4 }}>
+                <span className="rounded px-1 font-bold" style={{ background: "var(--amber)", color: "#4A3300", fontSize: 10, marginRight: 4 }}>
                   awaiting approval
                 </span>
               )}

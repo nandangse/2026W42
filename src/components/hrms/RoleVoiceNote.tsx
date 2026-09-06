@@ -152,11 +152,11 @@ export default function VoiceNote({ r, reload, onSaved }: { r: RoleLike; reload:
         <div className="text-xs font-semibold" style={{ color: C.dim }}>Management Expectation Note</div>
         {!rec ? (
           <button onClick={start} disabled={busy} className="text-xs font-bold rounded px-2.5 py-1"
-            style={{ background: "#E8600A", color: "#fff", opacity: busy ? 0.6 : 1 }}>
+            style={{ background: "var(--accent)", color: "#fff", opacity: busy ? 0.6 : 1 }}>
             {busy ? "Saving…" : r.summary ? "🎙 Record again" : "🎙 Record"}
           </button>
         ) : (
-          <button onClick={stop} className="text-xs font-bold rounded px-2.5 py-1" style={{ background: "#B3261E", color: "#fff" }}>
+          <button onClick={stop} className="text-xs font-bold rounded px-2.5 py-1" style={{ background: "var(--red)", color: "#fff" }}>
             ■ Stop
           </button>
         )}
@@ -167,14 +167,14 @@ export default function VoiceNote({ r, reload, onSaved }: { r: RoleLike; reload:
         Say what this role is really for. It is kept three ways — the recording, the words, and a summary — because tone
         carries what a typed paragraph loses, and nobody scrubs through audio to find one sentence.
       </div>
-      {rec && <div className="text-xs mt-1" style={{ color: "#B3261E" }}>● recording… {live && <span style={{ color: C.dim }}>{live}</span>}</div>}
+      {rec && <div className="text-xs mt-1" style={{ color: "var(--red)" }}>● recording… {live && <span style={{ color: C.dim }}>{live}</span>}</div>}
       {err && <div className="text-xs mt-1" style={{ color: C.red }}>{err}</div>}
       {r.summary && (
         <div className="rounded p-2 mt-2" style={{ background: "#F4F2EC" }}>
           <div className="flex items-center gap-2">
             <div className="text-xs font-bold" style={{ color: C.dim }}>What it comes to</div>
             <button onClick={resummarise} disabled={busy}
-              className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#DCE8F5", color: "#1B3A5C" }}
+              className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#DCE8F5", color: "var(--blue)" }}
               title="Write the summary again from the words above — nothing is re-recorded">
               ↻ Summarise again
             </button>

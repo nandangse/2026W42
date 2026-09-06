@@ -102,7 +102,7 @@ export default function Hrms({
   const NAV_W = collapsed ? 56 : 236;
 
   return (
-    <div className="min-h-screen" style={{ background: "#F1EFE9", color: "#22303C" }}>
+    <div className="min-h-screen" style={{ background: "var(--paper)", color: "var(--ink)" }}>
       {/* ═══════════════════ header ═══════════════════ */}
       <div className="no-print">
         <GenieShell module="hrms" title="Nandan HRMS" tagline="Employee master & people records" user={{ email, displayName, initials, role }}
@@ -110,7 +110,7 @@ export default function Hrms({
             <button
               onClick={() => (window.innerWidth < 860 ? setMobileNav((v) => !v) : setCollapsed((v) => !v))}
               className="rounded px-2 py-1.5 text-sm"
-              style={{ background: "#22303C", color: "#8FA1B3" }}
+              style={{ background: "var(--ink)", color: "#8FA1B3" }}
               title={collapsed ? "Show the menu" : "Collapse the menu"}
               aria-label="Toggle navigation"
             >
@@ -157,7 +157,7 @@ export default function Hrms({
                     title={collapsed ? s.label : undefined}
                     style={{
                       color: selfSelected || childSelected ? "#fff" : "#8FA1B3",
-                      background: selfSelected ? "#E8600A" : undefined,
+                      background: selfSelected ? "var(--accent)" : undefined,
                       fontSize: 12.5,
                       fontWeight: 700,
                     }}
@@ -180,7 +180,7 @@ export default function Hrms({
                           className="w-full flex items-center gap-1.5 pl-9 pr-3 py-1.5 text-left"
                           style={{
                             color: openKey === k.key ? "#fff" : "#6E8194",
-                            background: openKey === k.key ? "#E8600A" : undefined,
+                            background: openKey === k.key ? "var(--accent)" : undefined,
                             fontSize: 12,
                             fontWeight: openKey === k.key ? 700 : 500,
                           }}
@@ -282,7 +282,7 @@ export default function Hrms({
       </div>
 
       {isOwner && (
-        <div className="px-4 pb-4 no-print" style={{ fontSize: 11, color: "#8A94A0" }}>
+        <div className="px-4 pb-4 no-print" style={{ fontSize: 11, color: "var(--muted)" }}>
           Access to HRMS is granted in Genie → Admin → Users. HR data is isolated in its own hrms_ tables and is
           unreadable by any browser — see migration 0048.
         </div>
@@ -294,7 +294,7 @@ export default function Hrms({
 const Soon = () => (
   <span
     className="rounded px-1 flex-shrink-0"
-    style={{ fontSize: 8.5, fontWeight: 700, background: "#22303C", color: "#6E8194", marginLeft: "auto" }}
+    style={{ fontSize: 8.5, fontWeight: 700, background: "var(--ink)", color: "#6E8194", marginLeft: "auto" }}
     title="No screen yet — open it to see what will go there"
   >
     soon

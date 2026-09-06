@@ -40,11 +40,11 @@ export function QuoteCard() {
   }, []);
   if (!quote) return null;
   return (
-    <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA", borderTop: "3px solid #F5B32B" }}>
-      <div className="text-xs font-bold mb-1" style={{ color: "#8A94A0", letterSpacing: 1.1 }}>QUOTE OF THE DAY</div>
-      <div className="text-sm" style={{ color: "#22303C", lineHeight: 1.55 }}>{quote.q}</div>
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: "var(--line)", borderTop: "3px solid #F5B32B" }}>
+      <div className="text-xs font-bold mb-1" style={{ color: "var(--muted)", letterSpacing: 1.1 }}>QUOTE OF THE DAY</div>
+      <div className="text-sm" style={{ color: "var(--ink)", lineHeight: 1.55 }}>{quote.q}</div>
       <div className="text-xs mt-1 flex items-baseline gap-2 flex-wrap">
-        <span className="font-semibold" style={{ color: "#8A94A0" }}>— {quote.by}</span>
+        <span className="font-semibold" style={{ color: "var(--muted)" }}>— {quote.by}</span>
         {quote.cat && <span style={{ color: "#B8B5AC" }}>{quote.cat}</span>}
       </div>
     </div>
@@ -95,21 +95,21 @@ export default function QuoteOfDay({ trigger = 0 }: { trigger?: number }) {
         style={{ maxWidth: 460, borderTop: "5px solid #E8600A" }}
       >
         <div className="flex items-baseline justify-between gap-2">
-          <div className="text-xs font-bold tracking-widest" style={{ color: "#E8600A" }}>
+          <div className="text-xs font-bold tracking-widest" style={{ color: "var(--accent)" }}>
             ☀ QUOTE OF THE DAY
           </div>
           {quote.cat && (
-            <div className="text-xs font-semibold" style={{ color: "#8A94A0" }}>
+            <div className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
               {quote.cat}
             </div>
           )}
         </div>
 
-        <div className="text-lg mt-3" style={{ color: "#16232F", lineHeight: 1.45 }}>
+        <div className="text-lg mt-3" style={{ color: "var(--navy)", lineHeight: 1.45 }}>
           &ldquo;{quote.q}&rdquo;
         </div>
 
-        <div className="text-sm mt-2 font-semibold" style={{ color: "#8A94A0" }}>
+        <div className="text-sm mt-2 font-semibold" style={{ color: "var(--muted)" }}>
           — {quote.by || "Unattributed"}
           {quote.orig && (
             <span
@@ -126,14 +126,14 @@ export default function QuoteOfDay({ trigger = 0 }: { trigger?: number }) {
           <button
             onClick={hideToday}
             className="flex-1 py-2 rounded font-bold text-sm"
-            style={{ background: "#22303C", color: "#fff" }}
+            style={{ background: "var(--ink)", color: "#fff" }}
           >
             Don&apos;t show again till tomorrow
           </button>
           <button
             onClick={() => setShow(false)}
             className="py-2 px-4 rounded font-bold text-sm border"
-            style={{ borderColor: "#D9D6CD", color: "#5A6672" }}
+            style={{ borderColor: "#D9D6CD", color: "var(--dim)" }}
           >
             Close
           </button>

@@ -185,7 +185,7 @@ function WarehouseBox({ jobNo }: { jobNo: string }) {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="find an item" className="text-xs rounded px-2 py-1" style={{ border: `1px solid ${BORDER}`, width: 200 }} />
       </div>
       <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, overflow: "auto", maxHeight: "60vh" }}>
-        <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+        <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
           <thead><tr style={{ color: MUTED, fontSize: 10.5 }}>
             {["Item", "Group", "RBOM qty", "Issued", "Pending", "Value", "Status", "Kitted on", "By", "Remarks"].map((h, i) => <th key={h} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#fff", textAlign: i >= 2 && i <= 5 ? "right" : "left", borderBottom: `1px solid ${BORDER}` }}>{h}</th>)}
           </tr></thead>

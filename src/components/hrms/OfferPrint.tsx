@@ -61,19 +61,19 @@ export default function OfferPrint({ html, status, validDays, name, offerNo }: {
       `}</style>
 
       <div className="bar no-print" style={{
-        background: "#16232F", color: "#fff", padding: "10px 16px",
+        background: "var(--navy)", color: "#fff", padding: "10px 16px",
         display: "flex", gap: 12, alignItems: "center", fontFamily: "system-ui, sans-serif", fontSize: 13,
       }}>
         <b>{name}</b>
         <span style={{ opacity: .7 }}>{offerNo}</span>
-        <span style={{ background: isDraft ? "#8A5B00" : "#0D7A3F", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>
+        <span style={{ background: isDraft ? "#8A5B00" : "var(--green)", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>
           {isDraft ? "DRAFT" : status.toUpperCase()}
         </span>
         <span style={{ flex: 1 }} />
         <span style={{ opacity: .65, fontSize: 12 }}>about {sheets} page{sheets === 1 ? "" : "s"}</span>
         <span style={{ opacity: .55, fontSize: 11.5 }}>tick “Headers and footers” in the print box for page numbers</span>
         <button onClick={() => window.print()} style={{
-          background: "#E8600A", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer",
+          background: "var(--accent)", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer",
         }}>Save as PDF / Print</button>
       </div>
 
@@ -91,7 +91,7 @@ export default function OfferPrint({ html, status, validDays, name, offerNo }: {
       )}
 
       <div className="paper" style={{ position: "relative", zIndex: 1 }}>
-        <table className="lt">
+        <table className="lt genie-table">
           <thead>
             <tr>
               <th style={{ textAlign: "left" }}>
@@ -99,7 +99,7 @@ export default function OfferPrint({ html, status, validDays, name, offerNo }: {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={LOGO} alt="Nandan GSE" style={{ height: 28 }} />
                   <div style={{ textAlign: "right", fontFamily: "Georgia, serif", fontSize: 10, color: "#8B8F87", fontWeight: 400, lineHeight: 1.5 }}>
-                    <div style={{ fontWeight: 700, color: "#16232F", letterSpacing: ".05em" }}>
+                    <div style={{ fontWeight: 700, color: "var(--navy)", letterSpacing: ".05em" }}>
                       {isDraft ? "DRAFT OFFER LETTER" : "OFFER LETTER"}
                     </div>
                     <div>{offerNo}</div>

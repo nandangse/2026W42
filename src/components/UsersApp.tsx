@@ -53,9 +53,9 @@ export interface UserRow {
 
 /** The seven doors that are not Main Genie, in the order the menus show them. */
 export const APPS = [
-  { key: "crm", label: "CRM", icon: "💼", color: "#1B3A5C", path: "/crm" },
-  { key: "hrms", label: "HRMS", icon: "👤", color: "#E8600A", path: "/hrms" },
-  { key: "accounts", label: "Kuber", icon: "💰", color: "#0D7A3F", path: "/kuber" },
+  { key: "crm", label: "CRM", icon: "💼", color: "var(--blue)", path: "/crm" },
+  { key: "hrms", label: "HRMS", icon: "👤", color: "var(--accent)", path: "/hrms" },
+  { key: "accounts", label: "Kuber", icon: "💰", color: "var(--green)", path: "/kuber" },
   { key: "vishwakarma", label: "Vishwakarma", icon: "🛠", color: "#7C3AED", path: "/vishwakarma" },
   { key: "seva", label: "Seva", icon: "🛎", color: "#0F766E", path: "/seva" },
   { key: "ims", label: "IMS", icon: "📐", color: "#1B2D6B", path: "/ims" },
@@ -77,7 +77,7 @@ const roleLabel = (v: string) => ROLE_OPTIONS.find((r) => r.value === v)?.label 
 const hasApp = (u: UserRow, k: AppKey) => !!(u as unknown as Record<string, unknown>)[`${k}_access`];
 const implicitApp = (u: UserRow, k: AppKey) => !!(u as unknown as Record<string, unknown>)[`${k}_implicit`];
 
-const INK = "#16232F", DIM = "#5A6672", FAINT = "#8A94A0", LINE = "#E2E0DA", ORANGE = "#E8600A", GREEN = "#0D7A3F", RED = "#B3261E";
+const INK = "var(--navy)", DIM = "var(--dim)", FAINT = "var(--muted)", LINE = "var(--line)", ORANGE = "var(--accent)", GREEN = "var(--green)", RED = "var(--red)";
 
 const inp: React.CSSProperties = { border: `1px solid ${LINE}`, borderRadius: 6, padding: "5px 8px", fontSize: 13, width: "100%", background: "#fff", color: INK };
 
@@ -207,7 +207,7 @@ export default function UsersApp({
         <label className="text-xs flex items-center gap-1" style={{ color: DIM, cursor: "pointer" }} title="Show the HRMS type, employee id and login id">
           <input type="checkbox" checked={showId} onChange={(e) => setShowId(e.target.checked)} /> show ID
         </label>
-        {isOwner && <button onClick={() => setProv(true)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#16232F", color: "#fff" }} title="Make a login for every active employee on the HRMS roll">👥 Logins for the roll</button>}
+        {isOwner && <button onClick={() => setProv(true)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--navy)", color: "#fff" }} title="Make a login for every active employee on the HRMS roll">👥 Logins for the roll</button>}
         {canEdit && <button onClick={() => setAdding(true)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: ORANGE, color: "#fff" }}>+ Add user</button>}
       </div>
 
@@ -229,10 +229,10 @@ export default function UsersApp({
 
       {/* ── selection bar ── */}
       <div className="px-3 py-1.5 flex items-center gap-2 flex-wrap text-xs" style={{ background: "#FBFAF7", borderBottom: `1px solid ${LINE}` }}>
-        <button onClick={selectAll} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: LINE, color: "#1B3A5C" }}>Select all</button>
+        <button onClick={selectAll} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: LINE, color: "var(--blue)" }}>Select all</button>
         <button onClick={deselectAll} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: LINE, color: DIM }}>Deselect all</button>
         <button onClick={() => setMass(true)} disabled={!canEdit || picked.size === 0} className="font-bold rounded px-3 py-1"
-          style={{ background: canEdit && picked.size ? "#1B3A5C" : "#E9ECEF", color: canEdit && picked.size ? "#fff" : FAINT, cursor: canEdit && picked.size ? "pointer" : "not-allowed" }}
+          style={{ background: canEdit && picked.size ? "var(--blue)" : "#E9ECEF", color: canEdit && picked.size ? "#fff" : FAINT, cursor: canEdit && picked.size ? "pointer" : "not-allowed" }}
           title={canEdit ? "One command for every ticked row" : "Read-only for you"}>
           ✎ Edit selected{picked.size ? ` (${picked.size})` : ""}
         </button>
@@ -241,7 +241,7 @@ export default function UsersApp({
 
       {/* ── the table ── */}
       <div style={{ overflow: "auto", maxHeight: "calc(100vh - 290px)" }}>
-        <table className="w-full" style={{ fontSize: 13, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+        <table className="w-full genie-table" style={{ fontSize: 13, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
           <thead>
             <tr>
               <th className="py-2 px-2" style={{ position: "sticky", top: 0, background: "#fff", zIndex: 3, boxShadow: `inset 0 -2px 0 ${LINE}`, width: 28 }}>
@@ -259,7 +259,7 @@ export default function UsersApp({
           </thead>
           <tbody>
             {users === null && [0, 1, 2].map((i) => (
-              <tr key={"sk" + i} style={{ borderTop: `1px solid #EEECE6` }}><td className="py-2 px-2" colSpan={9}><div className="rounded" style={{ height: 12, width: `${60 - i * 10}%`, background: "#EFEDE7" }} /></td></tr>
+              <tr key={"sk" + i} style={{ borderTop: `1px solid #EEECE6` }}><td className="py-2 px-2" colSpan={9}><div className="rounded" style={{ height: 12, width: `${60 - i * 10}%`, background: "var(--line-soft)" }} /></td></tr>
             ))}
             {users !== null && rows.length === 0 && <tr><td className="py-4 px-2" colSpan={9} style={{ color: FAINT }}>Nobody matches.</td></tr>}
             {rows.map((u) => {
@@ -274,12 +274,12 @@ export default function UsersApp({
                     </span>
                   </td>
                   <td className="py-1.5 px-2">
-                    <button onClick={() => setOpen(u.id)} className="font-semibold text-left" style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2 }} title="Open every setting">
+                    <button onClick={() => setOpen(u.id)} className="font-semibold text-left" style={{ color: "var(--blue)", textDecoration: "underline", textUnderlineOffset: 2 }} title="Open every setting">
                       {nameOf(u)}
                     </button>
                     <span className="ml-1.5 rounded px-1 font-bold" style={{ background: "#F4F2EC", color: DIM, fontSize: 9.5 }}>{roleLabel(u.role)}</span>
                     {owner && <span className="ml-1 rounded px-1 font-bold" style={{ background: "#FFF3E8", color: ORANGE, fontSize: 9 }}>OWNER</span>}
-                    {editors.includes(u.email.toLowerCase()) && !owner && <span className="ml-1 rounded px-1 font-bold" style={{ background: "#DCE8F5", color: "#1B3A5C", fontSize: 9 }} title="May change users here">USER EDITOR</span>}
+                    {editors.includes(u.email.toLowerCase()) && !owner && <span className="ml-1 rounded px-1 font-bold" style={{ background: "#DCE8F5", color: "var(--blue)", fontSize: 9 }} title="May change users here">USER EDITOR</span>}
                     {u.disabled && <span className="ml-1 rounded px-1 font-bold" style={{ background: "#FBEDEA", color: RED, fontSize: 9 }}>DISABLED</span>}
                   </td>
                   <td className="py-1.5 px-2" style={{ color: DIM }}>{u.email}</td>
@@ -318,7 +318,7 @@ export default function UsersApp({
                     </div>
                   </td>
                   <td className="py-1.5 px-2 text-center">
-                    <button onClick={() => setOpen(u.id)} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title={canEdit ? "Edit every setting" : "See every setting"}>✎</button>
+                    <button onClick={() => setOpen(u.id)} className="rounded px-2 py-0.5 font-semibold" style={{ background: "#DCE8F5", color: "var(--blue)" }} title={canEdit ? "Edit every setting" : "See every setting"}>✎</button>
                   </td>
                   <td className="py-1.5 px-2 text-center">
                     {mayTouch(u) && u.email.toLowerCase() !== meEmail
@@ -464,7 +464,7 @@ function UserLightbox({ u, users, departments, canEdit, ownerEmail, isOwner, meE
           {story.map((p) => (
             <div key={p.title} className="rounded border p-3 mb-2" style={{ borderColor: LINE, background: "#FBFAF7" }}>
               <div className="font-bold text-sm mb-1" style={{ color: INK }}>{p.title}</div>
-              <div className="text-sm" style={{ color: "#22303C", lineHeight: 1.5 }}>{p.means}</div>
+              <div className="text-sm" style={{ color: "var(--ink)", lineHeight: 1.5 }}>{p.means}</div>
               <div className="text-sm mt-1.5 rounded px-2 py-1.5" style={{ background: "#FFF7E6", color: "#8A5B00", lineHeight: 1.5 }}><b>Limits:</b> {p.limits}</div>
             </div>
           ))}
@@ -526,14 +526,14 @@ function UserLightbox({ u, users, departments, canEdit, ownerEmail, isOwner, meE
                 const checked = owner ? true : groups[g.key];
                 return (
                   <label key={g.key} className="flex items-center gap-1 text-xs" style={{ cursor: dis || owner ? "default" : "pointer", opacity: owner ? 0.55 : 1 }} title={owner ? "The owner is in all three already" : g.title}>
-                    <input type="checkbox" checked={checked} disabled={dis || owner} onChange={(e) => act(`${g.label} saved`, { action: "groups", id: u.id, ...normaliseGroups({ ...groups, [g.key]: e.target.checked }) })} style={{ accentColor: "#1B3A5C" }} />
-                    <span style={{ color: checked ? "#1B3A5C" : FAINT, fontWeight: checked ? 700 : 400 }}>{g.label}</span>
+                    <input type="checkbox" checked={checked} disabled={dis || owner} onChange={(e) => act(`${g.label} saved`, { action: "groups", id: u.id, ...normaliseGroups({ ...groups, [g.key]: e.target.checked }) })} style={{ accentColor: "var(--blue)" }} />
+                    <span style={{ color: checked ? "var(--blue)" : FAINT, fontWeight: checked ? 700 : 400 }}>{g.label}</span>
                   </label>
                 );
               })}
               <label className="flex items-center gap-1 text-xs" style={{ cursor: profOk && !busy ? "pointer" : "default" }} title="Marks this person ready to connect Gmail">
                 <input type="checkbox" checked={!!u.oauth_available} disabled={!profOk || busy} onChange={(e) => profile({ oauth_available: e.target.checked }, "OAuth mark saved")} />
-                <span style={{ color: u.oauth_available ? "#1B3A5C" : FAINT, fontWeight: u.oauth_available ? 700 : 400 }}>✉ OAuth</span>
+                <span style={{ color: u.oauth_available ? "var(--blue)" : FAINT, fontWeight: u.oauth_available ? 700 : 400 }}>✉ OAuth</span>
               </label>
             </div>
           </Section>
@@ -560,7 +560,7 @@ function UserLightbox({ u, users, departments, canEdit, ownerEmail, isOwner, meE
             className="rounded px-3 py-1.5 font-bold" style={{ background: u.disabled ? RED : "#E6F4EA", color: u.disabled ? "#fff" : GREEN, opacity: dis || owner ? 0.5 : 1 }}>
             {u.disabled ? "Re-enable sign-in" : "Active — click to disable"}
           </button>
-          <button disabled={dis || owner} onClick={() => act(`Reset link sent to ${u.email}`, { action: "reset_email", id: u.id })} className="rounded px-3 py-1.5 font-bold" style={{ background: "#DCE8F5", color: "#1B3A5C", opacity: dis || owner ? 0.5 : 1 }} title="They set their own new password from the mail">✉ Send password-reset link</button>
+          <button disabled={dis || owner} onClick={() => act(`Reset link sent to ${u.email}`, { action: "reset_email", id: u.id })} className="rounded px-3 py-1.5 font-bold" style={{ background: "#DCE8F5", color: "var(--blue)", opacity: dis || owner ? 0.5 : 1 }} title="They set their own new password from the mail">✉ Send password-reset link</button>
           <button disabled={dis || owner} onClick={() => { const pw = window.prompt(`New password for ${u.email} (min 8 characters):`); if (pw) act("Password set", { action: "password", id: u.id, password: pw }); }} className="rounded px-3 py-1.5 font-bold" style={{ background: "#F4F2EC", color: DIM, opacity: dis || owner ? 0.5 : 1 }} title="For somebody who cannot reach their mail">🔑 Set a password</button>
           <span style={{ flex: 1 }} />
           <button disabled={dis || owner || u.email.toLowerCase() === meEmail} onClick={async () => { if (!window.confirm(`Remove ${u.email}?\n\nThey will no longer be able to sign in. Their plans, comments and edits remain in the app.`)) return; await act(`${u.email} removed`, { action: "delete", id: u.id }); onClose(); }} className="rounded px-3 py-1.5 font-bold" style={{ background: "#FBEDEA", color: RED, opacity: dis || owner ? 0.5 : 1 }}>✕ Remove account</button>
@@ -600,7 +600,7 @@ function Provision({ onClose, reload }: { onClose: () => void; reload: () => Pro
             <input type="checkbox" checked={!!types[k]} onChange={(e) => setTypes({ ...types, [k]: e.target.checked })} /> {k[0].toUpperCase() + k.slice(1)}
           </label>
         ))}
-        <button onClick={preview} disabled={busy || !chosen.length} className="rounded px-3 py-1.5 font-bold" style={{ background: "#1B3A5C", color: "#fff" }}>{busy ? "…" : "Preview who would be made"}</button>
+        <button onClick={preview} disabled={busy || !chosen.length} className="rounded px-3 py-1.5 font-bold" style={{ background: "var(--blue)", color: "#fff" }}>{busy ? "…" : "Preview who would be made"}</button>
         {plan && <button onClick={go} disabled={busy} className="rounded px-3 py-1.5 font-bold" style={{ background: ORANGE, color: "#fff" }}>Make {(plan ?? []).filter((p) => p.why === "will be made").length} logins</button>}
         {msg && <span className="font-semibold" style={{ color: msg.includes("✓") ? GREEN : RED }}>{msg}</span>}
       </div>
@@ -755,7 +755,7 @@ function MassEdit({ rows, users, departments, ownerEmail, isOwner, meEmail, onCl
             </div>
             <div className="mt-2">
               {GROUPS.map((g) => (
-                <div key={g.key} className="flex items-center gap-2 mb-1 text-xs"><span className="font-semibold" style={{ color: "#1B3A5C", minWidth: 110 }}>{g.label}</span>{tri(rooms[g.key] || "", (t) => setRooms({ ...rooms, [g.key]: t }), "put in", "take out")}</div>
+                <div key={g.key} className="flex items-center gap-2 mb-1 text-xs"><span className="font-semibold" style={{ color: "var(--blue)", minWidth: 110 }}>{g.label}</span>{tri(rooms[g.key] || "", (t) => setRooms({ ...rooms, [g.key]: t }), "put in", "take out")}</div>
               ))}
             </div>
           </Section>
@@ -766,7 +766,7 @@ function MassEdit({ rows, users, departments, ownerEmail, isOwner, meEmail, onCl
         </div>
       </div>
 
-      <div className="rounded p-2 text-xs mb-3" style={{ background: commands.length ? "#FFF7E6" : "#F4F2EC", border: `1px solid ${commands.length ? "#F5B32B" : LINE}`, color: commands.length ? "#8A5B00" : FAINT }}>
+      <div className="rounded p-2 text-xs mb-3" style={{ background: commands.length ? "#FFF7E6" : "#F4F2EC", border: `1px solid ${commands.length ? "var(--amber)" : LINE}`, color: commands.length ? "#8A5B00" : FAINT }}>
         {commands.length ? <><b>Will do, for each of the {targets.length}:</b> {commands.join(" · ")}</> : "Choose at least one command above."}
       </div>
       {progress.length > 0 && (
@@ -776,7 +776,7 @@ function MassEdit({ rows, users, departments, ownerEmail, isOwner, meEmail, onCl
       )}
       <div className="flex justify-end gap-2">
         <button onClick={onClose} disabled={busy} className="text-xs font-semibold rounded border px-3 py-1.5 bg-white" style={{ borderColor: LINE, color: DIM }}>{progress.length ? "Close" : "Cancel"}</button>
-        <button onClick={apply} disabled={busy || !commands.length || !targets.length} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#1B3A5C", color: "#fff", opacity: busy || !commands.length ? 0.5 : 1 }}>{busy ? `Applying… ${progress.length}/${targets.length}` : `Apply to ${targets.length}`}</button>
+        <button onClick={apply} disabled={busy || !commands.length || !targets.length} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--blue)", color: "#fff", opacity: busy || !commands.length ? 0.5 : 1 }}>{busy ? `Applying… ${progress.length}/${targets.length}` : `Apply to ${targets.length}`}</button>
       </div>
     </Shell>
   );

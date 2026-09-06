@@ -31,7 +31,7 @@ const TODAY = today();
  * captions may stay smaller; data may not.
  */
 const TD = { fontSize: 12 } as const;
-const TH = { fontSize: 11, fontWeight: 700, letterSpacing: 0.6, color: "#8A94A0" } as const;
+const TH = { fontSize: 11, fontWeight: 700, letterSpacing: 0.6, color: "var(--muted)" } as const;
 
 /** Per-row OTD %, on hover over the column header. */
 const OTD_ROW_FORMULA = [
@@ -71,9 +71,9 @@ const OTD_FORMULA = [
 ].join("\n");
 
 const C = {
-  ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC",
-  line: "#E2E0DA", panel: "#F4F2EC", accent: "#E8600A", navy: "#1B3A5C",
-  green: "#0D7A3F", amber: "#D97706", red: "#B3261E", violet: "#7C3AED",
+  ink: "var(--navy)", body: "var(--ink)", sub: "var(--dim)", mute: "var(--muted)", faint: "#B8B5AC",
+  line: "var(--line)", panel: "#F4F2EC", accent: "var(--accent)", navy: "var(--blue)",
+  green: "var(--green)", amber: "var(--warn)", red: "var(--red)", violet: "#7C3AED",
 };
 
 interface Payload {
@@ -283,7 +283,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
       <div className="flex gap-1 rounded p-1 bg-white border mb-3" style={{ borderColor: C.line, width: "fit-content" }}>
         {([["jobs", "Delivered Jobs"], ["install", "Installation Jobs"], ["analytics", "Delivered Jobs Analytics"]] as const).map(([k, l]) => (
           <button key={k} onClick={() => setSub(k)} className="px-3 py-1 rounded text-sm font-semibold"
-            style={sub === k ? { background: "#22303C", color: "#fff" } : { color: C.sub }}>
+            style={sub === k ? { background: "var(--ink)", color: "#fff" } : { color: C.sub }}>
             {l}
           </button>
         ))}
@@ -365,7 +365,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
               <td className="pr-2 py-0.5 font-bold" style={{ color: C.mute, fontSize: 10.5 }}>{l}</td>
               <td className="text-right px-1 py-0.5 tnum font-bold" style={{ color: C.ink }}>{money ? V(a) : a.toFixed(1)}</td>
               <td className="text-right px-1 py-0.5 tnum" style={{ color: C.navy }}>{t != null ? (money ? V(t) : String(Math.ceil(t))) : "—"}</td>
-              <td className="text-right pl-1 py-0.5 tnum font-bold" style={{ color: r == null ? C.faint : t != null && r > t ? "#B3261E" : C.green }}>
+              <td className="text-right pl-1 py-0.5 tnum font-bold" style={{ color: r == null ? C.faint : t != null && r > t ? "var(--red)" : C.green }}>
                 {r != null ? (money ? V(r) : String(Math.ceil(r))) : "—"}
               </td>
             </tr>
@@ -373,7 +373,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
           return (
             <div className="rounded-lg border bg-white p-3" style={{ borderColor: C.line, borderTop: `3px solid #7C3AED`, flex: "1 1 0", minWidth: 250 }}>
               <div className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>RUN RATE / MONTH · TARGET · REQUIRED</div>
-              <table className="mt-1" style={{ fontSize: 12.5, width: "100%" }}>
+              <table className="mt-1 genie-table" style={{ fontSize: 12.5, width: "100%" }}>
                 <thead>
                   <tr style={{ fontSize: 9.5, color: C.faint }}>
                     <td /><td className="text-right px-1">RUN RATE</td><td className="text-right px-1">TARGET</td><td className="text-right pl-1">REQUIRED</td>
@@ -391,7 +391,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
       </div>
 
       {/* what a "delivery" means here — said once, in the company's own navy */}
-      <div className="rounded-lg px-3 py-2 mb-3 text-sm font-semibold" style={{ background: "#1B3A5C", color: "#fff", lineHeight: 1.5, display: sub === "jobs" ? undefined : "none" }}>
+      <div className="rounded-lg px-3 py-2 mb-3 text-sm font-semibold" style={{ background: "var(--blue)", color: "#fff", lineHeight: 1.5, display: sub === "jobs" ? undefined : "none" }}>
         These deliveries are based on ERP dates — NOT invoice dates. ERP dates are the actual delivery from the factory.
         <span style={{ color: "#B9C7D4", fontWeight: 500 }}> · Note: Delivered = Delivered and Installation Stage.</span>
         <div className="mt-1" style={{ color: "#B9C7D4", fontWeight: 500, fontSize: 13 }}>
@@ -409,15 +409,15 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
           <div className="flex gap-2 flex-wrap mb-3">
             {/* LEFT — what still stands on the boards for the period */}
             <div className="rounded-lg border p-3" style={{ flex: "1 1 420px", minWidth: 320, borderColor: "#B9C7D4", background: "#F2F7FB", borderLeft: "4px solid #1B3A5C" }}>
-              <div className="text-sm" style={{ color: "#16232F" }}>
+              <div className="text-sm" style={{ color: "var(--navy)" }}>
                 <b>More additional jobs planned for {pl}</b>
                 {" — "}<b className="tnum">{pipe.nos}</b> nos + <b className="tnum" style={{ color: C.accent }}>{V(pipe.val)}</b> value + <b className="tnum" style={{ color: C.green }}>{V(pipe.tp)}</b> throughput
-                <span className="text-xs" style={{ color: "#5A6672" }}> · target dates up to {fmtFull(periodEnd)} · on the boards, not yet delivered</span>
+                <span className="text-xs" style={{ color: "var(--dim)" }}> · target dates up to {fmtFull(periodEnd)} · on the boards, not yet delivered</span>
               </div>
               {pipe.fams.length > 0 && (
                 <div className="flex gap-1.5 flex-wrap mt-2">
                   {pipe.fams.map(([f, n]) => (
-                    <span key={f} className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#fff", border: "1px solid #B9C7D4", color: "#1B3A5C" }}>
+                    <span key={f} className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#fff", border: "1px solid #B9C7D4", color: "var(--blue)" }}>
                       {n} × {f}
                     </span>
                   ))}
@@ -426,27 +426,27 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
             </div>
             {/* RIGHT — the prize, if every one of them goes out the gate */}
             <div className="rounded-lg border p-3" style={{ flex: "1 1 360px", minWidth: 300, borderColor: "#BFE3CB", background: "#F2FAF4", borderLeft: "4px solid #0D7A3F" }}>
-              <div className="text-xs font-bold" style={{ color: "#0D7A3F", letterSpacing: 0.8 }}>IF COMPLETED AND DELIVERED — the {pl} report will read</div>
-              <div className="mt-1 tnum" style={{ fontSize: 20, fontWeight: 800, color: "#16232F" }}>
+              <div className="text-xs font-bold" style={{ color: "var(--green)", letterSpacing: 0.8 }}>IF COMPLETED AND DELIVERED — the {pl} report will read</div>
+              <div className="mt-1 tnum" style={{ fontSize: 20, fontWeight: 800, color: "var(--navy)" }}>
                 {totals.nos + pipe.nos} nos
                 <span style={{ color: C.accent }}> · {V(totals.value + pipe.val)}</span>
                 <span style={{ color: C.green }}> · {V(totals.throughput + pipe.tp)}</span>
               </div>
-              <div className="text-xs mt-1" style={{ color: "#5A6672" }}>
+              <div className="text-xs mt-1" style={{ color: "var(--dim)" }}>
                 {totals.nos} already out the gate + {pipe.nos} on the boards
               </div>
               {(() => {
                 const pm = Math.max(0.5, (Math.round((new Date(periodEnd + "T00:00:00Z").getTime() - new Date(from + "T00:00:00Z").getTime()) / 86400000) + 1) / 30.44);
                 return (
-                  <div className="text-sm mt-1 tnum" style={{ color: "#16232F" }}>
+                  <div className="text-sm mt-1 tnum" style={{ color: "var(--navy)" }}>
                     <b>Monthly average:</b> {((totals.nos + pipe.nos) / pm).toFixed(1)} nos
                     <span style={{ color: C.accent }}> · {V((totals.value + pipe.val) / pm)}</span>
                     <span style={{ color: C.green }}> · {V((totals.throughput + pipe.tp) / pm)}</span>
-                    <span className="text-xs" style={{ color: "#5A6672" }}> over the {pm.toFixed(1)}-month period</span>
+                    <span className="text-xs" style={{ color: "var(--dim)" }}> over the {pm.toFixed(1)}-month period</span>
                   </div>
                 );
               })()}
-              <div className="mt-1.5 font-bold" style={{ color: "#0D7A3F", fontSize: 13 }}>
+              <div className="mt-1.5 font-bold" style={{ color: "var(--green)", fontSize: 13 }}>
                 Come on — LET&apos;S DO IT AND SHOW THIS SUCCESS! 🚀
               </div>
             </div>
@@ -480,7 +480,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
                 </span>
                 <span style={{ fontSize: 12, color: C.mute }}>mean of {otd.measurable}</span>
               </div>
-              <div className="mt-1" style={{ height: 7, background: "#EFEDE7", borderRadius: 2, overflow: "hidden" }}>
+              <div className="mt-1" style={{ height: 7, background: "var(--line-soft)", borderRadius: 2, overflow: "hidden" }}>
                 <div style={{
                   width: `${Math.max(0, Math.min(100, otd.pct))}%`, height: 7,
                   background: otd.pct >= 90 ? C.green : otd.pct >= 50 ? C.amber : C.red,
@@ -540,7 +540,7 @@ export default function DeliveredJobs({ V }: { V: (rupees: number) => string }) 
 
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+          <table className="w-full text-xs genie-table" style={{ borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ color: C.mute, borderBottom: `1px solid ${C.line}` }}>
                 <th className="text-left px-3 py-2" style={TH}>{cut === "month" ? "MONTH" : cut === "family" ? "FAMILY" : "CUSTOMER"}</th>
@@ -605,7 +605,7 @@ function MiniBar({ v, max, mid, color }: { v: number; max: number; mid: number; 
   const w = Math.max(2, (v / max) * 100);
   const m = mid > 0 ? (mid / max) * 100 : null;
   return (
-    <div className="relative" style={{ height: 9, background: "#EFEDE7", borderRadius: 2 }}>
+    <div className="relative" style={{ height: 9, background: "var(--line-soft)", borderRadius: 2 }}>
       <div style={{ width: `${w}%`, height: 9, background: color, borderRadius: 2 }} />
       {m != null && (
         <div title={`median ${Math.round(mid).toLocaleString("en-IN")}`}
@@ -710,7 +710,7 @@ function JobTable({ rows, V }: { rows: DeliveredJob[]; V: (n: number) => string 
         ))}
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+        <table className="w-full text-xs genie-table" style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ color: C.mute, borderBottom: `1px solid ${C.line}` }}>
               {[
@@ -833,7 +833,7 @@ function InstallationTable({ rows, V }: { rows: NonNullable<Payload["installatio
       </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+            <table className="w-full text-xs genie-table" style={{ borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ color: C.mute, borderBottom: `1px solid ${C.line}` }}>
                   <th className="text-left px-3 py-2" style={TH}>PROJECT</th>
@@ -855,7 +855,7 @@ function InstallationTable({ rows, V }: { rows: NonNullable<Payload["installatio
                     <td className="text-right px-2 py-1.5 tnum" style={TD}>{r.delivered_on ? fmtFull(r.delivered_on) : "—"}</td>
                     <td className="text-right px-2 py-1.5 tnum" style={{ ...TD, color: C.ink }}>{r.val > 1 ? V(r.val) : "—"}</td>
                     <td className="text-right px-2 py-1.5 tnum" style={{ ...TD, color: C.green }}>{r.billed != null ? V(r.billed) : "—"}</td>
-                    <td className="text-right px-2 py-1.5 tnum font-bold" style={{ ...TD, color: r.pending ? "#B3261E" : C.faint }}>{r.pending != null ? V(r.pending) : "—"}</td>
+                    <td className="text-right px-2 py-1.5 tnum font-bold" style={{ ...TD, color: r.pending ? "var(--red)" : C.faint }}>{r.pending != null ? V(r.pending) : "—"}</td>
                     <td className="px-2 py-1.5" style={{ ...TD, color: C.sub, maxWidth: 340 }} title={r.status || ""}>{r.status ? r.status.slice(0, 120) + (r.status.length > 120 ? "…" : "") : "—"}</td>
                   </tr>
                 ))}
@@ -869,7 +869,7 @@ function InstallationTable({ rows, V }: { rows: NonNullable<Payload["installatio
                     <td className="px-3 py-2" colSpan={4} style={{ ...TD, color: C.ink }}>Total · {(rows).length} at site</td>
                     <td className="text-right px-2 py-2 tnum" style={{ ...TD, color: C.ink }}>{V((rows).reduce((s, r) => s + (r.val > 1 ? r.val : 0), 0))}</td>
                     <td className="text-right px-2 py-2 tnum" style={{ ...TD, color: C.green }}>{V((rows).reduce((s, r) => s + (r.billed ?? 0), 0))}</td>
-                    <td className="text-right px-2 py-2 tnum" style={{ ...TD, color: "#B3261E" }}>{V((rows).reduce((s, r) => s + (r.pending ?? 0), 0))}</td>
+                    <td className="text-right px-2 py-2 tnum" style={{ ...TD, color: "var(--red)" }}>{V((rows).reduce((s, r) => s + (r.pending ?? 0), 0))}</td>
                     <td className="px-2" style={{ fontSize: 10, color: C.faint }}>billed = value − pending, where the live board still knows the money</td>
                   </tr>
                 </tfoot>

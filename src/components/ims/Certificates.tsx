@@ -118,7 +118,7 @@ export default function Certificates({ boot }: { boot: Boot }) {
                       <span style={{ color: expiryColour(c.expiry_date), fontWeight: 700 }}>{fmtD(c.expiry_date)}</span>
                       <div style={{ fontSize: 10, color: MUTED }}>{expiryWords(c.expiry_date)}</div>
                     </Td>
-                    <Td>{owner ? owner.full_name : <span style={{ color: "#B3261E", fontWeight: 700 }}>Nobody</span>}</Td>
+                    <Td>{owner ? owner.full_name : <span style={{ color: "var(--red)", fontWeight: 700 }}>Nobody</span>}</Td>
                     <Td>
                       {c.file_path
                         ? <button onClick={() => view(String(c.file_path))} className="font-bold underline" style={{ color: INK }}>Open</button>

@@ -80,7 +80,7 @@ export default function WhatsAppBroadcast({ who }: { who: string }) {
 
   const q = st?.queue;
   const audience = Object.entries(st?.byType || {}).filter(([t]) => !types.size || types.has(t)).reduce((a, [, v]) => ({ n: a.n + v.n, p: a.p + v.withPhone }), { n: 0, p: 0 });
-  const tone = (s: string) => (s === "delivered" ? C.green : s === "failed" ? C.red : s === "sent" ? "#1B3A5C" : C.dim);
+  const tone = (s: string) => (s === "delivered" ? C.green : s === "failed" ? C.red : s === "sent" ? "var(--blue)" : C.dim);
 
   return (
     <Pane title="WhatsApp — one message to everybody" who={who}
@@ -123,8 +123,8 @@ export default function WhatsAppBroadcast({ who }: { who: string }) {
           <div className="text-xs mt-1" style={{ color: C.faint }}>{types.size ? "Ticked types only" : "Nobody ticked = everybody on the roll"} · {audience.p} of {audience.n} have a personal mobile.</div>
 
           <div className="flex gap-2 mt-3 flex-wrap">
-            <button onClick={doPreview} disabled={busy || !bodyTxt.trim()} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#1B3A5C", color: "#fff" }}>👁 Preview</button>
-            <button onClick={doQueue} disabled={busy || !preview} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: preview ? C.orange : "#E2E0DA", color: preview ? "#fff" : C.faint }}>⏳ Queue {preview ? preview.count - preview.noPhone : ""}</button>
+            <button onClick={doPreview} disabled={busy || !bodyTxt.trim()} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--blue)", color: "#fff" }}>👁 Preview</button>
+            <button onClick={doQueue} disabled={busy || !preview} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: preview ? C.orange : "var(--line)", color: preview ? "#fff" : C.faint }}>⏳ Queue {preview ? preview.count - preview.noPhone : ""}</button>
           </div>
 
           {preview && (
@@ -157,7 +157,7 @@ export default function WhatsAppBroadcast({ who }: { who: string }) {
             </div>
           )}
           <div className="flex gap-2 flex-wrap mb-2">
-            <button onClick={doSend} disabled={busy || !(q?.counts?.queued)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: q?.counts?.queued ? C.green : "#E2E0DA", color: q?.counts?.queued ? "#fff" : C.faint }}>▶ Send next 10</button>
+            <button onClick={doSend} disabled={busy || !(q?.counts?.queued)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: q?.counts?.queued ? C.green : "var(--line)", color: q?.counts?.queued ? "#fff" : C.faint }}>▶ Send next 10</button>
             <button onClick={doCheck} disabled={busy || !(q?.counts?.sent)} className="text-xs font-semibold rounded border px-3 py-1.5 bg-white" style={{ borderColor: C.line, color: C.dim }}>⟳ Check delivery</button>
             <button onClick={load} className="text-xs font-semibold rounded border px-3 py-1.5 bg-white" style={{ borderColor: C.line, color: C.dim }}>↻</button>
           </div>

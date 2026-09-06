@@ -126,7 +126,7 @@ export default function Items({ summary, initialGroup }: { summary: Summary; ini
     </style></head><body>
       <h1>📦 Nandan Saamaan — Items</h1>
       <div class="sub">${esc(filtersWords)} · rows ${from}–${to} of ${total.toLocaleString("en-IN")} · printed ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</div>
-      <table><thead><tr><th>Code</th><th>Name</th><th>Group</th><th>UOM</th><th>Class</th><th>QC</th><th class="n">Last purchase</th><th class="n">Valuation</th><th class="n">Closing (ERP)</th><th class="n">Closing (Genie)</th><th>Drawings</th></tr></thead>
+      <table className="genie-table"><thead><tr><th>Code</th><th>Name</th><th>Group</th><th>UOM</th><th>Class</th><th>QC</th><th class="n">Last purchase</th><th class="n">Valuation</th><th class="n">Closing (ERP)</th><th class="n">Closing (Genie)</th><th>Drawings</th></tr></thead>
       <tbody>${body}</tbody></table>
     </body></html>`);
     w.document.close();
@@ -420,7 +420,7 @@ function StockRegister({ code, base, data, err }: { code: string; base: string; 
       </div>
       {data.ledger.length ? (
         <div className="rounded border overflow-auto" style={{ borderColor: BORDER, background: "#fff", maxHeight: "50vh" }}>
-          <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 900 }}>
+          <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 900 }}>
             <thead><tr style={{ background: NAVY, color: "#fff", position: "sticky", top: 0 }}>
               <th className="px-2 py-1 text-left">Date</th><th className="px-2 py-1 text-left">Warehouse</th><th className="px-2 py-1 text-right">In</th><th className="px-2 py-1 text-right">Out</th>
               <th className="px-2 py-1 text-right">Balance</th><th className="px-2 py-1 text-right">Rate</th><th className="px-2 py-1 text-right">Balance value</th>
@@ -435,7 +435,7 @@ function StockRegister({ code, base, data, err }: { code: string; base: string; 
                   <td className="px-2 py-1 tnum whitespace-nowrap" style={{ borderBottom: `1px solid ${BORDER}` }}>{fmtD(l.posting_date)} <span style={{ color: MUTED }}>{S(l.posting_time).slice(0, 5)}</span></td>
                   <td className="px-2 py-1" style={{ borderBottom: `1px solid ${BORDER}` }}>{l.warehouse}</td>
                   <td className="px-2 py-1 text-right tnum font-bold" style={{ borderBottom: `1px solid ${BORDER}`, color: GREEN }} title={reco ? "a reconciliation set the balance; the movement is the difference from the line before" : ""}>{q > 0 ? `${qtyFmt(q)}${reco ? "≈" : ""}` : unknown ? "·" : ""}</td>
-                  <td className="px-2 py-1 text-right tnum font-bold" style={{ borderBottom: `1px solid ${BORDER}`, color: "#B3261E" }} title={reco ? "a reconciliation set the balance; the movement is the difference from the line before" : ""}>{q < 0 ? `${qtyFmt(-q)}${reco ? "≈" : ""}` : ""}</td>
+                  <td className="px-2 py-1 text-right tnum font-bold" style={{ borderBottom: `1px solid ${BORDER}`, color: "var(--red)" }} title={reco ? "a reconciliation set the balance; the movement is the difference from the line before" : ""}>{q < 0 ? `${qtyFmt(-q)}${reco ? "≈" : ""}` : ""}</td>
                   <td className="px-2 py-1 text-right tnum" style={{ borderBottom: `1px solid ${BORDER}` }}>{qtyFmt(l.qty_after_transaction)}</td>
                   <td className="px-2 py-1 text-right tnum" style={{ borderBottom: `1px solid ${BORDER}` }} title={`incoming ${money(l.incoming_rate)}`}>{money(l.valuation_rate)}</td>
                   <td className="px-2 py-1 text-right tnum" style={{ borderBottom: `1px solid ${BORDER}` }}>{money(l.stock_value)}</td>
@@ -493,7 +493,7 @@ function Detail({ code, base, onClose }: { code: string; base: string; onClose: 
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-2">
               <Chip text={S(item.item_group)} colour={NAVY} />
-              {item.disabled ? <Chip text="Disabled on the ERP" colour="#5A6672" /> : null}
+              {item.disabled ? <Chip text="Disabled on the ERP" colour="var(--dim)" /> : null}
               {S(item.qc_status) && <Chip text={S(item.qc_status)} colour={statusColour(S(item.qc_status))} />}
               {S(item.custom_item_class) && <Chip text={`Class ${S(item.custom_item_class)}`} colour={MUTED} />}
             </div>
@@ -613,7 +613,7 @@ function Detail({ code, base, onClose }: { code: string; base: string; onClose: 
               <div key={k} className="mb-3">
                 <div className="text-xs font-bold uppercase mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>{CHILD_WORDS[k] ?? k} ({rows.length})</div>
                 <div className="rounded border overflow-auto" style={{ borderColor: BORDER, background: "#fff" }}>
-                  <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+                  <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
                     <thead><tr style={{ background: NAVY, color: "#fff" }}>{cols.map((c) => <th key={c} className="px-2 py-1 text-left whitespace-nowrap">{c}</th>)}</tr></thead>
                     <tbody>{rows.map((r, i) => (
                       <tr key={i} style={{ background: i % 2 ? "#FAF9F5" : "#fff" }}>

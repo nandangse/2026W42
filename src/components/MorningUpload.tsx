@@ -89,12 +89,12 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
   const NUMWORD = ["no", "one", "two", "three", "four", "five", "six"];
 
   return (
-    <div className={embedded ? "" : "min-h-screen"} style={embedded ? {} : { background: "#F1EFE9" }}>
+    <div className={embedded ? "" : "min-h-screen"} style={embedded ? {} : { background: "var(--paper)" }}>
       {!embedded && <QuoteOfDay />}
       {!embedded && (
         <div
           className="px-4 py-2.5"
-          style={{ background: "#16232F", borderBottom: "3px solid #E8600A" }}
+          style={{ background: "var(--navy)", borderBottom: "3px solid #E8600A" }}
         >
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-3">
@@ -103,7 +103,7 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
                 <img src={LOGO} alt="Nandan GSE" style={{ height: 30 }} />
               </div>
               <div>
-                <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>
+                <div className="text-xs tracking-widest font-bold" style={{ color: "var(--accent)" }}>
                   GENIE
                 </div>
                 <h1 className="text-base font-bold text-white leading-tight">
@@ -113,7 +113,7 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
             </div>
             <span className="text-xs rounded px-2 py-1.5" style={{ background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }}>
               👤 {email}
-              <button onClick={logout} className="ml-1 font-bold" style={{ color: "#E8600A" }}>
+              <button onClick={logout} className="ml-1 font-bold" style={{ color: "var(--accent)" }}>
                 Logout
               </button>
             </span>
@@ -129,14 +129,14 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
         <ErpSyncPanel />
 
         <div className="mb-3 flex items-baseline justify-between flex-wrap gap-2">
-          <h2 className="text-lg font-bold" style={{ color: "#16232F" }}>
+          <h2 className="text-lg font-bold" style={{ color: "var(--navy)" }}>
             {rows.length === dailyTotal
               ? `Today's ${NUMWORD[dailyTotal] || dailyTotal} files`
               : `The ${NUMWORD[rows.length] || rows.length} morning files`}
           </h2>
           <span
             className="text-sm font-semibold"
-            style={{ color: dailyTotal > 0 && loadedCount === dailyTotal ? "#0D7A3F" : "#8A94A0" }}
+            style={{ color: dailyTotal > 0 && loadedCount === dailyTotal ? "var(--green)" : "var(--muted)" }}
           >
             {loadedCount}/{dailyTotal} daily loaded{date && ` · ${date.split("-").reverse().join("-")}`}
           </span>
@@ -147,8 +147,8 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
             // Daily files are chased in red until they land. An occasional file
             // is never overdue, so it reports its own history in a neutral tone
             // rather than accusing Shweta of missing something.
-            const edge = r.loadedToday ? "#0D7A3F" : r.daily ? "#E8600A" : "#C9C6BE";
-            const tone = r.loadedToday ? "#0D7A3F" : r.daily ? "#B3261E" : "#8A94A0";
+            const edge = r.loadedToday ? "var(--green)" : r.daily ? "var(--accent)" : "#C9C6BE";
+            const tone = r.loadedToday ? "var(--green)" : r.daily ? "var(--red)" : "var(--muted)";
             const statusText = r.loadedToday
               ? `✓ loaded today${r.at ? " at " + timeOf(r.at) : ""}`
               : r.daily
@@ -160,22 +160,22 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
             <div
               key={r.key}
               className="bg-white rounded-lg p-3 border flex flex-col gap-2"
-              style={{ borderColor: "#E2E0DA", borderLeft: `5px solid ${edge}` }}
+              style={{ borderColor: "var(--line)", borderLeft: `5px solid ${edge}` }}
             >
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div>
-                  <div className="font-bold text-sm flex items-center gap-2" style={{ color: "#16232F" }}>
+                  <div className="font-bold text-sm flex items-center gap-2" style={{ color: "var(--navy)" }}>
                     {r.nm}
                     {!r.daily && (
                       <span
                         className="text-[10px] font-bold rounded px-1.5 py-0.5"
-                        style={{ background: "#EDEAE3", color: "#8A94A0" }}
+                        style={{ background: "#EDEAE3", color: "var(--muted)" }}
                       >
                         WHEN IT CHANGES
                       </span>
                     )}
                   </div>
-                  <div className="text-xs" style={{ color: "#8A94A0" }}>
+                  <div className="text-xs" style={{ color: "var(--muted)" }}>
                     {r.desc}
                   </div>
                 </div>
@@ -201,7 +201,7 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
                     target="_blank"
                     rel="noreferrer"
                     className="text-xs rounded px-2 py-1.5 font-semibold"
-                    style={{ background: "#DCE8F5", color: "#1B3A5C" }}
+                    style={{ background: "#DCE8F5", color: "var(--blue)" }}
                   >
                     ⬇ Download sheet
                   </a>
@@ -219,7 +219,7 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
                   onClick={() => fileRefs.current[r.key]?.click()}
                   disabled={busyKey === r.key}
                   className="text-xs rounded px-3 py-1.5 font-bold"
-                  style={{ background: "#E8600A", color: "#fff", opacity: busyKey === r.key ? 0.6 : 1 }}
+                  style={{ background: "var(--accent)", color: "#fff", opacity: busyKey === r.key ? 0.6 : 1 }}
                 >
                   {busyKey === r.key ? "Uploading…" : "⬆ Upload"}
                 </button>
@@ -232,13 +232,13 @@ export default function MorningUpload({ email, embedded = false }: { email: stri
         {msg && (
           <pre
             className="mt-4 text-xs rounded p-3 whitespace-pre-wrap"
-            style={{ background: "#fff", border: "1px solid #E2E0DA", color: "#22303C" }}
+            style={{ background: "#fff", border: "1px solid #E2E0DA", color: "var(--ink)" }}
           >
             {msg}
           </pre>
         )}
 
-        <p className="text-xs mt-4" style={{ color: "#8A94A0" }}>
+        <p className="text-xs mt-4" style={{ color: "var(--muted)" }}>
           The full PRE workbook is also accepted here — it covers Jobs + Projects
           in one upload. The app never talks to the ERP; these links just open in
           your browser. Delivered Jobs is the one file that is not needed every

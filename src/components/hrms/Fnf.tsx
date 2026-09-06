@@ -60,7 +60,7 @@ export default function Fnf({ who, isOwner }: { who: string; isOwner: boolean })
         <span className="text-xs" style={{ color: C.faint }}>{shown.length} settlement{shown.length === 1 ? "" : "s"}</span>
       </div>
       <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflowX: "auto" }}>
-        <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+        <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
           <thead><tr style={{ color: C.faint, fontSize: 11 }}>
             {["No.", "Person", "Done on", "Resignation", "Exit", "Called for F&F", "Loan closing", "Pending exp.", "TDS of year", "Advance paid", "Advance to pay", "Checklist", "Status", ""].map((h, i) => (
               <th key={h + i} className="text-left px-2 py-1.5" style={{ borderBottom: `1px solid ${C.line}`, textAlign: i >= 6 && i <= 10 ? "right" : "left" }}>{h}</th>
@@ -74,7 +74,7 @@ export default function Fnf({ who, isOwner }: { who: string; isOwner: boolean })
               return (
                 <tr key={r.id} style={{ borderTop: "1px solid #EEECE6", cursor: "pointer" }} role="button" tabIndex={0} onClick={() => setOpen(r.id)}>
                   <td className="px-2 py-1.5" style={{ color: C.faint }}>{r.fnf_no || "—"}</td>
-                  <td className="px-2 py-1.5"><b style={{ color: "#1B3A5C" }}>{r.name}</b><br /><span style={{ fontSize: 11, color: C.faint }}>{r.employee_id} · {r.designation || "—"} · {r.department || "—"}</span></td>
+                  <td className="px-2 py-1.5"><b style={{ color: "var(--blue)" }}>{r.name}</b><br /><span style={{ fontSize: 11, color: C.faint }}>{r.employee_id} · {r.designation || "—"} · {r.department || "—"}</span></td>
                   <td className="px-2 py-1.5">{day(r.done_on)}</td>
                   <td className="px-2 py-1.5">{day(r.resignation_date)}</td>
                   <td className="px-2 py-1.5">{day(r.exit_date)}</td>
@@ -86,7 +86,7 @@ export default function Fnf({ who, isOwner }: { who: string; isOwner: boolean })
                   <td className="px-2 py-1.5 text-right tnum">{inr(r.advance_to_pay)}</td>
                   <td className="px-2 py-1.5"><span style={{ color: r.checklist_done === r.checklist_total ? C.green : C.dim }}>{r.checklist_done}/{r.checklist_total}</span></td>
                   <td className="px-2 py-1.5"><span className="rounded px-1.5 py-0.5 font-bold" style={{ background: tone.bg, color: tone.fg, fontSize: 10.5 }}>{r.status}</span></td>
-                  <td className="px-2 py-1.5"><span style={{ color: "#1B3A5C" }}>open ›</span></td>
+                  <td className="px-2 py-1.5"><span style={{ color: "var(--blue)" }}>open ›</span></td>
                 </tr>
               );
             })}
@@ -128,7 +128,7 @@ function AddNew({ onClose, onCreated }: { onClose: () => void; onCreated: (id: s
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,0.55)", zIndex: 70, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "32px 16px", overflowY: "auto" }}>
       <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg" style={{ width: "min(680px, 100%)" }}>
-        <div className="px-4 py-3 flex items-center" style={{ background: "#16232F", color: "#fff" }}>
+        <div className="px-4 py-3 flex items-center" style={{ background: "var(--navy)", color: "#fff" }}>
           <div style={{ flex: 1 }}><div className="font-bold" style={{ fontSize: 16 }}>New settlement</div><div className="text-xs" style={{ color: "#8FA1B3" }}>The person, the dates, and the money HR knows. The rest comes from the record.</div></div>
           <button onClick={onClose} className="font-bold" style={{ color: "#8FA1B3", fontSize: 20 }}>✕</button>
         </div>
@@ -151,7 +151,7 @@ function AddNew({ onClose, onCreated }: { onClose: () => void; onCreated: (id: s
           ) : (
             <div className="rounded p-2 mb-3 flex items-center gap-2" style={{ background: "#FBFAF7", border: `1px solid ${C.line}` }}>
               <div style={{ flex: 1 }}><b>{pick.name}</b> <span style={{ color: C.faint, fontSize: 12 }}>{pick.id} · {pick.designation || "—"} · {pick.department || "—"} · {pick.type || "—"}</span></div>
-              <button onClick={() => setPick(null)} className="text-xs" style={{ color: "#1B3A5C" }}>change</button>
+              <button onClick={() => setPick(null)} className="text-xs" style={{ color: "var(--blue)" }}>change</button>
             </div>
           )}
           <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
@@ -221,7 +221,7 @@ function Settlement({ id, who, isOwner, onBack }: { id: string; who: string; isO
   const done = (r.checklist || []).filter((c) => c.done).length;
 
   const TabBtn = ({ k, label }: { k: Tab; label: string }) => (
-    <button onClick={() => setTab(k)} className="text-xs font-bold rounded px-2.5 py-1.5" style={tab === k ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>{label}</button>
+    <button onClick={() => setTab(k)} className="text-xs font-bold rounded px-2.5 py-1.5" style={tab === k ? { background: "var(--navy)", color: "#fff" } : { color: "#5B6B7A" }}>{label}</button>
   );
 
   return (
@@ -238,7 +238,7 @@ function Settlement({ id, who, isOwner, onBack }: { id: string; who: string; isO
 
       {/* the money at a glance */}
       <div className="flex gap-2 flex-wrap mb-3">
-        {[["Earnings", inr(st.totalEarn), C.green], ["Deductions", inr(st.totalDed), C.red], [st.net >= 0 ? "Net payable" : "Net recoverable", inr(Math.abs(st.net)), "#1B3A5C"], ["Checklist", `${done}/${(r.checklist || []).length}`, done === (r.checklist || []).length ? C.green : C.dim], ["Exit", day(r.exit_date), C.ink], ["F&F on", day(r.fnf_call_date), C.ink]].map(([l, v, c]) => (
+        {[["Earnings", inr(st.totalEarn), C.green], ["Deductions", inr(st.totalDed), C.red], [st.net >= 0 ? "Net payable" : "Net recoverable", inr(Math.abs(st.net)), "var(--blue)"], ["Checklist", `${done}/${(r.checklist || []).length}`, done === (r.checklist || []).length ? C.green : C.dim], ["Exit", day(r.exit_date), C.ink], ["F&F on", day(r.fnf_call_date), C.ink]].map(([l, v, c]) => (
           <div key={l} className="bg-white rounded-lg border px-3 py-2" style={{ borderColor: C.line, minWidth: 130 }}>
             <div className="font-bold" style={{ fontSize: 18, color: c as string }}>{v}</div><div className="text-xs" style={{ color: C.faint }}>{l}</div>
           </div>
@@ -286,7 +286,7 @@ function Preview({ id, doc, html }: { id: string; doc: DocKey; html?: string }) 
     <div className="bg-white rounded-lg border" style={{ borderColor: C.line }}>
       <div className="px-3 py-2 flex items-center gap-2 no-print" style={{ borderBottom: `1px solid ${C.line}` }}>
         <span className="text-xs font-bold" style={{ color: C.faint }}>PREVIEW</span><span style={{ flex: 1 }} />
-        <a href={`/hrms/fnf/${id}/print?doc=${doc}`} target="_blank" rel="noopener noreferrer" className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#16232F", color: "#fff" }}>🖨 Open for paper / PDF</a>
+        <a href={`/hrms/fnf/${id}/print?doc=${doc}`} target="_blank" rel="noopener noreferrer" className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--navy)", color: "#fff" }}>🖨 Open for paper / PDF</a>
       </div>
       <div className="p-4" style={{ overflowX: "auto" }}>
         {html ? <div dangerouslySetInnerHTML={{ __html: html }} /> : <div className="text-xs" style={{ color: C.faint }}>rendering…</div>}
@@ -331,7 +331,7 @@ function Details({ r, save, person }: { r: FnfRow; save: (p: Record<string, unkn
             <div className="font-bold" style={{ color: C.faint }}>CONTACT ON RECORD</div>
             Personal mobile <b>{person.phone || "—"}</b> · Company mobile <b>{person.company_mobile || "—"}</b><br />
             Personal e-mail <b>{person.personal_email || "—"}</b> · Work e-mail <b>{person.email || "—"}</b><br />
-            {person.drive_folder ? <a href={person.drive_folder} target="_blank" rel="noopener noreferrer" style={{ color: "#1B3A5C", textDecoration: "underline" }}>{person.drive_folder_name || "Drive folder"}</a> : "No Drive folder on record"}
+            {person.drive_folder ? <a href={person.drive_folder} target="_blank" rel="noopener noreferrer" style={{ color: "var(--blue)", textDecoration: "underline" }}>{person.drive_folder_name || "Drive folder"}</a> : "No Drive folder on record"}
             {person.drive_folder_name && /^\s*active/i.test(person.drive_folder_name) && <span style={{ color: C.red }}> — rename to Inactive - … before closing</span>}
           </div>
         )}
@@ -352,7 +352,7 @@ function Checklist({ id, r, reload, save, html }: { id: string; r: FnfRow; reloa
     <>
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: C.red }}>{msg}</div>}
       <div className="bg-white rounded-lg border mb-3" style={{ borderColor: C.line }}>
-        <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+        <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
           <thead><tr style={{ color: C.faint, fontSize: 11 }}>
             <th className="px-2 py-1.5 text-left" style={{ borderBottom: `1px solid ${C.line}`, width: 28 }}>#</th>
             <th className="px-2 py-1.5 text-left" style={{ borderBottom: `1px solid ${C.line}` }}>Closing activity</th>
@@ -376,7 +376,7 @@ function Checklist({ id, r, reload, save, html }: { id: string; r: FnfRow; reloa
         </table>
         <div className="px-2 py-2 flex gap-2 no-print" style={{ borderTop: `1px solid ${C.line}` }}>
           <input value={newItem} onChange={(e) => setNewItem(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="another closing activity…" style={{ ...inp, flex: 1 }} />
-          <button onClick={add} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#1B3A5C", color: "#fff" }}>+ Add line</button>
+          <button onClick={add} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--blue)", color: "#fff" }}>+ Add line</button>
         </div>
       </div>
       <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: C.line }}>
@@ -410,7 +410,7 @@ function Calculation({ r, st, save, html, id }: { r: FnfRow; st: ReturnType<type
         </div>
       ))}
       <div className="flex gap-2">
-        <button onClick={() => set([...list, { label: "", amount: 0 }])} className="text-xs font-semibold" style={{ color: "#1B3A5C" }}>+ another line</button>
+        <button onClick={() => set([...list, { label: "", amount: 0 }])} className="text-xs font-semibold" style={{ color: "var(--blue)" }}>+ another line</button>
         {JSON.stringify(list) !== JSON.stringify(r[key] || []) && <button onClick={() => save({ [key]: list.filter((l) => l.label || l.amount) }, "Lines saved")} className="text-xs font-bold rounded px-2 py-0.5" style={{ background: C.green, color: "#fff" }}>Save lines</button>}
       </div>
     </div>
@@ -418,12 +418,12 @@ function Calculation({ r, st, save, html, id }: { r: FnfRow; st: ReturnType<type
   return (
     <>
       <div className="bg-white rounded-lg border mb-3" style={{ borderColor: C.line }}>
-        <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+        <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
           <thead><tr style={{ background: "#F4F2EC", fontWeight: 700 }}><td className="px-2 py-1.5">Earnings</td><td className="px-2 py-1.5 text-right">₹</td><td className="px-2 py-1.5" style={{ width: 130 }}>Override</td></tr></thead>
           <tbody>{st.earnings.map((l, i) => <Row key={i} l={l} ov />)}</tbody>
         </table>
         <Extra list={earn} set={setEarn} key="other_earn" />
-        <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+        <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
           <thead><tr style={{ background: "#F4F2EC", fontWeight: 700 }}><td className="px-2 py-1.5">Deductions</td><td className="px-2 py-1.5 text-right">₹</td><td className="px-2 py-1.5" style={{ width: 130 }}>Override</td></tr></thead>
           <tbody>{st.deductions.map((l, i) => <Row key={i} l={l} ov />)}</tbody>
         </table>
@@ -450,7 +450,7 @@ function LetterTab({ id, r, which, defaults, save, html }: { id: string; r: FnfR
         <div className="text-xs font-bold mb-1" style={{ color: C.faint }}>{which === "resignation" ? "THE RESIGNATION AS RECEIVED — type or paste what the person wrote; the default is a standard wording" : "WORDING — saved as issued; the default is filled from the record"}</div>
         <textarea value={v} rows={14} onChange={(e) => setV(e.target.value)} style={{ ...inp, lineHeight: 1.6, fontFamily: "Georgia, serif" }} />
         <div className="flex gap-2 mt-1">
-          <button onClick={() => save({ [key]: v }, "Wording saved")} disabled={!dirty} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: dirty ? C.green : "#E2E0DA", color: dirty ? "#fff" : C.faint }}>Save wording</button>
+          <button onClick={() => save({ [key]: v }, "Wording saved")} disabled={!dirty} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: dirty ? C.green : "var(--line)", color: dirty ? "#fff" : C.faint }}>Save wording</button>
           {r[key] && <button onClick={() => save({ [key]: "" }, "Back to the default")} className="text-xs font-semibold rounded border px-3 py-1.5 bg-white" style={{ borderColor: C.line, color: C.dim }}>Back to default</button>}
         </div>
       </div>

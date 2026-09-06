@@ -150,7 +150,7 @@ export default function PurchaseOrders({ erpBase }: { erpBase: string }) {
             <a href={erpForm(erpBase, "Purchase Order", open.po.name)} target="_blank" rel="noreferrer" className="hover:underline" style={{ color: NAVY }}>open in ERP ↗</a>
           </div>
           <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, overflow: "auto", maxHeight: "60vh" }}>
-            <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+            <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
               <thead><tr style={{ color: MUTED, fontSize: 10.5 }}>{["#", "Item", "Qty", "Rate", "Amount", "Received", "Billed", "Warehouse", "Required by"].map((h, i) => <th key={h} className="px-2 py-1.5" style={{ textAlign: i >= 2 && i <= 6 ? "right" : "left", borderBottom: `1px solid ${BORDER}`, position: "sticky", top: 0, background: "#fff" }}>{h}</th>)}</tr></thead>
               <tbody>
                 {open.items.map((i) => (

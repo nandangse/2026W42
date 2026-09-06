@@ -31,14 +31,14 @@ export default function NextThirtyDays({ jobs }: { jobs: StripJob[] }) {
         const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         const dm = (iso: string) => { const d = parseISO(iso); return `${d.getUTCDate()}/${d.getUTCMonth() + 1}`; };
         /** What the mouse reveals: the jobs themselves, in delivery order. */
-        const cell = (n: number) => n ? (n > 3 ? "#B3261E" : n > 1 ? "#E8600A" : "#16232F") : "#C9C6BE";
+        const cell = (n: number) => n ? (n > 3 ? "var(--red)" : n > 1 ? "var(--accent)" : "var(--navy)") : "#C9C6BE";
         const panel = (list: StripJob[], label: string) => (
           <div style={{
             position: "absolute", top: "100%", left: 0, zIndex: 40, minWidth: 320, maxWidth: 460,
-            background: "#16232F", color: "#fff", borderRadius: 6, padding: "8px 10px",
+            background: "var(--navy)", color: "#fff", borderRadius: 6, padding: "8px 10px",
             boxShadow: "0 10px 30px rgba(22,35,47,.35)", textAlign: "left", whiteSpace: "normal",
           }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#F5B32B", letterSpacing: .6, marginBottom: 4 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "var(--amber)", letterSpacing: .6, marginBottom: 4 }}>
               {label} · {list.length} job{list.length === 1 ? "" : "s"}
             </div>
             {list.slice(0, 14).map((j) => (
@@ -52,20 +52,20 @@ export default function NextThirtyDays({ jobs }: { jobs: StripJob[] }) {
         );
 
   return (
-          <div className="hidden md:block bg-white rounded-lg border mb-3 overflow-x-auto" style={{ borderColor: "#E2E0DA" }}>
-            <div className="px-3 pt-2 text-xs font-bold" style={{ color: "#8A94A0" }}>
+          <div className="hidden md:block bg-white rounded-lg border mb-3 overflow-x-auto" style={{ borderColor: "var(--line)" }}>
+            <div className="px-3 pt-2 text-xs font-bold" style={{ color: "var(--muted)" }}>
               THE NEXT 30 DAYS — jobs by target delivery date · hover a day to see them
             </div>
-            <table className="text-xs" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}>
+            <table className="text-xs genie-table" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}>
               <tbody>
                 <tr>
                   <td onMouseEnter={() => setHoverDay("prev")} onMouseLeave={() => setHoverDay(null)}
                     className="px-1 py-1.5 text-center"
                     style={{ borderRight: "2px solid #E2E0DA", background: "#F7F5EF", cursor: before.length ? "help" : "default", width: 74, position: "relative" }}>
                     {hoverDay === "prev" && before.length > 0 && panel(before, "OVERDUE — before today")}
-                    <div style={{ fontSize: 9.5, color: "#8A94A0", fontWeight: 700 }}>PREVIOUS</div>
-                    <div className="tnum" style={{ fontSize: 15, fontWeight: 800, color: before.length ? "#B3261E" : "#C9C6BE" }}>{before.length || "·"}</div>
-                    <div style={{ fontSize: 9, color: "#8A94A0" }}>overdue</div>
+                    <div style={{ fontSize: 9.5, color: "var(--muted)", fontWeight: 700 }}>PREVIOUS</div>
+                    <div className="tnum" style={{ fontSize: 15, fontWeight: 800, color: before.length ? "var(--red)" : "#C9C6BE" }}>{before.length || "·"}</div>
+                    <div style={{ fontSize: 9, color: "var(--muted)" }}>overdue</div>
                   </td>
                   {days.map((iso) => {
                     const d = parseISO(iso);
@@ -85,7 +85,7 @@ export default function NextThirtyDays({ jobs }: { jobs: StripJob[] }) {
                         }}>
                         {hoverDay === iso && list.length > 0 && panel(list, `${dm(iso)} ${dow[d.getUTCDay()]}`)}
                         {sun && <div style={{ fontSize: 8.5, fontWeight: 800, color: "#8A6D1A" }}>W{isoWeek(iso)}</div>}
-                        <div className="tnum" style={{ fontSize: 9.5, color: sun ? "#8A6D1A" : "#8A94A0", fontWeight: sun ? 700 : 400 }}>{dm(iso)}</div>
+                        <div className="tnum" style={{ fontSize: 9.5, color: sun ? "#8A6D1A" : "var(--muted)", fontWeight: sun ? 700 : 400 }}>{dm(iso)}</div>
                         <div style={{ fontSize: 9, color: sun ? "#8A6D1A" : "#B8B5AC" }}>{dow[d.getUTCDay()]}</div>
                         <div className="tnum" style={{ fontSize: 14, fontWeight: 800, color: cell(list.length) }}>{list.length || "·"}</div>
                       </td>
@@ -97,9 +97,9 @@ export default function NextThirtyDays({ jobs }: { jobs: StripJob[] }) {
                     {hoverDay === "later" && after.length > 0 && (
                       <div style={{ position: "absolute", right: 0, top: "100%", zIndex: 40 }}>{panel(after, "BEYOND 30 DAYS")}</div>
                     )}
-                    <div style={{ fontSize: 9.5, color: "#8A94A0", fontWeight: 700 }}>LATER</div>
-                    <div className="tnum" style={{ fontSize: 15, fontWeight: 800, color: after.length ? "#1B3A5C" : "#C9C6BE" }}>{after.length || "·"}</div>
-                    <div style={{ fontSize: 9, color: "#8A94A0" }}>beyond</div>
+                    <div style={{ fontSize: 9.5, color: "var(--muted)", fontWeight: 700 }}>LATER</div>
+                    <div className="tnum" style={{ fontSize: 15, fontWeight: 800, color: after.length ? "var(--blue)" : "#C9C6BE" }}>{after.length || "·"}</div>
+                    <div style={{ fontSize: 9, color: "var(--muted)" }}>beyond</div>
                   </td>
                 </tr>
               </tbody>

@@ -436,7 +436,7 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
             <span className="ml-auto tnum">{visible.length}{visible.length !== grid.items.length ? ` of ${grid.items.length}` : ""} items · {grid.jobs.length} jobs · {grid.issues} issues so far · sorted by {sortKey}{sortDir === -1 ? " ↓" : " ↑"}</span>
           </div>
           <div className="rounded-lg border overflow-auto" style={{ borderColor: BORDER, background: "#fff", maxHeight: "70vh" }}>
-            <table className="text-xs" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 420 + grid.jobs.length * 150 }}>
+            <table className="text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 420 + grid.jobs.length * 150 }}>
               <thead>
                 <tr style={{ background: "#14224F", color: "#fff" }}>
                   <th rowSpan={fullHead ? 5 : 2} className="px-2 py-1 text-left" style={{ position: "sticky", left: 0, top: 0, zIndex: 3, background: "#14224F", width: 120, minWidth: 120, maxWidth: 120, verticalAlign: "bottom" }}>

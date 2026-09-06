@@ -86,7 +86,7 @@ export default function SalarySheets({ who: me, isOwner }: { who: string; isOwne
       </div>
 
       <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflowX: "auto" }}>
-        <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse", minWidth: 1100 }}>
+        <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse", minWidth: 1100 }}>
           <thead>
             <tr style={{ color: C.faint, fontSize: 10.5, background: "#F4F2EC" }}>
               <th className="text-left px-2 py-1.5" style={{ borderBottom: `1px solid ${C.line}` }}>Month</th>
@@ -124,7 +124,7 @@ export default function SalarySheets({ who: me, isOwner }: { who: string; isOwne
                   <td className="px-2 py-1.5" style={{ maxWidth: 190 }}>
                     <button onClick={() => setOpen(s.id)} className="text-left block w-full"
                       title={s.file_name || ""}
-                      style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      style={{ color: "var(--blue)", textDecoration: "underline", textUnderlineOffset: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {s.file_name || "(no file)"}
                     </button>
                     <div style={{ fontSize: 10, color: C.faint, whiteSpace: "nowrap" }}>
@@ -133,7 +133,7 @@ export default function SalarySheets({ who: me, isOwner }: { who: string; isOwne
                     </div>
                   </td>
                   <td className="px-2 py-1.5">
-                    <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: s.status === "Frozen" ? "#E6F4EA" : "#FFF3E8", color: s.status === "Frozen" ? "#0D7A3F" : "#8A5B00" }}>
+                    <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: s.status === "Frozen" ? "#E6F4EA" : "#FFF3E8", color: s.status === "Frozen" ? "var(--green)" : "#8A5B00" }}>
                       {s.status === "Frozen" ? "✓ Frozen" : "Draft"}
                     </span>
                   </td>
@@ -161,13 +161,13 @@ export default function SalarySheets({ who: me, isOwner }: { who: string; isOwne
                     <div className="flex gap-1 flex-wrap items-center">
                     <a href={`/hrms/salary-register/${s.id}/print`} target="_blank" rel="noopener noreferrer"
                       className="rounded px-2 py-1 font-bold inline-block"
-                      style={{ background: "#1B3A5C", color: "#fff", fontSize: 10.5 }}
+                      style={{ background: "var(--blue)", color: "#fff", fontSize: 10.5 }}
                       title="The month's salary register — MIS summary first, then every line, landscape">
                       📄 Register
                     </a>
                     {s.status === "Frozen" ? (
                       <a href={`/hrms/salary-slips/${s.id}/print`} target="_blank" rel="noopener noreferrer"
-                        className="rounded px-2 py-1 font-bold inline-block" style={{ background: "#0D7A3F", color: "#fff", fontSize: 10.5 }}
+                        className="rounded px-2 py-1 font-bold inline-block" style={{ background: "var(--green)", color: "#fff", fontSize: 10.5 }}
                         title="Every slip, one A5 page each — the single file that goes to the Drive folders">
                         🧾 Slips
                       </a>
@@ -188,7 +188,7 @@ export default function SalarySheets({ who: me, isOwner }: { who: string; isOwne
                       <div className="flex gap-1 flex-wrap mt-1" style={{ fontSize: 10 }}>
                         {(["pf", "pt", "mlwf", "esic", "tds"] as const).map((k) => (
                           <a key={k} href={`/hrms/statutory/${s.id}/print?kind=${k}`} target="_blank" rel="noopener noreferrer"
-                            className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#F4F2EC", color: "#1B3A5C" }}>
+                            className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#F4F2EC", color: "var(--blue)" }}>
                             {k.toUpperCase()}
                           </a>
                         ))}
@@ -272,7 +272,7 @@ function Upload({ onDone }: { onDone: (msg: string) => void }) {
         <div className="mt-2 rounded p-2" style={{ background: "#fff", border: `1px solid ${C.line}`, fontSize: 12 }}>
           <b>{read.lines} lines read.</b> Columns understood:{" "}
           {Object.entries(read.columns).map(([k, v]) => (
-            <span key={k} className="rounded px-1.5 py-0.5 mr-1" style={{ background: "#E6F4EA", color: "#0D7A3F", fontSize: 11 }}>{k} ← “{v}”</span>
+            <span key={k} className="rounded px-1.5 py-0.5 mr-1" style={{ background: "#E6F4EA", color: "var(--green)", fontSize: 11 }}>{k} ← “{v}”</span>
           ))}
           {read.warnings.map((w, i) => (
             <div key={i} style={{ color: "#8A5B00", marginTop: 4 }}>⚠ {w}</div>
@@ -301,9 +301,9 @@ function SheetBox({ id, onClose }: { id: string; onClose: () => void }) {
           </div>
           <div className="flex gap-2 items-center">
             <a href={`/hrms/salary-register/${id}/print`} target="_blank" rel="noopener noreferrer"
-              className="rounded px-2 py-1 font-bold" style={{ background: "#1B3A5C", color: "#fff", fontSize: 11.5 }}>📄 Register PDF</a>
+              className="rounded px-2 py-1 font-bold" style={{ background: "var(--blue)", color: "#fff", fontSize: 11.5 }}>📄 Register PDF</a>
             <a href={`/hrms/salary-slips/${id}/print?samples=1`} target="_blank" rel="noopener noreferrer"
-              className="rounded px-2 py-1 font-bold" style={{ background: "#0D7A3F", color: "#fff", fontSize: 11.5 }}
+              className="rounded px-2 py-1 font-bold" style={{ background: "var(--green)", color: "#fff", fontSize: 11.5 }}
               title="Nine A5 samples across the pay bands — eyeball a few each month">🧾 Slip samples (A5)</a>
             {d?.status === "Frozen" && (
               <a href={`/hrms/salary-slips/${id}/print`} target="_blank" rel="noopener noreferrer"
@@ -323,7 +323,7 @@ function SheetBox({ id, onClose }: { id: string; onClose: () => void }) {
               {(d.mapping?.warnings || []).map((w, i) => (
                 <div key={i} className="rounded p-2 mb-2" style={{ background: "#FFF7E6", border: "1px solid #F5D9A8", fontSize: 12.5, color: "#8A5B00" }}>⚠ {w}</div>
               ))}
-              <table className="w-full" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
+              <table className="w-full genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse" }}>
                 <thead><tr style={{ color: C.faint, fontSize: 11, position: "sticky", top: 0, background: "#F4F2EC" }}>
                   {["EmployeeID", "Name", "Type", "Earned", "Deductions", "Net"].map((h, i) => (
                     <th key={h} className={i > 2 ? "text-right px-2 py-1.5" : "text-left px-2 py-1.5"} style={{ borderBottom: `1px solid ${C.line}` }}>{h}</th>))}

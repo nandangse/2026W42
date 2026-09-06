@@ -21,9 +21,9 @@ import { runRate, type Pace, type RunRate as Rate } from "@/lib/run-rate";
 import { today } from "@/lib/schedule";
 
 const C = {
-  ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC",
-  line: "#E2E0DA", panel: "#F4F2EC", accent: "#E8600A", navy: "#1B3A5C",
-  green: "#0D7A3F", amber: "#D97706", red: "#B3261E",
+  ink: "var(--navy)", body: "var(--ink)", sub: "var(--dim)", mute: "var(--muted)", faint: "#B8B5AC",
+  line: "var(--line)", panel: "#F4F2EC", accent: "var(--accent)", navy: "var(--blue)",
+  green: "var(--green)", amber: "var(--warn)", red: "var(--red)",
 };
 
 const PACE_FORMULA = [
@@ -203,7 +203,7 @@ function Line({ label, p, r, V, color }: { label: string; p: Pace; r: Rate; V: (
       {/* fill = where we are · tick = where the calendar says we should be */}
       <div
         className="relative mt-1"
-        style={{ height: 9, background: "#EFEDE7", borderRadius: 2 }}
+        style={{ height: 9, background: "var(--line-soft)", borderRadius: 2 }}
         title={`${V(p.actual)} billed · pace says ${V(p.expected)} by today`}
       >
         <div style={{ width: `${fill}%`, height: 9, background: color, borderRadius: 2 }} />

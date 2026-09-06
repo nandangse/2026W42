@@ -13,15 +13,15 @@ import { useCallback, useEffect, useState } from "react";
 import { swallow } from "@/lib/swallow";
 import { addDays, istToday } from "@/lib/fmt";
 
-const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A", RED = "#B3261E", GREEN = "#0D7A3F";
+const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", ORANGE = "var(--accent)", RED = "var(--red)", GREEN = "var(--green)";
 
 const LANES: { key: string; label: string; colour: string }[] = [
-  { key: "job", label: "Jobs", colour: "#1B3A5C" },
-  { key: "goal", label: "Goals", colour: "#0D7A3F" },
+  { key: "job", label: "Jobs", colour: "var(--blue)" },
+  { key: "goal", label: "Goals", colour: "var(--green)" },
   { key: "rock", label: "Quarterly Rocks", colour: "#7A5E1E" },
   { key: "audit", label: "Audit", colour: "#7C3AED" },
   { key: "strategic", label: "Strategic Actions", colour: "#C2410C" },
-  { key: "other", label: "Other", colour: "#5A6672" },
+  { key: "other", label: "Other", colour: "var(--dim)" },
 ];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -161,7 +161,7 @@ export default function KuberTasking() {
         <div className="relative">
           <button onClick={() => setPickerOpen((v) => !v)}
             className="rounded border px-3 py-1.5 text-sm font-bold bg-white"
-            style={{ borderColor: chosen.size ? "#1B3A5C" : BORDER, color: "#1B3A5C" }}>
+            style={{ borderColor: chosen.size ? "var(--blue)" : BORDER, color: "var(--blue)" }}>
             👤 People ({chosen.size}) ▾
           </button>
           {pickerOpen && (
@@ -171,7 +171,7 @@ export default function KuberTasking() {
                 {assignees.length === 0 && <div className="px-3 py-2 text-xs" style={{ color: MUTED }}>Nobody holds a tagged task yet.</div>}
                 {assignees.map((w) => (
                   <label key={w} className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 rounded" style={{ cursor: "pointer", color: INK }}>
-                    <input type="checkbox" checked={chosen.has(w)} onChange={() => togglePerson(w)} style={{ accentColor: "#1B3A5C" }} />
+                    <input type="checkbox" checked={chosen.has(w)} onChange={() => togglePerson(w)} style={{ accentColor: "var(--blue)" }} />
                     {w}
                   </label>
                 ))}
@@ -183,14 +183,14 @@ export default function KuberTasking() {
         <div className="flex gap-0.5 rounded p-0.5" style={{ background: "#fff", border: `1px solid ${BORDER}` }}>
           {(["day", "week", "month"] as Range[]).map((r) => (
             <button key={r} onClick={() => setRange(r)} className="rounded px-2.5 py-1 text-xs font-bold"
-              style={range === r ? { background: "#22303C", color: "#fff" } : { color: MUTED }}>
+              style={range === r ? { background: "var(--ink)", color: "#fff" } : { color: MUTED }}>
               {r[0].toUpperCase() + r.slice(1)}
             </button>
           ))}
         </div>
-        <button onClick={() => step(-1)} className="rounded border px-2.5 py-1.5 text-sm font-bold bg-white" style={{ borderColor: BORDER, color: "#1B3A5C" }}>‹</button>
+        <button onClick={() => step(-1)} className="rounded border px-2.5 py-1.5 text-sm font-bold bg-white" style={{ borderColor: BORDER, color: "var(--blue)" }}>‹</button>
         <span className="text-sm font-bold tnum" style={{ color: INK }}>{spanLabel}</span>
-        <button onClick={() => step(1)} className="rounded border px-2.5 py-1.5 text-sm font-bold bg-white" style={{ borderColor: BORDER, color: "#1B3A5C" }}>›</button>
+        <button onClick={() => step(1)} className="rounded border px-2.5 py-1.5 text-sm font-bold bg-white" style={{ borderColor: BORDER, color: "var(--blue)" }}>›</button>
         {!spanHasToday && <button onClick={() => setAnchor(today)} className="text-xs font-bold" style={{ color: ORANGE }}>today</button>}
         <button onClick={() => setAdding(true)} className="rounded px-3.5 py-1.5 text-sm font-bold text-white" style={{ background: ORANGE }}>+ Add New</button>
       </div>
@@ -201,17 +201,17 @@ export default function KuberTasking() {
         </div>
       )}
       {chosen.size === 0 && tasks !== null && (
-        <div className="rounded p-3 text-sm mb-2" style={{ background: "#EEF1FA", color: "#1B3A5C" }}>
+        <div className="rounded p-3 text-sm mb-2" style={{ background: "#EEF1FA", color: "var(--blue)" }}>
           Nobody is selected — open 👤 People and tick who to watch.
         </div>
       )}
 
       {/* ── the week, lane by lane ──────────────────────────────────── */}
       <div className="rounded-lg overflow-auto" style={{ border: `1px solid ${BORDER}`, background: "#fff", maxHeight: "74vh" }}>
-        <table style={{ minWidth: 1200, borderCollapse: "separate", borderSpacing: 0, width: "100%" }}>
+        <table className="genie-table" style={{ minWidth: 1200, borderCollapse: "separate", borderSpacing: 0, width: "100%" }}>
           <thead>
             <tr>
-              <th className="px-3 py-2.5 text-left text-xs font-bold" style={{ position: "sticky", left: 0, top: 0, background: "#16232F", color: "#fff", minWidth: 170, zIndex: 4, letterSpacing: 0.6 }}>SWIMLANE</th>
+              <th className="px-3 py-2.5 text-left text-xs font-bold" style={{ position: "sticky", left: 0, top: 0, background: "var(--navy)", color: "#fff", minWidth: 170, zIndex: 4, letterSpacing: 0.6 }}>SWIMLANE</th>
               {spanHasToday && (
                 <th className="px-2 py-2.5 text-left text-xs font-bold" style={{ position: "sticky", top: 0, background: "#5B2320", color: "#F5C9C4", minWidth: 140 }}>OVERDUE</th>
               )}
@@ -220,7 +220,7 @@ export default function KuberTasking() {
                 return (
                   <th key={c.key} className="px-2 py-2.5 text-left text-xs" style={{
                     position: "sticky", top: 0, minWidth: range === "day" ? 320 : 140,
-                    background: isNow ? "#1B3A5C" : "#16232F",
+                    background: isNow ? "var(--blue)" : "var(--navy)",
                     color: isNow ? "#fff" : "#C7D0DA",
                   }}>
                     <b>{c.label}</b> <span style={{ fontWeight: 400, opacity: 0.75 }}>{c.sub}</span>
@@ -346,7 +346,7 @@ function TaskPeek({ t, onClose, onChanged, today }: { t: KTask; onClose: () => v
         </div>
         <div className="flex gap-2">
           <button onClick={toggle} disabled={busy}
-            className="flex-1 rounded py-1.5 text-sm font-bold text-white" style={{ background: t.done ? "#5A6672" : GREEN }}>
+            className="flex-1 rounded py-1.5 text-sm font-bold text-white" style={{ background: t.done ? "var(--dim)" : GREEN }}>
             {t.done ? "Reopen" : "✓ Done"}
           </button>
           <button onClick={onClose} className="rounded px-3 text-sm" style={{ color: MUTED }}>Close</button>

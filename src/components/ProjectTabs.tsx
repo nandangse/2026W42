@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 
-const C = { navy: "#1B3A5C", ink: "#16232F", sub: "#8A94A0", line: "#E2E0DA", green: "#0D7A3F", accent: "#E8600A", amber: "#B26A00" };
+const C = { navy: "var(--blue)", ink: "var(--navy)", sub: "var(--muted)", line: "var(--line)", green: "var(--green)", accent: "var(--accent)", amber: "#B26A00" };
 
 export type TabKey =
   | "product" | "tds" | "jobs" | "commercials" | "charter" | "rbom"
@@ -51,9 +51,9 @@ const LIST_SHAPE: Record<string, { label: string; qty?: string; uom?: boolean; d
 };
 
 const STATES: { k: string; label: string; bg: string; fg: string }[] = [
-  { k: "open",    label: "Open",    bg: "#F4F2EC", fg: "#5A6672" },
+  { k: "open",    label: "Open",    bg: "#F4F2EC", fg: "var(--dim)" },
   { k: "doing",   label: "Doing",   bg: "#FFF3E8", fg: "#B26A00" },
-  { k: "done",    label: "Done",    bg: "#E8F3E9", fg: "#0D7A3F" },
+  { k: "done",    label: "Done",    bg: "#E8F3E9", fg: "var(--green)" },
   { k: "dropped", label: "Dropped", bg: "#F7F5EF", fg: "#B8B5AC" },
 ];
 
@@ -105,13 +105,13 @@ export default function ProjectTabs({
             <button key={t.k} onClick={() => setTab(t.k)}
               title={t.note || t.label}
               className="px-3 py-1.5 rounded text-sm font-semibold"
-              style={on ? { background: "#22303C", color: "#fff" } : { color: C.navy, background: "#fff", border: `1px solid ${C.line}` }}>
+              style={on ? { background: "var(--ink)", color: "#fff" } : { color: C.navy, background: "#fff", border: `1px solid ${C.line}` }}>
               {t.label}
               {n > 0 && <span className="tnum" style={{ opacity: .75 }}> · {n}</span>}
               {/* A section with something in it should be visible as such
                   from the tab strip — otherwise every tab looks equally
                   empty and nobody knows which ones are actually kept. */}
-              {has && <span style={{ color: on ? "#F5B32B" : C.green }}> ●</span>}
+              {has && <span style={{ color: on ? "var(--amber)" : C.green }}> ●</span>}
             </button>
           );
         })}
@@ -199,7 +199,7 @@ function DocPane({
           <div className="flex items-center gap-2 mt-2">
             <button onClick={save} disabled={!dirty || busy === section}
               className="px-3 py-1.5 rounded text-sm font-bold"
-              style={{ background: dirty ? "#0D7A3F" : "#E2E0DA", color: dirty ? "#fff" : "#8A94A0" }}>
+              style={{ background: dirty ? "var(--green)" : "var(--line)", color: dirty ? "#fff" : "var(--muted)" }}>
               {busy === section ? "Saving…" : dirty ? "Save" : "Saved"}
             </button>
             {!!seed && !text.trim() && (
@@ -263,9 +263,9 @@ function ListPane({
       </div>
 
       <div className="overflow-x-auto mt-1">
-        <table className="w-full text-xs" style={{ minWidth: 900 }}>
+        <table className="w-full text-xs genie-table" style={{ minWidth: 900 }}>
           <thead>
-            <tr style={{ background: "#22303C", color: "#fff" }}>
+            <tr style={{ background: "var(--ink)", color: "#fff" }}>
               <th className="px-2 py-2 text-left">{shape.label}</th>
               {shape.qty && <th className="px-2 py-2 text-left" style={{ width: 90 }}>{shape.qty}</th>}
               {shape.uom && <th className="px-2 py-2 text-left" style={{ width: 80 }}>Unit</th>}
@@ -297,7 +297,7 @@ function ListPane({
                   <td className="px-1 py-1 text-center">
                     <button
                       onClick={() => { if (window.confirm(`Remove "${r.label}"?`)) void write({ action: "drop", id: r.id }); }}
-                      title="Remove this line" style={{ color: "#B3261E", fontWeight: 700 }}>×</button>
+                      title="Remove this line" style={{ color: "var(--red)", fontWeight: 700 }}>×</button>
                   </td>
                 )}
               </tr>
@@ -325,7 +325,7 @@ function ListPane({
             placeholder={shape.owner} className="rounded border px-2 py-1 text-xs" style={{ borderColor: C.line, width: 130 }} />}
           <button onClick={add} disabled={busy || !String(draft.label ?? "").trim()}
             className="px-3 py-1 rounded text-xs font-bold"
-            style={{ background: String(draft.label ?? "").trim() ? "#0D7A3F" : "#E2E0DA", color: String(draft.label ?? "").trim() ? "#fff" : "#8A94A0" }}>
+            style={{ background: String(draft.label ?? "").trim() ? "var(--green)" : "var(--line)", color: String(draft.label ?? "").trim() ? "#fff" : "var(--muted)" }}>
             {busy ? "…" : "+ Add"}
           </button>
         </div>

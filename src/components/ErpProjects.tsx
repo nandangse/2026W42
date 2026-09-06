@@ -11,8 +11,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 
 const C = {
-  ink: "#16232F", sub: "#5A6672", mute: "#8A94A0", line: "#E2E0DA",
-  panel: "#F4F2EC", accent: "#E8600A", navy: "#1B3A5C", green: "#0D7A3F", red: "#B3261E",
+  ink: "var(--navy)", sub: "var(--dim)", mute: "var(--muted)", line: "var(--line)",
+  panel: "#F4F2EC", accent: "var(--accent)", navy: "var(--blue)", green: "var(--green)", red: "var(--red)",
 };
 
 /** The fields worth leading with — the rest trail alphabetically. */
@@ -91,12 +91,12 @@ export default function ErpProjects() {
       </div>
 
       <div className="rounded-lg border bg-white overflow-x-auto" style={{ borderColor: C.line, maxHeight: "calc(100vh - 220px)", overflowY: "auto" }}>
-        <table className="text-xs" style={{ borderCollapse: "collapse", minWidth: cols.length * 130 }}>
+        <table className="text-xs genie-table" style={{ borderCollapse: "collapse", minWidth: cols.length * 130 }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
-            <tr style={{ background: "#22303C", color: "#fff" }}>
+            <tr style={{ background: "var(--ink)", color: "#fff" }}>
               {cols.map((c, i) => (
                 <th key={c} className="px-2 py-2 text-left whitespace-nowrap"
-                  style={i === 0 ? { position: "sticky", left: 0, background: "#22303C", zIndex: 3 } : undefined}>
+                  style={i === 0 ? { position: "sticky", left: 0, background: "var(--ink)", zIndex: 3 } : undefined}>
                   {c.replace(/^custom_/, "✳ ").replace(/_/g, " ")}
                 </th>
               ))}

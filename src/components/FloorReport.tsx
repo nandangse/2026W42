@@ -66,7 +66,7 @@ function CrewTable({ rows, size = 10.5 }: { rows: { label: string; crew: Partial
     <td style={{ border: "1px solid #DCD8CC", padding: "1px 5px", textAlign: "right", fontVariantNumeric: "tabular-nums", ...extra }}>{v}</td>
   );
   return (
-    <table style={{ borderCollapse: "collapse", fontSize: size, width: "auto", display: "inline-table" }}>
+    <table className="genie-table" style={{ borderCollapse: "collapse", fontSize: size, width: "auto", display: "inline-table" }}>
       <thead>
         <tr style={{ background: "#F4F2EC" }}>
           <th style={{ border: "1px solid #DCD8CC", padding: "1px 5px", textAlign: "left", fontSize: size - 1.5 }}></th>
@@ -113,7 +113,7 @@ function WorkingToday({ floor, manpower }: { floor: Job[]; manpower: Record<stri
       <b style={{ fontSize: 12 }}>WORKING TODAY</b>
       <CrewTable size={11.5} rows={[{ label: "recorded", crew: tot, bold: true }]} />
       {silent > 0 && (
-        <span style={{ fontSize: 10.5, color: "#B3261E", fontWeight: 700 }}>
+        <span style={{ fontSize: 10.5, color: "var(--red)", fontWeight: 700 }}>
           {silent} of {floor.length} jobs silent — no allocation recorded
         </span>
       )}
@@ -247,7 +247,7 @@ export default function FloorReport() {
   }, [board]);
 
   if (err) return <div style={{ padding: 40, fontFamily: "system-ui" }}>{/sign|401/i.test(err) ? "Log in to Genie first, then open this page again." : err}</div>;
-  if (!board) return <div style={{ padding: 40, fontFamily: "system-ui", color: "#8A94A0" }}>reading the board…</div>;
+  if (!board) return <div style={{ padding: 40, fontFamily: "system-ui", color: "var(--muted)" }}>reading the board…</div>;
 
   return (
     <>
@@ -272,11 +272,11 @@ export default function FloorReport() {
         }
       `}</style>
 
-      <div className="no-print" style={{ background: "#16232F", color: "#fff", padding: "10px 16px", display: "flex", gap: 12, alignItems: "center", fontSize: 13, position: "sticky", top: 0, zIndex: 10 }}>
+      <div className="no-print" style={{ background: "var(--navy)", color: "#fff", padding: "10px 16px", display: "flex", gap: 12, alignItems: "center", fontSize: 13, position: "sticky", top: 0, zIndex: 10 }}>
         <b>On Floor report{full ? " — PRE edition" : ""}</b>
         <span style={{ opacity: .7 }}>{floor.length} jobs · {dmy(TODAY)}</span>
         <span style={{ flex: 1 }} />
-        <button onClick={() => window.print()} style={{ background: "#E8600A", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>
+        <button onClick={() => window.print()} style={{ background: "var(--accent)", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>
           Save as PDF / Print
         </button>
       </div>
@@ -286,7 +286,7 @@ export default function FloorReport() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={LOGO} alt="Nandan GSE" style={{ height: 26 }} />
           <div style={{ textAlign: "right", fontSize: 11, color: "#8B8F87" }}>
-            <b style={{ color: "#16232F", fontSize: 13 }}>ON FLOOR — {dmy(TODAY)}</b><br />
+            <b style={{ color: "var(--navy)", fontSize: 13 }}>ON FLOOR — {dmy(TODAY)}</b><br />
             walk sheet · tick each item as it is checked
           </div>
         </div>
@@ -295,11 +295,11 @@ export default function FloorReport() {
             appears only on the PRE edition */}
         <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "nowrap" }}>
           {([
-            ["ON FLOOR", String(floor.length), "being worked on now", "#0D7A3F"],
-            ["ALREADY LATE", String(late.length), late.length ? "past target delivery" : "none late", late.length ? "#B3261E" : "#0D7A3F"],
-            [`DELIVERY UPTO ${dmy(saturday)} · Sat`, String(week.length), week.length ? "incl. every overdue job" : "nothing due by Saturday", "#E8600A"],
-            ["DELIVERED · LAST 7 DAYS", String(d7.n), full && moneyOk ? (d7.n ? `${lakh(d7.val)} · TP ${lakh(d7.tp)}` : "nothing went out") : d7.n ? "went out the gate" : "nothing went out", "#1B3A5C"],
-            ["DELIVERED · LAST 30 DAYS", String(d30.n), full && moneyOk ? (d30.n ? `${lakh(d30.val)} · TP ${lakh(d30.tp)}` : "nothing went out") : d30.n ? "went out the gate" : "nothing went out", "#1B3A5C"],
+            ["ON FLOOR", String(floor.length), "being worked on now", "var(--green)"],
+            ["ALREADY LATE", String(late.length), late.length ? "past target delivery" : "none late", late.length ? "var(--red)" : "var(--green)"],
+            [`DELIVERY UPTO ${dmy(saturday)} · Sat`, String(week.length), week.length ? "incl. every overdue job" : "nothing due by Saturday", "var(--accent)"],
+            ["DELIVERED · LAST 7 DAYS", String(d7.n), full && moneyOk ? (d7.n ? `${lakh(d7.val)} · TP ${lakh(d7.tp)}` : "nothing went out") : d7.n ? "went out the gate" : "nothing went out", "var(--blue)"],
+            ["DELIVERED · LAST 30 DAYS", String(d30.n), full && moneyOk ? (d30.n ? `${lakh(d30.val)} · TP ${lakh(d30.tp)}` : "nothing went out") : d30.n ? "went out the gate" : "nothing went out", "var(--blue)"],
           ] as const).map(([l, v, sub, c]) => (
             <div key={l} style={{ border: `1px solid #DCD8CC`, borderTop: `3px solid ${c}`, borderRadius: 6, padding: "4px 8px", flex: "1 1 0", minWidth: 0, overflow: "hidden" }}>
               <div style={{ fontSize: 8, letterSpacing: ".04em", color: "#8B8F87", fontWeight: 700, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{l}</div>
@@ -315,7 +315,7 @@ export default function FloorReport() {
         )}
         <WorkingToday floor={floor} manpower={manpower} />
 
-        <table style={{ fontSize: 11.5 }}>
+        <table className="genie-table" style={{ fontSize: 11.5 }}>
           <thead>
             <tr style={{ background: "#F4F2EC" }}>
               {([
@@ -345,7 +345,7 @@ export default function FloorReport() {
                     <div style={{ fontSize: 10.5, lineHeight: 1.3, marginTop: 1 }}>{j.tag || "—"}</div>
                     {j.cust && <div style={{ fontSize: 10, color: "#8B8F87" }}>{j.cust}</div>}
                     {j.tdd && (
-                      <div style={{ fontSize: 16, fontWeight: 800, marginTop: 3, color: lateJob ? "#B3261E" : "#16232F", fontVariantNumeric: "tabular-nums" }}>
+                      <div style={{ fontSize: 16, fontWeight: 800, marginTop: 3, color: lateJob ? "var(--red)" : "var(--navy)", fontVariantNumeric: "tabular-nums" }}>
                         {dmyd(j.tdd)}{lateJob ? " ⚠" : ""}
                       </div>
                     )}
@@ -359,13 +359,13 @@ export default function FloorReport() {
                         { label: "plan", crew: stage?.crew ?? null },
                         { label: "today", crew: recTotal > 0 ? rec! : null, bold: true },
                       ]} />
-                      {recTotal === 0 && <div style={{ fontSize: 9, color: "#B3261E", fontWeight: 700 }}>no manpower recorded</div>}
+                      {recTotal === 0 && <div style={{ fontSize: 9, color: "var(--red)", fontWeight: 700 }}>no manpower recorded</div>}
                     </div>
                   </td>
                   {/* one narrow cell: who owns it, what is pending, how far it is */}
                   <td style={{ border: "1px solid #DCD8CC", padding: "6px 8px", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", width: 108 }}>
                     <div title={j.ownerName || j.own}>Prj <b>{j.ownerInitials || initialsOf(j.ownerName || j.own) || "—"}</b>
-                      <span title={j.productionOwner || "not set"} style={{ marginLeft: 6, color: j.productionOwner ? "#16232F" : "#B3261E", fontWeight: j.productionOwner ? 400 : 700 }}>
+                      <span title={j.productionOwner || "not set"} style={{ marginLeft: 6, color: j.productionOwner ? "var(--navy)" : "var(--red)", fontWeight: j.productionOwner ? 400 : 700 }}>
                         Prd {j.productionOwner ? <b>{initialsOf(j.productionOwner)}</b> : "—"}
                       </span>
                     </div>
@@ -378,16 +378,16 @@ export default function FloorReport() {
                       <div key={i} className="pend" style={{ display: "flex", gap: 7, alignItems: "flex-start", padding: "3px 0", borderBottom: "1px solid #F2F0EA" }}>
                         <span aria-hidden style={{
                           width: 11, height: 11, borderRadius: 2, marginTop: 2, flex: "none",
-                          border: `1.5px solid ${x.kind === "material" ? "#8A5B00" : x.kind === "milestone" ? "#1B3A5C" : "#16232F"}`,
+                          border: `1.5px solid ${x.kind === "material" ? "#8A5B00" : x.kind === "milestone" ? "var(--blue)" : "var(--navy)"}`,
                         }} />
                         <span style={{ lineHeight: 1.35 }}>
                           <span style={{
                             fontWeight: 700, fontSize: 9,
-                            color: x.kind === "material" ? "#8A5B00" : x.kind === "milestone" ? "#1B3A5C" : "#5A6572",
+                            color: x.kind === "material" ? "#8A5B00" : x.kind === "milestone" ? "var(--blue)" : "#5A6572",
                           }}>{x.kind === "material" ? "MAT" : x.kind === "milestone" ? "MILE" : "TASK"}</span>{" "}
                           <b>{x.text}</b>
-                          {x.date ? ` · ${dmyd(x.date)}` : <b style={{ color: "#B3261E" }}> · NO DATE</b>}
-                          {x.defect && <b style={{ color: "#B3261E" }}> · QC DEFECTIVE</b>}
+                          {x.date ? ` · ${dmyd(x.date)}` : <b style={{ color: "var(--red)" }}> · NO DATE</b>}
+                          {x.defect && <b style={{ color: "var(--red)" }}> · QC DEFECTIVE</b>}
                           {x.sub && <><br /><span style={{ color: "#5A6572", fontSize: 10.5 }}>{x.sub}</span></>}
                         </span>
                       </div>
@@ -421,7 +421,7 @@ export default function FloorReport() {
                   <div key={j.id} style={{ padding: "2px 0", lineHeight: 1.45 }}>
                     <b>{jobNo(j.id)}</b> · {j.tag || "—"} ·{" "}
                     {slip > 0 || overdue ? (
-                      <span style={{ border: "1.5px solid #B3261E", borderRadius: 3, padding: "0 4px", color: "#B3261E", fontWeight: 700, whiteSpace: "nowrap" }}>
+                      <span style={{ border: "1.5px solid #B3261E", borderRadius: 3, padding: "0 4px", color: "var(--red)", fontWeight: 700, whiteSpace: "nowrap" }}>
                         {dmy(j.tdd)}{slip > 0 ? ` · Delay: ${slip}d` : ""}{overdue && !slip ? " · overdue" : ""}
                       </span>
                     ) : (

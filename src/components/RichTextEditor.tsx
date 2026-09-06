@@ -94,7 +94,7 @@ export function RichContent({ text, legacy, thumbs }: { text: string; legacy: (s
   return <div className={thumbs ? "rich-thumbs" : undefined} role="button" tabIndex={0} onClick={thumbs ? expand : undefined}>{legacy(clean)}</div>;
 }
 
-const COLORS = ["#16232F", "#B3261E", "#E8600A", "#0D7A3F", "#1B3A5C", "#7C3AED"];
+const COLORS = ["var(--navy)", "var(--red)", "var(--accent)", "var(--green)", "var(--blue)", "#7C3AED"];
 
 export default function RichTextEditor({ initial, onSave, onCancel, busy, minHeight = 220, placeholder, onUploadImage, live, onChangeHtml }: {
   initial: string; onSave?: (html: string) => void; onCancel?: () => void; busy?: boolean; minHeight?: number; placeholder?: string;
@@ -141,12 +141,12 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
   const cmd = (c: string, v?: string) => { ref.current?.focus(); document.execCommand(c, false, v); };
   const TB = ({ label, title, onClick, strong, style }: { label: React.ReactNode; title: string; onClick: () => void; strong?: boolean; style?: React.CSSProperties }) => (
     <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onClick} title={title}
-      className="rounded border px-2 py-0.5 text-xs" style={{ borderColor: "#E2E0DA", background: "#fff", fontWeight: strong ? 800 : 500, ...style }}>{label}</button>
+      className="rounded border px-2 py-0.5 text-xs" style={{ borderColor: "var(--line)", background: "#fff", fontWeight: strong ? 800 : 500, ...style }}>{label}</button>
   );
 
   const insertTable = () => {
     const cell = '<td style=""> </td>';
-    cmd("insertHTML", `<table border="1"><tbody>${`<tr>${cell.repeat(3)}</tr>`.repeat(2)}</tbody></table><br>`);
+    cmd("insertHTML", `<table className="genie-table" border="1"><tbody>${`<tr>${cell.repeat(3)}</tr>`.repeat(2)}</tbody></table><br>`);
   };
   const fileInput = useRef<HTMLInputElement | null>(null);
   const uploadAndInsert = async (f: File) => {
@@ -184,7 +184,7 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
         <span style={{ width: 4 }} />
         <TB label={<span style={{ borderBottom: "3px solid #B3261E" }}>A</span>} title="Text colour" onClick={() => setColorOpen((v) => !v)} />
         {colorOpen && (
-          <span className="flex gap-1 items-center rounded border px-1.5 py-1" style={{ borderColor: "#E2E0DA", background: "#fff" }}>
+          <span className="flex gap-1 items-center rounded border px-1.5 py-1" style={{ borderColor: "var(--line)", background: "#fff" }}>
             {COLORS.map((c) => (
               <button key={c} type="button" onMouseDown={(e) => e.preventDefault()}
                 onClick={() => { cmd("foreColor", c); setColorOpen(false); }}
@@ -204,14 +204,14 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
         onInput={live && onChangeHtml ? () => onChangeHtml(ref.current?.innerHTML || "") : undefined}
         data-placeholder={placeholder || ""}
         className="w-full rounded border p-3 text-sm rich-html"
-        style={{ borderColor: "#E8600A", lineHeight: 1.6, minHeight, maxHeight: "calc(100vh - 360px)", overflowY: "auto", outline: "none", background: "#fff" }} />
+        style={{ borderColor: "var(--accent)", lineHeight: 1.6, minHeight, maxHeight: "calc(100vh - 360px)", overflowY: "auto", outline: "none", background: "#fff" }} />
       {!live && (
       <div className="flex gap-2 mt-1.5">
         <button onClick={() => { if (selImg.current) selImg.current.style.outline = ""; onSave?.(sanitizeRich(ref.current?.innerHTML || "")); }} disabled={!!busy}
-          className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: "#0D7A3F" }}>
+          className="rounded px-3 py-1 text-xs font-bold text-white" style={{ background: "var(--green)" }}>
           {busy ? "Saving…" : "✓ Save"}
         </button>
-        <button onClick={onCancel} className="rounded px-3 py-1 text-xs font-bold" style={{ background: "#EFEDE7", color: "#5A6672" }}>Cancel</button>
+        <button onClick={onCancel} className="rounded px-3 py-1 text-xs font-bold" style={{ background: "var(--line-soft)", color: "var(--dim)" }}>Cancel</button>
       </div>
       )}
       {/* the table/img dress, once for every rich box on the page */}

@@ -23,12 +23,12 @@ export interface HomeData {
 }
 
 export const DOORS: { key: string; label: string; icon: string; href: string; blurb: string; color: string }[] = [
-  { key: "main", label: "Planning", icon: "🧞", href: "/#floor", blurb: "On Floor, jobs, milestones, delivery", color: "#16232F" },
-  { key: "crm", label: "CRM", icon: "🤝", href: "/crm", blurb: "Enquiries to orders", color: "#1B3A5C" },
-  { key: "hrms", label: "HRMS", icon: "👤", href: "/hrms", blurb: "People, pay, appraisals", color: "#E8600A" },
+  { key: "main", label: "Planning", icon: "🧞", href: "/#floor", blurb: "On Floor, jobs, milestones, delivery", color: "var(--navy)" },
+  { key: "crm", label: "CRM", icon: "🤝", href: "/crm", blurb: "Enquiries to orders", color: "var(--blue)" },
+  { key: "hrms", label: "HRMS", icon: "👤", href: "/hrms", blurb: "People, pay, appraisals", color: "var(--accent)" },
   { key: "ims", label: "IMS", icon: "📐", href: "/ims", blurb: "Standards, audits, documents", color: "#1B2D6B" },
   { key: "lms", label: "LMS", icon: "📚", href: "/lms", blurb: "Learning", color: "#6D28D9" },
-  { key: "accounts", label: "Kuber", icon: "💰", href: "/kuber", blurb: "Books, bank, balances", color: "#0D7A3F" },
+  { key: "accounts", label: "Kuber", icon: "💰", href: "/kuber", blurb: "Books, bank, balances", color: "var(--green)" },
   { key: "vishwakarma", label: "Vishwakarma", icon: "🛠", href: "/vishwakarma", blurb: "Design", color: "#7C3AED" },
   { key: "saamaan", label: "Saamaan", icon: "📦", href: "/saamaan", blurb: "Materials", color: "#B45309" },
 ];
@@ -50,8 +50,8 @@ export function Greeting({ d }: { d: HomeData | null }) {
   const today = new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long", year: "numeric" });
   return (
     <div className="mb-3">
-      <div className="font-bold" style={{ fontSize: 22, color: "#16232F", lineHeight: 1.2 }}>{greeting()}, {name || "…"}</div>
-      <div className="text-xs" style={{ color: "#8A94A0" }}>{sub}{sub ? " · " : ""}{today}</div>
+      <div className="font-bold" style={{ fontSize: 22, color: "var(--navy)", lineHeight: 1.2 }}>{greeting()}, {name || "…"}</div>
+      <div className="text-xs" style={{ color: "var(--muted)" }}>{sub}{sub ? " · " : ""}{today}</div>
     </div>
   );
 }
@@ -67,10 +67,10 @@ export function DoorTiles({ d, current, onGo }: { d: HomeData | null; current?: 
         <a key={x.key} href={x.href}
           onClick={(e) => { if (onGo && onGo(x.key)) e.preventDefault(); }}
           className="rounded-lg p-3 flex flex-col gap-1"
-          style={{ background: x.key === current ? "#F1EFE9" : "#fff", border: `1px solid ${x.key === current ? x.color : "#E2E0DA"}`, borderTop: `3px solid ${x.color}`, textDecoration: "none", color: "#16232F", minHeight: 78 }}>
+          style={{ background: x.key === current ? "var(--paper)" : "#fff", border: `1px solid ${x.key === current ? x.color : "var(--line)"}`, borderTop: `3px solid ${x.color}`, textDecoration: "none", color: "var(--navy)", minHeight: 78 }}>
           <div className="flex items-center gap-2 font-bold" style={{ fontSize: 15 }}><span>{x.icon}</span>{x.label}</div>
-          <div className="text-xs" style={{ color: "#5A6672" }}>{x.blurb}</div>
-          {x.key === current && <div className="text-xs font-semibold mt-auto" style={{ color: "#0D7A3F" }}>you are here</div>}
+          <div className="text-xs" style={{ color: "var(--dim)" }}>{x.blurb}</div>
+          {x.key === current && <div className="text-xs font-semibold mt-auto" style={{ color: "var(--green)" }}>you are here</div>}
         </a>
       ))}
     </div>

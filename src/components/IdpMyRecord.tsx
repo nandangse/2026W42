@@ -16,7 +16,7 @@ import { api } from "@/lib/api";
 import { FIELD_GROUPS, splitMulti, type FieldSpec } from "@/lib/hrms";
 import { IDP_RECORD_GROUPS, IDP_RECORD_HIDE } from "@/lib/idp";
 
-const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
+const C = { ink: "var(--ink)", dim: "var(--dim)", faint: "var(--muted)", line: "var(--line)", orange: "var(--accent)", green: "var(--green)", red: "var(--red)" };
 
 export interface MyRecord { value: Record<string, string | null>; pending: Record<string, boolean> }
 
@@ -126,7 +126,7 @@ function Row({
       <div className="flex items-baseline gap-2 flex-wrap">
         <div style={{ fontSize: 13, fontWeight: 600, color: C.dim, minWidth: 150 }}>{f.label}</div>
         {pending && (
-          <span className="rounded px-1.5" style={{ fontSize: 10, fontWeight: 700, background: "#F5B32B", color: "#4A3300" }}>
+          <span className="rounded px-1.5" style={{ fontSize: 10, fontWeight: 700, background: "var(--amber)", color: "#4A3300" }}>
             change sent for approval
           </span>
         )}

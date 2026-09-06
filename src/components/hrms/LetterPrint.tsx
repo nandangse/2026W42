@@ -42,14 +42,14 @@ export default function LetterPrint({ html, kind, name, ref: refNo, draft, foote
           .mark { position: fixed; }
         }
       `}</style>
-      <div className="bar no-print" style={{ background: "#16232F", color: "#fff", padding: "10px 16px", display: "flex", gap: 12, alignItems: "center", fontFamily: "system-ui, sans-serif", fontSize: 13 }}>
+      <div className="bar no-print" style={{ background: "var(--navy)", color: "#fff", padding: "10px 16px", display: "flex", gap: 12, alignItems: "center", fontFamily: "system-ui, sans-serif", fontSize: 13 }}>
         <b>{name}</b>
         <span style={{ opacity: .7 }}>{kind}</span>
         <span style={{ opacity: .5 }}>{refNo}</span>
         {draft && <span style={{ background: "#8A5B00", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>DRAFT</span>}
         <span style={{ flex: 1 }} />
         <span style={{ opacity: .65, fontSize: 12 }}>about {sheets} page{sheets === 1 ? "" : "s"}</span>
-        <button onClick={() => window.print()} style={{ background: "#E8600A", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>Save as PDF / Print</button>
+        <button onClick={() => window.print()} style={{ background: "var(--accent)", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>Save as PDF / Print</button>
       </div>
       {draft && (
         <div className="mark" aria-hidden style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
@@ -57,13 +57,13 @@ export default function LetterPrint({ html, kind, name, ref: refNo, draft, foote
         </div>
       )}
       <div className="paper" style={{ position: "relative", zIndex: 1 }}>
-        <table className="lt">
+        <table className="lt genie-table">
           <thead><tr><th style={{ textAlign: "left" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={LOGO} alt="Nandan GSE" style={{ height: 28 }} />
               <div style={{ textAlign: "right", fontFamily: "Georgia, serif", fontSize: 10, color: "#8B8F87", fontWeight: 400, lineHeight: 1.5 }}>
-                <div style={{ fontWeight: 700, color: "#16232F", letterSpacing: ".05em" }}>{kind.toUpperCase()}</div>
+                <div style={{ fontWeight: 700, color: "var(--navy)", letterSpacing: ".05em" }}>{kind.toUpperCase()}</div>
                 <div>{refNo}</div>
               </div>
             </div>

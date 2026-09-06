@@ -33,10 +33,10 @@ const EXP_BANDS: [string, (n: number) => boolean][] = [
 ];
 
 const STAGE_STYLE: Record<string, { bg: string; fg: string }> = {
-  "Final": { bg: "#E6F4EA", fg: "#0D7A3F" },
-  "Manager Completed": { bg: "#DCE8F5", fg: "#1B3A5C" },
+  "Final": { bg: "#E6F4EA", fg: "var(--green)" },
+  "Manager Completed": { bg: "#DCE8F5", fg: "var(--blue)" },
   "Completed": { bg: "#FFF3E8", fg: "#8A5B00" },
-  "Started": { bg: "#F4F2EC", fg: "#8A94A0" },
+  "Started": { bg: "#F4F2EC", fg: "var(--muted)" },
   "—": { bg: "#F4F2EC", fg: "#C9C6BD" },
 };
 
@@ -158,7 +158,7 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
 </style></head><body>
 <h1>Appraisal Table</h1>
 <div class="sub">Nandan GSE &middot; ${esc(when)} IST &middot; ${shown.length} of ${(rows || []).length} on the roll${on.length ? " &middot; " + esc(on.join(" &middot; ")) : ""}</div>
-<table><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+<table className="genie-table"><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
 <tbody>${body}</tbody>
 <tfoot><tr>
   <td colspan="6">TOTAL &middot; ${shown.length} shown</td>
@@ -179,7 +179,7 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
 
   const link = (r: Row, text: string, bold = false) => (
     <button onClick={() => onOpenPerson(r.id)} className={`text-left ${bold ? "font-bold" : "font-semibold"}`}
-      style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2 }}
+      style={{ color: "var(--blue)", textDecoration: "underline", textUnderlineOffset: 2 }}
       title="Open the Individual Report Card for Appraisal">
       {text}
     </button>
@@ -251,7 +251,7 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
             className="text-xs rounded px-2 py-1.5 bg-white" style={{ border: `1px solid ${C.line}`, width: 84 }} />
           {(minPay || maxPay) && (
             <button onClick={() => { setMinPay(""); setMaxPay(""); }} title="Clear the salary range"
-              style={{ color: "#B3261E", fontWeight: 700 }}>×</button>
+              style={{ color: "var(--red)", fontWeight: 700 }}>×</button>
           )}
         </span>
         <span className="text-xs" style={{ color: C.faint }}>

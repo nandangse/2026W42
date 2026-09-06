@@ -31,7 +31,7 @@ interface Throttle {
 }
 
 const STATUS_COLOUR: Record<string, string> = {
-  queued: "#8A94A0", sending: "#D97706", sent: "#1B6B93", delivered: GREEN, failed: "#B3261E", cancelled: "#5A6672",
+  queued: "var(--muted)", sending: "var(--warn)", sent: "#1B6B93", delivered: GREEN, failed: "var(--red)", cancelled: "var(--dim)",
 };
 const stamp = (v: unknown) =>
   v ? new Date(String(v)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
@@ -71,7 +71,7 @@ export default function PeriskopeQueue() {
       <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>WhatsApp Business — Periskope</div>
-          <div className="text-sm" style={{ color: "#5A6672", maxWidth: 640, lineHeight: 1.5 }}>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 640, lineHeight: 1.5 }}>
             Personalised messages are made here and <b>parked</b>. A hand releases each one; only what Periskope
             confirms as delivered becomes a WhatsApp Biz message on the record.
           </div>
@@ -101,8 +101,8 @@ export default function PeriskopeQueue() {
       {t && (
         <div className="rounded border p-3 mb-3" style={{ borderColor: t.blocked ? ORANGE : BORDER, background: "#fff" }}>
           <div className="flex gap-5 flex-wrap items-center text-sm">
-            <span><b style={{ color: t.sentLastHour >= t.perHour ? "#B3261E" : INK }}>{t.sentLastHour}</b> <span style={{ color: MUTED }}>/ {t.perHour} this hour</span></span>
-            <span><b style={{ color: t.sentToday >= t.perDay ? "#B3261E" : INK }}>{t.sentToday}</b> <span style={{ color: MUTED }}>/ {t.perDay} today</span></span>
+            <span><b style={{ color: t.sentLastHour >= t.perHour ? "var(--red)" : INK }}>{t.sentLastHour}</b> <span style={{ color: MUTED }}>/ {t.perHour} this hour</span></span>
+            <span><b style={{ color: t.sentToday >= t.perDay ? "var(--red)" : INK }}>{t.sentToday}</b> <span style={{ color: MUTED }}>/ {t.perDay} today</span></span>
             <span style={{ color: MUTED }}>{t.gapSeconds}s apart · last sent {t.secondsSinceLast === null ? "never" : `${t.secondsSinceLast}s ago`}</span>
             {t.blocked
               ? <span className="font-bold" style={{ color: "#B26A00" }}>⏸ {t.blocked}</span>
@@ -127,10 +127,10 @@ export default function PeriskopeQueue() {
       </div>
 
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "60vh" }}>
-        <table className="w-full text-xs" style={{ minWidth: 860, borderCollapse: "separate", borderSpacing: 0 }}>
-          <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+        <table className="w-full text-xs genie-table" style={{ minWidth: 860, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
             {["Status", "To", "Message", "Queued", "Sent", "Delivered", ""].map((h) => (
-              <th key={h} className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
+              <th key={h} className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>{h}</th>
             ))}
           </tr></thead>
           <tbody>
@@ -141,7 +141,7 @@ export default function PeriskopeQueue() {
               </td></tr>
             )}
             {rows.map((r, i) => (
-              <tr key={r.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+              <tr key={r.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                 <td className="px-2 py-1.5">
                   <span className="rounded px-2 py-0.5 font-bold text-white" style={{ background: STATUS_COLOUR[r.status] || MUTED }}>{r.status}</span>
                   {r.error && <div style={{ color: "#8E2C20", maxWidth: 200 }}>{r.error}</div>}

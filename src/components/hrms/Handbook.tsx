@@ -86,9 +86,9 @@ export default function Handbook({ who: me, standalone, defaultLang = "en" }: { 
   const next = st && idx >= 0 && idx < st.sections.length - 1 ? st.sections[idx + 1] : null;
   const Nav = () => (
     <div className="flex items-center gap-2 px-5 py-2" style={{ borderTop: `1px solid ${C.line}`, background: "#fff" }}>
-      {prev ? <button onClick={() => goTo(prev.slug)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#F4F2EC", color: "#1B3A5C" }}>← {prev.ord}. {prev.title}</button> : <span />}
+      {prev ? <button onClick={() => goTo(prev.slug)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#F4F2EC", color: "var(--blue)" }}>← {prev.ord}. {prev.title}</button> : <span />}
       <span style={{ flex: 1 }} />
-      {next ? <button onClick={() => goTo(next.slug)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#16232F", color: "#fff" }}>{next.ord}. {next.title} →</button> : <span className="text-xs" style={{ color: C.faint }}>end of the handbook</span>}
+      {next ? <button onClick={() => goTo(next.slug)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--navy)", color: "#fff" }}>{next.ord}. {next.title} →</button> : <span className="text-xs" style={{ color: C.faint }}>end of the handbook</span>}
     </div>
   );
   const qs = useMemo(() => (st?.questions || []).filter((x) => x.section === sec?.slug), [st, sec]);
@@ -133,8 +133,8 @@ export default function Handbook({ who: me, standalone, defaultLang = "en" }: { 
             const on = sec?.slug === s.slug, hit = hits.includes(s.slug);
             return (
               <button key={s.slug} onClick={() => goTo(s.slug)} className="block w-full text-left rounded px-2 py-1.5 text-xs"
-                style={{ background: on ? "#16232F" : hit ? "#FFF3E8" : "transparent", color: on ? "#fff" : C.ink, fontWeight: on || hit ? 700 : 500, opacity: s.published ? 1 : 0.55 }}>
-                <span style={{ color: on ? "#8FA1B3" : C.faint, marginRight: 6 }}>{s.ord}</span>{s.title}{!s.published && <span className="ml-1" style={{ fontSize: 9, color: on ? "#F5B32B" : "#8A5B00" }}>draft</span>}{n > 0 && <span className="ml-1 rounded px-1" style={{ fontSize: 9, background: on ? "rgba(255,255,255,0.15)" : "#F4F2EC", color: on ? "#fff" : C.faint }}>{n} Q</span>}
+                style={{ background: on ? "var(--navy)" : hit ? "#FFF3E8" : "transparent", color: on ? "#fff" : C.ink, fontWeight: on || hit ? 700 : 500, opacity: s.published ? 1 : 0.55 }}>
+                <span style={{ color: on ? "#8FA1B3" : C.faint, marginRight: 6 }}>{s.ord}</span>{s.title}{!s.published && <span className="ml-1" style={{ fontSize: 9, color: on ? "var(--amber)" : "#8A5B00" }}>draft</span>}{n > 0 && <span className="ml-1 rounded px-1" style={{ fontSize: 9, background: on ? "rgba(255,255,255,0.15)" : "#F4F2EC", color: on ? "#fff" : C.faint }}>{n} Q</span>}
               </button>
             );
           })}
@@ -149,8 +149,8 @@ export default function Handbook({ who: me, standalone, defaultLang = "en" }: { 
               <div className="px-5 pt-4 pb-3" style={{ borderBottom: `1px solid ${C.line}` }}>
                 <div className="flex items-baseline gap-2 flex-wrap">
                   <div className="text-xs font-bold" style={{ color: C.faint }}>SECTION {sec.ord} OF {st?.sections.length}</div>
-                  {prev && <button onClick={() => goTo(prev.slug)} className="text-xs font-semibold" style={{ color: "#1B3A5C" }} title={prev.title}>← back</button>}
-                  {next && <button onClick={() => goTo(next.slug)} className="text-xs font-semibold" style={{ color: "#1B3A5C" }} title={next.title}>next →</button>}
+                  {prev && <button onClick={() => goTo(prev.slug)} className="text-xs font-semibold" style={{ color: "var(--blue)" }} title={prev.title}>← back</button>}
+                  {next && <button onClick={() => goTo(next.slug)} className="text-xs font-semibold" style={{ color: "var(--blue)" }} title={next.title}>next →</button>}
                   <span style={{ flex: 1 }} />
                   <span className="text-xs" style={{ color: C.faint }}>v{sec.version}{sec.updated_by && sec.updated_by !== "system" ? ` · ${who(sec.updated_by)} · ${fmtFull(String(sec.updated_at))}` : ""}</span>
                   {st?.hr && lang !== "en" && <span className="text-xs" style={{ color: C.faint }}>Edit in English — the translation follows</span>}
@@ -158,8 +158,8 @@ export default function Handbook({ who: me, standalone, defaultLang = "en" }: { 
                 </div>
                 {!edit ? (
                   <>
-                    <h2 className="font-bold" style={{ fontSize: 22, color: "#16232F", marginTop: 4 }}>{sec.title}</h2>
-                    {sec.summary && <div className="rounded p-2.5 mt-2" style={{ background: "#FFF3E8", borderLeft: `3px solid ${C.orange}`, fontSize: 13.5, color: "#16232F", lineHeight: 1.5 }}><b>What this means for you.</b> {sec.summary}</div>}
+                    <h2 className="font-bold" style={{ fontSize: 22, color: "var(--navy)", marginTop: 4 }}>{sec.title}</h2>
+                    {sec.summary && <div className="rounded p-2.5 mt-2" style={{ background: "#FFF3E8", borderLeft: `3px solid ${C.orange}`, fontSize: 13.5, color: "var(--navy)", lineHeight: 1.5 }}><b>What this means for you.</b> {sec.summary}</div>}
                   </>
                 ) : (
                   <Editor sec={sec} busy={busy} onSave={(patch) => act({ action: "save", slug: sec.slug, ...patch }, `${sec.title} saved`)} onRemove={() => { if (window.confirm(`Remove the section "${sec.title}"?`)) { act({ action: "remove", slug: sec.slug }, "Section removed"); setCur(""); setEdit(false); } }} />
@@ -176,7 +176,7 @@ export default function Handbook({ who: me, standalone, defaultLang = "en" }: { 
                 <div className="mt-3">
                   <div className="text-xs font-bold" style={{ color: C.dim }}>Ask HR about this · एचआर से पूछें</div>
                   <textarea value={ask} rows={3} onChange={(e) => setAsk(e.target.value)} placeholder="Write your question in any language. HR answers you here, and may publish the answer for everyone." className="w-full rounded px-2 py-1.5 mt-1" style={{ border: `1px solid ${C.line}`, fontSize: 13 }} />
-                  <div className="flex justify-end mt-1"><button onClick={async () => { await act({ action: "ask", section: sec.slug, question: ask }, "Sent to HR"); setAsk(""); }} disabled={busy || !ask.trim()} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#1B3A5C", color: "#fff", opacity: ask.trim() ? 1 : 0.5 }}>Ask HR</button></div>
+                  <div className="flex justify-end mt-1"><button onClick={async () => { await act({ action: "ask", section: sec.slug, question: ask }, "Sent to HR"); setAsk(""); }} disabled={busy || !ask.trim()} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--blue)", color: "#fff", opacity: ask.trim() ? 1 : 0.5 }}>Ask HR</button></div>
                 </div>
               </div>
             </div>
@@ -211,10 +211,10 @@ function QCard({ x, hr, busy, onAct }: { x: Q; hr: boolean; busy: boolean; onAct
   const [ans, setAns] = useState(x.answer || "");
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded border bg-white mb-2" style={{ borderColor: C.line, borderLeft: `3px solid ${x.status === "Open" ? "#E8600A" : "#0D7A3F"}` }}>
+    <div className="rounded border bg-white mb-2" style={{ borderColor: C.line, borderLeft: `3px solid ${x.status === "Open" ? "var(--accent)" : "var(--green)"}` }}>
       <button onClick={() => setOpen((v) => !v)} className="w-full text-left px-3 py-2 text-xs flex gap-2 items-baseline flex-wrap">
         <span className="font-semibold" style={{ flex: 1, color: C.ink }}>{x.question.length > 140 && !open ? x.question.slice(0, 140) + "…" : x.question}</span>
-        {x.mine && <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 9, background: "#DCE8F5", color: "#1B3A5C" }}>MINE</span>}
+        {x.mine && <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 9, background: "#DCE8F5", color: "var(--blue)" }}>MINE</span>}
         {x.published && <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 9, background: "#E6F4EA", color: C.green }}>PUBLISHED</span>}
         <span style={{ color: C.faint }}>{hr || x.mine ? who(x.raised_by) : "a colleague"} · {fmtFull(String(x.raised_at))}</span>
       </button>
@@ -226,7 +226,7 @@ function QCard({ x, hr, busy, onAct }: { x: Q; hr: boolean; busy: boolean; onAct
             <div className="mt-2">
               {!x.answer && <textarea value={ans} rows={3} onChange={(e) => setAns(e.target.value)} placeholder="HR's answer" className="w-full rounded px-2 py-1.5" style={{ border: `1px solid ${C.line}`, fontSize: 13 }} />}
               <div className="flex gap-2 justify-end mt-1 flex-wrap">
-                {!x.answer && <button onClick={() => onAct({ action: "answer", id: x.id, answer: ans, publish: false }, "Answered")} disabled={busy || !ans.trim()} className="text-xs font-semibold rounded border px-3 py-1 bg-white" style={{ borderColor: C.line, color: "#1B3A5C" }}>Answer privately</button>}
+                {!x.answer && <button onClick={() => onAct({ action: "answer", id: x.id, answer: ans, publish: false }, "Answered")} disabled={busy || !ans.trim()} className="text-xs font-semibold rounded border px-3 py-1 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }}>Answer privately</button>}
                 {!x.answer && <button onClick={() => onAct({ action: "answer", id: x.id, answer: ans, publish: true }, "Answered and published")} disabled={busy || !ans.trim()} className="text-xs font-bold rounded px-3 py-1" style={{ background: C.green, color: "#fff" }}>Answer & publish</button>}
                 {x.answer && (x.published
                   ? <button onClick={() => onAct({ action: "unpublish", id: x.id }, "Unpublished")} disabled={busy} className="text-xs font-semibold rounded border px-3 py-1 bg-white" style={{ borderColor: C.line, color: C.dim }}>Unpublish</button>
@@ -256,7 +256,7 @@ function Editor({ sec, busy, onSave, onRemove }: { sec: Section; busy: boolean; 
       <div className="mt-2 hb"><RichText value={sec.body} rows={24} onSave={(html) => onSave({ title, summary, ord: Number(ord) || sec.ord, published, body: html })} placeholder="The section…" /></div>
       <div className="flex items-center gap-3 mt-2 flex-wrap text-xs">
         <label className="flex items-center gap-1" style={{ cursor: "pointer" }}><input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} /> Published (visible to everyone)</label>
-        <button onClick={() => onSave({ title, summary, ord: Number(ord) || sec.ord, published })} disabled={busy} className="font-bold rounded px-3 py-1.5" style={{ background: "#1B3A5C", color: "#fff" }}>Save title, summary and order</button>
+        <button onClick={() => onSave({ title, summary, ord: Number(ord) || sec.ord, published })} disabled={busy} className="font-bold rounded px-3 py-1.5" style={{ background: "var(--blue)", color: "#fff" }}>Save title, summary and order</button>
         <span style={{ flex: 1 }} />
         <button onClick={onRemove} disabled={busy} className="font-semibold rounded px-2 py-1" style={{ background: "#FBEDEA", color: C.red }}>✕ Remove section</button>
       </div>

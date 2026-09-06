@@ -19,5 +19,5 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "nandan-works-planning-V1.9.jsx"]
+  "exclude": ["node_modules", "scratchpad", "docs"]
 }

@@ -41,7 +41,7 @@ Q_LABEL["final_voice"] = "Final reply to Raghu";
 
 function heldChip(h: { submitted: string | null; started?: string | null } | null | undefined) {
   if (!h) return <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#F4F2EC", color: "#C9C6BD" }}>not held</span>;
-  if (h.submitted) return <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#E6F4EA", color: "#0D7A3F" }}>held · {day(h.submitted)}</span>;
+  if (h.submitted) return <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#E6F4EA", color: "var(--green)" }}>held · {day(h.submitted)}</span>;
   return <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#FFF3E8", color: "#8A5B00" }}>in progress</span>;
 }
 
@@ -76,14 +76,14 @@ export default function AppraisalInterviews({ who }: { who: string }) {
 
   const columns: Column<Row>[] = useMemo(() => [
     { key: "id", label: "EmployeeID", width: 105, value: (r) => r.id, render: (r) => <b>{r.id}</b> },
-    { key: "name", label: "Name", width: 190, value: (r) => r.name, render: (r) => <span className="font-semibold" style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2 }}>{r.name}</span> },
+    { key: "name", label: "Name", width: 190, value: (r) => r.name, render: (r) => <span className="font-semibold" style={{ color: "var(--blue)", textDecoration: "underline", textUnderlineOffset: 2 }}>{r.name}</span> },
     { key: "department", label: "Department", width: 135, value: (r) => r.department },
     { key: "self", label: "Self discussion", width: 155, value: (r) => r.self?.submitted || (r.self ? "~" : ""), render: (r) => heldChip(r.self) },
     { key: "selfsaid", label: "Self said", width: 110, align: "right", value: (r) => r.self?.seconds ?? null, numeric: true, render: (r) => r.self?.voices ? <span style={{ fontSize: 11.5 }}>{r.self.voices} notes · {mins(r.self.seconds)}</span> : null },
     { key: "mgrby", label: "Manager", width: 160, value: (r) => r.reviews.map((v) => v.by).join(", ") },
     { key: "mgr", label: "Manager discussion", width: 165, value: (r) => r.reviews.find((v) => v.submitted)?.submitted || (r.reviews.length ? "~" : ""), render: (r) => heldChip(r.reviews.find((v) => v.submitted) || r.reviews[0] || null) },
     { key: "mgrsaid", label: "Manager said", width: 115, align: "right", numeric: true, value: (r) => r.reviews.reduce((a, v) => a + v.seconds, 0) || null, render: (r) => { const s = r.reviews.reduce((a, v) => a + v.seconds, 0); const n = r.reviews.reduce((a, v) => a + v.voices, 0); return n ? <span style={{ fontSize: 11.5 }}>{n} notes · {mins(s)}</span> : null; } },
-    { key: "state", label: "Audit", width: 130, value: (r) => state(r), render: (r) => { const st = state(r); const ok = st === "Both held"; return <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: ok ? "#E6F4EA" : st === "Not held" ? "#FBEAE8" : "#FFF3E8", color: ok ? "#0D7A3F" : st === "Not held" ? "#B3392E" : "#8A5B00" }}>{ok ? "✓ " : ""}{st}</span>; } },
+    { key: "state", label: "Audit", width: 130, value: (r) => state(r), render: (r) => { const st = state(r); const ok = st === "Both held"; return <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: ok ? "#E6F4EA" : st === "Not held" ? "#FBEAE8" : "#FFF3E8", color: ok ? "var(--green)" : st === "Not held" ? "#B3392E" : "#8A5B00" }}>{ok ? "✓ " : ""}{st}</span>; } },
   ], []);
 
   const both = (rows || []).filter((r) => state(r) === "Both held").length;

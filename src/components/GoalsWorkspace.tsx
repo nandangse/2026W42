@@ -32,9 +32,9 @@ interface LearningSummary {
 const TODAY = today();
 
 const C = {
-  ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC",
-  line: "#E2E0DA", panel: "#F4F2EC", shell: "#EFEDE7", accent: "#E8600A",
-  navy: "#1B3A5C", green: "#0D7A3F", amber: "#D97706", red: "#B3261E", violet: "#7C3AED",
+  ink: "var(--navy)", body: "var(--ink)", sub: "var(--dim)", mute: "var(--muted)", faint: "#B8B5AC",
+  line: "var(--line)", panel: "#F4F2EC", shell: "var(--line-soft)", accent: "var(--accent)",
+  navy: "var(--blue)", green: "var(--green)", amber: "var(--warn)", red: "var(--red)", violet: "#7C3AED",
 };
 
 // ===========================================================================
@@ -62,7 +62,7 @@ function Label({ children }: { children: React.ReactNode }) {
 /** Horizontal completion bar. The one place a percentage becomes a picture. */
 function Bar({ pct, color = C.accent, h = 6, ghost }: { pct: number; color?: string; h?: number; ghost?: number | null }) {
   return (
-    <div className="relative w-full rounded" style={{ height: h, background: "#E2E0DA", overflow: "hidden" }}>
+    <div className="relative w-full rounded" style={{ height: h, background: "var(--line)", overflow: "hidden" }}>
       <div className="absolute left-0 top-0 rounded" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, height: h, background: color }} />
       {ghost != null && (
         // where the work below has got to, when it disagrees with the reading
@@ -79,7 +79,7 @@ function Gauge({ pct, color, seg = 20, w = 4, h = 10 }: { pct: number; color: st
   return (
     <div className="flex items-end" style={{ gap: 2 }}>
       {Array.from({ length: seg }).map((_, i) => (
-        <div key={i} style={{ width: w, height: h, background: i < on ? color : "#E2E0DA", borderRadius: 1 }} />
+        <div key={i} style={{ width: w, height: h, background: i < on ? color : "var(--line)", borderRadius: 1 }} />
       ))}
     </div>
   );
@@ -95,7 +95,7 @@ function Avatar({ text, size = 20, bg = "#DCE8F5", color = C.navy }: { text: str
 }
 
 const bandColor: Record<string, string> = {
-  management: "#1B3A5C", stratcom: "#7C3AED", lc: "#0D9488", all: "#8A94A0",
+  management: "var(--blue)", stratcom: "#7C3AED", lc: "#0D9488", all: "var(--muted)",
 };
 
 function BandChips({ bands, all }: { bands: string[]; all: { code: string; label: string }[] }) {
@@ -1901,7 +1901,7 @@ function RockEditor({ ctx, target, onClose }: { ctx: Ctx; target: EditTarget; on
     owner_id: r?.owner_id ?? "", dept_id: r?.dept_id ?? "",
     start_date: r?.start_date ?? "", due_date: r?.due_date ?? "",
     status: (r?.status ?? "not_started") as GoalStatus,
-    bands: r?.bands ?? ["all"], color: r?.color ?? "#E8600A",
+    bands: r?.bands ?? ["all"], color: r?.color ?? "var(--accent)",
   });
   const [busy, setBusy] = useState(false);
   const set = (k: string, v: unknown) => setF((p) => ({ ...p, [k]: v }));

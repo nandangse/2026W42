@@ -27,7 +27,7 @@ export const ORANGE = "#F04E23";
 export const ORANGE_SOFT = "#FEF0EC";
 export const GREEN = "#1A7F4E";
 export const AMBER = "#B45309";
-export const RED = "#B3261E";
+export const RED = "var(--red)";
 
 export const S = (v: unknown) => String(v ?? "");
 export const TODAY = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
@@ -82,7 +82,7 @@ export function statusColour(s: string): string {
   if (/approved|achieved|done|closed|verified|valid|complete|compliant/.test(t)) return GREEN;
   if (/review|progress|in_progress|triaged|scheduled/.test(t)) return "#1B6B93";
   if (/draft|pending|target|new|idea|planned|open/.test(t)) return MUTED;
-  if (/obsolete|superseded|cancelled|withdrawn|lapsed|rejected/.test(t)) return "#5A6672";
+  if (/obsolete|superseded|cancelled|withdrawn|lapsed|rejected/.test(t)) return "var(--dim)";
   if (/overdue|expired|major|critical|urgent/.test(t)) return RED;
   if (/due|amber|warning|partial|minor/.test(t)) return AMBER;
   return MUTED;
@@ -132,7 +132,7 @@ export function Screen({
 export function TableBox({ children, min = 760 }: { children: React.ReactNode; min?: number }) {
   return (
     <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "70vh" }}>
-      <table className="w-full text-xs" style={{ minWidth: min, borderCollapse: "separate", borderSpacing: 0 }}>
+      <table className="w-full text-xs genie-table" style={{ minWidth: min, borderCollapse: "separate", borderSpacing: 0 }}>
         {children}
       </table>
     </div>

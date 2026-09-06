@@ -20,7 +20,7 @@ import { MONTHS } from "@/lib/salary-sheet";
 import { IDP_SECTIONS, IDP_RATINGS } from "@/lib/idp";
 import { inr } from "@/lib/fmt";
 
-const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E", navy: "#16232F", paper: "#F1EFE9" };
+const C = { ink: "var(--ink)", dim: "var(--dim)", faint: "var(--muted)", line: "var(--line)", orange: "var(--accent)", green: "var(--green)", red: "var(--red)", navy: "var(--navy)", paper: "var(--paper)" };
 
 const d1 = (n: number | null | undefined) => (n == null ? "—" : String(Math.round(Number(n) * 10) / 10));
 const when = (s: string | null | undefined) => (s ? new Date(s).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric" }) : "—");
@@ -225,7 +225,7 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
   if (!rows.length) return <Empty>Nothing yet.</Empty>;
   return (
     <div className="rounded-lg overflow-x-auto" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
-      <table className="text-xs" style={{ borderCollapse: "collapse", minWidth: "100%" }}>
+      <table className="text-xs genie-table" style={{ borderCollapse: "collapse", minWidth: "100%" }}>
         <thead><tr>{head.map((h, i) => <th key={i} className="px-2 py-2 text-left" style={{ background: "#F4F2EC", color: C.dim, whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
         <tbody>{rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} className="px-2 py-2 tnum" style={{ borderTop: "1px solid #F4F2EC", whiteSpace: "nowrap" }}>{c}</td>)}</tr>)}</tbody>
       </table>

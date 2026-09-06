@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.1.1",
+    date: "2026-09-06",
+    module: "Genie 5 — the two giants split, tabs load when opened, one colour voice, the table standard everywhere (items 14–16)",
+    items: [
+      "THE PLANNING SUITE IS FIFTEEN FILES, NOT ONE. 11,555 lines and 66 components in a single file are now src/components/planning/ — one file per tab (On Floor, Delivery Board, Load Board, Job Plan, Tasking, Admin, Live Projects, Material & Escalations, Consult & Principles, Manpower, My Week, Feature Requests, Profile, Jobs in Progress) and a shared file for the types and helpers. The main file is 960 lines: the header, the tabs, the state. Nothing a person sees changed.",
+      "TABS ARRIVE WHEN OPENED. Fourteen of those tabs are fetched the first time somebody opens them, not on sign-in: Delivery Board, Load Board, Job Plan, Tasking, Admin, Live Projects, Pending Material, Escalations, Consult, Principles, On Floor, Feature Requests, My Week, Jobs in Progress. The CRM's record modal and record form arrive the same way; the CRM itself is five files (record, quote, product, widgets, shared) around a 1,160-line main.",
+      "ONE COLOUR VOICE. 2,657 hard-coded hex colours across 141 screens now name the token — var(--accent), var(--navy), var(--red), var(--green) and the rest — so the palette lives in one place (globals.css) and a screen cannot invent a fourteenth grey.",
+      "THE TABLE STANDARD, EVERYWHERE. The 135 hand-rolled tables in 72 files carry the standard class: sticky navy header, zebra rows, tabular numbers, and on a phone each scrolls inside its own box. A table that styled its own header keeps that; the rest read like Kuber's Supplier Report Card, which is the standard.",
+    ],
+  },
+  {
     v: "5.0.1.0",
     date: "2026-09-06",
     module: "Home — the landing shaped to the person; one header on every door; the Users asks",

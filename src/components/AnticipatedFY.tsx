@@ -14,9 +14,9 @@
 import { useState } from "react";
 
 const C = {
-  ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC",
-  line: "#E2E0DA", panel: "#F4F2EC", accent: "#E8600A", navy: "#1B3A5C",
-  green: "#0D7A3F", amber: "#D97706", red: "#B3261E", violet: "#7C3AED",
+  ink: "var(--navy)", body: "var(--ink)", sub: "var(--dim)", mute: "var(--muted)", faint: "#B8B5AC",
+  line: "var(--line)", panel: "#F4F2EC", accent: "var(--accent)", navy: "var(--blue)",
+  green: "var(--green)", amber: "var(--warn)", red: "var(--red)", violet: "#7C3AED",
 };
 
 interface Group { sales: number; throughput: number; jobs: number }
@@ -62,7 +62,7 @@ export default function AnticipatedFY({
         <div className="flex items-baseline gap-4 mt-0.5" style={{ flexWrap: "nowrap" }}>
           <div>
             <div style={{ fontSize: 10, color: "#8FA1B3" }}>SALES</div>
-            <div className="tnum font-bold" style={{ fontSize: 21, lineHeight: 1.1, color: "#F5B32B" }}>
+            <div className="tnum font-bold" style={{ fontSize: 21, lineHeight: 1.1, color: "var(--amber)" }}>
               {V(a.expected.sales)}
             </div>
             {hasTarget && salesPct != null && (
@@ -102,7 +102,7 @@ export default function AnticipatedFY({
             </div>
 
             <div className="p-4">
-              <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+              <table className="w-full text-sm genie-table" style={{ borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ color: C.mute, borderBottom: `1px solid ${C.line}` }}>
                     <th className="text-left py-1.5" style={{ fontSize: 10, letterSpacing: 0.6 }}>WHAT</th>
@@ -121,7 +121,7 @@ export default function AnticipatedFY({
                   <tr style={{ background: C.ink, color: "#fff" }}>
                     <td className="py-2 px-1 font-bold">TOTAL ANTICIPATED</td>
                     <td className="py-2 text-right tnum">—</td>
-                    <td className="py-2 text-right tnum font-bold" style={{ color: "#F5B32B" }}>{V(a.expected.sales)}</td>
+                    <td className="py-2 text-right tnum font-bold" style={{ color: "var(--amber)" }}>{V(a.expected.sales)}</td>
                     <td className="py-2 text-right tnum font-bold" style={{ color: "#7BC67E" }}>{V(a.expected.throughput)}</td>
                   </tr>
                   {hasTarget && (
@@ -137,7 +137,7 @@ export default function AnticipatedFY({
                           <b>Gap</b>
                           {/* the gap is an INVITATION, not a shortfall
                               (Dr Raghu, 30 Aug 2026) */}
-                          <div className="font-normal" style={{ fontSize: 11, color: "#8A94A0", lineHeight: 1.4 }}>
+                          <div className="font-normal" style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.4 }}>
                             = more sales that can be booked and billed in this year, comfortably
                           </div>
                         </td>

@@ -12,7 +12,7 @@
 // javascript: URL in a lesson is printed rather than followed.
 import React from "react";
 
-const C = { ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", line: "#E2E0DA", panel: "#F4F2EC", navy: "#1B3A5C" };
+const C = { ink: "var(--navy)", body: "var(--ink)", sub: "var(--dim)", mute: "var(--muted)", line: "var(--line)", panel: "#F4F2EC", navy: "var(--blue)" };
 
 const safeHref = (raw: string): string | null => {
   const u = raw.trim();

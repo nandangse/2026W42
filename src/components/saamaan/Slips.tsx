@@ -34,7 +34,7 @@ interface Line {
 const who = (s: string | null) => (S(s).includes("@") ? S(s).split("@")[0] : S(s)) || "·";
 
 const qtyFmt = (n: unknown) => Number(n ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 3 });
-const statusColour = (s: string, level: number) => (s === "done" ? GREEN : s === "cancelled" ? "#5A6672" : level >= 3 ? RED : level > 0 ? AMBER : NAVY);
+const statusColour = (s: string, level: number) => (s === "done" ? GREEN : s === "cancelled" ? "var(--dim)" : level >= 3 ? RED : level > 0 ? AMBER : NAVY);
 const LADDER = ["", "project manager", "COO", "Raghu"];
 
 export default function Slips({ mrp }: { mrp?: string } = {}) {
@@ -125,10 +125,10 @@ export function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void })
           <img src="${LOGO}" alt="Nandan GSE" />
           <div class="t"><div class="h1">Nandan ${kindWord}</div><div class="no">${esc(s.slip_no)}</div></div>
         </header>
-        <table class="meta"><tr><td><b>Date</b> ${esc(fmtD(s.created_at))}</td><td><b>From</b> ${esc(data?.from_name || who(s.from_email))}</td><td><b>To</b> ${esc(data?.to_name || who(s.to_email))}</td></tr></table>
+        <table className="genie-table" class="meta"><tr><td><b>Date</b> ${esc(fmtD(s.created_at))}</td><td><b>From</b> ${esc(data?.from_name || who(s.from_email))}</td><td><b>To</b> ${esc(data?.to_name || who(s.to_email))}</td></tr></table>
         <div class="proj"><b>Project</b> ${esc(p.project.replace(/^NGSE-PROJ-/, "") || "—")} <span class="pn">${esc(p.project_name)}</span> &nbsp;·&nbsp; <b>Jobs</b> ${esc(p.jobs.join(", ") || "—")}</div>
         <div class="own"><b>Production Owner:</b> ${esc(owners(p))}</div>
-        <table class="lines"><thead><tr><th>Item Group</th><th>Item</th><th class="n">Qty</th><th>UOM</th></tr></thead><tbody>
+        <table className="genie-table" class="lines"><thead><tr><th>Item Group</th><th>Item</th><th class="n">Qty</th><th>UOM</th></tr></thead><tbody>
           ${p.groups.map((g) => g.lines.map((l, i) => `<tr><td>${i === 0 ? esc(g.group.replace(/^RM - /, "")) : ""}</td><td><b>${esc(l.item_code)}</b> ${esc(l.item_name)}</td><td class="n">${esc(qtyFmt(l.qty))}</td><td>${esc(l.uom)}</td></tr>`).join("")).join("")}
         </tbody></table>
         <footer>
@@ -199,7 +199,7 @@ export function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void })
           {p.groups.map((g) => (
             <div key={g.group}>
               <div className="px-3 py-1 text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: 0.6, borderTop: `1px solid ${BORDER}` }}>{g.group.replace(/^RM - /, "") || "(no group)"}</div>
-              <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+              <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
                 <tbody>
                   {g.lines.map((l, i) => {
                     const owed = (Number(l.qty) || 0) - (Number(l.released_qty) || 0);

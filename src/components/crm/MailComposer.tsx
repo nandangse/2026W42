@@ -284,7 +284,7 @@ export default function MailComposer({ ctx, onClose, onSent }: {
               </button>
             </div>
           )}
-          {tplMsg && <div className="text-xs font-semibold mb-1" style={{ color: tplMsg.startsWith("Saved") ? "#0D7A3F" : "#8E2C20" }}>{tplMsg}</div>}
+          {tplMsg && <div className="text-xs font-semibold mb-1" style={{ color: tplMsg.startsWith("Saved") ? "var(--green)" : "#8E2C20" }}>{tplMsg}</div>}
           {err && <div className="rounded p-2 mb-2 text-xs font-semibold" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
         </div>
 
@@ -306,7 +306,7 @@ export default function MailComposer({ ctx, onClose, onSent }: {
           <button onClick={() => setTrack((v) => !v)}
             className="rounded-full px-3 py-1 text-xs font-bold border flex items-center gap-1"
             title="A hidden pixel stamps the mail when it is opened. Gmail's proxy can fire it without a human — a signal, not a court record."
-            style={track ? { background: "#E9F5EC", borderColor: "#0D7A3F", color: "#0D7A3F" } : { background: "#fff", borderColor: BORDER, color: MUTED }}>
+            style={track ? { background: "#E9F5EC", borderColor: "var(--green)", color: "var(--green)" } : { background: "#fff", borderColor: BORDER, color: MUTED }}>
             ◉ Tracking {track ? "on" : "off"}
           </button>
           <div className="relative">

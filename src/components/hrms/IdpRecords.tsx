@@ -108,7 +108,7 @@ export default function IdpRecords({ who }: { who: string }) {
 
       {openId && (
         <div className="fixed inset-0 flex justify-end no-print" style={{ background: "rgba(13,22,31,0.35)", zIndex: 60 }} role="button" tabIndex={0} onClick={() => setOpenId(null)}>
-          <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(860px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
+          <div className="h-full overflow-y-auto" style={{ background: "var(--paper)", width: "min(860px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
             {!full ? (
               <div className="p-4 text-xs" style={{ color: C.faint }}>loading…</div>
             ) : (
@@ -123,7 +123,7 @@ export default function IdpRecords({ who }: { who: string }) {
 
 function Stat({ n, l, hint, warn }: { n: number; l: string; hint?: string; warn?: boolean }) {
   return (
-    <div className="bg-white rounded-lg border px-3 py-2" style={{ borderColor: warn && n ? "#F5B32B" : C.line, minWidth: 130 }} title={hint}>
+    <div className="bg-white rounded-lg border px-3 py-2" style={{ borderColor: warn && n ? "var(--amber)" : C.line, minWidth: 130 }} title={hint}>
       <div className="font-bold tnum" style={{ fontSize: 21, lineHeight: 1.1 }}>{n}</div>
       <div style={{ fontSize: 11, color: C.faint }}>{l}</div>
     </div>
@@ -141,7 +141,7 @@ function IdpFullView({ f, onReopened }: { f: Full; onReopened: () => void }) {
   };
   return (
     <>
-      <div className="px-4 py-3 sticky top-0" style={{ background: "#16232F", color: "#fff", zIndex: 2 }}>
+      <div className="px-4 py-3 sticky top-0" style={{ background: "var(--navy)", color: "#fff", zIndex: 2 }}>
         <div className="font-bold">{f.person_name || f.person_email}</div>
         <div style={{ fontSize: 11, color: "#8FA1B3" }}>
           {f.employee_id && <>EmployeeID {f.employee_id} · </>}{f.role_at_time || "no role recorded"} · cycle {f.cycle}
@@ -149,7 +149,7 @@ function IdpFullView({ f, onReopened }: { f: Full; onReopened: () => void }) {
         <div style={{ fontSize: 11, color: "#8FA1B3", marginTop: 2 }}>
           {f.submitted_at
             ? <>Submitted {fmtFull(String(f.submitted_at))}</>
-            : <b style={{ color: "#F5B32B" }}>Started {fmtFull(String(f.started_at))} and NOT submitted — this is not an IDP yet</b>}
+            : <b style={{ color: "var(--amber)" }}>Started {fmtFull(String(f.started_at))} and NOT submitted — this is not an IDP yet</b>}
         </div>
         {f.submitted_at && (
           <button onClick={reopen} disabled={busy}
@@ -237,7 +237,7 @@ function IdpFullView({ f, onReopened }: { f: Full; onReopened: () => void }) {
             <div className="font-bold text-sm">Attached</div>
             {f.attachments.map((a) => (
               <div key={a.name + a.at} className="flex items-center gap-2 py-1" style={{ fontSize: 13 }}>
-                📄 {a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ color: "#1B3A5C", fontWeight: 600 }}>{a.name}</a> : a.name}
+                📄 {a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--blue)", fontWeight: 600 }}>{a.name}</a> : a.name}
                 <span style={{ fontSize: 11, color: C.faint }}>{Math.max(1, Math.round(a.size / 1024))} KB</span>
               </div>
             ))}

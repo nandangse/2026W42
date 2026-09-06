@@ -29,7 +29,7 @@
 import { useEffect, useRef, useState } from "react";
 import { swallow } from "@/lib/swallow";
 
-const C = { line: "#E2E0DA", dim: "#5A6672", faint: "#8A94A0", orange: "#E8600A", red: "#B3261E", green: "#0D7A3F" };
+const C = { line: "var(--line)", dim: "var(--dim)", faint: "var(--muted)", orange: "var(--accent)", red: "var(--red)", green: "var(--green)" };
 
 export interface Recording { url: string | null; seconds: number | null; at: string; transcript?: string | null }
 
@@ -292,7 +292,7 @@ export default function DictateBox({
           {!rec ? (
             <button type="button" onClick={start} disabled={busy}
               className="text-xs font-bold rounded px-2.5 py-1"
-              style={{ background: busy ? "#E2E0DA" : C.orange, color: busy ? "#8A94A0" : "#fff" }}>
+              style={{ background: busy ? "var(--line)" : C.orange, color: busy ? "var(--muted)" : "#fff" }}>
               {busy ? "Writing it out…" : recordings.length ? "🎙 Say some more" : "🎙 Speak the answer"}
             </button>
           ) : (

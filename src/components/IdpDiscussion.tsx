@@ -24,7 +24,7 @@ import IdpFinal, { type SalaryRow, type SalaryInfo, type Attachment } from "./Id
 import { TeamBox, TeamList, TeamReview, type TeamRow } from "./IdpTeamReview";
 import { RichTextView } from "./hrms/RichText";
 
-const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
+const C = { ink: "var(--ink)", dim: "var(--dim)", faint: "var(--muted)", line: "var(--line)", orange: "var(--accent)", green: "var(--green)", red: "var(--red)" };
 
 interface Rec { url: string | null; seconds: number | null; at: string }
 export interface RoleDoc {
@@ -133,7 +133,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     const doneDashboard = (
       <>
         <TeamBox onOpen={setReviewRow} />
-        <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-3 hover:opacity-90" style={{ background: "#16232F", color: "#fff", textDecoration: "none" }}>
+        <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-3 hover:opacity-90" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none" }}>
           <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
           <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>Read it, ask HR under any section, and acknowledge the edition at the end.</div>
         </a>
@@ -158,7 +158,7 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
         <div className="mx-auto px-4 py-8 md:py-10" style={{ maxWidth: 620 }}>
           <h1 className="font-bold" style={{ fontSize: 24 }}>Welcome {name}</h1>
           {/* THE HANDBOOK, WHERE EVERY EMPLOYEE ALREADY COMES (Dr Raghu, 5 Sep 2026) */}
-          <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "#16232F", color: "#fff", textDecoration: "none" }}>
+          <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none" }}>
             <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
             <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>How things work at Nandan GSE: hours, leave, pay, conduct, safety, leaving. Read it, ask HR under any section, and acknowledge the edition at the end.</div>
           </a>
@@ -183,14 +183,14 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     <>
       {/* "for the ones who did not fill the IDP show them a BIG RED BOX" (Dr Raghu, 5 Sep 2026) */}
       {!state.done.length && state.idpDue !== false && (
-        <div className="rounded-lg p-4 mt-4" style={{ background: "#B3261E", color: "#fff", border: "3px solid #7F1A14" }}>
+        <div className="rounded-lg p-4 mt-4" style={{ background: "var(--red)", color: "#fff", border: "3px solid #7F1A14" }}>
           <div className="font-bold" style={{ fontSize: 22, lineHeight: 1.2 }}>⚠ You have not submitted your IDP</div>
           <div className="mt-1" style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.95 }}>{state.open ? "It is started but not submitted. Finish it and press Submit — until then it is not an IDP." : "Your Individual Development Plan is due. Set aside an hour and start below."}</div>
         </div>
       )}
       <TeamBox onOpen={setReviewRow} />
       {/* THE HANDBOOK, WHERE EVERY EMPLOYEE ALREADY COMES (Dr Raghu, 5 Sep 2026) */}
-      <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "#16232F", color: "#fff", textDecoration: "none" }}>
+      <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none" }}>
         <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
         <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>How things work at Nandan GSE: hours, leave, pay, conduct, safety, leaving. Read it, ask HR under any section, and acknowledge the edition at the end.</div>
       </a>
@@ -313,8 +313,8 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
         <button onClick={start} disabled={!consent || !watched || busy || state.needsMigration}
           className="mt-5 rounded font-bold"
           style={{
-            background: consent && watched && !state.needsMigration ? C.orange : "#E2E0DA",
-            color: consent && watched && !state.needsMigration ? "#fff" : "#8A94A0",
+            background: consent && watched && !state.needsMigration ? C.orange : "var(--line)",
+            color: consent && watched && !state.needsMigration ? "#fff" : "var(--muted)",
             padding: "15px 26px", fontSize: 16, width: "100%", maxWidth: 340,
             cursor: consent && watched && !state.needsMigration ? "pointer" : "not-allowed",
           }}>
@@ -448,15 +448,15 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, salary, name, se
       {/* where you are — FROZEN to the top so the way forward never scrolls
           away, with the role brief one press away on the right */}
       <div className="flex gap-1 flex-wrap items-center py-2"
-        style={{ position: "sticky", top: 46, zIndex: 30, background: "#F1EFE9" }}>
+        style={{ position: "sticky", top: 46, zIndex: 30, background: "var(--paper)" }}>
         {steps.map((x, i) => (
           <button key={x.key} onClick={() => go(i)}
             className="rounded px-2 py-1"
             style={{
               fontSize: 11.5, fontWeight: i === step ? 700 : 500,
-              background: i === step ? "#16232F" : stepDone(x.key) ? "#E6F4EA" : "#fff",
+              background: i === step ? "var(--navy)" : stepDone(x.key) ? "#E6F4EA" : "#fff",
               color: i === step ? "#fff" : stepDone(x.key) ? C.green : C.faint,
-              border: `1px solid ${i === step ? "#16232F" : C.line}`,
+              border: `1px solid ${i === step ? "var(--navy)" : C.line}`,
             }}
             title={x.title}>
             {stepDone(x.key) && i !== step ? "✓ " : ""}{i + 1}
@@ -483,12 +483,12 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, salary, name, se
       {briefOpen && (
         <div className="fixed inset-0" style={{ background: "rgba(13,22,31,0.45)", zIndex: 60 }} role="button" tabIndex={0} onClick={() => setBriefOpen(false)}>
           <div className="mx-auto my-4 md:my-8 rounded-lg overflow-y-auto"
-            style={{ maxWidth: 760, maxHeight: "calc(100vh - 40px)", background: "#F1EFE9", padding: 14 }}
+            style={{ maxWidth: 760, maxHeight: "calc(100vh - 40px)", background: "var(--paper)", padding: 14 }}
             role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-2">
               <div className="font-bold" style={{ fontSize: 16 }}>Role &amp; Responsibility assigned to me</div>
               <button onClick={() => setBriefOpen(false)} className="ml-auto text-sm font-bold rounded px-2.5 py-1"
-                style={{ background: "#16232F", color: "#8FA1B3" }}>✕ close</button>
+                style={{ background: "var(--navy)", color: "#8FA1B3" }}>✕ close</button>
             </div>
             {roleDocs.length === 0 && open.role_summary && (
               <RoleBrief roleDoc={null} fallbackRole={open.role_at_time} fallbackSummary={open.role_summary} startOpen />
@@ -520,7 +520,7 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, salary, name, se
             const v = answers[q.id] || "";
             const short = q.min ? v.trim().length > 0 && v.trim().length < q.min : false;
             return (
-              <div key={q.id} className="mt-3 rounded-lg p-3" style={{ background: "#fff", border: `1px solid ${short ? "#F5B32B" : C.line}` }}>
+              <div key={q.id} className="mt-3 rounded-lg p-3" style={{ background: "#fff", border: `1px solid ${short ? "var(--amber)" : C.line}` }}>
                 <div className="font-semibold" style={{ fontSize: 15 }}>{q.label}</div>
                 {q.hint && <div style={{ fontSize: 13, color: C.dim, lineHeight: 1.5, marginTop: 2 }}>{q.hint}</div>}
                 {q.help && (
@@ -611,7 +611,7 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, salary, name, se
                 const short = !v || (q.min ? v.length < q.min : false);
                 return (
                   <button key={q.id} onClick={() => go(si + 1)} className="w-full text-left rounded-lg p-3 mt-2"
-                    style={{ background: "#fff", border: `1px solid ${short ? "#F5B32B" : C.line}` }}>
+                    style={{ background: "#fff", border: `1px solid ${short ? "var(--amber)" : C.line}` }}>
                     <div className="font-semibold" style={{ fontSize: 13.5 }}>{q.label}</div>
                     <div style={{ fontSize: 13.5, color: v ? C.ink : "#8A5B00", whiteSpace: "pre-wrap", lineHeight: 1.7, marginTop: 3 }}>
                       {v || "Not answered yet — tap to write it."}
@@ -624,7 +624,7 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, salary, name, se
           <div className="mt-4">
             <div className="font-bold" style={{ fontSize: 15 }}>How I rated myself</div>
             <button onClick={() => go(steps.length - 2)} className="w-full text-left rounded-lg mt-2"
-              style={{ background: "#fff", border: `1px solid ${IDP_RATINGS.every((d) => ratings[d.key]) ? C.line : "#F5B32B"}` }}>
+              style={{ background: "#fff", border: `1px solid ${IDP_RATINGS.every((d) => ratings[d.key]) ? C.line : "var(--amber)"}` }}>
               {IDP_RATINGS.map((d, i) => (
                 <div key={d.key} className="px-3 py-1.5 flex items-center gap-3" style={{ borderTop: i ? "1px solid #EEECE6" : undefined }}>
                   <div style={{ fontSize: 13.5, flex: 1 }}>{d.key}</div>
@@ -663,7 +663,7 @@ function Filling({ open, roleDocs, isLeader, myRecord, options, salary, name, se
             return (
               <button onClick={submit} disabled={!ready || busy} className="rounded font-bold"
                 style={{
-                  background: ready ? C.green : "#E2E0DA", color: ready ? "#fff" : "#8A94A0",
+                  background: ready ? C.green : "var(--line)", color: ready ? "#fff" : "var(--muted)",
                   padding: "14px 22px", fontSize: 15, flex: 1, maxWidth: 340,
                   cursor: ready ? "pointer" : "not-allowed",
                 }}>
@@ -813,25 +813,25 @@ function SittingTimer({ startedAt }: { startedAt: string }) {
 
 function Shell({ children, initials, startedAt, name }: { children: React.ReactNode; initials: string | null; startedAt?: string | null; name?: string }) {
   return (
-    <div className="min-h-screen idp" style={{ background: "#F1EFE9", color: C.ink }}>
+    <div className="min-h-screen idp" style={{ background: "var(--paper)", color: C.ink }}>
       {name ? <WhatsAppFab name={name} form="IDP Discussion" /> : null}
-      <div style={{ background: "#16232F", color: "#fff", position: "sticky", top: 0, zIndex: 40 }}>
+      <div style={{ background: "var(--navy)", color: "#fff", position: "sticky", top: 0, zIndex: 40 }}>
         <div className="px-3 py-2 flex items-center gap-2.5">
           <div className="rounded bg-white px-1.5 py-1 flex-shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={LOGO} alt="Nandan GSE" style={{ height: 22, display: "block" }} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>IDP</div>
+            <div className="text-xs tracking-widest font-bold" style={{ color: "var(--accent)" }}>IDP</div>
             <div className="font-bold text-white leading-tight truncate" style={{ fontSize: 13 }}>
               IDP Discussion — Individual
             </div>
             {startedAt && <SittingTimer startedAt={startedAt} />}
           </div>
           <a href="/" className="ml-auto text-xs font-semibold rounded px-2.5 py-1.5"
-            style={{ background: "#22303C", color: "#8FA1B3" }}>← Genie</a>
+            style={{ background: "var(--ink)", color: "#8FA1B3" }}>← Genie</a>
           <span className="rounded-full font-bold flex items-center justify-center"
-            style={{ width: 26, height: 26, fontSize: 11, background: initials ? "#E8600A" : "#B3261E", color: "#fff" }}>
+            style={{ width: 26, height: 26, fontSize: 11, background: initials ? "var(--accent)" : "var(--red)", color: "#fff" }}>
             {initials || "??"}
           </span>
         </div>

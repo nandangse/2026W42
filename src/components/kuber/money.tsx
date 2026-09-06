@@ -61,7 +61,7 @@ export function UnitPicker() {
       {CHOICES.map(([u, l]) => (
         <button key={u} onClick={() => setUnit(u)}
           className="rounded px-2 py-1 text-xs font-bold"
-          style={unit === u ? { background: "#F5B32B", color: "#16232F" } : { color: "#8FA1B3" }}>
+          style={unit === u ? { background: "var(--amber)", color: "var(--navy)" } : { color: "#8FA1B3" }}>
           {l}
         </button>
       ))}

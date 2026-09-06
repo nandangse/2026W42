@@ -50,12 +50,12 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
         }
       `}</style>
 
-      <div className="no-print" style={{ background: "#16232F", color: "#fff", padding: "10px 16px", display: "flex", gap: 12, alignItems: "center", fontSize: 13, position: "sticky", top: 0, zIndex: 10 }}>
+      <div className="no-print" style={{ background: "var(--navy)", color: "#fff", padding: "10px 16px", display: "flex", gap: 12, alignItems: "center", fontSize: 13, position: "sticky", top: 0, zIndex: 10 }}>
         <b>Salary Slips — {period}</b>
         {draft && <span style={{ background: "#8A5B00", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>DRAFT — month not frozen</span>}
         <span style={{ opacity: .7 }}>{picked.length} of {total} · A5, one per page</span>
         <span style={{ flex: 1 }} />
-        <button onClick={() => window.print()} style={{ background: "#E8600A", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>
+        <button onClick={() => window.print()} style={{ background: "var(--accent)", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>
           Save as PDF / Print
         </button>
       </div>
@@ -86,11 +86,11 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
             </div>
 
             {/* identity */}
-            <table style={{ marginBottom: 5 }}>
+            <table className="genie-table" style={{ marginBottom: 5 }}>
               <tbody>
                 <tr>
                   <td style={{ width: "34%" }}><b>Name:</b> {s.name}</td>
-                  <td style={{ width: "22%" }}><b>Employee ID:</b> {s.id}{s.hold && <b style={{ color: "#B3261E" }}> · HOLD</b>}</td>
+                  <td style={{ width: "22%" }}><b>Employee ID:</b> {s.id}{s.hold && <b style={{ color: "var(--red)" }}> · HOLD</b>}</td>
                   <td style={{ width: "44%" }}><b>Designation:</b> {dashless(s.designation)}</td>
                 </tr>
                 <tr>
@@ -111,7 +111,7 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
             </table>
 
             {/* money */}
-            <table style={{ marginBottom: 5 }}>
+            <table className="genie-table" style={{ marginBottom: 5 }}>
               <thead>
                 <tr style={{ background: "#F4F2EC", fontWeight: 700 }}>
                   <td style={{ width: "26%" }}>Earnings</td>
@@ -152,7 +152,7 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
             </table>
 
             {/* the answer */}
-            <table style={{ marginBottom: 5 }}>
+            <table className="genie-table" style={{ marginBottom: 5 }}>
               <tbody>
                 <tr style={{ background: "#FFF9C4" }}>
                   <td style={{ width: "22%", fontWeight: 800, fontSize: 11 }}>NET PAY ₹{inr(s.net)}</td>
@@ -165,7 +165,7 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
             </table>
 
             {/* balances + bank */}
-            <table>
+            <table className="genie-table">
               <tbody>
                 <tr>
                   <td style={{ width: "18%" }}><b>Leave Details</b></td>

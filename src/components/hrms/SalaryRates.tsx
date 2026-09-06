@@ -77,10 +77,10 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
       {/* ── the sheets ── */}
       <div className="flex gap-1.5 mb-2 flex-wrap items-center">
         {(st?.structures || []).map((x) => { const t = tone(x.status); return (
-          <button key={x.id} onClick={() => load(x.id)} className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: cur === x.id ? "#16232F" : "#fff", color: cur === x.id ? "#fff" : C.ink, border: `1px solid ${cur === x.id ? "#16232F" : C.line}` }}>
+          <button key={x.id} onClick={() => load(x.id)} className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: cur === x.id ? "var(--navy)" : "#fff", color: cur === x.id ? "#fff" : C.ink, border: `1px solid ${cur === x.id ? "var(--navy)" : C.line}` }}>
             {x.title} <span className="rounded px-1.5 ml-1" style={{ fontSize: 9.5, background: cur === x.id ? "rgba(255,255,255,0.15)" : t.bg, color: cur === x.id ? "#fff" : t.c }}>{x.status}</span> <span style={{ color: cur === x.id ? "#8FA1B3" : C.faint, fontSize: 10.5 }}>{x.lines}</span>
           </button>); })}
-        {st && !st.structures.some((x) => x.code === "2025-06") && <button onClick={() => act({ action: "seed_old" }, "Salary Structure 2025-06 filled from the records", false)} disabled={busy} className="rounded px-3 py-1.5 text-xs font-semibold border bg-white" style={{ borderColor: C.line, color: "#1B3A5C" }}>Fill 2025-06 from the records</button>}
+        {st && !st.structures.some((x) => x.code === "2025-06") && <button onClick={() => act({ action: "seed_old" }, "Salary Structure 2025-06 filled from the records", false)} disabled={busy} className="rounded px-3 py-1.5 text-xs font-semibold border bg-white" style={{ borderColor: C.line, color: "var(--blue)" }}>Fill 2025-06 from the records</button>}
       </div>
 
       {s && (
@@ -93,12 +93,12 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="find a person" className="rounded px-2 py-1" style={{ border: `1px solid ${C.line}`, width: 180 }} />
             {isOwner && s.status !== "Live" && <button onClick={() => { if (window.confirm(`Make ${s.title} the Live structure?\n\nThe Live one becomes Overwritten and the payroll run reads this one from now.`)) act({ action: "set_live", id: s.id }, `${s.title} is Live`); }} disabled={busy} className="font-bold rounded px-3 py-1.5" style={{ background: C.green, color: "#fff" }}>✓ Make Live</button>}
             <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="block" style={{ fontSize: 11, maxWidth: 200 }} />
-            <button onClick={upload} disabled={busy} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: C.line, color: "#1B3A5C" }} title="Rows from a CSV or Excel, matched on Employee ID">⬆ Import</button>
+            <button onClick={upload} disabled={busy} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }} title="Rows from a CSV or Excel, matched on Employee ID">⬆ Import</button>
             {isOwner && s.status !== "Live" && <button onClick={() => { if (window.confirm(`Remove ${s.title} and its ${s.lines} lines?`)) act({ action: "remove_structure", id: s.id }, "Removed", false); }} disabled={busy} className="font-semibold rounded px-2 py-1" style={{ background: "#FBEDEA", color: C.red }}>✕</button>}
           </div>
 
           <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflow: "auto", maxHeight: "calc(100vh - 290px)" }}>
-            <table style={{ fontSize: 12.5, borderCollapse: "collapse", whiteSpace: "nowrap", minWidth: 1400 }}>
+            <table className="genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse", whiteSpace: "nowrap", minWidth: 1400 }}>
               <thead><tr style={{ color: C.faint, fontSize: 10.5 }}>
                 {["Employee ID", "Name", "Type", "Department", "Designation", "Reporting manager", "Basic and DA", "HRA", "Fixed Allowance", "Conveyance", "Medical Allowance", "Gross Salary", "Per Day Rate", ""].map((h, i) => (
                   <th key={h + i} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#fff", zIndex: i < 2 ? 3 : 2, textAlign: i >= 6 && i <= 12 ? "right" : "left", ...(i === 0 ? { left: 0, minWidth: 80 } : i === 1 ? { left: 80, minWidth: 200 } : {}) }}>{h}</th>
@@ -109,7 +109,7 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
                 <tr style={{ borderTop: `2px solid ${C.line}`, background: "#FBFAF7" }}>
                   <td className="px-2 py-1.5" style={{ position: "sticky", left: 0, background: "#FBFAF7" }}><input value={newLine} onChange={(e) => setNewLine(e.target.value)} placeholder="new ID" className="rounded px-1.5 py-0.5 tnum" style={{ border: `1px solid ${C.line}`, width: 64, fontSize: 12 }} /></td>
                   <td className="px-2 py-1.5" colSpan={12} style={{ color: C.faint, fontSize: 11.5 }}>Type a four-digit Employee ID and press Add; then fill the line in place.</td>
-                  <td className="px-2 py-1.5"><button onClick={async () => { if (/^\d{4}$/.test(newLine.trim())) { await act({ action: "save_rate", structure_id: s.id, employee_id: newLine.trim(), basic_da: 0 }, "Line added"); setNewLine(""); } }} disabled={busy || !/^\d{4}$/.test(newLine.trim())} className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#1B3A5C", color: "#fff" }}>Add</button></td>
+                  <td className="px-2 py-1.5"><button onClick={async () => { if (/^\d{4}$/.test(newLine.trim())) { await act({ action: "save_rate", structure_id: s.id, employee_id: newLine.trim(), basic_da: 0 }, "Line added"); setNewLine(""); } }} disabled={busy || !/^\d{4}$/.test(newLine.trim())} className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "var(--blue)", color: "#fff" }}>Add</button></td>
                 </tr>
               </tbody>
               <tfoot><tr style={{ fontWeight: 700, borderTop: `2px solid ${C.line}` }}>

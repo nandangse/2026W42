@@ -41,7 +41,7 @@ export default async function MySlipsPage() {
     return (
       <div style={{ padding: 40, fontFamily: "system-ui, sans-serif", maxWidth: 560 }}>
         <h1 style={{ fontSize: 20 }}>My Salary Slips</h1>
-        <p style={{ color: "#5A6672", lineHeight: 1.7 }}>
+        <p style={{ color: "var(--dim)", lineHeight: 1.7 }}>
           Your login is not linked to an employee record yet. Ask HR to set your Genie user on your
           record in the Employee Master, and your slips appear here.
         </p>
@@ -60,14 +60,14 @@ export default async function MySlipsPage() {
     .filter((x) => x.row);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F1EFE9", fontFamily: "system-ui, sans-serif", color: "#16232F" }}>
-      <div style={{ background: "#16232F", color: "#fff", padding: "12px 18px" }}>
+    <div style={{ minHeight: "100vh", background: "var(--paper)", fontFamily: "system-ui, sans-serif", color: "var(--navy)" }}>
+      <div style={{ background: "var(--navy)", color: "#fff", padding: "12px 18px" }}>
         <b style={{ fontSize: 15 }}>My Salary Slips</b>
         <span style={{ opacity: .7, fontSize: 13 }}> — {me.name} · {me.id}</span>
       </div>
       <div style={{ maxWidth: 620, margin: "24px auto", padding: "0 16px" }}>
         {!mine.length && (
-          <div style={{ background: "#fff", border: "1px solid #E2E0DA", borderRadius: 8, padding: 18, fontSize: 14, color: "#5A6672", lineHeight: 1.7 }}>
+          <div style={{ background: "#fff", border: "1px solid #E2E0DA", borderRadius: 8, padding: 18, fontSize: 14, color: "var(--dim)", lineHeight: 1.7 }}>
             No slip is available yet. A month&apos;s slips appear here once HR closes and freezes that month.
           </div>
         )}
@@ -76,7 +76,7 @@ export default async function MySlipsPage() {
             style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
               background: "#fff", border: "1px solid #E2E0DA", borderRadius: 8, padding: "14px 16px",
-              marginBottom: 10, textDecoration: "none", color: "#16232F",
+              marginBottom: 10, textDecoration: "none", color: "var(--navy)",
             }}>
             <b style={{ fontSize: 15 }}>🧾 {MONTHS[s.month - 1]} {s.year}</b>
             <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, color: "#0D6E39" }}>

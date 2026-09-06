@@ -63,7 +63,7 @@ export default function HrQueries({ who: me, standalone }: { who: string; standa
           <div className="text-xs mt-1" style={{ color: C.faint, lineHeight: 1.6, maxWidth: 760 }}>{INTRO_HI}</div>
           <div className="flex gap-2 mt-3 flex-wrap">
             <button onClick={() => setMode("self")} className="rounded px-4 py-2.5 font-bold" style={{ background: C.orange, color: "#fff", fontSize: 14 }}>🙋 HR query for myself</button>
-            {hr && !standalone && <button onClick={() => setMode("other")} className="rounded px-4 py-2.5 font-bold" style={{ background: "#1B3A5C", color: "#fff", fontSize: 14 }}>👥 HR query for others</button>}
+            {hr && !standalone && <button onClick={() => setMode("other")} className="rounded px-4 py-2.5 font-bold" style={{ background: "var(--blue)", color: "#fff", fontSize: 14 }}>👥 HR query for others</button>}
           </div>
           {anon && <div className="text-xs mt-2" style={{ color: C.faint }}>No login needed. Fill the contact block at the end so HR knows who to answer.</div>}
         </div>
@@ -75,7 +75,7 @@ export default function HrQueries({ who: me, standalone }: { who: string; standa
       <div className="flex gap-1.5 mb-2 no-print flex-wrap items-center">
         <span className="text-xs font-bold" style={{ color: C.faint }}>{hr ? "ALL QUERIES" : "MY QUERIES"}</span>
         {(["open", "answered"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className="rounded px-3 py-1 font-bold" style={{ fontSize: 12, background: tab === t ? "#16232F" : "#fff", color: tab === t ? "#fff" : C.dim, border: `1px solid ${tab === t ? "#16232F" : C.line}` }}>
+          <button key={t} onClick={() => setTab(t)} className="rounded px-3 py-1 font-bold" style={{ fontSize: 12, background: tab === t ? "var(--navy)" : "#fff", color: tab === t ? "#fff" : C.dim, border: `1px solid ${tab === t ? "var(--navy)" : C.line}` }}>
             {t === "open" ? `Open${openN ? ` (${openN})` : ""}` : `Answered (${(rows || []).length - openN})`}
           </button>
         ))}
@@ -120,7 +120,7 @@ function QueryForm({ mode, mine, onClose, onDone }: { mode: "self" | "other"; mi
 
   return (
     <div className="bg-white rounded-lg border mb-3" style={{ borderColor: C.orange }}>
-      <div className="px-4 py-3 flex items-center gap-2" style={{ background: "#16232F", color: "#fff", borderRadius: "8px 8px 0 0" }}>
+      <div className="px-4 py-3 flex items-center gap-2" style={{ background: "var(--navy)", color: "#fff", borderRadius: "8px 8px 0 0" }}>
         <div style={{ flex: 1 }}>
           <div className="font-bold" style={{ fontSize: 15 }}>{mode === "self" ? "HR query for myself" : "HR query for someone else"}</div>
           <div className="text-xs" style={{ color: "#8FA1B3" }}>Tick everything that applies · जो लागू हो सब टिक करें</div>
@@ -211,16 +211,16 @@ function QueryCard({ r, hr, expanded, onToggle, onChanged }: { r: Row; hr: boole
   const answered = r.status !== "Open";
   const c = r.form?.contact;
   return (
-    <div className="bg-white rounded-lg border mb-2" style={{ borderColor: C.line, borderLeft: `4px solid ${answered ? "#0D7A3F" : "#E8600A"}` }}>
+    <div className="bg-white rounded-lg border mb-2" style={{ borderColor: C.line, borderLeft: `4px solid ${answered ? "var(--green)" : "var(--accent)"}` }}>
       <button onClick={onToggle} className="w-full text-left px-3 py-2.5">
         <div className="flex items-baseline gap-2 flex-wrap">
-          {String(r.subject || "").startsWith("Application") && <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#E6F0FA", color: "#1B3A5C", fontSize: 10 }}>APPLICATION</span>}
+          {String(r.subject || "").startsWith("Application") && <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#E6F0FA", color: "var(--blue)", fontSize: 10 }}>APPLICATION</span>}
           <span className="font-bold" style={{ fontSize: 13.5 }}>{r.subject}</span>
           {(r.person || c?.name) && <span style={{ fontSize: 12, color: C.faint }}>· {r.employee_id || c?.employee_id} {r.person || c?.name}</span>}
-          {!r.for_self && <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#DCE8F5", color: "#1B3A5C" }}>raised by HR</span>}
+          {!r.for_self && <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#DCE8F5", color: "var(--blue)" }}>raised by HR</span>}
           <div style={{ flex: 1 }} />
           <span style={{ fontSize: 11, color: C.faint }}>{day(r.raised_at)} · {who(r.raised_by)}</span>
-          {answered ? <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#E6F4EA", color: "#0D7A3F" }}>answered {day(r.answered_at)}</span>
+          {answered ? <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#E6F4EA", color: "var(--green)" }}>answered {day(r.answered_at)}</span>
             : <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#FFF3E8", color: "#8A5B00" }}>open</span>}
           <span style={{ color: C.faint, fontSize: 12 }}>{expanded ? "▲" : "▼"}</span>
         </div>
@@ -244,7 +244,7 @@ function QueryCard({ r, hr, expanded, onToggle, onChanged }: { r: Row; hr: boole
           {err && <div className="text-xs font-semibold mt-2" style={{ color: C.red }}>{err}</div>}
           <div className="flex gap-2 mt-2 flex-wrap">
             <input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="add to the discussion…" style={{ ...inp, flex: 1 }} />
-            <button onClick={() => send({ action: "reply", text: reply })} disabled={busy || !reply.trim()} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#1B3A5C", color: "#fff" }}>Reply</button>
+            <button onClick={() => send({ action: "reply", text: reply })} disabled={busy || !reply.trim()} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--blue)", color: "#fff" }}>Reply</button>
           </div>
           {hr && !answered && (
             <div className="mt-2">

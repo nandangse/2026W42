@@ -36,12 +36,12 @@ import { useEffect, useState } from "react";
 /** Last hand-revision of the prose on this page. Bump it when you edit. */
 const DOC_REVISED = "3 September 2026";
 
-const NAVY = "#16232F";
-const INK = "#22303C";
-const MUTED = "#8A94A0";
-const BORDER = "#E2E0DA";
-const ORANGE = "#E8600A";
-const AMBER = "#F5B32B";
+const NAVY = "var(--navy)";
+const INK = "var(--ink)";
+const MUTED = "var(--muted)";
+const BORDER = "var(--line)";
+const ORANGE = "var(--accent)";
+const AMBER = "var(--amber)";
 const RED = "#C0392B";
 
 /* ══════════════════════ measured facts about the codebase ══════════════════
@@ -494,7 +494,7 @@ function Sec({ n, title, lead, children }: { n: string; title: string; lead?: st
           <h3 className="font-bold" style={{ fontSize: 15, color: INK }}>{title}</h3>
         </div>
         {lead && (
-          <p className="text-xs mb-3" style={{ color: "#5A6672", lineHeight: 1.6, maxWidth: "88ch" }}>{lead}</p>
+          <p className="text-xs mb-3" style={{ color: "var(--dim)", lineHeight: 1.6, maxWidth: "88ch" }}>{lead}</p>
         )}
         {children}
       </Card>
@@ -514,7 +514,7 @@ function KV({ k, v }: { k: string; v: React.ReactNode }) {
 
 function Tags({ items, tone = "slate" }: { items: string[]; tone?: "slate" | "orange" }) {
   const bg = tone === "orange" ? "#FDF1E7" : "#F4F3EF";
-  const fg = tone === "orange" ? "#A5450A" : "#5A6672";
+  const fg = tone === "orange" ? "#A5450A" : "var(--dim)";
   return (
     <div className="flex flex-wrap gap-1">
       {items.map((t) => (
@@ -630,7 +630,7 @@ export default function SoftwareDescription() {
         lead="Genie is divided into Spaces, not pages. A Space is a whole area of the application with its own sub-navigation and its own admission test, and the test is enforced on the server every time — a Space you cannot open is a Space whose data you cannot fetch either. Three admission mechanisms are in use, and they are deliberately different things: a ROLE is what you are, a GROUP FLAG is which room you sit in, and a GRANT is a decision somebody made about you by name."
       >
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
+          <table className="genie-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
             <thead>
               <tr>
                 <th style={TH}>Space</th>
@@ -645,7 +645,7 @@ export default function SoftwareDescription() {
                   <td style={{ ...TD, fontWeight: 700, whiteSpace: "nowrap" }}>{s.icon} {s.name}</td>
                   <td style={{ ...TD, maxWidth: 380 }}>{s.what}</td>
                   <td style={TD}>{s.who}</td>
-                  <td style={{ ...TD, color: "#5A6672" }}>{s.how}</td>
+                  <td style={{ ...TD, color: "var(--dim)" }}>{s.how}</td>
                 </tr>
               ))}
             </tbody>
@@ -749,7 +749,7 @@ export default function SoftwareDescription() {
         <div className="mt-3">
           <div className="font-bold text-xs mb-1.5" style={{ color: INK }}>Object storage — {SIZE.buckets} buckets, all private</div>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
+            <table className="genie-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
               <thead>
                 <tr>
                   <th style={TH}>Bucket</th>
@@ -762,7 +762,7 @@ export default function SoftwareDescription() {
                   <tr key={b}>
                     <td style={{ ...TD, fontFamily: "ui-monospace, monospace", fontSize: 11.5, whiteSpace: "nowrap" }}>{b}</td>
                     <td style={TD}>{holds}</td>
-                    <td style={{ ...TD, color: "#5A6672" }}>{how}</td>
+                    <td style={{ ...TD, color: "var(--dim)" }}>{how}</td>
                   </tr>
                 ))}
               </tbody>
@@ -786,7 +786,7 @@ export default function SoftwareDescription() {
           <div className="rounded p-2.5" style={{ background: "#F7F6F2", border: "1px solid " + BORDER }}>
             <div className="font-bold text-xs mb-1">Roles — what you are</div>
             <Tags items={["admin", "planner", "project_owner", "user", "sales", "viewer", "uploader"]} tone="orange" />
-            <p className="text-xs mt-1.5" style={{ color: "#5A6672", lineHeight: 1.55 }}>
+            <p className="text-xs mt-1.5" style={{ color: "var(--dim)", lineHeight: 1.55 }}>
               Editors (admin, planner, project_owner) may change plans. A user works tasks only. A viewer reads.
               The uploader sees the upload page and nothing else.
             </p>
@@ -794,7 +794,7 @@ export default function SoftwareDescription() {
           <div className="rounded p-2.5" style={{ background: "#F7F6F2", border: "1px solid " + BORDER }}>
             <div className="font-bold text-xs mb-1">Group flags — which room you are in</div>
             <Tags items={["lc", "stratcom", "management"]} tone="orange" />
-            <p className="text-xs mt-1.5" style={{ color: "#5A6672", lineHeight: 1.55 }}>
+            <p className="text-xs mt-1.5" style={{ color: "var(--dim)", lineHeight: 1.55 }}>
               Not roles. The Leadership Circle sees Delivered Jobs; Stratcom sees the forward money and may flag a
               job as on the floor. The owner is in all three without anything being stored against him.
             </p>
@@ -802,7 +802,7 @@ export default function SoftwareDescription() {
           <div className="rounded p-2.5" style={{ background: "#F7F6F2", border: "1px solid " + BORDER }}>
             <div className="font-bold text-xs mb-1">Grants — a decision about you by name</div>
             <Tags items={["goal_access", "sales_access"]} tone="orange" />
-            <p className="text-xs mt-1.5" style={{ color: "#5A6672", lineHeight: 1.55 }}>
+            <p className="text-xs mt-1.5" style={{ color: "var(--dim)", lineHeight: 1.55 }}>
               Default is no, for everyone, including admins. Two tables, each gating a whole Space, revocable in
               Admin. The owner is implicit in both.
             </p>
@@ -901,7 +901,7 @@ export default function SoftwareDescription() {
             <div key={m.name} className="rounded border" style={{ borderColor: BORDER, breakInside: "avoid" }}>
               <div className="flex items-baseline gap-2 flex-wrap px-3 py-2" style={{ background: "#F7F6F2", borderBottom: "1px solid " + BORDER }}>
                 <div className="font-bold text-sm" style={{ color: INK }}>{m.name}</div>
-                <span className="text-xs" style={{ background: "#E9E7E0", color: "#5A6672", borderRadius: 3, padding: "1px 6px" }}>{m.space}</span>
+                <span className="text-xs" style={{ background: "#E9E7E0", color: "var(--dim)", borderRadius: 3, padding: "1px 6px" }}>{m.space}</span>
                 <span className="text-xs tnum" style={{ color: MUTED }}>since v{m.since}</span>
               </div>
               <div className="px-3 py-1.5">
@@ -931,7 +931,7 @@ export default function SoftwareDescription() {
           <span style={{ color: RED, fontWeight: 700 }}>{gaps} gaps</span>
         </div>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
+          <table className="genie-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
             <thead>
               <tr>
                 <th style={TH}>Ref</th>
@@ -975,7 +975,7 @@ export default function SoftwareDescription() {
       {/* ── how to keep this true ── */}
       <div className="rounded-lg px-4 py-3" style={{ background: "#F7F6F2", border: "1px solid " + BORDER }}>
         <div className="font-bold text-xs mb-1" style={{ color: INK, letterSpacing: 0.6 }}>KEEPING THIS PAGE TRUE</div>
-        <p className="text-xs" style={{ color: "#5A6672", lineHeight: 1.65, maxWidth: "92ch" }}>
+        <p className="text-xs" style={{ color: "var(--dim)", lineHeight: 1.65, maxWidth: "92ch" }}>
           The version, the release count and the effort figures are read live from the release log and cannot go stale.
           Everything else is prose in <code style={{ fontFamily: "ui-monospace, monospace", fontSize: 11 }}>src/components/SoftwareDescription.tsx</code> and
           is only as true as its last revision, dated at the top. A new module is one entry in the module register, in the

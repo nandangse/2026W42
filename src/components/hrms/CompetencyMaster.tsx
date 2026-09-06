@@ -69,7 +69,7 @@ export default function CompetencyMaster({ note }: { note?: string }) {
           <button disabled={busy || !add.name.trim() || !add.definition.trim()}
             onClick={() => { run({ action: "master-add", ...add }, `Added “${add.name.trim()}”`); setAdd({ name: "", definition: "", category: add.category }); }}
             className="text-xs font-bold rounded px-3 py-1.5"
-            style={{ background: add.name.trim() && add.definition.trim() ? "#E8600A" : "#E2E0DA", color: add.name.trim() && add.definition.trim() ? "#fff" : "#8A94A0" }}>
+            style={{ background: add.name.trim() && add.definition.trim() ? "var(--accent)" : "var(--line)", color: add.name.trim() && add.definition.trim() ? "#fff" : "var(--muted)" }}>
             + Add
           </button>
         </div>

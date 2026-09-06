@@ -102,10 +102,10 @@ export default function ForecastView() {
       </div>
 
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER }}>
-        <table className="text-xs" style={{ minWidth: 900, borderCollapse: "separate", borderSpacing: 0 }}>
+        <table className="text-xs genie-table" style={{ minWidth: 900, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
-            <tr style={{ background: "#22303C", color: "#fff" }}>
-              <th className="px-3 py-2 text-left" style={{ position: "sticky", left: 0, background: "#22303C", minWidth: 190 }}>Stage · probability</th>
+            <tr style={{ background: "var(--ink)", color: "#fff" }}>
+              <th className="px-3 py-2 text-left" style={{ position: "sticky", left: 0, background: "var(--ink)", minWidth: 190 }}>Stage · probability</th>
               {cols.map((m) => (
                 <th key={m} className="px-2 py-2 text-right whitespace-nowrap" style={{ minWidth: 96, opacity: m === "later" || m === "none" ? 0.7 : 1 }}>
                   {monthLabel(m)}
@@ -171,7 +171,7 @@ export default function ForecastView() {
                     })}
                   </tr>
                   {!isFolded && lanes.map((l) => (
-              <tr key={l.id} className="border-t" style={{ borderColor: "#EFEDE7" }}>
+              <tr key={l.id} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
                 <td className="px-3 py-1.5" style={{ position: "sticky", left: 0, background: "#fff" }}>
                   <span className="font-semibold" style={{ color: INK, paddingLeft: 14 }}>
                     <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: l.colour || MUTED, marginRight: 6 }} />
@@ -204,7 +204,7 @@ export default function ForecastView() {
               );
             })}
 
-            <tr className="border-t" style={{ borderColor: "#22303C", background: "#FAF9F5" }}>
+            <tr className="border-t" style={{ borderColor: "var(--ink)", background: "#FAF9F5" }}>
               <td className="px-3 py-2 font-bold" style={{ position: "sticky", left: 0, background: "#FAF9F5", color: INK }}>Total pending (unweighted)</td>
               {cols.map((m) => (
                 <td key={m} className="px-2 py-2 text-right tnum font-bold" style={{ color: data.raw[m] ? GREEN : "#D5D2C8" }}>

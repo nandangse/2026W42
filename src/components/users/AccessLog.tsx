@@ -36,8 +36,8 @@ export default function AccessLog({ userId }: { userId: string }) {
       .catch((e) => { swallow("access-log", e); setDays([]); });
   }, [userId]);
 
-  if (days === null) return <div className="text-xs" style={{ color: "#8A94A0" }}>reading…</div>;
-  if (!installed) return <div className="text-xs" style={{ color: "#B3261E" }}>Run migration 0144 first — the access log has nowhere to write yet.</div>;
+  if (days === null) return <div className="text-xs" style={{ color: "var(--muted)" }}>reading…</div>;
+  if (!installed) return <div className="text-xs" style={{ color: "var(--red)" }}>Run migration 0144 first — the access log has nowhere to write yet.</div>;
 
   const byDay = new Map(days.map((d) => [d.day, d]));
   const today = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) + "T00:00:00Z");
@@ -58,19 +58,19 @@ export default function AccessLog({ userId }: { userId: string }) {
 
   return (
     <div>
-      <div className="flex gap-4 flex-wrap text-xs mb-3" style={{ color: "#5A6672" }}>
-        <span><b style={{ color: "#16232F" }}>{activeDays}</b> days on Genie in the last 60</span>
-        <span><b style={{ color: "#16232F" }}>{totalMin}</b> minutes</span>
-        <span><b style={{ color: "#16232F" }}>{totalReq}</b> records pulled</span>
-        <span className="ml-auto" style={{ color: "#8A94A0" }}>Sunday to Saturday · newest week on top · hover a day</span>
+      <div className="flex gap-4 flex-wrap text-xs mb-3" style={{ color: "var(--dim)" }}>
+        <span><b style={{ color: "var(--navy)" }}>{activeDays}</b> days on Genie in the last 60</span>
+        <span><b style={{ color: "var(--navy)" }}>{totalMin}</b> minutes</span>
+        <span><b style={{ color: "var(--navy)" }}>{totalReq}</b> records pulled</span>
+        <span className="ml-auto" style={{ color: "var(--muted)" }}>Sunday to Saturday · newest week on top · hover a day</span>
       </div>
       <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "separate", borderSpacing: 3, fontSize: 12 }}>
+        <table className="genie-table" style={{ borderCollapse: "separate", borderSpacing: 3, fontSize: 12 }}>
           <thead>
             <tr>
-              <th className="text-left pr-2" style={{ color: "#8A94A0", fontWeight: 600 }}>Week</th>
-              {DOW.map((d) => <th key={d} style={{ color: "#8A94A0", fontWeight: 600, minWidth: 54 }}>{d}</th>)}
-              <th className="text-right pl-2" style={{ color: "#8A94A0", fontWeight: 600 }}>min</th>
+              <th className="text-left pr-2" style={{ color: "var(--muted)", fontWeight: 600 }}>Week</th>
+              {DOW.map((d) => <th key={d} style={{ color: "var(--muted)", fontWeight: 600, minWidth: 54 }}>{d}</th>)}
+              <th className="text-right pl-2" style={{ color: "var(--muted)", fontWeight: 600 }}>min</th>
             </tr>
           </thead>
           <tbody>
@@ -79,8 +79,8 @@ export default function AccessLog({ userId }: { userId: string }) {
               const wmin = wk.reduce((a, d) => a + (d?.minutes || 0), 0);
               return (
                 <tr key={iso(w.start)}>
-                  <td className="pr-2 tnum" style={{ color: "#16232F", fontWeight: 700, whiteSpace: "nowrap" }}>
-                    Week {w.no}<div style={{ fontSize: 10, color: "#8A94A0", fontWeight: 400 }}>{dm(w.start)}</div>
+                  <td className="pr-2 tnum" style={{ color: "var(--navy)", fontWeight: 700, whiteSpace: "nowrap" }}>
+                    Week {w.no}<div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 400 }}>{dm(w.start)}</div>
                   </td>
                   {w.days.map((d, i) => {
                     const rec = wk[i];
@@ -92,22 +92,22 @@ export default function AccessLog({ userId }: { userId: string }) {
                     return (
                       <td key={i} title={title} className="text-center tnum" style={{
                         height: 34, borderRadius: 5, cursor: out ? "default" : "help",
-                        background: out ? "transparent" : on ? "#0B5D2E" : "#F1EFE9",
-                        color: on ? "#fff" : out ? "#D9D6CD" : "#8A94A0",
-                        fontWeight: on ? 700 : 400, border: `1px solid ${out ? "transparent" : on ? "#0B5D2E" : "#E2E0DA"}`,
+                        background: out ? "transparent" : on ? "#0B5D2E" : "var(--paper)",
+                        color: on ? "#fff" : out ? "#D9D6CD" : "var(--muted)",
+                        fontWeight: on ? 700 : 400, border: `1px solid ${out ? "transparent" : on ? "#0B5D2E" : "var(--line)"}`,
                       }}>
                         {d.getUTCDate()}{on && <div style={{ fontSize: 9, fontWeight: 400 }}>{rec.minutes}m</div>}
                       </td>
                     );
                   })}
-                  <td className="text-right pl-2 tnum" style={{ color: wmin ? "#16232F" : "#B8B5AC", fontWeight: 600 }}>{wmin || "·"}</td>
+                  <td className="text-right pl-2 tnum" style={{ color: wmin ? "var(--navy)" : "#B8B5AC", fontWeight: 600 }}>{wmin || "·"}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-      <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>A minute is counted while the tab is open and visible; records are the API calls the browser made. Thresholds for copying or screenshotting come next, on these numbers.</div>
+      <div className="text-xs mt-2" style={{ color: "var(--muted)" }}>A minute is counted while the tab is open and visible; records are the API calls the browser made. Thresholds for copying or screenshotting come next, on these numbers.</div>
     </div>
   );
 }

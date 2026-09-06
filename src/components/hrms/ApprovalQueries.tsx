@@ -97,7 +97,7 @@ function QueryCard({ r, isOwner, expanded, onToggle, onChanged }: { r: Row; isOw
   };
   const answered = r.status !== "Open";
   return (
-    <div className="bg-white rounded-lg border mb-2" style={{ borderColor: C.line, borderLeft: `4px solid ${answered ? "#0D7A3F" : "#E8600A"}` }}>
+    <div className="bg-white rounded-lg border mb-2" style={{ borderColor: C.line, borderLeft: `4px solid ${answered ? "var(--green)" : "var(--accent)"}` }}>
       <button onClick={onToggle} className="w-full text-left px-3 py-2.5">
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#F4F2EC", color: C.dim }}>{r.topic}</span>
@@ -106,7 +106,7 @@ function QueryCard({ r, isOwner, expanded, onToggle, onChanged }: { r: Row; isOw
           <div style={{ flex: 1 }} />
           <span style={{ fontSize: 11, color: C.faint }}>asked {day(r.raised_at)} by {who(r.raised_by)}</span>
           {answered
-            ? <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#E6F4EA", color: "#0D7A3F" }}>answered {day(r.answered_at)}</span>
+            ? <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#E6F4EA", color: "var(--green)" }}>answered {day(r.answered_at)}</span>
             : <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#FFF3E8", color: "#8A5B00" }}>open</span>}
           <span style={{ color: C.faint, fontSize: 12 }}>{expanded ? "▲" : "▼"}</span>
         </div>
@@ -125,7 +125,7 @@ function QueryCard({ r, isOwner, expanded, onToggle, onChanged }: { r: Row; isOw
 
           {r.answer && (
             <div className="rounded p-2.5 mt-2" style={{ background: "#E6F4EA", border: "1px solid #BFE3CB" }}>
-              <div className="font-bold" style={{ fontSize: 12, color: "#0D7A3F" }}>The decision — {who(r.answered_by)}, {day(r.answered_at)}</div>
+              <div className="font-bold" style={{ fontSize: 12, color: "var(--green)" }}>The decision — {who(r.answered_by)}, {day(r.answered_at)}</div>
               <div style={{ fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.6, marginTop: 3 }}>{r.answer}</div>
             </div>
           )}
@@ -134,7 +134,7 @@ function QueryCard({ r, isOwner, expanded, onToggle, onChanged }: { r: Row; isOw
             <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={2} placeholder="Add to the discussion…"
               className="w-full rounded px-2 py-1.5" style={{ border: `1px solid ${C.line}`, fontSize: 13 }} />
             <button onClick={() => send({ action: "reply", text: reply })} disabled={busy || !reply.trim()}
-              className="rounded px-3 py-1.5 font-bold mt-1" style={{ background: reply.trim() ? "#1B3A5C" : "#E2E0DA", color: reply.trim() ? "#fff" : "#8A94A0", fontSize: 12.5 }}>
+              className="rounded px-3 py-1.5 font-bold mt-1" style={{ background: reply.trim() ? "var(--blue)" : "var(--line)", color: reply.trim() ? "#fff" : "var(--muted)", fontSize: 12.5 }}>
               Reply
             </button>
           </div>
@@ -145,7 +145,7 @@ function QueryCard({ r, isOwner, expanded, onToggle, onChanged }: { r: Row; isOw
               <textarea value={answer} onChange={(e) => setAnswer(e.target.value)} rows={3} placeholder="The decision, in your words…"
                 className="w-full rounded px-2 py-1.5 mt-1" style={{ border: `1px solid ${C.line}`, fontSize: 13 }} />
               <button onClick={() => send({ action: "answer", answer })} disabled={busy || !answer.trim()}
-                className="rounded px-3 py-1.5 font-bold mt-1" style={{ background: answer.trim() ? C.green : "#E2E0DA", color: answer.trim() ? "#fff" : "#8A94A0", fontSize: 12.5 }}>
+                className="rounded px-3 py-1.5 font-bold mt-1" style={{ background: answer.trim() ? C.green : "var(--line)", color: answer.trim() ? "#fff" : "var(--muted)", fontSize: 12.5 }}>
                 ✓ Answer and close
               </button>
             </div>

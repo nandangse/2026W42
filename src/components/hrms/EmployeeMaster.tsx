@@ -40,7 +40,7 @@ interface HistoryRow {
   by_initials: string | null; by_email: string | null; edited_at: string;
 }
 
-const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
+const C = { ink: "var(--ink)", dim: "var(--dim)", faint: "var(--muted)", line: "var(--line)", orange: "var(--accent)", green: "var(--green)", red: "var(--red)" };
 
 const val = (e: HrmsEmployee, k: string) => e.value[k] ?? "";
 const isActive = (e: HrmsEmployee) => onRoll(e.value);
@@ -289,7 +289,7 @@ export default function EmployeeMaster({
         who={who}
         tools={
           <>
-            <button onClick={() => setExportOpen((v) => !v)} className="text-xs font-bold rounded px-2.5 py-1.5" style={{ background: "#DCE8F5", color: "#1B3A5C" }} title="Download the master as an Excel workbook">⬇ Download Excel</button>
+            <button onClick={() => setExportOpen((v) => !v)} className="text-xs font-bold rounded px-2.5 py-1.5" style={{ background: "#DCE8F5", color: "var(--blue)" }} title="Download the master as an Excel workbook">⬇ Download Excel</button>
             {view === "active" && (
               <button onClick={() => setAdding((v) => !v)} className="text-xs font-bold rounded px-2.5 py-1.5" style={{ background: C.orange, color: "#fff" }} title="Somebody who has joined but is not on the HR sheet yet">+ Add person</button>
             )}
@@ -341,7 +341,7 @@ export default function EmployeeMaster({
             {types.map((d) => (<option key={d} value={d}>{d}</option>))}
           </select>
           <button onClick={() => setColsOpen((v) => !v)} className="text-xs font-bold rounded px-2.5 py-1.5"
-            style={{ background: extraCols.length ? "#16232F" : "#fff", color: extraCols.length ? "#fff" : C.dim, border: `1px solid ${C.line}` }}
+            style={{ background: extraCols.length ? "var(--navy)" : "#fff", color: extraCols.length ? "#fff" : C.dim, border: `1px solid ${C.line}` }}
             title="Choose which of the record's fields appear as columns">
             + Add column{extraCols.length ? ` (${extraCols.length})` : ""}
           </button>
@@ -377,7 +377,7 @@ export default function EmployeeMaster({
                     {fields.map((f) => (
                       <label key={f.key} className="flex items-center gap-1 text-xs" style={{ cursor: "pointer", color: C.dim }}>
                         <input type="checkbox" checked={extraCols.includes(f.key)} onChange={() => toggleCol(f.key)}
-                          style={{ accentColor: "#E8600A", width: 13, height: 13 }} />
+                          style={{ accentColor: "var(--accent)", width: 13, height: 13 }} />
                         {f.label}
                       </label>
                     ))}
@@ -389,17 +389,17 @@ export default function EmployeeMaster({
         )}
 
         {exportOpen && (
-          <div className="bg-white rounded-lg border p-3 mb-2 no-print" style={{ borderColor: "#F5B32B" }}>
+          <div className="bg-white rounded-lg border p-3 mb-2 no-print" style={{ borderColor: "var(--amber)" }}>
             <div className="text-xs font-bold mb-2" style={{ color: "#8A5B00", lineHeight: 1.6 }}>
               Please note the export will be as per chosen options. Dont leave the data here and there
             </div>
             <div className="flex gap-1.5 flex-wrap items-center">
               <button onClick={() => runExport("filtered")} disabled={!!exporting}
-                className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#1B3A5C", color: "#fff", opacity: exporting ? 0.6 : 1 }}>
+                className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--blue)", color: "#fff", opacity: exporting ? 0.6 : 1 }}>
                 {exporting === "filtered" ? "Building…" : `Export filtered report (${filtered.length})`}
               </button>
               <button onClick={() => runExport("all")} disabled={!!exporting}
-                className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff", opacity: exporting ? 0.6 : 1 }}>
+                className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--accent)", color: "#fff", opacity: exporting ? 0.6 : 1 }}>
                 {exporting === "all" ? "Building…" : "Export All"}
               </button>
               <span className="text-xs" style={{ color: C.faint }}>
@@ -429,7 +429,7 @@ export default function EmployeeMaster({
 
 function Stat({ n, l, hint, warn }: { n: number | string; l: string; hint?: string; warn?: boolean }) {
   return (
-    <div className="bg-white rounded-lg border px-3 py-2" style={{ borderColor: warn ? "#F5B32B" : C.line, minWidth: 118 }} title={hint}>
+    <div className="bg-white rounded-lg border px-3 py-2" style={{ borderColor: warn ? "var(--amber)" : C.line, minWidth: 118 }} title={hint}>
       <div className="font-bold tnum" style={{ fontSize: 21, lineHeight: 1.1, color: warn ? "#8A5B00" : C.ink }}>{n}</div>
       <div style={{ fontSize: 11, color: C.faint }}>{l}</div>
     </div>
@@ -463,8 +463,8 @@ function PersonCard({ e, frozen, onClose }: { e: HrmsEmployee; frozen?: boolean;
 
   return (
     <div className="fixed inset-0 flex justify-end no-print" style={{ background: "rgba(13,22,31,0.35)", zIndex: 60 }} role="button" tabIndex={0} onClick={onClose}>
-      <div className="h-full overflow-y-auto" style={{ background: "#F1EFE9", width: "min(620px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} role="button" tabIndex={0} onClick={(ev) => ev.stopPropagation()}>
-        <div className="px-4 py-3 sticky top-0" style={{ background: "#16232F", color: "#fff", zIndex: 2 }}>
+      <div className="h-full overflow-y-auto" style={{ background: "var(--paper)", width: "min(620px, 100%)", boxShadow: "-8px 0 24px rgba(0,0,0,0.18)" }} role="button" tabIndex={0} onClick={(ev) => ev.stopPropagation()}>
+        <div className="px-4 py-3 sticky top-0" style={{ background: "var(--navy)", color: "#fff", zIndex: 2 }}>
           <div className="flex items-start gap-2">
             <div style={{ minWidth: 0 }}>
               <div className="font-bold">{val(e, "name") || e.id}</div>
@@ -477,10 +477,10 @@ function PersonCard({ e, frozen, onClose }: { e: HrmsEmployee; frozen?: boolean;
                 {[val(e, "designation"), val(e, "department")].filter(Boolean).join(" · ") || "no designation recorded"}
               </div>
             </div>
-            <button onClick={onClose} className="ml-auto text-sm font-bold rounded px-2 py-1" style={{ background: "#22303C", color: "#8FA1B3" }}>✕</button>
+            <button onClick={onClose} className="ml-auto text-sm font-bold rounded px-2 py-1" style={{ background: "var(--ink)", color: "#8FA1B3" }}>✕</button>
           </div>
           <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: frozen ? "#4A3B7A" : "#22303C", color: frozen ? "#fff" : "#8FA1B3" }}>
+            <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: frozen ? "#4A3B7A" : "var(--ink)", color: frozen ? "#fff" : "#8FA1B3" }}>
               {frozen ? "🔒 FROZEN — FY 2025-26" : "VIEW ONLY"}
             </span>
             {frozen ? (
@@ -488,7 +488,7 @@ function PersonCard({ e, frozen, onClose }: { e: HrmsEmployee; frozen?: boolean;
                 Frozen record — edit from Active Employees, not from here.
               </span>
             ) : (
-              <button onClick={edit} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#E8600A", color: "#fff" }}
+              <button onClick={edit} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--accent)", color: "#fff" }}
                 title="Opens this record in its own tab, where it can be changed. Every change is logged.">
                 ✎ Edit Record ↗
               </button>
@@ -499,12 +499,12 @@ function PersonCard({ e, frozen, onClose }: { e: HrmsEmployee; frozen?: boolean;
         <div className="flex gap-1 flex-wrap px-3 py-1.5" style={{ background: "#EAE7DF", borderBottom: "1px solid #DCD9D1" }}>
           {FIELD_GROUPS.map((g) => (
             <button key={g.key} onClick={() => setTab(g.key)} className="text-xs font-bold rounded px-2 py-1"
-              style={tab === g.key ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
+              style={tab === g.key ? { background: "var(--navy)", color: "#fff" } : { color: "#5B6B7A" }}>
               {g.label}
             </button>
           ))}
           <button onClick={() => setTab("history")} className="text-xs font-bold rounded px-2 py-1"
-            style={tab === "history" ? { background: "#16232F", color: "#fff" } : { color: "#5B6B7A" }}>
+            style={tab === "history" ? { background: "var(--navy)", color: "#fff" } : { color: "#5B6B7A" }}>
             History
           </button>
         </div>
@@ -531,7 +531,7 @@ function PersonCard({ e, frozen, onClose }: { e: HrmsEmployee; frozen?: boolean;
                 {(history || []).map((h, i) => (
                   <div key={h.id} className="px-3 py-2" style={{ borderTop: i ? "1px solid #EEECE6" : undefined }}>
                     <div className="text-xs" style={{ lineHeight: 1.6 }}>
-                      <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#E8600A", color: "#fff", fontSize: 10 }}>
+                      <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "var(--accent)", color: "#fff", fontSize: 10 }}>
                         {h.by_initials || "—"}
                       </span>{" "}
                       <span style={{ color: CC.faint }}>

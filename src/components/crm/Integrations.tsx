@@ -81,7 +81,7 @@ export default function Integrations() {
         Keys for outside services, kept in the CRM&apos;s database — change one here and it is live at once, no redeploy.
       </p>
       {needs && <div className="text-xs rounded border p-2 mb-3" style={{ borderColor: "#F5D9A8", background: "#FFF7E6", color: "#8A5B00" }}>Run CRM migration 0019 — the integrations have nowhere to live yet.</div>}
-      {err && <div className="text-xs font-semibold mb-2" style={{ color: "#B3261E" }}>{err}</div>}
+      {err && <div className="text-xs font-semibold mb-2" style={{ color: "var(--red)" }}>{err}</div>}
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: GREEN }}>{msg}</div>}
 
       {(rows || []).map((it) => (
@@ -90,7 +90,7 @@ export default function Integrations() {
             <b style={{ fontSize: 14, color: INK }}>{it.label}</b>
             {it.configured
               ? <span className="rounded px-2 font-bold" style={{ fontSize: 10.5, background: "#E6F4EB", color: GREEN }}>connected · …{it.tail}</span>
-              : <span className="rounded px-2 font-bold" style={{ fontSize: 10.5, background: "#FBEAE8", color: "#B3261E" }}>not connected</span>}
+              : <span className="rounded px-2 font-bold" style={{ fontSize: 10.5, background: "#FBEAE8", color: "var(--red)" }}>not connected</span>}
             {it.key === "zoom" && it.configured && (
               <button onClick={async () => {
                 setZoomTest(null);
@@ -104,7 +104,7 @@ export default function Integrations() {
           </div>
           {it.key === "zoom" && zoomTest && (
             <div className="rounded border p-2 mt-2 text-xs" style={{ borderColor: zoomTest.ok && !(zoomTest.missing?.length) ? GREEN : "#F5D9A8", background: zoomTest.ok && !(zoomTest.missing?.length) ? "#F2FAF5" : "#FFF7E6", lineHeight: 1.6 }}>
-              {!zoomTest.ok ? <b style={{ color: "#B3261E" }}>Zoom refused: {zoomTest.error}</b> : (
+              {!zoomTest.ok ? <b style={{ color: "var(--red)" }}>Zoom refused: {zoomTest.error}</b> : (
                 <>
                   <b style={{ color: GREEN }}>Zoom accepts the app</b> · {zoomTest.granted?.length ?? 0} scope{(zoomTest.granted?.length ?? 0) === 1 ? "" : "s"} granted · {zoomTest.webhook}
                   {zoomTest.missing?.length ? (
@@ -168,7 +168,7 @@ export default function Integrations() {
                   ⬇ Pull enquiry info
                 </button>
                 <button onClick={() => erpAction("push_jobs")} disabled={busy === it.key}
-                  className="rounded px-3 py-1.5 font-bold border" style={{ borderColor: "#F5B32B", color: "#8A5B00", fontSize: 12.5 }}
+                  className="rounded px-3 py-1.5 font-bold border" style={{ borderColor: "var(--amber)", color: "#8A5B00", fontSize: 12.5 }}
                   title="Writes TDD / kitting % / production % to the ERP through the confirmed mapping — only where the value differs">
                   ⬆ Push job dates &amp; %
                 </button>

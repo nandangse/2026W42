@@ -61,7 +61,7 @@ export default function SalarySlipsTable({ who }: { who: string }) {
       key: "slip", label: "Salary Slip", width: 100, value: () => "",
       render: (r) => r.employee_id ? (
         <a href={`/hrms/salary-slips/${r.sheet_id}/print?emp=${encodeURIComponent(r.employee_id)}`} target="_blank" rel="noopener noreferrer"
-          className="font-bold" style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2, fontSize: 11.5 }}>
+          className="font-bold" style={{ color: "var(--blue)", textDecoration: "underline", textUnderlineOffset: 2, fontSize: 11.5 }}>
           🧾 Open
         </a>
       ) : null,

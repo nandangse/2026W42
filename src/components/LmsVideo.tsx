@@ -16,8 +16,8 @@ import { swallow } from "@/lib/swallow";
 import { clock, type VideoRef } from "@/lib/lms";
 
 const C = {
-  ink: "#16232F", body: "#22303C", sub: "#5A6672", mute: "#8A94A0", faint: "#B8B5AC",
-  line: "#E2E0DA", panel: "#F4F2EC", accent: "#E8600A",
+  ink: "var(--navy)", body: "var(--ink)", sub: "var(--dim)", mute: "var(--muted)", faint: "#B8B5AC",
+  line: "var(--line)", panel: "#F4F2EC", accent: "var(--accent)",
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -231,17 +231,17 @@ function YouTubePlayer({ id }: { id: string }) {
           {playing ? "❚❚" : "▶"}
         </button>
         <button onClick={forward} disabled={!ready} className="rounded font-bold"
-          style={{ background: "#22303C", color: "#fff", height: 26, padding: "0 8px", opacity: ready ? 1 : 0.5, fontSize: 11 }}
+          style={{ background: "var(--ink)", color: "#fff", height: 26, padding: "0 8px", opacity: ready ? 1 : 0.5, fontSize: 11 }}
           title={`Forward ${FORWARD_SECONDS} seconds`} aria-label={`Forward ${FORWARD_SECONDS} seconds`}>
           ⏩ {FORWARD_SECONDS}s
         </button>
         <button onClick={cycleRate} disabled={!ready} className="rounded font-bold tnum"
-          style={{ background: rate !== 1 ? C.accent : "#22303C", color: "#fff", height: 26, padding: "0 8px", opacity: ready ? 1 : 0.5, fontSize: 11 }}
+          style={{ background: rate !== 1 ? C.accent : "var(--ink)", color: "#fff", height: 26, padding: "0 8px", opacity: ready ? 1 : 0.5, fontSize: 11 }}
           title="Playback speed — click to cycle" aria-label="Playback speed">
           {rate}×
         </button>
         <button onClick={toggleMute} disabled={!ready} className="rounded font-bold"
-          style={{ background: muted ? "#B3261E" : "#22303C", color: "#fff", height: 26, padding: "0 8px", opacity: ready ? 1 : 0.5, fontSize: 12 }}
+          style={{ background: muted ? "var(--red)" : "var(--ink)", color: "#fff", height: 26, padding: "0 8px", opacity: ready ? 1 : 0.5, fontSize: 12 }}
           title={muted ? "Unmute" : "Mute"} aria-label={muted ? "Unmute" : "Mute"}>
           {muted ? "🔇" : "🔊"}
         </button>
@@ -256,7 +256,7 @@ function YouTubePlayer({ id }: { id: string }) {
           {clock(at)} / {len ? clock(len) : "—"}
         </span>
         <button onClick={toggleFs} disabled={!ready} className="rounded font-bold"
-          style={{ background: "#22303C", color: "#fff", height: 26, padding: "0 8px", opacity: ready ? 1 : 0.5, fontSize: 12 }}
+          style={{ background: "var(--ink)", color: "#fff", height: 26, padding: "0 8px", opacity: ready ? 1 : 0.5, fontSize: 12 }}
           title={fs ? "Exit full screen" : "Full screen"} aria-label={fs ? "Exit full screen" : "Full screen"}>
           {fs ? "⤢ Exit" : "⛶"}
         </button>

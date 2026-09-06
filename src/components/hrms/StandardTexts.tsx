@@ -130,7 +130,7 @@ export default function StandardTexts({ who }: { who: string }) {
                 <div className="flex items-baseline gap-2 flex-wrap">
                   <span className="font-bold" style={{ fontSize: 14 }}>{t.title}</span>
                   <span className="rounded px-1.5 py-0.5" style={{ fontSize: 10, background: "#F4F2EC", color: C.faint }}>v{t.version}</span>
-                  <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: t.kind === "email" ? "#DCE8F5" : t.kind === "whatsapp" ? "#E6F4EA" : "#FFF3E8", color: t.kind === "email" ? "#1B3A5C" : t.kind === "whatsapp" ? C.green : C.orange }}>{t.kind === "email" ? "✉ e-mail" : t.kind === "whatsapp" ? "💬 WhatsApp" : "¶ letter text"}</span>
+                  <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: t.kind === "email" ? "#DCE8F5" : t.kind === "whatsapp" ? "#E6F4EA" : "#FFF3E8", color: t.kind === "email" ? "var(--blue)" : t.kind === "whatsapp" ? C.green : C.orange }}>{t.kind === "email" ? "✉ e-mail" : t.kind === "whatsapp" ? "💬 WhatsApp" : "¶ letter text"}</span>
                   {t.updated_by === "system" && <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#F4F2EC", color: C.faint }} title="Seeded by Genie to show the shape — edit the words, keep the variables">SYSTEM</span>}
                   <div style={{ flex: 1 }} />
                   <span style={{ fontSize: 11, color: C.faint }}>
@@ -175,7 +175,7 @@ export default function StandardTexts({ who }: { who: string }) {
               {vars.map((v) => (
                 <button key={v.key} onClick={() => copy(v.key)} className="block w-full text-left rounded px-1.5 py-0.5"
                   style={{ fontSize: 12, background: copied === v.key ? "#E6F4EA" : "transparent", color: C.ink }} title={`{{${v.key}}} → ${v.label}`}>
-                  <code style={{ color: "#1B3A5C", fontSize: 11.5 }}>{`{{${v.key}}}`}</code> <span style={{ color: C.faint }}>{v.label}</span>{copied === v.key && <span style={{ color: C.green }}> copied</span>}
+                  <code style={{ color: "var(--blue)", fontSize: 11.5 }}>{`{{${v.key}}}`}</code> <span style={{ color: C.faint }}>{v.label}</span>{copied === v.key && <span style={{ color: C.green }}> copied</span>}
                 </button>
               ))}
             </div>
@@ -201,7 +201,7 @@ function PlainEditor({ value, subject, onSave }: { value: string; subject?: stri
         className="w-full rounded px-2 py-1.5" style={{ border: `1px solid ${C.line}`, fontSize: 13, lineHeight: 1.7 }} />
       <div className="flex items-center gap-2 mt-1">
         <button onClick={() => onSave(v, subject !== undefined ? sub : undefined)} disabled={!dirty} className="rounded px-3 py-1.5 font-bold"
-          style={{ background: !dirty ? "#E2E0DA" : C.green, color: !dirty ? "#8A94A0" : "#fff", fontSize: 12.5 }}>Save</button>
+          style={{ background: !dirty ? "var(--line)" : C.green, color: !dirty ? "var(--muted)" : "#fff", fontSize: 12.5 }}>Save</button>
         <span style={{ fontSize: 11.5, color: C.faint }}>{"{{name}}"}, {"{{first_name}}"} and the variables on the right are filled in when the mail goes out. &lt;name&gt; still works.</span>
       </div>
     </>

@@ -35,7 +35,7 @@ const erpForm = (base: string, doctype: string, name: string) =>
 const who = (s: string) => (S(s).includes("@") ? S(s).split("@")[0] : S(s)) || "·";
 
 const docWord = (b: Bom) => (b.docstatus === 2 ? "cancelled" : b.docstatus === 1 ? "submitted" : "draft");
-const docColour = (b: Bom) => (b.docstatus === 2 ? "#5A6672" : b.docstatus === 1 ? GREEN : AMBER);
+const docColour = (b: Bom) => (b.docstatus === 2 ? "var(--dim)" : b.docstatus === 1 ? GREEN : AMBER);
 
 /**
  * The project's Approved BOM, and nothing else. Its header comes from the
@@ -123,7 +123,7 @@ export default function Projects({ summary }: { summary: Summary }) {
       />
       <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
         BOM is the ERP&apos;s Approved BOM field. The pill&apos;s dot is that BOM&apos;s state on the ERP:
-        <span style={{ color: GREEN }}> ●</span> submitted, <span style={{ color: AMBER }}>●</span> draft, <span style={{ color: "#5A6672" }}>●</span> cancelled.
+        <span style={{ color: GREEN }}> ●</span> submitted, <span style={{ color: AMBER }}>●</span> draft, <span style={{ color: "var(--dim)" }}>●</span> cancelled.
         Item is what that BOM manufactures. Last Modified is the project&apos;s; hover the pill for the BOM&apos;s own.
       </div>
     </Screen>

@@ -113,7 +113,7 @@ function QueueScreen({ channel }: { channel: "email" | "whatsapp" }) {
           : "Composed and kept, editable — SEND opens WhatsApp with the words ready, and that click is the moment it enters Communication."}
       </p>
       {needs && <div className="text-xs rounded border p-2 mb-3" style={{ borderColor: "#F5D9A8", background: "#FFF7E6", color: "#8A5B00" }}>Run CRM migration 0022 — the queues have nowhere to live yet.</div>}
-      {err && <div className="text-xs font-semibold mb-2" style={{ color: "#B3261E" }}>{err}</div>}
+      {err && <div className="text-xs font-semibold mb-2" style={{ color: "var(--red)" }}>{err}</div>}
 
       {compose && (
         <MailComposer
@@ -124,11 +124,11 @@ function QueueScreen({ channel }: { channel: "email" | "whatsapp" }) {
       )}
       {tab === "tracking" && channel === "email" ? (
         <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "68vh" }}>
-          <table className="w-full text-xs" style={{ minWidth: 640, borderCollapse: "separate", borderSpacing: 0 }}>
+          <table className="w-full text-xs genie-table" style={{ minWidth: 640, borderCollapse: "separate", borderSpacing: 0 }}>
             <thead>
-              <tr style={{ background: "#22303C", color: "#fff" }}>
+              <tr style={{ background: "var(--ink)", color: "#fff" }}>
                 {["Sent", "To", "Subject", "Opened", "Times"].map((h) => (
-                  <th key={h} className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
+                  <th key={h} className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -136,7 +136,7 @@ function QueueScreen({ channel }: { channel: "email" | "whatsapp" }) {
               {needs && (<tr><td colSpan={5} className="px-3 py-4" style={{ color: "#8A6D1A" }}>Run CRM migration 0023 first — the pixel has nowhere to write yet.</td></tr>)}
               {tracked?.length === 0 && !needs && (<tr><td colSpan={5} className="px-3 py-4" style={{ color: MUTED }}>No tracked mail yet — the Tracking toggle in the composer starts this ledger.</td></tr>)}
               {(tracked || []).map((m, i) => (
-                <tr key={m.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                <tr key={m.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   <td className="px-2 py-1.5 whitespace-nowrap" style={{ color: MUTED }}>
                     {new Date(m.occurred_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </td>
@@ -144,7 +144,7 @@ function QueueScreen({ channel }: { channel: "email" | "whatsapp" }) {
                   <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.subject}</td>
                   <td className="px-2 py-1.5 whitespace-nowrap">
                     {m.opened_at
-                      ? <span className="font-bold" style={{ color: "#0D7A3F" }}>✓ {new Date(m.opened_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                      ? <span className="font-bold" style={{ color: "var(--green)" }}>✓ {new Date(m.opened_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                       : <span style={{ color: MUTED }}>not yet</span>}
                   </td>
                   <td className="px-2 py-1.5 tnum">{m.open_count || 0}</td>
@@ -185,8 +185,8 @@ function QueueScreen({ channel }: { channel: "email" | "whatsapp" }) {
                 <div style={{ fontSize: 11, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {q.subject ? `${q.subject} — ` : ""}{(q.body || "").slice(0, 90)}
                 </div>
-                {q.sent_note && tab !== "queue" && <div style={{ fontSize: 10, color: q.sent_note.includes("failed") ? "#B3261E" : MUTED }}>{q.sent_note} · {d10(q.sent_at)}</div>}
-                {q.sent_note?.includes("failed") && tab === "queue" && <div style={{ fontSize: 10, color: "#B3261E" }}>{q.sent_note}</div>}
+                {q.sent_note && tab !== "queue" && <div style={{ fontSize: 10, color: q.sent_note.includes("failed") ? "var(--red)" : MUTED }}>{q.sent_note} · {d10(q.sent_at)}</div>}
+                {q.sent_note?.includes("failed") && tab === "queue" && <div style={{ fontSize: 10, color: "var(--red)" }}>{q.sent_note}</div>}
               </div>
               {tab === "queue" && (
                 <button onClick={() => setEdit(q)} className="rounded px-3 py-1.5 font-bold"
@@ -285,7 +285,7 @@ function QueueLightbox({ item, onClose, onChanged }: { item: QItem; onClose: () 
               Send automatically at 6 AM {item.due_at ? `(due ${d10(item.due_at)})` : ""}
             </label>
           )}
-          {err && <div className="text-xs font-semibold mt-2" style={{ color: "#B3261E" }}>{err}</div>}
+          {err && <div className="text-xs font-semibold mt-2" style={{ color: "var(--red)" }}>{err}</div>}
         </div>
         <div className="flex gap-2 px-4 py-3" style={{ borderTop: `1px solid ${BORDER}` }}>
           <button onClick={send} disabled={busy !== null} className="rounded px-3 py-2 font-bold" style={{ background: GREEN, color: "#fff", fontSize: 13 }}>
@@ -295,7 +295,7 @@ function QueueLightbox({ item, onClose, onChanged }: { item: QItem; onClose: () 
             {busy === "keep" ? "…" : "Keep in queue"}
           </button>
           <span style={{ flex: 1 }} />
-          <button onClick={cancel} disabled={busy !== null} className="rounded px-3 py-2 font-bold" style={{ color: "#B3261E", fontSize: 13 }}>Cancel it</button>
+          <button onClick={cancel} disabled={busy !== null} className="rounded px-3 py-2 font-bold" style={{ color: "var(--red)", fontSize: 13 }}>Cancel it</button>
         </div>
       </div>
     </div>

@@ -117,7 +117,7 @@ export default function RoleRecord({
       stage={r.stage} pending={pending}>
 
       <div className="px-3 md:px-4 py-2 flex items-center gap-2 flex-wrap no-print"
-        style={{ background: pending ? "#FFF7E6" : "#EAE7DF", borderBottom: `1px solid ${pending ? "#F5B32B" : "#DCD9D1"}` }}>
+        style={{ background: pending ? "#FFF7E6" : "#EAE7DF", borderBottom: `1px solid ${pending ? "var(--amber)" : "#DCD9D1"}` }}>
         {pending ? (
           <span className="text-xs" style={{ color: "#8A5B00" }}>
             <b>Waiting on Dr Raghu.</b> Changed by {String(r.pending_by || "").split("·")[0].trim() || "somebody"} on{" "}
@@ -130,13 +130,13 @@ export default function RoleRecord({
         )}
         {isOwner && pending && (
           <button onClick={() => act({ action: "approve" }, "Approved")}
-            className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#0D7A3F", color: "#fff" }}>
+            className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--green)", color: "#fff" }}>
             ✓ Approve these changes
           </button>
         )}
         {isOwner && r.stage === "Draft" && (
           <button onClick={() => act({ action: "stage", stage: "Final" }, "Marked Final")}
-            className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#16232F", color: "#fff" }}>
+            className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--navy)", color: "#fff" }}>
             ✓ Mark the role Final
           </button>
         )}
@@ -213,7 +213,7 @@ export default function RoleRecord({
                 {(changes || []).map((c) => (
                   <div key={c.id} className="py-2" style={{ borderTop: "1px solid #EEECE6" }}>
                     <div className="text-xs" style={{ lineHeight: 1.6 }}>
-                      <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#E8600A", color: "#fff", fontSize: 10 }}>
+                      <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "var(--accent)", color: "#fff", fontSize: 10 }}>
                         {String(c.changed_by || "—").split("·")[0].trim()}
                       </span>{" "}
                       <span style={{ color: C.faint }}>
@@ -251,17 +251,17 @@ function Shell({
   title?: string; sub?: string; stage?: string; pending?: boolean;
 }) {
   return (
-    <div className="min-h-screen" style={{ background: "#F1EFE9", color: C.ink }}>
-      <div style={{ background: "#16232F", color: "#fff" }}>
+    <div className="min-h-screen" style={{ background: "var(--paper)", color: C.ink }}>
+      <div style={{ background: "var(--navy)", color: "#fff" }}>
         <div className="px-3 py-2 flex items-center gap-2.5">
           <div className="rounded bg-white px-1.5 py-1 flex-shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={LOGO} alt="Nandan GSE" style={{ height: 22, display: "block" }} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div className="text-xs tracking-widest font-bold" style={{ color: "#E8600A" }}>
+            <div className="text-xs tracking-widest font-bold" style={{ color: "var(--accent)" }}>
               HRIS · ROLE
-              <span style={{ background: "#E8600A", color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6, letterSpacing: 0 }}>
+              <span style={{ background: "var(--accent)", color: "#fff", borderRadius: 3, padding: "1px 5px", marginLeft: 6, letterSpacing: 0 }}>
                 V {APP_VERSION}
               </span>
             </div>
@@ -275,14 +275,14 @@ function Shell({
             }}>{stage}</span>
           )}
           {pending && (
-            <span className="rounded px-1.5 py-0.5 font-bold flex-shrink-0" style={{ fontSize: 10, background: "#F5B32B", color: "#4A3300" }}>
+            <span className="rounded px-1.5 py-0.5 font-bold flex-shrink-0" style={{ fontSize: 10, background: "var(--amber)", color: "#4A3300" }}>
               awaiting RJ
             </span>
           )}
           <a href="/hrms#idp.roles" className="ml-auto text-xs font-semibold rounded px-2.5 py-1.5 flex-shrink-0"
-            style={{ background: "#22303C", color: "#8FA1B3" }}>← Roles</a>
+            style={{ background: "var(--ink)", color: "#8FA1B3" }}>← Roles</a>
           <span className="rounded-full font-bold flex items-center justify-center flex-shrink-0"
-            style={{ width: 26, height: 26, fontSize: 11, background: initials ? "#E8600A" : "#B3261E", color: "#fff" }}
+            style={{ width: 26, height: 26, fontSize: 11, background: initials ? "var(--accent)" : "var(--red)", color: "#fff" }}
             title={who}>{initials || "??"}</span>
         </div>
       </div>
@@ -309,7 +309,7 @@ function Pick({ label, value, options, onSave, width = 170 }: { label: string; v
       <div className="text-xs font-semibold" style={{ color: C.dim }}>{label}</div>
       <select value={value} onChange={(e) => onSave(e.target.value)}
         className="text-xs rounded px-2 py-1.5 mt-1 bg-white"
-        style={{ border: `1px solid ${orphan ? "#F5B32B" : C.line}`, width }}>
+        style={{ border: `1px solid ${orphan ? "var(--amber)" : C.line}`, width }}>
         <option value="">— not set —</option>
         {orphan && <option value={value}>{value} (not on the list)</option>}
         {options.map((o) => (<option key={o} value={o}>{o}</option>))}

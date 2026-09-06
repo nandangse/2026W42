@@ -159,7 +159,7 @@ export default function Dashboard({ summary, go }: { summary: Summary; go: (k: s
 
         <div className="bg-white rounded-lg border p-4" style={{ borderColor: BORDER }}>
           <div className="text-sm font-bold mb-2" style={{ color: INK }}>How this room works</div>
-          <div className="text-sm" style={{ color: "#5A6672", lineHeight: 1.7 }}>
+          <div className="text-sm" style={{ color: "var(--dim)", lineHeight: 1.7 }}>
             The ERP owns the Item master. <b>Items</b> is a mirror of every item whose group is named
             &ldquo;RM - …&rdquo; and which is not disabled — every field the ERP holds, the rich description with its
             pictures, the drawings in PDF, DWG and DXF, every attachment, and every link, as they are. Search it, filter

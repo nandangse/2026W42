@@ -20,7 +20,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 
-const C = { line: "#E2E0DA", dim: "#5A6672", faint: "#8A94A0" };
+const C = { line: "var(--line)", dim: "var(--dim)", faint: "var(--muted)" };
 
 /** Strip anything that could execute. Belt; the server has the braces. */
 export function cleanHtml(html: string): string {
@@ -100,7 +100,7 @@ export default function RichText({
   };
 
   return (
-    <div className="rounded" style={{ border: `1px solid ${focused ? "#E8600A" : C.line}`, background: "#fff" }}>
+    <div className="rounded" style={{ border: `1px solid ${focused ? "var(--accent)" : C.line}`, background: "#fff" }}>
       <div className="flex items-center gap-0.5 px-1 py-1" style={{ borderBottom: `1px solid ${C.line}`, background: "#F8F7F3" }}>
         {BUTTONS.map(([c, label, title]) => (
           <button key={c} type="button" title={title}

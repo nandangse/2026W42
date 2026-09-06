@@ -126,7 +126,7 @@ export default function Settings({ boot }: { boot: Boot }) {
                     {may && (
                       <Td>
                         {g.role === "dept_head" && !g.department
-                          ? <span className="text-xs font-bold" style={{ color: "#B3261E" }}>Needs a department</span>
+                          ? <span className="text-xs font-bold" style={{ color: "var(--red)" }}>Needs a department</span>
                           : null}
                       </Td>
                     )}

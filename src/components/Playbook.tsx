@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { driveToken, uploadToDriveFolder } from "@/lib/drive-browser";
 
-const INK = "#16232F", MUTED = "#8A94A0", BORDER = "#E2E0DA", ORANGE = "#E8600A", GREEN = "#0D7A3F", RED = "#B3261E";
+const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", ORANGE = "var(--accent)", GREEN = "var(--green)", RED = "var(--red)";
 
 interface Book { kind: string; title: string; folder_id: string; version: string; content: string; compiled_at: string | null; by: string | null }
 interface Doc { id: string; title: string; category: string; link: string; status: string; by: string | null; at: string; hasExtract: boolean }
@@ -100,7 +100,7 @@ export default function PlaybookScreen({ kind, email }: { kind: string; email?: 
       <div className="flex items-start justify-between gap-3 mb-1 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>
-            {book.title} <span className="rounded px-2 py-0.5 text-xs font-bold align-middle" style={{ background: "#22303C", color: "#fff" }}>v {book.version}</span>
+            {book.title} <span className="rounded px-2 py-0.5 text-xs font-bold align-middle" style={{ background: "var(--ink)", color: "#fff" }}>v {book.version}</span>
           </div>
           <div className="text-xs" style={{ color: MUTED }}>
             {book.compiled_at
@@ -130,7 +130,7 @@ export default function PlaybookScreen({ kind, email }: { kind: string; email?: 
       <div className="flex gap-1 my-2">
         {(["book", "docs"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className="rounded-full px-3 py-1 text-xs font-bold border"
-            style={tab === t ? { background: "#22303C", color: "#fff", borderColor: "#22303C" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
+            style={tab === t ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
             {t === "book" ? "The book" : `Documents (${docs.length})`}
           </button>
         ))}
@@ -145,16 +145,16 @@ export default function PlaybookScreen({ kind, email }: { kind: string; email?: 
       )}
       {tab === "docs" && (
         <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "68vh" }}>
-          <table className="w-full text-xs" style={{ minWidth: 640, borderCollapse: "separate", borderSpacing: 0 }}>
-            <thead><tr style={{ background: "#22303C", color: "#fff" }}>
+          <table className="w-full text-xs genie-table" style={{ minWidth: 640, borderCollapse: "separate", borderSpacing: 0 }}>
+            <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
               {["Status", "Title", "Category", "Text taken", "Added by", "On", ""].map((h) => (
-                <th key={h} className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, background: "#22303C" }}>{h}</th>
+                <th key={h} className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
               {docs.length === 0 && (<tr><td colSpan={7} className="px-3 py-5 text-center" style={{ color: MUTED }}>No intelligence yet — the first document starts the book.</td></tr>)}
               {docs.map((d, i) => (
-                <tr key={d.id} className="border-t" style={{ borderColor: "#EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                <tr key={d.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   <td className="px-2 py-1.5">
                     <span className="rounded px-2 py-0.5 font-bold text-white" style={{ background: d.status === "compiled" ? GREEN : ORANGE }}>{d.status}</span>
                   </td>

@@ -66,7 +66,7 @@ export default function AnalyticsScreen() {
       <div className="flex gap-1 mb-3 flex-wrap">
         {([["ratios", "📐 Conversion Ratios"], ["funnel", "🏺 Sales Funnel"], ["focus", "🎯 Focus Dashboard"], ["effort", "🏃 Effort Dashboard"], ["breakdown", "📦 Breakdowns"]] as const).map(([k, l]) => (
           <button key={k} onClick={() => setView(k)} className="px-3 py-1.5 rounded text-sm font-bold"
-            style={view === k ? { background: NAVY, color: "#fff" } : { color: "#5A6672", border: `1px solid ${BORDER}`, background: "#fff" }}>
+            style={view === k ? { background: NAVY, color: "#fff" } : { color: "var(--dim)", border: `1px solid ${BORDER}`, background: "#fff" }}>
             {l}
           </button>
         ))}
@@ -166,7 +166,7 @@ export default function AnalyticsScreen() {
                 >
                   <span style={{
                     display: "inline-block", width: 8, height: 8, borderRadius: 2,
-                    background: s.colour || "#8A94A0", marginRight: 6,
+                    background: s.colour || "var(--muted)", marginRight: 6,
                   }} />
                   {s.name} <b className="tnum">{s.count.toLocaleString("en-IN")}</b>
                 </span>
@@ -195,7 +195,7 @@ function Station({ label, n, amt, strong, compact }: { label: string; n: number;
         {n.toLocaleString("en-IN")}
       </div>
       {amt && (
-        <div className="tnum font-bold" style={{ fontSize: compact ? 10.5 : 12, color: strong ? "#8FD5A6" : "#0D7A3F" }}>
+        <div className="tnum font-bold" style={{ fontSize: compact ? 10.5 : 12, color: strong ? "#8FD5A6" : "var(--green)" }}>
           {amt}
         </div>
       )}
@@ -240,12 +240,12 @@ function FunnelView({ range }: { range: DateRange }) {
           <div style={{ flex: 1 }}>
             <div className="rounded-r flex items-center px-2" style={{
               width: `${Math.max(2, (r.count / max) * 100)}%`, minWidth: 44, height: 22,
-              background: r.colour || "#8A94A0", color: "#fff", fontSize: 11.5, fontWeight: 800, whiteSpace: "nowrap",
+              background: r.colour || "var(--muted)", color: "#fff", fontSize: 11.5, fontWeight: 800, whiteSpace: "nowrap",
             }}>
               {r.count.toLocaleString("en-IN")}
             </div>
           </div>
-          <div className="tnum text-xs font-bold" style={{ width: 100, color: "#0D7A3F" }}>{cr(r.amt) ?? "—"}</div>
+          <div className="tnum text-xs font-bold" style={{ width: 100, color: "var(--green)" }}>{cr(r.amt) ?? "—"}</div>
         </div>
       ))}
     </div>
@@ -280,7 +280,7 @@ function FocusView() {
       <Card title="💰 The biggest open quotes" hint="Every rupee on the table, largest first — draft, live, hotlist and submitted.">
         {data.hot.map((q) => (
           <div key={q.id} className="flex items-baseline gap-3 text-sm py-0.5 flex-wrap">
-            <b className="tnum" style={{ width: 90, color: "#0D7A3F" }}>{money(q)}</b>
+            <b className="tnum" style={{ width: 90, color: "var(--green)" }}>{money(q)}</b>
             <span style={{ minWidth: 160 }}>{q.company ?? "—"}</span>
             <span className="tnum text-xs" style={{ color: MUTED }}>{(q.quote_no.match(/(\d+)\s*$/) || [, q.quote_no])[1]}</span>
             <span className="text-xs rounded px-1.5" style={{ background: "#EEF1F5", color: NAVY, fontWeight: 700 }}>{q.status}</span>
@@ -294,7 +294,7 @@ function FocusView() {
           <div key={q.id} className="flex items-baseline gap-3 text-sm py-0.5 flex-wrap">
             <b style={{ color: "#B45309", width: 90 }}>{d(q.valid_until)}</b>
             <span style={{ minWidth: 160 }}>{q.company ?? "—"}</span>
-            <b className="tnum" style={{ color: "#0D7A3F" }}>{money(q)}</b>
+            <b className="tnum" style={{ color: "var(--green)" }}>{money(q)}</b>
           </div>
         ))}
         {data.expiring.length === 0 && <div className="text-sm" style={{ color: MUTED }}>Nothing expiring soon.</div>}
@@ -302,7 +302,7 @@ function FocusView() {
       <Card title="🧊 Going cold" hint="Open opportunities with no touch in 14 days — biggest first; one call warms them.">
         {data.cold.map((o) => (
           <div key={o.id} className="flex items-baseline gap-3 text-sm py-0.5 flex-wrap">
-            <b className="tnum" style={{ width: 90, color: "#0D7A3F" }}>{cr(Number(o.amount) || 0) ?? "—"}</b>
+            <b className="tnum" style={{ width: 90, color: "var(--green)" }}>{cr(Number(o.amount) || 0) ?? "—"}</b>
             <span style={{ minWidth: 160 }}>{o.company ?? "—"}</span>
             <span className="text-xs" style={{ color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 260 }}>{o.name}</span>
             <span className="text-xs rounded px-1.5" style={{ background: "#EEF1F5", color: NAVY, fontWeight: 700 }}>{o.stage ?? "—"}</span>
@@ -334,7 +334,7 @@ function EffortView({ range }: { range: DateRange }) {
         Effort against output, inside the range: every interaction logged (calls, mails, visits), the enquiries opened, and the quotes made with their money. Effort that never becomes a quote shows itself here.
       </div>
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <table className="genie-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr style={{ textAlign: "left", color: MUTED, fontSize: 11 }}>
             <th className="py-1 pr-3">PERSON</th>
             <th className="py-1 pr-3" style={{ textAlign: "right" }}>TOUCHES</th>
@@ -355,7 +355,7 @@ function EffortView({ range }: { range: DateRange }) {
                 <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{r.visits || "—"}</td>
                 <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{r.opps || "—"}</td>
                 <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{r.quotes || "—"}</td>
-                <td className="py-1.5 tnum font-bold" style={{ textAlign: "right", color: "#0D7A3F" }}>{cr(r.quoteAmt) ?? "—"}</td>
+                <td className="py-1.5 tnum font-bold" style={{ textAlign: "right", color: "var(--green)" }}>{cr(r.quoteAmt) ?? "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -380,19 +380,19 @@ function BreakdownView({ range }: { range: { from: string; to: string } }) {
   }, [range.from, range.to]);
   const inr = (n: number) => n >= 10000000 ? `₹ ${(n / 10000000).toFixed(2)} Cr` : n >= 100000 ? `₹ ${(n / 100000).toFixed(1)} L` : `₹ ${n.toLocaleString("en-IN")}`;
   const Lane = ({ title, note, rows }: { title: string; note: string; rows: RowB[] }) => (
-    <div className="bg-white rounded-lg border p-3" style={{ borderColor: "#E2E0DA" }}>
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: "var(--line)" }}>
       <div className="font-bold text-sm">{title}</div>
-      <div className="text-xs mb-2" style={{ color: "#8A94A0" }}>{note}</div>
-      {rows.length === 0 && <div className="text-sm" style={{ color: "#8A94A0" }}>Nothing in this range.</div>}
+      <div className="text-xs mb-2" style={{ color: "var(--muted)" }}>{note}</div>
+      {rows.length === 0 && <div className="text-sm" style={{ color: "var(--muted)" }}>Nothing in this range.</div>}
       {rows.map((r) => {
         const max = rows[0]?.amt || 1;
         return (
           <div key={r.name} className="flex items-center gap-2 py-1" style={{ borderTop: "1px solid #F0F1F6" }}>
             <span className="text-sm" style={{ minWidth: 220, maxWidth: 340, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.name}>{r.name}</span>
             <div style={{ flex: 1, height: 10, background: "#F4F2EC", borderRadius: 5, overflow: "hidden" }}>
-              <div style={{ width: `${Math.max(2, (r.amt / max) * 100)}%`, height: "100%", background: "#1B3A5C", borderRadius: 5 }} />
+              <div style={{ width: `${Math.max(2, (r.amt / max) * 100)}%`, height: "100%", background: "var(--blue)", borderRadius: 5 }} />
             </div>
-            <span className="text-xs tnum" style={{ color: "#8A94A0", minWidth: 34, textAlign: "right" }}>{r.count}</span>
+            <span className="text-xs tnum" style={{ color: "var(--muted)", minWidth: 34, textAlign: "right" }}>{r.count}</span>
             <span className="text-sm tnum font-bold" style={{ minWidth: 90, textAlign: "right" }}>{inr(r.amt)}</span>
           </div>
         );
@@ -401,8 +401,8 @@ function BreakdownView({ range }: { range: { from: string; to: string } }) {
   );
   return (
     <div className="grid gap-3" style={{ gridTemplateColumns: "1fr", maxWidth: 980 }}>
-      {err && <div className="rounded p-2 text-sm" style={{ background: "#FBEDEA", color: "#B3261E" }}>{err}</div>}
-      {data === null && !err && <div className="text-sm" style={{ color: "#8A94A0" }}>slicing the range…</div>}
+      {err && <div className="rounded p-2 text-sm" style={{ background: "#FBEDEA", color: "var(--red)" }}>{err}</div>}
+      {data === null && !err && <div className="text-sm" style={{ color: "var(--muted)" }}>slicing the range…</div>}
       {data && (<>
         <Lane title="📦 Product family" note="Quote money per Item Group in the range — count is distinct quotations" rows={data.families} />
         <Lane title="🔩 Product" note="The top products by quote money in the range" rows={data.products} />

@@ -107,14 +107,14 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
 
       {d && (
         <>
-          <div className="rounded-lg px-3 py-2 mb-2 flex items-baseline gap-x-4 gap-y-1 flex-wrap" style={{ background: "#16232F", color: "#fff" }}>
+          <div className="rounded-lg px-3 py-2 mb-2 flex items-baseline gap-x-4 gap-y-1 flex-wrap" style={{ background: "var(--navy)", color: "#fff" }}>
             <span className="font-bold">{d.employee.name}</span>
             <span style={{ fontSize: 12, color: "#8FA1B3" }}>
               {d.employee.id} · {[d.employee.designation, d.employee.department, d.employee.type].filter(Boolean).join(" · ")}
             </span>
             {d.idp?.submitted_at
               ? <span style={{ fontSize: 11, color: "#9AD3AE" }}>IDP submitted {fmtFull(String(d.idp.submitted_at))}</span>
-              : <span style={{ fontSize: 11, color: "#F5B32B" }}>IDP not submitted — read with that in mind</span>}
+              : <span style={{ fontSize: 11, color: "var(--amber)" }}>IDP not submitted — read with that in mind</span>}
           </div>
           <div className="flex gap-x-4 gap-y-1 flex-wrap mb-2 px-1" style={{ fontSize: 12, color: C.dim }}>
             {d.employee.age != null && <span>Age <b style={{ color: C.ink }}>{d.employee.age}</b></span>}
@@ -129,7 +129,7 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
           <div className="flex gap-1 flex-wrap mb-3 no-print">
             {TABS.map((t) => (
               <button key={t} onClick={() => setTab(t)} className="text-xs font-bold rounded px-2.5 py-1.5"
-                style={tab === t ? { background: "#E8600A", color: "#fff" } : { background: "#fff", border: `1px solid ${C.line}`, color: C.dim }}>
+                style={tab === t ? { background: "var(--accent)", color: "#fff" } : { background: "#fff", border: `1px solid ${C.line}`, color: C.dim }}>
                 {t}
               </button>
             ))}
@@ -242,12 +242,12 @@ function GrossGraph({ years }: { years: { year: number; gross: number | null; no
           <text key={y.year} x={x(y.year)} y={Hh - 10} textAnchor="middle" fontSize={9.5} fill={y.gross != null ? C.ink : C.faint}>{String(y.year).slice(2)}</text>
         ))}
         {known.length > 1 && (
-          <path d={known.map((y, i) => `${i ? "L" : "M"}${x(y.year)},${yy(y.gross!)}`).join(" ")} fill="none" stroke="#0D7A3F" strokeWidth={2.2} />
+          <path d={known.map((y, i) => `${i ? "L" : "M"}${x(y.year)},${yy(y.gross!)}`).join(" ")} fill="none" stroke="var(--green)" strokeWidth={2.2} />
         )}
         {known.map((y) => (
           <g key={y.year}>
-            <circle cx={x(y.year)} cy={yy(y.gross!)} r={3.2} fill="#0D7A3F" />
-            <text x={x(y.year)} y={yy(y.gross!) - 7} textAnchor="middle" fontSize={9.5} fontWeight={700} fill="#0D7A3F">₹{Math.round((y.gross || 0) / 1000)}k</text>
+            <circle cx={x(y.year)} cy={yy(y.gross!)} r={3.2} fill="var(--green)" />
+            <text x={x(y.year)} y={yy(y.gross!) - 7} textAnchor="middle" fontSize={9.5} fontWeight={700} fill="var(--green)">₹{Math.round((y.gross || 0) / 1000)}k</text>
           </g>
         ))}
         {known.length <= 1 && <text x={W / 2} y={40} textAnchor="middle" fontSize={10} fill={C.faint}>history fills as each appraisal cycle lands — earlier years join when the old sheets are given</text>}
@@ -350,7 +350,7 @@ function DiscussionTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolea
             className="w-full mt-1 px-2 py-1.5 rounded border font-normal" style={{ borderColor: "#D9CBF5", lineHeight: 1.5 }} /></label>
       </div>
       {saved.at && <div className="text-xs mt-2" style={{ color: C.faint }}>last saved by {saved.by} · {new Date(String(saved.at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} IST</div>}
-      {msg && <div className="text-xs font-bold mt-2" style={{ color: /✓/.test(msg) ? C.green : "#B3261E" }}>{msg}</div>}
+      {msg && <div className="text-xs font-bold mt-2" style={{ color: /✓/.test(msg) ? C.green : "var(--red)" }}>{msg}</div>}
       {!ro && (
         <button onClick={save} disabled={busy} className="rounded px-4 py-1.5 text-sm font-bold text-white mt-3" style={{ background: busy ? "#B9BEC4" : C.orange }}>
           💾 Save the record
@@ -651,7 +651,7 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
 
       {d.appraisal && (
         d.appraisal.approved_at
-          ? <div className="rounded px-2.5 py-1.5 mt-2 inline-block" style={{ background: "#E6F4EA", color: "#0D7A3F", fontSize: 12, fontWeight: 700 }}>
+          ? <div className="rounded px-2.5 py-1.5 mt-2 inline-block" style={{ background: "#E6F4EA", color: "var(--green)", fontSize: 12, fontWeight: 700 }}>
               ✓ Finalised by {String(d.appraisal.approved_by || "").split("·")[0].trim() || "RJ"} on {fmtFull(String(d.appraisal.approved_at))}
             </div>
           : d.appraisal.pending_since
@@ -678,7 +678,7 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
             <div className="font-bold" style={{ fontSize: 14 }}>The New Salary Structure</div>
             <span style={{ fontSize: 11, color: C.faint }}>the gross HOLDS — type in the Monthly column and Fixed Allowance absorbs, the Basic % follows{isStaff ? " · Staff rule: HRA stays 20% of Basic & DA by itself" : ""}</span>
           </div>
-          <table style={{ fontSize: 12.5, width: "100%", tableLayout: "fixed", borderCollapse: "collapse", marginTop: 6 }}>
+          <table className="genie-table" style={{ fontSize: 12.5, width: "100%", tableLayout: "fixed", borderCollapse: "collapse", marginTop: 6 }}>
             <thead>
               <tr>
                 <th className="text-left px-1.5 py-1" style={{ border: `1px solid ${C.line}`, width: "48%" }}>Components of Compensation</th>
@@ -757,7 +757,7 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
       <div className="flex items-center gap-2 mt-3">
         <button onClick={() => save()} disabled={busy || !n}
           className="rounded font-bold px-4 py-2"
-          style={{ background: n ? C.green : "#E2E0DA", color: n ? "#fff" : "#8A94A0", fontSize: 14 }}>
+          style={{ background: n ? C.green : "var(--line)", color: n ? "#fff" : "var(--muted)", fontSize: 14 }}>
           {busy ? "Saving…" : isOwner ? (d.appraisal ? "✓ Update and finalise" : "✓ Save and finalise") : (d.appraisal ? "Update — send to RJ" : "Save — send to RJ")}
         </button>
         <button onClick={() => save(true)} disabled={busy || !n}
@@ -768,7 +768,7 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
         </button>
         {isOwner && d.appraisal?.pending_since && !d.appraisal?.approved_at && (
           <button onClick={approveThis} disabled={busy}
-            className="rounded font-bold px-3 py-2" style={{ background: "#0D7A3F", color: "#fff", fontSize: 13 }}>
+            className="rounded font-bold px-3 py-2" style={{ background: "var(--green)", color: "#fff", fontSize: 13 }}>
             ✓ Finalise this one
           </button>
         )}

@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
-const BORDER = "#E2E0DA", MUTED = "#8A94A0", INK = "#22303C", ORANGE = "#E8600A", NAVY = "#16232F";
+const BORDER = "var(--line)", MUTED = "var(--muted)", INK = "var(--ink)", ORANGE = "var(--accent)", NAVY = "var(--navy)";
 
 /* ------------------------------------------------ Genie usage (owner) */
 type UsageRow = { name: string; total: number; last30: number; ai: Record<string, number>; costInr: number; costInr30: number; hours30?: number; hoursAll?: number };
@@ -36,7 +36,7 @@ export function GenieUsagePanel() {
       <div className="font-bold text-sm mb-1">🧞 Genie — who uses it, and what the AI costs</div>
       <AiMasterSwitch />
       <div className="text-xs mb-3" style={{ color: MUTED, maxWidth: "90ch", lineHeight: 1.5 }}>{note}</div>
-      {err && <div className="text-sm" style={{ color: "#B3261E" }}>{err}</div>}
+      {err && <div className="text-sm" style={{ color: "var(--red)" }}>{err}</div>}
       {rows === null && !err && <div className="text-sm" style={{ color: MUTED }}>reading the trail…</div>}
       {totals && (
         <div className="flex gap-3 flex-wrap mb-3">
@@ -51,7 +51,7 @@ export function GenieUsagePanel() {
       )}
       {rows && rows.length > 0 && (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <table className="genie-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead><tr style={{ textAlign: "left", color: MUTED, fontSize: 11 }}>
               <th className="py-1 pr-3">PERSON</th>
               <th className="py-1 pr-3" style={{ textAlign: "right" }}>≈HOURS · 30D</th>
@@ -69,7 +69,7 @@ export function GenieUsagePanel() {
               {rows.map((r) => (
                 <tr key={r.name} style={{ borderTop: `1px solid ${BORDER}` }}>
                   <td className="py-1.5 pr-3 font-semibold">{r.name}</td>
-                  <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right", fontWeight: 800, color: "#1B3A5C" }}>{r.hours30 ?? "—"}</td>
+                  <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right", fontWeight: 800, color: "var(--blue)" }}>{r.hours30 ?? "—"}</td>
                   <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right", color: MUTED }}>{r.hoursAll ?? "—"}</td>
                   <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right", fontWeight: 700 }}>{r.last30.toLocaleString("en-IN")}</td>
                   <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right", color: MUTED }}>{r.total.toLocaleString("en-IN")}</td>
@@ -146,7 +146,7 @@ export function ConsultRaghuPanel() {
       <div className="flex gap-1 mb-3">
         {([["kb", "📚 Knowledgebase"], ["conv", "💬 Conversations done"]] as const).map(([k, l]) => (
           <button key={k} onClick={() => setView(k)} className="px-3 py-1.5 rounded text-sm font-bold"
-            style={view === k ? { background: ORANGE, color: "#fff" } : { color: "#5A6672", border: `1px solid ${BORDER}` }}>
+            style={view === k ? { background: ORANGE, color: "#fff" } : { color: "var(--dim)", border: `1px solid ${BORDER}` }}>
             {l}
           </button>
         ))}
@@ -163,7 +163,7 @@ export function ConsultRaghuPanel() {
       <div className="flex gap-1 mb-3 flex-wrap">
         {SECTIONS.map(([k, label]) => (
           <button key={k} onClick={() => setSection(k)} className="px-3 py-1.5 rounded text-sm font-semibold"
-            style={section === k ? { background: NAVY, color: "#fff" } : { color: "#5A6672", border: `1px solid ${BORDER}` }}>
+            style={section === k ? { background: NAVY, color: "#fff" } : { color: "var(--dim)", border: `1px solid ${BORDER}` }}>
             {label}
           </button>
         ))}
@@ -186,7 +186,7 @@ export function ConsultRaghuPanel() {
             style={{ background: busy || (!paste.trim() && !file) ? "#B9BEC4" : "#7C3AED" }}>
             {busy ? "Weaving…" : "🧠 Weave into the knowledgebase"}
           </button>
-          {msg && <span className="text-xs font-semibold" style={{ color: msg.startsWith("✓") ? "#0D7A3F" : busy ? MUTED : "#B3261E", maxWidth: "60ch" }}>{msg}</span>}
+          {msg && <span className="text-xs font-semibold" style={{ color: msg.startsWith("✓") ? "var(--green)" : busy ? MUTED : "var(--red)", maxWidth: "60ch" }}>{msg}</span>}
         </div>
       </div>
 
@@ -196,7 +196,7 @@ export function ConsultRaghuPanel() {
             Version {row.version} · {String(row.content || "").length.toLocaleString("en-IN")} characters
           </span>
           <button onClick={() => setShowDoc((v) => !v)} className="text-xs font-bold rounded border px-2 py-0.5"
-            style={{ borderColor: BORDER, background: "#fff", color: "#5A6672" }}>
+            style={{ borderColor: BORDER, background: "#fff", color: "var(--dim)" }}>
             {showDoc ? "hide the document" : "read the document"}
           </button>
         </div>
@@ -211,7 +211,7 @@ export function ConsultRaghuPanel() {
         <div className="mt-3">
           <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>RECENT DROPS</div>
           {uploads.map((u, i) => (
-            <div key={i} className="text-xs py-0.5" style={{ color: "#5A6672" }}>
+            <div key={i} className="text-xs py-0.5" style={{ color: "var(--dim)" }}>
               {String(u.uploaded_at).slice(0, 16).replace("T", " ")} · {u.filename || "pasted text"} · {Number(u.chars).toLocaleString("en-IN")} chars {u.note ? `· ${u.note}` : ""}
             </div>
           ))}
@@ -265,12 +265,12 @@ function DiscussionsPanel() {
       <div className="text-xs mb-2" style={{ color: MUTED, maxWidth: "90ch", lineHeight: 1.5 }}>
         Every Consult Dr Raghu conversation, newest first — click a row to read it whole. Your eyes alone.
       </div>
-      {rMsg && <div className="text-xs mb-2" style={{ color: "#B3261E" }}>{rMsg}</div>}
+      {rMsg && <div className="text-xs mb-2" style={{ color: "var(--red)" }}>{rMsg}</div>}
       {chats === null && <div className="text-sm" style={{ color: MUTED }}>loading…</div>}
       {chats !== null && chats.length === 0 && <div className="text-sm" style={{ color: MUTED }}>No consultations yet.</div>}
       {chats !== null && chats.length > 0 && (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <table className="genie-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead><tr style={{ textAlign: "left", color: MUTED, fontSize: 11 }}>
               <th className="py-1 pr-3">DATE</th>
               <th className="py-1 pr-3">BY</th>
@@ -288,7 +288,7 @@ function DiscussionsPanel() {
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}>
                   <td className="py-1.5 pr-3 tnum" style={{ whiteSpace: "nowrap" }}>{d(c.started_at)}</td>
                   <td className="py-1.5 pr-3 font-semibold" style={{ whiteSpace: "nowrap" }}>{c.who}</td>
-                  <td className="py-1.5 pr-3" style={{ whiteSpace: "nowrap", color: "#5A6672" }}>{TT[c.target_type] ?? c.target_type}</td>
+                  <td className="py-1.5 pr-3" style={{ whiteSpace: "nowrap", color: "var(--dim)" }}>{TT[c.target_type] ?? c.target_type}</td>
                   <td className="py-1.5 pr-3 font-semibold">{c.target}</td>
                   <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{c.minutes || "—"}</td>
                   <td className="py-1.5 pr-3 tnum" style={{ textAlign: "right" }}>{c.letters.toLocaleString("en-IN")}</td>
@@ -325,7 +325,7 @@ function DiscussionsPanel() {
                   <div className="rounded-lg px-3 py-2 text-sm" style={{
                     maxWidth: "85%", lineHeight: 1.55, whiteSpace: "pre-wrap",
                     background: m.role === "user" ? NAVY : "#fff",
-                    color: m.role === "user" ? "#fff" : "#22303C",
+                    color: m.role === "user" ? "#fff" : "var(--ink)",
                     border: m.role === "user" ? "none" : `1px solid ${BORDER}`,
                   }}>
                     {m.content}
@@ -365,7 +365,7 @@ function AiMasterSwitch() {
     finally { setBusy(false); }
   };
   return (
-    <div className="rounded border p-2.5 mb-3 flex items-center gap-3 flex-wrap" style={{ borderColor: paused ? "#B3261E" : BORDER, background: paused ? "#FBEDEA" : "#F6FBF7" }}>
+    <div className="rounded border p-2.5 mb-3 flex items-center gap-3 flex-wrap" style={{ borderColor: paused ? "var(--red)" : BORDER, background: paused ? "#FBEDEA" : "#F6FBF7" }}>
       <div>
         <div className="text-sm font-bold" style={{ color: paused ? "#8E2C20" : "#1A7F4E" }}>
           {paused === null ? "…" : paused ? "⏻ Genie AI is PAUSED — everywhere" : "⏻ Genie AI is ON"}
@@ -377,7 +377,7 @@ function AiMasterSwitch() {
       </div>
       <button onClick={flip} disabled={busy || paused === null}
         className="ml-auto rounded px-4 py-2 text-sm font-black text-white"
-        style={{ background: paused ? "#1A7F4E" : "#B3261E" }}>
+        style={{ background: paused ? "#1A7F4E" : "var(--red)" }}>
         {busy ? "…" : paused ? "TURN AI ON" : "PAUSE ALL AI"}
       </button>
       {msg && <div className="text-xs w-full" style={{ color: "#8E2C20" }}>{msg}</div>}

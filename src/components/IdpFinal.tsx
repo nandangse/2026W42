@@ -18,7 +18,7 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
 import { LOOM_EMBED } from "@/lib/idp";
 import { api } from "@/lib/api";
 
-const C = { ink: "#22303C", dim: "#5A6672", faint: "#8A94A0", line: "#E2E0DA", orange: "#E8600A", green: "#0D7A3F", red: "#B3261E" };
+const C = { ink: "var(--ink)", dim: "var(--dim)", faint: "var(--muted)", line: "var(--line)", orange: "var(--accent)", green: "var(--green)", red: "var(--red)" };
 
 export interface SalaryRow { label: string; monthly: number | null; yearly: number | null; kind: "head" | "row" | "total" | "note" }
 export interface SalaryInfo { name: string | null; department: string | null; designation: string | null; type: string | null; years: string | null; age: string | null }
@@ -119,7 +119,7 @@ export default function IdpFinal({
         </div>
         <div className="flex items-center gap-2 flex-wrap mt-2">
           {roleName && <span className="rounded px-2 py-0.5 font-bold" style={{ background: "#FFF3E8", fontSize: 13 }}>{roleName}</span>}
-          <button onClick={onOpenBrief} className="text-xs font-bold rounded px-2.5 py-1.5" style={{ background: "#16232F", color: "#fff" }}>
+          <button onClick={onOpenBrief} className="text-xs font-bold rounded px-2.5 py-1.5" style={{ background: "var(--navy)", color: "#fff" }}>
             📋 Read the full role
           </button>
         </div>
@@ -150,7 +150,7 @@ export default function IdpFinal({
           {/* fits the screen it is on: fixed layout, percentages, and the
               rupee columns tight — nothing to scroll sideways for */}
           <div className="mt-2">
-            <table style={{ fontSize: 12.5, width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }}>
+            <table className="genie-table" style={{ fontSize: 12.5, width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
                   <th className="text-left px-1.5 py-1.5" style={{ border: `1px solid ${C.line}`, width: "48%" }}>Components of Compensation</th>
@@ -298,7 +298,7 @@ export default function IdpFinal({
             accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.txt"
             onChange={(e) => { attach(e.target.files?.[0] || null); e.target.value = ""; }} />
           <button onClick={() => fileRef.current?.click()} disabled={uploading}
-            className="text-xs font-bold rounded px-3 py-2" style={{ background: "#16232F", color: "#fff", opacity: uploading ? 0.6 : 1 }}>
+            className="text-xs font-bold rounded px-3 py-2" style={{ background: "var(--navy)", color: "#fff", opacity: uploading ? 0.6 : 1 }}>
             {uploading ? "Attaching…" : "📎 Attach document"}
           </button>
           <span style={{ fontSize: 11.5, color: C.faint }}>PDF, Word, PowerPoint, Excel or an image · under 25 MB</span>
@@ -309,7 +309,7 @@ export default function IdpFinal({
             {attachments.map((a) => (
               <div key={a.path} className="flex items-center gap-2 py-1" style={{ borderTop: "1px solid #EEECE6", fontSize: 13 }}>
                 <span>📄</span>
-                {a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ color: "#1B3A5C", fontWeight: 600 }}>{a.name}</a> : <span>{a.name}</span>}
+                {a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--blue)", fontWeight: 600 }}>{a.name}</a> : <span>{a.name}</span>}
                 <span style={{ fontSize: 11, color: C.faint }}>{Math.max(1, Math.round(a.size / 1024))} KB</span>
               </div>
             ))}

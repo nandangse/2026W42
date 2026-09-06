@@ -32,7 +32,7 @@ function Gauge({ pct, color, seg = 14, w = 4, h = 8 }: { pct: number; color: str
   return (
     <div className="flex items-end" style={{ gap: 2 }}>
       {Array.from({ length: seg }).map((_, i) => (
-        <div key={i} style={{ width: w, height: h, background: i < on ? color : "#E2E0DA" }} />
+        <div key={i} style={{ width: w, height: h, background: i < on ? color : "var(--line)" }} />
       ))}
     </div>
   );
@@ -44,7 +44,7 @@ function Who({ ids, size = 20 }: { ids: string[]; size?: number }) {
       {ids.length === 0 && <span className="text-xs" style={{ color: "#B8B5AC" }}>—</span>}
       {ids.map((i, k) => (
         <div key={i + k} title={i} className="flex items-center justify-center font-bold tnum"
-          style={{ width: size, height: size, borderRadius: size, background: "#DCE8F5", color: "#1B3A5C", fontSize: size * 0.42 }}>
+          style={{ width: size, height: size, borderRadius: size, background: "#DCE8F5", color: "var(--blue)", fontSize: size * 0.42 }}>
           {i}
         </div>
       ))}
@@ -60,13 +60,13 @@ function Who({ ids, size = 20 }: { ids: string[]; size?: number }) {
  */
 const HEX6 = /^#[0-9a-f]{6}$/i;
 function makeSwimColorers(swimlanes: { name: string; color: string }[]) {
-  const byName = new Map(swimlanes.map((s) => [s.name, HEX6.test(s.color) ? s.color : "#5A6672"]));
-  const color = (name: string | null) => (name && byName.get(name)) || "#5A6672";
+  const byName = new Map(swimlanes.map((s) => [s.name, HEX6.test(s.color) ? s.color : "var(--dim)"]));
+  const color = (name: string | null) => (name && byName.get(name)) || "var(--dim)";
   const bg = (name: string | null) => color(name) + "1A"; // ~10% alpha tint
   return { color, bg };
 }
 
-function Chip({ children, color = "#5A6672", bg = "#F4F2EC" }: { children: React.ReactNode; color?: string; bg?: string }) {
+function Chip({ children, color = "var(--dim)", bg = "#F4F2EC" }: { children: React.ReactNode; color?: string; bg?: string }) {
   return (
     <span className="rounded px-1.5 py-0.5 font-bold whitespace-nowrap"
       style={{ background: bg, color, fontSize: 10, letterSpacing: 0.4, textTransform: "uppercase" }}>
@@ -125,15 +125,15 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
   if (notInstalled) {
     return (
       <div className="p-8" style={{ maxWidth: 620 }}>
-        <div className="text-lg font-bold mb-2" style={{ color: "#16232F" }}>Goals layer not installed yet</div>
-        <p className="text-sm mb-3" style={{ color: "#5A6672", lineHeight: 1.6 }}>
+        <div className="text-lg font-bold mb-2" style={{ color: "var(--navy)" }}>Goals layer not installed yet</div>
+        <p className="text-sm mb-3" style={{ color: "var(--dim)", lineHeight: 1.6 }}>
           The goal tables haven&apos;t been created in this database. Run{" "}
           <code style={{ background: "#F4F2EC", padding: "1px 5px", borderRadius: 3 }}>
             supabase/migrations/0010_goals_layer.sql
           </code>{" "}
           in the Supabase SQL editor, then reload.
         </p>
-        <p className="text-xs" style={{ color: "#8A94A0", lineHeight: 1.6 }}>
+        <p className="text-xs" style={{ color: "var(--muted)", lineHeight: 1.6 }}>
           Everything else in the suite works without it — the migration only adds new tables, so nothing already
           running depends on it.
         </p>
@@ -144,26 +144,26 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
   if (denied) {
     return (
       <div className="p-8" style={{ maxWidth: 620 }}>
-        <div className="text-lg font-bold mb-2" style={{ color: "#16232F" }}>The goal tree hasn&apos;t been shared with you</div>
-        <p className="text-sm mb-3" style={{ color: "#5A6672", lineHeight: 1.6 }}>
+        <div className="text-lg font-bold mb-2" style={{ color: "var(--navy)" }}>The goal tree hasn&apos;t been shared with you</div>
+        <p className="text-sm mb-3" style={{ color: "var(--dim)", lineHeight: 1.6 }}>
           Goals access is granted per person rather than following your planning role. Your own work still reaches you —
           it&apos;s all on <b>My Week</b>.
         </p>
-        <p className="text-xs" style={{ color: "#8A94A0", lineHeight: 1.6 }}>
+        <p className="text-xs" style={{ color: "var(--muted)", lineHeight: 1.6 }}>
           Seeing the tree and seeing your own work are two separate checks. Keeping them apart is what lets the cascade
           extend below the leadership group later without breaking anyone&apos;s to-do list.
         </p>
       </div>
     );
   }
-  if (err) return <div className="p-8 text-sm" style={{ color: "#B3261E" }}>{err}</div>;
-  if (!tree) return <div className="p-8 text-sm" style={{ color: "#8A94A0" }}>Loading the goal tree…</div>;
+  if (err) return <div className="p-8 text-sm" style={{ color: "var(--red)" }}>{err}</div>;
+  if (!tree) return <div className="p-8 text-sm" style={{ color: "var(--muted)" }}>Loading the goal tree…</div>;
 
   if (!tree.goals.length) {
     return (
       <div className="p-8" style={{ maxWidth: 620 }}>
-        <div className="text-lg font-bold mb-2" style={{ color: "#16232F" }}>No goals for {tree.period} yet</div>
-        <p className="text-sm mb-4" style={{ color: "#5A6672", lineHeight: 1.6 }}>
+        <div className="text-lg font-bold mb-2" style={{ color: "var(--navy)" }}>No goals for {tree.period} yet</div>
+        <p className="text-sm mb-4" style={{ color: "var(--dim)", lineHeight: 1.6 }}>
           Start with the five organisational goals. Everything else hangs off one of them.
         </p>
         {tree.canEdit && (
@@ -174,7 +174,7 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
               await load();
             }}
             className="text-sm font-bold rounded px-4 py-2"
-            style={{ background: "#E8600A", color: "#fff" }}
+            style={{ background: "var(--accent)", color: "#fff" }}
           >
             + Create the five goals
           </button>
@@ -197,14 +197,14 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
     <div className="p-4">
       {/* ---- the five ---- */}
       <div className="flex items-center gap-3 mb-2 flex-wrap">
-        <div className="text-xs font-bold" style={{ color: "#8A94A0", letterSpacing: 1.4 }}>
+        <div className="text-xs font-bold" style={{ color: "var(--muted)", letterSpacing: 1.4 }}>
           THE FIVE · {tree.period}
         </div>
-        <div className="flex-1" style={{ height: 1, background: "#E2E0DA", minWidth: 40 }} />
-        <div className="flex gap-1 rounded p-1 border" style={{ background: "#fff", borderColor: "#E2E0DA" }}>
+        <div className="flex-1" style={{ height: 1, background: "var(--line)", minWidth: 40 }} />
+        <div className="flex gap-1 rounded p-1 border" style={{ background: "#fff", borderColor: "var(--line)" }}>
           {([["cascade", "Cascade"], ["swim", "Swimlanes"]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setView(k)} className="px-3 py-1 rounded text-xs font-bold"
-              style={view === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>
+              style={view === k ? { background: "var(--ink)", color: "#fff" } : { color: "var(--dim)" }}>
               {l}
             </button>
           ))}
@@ -222,25 +222,25 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
               className="text-left rounded-lg border p-3 flex flex-col gap-2"
               style={{
                 flex: "1 1 0", minWidth: 200, background: "#fff",
-                borderColor: active ? "#E8600A" : "#E2E0DA",
-                borderTop: `3px solid ${active ? "#E8600A" : "#D9D6CD"}`,
+                borderColor: active ? "var(--accent)" : "var(--line)",
+                borderTop: `3px solid ${active ? "var(--accent)" : "#D9D6CD"}`,
               }}>
               <div className="flex items-baseline gap-2">
-                <span className="font-bold tnum" style={{ fontSize: 26, lineHeight: 0.85, color: active ? "#E8600A" : "#D9D6CD" }}>
+                <span className="font-bold tnum" style={{ fontSize: 26, lineHeight: 0.85, color: active ? "var(--accent)" : "#D9D6CD" }}>
                   {String(n.goal_num ?? 0).padStart(2, "0")}
                 </span>
                 <span className="ml-auto"><Chip color={st.color}>{st.label}</Chip></span>
               </div>
-              <div className="text-sm font-semibold" style={{ minHeight: 40, lineHeight: 1.35, color: "#16232F" }}>{n.what}</div>
+              <div className="text-sm font-semibold" style={{ minHeight: 40, lineHeight: 1.35, color: "var(--navy)" }}>{n.what}</div>
               {n.swimlane && <div><Chip color={swimColor(n.swimlane)} bg={swimBg(n.swimlane)}>{n.swimlane}</Chip></div>}
               <div className="flex items-end justify-between gap-2">
                 <div>
                   {n.target_no != null && (
-                    <div className="tnum text-sm" style={{ color: "#22303C" }}>
-                      {n.current_no ?? 0}<span style={{ color: "#8A94A0", fontSize: 11 }}> / {n.target_no} {n.unit ?? ""}</span>
+                    <div className="tnum text-sm" style={{ color: "var(--ink)" }}>
+                      {n.current_no ?? 0}<span style={{ color: "var(--muted)", fontSize: 11 }}> / {n.target_no} {n.unit ?? ""}</span>
                     </div>
                   )}
-                  <div className="mt-1"><Gauge pct={pct} color={active ? "#E8600A" : "#8A94A0"} /></div>
+                  <div className="mt-1"><Gauge pct={pct} color={active ? "var(--accent)" : "var(--muted)"} /></div>
                 </div>
                 <Who ids={n.owners} />
               </div>
@@ -276,7 +276,7 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
           ...lanes,
           ...(unassignedAll.length
             ? [{
-                id: "none", name: "No category", color: "#8A94A0",
+                id: "none", name: "No category", color: "var(--muted)",
                 total: unassignedAll.length, counts: countsFor(unassignedAll),
                 items: shown.filter((n) => !n.swimlane),
               }]
@@ -286,19 +286,19 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
         return (
           <>
             <div className="flex items-center gap-2 flex-wrap mb-3">
-              <span className="text-xs font-bold" style={{ color: "#8A94A0" }}>SHOW</span>
+              <span className="text-xs font-bold" style={{ color: "var(--muted)" }}>SHOW</span>
               {(LEVEL_ORDER as NodeType[]).map((lv) => {
                 const on = levels.includes(lv);
                 return (
                   <button key={lv}
                     onClick={() => setLevels((p) => (on ? p.filter((x) => x !== lv) : [...p, lv]))}
                     className="text-xs font-bold rounded px-2 py-1"
-                    style={on ? { background: "#22303C", color: "#fff" } : { background: "#F4F2EC", color: "#8A94A0" }}>
+                    style={on ? { background: "var(--ink)", color: "#fff" } : { background: "#F4F2EC", color: "var(--muted)" }}>
                     {LEVEL_PLURAL[lv]}
                   </button>
                 );
               })}
-              <span className="text-xs ml-2" style={{ color: "#8A94A0" }}>
+              <span className="text-xs ml-2" style={{ color: "var(--muted)" }}>
                 {shown.length} shown across {cols.length} categories
               </span>
             </div>
@@ -315,19 +315,19 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
                     <div className="rounded-t-lg p-2" style={{ background: swimBg(lane.name), borderBottom: `3px solid ${swimColor(lane.name)}` }}>
                       <div className="flex items-baseline justify-between">
                         <span className="font-bold text-sm" style={{ color: swimColor(lane.name) }}>{lane.name}</span>
-                        <span className="text-xs tnum" style={{ color: "#5A6672" }}>{lane.total}</span>
+                        <span className="text-xs tnum" style={{ color: "var(--dim)" }}>{lane.total}</span>
                       </div>
                       {/* the number of tactics/subfields within this field, by level */}
-                      <div className="text-xs mt-0.5" style={{ color: "#5A6672", lineHeight: 1.4 }}>
+                      <div className="text-xs mt-0.5" style={{ color: "var(--dim)", lineHeight: 1.4 }}>
                         {breakdown.length ? breakdown.join(" · ") : "empty"}
                       </div>
                       <div className="flex items-center gap-2 mt-1.5">
                         <Gauge pct={avg} color={swimColor(lane.name)} seg={12} w={4} h={6} />
-                        <span className="text-xs tnum" style={{ color: "#5A6672" }}>{Math.round(avg)}%</span>
-                        {done > 0 && <span className="text-xs ml-auto" style={{ color: "#0D7A3F" }}>{done} done</span>}
+                        <span className="text-xs tnum" style={{ color: "var(--dim)" }}>{Math.round(avg)}%</span>
+                        {done > 0 && <span className="text-xs ml-auto" style={{ color: "var(--green)" }}>{done} done</span>}
                       </div>
                     </div>
-                    <div className="rounded-b-lg p-2" style={{ background: "#EFEDE7", minHeight: 90 }}>
+                    <div className="rounded-b-lg p-2" style={{ background: "var(--line-soft)", minHeight: 90 }}>
                       {lane.items.length === 0 && (
                         <div className="text-xs text-center py-4" style={{ color: "#B8B5AC" }}>Nothing here</div>
                       )}
@@ -339,22 +339,22 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
                         return (
                           <div key={n.id} role="button" tabIndex={0} onClick={() => setInspect(n.id)}
                             className="rounded border mb-1.5 cursor-pointer p-2 bg-white"
-                            style={{ borderColor: "#E2E0DA", borderLeft: `3px solid ${st.color}` }}>
+                            style={{ borderColor: "var(--line)", borderLeft: `3px solid ${st.color}` }}>
                             <div className="flex items-center gap-1 mb-1">
-                              <Chip color="#5A6672" bg="#F4F2EC">{LEVEL_LABEL[n.node_type]}</Chip>
-                              {goalNum != null && <Chip color="#E8600A" bg="#FFF3E8">G{goalNum}</Chip>}
-                              {n.metric_source && <Chip color="#0D7A3F" bg="#E6F4EA">live</Chip>}
+                              <Chip color="var(--dim)" bg="#F4F2EC">{LEVEL_LABEL[n.node_type]}</Chip>
+                              {goalNum != null && <Chip color="var(--accent)" bg="#FFF3E8">G{goalNum}</Chip>}
+                              {n.metric_source && <Chip color="var(--green)" bg="#E6F4EA">live</Chip>}
                             </div>
                             <div className="text-xs font-semibold" style={{
-                              lineHeight: 1.35, color: "#16232F",
+                              lineHeight: 1.35, color: "var(--navy)",
                               textDecoration: n.status === "done" ? "line-through" : "none",
                               opacity: n.status === "done" ? 0.55 : 1,
                               display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
                             }}>{n.what}</div>
                             <div className="flex items-center gap-2 mt-1.5">
                               <Who ids={n.owners} size={17} />
-                              <span className="tnum" style={{ fontSize: 10, color: late ? "#B3261E" : "#8A94A0" }}>{fmt(n.end_date)}</span>
-                              <span className="ml-auto tnum" style={{ fontSize: 10, color: "#5A6672" }}>{Math.round(pct)}%</span>
+                              <span className="tnum" style={{ fontSize: 10, color: late ? "var(--red)" : "var(--muted)" }}>{fmt(n.end_date)}</span>
+                              <span className="ml-auto tnum" style={{ fontSize: 10, color: "var(--dim)" }}>{Math.round(pct)}%</span>
                             </div>
                             <div className="mt-1"><Gauge pct={pct} color={st.color} seg={16} w={3} h={4} /></div>
                           </div>
@@ -365,7 +365,7 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
                 );
               })}
             </div>
-            <div className="text-xs" style={{ color: "#8A94A0" }}>
+            <div className="text-xs" style={{ color: "var(--muted)" }}>
               Every node carries a category, so the same work appears here and in the cascade — this is the same tree
               sliced the other way. Tap any card to open it.
             </div>
@@ -380,13 +380,13 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
             <span key={id} className="flex items-center gap-2">
               {i > 0 && <span style={{ color: "#B8B5AC" }}>›</span>}
               <button onClick={() => setPath(path.slice(0, i))} className="text-xs truncate"
-                style={{ maxWidth: 230, color: i === crumbs.length - 1 ? "#E8600A" : "#5A6672", fontWeight: i === crumbs.length - 1 ? 700 : 400 }}>
+                style={{ maxWidth: 230, color: i === crumbs.length - 1 ? "var(--accent)" : "var(--dim)", fontWeight: i === crumbs.length - 1 ? 700 : 400 }}>
                 {i === 0 ? "Goal " + (nodes[id]?.goal_num ?? "") : nodes[id]?.what}
               </button>
             </span>
           ))}
           {path.length > 0 && (
-            <button onClick={() => setPath([])} className="text-xs font-bold rounded px-2 py-0.5 ml-2" style={{ background: "#F4F2EC", color: "#8A94A0" }}>
+            <button onClick={() => setPath([])} className="text-xs font-bold rounded px-2 py-0.5 ml-2" style={{ background: "#F4F2EC", color: "var(--muted)" }}>
               Collapse all
             </button>
           )}
@@ -399,9 +399,9 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
         {columns.map((col) => (
           <div key={col.depth} className="flex-shrink-0" style={{ width: 264, borderRight: "1px solid #E2E0DA", paddingRight: 12, marginRight: 12 }}>
             <div className="flex items-center gap-2 pb-1.5 mb-2" style={{ borderBottom: "1px solid #E2E0DA" }}>
-              <span className="tnum font-bold" style={{ fontSize: 10, color: "#E8600A" }}>{String(col.depth + 1).padStart(2, "0")}</span>
-              <span className="text-xs font-bold" style={{ color: "#5A6672", letterSpacing: 1.1 }}>{LEVEL_COLUMNS[col.depth]?.toUpperCase()}</span>
-              <span className="ml-auto tnum text-xs" style={{ color: "#8A94A0" }}>{col.kids.length}</span>
+              <span className="tnum font-bold" style={{ fontSize: 10, color: "var(--accent)" }}>{String(col.depth + 1).padStart(2, "0")}</span>
+              <span className="text-xs font-bold" style={{ color: "var(--dim)", letterSpacing: 1.1 }}>{LEVEL_COLUMNS[col.depth]?.toUpperCase()}</span>
+              <span className="ml-auto tnum text-xs" style={{ color: "var(--muted)" }}>{col.kids.length}</span>
             </div>
             {col.kids.map((k) => {
               const n = nodes[k];
@@ -412,28 +412,28 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
               return (
                 <div key={k} role="button" tabIndex={0} onClick={() => select(col.depth, k)}
                   className="rounded border mb-1.5 cursor-pointer p-2"
-                  style={{ background: sel ? "#FFF3E8" : "#fff", borderColor: sel ? "#E8600A" : "#E2E0DA", borderLeft: `3px solid ${st.color}` }}>
+                  style={{ background: sel ? "#FFF3E8" : "#fff", borderColor: sel ? "var(--accent)" : "var(--line)", borderLeft: `3px solid ${st.color}` }}>
                   <div className="text-xs font-semibold" style={{
-                    lineHeight: 1.35, color: "#16232F",
+                    lineHeight: 1.35, color: "var(--navy)",
                     textDecoration: n.status === "done" ? "line-through" : "none",
                     opacity: n.status === "done" ? 0.55 : 1,
                     display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
                   }}>{n.what}</div>
                   <div className="flex items-center gap-2 mt-2">
                     <Who ids={n.owners} size={17} />
-                    <span className="tnum" style={{ fontSize: 10, color: late ? "#B3261E" : "#8A94A0" }}>{fmt(n.end_date)}</span>
-                    <span className="ml-auto tnum" style={{ fontSize: 10, color: "#5A6672" }}>{Math.round(pct)}%</span>
+                    <span className="tnum" style={{ fontSize: 10, color: late ? "var(--red)" : "var(--muted)" }}>{fmt(n.end_date)}</span>
+                    <span className="ml-auto tnum" style={{ fontSize: 10, color: "var(--dim)" }}>{Math.round(pct)}%</span>
                     <button onClick={(e) => { e.stopPropagation(); setInspect(k); }} title="Open detail"
-                      className="rounded" style={{ border: "1px solid #E2E0DA", width: 18, height: 18, fontSize: 11, lineHeight: 1, color: "#5A6672" }}>⋯</button>
+                      className="rounded" style={{ border: "1px solid #E2E0DA", width: 18, height: 18, fontSize: 11, lineHeight: 1, color: "var(--dim)" }}>⋯</button>
                   </div>
                   <div className="mt-1.5"><Gauge pct={pct} color={st.color} seg={16} w={3} h={5} /></div>
                   <div className="mt-1.5 flex items-center gap-1 flex-wrap">
                     {n.swimlane && <Chip color={swimColor(n.swimlane)} bg={swimBg(n.swimlane)}>{n.swimlane}</Chip>}
-                    {n.metric_source && <Chip color="#0D7A3F" bg="#E6F4EA">live</Chip>}
+                    {n.metric_source && <Chip color="var(--green)" bg="#E6F4EA">live</Chip>}
                     {n.kids.length > 0 && (
                       <>
                         <Chip>{n.kids.length} below</Chip>
-                        <span style={{ color: sel ? "#E8600A" : "#B8B5AC", fontSize: 12 }}>›</span>
+                        <span style={{ color: sel ? "var(--accent)" : "#B8B5AC", fontSize: 12 }}>›</span>
                       </>
                     )}
                   </div>
@@ -443,18 +443,18 @@ export default function GoalsBoard({ canEditPlanning }: { canEditPlanning: boole
             {tree.canEdit && (
               <button onClick={() => setInspect(col.parent)}
                 className="w-full text-xs font-bold rounded py-1.5"
-                style={{ border: "1px dashed #D9D6CD", color: "#8A94A0", background: "transparent" }}>
+                style={{ border: "1px dashed #D9D6CD", color: "var(--muted)", background: "transparent" }}>
                 + Add
               </button>
             )}
           </div>
         ))}
         {columns.length === 0 && goal && (
-          <div className="text-sm p-4" style={{ color: "#8A94A0", maxWidth: 380 }}>
+          <div className="text-sm p-4" style={{ color: "var(--muted)", maxWidth: 380 }}>
             Nothing under this goal yet. Open it with ⋯ on the card above and add the first project.
             <div className="mt-2">
               {tree.canEdit && (
-                <button onClick={() => setInspect(goal)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "#1B3A5C", color: "#fff" }}>
+                <button onClick={() => setInspect(goal)} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--blue)", color: "#fff" }}>
                   Open goal
                 </button>
               )}
@@ -548,83 +548,83 @@ function Inspector({ tree, id, onClose, reload }: { tree: Tree; id: string; onCl
       <aside className="fixed top-0 right-0 bottom-0 flex flex-col"
         style={{ width: "min(430px, 94vw)", background: "#fff", borderLeft: "1px solid #E2E0DA", zIndex: 60, boxShadow: "-20px 0 50px rgba(0,0,0,.25)" }}>
         <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid #E2E0DA" }}>
-          <Chip color="#E8600A" bg="#FFF3E8">{LEVEL_LABEL[n.node_type]}</Chip>
+          <Chip color="var(--accent)" bg="#FFF3E8">{LEVEL_LABEL[n.node_type]}</Chip>
           {n.swimlane && <Chip>{n.swimlane}</Chip>}
-          {n.unaligned && <Chip color="#D97706" bg="#FFF7E6">unaligned</Chip>}
+          {n.unaligned && <Chip color="var(--warn)" bg="#FFF7E6">unaligned</Chip>}
           {tree.canEdit && (
             <div className="ml-auto flex gap-1">
               {(["detail", "edit"] as const).map((k) => (
                 <button key={k} onClick={() => setTab(k)} className="text-xs font-bold rounded px-2 py-1"
-                  style={tab === k ? { background: "#22303C", color: "#fff" } : { color: "#5A6672" }}>
+                  style={tab === k ? { background: "var(--ink)", color: "#fff" } : { color: "var(--dim)" }}>
                   {k === "detail" ? "Detail" : "Edit"}
                 </button>
               ))}
             </div>
           )}
-          <button onClick={onClose} className="rounded ml-1" style={{ border: "1px solid #E2E0DA", width: 24, height: 24, color: "#8A94A0" }}>✕</button>
+          <button onClick={onClose} className="rounded ml-1" style={{ border: "1px solid #E2E0DA", width: 24, height: 24, color: "var(--muted)" }}>✕</button>
         </div>
 
         <div className="overflow-y-auto p-4">
           {tab === "edit" ? (
             <div className="space-y-2">
               <Label>What</Label>
-              <textarea value={f.what} onChange={(e) => setF({ ...f, what: e.target.value })} rows={2} className="w-full text-sm border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
+              <textarea value={f.what} onChange={(e) => setF({ ...f, what: e.target.value })} rows={2} className="w-full text-sm border rounded px-2 py-1" style={{ borderColor: "var(--line)" }} />
               <Label>How</Label>
-              <textarea value={f.how} onChange={(e) => setF({ ...f, how: e.target.value })} rows={3} className="w-full text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
+              <textarea value={f.how} onChange={(e) => setF({ ...f, how: e.target.value })} rows={3} className="w-full text-xs border rounded px-2 py-1" style={{ borderColor: "var(--line)" }} />
               <div className="flex gap-2">
                 <div className="flex-1"><Label>Status</Label>
-                  <select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as GoalStatus })} className="w-full text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
+                  <select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as GoalStatus })} className="w-full text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "var(--line)" }}>
                     {Object.entries(STATUS_META).map(([k, v]) => (<option key={k} value={k}>{v.label}</option>))}
                   </select>
                 </div>
                 <div className="flex-1"><Label>Swimlane</Label>
-                  <select value={f.swimlane_id} onChange={(e) => setF({ ...f, swimlane_id: e.target.value })} className="w-full text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
+                  <select value={f.swimlane_id} onChange={(e) => setF({ ...f, swimlane_id: e.target.value })} className="w-full text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "var(--line)" }}>
                     <option value="">—</option>
                     {tree.swimlanes.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
                   </select>
                 </div>
               </div>
               <div className="flex gap-2">
-                <div className="flex-1"><Label>Start</Label><input type="date" value={f.start_date} onChange={(e) => setF({ ...f, start_date: e.target.value })} className="w-full text-xs border rounded px-1 py-1" style={{ borderColor: "#E2E0DA" }} /></div>
-                <div className="flex-1"><Label>End</Label><input type="date" value={f.end_date} onChange={(e) => setF({ ...f, end_date: e.target.value })} className="w-full text-xs border rounded px-1 py-1" style={{ borderColor: "#E2E0DA" }} /></div>
+                <div className="flex-1"><Label>Start</Label><input type="date" value={f.start_date} onChange={(e) => setF({ ...f, start_date: e.target.value })} className="w-full text-xs border rounded px-1 py-1" style={{ borderColor: "var(--line)" }} /></div>
+                <div className="flex-1"><Label>End</Label><input type="date" value={f.end_date} onChange={(e) => setF({ ...f, end_date: e.target.value })} className="w-full text-xs border rounded px-1 py-1" style={{ borderColor: "var(--line)" }} /></div>
               </div>
               <Label>Numbers — leave blank to enter a percentage instead</Label>
               <div className="flex gap-2">
                 {(["start_no", "current_no", "target_no"] as const).map((k) => (
                   <div key={k} className="flex-1">
-                    <div className="text-xs mb-0.5" style={{ color: "#8A94A0" }}>{k.split("_")[0]}</div>
-                    <input type="number" value={f[k] as any} onChange={(e) => setF({ ...f, [k]: e.target.value })} className="w-full text-xs border rounded px-1 py-1 tnum" style={{ borderColor: "#E2E0DA" }} />
+                    <div className="text-xs mb-0.5" style={{ color: "var(--muted)" }}>{k.split("_")[0]}</div>
+                    <input type="number" value={f[k] as any} onChange={(e) => setF({ ...f, [k]: e.target.value })} className="w-full text-xs border rounded px-1 py-1 tnum" style={{ borderColor: "var(--line)" }} />
                   </div>
                 ))}
-                <div className="flex-1"><div className="text-xs mb-0.5" style={{ color: "#8A94A0" }}>unit</div>
-                  <select value={f.unit_id} onChange={(e) => setF({ ...f, unit_id: e.target.value })} className="w-full text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
+                <div className="flex-1"><div className="text-xs mb-0.5" style={{ color: "var(--muted)" }}>unit</div>
+                  <select value={f.unit_id} onChange={(e) => setF({ ...f, unit_id: e.target.value })} className="w-full text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "var(--line)" }}>
                     <option value="">—</option>
                     {tree.units.map((u) => (<option key={u.id} value={u.id}>{u.label}</option>))}
                   </select>
                 </div>
               </div>
               <Label>Live feed — read the current number from the planning data</Label>
-              <select value={f.metric_source} onChange={(e) => setF({ ...f, metric_source: e.target.value })} className="w-full text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "#E2E0DA" }}>
+              <select value={f.metric_source} onChange={(e) => setF({ ...f, metric_source: e.target.value })} className="w-full text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "var(--line)" }}>
                 <option value="">Not fed — the number is typed</option>
                 {tree.metrics.map((m) => (<option key={m.key} value={m.key}>{m.label} ({m.unitHint})</option>))}
               </select>
               {f.metric_source && (
-                <div className="text-xs rounded p-2" style={{ background: "#E6F4EA", color: "#0D7A3F" }}>
+                <div className="text-xs rounded p-2" style={{ background: "#E6F4EA", color: "var(--green)" }}>
                   {tree.metrics.find((m) => m.key === f.metric_source)?.describe}
                 </div>
               )}
               <div className="flex gap-2 pt-2">
-                <button onClick={save} disabled={busy} className="flex-1 text-sm font-bold rounded py-2" style={{ background: "#E8600A", color: "#fff", opacity: busy ? 0.6 : 1 }}>
+                <button onClick={save} disabled={busy} className="flex-1 text-sm font-bold rounded py-2" style={{ background: "var(--accent)", color: "#fff", opacity: busy ? 0.6 : 1 }}>
                   {busy ? "Saving…" : "Save"}
                 </button>
-                <button onClick={remove} className="text-sm font-bold rounded px-3" style={{ background: "#FBEDEA", color: "#B3261E" }}>Delete</button>
+                <button onClick={remove} className="text-sm font-bold rounded px-3" style={{ background: "#FBEDEA", color: "var(--red)" }}>Delete</button>
               </div>
             </div>
           ) : (
             <>
-              <div className="text-base font-bold mb-1" style={{ color: "#16232F", lineHeight: 1.3 }}>{n.what}</div>
+              <div className="text-base font-bold mb-1" style={{ color: "var(--navy)", lineHeight: 1.3 }}>{n.what}</div>
               <Label>How</Label>
-              <div className="text-sm mb-3" style={{ color: "#5A6672", lineHeight: 1.5 }}>
+              <div className="text-sm mb-3" style={{ color: "var(--dim)", lineHeight: 1.5 }}>
                 {n.how || <span style={{ color: "#B8B5AC" }}>Not written yet.</span>}
               </div>
 
@@ -634,11 +634,11 @@ function Inspector({ tree, id, onClose, reload }: { tree: Tree; id: string; onCl
               </div>
 
               <Label>When</Label>
-              <div className="text-sm tnum mb-1" style={{ color: "#22303C" }}>
-                {fmt(n.start_date)} → <span style={{ color: late ? "#B3261E" : "#22303C" }}>{fmtFull(n.end_date)}</span>
+              <div className="text-sm tnum mb-1" style={{ color: "var(--ink)" }}>
+                {fmt(n.start_date)} → <span style={{ color: late ? "var(--red)" : "var(--ink)" }}>{fmtFull(n.end_date)}</span>
               </div>
               {n.original_end && n.end_date && n.original_end !== n.end_date && (
-                <div className="text-xs mb-3" style={{ color: "#D97706" }}>
+                <div className="text-xs mb-3" style={{ color: "var(--warn)" }}>
                   pushed from {fmtFull(n.original_end)} · {diffDays(n.original_end, n.end_date)} days · {n.push_count} push{n.push_count === 1 ? "" : "es"}
                 </div>
               )}
@@ -652,29 +652,29 @@ function Inspector({ tree, id, onClose, reload }: { tree: Tree; id: string; onCl
                     <div className="flex items-end gap-4 mb-2">
                       {([["Start", n.start_no], ["Current", n.current_no], ["Target", n.target_no]] as const).map(([l, v], i) => (
                         <div key={l}>
-                          <div className="text-xs" style={{ color: "#8A94A0" }}>{l}</div>
-                          <div className="tnum font-bold" style={{ fontSize: i === 1 ? 20 : 14, color: i === 1 ? "#E8600A" : "#5A6672" }}>{v ?? "—"}</div>
+                          <div className="text-xs" style={{ color: "var(--muted)" }}>{l}</div>
+                          <div className="tnum font-bold" style={{ fontSize: i === 1 ? 20 : 14, color: i === 1 ? "var(--accent)" : "var(--dim)" }}>{v ?? "—"}</div>
                         </div>
                       ))}
-                      <div className="text-xs pb-1" style={{ color: "#8A94A0" }}>{n.unit}</div>
+                      <div className="text-xs pb-1" style={{ color: "var(--muted)" }}>{n.unit}</div>
                     </div>
-                    <div className="text-xs tnum mb-2" style={{ color: "#8A94A0" }}>
+                    <div className="text-xs tnum mb-2" style={{ color: "var(--muted)" }}>
                       ({n.current_no} − {n.start_no}) ÷ ({n.target_no} − {n.start_no}) = {Math.round(pct)}%
                     </div>
                   </>
                 )}
-                {basis === "manual" && <div className="tnum font-bold mb-2" style={{ fontSize: 20, color: "#E8600A" }}>{Math.round(pct)}%</div>}
+                {basis === "manual" && <div className="tnum font-bold mb-2" style={{ fontSize: 20, color: "var(--accent)" }}>{Math.round(pct)}%</div>}
                 <Gauge pct={pct} color={st.color} seg={22} w={5} h={11} />
                 {basis === "rolled" && (
-                  <div className="text-xs mt-2" style={{ color: "#8A94A0" }}>
+                  <div className="text-xs mt-2" style={{ color: "var(--muted)" }}>
                     Weighted average of {n.kids.length} items below. Move a tactic and this moves — and so does the goal above it.
                   </div>
                 )}
                 {n.metric_source && (
-                  <div className="text-xs mt-2 rounded p-2" style={{ background: "#E6F4EA", color: "#0D7A3F" }}>
+                  <div className="text-xs mt-2 rounded p-2" style={{ background: "#E6F4EA", color: "var(--green)" }}>
                     <b>Live</b> — {n.metricNote || "read from the planning data"}. Nobody types this number.
                     {n.kids.length > 0 && (
-                      <div className="mt-1" style={{ color: "#5A6672" }}>
+                      <div className="mt-1" style={{ color: "var(--dim)" }}>
                         The {n.kids.length} item{n.kids.length === 1 ? "" : "s"} below are how this moves, but the
                         measurement is what counts — so this percentage is the reading, not their average.
                       </div>
@@ -693,26 +693,26 @@ function Inspector({ tree, id, onClose, reload }: { tree: Tree; id: string; onCl
                 <div key={i} className="flex gap-2 mb-2">
                   <Who ids={[c.by]} size={20} />
                   <div>
-                    <div className="text-xs tnum" style={{ color: "#8A94A0" }}>{new Date(c.at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short" })}</div>
-                    <div className="text-xs" style={{ color: "#5A6672", lineHeight: 1.45 }}>{c.body}</div>
+                    <div className="text-xs tnum" style={{ color: "var(--muted)" }}>{new Date(c.at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short" })}</div>
+                    <div className="text-xs" style={{ color: "var(--dim)", lineHeight: 1.45 }}>{c.body}</div>
                   </div>
                 </div>
               ))}
               <div className="flex gap-1 mt-2">
                 <input value={cmt} onChange={(e) => setCmt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && postComment()}
-                  placeholder="Add a comment" className="flex-1 text-xs border rounded px-2 py-1" style={{ borderColor: "#E2E0DA" }} />
-                <button onClick={postComment} className="text-xs font-bold rounded px-2" style={{ background: "#E8600A", color: "#fff" }}>Post</button>
+                  placeholder="Add a comment" className="flex-1 text-xs border rounded px-2 py-1" style={{ borderColor: "var(--line)" }} />
+                <button onClick={postComment} className="text-xs font-bold rounded px-2" style={{ background: "var(--accent)", color: "#fff" }}>Post</button>
               </div>
 
               {tree.canEdit && n.node_type !== "tactic" && (
                 <button onClick={addChild} className="w-full text-xs font-bold rounded py-2 mt-4"
-                  style={{ border: "1px dashed #D9D6CD", color: "#5A6672" }}>
+                  style={{ border: "1px dashed #D9D6CD", color: "var(--dim)" }}>
                   + Add {LEVEL_LABEL[CHILD_OF[n.node_type]].toLowerCase()}
                 </button>
               )}
               {tree.canEdit && n.node_type === "tactic" && (
                 <button onClick={addChild} className="w-full text-xs font-bold rounded py-2 mt-4"
-                  style={{ border: "1px dashed #D9D6CD", color: "#5A6672" }}>
+                  style={{ border: "1px dashed #D9D6CD", color: "var(--dim)" }}>
                   + Add subtask
                 </button>
               )}
@@ -725,5 +725,5 @@ function Inspector({ tree, id, onClose, reload }: { tree: Tree; id: string; onCl
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <div className="text-xs font-bold mb-1" style={{ color: "#8A94A0", letterSpacing: 1.1, textTransform: "uppercase" }}>{children}</div>;
+  return <div className="text-xs font-bold mb-1" style={{ color: "var(--muted)", letterSpacing: 1.1, textTransform: "uppercase" }}>{children}</div>;
 }

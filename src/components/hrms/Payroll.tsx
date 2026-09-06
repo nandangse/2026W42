@@ -78,7 +78,7 @@ export default function Payroll({ who: me, isOwner }: { who: string; isOwner: bo
       )}
 
       <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflowX: "auto" }}>
-        <table className="w-full" style={{ fontSize: 13, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+        <table className="w-full genie-table" style={{ fontSize: 13, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
           <thead><tr style={{ color: C.faint, fontSize: 11 }}>
             {["Month", "Year", "Date run", "Run by", "Sheet", "People", "Net payable", "Approved by", "Approved on", ""].map((h, i) => (
               <th key={h + i} className="text-left px-2 py-2" style={{ borderBottom: `1px solid ${C.line}`, textAlign: i === 5 || i === 6 ? "right" : "left" }}>{h}</th>
@@ -89,7 +89,7 @@ export default function Payroll({ who: me, isOwner }: { who: string; isOwner: bo
             {rows?.length === 0 && <tr><td colSpan={10} className="px-2 py-4" style={{ color: C.faint }}>No runs yet — upload a sheet under Finalized Salary Sheets, or record one here.</td></tr>}
             {rows?.map((r) => (
               <tr key={r.id} style={{ borderTop: "1px solid #EEECE6" }}>
-                <td className="px-2 py-1.5 font-semibold"><button onClick={() => setOpenId(r.id)} style={{ color: "#1B3A5C", textDecoration: "underline", textUnderlineOffset: 2 }} title="Open the run">{MONTHS[r.month - 1]}</button></td>
+                <td className="px-2 py-1.5 font-semibold"><button onClick={() => setOpenId(r.id)} style={{ color: "var(--blue)", textDecoration: "underline", textUnderlineOffset: 2 }} title="Open the run">{MONTHS[r.month - 1]}</button></td>
                 <td className="px-2 py-1.5">{r.year}</td>
                 <td className="px-2 py-1.5">{r.uploaded_at ? fmtFull(String(r.uploaded_at)) : fmtFull(String(r.created_at))}</td>
                 <td className="px-2 py-1.5">{who(r.uploaded_by)}</td>
@@ -102,7 +102,7 @@ export default function Payroll({ who: me, isOwner }: { who: string; isOwner: bo
                 <td className="px-2 py-1.5">{r.approved_by ? <span className="font-bold" style={{ color: C.green }}>✓ {who(r.approved_by)}</span> : <span style={{ color: "#8A5B00" }}>awaiting Raghu</span>}</td>
                 <td className="px-2 py-1.5" style={{ color: C.faint }}>{r.approved_at ? fmtFull(String(r.approved_at)) : "—"}</td>
                 <td className="px-2 py-1.5 text-right whitespace-nowrap">
-                  <button onClick={() => setOpenId(r.id)} className="text-xs font-semibold rounded border px-2 py-0.5 bg-white mr-1" style={{ borderColor: C.line, color: "#1B3A5C" }}>open</button>
+                  <button onClick={() => setOpenId(r.id)} className="text-xs font-semibold rounded border px-2 py-0.5 bg-white mr-1" style={{ borderColor: C.line, color: "var(--blue)" }}>open</button>
                   {isOwner && (r.approved_by
                     ? <button onClick={() => act({ action: "unapprove", id: r.id }, "Approval withdrawn")} className="text-xs font-semibold rounded border px-2 py-0.5 bg-white" style={{ borderColor: C.line, color: C.dim }}>withdraw</button>
                     : <button onClick={() => { if (window.confirm(`Approve the ${MONTHS[r.month - 1]} ${r.year} payroll run?`)) act({ action: "approve", id: r.id }, `${MONTHS[r.month - 1]} ${r.year} approved`); }} className="text-xs font-bold rounded px-2.5 py-1" style={{ background: C.green, color: "#fff" }}>✓ Approve</button>)}
