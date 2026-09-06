@@ -78,6 +78,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.3.0",
+    date: "2026-09-06",
+    module: "Marketing — Apollo Leads, the pool",
+    items: [
+      "\"there are 253 lists in Apollo with 3.1 million people! Can we get this data into the Marketing? Will it bloat the database?\" (Dr Raghu, 6 Sep 2026). Measured before answering: the CRM holds 139,536 people and 57,384 companies today, and the people table carries seven indexes including a full-text one. Three million people would add about 3 GB — the rows are the small part — and every CRM search would then share an instance whose working set no longer fits in memory. So they do not go in the CRM.",
+      "\"ok make a new table called Apollo lead. Sync it there. We can do a workflow where to import from Apollo to the leads is a click away! We can search with filters and then do select all and then add to leads. Apollo list name will come in as tag on the Apollo lead.\" Marketing → Apollo Leads is that pool: flat text, no generated columns, no full-text index, three indexes in all — about 350 bytes a row, so even the whole 3.1 million is around 1 GB and it never touches the CRM's own tables. Migration 0057 on the CRM database.",
+      "IMPORTING A LIST. Export the list from Apollo as CSV and drop it in with the list name; every row is tagged with it. The file is read in the browser and taken in 500 rows at a time by one database call — no lookup per row — so a big list lands in minutes rather than days. A person already in the pool keeps what they have, gains the new list tag, and has their blanks filled.",
+      "ADDING TO LEADS, A CLICK AWAY. Filter the pool by list, title, company, country, city, whether there is an e-mail, and whether they are in the CRM already; select all shown or all matching; then Add to Leads. Each one becomes a person — and a company when it names one — matched on e-mail, then domain, then name, so nothing is duplicated, tagged Apollo and with every Apollo list it came from as a tag. They can join a mailing list in the same step.",
+      "Leads' own Apollo import is gone; the pool is the way in, and the button there points at it.",
+    ],
+  },
+  {
     v: "5.0.2.4",
     date: "2026-09-06",
     module: "Enter works again in every rich box",

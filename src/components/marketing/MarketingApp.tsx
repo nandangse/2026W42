@@ -19,6 +19,7 @@ import { swallow } from "@/lib/swallow";
 import { fmtAt } from "@/lib/fmt";
 import { CompanyBox, PersonBox, Modal, type Person, type Company } from "@/components/marketing/LeadBoxes";
 import RichTextEditor from "@/components/RichTextEditor";
+import ApolloLeads from "@/components/marketing/ApolloLeads";
 
 type List = { id: string; name: string; description: string | null; created_by_email: string; created_at: string; count: number };
 type Campaign = { id: string; name: string; status: string; subject: string | null; body_html?: string | null; list_ids: string[]; person_ids: string[]; channel_ids: string[]; speed_per_hour: number; created_by_email: string; created_at: string; started_at: string | null; done_at: string | null; counts: Record<string, number> | null; checklist?: Record<string, number | string> | null; deliverability?: { score: number; issues: string[] } | null };
@@ -26,7 +27,7 @@ type Channel = { id: string; email: string; label: string | null; kind: "gmail" 
 type Template = { id: string; name: string; subject: string | null; body_html: string | null };
 
 const SECTIONS = [
-  { key: "leads", label: "Leads", icon: "🎯" }, { key: "lists", label: "Lists", icon: "📋" }, { key: "campaigns", label: "Email Marketing", icon: "✉️" },
+  { key: "leads", label: "Leads", icon: "🎯" }, { key: "apollo", label: "Apollo Leads", icon: "🛰" }, { key: "lists", label: "Lists", icon: "📋" }, { key: "campaigns", label: "Email Marketing", icon: "✉️" },
   { key: "templates", label: "Templates", icon: "📝" }, { key: "channels", label: "Sending Channels", icon: "📡" }, { key: "unsubscribes", label: "Unsubscribes", icon: "🚫" },
 ];
 const INK = "var(--ink)", MUTED = "var(--muted)", LINE = "var(--line)", ACCENT = "var(--accent)", GREEN = "var(--green)", RED = "var(--red)", NAVY = "var(--navy)";
@@ -65,6 +66,7 @@ export default function MarketingApp({ email, displayName, initials, role, marke
             {SECTIONS.map((s) => <button key={s.key} onClick={() => go(s.key)} className="text-xs font-bold rounded px-2 py-1 whitespace-nowrap" style={{ background: section === s.key ? NAVY : "#fff", color: section === s.key ? "#fff" : INK, border: `1px solid ${LINE}` }}>{s.icon} {s.label}</button>)}
           </div>
           {section === "leads" && <Leads me={email} seesAll={seesAll} />}
+          {section === "apollo" && <ApolloSection />}
           {section === "lists" && <Lists />}
           {section === "campaigns" && <Campaigns seesAll={seesAll} />}
           {section === "templates" && <Templates />}
@@ -74,6 +76,14 @@ export default function MarketingApp({ email, displayName, initials, role, marke
       </div>
     </GenieShell>
   );
+}
+
+/** Apollo Leads needs the mailing lists, so a promotion can land on one. */
+function ApolloSection() {
+  const [lists, setLists] = useState<List[]>([]);
+  const load = useCallback(() => api<{ lists: List[] }>("/api/marketing/lists").then((j) => setLists(j.lists || [])).catch(() => setLists([])), []);
+  useEffect(() => { load(); }, [load]);
+  return <ApolloLeads lists={lists} onPromoted={load} />;
 }
 
 /* ───────────────────────────── Leads ───────────────────────────── */
@@ -91,7 +101,6 @@ function Leads({ me, seesAll }: { me: string; seesAll: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
   const [lists, setLists] = useState<List[]>([]);
   const [msg, setMsg] = useState("");
-  const [importing, setImporting] = useState(false);
   const [adding, setAdding] = useState(false);
   const [bulkTo, setBulkTo] = useState("");
 
@@ -141,7 +150,7 @@ function Leads({ me, seesAll }: { me: string; seesAll: boolean }) {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={kind === "person" ? "search name, e-mail, title…" : "search company, domain, city…"} style={{ ...inp, width: 240 }} />
         <span className="ml-auto" />
         <button onClick={() => setAdding(true)} style={btn("#fff", INK)} className="border">+ Add {kind === "person" ? "person" : "company"}</button>
-        <button onClick={() => setImporting(true)} style={btn(ACCENT)}>⬆ Import Apollo CSV</button>
+        <a href="/marketing/apollo" style={{ ...btn(ACCENT), textDecoration: "none" }} title="Apollo lists land in the pool first; you pick who joins the CRM">🛰 Apollo Leads →</a>
       </div>
       {/* ---- the filters (Dr Raghu, 6 Sep 2026: "also have a filter on the top") ---- */}
       <div className="flex items-center gap-1.5 flex-wrap mb-2 text-xs rounded px-2 py-1.5" style={{ background: "#fff", border: `1px solid ${LINE}` }}>
@@ -201,7 +210,6 @@ function Leads({ me, seesAll }: { me: string; seesAll: boolean }) {
       )}
       {open && kind === "company" && <CompanyBox id={open} seesAll={seesAll} lists={lists} onClose={() => setOpen(null)} onChanged={load} />}
       {open && kind === "person" && <PersonBox id={open} seesAll={seesAll} lists={lists} onClose={() => setOpen(null)} onChanged={load} />}
-      {importing && <ApolloImport lists={lists} onClose={() => { setImporting(false); load(); loadLists(); }} />}
       {adding && <AddLead kind={kind} onClose={() => { setAdding(false); load(); }} />}
     </div>
   );
@@ -220,57 +228,6 @@ function AddLead({ kind, onClose }: { kind: "person" | "company"; onClose: () =>
       </div>
       {msg && <div className="text-xs mt-2" style={{ color: RED }}>{msg}</div>}
       <button onClick={save} className="mt-3" style={btn(ACCENT)}>Save</button>
-    </Modal>
-  );
-}
-
-/** Apollo's people CSV, parsed here, sent 200 rows at a time. */
-function ApolloImport({ lists, onClose }: { lists: List[]; onClose: () => void }) {
-  const [rows, setRows] = useState<Record<string, string>[]>([]);
-  const [listId, setListId] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState("");
-  const [msg, setMsg] = useState("");
-  const parse = (text: string) => {
-    const out: string[][] = []; let cur = ""; let row: string[] = []; let inQ = false;
-    for (let i = 0; i < text.length; i++) {
-      const ch = text[i];
-      if (inQ) { if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else inQ = false; } else cur += ch; }
-      else if (ch === '"') inQ = true; else if (ch === ",") { row.push(cur); cur = ""; } else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cur); out.push(row); row = []; cur = ""; } else cur += ch;
-    }
-    if (cur || row.length) { row.push(cur); out.push(row); }
-    const head = (out.shift() || []).map((h) => h.trim().toLowerCase());
-    const col = (names: string[]) => head.findIndex((h) => names.includes(h));
-    const C = { first: col(["first name", "first_name"]), last: col(["last name", "last_name"]), title: col(["title", "job title"]), email: col(["email", "work email", "email address"]), phone: col(["work direct phone", "mobile phone", "corporate phone", "phone", "company phone"]), linkedin: col(["person linkedin url", "linkedin url", "linkedin"]), city: col(["city"]), country: col(["country"]), company: col(["company", "company name", "company name for emails"]), website: col(["website", "company website"]), industry: col(["industry"]) };
-    const g = (r: string[], i: number) => (i >= 0 ? (r[i] || "").trim() : "");
-    return out.filter((r) => r.some((x) => x.trim())).map((r) => ({ first_name: g(r, C.first), last_name: g(r, C.last), title: g(r, C.title), email: g(r, C.email), phone: g(r, C.phone), linkedin: g(r, C.linkedin), city: g(r, C.city), country: g(r, C.country), company: g(r, C.company), website: g(r, C.website), industry: g(r, C.industry) }));
-  };
-  const pick = async (file: File | null) => { if (!file) return; setRows(parse(await file.text())); setDone(""); };
-  const run = async () => {
-    setBusy(true); setMsg(""); const tot = { companiesNew: 0, companiesMatched: 0, peopleNew: 0, peopleMatched: 0, skipped: 0 };
-    try {
-      for (let i = 0; i < rows.length; i += 200) {
-        const r = await api<typeof tot>("/api/marketing/import", { rows: rows.slice(i, i + 200), list_id: listId || undefined });
-        for (const k of Object.keys(tot) as (keyof typeof tot)[]) tot[k] += r[k] || 0;
-        setDone(`${Math.min(i + 200, rows.length)} of ${rows.length}…`);
-      }
-      setDone(`Done: ${tot.peopleNew} people new, ${tot.peopleMatched} already here · ${tot.companiesNew} companies new (tagged Apollo + Leads), ${tot.companiesMatched} matched · ${tot.skipped} skipped ✓`);
-      setRows([]);
-    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
-  };
-  return (
-    <Modal title="Import from Apollo" onClose={onClose} width={640}>
-      <div className="text-sm mb-3" style={{ color: "var(--dim)", lineHeight: 1.6 }}>Export people from Apollo as CSV and drop it here. People are matched on e-mail, companies on domain then name. New companies come in tagged <b>Apollo</b> and <b>Leads</b> and never show in the CRM's Company list; new people are tagged <b>Apollo</b>.</div>
-      <input type="file" accept=".csv,text/csv" onChange={(e) => pick(e.target.files?.[0] ?? null)} className="mb-2" />
-      {rows.length > 0 && (
-        <div className="text-sm mb-2"><b>{rows.length}</b> rows read · {rows.filter((r) => r.email).length} with an e-mail · {new Set(rows.map((r) => r.company.toLowerCase()).filter(Boolean)).size} companies</div>
-      )}
-      <label className="text-xs font-semibold block mb-2" style={{ color: "var(--dim)" }}>Also add everyone to a list
-        <select value={listId} onChange={(e) => setListId(e.target.value)} style={inp}><option value="">— no list —</option>{lists.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
-      </label>
-      {msg && <div className="text-xs mb-2" style={{ color: RED }}>{msg}</div>}
-      {done && <div className="text-sm mb-2 font-semibold" style={{ color: done.includes("✓") ? GREEN : "var(--dim)" }}>{done}</div>}
-      <button onClick={run} disabled={busy || !rows.length} style={btn(rows.length && !busy ? ACCENT : "#E9ECEF", rows.length && !busy ? "#fff" : MUTED)}>{busy ? "Importing…" : `Import ${rows.length} rows`}</button>
     </Modal>
   );
 }
