@@ -78,6 +78,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.1.3",
+    date: "2026-09-06",
+    module: "Kuber — the year-wise files",
+    items: [
+      "\"in Kuber uploads, make a year wise upload too. Year - XML Masters - XML Transactions - Audited Financials - GST reports. For this year, keep adding month wise, so latest is to be taken. Suresh and me can upload. 2025-26, 2024-25 etc upto 2005. This will help to get more data as needed for review\" (Dr Raghu, 6 Sep 2026). Kuber → Upload Files carries a second grid: one row a year from the running year back to 2005-06, four columns. Each cell shows the latest file for that year and kind — name, size, who, when, a Drive link — and, for Dr Raghu and Suresh, an upload button. The running year takes a month per file and shows the newest. The file goes to Google Drive from the browser into an FY <year> subfolder of the Tally folder, the same leg the daily XML upload uses; only the register row reaches Genie. Migration 0145.",
+      "\"i think its the balances or the payments received in the past year that you are not considering\" (Dr Raghu, 6 Sep 2026, on the dashboard). Correct: the books hold one year's transactions, so receipts and balances from earlier years are not netted against the open bills. The dashboard cards add up exactly to the 4,454 open bills of the 5 Sept upload; what they lack is the years before it. Reading past years' transactions from the year-wise files into the books, without wiping the running year, is the next step on Kuber.",
+    ],
+  },
+  {
     v: "5.0.1.2",
     date: "2026-09-06",
     module: "Planning wears the one header too",
