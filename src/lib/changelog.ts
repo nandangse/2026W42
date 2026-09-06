@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.2.2",
+    date: "2026-09-06",
+    module: "Marketing — the company opened wide; filters; select all; who belongs in the CRM",
+    items: [
+      "\"this is too simplistic. Make a larger box! Also within the company show contacts. Company has to have location, industry, tags, etc.\" (Dr Raghu, 6 Sep 2026). A company opens across the screen with four tabs: Record — every field editable in place (industry from the CRM's list, city, state, country, domain, website, LinkedIn, employees, revenue, GSTIN, lead, assigned, shared notes); Contacts — the company's people, add one on the spot, tick them and add to a list, open any of them; Tags — the CRM's shared tags, add or remove, new ones by typing; My notes. A person opens the same way: record, tags, notes and sends, and can be moved to another company.",
+      "\"also have a filter on the top. And select all.\" Leads carries a filter bar: source, lead or customer, industry, has e-mail, country, city, assigned to, only mine. Select all shown, or select all N matching across every page; then add to a list, mark as lead, or assign, in one go.",
+      "\"Leads in the Marketing = all contacts and all companies. Leads in the CRM = only those added in CRM or having an opportunity or contact or quotation or any communication.\" Marketing shows every company and person whatever the source. The CRM's Company and People lists show what was made in the CRM, plus any Apollo import that has since earned an opportunity, a quotation, a message, an interaction, a call or a seat on an opportunity.",
+    ],
+  },
+  {
     v: "5.0.2.1",
     date: "2026-09-06",
     module: "Marketing — Mailercloud, to the letter of its reference",

@@ -17,9 +17,8 @@ import GenieShell from "@/components/GenieShell";
 import GenieTable from "@/components/GenieTable";
 import { swallow } from "@/lib/swallow";
 import { fmtAt } from "@/lib/fmt";
+import { CompanyBox, PersonBox, Modal, type Person, type Company } from "@/components/marketing/LeadBoxes";
 
-type Person = { id: string; first_name: string | null; last_name: string | null; full_name: string | null; job_title: string | null; primary_email: string | null; primary_phone: string | null; linkedin_url: string | null; city: string | null; country: string | null; company_id: string | null; source: string; assigned_to: string | null; created_by_email: string | null; created_at: string; company?: { name: string } | null };
-type Company = { id: string; name: string; domain_name: string | null; website: string | null; city: string | null; country: string | null; source: string; is_lead: boolean; is_customer: boolean; assigned_to: string | null; created_by_email: string | null; created_at: string };
 type List = { id: string; name: string; description: string | null; created_by_email: string; created_at: string; count: number };
 type Campaign = { id: string; name: string; status: string; subject: string | null; body_html?: string | null; list_ids: string[]; person_ids: string[]; channel_ids: string[]; speed_per_hour: number; created_by_email: string; created_at: string; started_at: string | null; done_at: string | null; counts: Record<string, number> | null; checklist?: Record<string, number | string> | null; deliverability?: { score: number; issues: string[] } | null };
 type Channel = { id: string; email: string; label: string | null; kind: "gmail" | "resend" | "mailercloud"; daily_limit: number; hourly_limit: number; active: boolean; sent_today: number; sent_this_hour: number; gmail: string | null; api_key: string | null; resendKeyOnDeploy: boolean };
@@ -82,150 +81,128 @@ function Leads({ me, seesAll }: { me: string; seesAll: boolean }) {
   const [kind, setKind] = useState<"person" | "company">("person");
   const [q, setQ] = useState("");
   const [mine, setMine] = useState(!seesAll);
+  const [flt, setFlt] = useState<Record<string, string>>({});
   const [rows, setRows] = useState<(Person | Company)[] | null>(null);
   const [total, setTotal] = useState(0);
   const [installed, setInstalled] = useState(true);
+  const [industries, setIndustries] = useState<{ id: number; name: string }[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [open, setOpen] = useState<Person | Company | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   const [lists, setLists] = useState<List[]>([]);
   const [msg, setMsg] = useState("");
   const [importing, setImporting] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [bulkTo, setBulkTo] = useState("");
 
+  const qs = useCallback(() => {
+    const p = new URLSearchParams({ kind, q, mine: mine ? "1" : "0" });
+    for (const [k, v] of Object.entries(flt)) if (v) p.set(k, v);
+    return p.toString();
+  }, [kind, q, mine, flt]);
   const load = useCallback(() => {
-    api<{ rows: (Person | Company)[]; total: number; installed: boolean }>(`/api/marketing/leads?kind=${kind}&q=${encodeURIComponent(q)}&mine=${mine ? 1 : 0}`)
-      .then((j) => { setRows(j.rows); setTotal(j.total); setInstalled(j.installed !== false); }).catch((e) => { swallow("marketing/leads", e); setRows([]); });
-  }, [kind, q, mine]);
+    api<{ rows: (Person | Company)[]; total: number; installed: boolean; industries: { id: number; name: string }[] }>(`/api/marketing/leads?${qs()}`)
+      .then((j) => { setRows(j.rows); setTotal(j.total); setInstalled(j.installed !== false); if (j.industries?.length) setIndustries(j.industries); }).catch((e) => { swallow("marketing/leads", e); setRows([]); });
+  }, [qs]);
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [load]);
-  useEffect(() => { api<{ lists: List[] }>("/api/marketing/lists").then((j) => setLists(j.lists || [])).catch(() => setLists([])); }, []);
+  const loadLists = useCallback(() => api<{ lists: List[] }>("/api/marketing/lists").then((j) => setLists(j.lists || [])).catch(() => setLists([])), []);
+  useEffect(() => { loadLists(); }, [loadLists]);
+  useEffect(() => { setPicked(new Set()); }, [kind, q, flt, mine]);
 
   const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const shown = rows ?? [];
+  const allShown = shown.length > 0 && shown.every((r) => picked.has(r.id));
+  const selectShown = () => setPicked(new Set(shown.map((r) => r.id)));
+  const selectAllMatching = async () => { try { const j = await api<{ ids: string[]; total: number }>(`/api/marketing/leads?${qs()}&ids=1`); setPicked(new Set(j.ids)); setMsg(`${j.ids.length} of ${j.total} selected ✓`); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); } };
   const addToList = async (listId: string) => {
     if (!picked.size || !listId) return;
-    try { const r = await api<{ n: number }>("/api/marketing/lists", { action: "add", list_id: listId, person_ids: [...picked] }); setMsg(`${r.n} added to the list ✓`); setPicked(new Set()); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    try { const r = await api<{ n: number }>("/api/marketing/lists", { action: "add", list_id: listId, person_ids: [...picked] }); setMsg(`${r.n} added to the list ✓`); setPicked(new Set()); loadLists(); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  };
+  const bulk = async (set: Record<string, unknown>, label: string) => {
+    if (!picked.size) return;
+    try { const r = await api<{ n: number }>("/api/marketing/leads", { action: "bulk", kind, ids: [...picked], set }); setMsg(`${label} on ${r.n} ✓`); setPicked(new Set()); load(); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   };
   const assign = async (id: string, to: string) => { try { await api("/api/marketing/leads", { action: "assign", kind, id, to }); load(); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); } };
   const markLead = async (c: Company, lead: boolean) => { try { await api("/api/marketing/leads", { action: "mark_lead", company_id: c.id, lead }); load(); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); } };
+  const setF = (k: string, v: string) => setFlt((f) => ({ ...f, [k]: v }));
+  const sel = (k: string, opts: [string, string][], title: string) => (
+    <select value={flt[k] || ""} onChange={(e) => setF(k, e.target.value)} title={title} style={{ ...inp, width: "auto", padding: "4px 6px", fontSize: 12 }}>
+      {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+    </select>
+  );
 
   return (
     <div>
       <div className="flex items-center gap-2 flex-wrap mb-2">
         <div className="flex rounded overflow-hidden" style={{ border: `1px solid ${LINE}` }}>
-          <button onClick={() => { setKind("person"); setPicked(new Set()); }} className="px-3 py-1.5 text-sm font-bold" style={{ background: kind === "person" ? NAVY : "#fff", color: kind === "person" ? "#fff" : INK }}>👤 People</button>
-          <button onClick={() => { setKind("company"); setPicked(new Set()); }} className="px-3 py-1.5 text-sm font-bold" style={{ background: kind === "company" ? NAVY : "#fff", color: kind === "company" ? "#fff" : INK }}>🏢 Companies</button>
+          <button onClick={() => setKind("person")} className="px-3 py-1.5 text-sm font-bold" style={{ background: kind === "person" ? NAVY : "#fff", color: kind === "person" ? "#fff" : INK }}>👤 People</button>
+          <button onClick={() => setKind("company")} className="px-3 py-1.5 text-sm font-bold" style={{ background: kind === "company" ? NAVY : "#fff", color: kind === "company" ? "#fff" : INK }}>🏢 Companies</button>
         </div>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={kind === "person" ? "search name, e-mail, title…" : "search company, domain, city…"} style={{ ...inp, width: 260 }} />
-        {seesAll && <label className="text-xs flex items-center gap-1" style={{ color: MUTED }}><input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> only mine</label>}
-        <span className="text-xs tnum" style={{ color: MUTED }}>{total.toLocaleString("en-IN")} {kind === "person" ? "people" : "companies"}</span>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={kind === "person" ? "search name, e-mail, title…" : "search company, domain, city…"} style={{ ...inp, width: 240 }} />
         <span className="ml-auto" />
-        <button onClick={() => setAdding(true)} style={btn("#fff", INK)} className="border" >+ Add {kind === "person" ? "person" : "company"}</button>
+        <button onClick={() => setAdding(true)} style={btn("#fff", INK)} className="border">+ Add {kind === "person" ? "person" : "company"}</button>
         <button onClick={() => setImporting(true)} style={btn(ACCENT)}>⬆ Import Apollo CSV</button>
+      </div>
+      {/* ---- the filters (Dr Raghu, 6 Sep 2026: "also have a filter on the top") ---- */}
+      <div className="flex items-center gap-1.5 flex-wrap mb-2 text-xs rounded px-2 py-1.5" style={{ background: "#fff", border: `1px solid ${LINE}` }}>
+        <span className="font-bold mr-1" style={{ color: MUTED }}>FILTER</span>
+        {sel("source", [["", "any source"], ["crm", "CRM"], ["apollo", "Apollo"]], "where the record came from")}
+        {kind === "company" && sel("lead", [["", "leads & others"], ["1", "leads only"]], "marked as lead")}
+        {kind === "company" && sel("customer", [["", "customers & others"], ["1", "customers only"]], "already a customer")}
+        {kind === "company" && industries.length > 0 && sel("industry", [["", "any industry"], ...industries.map((i) => [String(i.id), i.name] as [string, string])], "industry")}
+        {kind === "person" && sel("has_email", [["", "with or without e-mail"], ["1", "has e-mail"], ["0", "no e-mail"]], "e-mail on the record")}
+        <input value={flt.country || ""} onChange={(e) => setF("country", e.target.value)} placeholder="country" style={{ ...inp, width: 110, padding: "4px 6px", fontSize: 12 }} />
+        <input value={flt.city || ""} onChange={(e) => setF("city", e.target.value)} placeholder="city" style={{ ...inp, width: 110, padding: "4px 6px", fontSize: 12 }} />
+        {seesAll && <input value={flt.assigned || ""} onChange={(e) => setF("assigned", e.target.value)} placeholder="assigned to (e-mail, or none)" style={{ ...inp, width: 200, padding: "4px 6px", fontSize: 12 }} />}
+        {seesAll && <label className="flex items-center gap-1" style={{ color: MUTED }}><input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> only mine</label>}
+        {(Object.values(flt).some(Boolean) || q) && <button onClick={() => { setFlt({}); setQ(""); }} className="font-semibold" style={{ color: RED }}>✕ clear</button>}
+        <span className="ml-auto tnum" style={{ color: MUTED }}>{total.toLocaleString("en-IN")} {kind === "person" ? "people" : "companies"}{shown.length < total ? ` · showing ${shown.length}` : ""}</span>
       </div>
       {!installed && <div className="text-xs mb-2" style={{ color: RED }}>Run CRM migration 0055 first — the leads fields do not exist yet.</div>}
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: msg.includes("✓") ? GREEN : RED }}>{msg}</div>}
-      {kind === "person" && picked.size > 0 && (
-        <div className="flex items-center gap-2 mb-2 text-xs rounded px-3 py-2" style={{ background: "#FFF7E6", border: "1px solid #F5B32B" }}>
-          <b>{picked.size} chosen</b> → add to list
-          <select onChange={(e) => { addToList(e.target.value); e.target.value = ""; }} style={{ ...inp, width: 220 }} defaultValue="">
-            <option value="">choose a list…</option>
-            {lists.map((l) => <option key={l.id} value={l.id}>{l.name} ({l.count})</option>)}
-          </select>
-          <button onClick={() => setPicked(new Set())} className="font-semibold" style={{ color: MUTED }}>clear</button>
-        </div>
-      )}
+      {/* ---- select all + what to do with the selection ---- */}
+      <div className="flex items-center gap-2 flex-wrap mb-2 text-xs rounded px-3 py-1.5" style={{ background: picked.size ? "#FFF7E6" : "#FBFAF7", border: `1px solid ${picked.size ? "#F5B32B" : LINE}` }}>
+        <button onClick={selectShown} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: LINE, color: "var(--blue)" }}>Select all shown ({shown.length})</button>
+        {total > shown.length && <button onClick={selectAllMatching} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: LINE, color: "var(--blue)" }}>Select all {total.toLocaleString("en-IN")} matching</button>}
+        <button onClick={() => setPicked(new Set())} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: LINE, color: MUTED }}>Deselect</button>
+        {picked.size > 0 && <b>{picked.size} chosen →</b>}
+        {picked.size > 0 && kind === "person" && (
+          <select onChange={(e) => { addToList(e.target.value); e.target.value = ""; }} style={{ ...inp, width: 220, padding: "4px 6px" }} defaultValue=""><option value="">add to list…</option>{lists.map((l) => <option key={l.id} value={l.id}>{l.name} ({l.count})</option>)}</select>
+        )}
+        {picked.size > 0 && kind === "company" && <><button onClick={() => bulk({ is_lead: true }, "Marked as lead")} style={btn("#0F766E")}>mark as lead</button><button onClick={() => bulk({ is_lead: false }, "Lead mark taken off")} style={btn("#fff", "var(--dim)")}>not a lead</button></>}
+        {picked.size > 0 && seesAll && <><input value={bulkTo} onChange={(e) => setBulkTo(e.target.value)} placeholder="assign to e-mail" style={{ ...inp, width: 190, padding: "4px 6px" }} /><button onClick={() => bulk({ assigned_to: bulkTo }, bulkTo ? `Assigned to ${bulkTo}` : "Unassigned")} style={btn(NAVY)}>assign</button></>}
+      </div>
       {kind === "person" ? (
-        <GenieTable<Person> rows={rows as Person[] | null} minWidth={900} maxHeight="calc(100vh - 220px)" empty="No people yet — import from Apollo or add one."
+        <GenieTable<Person> rows={rows as Person[] | null} minWidth={980} maxHeight="calc(100vh - 300px)" empty="No people match — import from Apollo or add one."
           columns={[
             { key: "pick", label: "", render: (r) => <input type="checkbox" checked={picked.has(r.id)} onChange={() => toggle(r.id)} /> },
-            { key: "name", label: "Name", sort: (r) => r.full_name || "", render: (r) => <button onClick={() => setOpen(r)} className="font-semibold text-left" style={{ color: "var(--blue)", textDecoration: "underline" }}>{r.full_name || r.primary_email || "—"}</button> },
+            { key: "name", label: "Name", sort: (r) => r.full_name || "", render: (r) => <button onClick={() => setOpen(r.id)} className="font-semibold text-left" style={{ color: "var(--blue)", textDecoration: "underline" }}>{r.full_name || r.primary_email || "—"}</button> },
             { key: "title", label: "Title", render: (r) => r.job_title || "·" },
             { key: "company", label: "Company", sort: (r) => r.company?.name || "", render: (r) => r.company?.name || "·" },
             { key: "email", label: "E-mail", render: (r) => r.primary_email || <span style={{ color: RED }}>none</span> },
+            { key: "phone", label: "Phone", render: (r) => r.primary_phone || "·" },
             { key: "city", label: "City", render: (r) => [r.city, r.country].filter(Boolean).join(", ") || "·" },
             { key: "source", label: "Source", render: (r) => <span className="rounded px-1 text-xs font-bold" style={{ background: r.source === "apollo" ? "#EEF2FF" : "#E6F4EA", color: INK }}>{r.source}</span> },
-            { key: "who", label: "Assigned", render: (r) => seesAll ? <input defaultValue={r.assigned_to || ""} onBlur={(e) => { if (e.target.value !== (r.assigned_to || "")) assign(r.id, e.target.value); }} placeholder="e-mail" style={{ ...inp, width: 170, padding: "2px 6px", fontSize: 12 }} /> : (r.assigned_to || "·") },
+            { key: "who", label: "Assigned", render: (r) => seesAll ? <input defaultValue={r.assigned_to || ""} onBlur={(e) => { if (e.target.value !== (r.assigned_to || "")) assign(r.id, e.target.value); }} placeholder="e-mail" style={{ ...inp, width: 160, padding: "2px 6px", fontSize: 12 }} /> : (r.assigned_to || "·") },
           ]} />
       ) : (
-        <GenieTable<Company> rows={rows as Company[] | null} minWidth={900} maxHeight="calc(100vh - 220px)" empty="No companies yet."
+        <GenieTable<Company> rows={rows as Company[] | null} minWidth={980} maxHeight="calc(100vh - 300px)" empty="No companies match."
           columns={[
-            { key: "name", label: "Company", sort: (r) => r.name, render: (r) => <button onClick={() => setOpen(r)} className="font-semibold text-left" style={{ color: "var(--blue)", textDecoration: "underline" }}>{r.name}</button> },
+            { key: "pick", label: "", render: (r) => <input type="checkbox" checked={picked.has(r.id)} onChange={() => toggle(r.id)} /> },
+            { key: "name", label: "Company", sort: (r) => r.name, render: (r) => <button onClick={() => setOpen(r.id)} className="font-semibold text-left" style={{ color: "var(--blue)", textDecoration: "underline" }}>{r.name}</button> },
+            { key: "industry", label: "Industry", sort: (r) => r.industry?.name || "", render: (r) => r.industry?.name || "·" },
             { key: "domain", label: "Domain", render: (r) => r.domain_name || "·" },
-            { key: "city", label: "City", render: (r) => [r.city, r.country].filter(Boolean).join(", ") || "·" },
-            { key: "lead", label: "Lead", render: (r) => <button onClick={() => markLead(r, !r.is_lead)} className="rounded px-2 text-xs font-bold" style={{ background: r.is_lead ? "#0F766E" : "#fff", color: r.is_lead ? "#fff" : MUTED, border: `1px solid ${r.is_lead ? "#0F766E" : "#E2E0DA"}` }} title="Mark as lead — or take it off">{r.is_lead ? "✓ lead" : "mark as lead"}</button> },
+            { key: "city", label: "Location", render: (r) => [r.city, r.state, r.country].filter(Boolean).join(", ") || "·" },
+            { key: "lead", label: "Lead", render: (r) => <button onClick={() => markLead(r, !r.is_lead)} className="rounded px-2 text-xs font-bold" style={{ background: r.is_lead ? "#0F766E" : "#fff", color: r.is_lead ? "#fff" : MUTED, border: `1px solid ${r.is_lead ? "#0F766E" : "#E2E0DA"}`, whiteSpace: "nowrap" }}>{r.is_lead ? "✓ lead" : "mark as lead"}</button> },
             { key: "customer", label: "Customer", render: (r) => (r.is_customer ? "✓" : "·") },
             { key: "source", label: "Source", render: (r) => <span className="rounded px-1 text-xs font-bold" style={{ background: r.source === "apollo" ? "#EEF2FF" : "#E6F4EA", color: INK }}>{r.source}</span> },
-            { key: "who", label: "Assigned", render: (r) => seesAll ? <input defaultValue={r.assigned_to || ""} onBlur={(e) => { if (e.target.value !== (r.assigned_to || "")) assign(r.id, e.target.value); }} placeholder="e-mail" style={{ ...inp, width: 170, padding: "2px 6px", fontSize: 12 }} /> : (r.assigned_to || "·") },
+            { key: "who", label: "Assigned", render: (r) => seesAll ? <input defaultValue={r.assigned_to || ""} onBlur={(e) => { if (e.target.value !== (r.assigned_to || "")) assign(r.id, e.target.value); }} placeholder="e-mail" style={{ ...inp, width: 160, padding: "2px 6px", fontSize: 12 }} /> : (r.assigned_to || "·") },
           ]} />
       )}
-      {open && <LeadBox kind={kind} row={open} onClose={() => setOpen(null)} />}
-      {importing && <ApolloImport lists={lists} onClose={() => { setImporting(false); load(); }} />}
+      {open && kind === "company" && <CompanyBox id={open} seesAll={seesAll} lists={lists} onClose={() => setOpen(null)} onChanged={load} />}
+      {open && kind === "person" && <PersonBox id={open} seesAll={seesAll} lists={lists} onClose={() => setOpen(null)} onChanged={load} />}
+      {importing && <ApolloImport lists={lists} onClose={() => { setImporting(false); load(); loadLists(); }} />}
       {adding && <AddLead kind={kind} onClose={() => { setAdding(false); load(); }} />}
     </div>
-  );
-}
-
-function Modal({ title, onClose, children, width = 720 }: { title: React.ReactNode; onClose: () => void; children: React.ReactNode; width?: number }) {
-  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
-  return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,.55)", zIndex: 70, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "32px 12px", overflowY: "auto" }}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg genie-modal" style={{ width: `min(${width}px, 100%)`, maxHeight: "90vh", overflowY: "auto" }}>
-        <div className="px-4 py-3 flex items-center gap-3" style={{ background: NAVY, color: "#fff", position: "sticky", top: 0, zIndex: 2 }}>
-          <div className="font-bold flex-1" style={{ fontSize: 15 }}>{title}</div>
-          <button onClick={onClose} style={{ color: "#8FA1B3", fontSize: 20, lineHeight: 1 }}>✕</button>
-        </div>
-        <div className="p-4">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-/** A lead, opened: the record, my notes, my sends. No opportunities, deals or Eva brief here — those are the CRM's. */
-function LeadBox({ kind, row, onClose }: { kind: "person" | "company"; row: Person | Company; onClose: () => void }) {
-  const [notes, setNotes] = useState<{ id: string; body: string; created_at: string }[]>([]);
-  const [sends, setSends] = useState<{ status: string; sent_at: string | null; opened_at: string | null; open_count: number; campaign: { name: string } | null }[]>([]);
-  const [text, setText] = useState("");
-  const load = useCallback(() => { api<{ notes: typeof notes; sends: typeof sends }>(`/api/marketing/notes?entity=${kind}&id=${row.id}`).then((j) => { setNotes(j.notes); setSends(j.sends); }).catch((e) => swallow("marketing/notes", e)); }, [kind, row.id]);
-  useEffect(() => { load(); }, [load]);
-  const p = row as Person, c = row as Company;
-  const save = async () => { if (!text.trim()) return; await api("/api/marketing/notes", { entity: kind, entity_id: row.id, body: text }); setText(""); load(); };
-  return (
-    <Modal title={kind === "person" ? (p.full_name || p.primary_email) : c.name} onClose={onClose}>
-      <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
-        <div className="rounded border p-3" style={{ borderColor: LINE, background: "#FBFAF7" }}>
-          <div className="text-xs font-bold mb-2" style={{ color: MUTED }}>RECORD</div>
-          {kind === "person" ? (
-            <div className="text-sm" style={{ lineHeight: 1.7 }}>
-              <div><b>{p.full_name}</b> {p.job_title ? `· ${p.job_title}` : ""}</div>
-              <div>{p.company?.name || "—"}</div>
-              <div>{p.primary_email || "no e-mail"}{p.primary_phone ? ` · ${p.primary_phone}` : ""}</div>
-              <div>{[p.city, p.country].filter(Boolean).join(", ")}</div>
-              {p.linkedin_url && <a href={p.linkedin_url} target="_blank" rel="noreferrer" style={{ color: "var(--blue)" }}>LinkedIn ↗</a>}
-              <div className="text-xs mt-1" style={{ color: MUTED }}>source {p.source} · assigned {p.assigned_to || "—"} · by {p.created_by_email || "—"}</div>
-            </div>
-          ) : (
-            <div className="text-sm" style={{ lineHeight: 1.7 }}>
-              <div><b>{c.name}</b>{c.is_lead ? " · lead" : ""}{c.is_customer ? " · customer" : ""}</div>
-              <div>{c.domain_name || c.website || "—"}</div>
-              <div>{[c.city, c.country].filter(Boolean).join(", ")}</div>
-              <div className="text-xs mt-1" style={{ color: MUTED }}>source {c.source} · assigned {c.assigned_to || "—"} · by {c.created_by_email || "—"}</div>
-            </div>
-          )}
-        </div>
-        <div className="rounded border p-3" style={{ borderColor: LINE }}>
-          <div className="text-xs font-bold mb-2" style={{ color: MUTED }}>MY NOTES</div>
-          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="a note only you see" style={inp} />
-          <button onClick={save} className="mt-1" style={btn(NAVY)}>Save note</button>
-          {notes.map((n) => <div key={n.id} className="text-sm mt-2" style={{ borderTop: `1px solid ${LINE}`, paddingTop: 6 }}><div className="text-xs" style={{ color: MUTED }}>{fmtAt(n.created_at)}</div>{n.body}</div>)}
-        </div>
-      </div>
-      {kind === "person" && (
-        <div className="rounded border p-3 mt-3" style={{ borderColor: LINE }}>
-          <div className="text-xs font-bold mb-2" style={{ color: MUTED }}>MY SENDS</div>
-          {sends.length === 0 && <div className="text-xs" style={{ color: MUTED }}>No campaign mail from you to this person yet.</div>}
-          {sends.map((s, i) => <div key={i} className="text-sm flex gap-3"><span>{s.campaign?.name || "campaign"}</span><span style={{ color: s.status === "opened" ? GREEN : s.status === "bounced" || s.status === "failed" ? RED : MUTED }}>{s.status}{s.open_count ? ` ×${s.open_count}` : ""}</span><span className="tnum" style={{ color: MUTED }}>{s.sent_at ? fmtAt(s.sent_at) : ""}</span></div>)}
-        </div>
-      )}
-    </Modal>
   );
 }
 

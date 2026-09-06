@@ -53,10 +53,15 @@ import { meetingFromInteraction, syncInteraction } from "@/lib/zoom";
  */
 
 /**
- * THE APOLLO IMPORTS STAY OUT OF THE CRM (Dr Raghu, 6 Sep 2026: "all the
- * Apollo imports don't need to clog my Company"). Marketing's imports carry
- * source = apollo; the CRM's Company and People lists show source = crm.
- * The column arrives with CRM migration 0055; until then nothing is filtered.
+ * WHO BELONGS IN THE CRM (Dr Raghu, 6 Sep 2026): "Leads in the Marketing =
+ * all contacts and all companies. Leads in the CRM = only those added in
+ * CRM or having an opportunity or quotation or any communication."
+ *
+ * So the CRM's Company and People lists show source = crm, plus any Apollo
+ * import that has since earned an opportunity, a quotation, a message, an
+ * interaction, a call, or a seat on an opportunity. The earned set is
+ * computed once a minute; the column arrives with CRM migration 0055 and
+ * until then nothing is filtered.
  */
 let SOURCE_COL: boolean | null = null;
 async function hasSourceColumn(db: ReturnType<typeof crmDb>): Promise<boolean> {
@@ -66,6 +71,29 @@ async function hasSourceColumn(db: ReturnType<typeof crmDb>): Promise<boolean> {
   return SOURCE_COL;
 }
 const CRM_ONLY = new Set(["company", "person"]);
+const earned: Record<string, { at: number; ids: string[] }> = {};
+async function earnedApolloIds(db: ReturnType<typeof crmDb>, kind: "company" | "person"): Promise<string[]> {
+  const c = earned[kind];
+  if (c && Date.now() - c.at < 60_000) return c.ids;
+  const ids = new Set<string>();
+  const col = kind === "company" ? "company_id" : "person_id";
+  const pulls: [string, string][] = kind === "company"
+    ? [["opportunity", "company_id"], ["quotation", "company_id"], ["message", "company_id"], ["interaction", "company_id"], ["call_log", "company_id"]]
+    : [["quotation", "contact_id"], ["message", "person_id"], ["interaction", "person_id"], ["call_log", "person_id"], ["opportunity_contact", "person_id"]];
+  for (const [table, column] of pulls) {
+    try {
+      const { data } = await db.from(table).select(`${column}, ref:${column}!inner(source)`).eq(`ref.source`, "apollo").limit(5000);
+      for (const r of data || []) { const v = (r as unknown as Record<string, unknown>)[column]; if (v) ids.add(String(v)); }
+    } catch { /* a table without the link: nothing earned there */ }
+  }
+  void col;
+  earned[kind] = { at: Date.now(), ids: [...ids] };
+  return earned[kind].ids;
+}
+/** The filter clause for a list: source = crm, or an Apollo record that earned its place. */
+function crmScope<T extends { or: (f: string) => T; eq: (c: string, v: string) => T }>(qy: T, ids: string[]): T {
+  return ids.length ? qy.or(`source.eq.crm,id.in.(${ids.slice(0, 2000).join(",")})`) : qy.eq("source", "crm");
+}
 
 const LINK_CAP = 500;
 
@@ -302,6 +330,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
     const wantsInd = !!indFilter && !isCompany && d.fields.some((f) => f.name === "company_id");
 
     const hideApollo = CRM_ONLY.has(d.name) && (await hasSourceColumn(db));
+    const earnedIds = hideApollo ? await earnedApolloIds(db, d.name as "company" | "person") : [];
 
     const select = isCompany ? COMPANY_SELECT
       : isOpp ? (wantsInd ? "*, company_join:company_id!inner(industry_id, industry:industry_id(name))" : OPP_SELECT)
@@ -321,7 +350,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       // the mail composer's To-picker needs the address beside the name
       let pq = db.from(d.table).select(d.name === "person" ? `id, ${d.titleField}, primary_email` : `id, ${d.titleField}`);
       if (["company", "person", "opportunity", "product"].includes(d.name)) pq = pq.is("deleted_at", null);
-      if (hideApollo) pq = pq.neq("source", "apollo");
+      if (hideApollo) pq = crmScope(pq, earnedIds);
       for (const f of d.fields) {
         if (f.virtual) continue;
         const v = u.searchParams.get(`f_${f.name}`);
@@ -423,7 +452,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       const buildAgg = () => {
         let qy = db.from(d.table).select(aggSelect);
         if (["company", "person", "opportunity", "product"].includes(d.name)) qy = qy.is("deleted_at", null);
-        if (hideApollo) qy = qy.neq("source", "apollo");
+        if (hideApollo) qy = crmScope(qy, earnedIds);
         if (wantsInd) qy = (String(indFilter).includes(",") ? qy.in("company_join.industry_id", String(indFilter).split(",")) : qy.eq("company_join.industry_id", indFilter));
         for (const f of d.fields) {
           if (f.virtual) continue;
@@ -511,7 +540,7 @@ export async function GET(req: Request, { params }: { params: { doctype: string 
       let qy = db.from(d.table).select(select, withCount ? { count: "exact" as const } : undefined);
       // Merged and soft-deleted rows stay in the ledger, not on the screens.
       if (["company", "person", "opportunity", "product"].includes(d.name)) qy = qy.is("deleted_at", null);
-      if (hideApollo) qy = qy.neq("source", "apollo");
+      if (hideApollo) qy = crmScope(qy, earnedIds);
       if (tagIds) qy = qy.in("id", tagIds.length ? tagIds.slice(0, 2000) : ["00000000-0000-0000-0000-000000000000"]);
       if (wantsInd) qy = (String(indFilter).includes(",") ? qy.in("company_join.industry_id", String(indFilter).split(",")) : qy.eq("company_join.industry_id", indFilter));
       for (const f of d.fields) {
