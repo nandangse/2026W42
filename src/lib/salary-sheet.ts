@@ -54,6 +54,17 @@ export interface SheetRow {
   leave_ob?: number | null; leave_added?: number | null; leave_used?: number | null;
   leave_encashed?: number | null; leave_cb?: number | null; compoff_days?: number | null;
   loan_ob?: number | null; loan_added?: number | null; loan_cb?: number | null;
+  /**
+   * THE LINES THE SLIP DRAWS THAT NOTHING WAS READING (found 7 Sep 2026 from
+   * the upload's own "not used" list). The August sheet carries Comp Of_m,
+   * Days Leave Encashed, Leave Encashment Amount, Site Allow, Interim Bonus,
+   * Lunch, ESI, Late Deduction, Per Day and In words — and the parser had a
+   * rule for none of them, so every one printed blank or nil on the payslip.
+   */
+  compoff_amt?: number | null; encash_amt?: number | null;
+  lunch?: number | null; esi?: number | null; late_ded?: number | null;
+  bonus?: number | null; per_day?: number | null; in_words?: string | null;
+  loan_taken?: number | null;
   fixed_allowance?: number | null;
   conveyance?: number | null;
   site_allowance?: number | null;
@@ -186,10 +197,22 @@ const COLUMN_RULES: { key: keyof SheetRow | "skip"; test: (h: string) => boolean
   { key: "leave_used", test: (h) => /^leave(used|utilized|utilised|taken)$/.test(h) },
   { key: "leave_encashed", test: (h) => /^leaveencash(ed|ment)?$/.test(h) },
   { key: "leave_cb", test: (h) => /^leave(closing|cb)(balance)?$/.test(h) },
-  { key: "compoff_days", test: (h) => /^comp(ensatory)?off(days)?$/.test(h) },
   { key: "loan_ob", test: (h) => /^loan(opening|ob)(balance)?$/.test(h) },
   { key: "loan_added", test: (h) => /^loan(added|taken|disbursed)$/.test(h) },
   { key: "loan_cb", test: (h) => /^loan(closing|cb)(balance)?$/.test(h) },
+  // the sheet writes several of these with a trailing _m for "merged"
+  /* the sheet writes it "Comp Of_m" — one f, and a trailing _m for "merged";
+     headers are stripped to letters and digits before matching */
+  { key: "compoff_days", test: (h) => /^comp(ensatory)?of{1,2}(days|m)?$/.test(h) },
+  { key: "loan_taken", test: (h) => /^loantakenm?$/.test(h) },
+  { key: "encash_amt", test: (h) => /^leaveencashmentamount$/.test(h) },
+  { key: "site_allowance", test: (h) => /^siteallow(ance)?$/.test(h) },
+  { key: "bonus", test: (h) => /^interimbonus$/.test(h) },
+  { key: "lunch", test: (h) => /^lunch$/.test(h) },
+  { key: "esi", test: (h) => /^esi(c)?$/.test(h) },
+  { key: "late_ded", test: (h) => /^latededuction$/.test(h) },
+  { key: "per_day", test: (h) => /^perday$/.test(h) },
+  { key: "in_words", test: (h) => /^inwords$/.test(h) },
   { key: "gross", test: (h) => /^(gross|grosssalary|grosssalaryrate|grosspay|monthlygross|fixedgross)$/.test(h) },
   { key: "net", test: (h) => /(netpayable|netsalary|netpayment|netpay|netamount|amountpayable|takehome)/.test(h) || h === "net" },
   { key: "deductions", test: (h) => /^(totaldeductions?|deductions?|lessdeductions?|recovery)$/.test(h) },
@@ -201,7 +224,8 @@ const REGISTER_KEYS: (keyof SheetRow)[] = [
   "attendance", "paid_days", "gross", "basic_da", "hra", "fixed_allowance", "conveyance",
   "medical", "site_allowance", "pf", "pt", "other_ded", "loan", "advance", "tds", "arrears",
   "leave_ob", "leave_added", "leave_used", "leave_encashed", "leave_cb", "compoff_days",
-  "loan_ob", "loan_added", "loan_cb",
+  "loan_ob", "loan_added", "loan_cb", "loan_taken",
+  "compoff_amt", "encash_amt", "lunch", "esi", "late_ded", "bonus", "per_day", "in_words",
 ];
 
 /** OT, as the company books it: Site Allowance + HRA of the labour types. */

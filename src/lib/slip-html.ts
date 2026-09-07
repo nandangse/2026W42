@@ -55,13 +55,17 @@ ${opts.draft ? '<div class="draft"><span>DRAFT SALARY SLIP</span></div>' : ""}
 <tbody>
 ${money("Basic And DA", s.basic_rate, s.basic, "Provident Fund", s.pf)}
 ${money("HRA", null, s.hra, "Professional Tax", s.pt)}
-${money("Conveyance", s.conv_rate, s.conveyance, "ESIC", s.esi)}
-${money("Fixed Allowance", s.fixed_rate, s.fixed, "Advance", s.advance)}
-${money("Medical Allowance", s.med_rate, s.medical, "Loan EMI", s.loan_ded)}
-${money("Leave Encashment", null, s.leave_encash, "TDS Deduction", s.tds)}
-${money("Site Allowance", null, s.site, "Other Deductions", s.other_ded)}
-${money("Interim Bonus", null, s.bonus, "Lunch", s.lunch)}
-${money("Arrears", null, s.arrears, "", null)}
+${money("Conveyance", s.conv_rate, s.conveyance, "Advance", s.advance)}
+${money("Fixed Allowance", s.fixed_rate, s.fixed, "Loan EMI", s.loan_ded)}
+${money("Medical Allowance", s.med_rate, s.medical, "TDS Deduction", s.tds)}
+${money("Leave Encashment", null, s.leave_encash, "Other Deductions", s.other_ded)}
+${money("Site Allowance", null, s.site, "Lunch", s.lunch)}
+${money("Interim Bonus", null, s.bonus, "", null)}
+${/* ESIC ONLY WHEN THERE IS ESIC (Dr Raghu, 7 Sep 2026: "ESIC you dont
+      need to show as it will be 0 for all"). This renderer prints every row
+      it is given — unlike the on-screen one, which drops the nil ones — so
+      the label itself has to go. Blank label ⇒ money() prints no figure. */""}
+${money("Arrears", null, s.arrears, s.esi ? "ESIC" : "", s.esi)}
 <tr class="hd"><td>Total Earned</td><td></td><td class="r">${inr(s.total_earned)}</td><td>Total Deduction</td><td class="r">${inr(s.total_ded)}</td></tr>
 </tbody></table>
 
@@ -75,7 +79,7 @@ ${money("Arrears", null, s.arrears, "", null)}
 
 <table style="margin-top:3px"><tbody><tr class="net">
 <td style="width:30%;font-weight:800;font-size:11px;padding:3px 6px">NET PAID ₹${inr(s.net)}</td>
-<td style="font-size:7.6px"><b>Rupees ${esc(s.in_words || wordsOf(s.net))} only</b></td>
+<td style="font-size:7.6px"><b>${esc(s.in_words && /rupees/i.test(s.in_words) ? s.in_words : `Rupees ${s.in_words || wordsOf(s.net)} only`)}</b></td>
 </tr></tbody></table>
 
 <div style="display:flex;gap:8px;align-items:flex-end;margin-top:3px">

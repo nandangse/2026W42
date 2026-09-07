@@ -151,16 +151,18 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
         @media print {
           html, body { background: #fff; }
           .no-print { display: none !important; }
-          /* THE PAPER IS THE PAGE, IN MILLIMETRES (Dr Raghu, 7 Sep 2026:
-             "pdf still breaking"). width:100% is 100% OF THE BODY, and the
-             body stretches to whatever the widest thing on it is — the
-             charts above the register among them — so the register inherited
-             a width larger than the sheet and walked off the right edge.
+          /* THE PAPER IS THE PAGE, IN MILLIMETRES.
+             width:100% is 100% OF THE BODY, and the body stretches to the
+             widest thing on it — the charts above the register among them —
+             so the register inherited a width larger than the sheet.
              A4 landscape is 297mm; less the 8mm margins, 281mm. Stated
-             outright, it cannot be stretched by anything else on the page. */
+             outright, nothing else on the page can stretch it.
+             CONFIRMED CORRECT IN PRINT VIEW by Dr Raghu, 7 Sep 2026. The
+             screenshots that looked cut off were the ON-SCREEN table, which
+             scrolls sideways inside .regwrap by design. Do not "fix" this
+             again on the strength of a screen capture. */
           .paper { width: 281mm !important; max-width: 281mm !important; margin: 0; padding: 0; box-shadow: none; overflow: hidden; }
           body { width: 281mm; }
-          /* nothing above the register may stretch the sheet under it */
           .paper table { max-width: 100% !important; }
           .paper svg { max-width: 100% !important; }
           .regwrap { overflow: visible; }

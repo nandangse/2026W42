@@ -215,6 +215,16 @@ export function pickSamples(slips: Slip[]): { label: string; slip: Slip | null }
   };
   pick("With a loan deduction", (s) => (s.loan_ded || 0) > 0, (s) => s.loan_ded || 0);
   pick("With an advance deducted", (s) => (s.advance || 0) > 0, (s) => s.advance || 0);
+  /**
+   * Comp off EARNED and comp off PAID are two different things, and the slip
+   * shows them in two places — the leave line and the encashment row (Dr
+   * Raghu, 7 Sep 2026: "also show one which is having a comp off and paid
+   * also"). One sample must carry both, or neither line is ever checked.
+   */
+  pick("Comp off — earned and paid",
+    (s) => (s.compoff_days || 0) > 0 && ((s.compoff_amt || 0) > 0 || (s.leave_encash || 0) > 0),
+    (s) => s.compoff_amt || s.leave_encash || 0);
+  pick("Comp off earned", (s) => (s.compoff_days || 0) > 0, (s) => s.compoff_days || 0);
   pick("Labour - Contract", (s) => /labour\s*-\s*contract/i.test(String(s.category || "")), (s) => s.gross_rate || 0);
   pick("Contractor", (s) => /^contractor$/i.test(String(s.category || "").trim()), (s) => s.gross_rate || 0);
   return out;

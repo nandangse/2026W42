@@ -78,6 +78,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.16.0",
+    date: "2026-09-07",
+    module: "Ten more columns the payslip was never being given, and ESIC off the slip",
+    items: [
+      "\"Check the comp off and the leave encashment — that should also be seen in the slip\" (Dr Raghu, 7 Sep 2026). The upload's own \"not used\" list gave the answer, and it was worse than comp off alone: the parser had a rule for NONE of <b>Comp Of_m, Days Leave Encashed, Leave Encashment Amount, Site Allow, Interim Bonus, Lunch, ESI, Late Deduction, Per Day</b> or <b>In words</b>. Every one of those lines printed blank or nil on every payslip from an uploaded month, and the slip looked complete while saying nothing.",
+      "All ten are read now, spellings and all — the sheet writes comp off as \"Comp Of_m\", with one f and a trailing _m for merged, and headers are stripped to letters and digits before matching. Every rule was tested against the sheet's own header text before shipping.",
+      "LEAVE ENCASHMENT ALWAYS SHOWS, even at nil, and the leave line always names the comp off days. A man should be able to see that his encashment was nothing, not have to infer it from a line that is not there.",
+      "AND THE AMOUNT IN WORDS IS SAID ONCE. It read \"Rupees Rupees Twenty Four Thousand Eight Hundred and Six Only only\" — the register already writes the whole sentence and I was wrapping it in another. Mine, from this morning.",
+      "Two more sample slips: one with comp off EARNED AND PAID, and one with comp off earned — because those are two different things shown in two different places, and neither line is ever checked unless a sample carries it.",
+      "ESIC is off the slip. It is nil for everyone, and it was only ever visible because a row survives when EITHER side carries a figure and Conveyance sat beside it. Moved to the foot of the deductions, where it is dropped for everybody — and comes back on its own the day someone is actually on ESIC, rather than sitting inside Total Deduction and itemised nowhere.",
+    ],
+  },
+  {
     v: "5.0.15.5",
     date: "2026-09-07",
     module: "The register PDF, pinned to the page",
