@@ -11,7 +11,7 @@
  */
 import { useMemo } from "react";
 import { LOGO } from "@/lib/logo";
-import { MONTHS, REGISTER_COLUMNS, otOf, type SheetRow } from "@/lib/salary-sheet";
+import { LEDGER_COLUMNS, MONTHS, REGISTER_COLUMNS, otOf, type SheetRow } from "@/lib/salary-sheet";
 import { inr } from "@/lib/fmt";
 
 interface Sheet {
@@ -328,6 +328,47 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
               })}
             </tr>
           </tfoot>
+        </table>
+        </div>
+
+        {/* THE LEAVE AND LOAN STATEMENT, its own sheet (Dr Raghu, 7 Sep 2026:
+            "pdf is breaking"). Nine more columns on the money register made
+            twenty-nine across A4 landscape, which no size can carry. These
+            are a statement, not the month's arithmetic, so they follow with
+            the ID and name repeated. */}
+        <div className="pagebreak" />
+        <div className="regwrap" style={{ marginTop: 10 }}>
+        <table className="reg genie-table" style={{ fontSize: 8.6 }}>
+          <thead>
+            <tr>
+              <th colSpan={2 + LEDGER_COLUMNS.length} style={{ background: "var(--navy)", color: "#fff", textAlign: "left", padding: "4px 6px", fontSize: 10 }}>
+                LEAVE &amp; LOAN STATEMENT — {title.toUpperCase()} · Nandan GSE Private Limited · {rows.length} employees
+              </th>
+            </tr>
+            <tr style={{ background: "#F4F2EC" }}>
+              <th style={{ textAlign: "left", width: "6%" }}>Emp ID</th>
+              <th style={{ textAlign: "left", width: "20%", minWidth: 110 }}>Name</th>
+              {LEDGER_COLUMNS.map((c) => (
+                <th key={c.key as string} style={{ textAlign: "right", fontSize: 8, whiteSpace: "nowrap" }}>{c.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} style={{ background: i % 2 ? "#FBFAF6" : "#fff" }}>
+                <td style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{r.employee_id || "—"}</td>
+                <td className="nm">{r.name || "—"}</td>
+                {LEDGER_COLUMNS.map((c) => {
+                  const v = r[c.key];
+                  return (
+                    <td key={c.key as string} style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: v == null ? "#C9C6BD" : undefined, fontWeight: String(c.key).endsWith("_cb") ? 700 : 400 }}>
+                      {v == null ? "—" : typeof v === "string" ? v : inr(v as number)}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
         </table>
         </div>
 

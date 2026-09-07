@@ -89,8 +89,19 @@ export const REGISTER_COLUMNS: { key: keyof SheetRow; label: string }[] = [
   { key: "deductions", label: "Total Ded." },
   { key: "arrears", label: "Arrears" },
   { key: "net", label: "Net Pay" },
-  /* the ledgers, at the far right where they read as a statement rather than
-     as part of the month's arithmetic (Dr Raghu, 7 Sep 2026) */
+];
+
+/**
+ * THE LEDGERS PRINT AS THEIR OWN SHEET (Dr Raghu, 7 Sep 2026: "pdf is
+ * breaking").
+ *
+ * Adding these nine to the money register took it from twenty columns to
+ * twenty-nine, and twenty-nine do not fit across A4 landscape at any size a
+ * person can read. They are a statement rather than part of the month's
+ * arithmetic, so they follow on their own page with the ID and name repeated
+ * — which is how a leave and loan statement is read anyway.
+ */
+export const LEDGER_COLUMNS: { key: keyof SheetRow; label: string }[] = [
   { key: "leave_ob", label: "Leave OB" },
   { key: "leave_added", label: "Leave Added" },
   { key: "compoff_days", label: "Comp Off" },
@@ -99,6 +110,7 @@ export const REGISTER_COLUMNS: { key: keyof SheetRow; label: string }[] = [
   { key: "leave_cb", label: "Leave CB" },
   { key: "loan_ob", label: "Loan OB" },
   { key: "loan_added", label: "Loan Added" },
+  { key: "loan", label: "Loan Deducted" },
   { key: "loan_cb", label: "Loan CB" },
 ];
 

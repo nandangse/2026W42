@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.15.1",
+    date: "2026-09-07",
+    module: "The register PDF, unbroken again",
+    items: [
+      "\"PDF is breaking\" (Dr Raghu, 7 Sep 2026) — and it was my doing, from an hour before. Putting the leave and loan ledgers onto the money register took it from twenty columns to twenty-nine, and twenty-nine do not cross an A4 landscape page at any size a person can read.",
+      "So the ledgers print as their OWN sheet, on the page after, with the ID and name repeated: LEAVE &amp; LOAN STATEMENT. Which is how such a thing is read anyway — it is a statement of balances, not part of the month's arithmetic. The money register is back to twenty columns and fits as it did.",
+      "Both are still one table each on screen, scrolling sideways if they must; nothing was taken away, it simply stopped being crammed onto one sheet.",
+    ],
+  },
+  {
     v: "5.0.15.0",
     date: "2026-09-07",
     module: "A rate list can be frozen, and signed",
