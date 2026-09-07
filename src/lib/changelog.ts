@@ -78,6 +78,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.5.3",
+    date: "2026-09-07",
+    module: "The growth note lands in the Note from Raghu",
+    items: [
+      "\"it will also come here!\" (Dr Raghu, 7 Sep 2026, on the Finalised discussion). The Note from Raghu is what rides into the IDP letter, and the growth note is that note — so an empty box now fills itself from the growth note the moment there is one, and a ↧ button brings it in again after an edit. Nothing is overwritten: a note already typed stays as it is until the button is pressed.",
+    ],
+  },
+  {
     v: "5.0.5.2",
     date: "2026-09-07",
     module: "The growth note comes before the brief, and can be written for everyone at once",

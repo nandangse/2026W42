@@ -386,6 +386,16 @@ function DiscussionTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolea
   });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  /**
+   * The growth note travels here (Dr Raghu, 7 Sep 2026: "it will also come
+   * here!"). The Note from Raghu is what rides into the IDP letter, and the
+   * growth note IS that note — so an empty box fills itself from it, and the
+   * button brings it in again after an edit.
+   */
+  const growth = (d.appraisal as Record<string, unknown> | null)?.growth_note ? String((d.appraisal as Record<string, unknown>).growth_note) : "";
+  useEffect(() => {
+    if (growth && !String(saved.note_raghu || "").trim()) setF((x) => (x.note_raghu.trim() ? x : { ...x, note_raghu: growth }));
+  }, [growth, saved.note_raghu]);
   const save = async () => {
     setBusy(true); setMsg("");
     try {
@@ -415,9 +425,21 @@ function DiscussionTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolea
         <label className="text-xs font-bold" style={{ color: C.dim, gridColumn: "1 / -1" }}>MINUTES OF THE MEETING
           <textarea disabled={ro} value={f.mom} onChange={(e) => setF({ ...f, mom: e.target.value })} rows={5}
             className="w-full mt-1 px-2 py-1.5 rounded border font-normal" style={{ borderColor: C.line, lineHeight: 1.5 }} /></label>
-        <label className="text-xs font-bold" style={{ color: "#7C3AED", gridColumn: "1 / -1" }}>NOTE FROM RAGHU — goes into the IDP letter
-          <textarea disabled={ro} value={f.note_raghu} onChange={(e) => setF({ ...f, note_raghu: e.target.value })} rows={4}
-            className="w-full mt-1 px-2 py-1.5 rounded border font-normal" style={{ borderColor: "#D9CBF5", lineHeight: 1.5 }} /></label>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold" style={{ color: "#7C3AED" }}>NOTE FROM RAGHU — goes into the IDP letter</span>
+            {!ro && growth && (
+              <button onClick={() => setF((x) => ({ ...x, note_raghu: growth }))} className="text-xs font-bold rounded px-2 py-0.5"
+                style={{ background: "#F3EEFF", color: "#7C3AED", border: "1px solid #D9CBF5" }}
+                title="Put the growth note in here — it is the same note, in your voice, that the person is handed">
+                ↧ bring in the growth note
+              </button>
+            )}
+            {!ro && !growth && <span className="text-xs" style={{ color: C.faint }}>— write the growth note on its tab and it lands here on its own</span>}
+          </div>
+          <textarea disabled={ro} value={f.note_raghu} onChange={(e) => setF({ ...f, note_raghu: e.target.value })} rows={6}
+            className="w-full mt-1 px-2 py-1.5 rounded border font-normal text-sm" style={{ borderColor: "#D9CBF5", lineHeight: 1.6 }} />
+        </div>
       </div>
       {saved.at && <div className="text-xs mt-2" style={{ color: C.faint }}>last saved by {saved.by} · {new Date(String(saved.at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} IST</div>}
       {msg && <div className="text-xs font-bold mt-2" style={{ color: /✓/.test(msg) ? C.green : "var(--red)" }}>{msg}</div>}
