@@ -78,6 +78,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.4.2",
+    date: "2026-09-07",
+    module: "HRMS — the Appraisal Table filters by reporting manager",
+    items: [
+      "\"in this add filter for reporting manager. multiple tickbox\" (Dr Raghu, 7 Sep 2026). A Reporting manager button sits between the department and the age filters: it opens a list of every manager on the roll with how many report to each, a box to find one by name, and all / none. Tick as many as you like and the table keeps only their people; the count, the totals and the PDF all follow, and the PDF's header says whose people it is. People with no manager named are their own line, so the gaps are easy to find. The manager is read from the HRMS record and from any edit made to it.",
+    ],
+  },
+  {
     v: "5.0.4.1",
     date: "2026-09-07",
     module: "A dead landing link answers properly",

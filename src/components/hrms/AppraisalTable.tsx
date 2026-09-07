@@ -15,7 +15,7 @@ import { Pane } from "./Pane";
 import { C } from "./RecordFields";
 
 interface Row {
-  id: string; name: string; department: string | null; designation: string | null; type: string | null;
+  id: string; name: string; department: string | null; designation: string | null; type: string | null; manager: string | null;
   age: number | null; exp: number | null;
   prevGross: number | null; newGross: number | null; inc: number | null; incPct: number | null;
   stage: string;
@@ -55,6 +55,10 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
    * between 40 and 60" -- and a fixed set of bands would answer only the ones
    * somebody guessed in advance.
    */
+  // Dr Raghu, 7 Sep 2026: "add filter for reporting manager. multiple tickbox".
+  const [mgrs, setMgrs] = useState<Set<string>>(new Set());
+  const [mgrOpen, setMgrOpen] = useState(false);
+  const [mgrQ, setMgrQ] = useState("");
   const [minPay, setMinPay] = useState("");
   const [maxPay, setMaxPay] = useState("");
 
@@ -65,6 +69,12 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
 
   const types = useMemo(() => [...new Set((rows || []).map((r) => r.type).filter(Boolean))].sort() as string[], [rows]);
   const depts = useMemo(() => [...new Set((rows || []).map((r) => r.department).filter(Boolean))].sort() as string[], [rows]);
+  /** Every reporting manager on the roll, with how many report to them; nobody's manager is its own line. */
+  const managers = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const r of rows || []) { const k = (r.manager || "").trim() || "— none named —"; n.set(k, (n.get(k) || 0) + 1); }
+    return [...n.entries()].sort((a, b) => (a[0] === "— none named —" ? 1 : b[0] === "— none named —" ? -1 : b[1] - a[1] || a[0].localeCompare(b[0])));
+  }, [rows]);
 
   const shown = useMemo(() => {
     const n = q.trim().toLowerCase();
@@ -73,6 +83,7 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
     return (rows || []).filter((r) => {
       if (type && r.type !== type) return false;
       if (dept && r.department !== dept) return false;
+      if (mgrs.size && !mgrs.has((r.manager || "").trim() || "— none named —")) return false;
       if (ageF && (r.age == null || !ageF(r.age))) return false;
       if (expF && (r.exp == null || !expF(r.exp))) return false;
       /**
@@ -94,7 +105,7 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
       if (n && !`${r.id} ${r.name} ${r.designation || ""}`.toLowerCase().includes(n)) return false;
       return true;
     });
-  }, [rows, q, type, dept, age, exp, minPay, maxPay]);
+  }, [rows, q, type, dept, mgrs, age, exp, minPay, maxPay]);
 
   /**
    * THE APPRAISAL TABLE ON PAPER.
@@ -116,6 +127,7 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
     const on: string[] = [];
     if (type) on.push(type);
     if (dept) on.push(dept);
+    if (mgrs.size) on.push(`under ${[...mgrs].join(", ")}`);
     if (age) on.push(`age ${age}`);
     if (exp) on.push(`experience ${exp}`);
     if (minPay || maxPay) on.push(`gross ${minPay || "any"}–${maxPay || "any"}`);
@@ -233,6 +245,36 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
           <option value="">All departments</option>
           {depts.map((t) => (<option key={t} value={t}>{t}</option>))}
         </select>
+        {/* Reporting manager — several at once (Dr Raghu, 7 Sep 2026) */}
+        <span className="relative">
+          <button onClick={() => setMgrOpen((o) => !o)} className="text-xs rounded px-2 py-1.5 bg-white font-semibold"
+            style={{ border: `1px solid ${mgrs.size ? C.ink : C.line}`, color: mgrs.size ? C.ink : undefined, whiteSpace: "nowrap" }}
+            title="Tick one manager or several; the table keeps only their people">
+            {mgrs.size ? `${mgrs.size} manager${mgrs.size === 1 ? "" : "s"}` : "Reporting manager"} ▾
+          </button>
+          {mgrOpen && (
+            <>
+              <span className="fixed inset-0" style={{ zIndex: 58 }} onClick={() => setMgrOpen(false)} />
+              <div className="absolute rounded-lg border bg-white" style={{ top: "calc(100% + 4px)", left: 0, width: 290, maxHeight: 340, overflowY: "auto", borderColor: C.line, boxShadow: "0 12px 30px rgba(0,0,0,.2)", zIndex: 59 }}>
+                <div className="p-2" style={{ borderBottom: `1px solid ${C.line}`, position: "sticky", top: 0, background: "#fff" }}>
+                  <input value={mgrQ} onChange={(e) => setMgrQ(e.target.value)} placeholder="find a manager…" className="text-xs rounded px-2 py-1 w-full" style={{ border: `1px solid ${C.line}` }} />
+                  <div className="flex gap-2 mt-1 text-xs">
+                    <button onClick={() => setMgrs(new Set(managers.map(([m]) => m)))} className="font-semibold" style={{ color: "var(--blue)" }}>all</button>
+                    <button onClick={() => setMgrs(new Set())} className="font-semibold" style={{ color: C.faint }}>none</button>
+                    <span className="ml-auto" style={{ color: C.faint }}>{managers.length} in all</span>
+                  </div>
+                </div>
+                {managers.filter(([m]) => !mgrQ.trim() || m.toLowerCase().includes(mgrQ.trim().toLowerCase())).map(([m, n]) => (
+                  <label key={m} className="flex items-center gap-2 px-2 py-1 text-xs" style={{ cursor: "pointer" }}>
+                    <input type="checkbox" checked={mgrs.has(m)} onChange={(e) => setMgrs((s2) => { const x = new Set(s2); if (e.target.checked) x.add(m); else x.delete(m); return x; })} />
+                    <span className="flex-1 truncate" style={{ color: m.startsWith("—") ? C.faint : undefined }}>{m}</span>
+                    <span className="tnum" style={{ color: C.faint }}>{n}</span>
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+        </span>
         <select value={age} onChange={(e) => setAge(e.target.value)} className="text-xs rounded px-2 py-1.5 bg-white" style={{ border: `1px solid ${C.line}` }}>
           <option value="">Any age</option>
           {AGE_BANDS.map(([l]) => (<option key={l} value={l}>{l}</option>))}

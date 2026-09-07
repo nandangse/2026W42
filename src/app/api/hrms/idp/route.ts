@@ -53,7 +53,7 @@ export async function GET(req: Request) {
       const T = await hrmsTables(admin);
       const [{ data: emps }, { data: eds }, { data: idps }, { data: revs }] = await Promise.all([
         admin.from(T.employees).select("id, name, department, designation, dob, doj, active, extra"),
-        admin.from(T.edits).select("employee_id, field, value").in("field", ["type", "status", "department", "designation", "basic_da", "hra", "fixed_allowance", "conveyance", "medical_allowance"]),
+        admin.from(T.edits).select("employee_id, field, value").in("field", ["type", "status", "department", "designation", "reporting_manager", "basic_da", "hra", "fixed_allowance", "conveyance", "medical_allowance"]),
         admin.from("hrms_idp").select("id, employee_id, submitted_at, ratings, ask:answers->>ask_gross").eq("cycle", CYCLE_TBL),
         admin.from("hrms_idp_review").select("idp_id, submitted_at, ratings, gross_proposed"),
       ]);
@@ -138,6 +138,8 @@ export async function GET(req: Request) {
             id, name: String(e.name || id),
             department: pick("department", "Department", e.department) as string | null,
             designation: pick("designation", "Designation", e.designation) as string | null,
+            // who they report to — the Appraisal Table filters by it (7 Sep 2026)
+            manager: pick("reporting_manager", "Reporting Manager") as string | null,
             type,
             age: years(e.dob), exp: years(e.doj),
             prevGross: prev, newGross,
