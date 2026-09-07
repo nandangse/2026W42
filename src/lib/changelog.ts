@@ -78,6 +78,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.17.4",
+    date: "2026-09-07",
+    module: "The IDP salary card says when it starts",
+    items: [
+      "\"IDP valid from 1st August 2026\" now stands under the salary table on the IDP Results tab (Dr Raghu, 7 Sep 2026). The figures there are the new ones, and a man reading them has to know from which month they are his — otherwise he checks them against his July slip and concludes something is wrong.",
+    ],
+  },
+  {
     v: "5.0.17.3",
     date: "2026-09-07",
     module: "The slip's earnings now add up to the slip's own total",

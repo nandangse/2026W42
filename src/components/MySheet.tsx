@@ -238,6 +238,13 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
                     ))}
                   </tbody>
                 </table>
+                {/* WHEN IT STARTS (Dr Raghu, 7 Sep 2026). The figures are the
+                    new ones and a man reading them needs to know from which
+                    month they are his — otherwise he checks them against
+                    July's slip and thinks something is wrong. */}
+                <div className="text-sm mt-2" style={{ fontWeight: 700 }}>
+                  IDP valid from 1st August 2026.
+                </div>
               </Card>
             )}
 
