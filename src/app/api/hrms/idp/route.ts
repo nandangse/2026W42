@@ -354,8 +354,24 @@ export async function GET(req: Request) {
         const earlier = (structs || []).find((x) => String(x.status) !== "Live");
         if (earlier) {
           const { data: rate } = await admin.from("hrms_salary_rate")
-            .select("gross").eq("structure_id", earlier.id).eq("employee_id", person).maybeSingle();
-          if (rate?.gross != null) prevFromList = Number(rate.gross);
+            .select("gross, basic_da, hra").eq("structure_id", earlier.id).eq("employee_id", person).maybeSingle();
+          /**
+           * A LINE WITH NO BASIC IS A BROKEN LINE, not a small salary
+           * (Dr Raghu, 7 Sep 2026: "Ajay was 130 ... where have u seen 52?").
+           *
+           * His 2025-06 row reads gross 52,000 with basic_da 0 — and an HRA
+           * of 15,600, which for Staff is twenty per cent of a basic of
+           * 78,000. Add that basic back and the row comes to 1,30,000, which
+           * is what he was on and what August paid him. The basic column was
+           * lost and the gross recomputed from what was left.
+           *
+           * One line in two hundred, and it would have shown a man a
+           * Rs 78,000 rise he never had. So a line whose basic is zero while
+           * its HRA is not is refused, and the figure the appraisal recorded
+           * answers instead.
+           */
+          const broken = rate != null && !Number(rate.basic_da) && Number(rate.hra) > 0;
+          if (rate?.gross != null && !broken) prevFromList = Number(rate.gross);
         }
       } catch (e) { swallow("hrms/idp prev list", e); }
 

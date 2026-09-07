@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.14.4",
+    date: "2026-09-07",
+    module: "A rate line with no basic is a broken line",
+    items: [
+      "\"Ajay was 130 ... where have u seen 52?\" (Dr Raghu, 7 Sep 2026). He was right, and the 52,000 came from his line in the previous rate list — which turned out to be corrupt, and the line says so itself.",
+      "It read gross 52,000 with <b>basic_da 0</b> and an HRA of 15,600. HRA is twenty per cent of basic for Staff, so an HRA of 15,600 means a basic of 78,000. Add it back: 78,000 + 15,600 + 32,600 + 2,550 + 1,250 = <b>1,30,000</b> — what he was on, and what August actually paid him. The basic column had been lost and the gross recomputed from what was left.",
+      "One line in two hundred, and it would have shown a man a Rs 78,000 rise he never had. The line is repaired, and a guard now REFUSES any previous-list line whose basic is zero while its HRA is not — arithmetically impossible for Staff — so the figure the appraisal recorded answers instead. A corrupt line can no longer overrule a real one.",
+    ],
+  },
+  {
     v: "5.0.14.3",
     date: "2026-09-07",
     module: "Previous Gross comes from the previous period's rate list",
