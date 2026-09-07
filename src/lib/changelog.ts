@@ -78,6 +78,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.5.4",
+    date: "2026-09-07",
+    module: "The Appraisal Table's money columns come back",
+    items: [
+      "\"what happened to this???\" (Dr Raghu, 7 Sep 2026). Mine, and plainly: 5.0.5.2 asked the appraisal table for the growth-note column, migration 0148 had not been run — I had not even sent it — and a query that asks for a column which is not there fails whole. So New Gross, Increase, Increase % and the Final count all read empty on the live table. Nothing was lost: the twenty approved appraisals and the twenty-one new grosses were sitting untouched. The query now asks for the column and falls back without it, so the table stands whether or not the migration has run. 0148 is sent.",
+    ],
+  },
+  {
     v: "5.0.5.3",
     date: "2026-09-07",
     module: "The growth note lands in the Note from Raghu",

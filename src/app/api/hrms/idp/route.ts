@@ -59,8 +59,18 @@ export async function GET(req: Request) {
       ]);
       let appr: { employee_id: string; new_gross: number | null; prev_gross: number | null; approved_at?: string | null; growth_note?: string | null }[] = [];
       try {
-        const { data: ap } = await admin.from("hrms_appraisal").select("employee_id, new_gross, prev_gross, approved_at, growth_note").eq("cycle", CYCLE_TBL);
-        appr = (ap || []) as typeof appr;
+        /**
+         * growth_note arrives with migration 0148. Asking for a column that
+         * is not there fails the WHOLE query, which on 7 Sep 2026 emptied
+         * New Gross, Increase and the Final count on the live table until
+         * the migration ran. So: ask for it, and fall back without it.
+         */
+        type ApRows = { data: Record<string, unknown>[] | null; error: { message: string } | null };
+        const BASE = "employee_id, new_gross, prev_gross, approved_at";
+        let q = (await admin.from("hrms_appraisal").select(BASE + ", growth_note").eq("cycle", CYCLE_TBL)) as unknown as ApRows;
+        if (q.error) q = (await admin.from("hrms_appraisal").select(BASE).eq("cycle", CYCLE_TBL)) as unknown as ApRows;
+        if (q.error) throw new Error(q.error.message);
+        appr = (q.data || []) as unknown as typeof appr;
       } catch (e) { swallow("hrms/idp", e); /* pre-0061 */ }
 
       const ovBy = new Map<string, Map<string, string | null>>();
