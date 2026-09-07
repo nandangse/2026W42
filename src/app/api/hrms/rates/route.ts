@@ -155,9 +155,45 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    /**
+     * FREEZING A RATE LIST, SIGNED (Dr Raghu, 7 Sep 2026: "after uploading,
+     * give a facility to freeze it by Raghu. Let me sign my name on it").
+     *
+     * A rate list is what everybody is paid from, and until now anybody with
+     * HRMS could edit any cell of it for ever. Freezing closes it: the cells
+     * stop taking edits and the sheet carries the name he typed, the account
+     * that typed it and the moment. His alone, like making one Live.
+     *
+     * The signature is kept as he wrote it. A name a man typed himself is a
+     * different thing from a tick some code set true.
+     */
+    if (action === "freeze" || action === "unfreeze") {
+      if (!owner) throw new HttpError(403, `Freezing a rate list is ${RAGHU_EMAIL}'s.`);
+      const sid = String(body.structure_id || "");
+      if (!sid) throw new HttpError(400, "Which list?");
+      const on = action === "freeze";
+      const signed = String(body.signed_as || "").trim();
+      if (on && signed.length < 3) throw new HttpError(400, "Please sign your name on it.");
+      const patch = on
+        ? { frozen_at: now, frozen_by: stamp, signed_as: signed.slice(0, 120), updated_at: now }
+        : { frozen_at: null, frozen_by: null, signed_as: null, updated_at: now };
+      const { error } = await admin.from("hrms_salary_structure").update(patch).eq("id", sid);
+      if (error) {
+        if (/frozen_at|signed_as|schema cache/i.test(error.message))
+          throw new HttpError(503, "Run migration 0155 first — a signature has nowhere to sit yet.");
+        throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true, frozen: on, signed_as: on ? signed : null });
+    }
+
     if (action === "save_rate") {
       const sid = String(body.structure_id || ""), eid = String(body.employee_id || "").trim();
       if (!sid || !/^\d{4}$/.test(eid)) throw new HttpError(400, "Structure and a four-digit Employee ID, please.");
+      // a signed list is closed — refused here, not merely hidden on the screen
+      try {
+        const { data: st } = await admin.from("hrms_salary_structure").select("frozen_at, title").eq("id", sid).maybeSingle();
+        if (st?.frozen_at) throw new HttpError(409, `${st.title} is frozen and signed. Take the freeze off before changing a rate.`);
+      } catch (e) { if (e instanceof HttpError) throw e; swallow("hrms/rates frozen", e); }
       const r = { basic_da: num(body.basic_da), hra: num(body.hra), fixed_allowance: num(body.fixed_allowance), conveyance: num(body.conveyance), medical_allowance: num(body.medical_allowance) };
       const row = { structure_id: sid, employee_id: eid, name: body.name ?? null, type: body.type ?? null, department: body.department ?? null, designation: body.designation ?? null, reporting_manager: body.reporting_manager ?? null, ...r, ...derive(r, (body.type as string) ?? null), note: body.note ?? null, updated_by: stamp, updated_at: now };
       const { error } = await admin.from("hrms_salary_rate").upsert(row, { onConflict: "structure_id,employee_id" });

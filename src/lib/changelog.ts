@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.15.0",
+    date: "2026-09-07",
+    module: "A rate list can be frozen, and signed",
+    items: [
+      "\"After uploading, give a facility to freeze it by Raghu. Let me sign my name on it.\" (Dr Raghu, 7 Sep 2026). A rate list is what everybody is paid from, and until today anybody with HRMS could edit any cell of it, for ever, with nothing to say the sheet had ever been settled.",
+      "<b>🔒 Freeze &amp; sign</b> asks him to type his name, then closes the list: the cells stop taking edits and the sheet carries the name he typed, the account that typed it and the moment. His alone, like making a list Live. The refusal is on the server, not merely hidden on the screen — a frozen list answers \"take the freeze off before changing a rate\" whatever sends the change.",
+      "The signature is kept AS HE WROTE IT, not as a tick. A name a man typed himself is a different thing from a boolean somebody's code set true, and on a document that decides what two hundred people are paid the difference is the whole point (migration 0155).",
+      "And the Salary Rate List's own heading was pale grey on white and read as nothing at all — \"the header is white font\". It has a solid ground now, the same one the attendance muster was given this morning.",
+    ],
+  },
+  {
     v: "5.0.14.5",
     date: "2026-09-07",
     module: "On Floor — the second card is WITH PEOPLE",

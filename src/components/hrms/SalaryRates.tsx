@@ -14,7 +14,9 @@ import { Pane } from "./Pane";
 import { C } from "./RecordFields";
 import { inr } from "@/lib/fmt";
 
-interface Structure { id: string; code: string; title: string; status: string; effective_from: string | null; note: string | null; created_by: string | null; created_at: string; updated_at: string; lines: number }
+interface Structure { id: string; code: string; title: string; status: string; effective_from: string | null; note: string | null; created_by: string | null; created_at: string; updated_at: string; lines: number;
+  /** Signed and closed — see the FREEZE button (Dr Raghu, 7 Sep 2026). */
+  frozen_at?: string | null; frozen_by?: string | null; signed_as?: string | null }
 interface Rate { id: string; employee_id: string; name: string | null; type: string | null; department: string | null; designation: string | null; reporting_manager: string | null; basic_da: number; hra: number; fixed_allowance: number; conveyance: number; medical_allowance: number; gross: number; per_day: number; note: string | null; updated_by: string | null; updated_at: string }
 
 
@@ -87,11 +89,31 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
         <>
           <div className="bg-white rounded-lg border px-3 py-2 mb-2 flex gap-3 items-center flex-wrap text-xs" style={{ borderColor: C.line }}>
             <span className="rounded px-2 py-0.5 font-bold" style={{ background: tone(s.status).bg, color: tone(s.status).c }}>{s.status}</span>
+            {s.frozen_at && (
+              <span className="rounded px-2 py-0.5 font-bold" style={{ background: "#E6F0FA", color: "var(--blue)" }}
+                title={`Frozen by ${s.frozen_by || "—"}`}>
+                🔒 Frozen · signed <i>{s.signed_as}</i> on {String(s.frozen_at).slice(8, 10)}-{String(s.frozen_at).slice(5, 7)}-{String(s.frozen_at).slice(0, 4)}
+              </span>
+            )}
             <span style={{ color: C.dim }}>from {s.effective_from || "—"} · {s.lines} lines · {Object.entries(byType).map(([k, v]) => `${v} ${k}`).join(", ")} · gross ₹{inr(totals.gross)}/month</span>
             {s.note && <span style={{ color: C.faint }}>· {s.note}</span>}
             <span style={{ flex: 1 }} />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="find a person" className="rounded px-2 py-1" style={{ border: `1px solid ${C.line}`, width: 180 }} />
-            {isOwner && s.status !== "Live" && <button onClick={() => { if (window.confirm(`Make ${s.title} the Live structure?\n\nThe Live one becomes Overwritten and the payroll run reads this one from now.`)) act({ action: "set_live", id: s.id }, `${s.title} is Live`); }} disabled={busy} className="font-bold rounded px-3 py-1.5" style={{ background: C.green, color: "#fff" }}>✓ Make Live</button>}
+            {isOwner && s.status !== "Live" && !s.frozen_at && <button onClick={() => { if (window.confirm(`Make ${s.title} the Live structure?\n\nThe Live one becomes Overwritten and the payroll run reads this one from now.`)) act({ action: "set_live", id: s.id }, `${s.title} is Live`); }} disabled={busy} className="font-bold rounded px-3 py-1.5" style={{ background: C.green, color: "#fff" }}>✓ Make Live</button>}
+            {/* FREEZE AND SIGN (Dr Raghu, 7 Sep 2026: "after uploading, give
+                a facility to freeze it by Raghu. Let me sign my name on it").
+                A signed list stops taking edits — refused on the server too,
+                not merely hidden here. */}
+            {isOwner && !s.frozen_at && (
+              <button onClick={() => {
+                const signed = window.prompt(`Freeze ${s.title} and sign it?\n\nNo cell can be edited afterwards until the freeze is taken off.\n\nType your name to sign:`, "Raghunandan Jagdish");
+                if (signed && signed.trim().length >= 3) act({ action: "freeze", structure_id: s.id, signed_as: signed.trim() }, `${s.title} frozen and signed`);
+              }} disabled={busy} className="font-bold rounded px-3 py-1.5" style={{ background: "var(--navy)", color: "#fff" }}>🔒 Freeze &amp; sign</button>
+            )}
+            {isOwner && s.frozen_at && (
+              <button onClick={() => { if (window.confirm(`Take the freeze off ${s.title}?\n\nThe signature is removed with it, and the cells open again.`)) act({ action: "unfreeze", structure_id: s.id }, "Freeze taken off"); }}
+                disabled={busy} className="font-semibold rounded px-2.5 py-1.5" style={{ border: `1px solid ${C.line}`, background: "#fff", color: C.dim }}>unfreeze</button>
+            )}
             <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="block" style={{ fontSize: 11, maxWidth: 200 }} />
             <button onClick={upload} disabled={busy} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }} title="Rows from a CSV or Excel, matched on Employee ID">⬆ Import</button>
             {isOwner && s.status !== "Live" && <button onClick={() => { if (window.confirm(`Remove ${s.title} and its ${s.lines} lines?`)) act({ action: "remove_structure", id: s.id }, "Removed", false); }} disabled={busy} className="font-semibold rounded px-2 py-1" style={{ background: "#FBEDEA", color: C.red }}>✕</button>}
@@ -99,9 +121,14 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
 
           <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflow: "auto", maxHeight: "calc(100vh - 290px)" }}>
             <table className="genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse", whiteSpace: "nowrap", minWidth: 1400 }}>
-              <thead><tr style={{ color: C.faint, fontSize: 10.5 }}>
+              {/* A SOLID GROUND UNDER THE HEADING (Dr Raghu, 7 Sep 2026: "on
+                  salary rate list the header is white font — change the
+                  background colour"). It was muted grey on white and read as
+                  nothing at all; the muster's header was given the same
+                  treatment this morning, so the two now match. */}
+              <thead><tr style={{ fontSize: 10.5 }}>
                 {["Employee ID", "Name", "Type", "Department", "Designation", "Reporting manager", "Basic and DA", "HRA", "Fixed Allowance", "Conveyance", "Medical Allowance", "Gross Salary", "Per Day Rate", ""].map((h, i) => (
-                  <th key={h + i} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#fff", zIndex: i < 2 ? 3 : 2, textAlign: i >= 6 && i <= 12 ? "right" : "left", ...(i === 0 ? { left: 0, minWidth: 80 } : i === 1 ? { left: 80, minWidth: 200 } : {}) }}>{h}</th>
+                  <th key={h + i} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#F4F2EC", color: C.ink, fontWeight: 700, borderBottom: `2px solid ${C.line}`, zIndex: i < 2 ? 3 : 2, textAlign: i >= 6 && i <= 12 ? "right" : "left", whiteSpace: "nowrap", ...(i === 0 ? { left: 0, minWidth: 80 } : i === 1 ? { left: 80, minWidth: 200 } : {}) }}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
