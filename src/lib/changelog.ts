@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.13.1",
+    date: "2026-09-07",
+    module: "\"Dear Dr\", and the IDP front page rebuilt",
+    items: [
+      "\"Why Dr?\" (Dr Raghu, 7 Sep 2026). Because the greeting took the first word of the name and the first word was his title. A man is not called by his honorific: Dr Raghunandan Jagdish is <b>Raghunandan</b>, Col K R Acharya is <b>Acharya</b> — initials are not a name either. One helper now decides what to call somebody, and the page, the sign-in and the password generator all ask it.",
+      "THE FRONT PAGE REBUILT — \"this IDP front page is not good\". The name is larger and the role reads under it in plain words. The three numbers he asked for lead with LAST NET PAY and say which month they are for, instead of a bare month tag.",
+      "And beneath them a COLUMN of wide buttons in his order — the payslip for the latest month by name, Learning Goals, Employee Handbook, HR Queries with its open count, then Apply for Leave, Advance, Loan, Leave Encashment and Uniform. Each is a thumb's width tall and the column runs the full width on a phone, because that is where this page is read: standing up, on the floor.",
+    ],
+  },
+  {
     v: "5.0.13.0",
     date: "2026-09-07",
     module: "Signing in to /idp with a personal e-mail",

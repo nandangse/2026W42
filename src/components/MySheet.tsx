@@ -19,6 +19,7 @@ import { LOGO } from "@/lib/logo";
 import { MONTHS } from "@/lib/salary-sheet";
 import { IDP_SECTIONS, IDP_RATINGS } from "@/lib/idp";
 import { inr } from "@/lib/fmt";
+import { firstName } from "@/lib/person-name";
 
 const C = { ink: "var(--ink)", dim: "var(--dim)", faint: "var(--muted)", line: "var(--line)", orange: "var(--accent)", green: "var(--green)", red: "var(--red)", navy: "var(--navy)", paper: "var(--paper)" };
 
@@ -61,6 +62,19 @@ const APPLY: [string, string][] = [["leave", "Apply for Leave"], ["advance", "Ap
 /** Flip to true the day the three registers are finished for the employee. */
 const REGISTERS_READY = false;
 
+/** A wide, thumb-sized button. The IDP page is read on a phone, standing up. */
+function BigButton({ label, onClick, tone }: { label: string; onClick: () => void; tone: "ink" | "orange" | "plain" }) {
+  const bg = tone === "orange" ? C.orange : tone === "ink" ? C.navy : "#fff";
+  const fg = tone === "plain" ? C.ink : "#fff";
+  return (
+    <button onClick={onClick} className="text-left font-bold rounded-lg"
+      style={{ background: bg, color: fg, border: tone === "plain" ? `1px solid ${C.line}` : "none",
+        padding: "13px 16px", fontSize: 15, width: "100%" }}>
+      {label}
+    </button>
+  );
+}
+
 function ComingSoon({ what, line }: { what: string; line: string }) {
   return (
     <div className="rounded-lg px-4 py-6 text-center" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
@@ -98,37 +112,58 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
 
       <div className="px-3 py-3" style={{ maxWidth: 760, margin: "0 auto" }}>
         {tab === "home" ? (
-          <div style={{ margin: "-12px -12px 0" }}>      {/* ── the head ── */}
-      <div className="px-4 pt-4 pb-3" style={{ background: "#fff", borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ margin: "-12px -12px 0" }}>
+      {/* ── THE HOME PAGE (Dr Raghu, 7 Sep 2026: "this IDP front page is not
+             good"). One card: who you are, the three numbers that matter,
+             what is waiting on you — and then a COLUMN of plain buttons down
+             the left, big enough for a thumb, in the order he gave them. On
+             a phone the column is the whole width. ── */}
+      <div className="px-4 pt-4 pb-4" style={{ background: "#fff", borderBottom: `1px solid ${C.line}` }}>
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {!embedded && <img src={LOGO} alt="Nandan GSE" style={{ height: 30 }} />}
           <span style={{ flex: 1 }} />
           <span className="text-xs" style={{ color: C.faint }}>{d.today}</span>
         </div>
-        <div className="font-bold mt-3" style={{ fontSize: 24, lineHeight: 1.2 }}>Dear {d.linked ? d.me.name.split(" ")[0] : name}</div>
-        <div className="text-sm mt-1" style={{ color: C.dim }}>Data of yours as per Genie.</div>
+        <div className="font-bold mt-3" style={{ fontSize: 26, lineHeight: 1.15 }}>
+          Dear {d.linked ? firstName(d.me.name) : firstName(name)}
+        </div>
         {!d.linked && <div className="rounded-lg p-3 mt-3 text-sm" style={{ background: "#FFF7E6", border: "1px solid #F5B32B", color: "#8A5B00" }}>Your login is not linked to your employee record yet. Ask HR to set your Genie user on your record, and everything below fills in.</div>}
+
         {d.linked && (
           <>
-            <div className="text-xs mt-2" style={{ color: C.faint }}>{d.me.id} · {d.me.designation || d.me.type}{d.me.department ? ` · ${d.me.department}` : ""}{d.me.doj ? ` · since ${when(d.me.doj)}` : ""}{d.me.manager ? ` · reports to ${d.me.manager}` : ""}</div>
-            <div className="grid gap-2 mt-3" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-              <Tile label="Leave balance" value={d1(latest?.slip?.leave_cb)} hint={latest ? `${MONTHS[latest.month - 1].slice(0, 3)} ${latest.year}` : "no month yet"} onClick={() => setTab("leave")} />
-              <Tile label="Loan balance" value={`₹${inr(latest?.slip?.loan_cb ?? 0)}`} hint={latest ? `${MONTHS[latest.month - 1].slice(0, 3)} ${latest.year}` : "—"} onClick={() => setTab("loan")} />
-              <Tile label="Last net pay" value={`₹${inr(latest?.net)}`} hint={latest ? `${MONTHS[latest.month - 1].slice(0, 3)} ${latest.year}` : "—"} onClick={() => setTab("slips")} />
+            <div className="text-sm mt-1" style={{ color: C.dim, lineHeight: 1.6 }}>
+              <b>{d.me.designation || d.me.type}</b>{d.me.department ? ` · ${d.me.department}` : ""}<br />
+              <span style={{ color: C.faint, fontSize: 12.5 }}>
+                {d.me.id}{d.me.doj ? ` · with Nandan since ${when(d.me.doj)}` : ""}{d.me.manager ? ` · reports to ${d.me.manager}` : ""}
+              </span>
             </div>
-            {pending.length > 0 && <div className="rounded-lg px-3 py-2 mt-3 text-xs" style={{ background: "#FFF7E6", border: "1px solid #F5B32B", color: "#8A5B00" }}><b>Waiting on you:</b> {pending.join(" · ")}</div>}
+
+            <div className="grid gap-2 mt-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+              <Tile label="Last net pay" value={`₹${inr(latest?.net)}`} hint={latest ? `for ${MONTHS[latest.month - 1]} ${latest.year}` : "no month yet"} onClick={() => setTab("slips")} />
+              <Tile label="Leave balance" value={d1(latest?.slip?.leave_cb)} hint={latest ? `as at ${MONTHS[latest.month - 1].slice(0, 3)} ${latest.year}` : "no month yet"} onClick={() => setTab("leave")} />
+              <Tile label="Loan balance" value={`₹${inr(latest?.slip?.loan_cb ?? 0)}`} hint={latest ? `as at ${MONTHS[latest.month - 1].slice(0, 3)} ${latest.year}` : "—"} onClick={() => setTab("loan")} />
+            </div>
+
+            {pending.length > 0 && <div className="rounded-lg px-3 py-2 mt-3 text-sm" style={{ background: "#FFF7E6", border: "1px solid #F5B32B", color: "#8A5B00" }}><b>Waiting on you:</b> {pending.join(" · ")}</div>}
             {teamBox}
             {dashboard}
+
+            {/* the column of buttons, in his order */}
+            <div className="mt-4" style={{ display: "grid", gap: 8, gridTemplateColumns: "minmax(0, 340px)" }}>
+              <BigButton onClick={() => setTab("slips")} tone="ink"
+                label={latest ? `📄 Payslip for ${MONTHS[latest.month - 1]} ${latest.year}` : "📄 Payslips"} />
+              <BigButton onClick={() => setTab("learning")} tone="ink" label="🎯 Learning Goals" />
+              <BigButton onClick={() => setTab("handbook")} tone="ink" label="📘 Employee Handbook" />
+              <BigButton onClick={() => setTab("queries")} tone="orange"
+                label={`💬 HR Queries${d.queries.some((q) => q.status === "Open") ? ` · ${d.queries.filter((q) => q.status === "Open").length} open` : ""}`} />
+              <div style={{ height: 4 }} />
+              {APPLY.map(([k, l]) => (
+                <BigButton key={k} onClick={() => { setApply(k); setMsg(""); }} tone="plain" label={l} />
+              ))}
+            </div>
           </>
         )}
-        {/* ── the buttons ── */}
-        <div className="flex gap-2 mt-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-          {APPLY.map(([k, l]) => (
-            <button key={k} onClick={() => { setApply(k); setMsg(""); }} disabled={!d.linked} className="text-xs font-bold rounded-full px-3 py-2 whitespace-nowrap flex-shrink-0" style={{ background: C.navy, color: "#fff", opacity: d.linked ? 1 : 0.5 }}>{l}</button>
-          ))}
-          <a href="/hrms/query" target="_blank" rel="noreferrer" className="text-xs font-bold rounded-full px-3 py-2 whitespace-nowrap flex-shrink-0" style={{ background: C.orange, color: "#fff", textDecoration: "none" }}>HR Queries ↗</a>
-        </div>
       </div></div>
         ) : tab === "idpform" ? (
           <>{idpPanel ?? <Empty>The IDP is not open on this page.</Empty>}</>
