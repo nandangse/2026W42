@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.5.2",
+    date: "2026-09-07",
+    module: "The growth note comes before the brief, and can be written for everyone at once",
+    items: [
+      "\"put the growth note here before Raghu's brief. Raghu's brief is internal and the Growth note is external.\" (Dr Raghu, 7 Sep 2026). The Growth note tab now sits before Raghu's brief on the Report Card, and each says which it is: the note is what the person is handed, the brief is for him alone and never shown.",
+      "\"It will be generated for all in mass at the end together. However I should be able to see for each too.\" The Appraisal Table carries a ✨ Growth notes button for the owner, with the number still to write. It writes one for everybody the filters have left on screen who has none — three at a time, a line saying who is being written now, and a Stop that leaves everything already written in place, so starting again simply carries on. Anyone whose note exists is skipped, and a single person can still be written or rewritten on their own card.",
+      "COL K R ACHARYA'S REVIEW. \"I reviewed Acharya but it shows as not reviewed\" — it was in progress when the screen was taken and landed a minute later; the card shows it now. Worth knowing for the rest of the round: a review is only locked once Submit goes through, and the card says in progress until then rather than pretending there is nothing.",
+    ],
+  },
+  {
     v: "5.0.5.1",
     date: "2026-09-07",
     module: "The version is back on the header, for every admin",

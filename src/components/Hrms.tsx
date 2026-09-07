@@ -217,7 +217,7 @@ export default function Hrms({
         ) : nav.key === "appraisal.interviews" ? (
           <AppraisalInterviews who={who} />
         ) : nav.key === "appraisal.table" ? (
-          <AppraisalTable who={who}
+          <AppraisalTable who={who} isOwner={isOwner}
             onOpenPerson={(id) => {
               // the table is the index; the card is the page. Hand the person
               // across and switch — one click from the row to the discussion.

@@ -57,9 +57,9 @@ export async function GET(req: Request) {
         admin.from("hrms_idp").select("id, employee_id, submitted_at, ratings, ask:answers->>ask_gross").eq("cycle", CYCLE_TBL),
         admin.from("hrms_idp_review").select("idp_id, submitted_at, ratings, gross_proposed"),
       ]);
-      let appr: { employee_id: string; new_gross: number | null; prev_gross: number | null; approved_at?: string | null }[] = [];
+      let appr: { employee_id: string; new_gross: number | null; prev_gross: number | null; approved_at?: string | null; growth_note?: string | null }[] = [];
       try {
-        const { data: ap } = await admin.from("hrms_appraisal").select("employee_id, new_gross, prev_gross, approved_at").eq("cycle", CYCLE_TBL);
+        const { data: ap } = await admin.from("hrms_appraisal").select("employee_id, new_gross, prev_gross, approved_at, growth_note").eq("cycle", CYCLE_TBL);
         appr = (ap || []) as typeof appr;
       } catch (e) { swallow("hrms/idp", e); /* pre-0061 */ }
 
@@ -140,6 +140,8 @@ export async function GET(req: Request) {
             designation: pick("designation", "Designation", e.designation) as string | null,
             // who they report to — the Appraisal Table filters by it (7 Sep 2026)
             manager: pick("reporting_manager", "Reporting Manager") as string | null,
+            // whether the growth note is already written, for the mass run
+            growth: !!ap?.growth_note,
             type,
             age: years(e.dob), exp: years(e.doj),
             prevGross: prev, newGross,

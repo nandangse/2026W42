@@ -15,7 +15,7 @@ import { Pane } from "./Pane";
 import { C } from "./RecordFields";
 
 interface Row {
-  id: string; name: string; department: string | null; designation: string | null; type: string | null; manager: string | null;
+  id: string; name: string; department: string | null; designation: string | null; type: string | null; manager: string | null; growth?: boolean;
   age: number | null; exp: number | null;
   prevGross: number | null; newGross: number | null; inc: number | null; incPct: number | null;
   stage: string;
@@ -40,7 +40,7 @@ const STAGE_STYLE: Record<string, { bg: string; fg: string }> = {
   "—": { bg: "#F4F2EC", fg: "#C9C6BD" },
 };
 
-export default function AppraisalTable({ who, onOpenPerson }: { who: string; onOpenPerson: (id: string) => void }) {
+export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: string; onOpenPerson: (id: string) => void; isOwner: boolean }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [msg, setMsg] = useState("");
   const [q, setQ] = useState("");
@@ -59,6 +59,10 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
   const [mgrs, setMgrs] = useState<Set<string>>(new Set());
   const [mgrOpen, setMgrOpen] = useState(false);
   const [mgrQ, setMgrQ] = useState("");
+  // the mass run of growth notes (Dr Raghu, 7 Sep 2026: "it will be generated
+  // for all in mass at the end together")
+  const [run, setRun] = useState<{ done: number; of: number; now: string; fail: number } | null>(null);
+  const stop = useState<{ v: boolean }>({ v: false })[0];
   const [minPay, setMinPay] = useState("");
   const [maxPay, setMaxPay] = useState("");
 
@@ -222,6 +226,39 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
   const mgr = (rows || []).filter((r) => r.stage === "Manager Completed").length;
   const sub = (rows || []).filter((r) => r.stage === "Completed").length;
 
+  /** How many of the rows on screen still have no growth note. */
+  const missingNotes = useMemo(() => shown.filter((r) => !r.growth).length, [shown]);
+
+  /**
+   * One at a time, three in flight: each note is a full Claude read of the
+   * role, the IDP and the manager's words, so this is minutes not seconds.
+   * Anyone who already has one is skipped, so stopping and starting again
+   * simply carries on.
+   */
+  const massGrowth = async () => {
+    const todo = shown.filter((r) => !r.growth);
+    if (!todo.length) { window.alert("Every row on screen already has a growth note."); return; }
+    if (!window.confirm(`Write the growth note for ${todo.length} ${todo.length === 1 ? "person" : "people"}?\n\nEach one is read and written on its own, so this takes a few minutes. You can stop it, and starting again carries on from where it left off.`)) return;
+    stop.v = false;
+    setRun({ done: 0, of: todo.length, now: todo[0]?.name || "", fail: 0 });
+    let done = 0, fail = 0;
+    const queue = [...todo];
+    const worker = async () => {
+      while (queue.length && !stop.v) {
+        const r = queue.shift()!;
+        setRun({ done, of: todo.length, now: r.name, fail });
+        try { await api.post("/api/hrms/idp", { action: "growth-note", employee_id: r.id }); }
+        catch { fail += 1; }
+        done += 1;
+        setRun({ done, of: todo.length, now: r.name, fail });
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    setRun(null);
+    setMsg(`${done - fail} growth note${done - fail === 1 ? "" : "s"} written${fail ? `, ${fail} failed` : ""}${stop.v ? " — stopped" : ""} ✓`);
+    api.get("/api/hrms/idp?table=1").then((j) => setRows(j.rows || [])).catch(() => null);
+  };
+
   return (
     <Pane title="Appraisal Table" who={who} print onPrint={pressPaper}
       blurb="Everybody on one row: the money and where their appraisal stands. Click the EmployeeID or the name to open that person's Report Card.">
@@ -283,6 +320,16 @@ export default function AppraisalTable({ who, onOpenPerson }: { who: string; onO
           <option value="">Any experience</option>
           {EXP_BANDS.map(([l]) => (<option key={l} value={l}>{l}</option>))}
         </select>
+        {/* THE MASS RUN (Dr Raghu, 7 Sep 2026) — writes the growth note for
+            everybody the filters have left on screen who has none yet. */}
+        {isOwner && (
+          <button onClick={() => (run ? (stop.v = true) : massGrowth())}
+            className="text-xs font-bold rounded px-2.5 py-1.5 text-white"
+            style={{ background: run ? "#B3261E" : "#0D7A3F", whiteSpace: "nowrap" }}
+            title="Writes the growth note — the one the person is handed — for every row shown that has none yet">
+            {run ? `Stop · ${run.done}/${run.of}` : `✨ Growth notes${missingNotes ? ` (${missingNotes})` : ""}`}
+          </button>
+        )}
         {/* Dr Raghu, 2 Sep 2026: "put a filter for salary range Min and Max". */}
         <span className="text-xs flex items-center gap-1" style={{ color: C.faint }}>
           <span style={{ whiteSpace: "nowrap" }}>Gross ₹</span>

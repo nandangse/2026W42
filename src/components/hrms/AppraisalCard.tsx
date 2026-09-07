@@ -50,7 +50,12 @@ interface PersonData {
   } | null;
 }
 
-const TABS = ["Self IDP", "Manager IDP comment", "Finalised IDP for Employee", "Raghu's brief", "Growth note", "Finalised discussion", "Appraisal Final"] as const;
+/**
+ * Growth note sits BEFORE Raghu's brief (Dr Raghu, 7 Sep 2026): "Raghu's
+ * brief is internal and the Growth note is external." The thing the person
+ * is handed comes first; the thing only he reads comes after.
+ */
+const TABS = ["Self IDP", "Manager IDP comment", "Finalised IDP for Employee", "Growth note", "Raghu's brief", "Finalised discussion", "Appraisal Final"] as const;
 
 export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: boolean }) {
   const [people, setPeople] = useState<ListRow[] | null>(null);
@@ -138,8 +143,8 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
           {tab === "Self IDP" && <SelfTab d={d} />}
           {tab === "Manager IDP comment" && <ManagerTab d={d} />}
           {tab === "Finalised IDP for Employee" && <FinalisedTab d={d} />}
-          {tab === "Raghu's brief" && <RaghuBriefTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
           {tab === "Growth note" && <GrowthNoteTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
+          {tab === "Raghu's brief" && <RaghuBriefTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
           {tab === "Finalised discussion" && <DiscussionTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
           {tab === "Appraisal Final" && <AppraisalTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
         </>
@@ -295,8 +300,8 @@ function RaghuBriefTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolea
         )}
       </div>
       <p className="text-xs mb-2" style={{ color: C.dim, lineHeight: 1.5 }}>
-        Five minutes before the sit-down: the role, the work in their own words, what to affirm, what to raise, three
-        questions, and a feedback seed to adapt. Grounded in the record — click-only, like every Genie.
+        <b>Internal — for me alone, never shown to them.</b> Five minutes before the sit-down: the role, the work in
+        their own words, what to affirm, what to raise, three questions, and a feedback seed to adapt.
         {at && <> · last written {new Date(String(at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} IST</>}
       </p>
       {text
@@ -357,7 +362,7 @@ function GrowthNoteTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolea
         )}
       </div>
       <p className="text-xs mb-1" style={{ color: C.dim, lineHeight: 1.55 }}>
-        The note the person is handed, in my own voice and addressed to them: what I have seen, what they do well, where
+        <b>External — this is what they are given.</b> In my own voice and addressed to them: what I have seen, what they do well, where
         I want them to grow, what we will do to help, and what I expect. Written from the role, their IDP and their
         manager&apos;s words — never from money.{floor ? " In Hindi as well, because they work on the floor." : ""}
         {at && <> · last written {new Date(String(at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</>}
