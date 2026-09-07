@@ -78,6 +78,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.7.1",
+    date: "2026-09-07",
+    module: "A manager review says it is in, and can be sent again",
+    items: [
+      "\"after this mention: Submitted — resubmit again if needed\" (Dr Raghu, 7 Sep 2026). A review that has gone in now says so on the screen, with the day and time, instead of the submit box simply vanishing. Beside it, Change it and send again reopens the ratings, the proposal and the voice note.",
+      "And it really can be sent again: the review used to lock on the first submit, so a rating pressed by mistake or a voice note that cut off stood for the year. Sending again replaces what was there and the growth note is written afresh; the row keeps the time it last moved.",
+    ],
+  },
+  {
     v: "5.0.7.0",
     date: "2026-09-07",
     module: "HRMS — the workers' revision, loaded in one go",

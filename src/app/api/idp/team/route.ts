@@ -256,7 +256,12 @@ export async function POST(req: Request) {
         .upsert({ idp_id: idpId, reviewer_email: u.email, reviewer_name: stampName }, { onConflict: "idp_id,reviewer_email", ignoreDuplicates: false })
         .select("*").maybeSingle();
       if (!rv) throw new Error("could not open the review");
-      if (rv.submitted_at) throw new HttpError(409, "This review is already submitted.");
+      /**
+       * A REVIEW CAN BE SENT AGAIN (Dr Raghu, 7 Sep 2026: "Submitted —
+       * resubmit again if needed"). It used to lock on the first submit,
+       * which meant a wrong rating or a half-said voice note stood for the
+       * year. The row keeps updated_at, so the record still shows it moved.
+       */
       return rv;
     };
 

@@ -168,7 +168,12 @@ export function TeamReview({ row, onClose }: { row: TeamRow; onClose: () => void
   const setR = (k: string, v: number) => { const n = { ...ratings, [k]: v }; setRatings(n); save({ ratings: n }); };
 
   const allRated = IDP_RATINGS.every((x) => ratings[x.key]);
-  const locked = !!d?.review?.submitted_at;
+  const submittedAt = d?.review?.submitted_at || null;
+  // Dr Raghu, 7 Sep 2026: a submitted review is not sealed — it can be sent
+  // again. "Locked" now only means "already sent once", and reopening is a
+  // click, so a wrong rating does not stand for a year.
+  const [reopened, setReopened] = useState(false);
+  const locked = !!submittedAt && !reopened;
 
   const reveal = async () => {
     setBusy(true); setMsg("");
@@ -185,6 +190,7 @@ export function TeamReview({ row, onClose }: { row: TeamRow; onClose: () => void
     try {
       const j = await api.post("/api/idp/team", { action: "submit", idpId: row.idpId, ratings, gross_proposed: gross, notes });
       setAnalysis(j.analysis || null);
+      setReopened(false);
       await load();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
@@ -333,6 +339,17 @@ export function TeamReview({ row, onClose }: { row: TeamRow; onClose: () => void
                 </div>
               </div>
 
+              {locked && (
+                <div className="rounded-lg p-3 mt-4 mb-2" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
+                  <div className="rounded font-bold" style={{ background: "#E6F4EA", color: C.green, padding: "13px 22px", fontSize: 15, maxWidth: 420, textAlign: "center" }}>
+                    ✓ Submitted{submittedAt ? ` · ${fmtFull(String(submittedAt))}` : ""}
+                  </div>
+                  <div style={{ fontSize: 12, color: C.faint, marginTop: 6, lineHeight: 1.5 }}>
+                    Submitted — resubmit again if needed.{" "}
+                    <button onClick={() => setReopened(true)} className="font-bold" style={{ color: "var(--blue)" }}>Change it and send again</button>
+                  </div>
+                </div>
+              )}
               {!locked && (
                 <div className="rounded-lg p-3 mt-4 mb-2" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
                   <button onClick={submit} disabled={busy || !allRated || !voice.length}
@@ -343,11 +360,12 @@ export function TeamReview({ row, onClose }: { row: TeamRow; onClose: () => void
                       padding: "13px 22px", fontSize: 15, width: "100%", maxWidth: 340,
                       cursor: allRated && voice.length ? "pointer" : "not-allowed",
                     }}>
-                    {busy ? "Writing the growth note…" : "✓ Submit my review"}
+                    {busy ? "Writing the growth note…" : submittedAt ? "✓ Send the review again" : "✓ Submit my review"}
                   </button>
                   <div style={{ fontSize: 12, color: C.faint, marginTop: 6, lineHeight: 1.5 }}>
                     {!allRated ? "Rate all eleven dimensions first." : !voice.length ? "The voice note is compulsory." :
-                      "On submitting you will see the growth note — what this person should be doing next, written as a CHRO would."}
+                      submittedAt ? "This replaces what you sent before, and the growth note is written afresh."
+                        : "On submitting you will see the growth note — what this person should be doing next, written as a CHRO would."}
                   </div>
                 </div>
               )}
