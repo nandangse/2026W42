@@ -78,6 +78,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.14.0",
+    date: "2026-09-07",
+    module: "Every person their own salary slip, by mail",
+    items: [
+      "\"We need to now have a separate mail to send to attach individual salary slips to the mail to their personal mail id\" (Dr Raghu, 7 Sep 2026).",
+      "This is a different thing from the mass mail, where one attachment goes to everybody: here EVERY MAIL CARRIES A DIFFERENT PDF, and it has to be the right one. So the address is the personal one and nothing else — never the work mailbox, which five or six people share — and anybody without a personal address is NAMED rather than quietly sent to a shared box.",
+      "The PDF is the same A5 slip the screen prints, pressed through the same serverless Chromium the quotes already use, so the paper and the attachment cannot drift apart. It is filed as \"August 2026 - 6474 - Budhan Das.pdf\", the name the Drive folder uses. A month not yet frozen carries DRAFT across its face.",
+      "Eight at a time, because a slip is a browser page rendered for real; every one, sent or failed with its reason, lands on that person's Communication tab. Answers go to hr@nandan.co.in whoever's mailbox carried it.",
+      "The words in the mail are his, saved as a template: the slip for the month, the HR query link, and the postscript pointing at genie.nandan.co.in/idp.",
+    ],
+  },
+  {
     v: "5.0.13.2",
     date: "2026-09-07",
     module: "IDP Results, in the order he asked for it",
