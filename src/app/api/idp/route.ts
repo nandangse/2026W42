@@ -3,7 +3,8 @@ import { readBody } from "@/lib/validate";
 import { swallow } from "@/lib/swallow";
 import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
-import { requireUser, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
+import { requireUser, errJson, HttpError, RAGHU_EMAIL, type AuthedUser } from "@/lib/auth";
+import { idpSession } from "@/lib/idp-session";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, splitMulti, FIELD_GROUPS, fieldSpec } from "@/lib/hrms";
 import { salaryTable, type SalaryRow } from "@/lib/salary";
@@ -114,10 +115,44 @@ async function whoAreThey(email: string) {
   }
 }
 
+/**
+ * WHO IS ASKING — A GENIE LOGIN, OR A PASSWORD FROM HR
+ * (Dr Raghu, 7 Sep 2026: "the temp password doesnt work, it just craps ...
+ * only genie logged in people are able").
+ *
+ * The password sign-in worked all along — it set its cookie and let them
+ * through. What failed was the very next thing: this route took a Genie user
+ * and nothing else, so the page's first call came back 401 and it sat on
+ * "Loading…" for ever. /api/my/sheet had been taught the cookie; this one
+ * had not, and it is the one the IDP page calls first.
+ *
+ * A password session acts as the employee's WORK e-mail, because that is
+ * what the IDP rows were filed under (38 of the 54 written so far); where
+ * there is none, the personal address they signed in with. Never an owner,
+ * so nothing behind isOwner opens to a password.
+ */
+async function whoIsAsking(): Promise<AuthedUser> {
+  const eid = await idpSession();
+  if (!eid) return await requireUser();
+  const admin = adminClient();
+  const T = await hrmsTables(admin);
+  const { data: emp } = await admin.from(T.employees).select("id, name, email").eq("id", eid).maybeSingle();
+  const { data: lg } = await admin.from("hrms_idp_login").select("email").eq("employee_id", eid).maybeSingle();
+  const email = String(emp?.email || "").trim().toLowerCase() || String(lg?.email || "").trim().toLowerCase();
+  if (!email) throw new HttpError(403, "Your record has no e-mail on it — ask HR to add one.");
+  const name = String(emp?.name || "").trim();
+  return {
+    id: `idp:${eid}`, email, role: "user", disabled: false,
+    initials: name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || null,
+    displayName: name || null, erpOwner: null, isOwner: false,
+    lc: false, stratcom: false, management: false,
+  } as AuthedUser;
+}
+
 // GET /api/idp — am I part-way through one, and have I finished one?
 export async function GET(req: Request) {
   try {
-    const u = await requireUser();
+    const u = await whoIsAsking();
 
     /**
      * ?diag=1 — the transcription self-test, owner only.
@@ -362,7 +397,7 @@ async function polishSpoken(email: string, text: string): Promise<string> {
 export async function POST(req: Request) {
   try {
     await assertAiOn();
-    const u = await requireUser();
+    const u = await whoIsAsking();
     const admin = adminClient();
 
     /**

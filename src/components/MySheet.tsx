@@ -174,12 +174,12 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
         .idpm .gbtn .e{font-size:22px}
         .idpm .sect{font-family:Barlow,system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:.06em;
           text-transform:uppercase;color:var(--i-muted);margin-top:4px}
-        .idpm .nav{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:repeat(5,1fr);
+        .idpm .nav{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:repeat(6,1fr);
           background:#fff;border-top:1px solid var(--i-line);padding:6px 4px calc(8px + env(safe-area-inset-bottom));
           max-width:560px;margin:0 auto}
         .idpm .nav button{display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;padding:6px 2px;
-          border-radius:12px;color:var(--i-muted);font-family:Barlow,system-ui,sans-serif;font-size:12px;font-weight:600}
-        .idpm .nav button .e{font-size:21px;line-height:1}
+          border-radius:12px;color:var(--i-muted);font-family:Barlow,system-ui,sans-serif;font-size:11px;font-weight:600}
+        .idpm .nav button .e{font-size:20px;line-height:1}
         .idpm .nav button[data-on="1"]{color:var(--i-accent)}
         .idpm .nav .cnt{position:absolute;margin-left:20px;margin-top:-3px;background:var(--i-accent);color:#fff;
           font-size:11px;font-weight:700;min-width:18px;height:18px;padding:0 5px;border-radius:9px;display:grid;place-items:center}
@@ -237,6 +237,24 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
 
         {d.linked && (
           <>
+            {/* THE IDP FIRST, ABOVE THE MONEY (Dr Raghu, 7 Sep 2026: "show
+                IDP right at the top"). It is what the page is named for and
+                what a man is told to come here and read; the pay figures are
+                what he already knows. It stood below them and below the
+                notices, which is the wrong way round. */}
+            <button className="action accent" onClick={() => setTab("idp")}>
+              <div className="ic">📈</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="h">Your IDP</div>
+                <div className="dsc">
+                  {d.released.length ? "Your sheet, the growth plan and your role" : d.idps.length ? "What you wrote, and what came back" : "Opens when your round is written"}
+                </div>
+              </div>
+              <span style={{ opacity: .85 }}>›</span>
+            </button>
+            {teamBox}
+            {dashboard}
+
             <div className="tiles">
               <button className="tile" onClick={() => setTab("slips")}>
                 <div className="l">Last net pay</div>
@@ -263,9 +281,6 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
                 <span className="disp" style={{ fontWeight: 600, color: "var(--i-warn)" }}>Open</span>
               </button>
             ))}
-
-            {teamBox}
-            {dashboard}
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button className="action accent" onClick={() => { setApply("leave"); setMsg(""); }}>
@@ -501,7 +516,6 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
             <div className="list">
               {([["records", "HRIS record", "Address, bank, nominee, ID proofs"],
                  ["loan", "Loan register", "Opening, added, deducted, closing"],
-                 ["idp", "IDP results", "Your sheet, the growth plan, your role"],
                  ["learning", "Learning goals", "What you are working towards"],
                  ["handbook", "Employee Handbook", `Edition ${d.handbook.edition}${d.handbook.acknowledged ? " · acknowledged" : " · not yet acknowledged"}`],
                 ] as [Tab, string, string][]).map(([k, h, sub]) => (
@@ -533,9 +547,13 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
 
       {/* ── the five along the bottom, where a thumb reaches ── */}
       <div className="nav">
-        {([["home", "Home", "\u{1F3E0}"], ["leave", "Leave", "\u{1F5D3}\uFE0F"], ["slips", "Pay", "\u{1F4C4}"],
-           ["queries", "Ask HR", "\u{1F4AC}"], ["more", "More", "\u2630"]] as [Tab, string, string][]).map(([k, l, e]) => (
-          <button key={k} data-on={tab === k || (k === "more" && !["home", "leave", "slips", "queries"].includes(tab)) ? "1" : "0"}
+        {/* IDP SITS BESIDE HOME (Dr Raghu, 7 Sep 2026: "next to home put
+            IDP"). It is the thing the page is named for, and it was buried
+            under More — one tap too far for the one page a man is told to
+            go and read. */}
+        {([["home", "Home", "\u{1F3E0}"], ["idp", "IDP", "\u{1F4C8}"], ["leave", "Leave", "\u{1F5D3}\uFE0F"],
+           ["slips", "Pay", "\u{1F4C4}"], ["queries", "Ask HR", "\u{1F4AC}"], ["more", "More", "\u2630"]] as [Tab, string, string][]).map(([k, l, e]) => (
+          <button key={k} data-on={tab === k || (k === "more" && !["home", "idp", "leave", "slips", "queries"].includes(tab)) ? "1" : "0"}
             onClick={() => setTab(k)}>
             {k === "queries" && openQ > 0 && <span className="cnt">{openQ}</span>}
             <span className="e">{e}</span>

@@ -78,6 +78,26 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.19.7",
+    date: "2026-09-07",
+    module: "The password sign-in reaches the page it opens",
+    items: [
+      "\"The temp password doesnt work, it just craps ... only genie logged in people are able\" (Dr Raghu, 7 Sep 2026). <b>The password was never the problem.</b> All 194 issued passwords match their own hashes; the sign-in set its cookie and let people through. What failed was the very next step: <b>/api/idp took a Genie login and nothing else</b>, so the page's first call came back 401 and it sat on \"Loading…\" for ever. /api/my/sheet had been taught the cookie in 0154; this route — the one the IDP page calls FIRST — had not. Every one of the 194 hit it.",
+      "A password session now acts as the employee's work e-mail, which is what the IDP rows were filed under (38 of the 54 written so far), falling back to the personal address they signed in with. Never an owner, so nothing behind isOwner opens to a password.",
+      "And the corner shows his own letters instead of <b>??</b> — a man who signed in with the password HR sent him is as known to us as one with a Genie login; nobody had simply worked his initials out.",
+      "For the record, since it looked like a password fault: of the eleven IDP login mails sent, ten carried the person's own correct password. One — 6608 Tushar Giri — went out with no password in it at all, because his had already been used. He needs a fresh one.",
+    ],
+  },
+  {
+    v: "5.0.19.6",
+    date: "2026-09-07",
+    module: "IDP beside Home, and first on the page",
+    items: [
+      "\"Next to home put IDP\" (Dr Raghu, 7 Sep 2026). It is the thing the page is named for and it was buried under More — one tap too far for the one page a man is actually told to go and read. Six along the bottom now: <b>Home · IDP · Leave · Pay · Ask HR · More</b>, and IDP comes off the More list since it is no longer hiding there.",
+      "AND IT STANDS FIRST ON HOME (\"show IDP right at the top\") — above the pay figures and above the notices, where it sat before. The pay figures are what a man already knows; the IDP is what he was told to come here and read.",
+    ],
+  },
+  {
     v: "5.0.19.5",
     date: "2026-09-07",
     module: "Pay Days on the payslip header, and the clock in Communications",

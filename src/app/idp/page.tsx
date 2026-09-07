@@ -34,7 +34,13 @@ export default async function IdpPage() {
   const who = await idpSession();
   if (who) {
     const { data } = await adminClient().from("hrms_employees").select("name").eq("id", who).maybeSingle();
-    return <IdpDiscussion name={firstName(String(data?.name || who))} initials={null} />;
+    /* HIS OWN LETTERS, NOT "??" (Dr Raghu, 7 Sep 2026: "the name on right top
+       is also corner"). A man who signed in with the password HR sent him is
+       as known to us as one with a Genie login; the corner said ?? only
+       because nobody had worked his initials out. */
+    const full = String(data?.name || "").trim();
+    const ini = full.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || null;
+    return <IdpDiscussion name={firstName(full || String(who))} initials={ini} />;
   }
   redirect("/idp/sign-in");
 }
