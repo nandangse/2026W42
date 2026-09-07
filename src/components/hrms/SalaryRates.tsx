@@ -49,7 +49,22 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
   };
 
   const s = st?.structures.find((x) => x.id === cur) || null;
-  const rows = useMemo(() => { const n = q.trim().toLowerCase(); return (st?.rates || []).filter((r) => !n || `${r.employee_id} ${r.name || ""} ${r.type || ""} ${r.department || ""} ${r.designation || ""}`.toLowerCase().includes(n)); }, [st, q]);
+  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "employee_id", dir: "asc" });
+  const rows = useMemo(() => {
+    const n = q.trim().toLowerCase();
+    const list = (st?.rates || []).filter((r) => !n || `${r.employee_id} ${r.name || ""} ${r.type || ""} ${r.department || ""} ${r.designation || ""}`.toLowerCase().includes(n));
+    /* Money sorts as money and text as text — a string sort would put a
+       gross of 9,000 above one of 80,000, which is how a sortable column
+       ends up trusted less than no sort at all. */
+    const numeric = new Set(["employee_id", "basic_da", "hra", "fixed_allowance", "conveyance", "medical_allowance", "gross", "per_day"]);
+    const k = sort.key, sign = sort.dir === "asc" ? 1 : -1;
+    const val = (r: Rate) => (r as unknown as Record<string, unknown>)[k];
+    return [...list].sort((a, b) => {
+      const x = val(a), y = val(b);
+      if (numeric.has(k)) return sign * ((Number(x) || 0) - (Number(y) || 0));
+      return sign * String(x ?? "").localeCompare(String(y ?? ""), "en", { sensitivity: "base" });
+    });
+  }, [st, q, sort]);
   const totals = useMemo(() => rows.reduce((a, r) => ({ gross: a.gross + Number(r.gross || 0), basic: a.basic + Number(r.basic_da || 0) }), { gross: 0, basic: 0 }), [rows]);
   const byType = useMemo(() => { const m: Record<string, number> = {}; for (const r of rows) m[r.type || "?"] = (m[r.type || "?"] || 0) + 1; return m; }, [rows]);
 
@@ -120,27 +135,35 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
           </div>
 
           <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflow: "auto", maxHeight: "calc(100vh - 290px)" }}>
-            <table className="genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse", whiteSpace: "nowrap", minWidth: 1400 }}>
+            <table className="genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse", whiteSpace: "nowrap", minWidth: 1040 }}>
               {/* A SOLID GROUND UNDER THE HEADING (Dr Raghu, 7 Sep 2026: "on
                   salary rate list the header is white font — change the
                   background colour"). It was muted grey on white and read as
                   nothing at all; the muster's header was given the same
                   treatment this morning, so the two now match. */}
+              {/* EVERY COLUMN SORTS (Dr Raghu, 7 Sep 2026: "make provision to
+                  sort also"). Click to sort, click again to reverse. Text
+                  sorts as text and money as money, so Gross does not put
+                  9,000 above 80,000 the way a string comparison would. */}
               <thead><tr style={{ fontSize: 10.5 }}>
-                {["Employee ID", "Name", "Type", "Department", "Designation", "Reporting manager", "Basic and DA", "HRA", "Fixed Allowance", "Conveyance", "Medical Allowance", "Gross Salary", "Per Day Rate", ""].map((h, i) => (
-                  <th key={h + i} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#F4F2EC", color: C.ink, fontWeight: 700, borderBottom: `2px solid ${C.line}`, zIndex: i < 2 ? 3 : 2, textAlign: i >= 6 && i <= 12 ? "right" : "left", whiteSpace: "nowrap", ...(i === 0 ? { left: 0, minWidth: 80 } : i === 1 ? { left: 80, minWidth: 200 } : {}) }}>{h}</th>
+                {COLS.map(([key, label], i) => (
+                  <th key={key || label} onClick={() => key && setSort((p) => ({ key, dir: p.key === key && p.dir === "asc" ? "desc" : "asc" }))}
+                    className="px-2 py-1.5" title={key ? "Sort by this column" : undefined}
+                    style={{ position: "sticky", top: 0, background: "#F4F2EC", color: C.ink, fontWeight: 700, borderBottom: `2px solid ${C.line}`, zIndex: i < 2 ? 3 : 2, textAlign: i >= 2 && i <= 8 ? "right" : "left", whiteSpace: "nowrap", cursor: key ? "pointer" : "default", userSelect: "none", ...(i === 0 ? { left: 0, minWidth: 80 } : i === 1 ? { left: 80, minWidth: 200 } : {}) }}>
+                    {label}{sort.key === key ? <span style={{ marginLeft: 3 }}>{sort.dir === "asc" ? "▲" : "▼"}</span> : null}
+                  </th>
                 ))}
               </tr></thead>
               <tbody>
                 {rows.map((r) => <RateRow key={r.id} r={r} sid={s.id} busy={busy} onSaved={() => load(cur)} onMsg={setMsg} />)}
                 <tr style={{ borderTop: `2px solid ${C.line}`, background: "#FBFAF7" }}>
                   <td className="px-2 py-1.5" style={{ position: "sticky", left: 0, background: "#FBFAF7" }}><input value={newLine} onChange={(e) => setNewLine(e.target.value)} placeholder="new ID" className="rounded px-1.5 py-0.5 tnum" style={{ border: `1px solid ${C.line}`, width: 64, fontSize: 12 }} /></td>
-                  <td className="px-2 py-1.5" colSpan={12} style={{ color: C.faint, fontSize: 11.5 }}>Type a four-digit Employee ID and press Add; then fill the line in place.</td>
+                  <td className="px-2 py-1.5" colSpan={8} style={{ color: C.faint, fontSize: 11.5 }}>Type a four-digit Employee ID and press Add; then fill the line in place.</td>
                   <td className="px-2 py-1.5"><button onClick={async () => { if (/^\d{4}$/.test(newLine.trim())) { await act({ action: "save_rate", structure_id: s.id, employee_id: newLine.trim(), basic_da: 0 }, "Line added"); setNewLine(""); } }} disabled={busy || !/^\d{4}$/.test(newLine.trim())} className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "var(--blue)", color: "#fff" }}>Add</button></td>
                 </tr>
               </tbody>
               <tfoot><tr style={{ fontWeight: 700, borderTop: `2px solid ${C.line}` }}>
-                <td className="px-2 py-1.5" colSpan={6} style={{ position: "sticky", left: 0, background: "#fff" }}>{rows.length} people</td>
+                <td className="px-2 py-1.5" colSpan={2} style={{ position: "sticky", left: 0, background: "#fff" }}>{rows.length} people</td>
                 <td className="px-2 py-1.5 text-right tnum">{inr(totals.basic)}</td>
                 {["hra", "fixed_allowance", "conveyance", "medical_allowance", "gross", "per_day"].map((k) => <td key={k} className="px-2 py-1.5 text-right tnum">{k === "per_day" ? "" : inr(rows.reduce((a, r) => a + Number((r as unknown as Record<string, unknown>)[k] || 0), 0))}</td>)}
                 <td />
@@ -153,6 +176,14 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
     </Pane>
   );
 }
+
+/** The columns, in order: [sort key, heading]. An empty key does not sort. */
+const COLS: [string, string][] = [
+  ["employee_id", "Employee ID"], ["name", "Name"],
+  ["basic_da", "Basic and DA"], ["hra", "HRA"], ["fixed_allowance", "Fixed Allowance"],
+  ["conveyance", "Conveyance"], ["medical_allowance", "Medical Allowance"],
+  ["gross", "Gross Salary"], ["per_day", "Per Day Rate"], ["", ""],
+];
 
 function RateRow({ r, sid, busy, onSaved, onMsg }: { r: Rate; sid: string; busy: boolean; onSaved: () => void; onMsg: (m: string) => void }) {
   const [v, setV] = useState<Record<string, string>>({});
@@ -177,7 +208,12 @@ function RateRow({ r, sid, busy, onSaved, onMsg }: { r: Rate; sid: string; busy:
     <tr style={{ borderTop: "1px solid #EEECE6" }}>
       <td className="px-2 py-0.5 tnum font-semibold" style={{ position: "sticky", left: 0, background: "#fff", minWidth: 80 }}>{r.employee_id}</td>
       <td className="px-1 py-0.5" style={{ position: "sticky", left: 80, background: "#fff", minWidth: 200 }}>{cell("name", false, 190)}</td>
-      {cell("type", false, 90)}{cell("department", false, 120)}{cell("designation", false, 150)}{cell("reporting_manager", false, 150)}
+      {/* NO Type, Department, Designation or Reporting manager here (Dr
+          Raghu, 7 Sep 2026: "these are not needed — they will be updated in
+          the HRIS"). They were editable in two places at once, and this was
+          the copy nobody filled in: four empty columns across the whole
+          list, inviting a correction that the employee record would not
+          learn about. This list is rates. The HRIS owns who a man is. */}
       {MONEY.map((k) => cell(k, true, 96))}
       <td className="px-2 py-0.5 text-right tnum font-bold">{inr(r.gross)}</td>
       <td className="px-2 py-0.5 text-right tnum" style={{ color: C.dim }}>{inr(r.per_day)}</td>

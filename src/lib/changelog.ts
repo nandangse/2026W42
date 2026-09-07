@@ -78,6 +78,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.17.5",
+    date: "2026-09-07",
+    module: "The salary rate list: four columns off, and every column sorts",
+    items: [
+      "TYPE, DEPARTMENT, DESIGNATION AND REPORTING MANAGER ARE OFF THE RATE LIST (Dr Raghu, 7 Sep 2026: \"these are not needed — they will be updated in the HRIS\"). They were editable in two places at once, and this was the copy nobody filled in: four empty columns down the whole list, inviting a correction the employee record would never learn about. This list is rates; the HRIS owns who a man is.",
+      "EVERY COLUMN SORTS — click to sort, click again to reverse. Money sorts as money and text as text, so Gross does not put 9,000 above 80,000 the way a string comparison would; a sortable column that sorts wrongly is worse than none.",
+    ],
+  },
+  {
     v: "5.0.17.4",
     date: "2026-09-07",
     module: "The IDP salary card says when it starts",
