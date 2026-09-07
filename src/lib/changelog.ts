@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.19.0",
+    date: "2026-09-07",
+    module: "/idp rebuilt for the phone, to his own design",
+    items: [
+      "Dr Raghu drew the page he wanted and said \"make the genie.nandan.co.in/idp like this\" (7 Sep 2026). Nine tabs in a strip you had to drag sideways was a desktop habit put on a phone — and almost everyone who opens this page opens it on a phone.",
+      "FIVE THINGS ALONG THE BOTTOM, where a thumb reaches: <b>Home, Leave, Pay, Ask HR, More</b>. The four a man actually opens the page for, and More for the rest — HRIS record, loan register, IDP results, learning goals, the handbook. Nothing is gone; it is simply out of the way. Ask HR carries a count when a query is open.",
+      "A dark bar at the top with his employee number and role, a greeting, the three figures as tiles, what is waiting on him as a bar he can press, then big cards with room for a thumb, and the requests as a grid of pictures — one per kind, so a man who reads slowly still finds his.",
+      "His palette and type throughout: navy and orange, Barlow for the headings and figures, Source Sans 3 for reading, 17px body — because these are read on a shop floor and not at a desk.",
+    ],
+  },
+  {
     v: "5.0.18.3",
     date: "2026-09-07",
     module: "Communications: the counts open, and a reply sits with the mail it answers",

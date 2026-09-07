@@ -15,6 +15,11 @@ export const dynamic = "force-dynamic";
  * their own and only their own: every query behind it is scoped to the
  * caller's email, so there is no parameter that could name somebody else.
  */
+/* The two faces the design uses — Barlow for headings and figures, Source
+   Sans 3 for reading. Both fall back to the system stack if the network is
+   poor, which on a shop floor it often is. */
+export const metadata = { title: "Nandan Genie" };
+
 export default async function IdpPage() {
   const user = await currentUser();
   if (user && !user.disabled)

@@ -47,7 +47,7 @@ interface Sheet {
   kinds: Record<string, { label: string; fields: Field[] }>;
   today: string;
 }
-type Tab = "home" | "idpform" | "records" | "slips" | "leave" | "loan" | "idp" | "learning" | "handbook" | "queries";
+type Tab = "home" | "idpform" | "records" | "slips" | "leave" | "loan" | "idp" | "learning" | "handbook" | "queries" | "more";
 /**
  * The IDP FORM tab is deliberately absent (Dr Raghu, 7 Sep 2026: "remove the
  * IDP edit option for all now — hide the tab"). The round is written; what a
@@ -56,6 +56,10 @@ type Tab = "home" | "idpform" | "records" | "slips" | "leave" | "loan" | "idp" |
  * because the next round will want it back.
  */
 const TABS: [Tab, string][] = [["home", "Home"], ["records", "HRIS Records"], ["slips", "Payslips"], ["leave", "Leave Register"], ["loan", "Loan Register"], ["idp", "IDP Results"], ["learning", "Learning Goals"], ["handbook", "Employee Handbook"], ["queries", "HR Queries"]];
+/** One picture per request, so a man who reads slowly still finds his. */
+const APPLY_ICON: Record<string, string> = {
+  leave: "🗓️", advance: "💳", loan: "🏦", encashment: "💰", uniform: "👕", shoes: "🥾", other: "⋯",
+};
 const APPLY: [string, string][] = [["leave", "Apply for Leave"], ["advance", "Apply for Advance"], ["loan", "Apply for Loan"], ["encashment", "Apply for Leave Encashment"], ["uniform", "Apply for Uniform"], ["shoes", "Apply for Shoes"], ["other", "Apply for Other Things"]];
 
 /**
@@ -104,71 +108,211 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
   if (d.linked && !d.handbook.acknowledged) pending.push("Read and acknowledge the Employee Handbook");
   if (d.linked && lastIdp && !(lastIdp.answers?.learning || "").trim()) pending.push("Write your learning goals");
 
+  const openQ = d.linked ? d.queries.filter((q) => q.status === "Open").length : 0;
+  const initials = (d.linked ? d.me.name : name || "").split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join("").toUpperCase();
+
   return (
-    <div style={{ minHeight: "100vh", background: C.paper, color: C.ink, fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {/* ── the tabs ── */}
-      <div className="flex gap-1 px-2 py-1.5 overflow-x-auto" style={{ position: "sticky", top: embedded ? 54 : 0, zIndex: 30, background: C.paper, borderBottom: `1px solid ${C.line}`, scrollbarWidth: "none" }}>
-        {TABS.map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className="text-xs font-bold rounded px-3 py-2 whitespace-nowrap flex-shrink-0" style={{ background: tab === k ? C.navy : "transparent", color: tab === k ? "#fff" : C.dim }}>{k === "idpform" && idpStatus === "done" ? "IDP ✓" : k === "idpform" && idpStatus === "open" ? "IDP · open" : l}{k === "queries" && d.linked && d.queries.some((q) => q.status === "Open") ? ` · ${d.queries.filter((q) => q.status === "Open").length}` : ""}</button>
-        ))}
+    <div className="idp" style={{ minHeight: "100vh", background: "var(--i-ground)", color: "var(--i-text)" }}>
+      {/*
+        THE PHONE, NOT THE DESKTOP (Dr Raghu, 7 Sep 2026, with a design of his
+        own: "make the genie.nandan.co.in/idp like this").
+
+        Nine tabs in a strip that had to be scrolled sideways was a desktop
+        habit put on a phone — and almost everybody who opens this page opens
+        it on a phone. So: five things along the bottom where a thumb reaches,
+        the four a man actually wants (Home, Leave, Pay, Ask HR) and More for
+        the rest. Big targets, one column, and type at 17px because these are
+        read on the shop floor.
+      */}
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap" />
+      <style>{`
+        .idp{
+          --i-ink:#1B2233; --i-accent:#E4580B; --i-accent-ink:#fff; --i-accent-soft:#FDEBDF;
+          --i-ground:#F3F4F7; --i-surface:#fff; --i-surface-2:#F8F9FB; --i-line:#DCE0E8; --i-line-2:#C5CAD6;
+          --i-text:#1B2233; --i-muted:#5C6577; --i-faint:#8A93A5;
+          --i-good:#1F8A4C; --i-good-soft:#E3F3E9; --i-warn:#B8771A; --i-warn-soft:#FBF1DC;
+          --i-crit:#C13A2B; --i-header-muted:#AEB6C7;
+          --i-shadow:0 1px 2px rgba(27,34,51,.06),0 4px 14px rgba(27,34,51,.08);
+          font-family:"Source Sans 3","Segoe UI",system-ui,Roboto,Arial,sans-serif;
+          font-size:17px; line-height:1.4; -webkit-font-smoothing:antialiased;
+        }
+        .idp h1,.idp h2,.idp h3,.idp .disp{font-family:"Barlow","Segoe UI",system-ui,Roboto,Arial,sans-serif}
+        .idp .top{position:sticky;top:${embedded ? 54 : 0}px;z-index:30;background:var(--i-ink);color:#fff;
+          padding:12px 16px;display:flex;align-items:center;gap:12px;min-height:60px}
+        .idp .logo{width:34px;height:34px;border-radius:9px;background:var(--i-accent);display:grid;place-items:center;
+          font-family:Barlow,system-ui,sans-serif;font-weight:700;color:#fff;font-size:15px;flex:none}
+        .idp .avatar{width:40px;height:40px;border-radius:50%;background:var(--i-accent);color:#fff;display:grid;
+          place-items:center;font-family:Barlow,system-ui,sans-serif;font-weight:700;font-size:15px;flex:none}
+        .idp .wrap{max-width:560px;margin:0 auto;padding:16px 16px 104px}
+        .idp .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+        .idp .tile{background:var(--i-surface);border:1px solid var(--i-line);border-radius:10px;padding:10px;
+          min-height:78px;display:flex;flex-direction:column;justify-content:space-between;text-align:left}
+        .idp .tile .l{font-size:12px;color:var(--i-muted);line-height:1.2}
+        .idp .tile .v{font-family:Barlow,system-ui,sans-serif;font-weight:700;font-size:19px;line-height:1.1;margin-top:6px}
+        .idp .tile .f{font-size:11.5px;color:var(--i-faint);margin-top:4px}
+        @media (max-width:360px){.idp .tiles{grid-template-columns:1fr 1fr}.idp .tile:first-child{grid-column:1/-1}}
+        .idp .alert{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:10px;width:100%;
+          background:var(--i-warn-soft);border-left:4px solid var(--i-warn);min-height:56px;text-align:left}
+        .idp .action{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--i-surface);
+          border:1px solid var(--i-line);border-radius:14px;padding:14px;min-height:64px;box-shadow:var(--i-shadow)}
+        .idp .action:active{transform:scale(.99)}
+        .idp .action .ic{width:44px;height:44px;border-radius:12px;background:var(--i-surface-2);display:grid;
+          place-items:center;flex:none;border:1px solid var(--i-line);font-size:20px}
+        .idp .action .h{font-family:Barlow,system-ui,sans-serif;font-weight:600;font-size:17.5px}
+        .idp .action .dsc{font-size:14px;color:var(--i-muted);margin-top:2px}
+        .idp .action.primary{background:var(--i-ink);border-color:var(--i-ink);color:#fff}
+        .idp .action.primary .ic{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.14)}
+        .idp .action.primary .dsc{color:var(--i-header-muted)}
+        .idp .action.accent{background:var(--i-accent);border-color:var(--i-accent);color:#fff}
+        .idp .action.accent .ic{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.25)}
+        .idp .action.accent .dsc{color:#fff;opacity:.85}
+        .idp .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+        .idp .gbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+          background:var(--i-surface);border:1px solid var(--i-line);border-radius:10px;min-height:84px;padding:10px 6px;
+          font-family:Barlow,system-ui,sans-serif;font-weight:600;font-size:14px;text-align:center;line-height:1.15}
+        .idp .gbtn .e{font-size:22px}
+        .idp .sect{font-family:Barlow,system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:.06em;
+          text-transform:uppercase;color:var(--i-muted);margin-top:4px}
+        .idp .nav{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:repeat(5,1fr);
+          background:#fff;border-top:1px solid var(--i-line);padding:6px 4px calc(8px + env(safe-area-inset-bottom));
+          max-width:560px;margin:0 auto}
+        .idp .nav button{display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;padding:6px 2px;
+          border-radius:12px;color:var(--i-muted);font-family:Barlow,system-ui,sans-serif;font-size:12px;font-weight:600}
+        .idp .nav button .e{font-size:21px;line-height:1}
+        .idp .nav button[data-on="1"]{color:var(--i-accent)}
+        .idp .nav .cnt{position:absolute;margin-left:20px;margin-top:-3px;background:var(--i-accent);color:#fff;
+          font-size:11px;font-weight:700;min-width:18px;height:18px;padding:0 5px;border-radius:9px;display:grid;place-items:center}
+        .idp .list{display:flex;flex-direction:column;background:var(--i-surface);border:1px solid var(--i-line);
+          border-radius:14px;overflow:hidden}
+        .idp .item{display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:60px;
+          border-top:1px solid var(--i-line);text-align:left;width:100%}
+        .idp .item:first-child{border-top:0}
+      `}</style>
+
+      {/* ── the bar at the top ── */}
+      <div className="top">
+        {!embedded && <div className="logo">N</div>}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="disp" style={{ fontWeight: 700, fontSize: 18, lineHeight: 1.1 }}>Nandan Genie</div>
+          <div style={{ fontSize: 12.5, color: "var(--i-header-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {d.linked ? `${d.me.id} · ${d.me.designation || d.me.type}` : "Employee self-service"}
+          </div>
+        </div>
+        <div className="avatar">{initials || "N"}</div>
       </div>
       {msg && <div className="px-4 pt-3 text-sm font-semibold" style={{ color: msg.endsWith("✓") ? C.green : C.red }}>{msg}</div>}
 
-      <div className="px-3 py-3" style={{ maxWidth: 760, margin: "0 auto" }}>
+      <div className="wrap">
         {tab === "home" ? (
-          <div style={{ margin: "-12px -12px 0" }}>
-      {/* ── THE HOME PAGE (Dr Raghu, 7 Sep 2026: "this IDP front page is not
-             good"). One card: who you are, the three numbers that matter,
-             what is waiting on you — and then a COLUMN of plain buttons down
-             the left, big enough for a thumb, in the order he gave them. On
-             a phone the column is the whole width. ── */}
-      <div className="px-4 pt-4 pb-4" style={{ background: "#fff", borderBottom: `1px solid ${C.line}` }}>
-        <div className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {!embedded && <img src={LOGO} alt="Nandan GSE" style={{ height: 30 }} />}
-          <span style={{ flex: 1 }} />
-          <span className="text-xs" style={{ color: C.faint }}>{d.today}</span>
+          <div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div>
+          <div style={{ fontSize: 13, color: "var(--i-muted)" }}>{d.today}</div>
+          <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, lineHeight: 1.15 }}>
+            Namaste, {d.linked ? firstName(d.me.name) : firstName(name)}
+          </h1>
+          {d.linked && (
+            <>
+              <div style={{ fontWeight: 600, marginTop: 4 }}>
+                {d.me.designation || d.me.type}{d.me.department ? ` · ${d.me.department}` : ""}
+              </div>
+              <div style={{ color: "var(--i-muted)", fontSize: 14, marginTop: 2 }}>
+                {d.me.id}{d.me.doj ? ` · with Nandan since ${when(d.me.doj)}` : ""}{d.me.manager ? ` · reports to ${d.me.manager}` : ""}
+              </div>
+            </>
+          )}
         </div>
-        <div className="font-bold mt-3" style={{ fontSize: 26, lineHeight: 1.15 }}>
-          Dear {d.linked ? firstName(d.me.name) : firstName(name)}
-        </div>
-        {!d.linked && <div className="rounded-lg p-3 mt-3 text-sm" style={{ background: "#FFF7E6", border: "1px solid #F5B32B", color: "#8A5B00" }}>Your login is not linked to your employee record yet. Ask HR to set your Genie user on your record, and everything below fills in.</div>}
+
+        {!d.linked && (
+          <div className="alert"><div style={{ flex: 1, fontSize: 15 }}>
+            Your login is not linked to your employee record yet. Ask HR to set your Genie user on your record, and everything below fills in.
+          </div></div>
+        )}
 
         {d.linked && (
           <>
-            <div className="text-sm mt-1" style={{ color: C.dim, lineHeight: 1.6 }}>
-              <b>{d.me.designation || d.me.type}</b>{d.me.department ? ` · ${d.me.department}` : ""}<br />
-              <span style={{ color: C.faint, fontSize: 12.5 }}>
-                {d.me.id}{d.me.doj ? ` · with Nandan since ${when(d.me.doj)}` : ""}{d.me.manager ? ` · reports to ${d.me.manager}` : ""}
-              </span>
+            <div className="tiles">
+              <button className="tile" onClick={() => setTab("slips")}>
+                <div className="l">Last net pay</div>
+                <div className="v tnum">₹{inr(latest?.net)}</div>
+                <div className="f">{latest ? `for ${MONTHS[latest.month - 1]} ${latest.year}` : "no month yet"}</div>
+              </button>
+              <button className="tile" onClick={() => setTab("leave")}>
+                <div className="l">Leave balance</div>
+                <div className="v tnum">{d1(latest?.slip?.leave_cb)}</div>
+                <div className="f">{latest ? `as at ${MONTHS[latest.month - 1].slice(0, 3)} ${latest.year}` : "no month yet"}</div>
+              </button>
+              <button className="tile" onClick={() => setTab("loan")}>
+                <div className="l">Loan balance</div>
+                <div className="v tnum">₹{inr(latest?.slip?.loan_cb ?? 0)}</div>
+                <div className="f">{latest ? `as at ${MONTHS[latest.month - 1].slice(0, 3)} ${latest.year}` : "—"}</div>
+              </button>
             </div>
 
-            <div className="grid gap-2 mt-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
-              <Tile label="Last net pay" value={`₹${inr(latest?.net)}`} hint={latest ? `for ${MONTHS[latest.month - 1]} ${latest.year}` : "no month yet"} onClick={() => setTab("slips")} />
-              <Tile label="Leave balance" value={d1(latest?.slip?.leave_cb)} hint={latest ? `as at ${MONTHS[latest.month - 1].slice(0, 3)} ${latest.year}` : "no month yet"} onClick={() => setTab("leave")} />
-              <Tile label="Loan balance" value={`₹${inr(latest?.slip?.loan_cb ?? 0)}`} hint={latest ? `as at ${MONTHS[latest.month - 1].slice(0, 3)} ${latest.year}` : "—"} onClick={() => setTab("loan")} />
-            </div>
+            {/* what is actually waiting on him, not a general notice */}
+            {pending.map((pnd) => (
+              <button key={pnd} className="alert" onClick={() => setTab(/handbook/i.test(pnd) ? "handbook" : "learning")}>
+                <span style={{ fontSize: 20 }}>⚠️</span>
+                <div style={{ flex: 1, fontSize: 15 }}><b>Waiting on you:</b> {pnd}</div>
+                <span className="disp" style={{ fontWeight: 600, color: "var(--i-warn)" }}>Open</span>
+              </button>
+            ))}
 
-            {pending.length > 0 && <div className="rounded-lg px-3 py-2 mt-3 text-sm" style={{ background: "#FFF7E6", border: "1px solid #F5B32B", color: "#8A5B00" }}><b>Waiting on you:</b> {pending.join(" · ")}</div>}
             {teamBox}
             {dashboard}
 
-            {/* the column of buttons, in his order */}
-            <div className="mt-4" style={{ display: "grid", gap: 8, gridTemplateColumns: "minmax(0, 340px)" }}>
-              <BigButton onClick={() => setTab("slips")} tone="ink"
-                label={latest ? `📄 Payslip for ${MONTHS[latest.month - 1]} ${latest.year}` : "📄 Payslips"} />
-              <BigButton onClick={() => setTab("learning")} tone="ink" label="🎯 Learning Goals" />
-              <BigButton onClick={() => setTab("handbook")} tone="ink" label="📘 Employee Handbook" />
-              <BigButton onClick={() => setTab("queries")} tone="orange"
-                label={`💬 HR Queries${d.queries.some((q) => q.status === "Open") ? ` · ${d.queries.filter((q) => q.status === "Open").length} open` : ""}`} />
-              <div style={{ height: 4 }} />
-              {APPLY.map(([k, l]) => (
-                <BigButton key={k} onClick={() => { setApply(k); setMsg(""); }} tone="plain" label={l} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button className="action accent" onClick={() => { setApply("leave"); setMsg(""); }}>
+                <div className="ic">🗓️</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="h">Apply for Leave</div>
+                  <div className="dsc">{latest?.slip?.leave_cb != null ? `${d1(latest.slip.leave_cb)} days available` : "Goes to your reporting manager"}</div>
+                </div>
+                <span style={{ opacity: .8 }}>›</span>
+              </button>
+              <button className="action" onClick={() => setTab("slips")}>
+                <div className="ic">📄</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="h">Payslip{latest ? ` for ${MONTHS[latest.month - 1]} ${latest.year}` : "s"}</div>
+                  <div className="dsc">View, download, or ask a question</div>
+                </div>
+                <span style={{ color: "var(--i-faint)" }}>›</span>
+              </button>
+              <button className="action" onClick={() => setTab("queries")}>
+                <div className="ic">💬</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="h">Ask HR</div>
+                  <div className="dsc">{openQ ? `${openQ} open · ` : ""}Leave, pay, uniform, safety</div>
+                </div>
+                <span style={{ color: "var(--i-faint)" }}>›</span>
+              </button>
+              <button className="action" onClick={() => setTab("learning")}>
+                <div className="ic">🎯</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="h">Learning Goals</div>
+                  <div className="dsc">{d.learning.length ? `${d.learning.length} noted` : "Set with your manager"}</div>
+                </div>
+                <span style={{ color: "var(--i-faint)" }}>›</span>
+              </button>
+            </div>
+
+            <div className="sect">Requests</div>
+            <div className="grid3">
+              {APPLY.filter(([k]) => k !== "leave").map(([k, l]) => (
+                <button key={k} className="gbtn" onClick={() => { setApply(k); setMsg(""); }}>
+                  <span className="e">{APPLY_ICON[k] || "•"}</span>
+                  <span>{l.replace(/^Apply for /, "")}</span>
+                </button>
               ))}
+            </div>
+            <div style={{ fontSize: 13, color: "var(--i-faint)", textAlign: "center" }}>
+              Every request goes to your reporting manager first, then to HR.
             </div>
           </>
         )}
-      </div></div>
+      </div>
+      </div>
         ) : tab === "idpform" ? (
           <>{idpPanel ?? <Empty>The IDP is not open on this page.</Empty>}</>
         ) : !d.linked ? null : tab === "records" ? (
@@ -332,7 +476,7 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
             </a>
             <div className="text-sm mt-3" style={{ color: d.handbook.acknowledged ? C.green : "#8A5B00" }}>{d.handbook.acknowledged ? `✓ You acknowledged this edition on ${when(d.handbook.acknowledged)}.` : "You have not acknowledged this edition yet."}</div>
           </>
-        ) : (
+        ) : tab === "queries" ? (
           <>
             <a href="/hrms/query" target="_blank" rel="noreferrer" className="block rounded-lg p-3 mb-3 text-sm font-bold" style={{ background: C.orange, color: "#fff", textDecoration: "none" }}>+ Raise an HR query ↗</a>
             {d.queries.length === 0 && <Empty>Nothing raised yet.</Empty>}
@@ -344,7 +488,55 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
               </Card>
             ))}
           </>
-        )}
+        ) : tab === "more" ? (
+          /* EVERYTHING THE FIVE DO NOT CARRY. The old nine-tab strip lives on
+             here as a list — reachable, but not in the way of the four things
+             a man opens this page for. */
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }} key="more">
+            <div className="list">
+              {([["records", "HRIS record", "Address, bank, nominee, ID proofs"],
+                 ["loan", "Loan register", "Opening, added, deducted, closing"],
+                 ["idp", "IDP results", "Your sheet, the growth plan, your role"],
+                 ["learning", "Learning goals", "What you are working towards"],
+                 ["handbook", "Employee Handbook", `Edition ${d.handbook.edition}${d.handbook.acknowledged ? " · acknowledged" : " · not yet acknowledged"}`],
+                ] as [Tab, string, string][]).map(([k, h, sub]) => (
+                <button key={k} className="item" onClick={() => setTab(k)}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 16 }}>{h}</div>
+                    <div style={{ fontSize: 13.5, color: "var(--i-muted)", marginTop: 1 }}>{sub}</div>
+                  </div>
+                  <span style={{ color: "var(--i-faint)" }}>›</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="sect">Requests</div>
+            <div className="grid3">
+              {APPLY.map(([k, l]) => (
+                <button key={k} className="gbtn" onClick={() => { setApply(k); setMsg(""); }}>
+                  <span className="e">{APPLY_ICON[k] || "•"}</span>
+                  <span>{l.replace(/^Apply for /, "")}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 13, color: "var(--i-faint)", textAlign: "center" }}>
+              Nandan Genie · genie.nandan.co.in · Nandan GSE Pvt Ltd
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {/* ── the five along the bottom, where a thumb reaches ── */}
+      <div className="nav">
+        {([["home", "Home", "\u{1F3E0}"], ["leave", "Leave", "\u{1F5D3}\uFE0F"], ["slips", "Pay", "\u{1F4C4}"],
+           ["queries", "Ask HR", "\u{1F4AC}"], ["more", "More", "\u2630"]] as [Tab, string, string][]).map(([k, l, e]) => (
+          <button key={k} data-on={tab === k || (k === "more" && !["home", "leave", "slips", "queries"].includes(tab)) ? "1" : "0"}
+            onClick={() => setTab(k)}>
+            {k === "queries" && openQ > 0 && <span className="cnt">{openQ}</span>}
+            <span className="e">{e}</span>
+            <span>{l}</span>
+          </button>
+        ))}
       </div>
 
       {apply && d.linked && <ApplyBox kind={apply} spec={d.kinds[apply]} onClose={() => setApply(null)} onDone={(s) => { setApply(null); setMsg(`Sent to HR: ${s} ✓`); setTab("queries"); load(); }} />}
