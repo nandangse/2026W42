@@ -9,6 +9,7 @@ import { hrmsTables, FIELD_GROUPS } from "@/lib/hrms";
 import { people } from "@/lib/hrms-wa";
 import { extractSlips, slipsFromRegister, type Slip } from "@/lib/salary-slip";
 import { HANDBOOK_EDITION } from "@/lib/handbook-seed";
+import { salaryTable } from "@/lib/salary";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -24,6 +25,11 @@ export const maxDuration = 60;
  * second, lowercase-exact, never a pattern.
  */
 const CYCLE = "2026-27";
+/** The salary table reads by sheet header; the record keeps field keys. */
+const SHEET_TO_KEY: Record<string, string> = {
+  "Basic and DA": "basic_da", "HRA": "hra", "Fixed Allowance": "fixed_allowance",
+  "Conveyance": "conveyance", "Medical Allowance": "medical_allowance", "Site Allowance": "site_allowance",
+};
 /** The record groups the person reads on their own sheet. */
 const MY_GROUPS = ["identity", "contact", "personal", "family", "statutory", "pay", "bank", "benefits", "documents"];
 
@@ -165,6 +171,45 @@ export async function GET(req: Request) {
     const { data: qs } = await admin.from("hrms_query").select("id, subject, question, topic, status, answer, raised_at, answered_at, answered_by, form")
       .in("topic", ["HR Query", "Application", "Handbook"]).or(`raised_email.eq.${subject.toLowerCase()},employee_id.eq.${p.id}`).order("raised_at", { ascending: false }).limit(200);
 
+    /**
+     * WHAT THE IDP RESULTS PAGE SHOWS, in his order (Dr Raghu, 7 Sep 2026:
+     * "show the table up front, then Raghu's message, then the Growth Plan,
+     * then the Role, responsibility, KRA, KPI, Competence, then his form
+     * filled up").
+     *
+     * The salary table is the same one every other screen draws, so a person
+     * reads on their own page exactly what HR reads on theirs. The role and
+     * its competencies come from the register, by the role they actually
+     * hold. The growth note is Dr Raghu's letter to them.
+     */
+    const salary = salaryTable((k) => v[SHEET_TO_KEY[k] || k] ?? null, p.type);
+    let growth: { note: string | null; hi: string | null; at: string | null } | null = null;
+    try {
+      const { data: g } = await admin.from("hrms_appraisal")
+        .select("growth_note, growth_note_hi, growth_note_at")
+        .eq("employee_id", p.id).eq("cycle", CYCLE).maybeSingle();
+      if (g?.growth_note) growth = { note: g.growth_note, hi: g.growth_note_hi ?? null, at: g.growth_note_at ?? null };
+    } catch (e) { swallow("my/sheet growth", e); }
+
+    let roles: { role: string; job_description: string | null; deliverable: string | null; metric: string | null; competencies: { competency: string; level: string | null; note: string | null }[] }[] = [];
+    try {
+      const held = String(v.role || "").split(/[,;|]/).map((x) => x.trim()).filter(Boolean);
+      if (held.length) {
+        const { data: rs } = await admin.from("hrms_role")
+          .select("id, role, job_description, deliverable, metric").in("role", held);
+        const ids = (rs || []).map((r) => r.id);
+        const { data: cs } = ids.length
+          ? await admin.from("hrms_role_competency").select("role_id, competency, level, note").in("role_id", ids)
+          : { data: [] };
+        roles = (rs || []).map((r) => ({
+          role: String(r.role), job_description: r.job_description, deliverable: r.deliverable, metric: r.metric,
+          competencies: ((cs || []) as { role_id: string; competency: string; level: string | null; note: string | null }[])
+            .filter((c) => String(c.role_id) === String(r.id))
+            .map((c) => ({ competency: c.competency, level: c.level, note: c.note })),
+        }));
+      }
+    } catch (e) { swallow("my/sheet roles", e); }
+
     // ---- the handbook ----
     let acknowledged: string | null = null;
     try { const { data: a } = await admin.from("hrms_handbook_ack").select("acknowledged_at").eq("email", subject.toLowerCase()).eq("edition", HANDBOOK_EDITION).maybeSingle(); acknowledged = a?.acknowledged_at || null; } catch (e) { swallow("my/sheet", e); /* */ }
@@ -173,6 +218,8 @@ export async function GET(req: Request) {
       linked: true,
       me: { id: p.id, name: p.name, email: subject, type: p.type, department: p.department, designation: v.designation || null, doj: v.doj || null, location: v.location || null, manager: v.reporting_manager || null, phone: p.phone },
       record, months, idps: done, reviews, released, learning, queries: qs || [],
+      salary: salary ? { rows: salary.rows, gross: salary.gross, ctcLakhs: salary.ctcLakhs } : null,
+      growth, roles,
       handbook: { edition: HANDBOOK_EDITION, acknowledged },
       kinds: APPLICATION_KINDS,
       today: new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "long", year: "numeric" }),

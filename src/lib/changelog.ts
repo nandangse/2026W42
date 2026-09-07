@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.13.2",
+    date: "2026-09-07",
+    module: "IDP Results, in the order he asked for it",
+    items: [
+      "\"Show the table up front, then Raghu's message, then the Growth Plan, then the Role, responsibility, KRA, KPI, Competence, then his form filled up\" (Dr Raghu, 7 Sep 2026). Read top to bottom, that is the whole conversation — the money, the man who decided it, why, what the job asks, and last what they said themselves.",
+      "THE TABLE IS THE SAME ONE HR READS, so a person sees on their own page exactly what is on the Report Card. Every earning line and no further: \"use all the fields, upto gross\" — deductions and cost to company are not what he asked to show.",
+      "THE ROLE COMES FROM THE REGISTER, by the role they actually hold — the job description, the deliverable as KRA, the metric as KPI, and every competency that role asks for, with its level. All 200 people who hold a role have all four; nothing here is invented for anybody.",
+      "The growth note reads in Dr Raghu's own voice, with the Hindi beneath it for the floor. A place for his recorded message sits at the top and appears the moment one is put at /raghu-message.mp3 — until then nothing is drawn, rather than an empty player.",
+    ],
+  },
+  {
     v: "5.0.13.1",
     date: "2026-09-07",
     module: "\"Dear Dr\", and the IDP front page rebuilt",

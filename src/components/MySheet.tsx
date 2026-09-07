@@ -40,6 +40,10 @@ interface Sheet {
   learning: { id: string; note: string; at: string }[];
   queries: { id: string; subject: string; question: string; topic: string; status: string; answer: string | null; raised_at: string; answered_at: string | null; answered_by: string | null }[];
   handbook: { edition: string; acknowledged: string | null };
+  /** The IDP Results page: the table, the growth note, the role. */
+  salary?: { rows: { label: string; monthly: number | null; yearly: number | null; kind: string }[]; gross: number; ctcLakhs: string } | null;
+  growth?: { note: string; hi: string | null; at: string | null } | null;
+  roles?: { role: string; job_description: string | null; deliverable: string | null; metric: string | null; competencies: { competency: string; level: string | null; note: string | null }[] }[];
   kinds: Record<string, { label: string; fields: Field[] }>;
   today: string;
 }
@@ -211,6 +215,75 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
           )
         ) : tab === "idp" ? (
           <>
+            {/* HIS ORDER (Dr Raghu, 7 Sep 2026): "show the table up front,
+                then Raghu's message, then the Growth Plan, then the Role,
+                responsibility, KRA, KPI, Competence, then his form filled
+                up." Read top to bottom, it is the whole conversation. */}
+
+            {/* 1 · the table */}
+            {d.salary && (
+              <Card title="Your salary, as it stands">
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
+                  <tbody>
+                    {/* every earning line, up to the gross and no further
+                        (Dr Raghu, 7 Sep 2026: "use all the fields, upto
+                        gross") — what is below it is deductions and cost to
+                        the company, and neither is what he asked to show. */}
+                    {d.salary.rows.slice(0, d.salary.rows.findIndex((x) => x.kind === "total") + 1)
+                      .filter((r) => r.kind !== "note" && r.kind !== "head" && r.monthly != null).map((r, i) => (
+                      <tr key={i} style={{ background: r.kind === "total" ? "#FFF9C4" : undefined, fontWeight: r.kind === "row" ? 400 : 700 }}>
+                        <td style={{ padding: "5px 6px", borderTop: "1px solid #EEECE6" }}>{r.label}</td>
+                        <td className="tnum" style={{ padding: "5px 6px", borderTop: "1px solid #EEECE6", textAlign: "right" }}>₹{inr(r.monthly)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            )}
+
+            {/* 2 · Raghu's message to everybody */}
+            <Card title="A message from Dr Raghunandan Jagdish">
+              <audio controls preload="none" style={{ width: "100%" }} src="/raghu-message.mp3"
+                onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }} />
+              <div className="text-sm mt-2" style={{ lineHeight: 1.7 }}>
+                Every one of you matters to Nandan, and this year&apos;s plan is how we get the best from each other.
+                Read your growth note below, and your role beneath it.
+              </div>
+            </Card>
+
+            {/* 3 · the growth plan */}
+            {d.growth && (
+              <Card title="Your growth plan" tone="amber">
+                <div className="text-sm" style={{ whiteSpace: "pre-wrap", lineHeight: 1.75 }}>{d.growth.note}</div>
+                {d.growth.hi && (
+                  <div className="text-sm mt-3 pt-3" style={{ whiteSpace: "pre-wrap", lineHeight: 1.85, borderTop: "1px solid #EEECE6" }}>{d.growth.hi}</div>
+                )}
+              </Card>
+            )}
+
+            {/* 4 · the role, and what it asks of them */}
+            {d.roles?.map((r, i) => (
+              <Card key={i} title={`Your role — ${r.role}`}>
+                {r.job_description && <><div className="text-xs font-bold" style={{ color: C.faint }}>WHAT THE JOB IS</div><div className="text-sm mb-2" style={{ whiteSpace: "pre-wrap", lineHeight: 1.65 }}>{r.job_description}</div></>}
+                {r.deliverable && <><div className="text-xs font-bold" style={{ color: C.faint }}>WHAT YOU MUST DELIVER — KRA</div><div className="text-sm mb-2" style={{ whiteSpace: "pre-wrap", lineHeight: 1.65 }}>{r.deliverable}</div></>}
+                {r.metric && <><div className="text-xs font-bold" style={{ color: C.faint }}>HOW IT IS MEASURED — KPI</div><div className="text-sm mb-2" style={{ whiteSpace: "pre-wrap", lineHeight: 1.65 }}>{r.metric}</div></>}
+                {r.competencies.length > 0 && (
+                  <>
+                    <div className="text-xs font-bold" style={{ color: C.faint }}>COMPETENCIES THIS ROLE ASKS FOR</div>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {r.competencies.map((c, k) => (
+                        <span key={k} title={c.note || undefined} className="rounded px-2 py-1 text-xs font-semibold"
+                          style={{ background: "#F4F2EC", border: `1px solid ${C.line}` }}>
+                          {c.competency}{c.level ? ` · ${c.level}` : ""}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </Card>
+            ))}
+
+            {/* 5 · and finally, what they wrote themselves */}
             {d.released.map((r, i) => (
               <Card key={i} title={`Released — ${r.cycle}`} tone="green">
                 {r.new_designation && <div className="text-sm"><b>Designation:</b> {r.new_designation}</div>}
