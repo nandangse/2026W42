@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.15.4",
+    date: "2026-09-07",
+    module: "The stamp goes in the corner, and four samples chosen by shape",
+    items: [
+      "\"This is the stamp and sign — make sure its in a corner\" (Dr Raghu, 7 Sep 2026). Bottom right of the slip, clear of the note, larger than before and free to keep its own proportions — the way a seal is put on a document by hand. It is drawn only once a seal is placed at /nandan-stamp.png; until then nothing shows, because an empty square where a seal belongs looks worse than no seal at all.",
+      "\"In sample also show someone who has loan payment, someone who has advance payment, Labour contract, Contractor.\" The nine bands sample by MONEY, so they can miss the slips whose shape is what goes wrong — a deduction line nobody has checked, or an engagement type built by a different rule. A Contractor is Basic &amp; DA alone, with no HRA and no benefits, and no money band would ever have shown one.",
+      "Four more are chosen by shape, the biggest of each, since an error shows most plainly on a large number. Nobody already in a band is repeated, and where the month holds no such person the line says so. August has all four: 63 with a loan deducted, 62 with an advance, 12 Labour - Contract, 7 Contractors.",
+    ],
+  },
+  {
     v: "5.0.15.2",
     date: "2026-09-07",
     module: "The slip prints only the lines that carry something",

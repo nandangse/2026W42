@@ -181,7 +181,7 @@ export const SAMPLE_BANDS: { label: string; kind: "worker" | "staff"; lo: number
 export function pickSamples(slips: Slip[]): { label: string; slip: Slip | null }[] {
   const isWorker = (s: Slip) => /labour/i.test(String(s.category || ""));
   const isStaff = (s: Slip) => /^staff$/i.test(String(s.category || ""));
-  return SAMPLE_BANDS.map((b) => {
+  const out = SAMPLE_BANDS.map((b) => {
     const pool = slips.filter((s) =>
       (b.kind === "worker" ? isWorker(s) : isStaff(s)) &&
       !s.hold && (s.net || 0) > 0 &&
@@ -190,6 +190,34 @@ export function pickSamples(slips: Slip[]): { label: string; slip: Slip | null }
     pool.sort((a, c) => (a.gross_rate || 0) - (c.gross_rate || 0));
     return { label: b.label, slip: pool[Math.floor(pool.length / 2)] || null };
   });
+
+  /**
+   * THE CASES THAT LOOK DIFFERENT (Dr Raghu, 7 Sep 2026: "in sample also show
+   * someone who has loan payment, someone who has advance payment, Labour
+   * contract, Contractor").
+   *
+   * The bands sample by MONEY, so they can miss the shapes that go wrong —
+   * a deduction line nobody checked, or an engagement type whose slip is
+   * built by a different rule. These four are chosen by SHAPE instead: the
+   * biggest of each, since a large one shows an error most plainly.
+   *
+   * A person already shown in a band is not repeated; where nobody in the
+   * month fits, the line says so rather than quietly showing eight samples
+   * where nine were asked for.
+   */
+  const taken = new Set(out.map((x) => x.slip?.id).filter(Boolean));
+  const pick = (label: string, ok: (s: Slip) => boolean, by: (s: Slip) => number) => {
+    const hit = slips
+      .filter((s) => !s.hold && (s.net || 0) > 0 && !taken.has(s.id) && ok(s))
+      .sort((a, c) => by(c) - by(a))[0] || null;
+    if (hit) taken.add(hit.id);
+    out.push({ label, slip: hit });
+  };
+  pick("With a loan deduction", (s) => (s.loan_ded || 0) > 0, (s) => s.loan_ded || 0);
+  pick("With an advance deducted", (s) => (s.advance || 0) > 0, (s) => s.advance || 0);
+  pick("Labour - Contract", (s) => /labour\s*-\s*contract/i.test(String(s.category || "")), (s) => s.gross_rate || 0);
+  pick("Contractor", (s) => /^contractor$/i.test(String(s.category || "").trim()), (s) => s.gross_rate || 0);
+  return out;
 }
 
 // ─────────────────────────────────────────────────────────────────────────

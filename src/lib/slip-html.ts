@@ -84,7 +84,7 @@ ${money("Arrears", null, s.arrears, "", null)}
     Any issues please contact the HR Department or mail hr@nandan.co.in.<br>
     <b>This is a computer generated document and needs no signature when it reaches you from a Nandan GSE mail ID.</b>
   </div>
-  ${opts.stampUrl ? `<img src="${opts.stampUrl}" alt="" style="height:46px;width:46px;object-fit:contain;opacity:.9">` : ""}
+  ${opts.stampUrl ? `<img src="${opts.stampUrl}" alt="Nandan GSE Pvt Ltd" style="height:62px;width:auto;max-width:110px;object-fit:contain;align-self:flex-end;flex-shrink:0">` : ""}
 </div>
 </div></body></html>`;
 }

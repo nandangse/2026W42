@@ -236,8 +236,14 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
               </tbody>
             </table>
 
+            {/* THE STAMP SITS IN THE CORNER (Dr Raghu, 7 Sep 2026: "this is
+                the stamp and sign — make sure its in a corner"). Bottom
+                right, clear of the note, the way a seal is put on a document
+                by hand. It is drawn only when one has been placed at
+                /nandan-stamp.png; until then nothing shows, because an empty
+                square where a seal belongs looks worse than no seal. */}
             <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginTop: 3 }}>
-              <div style={{ fontSize: 6.6, color: "#5A6572", lineHeight: 1.45, flex: 1 }}>
+              <div style={{ fontSize: 6.6, color: "#5A6572", lineHeight: 1.45, flex: 1, paddingRight: 4 }}>
                 Note: Leave of one year will be kept in balance (8 nos for Labour and 15 nos for Staff). Please note this.<br />
                 Any issues please contact the HR Department or mail hr@nandan.co.in.<br />
                 <b>This is a computer generated document and needs no signature when it reaches you from a Nandan GSE mail ID.</b>
@@ -246,7 +252,9 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
                   Until then nothing is drawn — an empty box where a seal
                   should be looks worse than no seal at all. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/nandan-stamp.png" alt="" style={{ height: 46, width: 46, objectFit: "contain", opacity: 0.9 }}
+              <img src="/nandan-stamp.png" alt="Nandan GSE Pvt Ltd"
+                style={{ height: 62, width: "auto", maxWidth: 110, objectFit: "contain",
+                  alignSelf: "flex-end", flexShrink: 0, marginRight: 2, marginBottom: 1 }}
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
             </div>
           </div>

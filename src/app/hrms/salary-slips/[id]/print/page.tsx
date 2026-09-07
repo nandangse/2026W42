@@ -13,7 +13,11 @@ export const metadata: Metadata = { title: "Nandan HRMS Genie" };
 /**
  * /hrms/salary-slips/<sheetId>/print — A5 salary slips off the month's file.
  *
- *   ?samples=1   — the nine band samples (worker 10–30k, staff 20k–1.5L+)
+ *   ?samples=1   — nine by money band (worker 10–30k, staff 20k–1.5L+) and
+ *                  four by shape: a loan deduction, an advance, a Labour -
+ *                  Contract and a Contractor (Dr Raghu, 7 Sep 2026), because
+ *                  the bands sample by money and can miss the slips whose
+ *                  SHAPE is what goes wrong
  *   ?emp=6972    — one person's slip
  *   (neither)    — every slip in the file, one A5 page each
  *
