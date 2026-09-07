@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.6.1",
+    date: "2026-09-07",
+    module: "Per day on the appraisal, and medical for Staff alone",
+    items: [
+      "\"show here also per day payment\" and \"per day = gross/26 for labour and labour - contract, for rest 31\" (Dr Raghu, 7 Sep 2026). A fourth card beside the increment and the CTC: the new per-day rate, the divisor named on it so nobody has to remember which one applies, and the old per day underneath.",
+      "\"medical allowance is there only for staff\". A Prod - Fitter's card was still offering ₹1,250 marked always: the worker rule was written in one place and a second line put it back for everyone who was not on contract. Medical is now Staff and nobody else, on the appraisal desk. The roll already agreed — all 63 Staff carry a medical allowance and not one other person does — so nothing anybody holds today changes.",
+      "The Salary Rate List still works its own per day out as (gross − conveyance) ÷ 26 for everyone, which the payroll reads. That is a different number from this one and it has not been touched; say the word and it follows the same rule.",
+    ],
+  },
+  {
     v: "5.0.6.0",
     date: "2026-09-07",
     module: "The Appraisal Table in his own words — Released, Pending, and ticking rows",

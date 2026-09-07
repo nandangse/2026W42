@@ -18,7 +18,7 @@ import { swallow } from "@/lib/swallow";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 import { IDP_SECTIONS, IDP_RATINGS } from "@/lib/idp";
-import { NO_HRA_NO_MEDICAL, salaryTable, type SalaryRow, type ExtraRow } from "@/lib/salary";
+import { NO_HRA_NO_MEDICAL, payDaysFor, perDayOf, salaryTable, type SalaryRow, type ExtraRow } from "@/lib/salary";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
 import { inr } from "@/lib/fmt";
@@ -576,7 +576,11 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
     const basic = Math.round((target * pct) / 100);
     const hra = isWorker ? 0 : isStaff ? Math.round(basic * 0.2) : (baseComps.hra || 0);
     const conveyance = baseComps.conveyance || 0;   // fixed — never scaled
-    const medical = isWorker ? 0 : 1250;            // always, EXCEPT for workers
+    // MEDICAL BELONGS TO STAFF ALONE (Dr Raghu, 7 Sep 2026: "medical
+    // allowance is there only for staff"). The roll already says so — all
+    // 63 Staff carry it and nobody else does — so this only stops the
+    // appraisal desk offering it to somebody who never had it.
+    const medical = isStaff ? 1250 : 0;
     const fixed = Math.max(0, target - basic - hra - conveyance - medical);
     return { basic_da: String(basic), hra: String(hra), fixed: String(fixed), conveyance: String(conveyance), medical: String(medical) };
   }, [baseComps, isStaff, isContract, isWorker, basicPct]);
@@ -652,7 +656,8 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
     if (isContract) {
       for (const k of ["hra", "fixed", "conveyance", "medical"]) if (next[k] !== "0") { next[k] = "0"; touched = true; }
     } else {
-      if (next.medical !== "1250") { next.medical = "1250"; touched = true; }
+      const wantMedical = isStaff ? "1250" : "0";
+      if (next.medical !== wantMedical) { next.medical = wantMedical; touched = true; }
       if (isStaff) {
         const want = String(Math.round(basic * 0.2));
         if (next.hra !== want) { next.hra = want; touched = true; }
@@ -761,6 +766,16 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
           <Head n={`${inc >= 0 ? "+" : "−"}₹${inr(Math.abs(inc))}`} l="Increment / month" sub={prev ? `${inc >= 0 ? "+" : "−"}${Math.abs((inc / prev) * 100).toFixed(1)}% increment` : ""} good={inc >= 0} />
           <Head n={`${inc >= 0 ? "+" : "−"}₹${inr(Math.abs(inc) * 12)}`} l="Increment / year" good={inc >= 0} />
           {newTable && <Head n={`Rs ${newTable.ctcLakhs} L`} l="New annual CTC (approx)" good />}
+          {/* Per day (Dr Raghu, 7 Sep 2026): gross ÷ 26 for Labour and
+              Labour - Contract, ÷ 31 for everybody else. */}
+          {newTable && (
+            <Head
+              n={`₹${inr(Math.round(perDayOf(newTable.gross, d.employee.type) ?? 0))}`}
+              l={`Per day · gross ÷ ${payDaysFor(d.employee.type)}`}
+              sub={prev ? `was ₹${inr(Math.round(perDayOf(prev, d.employee.type) ?? 0))}` : undefined}
+              good={inc >= 0}
+            />
+          )}
         </div>
       )}
 
@@ -798,7 +813,7 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
                                 : isWorker && (key === "medical" || key === "hra")
                                 ? <span className="tnum" title="Workers are not paid HRA or Medical Allowance" style={{ color: C.dim }}>— <span style={{ fontSize: 10 }}>not for workers</span></span>
                                 : key === "medical"
-                                ? <span className="tnum" title="Medical Allowance is always ₹1,250 — the rule" style={{ fontWeight: 600 }}>
+                                ? <span className="tnum" title="Medical Allowance is ₹1,250 for Staff — and for Staff alone" style={{ fontWeight: 600 }}>
                                     {inr(Number(comps[key]) || 0)} <span style={{ fontSize: 10, color: C.dim }}>always</span>
                                   </span>
                                 : isStaff && key === "hra"

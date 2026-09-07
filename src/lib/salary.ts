@@ -40,6 +40,17 @@ export const CONTRACT_TYPES_SET = CONTRACT_TDS;
  */
 export const NO_HRA_NO_MEDICAL = new Set(["Labour", "Labour - Contract"]);
 
+/**
+ * PAY DAYS IN A MONTH, and so the per-day rate (Dr Raghu, 7 Sep 2026):
+ * "per day = gross/26 for labour and labour - contract, for rest 31."
+ */
+export const payDaysFor = (type: string | null | undefined): 26 | 31 =>
+  NO_HRA_NO_MEDICAL.has(String(type || "")) ? 26 : 31;
+
+/** The per-day rate on a gross, by his rule. */
+export const perDayOf = (gross: number | null | undefined, type: string | null | undefined): number | null =>
+  gross == null || !Number.isFinite(Number(gross)) ? null : Number(gross) / payDaysFor(type);
+
 /** The annual bonus belongs to Staff and Labour alone (same day). */
 const BONUS_TYPES = new Set(["Staff", "Labour"]);
 
