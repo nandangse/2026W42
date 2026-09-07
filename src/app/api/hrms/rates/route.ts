@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { payDaysFor } from "@/lib/salary";
 import { readBody } from "@/lib/validate";
 import { swallow } from "@/lib/swallow";
 import * as XLSX from "xlsx";
@@ -22,12 +23,15 @@ export const maxDuration = 120;
  * POST multipart (structure_id, file)             rows from a CSV/Excel, matched on Employee ID
  *
  * Gross and per-day are worked out on save: gross = basic + HRA + fixed +
- * conveyance + medical; per day = (gross − conveyance) ÷ 26, as the rules say.
+ * conveyance + medical; per day = gross ÷ 26 for Labour and Labour - Contract,
+ * ÷ 31 for everybody else (Dr Raghu, 7 Sep 2026). Payroll's own per-day —
+ * (basic + HRA + fixed + medical) ÷ 26, conveyance not counted — is his rule
+ * of 4 Sep for encashment and is untouched.
  */
 const num = (v: unknown) => { const n = Number(String(v ?? "").replace(/[₹,\s]/g, "")); return Number.isFinite(n) ? n : 0; };
-const derive = (r: { basic_da: number; hra: number; fixed_allowance: number; conveyance: number; medical_allowance: number }) => {
+const derive = (r: { basic_da: number; hra: number; fixed_allowance: number; conveyance: number; medical_allowance: number }, type?: string | null) => {
   const gross = r.basic_da + r.hra + r.fixed_allowance + r.conveyance + r.medical_allowance;
-  return { gross, per_day: Math.round((gross - r.conveyance) / 26) };
+  return { gross, per_day: Math.round(gross / payDaysFor(type ?? null)) };
 };
 
 export async function GET(req: Request) {
@@ -82,7 +86,7 @@ export async function POST(req: Request) {
         const L = grid[i] || []; const id = String(L[cId] ?? "").trim();
         if (!/^\d{4}$/.test(id)) continue;
         const r = { basic_da: num(L[cBasic]), hra: cHra >= 0 ? num(L[cHra]) : 0, fixed_allowance: cFixed >= 0 ? num(L[cFixed]) : 0, conveyance: cConv >= 0 ? num(L[cConv]) : 0, medical_allowance: cMed >= 0 ? num(L[cMed]) : 0 };
-        rows.push({ structure_id: sid, employee_id: id, name: cName >= 0 ? String(L[cName] || "") : null, type: cType >= 0 ? String(L[cType] || "") : null, department: cDept >= 0 ? String(L[cDept] || "") : null, designation: cDesig >= 0 ? String(L[cDesig] || "") : null, reporting_manager: cMgr >= 0 ? String(L[cMgr] || "") : null, ...r, ...derive(r), note: `imported from ${f.name}`, updated_by: stamp, updated_at: now });
+        rows.push({ structure_id: sid, employee_id: id, name: cName >= 0 ? String(L[cName] || "") : null, type: cType >= 0 ? String(L[cType] || "") : null, department: cDept >= 0 ? String(L[cDept] || "") : null, designation: cDesig >= 0 ? String(L[cDesig] || "") : null, reporting_manager: cMgr >= 0 ? String(L[cMgr] || "") : null, ...r, ...derive(r, cType >= 0 ? String(L[cType] || "") : null), note: `imported from ${f.name}`, updated_by: stamp, updated_at: now });
       }
       if (!rows.length) throw new HttpError(400, "No lines with a four-digit Employee ID were read.");
       const { error } = await admin.from("hrms_salary_rate").upsert(rows, { onConflict: "structure_id,employee_id" });
@@ -103,7 +107,7 @@ export async function POST(req: Request) {
       const ppl = await people(admin);
       const rows = ppl.map((p) => {
         const r = { basic_da: num(p.value.basic_da), hra: num(p.value.hra), fixed_allowance: num(p.value.fixed_allowance), conveyance: num(p.value.conveyance), medical_allowance: num(p.value.medical_allowance) };
-        return { structure_id: s.id, employee_id: p.id, name: p.name, type: p.type || null, department: p.department, designation: p.value.designation || null, reporting_manager: String(p.value.reporting_manager || p.value.reports_to || ""), ...r, ...derive(r), note: "from the record", updated_by: stamp, updated_at: now };
+        return { structure_id: s.id, employee_id: p.id, name: p.name, type: p.type || null, department: p.department, designation: p.value.designation || null, reporting_manager: String(p.value.reporting_manager || p.value.reports_to || ""), ...r, ...derive(r, p.type || null), note: "from the record", updated_by: stamp, updated_at: now };
       }).filter((r) => r.basic_da > 0 || r.gross > 0);
       for (let i = 0; i < rows.length; i += 200) { const { error: ie } = await admin.from("hrms_salary_rate").upsert(rows.slice(i, i + 200), { onConflict: "structure_id,employee_id" }); if (ie) throw new Error(ie.message); }
       return NextResponse.json({ ok: true, id: s.id, lines: rows.length });
@@ -155,11 +159,11 @@ export async function POST(req: Request) {
       const sid = String(body.structure_id || ""), eid = String(body.employee_id || "").trim();
       if (!sid || !/^\d{4}$/.test(eid)) throw new HttpError(400, "Structure and a four-digit Employee ID, please.");
       const r = { basic_da: num(body.basic_da), hra: num(body.hra), fixed_allowance: num(body.fixed_allowance), conveyance: num(body.conveyance), medical_allowance: num(body.medical_allowance) };
-      const row = { structure_id: sid, employee_id: eid, name: body.name ?? null, type: body.type ?? null, department: body.department ?? null, designation: body.designation ?? null, reporting_manager: body.reporting_manager ?? null, ...r, ...derive(r), note: body.note ?? null, updated_by: stamp, updated_at: now };
+      const row = { structure_id: sid, employee_id: eid, name: body.name ?? null, type: body.type ?? null, department: body.department ?? null, designation: body.designation ?? null, reporting_manager: body.reporting_manager ?? null, ...r, ...derive(r, (body.type as string) ?? null), note: body.note ?? null, updated_by: stamp, updated_at: now };
       const { error } = await admin.from("hrms_salary_rate").upsert(row, { onConflict: "structure_id,employee_id" });
       if (error) throw new Error(error.message);
       await admin.from("hrms_salary_structure").update({ updated_at: now }).eq("id", sid);
-      return NextResponse.json({ ok: true, ...derive(r) });
+      return NextResponse.json({ ok: true, ...derive(r, (body.type as string) ?? null) });
     }
 
     if (action === "remove_rate") {

@@ -241,7 +241,15 @@ export async function POST(req: Request) {
     const ensureMine = async (idpId: string) => {
       const { data: idp } = await admin.from("hrms_idp").select("id, person_email, submitted_at").eq("id", idpId).maybeSingle();
       if (!idp) throw new HttpError(404, "No such IDP.");
-      if (!emails.includes(String(idp.person_email).toLowerCase())) throw new HttpError(403, "That person is not in your team.");
+      /**
+       * DR RAGHU MAY REVIEW ANYBODY (7 Sep 2026: "have a button on this for
+       * me to give the manager IDP. I can give to anyone!! their manager may
+       * or may not do"). The team check counts a person as yours when their
+       * IDP e-mail matches a Genie login — and many were filled under a
+       * personal address that has no login, so even the owner was refused.
+       */
+      const owner = u.email.toLowerCase() === RAGHU_EMAIL;
+      if (!owner && !emails.includes(String(idp.person_email).toLowerCase())) throw new HttpError(403, "That person is not in your team.");
       if (!idp.submitted_at) throw new HttpError(409, "They have not submitted yet.");
       const { data: rv } = await admin
         .from("hrms_idp_review")

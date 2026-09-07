@@ -20,6 +20,7 @@ import { fmtFull } from "@/lib/schedule";
 import { IDP_SECTIONS, IDP_RATINGS } from "@/lib/idp";
 import { NO_HRA_NO_MEDICAL, payDaysFor, perDayOf, salaryTable, type SalaryRow, type ExtraRow } from "@/lib/salary";
 import { Pane } from "./Pane";
+import { TeamReview, type TeamRow } from "@/components/IdpTeamReview";
 import { C } from "./RecordFields";
 import { inr } from "@/lib/fmt";
 
@@ -62,6 +63,22 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
   const [pick, setPick] = useState("");
   const [d, setD] = useState<PersonData | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Self IDP");
+  // Dr Raghu, 7 Sep 2026: "also make this a search box" — 205 people is too
+  // many for a dropdown; type a name or an ID and pick from what matches.
+  const [pickQ, setPickQ] = useState("");
+  const [pickOpen, setPickOpen] = useState(false);
+  const [ownReview, setOwnReview] = useState<TeamRow | null>(null);
+  useEffect(() => {
+    const who2 = (people || []).find((p2) => (p2.employee_id || p2.idpId) === pick);
+    if (who2 && !pickOpen) setPickQ(who2.name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pick, people]);
+  const pickHits = useMemo(() => {
+    const q = pickQ.trim().toLowerCase();
+    const all = people || [];
+    if (!q) return all.slice(0, 60);
+    return all.filter((p2) => `${p2.employee_id || ""} ${p2.name}`.toLowerCase().includes(q)).slice(0, 60);
+  }, [people, pickQ]);
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
@@ -87,18 +104,27 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: C.red }}>{msg}</div>}
 
       <div className="flex items-center gap-2 flex-wrap mb-3 no-print">
-        <select value={pick} onChange={(e) => setPick(e.target.value)}
-          className="text-sm rounded px-2 py-2 bg-white" style={{ border: `1px solid ${C.line}`, minWidth: 260 }}>
-          <option value="">— choose a person (those with an IDP) —</option>
-          {pick && !(people || []).some((p) => p.employee_id === pick) && (
-            <option value={pick}>{pick} (no IDP yet)</option>
+        <div className="relative" style={{ maxWidth: 420 }}>
+          <input value={pickQ} onChange={(e) => { setPickQ(e.target.value); setPickOpen(true); }} onFocus={() => setPickOpen(true)}
+            placeholder="type a name or an EmployeeID…"
+            className="w-full px-3 py-2 rounded border" style={{ borderColor: C.line, fontSize: 14 }} />
+          {pickOpen && (
+            <>
+              <span className="fixed inset-0" style={{ zIndex: 58 }} onClick={() => setPickOpen(false)} />
+              <div className="absolute rounded-lg border bg-white" style={{ top: "calc(100% + 4px)", left: 0, right: 0, maxHeight: 320, overflowY: "auto", borderColor: C.line, boxShadow: "0 12px 30px rgba(0,0,0,.2)", zIndex: 59 }}>
+                {pickHits.length === 0 && <div className="px-3 py-2 text-sm" style={{ color: C.faint }}>Nobody matches.</div>}
+                {pickHits.map((p2) => (
+                  <button key={p2.idpId} onClick={() => { setPick(p2.employee_id || p2.idpId); setPickQ(p2.name); setPickOpen(false); }}
+                    className="block w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50"
+                    style={{ background: (p2.employee_id || p2.idpId) === pick ? "#FFF3E8" : undefined }}>
+                    <b>{p2.employee_id || "—"}</b> · {p2.name}
+                    {p2.submitted_at && <span className="ml-1 text-xs" style={{ color: C.green }}>IDP in</span>}
+                  </button>
+                ))}
+              </div>
+            </>
           )}
-          {(people || []).map((p) => (
-            <option key={p.idpId} value={p.employee_id!}>
-              {p.employee_id} · {p.name}{p.submitted_at ? "" : " (not submitted)"}
-            </option>
-          ))}
-        </select>
+        </div>
         {people !== null && people.length === 0 && <span className="text-xs" style={{ color: C.faint }}>Nobody has an IDP yet.</span>}
         {/* the interview's opening words (Dr Raghu, 29 Aug 2026) — in the
             blank space to the right, where the eye rests before the sit-down */}
@@ -141,7 +167,13 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
           </div>
 
           {tab === "Self IDP" && <SelfTab d={d} />}
-          {tab === "Manager IDP comment" && <ManagerTab d={d} />}
+          {tab === "Manager IDP comment" && (
+            <ManagerTab d={d} isOwner={isOwner} onWrite={() => d.idp && setOwnReview({
+              idpId: d.idp.id, name: d.employee.name, email: "", employeeId: d.employee.id,
+              role: d.employee.designation, depth: 1, submitted_at: d.idp.submitted_at,
+              review: d.reviews[0] ? { submitted_at: d.reviews[0].submitted_at } : null,
+            })} />
+          )}
           {tab === "Finalised IDP for Employee" && <FinalisedTab d={d} />}
           {tab === "Growth note" && <GrowthNoteTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
           {tab === "Raghu's brief" && <RaghuBriefTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
@@ -149,6 +181,7 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
           {tab === "Appraisal Final" && <AppraisalTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
         </>
       )}
+      {ownReview && <TeamReview row={ownReview} onClose={() => { setOwnReview(null); load(pick); }} />}
     </Pane>
   );
 }
@@ -190,8 +223,22 @@ function SelfTab({ d }: { d: PersonData }) {
 }
 
 /* ── 2 · the manager: ratings, salary direction, comments — nothing else ── */
-function ManagerTab({ d }: { d: PersonData }) {
-  if (!d.reviews.length) return <None what="No manager review yet" />;
+function ManagerTab({ d, isOwner, onWrite }: { d: PersonData; isOwner: boolean; onWrite: () => void }) {
+  /**
+   * "have a button on this for me to give the manager IDP. I can give to
+   * anyone!! their manager may or may not do" (Dr Raghu, 7 Sep 2026).
+   */
+  const writeBtn = isOwner && d.idp?.submitted_at ? (
+    <button onClick={onWrite} className="rounded px-3 py-1.5 text-xs font-bold text-white mb-3" style={{ background: "var(--blue)" }}
+      title="Write the manager review yourself — the same screen their manager would use">
+      ✎ {d.reviews.length ? "Write / change the manager review myself" : "Write the manager review myself"}
+    </button>
+  ) : null;
+  if (!d.reviews.length) return <div>{writeBtn}<None what="No manager review yet" /></div>;
+  return (<div>{writeBtn}{<ManagerReviews d={d} />}</div>);
+}
+
+function ManagerReviews({ d }: { d: PersonData }) {
   return (
     <>
       {d.reviews.map((r) => (

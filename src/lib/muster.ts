@@ -244,7 +244,7 @@ export function generateRegister(
       from = "rates";
       basic = rr.basic_da ?? 0; fixed = rr.fixed ?? 0; conv = rr.conveyance ?? 0; med = rr.medical ?? 0;
       if (!basic && rr.gross) basic = rr.gross - (rr.hra ?? 0) - fixed - conv - med;
-      if (rr.per_day && !basic) basic = rr.per_day * 26;
+      if (rr.per_day && !basic) basic = rr.per_day * payDays;   // the rate list divides by 26 or 31 by type (7 Sep 2026)
     } else if (rec) {
       basic = num(rec.get("Basic and DA")); fixed = num(rec.get("Fixed Allowance")); conv = num(rec.get("Conveyance")); med = worker ? 0 : num(rec.get("Medical Allowance"));
       if (basic) from = "record";

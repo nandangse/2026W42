@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.6.2",
+    date: "2026-09-07",
+    module: "The Report Card searches, he can write any manager review, and the rate list follows his per-day rule",
+    items: [
+      "\"also make this a search box\" (Dr Raghu, 7 Sep 2026). Two hundred and five people is too many for a dropdown: the Report Card's picker is a search box — type a name or an EmployeeID, see who matches with a mark against those whose IDP is in, and pick.",
+      "\"have a button on this for me to give the manager IDP. I can give to anyone!! their manager may or may not do.\" The Manager IDP comment tab carries that button for him, opening the very screen a manager would use — ratings, the spoken note, the proposal. It works for anybody: the team check counted a person as yours only when their IDP e-mail matched a Genie login, and many were filled under a personal address, so even the owner was being refused.",
+      "\"yes ur formula is right\" — the Salary Rate List's per day now reads gross ÷ 26 for Labour and Labour - Contract and ÷ 31 for everyone else, the same rule as the appraisal card. Payroll's own per-day for encashment — basic, HRA, fixed and medical divided by 26, conveyance not counted — is his rule of 4 September and has not been touched.",
+    ],
+  },
+  {
     v: "5.0.6.1",
     date: "2026-09-07",
     module: "Per day on the appraisal, and medical for Staff alone",
