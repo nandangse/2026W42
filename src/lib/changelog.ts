@@ -78,6 +78,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.7.0",
+    date: "2026-09-07",
+    module: "HRMS — the workers' revision, loaded in one go",
+    items: [
+      "\"can u check this ... only consider the Labour and Labour - Contract ... verify that this can be uploaded to the appraisal\" (Dr Raghu, 7 Sep 2026, with the Salary Revision Master). Checked first: 131 workers, every EmployeeID known to Genie and active, every row's parts adding to its stated gross on both sides, no worker carrying HRA or medical in the new block, and every new per-day equal to gross ÷ 26 — his own rule of the same morning. 123 rise, 8 stand, none fall: ₹4,25,942 more a month, 17.7%, ₹51.1 lakh a year.",
+      "\"yes. the staff and others i will do in the HRMS itself.\" The Appraisal Table has a Load the revision sheet button for the owner. The sheet carries each person twice — today's structure, a blank column, then the new one — so it reads the SECOND block against the EmployeeID. Check it first prints what would happen, person by person, with the totals, anybody who would go down, and everyone skipped with the reason. Only then does the second button write.",
+      "WHAT IT WRITES. Each worker's appraisal, with the new gross and its split, the previous gross worked out by the same arithmetic every other screen uses, the day the rate starts (1 August 2026 by default) and a note that everything before it was paid as interim bonus rather than arrears. Everything lands as PROPOSED — nothing is finalised or released by the load. Migration 0150.",
+      "AND THEN: ticked rows can be finalised in one go, which was the missing step between proposing and releasing. So the round runs load → tick → Finalise → Mark released, with the growth notes written whenever suits.",
+      "Seven people to look at before loading: the sheet calls 6605, 6611 and 6621 plain Labour where their records say Labour - Contract, and 6996 to 6999 have no type on their record at all. The load skips anyone whose record is not Labour or Labour - Contract and names them, so nothing goes in quietly.",
+    ],
+  },
+  {
     v: "5.0.6.2",
     date: "2026-09-07",
     module: "The Report Card searches, he can write any manager review, and the rate list follows his per-day rule",

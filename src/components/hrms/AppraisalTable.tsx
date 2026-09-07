@@ -64,6 +64,7 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
   // the mass run of growth notes (Dr Raghu, 7 Sep 2026: "it will be generated
   // for all in mass at the end together")
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [importing, setImporting] = useState(false);
   const [run, setRun] = useState<{ done: number; of: number; now: string; fail: number } | null>(null);
   const stop = useState<{ v: boolean }>({ v: false })[0];
   const [minPay, setMinPay] = useState("");
@@ -255,6 +256,18 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
   // Dr Raghu, 7 Sep 2026: "also in this put pending" — everybody not yet finalised.
   const pending = (rows || []).filter((r) => r.stage !== "Appraisal Finalised" && r.stage !== "Released").length;
 
+  /** Approve the proposed gross for everybody ticked — the step before releasing. */
+  const finalise = async (ids: string[]) => {
+    if (!ids.length) return;
+    if (!window.confirm(`Finalise ${ids.length} ${ids.length === 1 ? "appraisal" : "appraisals"}?\n\nThis approves the new gross that is proposed on each. Releasing is a separate step.`)) return;
+    setMsg("");
+    try {
+      const r = await api.post("/api/hrms/idp", { action: "approve-appraisal", ids });
+      setMsg(`${r.approved} finalised${r.approved < ids.length ? ` · ${ids.length - r.approved} skipped, nothing proposed on them` : ""} ✓`);
+      const j = await api.get("/api/hrms/idp?table=1"); setRows(j.rows || []); setPicked(new Set());
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
   /** Mark one or many as released — or take it back. */
   const release = async (ids: string[], on: boolean) => {
     setMsg("");
@@ -363,6 +376,13 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
           <option value="">Any experience</option>
           {EXP_BANDS.map(([l]) => (<option key={l} value={l}>{l}</option>))}
         </select>
+        {isOwner && (
+          <button onClick={() => setImporting(true)} className="text-xs font-bold rounded px-2.5 py-1.5 text-white"
+            style={{ background: "var(--blue)", whiteSpace: "nowrap" }}
+            title="Load the Salary Revision Master — the workers' new rates, straight onto their appraisals">
+            ⬆ Load the revision sheet
+          </button>
+        )}
         {/* THE MASS RUN (Dr Raghu, 7 Sep 2026) — writes the growth note for
             everybody the filters have left on screen who has none yet. */}
         {isOwner && (
@@ -406,23 +426,175 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
           {picked.size > 0 && (
             <>
               <button onClick={() => massGrowth([...picked])} disabled={!!run} className="font-bold rounded px-2.5 py-1 text-white" style={{ background: run ? "#B9BEC4" : "#0D7A3F" }}>✨ Write their growth notes</button>
+              <button onClick={() => finalise([...picked])} className="font-bold rounded px-2.5 py-1 text-white" style={{ background: "var(--blue)" }} title="Approve the new gross for everybody ticked — the step before releasing">✓ Finalise</button>
               <button onClick={() => release([...picked], true)} className="font-bold rounded px-2.5 py-1 text-white" style={{ background: "var(--green)" }}>✓ Mark released</button>
               <button onClick={() => release([...picked], false)} className="font-semibold rounded px-2.5 py-1 bg-white" style={{ border: `1px solid ${C.line}`, color: "var(--red)" }}>take release back</button>
             </>
           )}
         </div>
       )}
+      {importing && <RevisionImport onClose={() => setImporting(false)} onDone={async () => { const j = await api.get("/api/hrms/idp?table=1"); setRows(j.rows || []); }} />}
       <DataTable columns={columns} rows={shown} rowKey={(r) => r.id} initialFrozen={2}
         empty={rows === null ? "loading…" : "Nobody matches those filters."} />
     </Pane>
   );
 }
 
-function Stat({ n, l, green }: { n: number; l: string; green?: boolean }) {
+function Stat({ n, l, green }: { n: number | string; l: string; green?: boolean }) {
   return (
     <div className="bg-white rounded-lg border px-3 py-2" style={{ borderColor: C.line, minWidth: 120 }}>
       <div className="font-bold tnum" style={{ fontSize: 21, lineHeight: 1.1, color: green && n ? C.green : C.ink }}>{n}</div>
       <div style={{ fontSize: 11, color: C.faint }}>{l}</div>
+    </div>
+  );
+}
+
+/* ─────────────────── the workers' revision, loaded in one go ───────────────────
+   Dr Raghu, 7 Sep 2026: the Salary Revision Master carries each person twice —
+   what they are on today, then a blank column, then the new structure. This
+   reads the SECOND block against the EmployeeID, shows what it would do, and
+   writes each worker's appraisal as proposed. Staff and the rest he does in
+   the HRMS itself, so anybody who is not Labour or Labour - Contract is
+   skipped and named. */
+type Took = { id: string; name: string; type: string; prev: number; next: number; diff: number };
+type Skip = { id: string; name: string; why: string };
+
+function RevisionImport({ onClose, onDone }: { onClose: () => void; onDone: () => Promise<void> }) {
+  const [rows, setRows] = useState<Record<string, string | number>[] | null>(null);
+  const [fileName, setFileName] = useState("");
+  const [eff, setEff] = useState("2026-08-01");
+  const [note, setNote] = useState("Rate revised from 1 August 2026. Everything before that date was paid as interim bonus, not arrears.");
+  const [pre, setPre] = useState<{ totals: Record<string, number>; took: Took[]; skipped: Skip[] } | null>(null);
+  const [busy, setBusy] = useState("");
+  const [msg, setMsg] = useState("");
+  const [done, setDone] = useState("");
+
+  /** The CSV, read here. The new block is the SECOND time each header appears. */
+  const parse = (text: string) => {
+    const out: string[][] = []; let cur = ""; let row: string[] = []; let inQ = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQ) { if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else inQ = false; } else cur += ch; }
+      else if (ch === '"') inQ = true;
+      else if (ch === ",") { row.push(cur); cur = ""; }
+      else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cur); out.push(row); row = []; cur = ""; }
+      else cur += ch;
+    }
+    if (cur || row.length) { row.push(cur); out.push(row); }
+    const head = (out.shift() || []).map((h) => h.trim().toLowerCase());
+    const last = (name: string) => head.lastIndexOf(name);      // the NEW block
+    const first = (name: string) => head.indexOf(name);
+    const C = {
+      id: first("id"), type: first("type"),
+      basic: last("basic and da"), hra: last("hra"), fixed: last("fixed allowance"),
+      conv: last("conveyance"), med: last("medical allowance"), gross: last("gross salary"),
+      desig: last("designation"),
+    };
+    if (C.id < 0 || C.basic < 0) throw new Error("That file has no ID column, or no second Basic and DA — is it the Salary Revision Master?");
+    if (C.basic === first("basic and da")) throw new Error("Only one salary block in that file — the revision sheet carries the old one and then the new one.");
+    const n = (v: string) => Number(String(v || "").replace(/[₹,\s]/g, "")) || 0;
+    const g = (r: string[], i: number) => (i >= 0 ? (r[i] || "").trim() : "");
+    return out.filter((r) => g(r, C.id)).map((r) => ({
+      employee_id: g(r, C.id), type: g(r, C.type),
+      basic_da: n(g(r, C.basic)), hra: n(g(r, C.hra)), fixed_allowance: n(g(r, C.fixed)),
+      conveyance: n(g(r, C.conv)), medical_allowance: n(g(r, C.med)), gross: n(g(r, C.gross)),
+      designation: g(r, C.desig),
+    }));
+  };
+
+  const pick = async (file: File | null) => {
+    if (!file) return;
+    setMsg(""); setPre(null); setDone(""); setFileName(file.name);
+    try { setRows(parse(await file.text())); } catch (e) { setRows(null); setMsg(e instanceof Error ? e.message : String(e)); }
+  };
+  const run = async (preview: boolean) => {
+    if (!rows?.length) return;
+    setBusy(preview ? "preview" : "load"); setMsg("");
+    try {
+      if (preview) {
+        const r = await api.post("/api/hrms/appraisal-import", { rows, effective_from: eff, note, preview: true });
+        setPre({ totals: r.totals, took: r.took || [], skipped: r.skipped || [] });
+      } else {
+        const r = await api.post("/api/hrms/appraisal-import", { rows, effective_from: eff, note });
+        setDone(`${r.totals.people} appraisals written, proposed and waiting to be finalised${r.totals.skipped ? ` · ${r.totals.skipped} skipped` : ""} ✓`);
+        await onDone();
+      }
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy("");
+  };
+
+  const T = pre?.totals;
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,.55)", zIndex: 70, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "28px 12px", overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg genie-modal" style={{ width: "min(940px, 100%)", maxHeight: "92vh", overflowY: "auto" }}>
+        <div className="px-4 py-3 flex items-center gap-3" style={{ background: "var(--navy)", color: "#fff", position: "sticky", top: 0, zIndex: 2 }}>
+          <div className="font-bold flex-1" style={{ fontSize: 16 }}>Load the salary revision — Labour and Labour - Contract</div>
+          <button onClick={onClose} style={{ color: "#8FA1B3", fontSize: 20, lineHeight: 1 }}>✕</button>
+        </div>
+        <div className="p-4">
+          <p className="text-sm mb-3" style={{ color: C.dim, lineHeight: 1.6 }}>
+            The Salary Revision Master carries every person twice: what they are on today, then the new structure. This reads the
+            <b> new</b> block against the EmployeeID and writes each worker&apos;s appraisal as <b>proposed</b> — nothing is finalised
+            or released here. Staff and the rest are skipped and named; you do those in the HRMS.
+          </p>
+          <div className="flex gap-3 flex-wrap items-end mb-3">
+            <label className="text-xs font-bold" style={{ color: C.dim }}>THE FILE
+              <input type="file" accept=".csv,text/csv" onChange={(e) => { pick(e.target.files?.[0] ?? null); e.target.value = ""; }} className="block mt-1 text-xs" /></label>
+            <label className="text-xs font-bold" style={{ color: C.dim }}>NEW RATE STARTS
+              <input type="date" value={eff} onChange={(e) => setEff(e.target.value)} className="block mt-1 px-2 py-1.5 rounded border tnum" style={{ borderColor: C.line }} /></label>
+            <label className="text-xs font-bold flex-1" style={{ color: C.dim, minWidth: 260 }}>NOTE ON EVERY ROW
+              <input value={note} onChange={(e) => setNote(e.target.value)} className="block w-full mt-1 px-2 py-1.5 rounded border font-normal" style={{ borderColor: C.line }} /></label>
+          </div>
+          {rows && <div className="text-sm mb-2"><b>{rows.length}</b> rows read from {fileName}</div>}
+          {msg && <div className="text-xs font-bold mb-2" style={{ color: "var(--red)" }}>{msg}</div>}
+          {done && <div className="text-sm font-bold mb-2" style={{ color: "var(--green)" }}>{done}</div>}
+          <div className="flex gap-2 mb-3">
+            <button onClick={() => run(true)} disabled={!rows || !!busy} className="rounded px-3 py-1.5 text-xs font-bold text-white" style={{ background: rows && !busy ? "var(--navy)" : "#B9BEC4" }}>
+              {busy === "preview" ? "checking…" : "1 · Check it first"}
+            </button>
+            <button onClick={() => run(false)} disabled={!pre || !!busy || !!done} className="rounded px-3 py-1.5 text-xs font-bold text-white" style={{ background: pre && !busy && !done ? C.orange : "#B9BEC4" }}>
+              {busy === "load" ? "writing…" : `2 · Write ${T ? T.people : ""} appraisals`}
+            </button>
+          </div>
+          {T && (
+            <>
+              <div className="flex gap-2 flex-wrap mb-2">
+                <Stat n={T.people} l="workers matched" />
+                <Stat n={`₹${inr(T.next - T.prev)}`} l="more each month" green />
+                <Stat n={`₹${inr((T.next - T.prev) * 12)}`} l="a full year" green />
+                <Stat n={T.skipped} l="skipped" />
+              </div>
+              {(T.down > 0 || T.unchanged > 0) && (
+                <div className="text-xs mb-2" style={{ color: "#8A5B00" }}>
+                  {T.unchanged > 0 && <>{T.unchanged} unchanged. </>}{T.down > 0 && <b>{T.down} would go DOWN — look before you write.</b>}
+                </div>
+              )}
+              {pre.skipped.length > 0 && (
+                <div className="rounded border p-2 mb-2" style={{ borderColor: C.line, background: "#FBFAF7", maxHeight: 150, overflowY: "auto" }}>
+                  <div className="text-xs font-bold mb-1" style={{ color: C.faint }}>SKIPPED</div>
+                  {pre.skipped.map((s) => <div key={s.id} className="text-xs" style={{ color: C.dim }}><b>{s.id}</b> {s.name} — {s.why}</div>)}
+                </div>
+              )}
+              <div className="genie-scroll" style={{ maxHeight: 300 }}>
+                <table className="genie-table">
+                  <thead><tr><th>ID</th><th>Name</th><th>Type</th><th className="num">Now</th><th className="num">New</th><th className="num">Change</th></tr></thead>
+                  <tbody>
+                    {pre.took.map((t) => (
+                      <tr key={t.id}>
+                        <td className="tnum">{t.id}</td><td>{t.name}</td><td>{t.type}</td>
+                        <td className="num tnum">{inr(t.prev)}</td><td className="num tnum"><b>{inr(t.next)}</b></td>
+                        <td className="num tnum" style={{ color: t.diff > 0 ? "var(--green)" : t.diff < 0 ? "var(--red)" : C.faint, fontWeight: 700 }}>
+                          {t.diff > 0 ? "+" : ""}{inr(t.diff)}{t.prev ? ` (${((t.diff / t.prev) * 100).toFixed(1)}%)` : ""}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
