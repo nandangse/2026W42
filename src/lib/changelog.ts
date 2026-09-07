@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.10.6",
+    date: "2026-09-07",
+    module: "The appraisal download carries the whole new structure",
+    items: [
+      "\"In the appraisal table put in the new basic and DA, HR allowance, site allowance, gross total, total per day, per-day basis, new designation ... a number of approved total increase per month on gross, per-day increase, new per day. Make this downloadable as an Excel from the sheet itself.\" (Dr Raghu, 7 Sep 2026). All of it now rides in the download.",
+      "IT CARRIES WHAT WAS AGREED, NOT A RE-SPLIT. Where an appraisal was saved with its components edited by hand, those are the numbers that go out; only where none was saved does Genie split the new gross by its own rule — and a <b>Parts agreed</b> column says which of the two you are looking at, rather than leaving both to look alike.",
+      "His eighteen revision-sheet columns are untouched and still first, in his order, so the paste into Vinay's roster still lands by position. Everything new rides after the eighteenth, where a paste cannot reach.",
+      "THE TOTALS COUNT THE FINALISED ONLY. Previous gross, new gross, increase per month, increase per day, new per day and site allowance are summed over the appraisals actually finalised — a proposal nobody has agreed is not a commitment, and adding it to the same figure would overstate what the month owes. The count says how many of the shown rows it covers.",
+    ],
+  },
+  {
     v: "5.0.10.5",
     date: "2026-09-07",
     module: "Records can be rejected, not only approved",

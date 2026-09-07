@@ -7,7 +7,7 @@ import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { NextResponse as NR } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, FIELD_GROUPS } from "@/lib/hrms";
-import { salaryTable, scaledGetter, num } from "@/lib/salary";
+import { salaryTable, scaledGetter, num, splitGross, payDaysFor } from "@/lib/salary";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +19,7 @@ const CYCLE_TBL = "2026-27";
 const SHEET_TO_FIELD: Record<string, string> = {
   "Basic and DA": "basic_da", "HRA": "hra", "Fixed Allowance": "fixed_allowance",
   "Conveyance": "conveyance", "Medical Allowance": "medical_allowance",
+  "Site Allowance": "site_allowance",
 };
 
 /**
@@ -53,11 +54,12 @@ export async function GET(req: Request) {
       const T = await hrmsTables(admin);
       const [{ data: emps }, { data: eds }, { data: idps }, { data: revs }] = await Promise.all([
         admin.from(T.employees).select("id, name, department, designation, dob, doj, active, extra"),
-        admin.from(T.edits).select("employee_id, field, value").in("field", ["type", "status", "department", "designation", "reporting_manager", "basic_da", "hra", "fixed_allowance", "conveyance", "medical_allowance"]),
+        admin.from(T.edits).select("employee_id, field, value").in("field", ["type", "status", "department", "designation", "reporting_manager", "basic_da", "hra", "fixed_allowance", "conveyance", "medical_allowance", "site_allowance"]),
         admin.from("hrms_idp").select("id, employee_id, submitted_at, ratings, ask:answers->>ask_gross").eq("cycle", CYCLE_TBL),
         admin.from("hrms_idp_review").select("idp_id, submitted_at, ratings, gross_proposed"),
       ]);
-      let appr: { employee_id: string; new_gross: number | null; prev_gross: number | null; approved_at?: string | null; growth_note?: string | null; released_at?: string | null }[] = [];
+      type Structure = { components?: Record<string, number> } | null;
+      let appr: { employee_id: string; new_gross: number | null; prev_gross: number | null; approved_at?: string | null; growth_note?: string | null; released_at?: string | null; structure?: Structure; new_designation?: string | null }[] = [];
       try {
         /**
          * growth_note arrives with migration 0148. Asking for a column that
@@ -67,7 +69,9 @@ export async function GET(req: Request) {
          */
         type ApRows = { data: Record<string, unknown>[] | null; error: { message: string } | null };
         const BASE = "employee_id, new_gross, prev_gross, approved_at";
-        const EXTRA = ", growth_note, released_at";
+        // structure came with 0062 and new_designation later; both are asked
+        // for together and dropped together if the schema is behind.
+        const EXTRA = ", growth_note, released_at, structure, new_designation";
         let q = (await admin.from("hrms_appraisal").select(BASE + EXTRA).eq("cycle", CYCLE_TBL)) as unknown as ApRows;
         if (q.error) q = (await admin.from("hrms_appraisal").select(BASE).eq("cycle", CYCLE_TBL)) as unknown as ApRows;
         if (q.error) throw new Error(q.error.message);
@@ -158,6 +162,29 @@ export async function GET(req: Request) {
             // whether the growth note is already written, for the mass run
             growth: !!ap?.growth_note,
             released: ap?.released_at ?? null,
+            /**
+             * THE AGREED STRUCTURE, NOT A RE-SPLIT (Dr Raghu, 7 Sep 2026, on
+             * what the download must carry). Where an appraisal was saved
+             * with its components edited, those are what was agreed and those
+             * are what goes out; only where none was saved does Genie split
+             * the new gross by its own rule.
+             */
+            newParts: (() => {
+              const c = ap?.structure?.components;
+              if (c && Object.keys(c).length) return {
+                basic_da: Number(c.basic_da) || 0, hra: Number(c.hra) || 0,
+                fixed: Number(c.fixed) || 0, conveyance: Number(c.conveyance) || 0,
+                medical: Number(c.medical) || 0, site: Number(c.site) || 0, agreed: true,
+              };
+              if (newGross == null) return null;
+              const sp = splitGross(newGross, undefined, type);
+              return { basic_da: sp.basic_da, hra: sp.hra, fixed: sp.fixed_allowance,
+                conveyance: sp.conveyance, medical: sp.medical_allowance,
+                site: Number(pick("site_allowance", "Site Allowance") || 0), agreed: false };
+            })(),
+            newDesignation: ap?.new_designation ?? null,
+            siteAllowance: Number(pick("site_allowance", "Site Allowance") || 0),
+            payDays: payDaysFor(type),
             type,
             age: years(e.dob), exp: years(e.doj),
             prevGross: prev, newGross,

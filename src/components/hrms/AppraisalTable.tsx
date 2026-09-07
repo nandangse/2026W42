@@ -21,6 +21,9 @@ interface Row {
   age: number | null; exp: number | null;
   prevGross: number | null; newGross: number | null; inc: number | null; incPct: number | null;
   stage: string; released?: string | null;
+  /** The agreed new structure — what was saved, or Genie's own split. */
+  newParts?: { basic_da: number; hra: number; fixed: number; conveyance: number; medical: number; site: number; agreed: boolean } | null;
+  newDesignation?: string | null; siteAllowance?: number | null; payDays?: number | null;
 }
 
 const inr = (n: number | null) => (n == null ? "" : Math.round(n).toLocaleString("en-IN"));
@@ -54,8 +57,22 @@ const SHEET_COLUMNS = [
   "New Basic & DA", "New Allowance", "New Conveyance", "New Gross", "New / day",
   "Increase / day", "Increase / month", "Remarks",
 ] as const;
-/** Added AFTER his eighteen, never among them. */
-const EXTRA_COLUMNS = ["Department", "Designation", "Reporting manager", "Increase %", "Stage", "Released on", "Pay days"] as const;
+/**
+ * Added AFTER his eighteen, never among them (Dr Raghu, 7 Sep 2026, asking
+ * for the new structure in the download): "new basic and DA, HR allowance,
+ * site allowance, gross total, total per day, per-day basis, new designation
+ * ... approved total increase per month on gross".
+ *
+ * The parts are the AGREED ones where an appraisal was saved with its
+ * components edited; only where none was saved does Genie split the gross by
+ * its own rule, and the "Parts agreed" column says which it was.
+ */
+const EXTRA_COLUMNS = [
+  "New Basic & DA", "New HRA", "New Fixed Allowance", "New Conveyance", "New Medical",
+  "Site Allowance", "New Gross Total", "New Per Day", "Per-day basis", "Parts agreed",
+  "New Designation", "Department", "Designation", "Reporting manager",
+  "Increase %", "Increase / month", "Stage", "Released on",
+] as const;
 
 const r0 = (n: number | null | undefined) => (n == null ? "" : Math.round(n));
 function exportRow(r: Row): (string | number)[] {
@@ -64,6 +81,7 @@ function exportRow(r: Row): (string | number)[] {
   const newP = r.newGross == null ? null : splitGross(r.newGross, undefined, type);
   // One "Allowance" column, so the three parts add back to the gross exactly.
   const allow = (c: ReturnType<typeof splitGross> | null) => (c ? c.hra + c.fixed_allowance + c.medical_allowance : null);
+  const p = r.newParts || null;
   const oldDay = perDayOf(r.prevGross, type);
   const newDay = perDayOf(r.newGross, type);
   return [
@@ -73,9 +91,15 @@ function exportRow(r: Row): (string | number)[] {
     r0(newDay != null && oldDay != null ? newDay - oldDay : null),
     r0(r.inc),
     "",                                        // Remarks — his column, left for him
+    // the agreed new structure
+    r0(p?.basic_da), r0(p?.hra), r0(p?.fixed), r0(p?.conveyance), r0(p?.medical),
+    r0(p?.site ?? r.siteAllowance), r0(r.newGross), r0(newDay),
+    r.payDays ?? payDaysFor(type), p ? (p.agreed ? "agreed" : "split by Genie") : "",
+    r.newDesignation || "",
     r.department || "", r.designation || "", r.manager || "",
     r.incPct == null ? "" : Number(r.incPct.toFixed(1)),
-    r.stage, r.released ? String(r.released).slice(0, 10) : "", payDaysFor(type),
+    r0(r.inc),
+    r.stage, r.released ? String(r.released).slice(0, 10) : "",
   ];
 }
 
@@ -367,11 +391,35 @@ const shown = useMemo(() => {
   /** The shown rows, in his column order, as a real .xlsx. */
   const downloadExcel = async () => {
     const XLSX = await import("xlsx");
-    const aoa: (string | number)[][] = [[...SHEET_COLUMNS, ...EXTRA_COLUMNS], ...shown.map(exportRow)];
+    /**
+     * THE TOTALS HE ASKED FOR — "a number of approved total increase per
+     * month on gross" (Dr Raghu, 7 Sep 2026). Counted over the FINALISED
+     * ones only: a proposal that nobody has agreed is not a commitment, and
+     * adding it to the same figure would overstate what the month owes.
+     */
+    const final = shown.filter((r) => r.stage === "Appraisal Finalised" || r.stage === "Released");
+    const sum = (rs: Row[], f: (r: Row) => number | null | undefined) =>
+      rs.reduce((a, r) => a + (Number(f(r)) || 0), 0);
+    const dayOf = (r: Row) => {
+      const nd = perDayOf(r.newGross, r.type), od = perDayOf(r.prevGross, r.type);
+      return nd != null && od != null ? nd - od : 0;
+    };
+    const blank = Array(SHEET_COLUMNS.length + EXTRA_COLUMNS.length - 4).fill("");
+    const totals: (string | number)[][] = [
+      [],
+      ["APPROVED — the finalised only", `${final.length} of ${shown.length} shown`, "", "", ...blank],
+      ["Previous gross, total", Math.round(sum(final, (r) => r.prevGross)), "", "", ...blank],
+      ["New gross, total", Math.round(sum(final, (r) => r.newGross)), "", "", ...blank],
+      ["Increase per month, total", Math.round(sum(final, (r) => r.inc)), "", "", ...blank],
+      ["Increase per day, total", Math.round(sum(final, dayOf)), "", "", ...blank],
+      ["New per day, total", Math.round(final.reduce((a, r) => a + (perDayOf(r.newGross, r.type) || 0), 0)), "", "", ...blank],
+      ["Site allowance, total", Math.round(sum(final, (r) => r.newParts?.site ?? r.siteAllowance)), "", "", ...blank],
+    ];
+    const aoa: (string | number)[][] = [[...SHEET_COLUMNS, ...EXTRA_COLUMNS], ...shown.map(exportRow), ...totals];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 7 }, { wch: 26 }, { wch: 6 }, { wch: 7 }, { wch: 16 },
-      ...Array.from({ length: 12 }, () => ({ wch: 12 })), { wch: 22 },
-      { wch: 16 }, { wch: 22 }, { wch: 20 }, { wch: 9 }, { wch: 18 }, { wch: 12 }, { wch: 9 }];
+    ws["!cols"] = [{ wch: 8 }, { wch: 28 }, { wch: 6 }, { wch: 7 }, { wch: 17 },
+      ...Array.from({ length: 12 }, () => ({ wch: 13 })), { wch: 24 },
+      ...Array.from({ length: EXTRA_COLUMNS.length }, () => ({ wch: 16 }))];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Appraisal");
     const d = new Date();
