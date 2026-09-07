@@ -74,7 +74,20 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
     const mean = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
     const sd = pcts.length > 1 ? Math.sqrt(pcts.reduce((a, b) => a + (b - mean) ** 2, 0) / (pcts.length - 1)) : 0;
     const median = pcts.length ? [...pcts].sort((a, b) => a - b)[Math.floor(pcts.length / 2)] : 0;
-    return { all, decided, spoken, payNow, payNew, pcts, mean, sd, median };
+    /**
+     * THE SAME CURVE IN RUPEES (Dr Raghu, 7 Sep 2026: "show bell curve on the
+     * % as well as the absolute").
+     *
+     * A percentage and an amount are two different pictures of one decision,
+     * and they disagree in a way worth seeing: 18% to a man on 15,000 is
+     * 2,700, and 18% to a man on 1,50,000 is 27,000. The percentage curve
+     * says whether people were rated; the rupee curve says what it costs and
+     * who actually gained.
+     */
+    const amts = spoken.map((x) => (x.e.gross ?? 0) - (x.r.prevGross ?? 0)).filter((v) => Number.isFinite(v));
+    const aMean = amts.length ? amts.reduce((a, b) => a + b, 0) / amts.length : 0;
+    const aSd = amts.length > 1 ? Math.sqrt(amts.reduce((a, b) => a + (b - aMean) ** 2, 0) / (amts.length - 1)) : 0;
+    return { all, decided, spoken, payNow, payNew, pcts, mean, sd, median, amts, aMean, aSd };
   }, [rows]);
 
   const depts = useMemo(() => {
@@ -175,7 +188,12 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
             <Big n={pct(S.mean)} l="Average increase" sub={`median ${pct(S.median)} · 2026 was +13.25%`} green />
           </div>
 
-          <BellCurve pcts={S.pcts} mean={S.mean} sd={S.sd} />
+          <BellCurve values={S.pcts} mean={S.mean} sd={S.sd} step={2.5} unit="pct"
+            title="The bell curve — increase % across the company"
+            note={`n=${S.pcts.length} · mean ${pct(S.mean)} · spread ±${S.sd.toFixed(1)}. A healthy curve has a middle and two honest tails — everyone bunched at one number means nobody was really rated.`} />
+          <BellCurve values={S.amts} mean={S.aMean} sd={S.aSd} unit="inr"
+            title="The bell curve — increase in rupees a month"
+            note={`n=${S.amts.length} · mean ₹${inr(Math.round(S.aMean))} a month · spread ±₹${inr(Math.round(S.aSd))}. The same decision in money: a percentage treats a man on 15,000 and a man on 1,50,000 alike, and this does not.`} />
 
           {/* ── departments ── */}
           <Card title="Department wise" note="Decided money where Final; the manager's proposal where not — that part can still move.">
@@ -293,14 +311,22 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
 }
 
 /* ── the bell curve ── */
-function BellCurve({ pcts, mean, sd }: { pcts: number[]; mean: number; sd: number }) {
-  if (pcts.length < 3) {
-    return <Card title="The curve" note="Appears once at least a few increments are on the table."><div className="text-sm" style={{ color: C.faint }}>{pcts.length} so far — too few to draw honestly.</div></Card>;
+function BellCurve({ values, mean, sd, title, note, unit, step }: {
+  values: number[]; mean: number; sd: number; title: string; note: string; unit: "pct" | "inr"; step?: number;
+}) {
+  if (values.length < 3) {
+    return <Card title={title} note="Appears once at least a few increments are on the table."><div className="text-sm" style={{ color: C.faint }}>{values.length} so far — too few to draw honestly.</div></Card>;
   }
-  const lo = Math.floor(Math.min(0, ...pcts) / 2.5) * 2.5;
-  const hi = Math.ceil(Math.max(...pcts) / 2.5) * 2.5 + 2.5;
+  /* In rupees the range is not known in advance, so the bucket is chosen to
+     give about twenty of them and then rounded to a figure a person would
+     actually say out loud — 500, 1,000, 2,500, 5,000 — never 1,873. */
+  const span = Math.max(...values) - Math.min(0, ...values);
+  const nice = [250, 500, 1000, 2000, 2500, 5000, 10000, 25000, 50000];
+  const st = step ?? (nice.find((v) => span / v <= 20) ?? 100000);
+  const lo = Math.floor(Math.min(0, ...values) / st) * st;
+  const hi = Math.ceil(Math.max(...values) / st) * st + st;
   const buckets: { x0: number; n: number }[] = [];
-  for (let x = lo; x < hi; x += 2.5) buckets.push({ x0: x, n: pcts.filter((p) => p >= x && p < x + 2.5).length });
+  for (let x = lo; x < hi; x += st) buckets.push({ x0: x, n: values.filter((p) => p >= x && p < x + st).length });
   const maxN = Math.max(...buckets.map((b) => b.n), 1);
   const W = 680, H = 190, padL = 26, padB = 24;
   const bw = (W - padL - 8) / buckets.length;
@@ -311,9 +337,13 @@ function BellCurve({ pcts, mean, sd }: { pcts: number[]; mean: number; sd: numbe
     const y = Math.exp(-((v - mean) ** 2) / (2 * sd * sd));
     return `${i ? "L" : "M"}${X(v).toFixed(1)},${(H - padB - y * (H - padB - 14)).toFixed(1)}`;
   }).join(" ") : "";
+  /* EVERY LABEL PRINTED IS EVERY LABEL UNREADABLE (7 Sep 2026): at 34
+     buckets they ran into one another and the axis said nothing. One in
+     every nth, chosen so they never touch. */
+  const every = Math.max(1, Math.ceil(34 / bw));
+  const lbl = (v: number) => (unit === "pct" ? `${v}%` : v >= 1000 ? `${Math.round(v / 1000)}k` : String(v));
   return (
-    <Card title="The bell curve — increase % across the company"
-      note={`n=${pcts.length} · mean ${pct(mean)} · spread ±${sd.toFixed(1)}. A healthy curve has a middle and two honest tails — everyone bunched at one number means nobody was really rated.`}>
+    <Card title={title} note={note}>
       <div style={{ overflowX: "auto" }}>
         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 480, display: "block" }}>
           {buckets.map((b, i) => {
@@ -323,13 +353,13 @@ function BellCurve({ pcts, mean, sd }: { pcts: number[]; mean: number; sd: numbe
                 <rect x={X(b.x0) + 1.5} y={H - padB - h} width={bw - 3} height={h} rx={3}
                   fill={b.x0 < 0 ? "#D9838B" : b.x0 < mean - sd ? "#C9C6BD" : b.x0 > mean + sd ? "#7FB89A" : "var(--blue)"} opacity={0.85} />
                 {b.n > 0 && <text x={X(b.x0) + bw / 2} y={H - padB - h - 4} textAnchor="middle" fontSize="9.5" fill="#5A6572">{b.n}</text>}
-                <text x={X(b.x0) + bw / 2} y={H - 8} textAnchor="middle" fontSize="9" fill="var(--muted)">{b.x0}%</text>
+                {i % every === 0 && <text x={X(b.x0) + bw / 2} y={H - 8} textAnchor="middle" fontSize="9" fill="var(--muted)">{lbl(b.x0)}</text>}
               </g>
             );
           })}
           {curve && <path d={curve} fill="none" stroke="#B3392E" strokeWidth={1.7} strokeDasharray="5 3" opacity={0.8} />}
           <line x1={X(mean)} y1={12} x2={X(mean)} y2={H - padB} stroke="#B3392E" strokeWidth={1.3} />
-          <text x={X(mean) + 4} y={20} fontSize="10" fontWeight="bold" fill="#B3392E">mean {pct(mean)}</text>
+          <text x={X(mean) + 4} y={20} fontSize="10" fontWeight="bold" fill="#B3392E">mean {unit === "pct" ? pct(mean) : `₹${inr(Math.round(mean))}`}</text>
         </svg>
       </div>
     </Card>

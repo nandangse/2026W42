@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.19.2",
+    date: "2026-09-07",
+    module: "The bell curve in rupees as well as per cent",
+    items: [
+      "\"Show bell curve on the % as well as the absolute\" (Dr Raghu, 7 Sep 2026). A percentage and an amount are two pictures of one decision, and they disagree in a way worth seeing: 18% to a man on 15,000 is 2,700, and 18% to a man on 1,50,000 is 27,000. The percentage curve says whether people were really rated; the rupee curve says what it costs and who actually gained.",
+      "The rupee buckets size themselves — about twenty of them, rounded to a figure a person would say out loud (500, 1,000, 2,500, 5,000), never 1,873.",
+      "And the axis is readable again. At thirty-four buckets every label was printed and they ran into one another, so the axis said nothing at all: one in every nth now, spaced so they never touch.",
+    ],
+  },
+  {
     v: "5.0.19.1",
     date: "2026-09-07",
     module: "The IDP page, fixed — my breakage from an hour ago",
