@@ -8,10 +8,11 @@
  * the EmployeeID or the name opens that person's Individual Report Card,
  * which is where the discussion actually happens.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import DataTable, { type Column } from "./DataTable";
 import { Pane } from "./Pane";
+import { announce, onHrmsChange } from "@/lib/hrms-bus";
 import { splitGross, perDayOf, payDaysFor } from "@/lib/salary";
 import { C } from "./RecordFields";
 
@@ -117,10 +118,22 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
   const [minPay, setMinPay] = useState("");
   const [maxPay, setMaxPay] = useState("");
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     api.get("/api/hrms/idp?table=1").then((j) => setRows(j.rows || []))
       .catch((e) => { setMsg(e instanceof Error ? e.message : String(e)); setRows([]); });
   }, []);
+  useEffect(() => { reload(); }, [reload]);
+
+  /**
+   * THE COUNTS FOLLOW THE WORK (Dr Raghu, 7 Sep 2026: "this is not updating
+   * automatically. Once the change of status is done it should update!").
+   *
+   * Since the discussions open in their own tabs, this table sits in a tab
+   * that would otherwise never hear what happened in them. It listens now —
+   * for a finalise or a release announced by another tab, and for being
+   * looked at again, which catches anything the message missed.
+   */
+  useEffect(() => onHrmsChange(reload), [reload]);
 
   const types = useMemo(() => [...new Set((rows || []).map((r) => r.type).filter(Boolean))].sort() as string[], [rows]);
   const depts = useMemo(() => [...new Set((rows || []).map((r) => r.department).filter(Boolean))].sort() as string[], [rows]);
@@ -347,6 +360,7 @@ const shown = useMemo(() => {
       const r = await api.post("/api/hrms/idp", { action: "approve-appraisal", ids });
       setMsg(`${r.approved} finalised${r.approved < ids.length ? ` · ${ids.length - r.approved} skipped, nothing proposed on them` : ""} ✓`);
       const j = await api.get("/api/hrms/idp?table=1"); setRows(j.rows || []); setPicked(new Set());
+      announce("released");
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   };
 
@@ -372,6 +386,7 @@ const shown = useMemo(() => {
       setMsg(`${r.n} ${on ? "released" : "un-released"}${r.skipped ? ` · ${r.skipped} skipped, not finalised yet` : ""} ✓`);
       const j = await api.get("/api/hrms/idp?table=1"); setRows(j.rows || []);
       setPicked(new Set());
+      announce("appraisal");
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   };
 

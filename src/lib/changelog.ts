@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.10.3",
+    date: "2026-09-07",
+    module: "The counts follow the work, across tabs",
+    items: [
+      "\"This is not updating automatically. Once the change of status is done it should update!\" (Dr Raghu, 7 Sep 2026). Mine to fix: giving the discussions their own tabs an hour earlier is exactly what left the Appraisal Table sitting in a tab that could never hear what happened in them.",
+      "A tab that finalises or releases somebody now says so, and every other tab reloads — the six counts, the eight bands and the rows all move within the second. Where the browser has no BroadcastChannel a shared storage key carries the same word.",
+      "AND LOOKING AT A TAB AGAIN RE-READS IT, so a table left open since before the change catches up the moment you come back to it, whether or not any message reached it. Two ways to hear the same thing, because a stale count that looks live is worse than one that is plainly loading.",
+    ],
+  },
+  {
     v: "5.0.10.2",
     date: "2026-09-07",
     module: "Site Allowance, and the discussion in its own tab",

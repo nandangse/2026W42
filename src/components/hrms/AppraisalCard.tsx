@@ -22,6 +22,7 @@ import { NO_HRA_NO_MEDICAL, payDaysFor, perDayOf, salaryTable, type SalaryRow, t
 import { Pane } from "./Pane";
 import { TeamReview, type TeamRow } from "@/components/IdpTeamReview";
 import { C } from "./RecordFields";
+import { announce } from "@/lib/hrms-bus";
 import { inr } from "@/lib/fmt";
 
 
@@ -759,6 +760,7 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
       const r = await api.post("/api/hrms/idp", { action: "appraisal", employee_id: d.employee.id, new_gross: String(n), prev_gross: prev, structure, new_designation: newDesig.trim(), draft });
       setMsg(r?.warning ? String(r.warning) : draft ? "Draft saved — not submitted ✓" : r?.approved ? "Saved and finalised ✓" : "Saved — it now waits for RJ to finalise ✓");
       onSaved();
+      announce("appraisal");        // the table, in whichever tab it is open
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
   };
@@ -770,6 +772,7 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
     try {
       await api.post("/api/hrms/idp", { action: "approve-appraisal", ids: [d.employee.id] });
       setMsg("Finalised ✓"); onSaved();
+      announce("appraisal");
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
   };
