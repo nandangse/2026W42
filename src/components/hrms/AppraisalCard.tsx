@@ -288,7 +288,12 @@ function GrossGraph({ years }: { years: { year: number; gross: number | null; no
   const yy = (v: number) => Hh - 26 - (v / max) * (Hh - 52);
   return (
     <div className="bg-white rounded-lg border p-3 mb-2" style={{ borderColor: C.line }}>
-      <div className="font-bold mb-1" style={{ fontSize: 13 }}>Gross Salary — the climb</div>
+      <div className="flex items-baseline gap-2 mb-1">
+        <div className="font-bold" style={{ fontSize: 13 }}>Gross Salary — the climb</div>
+        {known.some((y) => /finalised/.test(y.note)) && (
+          <span className="rounded px-1.5 font-bold" style={{ fontSize: 9.5, background: "#E6F4EA", color: C.green }}>the last point is the finalised appraisal</span>
+        )}
+      </div>
       <svg viewBox={`0 0 ${W} ${Hh}`} style={{ width: "100%", maxWidth: 520 }}>
         <line x1={PAD} y1={Hh - 26} x2={W - PAD} y2={Hh - 26} stroke={C.line} />
         {years.map((y) => (
@@ -299,8 +304,10 @@ function GrossGraph({ years }: { years: { year: number; gross: number | null; no
         )}
         {known.map((y) => (
           <g key={y.year}>
-            <circle cx={x(y.year)} cy={yy(y.gross!)} r={3.2} fill="var(--green)" />
-            <text x={x(y.year)} y={yy(y.gross!) - 7} textAnchor="middle" fontSize={9.5} fontWeight={700} fill="var(--green)">₹{Math.round((y.gross || 0) / 1000)}k</text>
+            <title>{`${y.year}-${String(y.year + 1).slice(2)} · ₹${Math.round(y.gross || 0).toLocaleString("en-IN")}${y.note ? " · " + y.note : ""}`}</title>
+            <circle cx={x(y.year)} cy={yy(y.gross!)} r={/finalised/.test(y.note) ? 5 : 3.2} fill="var(--green)"
+              stroke={/finalised/.test(y.note) ? "#fff" : undefined} strokeWidth={/finalised/.test(y.note) ? 2 : undefined} />
+            <text x={x(y.year)} y={yy(y.gross!) - 8} textAnchor="middle" fontSize={/finalised/.test(y.note) ? 11 : 9.5} fontWeight={700} fill="var(--green)">₹{Math.round((y.gross || 0) / 1000)}k</text>
           </g>
         ))}
         {known.length <= 1 && <text x={W / 2} y={40} textAnchor="middle" fontSize={10} fill={C.faint}>history fills as each appraisal cycle lands — earlier years join when the old sheets are given</text>}

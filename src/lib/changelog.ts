@@ -78,6 +78,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.7.3",
+    date: "2026-09-07",
+    module: "The salary climb ends on the finalised number",
+    items: [
+      "\"this also should change with the number from Finalised\" (Dr Raghu, 7 Sep 2026). The climb read the Employee Master's own history first, so a year that had both a sheet figure and a settled appraisal drew the old number and the rise never showed. A finalised appraisal now wins for its year, drawn as a larger point with the label the eye goes to; the line says so above it, and hovering any point gives the year, the figure and where it came from.",
+      "A proposal does not move the line — only finalising does — so a figure still being argued over never looks like pay. A proposed one is still named on hover as proposed, not final.",
+    ],
+  },
+  {
     v: "5.0.7.2",
     date: "2026-09-07",
     module: "The revision loader takes the old rate from the sheet, not the record",

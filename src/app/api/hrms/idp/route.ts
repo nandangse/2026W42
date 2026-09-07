@@ -330,11 +330,13 @@ export async function GET(req: Request) {
       // years the sheets never covered stand honestly empty.
       const salaryYears: { year: number; gross: number | null; note: string }[] = [];
       const grossNow = salary?.gross ?? null;
-      let cycles: { cycle: string; new_gross: number | null; prev_gross: number | null }[] = [];
+      let cycles: { cycle: string; new_gross: number | null; prev_gross: number | null; approved_at?: string | null; effective_from?: string | null }[] = [];
       try {
-        const { data: aps } = await admin.from("hrms_appraisal")
-          .select("cycle, new_gross, prev_gross").eq("employee_id", person);
-        cycles = (aps || []) as typeof cycles;
+        const BASE = "cycle, new_gross, prev_gross, approved_at";
+        type Ap = { data: Record<string, unknown>[] | null; error: { message: string } | null };
+        let q = (await admin.from("hrms_appraisal").select(BASE + ", effective_from").eq("employee_id", person)) as unknown as Ap;
+        if (q.error) q = (await admin.from("hrms_appraisal").select(BASE).eq("employee_id", person)) as unknown as Ap;
+        cycles = (q.data || []) as unknown as typeof cycles;
       } catch (e) { swallow("hrms/idp", e); /* pre-0061 */ }
       // the Employee Master's own history (0097) speaks first for each year
       let hist: { fy: string; gross: number }[] = [];
@@ -347,8 +349,18 @@ export async function GET(req: Request) {
       for (let y = 2019; y <= 2027; y++) {
         const hh = histOf(y);
         const cy = cycles.find((c) => String(c.cycle).startsWith(String(y)));
-        if (hh?.gross) salaryYears.push({ year: y, gross: Number(hh.gross), note: `sheet ${hh.fy}` });
-        else if (cy?.new_gross) salaryYears.push({ year: y, gross: Number(cy.new_gross), note: `appraisal ${cy.cycle}` });
+        /**
+         * A FINALISED APPRAISAL IS THE PAY (Dr Raghu, 7 Sep 2026: "this also
+         * should change with the number from Finalised"). The climb used to
+         * read the Employee Master's sheet first, so a year that had both a
+         * sheet figure and a settled appraisal showed the old number and the
+         * rise never appeared. Finalised wins; a proposal does not, so the
+         * line does not move before he has decided.
+         */
+        if (cy?.new_gross && cy.approved_at)
+          salaryYears.push({ year: y, gross: Number(cy.new_gross), note: `appraisal ${cy.cycle} · finalised${cy.effective_from ? ` from ${String(cy.effective_from).slice(8, 10)}-${String(cy.effective_from).slice(5, 7)}-${String(cy.effective_from).slice(0, 4)}` : ""}` });
+        else if (hh?.gross) salaryYears.push({ year: y, gross: Number(hh.gross), note: `sheet ${hh.fy}` });
+        else if (cy?.new_gross) salaryYears.push({ year: y, gross: Number(cy.new_gross), note: `appraisal ${cy.cycle} · proposed, not final` });
         else if (y === 2026 && grossNow) salaryYears.push({ year: y, gross: grossNow, note: "current sheet" });
         else salaryYears.push({ year: y, gross: null, note: "" });
       }
