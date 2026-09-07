@@ -204,6 +204,11 @@ export default function FloorReport() {
   };
 
   const late = floor.filter((j) => j.tdd && j.tdd < TODAY);
+  /** Jobs with at least one trade recorded today — see the WITH PEOPLE card. */
+  const withPeople = useMemo(
+    () => floor.filter((j) => { const r = manpower[j.id]; return !!r && TRADES.some((t) => Number(r[t.key]) > 0); }).length,
+    [floor, manpower],
+  );
 
   /** What actually went out the gate — from the delivery record. */
   const deliveredSince = (days: number) => {
@@ -296,7 +301,19 @@ export default function FloorReport() {
         <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "nowrap" }}>
           {([
             ["ON FLOOR", String(floor.length), "being worked on now", "var(--green)"],
-            ["ALREADY LATE", String(late.length), late.length ? "past target delivery" : "none late", late.length ? "var(--red)" : "var(--green)"],
+            /**
+             * WITH PEOPLE, not late (Dr Raghu, 7 Sep 2026: "please make the
+             * second number card 'With people' — that is those number of jobs
+             * where there is someone today").
+             *
+             * The lateness was already on the sheet job by job; what the
+             * sheet could not say at a glance was how many of the jobs on the
+             * floor actually have a man on them today. Twenty-one of
+             * thirty-eight silent is the number worth leading with.
+             */
+            ["WITH PEOPLE", String(withPeople),
+              floor.length ? `of ${floor.length} on the floor · ${floor.length - withPeople} with nobody` : "nothing on the floor",
+              withPeople === floor.length ? "var(--green)" : withPeople ? "var(--accent)" : "var(--red)"],
             [`DELIVERY UPTO ${dmy(saturday)} · Sat`, String(week.length), week.length ? "incl. every overdue job" : "nothing due by Saturday", "var(--accent)"],
             ["DELIVERED · LAST 7 DAYS", String(d7.n), full && moneyOk ? (d7.n ? `${lakh(d7.val)} · TP ${lakh(d7.tp)}` : "nothing went out") : d7.n ? "went out the gate" : "nothing went out", "var(--blue)"],
             ["DELIVERED · LAST 30 DAYS", String(d30.n), full && moneyOk ? (d30.n ? `${lakh(d30.val)} · TP ${lakh(d30.tp)}` : "nothing went out") : d30.n ? "went out the gate" : "nothing went out", "var(--blue)"],

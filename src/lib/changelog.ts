@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.14.5",
+    date: "2026-09-07",
+    module: "On Floor — the second card is WITH PEOPLE",
+    items: [
+      "\"Please make the second number card 'With people' — that is those number of jobs where there is someone today\" (Dr Raghu, 7 Sep 2026). On the screen and on the PDF both.",
+      "Lateness was already on every row, and the sheet said none were late anyway. What the top of the page could NOT say at a glance was how many of the jobs on the floor actually have a man on them — twenty-one of thirty-eight silent is the number worth leading with.",
+      "It reads the same allocation the manpower table reads, so the card and the WORKING TODAY line beneath it can never disagree: a job counts when at least one trade is recorded on it today. Green when every job has somebody, amber while any are silent, red when nobody is anywhere.",
+    ],
+  },
+  {
     v: "5.0.14.4",
     date: "2026-09-07",
     module: "A rate line with no basic is a broken line",

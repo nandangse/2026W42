@@ -341,7 +341,13 @@ export function OnFloor({
           sub={d7.n ? `${V(d7.val)} · TP ${V(d7.tp)}` : "nothing went out"} color="var(--blue)" />
         <StatCard label="DELIVERED · 30 DAYS" value={String(d30.n)}
           sub={d30.n ? `${V(d30.val)} · TP ${V(d30.tp)}` : "nothing went out"} color="var(--blue)" />
-        <StatCard label="ALREADY LATE" value={String(late.length)} sub={late.length ? "past OTD" : "none past OTD"} color={late.length ? "var(--red)" : "var(--green)"} />
+        {/* WITH PEOPLE (Dr Raghu, 7 Sep 2026: "those number of jobs where
+            there is someone today"). Lateness is on every row already; what
+            the top of the page could not say was how many jobs actually have
+            a man on them. */}
+        <StatCard label="WITH PEOPLE" value={String(mpTotals.jobsWith)}
+          sub={jobs.length ? `of ${jobs.length} on the floor · ${jobs.length - mpTotals.jobsWith} with nobody` : "nothing on the floor"}
+          color={jobs.length && mpTotals.jobsWith === jobs.length ? "var(--green)" : mpTotals.jobsWith ? "var(--accent)" : "var(--red)"} />
         <StatCard
           label="SHOP UPDATES TODAY"
           value={String(todayNotes.length)}
