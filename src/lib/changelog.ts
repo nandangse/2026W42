@@ -78,6 +78,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.12.2",
+    date: "2026-09-07",
+    module: "The slip back to A5, the register across one A4 landscape, and why Leave and Loan were dashes",
+    items: [
+      "\"The salary slip has to be A5 landscape and all fitting into one page\" (Dr Raghu, 7 Sep 2026). Back to 210 × 148 mm — but at a size that actually fits: smaller type, tighter padding, and the overflow left VISIBLE. It was hidden before, which is how a slip could quietly lose its last line; if one ever runs over now, it shows.",
+      "NET PAID AT THE FOOT, WITH THE AMOUNT IN WORDS — Rupees in Indian grouping, crore, lakh and thousand, which is how the number is read aloud here.",
+      "THE REGISTER FITS ACROSS ONE A4 LANDSCAPE. \"The right is all cut off.\" A4 landscape is 297mm; less the margins, about 1,060 pixels — and the paper was set to 1,150, so the last columns walked off the sheet. In print the paper now takes the page's own width and the table is fixed-layout, so twenty columns share what there is instead of each taking what it likes. The name wraps rather than pushing everything sideways.",
+      "MEDICAL ALLOWANCE JOINS THE REGISTER, between Conveyance and Site Allowance, and in the earnings breakdown beside them.",
+      "WHY LEAVE AND LOAN SHOWED DASHES, which is the real fault and not a print one: every one of the 205 rows in the August register is EMPTY of leave and loan — not this person's, everybody's. That register was generated on 5 September, before those columns existed on a register row, so it carries twenty-two fields where the current one carries forty. The slip was reading faithfully from a register that never held the numbers. Regenerating August fills them in, brings medical with them, and picks up the corrected rates at the same time.",
+    ],
+  },
+  {
     v: "5.0.12.1",
     date: "2026-09-07",
     module: "The IDP page trimmed, and the handbook made readable on a phone",

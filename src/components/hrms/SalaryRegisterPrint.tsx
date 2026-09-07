@@ -76,7 +76,7 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
 
   const EARN_PARTS: [string, string][] = [
     ["basic_da", "Basic & DA"], ["hra", "HRA"], ["fixed_allowance", "Fixed"],
-    ["conveyance", "Conveyance"], ["site_allowance", "Site"], ["arrears", "Arrears"],
+    ["conveyance", "Conveyance"], ["medical", "Medical"], ["site_allowance", "Site"], ["arrears", "Arrears"],
   ];
   const DED_PARTS: [string, string][] = [
     ["pf", "PF"], ["pt", "PT"], ["loan", "Loan"], ["advance", "Advance"], ["tds", "TDS"], ["other_ded", "Other"],
@@ -127,10 +127,19 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
   return (
     <>
       <style>{`
-        @page { size: A4 landscape; margin: 9mm; }
+        /* A4 LANDSCAPE, AND THE WHOLE WIDTH ON THE PAGE (Dr Raghu, 7 Sep
+           2026: "the right is all cut off"). A4 landscape is 297mm; less
+           8mm of margin each side that is 281mm — about 1,060px — and the
+           paper was 1,150px wide, so the last columns walked off the sheet.
+           In print the paper takes the page's own width and the table is
+           FIXED-LAYOUT, so the columns share what there is instead of each
+           taking what it likes. */
+        @page { size: A4 landscape; margin: 8mm; }
         html, body { margin: 0; background: #EFEDE7; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #16232F; }
         .paper { max-width: 1150px; margin: 0 auto; background: #fff; padding: 22px 26px; }
-        table.reg { width: 100%; border-collapse: collapse; }
+        table.reg { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .reg td, .reg th { overflow: hidden; text-overflow: ellipsis; }
+        .reg td.nm { white-space: normal; word-break: break-word; }
         .reg thead { display: table-header-group; }
         .reg thead th { page-break-inside: avoid; }
         .reg td, .reg th { border: 1px solid #DCD8CC; padding: 2.5px 4px; }
@@ -138,7 +147,11 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
         @media print {
           html, body { background: #fff; }
           .no-print { display: none !important; }
-          .paper { max-width: none; margin: 0; padding: 0; box-shadow: none; }
+          .paper { max-width: none; width: 100%; margin: 0; padding: 0; box-shadow: none; }
+          /* small enough that twenty columns and a name still fit across */
+          .reg { font-size: 6.6px !important; }
+          .reg td, .reg th { padding: 1px 2px !important; }
+          .reg tr { break-inside: avoid; }
           .pagebreak { break-after: page; page-break-after: always; }
         }
       `}</style>
@@ -272,8 +285,8 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
               </th>
             </tr>
             <tr style={{ background: "#F4F2EC" }}>
-              <th style={{ textAlign: "left" }}>Emp ID</th>
-              <th style={{ textAlign: "left", minWidth: 90 }}>Name</th>
+              <th style={{ textAlign: "left", width: "4.2%" }}>Emp ID</th>
+              <th style={{ textAlign: "left", width: "11%" }}>Name</th>
               {REGISTER_COLUMNS.map((c) => (
                 <th key={c.key as string} style={{ textAlign: "right", fontSize: 8, whiteSpace: "nowrap" }}>{c.label}</th>
               ))}
@@ -283,7 +296,7 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
             {rows.map((r, i) => (
               <tr key={i} style={{ background: r.hold ? "#FBEAE8" : i % 2 ? "#FBFAF6" : "#fff" }}>
                 <td style={{ fontWeight: 700, whiteSpace: "nowrap", color: r.hold ? "var(--red)" : undefined }}>{r.employee_id || "—"}</td>
-                <td style={{ color: r.hold ? "var(--red)" : undefined }}>{r.name || "—"}{r.hold ? <b style={{ fontSize: 7.5 }}> · HOLD</b> : ""}</td>
+                <td className="nm" style={{ color: r.hold ? "var(--red)" : undefined }}>{r.name || "—"}{r.hold ? <b style={{ fontSize: 7.5 }}> · HOLD</b> : ""}</td>
                 {REGISTER_COLUMNS.map((c) => {
                   const v = r[c.key];
                   return (

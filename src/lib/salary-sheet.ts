@@ -39,6 +39,8 @@ export interface SheetRow {
   gross?: number | null;
   basic_da?: number | null;
   hra?: number | null;
+  /** Paid to Staff only — workers have no medical allowance (2 Sep 2026). */
+  medical?: number | null;
   fixed_allowance?: number | null;
   conveyance?: number | null;
   site_allowance?: number | null;
@@ -62,6 +64,7 @@ export const REGISTER_COLUMNS: { key: keyof SheetRow; label: string }[] = [
   { key: "hra", label: "HRA" },
   { key: "fixed_allowance", label: "Fixed Allow." },
   { key: "conveyance", label: "Conveyance" },
+  { key: "medical", label: "Medical" },
   { key: "site_allowance", label: "Site Allow." },
   { key: "earned", label: "Earned Salary" },
   { key: "pf", label: "PF" },

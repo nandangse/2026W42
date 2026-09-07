@@ -1,6 +1,6 @@
 "use client";
 /**
- * A4 salary slips — one per page, and the whole slip on the page.
+ * A5 LANDSCAPE salary slips — one per page, and the whole slip on the page.
  *
  * The OT / Comp Off / Late Mark / Late Deduction line the Word slip carried
  * is deliberately absent (Dr Raghu, 27 Aug 2026): those are inputs to the
@@ -10,12 +10,13 @@
  * person's Drive folder — "July 2026 - 6972 - Name" — so the print and the
  * filing use one name.
  *
- * IT WAS A5 LANDSCAPE WITH `overflow: hidden` (Dr Raghu, 7 Sep 2026: "make
- * sure that everything fits into one A4 page without cutting"). A fixed
- * height with the overflow hidden does not warn anybody: it simply stops
- * drawing, so a slip with a long leave line lost its bank details and nobody
- * could tell. A4 portrait has the room, the type is two points smaller
- * throughout, and nothing is clipped.
+ * A5 landscape is his (7 Sep 2026: "the salary slip has to be A5 landscape
+ * and all fitting into one page"). It was A5 before, but at a size that did
+ * not fit — with `overflow: hidden` on a fixed height, which does not warn
+ * anybody: it simply stops drawing, so a slip with a long leave line lost
+ * its bank details and nobody could tell. The type is small enough to fit
+ * now, and the overflow is left visible: if a slip ever does run over, it
+ * shows rather than losing a line in silence.
  *
  * Also his, the same day: NET PAY belongs at the BOTTOM, where the eye ends;
  * the per-day rate is not shown at all ("it doesn't look nice — just show
@@ -30,6 +31,32 @@ import { inr } from "@/lib/fmt";
 
 const dashless = (v: string | null) => (v && v !== "N/A" ? v : "—");
 
+/**
+ * The amount in words, for the foot of the slip (Dr Raghu, 7 Sep 2026: "in
+ * the bottom show also Net paid and also with the amount in words"). Indian
+ * grouping — crore, lakh, thousand — because that is how the number is read
+ * aloud here. Used only when the register did not already carry the words.
+ */
+const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+const under100 = (n: number): string =>
+  n < 20 ? ONES[n] : `${TENS[Math.floor(n / 10)]}${n % 10 ? ` ${ONES[n % 10]}` : ""}`;
+const under1000 = (n: number): string =>
+  n < 100 ? under100(n) : `${ONES[Math.floor(n / 100)]} Hundred${n % 100 ? ` ${under100(n % 100)}` : ""}`;
+export function wordsOf(v: number | null | undefined): string {
+  let n = Math.round(Number(v) || 0);
+  if (n <= 0) return "Zero";
+  const parts: string[] = [];
+  const take = (div: number, label: string) => {
+    const q = Math.floor(n / div);
+    if (q > 0) { parts.push(`${under1000(q)} ${label}`); n -= q * div; }
+  };
+  take(1e7, "Crore"); take(1e5, "Lakh"); take(1000, "Thousand");
+  if (n > 0) parts.push(under1000(n));
+  return parts.join(" ");
+}
+
 export default function SalarySlipsPrint({ month, year, picked, total, draft = false }: {
   month: number; year: number;
   picked: { label: string | null; slip: Slip }[];
@@ -41,18 +68,18 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
   return (
     <>
       <style>{`
-        /* A4 PORTRAIT, ONE SLIP A PAGE. The box is the sheet; the breathing
-           room is padding inside it. The height is MIN, not fixed, and
-           nothing is hidden — a slip that grows takes the room it needs
-           rather than losing its last lines in silence. */
-        @page { size: A4; margin: 0; }
+        /* A5 LANDSCAPE, 210 × 148 mm, ONE SLIP A PAGE. The box IS the sheet;
+           the breathing room is padding inside it. Everything is sized to
+           fit that height — the overflow is NOT hidden, so a slip that ever
+           did run over would show it rather than lose a line quietly. */
+        @page { size: 210mm 148mm; margin: 0; }
         html, body { margin: 0; background: #EFEDE7; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #16232F; }
-        .slip { width: 210mm; min-height: 297mm; box-sizing: border-box; margin: 0 auto 14px; background: #fff;
-                padding: 12mm 12mm 10mm; font-size: 8.5px; line-height: 1.45; display: flex; flex-direction: column; }
+        .slip { width: 210mm; height: 148mm; box-sizing: border-box; margin: 0 auto 14px; background: #fff;
+                padding: 4mm 5mm; font-size: 7.6px; line-height: 1.3; display: flex; flex-direction: column; }
         .slip table { width: 100%; border-collapse: collapse; }
-        .slip td, .slip th { border: 1px solid #C9C6BD; padding: 2.5px 5px; }
-        .bandbar { width: 210mm; margin: 18px auto 4px; font-weight: 800; font-size: 12px; color: #1B3A5C; }
-        .grow { flex: 1 1 auto; }
+        .slip td, .slip th { border: 1px solid #C9C6BD; padding: 1.4px 4px; }
+        .bandbar { width: 210mm; margin: 16px auto 4px; font-weight: 800; font-size: 12px; color: #1B3A5C; }
+        .grow { flex: 1 1 auto; min-height: 0; }
         @media screen { .slip { box-shadow: 0 2px 12px rgba(20,30,40,.12); } }
         @media print {
           html, body { background: #fff; }
@@ -64,7 +91,7 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
            responsive"). The sheet cannot be 210mm wide on a 375px screen, so
            on screen it becomes fluid; print is untouched. */
         @media screen and (max-width: 820px) {
-          .slip { width: 100%; min-height: 0; padding: 14px 12px; font-size: 11px; }
+          .slip { width: 100%; height: auto; padding: 14px 12px; font-size: 11px; }
           .bandbar { width: 100%; font-size: 12px; padding: 0 12px; box-sizing: border-box; }
           .slip td, .slip th { padding: 4px; }
           .stack td { display: block; width: auto !important; border-bottom: none; }
@@ -101,14 +128,14 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
               </div>
             )}
             {/* head */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "2px solid #16232F", paddingBottom: 4, marginBottom: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1.5px solid #16232F", paddingBottom: 2, marginBottom: 3 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={LOGO} alt="Nandan GSE" style={{ height: 18 }} />
-              <b style={{ fontSize: 11.5 }}>Salary Statement for the Month of {period}</b>
+              <img src={LOGO} alt="Nandan GSE" style={{ height: 14 }} />
+              <b style={{ fontSize: 10 }}>Salary Statement for the Month of {period}</b>
             </div>
 
             {/* identity */}
-            <table className="genie-table stack" style={{ marginBottom: 5 }}>
+            <table className="genie-table stack" style={{ marginBottom: 3 }}>
               <tbody>
                 <tr>
                   <td style={{ width: "34%" }}><b>Name:</b> {s.name}</td>
@@ -134,7 +161,7 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
             </table>
 
             {/* money */}
-            <table className="genie-table" style={{ marginBottom: 5 }}>
+            <table className="genie-table" style={{ marginBottom: 3 }}>
               <thead>
                 <tr style={{ background: "#F4F2EC", fontWeight: 700 }}>
                   <td style={{ width: "26%" }}>Earnings</td>
@@ -178,7 +205,7 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
             <table className="genie-table">
               <tbody>
                 <tr>
-                  <td style={{ width: "18%" }}><b>Leave Details</b></td>
+                  <td style={{ width: "16%" }}><b>Leave Details</b></td>
                   <td>
                     OB: {s.leave_ob ?? "—"} + Earned: {s.leave_added ?? "—"}{s.compoff_days != null ? <> + Comp off: {s.compoff_days}</> : null} − Used: {s.leave_used ?? "—"} − Encashed: {s.leave_encashed ?? "—"}{s.compoff_days != null && s.compoff_encashed_days ? <> (of which comp off {s.compoff_encashed_days})</> : null} = <b>Closing: {s.leave_cb ?? "—"}</b>
                   </td>
@@ -200,20 +227,20 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
 
             {/* THE ANSWER, LAST — "the net payment also has to be seen right
                 at the bottom" (Dr Raghu, 7 Sep 2026). */}
-            <table className="genie-table" style={{ marginTop: 6 }}>
+            <table className="genie-table" style={{ marginTop: 3 }}>
               <tbody>
                 <tr style={{ background: "#FFF9C4" }}>
-                  <td style={{ width: "26%", fontWeight: 800, fontSize: 13, padding: "6px 8px" }}>NET PAY ₹{inr(s.net)}</td>
-                  <td style={{ fontSize: 8.5 }}>
-                    {s.in_words || ""}
+                  <td style={{ width: "30%", fontWeight: 800, fontSize: 11, padding: "3px 6px" }}>NET PAID ₹{inr(s.net)}</td>
+                  <td style={{ fontSize: 7.6 }}>
+                    <b>Rupees {s.in_words || wordsOf(s.net)} only</b>
                     {s.round_up != null && s.round_up !== 0 ? ` · Round off ${s.round_up > 0 ? "(+)" : "(−)"}${Math.abs(s.round_up).toFixed(2)}` : ""}
                   </td>
                 </tr>
               </tbody>
             </table>
 
-            <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginTop: 6 }}>
-              <div style={{ fontSize: 7.5, color: "#5A6572", lineHeight: 1.55, flex: 1 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginTop: 3 }}>
+              <div style={{ fontSize: 6.6, color: "#5A6572", lineHeight: 1.45, flex: 1 }}>
                 Note: Leave of one year will be kept in balance (8 nos for Labour and 15 nos for Staff). Please note this.<br />
                 Any issues please contact the HR Department or mail hr@nandan.co.in.<br />
                 <b>This is a computer generated document and needs no signature when it reaches you from a Nandan GSE mail ID.</b>
@@ -222,7 +249,7 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
                   Until then nothing is drawn — an empty box where a seal
                   should be looks worse than no seal at all. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/nandan-stamp.png" alt="" style={{ height: 74, width: 74, objectFit: "contain", opacity: 0.9 }}
+              <img src="/nandan-stamp.png" alt="" style={{ height: 46, width: 46, objectFit: "contain", opacity: 0.9 }}
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
             </div>
           </div>
