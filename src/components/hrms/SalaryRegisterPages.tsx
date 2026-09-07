@@ -22,7 +22,7 @@
  */
 import { useMemo } from "react";
 import { LOGO } from "@/lib/logo";
-import { MONTHS, type SheetRow } from "@/lib/salary-sheet";
+import { LEDGER_COLUMNS, MONTHS, type SheetRow } from "@/lib/salary-sheet";
 import { inr } from "@/lib/fmt";
 
 export interface Bank { acct: string; ifsc: string; bank: string }
@@ -44,11 +44,22 @@ const lakh = (n: number) => (n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : n >= 1
  */
 const GROUPS: { title: string; note: string; match: (t: string) => boolean }[] = [
   { title: "Management", note: "Directors and management", match: (t) => /^management$/.test(t) },
+  { title: "Staff & Workers", note: "On the rolls — sorted by employee ID", match: (t) => /^staff$/.test(t) || /^labour$/.test(t) },
   { title: "Contractors", note: "Engaged as contractors", match: (t) => /^contractor$/.test(t) },
-  { title: "Staff & Labour", note: "On the rolls — sorted by employee ID", match: (t) => /^staff$/.test(t) || /^labour$/.test(t) },
-  { title: "Staff Contract & Labour Contract", note: "On contract", match: (t) => /contract/.test(t) && !/^contractor$/.test(t) },
-  { title: "Interns & Trainees", note: "Interns, trainees and apprentices", match: (t) => /intern|trainee|apprentice/.test(t) },
+  { title: "Labour Contract", note: "On contract", match: (t) => /contract/.test(t) && !/^contractor$/.test(t) },
+  { title: "Trainees & Interns", note: "Trainees, interns and apprentices", match: (t) => /intern|trainee|apprentice/.test(t) },
 ];
+
+const EARN_PARTS: [string, string][] = [
+  ["basic_da", "Basic & DA"], ["hra", "HRA"], ["fixed_allowance", "Fixed"],
+  ["conveyance", "Conveyance"], ["medical", "Medical"], ["site_allowance", "Site"],
+  ["encash_amt", "Encashment"], ["arrears", "Arrears"],
+];
+const DED_PARTS: [string, string][] = [
+  ["pf", "PF"], ["pt", "PT"], ["loan", "Loan"], ["advance", "Advance"], ["tds", "TDS"], ["other_ded", "Other"],
+];
+const EARN_COLORS = ["#1D4E7E", "#3E6A96", "#7FA3C5", "#0D6E39", "#7FB89A", "#8A5B00", "#C79A3B", "#8B8F87"];
+const DED_COLORS = ["#B3392E", "#D9838B", "#8A5B00", "#C79A3B", "#5B3FA8", "#8B8F87"];
 
 export default function SalaryRegisterPages({ sheet, banks }: { sheet: Sheet; banks: Record<string, Bank> }) {
   const rows = sheet.rows || [];
@@ -83,6 +94,66 @@ export default function SalaryRegisterPages({ sheet, banks }: { sheet: Sheet; ba
   };
 
   const paidOn = sheet.frozen_at ? new Date(sheet.frozen_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "";
+
+  /** A column's sum, or null when the month never carried that column. */
+  const sums = useMemo(() => {
+    const m = new Map<string, number | null>();
+    for (const [k] of [...EARN_PARTS, ...DED_PARTS]) {
+      let any = false, sum = 0;
+      for (const r of rows) {
+        const v = (r as unknown as Record<string, unknown>)[k];
+        if (v == null || typeof v === "string") continue;
+        any = true; sum += Number(v) || 0;
+      }
+      m.set(k, any ? Math.round(sum) : null);
+    }
+    return m;
+  }, [rows]);
+
+  const Bars = ({ parts, colors, total }: { parts: [string, string][]; colors: string[]; total: number }) => {
+    const denom = parts.map(([k]) => sums.get(k)).filter((v): v is number => v != null && v > 0).reduce((a, b) => a + b, 0) || 1;
+    return (
+      <div>
+        <div style={{ display: "flex", height: 16, borderRadius: 3, overflow: "hidden", border: "1px solid #DCD8CC" }}>
+          {parts.map(([k, label], i) => {
+            const v = sums.get(k);
+            if (v == null || v <= 0) return null;
+            return <div key={k} title={`${label} ${lakh(v)}`} style={{ width: `${(v / denom) * 100}%`, background: colors[i % colors.length] }} />;
+          })}
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 3, fontSize: 7.5 }}>
+          {parts.map(([k, label], i) => {
+            const v = sums.get(k);
+            return (
+              <span key={k} style={{ color: v == null ? "#C9C6BD" : "#46545F" }}>
+                <span style={{ display: "inline-block", width: 6, height: 6, background: v == null ? "#EEECE6" : colors[i % colors.length], borderRadius: 1, marginRight: 2 }} />
+                {label} <b>{v == null ? "not in sheet" : lakh(v)}</b>
+              </span>
+            );
+          })}
+          <b style={{ marginLeft: "auto", fontSize: 8 }}>Total {lakh(total)}</b>
+        </div>
+      </div>
+    );
+  };
+
+  /** Everybody, in ID order, for the leave and loan statement at the end. */
+  const ledger = useMemo(
+    () => [...rows].sort((a, b) => num(String(a.employee_id)) - num(String(b.employee_id))),
+    [rows],
+  );
+
+  /** The net-pay spread, in the month's own numbers. */
+  const { spread, step, maxN } = useMemo(() => {
+    const nets = rows.map((r) => r.net || 0).filter((n) => n > 0).sort((a, b) => a - b);
+    if (nets.length < 3) return { spread: [] as { lo: number; n: number }[], step: 1, maxN: 1 };
+    const max = nets[nets.length - 1];
+    const st = Math.max(5000, Math.ceil(max / 10 / 5000) * 5000);
+    const out: { lo: number; n: number }[] = [];
+    for (let lo = 0; lo < max + st; lo += st) out.push({ lo, n: nets.filter((v) => v >= lo && v < lo + st).length });
+    while (out.length && out[out.length - 1].n === 0) out.pop();
+    return { spread: out, step: st, maxN: Math.max(...out.map((b) => b.n), 1) };
+  }, [rows]);
 
   const Head = ({ page }: { page: string }) => (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 10, borderBottom: "2px solid #16232F", paddingBottom: 5, marginBottom: 7 }}>
@@ -198,6 +269,34 @@ export default function SalaryRegisterPages({ sheet, banks }: { sheet: Sheet; ba
           </tbody>
         </table>
 
+        {/* WHERE THE MONEY WENT (Dr Raghu, 7 Sep 2026: "page 1: all the
+            analytics, the graph, and the summaries of everything that we
+            have within the months"). Bars rather than a pie: the eye
+            compares lengths far better than angles, and these are parts of
+            one whole. A part the month did not carry is named as absent,
+            never drawn as a zero — a zero reads as "nothing was deducted". */}
+        <div style={{ fontSize: 10, fontWeight: 800, margin: "10px 0 4px" }}>Where the earnings went</div>
+        <Bars parts={EARN_PARTS} colors={EARN_COLORS} total={T.earned} />
+        <div style={{ fontSize: 10, fontWeight: 800, margin: "9px 0 4px" }}>What was deducted</div>
+        <Bars parts={DED_PARTS} colors={DED_COLORS} total={T.ded} />
+
+        {spread.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, fontWeight: 800, margin: "10px 0 4px" }}>How net pay is spread</div>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 54, borderBottom: "1px solid #C9C6BD" }}>
+              {spread.map((b) => (
+                <div key={b.lo} style={{ flex: 1, textAlign: "center" }} title={`${lakh(b.lo)}–${lakh(b.lo + step)}: ${b.n}`}>
+                  <div style={{ fontSize: 6.5, color: "#5A6572" }}>{b.n || ""}</div>
+                  <div style={{ height: Math.round((b.n / maxN) * 40), background: "var(--blue, #1D4E7E)", borderRadius: "2px 2px 0 0" }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 2, fontSize: 6, color: "#5A6572", marginTop: 2 }}>
+              {spread.map((b) => <div key={b.lo} style={{ flex: 1, textAlign: "center" }}>{Math.round(b.lo / 1000)}k</div>)}
+            </div>
+          </>
+        )}
+
         <div style={{ fontSize: 8, color: "#5A6572", marginTop: 9, lineHeight: 1.5 }}>
           Every figure is summed from the month&apos;s own register lines. A group showing <b>none</b> had nobody in it
           this month and is given no page — the absence is recorded here instead.
@@ -268,6 +367,66 @@ export default function SalaryRegisterPages({ sheet, banks }: { sheet: Sheet; ba
           </div>
         );
       })}
+
+      {/* ───────── THE LEAVE AND LOAN REGISTER, LAST ─────────
+          Dr Raghu, 7 Sep 2026: "at the end, just make a leave and loan
+          register so that it can still give us a record of what the opening
+          balance was, what was added and subtracted, and what the closing
+          balance was. Show the name, employee ID, and these two loan and
+          leave registers at the end so that they can all be together."
+
+          Together, and at the end, because it is read as a statement rather
+          than as part of the pay: a man asks what his leave was and what it
+          is now, and the answer should be on one sheet and not scattered
+          across five. Everybody in one run, in employee-ID order, so a name
+          is found in one place. A column the month never carried prints a
+          dash — never a zero, which would read as "nothing was added". */}
+      {ledger.length > 0 && (
+        <div className="sheet" style={{ fontFamily: "system-ui, -apple-system, sans-serif", color: "#16232F" }}>
+          <Head page={`Page ${groups.filter((g) => g.list.length).length + 2} — Leave &amp; Loan Register`} />
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 5 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 800 }}>Leave &amp; Loan Register</div>
+            <div style={{ fontSize: 8, color: "#5A6572" }}>Opening, what moved, and closing · {ledger.length} people · all groups together</div>
+          </div>
+          <table className="rg">
+            <colgroup>
+              <col style={{ width: "7%" }} /><col style={{ width: "21%" }} />
+              {LEDGER_COLUMNS.map((c) => <col key={String(c.key)} style={{ width: `${72 / LEDGER_COLUMNS.length}%` }} />)}
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Emp ID</th><th>Name</th>
+                {LEDGER_COLUMNS.map((c, i) => (
+                  <th key={String(c.key)} className="r"
+                    style={i === 6 ? { borderLeft: "2px solid #fff" } : undefined}>{c.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {ledger.map((r) => (
+                <tr key={String(r.employee_id)}>
+                  <td>{r.employee_id}</td>
+                  <td style={{ fontWeight: 600 }}>{r.name}</td>
+                  {LEDGER_COLUMNS.map((c, i) => {
+                    const v = (r as unknown as Record<string, unknown>)[String(c.key)];
+                    const closing = c.key === "leave_cb" || c.key === "loan_cb";
+                    return (
+                      <td key={String(c.key)} className="r"
+                        style={{ fontWeight: closing ? 700 : 400, ...(i === 6 ? { borderLeft: "2px solid #C9C6BD" } : {}) }}>
+                        {v == null ? "—" : /leave|comp/.test(String(c.key)) ? String(Math.round(Number(v) * 10) / 10) : inr(Math.round(Number(v)))}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ fontSize: 7.5, color: "#5A6572", marginTop: 5 }}>
+            Leave is in days, loan in rupees. Closing = opening + added + comp off − used − encashed for leave; opening + added − deducted for loan.
+          </div>
+          <SignOff label="Leave &amp; Loan Register" />
+        </div>
+      )}
     </>
   );
 }

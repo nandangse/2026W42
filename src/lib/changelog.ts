@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.18.2",
+    date: "2026-09-07",
+    module: "The register by group, in his order, with the analytics and a leave & loan register",
+    items: [
+      "PAGE 1 CARRIES THE ANALYTICS (Dr Raghu, 7 Sep 2026: \"all the analytics, the graph, and the summaries of everything that we have within the months\") — the headline totals, the month by group, where the earnings went and what was deducted drawn as bars, and how net pay is spread. Bars rather than a pie: the eye compares lengths far better than angles. A part the month never carried is named as absent, never drawn as a zero, because a zero reads as \"nothing was deducted\".",
+      "THE GROUPS ARE IN HIS ORDER: Management, then Staff &amp; Workers by employee ID running on for as many pages as it takes, then Contractors, then Labour Contract, then Trainees &amp; Interns when there are any.",
+      "AND THE LEAVE &amp; LOAN REGISTER STANDS AT THE END (\"so that it can still give us a record of what the opening balance was, what was added and subtracted, and what the closing balance was ... so that they can all be together\") — everybody in one run in ID order, leave in days and loan in rupees, opening through closing. It is read as a statement rather than as part of the pay: a man asks what his leave was and what it is now, and the answer should be on one sheet, not scattered across five.",
+    ],
+  },
+  {
     v: "5.0.18.1",
     date: "2026-09-07",
     module: "The muster prints, and the per-day rate follows the HRIS Type",
