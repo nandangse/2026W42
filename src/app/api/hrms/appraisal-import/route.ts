@@ -24,7 +24,7 @@ const CYCLE = "2026-27";
  *
  * { preview: true } says what would happen and writes nothing.
  */
-type In = { employee_id: string; basic_da?: number; hra?: number; fixed_allowance?: number; conveyance?: number; medical_allowance?: number; gross?: number; designation?: string };
+type In = { employee_id: string; basic_da?: number; hra?: number; fixed_allowance?: number; conveyance?: number; medical_allowance?: number; gross?: number; prev_gross?: number; designation?: string };
 
 export async function POST(req: Request) {
   try {
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       ovBy.get(id)!.set(String(e.field), e.value == null ? "" : String(e.value));
     }
 
-    const took: { id: string; name: string; type: string; prev: number; next: number; diff: number }[] = [];
+    const took: { id: string; name: string; type: string; prev: number; next: number; diff: number; moved: boolean }[] = [];
     const skipped: { id: string; name: string; why: string }[] = [];
     const writes: Record<string, unknown>[] = [];
     const eff = b.effective_from || "2026-08-01";
@@ -70,14 +70,25 @@ export async function POST(req: Request) {
         skipped.push({ id, name: String(e.name || ""), why: `the parts add to ${next.toLocaleString("en-IN")} but the sheet says ${num(r.gross).toLocaleString("en-IN")}` });
         continue;
       }
-      // what they are on today, by the same arithmetic every other screen uses
+      /**
+       * THE PREVIOUS GROSS COMES FROM THE SHEET, NOT THE RECORD (7 Sep 2026).
+       * Sixty-one of these workers had the new rate typed straight onto their
+       * record on 3 and 4 September, so reading "today" off the record would
+       * have called the new rate the old one and shown a zero increase. The
+       * sheet's own old column is the rate before the revision — that is what
+       * becomes 2025-26. The record is used only when the sheet is silent.
+       */
       const get = (k: string) => {
         const fk = ({ "Basic and DA": "basic_da", "HRA": "hra", "Fixed Allowance": "fixed_allowance", "Conveyance": "conveyance", "Medical Allowance": "medical_allowance" } as Record<string, string>)[k];
         const o = fk ? ov?.get(fk) : undefined;
         return o != null && String(o).trim() !== "" ? o : ex[k];
       };
-      const prev = salaryTable(get, type)?.gross ?? 0;
-      took.push({ id, name: String(e.name || ""), type, prev, next, diff: next - prev });
+      const onRecord = salaryTable(get, type)?.gross ?? 0;
+      const fromSheet = num(r.prev_gross);
+      const prev = fromSheet > 0 ? fromSheet : onRecord;
+      // the record has already been moved to the new rate by hand
+      const moved = onRecord > 0 && Math.abs(onRecord - next) <= 1 && Math.abs(onRecord - prev) > 1;
+      took.push({ id, name: String(e.name || ""), type, prev, next, diff: next - prev, moved });
       writes.push({
         employee_id: id, cycle: CYCLE, new_gross: next, prev_gross: prev || null,
         structure: { components: comps }, effective_from: eff, note,
@@ -93,6 +104,7 @@ export async function POST(req: Request) {
       next: took.reduce((a, x) => a + x.next, 0),
       unchanged: took.filter((x) => Math.abs(x.diff) < 1).length,
       down: took.filter((x) => x.diff < -1).length,
+      moved: took.filter((x) => x.moved).length,
     };
     if (b.preview) return NextResponse.json({ ok: true, preview: true, totals, took: took.slice(0, 400), skipped: skipped.slice(0, 100) });
 

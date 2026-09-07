@@ -456,7 +456,7 @@ function Stat({ n, l, green }: { n: number | string; l: string; green?: boolean 
    writes each worker's appraisal as proposed. Staff and the rest he does in
    the HRMS itself, so anybody who is not Labour or Labour - Contract is
    skipped and named. */
-type Took = { id: string; name: string; type: string; prev: number; next: number; diff: number };
+type Took = { id: string; name: string; type: string; prev: number; next: number; diff: number; moved?: boolean };
 type Skip = { id: string; name: string; why: string };
 
 function RevisionImport({ onClose, onDone }: { onClose: () => void; onDone: () => Promise<void> }) {
@@ -483,12 +483,13 @@ function RevisionImport({ onClose, onDone }: { onClose: () => void; onDone: () =
     if (cur || row.length) { row.push(cur); out.push(row); }
     const head = (out.shift() || []).map((h) => h.trim().toLowerCase());
     const last = (name: string) => head.lastIndexOf(name);      // the NEW block
-    const first = (name: string) => head.indexOf(name);
+    const first = (name: string) => head.indexOf(name);          // the OLD block
     const C = {
       id: first("id"), type: first("type"),
       basic: last("basic and da"), hra: last("hra"), fixed: last("fixed allowance"),
       conv: last("conveyance"), med: last("medical allowance"), gross: last("gross salary"),
       desig: last("designation"),
+      oldGross: first("gross salary"),   // the rate before the revision — this is what 2025-26 keeps
     };
     if (C.id < 0 || C.basic < 0) throw new Error("That file has no ID column, or no second Basic and DA — is it the Salary Revision Master?");
     if (C.basic === first("basic and da")) throw new Error("Only one salary block in that file — the revision sheet carries the old one and then the new one.");
@@ -498,6 +499,7 @@ function RevisionImport({ onClose, onDone }: { onClose: () => void; onDone: () =
       employee_id: g(r, C.id), type: g(r, C.type),
       basic_da: n(g(r, C.basic)), hra: n(g(r, C.hra)), fixed_allowance: n(g(r, C.fixed)),
       conveyance: n(g(r, C.conv)), medical_allowance: n(g(r, C.med)), gross: n(g(r, C.gross)),
+      prev_gross: n(g(r, C.oldGross)),
       designation: g(r, C.desig),
     }));
   };
@@ -533,9 +535,10 @@ function RevisionImport({ onClose, onDone }: { onClose: () => void; onDone: () =
         </div>
         <div className="p-4">
           <p className="text-sm mb-3" style={{ color: C.dim, lineHeight: 1.6 }}>
-            The Salary Revision Master carries every person twice: what they are on today, then the new structure. This reads the
-            <b> new</b> block against the EmployeeID and writes each worker&apos;s appraisal as <b>proposed</b> — nothing is finalised
-            or released here. Staff and the rest are skipped and named; you do those in the HRMS.
+            The Salary Revision Master carries every person twice: the rate before the revision, then the new structure. Both are read —
+            the <b>old</b> column becomes the previous gross and the <b>new</b> one the proposal — so a record somebody has already moved by
+            hand does not swallow its own increase. Everything lands as <b>proposed</b>; nothing is finalised or released here. Staff and
+            the rest are skipped and named; you do those in the HRMS.
           </p>
           <div className="flex gap-3 flex-wrap items-end mb-3">
             <label className="text-xs font-bold" style={{ color: C.dim }}>THE FILE
@@ -563,6 +566,7 @@ function RevisionImport({ onClose, onDone }: { onClose: () => void; onDone: () =
                 <Stat n={`₹${inr(T.next - T.prev)}`} l="more each month" green />
                 <Stat n={`₹${inr((T.next - T.prev) * 12)}`} l="a full year" green />
                 <Stat n={T.skipped} l="skipped" />
+                {T.moved > 0 && <Stat n={T.moved} l="record already moved" />}
               </div>
               {(T.down > 0 || T.unchanged > 0) && (
                 <div className="text-xs mb-2" style={{ color: "#8A5B00" }}>
@@ -581,9 +585,9 @@ function RevisionImport({ onClose, onDone }: { onClose: () => void; onDone: () =
                   <tbody>
                     {pre.took.map((t) => (
                       <tr key={t.id}>
-                        <td className="tnum">{t.id}</td><td>{t.name}</td><td>{t.type}</td>
+                        <td className="tnum">{t.id}</td><td>{t.name}{t.moved && <span className="ml-1 rounded px-1" style={{ fontSize: 9, background: "#FFF3E8", color: "#8A5B00" }} title="the record was already moved to the new rate by hand">record moved</span>}</td><td>{t.type}</td>
                         <td className="num tnum">{inr(t.prev)}</td><td className="num tnum"><b>{inr(t.next)}</b></td>
-                        <td className="num tnum" style={{ color: t.diff > 0 ? "var(--green)" : t.diff < 0 ? "var(--red)" : C.faint, fontWeight: 700 }}>
+                        <td className="num tnum" style={{ color: t.diff > 0 ? "var(--green)" : t.diff < 0 ? "var(--red)" : C.faint, fontWeight: 700 }} title={t.moved ? "This person's record was already moved to the new rate by hand — the previous gross here is the sheet's old column" : undefined}>
                           {t.diff > 0 ? "+" : ""}{inr(t.diff)}{t.prev ? ` (${((t.diff / t.prev) * 100).toFixed(1)}%)` : ""}
                         </td>
                       </tr>

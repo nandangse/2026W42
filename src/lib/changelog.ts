@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.7.2",
+    date: "2026-09-07",
+    module: "The revision loader takes the old rate from the sheet, not the record",
+    items: [
+      "Checked before loading anything, and just as well: sixty-one of the 127 workers had the new rate typed straight onto their record on 3 and 4 September. The loader was working the previous gross out from the record, so for those sixty-one it would have called the new rate the old one — a zero increase, and the raise gone from the record. The totals said so: ₹2.16 lakh a month where the sheet says ₹4.26 lakh.",
+      "So the loader now reads BOTH blocks. The sheet's old column is the previous gross — the rate before the revision, which is what 2025-26 keeps — and the new column is the proposal. A record somebody has already moved by hand no longer swallows its own increase, and the check screen marks those people so it is plain who was moved outside Genie.",
+      "Where things stand on the 131 in the sheet: 61 records already carry the new rate, 62 still carry the old, 4 match neither (Arbind Kumar Sharma, Mahesh Kumar, Trinath Sethi, Ajay Kumar Yadav) and 4 have no type on their record at all. Nothing has been written; the numbers went to Dr Raghu to settle with Vinay, YCN and Rajesh.",
+    ],
+  },
+  {
     v: "5.0.7.1",
     date: "2026-09-07",
     module: "A manager review says it is in, and can be sent again",
