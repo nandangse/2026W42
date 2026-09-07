@@ -15,7 +15,7 @@
  *   line on the person's own record under Communication, which is why
  *   nothing here has to be copied anywhere to reach the HRIS record.
  */
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { fmtFull } from "@/lib/schedule";
@@ -37,6 +37,7 @@ export default function Communications({ who }: { who: string }) {
   const [dir, setDir] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  const [status, setStatus] = useState("");
 
   const load = useCallback(async () => {
     try { const j = await api.get("/api/hrms/communication?all=1"); setRows(j.rows || []); }
@@ -44,7 +45,41 @@ export default function Communications({ who }: { who: string }) {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const shown = (rows || []).filter((r) => (!channel || r.channel === channel) && (!dir || r.direction === dir) && (!q || `${r.name} ${r.employee_id} ${r.subject || ""} ${r.body}`.toLowerCase().includes(q.toLowerCase())));
+  /**
+   * THE REPLY BELONGS WITH THE MAIL IT ANSWERS (Dr Raghu, 7 Sep 2026: "those
+   * that replied should show in front of the mail").
+   *
+   * A reply was just another line in a list of six hundred, so the fact that
+   * somebody had answered was invisible unless you happened to scroll past
+   * it. Each reply is now hung on the outgoing message it answers — the last
+   * one sent to that person on that channel before it came in — and the mail
+   * itself carries a green "replied" badge, which is the thing worth seeing
+   * at a glance.
+   */
+  const { replyOf, replied } = useMemo(() => {
+    const all = [...(rows || [])].sort((a, b) => String(a.sent_at).localeCompare(String(b.sent_at)));
+    const lastOut = new Map<string, string>();          // person+channel → the id of the last mail out
+    const map = new Map<string, Row[]>();               // outgoing id → its replies
+    for (const r of all) {
+      const k = `${r.employee_id}|${r.channel}`;
+      if (r.direction === "in") {
+        const parent = lastOut.get(k);
+        if (parent) map.set(parent, [...(map.get(parent) || []), r]);
+      } else lastOut.set(k, r.id);
+    }
+    const attached = new Set<string>();
+    for (const list of map.values()) for (const r of list) attached.add(r.id);
+    return { replyOf: map, replied: attached };
+  }, [rows]);
+
+  const shown = (rows || []).filter((r) =>
+    (!channel || r.channel === channel)
+    && (!dir || r.direction === dir)
+    && (!status || (r.direction === "in" ? status === "replies" : r.status === status))
+    // a reply shown under its own mail is not repeated at the top level,
+    // unless replies are what is being asked for
+    && !(dir !== "in" && status !== "replies" && replied.has(r.id))
+    && (!q || `${r.name} ${r.employee_id} ${r.subject || ""} ${r.body}`.toLowerCase().includes(q.toLowerCase())));
   const counts: Record<string, number> = {};
   for (const r of rows || []) { const k = r.direction === "in" ? "replies" : r.status; counts[k] = (counts[k] || 0) + 1; }
 
@@ -66,7 +101,20 @@ export default function Communications({ who }: { who: string }) {
       {tab === "all" && (
         <>
           <div className="flex gap-1.5 my-2 flex-wrap items-center text-xs">
-            {Object.entries(counts).map(([k, v]) => <span key={k} className="rounded px-2 py-0.5 font-bold" style={{ background: "#F4F2EC", color: tone(k === "replies" ? "received" : k) }}>{k} {v}</span>)}
+            {/* THE COUNTS ARE THE FILTER (Dr Raghu, 7 Sep 2026: "show the
+                ones that failed"). They read as buttons because they now are
+                — click "failed 12" to see those twelve, click it again to
+                come back. A count you cannot open is only a rumour. */}
+            {Object.entries(counts).map(([k, v]) => (
+              <button key={k} onClick={() => setStatus(status === k ? "" : k)} title={`Show only: ${k}`}
+                className="rounded px-2 py-0.5 font-bold" style={{
+                  background: status === k ? tone(k === "replies" ? "received" : k) : "#F4F2EC",
+                  color: status === k ? "#fff" : tone(k === "replies" ? "received" : k),
+                  border: `1px solid ${status === k ? "transparent" : C.line}`, cursor: "pointer" }}>
+                {k} {v}
+              </button>
+            ))}
+            {status && <button onClick={() => setStatus("")} className="rounded px-2 py-0.5" style={{ color: C.faint, cursor: "pointer" }}>clear</button>}
             <span style={{ flex: 1 }} />
             <select value={channel} onChange={(e) => setChannel(e.target.value)} className="rounded px-2 py-1 bg-white" style={{ border: `1px solid ${C.line}` }}><option value="">all channels</option><option value="whatsapp">WhatsApp</option><option value="email">E-mail</option><option value="note">Logged</option></select>
             <select value={dir} onChange={(e) => setDir(e.target.value)} className="rounded px-2 py-1 bg-white" style={{ border: `1px solid ${C.line}` }}><option value="">out and in</option><option value="out">sent</option><option value="in">replies</option></select>
@@ -89,7 +137,21 @@ export default function Communications({ who }: { who: string }) {
                   <span style={{ color: C.faint }}>{fmtFull(String(r.sent_at))} · {String(r.sent_by || "").split("·")[0].trim()}</span>
                   {r.error && <span style={{ color: C.red }} title={r.error}>!</span>}
                 </button>
+                {/* WHO ANSWERED, IN FRONT — the badge is the point of this;
+                    the words are one click away. */}
+                {(replyOf.get(r.id) || []).length > 0 && (
+                  <button onClick={() => setOpen(open === r.id ? null : r.id)}
+                    className="rounded px-1.5 py-0.5 font-bold mt-1" style={{ background: "#E6F4EA", color: C.green, fontSize: 10, cursor: "pointer" }}>
+                    ↩ {(replyOf.get(r.id) || []).length} {(replyOf.get(r.id) || []).length === 1 ? "reply" : "replies"}
+                  </button>
+                )}
                 {open === r.id && <div className="mt-1" style={{ fontSize: 12.5, lineHeight: 1.5, color: r.direction === "in" ? C.green : C.ink }} dangerouslySetInnerHTML={{ __html: /<[a-z][\s\S]*>/i.test(r.body) ? r.body : String(r.body).replace(/\n/g, "<br>") }} />}
+                {open === r.id && (replyOf.get(r.id) || []).map((x: Row) => (
+                  <div key={x.id} className="mt-1.5 rounded px-2 py-1.5" style={{ background: "#F3FAF5", borderLeft: `3px solid ${C.green}` }}>
+                    <div style={{ fontSize: 10.5, color: C.green, fontWeight: 700 }}>↩ {x.name} · {fmtFull(String(x.sent_at))}</div>
+                    <div style={{ fontSize: 12.5, lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: /<[a-z][\s\S]*>/i.test(x.body) ? x.body : String(x.body).replace(/\n/g, "<br>") }} />
+                  </div>
+                ))}
               </div>
             ))}
           </div>

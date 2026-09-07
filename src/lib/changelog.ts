@@ -78,6 +78,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.18.3",
+    date: "2026-09-07",
+    module: "Communications: the counts open, and a reply sits with the mail it answers",
+    items: [
+      "THE COUNTS ARE THE FILTER (Dr Raghu, 7 Sep 2026: \"show the ones that failed\"). sent, cancelled, failed and replies read as buttons because they now are — click <b>failed 12</b> to see those twelve, click again to come back. A count you cannot open is only a rumour.",
+      "AND A REPLY SITS WITH THE MAIL IT ANSWERS (\"those that replied should show in front of the mail\"). A reply was one more line among six hundred, so the fact that somebody had answered was invisible unless you scrolled past it. Each reply is now hung on the message it answers — the last one sent to that person on that channel — and the mail carries a green <b>↩ replied</b> badge, which is the thing worth seeing at a glance. Open the mail and the answer is underneath it.",
+    ],
+  },
+  {
     v: "5.0.18.2",
     date: "2026-09-07",
     module: "The register by group, in his order, with the analytics and a leave & loan register",
