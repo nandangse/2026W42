@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { allRows } from "@/lib/all-rows";
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { readBody } from "@/lib/validate";
@@ -37,7 +38,8 @@ export async function POST(req: Request) {
     const T = await hrmsTables(admin);
     const { data: emps } = await admin.from(T.employees).select("id, name, designation, active, extra");
     const byId = new Map((emps || []).map((e) => [String(e.id), e]));
-    const { data: eds } = await admin.from(T.edits).select("employee_id, field, value").in("field", ["type", "basic_da", "hra", "fixed_allowance", "conveyance", "medical_allowance"]);
+    const eds = await allRows<{ employee_id: string; field: string; value: string | null }>(() =>
+      admin.from(T.edits).select("employee_id, field, value").in("field", ["type", "basic_da", "hra", "fixed_allowance", "conveyance", "medical_allowance"]));
     const ovBy = new Map<string, Map<string, string>>();
     for (const e of eds || []) {
       const id = String(e.employee_id);

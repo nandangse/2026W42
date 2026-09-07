@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.12.0",
+    date: "2026-09-07",
+    module: "757 record overrides were being dropped on every read",
+    items: [
+      "Chasing an empty Roles column on the Employee Master turned up something much worse. PostgREST answers with at most <b>1,000 rows</b> unless it is asked for more, and it does not say when it truncates. The employee overrides passed that mark some time ago — <b>1,757 rows against a 1,000-row ceiling</b> — so 757 of them were silently dropped every time a screen read them.",
+      "That is why one Prod - Fitter showed his role and the man on the next line did not: nothing was wrong with either record, one simply fell past row 1,000. And it was never only roles — EVERY overridden field on those people vanished the same way. Designation, department, reporting manager, and the pay components: basic, HRA, fixed allowance, conveyance, medical, site allowance.",
+      "Everything that reads the whole table now pages through it: the Employee Master, the roles register, the export, the appraisal import, the Appraisal Table, and <b>people()</b> — which is what payroll, the mass mail and the Individual Report Card all read through. Anything generated before today from an override that sat past row 1,000 was working from a blank where a value should have been.",
+      "THE GROWTH NOTE NOW OPENS IN HIS OWN WORDS, unaltered, for all 205: \"Dear so-and-so, I appreciate you for being an important member of Team Nandan...\" through to \"if you do not put in data, it is also seen as non-performance.\" The opening is built by Genie, not asked of the model — the same paragraph must reach everybody word for word, and a model given words to reproduce will eventually improve one of them. The personalised part is written underneath it, and for the floor the whole letter is rendered again in Hindi.",
+    ],
+  },
+  {
     v: "5.0.11.4",
     date: "2026-09-07",
     module: "The payslip, on one A4 page and nothing cut",

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { allRows } from "@/lib/all-rows";
 import { readBody } from "@/lib/validate";
 import { swallow } from "@/lib/swallow";
 import { AI } from "@/lib/ai";
@@ -108,8 +109,8 @@ async function holders() {
   const { data } = await admin
     .from(T.employees)
     .select("id, name, designation, department, active, extra");
-  const { data: eds } = await admin
-    .from(T.edits).select("employee_id, field, value").in("field", ["role", "status"]);
+  const eds = await allRows<{ employee_id: string; field: string; value: string | null }>(() =>
+    admin.from(T.edits).select("employee_id, field, value").in("field", ["role", "status"]));
 
   const roleOf = new Map<string, string>();
   const statusOf = new Map<string, string>();

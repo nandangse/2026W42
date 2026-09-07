@@ -1,4 +1,5 @@
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
+import { allRows } from "@/lib/all-rows";
 import { readBody, type AnyBody } from "@/lib/validate";
 import { swallow } from "@/lib/swallow";
 import { adminClient } from "@/lib/supabase/admin";
@@ -46,7 +47,8 @@ export async function POST(req: Request) {
 
     const ovr = new Map<string, Map<string, string | null>>();
     try {
-      const { data: eds } = await admin.from(T.edits).select("employee_id, field, value");
+      const eds = await allRows<{ employee_id: string; field: string; value: string | null }>(() =>
+        admin.from(T.edits).select("employee_id, field, value"));
       for (const e of eds || []) {
         const id = String(e.employee_id);
         if (!ovr.has(id)) ovr.set(id, new Map());

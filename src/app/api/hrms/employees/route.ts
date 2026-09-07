@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { allRows } from "@/lib/all-rows";
 import { readBody } from "@/lib/validate";
 import { swallow } from "@/lib/swallow";
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
@@ -63,8 +64,8 @@ export async function GET(req: Request) {
 
     const overrides = new Map<string, Map<string, { value: string | null; by: string | null; at: string; pending?: boolean }>>();
     try {
-      const { data: eds } = await admin
-        .from(T.edits).select("employee_id, field, value, edited_by, edited_at, approved_at");
+      const eds = await allRows<{ employee_id: string; field: string; value: string | null; edited_by: string | null; edited_at: string | null; approved_at: string | null }>(
+        () => admin.from(T.edits).select("employee_id, field, value, edited_by, edited_at, approved_at"));
       for (const e of eds || []) {
         const id = String(e.employee_id);
         if (!overrides.has(id)) overrides.set(id, new Map());

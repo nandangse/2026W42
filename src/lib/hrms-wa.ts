@@ -12,6 +12,7 @@
  * whether the message was queued from the CRM or from here.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { allRows } from "@/lib/all-rows";
 import { swallow } from "@/lib/swallow";
 import { ALL_FIELDS, fieldSpec, hrmsTables, type FieldSpec } from "@/lib/hrms";
 import { employeeVars, payrollVars, renderTemplate, MONTHS } from "@/lib/hrms-template";
@@ -49,9 +50,11 @@ export async function people(admin: SupabaseClient, ids?: string[]): Promise<Per
   const rows = (data || []) as EmpRow[];
   const overrides = new Map<string, Map<string, string | null>>();
   try {
-    let e = admin.from(T.edits).select("employee_id, field, value");
-    if (ids?.length) e = e.in("employee_id", ids);
-    const { data: eds } = await e;
+    // every override, not the first thousand — see src/lib/all-rows.ts
+    const eds = await allRows<{ employee_id: string; field: string; value: string | null }>(() => {
+      const e = admin.from(T.edits).select("employee_id, field, value");
+      return ids?.length ? e.in("employee_id", ids) : e;
+    });
     for (const x of eds || []) {
       const k = String(x.employee_id);
       if (!overrides.has(k)) overrides.set(k, new Map());

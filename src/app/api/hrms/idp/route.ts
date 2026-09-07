@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { allRows } from "@/lib/all-rows";
 import { readBody } from "@/lib/validate";
 import { swallow } from "@/lib/swallow";
 import { AI } from "@/lib/ai";
@@ -54,7 +55,8 @@ export async function GET(req: Request) {
       const T = await hrmsTables(admin);
       const [{ data: emps }, { data: eds }, { data: idps }, { data: revs }] = await Promise.all([
         admin.from(T.employees).select("id, name, department, designation, location, dob, doj, active, extra"),
-        admin.from(T.edits).select("employee_id, field, value").in("field", ["type", "status", "department", "designation", "reporting_manager", "basic_da", "hra", "fixed_allowance", "conveyance", "medical_allowance", "site_allowance", "location", "phone", "personal_email"]),
+        allRows<{ employee_id: string; field: string; value: string | null }>(() =>
+          admin.from(T.edits).select("employee_id, field, value").in("field", ["type", "status", "department", "designation", "reporting_manager", "basic_da", "hra", "fixed_allowance", "conveyance", "medical_allowance", "site_allowance", "location", "phone", "personal_email"])).then((data) => ({ data })),
         admin.from("hrms_idp").select("id, employee_id, submitted_at, ratings, ask:answers->>ask_gross").eq("cycle", CYCLE_TBL),
         admin.from("hrms_idp_review").select("idp_id, submitted_at, ratings, gross_proposed"),
       ]);
@@ -636,31 +638,49 @@ export async function POST(req: Request) {
         (idp ? `THEIR OWN WORDS IN THIS YEAR'S IDP:\n${Object.entries(answers).map(([k, v]) => `${k}: ${String(v).slice(0, 900)}`).join("\n")}\n\n` : "NO IDP SUBMITTED THIS YEAR.\n\n") +
         (reviews.length ? `WHAT THEIR MANAGER WROTE:\n${reviews.map((r) => [r.notes, r.analysis].filter(Boolean).join(" · ")).join("\n")}\n` : "THE MANAGER HAS NOT WRITTEN YET.\n");
 
+      /**
+       * THE OPENING IS HIS, WORD FOR WORD (Dr Raghu, 7 Sep 2026: "Tell them
+       * — Dear so-and-so, I appreciate you for being an important member of
+       * Team Nandan…"). It is built here, not asked of the model: the same
+       * paragraph must reach all 205 people unaltered, and a model given
+       * words to reproduce will eventually improve one of them.
+       */
+      const firstName = String(emp.name || "").trim().split(/\s+/)[0] || String(emp.name || "");
+      const deptName = ed.get("department") || emp.department || "your";
+      const roleName = ed.get("designation") || emp.designation || "your role";
+      const yrs = emp.doj ? Math.max(0, Math.round(((Date.now() - Date.parse(String(emp.doj))) / (365.25 * 864e5)) * 10) / 10) : null;
+      const tenure = yrs == null ? "some years" : yrs < 1 ? "these first months" : `${yrs} years`;
+      const opening =
+        `Dear ${firstName},\n\n` +
+        `I appreciate you for being an important member of Team Nandan in the ${deptName} department, and for holding the ${roleName} role with us for ${tenure}. As we take the next growth of Nandan, it is important for you to be at your best performing ability, and for you to win with us.\n\n` +
+        `Please note that we will take your performance very seriously, and this appraisal has been done with great thought and with expectations. If the expectations do not match, there is going to be immense pressure on you, for sure, to deliver — because all data is seen in the system. If you do not put in data, that is also seen as non-performance. Kindly take that up and work it out to make this happen.`;
+
       const system = [
         "You are the finest CHRO in the country, holding the pen for Dr Raghunandan Jagdish — Dr Raghu — Managing Director of Nandan GSE, which has built ground support equipment for Indian airports out of Mumbai since 1994.",
         "You are writing the GROWTH NOTE he hands a person at their appraisal.",
         "",
+        "THE NOTE ALREADY HAS ITS OPENING — Dr Raghu has written it himself and it is fixed. It is given to you below under OPENING ALREADY WRITTEN. Do NOT repeat it, do not greet the person again, and do not restate its points. You write ONLY what comes after it, continuing in the same breath.",
+        "",
         "WRITE AS DR RAGHU, IN THE FIRST PERSON — 'I have watched', 'I want you to', 'I will'. Speak TO the person, never about them. Use their first name two or three times, placed naturally; never more.",
         "",
-        "Five short paragraphs, no headings, no bullet points, 220 to 300 words:",
+        "Four short paragraphs, no headings, no bullet points, 180 to 260 words:",
         "1. What I have seen in you this year, specific, from the record.",
         "2. What you do well, and why it matters to Nandan.",
         "3. Where I want you to grow this coming year — one or two things, concrete enough to act on Monday.",
-        "4. What I and the company will do to help that happen.",
-        "5. A close in my own voice: an expectation, and the belief behind it.",
+        "4. What I and the company will do to help that happen, closing in my own voice with an expectation and the belief behind it.",
         "",
         "RULES. Plain English a person reads once and understands. Warm, and straight — never flattery, never a lecture. No jargon: no synergy, no leverage, no bandwidth, no journey. Never invent an event, a number, a project or a customer that is not in the material; where the record is thin, speak to the role and to character rather than pretending to know. Never mention salary, increment or the appraisal figure. Never suggest a machine wrote it.",
         wantHindi
-          ? "THIS PERSON WORKS ON THE FLOOR. Write the same note again in simple, respectful Hindi in Devanagari — the आप form, short sentences, the Hindi a Mumbai shop floor actually speaks. Carry the same meaning rather than translating word for word; keep the person's name in Roman letters as written."
+          ? "THIS PERSON WORKS ON THE FLOOR. Write the WHOLE note again in simple, respectful Hindi in Devanagari — the opening given to you AND your own part, as one letter — using the आप form, short sentences, the Hindi a Mumbai shop floor actually speaks. Carry the same meaning rather than translating word for word; keep the person's name in Roman letters as written."
           : "Hindi is not needed for this person.",
         "",
-        'Answer as JSON only: {"en": "the note", "hi": "the Hindi note, or an empty string"}',
+        'Answer as JSON only: {"en": "only the part that follows the opening", "hi": "the whole letter in Hindi including the opening, or an empty string"}',
       ].join("\n");
 
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({ model: AI.FRONT, max_tokens: 3000, system, messages: [{ role: "user", content: material.slice(0, 60000) }] }),
+        body: JSON.stringify({ model: AI.FRONT, max_tokens: 3000, system, messages: [{ role: "user", content: `OPENING ALREADY WRITTEN (do not repeat it):\n${opening}\n\n---\n\n${material}`.slice(0, 60000) }] }),
       });
       const j = await res.json();
       if (!res.ok) throw new HttpError(502, (j as { error?: { message?: string } })?.error?.message || `Anthropic returned ${res.status}`);
@@ -668,9 +688,11 @@ export async function POST(req: Request) {
       const m = raw.match(/\{[\s\S]*\}/);
       if (!m) throw new HttpError(502, "Genie did not answer in the expected shape — try once more.");
       const parsed = JSON.parse(m[0]) as { en?: string; hi?: string };
-      const en = String(parsed.en || "").trim();
+      const tail = String(parsed.en || "").trim();
       const hi = String(parsed.hi || "").trim();
-      if (!en) throw new HttpError(502, "Genie came back empty — try once more.");
+      if (!tail) throw new HttpError(502, "Genie came back empty — try once more.");
+      // his words first, always, and then the part written for this person
+      const en = `${opening}\n\n${tail}`;
       const { error } = await admin.from("hrms_appraisal").upsert(
         { employee_id, cycle: "2026-27", growth_note: en, growth_note_hi: hi || null, growth_note_at: new Date().toISOString(), updated_at: new Date().toISOString() },
         { onConflict: "employee_id,cycle" });
