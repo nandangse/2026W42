@@ -47,6 +47,47 @@ export async function GET() {
       if (!data || data.length < PAGE) break;
     }
 
+    /**
+     * GENIE IS THE SOURCE OF THE THROUGHPUT, NOT THE ERP EXPORT (Dr Raghu,
+     * 7 Sep 2026: "all data is now to be taken from the Genie only, and there
+     * is no upload that is happening from the ERP ... whichever one they put
+     * an actual delivery date, the throughput numbers will carry on from
+     * there").
+     *
+     * The two jobs delivered on 7 September showed a throughput of zero
+     * because the export carried zero — while Genie's own board held both at
+     * 45%, Rs 17,31,678 each. The delivery date may be recorded in either
+     * place; the MONEY is Genie's. So each delivered row is overlaid with
+     * what the job board says: its throughput percent, its throughput value,
+     * and — where the export never carried one — its order value.
+     */
+    const board = new Map<string, { val: number | null; tp: number | null; tpv: number | null; tpp: number | null }>();
+    try {
+      const ids = [...new Set(rows.map((r) => String(r.id)))];
+      for (let i = 0; i < ids.length; i += 500) {
+        const { data: js } = await adminClient()
+          .from("jobs").select("id, val, tp, tpv, tpp").in("id", ids.slice(i, i + 500));
+        for (const j of (js || []) as { id: string; val: number | null; tp: number | null; tpv: number | null; tpp: number | null }[])
+          board.set(String(j.id), { val: j.val, tp: j.tp, tpv: j.tpv, tpp: j.tpp });
+      }
+    } catch (e) { swallow("delivered/board", e); /* the export still stands on its own */ }
+
+    let fromGenie = 0;
+    for (const r of rows) {
+      const b = board.get(String(r.id));
+      if (!b) continue;
+      const val = Number(r.val) || Number(b.val) || 0;
+      // the percent Genie holds, applied to the value — and where no percent
+      // is set, whatever throughput Genie already worked out
+      const fromPct = b.tpp != null && Number(b.tpp) > 0 ? (val * Number(b.tpp)) / 100 : 0;
+      const genie = fromPct || Number(b.tpv) || Number(b.tp) || 0;
+      const had = Number(r.tpv) || Number(r.tp) || 0;
+      if (genie > 0 && Math.round(genie) !== Math.round(had)) {
+        r.tpv = genie; r.tpp = b.tpp ?? r.tpp; fromGenie++;
+      }
+      if (!Number(r.val) && b.val) r.val = b.val;
+    }
+
     // When the report last landed, and which header the date was read from —
     // both belong on the page, because a dashboard whose source silently
     // stopped updating looks exactly like a quarter with no deliveries.
@@ -63,6 +104,7 @@ export async function GET() {
     } catch (e) { swallow("delivered", e); /* the stamp is context, never the point */ }
 
     const dateSources = [...new Set(rows.map((r) => r.date_source).filter(Boolean))] as string[];
+    void fromGenie;   // counted for the log; the page reads the rows themselves
 
     // THE PIPELINE (Dr Raghu, 29 Aug 2026): what more the period could still
     // produce — every active, undelivered job with its target date, value,

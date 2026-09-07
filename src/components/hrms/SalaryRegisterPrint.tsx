@@ -137,9 +137,13 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
         @page { size: A4 landscape; margin: 8mm; }
         html, body { margin: 0; background: #EFEDE7; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #16232F; }
         .paper { max-width: 1150px; margin: 0 auto; background: #fff; padding: 22px 26px; }
-        table.reg { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .reg td, .reg th { overflow: hidden; text-overflow: ellipsis; }
-        .reg td.nm { white-space: normal; word-break: break-word; }
+        /* On SCREEN the table keeps its natural widths and the paper scrolls
+           sideways if it must — squeezing twenty columns into 1,150px turned
+           every heading into "Gros…" and broke names across four lines.
+           Fixed layout is for the PAGE, where the width really is finite. */
+        table.reg { width: 100%; border-collapse: collapse; }
+        .regwrap { overflow-x: auto; }
+        .reg td.nm { white-space: nowrap; }
         .reg thead { display: table-header-group; }
         .reg thead th { page-break-inside: avoid; }
         .reg td, .reg th { border: 1px solid #DCD8CC; padding: 2.5px 4px; }
@@ -148,9 +152,14 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
           html, body { background: #fff; }
           .no-print { display: none !important; }
           .paper { max-width: none; width: 100%; margin: 0; padding: 0; box-shadow: none; }
-          /* small enough that twenty columns and a name still fit across */
-          .reg { font-size: 6.6px !important; }
-          .reg td, .reg th { padding: 1px 2px !important; }
+          .regwrap { overflow: visible; }
+          /* small enough that twenty columns and a name still fit across A4
+             landscape, and fixed so the columns share the width rather than
+             each taking what it likes */
+          table.reg { table-layout: fixed; }
+          .reg { font-size: 6.4px !important; }
+          .reg td, .reg th { padding: 1px 2px !important; overflow: hidden; }
+          .reg td.nm { white-space: normal; word-break: break-word; }
           .reg tr { break-inside: avoid; }
           .pagebreak { break-after: page; page-break-after: always; }
         }
@@ -277,6 +286,7 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
         <div className="pagebreak" />
 
         {/* ═══ the register ═══ */}
+        <div className="regwrap">
         <table className="reg genie-table" style={{ fontSize: 8.6 }}>
           <thead>
             <tr>
@@ -285,8 +295,8 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
               </th>
             </tr>
             <tr style={{ background: "#F4F2EC" }}>
-              <th style={{ textAlign: "left", width: "4.2%" }}>Emp ID</th>
-              <th style={{ textAlign: "left", width: "11%" }}>Name</th>
+              <th style={{ textAlign: "left", width: "4%" }}>Emp ID</th>
+              <th style={{ textAlign: "left", width: "13%", minWidth: 110 }}>Name</th>
               {REGISTER_COLUMNS.map((c) => (
                 <th key={c.key as string} style={{ textAlign: "right", fontSize: 8, whiteSpace: "nowrap" }}>{c.label}</th>
               ))}
@@ -319,6 +329,7 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
             </tr>
           </tfoot>
         </table>
+        </div>
 
         {/* the sign-off block — this page is printed, signed and kept, so the
             space above each name is for a pen, and the block never splits

@@ -131,6 +131,13 @@ const COLUMN_RULES: { key: keyof SheetRow | "skip"; test: (h: string) => boolean
   { key: "fixed_allowance", test: (h) => /^(fixedallowance|earnedfixedallowance|fixallowance)$/.test(h) },
   { key: "conveyance", test: (h) => /^(conveyance|earnedconveyance)$/.test(h) },
   { key: "site_allowance", test: (h) => /^(siteallowance|earnedsiteallowance)$/.test(h) },
+  /**
+   * MEDICAL WAS NEVER READ (found 7 Sep 2026: "the salary register is missing
+   * the medical allowance"). There was no rule for it at all — so every month
+   * ever uploaded dropped the column on the floor, whether or not the sheet
+   * carried it. Not August alone: July and every month before it.
+   */
+  { key: "medical", test: (h) => /^(medical|medicalallow(ance)?|earnedmedical(allowance)?|medallow(ance)?)$/.test(h) },
   { key: "pf", test: (h) => /^(pf|epf|providentfund|pfamount|pfemployee)$/.test(h) },
   { key: "pt", test: (h) => /^(pt|proftax|professionaltax|ptax)$/.test(h) },
   { key: "tds", test: (h) => /^tds(deduction)?$|^taxdeducted/.test(h) },
@@ -147,7 +154,7 @@ const COLUMN_RULES: { key: keyof SheetRow | "skip"; test: (h: string) => boolean
 /** The register fields read per line when their column exists. */
 const REGISTER_KEYS: (keyof SheetRow)[] = [
   "attendance", "paid_days", "gross", "basic_da", "hra", "fixed_allowance", "conveyance",
-  "site_allowance", "pf", "pt", "other_ded", "loan", "advance", "tds", "arrears",
+  "medical", "site_allowance", "pf", "pt", "other_ded", "loan", "advance", "tds", "arrears",
 ];
 
 /** OT, as the company books it: Site Allowance + HRA of the labour types. */

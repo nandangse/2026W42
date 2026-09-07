@@ -78,6 +78,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.12.3",
+    date: "2026-09-07",
+    module: "Throughput comes from Genie, and medical was never being read",
+    items: [
+      "\"All data is now to be taken from the Genie only, and there is no upload happening from the ERP ... whichever one they put an actual delivery date, the throughput numbers will carry on from there\" (Dr Raghu, 7 Sep 2026).",
+      "WHY THROUGHPUT READ ZERO. The two jobs delivered on 7 September — 2025262470 and 2025262471, Rs 38.48 L each — carry a throughput of zero in the ERP export, and the dashboard was reading the export. Genie's own board holds BOTH at 45%, Rs 17,31,678 each: Rs 34.63 L that the screen was showing as nothing.",
+      "Every delivered row is now overlaid with what Genie holds — the throughput percent applied to the value, or the throughput Genie already worked out. The delivery date may still be recorded in either place, as he said; the money is Genie's.",
+      "MEDICAL ALLOWANCE WAS NEVER BEING READ FROM AN UPLOADED SHEET. There was no column rule for it at all — rules existed for HRA, fixed allowance, conveyance and site allowance, and medical was simply not in the list. So every month ever uploaded dropped the column, whether the sheet carried it or not: July as much as August. The rule is in now; re-upload a month and its medical appears.",
+      "And a correction I owe: I said August's register was generated before those fields existed. It was not generated at all — it was UPLOADED, and an uploaded sheet carries only what is in the file. That is why it holds twenty-two fields, and why leave and loan read as dashes: those are computed by Generate from the muster and the rates, never read from a sheet.",
+    ],
+  },
+  {
     v: "5.0.12.2",
     date: "2026-09-07",
     module: "The slip back to A5, the register across one A4 landscape, and why Leave and Loan were dashes",
