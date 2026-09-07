@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.9.3",
+    date: "2026-09-07",
+    module: "The Appraisal Table, downloaded and cut eight ways",
+    items: [
+      "DOWNLOAD AS EXCEL. \"Use the same headings as the one I showed you in the CSV. I can just copy-paste it and put it into Vinay's sheet, and it will become live on his roster too. Do not change any sequence of any of the cells\" (Dr Raghu, 7 Sep 2026). A real .xlsx of whatever the filters are showing, in his eighteen columns in his order: ID, Name, Age, Yrs in Nandan, Type, then old Basic & DA / Allowance / Conveyance / Gross / per day, the same five new, Increase per day, Increase per month, Remarks. Nothing is ever inserted among them — a paste into a live roster lands by position, not by name, so a column moved here would be a wrong number there. What Genie can add — department, designation, reporting manager, increase %, stage, released on, pay days — rides after the eighteenth, where a paste cannot reach. Remarks is left empty for his own hand.",
+      "The parts are Genie's own split, not the sheet's: basic, allowance and conveyance always add back to the gross, workers carry no HRA and no medical, and per day is over 26 days for labour and 31 for the rest.",
+      "FOUR MORE BANDS. \"Also give staff and worker — not finalised, finalised but not released.\" Eight now, each with its count: released or not, finalised or not, for staff (with contractors) and workers (with labour on contract). Finalised means the number is agreed; released is the later act of telling the person, and they are counted apart because the gap between them is the work still to do.",
+    ],
+  },
+  {
     v: "5.0.9.2",
     date: "2026-09-07",
     module: "A 12 MB deck can ride along, and the count keeps moving",

@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import DataTable, { type Column } from "./DataTable";
 import { Pane } from "./Pane";
+import { splitGross, perDayOf, payDaysFor } from "@/lib/salary";
 import { C } from "./RecordFields";
 
 interface Row {
@@ -31,6 +32,51 @@ const EXP_BANDS: [string, (n: number) => boolean][] = [
   ["under 2 yrs", (n) => n < 2], ["2 – 5 yrs", (n) => n >= 2 && n < 5],
   ["5 – 10 yrs", (n) => n >= 5 && n < 10], ["10 – 20 yrs", (n) => n >= 10 && n < 20], ["20+ yrs", (n) => n >= 20],
 ];
+
+/**
+ * DOWNLOAD AS EXCEL (Dr Raghu, 7 Sep 2026: "use the same headings as the one
+ * I showed you in the CSV ... I can just copy-paste it and put it into
+ * Vinay's sheet, and it will become live on his roster too. Do not change any
+ * sequence of any of the cells").
+ *
+ * The eighteen columns are his, in his order, and nothing may be inserted
+ * among them — a paste into a live roster lands by position, not by name, so
+ * a column moved here is a wrong number there. Anything Genie can add rides
+ * AFTER the last of them, where a paste cannot reach.
+ *
+ * The parts are worked out by Genie's own split (basic + allowance +
+ * conveyance always add back to the gross), not read from the sheet.
+ */
+const SHEET_COLUMNS = [
+  "ID", "Name", "Age", "Yrs in Nandan", "Type",
+  "Old Basic & DA", "Old Allowance", "Old Conveyance", "Old Gross", "Old / day",
+  "New Basic & DA", "New Allowance", "New Conveyance", "New Gross", "New / day",
+  "Increase / day", "Increase / month", "Remarks",
+] as const;
+/** Added AFTER his eighteen, never among them. */
+const EXTRA_COLUMNS = ["Department", "Designation", "Reporting manager", "Increase %", "Stage", "Released on", "Pay days"] as const;
+
+const r0 = (n: number | null | undefined) => (n == null ? "" : Math.round(n));
+function exportRow(r: Row): (string | number)[] {
+  const type = String(r.type || "");
+  const oldP = r.prevGross == null ? null : splitGross(r.prevGross, undefined, type);
+  const newP = r.newGross == null ? null : splitGross(r.newGross, undefined, type);
+  // One "Allowance" column, so the three parts add back to the gross exactly.
+  const allow = (c: ReturnType<typeof splitGross> | null) => (c ? c.hra + c.fixed_allowance + c.medical_allowance : null);
+  const oldDay = perDayOf(r.prevGross, type);
+  const newDay = perDayOf(r.newGross, type);
+  return [
+    r.id, r.name, r.age == null ? "" : Number(r.age.toFixed(1)), r.exp == null ? "" : Number(r.exp.toFixed(1)), type,
+    r0(oldP?.basic_da), r0(allow(oldP)), r0(oldP?.conveyance), r0(r.prevGross), r0(oldDay),
+    r0(newP?.basic_da), r0(allow(newP)), r0(newP?.conveyance), r0(r.newGross), r0(newDay),
+    r0(newDay != null && oldDay != null ? newDay - oldDay : null),
+    r0(r.inc),
+    "",                                        // Remarks — his column, left for him
+    r.department || "", r.designation || "", r.manager || "",
+    r.incPct == null ? "" : Number(r.incPct.toFixed(1)),
+    r.stage, r.released ? String(r.released).slice(0, 10) : "", payDaysFor(type),
+  ];
+}
 
 const STAGE_STYLE: Record<string, { bg: string; fg: string }> = {
   "Released": { bg: "#0D7A3F", fg: "#fff" },
@@ -97,11 +143,17 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
  */
 const STAFF_TYPES = new Set(["Staff", "Contractor", "Consultant", "Intern", "Management"]);
 const WORKER_TYPES = new Set(["Labour", "Labour - Contract"]);
-const BANDS: [string, (t: string, released: boolean) => boolean][] = [
+/** Finalised = the number is agreed. Released is a later act, and its own stage. */
+const isFinal = (stage: string) => stage === "Appraisal Finalised" || stage === "Released";
+const BANDS: [string, (t: string, released: boolean, stage: string) => boolean][] = [
   ["Staff, IDP not released", (t, rel) => STAFF_TYPES.has(t) && !rel],
   ["Staff, IDP released", (t, rel) => STAFF_TYPES.has(t) && rel],
+  ["Staff, not finalised", (t, _r, st) => STAFF_TYPES.has(t) && !isFinal(st)],
+  ["Staff, finalised but not released", (t, rel, st) => STAFF_TYPES.has(t) && isFinal(st) && !rel],
   ["Workers, IDP not released", (t, rel) => WORKER_TYPES.has(t) && !rel],
   ["Workers, IDP released", (t, rel) => WORKER_TYPES.has(t) && rel],
+  ["Workers, not finalised", (t, _r, st) => WORKER_TYPES.has(t) && !isFinal(st)],
+  ["Workers, finalised but not released", (t, rel, st) => WORKER_TYPES.has(t) && isFinal(st) && !rel],
 ];
 
 const shown = useMemo(() => {
@@ -110,7 +162,7 @@ const shown = useMemo(() => {
     const expF = EXP_BANDS.find(([l]) => l === exp)?.[1];
     const bandF = BANDS.find(([l]) => l === band)?.[1];
     return (rows || []).filter((r) => {
-      if (bandF && !bandF(String(r.type || ""), !!r.released)) return false;
+      if (bandF && !bandF(String(r.type || ""), !!r.released, String(r.stage || ""))) return false;
       if (type && r.type !== type) return false;
       if (dept && r.department !== dept) return false;
       if (mgrs.size && !mgrs.has((r.manager || "").trim() || "— none named —")) return false;
@@ -290,6 +342,20 @@ const shown = useMemo(() => {
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   };
 
+  /** The shown rows, in his column order, as a real .xlsx. */
+  const downloadExcel = async () => {
+    const XLSX = await import("xlsx");
+    const aoa: (string | number)[][] = [[...SHEET_COLUMNS, ...EXTRA_COLUMNS], ...shown.map(exportRow)];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{ wch: 7 }, { wch: 26 }, { wch: 6 }, { wch: 7 }, { wch: 16 },
+      ...Array.from({ length: 12 }, () => ({ wch: 12 })), { wch: 22 },
+      { wch: 16 }, { wch: 22 }, { wch: 20 }, { wch: 9 }, { wch: 18 }, { wch: 12 }, { wch: 9 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Appraisal");
+    const d = new Date();
+    XLSX.writeFile(wb, `Appraisal ${band || "all"} - ${d.toISOString().slice(0, 10)}.xlsx`);
+  };
+
   /** Mark one or many as released — or take it back. */
   const release = async (ids: string[], on: boolean) => {
     setMsg("");
@@ -356,7 +422,7 @@ const shown = useMemo(() => {
           style={{ border: `1px solid ${band ? C.ink : C.line}`, color: band ? C.ink : undefined }}
           title="Staff means staff and contractors; workers means labour and labour on contract">
           <option value="">Everyone</option>
-          {BANDS.map(([l]) => (<option key={l} value={l}>{l} ({(rows || []).filter((r) => BANDS.find(([k]) => k === l)![1](String(r.type || ""), !!r.released)).length})</option>))}
+          {BANDS.map(([l]) => (<option key={l} value={l}>{l} ({(rows || []).filter((r) => BANDS.find(([k]) => k === l)![1](String(r.type || ""), !!r.released, String(r.stage || ""))).length})</option>))}
         </select>
         <select value={type} onChange={(e) => setType(e.target.value)} className="text-xs rounded px-2 py-1.5 bg-white" style={{ border: `1px solid ${C.line}` }}>
           <option value="">All types</option>
@@ -411,6 +477,11 @@ const shown = useMemo(() => {
             ⬆ Load the revision sheet
           </button>
         )}
+        <button onClick={downloadExcel} className="text-xs font-bold rounded px-2.5 py-1.5"
+          style={{ border: `1px solid ${C.line}`, background: "#fff", color: C.dim, whiteSpace: "nowrap" }}
+          title="The shown rows, in the revision sheet's own column order — paste straight into the roster">
+          ⤓ Download as Excel
+        </button>
         {/* THE MASS RUN (Dr Raghu, 7 Sep 2026) — writes the growth note for
             everybody the filters have left on screen who has none yet. */}
         {isOwner && (
