@@ -195,11 +195,59 @@ export async function POST(req: Request) {
         if (st?.frozen_at) throw new HttpError(409, `${st.title} is frozen and signed. Take the freeze off before changing a rate.`);
       } catch (e) { if (e instanceof HttpError) throw e; swallow("hrms/rates frozen", e); }
       const r = { basic_da: num(body.basic_da), hra: num(body.hra), fixed_allowance: num(body.fixed_allowance), conveyance: num(body.conveyance), medical_allowance: num(body.medical_allowance) };
-      const row = { structure_id: sid, employee_id: eid, name: body.name ?? null, type: body.type ?? null, department: body.department ?? null, designation: body.designation ?? null, reporting_manager: body.reporting_manager ?? null, ...r, ...derive(r, (body.type as string) ?? null), note: body.note ?? null, updated_by: stamp, updated_at: now };
+      /**
+       * THE TYPE IS THE HRIS'S, NOT THIS LIST'S (Dr Raghu, 7 Sep 2026: "in
+       * the Salary structure, the type pull it from the masters HRIS — then
+       * the per day rate will be as per that").
+       *
+       * It decides the per-day divisor: 26 for Labour and Labour - Contract,
+       * 31 for everybody else. Held here it was a second copy that nobody
+       * filled in, so every line divided by 31 — 127 men's per-day understated
+       * by a fifth. Read from the master it cannot drift, and whatever the
+       * caller sends is ignored.
+       */
+      const [who] = await people(admin, [eid]);
+      const hrisType = who?.type || null;
+      const row = { structure_id: sid, employee_id: eid, name: body.name ?? who?.name ?? null, type: hrisType, department: body.department ?? null, designation: body.designation ?? null, reporting_manager: body.reporting_manager ?? null, ...r, ...derive(r, hrisType), note: body.note ?? null, updated_by: stamp, updated_at: now };
       const { error } = await admin.from("hrms_salary_rate").upsert(row, { onConflict: "structure_id,employee_id" });
       if (error) throw new Error(error.message);
       await admin.from("hrms_salary_structure").update({ updated_at: now }).eq("id", sid);
-      return NextResponse.json({ ok: true, ...derive(r, (body.type as string) ?? null) });
+      return NextResponse.json({ ok: true, type: hrisType, ...derive(r, hrisType) });
+    }
+
+    /**
+     * PULL EVERY TYPE FROM THE HRIS AND WORK THE PER-DAY OUT AGAIN
+     * (Dr Raghu, 7 Sep 2026: "check it and update it").
+     *
+     * Deliberately a button he presses rather than something that happens
+     * quietly on a read: it rewrites 205 rates, and by his own rule every
+     * change to a rate carries who made it and when.
+     */
+    if (action === "sync_types") {
+      const sid = String(body.structure_id || "");
+      if (!sid) throw new HttpError(400, "Which structure?");
+      const { data: st } = await admin.from("hrms_salary_structure").select("frozen_at, title").eq("id", sid).maybeSingle();
+      if (st?.frozen_at) throw new HttpError(409, `${st.title} is frozen and signed. Take the freeze off first.`);
+      const { data: lines } = await admin.from("hrms_salary_rate")
+        .select("id, employee_id, type, basic_da, hra, fixed_allowance, conveyance, medical_allowance, gross, per_day").eq("structure_id", sid);
+      const rows = lines || [];
+      if (!rows.length) return NextResponse.json({ ok: true, changed: 0, checked: 0 });
+      const ppl = await people(admin, rows.map((x) => String(x.employee_id)));
+      const typeOf = new Map(ppl.map((p) => [String(p.id), p.type || null]));
+      let changed = 0, noType = 0;
+      for (const x of rows) {
+        const t = typeOf.get(String(x.employee_id)) ?? null;
+        if (!t) { noType++; continue; }
+        const r = { basic_da: num(x.basic_da), hra: num(x.hra), fixed_allowance: num(x.fixed_allowance), conveyance: num(x.conveyance), medical_allowance: num(x.medical_allowance) };
+        const d = derive(r, t);
+        if (String(x.type || "") === t && Math.abs(num(x.per_day) - d.per_day) <= 1) continue;
+        const { error } = await admin.from("hrms_salary_rate")
+          .update({ type: t, ...d, updated_by: stamp, updated_at: now }).eq("id", x.id);
+        if (error) throw new Error(error.message);
+        changed++;
+      }
+      await admin.from("hrms_salary_structure").update({ updated_at: now }).eq("id", sid);
+      return NextResponse.json({ ok: true, checked: rows.length, changed, noType });
     }
 
     if (action === "remove_rate") {

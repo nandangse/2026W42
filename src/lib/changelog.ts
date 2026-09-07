@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.18.1",
+    date: "2026-09-07",
+    module: "The muster prints, and the per-day rate follows the HRIS Type",
+    items: [
+      "THE ATTENDANCE MUSTER PRINTS (Dr Raghu, 7 Sep 2026: \"once you give me the muster and the salary register for print, I can print it, sign it, and then freeze it\"). The register had a print; the muster never did — though it is the one that most needs signing, being the record of who was actually here. A4 landscape, day by day with Sundays shaded, Prepared / Checked / Approved and the stamp at the foot. The button is on the run's Attendance muster tab.",
+      "THE TYPE COMES FROM THE HRIS, AND THE PER-DAY RATE FOLLOWS IT (\"in the Salary structure, the type pull it from the masters HRIS — then the per day rate will be as per that. Check it and update it\"). <b>All 205 lines of the Live structure had no Type at all</b>, so every one divided by 31 — and 127 of them are Labour or Labour - Contract, whose divisor is 26. Their per-day was understated by about a fifth: 6096 Arbind Kumar Sharma showed 866 where his 26,858 gross gives 1,033. That figure is not cosmetic — it prices comp off and leave encashment on the slip.",
+      "Type is now read from the employee master on every save and cannot be edited on the rate list, because a second copy of it is what caused this. It is shown as a column so the divisor is never a mystery, and <b>⟳ Types &amp; per day</b> pulls every line and works the rates out again — a button pressed, not a quiet background fix, since every rate change carries who made it and when.",
+      "The note under the list said \"Per day = (Gross − Conveyance) ÷ 26\". Conveyance was never subtracted and the divisor was never always 26; it now says what the code does.",
+    ],
+  },
+  {
     v: "5.0.18.0",
     date: "2026-09-07",
     module: "Sending the slips by category, and site allowance earned like a fixed allowance",

@@ -155,6 +155,15 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           <button key={k} onClick={() => setTab(k)} className="text-xs font-bold rounded px-2.5 py-1.5" style={tab === k ? { background: "var(--navy)", color: "#fff" } : { color: "#5B6B7A", background: "#EAE7DF" }}>{l}</button>
         ))}
         {(tab === "muster" || tab === "register" || tab === "comms") && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="find a person" className="text-xs rounded px-2 py-1 ml-auto" style={{ border: `1px solid ${C.line}`, width: 180 }} />}
+        {/* PRINT THE MUSTER (Dr Raghu, 7 Sep 2026: "once you give me the
+            muster and the salary register for print, I can print it, sign
+            it, and then freeze it"). The register had a print; the muster,
+            which is the record of who was actually here, did not. */}
+        {tab === "muster" && d.muster && (
+          <a href={`/hrms/muster/${id}/print`} target="_blank" rel="noopener noreferrer"
+            className="text-xs font-bold rounded px-2.5 py-1.5" style={{ background: "var(--blue)", color: "#fff" }}
+            title="A4 landscape, day by day, with Prepared / Checked / Approved and the stamp — to print and sign">📄 Print muster</a>
+        )}
       </div>
 
       {tab === "overview" && (

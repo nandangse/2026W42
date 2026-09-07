@@ -129,13 +129,28 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
               <button onClick={() => { if (window.confirm(`Take the freeze off ${s.title}?\n\nThe signature is removed with it, and the cells open again.`)) act({ action: "unfreeze", structure_id: s.id }, "Freeze taken off"); }}
                 disabled={busy} className="font-semibold rounded px-2.5 py-1.5" style={{ border: `1px solid ${C.line}`, background: "#fff", color: C.dim }}>unfreeze</button>
             )}
+            {/* PULL THE TYPES AND WORK THE PER-DAY OUT AGAIN (Dr Raghu, 7
+                Sep 2026: "check it and update it"). A pressed button, not a
+                quiet background fix: it rewrites every rate on the list, and
+                every rate change carries who made it and when. */}
+            {isOwner && !s.frozen_at && (
+              <button onClick={async () => {
+                if (!window.confirm(`Pull every Type from the HRIS and work the per-day rates out again?\n\nPer day = Gross ÷ 26 for Labour and Labour - Contract, ÷ 31 for the rest. Lines already right are left alone.`)) return;
+                try {
+                  const j = await api.post("/api/hrms/rates", { action: "sync_types", structure_id: s.id }) as { checked: number; changed: number; noType: number };
+                  setMsg(`${j.changed} of ${j.checked} lines updated${j.noType ? `; ${j.noType} have no Type on their HRIS record` : ""}.`);
+                  load(cur);
+                } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+              }} disabled={busy} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }}
+                title="Types come from the HRIS; the per-day divisor follows the Type">⟳ Types &amp; per day</button>
+            )}
             <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="block" style={{ fontSize: 11, maxWidth: 200 }} />
             <button onClick={upload} disabled={busy} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }} title="Rows from a CSV or Excel, matched on Employee ID">⬆ Import</button>
             {isOwner && s.status !== "Live" && <button onClick={() => { if (window.confirm(`Remove ${s.title} and its ${s.lines} lines?`)) act({ action: "remove_structure", id: s.id }, "Removed", false); }} disabled={busy} className="font-semibold rounded px-2 py-1" style={{ background: "#FBEDEA", color: C.red }}>✕</button>}
           </div>
 
           <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflow: "auto", maxHeight: "calc(100vh - 290px)" }}>
-            <table className="genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse", whiteSpace: "nowrap", minWidth: 1040 }}>
+            <table className="genie-table" style={{ fontSize: 12.5, borderCollapse: "collapse", whiteSpace: "nowrap", minWidth: 1140 }}>
               {/* A SOLID GROUND UNDER THE HEADING (Dr Raghu, 7 Sep 2026: "on
                   salary rate list the header is white font — change the
                   background colour"). It was muted grey on white and read as
@@ -149,7 +164,7 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
                 {COLS.map(([key, label], i) => (
                   <th key={key || label} onClick={() => key && setSort((p) => ({ key, dir: p.key === key && p.dir === "asc" ? "desc" : "asc" }))}
                     className="px-2 py-1.5" title={key ? "Sort by this column" : undefined}
-                    style={{ position: "sticky", top: 0, background: "#F4F2EC", color: C.ink, fontWeight: 700, borderBottom: `2px solid ${C.line}`, zIndex: i < 2 ? 3 : 2, textAlign: i >= 2 && i <= 8 ? "right" : "left", whiteSpace: "nowrap", cursor: key ? "pointer" : "default", userSelect: "none", ...(i === 0 ? { left: 0, minWidth: 80 } : i === 1 ? { left: 80, minWidth: 200 } : {}) }}>
+                    style={{ position: "sticky", top: 0, background: "#F4F2EC", color: C.ink, fontWeight: 700, borderBottom: `2px solid ${C.line}`, zIndex: i < 2 ? 3 : 2, textAlign: i >= 3 && i <= 9 ? "right" : "left", whiteSpace: "nowrap", cursor: key ? "pointer" : "default", userSelect: "none", ...(i === 0 ? { left: 0, minWidth: 80 } : i === 1 ? { left: 80, minWidth: 200 } : {}) }}>
                     {label}{sort.key === key ? <span style={{ marginLeft: 3 }}>{sort.dir === "asc" ? "▲" : "▼"}</span> : null}
                   </th>
                 ))}
@@ -158,19 +173,19 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
                 {rows.map((r) => <RateRow key={r.id} r={r} sid={s.id} busy={busy} onSaved={() => load(cur)} onMsg={setMsg} />)}
                 <tr style={{ borderTop: `2px solid ${C.line}`, background: "#FBFAF7" }}>
                   <td className="px-2 py-1.5" style={{ position: "sticky", left: 0, background: "#FBFAF7" }}><input value={newLine} onChange={(e) => setNewLine(e.target.value)} placeholder="new ID" className="rounded px-1.5 py-0.5 tnum" style={{ border: `1px solid ${C.line}`, width: 64, fontSize: 12 }} /></td>
-                  <td className="px-2 py-1.5" colSpan={8} style={{ color: C.faint, fontSize: 11.5 }}>Type a four-digit Employee ID and press Add; then fill the line in place.</td>
+                  <td className="px-2 py-1.5" colSpan={9} style={{ color: C.faint, fontSize: 11.5 }}>Type a four-digit Employee ID and press Add; then fill the line in place.</td>
                   <td className="px-2 py-1.5"><button onClick={async () => { if (/^\d{4}$/.test(newLine.trim())) { await act({ action: "save_rate", structure_id: s.id, employee_id: newLine.trim(), basic_da: 0 }, "Line added"); setNewLine(""); } }} disabled={busy || !/^\d{4}$/.test(newLine.trim())} className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "var(--blue)", color: "#fff" }}>Add</button></td>
                 </tr>
               </tbody>
               <tfoot><tr style={{ fontWeight: 700, borderTop: `2px solid ${C.line}` }}>
-                <td className="px-2 py-1.5" colSpan={2} style={{ position: "sticky", left: 0, background: "#fff" }}>{rows.length} people</td>
+                <td className="px-2 py-1.5" colSpan={3} style={{ position: "sticky", left: 0, background: "#fff" }}>{rows.length} people</td>
                 <td className="px-2 py-1.5 text-right tnum">{inr(totals.basic)}</td>
                 {["hra", "fixed_allowance", "conveyance", "medical_allowance", "gross", "per_day"].map((k) => <td key={k} className="px-2 py-1.5 text-right tnum">{k === "per_day" ? "" : inr(rows.reduce((a, r) => a + Number((r as unknown as Record<string, unknown>)[k] || 0), 0))}</td>)}
                 <td />
               </tr></tfoot>
             </table>
           </div>
-          <div className="text-xs mt-2" style={{ color: C.faint }}>Gross = Basic and DA + HRA + Fixed + Conveyance + Medical. Per day = (Gross − Conveyance) ÷ 26. Last change {fmtFull(String(s.updated_at))}.</div>
+          <div className="text-xs mt-2" style={{ color: C.faint }}>Gross = Basic and DA + HRA + Fixed + Conveyance + Medical. Per day = Gross ÷ 26 for Labour and Labour - Contract, ÷ 31 for everybody else — the Type decides it, and the Type comes from the HRIS. Last change {fmtFull(String(s.updated_at))}.</div>
         </>
       )}
     </Pane>
@@ -180,6 +195,11 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
 /** The columns, in order: [sort key, heading]. An empty key does not sort. */
 const COLS: [string, string][] = [
   ["employee_id", "Employee ID"], ["name", "Name"],
+  /* TYPE IS SHOWN BUT NOT EDITED HERE (Dr Raghu, 7 Sep 2026: "pull it from
+     the masters HRIS"). It decides the per-day divisor — 26 for Labour and
+     Labour - Contract, 31 for the rest — so it has to be visible; and it is
+     the HRIS's to change, so it is not a field on this screen. */
+  ["type", "Type"],
   ["basic_da", "Basic and DA"], ["hra", "HRA"], ["fixed_allowance", "Fixed Allowance"],
   ["conveyance", "Conveyance"], ["medical_allowance", "Medical Allowance"],
   ["gross", "Gross Salary"], ["per_day", "Per Day Rate"], ["", ""],
@@ -208,7 +228,11 @@ function RateRow({ r, sid, busy, onSaved, onMsg }: { r: Rate; sid: string; busy:
     <tr style={{ borderTop: "1px solid #EEECE6" }}>
       <td className="px-2 py-0.5 tnum font-semibold" style={{ position: "sticky", left: 0, background: "#fff", minWidth: 80 }}>{r.employee_id}</td>
       <td className="px-1 py-0.5" style={{ position: "sticky", left: 80, background: "#fff", minWidth: 200 }}>{cell("name", false, 190)}</td>
-      {/* NO Type, Department, Designation or Reporting manager here (Dr
+      {/* the HRIS's word, shown so the per-day divisor is never a mystery */}
+      <td className="px-2 py-0.5" style={{ color: C.dim, whiteSpace: "nowrap" }}>
+        {r.type || <span style={{ color: C.faint }}>—</span>}
+      </td>
+      {/* NO Department, Designation or Reporting manager here (Dr
           Raghu, 7 Sep 2026: "these are not needed — they will be updated in
           the HRIS"). They were editable in two places at once, and this was
           the copy nobody filled in: four empty columns across the whole
