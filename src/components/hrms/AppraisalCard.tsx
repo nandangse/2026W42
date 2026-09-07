@@ -615,6 +615,14 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
   // AND the % of basic should also be an update") — and NOTHING scales
   // proportionally any more: conveyance HOLDS, medical is 1250, HRA follows
   // its law, and THE FIXED ALLOWANCE ALONE absorbs the difference.
+  /**
+   * Site allowance is its own box, kept OUT of COMPS on purpose. COMPS is the
+   * arithmetic that holds the gross steady while the parts move; site sits
+   * above the gross, so putting it in there would make Fixed Allowance shrink
+   * every time a man was deputed (Dr Raghu, 7 Sep 2026).
+   */
+  const [site, setSite] = useState<string>(() => String((d.salary?.rows || []).find((r) => r.label.startsWith("Site Allowance"))?.monthly || ""));
+
   const [basicPct, setBasicPct] = useState<string>(() => {
     const cur = Object.values(baseComps).reduce((a, b) => a + b, 0);
     const b = baseComps.basic_da || 0;
@@ -732,11 +740,12 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
   const newTable = useMemo(() => {
     if (!n) return null;
     const get = (k: string) => {
+      if (k === "Site Allowance") return Number(site) || 0;
       const hit = COMPS.find(([, sheetKey]) => sheetKey === k);
       return hit ? Number(comps[hit[0]]) || 0 : 0;
     };
     return salaryTable(get, d.employee.type, extraRows);
-  }, [n, comps, d, extraRows]);
+  }, [n, comps, d, extraRows, site]);
 
   const inc = prev != null && n ? n - prev : null;
 
@@ -744,7 +753,7 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
     setBusy(true); setMsg("");
     try {
       const structure = {
-        components: Object.fromEntries(COMPS.map(([key]) => [key, Number(comps[key]) || 0])),
+        components: { ...Object.fromEntries(COMPS.map(([key]) => [key, Number(comps[key]) || 0])), site: Number(site) || 0 },
         extras: Object.fromEntries(EXTRAS.map(([key]) => [key, Number(extras[key]) || 0])),
       };
       const r = await api.post("/api/hrms/idp", { action: "appraisal", employee_id: d.employee.id, new_gross: String(n), prev_gross: prev, structure, new_designation: newDesig.trim(), draft });
@@ -857,7 +866,20 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
                       : <>
                           <td className="px-1.5 py-1" style={{ border: `1px solid ${C.line}` }}>{r.label}</td>
                           <td className="px-1.5 py-1 text-right tnum" style={{ border: `1px solid ${C.line}`, padding: key ? "2px 4px" : undefined }}>
-                            {key
+                            {r.label.startsWith("Site Allowance")
+                              ? (isContract
+                                ? <span className="tnum" style={{ color: C.dim }}>—</span>
+                                : <span className="flex gap-1 items-center justify-end">
+                                    <input value={site} inputMode="numeric" placeholder="0"
+                                      onChange={(e) => setSite(e.target.value.replace(/[^0-9]/g, ""))}
+                                      className="tnum rounded text-right px-1.5 py-1"
+                                      style={{ border: `1.5px solid ${C.green}`, fontWeight: 600, fontSize: 12.5, width: 110 }} />
+                                    {Number(site) > 0 && (
+                                      <button onClick={() => setSite("")} title="He is back from site — set it to zero"
+                                        className="rounded px-1.5 py-0.5" style={{ border: `1px solid ${C.line}`, fontSize: 10, color: C.dim }}>back</button>
+                                    )}
+                                  </span>)
+                              : key
                               ? (isContract && key !== "basic_da"
                                 ? <span className="tnum" title="A contract engagement is Basic & DA alone" style={{ color: C.dim }}>—</span>
                                 /* A worker has neither head — shown as not

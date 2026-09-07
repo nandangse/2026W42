@@ -58,10 +58,10 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
   const typeLabel = off.size === 0 ? "All employee types" : `${allTypes.length - off.size} of ${allTypes.length} types`;
 
   const P = ({ r, bold }: { r: Row; bold?: boolean }) => (
-    <button onClick={() => onOpenPerson(r.id)} className={`text-left ${bold ? "font-bold" : "font-semibold"}`}
-      style={{ color: "var(--blue)", textDecoration: "underline", textUnderlineOffset: 2 }} title={`${r.id} · open the Report Card`}>
+    <a href={`/hrms#appraisal.card:${encodeURIComponent(r.id)}`} target="_blank" rel="noopener noreferrer" className={`text-left ${bold ? "font-bold" : "font-semibold"}`}
+      style={{ color: "var(--blue)", textDecoration: "underline", textUnderlineOffset: 2 }} title={`${r.id} · open the appraisal discussion in a new tab`}>
       {r.name}
-    </button>
+    </a>
   );
 
   const S = useMemo(() => {

@@ -271,12 +271,20 @@ const shown = useMemo(() => {
     w.setTimeout(() => w.print(), 350);
   };
 
+  /**
+   * A REAL LINK, OPENING IN A NEW TAB (Dr Raghu, 7 Sep 2026: "in this table
+   * open the appraisal discussion with them in new tab"). The table is the
+   * index and one keeps one's place in it while the discussions open beside
+   * it. Being an anchor rather than a button, it also middle-clicks, copies
+   * and sends to somebody as a link.
+   */
   const link = (r: Row, text: string, bold = false) => (
-    <button onClick={() => onOpenPerson(r.id)} className={`text-left ${bold ? "font-bold" : "font-semibold"}`}
+    <a href={`/hrms#appraisal.card:${encodeURIComponent(r.id)}`} target="_blank" rel="noopener noreferrer"
+      className={`text-left ${bold ? "font-bold" : "font-semibold"}`}
       style={{ color: "var(--blue)", textDecoration: "underline", textUnderlineOffset: 2 }}
-      title="Open the Individual Report Card for Appraisal">
+      title="Open the appraisal discussion in a new tab">
       {text}
-    </button>
+    </a>
   );
 
   const columns: Column<Row>[] = useMemo(() => [

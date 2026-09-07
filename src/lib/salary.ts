@@ -104,6 +104,23 @@ export function salaryTable(get: (k: string) => unknown, type: string | null, ex
   const fixed = isContract ? 0 : num(get("Fixed Allowance"));
   const conv = isContract ? 0 : num(get("Conveyance"));
   const med = isContract || worker ? 0 : num(get("Medical Allowance"));
+  /**
+   * SITE ALLOWANCE — ON TOP OF THE GROSS, NEVER INSIDE IT (Dr Raghu, 7 Sep
+   * 2026: "if someone is sent to site it is easier to depute this way. When
+   * he comes back it becomes 0").
+   *
+   * IT SITS IN BENEFITS — his call, 7 Sep 2026: "sorry make it in benefits
+   * and NOT gross!" Which is the right home for it: a benefit is understood
+   * to be conditional, so it can go back to zero the day he returns from
+   * site without the return reading as a pay cut, and it still counts in the
+   * CTC, which is what a deputed man is actually worth to the company.
+   *
+   * Nothing statutory moves with it: the gross, PF, Professional Tax, the
+   * per-day rate and gratuity are all untouched by deputing a man or
+   * bringing him back. Payroll already pays it this way — the muster's own
+   * Site Allowance column is added on top of earnings, not inside the rate.
+   */
+  const site = isContract ? 0 : num(get("Site Allowance"));
   const gross = basic + hra + fixed + conv + med;
   if (!gross) return null;
 
@@ -121,7 +138,7 @@ export function salaryTable(get: (k: string) => unknown, type: string | null, ex
   const leaves = (perDay * 20) / 12;
   // twelve a year — the third Saturday of each month, not every Saturday
   const thirdSat = (perDay * THIRD_SATURDAYS_A_YEAR) / 12;
-  const benM = noBenefits || isContract ? 0 : pf + mediclaim + shoes + bonus + leaves + thirdSat;
+  const benM = noBenefits || isContract ? 0 : pf + mediclaim + shoes + bonus + leaves + thirdSat + site;
   const inv = (extras || []).filter((e) => e.monthly > 0);
   const invM = inv.reduce((a, e) => a + e.monthly, 0);
   // contract CTC is the basic alone — the agreed payout, nothing added
@@ -150,11 +167,13 @@ export function salaryTable(get: (k: string) => unknown, type: string | null, ex
         ]),
     { label: "Total Deductions (B)", monthly: dedM, yearly: dedY, kind: "total" },
     { label: "Net Salary (C = A - B)", monthly: netM, yearly: netY, kind: "total" },
+
     { label: "Benefits", monthly: null, yearly: null, kind: "head" },
     ...(noBenefits || isContract
       ? [{ label: isContract ? "A contract engagement — no benefits; the CTC is the Basic & DA alone" : "Benefits are not applicable for Management", monthly: null, yearly: null, kind: "note" as const }]
       : [
           ...(exempt ? [] : [R("Provident Fund Employer", pf)]),
+          R("Site Allowance — while deputed to site", site),
           R("Mediclaim of 2 lakhs", mediclaim),
           R("Shoes & Uniform Allowance", shoes),
           ...(bonus > 0 ? [R("Annual Bonus Approx @10%", bonus)] : []),

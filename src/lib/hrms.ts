@@ -344,6 +344,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
       t("fixed_allowance", "Fixed allowance", "Fixed Allowance", "money"),
       t("conveyance", "Conveyance", "Conveyance", "money"),
       t("medical_allowance", "Medical allowance", "Medical Allowance", "money"),
+      t("site_allowance", "Site allowance", "Site Allowance", "money"),
       t("gross", "Gross salary", "Gross Salary", "money"),
       t("per_day_rate", "Per day rate", "Per Day Rate", "money"),
       t("gross_2024_26", "Gross 2024-26", "Gross Salary 2024-26", "money"),

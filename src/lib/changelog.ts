@@ -78,6 +78,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.10.2",
+    date: "2026-09-07",
+    module: "Site Allowance, and the discussion in its own tab",
+    items: [
+      "\"In this also add another one called Site Allowance ... if someone is sent to site it is easier to depute this way. When he comes back it becomes 0.\" (Dr Raghu, 7 Sep 2026). It is a line of the salary structure now, with its own box and a <b>back</b> button that returns it to zero the day he comes off site.",
+      "IT SITS IN BENEFITS, NOT IN THE GROSS — his call, after we tried it both ways. Which is the right home: a benefit is understood to be conditional, so it can fall back to zero without the return reading as a pay cut, and it still counts in the CTC, which is what a deputed man is actually worth. The gross, Provident Fund, Professional Tax, the per-day rate and gratuity are untouched by deputing a man or bringing him back.",
+      "This is also how payroll has always paid it — the muster's Site Allowance column is added on top of earnings, never inside the rate. The structure now agrees with the register instead of being silent about a payment nineteen people already receive.",
+      "THE NINETEEN ARE LOADED. Every site allowance the August 2026 muster carries is now on the record — Rs 45,000 a month across nineteen people, from Rs 5,500 down to Rs 1,500 — so it shows on the old structure and the new one alike, without anybody retyping it.",
+      "THE DISCUSSION OPENS IN ITS OWN TAB. \"In this table open the appraisal discussion with them in new tab.\" The EmployeeID and the name on the Appraisal Table and on Summary Analytics are real links now, so the table keeps its place, its filters and its scroll while the discussions open beside it — and the link can be middle-clicked, copied, or sent to somebody, which a button never could.",
+    ],
+  },
+  {
     v: "5.0.10.1",
     date: "2026-09-07",
     module: "The attendance route, buildable",

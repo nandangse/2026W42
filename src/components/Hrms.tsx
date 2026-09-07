@@ -84,7 +84,21 @@ export default function Hrms({
   // writes the hash, so a screen can be sent to somebody as a link.
   useEffect(() => {
     const apply = () => {
-      const h = window.location.hash.replace(/^#/, "");
+      const raw = window.location.hash.replace(/^#/, "");
+      if (!raw) return;
+      /**
+       * #appraisal.card:6022 — the section, and who to open in it.
+       *
+       * A new tab does not inherit sessionStorage, which is how the person
+       * used to be handed across (Dr Raghu, 7 Sep 2026: "open the appraisal
+       * discussion with them in new tab"). So the person rides in the hash,
+       * where a link can carry it — and the link can then be middle-clicked,
+       * bookmarked, or sent to somebody.
+       */
+      const [h, person] = raw.split(":");
+      if (person) {
+        try { window.sessionStorage.setItem("hrms.appraisal.person", person); } catch (e) { swallow("Hrms", e); /* fine */ }
+      }
       if (h) setOpenKey(findNav(h).key);
     };
     apply();
