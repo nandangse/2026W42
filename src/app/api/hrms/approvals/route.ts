@@ -153,6 +153,46 @@ export async function POST(req: Request) {
 
     let people = 0, roles = 0;
 
+    /**
+     * REJECT — and rejecting has to UNDO (Dr Raghu, 7 Sep 2026: "in this
+     * there should be a provision to reject record also").
+     *
+     * Approving is a signature on a change that is already in the record.
+     * Rejecting therefore cannot be a signature of the opposite kind: the
+     * value is sitting there, so the only honest reading of "no" is to take
+     * it out again. The override is deleted and the field falls back to what
+     * the record held before HR touched it.
+     *
+     * Every rejection is written to the edit log first — the value that was
+     * refused, who refused it and when — so a change can be argued about
+     * afterwards. What cannot be recovered is an EARLIER override of the same
+     * field: there is one row per field, so the fall-back is to the base
+     * record, not to the previous edit. Rare, and said out loud rather than
+     * discovered.
+     */
+    if (body.action === "reject") {
+      const ids = Array.isArray(body.employeeIds) ? body.employeeIds.map(String) : [];
+      if (!ids.length && !body.all) throw new HttpError(400, "Name whose changes are being rejected.");
+      let read = admin.from(T.edits).select("employee_id, field, value, edited_by").is("approved_at", null);
+      if (!body.all) read = read.in("employee_id", ids);
+      const { data: waiting, error: readErr } = await read;
+      if (readErr) throw new Error(readErr.message);
+      const rows = (waiting || []) as { employee_id: string; field: string; value: string | null; edited_by: string | null }[];
+      if (rows.length) {
+        await admin.from(T.log).insert(rows.map((r) => ({
+          employee_id: r.employee_id, field: r.field,
+          old_value: r.value, new_value: null,
+          edited_by: `REJECTED by ${stamp} — had been set by ${r.edited_by || "HR"}`,
+          edited_at: now,
+        }))).then(() => null, (e) => swallow("hrms/approvals reject log", e));
+        let del = admin.from(T.edits).delete().is("approved_at", null);
+        if (!body.all) del = del.in("employee_id", ids);
+        const { error } = await del;
+        if (error) throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true, rejected: rows.length, people: 0, roles: 0 });
+    }
+
     if (body.all || (Array.isArray(body.employeeIds) && body.employeeIds.length)) {
       let q = admin.from(T.edits).update({ approved_at: now, approved_by: stamp }).is("approved_at", null);
       if (!body.all) q = q.in("employee_id", body.employeeIds.map(String));

@@ -70,6 +70,27 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
     setBusy(false);
   };
 
+  /**
+   * Rejecting takes the change back out of the record, so it asks first and
+   * says exactly what will happen — the field returns to what it held before
+   * HR edited it (Dr Raghu, 7 Sep 2026).
+   */
+  const reject = async (ids: string[], what: string) => {
+    if (!ids.length) return;
+    const n = (people || []).filter((p) => ids.includes(p.id)).reduce((a, p) => a + p.count, 0);
+    if (!window.confirm(
+      `Reject ${what}?\n\n${n} field change${n === 1 ? "" : "s"} will be TAKEN OUT of the record — each one goes back to what it held before HR edited it. The rejection is written to the edit log with the value that was refused.\n\nThis cannot be undone from here.`
+    )) return;
+    setBusy(true); setMsg("");
+    try {
+      const j = await api.post("/api/hrms/approvals", { action: "reject", employeeIds: ids });
+      setMsg(`Rejected — ${j.rejected} field change${j.rejected === 1 ? "" : "s"} taken back out of the record ✓`);
+      setPick({});
+      await load();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+
   const allOn = (people?.length || 0) > 0 && chosen.length === people?.length && chosenRoles.length === roles.length;
   const toggleAll = () => {
     if (allOn) { setPick({}); setRolePick({}); return; }
@@ -153,6 +174,13 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
               style={{ background: isOwner && picked ? "var(--green)" : "var(--line)", color: isOwner && picked ? "#fff" : "var(--muted)", cursor: isOwner && picked ? "pointer" : "not-allowed" }}>
               ✓ Approve selected{picked ? ` (${picked})` : ""}
             </button>
+            <button onClick={() => reject(chosen, `the ${chosen.length} selected record${chosen.length === 1 ? "" : "s"}`)}
+              disabled={busy || !chosen.length}
+              title="Take the selected changes back out of the record"
+              className="text-xs font-bold rounded px-3 py-2"
+              style={{ border: `1px solid ${chosen.length ? "var(--red)" : C.line}`, background: "#fff", color: chosen.length ? "var(--red)" : C.faint }}>
+              ✕ Reject selected{chosen.length ? ` (${chosen.length})` : ""}
+            </button>
             <button onClick={() => { if (window.confirm(`Approve everything waiting — ${total} record${total === 1 ? "" : "s"}?`)) approve({ all: true }, "Approved everything"); }}
               disabled={!isOwner || busy}
               className="text-xs font-bold rounded px-3 py-1.5"
@@ -192,10 +220,18 @@ export default function ApprovalRecords({ who, isOwner }: { who: string; isOwner
                         className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "#DCE8F5", color: "var(--blue)" }}
                         title="Open the record in a new tab">open ↗</a>
                       {isOwner && (
-                        <button onClick={() => approve({ employeeIds: [p.id] }, `${p.name} approved`)} disabled={busy}
-                          className="text-xs font-bold rounded px-2.5 py-1" style={{ background: "var(--green)", color: "#fff" }}>
-                          ✓
-                        </button>
+                        <>
+                          <button onClick={() => approve({ employeeIds: [p.id] }, `${p.name} approved`)} disabled={busy}
+                            title={`Agree all ${p.count} change${p.count === 1 ? "" : "s"} on ${p.name}`}
+                            className="text-xs font-bold rounded px-2.5 py-1" style={{ background: "var(--green)", color: "#fff" }}>
+                            ✓
+                          </button>
+                          <button onClick={() => reject([p.id], p.name)} disabled={busy}
+                            title={`Reject — take all ${p.count} change${p.count === 1 ? "" : "s"} back out of ${p.name}'s record`}
+                            className="text-xs font-bold rounded px-2.5 py-1" style={{ border: "1px solid var(--red)", background: "#fff", color: "var(--red)" }}>
+                            ✕
+                          </button>
+                        </>
                       )}
                     </div>
                     {openId === p.id && (

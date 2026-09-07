@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.10.5",
+    date: "2026-09-07",
+    module: "Records can be rejected, not only approved",
+    items: [
+      "\"In this there should be a provision to reject record also\" (Dr Raghu, 7 Sep 2026). RJ Approval — Records now has a ✕ against every person and a <b>Reject selected</b> beside Approve selected.",
+      "AND REJECTING UNDOES. Approving is a signature on a change that is already in the record — so rejecting cannot be a signature of the opposite kind. The value is sitting there, and the only honest reading of \"no\" is to take it out again: the change is removed and the field falls back to what the record held before HR edited it.",
+      "Every rejection is written to the edit log first — the value that was refused, who refused it, and when — so it can be argued about afterwards rather than vanishing. What cannot be recovered is an earlier edit of the same field: a field carries one pending change, so the fall-back is to the base record, not to a previous edit. It says so before you press it, along with how many fields are about to move.",
+      "It asks first, and names the number. Ninety-seven records were waiting when he asked for this, one of them carrying thirteen changes — a mis-click there would have been expensive.",
+    ],
+  },
+  {
     v: "5.0.10.4",
     date: "2026-09-07",
     module: "HR queries say what was asked",
