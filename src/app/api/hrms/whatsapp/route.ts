@@ -6,6 +6,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { people, sheetFor, renderFor, queueMessages, type Person } from "@/lib/hrms-wa";
 import { crmDb } from "@/crm/db";
 import { periskopeConfig, throttleState, periskopeStatus } from "@/crm/periskope";
+import { aisensyConfig, aisensyReady } from "@/crm/aisensy";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -51,14 +52,28 @@ export async function GET() {
       byType[t].n++; if (p.phone.length >= 8) byType[t].withPhone++;
       const d = String(p.department || "(no department)"); byDept[d] = (byDept[d] || 0) + 1;
     }
-    let queue: { counts: Record<string, number>; throttle: unknown; configured: boolean; configError: string | null; recent: unknown[] } = { counts: {}, throttle: null, configured: false, configError: null, recent: [] };
+    let queue: {
+      counts: Record<string, number>; throttle: unknown; configured: boolean; configError: string | null; recent: unknown[];
+      aisensy?: { configured: boolean; live: boolean; campaign: string | null; error: string | null };
+    } = { counts: {}, throttle: null, configured: false, configError: null, recent: [] };
     try {
       const crm = crmDb();
       const { data: q } = await crm.from("wa_queue").select("id, ref, status, error, queued_at, sent_at, delivered_at, template_name, phone").eq("source", "hrms").order("queued_at", { ascending: false }).limit(300);
       const counts: Record<string, number> = {};
       for (const r of q || []) counts[String(r.status)] = (counts[String(r.status)] || 0) + 1;
       const cfg = await periskopeConfig(crm);
-      queue = { counts, throttle: "error" in cfg ? null : await throttleState(crm, cfg), configured: !("error" in cfg), configError: "error" in cfg ? cfg.error : null, recent: (q || []).slice(0, 60) };
+      /* WHICH ROAD IS OPEN (Dr Raghu, 8 Sep 2026: "AI sensy can we try to
+         integrate"). Both are reported, because for a while both exist: the
+         Periskope number is restricted and AiSensy is the way out, but the
+         templates have to be approved by Meta before it can carry anything. */
+      const ai = await aisensyConfig(crm);
+      queue = { counts, throttle: "error" in cfg ? null : await throttleState(crm, cfg), configured: !("error" in cfg), configError: "error" in cfg ? cfg.error : null, recent: (q || []).slice(0, 60),
+        aisensy: {
+          configured: !("error" in ai),
+          live: aisensyReady(ai),
+          campaign: "error" in ai ? null : ai.defaultCampaign || null,
+          error: "error" in ai ? ai.error : (aisensyReady(ai) ? null : "AiSensy is switched off (paused = yes on its card). Set paused = no once a campaign is Live."),
+        } };
     } catch (e) { queue.configError = e instanceof Error ? e.message : String(e); }
     const names = new Map(all.map((p) => [p.id, p.name]));
     queue.recent = (queue.recent as { ref?: string }[]).map((r) => ({ ...r, name: names.get(String(r.ref || "")) || r.ref }));

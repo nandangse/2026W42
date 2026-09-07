@@ -19,6 +19,7 @@ import { employeeVars, payrollVars, renderTemplate, MONTHS } from "@/lib/hrms-te
 import { musterVars, OPTIONAL_MUSTER_VARS, type MusterRow } from "@/lib/muster";
 import { crmDb } from "@/crm/db";
 import { periskopeConfig, throttleState, periskopeSend, isPaused } from "@/crm/periskope";
+import { aisensyConfig, aisensySend, aisensyReady, type AisensyCfg } from "@/crm/aisensy";
 
 export interface EmpRow {
   id: string; name: string; email: string | null; dob: string | null; doj: string | null;
@@ -181,15 +182,36 @@ export interface DrainResult { sent: number; failed: number; stage: number; quot
  */
 export async function drainHrmsQueue(admin: SupabaseClient, opts: { n?: number; perRunFraction?: number }): Promise<DrainResult> {
   const crm = crmDb();
+
+  /**
+   * TWO PROVIDERS, ONE QUEUE (Dr Raghu, 8 Sep 2026: "AI sensy can we try to
+   * integrate").
+   *
+   * AiSensy is preferred where it is switched on, because it goes through
+   * Meta's own Business API rather than driving a phone — and the Periskope
+   * number is restricted anyway. Periskope stays as it is, and a row can
+   * still name its own provider, so the two run side by side while the
+   * templates are being approved.
+   *
+   * The throttle and the warm-up remain Periskope's, deliberately: they are
+   * about not alarming Meta, and that caution applies to either road.
+   */
+  const ai = await aisensyConfig(crm);
+  const useAi = aisensyReady(ai);
   const cfg = await periskopeConfig(crm);
-  if ("error" in cfg) throw new Error(cfg.error);
-  if (isPaused(cfg)) return { sent: 0, failed: 0, stage: 0, quota: 0, tried: 0, stopped: "WhatsApp sending is PAUSED on the Periskope card (paused = yes).", left: 0 };
-  const { stage, quota } = await warmupQuota(cfg.perHour);
+  if (!useAi) {
+    if ("error" in cfg) throw new Error(cfg.error);
+    if (isPaused(cfg)) return { sent: 0, failed: 0, stage: 0, quota: 0, tried: 0, stopped: "WhatsApp sending is PAUSED on the Periskope card (paused = yes), and AiSensy is not switched on.", left: 0 };
+  }
+  const perHour = useAi ? (ai as AisensyCfg).perHour : (cfg as { perHour: number }).perHour;
+  const { stage, quota } = await warmupQuota(perHour);
   const n = opts.n ? Math.max(1, Math.min(opts.n, quota)) : Math.max(1, Math.ceil(quota / (opts.perRunFraction || 6)));
-  const { data: rows } = await crm.from("wa_queue").select("id, phone, body, ref").eq("source", "hrms").eq("status", "queued").order("queued_at", { ascending: true }).limit(n);
+  const { data: rows } = await crm.from("wa_queue")
+    .select("id, phone, body, ref, template_name, params, media, provider")
+    .eq("source", "hrms").eq("status", "queued").order("queued_at", { ascending: true }).limit(n);
   let sent = 0, failed = 0, stopped: string | null = null, tried = 0;
   for (const row of rows || []) {
-    const t = await throttleState(crm, cfg);
+    const t = "error" in cfg ? { blocked: null as string | null, waitSeconds: 0 } : await throttleState(crm, cfg);
     if (t.blocked) {
       if (t.waitSeconds && t.waitSeconds <= 30) await new Promise((r) => setTimeout(r, (t.waitSeconds + 1) * 1000));
       else { stopped = t.blocked; break; }
@@ -197,9 +219,29 @@ export async function drainHrmsQueue(admin: SupabaseClient, opts: { n?: number; 
     const { data: claimed } = await crm.from("wa_queue").update({ status: "sending" }).eq("id", row.id).eq("status", "queued").select("id").maybeSingle();
     if (!claimed) continue;
     tried++;
-    const res = await periskopeSend(cfg, String(row.phone), String(row.body));
+    /* the row may name its own road; otherwise whichever is switched on */
+    const viaAi = String(row.provider || "").toLowerCase() === "aisensy" || (useAi && !row.provider);
+    let res: { ok: boolean; uniqueId?: string; error?: string };
+    if (viaAi) {
+      if (!useAi) res = { ok: false, error: "error" in ai ? ai.error : "AiSensy is paused" };
+      else {
+        const a = ai as AisensyCfg;
+        const r = await aisensySend(a, {
+          campaign: String(row.template_name || a.defaultCampaign || ""),
+          phone: String(row.phone),
+          userName: String(row.ref || "").slice(0, 60) || String(row.phone),
+          params: Array.isArray(row.params) ? (row.params as string[]) : undefined,
+          media: (row.media as { url: string; filename: string } | null) || null,
+        });
+        res = { ok: r.ok, uniqueId: r.id, error: r.error };
+      }
+    } else if ("error" in cfg) {
+      res = { ok: false, error: cfg.error };
+    } else {
+      res = await periskopeSend(cfg, String(row.phone), String(row.body));
+    }
     if (!res.ok) { failed++; await crm.from("wa_queue").update({ status: "failed", error: String(res.error || "").slice(0, 500) }).eq("id", row.id); }
-    else { sent++; await crm.from("wa_queue").update({ status: "sent", external_id: res.uniqueId ?? null, sent_at: new Date().toISOString(), error: "" }).eq("id", row.id); }
+    else { sent++; await crm.from("wa_queue").update({ status: "sent", provider: viaAi ? "aisensy" : "periskope", external_id: res.uniqueId ?? null, sent_at: new Date().toISOString(), error: "" }).eq("id", row.id); }
     try { await admin.from("hrms_communication").update({ status: res.ok ? "sent" : "failed", error: res.ok ? null : String(res.error || "").slice(0, 500) }).eq("channel", "whatsapp").contains("meta", { queue_id: String(row.id) }); } catch (e) { swallow("lib/hrms-wa", e); /* best effort */ }
   }
   const { count } = await crm.from("wa_queue").select("id", { count: "exact", head: true }).eq("source", "hrms").eq("status", "queued");

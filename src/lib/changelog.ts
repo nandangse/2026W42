@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.21.0",
+    date: "2026-09-08",
+    module: "AiSensy — WhatsApp through Meta's own Business API",
+    items: [
+      "\"AI sensy can we try to integrate\" (Dr Raghu, 8 Sep 2026). It is in: the client, the queue, and the drain, sitting beside Periskope rather than replacing it, so both run while the templates are approved. AiSensy is preferred wherever it is switched on, because it goes through Meta's own Business API rather than driving a phone — and the Periskope number is restricted anyway.",
+      "TWO THINGS ABOUT IT SHAPE EVERYTHING. First, <b>there is no free-text send</b>: you name a CAMPAIGN — a Meta-approved template set Live in AiSensy — and pass its variables in order, so a queue row bound for AiSensy carries a campaign and its params, not a sentence. Second, <b>media is fetched, not uploaded</b>: their servers GET the url you give them, so a payslip must never have a permanent public link — it wants a signed url with a short life, and the migration says so on the column itself.",
+      "Migration <b>CRM 0058</b> adds params and media to wa_queue and seeds the AiSensy card in Settings → Integrations, switched OFF until the key is pasted and a campaign is Live. Nothing about Periskope changes: rows without params behave exactly as before, and the throttle and warm-up stay, because they are about not alarming Meta and that caution applies to either road.",
+      "Their published API is one endpoint and does not document replies or delivery receipts, so nothing here pretends to read them: a send is recorded as sent. Their errors are passed through whole rather than flattened to \"failed\" — a campaign that is not Live, and a template still awaiting Meta, each say so in their own words.",
+    ],
+  },
+  {
     v: "5.0.20.0",
     date: "2026-09-07",
     module: "Why the slip mail stopped, and how it now carries on",
