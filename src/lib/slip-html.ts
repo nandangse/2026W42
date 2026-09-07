@@ -53,19 +53,40 @@ ${opts.draft ? '<div class="draft"><span>DRAFT SALARY SLIP</span></div>' : ""}
 <table style="margin-bottom:3px">
 <thead><tr class="hd"><td style="width:26%">Earnings</td><td class="r" style="width:12%">Rate</td><td class="r" style="width:12%">Earned</td><td style="width:26%">Deductions</td><td class="r" style="width:12%">Deducted</td></tr></thead>
 <tbody>
-${money("Basic And DA", s.basic_rate, s.basic, "Provident Fund", s.pf)}
-${money("HRA", null, s.hra, "Professional Tax", s.pt)}
-${money("Conveyance", s.conv_rate, s.conveyance, "Advance", s.advance)}
-${money("Fixed Allowance", s.fixed_rate, s.fixed, "Loan EMI", s.loan_ded)}
-${money("Medical Allowance", s.med_rate, s.medical, "TDS Deduction", s.tds)}
-${money("Leave Encashment + Comp Off", null, s.leave_encash, "Other Deductions", s.other_ded)}
-${money("Site Allowance", null, s.site, "Lunch", s.lunch)}
-${money("Interim Bonus", null, s.bonus, "", null)}
-${/* ESIC ONLY WHEN THERE IS ESIC (Dr Raghu, 7 Sep 2026: "ESIC you dont
-      need to show as it will be 0 for all"). This renderer prints every row
-      it is given — unlike the on-screen one, which drops the nil ones — so
-      the label itself has to go. Blank label ⇒ money() prints no figure. */""}
-${money("Arrears", null, s.arrears, s.esi ? "ESIC" : "", s.esi)}
+${/* THE SAME ROWS THE SCREEN SHOWS, AND NO OTHERS (Dr Raghu, 7 Sep 2026:
+      "the PDF that is going in the mail as an attachment is different from
+      the PDF that is seen on the screen").
+
+      It was: the screen drops a row when BOTH sides are nil, and this
+      renderer printed every row it was handed. So the emailed slip carried
+      Conveyance 0, Fixed 0, Site 0, Bonus —, Arrears 0, Advance 0, Loan 0,
+      Lunch 0 — eight lines of nothing that the screen had never shown, and
+      the two documents disagreed about a man's own pay.
+
+      One list, one rule, both renderers. Basic and the two statutory
+      deductions always stay, and so does Leave Encashment: a man should be
+      able to see that his encashment was nil, not have to infer it. */""}
+${([
+  ["Basic And DA", s.basic_rate, s.basic, "Provident Fund", s.pf],
+  ["HRA", null, s.hra, "Professional Tax", s.pt],
+  ["Conveyance", s.conv_rate, s.conveyance, "Advance", s.advance],
+  ["Fixed Allowance", s.fixed_rate, s.fixed, "Loan EMI", s.loan_ded],
+  ["Medical Allowance", s.med_rate, s.medical, "TDS Deduction", s.tds],
+  ["Leave Encashment + Comp Off", null, s.leave_encash, "Other Deductions", s.other_ded],
+  ["Site Allowance", null, s.site, "Lunch", s.lunch],
+  ["Interim Bonus", null, s.bonus, "", null],
+  /* ESIC last, so it is dropped for everybody — it is nil for all — and
+     comes back on its own the day someone is actually on it. */
+  ["Arrears", null, s.arrears, "ESIC", s.esi],
+] as [string, number | null | undefined, number | null | undefined, string, number | null | undefined][])
+  .filter(([e, , earned, d, ded], i) =>
+    i === 0 || i === 1
+    || /leave encashment/i.test(e)
+    || (earned != null && earned !== 0)
+    || (ded != null && ded !== 0)
+    || (!e && !d))
+  .map(([e, rate, earned, d, ded]) => money(e, rate, earned, d, ded))
+  .join("")}
 <tr class="hd"><td>Total Earned</td><td></td><td class="r">${inr(s.total_earned)}</td><td>Total Deduction</td><td class="r">${inr(s.total_ded)}</td></tr>
 </tbody></table>
 

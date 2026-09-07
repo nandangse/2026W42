@@ -42,18 +42,27 @@ export default async function SalaryRegisterPagesRoute({ params }: { params: { i
   const banks: Record<string, Bank> = {};
   if (rows.length) {
     const ppl = await people(admin, rows.map((r) => String(r.employee_id)));
-    // the record's own headers, matched loosely — "Account No", "Account No.
-    // 15 Digit", "IFSC Code", "Bank Name" have all been seen on these sheets
-    const pick = (v: Record<string, unknown>, re: RegExp) => {
-      for (const k of Object.keys(v)) if (re.test(k) && String(v[k] ?? "").trim()) return String(v[k]).trim();
+    /**
+     * BY THE KEY, NOT BY A GUESS AT IT (Dr Raghu, 7 Sep 2026: "in the salary
+     * register the account number is not put up — it says no bank account on
+     * record, but in the payslip you have put it up anyway").
+     *
+     * I matched the record's keys with /account\s*no/, and the key is
+     * `account_no` — an UNDERSCORE, which \s does not match. So it found
+     * nothing for anybody and 201 men were reported as having no bank
+     * account while their own payslip printed it. The slip reads the keys
+     * outright; so does this now, and the two cannot disagree again.
+     */
+    const val = (v: Record<string, unknown>, ...keys: string[]) => {
+      for (const k of keys) { const x = String(v[k] ?? "").trim(); if (x) return x; }
       return "";
     };
     for (const p of ppl) {
       const v = (p.value || {}) as Record<string, unknown>;
       banks[String(p.id)] = {
-        acct: pick(v, /account\s*no/i),
-        ifsc: pick(v, /ifsc/i),
-        bank: pick(v, /bank\s*name/i),
+        acct: val(v, "account_no", "account_15"),
+        ifsc: val(v, "ifsc"),
+        bank: val(v, "bank_name"),
       };
     }
   }

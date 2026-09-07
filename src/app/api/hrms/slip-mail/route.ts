@@ -10,6 +10,8 @@ import { MONTHS } from "@/lib/salary-sheet";
 import { crmDb } from "@/crm/db";
 import { myMailbox, mailboxByAddress, accessTokenFor, gmailSendMixed } from "@/crm/gmail";
 import { swallow } from "@/lib/swallow";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -40,6 +42,27 @@ async function sender(from: string) {
   })());
   if (!box) throw new HttpError(503, `${e} has no Gmail connected in Genie yet.`);
   return { token: await accessTokenFor(String(box.id)), fromEmail: String(box.email_address) };
+}
+
+/**
+ * THE SEAL, CARRIED INSIDE THE FILE (Dr Raghu, 7 Sep 2026: the emailed slip
+ * had no signature on it while the printed one did).
+ *
+ * The screen loads /nandan-stamp.png from the site. The PDF is pressed in a
+ * headless browser that has no site to load it from — a relative path there
+ * resolves to nothing, so the image was silently absent and the emailed slip
+ * went out unsigned. Read off disk once and inlined, it travels with the
+ * document. If the file is ever missing the slip simply has no seal, which
+ * is what it did before, rather than failing to send.
+ */
+let stampCache: string | null | undefined;
+async function stampDataUri(): Promise<string | undefined> {
+  if (stampCache !== undefined) return stampCache ?? undefined;
+  try {
+    const b = await readFile(join(process.cwd(), "public", "nandan-stamp.png"));
+    stampCache = `data:image/png;base64,${b.toString("base64")}`;
+  } catch (e) { swallow("slip-mail stamp", e); stampCache = null; }
+  return stampCache ?? undefined;
 }
 
 /** The month's slips, and who can actually be sent one. */
@@ -151,13 +174,14 @@ export async function POST(req: Request) {
     if (!u.isOwner && !/^(vinaym|hr)@nandan\.co\.in$/.test(u.email.toLowerCase()))
       throw new HttpError(403, "Slips go out from Dr Raghu or HR.");
     const { token, fromEmail } = await sender(String(b.from || "hr@nandan.co.in"));
+    const stampUrl = await stampDataUri();
     const offset = Math.max(0, Number(b.offset) || 0);
     const slice = sendable.slice(offset, offset + PER_CALL);
 
     let sent = 0; const failed: { id: string; name: string; why: string }[] = [];
     for (const { s, to } of slice) {
       try {
-        const pdf = await pressPdf(slipHtml(s, Number(sheet.month), Number(sheet.year), { draft: sheet.status !== "Frozen" }));
+        const pdf = await pressPdf(slipHtml(s, Number(sheet.month), Number(sheet.year), { draft: sheet.status !== "Frozen", stampUrl }));
         const subject = String(b.subject || `Your salary slip for ${period}`).replace(/\{\{\s*month\s*\}\}/gi, period);
         const html = String(b.body || "")
           .replace(/\{\{\s*first_name\s*\}\}/gi, String(s.name || "").split(/\s+/)[0])

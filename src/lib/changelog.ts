@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.19.3",
+    date: "2026-09-07",
+    module: "The emailed slip made identical to the printed one, and the register's bank details",
+    items: [
+      "\"The PDF that is going in the mail as an attachment is different from the PDF that is seen on the screen\" (Dr Raghu, 7 Sep 2026). It was, in two ways, and both were mine. The screen drops a row when BOTH sides are nil; the e-mail renderer printed every row it was handed — so Col K R Acharya's emailed slip carried Conveyance 0, Fixed 0, Site 0, Bonus —, Arrears 0, Advance 0, Loan 0 and Lunch 0, eight lines of nothing the screen had never shown. Both now run the same list under the same rule: his slip prints <b>four rows</b> either way.",
+      "AND THE EMAILED SLIP WAS UNSIGNED. The screen loads the seal from the site; the PDF is pressed in a headless browser with no site to load it from, so a relative path resolved to nothing and the image was silently absent. It is read off disk and carried inside the file now.",
+      "THE REGISTER'S BANK COLUMN SAID \"no bank account on record\" FOR ALL 205 — \"but in the payslip you have put it up anyway. There is something wrong.\" There was: I matched the record's keys with /account\\s*no/, and the key is <b>account_no</b> — an underscore, which \\s does not match. It found nothing for anybody. The slip reads the keys outright; so does the register now. <b>0 rows carried an account before, 201 of 205 do now</b>, and the four without one genuinely have none.",
+    ],
+  },
+  {
     v: "5.0.19.2",
     date: "2026-09-07",
     module: "The bell curve in rupees as well as per cent",
