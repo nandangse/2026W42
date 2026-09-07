@@ -78,6 +78,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.17.1",
+    date: "2026-09-07",
+    module: "The payroll run's register heading, made readable",
+    items: [
+      "\"This on the payroll run is still blank — show the background in dark colour\" (Dr Raghu, 7 Sep 2026). The Salary register tab's heading row was pale grey type on white, sticky over a white card: thirty-five columns of figures with nothing naming them. Dark ground, white type — the same as the printed register, so the screen and the paper name their columns the same way.",
+    ],
+  },
+  {
     v: "5.0.17.0",
     date: "2026-09-07",
     module: "The register as a signing copy, and the slip signed",

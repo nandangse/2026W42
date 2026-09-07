@@ -312,9 +312,16 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           <div className="flex gap-3 items-start" style={{ flexWrap: "wrap" }}>
           <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflow: "auto", maxHeight: "calc(100vh - 300px)", flex: "1 1 700px", minWidth: 0 }}>
             <table className="genie-table" style={{ fontSize: 12, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
-              <thead><tr style={{ color: C.faint, fontSize: 10 }}>
+              {/* A HEADING HAS TO BE READABLE (Dr Raghu, 7 Sep 2026: "this on
+                  the payroll run is still blank — show the background in dark
+                  colour"). It was C.faint on white: pale grey on white, which
+                  is not a faint heading, it is no heading. Thirty-five columns
+                  of figures with nothing naming them. Dark ground, white type
+                  — the same as the printed register, so the screen and the
+                  paper name their columns the same way. */}
+              <thead><tr style={{ fontSize: 10 }}>
                 {["Emp", "Name", "Type", "Due", "Leave OB", "Earned lv", "Comp off", "Lv used", "Encashed", "Leave CB", "Paid days", "Per day", "Basic & DA", "HRA", "Fixed", "Conv", "Medical", "OT pay", "Site", "Comp off ₹", "Encash ₹", "Arrears", "Earned", "PF", "PT", "Loan", "Advance", "TDS", "Lunch", "Late", "Other", "Deductions", "Net", "To pay", "Rate from"].map((h, i) => (
-                  <th key={h} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#fff", textAlign: i < 3 ? "left" : "right", zIndex: i < 2 ? 3 : 2, ...(i === 0 ? { left: 0, minWidth: 60, width: 60 } : i === 1 ? { left: 60 } : {}) }}>{h}</th>
+                  <th key={h} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#16232F", color: "#fff", fontWeight: 700, textAlign: i < 3 ? "left" : "right", zIndex: i < 2 ? 3 : 2, borderBottom: "2px solid #16232F", ...(i === 0 ? { left: 0, minWidth: 60, width: 60 } : i === 1 ? { left: 60 } : {}) }}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
