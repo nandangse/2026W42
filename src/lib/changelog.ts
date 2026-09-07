@@ -82,7 +82,7 @@ export const UPDATES: UpdateEntry[] = [
     date: "2026-09-07",
     module: "A dead landing link answers properly",
     items: [
-      "Checked after shipping: a landing address with no page behind it rendered an empty screen and answered 200, and would have shown a stranger Genie's own wrong-page screen with a Sign in button. It now has its own: the Nandan mark, one honest line, and the way to reach sales — and it answers 404, so a search engine drops the link rather than keeping it.",
+      "Checked after shipping: a landing address with no page behind it rendered an empty screen, and would have shown a stranger Genie's own wrong-page screen with a Sign in button. It now has its own: the Nandan mark, one honest line, and the way to reach sales. It still answers 200 rather than 404 — Next sends the page before the code can change the status — so a search engine may keep a dead link a while longer. Cosmetic to a reader, and noted rather than claimed fixed.",
     ],
   },
   {
