@@ -166,8 +166,35 @@ export async function POST(req: Request) {
       if ("due" in body) patch.due = dateOrNull(body.due);
       if ("who" in body) patch.who = str(body.who, 60) || null;
       if ("note" in body) patch.note = str(body.note, 2000) || null;
-      const { error } = await admin.from("materials").update(patch).eq("id", body.id);
+      /**
+       * THE STATUS DROPDOWN POSTS THIS ACTION, and until today this action
+       * quietly dropped it (Dr Raghu, 7 Sep 2026: "the recieved should change
+       * status"). It was not that the status failed to follow the receipt —
+       * it was that changing the status itself did nothing at all.
+       *
+       * The receipt date is not typed: "when the status is changed to
+       * recieved its the date the task is closed." So the clock is read here,
+       * and cleared again if the line moves back to being short.
+       */
+      let becameReceived = false;
+      if ("status" in body) {
+        const st = normStatus(body.status);
+        patch.status = st;
+        patch.received_at = st === "Received" ? new Date().toISOString() : null;
+        becameReceived = true;
+      }
+      let { error } = await admin.from("materials").update(patch).eq("id", body.id);
+      if (error && /received_at|column|schema cache/i.test(error.message)) {
+        // migration 0152 not run yet — the status must still land
+        delete patch.received_at;
+        ({ error } = await admin.from("materials").update(patch).eq("id", body.id));
+      }
       if (error) throw new Error(error.message);
+
+      // Received closes the linked task; anything else re-opens it — QC
+      // Defective included, because the item is on site and useless.
+      if (becameReceived && row?.task_id)
+        await admin.from("manual_tasks").update({ done: normStatus(body.status) === "Received" }).eq("id", row.task_id);
 
       // a promoted line's task follows its date and owner, or the link is a lie
       if (row?.task_id && ("due" in body || "who" in body || "item" in body)) {
@@ -184,9 +211,12 @@ export async function POST(req: Request) {
       const status = normStatus(body.status);
       const { error } = await admin
         .from("materials")
-        .update({ status, updated_at: new Date().toISOString() })
+        .update({ status, updated_at: new Date().toISOString(), received_at: status === "Received" ? new Date().toISOString() : null })
         .eq("id", body.id);
-      if (error) throw new Error(error.message);
+      if (error && /received_at|column|schema cache/i.test(error.message)) {
+        const retry = await admin.from("materials").update({ status, updated_at: new Date().toISOString() }).eq("id", body.id);
+        if (retry.error) throw new Error(retry.error.message);
+      } else if (error) throw new Error(error.message);
 
       /**
        * The mirror, half one.

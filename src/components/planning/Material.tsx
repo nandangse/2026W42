@@ -198,6 +198,70 @@ export function PendingMaterial({
     setBusy(null);
   };
 
+  /**
+   * PRINT WHAT IS ON THE SCREEN (Dr Raghu, 7 Sep 2026: "give a download
+   * button to download as PDF the filtered view as its seen on screen in
+   * the sort order and filter order").
+   *
+   * It walks `rows` — the same array the table renders, already filtered and
+   * already sorted — so the sheet cannot disagree with the screen. The
+   * filters in force are printed at the top, because a list of shortages
+   * with no statement of what it excludes is a dangerous thing to carry into
+   * a meeting.
+   */
+  const printPdf = () => {
+    const esc = (v: unknown) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
+    const horizonLabel = HORIZONS.find(([k]) => k === horizon)?.[1] || horizon;
+    const statusLabel = ({ open: "Yet to receive + QC Defective", yet: "Yet to receive only", defect: "QC Defective only", received: "Received", all: "Every status" } as Record<string, string>)[fStatus] || fStatus;
+    const bits = [horizonLabel, `status: ${statusLabel}`];
+    if (q.trim()) bits.push(`search: "${q.trim()}"`);
+    if (fProj !== "all") bits.push(`project: ${fProj}`);
+    if (fJob !== "all") bits.push(`job: ${jobNo(fJob)}`);
+    if (fWho !== "all") bits.push(`with: ${fWho}`);
+    if (sortKey) bits.push(`sorted by ${sortKey}${sortDir === -1 ? " (descending)" : ""}`);
+    const body = rows.map((r) => {
+      const overdue = !!r.m.due && r.m.due < TODAY;
+      return `<tr${overdue ? ' class="late"' : ""}>
+<td class="mono">${esc(jobNo(r.job.id))}</td>
+<td class="tag">${esc(r.job.tag)}</td>
+<td class="c">${esc(fmtFull(r.job.tdd || null))}</td>
+<td>${esc(r.m.item)}</td>
+<td class="c">${esc(r.m.qty ?? "")}</td>
+<td class="c">${esc(fmtFull(r.m.due || null))}</td>
+<td>${esc(r.m.note || "")}</td>
+<td class="c">${esc(r.m.status || "Yet to receive")}</td>
+<td class="c">${esc(r.m.who || "")}</td></tr>`;
+    }).join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Materials still short — ${new Date().toLocaleDateString("en-IN")}</title><style>
+@page { size: A4 landscape; margin: 10mm; }
+body { font-family: Arial, Helvetica, sans-serif; color: #22303C; }
+h1 { font-size: 16px; margin: 0 0 2px; }
+.sub { font-size: 10.5px; color: #5A6B7B; margin-bottom: 8px; line-height: 1.5; }
+table { border-collapse: collapse; width: 100%; font-size: 9.5px; }
+th { background: #22303C; color: #fff; padding: 4px 5px; text-align: left; }
+td { border-bottom: 1px solid #E7E4DC; padding: 3px 5px; vertical-align: top; }
+td.c { text-align: center; white-space: nowrap; }
+td.mono { font-weight: bold; white-space: nowrap; }
+td.tag { color: #5A6B7B; max-width: 210px; }
+tr.late td { background: #FBE9E7; }
+tr.late td.c { font-weight: bold; color: #B3261E; }
+.foot { margin-top: 8px; font-size: 10px; color: #5A6B7B; }
+thead { display: table-header-group; }
+</style></head><body>
+<h1>Materials still short</h1>
+<div class="sub">Nandan GSE &middot; ${rows.length} line${rows.length === 1 ? "" : "s"} across ${jobsAffected} job${jobsAffected === 1 ? "" : "s"} &middot; printed ${new Date().toLocaleString("en-IN")}<br>
+Showing: ${esc(bits.join(" &middot; "))}</div>
+<table><thead><tr><th>Job</th><th>Tag</th><th>TDD</th><th>Material / kit item</th><th>Qty</th><th>Receivable</th><th>Update</th><th>Status</th><th>With</th></tr></thead>
+<tbody>${body}</tbody></table>
+<div class="foot"><b>${late}</b> past their receivable date (shaded) &middot; <b>${defective}</b> QC defective. This is the screen as it was filtered and sorted, nothing more and nothing less.</div>
+</body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) { window.alert("Your browser blocked the print window. Allow pop-ups for this site and press PDF again."); return; }
+    w.document.write(html); w.document.close(); w.focus();
+    // let it lay out before the dialogue opens, or Chrome measures a blank page
+    w.setTimeout(() => w.print(), 350);
+  };
+
   const late = rows.filter((r) => r.m.due && r.m.due < TODAY).length;
   const defective = rows.filter((r) => String(r.m.status || "").toLowerCase().includes("defect")).length;
   const jobsAffected = new Set(rows.map((r) => r.job.id)).size;
@@ -250,6 +314,13 @@ export function PendingMaterial({
         <span className="text-xs" style={{ color: "var(--muted)" }}>
           {fStatus === "open" ? "Received lines are not shown — this is what is still short." : ""}
         </span>
+        <span style={{ flex: 1 }} />
+        <button onClick={printPdf} disabled={!rows.length}
+          className="px-2.5 py-1 rounded text-sm font-bold"
+          style={{ background: rows.length ? "var(--ink)" : "#D9D6CD", color: "#fff", whiteSpace: "nowrap" }}
+          title="Print what is on the screen — the same filters, the same sort order">
+          ⎙ PDF of this view
+        </button>
         {msg && <span className="text-xs font-bold" style={{ color: "var(--red)" }}>{msg}</span>}
       </div>
 

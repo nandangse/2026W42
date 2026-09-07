@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.11.3",
+    date: "2026-09-07",
+    module: "Material — the status actually saves, and the view prints",
+    items: [
+      "\"The recieved should change status\" (Dr Raghu, 7 Sep 2026). The truth was worse than that: <b>changing the status did nothing at all</b>. The dropdown posts the update action, and that action read the item, quantity, date, owner and note — and silently dropped the status. Every status anybody set on this screen was lost the moment the page reloaded.",
+      "It saves now, and it closes the linked task with it. QC Defective deliberately RE-OPENS the task: the thing is on site and useless, so the chasing is not finished.",
+      "THE RECEIPT DATE IS NOT TYPED. \"Not recieved ON... when the status is changed to recieved its the date the task is closed.\" So the clock is read at the moment it is marked Received, and cleared again if the line goes back to being short — a stale date would say a thing arrived when it has not (migration 0152).",
+      "PDF OF THIS VIEW. \"Download as PDF the filtered view as its seen on screen in the sort order and filter order.\" It walks the very array the table renders, already filtered and already sorted, so the sheet cannot disagree with the screen — and it prints the filters in force at the top, because a list of shortages that does not say what it excludes is a dangerous thing to carry into a meeting. Overdue lines are shaded, as on screen.",
+    ],
+  },
+  {
     v: "5.0.11.2",
     date: "2026-09-07",
     module: "The muster's frozen row carries the date",
