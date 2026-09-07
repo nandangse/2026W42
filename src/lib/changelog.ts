@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.9.2",
+    date: "2026-09-07",
+    module: "A 12 MB deck can ride along, and the count keeps moving",
+    items: [
+      "\"Request Entity Too Large — FUNCTION_PAYLOAD_TOO_LARGE\" (Dr Raghu, 7 Sep 2026, attaching a 1.2 MB photograph and a 12 MB PDF). Vercel refuses any request body over 4.5 MB, so the files could never reach the send at all — my fault for posting them through the API in the first place.",
+      "The browser now pushes each file STRAIGHT INTO STORAGE with a signed URL — the same road the IDP's own attachments take — and only the file's name travels with the mail. The bytes are fetched server-side, where no such limit applies. Up to 18 MB together, which is as much as Gmail will carry once base64 has swollen it.",
+      "A SEND OF 62 THAT SAT AT \"0 of 62\". Forty mails went out in one call, and this morning I had added a second Gmail round trip to each of them just to learn which conversation it opened — eighty calls before the screen heard anything back. Gmail hands the conversation back with the send itself, for free, so that second trip is gone; and a call now carries twelve, which returns in about twenty seconds. The count moves while it works, and a stall shows itself instead of looking like patience.",
+    ],
+  },
+  {
     v: "5.0.9.1",
     date: "2026-09-07",
     module: "Nobody sends as somebody else",

@@ -155,6 +155,9 @@ export async function gmailSend(
   /** Where an answer should go, when that is not the sending address
    *  (Dr Raghu, 7 Sep 2026: HRMS mail from his account, answered to HR). */
   replyTo?: string | null,
+  /** Filled with the conversation Gmail put this message in — free here,
+   *  where the send's own answer already carries it. */
+  out?: { threadId?: string },
 ): Promise<string> {
   // The sender reads as the PERSON, not the address — RFC 2047-encoded so
   // any script in the name survives the wire.
@@ -217,6 +220,7 @@ export async function gmailSend(
   });
   const j = await r.json();
   if (!r.ok) throw new Error((j.error as { message?: string })?.message || "Gmail refused the send");
+  if (out) out.threadId = j.threadId ? String(j.threadId) : undefined;
   return String(j.id);
 }
 
@@ -276,6 +280,7 @@ export async function gmailSendMixed(
   token: string, fromEmail: string, to: string, subject: string, htmlBody: string,
   attachments: { name: string; mime: string; base64: string }[],
   cc?: string, bcc?: string, fromName?: string, replyTo?: string | null,
+  out?: { threadId?: string },
 ): Promise<string> {
   const from = fromName
     ? `=?UTF-8?B?${Buffer.from(fromName).toString("base64")}?= <${fromEmail}>`
@@ -314,7 +319,8 @@ export async function gmailSendMixed(
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify({ raw }),
   });
-  const j = (await r.json()) as { id?: string; error?: { message?: string } };
+  const j = (await r.json()) as { id?: string; threadId?: string; error?: { message?: string } };
   if (!r.ok || !j.id) throw new Error(j.error?.message || `Gmail refused the send (${r.status})`);
+  if (out) out.threadId = j.threadId ? String(j.threadId) : undefined;
   return j.id;
 }

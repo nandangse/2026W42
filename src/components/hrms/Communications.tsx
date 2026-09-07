@@ -17,6 +17,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { supabaseBrowser } from "@/lib/supabase/browser";
 import { fmtFull } from "@/lib/schedule";
 import RichTextEditor from "@/components/RichTextEditor";
 import { Pane } from "./Pane";
@@ -261,7 +262,8 @@ function MassEmail({ draft, onClose }: { draft: Camp | null; onClose: () => void
   const [types, setTypes] = useState<string[]>(draft?.audience?.types || []);
   const [depts, setDepts] = useState<string[]>(draft?.audience?.departments || []);
   const [groups, setGroups] = useState<string[]>(draft?.audience?.groups || []);
-  const [atts, setAtts] = useState<{ name: string; mime: string; base64: string; size: number }[]>([]);
+  const [atts, setAtts] = useState<{ name: string; mime: string; path: string; size: number }[]>([]);
+  const [upload, setUpload] = useState("");
   const [pre, setPre] = useState<Pre | null>(null);
   const [showList, setShowList] = useState(false);
   const [busy, setBusy] = useState("");
@@ -294,15 +296,27 @@ function MassEmail({ draft, onClose }: { draft: Camp | null; onClose: () => void
     }
     document.execCommand("insertText", false, token);
   };
+  /**
+   * The file goes STRAIGHT INTO STORAGE, not through the API (Dr Raghu,
+   * 7 Sep 2026, on a 12 MB deck: "Request Entity Too Large"). Vercel refuses
+   * a request body over 4.5 MB, so a big attachment could never reach the
+   * send at all. Genie asks for a signed URL, the browser pushes the file to
+   * storage itself, and only the name travels with the mail.
+   */
   const addFiles = async (list: FileList | null) => {
     if (!list) return;
     const out = [...atts];
+    setMsg("");
     for (const f of Array.from(list)) {
-      const buf = await f.arrayBuffer();
-      let bin = ""; const bytes = new Uint8Array(buf);
-      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-      out.push({ name: f.name, mime: f.type || "application/octet-stream", base64: btoa(bin), size: f.size });
+      setUpload(`sending ${f.name} up…`);
+      try {
+        const t = await api.post("/api/hrms/mass-mail", { action: "attach-url", name: f.name, size: f.size });
+        const { error } = await supabaseBrowser().storage.from(t.bucket).uploadToSignedUrl(t.path, t.token, f);
+        if (error) throw new Error(`${f.name} did not upload: ${error.message}`);
+        out.push({ name: f.name, mime: f.type || "application/octet-stream", path: t.path, size: f.size });
+      } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     }
+    setUpload("");
     setAtts(out);
   };
 
@@ -318,7 +332,7 @@ function MassEmail({ draft, onClose }: { draft: Camp | null; onClose: () => void
   const saveDraft = async () => {
     setBusy("draft"); setMsg("");
     try {
-      const r = await api.post("/api/hrms/mass-mail", { action: "save-draft", campaign_id: campId || undefined, subject, body, ...settings, ...audience, attachments: atts.map(({ name, base64 }) => ({ name, base64 })) });
+      const r = await api.post("/api/hrms/mass-mail", { action: "save-draft", campaign_id: campId || undefined, subject, body, ...settings, ...audience, attachments: atts.map(({ name, mime, path }) => ({ name, mime, path })) });
       setCampId(r.campaign_id); setMsg("Draft saved ✓");
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     setBusy("");
@@ -331,7 +345,7 @@ function MassEmail({ draft, onClose }: { draft: Camp | null; onClose: () => void
     let off = 0, sent = 0, failed = 0, cid = campId;
     try {
       for (;;) {
-        const r = await api.post("/api/hrms/mass-mail", { action: "send", subject, body, ...settings, ...audience, campaign_id: cid || undefined, attachments: atts.map(({ name, mime, base64 }) => ({ name, mime, base64 })), offset: off });
+        const r = await api.post("/api/hrms/mass-mail", { action: "send", subject, body, ...settings, ...audience, campaign_id: cid || undefined, attachments: atts.map(({ name, mime, path }) => ({ name, mime, path })), offset: off });
         cid = r.campaign_id || cid; setCampId(cid);
         sent += r.sent || 0; failed += (r.failed || []).length; off = r.done;
         setProgress({ done: r.done, of: r.of, sent, failed });
@@ -444,6 +458,7 @@ function MassEmail({ draft, onClose }: { draft: Camp | null; onClose: () => void
                   <label className="text-xs font-bold rounded px-2.5 py-1.5" style={{ border: `1px solid ${C.line}`, cursor: "pointer", color: C.dim }}>
                     📎 Attach files<input type="file" multiple className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
                   </label>
+                  {upload && <span className="text-xs font-bold" style={{ color: "var(--blue)" }}>{upload}</span>}
                   {atts.map((a, i) => (
                     <span key={i} className="text-xs rounded px-2 py-1" style={{ background: "#F4F2EC" }}>
                       {a.name} <span style={{ color: C.faint }}>{(a.size / 1024).toFixed(0)} KB</span>

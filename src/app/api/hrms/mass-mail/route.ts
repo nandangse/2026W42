@@ -24,8 +24,28 @@ export const maxDuration = 300;
  * record and on this page.
  */
 const FROM_ALLOWED = ["hr@nandan.co.in", "raghu@nandan.co.in"];
-const MAX_PER_CALL = 40;
-const MAX_ATTACH = 8 * 1024 * 1024;
+/**
+ * HOW MANY IN ONE CALL. Forty was too many (Dr Raghu, 7 Sep 2026: a send to
+ * 62 sat at "0 of 62"). Each mail is a Gmail round trip and a ledger write,
+ * and forty of them ran past the function's patience before the screen heard
+ * anything back. Twelve returns in about twenty seconds, so the count moves
+ * while it works and a stall is visible rather than silent.
+ */
+const MAX_PER_CALL = 12;
+/** Gmail itself refuses over 25 MB; leave room for the base64 swell. */
+const MAX_ATTACH = 18 * 1024 * 1024;
+/**
+ * ATTACHMENTS GO ROUND THE API, NOT THROUGH IT (Dr Raghu, 7 Sep 2026, on a
+ * 12 MB deck: "Request Entity Too Large FUNCTION_PAYLOAD_TOO_LARGE").
+ *
+ * Vercel refuses a request body over 4.5 MB, so a file can never be posted
+ * to this route at all. The browser uploads it straight into storage with a
+ * signed URL — the same path the IDP's own attachments take — and the send
+ * carries only its name. The bytes are fetched here, server-side, where no
+ * such limit applies.
+ */
+const BUCKET = "voice-notes";
+const ATT_PREFIX = "mass-mail/";
 
 const ok = (x: unknown) => { const s2 = String(x || "").trim(); return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s2) ? s2.toLowerCase() : ""; };
 
@@ -345,6 +365,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, found, done, of: threads.length, more: done < threads.length });
     }
 
+    /** A signed URL the browser can push one file into, direct to storage. */
+    if (b.action === "attach-url") {
+      const name = String(b.name || "file").replace(/[^\w.\- ]+/g, "_").slice(0, 90);
+      if (Number(b.size || 0) > MAX_ATTACH) throw new HttpError(400, `${name} is larger than 18 MB — Gmail will not carry it.`);
+      const path = `${ATT_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${name}`;
+      const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, bucket: BUCKET, path, token: data.token, name });
+    }
+
     if (b.action === "preview") {
       return NextResponse.json({
         ok: true, count: sendable.length, noEmail,
@@ -376,8 +406,17 @@ export async function POST(req: Request) {
         throw new HttpError(403, `A mail may not go out reading as ${showAs} — that is not your address, and not the mailbox carrying it. Send it through ${showAs} instead, or leave the From line as ${fromEmail}.`);
       const headerFrom = showAs && FROM_ALLOWED.includes(showAs) ? showAs : fromEmail;
       const fromName = headerFrom === "hr@nandan.co.in" ? "Nandan GSE HR" : "Nandan GSE";
-      const atts = (Array.isArray(b.attachments) ? b.attachments : []) as { name: string; mime: string; base64: string }[];
-      if (atts.reduce((a, x) => a + (x.base64 || "").length * 0.75, 0) > MAX_ATTACH) throw new HttpError(400, "The attachments come to more than 8 MB together.");
+      /** Named here, fetched from storage — see ATTACHMENTS above. */
+      const asked = (Array.isArray(b.attachments) ? b.attachments : []) as { name: string; mime: string; base64?: string; path?: string }[];
+      const atts: { name: string; mime: string; base64: string }[] = [];
+      for (const a of asked) {
+        if (a.base64) { atts.push({ name: a.name, mime: a.mime, base64: a.base64 }); continue; }
+        if (!a.path || !a.path.startsWith(ATT_PREFIX)) throw new HttpError(400, `${a.name} was not uploaded — attach it again.`);
+        const { data, error } = await admin.storage.from(BUCKET).download(a.path);
+        if (error || !data) throw new HttpError(400, `${a.name} could not be read back from storage — attach it again.`);
+        atts.push({ name: a.name, mime: a.mime || data.type || "application/octet-stream", base64: Buffer.from(await data.arrayBuffer()).toString("base64") });
+      }
+      if (atts.reduce((a, x) => a + (x.base64 || "").length * 0.75, 0) > MAX_ATTACH) throw new HttpError(400, "The attachments come to more than 18 MB together — Gmail will not carry that.");
 
       const offset = Math.max(0, Number(b.offset) || 0);
       const slice = sendable.slice(offset, offset + MAX_PER_CALL);
@@ -400,16 +439,15 @@ export async function POST(req: Request) {
       }
       let sent = 0; const failed: { id: string; name: string; why: string }[] = [];
       for (const r of slice) {
+        // The conversation Gmail put it in comes back with the send itself —
+        // a reply finds the right record through this, and it costs nothing.
+        const box: { threadId?: string } = {};
         try {
           const id = atts.length
-            ? await gmailSendMixed(token, headerFrom, r.to, r.subject, r.html, atts, undefined, undefined, fromName, replyTo)
-            : await gmailSend(token, headerFrom, r.to, r.subject, r.html, undefined, undefined, fromName, undefined, null, replyTo);
+            ? await gmailSendMixed(token, headerFrom, r.to, r.subject, r.html, atts, undefined, undefined, fromName, replyTo, box)
+            : await gmailSend(token, headerFrom, r.to, r.subject, r.html, undefined, undefined, fromName, undefined, null, replyTo, box);
           sent++;
-          // The conversation this opened — a reply comes back on this thread,
-          // and that is how it finds its way to the right record.
-          let thread: string | null = null;
-          try { thread = String((await gmailGet(token, `messages/${id}?format=minimal`)).threadId || "") || null; }
-          catch (e2) { swallow("hrms/mass-mail thread id", e2); }
+          const thread = box.threadId || null;
           await admin.from("hrms_communication").insert({
             employee_id: r.id, channel: "email", direction: "out", to_address: r.to,
             mass_id: massId, thread_id: thread,
