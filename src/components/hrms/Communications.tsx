@@ -37,7 +37,7 @@ export default function Communications({ who }: { who: string }) {
   for (const r of rows || []) { const k = r.direction === "in" ? "replies" : r.status; counts[k] = (counts[k] || 0) + 1; }
 
   return (
-    <Pane title="Communications" who={who} print blurb="Everything HRMS has sent, and everything that came back — by person, by run, by channel. The same lines sit on each record's Communication tab and on each payroll run.">
+    <Pane title="Communications" who={who} blurb="Everything HRMS has sent, and everything that came back — by person, by run, by channel. The same lines sit on each record's Communication tab and on each payroll run.">
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: C.red }}>{msg}</div>}
       <div className="flex gap-1.5 mb-2 flex-wrap items-center text-xs">
         {Object.entries(counts).map(([k, v]) => <span key={k} className="rounded px-2 py-0.5 font-bold" style={{ background: "#F4F2EC", color: tone(k === "replies" ? "received" : k) }}>{k} {v}</span>)}

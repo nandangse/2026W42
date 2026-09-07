@@ -78,6 +78,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.8.1",
+    date: "2026-09-07",
+    module: "No PDF button on Communications",
+    items: [
+      "\"remove this pdf button\" (Dr Raghu, 7 Sep 2026). Gone from Communications. A ledger of what was sent is read on the screen and searched there; printing two hundred lines of it served nobody.",
+    ],
+  },
+  {
     v: "5.0.8.0",
     date: "2026-09-07",
     module: "HRMS — one mail to many, from HR's own inbox",
