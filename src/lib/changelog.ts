@@ -78,6 +78,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.11.4",
+    date: "2026-09-07",
+    module: "The payslip, on one A4 page and nothing cut",
+    items: [
+      "\"Make sure that everything fits into one A4 page without cutting\" (Dr Raghu, 7 Sep 2026) — and the reason it was cutting is worth saying plainly: the slip was A5 landscape at a FIXED height with the overflow hidden, so a slip whose leave line ran long simply stopped drawing. It lost its bank details and nothing said so. A4 portrait now, the height a minimum rather than a ceiling, and nothing hidden.",
+      "Two points smaller throughout, as he asked, which is what buys the room.",
+      "NET PAY MOVED TO THE BOTTOM — \"the net payment also has to be seen right at the bottom\" — pushed there by a spacer, so it sits at the foot of the page whatever the slip above it does. Larger than before, since it is the number anybody opens a payslip to read.",
+      "THE PER-DAY RATE IS GONE. \"Do not show it on the payslip, it doesn't look nice — just show payment days and gross.\" Payment days and gross remain; rate, earnings and deductions read as they did.",
+      "A round stamp sits beside the note, drawn only once a seal is placed at /nandan-stamp.png — until then nothing is shown, because an empty box where a seal should be looks worse than no seal. And the note now says the document needs no signature <b>when it reaches you from a Nandan GSE mail ID</b>.",
+      "On a phone the sheet stops being 210mm wide and becomes fluid, with the identity block stacking. Printing is untouched.",
+    ],
+  },
+  {
     v: "5.0.11.3",
     date: "2026-09-07",
     module: "Material — the status actually saves, and the view prints",

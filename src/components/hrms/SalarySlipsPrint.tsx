@@ -1,6 +1,6 @@
 "use client";
 /**
- * A5 salary slips — the July 2026 Word slip, redrawn to print one per page.
+ * A4 salary slips — one per page, and the whole slip on the page.
  *
  * The OT / Comp Off / Late Mark / Late Deduction line the Word slip carried
  * is deliberately absent (Dr Raghu, 27 Aug 2026): those are inputs to the
@@ -9,6 +9,18 @@
  * Each slip's screen bar shows the exact filename its PDF carries into the
  * person's Drive folder — "July 2026 - 6972 - Name" — so the print and the
  * filing use one name.
+ *
+ * IT WAS A5 LANDSCAPE WITH `overflow: hidden` (Dr Raghu, 7 Sep 2026: "make
+ * sure that everything fits into one A4 page without cutting"). A fixed
+ * height with the overflow hidden does not warn anybody: it simply stops
+ * drawing, so a slip with a long leave line lost its bank details and nobody
+ * could tell. A4 portrait has the room, the type is two points smaller
+ * throughout, and nothing is clipped.
+ *
+ * Also his, the same day: NET PAY belongs at the BOTTOM, where the eye ends;
+ * the per-day rate is not shown at all ("it doesn't look nice — just show
+ * payment days and gross"); and the round stamp sits beside the note so the
+ * thing reads as an official document.
  */
 import { LOGO } from "@/lib/logo";
 import { MONTHS } from "@/lib/salary-sheet";
@@ -29,24 +41,34 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
   return (
     <>
       <style>{`
-        /* A5 LANDSCAPE, EXACT (Dr Raghu, 27 Aug 2026): the sheet is
-           210 × 148 mm and the slip box IS the sheet — zero page margin,
-           the breathing room lives inside the box as padding, and the
-           height is fixed with overflow hidden so no slip can ever push
-           onto a second sheet and shift every slip after it. */
-        @page { size: 210mm 148mm; margin: 0; }
+        /* A4 PORTRAIT, ONE SLIP A PAGE. The box is the sheet; the breathing
+           room is padding inside it. The height is MIN, not fixed, and
+           nothing is hidden — a slip that grows takes the room it needs
+           rather than losing its last lines in silence. */
+        @page { size: A4; margin: 0; }
         html, body { margin: 0; background: #EFEDE7; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #16232F; }
-        .slip { width: 210mm; height: 148mm; box-sizing: border-box; margin: 0 auto 14px; background: #fff;
-                padding: 6mm 7mm; font-size: 9.5px; line-height: 1.4; overflow: hidden; }
+        .slip { width: 210mm; min-height: 297mm; box-sizing: border-box; margin: 0 auto 14px; background: #fff;
+                padding: 12mm 12mm 10mm; font-size: 8.5px; line-height: 1.45; display: flex; flex-direction: column; }
         .slip table { width: 100%; border-collapse: collapse; }
-        .slip td, .slip th { border: 1px solid #C9C6BD; padding: 2px 5px; }
-        .bandbar { width: 210mm; margin: 18px auto 4px; font-weight: 800; font-size: 13px; color: #1B3A5C; }
+        .slip td, .slip th { border: 1px solid #C9C6BD; padding: 2.5px 5px; }
+        .bandbar { width: 210mm; margin: 18px auto 4px; font-weight: 800; font-size: 12px; color: #1B3A5C; }
+        .grow { flex: 1 1 auto; }
         @media screen { .slip { box-shadow: 0 2px 12px rgba(20,30,40,.12); } }
         @media print {
           html, body { background: #fff; }
           .no-print, .bandbar { display: none !important; }
           .slip { box-shadow: none; margin: 0; page-break-after: always; break-after: page; }
           .slip:last-child { page-break-after: auto; }
+        }
+        /* THE SLIP ON A PHONE (Dr Raghu, 7 Sep 2026: "also make this mobile
+           responsive"). The sheet cannot be 210mm wide on a 375px screen, so
+           on screen it becomes fluid; print is untouched. */
+        @media screen and (max-width: 820px) {
+          .slip { width: 100%; min-height: 0; padding: 14px 12px; font-size: 11px; }
+          .bandbar { width: 100%; font-size: 12px; padding: 0 12px; box-sizing: border-box; }
+          .slip td, .slip th { padding: 4px; }
+          .stack td { display: block; width: auto !important; border-bottom: none; }
+          .stack tr { display: block; border-bottom: 1px solid #C9C6BD; }
         }
       `}</style>
 
@@ -86,7 +108,7 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
             </div>
 
             {/* identity */}
-            <table className="genie-table" style={{ marginBottom: 5 }}>
+            <table className="genie-table stack" style={{ marginBottom: 5 }}>
               <tbody>
                 <tr>
                   <td style={{ width: "34%" }}><b>Name:</b> {s.name}</td>
@@ -105,7 +127,8 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
                 <tr>
                   <td><b>Pay Days:</b> {inr(s.days_in_month)}</td>
                   <td><b>Present Days:</b> {inr(s.attendance)}</td>
-                  <td><b>Payment Days:</b> {inr(s.paid_days)} · <b>Gross:</b> {inr(s.gross_rate)} · <b>Per Day:</b> {inr(s.per_day)}</td>
+                  {/* the per-day rate is deliberately not shown (7 Sep 2026) */}
+                  <td><b>Payment Days:</b> {inr(s.paid_days)} · <b>Gross:</b> {inr(s.gross_rate)}</td>
                 </tr>
               </tbody>
             </table>
@@ -151,19 +174,6 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
               </tbody>
             </table>
 
-            {/* the answer */}
-            <table className="genie-table" style={{ marginBottom: 5 }}>
-              <tbody>
-                <tr style={{ background: "#FFF9C4" }}>
-                  <td style={{ width: "22%", fontWeight: 800, fontSize: 11 }}>NET PAY ₹{inr(s.net)}</td>
-                  <td style={{ fontSize: 9 }}>
-                    {s.in_words || ""}
-                    {s.round_up != null && s.round_up !== 0 ? ` · Round off ${s.round_up > 0 ? "(+)" : "(−)"}${Math.abs(s.round_up).toFixed(2)}` : ""}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
             {/* balances + bank */}
             <table className="genie-table">
               <tbody>
@@ -186,9 +196,34 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
               </tbody>
             </table>
 
-            <div style={{ fontSize: 8, color: "#5A6572", marginTop: 5, lineHeight: 1.5 }}>
-              Note: Leave of one year will be kept in balance (8 nos for Labour and 15 nos for Staff). Please note this.<br />
-              Any issues please contact the HR Department or mail hr@nandan.co.in · This is a computer generated document and does not need a signature.
+            <div className="grow" />
+
+            {/* THE ANSWER, LAST — "the net payment also has to be seen right
+                at the bottom" (Dr Raghu, 7 Sep 2026). */}
+            <table className="genie-table" style={{ marginTop: 6 }}>
+              <tbody>
+                <tr style={{ background: "#FFF9C4" }}>
+                  <td style={{ width: "26%", fontWeight: 800, fontSize: 13, padding: "6px 8px" }}>NET PAY ₹{inr(s.net)}</td>
+                  <td style={{ fontSize: 8.5 }}>
+                    {s.in_words || ""}
+                    {s.round_up != null && s.round_up !== 0 ? ` · Round off ${s.round_up > 0 ? "(+)" : "(−)"}${Math.abs(s.round_up).toFixed(2)}` : ""}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginTop: 6 }}>
+              <div style={{ fontSize: 7.5, color: "#5A6572", lineHeight: 1.55, flex: 1 }}>
+                Note: Leave of one year will be kept in balance (8 nos for Labour and 15 nos for Staff). Please note this.<br />
+                Any issues please contact the HR Department or mail hr@nandan.co.in.<br />
+                <b>This is a computer generated document and needs no signature when it reaches you from a Nandan GSE mail ID.</b>
+              </div>
+              {/* The round stamp, when one has been put at /nandan-stamp.png.
+                  Until then nothing is drawn — an empty box where a seal
+                  should be looks worse than no seal at all. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/nandan-stamp.png" alt="" style={{ height: 74, width: 74, objectFit: "contain", opacity: 0.9 }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
             </div>
           </div>
         </div>
