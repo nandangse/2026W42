@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.14.1",
+    date: "2026-09-07",
+    module: "Rewrite all the growth notes, and Dr Raghu's own voice on the page",
+    items: [
+      "\"Run the growth notes for all — yes\" (Dr Raghu, 7 Sep 2026). The mass run SKIPPED anybody who already had a note, so a change to the letter itself could never reach the 199 written before it — his standard opening among them. <b>Rewrite all</b> now sits beside it: the same run, deliberately over everybody, asked for once and warned about, because it replaces words he may already have read.",
+      "HIS RECORDED MESSAGE IS ON THE PAGE. The voice note he sent is at /raghu-message.mp3 and plays at the top of IDP Results, above the growth plan — the man himself, before the letter.",
+      "A correction I owe him: I said only 24 growth notes existed. <b>199 of 204 do.</b> What is true is that not one of them carries his opening — every one was written before this morning's change — which is what Rewrite all is for.",
+    ],
+  },
+  {
     v: "5.0.14.0",
     date: "2026-09-07",
     module: "Every person their own salary slip, by mail",

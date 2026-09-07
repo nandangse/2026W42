@@ -71,14 +71,18 @@ on conflict (employee_id, field) do update
   set value = excluded.value, edited_by = excluded.edited_by, edited_at = excluded.edited_at,
       approved_at = excluded.approved_at, approved_by = excluded.approved_by;
 
--- and one salary-history line per person for the year, so the climb is kept
+-- One salary-history line per person per year, so the climb is kept.
+--
+-- hrms_salary_history is UNIQUE on (employee_id, fy) — one row per person per
+-- year, by design. A plain insert therefore fails the moment somebody already
+-- has a 2026-27 row at a different figure, which is exactly what happened on
+-- the first run: 6143 already had one. So it UPDATES that row to the agreed
+-- number rather than trying to add a second.
 insert into public.hrms_salary_history (employee_id, fy, gross, "by", at)
 select t.employee_id, '2026-27', round(t.gross), 'RJ · raghu@nandan.co.in', now()
 from _target t
-where not exists (
-  select 1 from public.hrms_salary_history h
-  where h.employee_id = t.employee_id and h.fy = '2026-27' and round(h.gross) = round(t.gross)
-);
+on conflict (employee_id, fy) do update
+  set gross = excluded.gross, "by" = excluded."by", at = excluded.at;
 
 commit;
 

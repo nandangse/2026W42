@@ -390,11 +390,24 @@ const shown = useMemo(() => {
    * Anyone who already has one is skipped, so stopping and starting again
    * simply carries on.
    */
-  const massGrowth = async (only?: string[]) => {
+  /**
+   * REWRITING, not only filling the gaps (Dr Raghu, 7 Sep 2026: "run the
+   * growth notes for all — yes"). Skipping anyone who already had a note
+   * meant a change to the letter itself could never reach the 199 written
+   * before it — his standard opening among them. So a rewrite is now a
+   * deliberate choice, asked for once and warned about, because it replaces
+   * words he may already have read and approved.
+   */
+  const massGrowth = async (only?: string[], rewrite = false) => {
     const pool = only ? shown.filter((r) => only.includes(r.id)) : shown;
-    const todo = pool.filter((r) => !r.growth);
+    const todo = rewrite ? pool : pool.filter((r) => !r.growth);
     if (!todo.length) { window.alert(only ? "Every ticked person already has a growth note." : "Every row on screen already has a growth note."); return; }
-    if (!window.confirm(`Write the growth note for ${todo.length} ${todo.length === 1 ? "person" : "people"}?\n\nEach one is read and written on its own, so this takes a few minutes. You can stop it, and starting again carries on from where it left off.`)) return;
+    const had = todo.filter((r) => r.growth).length;
+    if (!window.confirm(
+      rewrite && had
+        ? `REWRITE the growth note for ${todo.length} ${todo.length === 1 ? "person" : "people"}?\n\n${had} of them already have one, and it will be REPLACED — the words change, including any you have already read.\n\nEach is written on its own, so this takes several minutes. You can stop it.`
+        : `Write the growth note for ${todo.length} ${todo.length === 1 ? "person" : "people"}?\n\nEach one is read and written on its own, so this takes a few minutes. You can stop it, and starting again carries on from where it left off.`
+    )) return;
     stop.v = false;
     setRun({ done: 0, of: todo.length, now: todo[0]?.name || "", fail: 0 });
     let done = 0, fail = 0;
@@ -504,6 +517,16 @@ const shown = useMemo(() => {
             style={{ background: run ? "#B3261E" : "#0D7A3F", whiteSpace: "nowrap" }}
             title="Writes the growth note — the one the person is handed — for every row shown that has none yet">
             {run ? `Stop · ${run.done}/${run.of}` : `✨ Growth notes${missingNotes ? ` (${missingNotes})` : ""}`}
+          </button>
+        )}
+        {/* and the same run, deliberately over everybody — the only way a
+            change to the letter reaches the ones already written */}
+        {isOwner && !run && (
+          <button onClick={() => massGrowth(undefined, true)}
+            className="text-xs font-bold rounded px-2.5 py-1.5"
+            style={{ border: "1px solid #0D7A3F", background: "#fff", color: "#0D7A3F", whiteSpace: "nowrap" }}
+            title="Write every shown person's growth note again, replacing the one they have">
+            ↻ Rewrite all ({shown.length})
           </button>
         )}
         {/* Dr Raghu, 2 Sep 2026: "put a filter for salary range Min and Max". */}
