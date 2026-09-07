@@ -78,6 +78,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.19.1",
+    date: "2026-09-07",
+    module: "The IDP page, fixed — my breakage from an hour ago",
+    items: [
+      "\"The IDP page is not working\" (Dr Raghu, 7 Sep 2026). Two faults, both mine from 5.0.19.0. The new mobile styles were scoped to <b>.idp</b> — which is not a free name: IdpDiscussion's own Shell already carries that class and globals.css already styles it, so every rule I wrote landed on the whole page and fought the rules already there. They are scoped to <b>.idpm</b> now, which belongs to nothing else.",
+      "And the new top bar was drawn INSIDE that Shell, which already has a navy header with the logo, ← Genie and the initials — so the page wore two stacked headers. It is drawn only when nothing else is drawing one.",
+    ],
+  },
+  {
     v: "5.0.19.0",
     date: "2026-09-07",
     module: "/idp rebuilt for the phone, to his own design",

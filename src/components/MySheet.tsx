@@ -112,7 +112,7 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
   const initials = (d.linked ? d.me.name : name || "").split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join("").toUpperCase();
 
   return (
-    <div className="idp" style={{ minHeight: "100vh", background: "var(--i-ground)", color: "var(--i-text)" }}>
+    <div className="idpm" style={{ minHeight: "100vh", background: "var(--i-ground)", color: "var(--i-text)" }}>
       {/*
         THE PHONE, NOT THE DESKTOP (Dr Raghu, 7 Sep 2026, with a design of his
         own: "make the genie.nandan.co.in/idp like this").
@@ -127,7 +127,7 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap" />
       <style>{`
-        .idp{
+        .idpm{
           --i-ink:#1B2233; --i-accent:#E4580B; --i-accent-ink:#fff; --i-accent-soft:#FDEBDF;
           --i-ground:#F3F4F7; --i-surface:#fff; --i-surface-2:#F8F9FB; --i-line:#DCE0E8; --i-line-2:#C5CAD6;
           --i-text:#1B2233; --i-muted:#5C6577; --i-faint:#8A93A5;
@@ -137,62 +137,66 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
           font-family:"Source Sans 3","Segoe UI",system-ui,Roboto,Arial,sans-serif;
           font-size:17px; line-height:1.4; -webkit-font-smoothing:antialiased;
         }
-        .idp h1,.idp h2,.idp h3,.idp .disp{font-family:"Barlow","Segoe UI",system-ui,Roboto,Arial,sans-serif}
-        .idp .top{position:sticky;top:${embedded ? 54 : 0}px;z-index:30;background:var(--i-ink);color:#fff;
+        .idpm h1,.idpm h2,.idpm h3,.idpm .disp{font-family:"Barlow","Segoe UI",system-ui,Roboto,Arial,sans-serif}
+        .idpm .top{position:sticky;top:0;z-index:30;background:var(--i-ink);color:#fff;
           padding:12px 16px;display:flex;align-items:center;gap:12px;min-height:60px}
-        .idp .logo{width:34px;height:34px;border-radius:9px;background:var(--i-accent);display:grid;place-items:center;
+        .idpm .logo{width:34px;height:34px;border-radius:9px;background:var(--i-accent);display:grid;place-items:center;
           font-family:Barlow,system-ui,sans-serif;font-weight:700;color:#fff;font-size:15px;flex:none}
-        .idp .avatar{width:40px;height:40px;border-radius:50%;background:var(--i-accent);color:#fff;display:grid;
+        .idpm .avatar{width:40px;height:40px;border-radius:50%;background:var(--i-accent);color:#fff;display:grid;
           place-items:center;font-family:Barlow,system-ui,sans-serif;font-weight:700;font-size:15px;flex:none}
-        .idp .wrap{max-width:560px;margin:0 auto;padding:16px 16px 104px}
-        .idp .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-        .idp .tile{background:var(--i-surface);border:1px solid var(--i-line);border-radius:10px;padding:10px;
+        .idpm .wrap{max-width:560px;margin:0 auto;padding:16px 16px 104px}
+        .idpm .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+        .idpm .tile{background:var(--i-surface);border:1px solid var(--i-line);border-radius:10px;padding:10px;
           min-height:78px;display:flex;flex-direction:column;justify-content:space-between;text-align:left}
-        .idp .tile .l{font-size:12px;color:var(--i-muted);line-height:1.2}
-        .idp .tile .v{font-family:Barlow,system-ui,sans-serif;font-weight:700;font-size:19px;line-height:1.1;margin-top:6px}
-        .idp .tile .f{font-size:11.5px;color:var(--i-faint);margin-top:4px}
-        @media (max-width:360px){.idp .tiles{grid-template-columns:1fr 1fr}.idp .tile:first-child{grid-column:1/-1}}
-        .idp .alert{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:10px;width:100%;
+        .idpm .tile .l{font-size:12px;color:var(--i-muted);line-height:1.2}
+        .idpm .tile .v{font-family:Barlow,system-ui,sans-serif;font-weight:700;font-size:19px;line-height:1.1;margin-top:6px}
+        .idpm .tile .f{font-size:11.5px;color:var(--i-faint);margin-top:4px}
+        @media (max-width:360px){.idpm .tiles{grid-template-columns:1fr 1fr}.idpm .tile:first-child{grid-column:1/-1}}
+        .idpm .alert{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:10px;width:100%;
           background:var(--i-warn-soft);border-left:4px solid var(--i-warn);min-height:56px;text-align:left}
-        .idp .action{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--i-surface);
+        .idpm .action{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--i-surface);
           border:1px solid var(--i-line);border-radius:14px;padding:14px;min-height:64px;box-shadow:var(--i-shadow)}
-        .idp .action:active{transform:scale(.99)}
-        .idp .action .ic{width:44px;height:44px;border-radius:12px;background:var(--i-surface-2);display:grid;
+        .idpm .action:active{transform:scale(.99)}
+        .idpm .action .ic{width:44px;height:44px;border-radius:12px;background:var(--i-surface-2);display:grid;
           place-items:center;flex:none;border:1px solid var(--i-line);font-size:20px}
-        .idp .action .h{font-family:Barlow,system-ui,sans-serif;font-weight:600;font-size:17.5px}
-        .idp .action .dsc{font-size:14px;color:var(--i-muted);margin-top:2px}
-        .idp .action.primary{background:var(--i-ink);border-color:var(--i-ink);color:#fff}
-        .idp .action.primary .ic{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.14)}
-        .idp .action.primary .dsc{color:var(--i-header-muted)}
-        .idp .action.accent{background:var(--i-accent);border-color:var(--i-accent);color:#fff}
-        .idp .action.accent .ic{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.25)}
-        .idp .action.accent .dsc{color:#fff;opacity:.85}
-        .idp .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-        .idp .gbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+        .idpm .action .h{font-family:Barlow,system-ui,sans-serif;font-weight:600;font-size:17.5px}
+        .idpm .action .dsc{font-size:14px;color:var(--i-muted);margin-top:2px}
+        .idpm .action.primary{background:var(--i-ink);border-color:var(--i-ink);color:#fff}
+        .idpm .action.primary .ic{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.14)}
+        .idpm .action.primary .dsc{color:var(--i-header-muted)}
+        .idpm .action.accent{background:var(--i-accent);border-color:var(--i-accent);color:#fff}
+        .idpm .action.accent .ic{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.25)}
+        .idpm .action.accent .dsc{color:#fff;opacity:.85}
+        .idpm .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+        .idpm .gbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
           background:var(--i-surface);border:1px solid var(--i-line);border-radius:10px;min-height:84px;padding:10px 6px;
           font-family:Barlow,system-ui,sans-serif;font-weight:600;font-size:14px;text-align:center;line-height:1.15}
-        .idp .gbtn .e{font-size:22px}
-        .idp .sect{font-family:Barlow,system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:.06em;
+        .idpm .gbtn .e{font-size:22px}
+        .idpm .sect{font-family:Barlow,system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:.06em;
           text-transform:uppercase;color:var(--i-muted);margin-top:4px}
-        .idp .nav{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:repeat(5,1fr);
+        .idpm .nav{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:repeat(5,1fr);
           background:#fff;border-top:1px solid var(--i-line);padding:6px 4px calc(8px + env(safe-area-inset-bottom));
           max-width:560px;margin:0 auto}
-        .idp .nav button{display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;padding:6px 2px;
+        .idpm .nav button{display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;padding:6px 2px;
           border-radius:12px;color:var(--i-muted);font-family:Barlow,system-ui,sans-serif;font-size:12px;font-weight:600}
-        .idp .nav button .e{font-size:21px;line-height:1}
-        .idp .nav button[data-on="1"]{color:var(--i-accent)}
-        .idp .nav .cnt{position:absolute;margin-left:20px;margin-top:-3px;background:var(--i-accent);color:#fff;
+        .idpm .nav button .e{font-size:21px;line-height:1}
+        .idpm .nav button[data-on="1"]{color:var(--i-accent)}
+        .idpm .nav .cnt{position:absolute;margin-left:20px;margin-top:-3px;background:var(--i-accent);color:#fff;
           font-size:11px;font-weight:700;min-width:18px;height:18px;padding:0 5px;border-radius:9px;display:grid;place-items:center}
-        .idp .list{display:flex;flex-direction:column;background:var(--i-surface);border:1px solid var(--i-line);
+        .idpm .list{display:flex;flex-direction:column;background:var(--i-surface);border:1px solid var(--i-line);
           border-radius:14px;overflow:hidden}
-        .idp .item{display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:60px;
+        .idpm .item{display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:60px;
           border-top:1px solid var(--i-line);text-align:left;width:100%}
-        .idp .item:first-child{border-top:0}
+        .idpm .item:first-child{border-top:0}
       `}</style>
 
-      {/* ── the bar at the top ── */}
+      {/* ── THE BAR AT THE TOP, only when nothing else is drawing one ──
+          /idp renders this inside IdpDiscussion's own Shell, which already
+          has a navy header with the logo, ← Genie and the initials. Drawing
+          a second one under it is what broke the page. */}
+      {!embedded && (
       <div className="top">
-        {!embedded && <div className="logo">N</div>}
+        <div className="logo">N</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="disp" style={{ fontWeight: 700, fontSize: 18, lineHeight: 1.1 }}>Nandan Genie</div>
           <div style={{ fontSize: 12.5, color: "var(--i-header-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -201,6 +205,7 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
         </div>
         <div className="avatar">{initials || "N"}</div>
       </div>
+      )}
       {msg && <div className="px-4 pt-3 text-sm font-semibold" style={{ color: msg.endsWith("✓") ? C.green : C.red }}>{msg}</div>}
 
       <div className="wrap">
