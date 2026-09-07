@@ -50,7 +50,10 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
            did run over would show it rather than lose a line quietly. */
         @page { size: 210mm 148mm; margin: 0; }
         html, body { margin: 0; background: #EFEDE7; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #16232F; }
-        .slip { width: 210mm; height: 148mm; box-sizing: border-box; margin: 0 auto 14px; background: #fff;
+        /* MIN-height on screen, so a slip that somehow runs long SHOWS it
+           rather than losing its foot; the page itself is exactly A5
+           landscape in print. Nothing is ever hidden (7 Sep 2026). */
+        .slip { width: 210mm; min-height: 148mm; box-sizing: border-box; margin: 0 auto 14px; background: #fff;
                 padding: 4mm 5mm; font-size: 7.6px; line-height: 1.3; display: flex; flex-direction: column; }
         .slip table { width: 100%; border-collapse: collapse; }
         .slip td, .slip th { border: 1px solid #C9C6BD; padding: 1.4px 4px; }
@@ -60,7 +63,7 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
         @media print {
           html, body { background: #fff; }
           .no-print, .bandbar { display: none !important; }
-          .slip { box-shadow: none; margin: 0; page-break-after: always; break-after: page; }
+          .slip { box-shadow: none; margin: 0; height: 148mm; min-height: 0; page-break-after: always; break-after: page; }
           .slip:last-child { page-break-after: auto; }
         }
         /* THE SLIP ON A PHONE (Dr Raghu, 7 Sep 2026: "also make this mobile
@@ -148,6 +151,18 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
                 </tr>
               </thead>
               <tbody>
+                {/**
+                  * ONLY THE LINES THAT CARRY SOMETHING (Dr Raghu, 7 Sep 2026:
+                  * "not fitting still"). A worker's slip was printing nine
+                  * earning rows when six of them were zero — conveyance,
+                  * fixed, medical, encashment, bonus, arrears — and the sheet
+                  * ran past its own foot, taking NET PAID with it.
+                  *
+                  * The two columns are one row, so a row goes only when BOTH
+                  * sides are empty. Basic and the two statutory deductions
+                  * always stay, because a payslip that does not mention PF
+                  * looks like a payslip that forgot it.
+                  */}
                 {([
                   ["Basic And DA", s.basic_rate, s.basic, "Provident Fund", s.pf],
                   ["HRA", null, s.hra, "Professional Tax", s.pt],
@@ -158,7 +173,13 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
                   ["Site Allowance", null, s.site, "Other Deductions", s.other_ded],
                   ["Interim Bonus", null, s.bonus, "Lunch", s.lunch],
                   ["Arrears", null, s.arrears, "", null],
-                ] as [string, number | null, number | null, string, number | null][]).map(([e, rate, earned, d, ded], i) => (
+                ] as [string, number | null, number | null, string, number | null][])
+                  .filter(([e, , earned, d, ded], i) =>
+                    i === 0 || i === 1                       // Basic & DA, and PF beside it
+                    || (earned != null && earned !== 0)
+                    || (ded != null && ded !== 0)
+                    || (!e && !d))
+                  .map(([e, rate, earned, d, ded], i) => (
                   <tr key={i}>
                     <td>{e}</td>
                     <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: rate == null ? "#C9C6BD" : undefined }}>{rate == null ? "" : inr(rate)}</td>

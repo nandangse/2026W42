@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.15.2",
+    date: "2026-09-07",
+    module: "The slip prints only the lines that carry something",
+    items: [
+      "\"Not fitting still\" (Dr Raghu, 7 Sep 2026). Dinesh Kumar's slip was printing nine earning rows when SIX of them were zero — conveyance, fixed allowance, medical, leave encashment, interim bonus, arrears — and those six rows are what pushed the sheet past its own foot and took NET PAID with it.",
+      "A row now prints only when something is on it. The two columns are one row, so a line goes only when BOTH sides are empty; Basic &amp; DA and the two statutory deductions always stay, because a payslip that does not mention PF looks like a payslip that forgot it.",
+      "And the box can no longer clip: on screen its height is a MINIMUM, so a slip that somehow ran long would show it rather than lose its foot in silence. In print it is exactly A5 landscape, as it must be.",
+      "A worker's slip now runs to five or six lines instead of nine, which is both shorter and truer — nobody needs to read a row of zeroes to learn they were not paid a medical allowance they do not get.",
+    ],
+  },
+  {
     v: "5.0.15.1",
     date: "2026-09-07",
     module: "The register PDF, unbroken again",
