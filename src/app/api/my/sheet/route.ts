@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { readBody } from "@/lib/validate";
 import { swallow } from "@/lib/swallow";
 import * as XLSX from "xlsx";
-import { requireUser, errJson, HttpError } from "@/lib/auth";
+import { requireUser, requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables, FIELD_GROUPS } from "@/lib/hrms";
 import { people } from "@/lib/hrms-wa";
@@ -65,11 +65,35 @@ async function me(email: string) {
   return p || null;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const u = await requireUser();
     const admin = adminClient();
-    const p = await me(u.email);
+
+    /**
+     * ?person=<employee id> — THE SAME SHEET, SEEN FROM HR'S SIDE.
+     *
+     * The Individual Report Card shows what the person themselves sees
+     * (Dr Raghu, 7 Sep 2026: "most of it will be what will be seen in his IDP
+     * that he sees"), so it asks this route rather than assembling a second,
+     * slightly different truth beside it. Naming somebody else needs the
+     * HRMS key; without the parameter nothing changes, and there is still no
+     * way for an ordinary login to name a person other than themselves.
+     */
+    const asked = new URL(req.url).searchParams.get("person");
+    let p: Awaited<ReturnType<typeof me>> = null;
+    let subject = u.email;
+    if (asked) {
+      await requireHrms();
+      p = (await people(admin, [asked]))[0] || null;
+      if (!p) throw new HttpError(404, "No such person on the roll.");
+      const pv = p.value as Record<string, string | null>;
+      // The IDP, the queries and the handbook are all keyed by the person's
+      // own e-mail, which is the Genie login on the record before the work one.
+      subject = String(pv.user_email || pv.email || "").trim().toLowerCase();
+    } else {
+      p = await me(u.email);
+    }
     if (!p) return NextResponse.json({ linked: false, name: u.displayName || u.email, email: u.email });
     const v = p.value as Record<string, string | null>;
 
@@ -108,7 +132,7 @@ export async function GET() {
     }
 
     // ---- the IDP, the reviews that came back, the appraisal that was released ----
-    const { data: idps } = await admin.from("hrms_idp").select("id, submitted_at, answers, ratings, role_at_time, cycle").eq("person_email", u.email.toLowerCase()).order("started_at", { ascending: false }).limit(5);
+    const { data: idps } = await admin.from("hrms_idp").select("id, submitted_at, answers, ratings, role_at_time, cycle").eq("person_email", subject.toLowerCase()).order("started_at", { ascending: false }).limit(5);
     const done = (idps || []).filter((d) => d.submitted_at);
     let reviews: Record<string, unknown>[] = [];
     if (done.length) {
@@ -126,15 +150,15 @@ export async function GET() {
 
     // ---- queries and applications ----
     const { data: qs } = await admin.from("hrms_query").select("id, subject, question, topic, status, answer, raised_at, answered_at, answered_by, form")
-      .in("topic", ["HR Query", "Application", "Handbook"]).or(`raised_email.eq.${u.email.toLowerCase()},employee_id.eq.${p.id}`).order("raised_at", { ascending: false }).limit(200);
+      .in("topic", ["HR Query", "Application", "Handbook"]).or(`raised_email.eq.${subject.toLowerCase()},employee_id.eq.${p.id}`).order("raised_at", { ascending: false }).limit(200);
 
     // ---- the handbook ----
     let acknowledged: string | null = null;
-    try { const { data: a } = await admin.from("hrms_handbook_ack").select("acknowledged_at").eq("email", u.email.toLowerCase()).eq("edition", HANDBOOK_EDITION).maybeSingle(); acknowledged = a?.acknowledged_at || null; } catch (e) { swallow("my/sheet", e); /* */ }
+    try { const { data: a } = await admin.from("hrms_handbook_ack").select("acknowledged_at").eq("email", subject.toLowerCase()).eq("edition", HANDBOOK_EDITION).maybeSingle(); acknowledged = a?.acknowledged_at || null; } catch (e) { swallow("my/sheet", e); /* */ }
 
     return NextResponse.json({
       linked: true,
-      me: { id: p.id, name: p.name, email: u.email, type: p.type, department: p.department, designation: v.designation || null, doj: v.doj || null, location: v.location || null, manager: v.reporting_manager || null, phone: p.phone },
+      me: { id: p.id, name: p.name, email: subject, type: p.type, department: p.department, designation: v.designation || null, doj: v.doj || null, location: v.location || null, manager: v.reporting_manager || null, phone: p.phone },
       record, months, idps: done, reviews, released, learning, queries: qs || [],
       handbook: { edition: HANDBOOK_EDITION, acknowledged },
       kinds: APPLICATION_KINDS,

@@ -78,10 +78,8 @@ export const NAV: NavSection[] = [
     key: "card",
     label: "Individual Report Card",
     icon: "🪪",
-    blurb: "One person, one page — record, role, IDP, appraisal history, ready to print for the file.",
-    built: false,
-    source:
-      "Employee Report Card (tab 7) in the Main Salary Sheet, and the Individual Report Card tab in the 2026 Appraisal workbook.",
+    blurb: "One person, one page — the MIS line, the record, the IDP, learning, leave, the attendance roster and every query.",
+    built: true,
   },
   {
     key: "idp",

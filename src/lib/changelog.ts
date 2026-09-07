@@ -78,6 +78,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.10.0",
+    date: "2026-09-07",
+    module: "The Individual Report Card — one person, one page",
+    items: [
+      "\"I should be able to choose one person, and that person's data will all be seen. Most of it will be what will be seen in his IDP that he sees.\" (Dr Raghu, 7 Sep 2026). Type a name or an ID and the whole page opens: the MIS line, the record, the IDP and what came back on it, learning, the months, the attendance roster and every query raised.",
+      "IT READS THE PERSON'S OWN SHEET. Rather than assemble a second, slightly different truth beside the employee's page, the card asks the very endpoint that page asks, with a person named. Naming somebody else needs the HRMS key; an ordinary login still has no way to ask for anyone but themselves.",
+      "MAIN MIS: company, since, age, birth date, department, reporting manager, designation, and — worked out from the musters — average attendance and average late coming. The engagement score is left saying it has no rule yet rather than showing a number nobody could defend.",
+      "ATTENDANCE, BY DAY OR BY WEEK. By day is the roster itself, 1 to 31 with each mark as Vishwas keeps it. By week it totals present and absent over proper calendar weeks running Sunday to Saturday — and where a month straddles six, the last day or two joins the fifth, because he asked for five. Beside the month: present, absent, late, comp off and ET. THE WORD OT DOES NOT APPEAR — \"just write ET, which means extra time\".",
+      "AND IT SAYS WHAT IS MISSING. Only August 2026 has a muster in Genie; every month from April 2025 to July 2026 has a payroll run with no muster attached. Those months are named on the page instead of being drawn as empty rows, because an empty roster reading as absence would be worse than no roster at all. Uploading each month's muster onto its run fills them in.",
+      "STILL TO COME on this card, and said plainly on the page rather than faked: the onboarding checklist has no source in Genie at all, and the pencil-per-section change request, the photograph and the mobile /idp are the next tranche.",
+    ],
+  },
+  {
     v: "5.0.9.3",
     date: "2026-09-07",
     module: "The Appraisal Table, downloaded and cut eight ways",

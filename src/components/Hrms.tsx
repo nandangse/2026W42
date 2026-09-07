@@ -27,6 +27,7 @@ import type { HrmsEmployee } from "@/lib/hrms";
 import { NAV, findNav, DEFAULT_KEY } from "@/lib/hrms-nav";
 import EmployeeMaster, { type MasterView } from "./hrms/EmployeeMaster";
 import { Pane, NotBuilt } from "./hrms/Pane";
+import ReportCard from "./hrms/ReportCard";
 import ModuleMasters from "./hrms/ModuleMasters";
 import RolesRegister from "./hrms/RolesRegister";
 import ApprovalRecords from "./hrms/ApprovalRecords";
@@ -228,6 +229,8 @@ export default function Hrms({
           <AppraisalCard who={who} isOwner={isOwner} />
         ) : nav.key === "idp.individual" ? (
           <IdpRecords who={who} />
+        ) : nav.key === "card" ? (
+          <ReportCard who={who} />
         ) : nav.key === "offers" ? (
           <Offers who={who} isOwner={isOwner} />
         ) : nav.key === "queries" ? (
