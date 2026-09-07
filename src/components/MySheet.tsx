@@ -43,8 +43,33 @@ interface Sheet {
   today: string;
 }
 type Tab = "home" | "idpform" | "records" | "slips" | "leave" | "loan" | "idp" | "learning" | "handbook" | "queries";
-const TABS: [Tab, string][] = [["home", "Home"], ["idpform", "IDP"], ["records", "HRIS Records"], ["slips", "Payslips"], ["leave", "Leave Register"], ["loan", "Loan Register"], ["idp", "IDP Results"], ["learning", "Learning Goals"], ["handbook", "Employee Handbook"], ["queries", "HR Queries"]];
+/**
+ * The IDP FORM tab is deliberately absent (Dr Raghu, 7 Sep 2026: "remove the
+ * IDP edit option for all now — hide the tab"). The round is written; what a
+ * person reads from here on is the RESULT, under IDP Results, not a box they
+ * could still type into. The panel itself is left in the file, unreachable,
+ * because the next round will want it back.
+ */
+const TABS: [Tab, string][] = [["home", "Home"], ["records", "HRIS Records"], ["slips", "Payslips"], ["leave", "Leave Register"], ["loan", "Loan Register"], ["idp", "IDP Results"], ["learning", "Learning Goals"], ["handbook", "Employee Handbook"], ["queries", "HR Queries"]];
 const APPLY: [string, string][] = [["leave", "Apply for Leave"], ["advance", "Apply for Advance"], ["loan", "Apply for Loan"], ["encashment", "Apply for Leave Encashment"], ["uniform", "Apply for Uniform"], ["shoes", "Apply for Shoes"], ["other", "Apply for Other Things"]];
+
+/**
+ * COMING SOON, said plainly (Dr Raghu, 7 Sep 2026). The tab stays where it
+ * is so nobody hunts for it later; it simply says the truth rather than
+ * showing half a register somebody might act on.
+ */
+/** Flip to true the day the three registers are finished for the employee. */
+const REGISTERS_READY = false;
+
+function ComingSoon({ what, line }: { what: string; line: string }) {
+  return (
+    <div className="rounded-lg px-4 py-6 text-center" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
+      <div style={{ fontSize: 26 }}>🔒</div>
+      <div className="font-bold mt-1" style={{ fontSize: 16 }}>{what} — coming soon</div>
+      <div className="text-sm mt-1" style={{ color: C.dim, lineHeight: 1.6, maxWidth: 380, margin: "6px auto 0" }}>{line}<br />It is being finished now. Until then, HR has it — write under HR Queries and they will answer.</div>
+    </div>
+  );
+}
 
 export default function MySheet({ name, children, teamBox, embedded, dashboard, idpPanel, idpStatus }: { name: string; children?: React.ReactNode; teamBox?: React.ReactNode; embedded?: boolean; dashboard?: React.ReactNode; idpPanel?: React.ReactNode; idpStatus?: "done" | "open" | "none" }) {
   const [d, setD] = useState<Sheet | null>(null);
@@ -122,6 +147,7 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
             ))}
           </>
         ) : tab === "slips" ? (
+          !REGISTERS_READY ? <ComingSoon what="Payslips" line="Your monthly slips will open here, one for each month HR has closed." /> : (
           <>
             <Note>Every month HR has closed, newest first. A month opens as your salary slip once it is frozen.</Note>
             {d.months.length === 0 && <Empty>No month yet.</Empty>}
@@ -133,16 +159,21 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
               </a>
             ))}
           </>
+          )
         ) : tab === "leave" ? (
+          !REGISTERS_READY ? <ComingSoon what="Leave Register" line="Your leave — opening, earned, comp off, used and closing, month by month." /> : (
           <>
             <Note>Opening + earned + comp off − used − encashed = closing, month by month. Comp off is added to your leave and taken out again when it is encashed.</Note>
             <Table head={["Month", "OB", "Earned", "Comp off", "Used", "Encashed", "Closing"]} rows={d.months.filter((m) => m.slip && m.slip.leave_cb != null).map((m) => [`${MONTHS[m.month - 1].slice(0, 3)} ${m.year}`, d1(m.slip!.leave_ob), d1(m.slip!.leave_added), d1(m.slip!.compoff_days), d1(m.slip!.leave_used), d1(m.slip!.leave_encashed), <b key="c">{d1(m.slip!.leave_cb)}</b>])} />
           </>
+          )
         ) : tab === "loan" ? (
+          !REGISTERS_READY ? <ComingSoon what="Loan Register" line="Your loan — opening, taken, deducted and closing, month by month." /> : (
           <>
             <Note>Opening + taken − deducted = closing, month by month.</Note>
             <Table head={["Month", "OB", "Taken", "Deducted", "Closing"]} rows={d.months.filter((m) => m.slip && (m.slip.loan_cb != null || m.slip.loan_ded)).map((m) => [`${MONTHS[m.month - 1].slice(0, 3)} ${m.year}`, `₹${inr(m.slip!.loan_ob)}`, `₹${inr(m.slip!.loan_added)}`, `₹${inr(m.slip!.loan_ded)}`, <b key="c">₹{inr(m.slip!.loan_cb)}</b>])} />
           </>
+          )
         ) : tab === "idp" ? (
           <>
             {d.released.map((r, i) => (

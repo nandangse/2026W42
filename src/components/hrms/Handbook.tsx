@@ -103,9 +103,22 @@ export default function Handbook({ who: me, standalone, defaultLang = "en" }: { 
       <style>{CSS}</style>
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</div>}
       {st?.needsMigration && <div className="rounded p-2 mb-2" style={{ background: "#FFF7E6", border: "1px solid #F5D9A8", fontSize: 12.5, color: "#8A5B00" }}>Run migration 0134 — the handbook has nowhere to live yet.</div>}
+      {/* ON A PHONE (Dr Raghu, 7 Sep 2026: "the handbook is not mobile
+          friendly — how can they read it?"). The index was a FIXED 260px
+          column, stuck to the top: on a 375px screen that is seventy per
+          cent of the width, leaving the handbook itself a gutter to read in.
+          Below 820px the index becomes a short scrolling strip across the
+          top and the text takes the full width, which is the only way a man
+          reads this on the floor. */}
+      <style>{`
+        @media (max-width: 820px) {
+          .hb-index { flex: 1 1 100% !important; position: static !important; max-height: 220px !important; }
+          .hb-body  { flex: 1 1 100% !important; }
+        }
+      `}</style>
       <div className="flex gap-3 items-start" style={{ flexWrap: "wrap" }}>
         {/* ── index ── */}
-        <div className="bg-white rounded-lg border p-2" style={{ borderColor: C.line, flex: "0 0 260px", position: "sticky", top: 8, maxHeight: "calc(100vh - 110px)", overflowY: "auto" }}>
+        <div className="bg-white rounded-lg border p-2 hb-index" style={{ borderColor: C.line, flex: "0 0 260px", position: "sticky", top: 8, maxHeight: "calc(100vh - 110px)", overflowY: "auto" }}>
           <div className="px-2 pt-1 pb-2">
             <div className="font-bold" style={{ fontSize: 14 }}>Employee Handbook</div>
             <div className="text-xs" style={{ color: C.faint }}>Edition {st?.edition || "…"}</div>
@@ -143,7 +156,7 @@ export default function Handbook({ who: me, standalone, defaultLang = "en" }: { 
         </div>
 
         {/* ── the section ── */}
-        <div style={{ flex: "1 1 560px", minWidth: 0 }}>
+        <div className="hb-body" style={{ flex: "1 1 560px", minWidth: 0 }}>
           {sec && (
             <div className="bg-white rounded-lg border" style={{ borderColor: C.line }}>
               <div className="px-5 pt-4 pb-3" style={{ borderBottom: `1px solid ${C.line}` }}>

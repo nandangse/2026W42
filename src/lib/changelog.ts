@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.12.1",
+    date: "2026-09-07",
+    module: "The IDP page trimmed, and the handbook made readable on a phone",
+    items: [
+      "\"Remove the IDP edit option for all now — hide the tab\" (Dr Raghu, 7 Sep 2026). Gone. The round is written; what a person reads from here is the RESULT, not a box they could still type into. The panel is left in the file, unreachable, because the next round will want it back.",
+      "Payslips, Leave Register and Loan Register say <b>coming soon</b> rather than showing half a register somebody might act on. The tabs stay where they are so nobody hunts for them later, and each says where to go meanwhile. One flag turns all three back on the day they are finished.",
+      "THE HANDBOOK ON A PHONE. \"It is not mobile friendly — how can they read it?\" The index was a fixed 260px column stuck to the top: on a 375px screen that is seventy per cent of the width, leaving the handbook itself a gutter to read in. Below 820px the index becomes a short strip across the top and the text takes the full width — which matters more here than anywhere, because the people who most need the handbook read it on a phone, on the floor.",
+    ],
+  },
+  {
     v: "5.0.12.0",
     date: "2026-09-07",
     module: "757 record overrides were being dropped on every read",
