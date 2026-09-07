@@ -266,6 +266,23 @@ export function inWords(n: number): string {
 }
 
 const N = (v: unknown): number | null => (v === null || v === undefined || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
+
+/**
+ * PAY DAYS AS THE SLIP SHOULD SAY THEM (Dr Raghu, 7 Sep 2026: "the paydays
+ * for labour contractors are 26 days and not 31 — only talking about the
+ * payslip, the rest of the things are right").
+ *
+ * A month on the labour and contract side is a 26-day month, and the slip
+ * was printing 31 because the register does not always carry a Pay Days
+ * column and the fallback was simply the length of the calendar month.
+ *
+ * DISPLAY ONLY. Nothing here touches what anybody is paid: the earnings, the
+ * per-day rate and the net are computed elsewhere and are unchanged. This is
+ * the figure printed in the header beside Present Days.
+ */
+const SIX_AND_TWENTY = /labour|contract/i;
+const slipPayDays = (type: string | null, fromSheet: number | null, daysInMonth: number): number | null =>
+  fromSheet ?? (SIX_AND_TWENTY.test(String(type || "")) ? 26 : daysInMonth);
 const T = (v: unknown): string | null => (v === null || v === undefined || String(v).trim() === "" ? null : String(v).trim());
 
 /**
@@ -308,7 +325,8 @@ export function slipsFromRegister(
       department: T(g("department")), designation: T(g("designation")),
       basic_rate: N(g("basic_da")), fixed_rate: N(g("fixed_allowance")), conv_rate: N(g("conveyance")),
       med_rate: N(g("medical_allowance")), gross_rate: N(r.gross) ?? N(g("gross_salary")),
-      days_in_month: N(r.pay_days) ?? daysInMonth, attendance: N(r.present) ?? N(r.attendance), paid_days: N(r.paid_days),
+      days_in_month: slipPayDays(T(r.type) || T(g("type")), N(r.pay_days), daysInMonth),
+      attendance: N(r.present) ?? N(r.attendance), paid_days: N(r.paid_days),
       basic: N(r.basic_da), hra: N(r.hra), fixed: N(r.fixed_allowance), conveyance: N(r.conveyance),
       site: N(r.site_allowance), medical: N(r.medical),
       leave_encash: encashLeave + encashComp,

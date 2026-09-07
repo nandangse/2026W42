@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.19.5",
+    date: "2026-09-07",
+    module: "Pay Days on the payslip header, and the clock in Communications",
+    items: [
+      "\"The paydays for labour contractors are 26 days and not 31 — only talking about the payslip, the rest of the things are right\" (Dr Raghu, 7 Sep 2026). A month on the labour and contract side is a 26-day month, and the slip printed 31 because the register does not always carry a Pay Days column and the fallback was the length of the calendar month.",
+      "Labour, Labour - Contract and Contractor now print <b>26</b>; Staff and Management keep 31. Labour was showing 31 too — 119 slips — which he had not flagged but was the same fault.",
+      "DISPLAY ONLY. Nothing anybody is paid moves: earnings, the per-day rate and the net are computed elsewhere and are untouched. This is the figure in the header beside Present Days.",
+      "AND COMMUNICATIONS SHOWS THE TIME (\"in this also show the time!\"). Two hundred mails go out inside a minute and a reply comes back an hour later; a date alone cannot say which came first, which is the whole question a ledger is read to answer. Every line — and every reply hung under it — now carries the hour and minute in IST.",
+    ],
+  },
+  {
     v: "5.0.19.3",
     date: "2026-09-07",
     module: "The emailed slip made identical to the printed one, and the register's bank details",

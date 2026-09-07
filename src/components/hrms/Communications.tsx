@@ -25,6 +25,21 @@ import { C } from "./RecordFields";
 
 interface Row { id: string; employee_id: string; name: string; channel: string; direction: string; to_address: string | null; subject: string | null; body: string; status: string; error: string | null; sent_by: string | null; sent_at: string; run_id: string | null; run_label: string | null }
 
+/**
+ * THE CLOCK, NOT ONLY THE CALENDAR (Dr Raghu, 7 Sep 2026: "in this also show
+ * the time!"). Two hundred mails go out inside a minute and a reply comes
+ * back an hour later; a date alone cannot tell you which came first, which
+ * is the whole question a ledger is read to answer.
+ */
+const stamp = (iso: string | null | undefined) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: true,
+  }).replace(",", " ·");
+};
+
 const tone = (s: string) => (s === "delivered" || s === "received" ? C.green : s === "failed" ? C.red : s === "sent" ? "var(--blue)" : C.dim);
 
 export default function Communications({ who }: { who: string }) {
@@ -134,7 +149,7 @@ export default function Communications({ who }: { who: string }) {
                   <span style={{ color: C.faint }}>{r.channel === "whatsapp" ? "💬" : r.channel === "email" ? "✉" : "📝"} {r.to_address || ""}{r.subject && r.channel === "email" ? ` · ${r.subject}` : ""}</span>
                   {r.run_label && <span className="rounded px-1.5 py-0.5" style={{ background: "#DCE8F5", color: "var(--blue)", fontSize: 10 }}>run {r.run_label}</span>}
                   <span style={{ flex: 1 }} />
-                  <span style={{ color: C.faint }}>{fmtFull(String(r.sent_at))} · {String(r.sent_by || "").split("·")[0].trim()}</span>
+                  <span style={{ color: C.faint }}>{stamp(r.sent_at)} · {String(r.sent_by || "").split("·")[0].trim()}</span>
                   {r.error && <span style={{ color: C.red }} title={r.error}>!</span>}
                 </button>
                 {/* WHO ANSWERED, IN FRONT — the badge is the point of this;
@@ -148,7 +163,7 @@ export default function Communications({ who }: { who: string }) {
                 {open === r.id && <div className="mt-1" style={{ fontSize: 12.5, lineHeight: 1.5, color: r.direction === "in" ? C.green : C.ink }} dangerouslySetInnerHTML={{ __html: /<[a-z][\s\S]*>/i.test(r.body) ? r.body : String(r.body).replace(/\n/g, "<br>") }} />}
                 {open === r.id && (replyOf.get(r.id) || []).map((x: Row) => (
                   <div key={x.id} className="mt-1.5 rounded px-2 py-1.5" style={{ background: "#F3FAF5", borderLeft: `3px solid ${C.green}` }}>
-                    <div style={{ fontSize: 10.5, color: C.green, fontWeight: 700 }}>↩ {x.name} · {fmtFull(String(x.sent_at))}</div>
+                    <div style={{ fontSize: 10.5, color: C.green, fontWeight: 700 }}>↩ {x.name} · {stamp(x.sent_at)}</div>
                     <div style={{ fontSize: 12.5, lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: /<[a-z][\s\S]*>/i.test(x.body) ? x.body : String(x.body).replace(/\n/g, "<br>") }} />
                   </div>
                 ))}
