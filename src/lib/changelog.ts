@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.20.0",
+    date: "2026-09-07",
+    module: "Why the slip mail stopped, and how it now carries on",
+    items: [
+      "\"Emailing is stopped ... says failed to fetch\" and \"why was it killed?\" (Dr Raghu, 7 Sep 2026). Because <b>pressPdf launched a whole Chromium for every single slip and closed it again</b>. Eight slips in one request meant eight cold starts, the launch being far and away the most expensive part; the function ran past its time limit and was killed mid-batch. Six went, the seventh never returned, and a request that never returns is exactly what \"Failed to fetch\" means in a browser. Nothing was wrong with the mail, the address or the PDF.",
+      "The launch is now paid ONCE for the whole batch and the slips are rendered on the same browser, and a batch is five rather than eight. A page that fails no longer takes the rest with it — that one is reported failed and the others still go.",
+      "AND SEND NOW RESUMES INSTEAD OF RESTARTING (\"how can we continue? without restarting\"). Every slip is written to the ledger as it goes, so the ledger knows who has one: anybody already sent this month is skipped, which makes pressing Send again a resume. A run cut short costs nothing but the press of a button, and nobody is mailed his payslip twice by accident. A cut-off batch is also retried once on its own before the run gives up. There is a tick for <b>send again to those already sent</b>, for the six that went out before the format was fixed.",
+    ],
+  },
+  {
     v: "5.0.19.8",
     date: "2026-09-07",
     module: "The apply forms: what he may encash, and sizes he can choose",

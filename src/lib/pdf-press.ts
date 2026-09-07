@@ -15,6 +15,57 @@ export interface PressOptions {
   landscape?: boolean;
 }
 
+/**
+ * MANY PAGES, ONE BROWSER (Dr Raghu, 7 Sep 2026: "emailing is stopped ...
+ * says failed to fetch").
+ *
+ * pressPdf launches Chromium, renders one page and closes it again. Pressing
+ * eight payslips therefore meant eight cold starts inside a single request —
+ * far and away the most expensive part — and the function was killed before
+ * it finished. Six slips went out and the browser reported "Failed to fetch",
+ * which is what a request that never returns looks like from the outside.
+ *
+ * The launch is the cost, so it is paid once and the pages are rendered on
+ * the same browser. A page that fails does not take the rest down with it:
+ * its slot comes back null and the caller reports that one as failed.
+ */
+export async function pressPdfMany(htmls: string[], opts: PressOptions = {}): Promise<(Buffer | null)[]> {
+  if (!htmls.length) return [];
+  const chromium = (await import("@sparticuz/chromium")).default;
+  const puppeteer = await import("puppeteer-core");
+  const executablePath = process.env.CHROME_PATH || await chromium.executablePath();
+  const browser = await puppeteer.launch({ args: chromium.args, executablePath, headless: true });
+  const out: (Buffer | null)[] = [];
+  try {
+    for (const html of htmls) {
+      let page;
+      try {
+        page = await browser.newPage();
+        await page.setContent(html, { waitUntil: "load", timeout: 30000 });
+        await new Promise((z) => setTimeout(z, 250));
+        out.push(Buffer.from(await page.pdf(pdfOptions(opts))));
+      } catch { out.push(null); }
+      finally { try { await page?.close(); } catch { /* the browser is closing anyway */ } }
+    }
+  } finally { await browser.close(); }
+  return out;
+}
+
+/** The page settings, shared by the one-off and the batch. */
+function pdfOptions(opts: PressOptions) {
+  return {
+    format: "A4" as const, printBackground: true, preferCSSPageSize: true,
+    ...(opts.footerHtml
+      ? {
+          displayHeaderFooter: true,
+          headerTemplate: "<span></span>",
+          footerTemplate: opts.footerHtml,
+          margin: { top: 0, bottom: "12mm", left: 0, right: 0 },
+        }
+      : { margin: { top: 0, bottom: 0, left: 0, right: 0 } }),
+  };
+}
+
 export async function pressPdf(html: string, opts: PressOptions = {}): Promise<Buffer> {
   const chromium = (await import("@sparticuz/chromium")).default;
   const puppeteer = await import("puppeteer-core");

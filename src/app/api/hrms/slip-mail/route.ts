@@ -5,7 +5,7 @@ import { readBody } from "@/lib/validate";
 import { people } from "@/lib/hrms-wa";
 import { slipsFromRegister, type Slip } from "@/lib/salary-slip";
 import { slipHtml } from "@/lib/slip-html";
-import { pressPdf } from "@/lib/pdf-press";
+import { pressPdfMany } from "@/lib/pdf-press";
 import { MONTHS } from "@/lib/salary-sheet";
 import { crmDb } from "@/crm/db";
 import { myMailbox, mailboxByAddress, accessTokenFor, gmailSendMixed } from "@/crm/gmail";
@@ -31,7 +31,10 @@ export const maxDuration = 300;
  * serverless Chromium the quotes use, so the paper and the attachment cannot
  * drift apart.
  */
-const PER_CALL = 8;                      // a slip is a browser page; eight is a comfortable minute
+/* Five at a time. Eight was chosen when every slip paid its own Chromium
+   cold start and the request was killed before it finished; now the launch
+   is paid once for the batch, five leaves comfortable room under the limit. */
+const PER_CALL = 5;
 const ok = (x: unknown) => { const s = String(x || "").trim(); return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s) ? s.toLowerCase() : ""; };
 
 async function sender(from: string) {
@@ -152,8 +155,35 @@ export async function POST(req: Request) {
      * start a conversation HR has not had yet.
      */
     const types = Array.isArray(b.types) ? b.types.map((t) => String(t).trim().toLowerCase()).filter(Boolean) : [];
+
+    /**
+     * PICK UP WHERE IT STOPPED (Dr Raghu, 7 Sep 2026: "how can we continue?
+     * without restarting").
+     *
+     * Every slip that goes is written to the ledger as it goes, so the ledger
+     * already knows who has one. Anybody already sent this month is left out,
+     * which makes pressing Send again a RESUME rather than a fresh start —
+     * and means a run killed halfway costs nothing but the press of a button.
+     * Nobody is mailed his payslip twice by accident.
+     *
+     * `resend: true` overrides it, for when a slip went out wrong and has to
+     * go again — as the six that went before the format was fixed must.
+     */
+    const already = new Set<string>();
+    if (!b.resend) {
+      try {
+        const { data: done } = await adminClient().from("hrms_communication")
+          .select("employee_id, meta").eq("channel", "email").eq("direction", "out").eq("status", "sent");
+        for (const r of (done || []) as { employee_id: string; meta: Record<string, unknown> | null }[]) {
+          const m = r.meta || {};
+          if (m.slip && Number(m.month) === Number(sheet.month) && Number(m.year) === Number(sheet.year))
+            already.add(String(r.employee_id));
+        }
+      } catch (e) { swallow("slip-mail already-sent", e); }
+    }
     const inScope = (s: Slip) =>
       !s.hold
+      && !already.has(s.id)
       && (!wanted || wanted.includes(s.id))
       && (!types.length || types.includes(String(s.category || "").trim().toLowerCase()));
 
@@ -169,6 +199,7 @@ export async function POST(req: Request) {
 
     if (b.action === "preview")
       return NextResponse.json({ ok: true, count: sendable.length, noPersonal, held, period,
+        already: already.size,
         sample: sendable.slice(0, 3).map((x) => ({ name: x.s.name, to: x.to })) });
 
     if (!u.isOwner && !/^(vinaym|hr)@nandan\.co\.in$/.test(u.email.toLowerCase()))
@@ -179,9 +210,15 @@ export async function POST(req: Request) {
     const slice = sendable.slice(offset, offset + PER_CALL);
 
     let sent = 0; const failed: { id: string; name: string; why: string }[] = [];
-    for (const { s, to } of slice) {
+    /* Every slip in this batch pressed on ONE browser — the launch is the
+       cost, and paying it per slip is what killed the request. */
+    const pdfs = await pressPdfMany(slice.map(({ s }) =>
+      slipHtml(s, Number(sheet.month), Number(sheet.year), { draft: sheet.status !== "Frozen", stampUrl })));
+    for (let i = 0; i < slice.length; i++) {
+      const { s, to } = slice[i];
       try {
-        const pdf = await pressPdf(slipHtml(s, Number(sheet.month), Number(sheet.year), { draft: sheet.status !== "Frozen", stampUrl }));
+        const pdf = pdfs[i];
+        if (!pdf) throw new Error("the slip could not be rendered");
         const subject = String(b.subject || `Your salary slip for ${period}`).replace(/\{\{\s*month\s*\}\}/gi, period);
         const html = String(b.body || "")
           .replace(/\{\{\s*first_name\s*\}\}/gi, String(s.name || "").split(/\s+/)[0])
@@ -202,6 +239,6 @@ export async function POST(req: Request) {
       }
     }
     const done = offset + slice.length;
-    return NextResponse.json({ ok: true, sent, failed, done, of: sendable.length, more: done < sendable.length, noPersonal, held });
+    return NextResponse.json({ ok: true, sent, failed, done, of: sendable.length, more: done < sendable.length, noPersonal, held, already: already.size });
   } catch (e) { return errJson(e); }
 }

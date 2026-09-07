@@ -35,7 +35,7 @@ Nandan HR<br><br>
 P.S. A separate mail has been sent to you about logging in to <a href="https://genie.nandan.co.in/idp">genie.nandan.co.in/idp</a>, where your slips, your IDP and your record all live.`;
 
 interface Checked { count: number; period: string; sample: { name: string; to: string }[];
-  noPersonal: { id: string; name: string; why?: string }[]; held: { id: string; name: string }[] }
+  noPersonal: { id: string; name: string; why?: string }[]; held: { id: string; name: string }[]; already?: number }
 interface TypeRow { type: string; n: number; hold: number }
 
 export default function SlipMail({ sheetId, status, onClose }: { sheetId: string; status: string; onClose: () => void }) {
@@ -53,6 +53,7 @@ export default function SlipMail({ sheetId, status, onClose }: { sheetId: string
    */
   const [types, setTypes] = useState<TypeRow[] | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
+  const [resend, setResend] = useState(false);
   useEffect(() => {
     fetch(`/api/hrms/slip-mail?sheet=${encodeURIComponent(sheetId)}`)
       .then((r) => r.json()).then((j) => setTypes(j.types || [])).catch(() => setTypes([]));
@@ -62,7 +63,7 @@ export default function SlipMail({ sheetId, status, onClose }: { sheetId: string
   const post = async (payload: Record<string, unknown>) => {
     const r = await fetch("/api/hrms/slip-mail", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sheet: sheetId, from, subject, body, types: picked, ...payload }),
+      body: JSON.stringify({ sheet: sheetId, from, subject, body, types: picked, resend, ...payload }),
     });
     const j = await r.json();
     if (!r.ok) throw new Error(j?.error || "Something went wrong.");
@@ -82,9 +83,22 @@ export default function SlipMail({ sheetId, status, onClose }: { sheetId: string
     if (!window.confirm(`Send ${chk.count} salary slips for ${chk.period}?\n\nEach person gets their own PDF at their PERSONAL address. This cannot be taken back.`)) return;
     setBusy(true); setNote("");
     let offset = 0, sent = 0; const failed: { name: string; why: string }[] = [];
+    /**
+     * A LOST BATCH DOES NOT END THE RUN (Dr Raghu, 7 Sep 2026: "how can we
+     * continue? without restarting"). A request that is killed shows up here
+     * as "Failed to fetch"; it is given one more go before the run stops, and
+     * because the server skips anybody already sent, nothing is doubled and
+     * nothing is missed. Press Send again at any point and it carries on.
+     */
     try {
       for (;;) {
-        const j = await post({ offset });
+        let j;
+        try { j = await post({ offset }); }
+        catch {
+          setNote("A batch was cut short — trying it once more…");
+          await new Promise((z) => setTimeout(z, 2500));
+          j = await post({ offset });
+        }
         sent += Number(j.sent) || 0;
         for (const f of j.failed || []) failed.push({ name: f.name, why: f.why });
         offset = Number(j.done) || offset;
@@ -92,8 +106,9 @@ export default function SlipMail({ sheetId, status, onClose }: { sheetId: string
         if (!j.more) break;
       }
       setNote(`Done — ${sent} slips sent${failed.length ? `, ${failed.length} failed` : ""}.`);
-    } catch (e) { setNote(e instanceof Error ? e.message : String(e)); }
-    finally { setBusy(false); }
+    } catch (e) {
+      setNote(`${e instanceof Error ? e.message : String(e)} — ${sent} went out. Press Send again and it will carry on from there; nobody is sent twice.`);
+    } finally { setBusy(false); setChk(null); }
   };
 
   const box: React.CSSProperties = { border: `1px solid ${C.line}`, borderRadius: 6, padding: "6px 8px", width: "100%", fontSize: 13 };
@@ -167,6 +182,11 @@ export default function SlipMail({ sheetId, status, onClose }: { sheetId: string
           style={{ background: chk?.count ? "var(--green)" : "#E4E2DC", color: chk?.count ? "#fff" : "#9AA3AC", border: 0, borderRadius: 6, padding: "6px 14px", fontWeight: 700, fontSize: 13, cursor: chk?.count && !busy ? "pointer" : "default" }}>
           2 · Send to {chk?.count ?? 0}
         </button>
+        <label className="flex items-center gap-1.5" style={{ fontSize: 12, color: C.dim, cursor: "pointer" }}
+          title="Normally anybody already sent this month is skipped, so Send picks up where it stopped">
+          <input type="checkbox" checked={resend} onChange={(e) => { setResend(e.target.checked); setChk(null); }} />
+          send again to those already sent
+        </label>
         {note && <span style={{ fontSize: 12.5, color: /Done/.test(note) ? "var(--green)" : "#B3392E", fontWeight: 600 }}>{note}</span>}
       </div>
 
@@ -184,6 +204,11 @@ export default function SlipMail({ sheetId, status, onClose }: { sheetId: string
       {chk && (
         <div style={{ marginTop: 10, borderTop: `1px solid ${C.line}`, paddingTop: 9, fontSize: 12.5 }}>
           <div><b>{chk.count}</b> will get their slip for <b>{chk.period}</b>, each at their own personal address.</div>
+          {!!chk.already && (
+            <div style={{ color: C.dim, marginTop: 3 }}>
+              {chk.already} already had one this month and {resend ? "will be sent it again" : "are skipped — so this carries on from where it stopped"}.
+            </div>
+          )}
           {chk.sample.length > 0 && (
             <div style={{ color: C.dim, marginTop: 4 }}>
               For example: {chk.sample.map((s) => `${s.name} → ${s.to}`).join(" · ")}
