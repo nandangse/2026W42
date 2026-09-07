@@ -47,6 +47,7 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
   const [msg, setMsg] = useState("");
   const [q, setQ] = useState("");
   const [type, setType] = useState("");
+  const [band, setBand] = useState("");   // the four Staff/Workers × released bands
   const [dept, setDept] = useState("");
   const [age, setAge] = useState("");
   const [exp, setExp] = useState("");
@@ -84,11 +85,32 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
     return [...n.entries()].sort((a, b) => (a[0] === "— none named —" ? 1 : b[0] === "— none named —" ? -1 : b[1] - a[1] || a[0].localeCompare(b[0])));
   }, [rows]);
 
-  const shown = useMemo(() => {
+  /**
+ * THE FOUR BANDS (Dr Raghu, 7 Sep 2026: "show dropdown of the chosen type —
+ * Staff IDP not released, Staff IDP released, Worker IDP released, Workers
+ * IDP not released. Staff means both staff and contractors, workers means
+ * both labour and labour contract").
+ *
+ * One dropdown answers the only question being asked at this stage of the
+ * round: who is still waiting to be told. The two families are his, not the
+ * record's — the record knows four types, he thinks in two.
+ */
+const STAFF_TYPES = new Set(["Staff", "Contractor", "Consultant", "Intern", "Management"]);
+const WORKER_TYPES = new Set(["Labour", "Labour - Contract"]);
+const BANDS: [string, (t: string, released: boolean) => boolean][] = [
+  ["Staff, IDP not released", (t, rel) => STAFF_TYPES.has(t) && !rel],
+  ["Staff, IDP released", (t, rel) => STAFF_TYPES.has(t) && rel],
+  ["Workers, IDP not released", (t, rel) => WORKER_TYPES.has(t) && !rel],
+  ["Workers, IDP released", (t, rel) => WORKER_TYPES.has(t) && rel],
+];
+
+const shown = useMemo(() => {
     const n = q.trim().toLowerCase();
     const ageF = AGE_BANDS.find(([l]) => l === age)?.[1];
     const expF = EXP_BANDS.find(([l]) => l === exp)?.[1];
+    const bandF = BANDS.find(([l]) => l === band)?.[1];
     return (rows || []).filter((r) => {
+      if (bandF && !bandF(String(r.type || ""), !!r.released)) return false;
       if (type && r.type !== type) return false;
       if (dept && r.department !== dept) return false;
       if (mgrs.size && !mgrs.has((r.manager || "").trim() || "— none named —")) return false;
@@ -113,7 +135,7 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
       if (n && !`${r.id} ${r.name} ${r.designation || ""}`.toLowerCase().includes(n)) return false;
       return true;
     });
-  }, [rows, q, type, dept, mgrs, age, exp, minPay, maxPay]);
+  }, [rows, q, band, type, dept, mgrs, age, exp, minPay, maxPay]);
 
   /**
    * THE APPRAISAL TABLE ON PAPER.
@@ -330,6 +352,12 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
       <div className="flex gap-1.5 flex-wrap items-center mb-2 no-print">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search ID, name, designation…"
           className="text-xs rounded px-2.5 py-1.5" style={{ border: `1px solid ${C.line}`, width: 230 }} />
+        <select value={band} onChange={(e) => setBand(e.target.value)} className="text-xs rounded px-2 py-1.5 bg-white font-semibold"
+          style={{ border: `1px solid ${band ? C.ink : C.line}`, color: band ? C.ink : undefined }}
+          title="Staff means staff and contractors; workers means labour and labour on contract">
+          <option value="">Everyone</option>
+          {BANDS.map(([l]) => (<option key={l} value={l}>{l} ({(rows || []).filter((r) => BANDS.find(([k]) => k === l)![1](String(r.type || ""), !!r.released)).length})</option>))}
+        </select>
         <select value={type} onChange={(e) => setType(e.target.value)} className="text-xs rounded px-2 py-1.5 bg-white" style={{ border: `1px solid ${C.line}` }}>
           <option value="">All types</option>
           {types.map((t) => (<option key={t} value={t}>{t}</option>))}

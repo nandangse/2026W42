@@ -78,6 +78,23 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.9.0",
+    date: "2026-09-07",
+    module: "HRMS — Mass Communication: drafts, rooms, rich text, and the replies",
+    items: [
+      "HR'S OWN MAILBOX WAS CONNECTED ALL ALONG. \"check in vinay mandes profile. he told me its connected\" (Dr Raghu, 7 Sep 2026) — and it is: Vinay Mande connected hr@nandan.co.in from his own Genie account on 4 September, so the mailbox sits under his profile and no profile carries hr@ as its login. Genie was looking the address up by profile, so it answered \"Gmail not connected\" about a live mailbox. An address is now connected when a mailbox carries it, not when somebody signs in as it. hr@nandan.co.in can send from this minute.",
+      "SEND AS HR, THROUGH ANY MAILBOX. \"an option to also still send the mail as From: hr@nandan.co.in even though its from my mail id. Reply to should be to hr@nandan.co.in.\" Three boxes now: what carries it, what the reader sees, and where answers go. The answers-to line always works. The From line is Gmail's to allow — it only lets an account write another address when that address is a verified Send mail as alias in it, so the screen says so before you send and, if Gmail refuses, the failure says exactly that instead of a code.",
+      "COMPANY OR PERSONAL ADDRESS. \"also give choice of personal mail id / company mail id.\" Work e-mail and personal e-mail are two different fields on the record, and the dropdown says how many people each one would actually reach.",
+      "LC AND STRATCOM AS AUDIENCES. \"here also give option to send to stratcom and LC seperately too.\" The two rooms are ticks on the Genie profile, not on the HR record, so they are read from there and matched to the roll by any address the person holds. A room is a whole audience on its own — ticking LC means the LC, not the LC narrowed by a department somebody left ticked.",
+      "THE MAIL IS RICH TEXT. \"make the mail rick text.\" Bold, lists, links and pictures, the same editor as everywhere else in Genie — and the paragraphs survive the journey, which they did not when the body was typed as plain text and posted as HTML.",
+      "SAVE DRAFT, AND A MASS COMMUNICATION TAB. \"keep this as Save draft and in communication make a tab called Mass Communication ... show the drafted and sent ones. In communication of course keep all in line.\" Communications now has two tabs: All communication, every message in one line as before; and Mass Communication, the same messages seen as the campaigns that sent them. A draft keeps the words, the audience and the three address settings — not the attachment bytes, because a draft is a plan and the files are picked again when it goes. Open a sent one to see every line it sent (migration 0151).",
+      "THE REPLIES COME BACK HERE. \"any replies recieved also to be plonked here both for whatsapp and email.\" Every mail records the Gmail conversation it opened, and Pull replies reads those threads back and files each answer against the person who wrote it. WhatsApp answers arrive on their own thread and not on the mail's, so they are matched by person and by clock — anything inbound from someone on the campaign, after it left, shows on it.",
+      "IT WAS ALREADY ON THE RECORD, AND NOW IT IS TIED TO THE CAMPAIGN TOO. \"all communication sent from here should also link to the HRIS records as Communication.\" Every mass mail was already written against the employee, which is what the record's Communication tab reads; each line now also carries the campaign it belonged to, so the same message is reachable from either end.",
+      "THREE AT RANDOM, AND THE LIST. \"on checking show the samples 3 random and also the record to whom it will go.\" The check shows three people picked at random rather than the same first three, which is the only way it catches a template that breaks on somebody in the middle of the roll — and Show who it goes to lists every recipient with their ID, type, department and the exact address it will use, with anybody who has no address named in red.",
+      "FOUR BANDS ON THE APPRAISAL TABLE. \"show dropdown of the chosen type — Staff IDP not released, Staff IDP released, Workers IDP released, Workers IDP not released. Staff means both staff and contractors, workers means both labour and labour contract.\" One dropdown for the only question this stage of the round asks: who is still waiting to be told. Each band carries its count.",
+    ],
+  },
+  {
     v: "5.0.8.1",
     date: "2026-09-07",
     module: "No PDF button on Communications",

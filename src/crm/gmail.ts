@@ -91,6 +91,25 @@ export async function myMailbox(profileId: string) {
   return data ?? null;
 }
 
+/**
+ * The mailbox that IS this address, whoever connected it.
+ *
+ * Vinay Mande connected hr@nandan.co.in from his own Genie account, so the
+ * mailbox sits under his profile and no profile carries hr@ as its login.
+ * Looking the address up by profile therefore answered "not connected" about
+ * a mailbox that has been live since 4 September (Dr Raghu, 7 Sep 2026:
+ * "check in vinay mandes profile, he told me its connected"). An address is
+ * connected when a mailbox carries it — not when somebody signs in as it.
+ */
+export async function mailboxByAddress(address: string) {
+  const { data } = await crmDb().from("mailbox")
+    .select("id, email_address, status, credential_kind, last_error, profile_id")
+    .eq("email_address", address.toLowerCase())
+    .eq("credential_kind", "oauth_refresh_token")
+    .maybeSingle();
+  return data ?? null;
+}
+
 /** A fresh access token for a mailbox — refresh token stays in the Vault. */
 export async function accessTokenFor(mailboxId: string): Promise<string> {
   const db = crmDb();
@@ -133,6 +152,9 @@ export async function gmailSend(
   cc?: string, bcc?: string, fromName?: string,
   reply?: { threadId?: string | null; inReplyTo?: string | null },
   pixelUrl?: string | null,
+  /** Where an answer should go, when that is not the sending address
+   *  (Dr Raghu, 7 Sep 2026: HRMS mail from his account, answered to HR). */
+  replyTo?: string | null,
 ): Promise<string> {
   // The sender reads as the PERSON, not the address — RFC 2047-encoded so
   // any script in the name survives the wire.
@@ -144,6 +166,7 @@ export async function gmailSend(
     `To: ${to}`,
     ...(cc ? [`Cc: ${cc}`] : []),
     ...(bcc ? [`Bcc: ${bcc}`] : []),
+    ...(replyTo ? [`Reply-To: ${replyTo}`] : []),
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
     ...(reply?.inReplyTo ? [`In-Reply-To: ${reply.inReplyTo}`, `References: ${reply.inReplyTo}`] : []),
     "MIME-Version: 1.0",
@@ -252,7 +275,7 @@ export async function driveUploadAttachment(
 export async function gmailSendMixed(
   token: string, fromEmail: string, to: string, subject: string, htmlBody: string,
   attachments: { name: string; mime: string; base64: string }[],
-  cc?: string, bcc?: string, fromName?: string,
+  cc?: string, bcc?: string, fromName?: string, replyTo?: string | null,
 ): Promise<string> {
   const from = fromName
     ? `=?UTF-8?B?${Buffer.from(fromName).toString("base64")}?= <${fromEmail}>`
@@ -263,6 +286,7 @@ export async function gmailSendMixed(
     `To: ${to}`,
     ...(cc ? [`Cc: ${cc}`] : []),
     ...(bcc ? [`Bcc: ${bcc}`] : []),
+    ...(replyTo ? [`Reply-To: ${replyTo}`] : []),
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
     "MIME-Version: 1.0",
     `Content-Type: multipart/mixed; boundary="${bd}"`,
