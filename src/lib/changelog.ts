@@ -78,6 +78,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.5.1",
+    date: "2026-09-07",
+    module: "The version is back on the header, for every admin",
+    items: [
+      "\"i am not seeing the genie version ... we discussed this, all admins need to see it\" (Dr Raghu, 7 Sep 2026). Right: 5.0.1.0 read \"version number for admins only\" as \"tucked inside the account menu\", which meant nobody saw it. It sits on the header bar again, beside the app's name, on every door — visible to admins, hidden from everyone else, exactly as agreed.",
+    ],
+  },
+  {
     v: "5.0.5.0",
     date: "2026-09-07",
     module: "HRMS — the growth note, in his own voice",

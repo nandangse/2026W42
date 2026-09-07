@@ -102,7 +102,19 @@ export default function GenieShell({
             <img src={LOGO} alt="Nandan GSE" style={{ height: 24, display: "block" }} />
           </a>
           <div className="min-w-0">
-            <div className="font-bold text-white truncate" style={{ fontSize: 15, letterSpacing: 0.4, lineHeight: 1.15 }}>{title}</div>
+            <div className="font-bold text-white truncate flex items-center gap-1.5" style={{ fontSize: 15, letterSpacing: 0.4, lineHeight: 1.15 }}>
+              {title}
+              {/* The version, on the bar itself — every admin sees it without
+                  opening a menu (Dr Raghu, 7 Sep 2026: "i am not seeing the
+                  genie version ... we discussed this, all admins need to see
+                  it"). 5.0.1.0 had tucked it inside the account dropdown. */}
+              {isAdmin && (
+                <span className="tnum" style={{ background: ORANGE, color: "#fff", borderRadius: 3, padding: "1px 5px", fontSize: 10.5, fontWeight: 700, letterSpacing: 0 }}
+                  title="Genie's version — Admin → Updates says what changed">
+                  V {APP_VERSION}
+                </span>
+              )}
+            </div>
             {tagline && <div className="genie-tagline truncate" style={{ fontSize: 11, color: MUTED }}>{tagline}</div>}
           </div>
           <span className="ml-auto" />
