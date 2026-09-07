@@ -78,6 +78,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.8.0",
+    date: "2026-09-07",
+    module: "HRMS — one mail to many, from HR's own inbox",
+    items: [
+      "\"here make a button — Send mass email, template choice, from mail id hr@nandan.co.in / raghu@nandan.co.in, choose the OAuth of that for sending, variables to add on right side, attachment, send.\" (Dr Raghu, 7 Sep 2026). Communications carries that button.",
+      "FROM WHOSE INBOX. hr@nandan.co.in or raghu@nandan.co.in, and the mail leaves through that address's own connected Gmail — so it sits in that mailbox's Sent and replies come back to it, rather than arriving from somewhere nobody recognises. An address whose Gmail is not connected is offered but greyed, and says why.",
+      "WHO IT GOES TO. Tick types, tick departments, or leave both alone for the whole roll; the screen says how many are on it and how many have an e-mail on their record.",
+      "THE MAIL. Start from a saved text or write it. Every variable the employee master holds sits down the right — click one and it drops where the cursor is, in the subject or the body. Attach as many files as you like up to 8 MB together.",
+      "CHECK, THEN SEND. Check it first counts who will receive it, names anybody without an e-mail, names any variable that comes out blank for somebody, and shows the mail as the first person will actually see it. Sending goes forty at a time with a running count, and every one — sent or failed, with the reason — is written into the ledger, so it appears on this page and on that person's own Communication tab.",
+    ],
+  },
+  {
     v: "5.0.7.3",
     date: "2026-09-07",
     module: "The salary climb ends on the finalised number",
