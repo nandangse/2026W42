@@ -281,8 +281,25 @@ export function slipsFromRegister(
   return rows.map((r) => {
     const rec = record(String(r.employee_id)) || {};
     const g = (k: string) => rec[k];
-    const encashLeave = N(r.encash_amt) ?? 0, encashComp = N(r.compoff_amt) ?? 0;
+    const encashLeave = N(r.encash_amt) ?? 0;
     const compDays = N(r.compoff_days) ?? N(r.compoff) ?? 0;
+    /**
+     * COMP OFF IS PAID BUT NEVER ITEMISED (Dr Raghu, 7 Sep 2026: "the comp
+     * was 1742, and the leave encashment was 6968 — the total is correct").
+     *
+     * The sheet carries comp off as DAYS ("Comp Of_m") and has no comp-off
+     * amount column at all, so compoff_amt is null for all 205. Total
+     * Earnings includes the money regardless: 6390's parts add to 42,908
+     * against a total of 44,650, and the 1,742 missing is exactly his 1.5
+     * days at his 1,161 per day. The slip was therefore printing earnings
+     * that did not add up to its own total.
+     *
+     * Comp off is paid at the per-day rate, so days × per day IS the amount
+     * whenever the column is absent — the same fallback the uploaded-sheet
+     * path has had since 5 Sep. This path never got it.
+     */
+    const perDayOf = N(r.per_day) ?? (N(r.gross) ? (N(r.gross) as number) / 26 : 0);
+    const encashComp = N(r.compoff_amt) ?? (compDays > 0 && perDayOf ? Math.round(compDays * perDayOf) : 0) ?? 0;
     const encashedDays = N(r.leave_encashed) ?? 0;   // the sheet's own Leave Encashed
     const net = N(r.net) ?? 0;
     const s: Slip = {

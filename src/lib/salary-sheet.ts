@@ -206,7 +206,13 @@ const COLUMN_RULES: { key: keyof SheetRow | "skip"; test: (h: string) => boolean
   { key: "compoff_days", test: (h) => /^comp(ensatory)?of{1,2}(days|m)?$/.test(h) },
   { key: "loan_taken", test: (h) => /^loantakenm?$/.test(h) },
   { key: "encash_amt", test: (h) => /^leaveencashmentamount$/.test(h) },
-  { key: "site_allowance", test: (h) => /^siteallow(ance)?$/.test(h) },
+  /* NO RULE FOR "Site Allow" — IT IS NOT THE MONEY (found 7 Sep 2026).
+     The sheet carries BOTH "Site Allow" (the input, what he sets for a man
+     sent to site) and "Site Allowance" (what was earned by it). A rule of
+     mine matched "siteallow" as well as "siteallowance", and since the input
+     column stands earlier in the sheet it won — so 6030's earned 11,622 was
+     read as 0 and his slip stopped adding up. The correct rule was already
+     at the top of this list; this one only got in its way. */
   { key: "bonus", test: (h) => /^interimbonus$/.test(h) },
   { key: "lunch", test: (h) => /^lunch$/.test(h) },
   { key: "esi", test: (h) => /^esi(c)?$/.test(h) },

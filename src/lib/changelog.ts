@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.17.3",
+    date: "2026-09-07",
+    module: "The slip's earnings now add up to the slip's own total",
+    items: [
+      "\"The comp was 1742, and the leave encashment was 6968. The total is correct: 44,650\" (Dr Raghu, 7 Sep 2026). He was right on every figure. 6390's earnings printed 42,908 against a Total Earned of 44,650 — and the missing 1,742 was exactly his 1.5 comp-off days at his 1,161 per day. <b>Before this, only 45 of the 205 slips had earnings that added up to their own total.</b> Now 189 do exactly, and 4 more within a few rupees of comp-off rounding.",
+      "COMP OFF IS PAID BUT WAS ITEMISED NOWHERE. The sheet carries comp off as DAYS and has no comp-off amount column at all, so the figure was null for all 205 while Total Earnings included the money regardless. Comp off is paid at the per-day rate, so days × per day IS the amount when the column is absent — the uploaded-sheet path has done this since 5 Sep; the generated-register path, which is what August uses, never got it.",
+      "AND SITE ALLOWANCE WAS READING THE WRONG COLUMN — mine, from this morning. The sheet carries BOTH \"Site Allow\" (the input, what is set for a man sent to site) and \"Site Allowance\" (what he earned by it). A rule I added yesterday matched the first as well as the second, and being earlier in the sheet the input won: 6030's earned <b>11,622 was read as 0</b>. The correct rule was already there; mine only got in its way, and is gone.",
+      "RE-UPLOAD AUGUST for both to take effect — the columns are matched at upload, so the stored register still carries the old mapping.",
+    ],
+  },
+  {
     v: "5.0.17.2",
     date: "2026-09-07",
     module: "Leave encashment on the slip, said once and said right",
