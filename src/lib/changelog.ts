@@ -78,6 +78,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.4.1",
+    date: "2026-09-07",
+    module: "A dead landing link answers properly",
+    items: [
+      "Checked after shipping: a landing address with no page behind it rendered an empty screen and answered 200, and would have shown a stranger Genie's own wrong-page screen with a Sign in button. It now has its own: the Nandan mark, one honest line, and the way to reach sales — and it answers 404, so a search engine drops the link rather than keeping it.",
+    ],
+  },
+  {
     v: "5.0.4.0",
     date: "2026-09-07",
     module: "Marketing — landing pages, and Genie hosts its own pictures",
