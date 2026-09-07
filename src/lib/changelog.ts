@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.5.0",
+    date: "2026-09-07",
+    module: "HRMS — the growth note, in his own voice",
+    items: [
+      "\"also show the growth note of CHRO. Write this in Raghu's voice to the person directly. Use first person and also use his name at least 2 to 3 times. For the workers mention this in Hindi also.\" (Dr Raghu, 7 Sep 2026). A Growth note tab on the Report Card, beside Raghu's brief. The brief is for him before the sit-down; this is the note the person is handed — written as he speaks, to them, saying I and you.",
+      "WHAT IT SAYS. Five short paragraphs, no headings: what I have seen in you this year; what you do well and why it matters to Nandan; where I want you to grow, concrete enough to act on Monday; what I and the company will do to help; and a close carrying an expectation and the belief behind it. Their first name two or three times, placed naturally. Written from the role as written, their own IDP words and their manager's — it invents no event, no number and no customer, and it never mentions salary or the increment.",
+      "IN HINDI FOR THE FLOOR. When the record says Labour, the same note comes back in Devanagari as well — the आप form, short sentences, the Hindi a Mumbai shop floor actually speaks, carrying the meaning rather than translating word for word. Both sit on the card, each with a copy button, kept on the cycle so it is written once and read many times. Migration 0148.",
+    ],
+  },
+  {
     v: "5.0.4.2",
     date: "2026-09-07",
     module: "HRMS — the Appraisal Table filters by reporting manager",

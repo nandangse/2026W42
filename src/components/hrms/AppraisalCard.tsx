@@ -50,7 +50,7 @@ interface PersonData {
   } | null;
 }
 
-const TABS = ["Self IDP", "Manager IDP comment", "Finalised IDP for Employee", "Raghu's brief", "Finalised discussion", "Appraisal Final"] as const;
+const TABS = ["Self IDP", "Manager IDP comment", "Finalised IDP for Employee", "Raghu's brief", "Growth note", "Finalised discussion", "Appraisal Final"] as const;
 
 export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: boolean }) {
   const [people, setPeople] = useState<ListRow[] | null>(null);
@@ -139,6 +139,7 @@ export default function AppraisalCard({ who, isOwner }: { who: string; isOwner: 
           {tab === "Manager IDP comment" && <ManagerTab d={d} />}
           {tab === "Finalised IDP for Employee" && <FinalisedTab d={d} />}
           {tab === "Raghu's brief" && <RaghuBriefTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
+          {tab === "Growth note" && <GrowthNoteTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
           {tab === "Finalised discussion" && <DiscussionTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
           {tab === "Appraisal Final" && <AppraisalTab d={d} isOwner={isOwner} onSaved={() => load(pick)} />}
         </>
@@ -301,6 +302,70 @@ function RaghuBriefTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolea
       {text
         ? <div className="text-sm rounded border p-3" style={{ borderColor: "#D9CBF5", whiteSpace: "pre-wrap", lineHeight: 1.65, background: "#FBFAFE" }}>{text}</div>
         : <div className="text-sm" style={{ color: C.faint }}>{isOwner ? "Not written yet — ✨ writes it from the role, the IDP and the reviews." : "Not written yet — RJ writes this one."}</div>}
+    </div>
+  );
+}
+
+/**
+ * THE GROWTH NOTE (Dr Raghu, 7 Sep 2026): "also show the growth note of
+ * CHRO. Write this in Raghu's voice to the person directly. Use first
+ * person and also use his name at least 2 to 3 times. For the workers
+ * mention this in Hindi also."
+ *
+ * Not the brief — the brief is for him before the sit-down. This is the
+ * note the person is handed, written as he would speak to them, and in
+ * Hindi as well for anybody on the floor.
+ */
+function GrowthNoteTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean; onSaved: () => void }) {
+  const ap = d.appraisal as Record<string, unknown> | null;
+  const [live, setLive] = useState<{ en: string; hi: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const en = live ? live.en : ap?.growth_note ? String(ap.growth_note) : "";
+  const hi = live ? live.hi : ap?.growth_note_hi ? String(ap.growth_note_hi) : "";
+  const at = ap?.growth_note_at ? String(ap.growth_note_at) : null;
+  const floor = /labour|worker/i.test(String(d.employee.type || ""));
+  const run = async () => {
+    setBusy(true); setMsg("");
+    try {
+      const r = await api.post("/api/hrms/idp", { action: "growth-note", employee_id: d.employee.id });
+      setLive({ en: String(r.en || ""), hi: String(r.hi || "") });
+      setMsg("Written ✓ — kept on the cycle"); onSaved();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+  const copy = (t: string) => { try { navigator.clipboard.writeText(t); setMsg("copied ✓"); } catch { setMsg("could not copy"); } };
+  const box = (text: string, label: string, hindi?: boolean) => (
+    <div className="mt-3">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="text-xs font-bold" style={{ color: C.faint, letterSpacing: 0.6 }}>{label}</div>
+        <button onClick={() => copy(text)} className="text-xs font-semibold" style={{ color: "var(--blue)" }}>copy</button>
+      </div>
+      <div className="text-sm rounded border p-4" style={{ borderColor: hindi ? "#F5D9B8" : "#CFE3D4", background: hindi ? "#FFFBF5" : "#F8FBF9", whiteSpace: "pre-wrap", lineHeight: hindi ? 1.9 : 1.75 }}>
+        {text}
+      </div>
+    </div>
+  );
+  return (
+    <div className="bg-white rounded-lg border p-4" style={{ borderColor: C.line, maxWidth: 800 }}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="font-bold" style={{ fontSize: 15 }}>Growth note — from me to {d.employee.name.split(" ")[0]}</div>
+        {isOwner && (
+          <button onClick={run} disabled={busy} className="rounded px-3 py-1.5 text-xs font-bold text-white ml-auto" style={{ background: busy ? "#B9BEC4" : "#0D7A3F" }}>
+            {busy ? "Writing…" : en ? "✨ Write it afresh" : "✨ Write the note"}
+          </button>
+        )}
+      </div>
+      <p className="text-xs mb-1" style={{ color: C.dim, lineHeight: 1.55 }}>
+        The note the person is handed, in my own voice and addressed to them: what I have seen, what they do well, where
+        I want them to grow, what we will do to help, and what I expect. Written from the role, their IDP and their
+        manager&apos;s words — never from money.{floor ? " In Hindi as well, because they work on the floor." : ""}
+        {at && <> · last written {new Date(String(at)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</>}
+      </p>
+      {msg && <div className="text-xs font-semibold" style={{ color: msg.includes("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
+      {en
+        ? <>{box(en, "IN ENGLISH")}{hi ? box(hi, "हिंदी में", true) : null}</>
+        : <div className="text-sm mt-2" style={{ color: C.faint }}>{isOwner ? "Not written yet — ✨ writes it from the role, their IDP and the manager's words." : "Not written yet."}</div>}
     </div>
   );
 }

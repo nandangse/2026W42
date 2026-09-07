@@ -497,6 +497,93 @@ export async function POST(req: Request) {
     // the FINALISED DISCUSSION (29 Aug 2026): date · attendees · link · MoM ·
     // Note from Raghu — kept on the cycle row; the note rides into the IDP
     // letter later.
+    /**
+     * { action: "growth-note", employee_id } — THE GROWTH NOTE (Dr Raghu,
+     * 7 Sep 2026): "write this in Raghu's voice to the person directly. Use
+     * first person and also use his name at least 2 to 3 times. For the
+     * workers mention this in Hindi also."
+     *
+     * Not a brief about them — a letter to them, in his voice, of the
+     * quality a good CHRO would write. Hindi beside it for Labour, because
+     * a note the person cannot read is not a note. Grounded in the same
+     * record as the brief; it invents nothing and never mentions money.
+     */
+    if (String(body.action || "") === "growth-note") {
+      const key = process.env.ANTHROPIC_API_KEY;
+      if (!key) throw new HttpError(503, "ANTHROPIC_API_KEY is not set on this deploy.");
+      const employee_id = String(body.employee_id || "");
+      if (!employee_id) throw new HttpError(400, "employee_id required");
+      const T = await hrmsTables(admin);
+      const { data: emp } = await admin.from(T.employees).select("id, name, department, designation, doj, extra").eq("id", employee_id).maybeSingle();
+      if (!emp) throw new HttpError(404, "no such person");
+      const extra = (emp.extra || {}) as Record<string, string>;
+      const { data: edits } = await admin.from(T.edits).select("field, value").eq("employee_id", employee_id).in("field", ["type", "designation", "department", "reporting_manager"]);
+      const ed = new Map((edits || []).map((r) => [String(r.field), r.value == null ? "" : String(r.value)]));
+      const type = ed.get("type") || extra["Type"] || "";
+      const wantHindi = /labour|worker|shop\s*floor/i.test(type);
+
+      const { data: roleRow } = await admin.from("hrms_role").select("role, job_description, deliverable, metric")
+        .ilike("role", String(ed.get("designation") || emp.designation || "")).limit(1).maybeSingle();
+      const { data: idpRows } = await admin.from("hrms_idp").select("id, answers, ratings, submitted_at").eq("employee_id", employee_id).eq("cycle", "2026-27").order("submitted_at", { ascending: false }).limit(1);
+      const idp = idpRows?.[0];
+      let reviews: { notes: string | null; analysis: string | null }[] = [];
+      if (idp?.id) {
+        const { data: rv } = await admin.from("hrms_idp_review").select("notes, analysis").eq("idp_id", idp.id);
+        reviews = (rv || []) as typeof reviews;
+      }
+      const answers = { ...((idp?.answers || {}) as Record<string, string>) };
+      delete answers["ask_gross"];
+      const material =
+        `PERSON: ${emp.name}\nDESIGNATION: ${ed.get("designation") || emp.designation || "—"}\nDEPARTMENT: ${ed.get("department") || emp.department || "—"}\n` +
+        `TYPE: ${type || "—"}\nWITH NANDAN SINCE: ${emp.doj || "—"}\nREPORTS TO: ${ed.get("reporting_manager") || extra["Reporting Manager"] || "—"}\n\n` +
+        (roleRow ? `THE ROLE AS WRITTEN: ${roleRow.role}\nWhat the job is: ${roleRow.job_description || ""}\nWhat they must deliver: ${roleRow.deliverable || ""}\nHow it is measured: ${roleRow.metric || ""}\n\n` : "") +
+        (idp ? `THEIR OWN WORDS IN THIS YEAR'S IDP:\n${Object.entries(answers).map(([k, v]) => `${k}: ${String(v).slice(0, 900)}`).join("\n")}\n\n` : "NO IDP SUBMITTED THIS YEAR.\n\n") +
+        (reviews.length ? `WHAT THEIR MANAGER WROTE:\n${reviews.map((r) => [r.notes, r.analysis].filter(Boolean).join(" · ")).join("\n")}\n` : "THE MANAGER HAS NOT WRITTEN YET.\n");
+
+      const system = [
+        "You are the finest CHRO in the country, holding the pen for Dr Raghunandan Jagdish — Dr Raghu — Managing Director of Nandan GSE, which has built ground support equipment for Indian airports out of Mumbai since 1994.",
+        "You are writing the GROWTH NOTE he hands a person at their appraisal.",
+        "",
+        "WRITE AS DR RAGHU, IN THE FIRST PERSON — 'I have watched', 'I want you to', 'I will'. Speak TO the person, never about them. Use their first name two or three times, placed naturally; never more.",
+        "",
+        "Five short paragraphs, no headings, no bullet points, 220 to 300 words:",
+        "1. What I have seen in you this year, specific, from the record.",
+        "2. What you do well, and why it matters to Nandan.",
+        "3. Where I want you to grow this coming year — one or two things, concrete enough to act on Monday.",
+        "4. What I and the company will do to help that happen.",
+        "5. A close in my own voice: an expectation, and the belief behind it.",
+        "",
+        "RULES. Plain English a person reads once and understands. Warm, and straight — never flattery, never a lecture. No jargon: no synergy, no leverage, no bandwidth, no journey. Never invent an event, a number, a project or a customer that is not in the material; where the record is thin, speak to the role and to character rather than pretending to know. Never mention salary, increment or the appraisal figure. Never suggest a machine wrote it.",
+        wantHindi
+          ? "THIS PERSON WORKS ON THE FLOOR. Write the same note again in simple, respectful Hindi in Devanagari — the आप form, short sentences, the Hindi a Mumbai shop floor actually speaks. Carry the same meaning rather than translating word for word; keep the person's name in Roman letters as written."
+          : "Hindi is not needed for this person.",
+        "",
+        'Answer as JSON only: {"en": "the note", "hi": "the Hindi note, or an empty string"}',
+      ].join("\n");
+
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model: AI.FRONT, max_tokens: 3000, system, messages: [{ role: "user", content: material.slice(0, 60000) }] }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new HttpError(502, (j as { error?: { message?: string } })?.error?.message || `Anthropic returned ${res.status}`);
+      const raw = ((j as { content?: { type: string; text: string }[] }).content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n").trim();
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (!m) throw new HttpError(502, "Genie did not answer in the expected shape — try once more.");
+      const parsed = JSON.parse(m[0]) as { en?: string; hi?: string };
+      const en = String(parsed.en || "").trim();
+      const hi = String(parsed.hi || "").trim();
+      if (!en) throw new HttpError(502, "Genie came back empty — try once more.");
+      const { error } = await admin.from("hrms_appraisal").upsert(
+        { employee_id, cycle: "2026-27", growth_note: en, growth_note_hi: hi || null, growth_note_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+        { onConflict: "employee_id,cycle" });
+      if (error && /growth_note|schema cache/i.test(error.message))
+        throw new HttpError(503, "Run migration 0148 first — the growth note has nowhere to live yet.");
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, en, hi, hindi: wantHindi });
+    }
+
     if (String(body.action || "") === "appraisal-discussion") {
       const employee_id = String(body.employee_id || "");
       if (!employee_id) throw new HttpError(400, "employee_id required");
