@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.15.5",
+    date: "2026-09-07",
+    module: "The register PDF, pinned to the page",
+    items: [
+      "\"PDF still breaking\" (Dr Raghu, 7 Sep 2026). Splitting the ledgers off was necessary but not sufficient, and the reason is worth writing down: the sheet was set to <b>width: 100%</b>, and 100% means 100% OF THE BODY — which stretches to whatever the widest thing on the page is. The charts and the by-type table above the register were setting that width, and the register inherited it and walked off the right edge.",
+      "It is stated in millimetres now. A4 landscape is 297mm; less the 8mm margins, 281mm. Pinned outright, the sheet cannot be stretched by anything else on the page, and nothing above it is allowed to exceed the paper either.",
+      "Two lessons in one evening about the same table: a fixed layout only holds the COLUMNS to the table's width — it says nothing about how wide the table itself has been told to be.",
+    ],
+  },
+  {
     v: "5.0.15.4",
     date: "2026-09-07",
     module: "The stamp goes in the corner, and four samples chosen by shape",
