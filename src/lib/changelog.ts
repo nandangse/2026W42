@@ -78,6 +78,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.10.1",
+    date: "2026-09-07",
+    module: "The attendance route, buildable",
+    items: [
+      "5.0.10.0 did not deploy: its attendance route exported the calendar-week helper, and a Next.js route file may export only its handlers. Vercel refused the build, so nothing live ever carried it — but I pushed on a build I had already been told had failed, because the check I wrote to stop exactly that did not gate the push. The helper now lives in src/lib/attendance.ts, where it belongs.",
+    ],
+  },
+  {
     v: "5.0.10.0",
     date: "2026-09-07",
     module: "The Individual Report Card — one person, one page",

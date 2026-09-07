@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import type { Muster, MusterRow } from "@/lib/muster";
+import { weeksOf, type Week } from "@/lib/attendance";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -23,39 +24,6 @@ export const maxDuration = 60;
  * NEVER THE WORD OT. "We should not use the word OT anywhere. Just write ET,
  * which means extra time" — the muster's own column is read, the label is his.
  */
-
-/** Sunday-start calendar weeks, clipped to the month. */
-export interface Week { n: number; from: number; to: number; present: number; absent: number; marks: string[] }
-
-const PRESENT = /^(p|hd|h\/d|pl?|present)$/i;
-const ABSENT = /^(a|abs|absent|lwp)$/i;
-
-/**
- * The month's days grouped into calendar weeks running Sunday to Saturday.
- * A month can straddle six such weeks; his rule is five, so a final stub of
- * a day or two joins the fifth rather than standing as a week of its own.
- */
-export function weeksOf(year: number, month: number, days: string[]): Week[] {
-  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const out: Week[] = [];
-  let from = 1;
-  while (from <= last) {
-    const dow = new Date(Date.UTC(year, month - 1, from)).getUTCDay();  // 0 = Sunday
-    const to = Math.min(last, from + (6 - dow));
-    out.push({ n: out.length + 1, from, to, present: 0, absent: 0, marks: [] });
-    from = to + 1;
-  }
-  while (out.length > 5) {
-    const stub = out.pop()!;
-    out[out.length - 1].to = stub.to;
-  }
-  for (const w of out) {
-    w.marks = days.slice(w.from - 1, w.to);
-    w.present = w.marks.filter((m) => PRESENT.test(String(m || "").trim())).length;
-    w.absent = w.marks.filter((m) => ABSENT.test(String(m || "").trim())).length;
-  }
-  return out;
-}
 
 export async function GET(req: Request) {
   try {
