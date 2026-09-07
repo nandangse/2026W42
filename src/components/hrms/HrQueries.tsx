@@ -17,6 +17,7 @@ import { fmtFull } from "@/lib/schedule";
 import { SECTIONS, FREE_TEXT, INTRO_EN, INTRO_HI, formToText, type HrQueryForm } from "@/lib/hr-query-form";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
+import { queryLine, genericSubject } from "@/lib/query-line";
 
 interface Row {
   id: string; employee_id: string | null; person: string | null; subject: string; question: string; status: string;
@@ -210,12 +211,21 @@ function QueryCard({ r, hr, expanded, onToggle, onChanged }: { r: Row; hr: boole
   };
   const answered = r.status !== "Open";
   const c = r.form?.contact;
+  /**
+   * The row says what was actually asked. A list of "HR query · HR query ·
+   * HR query" tells nobody anything, and the one line that matters was
+   * hidden behind the chevron (Dr Raghu, 7 Sep 2026).
+   */
+  const line = queryLine(r.question, r.subject);
+  const generic = genericSubject(r.subject);
+  const title = generic && line ? line : r.subject;
+  const under = !generic && line && line !== r.subject ? line : "";
   return (
     <div className="bg-white rounded-lg border mb-2" style={{ borderColor: C.line, borderLeft: `4px solid ${answered ? "var(--green)" : "var(--accent)"}` }}>
       <button onClick={onToggle} className="w-full text-left px-3 py-2.5">
         <div className="flex items-baseline gap-2 flex-wrap">
           {String(r.subject || "").startsWith("Application") && <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#E6F0FA", color: "var(--blue)", fontSize: 10 }}>APPLICATION</span>}
-          <span className="font-bold" style={{ fontSize: 13.5 }}>{r.subject}</span>
+          <span className="font-bold" style={{ fontSize: 13.5 }}>{title}</span>
           {(r.person || c?.name) && <span style={{ fontSize: 12, color: C.faint }}>· {r.employee_id || c?.employee_id} {r.person || c?.name}</span>}
           {!r.for_self && <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#DCE8F5", color: "var(--blue)" }}>raised by HR</span>}
           <div style={{ flex: 1 }} />
@@ -224,6 +234,9 @@ function QueryCard({ r, hr, expanded, onToggle, onChanged }: { r: Row; hr: boole
             : <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: "#FFF3E8", color: "#8A5B00" }}>open</span>}
           <span style={{ color: C.faint, fontSize: 12 }}>{expanded ? "▲" : "▼"}</span>
         </div>
+        {under && (
+          <div style={{ fontSize: 12.5, color: C.dim, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{under}</div>
+        )}
       </button>
       {expanded && (
         <div className="px-3 pb-3">

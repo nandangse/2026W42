@@ -19,6 +19,7 @@ import { fmtFull } from "@/lib/schedule";
 import { MONTHS } from "@/lib/hrms-template";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
+import { queryLine, genericSubject } from "@/lib/query-line";
 
 type Sheet = {
   linked: boolean;
@@ -352,7 +353,7 @@ function Queries({ d }: { d: Sheet }) {
         <div key={q.id} className="px-3 py-2" style={{ borderTop: i ? "1px solid #F1EFE9" : undefined }}>
           <div className="flex gap-2 items-baseline text-xs flex-wrap">
             <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: q.status === "Open" ? "#FFF3E8" : "#E6F4EA", color: q.status === "Open" ? "#8A5B00" : "var(--green)", fontSize: 10 }}>{q.status}</span>
-            <b>{q.subject || q.topic}</b>
+            <b>{genericSubject(q.subject) ? (queryLine(q.question, q.subject) || q.topic) : q.subject}</b>
             <span style={{ flex: 1 }} />
             <span style={{ color: C.faint }}>{fmtFull(String(q.raised_at))}</span>
           </div>

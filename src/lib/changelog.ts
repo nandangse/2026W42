@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.10.4",
+    date: "2026-09-07",
+    module: "HR queries say what was asked",
+    items: [
+      "\"In the HR queries make it a one sentence of all the queries he has raised. The ones raised by Vinay are also important.\" (Dr Raghu, 7 Sep 2026). Six rows all reading <b>HR query</b> told nobody anything, and the sentence that mattered was hidden behind the chevron.",
+      "Each row now carries the query in one line — and it is the person's OWN words where they wrote any: \"Please give me site allowance as I am staying in Dhamani village\", \"Please increase my salary rate\". Where they only ticked boxes, the ticks are the line; on an application it is the reason they gave — \"Going to hometown for Vinayaka Chaturthi\". The subject is used last, because the subject is where we started.",
+      "A query is stored as the whole form — Genie's question, the ticks, then whatever was typed. The line strips the form's own prompts, so the row reads as somebody speaking rather than as a questionnaire. The ones Vinay raises for a worker read the same way as the ones a person raises for themselves, which is the point: they are the ones with nobody else to ask.",
+      "The same line shows on the Individual Report Card's HR queries.",
+    ],
+  },
+  {
     v: "5.0.10.3",
     date: "2026-09-07",
     module: "The counts follow the work, across tabs",
