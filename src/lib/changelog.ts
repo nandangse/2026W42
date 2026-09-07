@@ -78,6 +78,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.9.1",
+    date: "2026-09-07",
+    module: "Nobody sends as somebody else",
+    items: [
+      "\"vinay cant send as me!\" (Dr Raghu, 7 Sep 2026). He could have, and that was mine to catch: the Shown as box offered both addresses to whoever opened it. Sending THROUGH a mailbox and being SEEN AS an address are different powers — anybody in HRMS may send through hr@nandan.co.in, and the mail honestly says so, but a mail leaving Vinay's hands reading as though Dr Raghu wrote it is not a convenience, it is a forgery, and the person answering it would never know.",
+      "An address may now be shown only when it is the mailbox actually carrying the mail, or the signed-in person's own. Refused on the server as well as hidden on the screen, so it does not depend on the dropdown. Dr Raghu is excepted — he asked to send as HR, and it is his company.",
+    ],
+  },
+  {
     v: "5.0.9.0",
     date: "2026-09-07",
     module: "HRMS — Mass Communication: drafts, rooms, rich text, and the replies",

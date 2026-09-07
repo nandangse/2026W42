@@ -82,6 +82,24 @@ async function boxFor(email: string) {
   return rp?.id ? await myMailbox(String(rp.id)) : null;
 }
 
+/**
+ * WHOSE NAME MAY GO ON A MAIL (Dr Raghu, 7 Sep 2026: "vinay cant send as
+ * me!").
+ *
+ * Sending THROUGH a mailbox and being SEEN AS an address are different
+ * powers. Anybody in HRMS may send through hr@nandan.co.in — that is HR's
+ * mailbox and the mail honestly says so. Nobody may put another person's
+ * address on the From line: a mail from Vinay's hands that reads as though
+ * Dr Raghu wrote it is not a convenience, it is a forgery, and the person
+ * answering it would never know.
+ *
+ * So an address may be shown only when it is the mailbox actually carrying
+ * the mail, or the signed-in person's own address. The owner is excepted
+ * because it is his company and his own instruction — he asked to send as HR.
+ */
+const showAsFor = (me: { email: string; isOwner?: boolean }) =>
+  me.isOwner ? [...FROM_ALLOWED] : FROM_ALLOWED.filter((a) => a === me.email.toLowerCase());
+
 async function senderFor(email: string) {
   const e = email.toLowerCase();
   if (!FROM_ALLOWED.includes(e)) throw new HttpError(400, `Mail can go from ${FROM_ALLOWED.join(" or ")} — not ${e}.`);
@@ -159,7 +177,7 @@ async function campaignLines(admin: ReturnType<typeof adminClient>, id: string) 
  *  audience, and (?list=1) the campaigns drafted and sent. */
 export async function GET(req: Request) {
   try {
-    await requireHrms();
+    const me = await requireHrms();
     const admin = adminClient();
     const sp = new URL(req.url).searchParams;
     if (sp.get("list")) return NextResponse.json(await campaigns(admin));
@@ -186,7 +204,7 @@ export async function GET(req: Request) {
     const seen = new Set<string>();
     const vars = variables.filter((v) => (seen.has(v.key) ? false : (seen.add(v.key), true)));
     return NextResponse.json({
-      froms, templates, variables: vars,
+      froms, templates, variables: vars, mayShowAs: showAsFor(me),
       types: [...new Set(all.map((p) => p.type).filter(Boolean))].sort(),
       departments: [...new Set(all.map((p) => p.department).filter(Boolean))].sort(),
       total: all.length,
@@ -354,6 +372,8 @@ export async function POST(req: Request) {
        * or quietly rewrites the header. So the answer is checked and said
        * plainly rather than assumed.
        */
+      if (showAs && showAs !== fromEmail && !showAsFor(u).includes(showAs))
+        throw new HttpError(403, `A mail may not go out reading as ${showAs} — that is not your address, and not the mailbox carrying it. Send it through ${showAs} instead, or leave the From line as ${fromEmail}.`);
       const headerFrom = showAs && FROM_ALLOWED.includes(showAs) ? showAs : fromEmail;
       const fromName = headerFrom === "hr@nandan.co.in" ? "Nandan GSE HR" : "Nandan GSE";
       const atts = (Array.isArray(b.attachments) ? b.attachments : []) as { name: string; mime: string; base64: string }[];

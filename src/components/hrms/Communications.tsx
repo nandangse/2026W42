@@ -236,6 +236,8 @@ type Boot = {
   variables: { key: string; label: string }[];
   types: string[]; departments: string[]; total: number; withEmail: number;
   withCompany: number; withPersonal: number;
+  /** The addresses THIS person may put on a From line — never somebody else's. */
+  mayShowAs: string[];
   groups: { key: string; label: string; count: number; title: string }[];
 };
 type Pre = {
@@ -374,10 +376,12 @@ function MassEmail({ draft, onClose }: { draft: Camp | null; onClose: () => void
                     as From: hr@nandan.co.in even though its from my mail id.
                     Reply to should be to hr@nandan.co.in." */}
                 <div className="grid gap-2 mb-2" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
+                  {/* Dr Raghu, 7 Sep 2026: "vinay cant send as me!" — only
+                      your own address, or the mailbox actually carrying it. */}
                   <label className="text-xs font-bold" style={{ color: C.dim }}>SHOWN AS — what the reader sees
                     <select value={fromAs} onChange={(e) => setFromAs(e.target.value)} style={{ ...inp, marginTop: 3 }}>
                       <option value="">the same address it goes through</option>
-                      {boot.froms.map((f) => <option key={f.email} value={f.email}>{f.email}</option>)}
+                      {(boot.mayShowAs || []).filter((a) => a !== from).map((a) => <option key={a} value={a}>{a}</option>)}
                     </select>
                   </label>
                   <label className="text-xs font-bold" style={{ color: C.dim }}>ANSWERS GO TO
@@ -398,6 +402,11 @@ function MassEmail({ draft, onClose }: { draft: Camp | null; onClose: () => void
                 {fromAs && fromAs !== from && (
                   <div className="text-xs mb-2 rounded px-2 py-1.5" style={{ background: "#FFF6E5", color: "#8A5B00" }}>
                     Gmail only lets {from} write {fromAs} on a mail when {fromAs} is a verified <b>Send mail as</b> address in that account&apos;s settings. If it is not, Gmail refuses the send and the check will say so. The answers-to line always works.
+                  </div>
+                )}
+                {!(boot.mayShowAs || []).filter((a) => a !== from).length && (
+                  <div className="text-xs mb-2" style={{ color: C.faint }}>
+                    The mail will read as {from}. Nobody may put another person&apos;s address on the From line — only the mailbox carrying it, or your own.
                   </div>
                 )}
 
