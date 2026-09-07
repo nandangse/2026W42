@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import IdpDiscussion from "@/components/IdpDiscussion";
+import { idpSession } from "@/lib/idp-session";
+import { adminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,20 @@ export const dynamic = "force-dynamic";
  */
 export default async function IdpPage() {
   const user = await currentUser();
-  if (!user || user.disabled) redirect("/login");
-  return <IdpDiscussion name={user.displayName || user.email.split("@")[0]} initials={user.initials} />;
+  if (user && !user.disabled)
+    return <IdpDiscussion name={user.displayName || user.email.split("@")[0]} initials={user.initials} />;
+
+  /**
+   * NOT EVERY EMPLOYEE HAS A GENIE LOGIN (Dr Raghu, 7 Sep 2026: "whoever is
+   * logged into Genie already can access their records; whoever is not can
+   * use their personal email ID"). The workers sign in with the personal
+   * address and the password HR issued, which sets its own cookie.
+   */
+  const who = await idpSession();
+  if (who) {
+    const { data } = await adminClient().from("hrms_employees").select("name").eq("id", who).maybeSingle();
+    const nm = String(data?.name || who);
+    return <IdpDiscussion name={nm.split(" ")[0]} initials={null} />;
+  }
+  redirect("/idp/sign-in");
 }

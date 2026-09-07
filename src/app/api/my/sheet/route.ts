@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { idpSession } from "@/lib/idp-session";
 import { readBody } from "@/lib/validate";
 import { swallow } from "@/lib/swallow";
 import * as XLSX from "xlsx";
@@ -67,7 +68,15 @@ async function me(email: string) {
 
 export async function GET(req: Request) {
   try {
-    const u = await requireUser();
+    /**
+     * A person signed in with their PERSONAL e-mail has no Genie user
+     * (Dr Raghu, 7 Sep 2026). Their cookie proves exactly one thing — which
+     * employee they are — so the sheet is served for that employee and can
+     * name nobody else. Everything below reads from `p` and `subject`, which
+     * is why this needs no second copy of the assembly.
+     */
+    const viaIdp = await idpSession();
+    const u = viaIdp ? null : await requireUser();
     const admin = adminClient();
 
     /**
@@ -80,10 +89,14 @@ export async function GET(req: Request) {
      * HRMS key; without the parameter nothing changes, and there is still no
      * way for an ordinary login to name a person other than themselves.
      */
-    const asked = new URL(req.url).searchParams.get("person");
+    const asked = viaIdp ? null : new URL(req.url).searchParams.get("person");
     let p: Awaited<ReturnType<typeof me>> = null;
-    let subject = u.email;
-    if (asked) {
+    let subject = u?.email ?? "";
+    if (viaIdp) {
+      p = (await people(admin, [viaIdp]))[0] || null;
+      const pv = (p?.value || {}) as Record<string, string | null>;
+      subject = String(pv.user_email || pv.email || pv.personal_email || "").trim().toLowerCase();
+    } else if (asked) {
       await requireHrms();
       p = (await people(admin, [asked]))[0] || null;
       if (!p) throw new HttpError(404, "No such person on the roll.");
@@ -92,9 +105,9 @@ export async function GET(req: Request) {
       // own e-mail, which is the Genie login on the record before the work one.
       subject = String(pv.user_email || pv.email || "").trim().toLowerCase();
     } else {
-      p = await me(u.email);
+      p = await me(u!.email);
     }
-    if (!p) return NextResponse.json({ linked: false, name: u.displayName || u.email, email: u.email });
+    if (!p) return NextResponse.json({ linked: false, name: u?.displayName || u?.email || "", email: u?.email || "" });
     const v = p.value as Record<string, string | null>;
 
     // ---- the record, in the groups the person reads ----
@@ -170,14 +183,21 @@ export async function GET(req: Request) {
 /** POST { action: apply, kind, fields } · { action: learning, note } · { action: learning_remove, id } */
 export async function POST(req: Request) {
   try {
-    const u = await requireUser();
+    /** The same two doors as the GET: a Genie login, or the personal one. */
+    const viaIdp = await idpSession();
+    const u = viaIdp ? null : await requireUser();
     const admin = adminClient();
     const body = await readBody(req, {});
     const action = String(body.action || "");
     const now = new Date().toISOString();
-    const p = await me(u.email);
+    const p = viaIdp ? (await people(admin, [viaIdp]))[0] || null : await me(u!.email);
     if (!p) throw new HttpError(403, "Your login is not linked to an employee record yet — ask HR.");
-    const stamp = u.initials ? `${u.initials} · ${u.email}` : u.email;
+    const pv = (p.value || {}) as Record<string, string | null>;
+    // whoever they are, an application is signed with an address that is theirs
+    const mine = viaIdp
+      ? String(pv.personal_email || pv.user_email || pv.email || "").trim().toLowerCase()
+      : u!.email.toLowerCase();
+    const stamp = viaIdp ? `${p.name} · ${mine}` : (u!.initials ? `${u!.initials} · ${u!.email}` : u!.email);
 
     if (action === "apply") {
       const kind = String(body.kind || "");
@@ -199,7 +219,7 @@ export async function POST(req: Request) {
       else head = `Other: ${String(fields.what).slice(0, 60)}`;
       const { error } = await admin.from("hrms_query").insert({
         employee_id: p.id, subject: `Application — ${head}`, question: lines.join("\n"), topic: "Application", status: "Open",
-        raised_by: stamp, raised_email: u.email.toLowerCase(), for_self: true,
+        raised_by: stamp, raised_email: mine, for_self: true,
         form: { application: kind, fields, contact: { employee_id: p.id, name: p.name, mobile: p.phone || "", personal_email: "", stay_location: "" } }, updated_at: now,
       });
       if (error) throw new Error(error.message);
@@ -209,12 +229,12 @@ export async function POST(req: Request) {
     if (action === "learning") {
       const note = String(body.note || "").trim();
       if (!note) throw new HttpError(400, "Write what you did.");
-      const { error } = await admin.from("hrms_learning_log").insert({ employee_id: p.id, email: u.email.toLowerCase(), note: note.slice(0, 2000) });
+      const { error } = await admin.from("hrms_learning_log").insert({ employee_id: p.id, email: mine, note: note.slice(0, 2000) });
       if (error) { if (/hrms_learning_log|schema cache|does not exist/i.test(error.message)) throw new HttpError(503, "Run migration 0142 first."); throw new Error(error.message); }
       return NextResponse.json({ ok: true });
     }
     if (action === "learning_remove") {
-      const { error } = await admin.from("hrms_learning_log").delete().eq("id", String(body.id || "")).eq("email", u.email.toLowerCase());
+      const { error } = await admin.from("hrms_learning_log").delete().eq("id", String(body.id || "")).eq("email", mine);
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true });
     }

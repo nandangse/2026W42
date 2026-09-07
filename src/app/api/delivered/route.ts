@@ -61,14 +61,15 @@ export async function GET() {
      * what the job board says: its throughput percent, its throughput value,
      * and — where the export never carried one — its order value.
      */
-    const board = new Map<string, { val: number | null; tp: number | null; tpv: number | null; tpp: number | null }>();
+    type BoardRow = { val: number | null; tp: number | null; tpv: number | null; tpp: number | null; delivered_on: string | null; delivered: boolean | null };
+    const board = new Map<string, BoardRow>();
     try {
       const ids = [...new Set(rows.map((r) => String(r.id)))];
       for (let i = 0; i < ids.length; i += 500) {
         const { data: js } = await adminClient()
-          .from("jobs").select("id, val, tp, tpv, tpp").in("id", ids.slice(i, i + 500));
-        for (const j of (js || []) as { id: string; val: number | null; tp: number | null; tpv: number | null; tpp: number | null }[])
-          board.set(String(j.id), { val: j.val, tp: j.tp, tpv: j.tpv, tpp: j.tpp });
+          .from("jobs").select("id, val, tp, tpv, tpp, delivered, delivered_on").in("id", ids.slice(i, i + 500));
+        for (const j of (js || []) as ({ id: string } & BoardRow)[])
+          board.set(String(j.id), { val: j.val, tp: j.tp, tpv: j.tpv, tpp: j.tpp, delivered: j.delivered, delivered_on: j.delivered_on });
       }
     } catch (e) { swallow("delivered/board", e); /* the export still stands on its own */ }
 
@@ -86,6 +87,15 @@ export async function GET() {
         r.tpv = genie; r.tpp = b.tpp ?? r.tpp; fromGenie++;
       }
       if (!Number(r.val) && b.val) r.val = b.val;
+      /**
+       * AND THE DATE IS GENIE'S TOO (Dr Raghu, 7 Sep 2026: "yes, we will use
+       * the Genie as the source for delivery dates too — it will of course
+       * synchronise with the ERP, hence we will look at it there only").
+       * Where the board carries a delivery date it wins; where it does not,
+       * the export's date still stands, so nothing that has already gone out
+       * of the door disappears while the board catches up.
+       */
+      if (b.delivered_on) { r.delivered_on = b.delivered_on; r.date_source = "Genie"; }
     }
 
     // When the report last landed, and which header the date was read from —

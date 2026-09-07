@@ -78,6 +78,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.13.0",
+    date: "2026-09-07",
+    module: "Signing in to /idp with a personal e-mail",
+    items: [
+      "\"All the IDP correspondences should be done with their personal mail ID ... whoever is logged into Genie already can access their records; whoever is not can use their personal email ID, and then a login password will be given to all of them\" (Dr Raghu, 7 Sep 2026).",
+      "WHY THE PERSONAL ADDRESS. Five or six people share one company mailbox, so a password sent there is a password shared with five colleagues — and a payslip is not a thing to share. The personal address is the only one that belongs to one person, and Genie refuses to issue two people the same one: a clash is named rather than guessed at.",
+      "THE PASSWORD IS HIS SHAPE — NGSE, two letters of the first name, two of the last, two random digits, an asterisk: <b>NGSEViRu47*</b>. Honorifics are skipped, so Dr Raghunandan Jagdish is Ra, not Dr. Nobody is forced to change it, as he asked.",
+      "WHAT IS STORED, and it matters: the login checks a salted HASH. The plain password sits beside it only so the first mail can carry it as <b>{{PERS_PAS}}</b>, and it is WIPED the moment the person signs in. Until then anybody with HRMS access could read it — that is the price of mail-merging a password, and it is exactly why it does not survive first use.",
+      "Five wrong tries locks that address for fifteen minutes, and a wrong password and an unknown address give the same answer, so the page cannot be used to find out who works here.",
+      "A sign-in page at /idp/sign-in built for a phone on a shop floor: two boxes, big type, and nothing else. The cookie it sets proves one thing only — which employee this is — and it opens their own sheet and nothing else. They can read and apply from it exactly as a Genie login can.",
+      "AND TWO OF HIS ANSWERS ELSEWHERE. The per-day is now the IDP's everywhere — gross over 26 for Labour and Labour - Contract, 31 for the rest — replacing payroll's older basic+HRA+fixed+medical over 26, so comp-off encashment and late deductions stop disagreeing with the appraisal. And delivery DATES now come from Genie's board where it has one, as the throughput already does.",
+    ],
+  },
+  {
     v: "5.0.12.3",
     date: "2026-09-07",
     module: "Throughput comes from Genie, and medical was never being read",

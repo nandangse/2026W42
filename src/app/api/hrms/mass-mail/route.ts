@@ -218,6 +218,15 @@ export async function GET(req: Request) {
     } catch (e) { swallow("hrms/mass-mail", e); }
     const variables = [
       { key: "first_name", label: "First name" }, { key: "name", label: "Full name" },
+      /**
+       * THE TEMPORARY PASSWORD, for the one mail that carries it (Dr Raghu,
+       * 7 Sep 2026: "keep the password as a variable with PERS_PAS so that we
+       * can use that in the mailing and it can go as a mail-merged
+       * document"). It resolves only while the password is still unused —
+       * once the person signs in it is wiped, and this comes out blank
+       * rather than posting a live password into a second mail.
+       */
+      { key: "PERS_PAS", label: "Their temporary /idp password" },
       { key: "employee_id", label: "Employee ID" }, { key: "today", label: "Today's date" }, { key: "cycle", label: "Appraisal cycle" },
       ...ALL_FIELDS.filter((f) => !f.derived).map((f) => ({ key: f.key, label: f.label })),
     ];
@@ -274,8 +283,17 @@ export async function POST(req: Request) {
     const replyTo = ok(b.reply_to) || null;
     const showAs = ok(b.from_as) || null;
 
+    /** The unused temporary passwords, for {{PERS_PAS}}. */
+    const tempPw = new Map<string, string>();
+    if (/PERS_PAS/i.test(`${subject} ${body}`)) {
+      try {
+        const { data: lg } = await admin.from("hrms_idp_login").select("employee_id, pw_temp").not("pw_temp", "is", null);
+        for (const r of (lg || []) as { employee_id: string; pw_temp: string }[]) tempPw.set(String(r.employee_id), r.pw_temp);
+      } catch (e) { swallow("hrms/mass-mail passwords", e); }
+    }
+
     const rendered = chosen.map((p) => {
-      const vars = employeeVars(p.value, { employee_id: p.id });
+      const vars = employeeVars(p.value, { employee_id: p.id, PERS_PAS: tempPw.get(p.id) || "" });
       const to = addressOf(p, toPref);
       const s = renderTemplate(subject, vars);
       const h = renderTemplate(body, vars);

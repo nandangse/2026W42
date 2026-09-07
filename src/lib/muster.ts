@@ -1,3 +1,4 @@
+import { payDaysFor } from "./salary";
 /**
  * The attendance MUSTER and the SALARY RATE LIST, read from what HR uploads
  * (Dr Raghu, 4 Sep 2026: "upload the Muster, the salary rate list here.
@@ -252,7 +253,18 @@ export function generateRegister(
     if (from === "none") noRate++;
     const hraRate = contractish ? 0 : basic * 0.2;
     const gross = basic + (worker ? 0 : hraRate) + fixed + conv + med;      // the rate as the sheet states it
-    const perDay = (basic + (worker ? 0 : hraRate) + fixed + med) / 26;        // conveyance does not count
+    /**
+     * THE PER-DAY IS THE IDP'S (Dr Raghu, 7 Sep 2026: "the per-day rate as
+     * done in the IDP is the right one — please use that, the latest one").
+     *
+     * That is the gross over the person's own pay days: 26 for Labour and
+     * Labour - Contract, 31 for everybody else. It replaces the older rule
+     * here, which took basic + HRA + fixed + medical over 26 for everyone and
+     * left conveyance out — so two screens quoted two different per-days for
+     * the same person. This one number now drives comp-off encashment, leave
+     * encashment and the late deduction, which is where it is actually spent.
+     */
+    const perDay = gross / payDaysFor(t);
 
     // ── leave and payment days ──
     const led = ledger(m.employee_id);
