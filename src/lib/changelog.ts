@@ -78,6 +78,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.11.1",
+    date: "2026-09-07",
+    module: "Download as Excel — coloured, and from the button",
+    items: [
+      "\"Give it to me as an Excel with colour, properly done, so that I can copy-paste it directly into the employee master sheet\" — and then, when I sent one by hand, \"from the button\" (Dr Raghu, 7 Sep 2026). Quite right: a sheet only I can make is a sheet he has to ask for.",
+      "THREE BANDS, HIS SHAPE. <b>As it stands today</b>, read from Genie's own records; one blank column; <b>as the appraisal says</b>, from what was finalised; and Genie's own arithmetic far to the right, where a paste into the master sheet cannot reach it. Header and the first two columns freeze, every column filters, and the totals are live SUM formulas rather than numbers that go stale the moment a cell is edited.",
+      "Rows whose gross actually moves are tinted; the ones finalised at the same figure stay pale, so 178 changes do not hide among 204 rows.",
+      "NEITHER SIDE COMES FROM A SPREADSHEET. \"Do not refer to the Google Sheet right now, as the rates have been changed. The old rates that are there in Genie are correct.\" So the left block is the record and the right is the appraisal; the sheet he pastes into is a destination and never a source.",
+      "It is built on the server, because a coloured workbook needs ExcelJS and ExcelJS wants Node's streams — and the rows go up exactly as the filters left them, so what downloads is what he is looking at rather than a second query that might disagree.",
+    ],
+  },
+  {
     v: "5.0.11.0",
     date: "2026-09-07",
     module: "Payroll takes the rate from the system, and the download takes his shape",

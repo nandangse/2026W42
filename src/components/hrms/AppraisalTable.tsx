@@ -40,70 +40,10 @@ const EXP_BANDS: [string, (n: number) => boolean][] = [
 ];
 
 /**
- * DOWNLOAD AS EXCEL — THE REVISION MASTER'S OWN SHAPE (Dr Raghu, 7 Sep 2026:
- * "it should be having the heading as per this CSV", handing over Salary
- * Revision Master (2), and "make the rates as per the appraisal! why isn't
- * changed?").
- *
- * His sheet is two blocks side by side with one blank column between them:
- * the LEFT is what the person is on today, the RIGHT is what they move to.
- * A paste lands by position, so the shape is copied exactly — nineteen
- * columns, a gap, then twelve — and nothing is inserted anywhere in it.
- *
- * The right-hand block is the APPRAISAL, which is what was missing: the
- * sheet he downloaded had the new block mirroring the old, because the sheet
- * cannot know what was finalised in Genie. Where an appraisal was saved with
- * its components edited by hand, those exact figures go out; only where none
- * was saved does Genie split the new gross by its own rule.
+ * The download itself is built on the server — src/lib/appraisal-xlsx.ts —
+ * because a coloured workbook needs ExcelJS and ExcelJS wants Node's
+ * streams. What goes up is what the filters have left on the screen.
  */
-const LEFT_COLUMNS = [
-  "ID", "Name", "Type", "Experience in Nandan", "Age",
-  "Department", "Designation", "Reporting Manager", "Job Location", "Days Paid",
-  "Basic and DA", "HRA", "Fixed Allowance", "Conveyance", "Medical Allowance",
-  "Gross Salary", "Per Day Rate", "PERSONAL Mobile No", "Personal Mail ID",
-] as const;
-/** One empty column, exactly as his sheet has it. */
-const RIGHT_COLUMNS = [
-  "Department", "Designation", "Reporting Manager", "Job Location", "Days Paid",
-  "Basic and DA", "HRA", "Fixed Allowance", "Conveyance", "Medical Allowance",
-  "Gross Salary", "Per Day Rate",
-] as const;
-/** Genie's own, far to the right where a paste cannot reach. */
-const TAIL_COLUMNS = ["Site Allowance", "Increase / month", "Increase / day", "Increase %", "Parts agreed", "Stage", "Released on", "Remarks"] as const;
-
-const r0 = (n: number | null | undefined) => (n == null ? "" : Math.round(n));
-const d1 = (n: number | null | undefined) => (n == null ? "" : Number(n.toFixed(1)));
-
-function exportRow(r: Row): (string | number)[] {
-  const type = String(r.type || "");
-  const days = r.payDays ?? payDaysFor(type);
-  const o = r.oldParts;
-  // Where no structure was agreed, Genie splits the new gross by its own rule.
-  const p = r.newParts || (r.newGross == null ? null : (() => {
-    const sp = splitGross(r.newGross, undefined, type);
-    return { basic_da: sp.basic_da, hra: sp.hra, fixed: sp.fixed_allowance, conveyance: sp.conveyance, medical: sp.medical_allowance, site: 0, agreed: false };
-  })());
-  const oldDay = perDayOf(r.prevGross, type);
-  const newDay = perDayOf(r.newGross, type);
-  return [
-    // ── the left block: what he is on today ──
-    r.id, r.name, type, d1(r.exp), d1(r.age),
-    r.department || "", r.designation || "", r.manager || "", r.location || "", days,
-    r0(o?.basic_da), r0(o?.hra), r0(o?.fixed), r0(o?.conveyance), r0(o?.medical),
-    r0(r.prevGross), r0(oldDay), r.mobile || "", r.personalEmail || "",
-    "",                                              // the blank column
-    // ── the right block: what the appraisal says ──
-    r.department || "", r.newDesignation || r.designation || "", r.manager || "", r.location || "", days,
-    r0(p?.basic_da), r0(p?.hra), r0(p?.fixed), r0(p?.conveyance), r0(p?.medical),
-    r0(r.newGross), r0(newDay),
-    // ── Genie's own ──
-    r0(p?.site ?? r.siteAllowance), r0(r.inc),
-    r0(newDay != null && oldDay != null ? newDay - oldDay : null),
-    r.incPct == null ? "" : Number(r.incPct.toFixed(1)),
-    p ? (p.agreed ? "agreed" : "split by Genie") : "",
-    r.stage, r.released ? String(r.released).slice(0, 10) : "", "",
-  ];
-}
 
 const STAGE_STYLE: Record<string, { bg: string; fg: string }> = {
   "Released": { bg: "#0D7A3F", fg: "#fff" },
@@ -392,51 +332,41 @@ const shown = useMemo(() => {
 
   /** The shown rows, in his column order, as a real .xlsx. */
   const downloadExcel = async () => {
-    const XLSX = await import("xlsx");
     /**
-     * THE TOTALS HE ASKED FOR — "a number of approved total increase per
-     * month on gross" (Dr Raghu, 7 Sep 2026). Counted over the FINALISED
-     * ones only: a proposal that nobody has agreed is not a commitment, and
-     * adding it to the same figure would overstate what the month owes.
+     * The sheet is built on the server, where ExcelJS can colour it — the
+     * rows go up exactly as they are filtered and sorted here, so what
+     * downloads is what he is looking at (Dr Raghu, 7 Sep 2026: "from the
+     * button").
      */
-    const final = shown.filter((r) => r.stage === "Appraisal Finalised" || r.stage === "Released");
-    const sum = (rs: Row[], f: (r: Row) => number | null | undefined) =>
-      rs.reduce((a, r) => a + (Number(f(r)) || 0), 0);
-    const dayOf = (r: Row) => {
-      const nd = perDayOf(r.newGross, r.type), od = perDayOf(r.prevGross, r.type);
-      return nd != null && od != null ? nd - od : 0;
-    };
-    const WIDTH = LEFT_COLUMNS.length + 1 + RIGHT_COLUMNS.length + TAIL_COLUMNS.length;
-    const blank = Array(Math.max(0, WIDTH - 4)).fill("");
-    const totals: (string | number)[][] = [
-      [],
-      ["APPROVED — the finalised only", `${final.length} of ${shown.length} shown`, "", "", ...blank],
-      ["Previous gross, total", Math.round(sum(final, (r) => r.prevGross)), "", "", ...blank],
-      ["New gross, total", Math.round(sum(final, (r) => r.newGross)), "", "", ...blank],
-      ["Increase per month, total", Math.round(sum(final, (r) => r.inc)), "", "", ...blank],
-      ["Increase per day, total", Math.round(sum(final, dayOf)), "", "", ...blank],
-      ["New per day, total", Math.round(final.reduce((a, r) => a + (perDayOf(r.newGross, r.type) || 0), 0)), "", "", ...blank],
-      ["Site allowance, total", Math.round(sum(final, (r) => r.newParts?.site ?? r.siteAllowance)), "", "", ...blank],
-    ];
-    const header = [...LEFT_COLUMNS, "", ...RIGHT_COLUMNS, ...TAIL_COLUMNS];
-    // A second header line names the two blocks, the way his own sheet reads.
-    const band2 = Array(WIDTH).fill("");
-    band2[0] = "AS IT STANDS TODAY";
-    band2[LEFT_COLUMNS.length + 1] = "AS THE APPRAISAL SAYS";
-    band2[LEFT_COLUMNS.length + 1 + RIGHT_COLUMNS.length] = "GENIE";
-    const aoa: (string | number)[][] = [band2, header, ...shown.map(exportRow), ...totals];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 8 }, { wch: 28 }, { wch: 16 }, { wch: 9 }, { wch: 6 },
-      { wch: 18 }, { wch: 24 }, { wch: 22 }, { wch: 12 }, { wch: 6 },
-      ...Array.from({ length: 7 }, () => ({ wch: 13 })), { wch: 16 }, { wch: 26 },
-      { wch: 3 },
-      { wch: 18 }, { wch: 24 }, { wch: 22 }, { wch: 12 }, { wch: 6 },
-      ...Array.from({ length: 7 }, () => ({ wch: 13 })),
-      ...Array.from({ length: TAIL_COLUMNS.length }, () => ({ wch: 15 }))];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Appraisal");
-    const d = new Date();
-    XLSX.writeFile(wb, `Appraisal ${band || "all"} - ${d.toISOString().slice(0, 10)}.xlsx`);
+    const payload = shown.map((r) => ({
+      id: r.id, name: r.name, type: r.type, exp: r.exp, age: r.age,
+      department: r.department, designation: r.designation, manager: r.manager,
+      location: r.location ?? null, mobile: r.mobile ?? null, personalEmail: r.personalEmail ?? null,
+      payDays: r.payDays ?? payDaysFor(String(r.type || "")),
+      oldParts: r.oldParts ?? null, prevGross: r.prevGross,
+      newParts: r.newParts ?? (r.newGross == null ? null : (() => {
+        const sp = splitGross(r.newGross, undefined, String(r.type || ""));
+        return { basic_da: sp.basic_da, hra: sp.hra, fixed: sp.fixed_allowance, conveyance: sp.conveyance, medical: sp.medical_allowance, site: 0, agreed: false };
+      })()),
+      newGross: r.newGross, newDesignation: r.newDesignation ?? null,
+      stage: r.stage, released: r.released ?? null,
+    }));
+    setMsg("building the sheet…");
+    try {
+      const res = await fetch("/api/hrms/appraisal-export", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ rows: payload, title: band || "Appraisal" }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `The sheet could not be built (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Employee master - ${band || "all"} - ${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      setMsg(`${payload.length} ${payload.length === 1 ? "person" : "people"} downloaded ✓`);
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   };
 
   /** Mark one or many as released — or take it back. */
