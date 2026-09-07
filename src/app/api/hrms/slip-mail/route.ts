@@ -91,14 +91,20 @@ export async function GET(req: Request) {
     const rows = slips.map((s: Slip) => {
       const p = by.get(s.id);
       const raw = ok(p?.value?.personal_email);
-      return { id: s.id, name: s.name, net: s.net, personal: addressOf(s.id), type: p?.type || null,
+      /* the slip's own category, not the record's — it is what the send
+         filters on, and a tick box that names a different thing from the
+         filter behind it is a trap */
+      return { id: s.id, name: s.name, net: s.net, personal: addressOf(s.id),
+        type: String(s.category || p?.type || "").trim() || null, hold: !!s.hold,
         why: addressOf(s.id) ? "" : raw ? `${raw} is shared by more than one person` : "no personal e-mail on record" };
     });
     void shared;
+    const types = [...new Set(rows.map((r) => String(r.type || "").trim()).filter(Boolean))].sort()
+      .map((t) => ({ type: t, n: rows.filter((r) => r.type === t).length, hold: rows.filter((r) => r.type === t && r.hold).length }));
     return NextResponse.json({
       month: sheet.month, year: sheet.year, status: sheet.status,
       total: rows.length, withPersonal: rows.filter((r) => r.personal).length,
-      rows,
+      types, rows,
     });
   } catch (e) { return errJson(e); }
 }
@@ -112,19 +118,35 @@ export async function POST(req: Request) {
     const period = `${MONTHS[Number(sheet.month) - 1]} ${sheet.year}`;
     const wanted = Array.isArray(b.ids) ? b.ids.map(String) : null;
 
-    const sendable = slips
-      .filter((s: Slip) => !wanted || wanted.includes(s.id))
-      .map((s: Slip) => ({ s, to: addressOf(s.id) }))
-      .filter((x) => x.to);
+    /**
+     * WHO IT GOES TO (Dr Raghu, 7 Sep 2026: "the categories that we choose.
+     * It could be select all, or it could be choosing the categories.
+     * Whoever is on hold doesn't need to be sent a salary slip because it
+     * doesn't make any sense").
+     *
+     * `types` empty means everybody. A man on hold is never sent one, whatever
+     * is chosen — his slip says he was paid nothing, and sending it would
+     * start a conversation HR has not had yet.
+     */
+    const types = Array.isArray(b.types) ? b.types.map((t) => String(t).trim().toLowerCase()).filter(Boolean) : [];
+    const inScope = (s: Slip) =>
+      !s.hold
+      && (!wanted || wanted.includes(s.id))
+      && (!types.length || types.includes(String(s.category || "").trim().toLowerCase()));
+
+    const sendable = slips.filter(inScope).map((s: Slip) => ({ s, to: addressOf(s.id) })).filter((x) => x.to);
+    const held = slips.filter((s: Slip) => s.hold && (!types.length || types.includes(String(s.category || "").trim().toLowerCase())))
+      .map((s: Slip) => ({ id: s.id, name: s.name }));
     const noPersonal = slips
-      .filter((s: Slip) => !addressOf(s.id))
+      .filter((s: Slip) => inScope(s) && !addressOf(s.id))
       .map((s: Slip) => {
         const raw = ok(by.get(s.id)?.value?.personal_email);
         return { id: s.id, name: s.name, why: raw ? `${raw} is shared` : "no personal e-mail" };
       });
 
     if (b.action === "preview")
-      return NextResponse.json({ ok: true, count: sendable.length, noPersonal, period, sample: sendable.slice(0, 3).map((x) => ({ name: x.s.name, to: x.to })) });
+      return NextResponse.json({ ok: true, count: sendable.length, noPersonal, held, period,
+        sample: sendable.slice(0, 3).map((x) => ({ name: x.s.name, to: x.to })) });
 
     if (!u.isOwner && !/^(vinaym|hr)@nandan\.co\.in$/.test(u.email.toLowerCase()))
       throw new HttpError(403, "Slips go out from Dr Raghu or HR.");
@@ -156,6 +178,6 @@ export async function POST(req: Request) {
       }
     }
     const done = offset + slice.length;
-    return NextResponse.json({ ok: true, sent, failed, done, of: sendable.length, more: done < sendable.length, noPersonal });
+    return NextResponse.json({ ok: true, sent, failed, done, of: sendable.length, more: done < sendable.length, noPersonal, held });
   } catch (e) { return errJson(e); }
 }

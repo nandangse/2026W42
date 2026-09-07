@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.18.0",
+    date: "2026-09-07",
+    module: "Sending the slips by category, and site allowance earned like a fixed allowance",
+    items: [
+      "THE SEND CHOOSES ITS PEOPLE (Dr Raghu, 7 Sep 2026: \"it could be select all, or it could be choosing the categories\"). Mail slips now opens with the month's categories as tick boxes — Staff, Labour, Labour - Contract, Contractor, Management — each showing how many it would reach. Nothing ticked means everybody.",
+      "AND NOBODY ON HOLD IS EVER SENT ONE (\"whoever is on hold doesn't need to be sent a salary slip because it doesn't make any sense\"). Enforced on the server, not merely hidden on the screen, and the Check names who was held back so it reads as a rule rather than an oversight.",
+      "SITE ALLOWANCE IS EARNED LIKE A FIXED ALLOWANCE (\"if the attendance is more than 7, then they will get the site allowance. If the attendance is less than 7, they will get it only pro rata\") — whole from seven days present, in proportion below that, exactly as Fixed and Medical already work. It was paid flat before: a man on site two days drew what a man there all month drew.",
+      "AND IT IS TAKEN FROM ONE SOURCE, NEVER TWO (\"if in the muster sheet another site allowance is also seen, do not double it\"). The rate list wins where it carries a figure and the muster is the fallback — today no rate list has a site column at all, so nothing changes hands yet. Where both speak, the rate list is taken and the clash is NAMED in the run's warnings rather than quietly added up.",
+    ],
+  },
+  {
     v: "5.0.17.5",
     date: "2026-09-07",
     module: "The salary rate list: four columns off, and every column sorts",

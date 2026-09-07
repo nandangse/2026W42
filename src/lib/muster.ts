@@ -231,6 +231,7 @@ export function generateRegister(
 ): { rows: RegisterRow[]; warnings: string[] } {
   const rateOf = new Map((rates?.rows || []).map((r) => [r.employee_id, r]));
   const warnings: string[] = [];
+  const siteClash: string[] = [];
   let noRate = 0;
   const rows = muster.rows.map((m) => {
     const rec = record(m.employee_id);
@@ -294,8 +295,36 @@ export function generateRegister(
     const eConv = workingDays > 0 ? Math.round(conv * m.present / workingDays) : 0;   // extra days earn extra conveyance
     const eMed = m.present >= 7 ? med : Math.round(med * m.present / 26);   // like fixed: full from 7 days, else pro rata
     const otPay = worker ? Math.round((m.ot ?? 0) * basic / 208) : 0;
-    const siteFlat = m.site_allowance ?? 0;
-    const site = worker ? siteFlat + Math.max(0, otPay - hra) : siteFlat;
+
+    /**
+     * SITE ALLOWANCE IS A FIXED ALLOWANCE (Dr Raghu, 7 Sep 2026: "site
+     * allowance is to be given as a fixed allowance when somebody is on the
+     * site. If the attendance is more than 7, then they will get the site
+     * allowance. If the attendance is less than 7, they will get it only pro
+     * rata").
+     *
+     * So it earns exactly the way Fixed and Medical earn: whole from seven
+     * days present, and below that in proportion. It was being paid flat
+     * before — a man on site for two days drew the same as a man there all
+     * month.
+     *
+     * AND ONE SOURCE, NEVER TWO ("if in the muster sheet another site
+     * allowance is also seen, do not double it — always make sure that you
+     * take up only one. In future you will try not to put that into the
+     * muster at all"). The rate list is the intended home, so it wins where
+     * it carries a figure; the muster is the fallback for today, when no
+     * rate list has a site column at all. Where both speak, the rate list is
+     * taken and the clash is named in the warnings rather than being added
+     * up in silence.
+     */
+    const siteFromRate = rr?.site ?? 0;
+    const siteFromMuster = m.site_allowance ?? 0;
+    if (siteFromRate > 0 && siteFromMuster > 0) siteClash.push(m.employee_id);
+    const siteRate = siteFromRate > 0 ? siteFromRate : siteFromMuster;
+    const eSite = m.present >= 7 ? siteRate : Math.round(siteRate * m.present / 26);
+    // a worker's OT above his HRA has been carried in site allowance since
+    // 4 Sep; that is OT money and is not pro-rated by days on site
+    const site = worker ? eSite + Math.max(0, otPay - hra) : eSite;
     const otShort = worker && otPay < hra ? hra - otPay : 0;
     const compAmt = Math.round(compEncash * perDay);
     const encashAmt = Math.round((m.leave_encash ?? 0) * perDay);
@@ -322,6 +351,8 @@ export function generateRegister(
       hold: /hold/i.test(m.status) || /f ?& ?f|resign|terminat/i.test(m.status), rate_from: from, mobile: m.mobile,
     };
   });
+  if (siteClash.length)
+    warnings.push(`Site allowance was given in BOTH the rate list and the muster for ${siteClash.length} ${siteClash.length === 1 ? "person" : "people"} (${siteClash.slice(0, 8).join(", ")}${siteClash.length > 8 ? " …" : ""}). The rate list was taken and the muster's figure ignored — it was NOT added on top.`);
   if (noRate) warnings.push(`${noRate} line${noRate === 1 ? "" : "s"} have no rate — neither in the rate list nor on the record — so earn nothing until one is given.`);
   return { rows, warnings };
 }
@@ -361,7 +392,8 @@ export const PAYROLL_RULES: { head: string; lines: string[] }[] = [
   { head: "Earnings", lines: [
     "Basic & DA = rate × paid days ÷ pay days.",
     "HRA = 20% of earned basic, Staff and workers alike; none for Management and contract types.",
-    "Workers' OT = hours × basic ÷ 208, always single. The HRA is the first part of it; the balance is Site Allowance, with any flat site amount from the muster. OT below the HRA is an Other Deduction.",
+    "Workers' OT = hours × basic ÷ 208, always single. The HRA is the first part of it; the balance is carried in Site Allowance. OT below the HRA is an Other Deduction.",
+    "Site allowance, like fixed: in full at 7 or more days present, else pro rata. It is taken from the rate list where that carries one, otherwise from the muster — one source, never both added together.",
     "Fixed allowance in full at 7 or more days present, else pro rata.",
     "Conveyance = rate × present ÷ the company's working days that month (calendar days less Sundays and the third Saturday, or what HR set on the run). A day worked beyond them earns conveyance too.",
     "Medical, like fixed: in full at 7 or more days present, else pro rata.",

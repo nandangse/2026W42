@@ -22,7 +22,7 @@
  * PDF, and a request that tried two hundred would time out halfway with no
  * record of where it stopped.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { C } from "./RecordFields";
 
 const DEFAULT_BODY = `Dear {{first_name}},<br><br>
@@ -34,7 +34,9 @@ Thank you,<br>
 Nandan HR<br><br>
 P.S. A separate mail has been sent to you about logging in to <a href="https://genie.nandan.co.in/idp">genie.nandan.co.in/idp</a>, where your slips, your IDP and your record all live.`;
 
-interface Checked { count: number; period: string; sample: { name: string; to: string }[]; noPersonal: { id: string; name: string; why?: string }[] }
+interface Checked { count: number; period: string; sample: { name: string; to: string }[];
+  noPersonal: { id: string; name: string; why?: string }[]; held: { id: string; name: string }[] }
+interface TypeRow { type: string; n: number; hold: number }
 
 export default function SlipMail({ sheetId, status, onClose }: { sheetId: string; status: string; onClose: () => void }) {
   const [from, setFrom] = useState("hr@nandan.co.in");
@@ -44,11 +46,23 @@ export default function SlipMail({ sheetId, status, onClose }: { sheetId: string
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [prog, setProg] = useState<{ done: number; of: number; sent: number; failed: { name: string; why: string }[] } | null>(null);
+  /**
+   * WHICH CATEGORIES (Dr Raghu, 7 Sep 2026: "it could be select all, or it
+   * could be choosing the categories"). Nothing ticked means everybody —
+   * the same convention the mass mail uses, so the two screens read alike.
+   */
+  const [types, setTypes] = useState<TypeRow[] | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  useEffect(() => {
+    fetch(`/api/hrms/slip-mail?sheet=${encodeURIComponent(sheetId)}`)
+      .then((r) => r.json()).then((j) => setTypes(j.types || [])).catch(() => setTypes([]));
+  }, [sheetId]);
+  const toggle = (t: string) => { setChk(null); setPicked((p) => (p.includes(t) ? p.filter((x) => x !== t) : [...p, t])); };
 
   const post = async (payload: Record<string, unknown>) => {
     const r = await fetch("/api/hrms/slip-mail", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sheet: sheetId, from, subject, body, ...payload }),
+      body: JSON.stringify({ sheet: sheetId, from, subject, body, types: picked, ...payload }),
     });
     const j = await r.json();
     if (!r.ok) throw new Error(j?.error || "Something went wrong.");
@@ -97,6 +111,36 @@ export default function SlipMail({ sheetId, status, onClose }: { sheetId: string
         </div>
       )}
 
+      {/* WHO IT GOES TO */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: C.faint, textTransform: "uppercase", letterSpacing: .3, marginBottom: 4 }}>Who it goes to</div>
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <button onClick={() => { setPicked([]); setChk(null); }}
+            className="rounded px-2.5 py-1 font-bold" style={{ fontSize: 12, cursor: "pointer",
+              border: picked.length === 0 ? "1px solid #16232F" : `1px solid ${C.line}`,
+              background: picked.length === 0 ? "#16232F" : "#fff", color: picked.length === 0 ? "#fff" : C.dim }}>
+            Everybody
+          </button>
+          {(types || []).map((t) => {
+            const on = picked.includes(t.type);
+            return (
+              <button key={t.type} onClick={() => toggle(t.type)}
+                className="rounded px-2.5 py-1 font-semibold" style={{ fontSize: 12, cursor: "pointer",
+                  border: on ? "1px solid var(--blue)" : `1px solid ${C.line}`,
+                  background: on ? "var(--blue)" : "#fff", color: on ? "#fff" : C.dim }}>
+                {t.type} · {t.n - t.hold}{t.hold ? <span style={{ opacity: .75 }}> (+{t.hold} on hold)</span> : null}
+              </button>
+            );
+          })}
+          {types === null && <span style={{ fontSize: 12, color: C.faint }}>reading the month…</span>}
+        </div>
+        {/* NOBODY ON HOLD IS SENT ONE. His slip says he was paid nothing, and
+            sending it starts a conversation HR has not had yet. */}
+        <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4 }}>
+          Nothing ticked means everybody. <b>Anyone on hold is never sent a slip</b>, whatever is chosen.
+        </div>
+      </div>
+
       <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 2fr" }}>
         <label style={{ fontSize: 12 }}>Sent through
           <input value={from} onChange={(e) => setFrom(e.target.value)} style={box} />
@@ -143,6 +187,12 @@ export default function SlipMail({ sheetId, status, onClose }: { sheetId: string
           {chk.sample.length > 0 && (
             <div style={{ color: C.dim, marginTop: 4 }}>
               For example: {chk.sample.map((s) => `${s.name} → ${s.to}`).join(" · ")}
+            </div>
+          )}
+          {chk.held.length > 0 && (
+            <div style={{ marginTop: 6, background: "#F4F2EC", border: `1px solid ${C.line}`, borderRadius: 6, padding: "6px 9px" }}>
+              <b>{chk.held.length} on hold — not sent</b>, by the rule, not by oversight:
+              <div style={{ color: C.dim, marginTop: 3 }}>{chk.held.map((p) => `${p.id} ${p.name}`).join(" · ")}</div>
             </div>
           )}
           {chk.noPersonal.length > 0 && (
