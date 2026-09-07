@@ -78,6 +78,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.17.0",
+    date: "2026-09-07",
+    module: "The register as a signing copy, and the slip signed",
+    items: [
+      "THE SALARY REGISTER AS SEPARATE PORTRAIT PAGES — 'this will help us to print it, stamp it, sign it, and keep it on record'. Page 1 is the MIS summary; then a page per group in his order: Management, Contractors, Staff & Labour together sorted by employee ID, Staff Contract & Labour Contract together, Interns & Trainees. Eight columns — employee ID, name, attendance, pay days, earned, deductions, net, date paid — with the account number, IFSC and bank name set small under each name. 201 of the 205 on the August register carry an account number; the four without one say so rather than showing a gap. Prepared / Checked / Approved rules and the stamp at the foot of every page. The landscape nineteen-column ledger is untouched and still the full record.",
+      "A group with nobody in it gets no blank page — it is named on the summary as having none, which is the fact worth recording. August has no Staff Contract and no interns, so those pages do not print.",
+      "Staff & Labour is 183 people. That is not one sheet of A4 at any font, so the group runs on with its heading row repeating — printing it unreadably small would have been the worse answer.",
+      "NET PAID is larger, with the amount in words directly beneath it rather than beside it, and the signature now sits in the right half of that same bar — a signature loose at the foot of a page signs nothing in particular; inside the net-paid bar it signs the amount.",
+      "'This is a computer generated document and needs no signature' is gone from the slip. It is signed now, and a signed document that announces it needs no signature contradicts itself.",
+      "THE SLIPS CAN ACTUALLY GO — 'how will the slips go' (Dr Raghu, 7 Sep 2026). They could not. The mass-mail screen attaches ONE list of files to EVERYBODY, which is right for a circular and useless for a payslip; the route that presses a different PDF per person had no button anywhere; and {{month}} fills from the HRIS record there, so the mail would have read 'your salary slip for .' with nothing attached. There is now a <b>Mail slips</b> button on the salary sheet itself — the only screen that knows which month — with Check before Send, three real samples, and everyone who will get nothing named.",
+      "AND AN ADDRESS TWO PEOPLE SHARE IS NOT A PERSONAL ADDRESS. Three men carry hr@nandan.co.in in their Personal Mail ID column; sending would have put three payslips in the shared HR mailbox, the precise thing the personal-only rule exists to stop. Shared addresses are refused and named. The test is shared, not company-domain — raghu@nandan.co.in belongs to one man and there is no reason to refuse him his own slip.",
+      "ALL SLIPS can be printed for a month that is not yet frozen. It was gated on Frozen, which is backwards: the month you most need to read every slip of is the one still open, because that is when a mistake can be corrected. Unfrozen slips print DRAFT across every page.",
+    ],
+  },
+  {
     v: "5.0.16.0",
     date: "2026-09-07",
     module: "Ten more columns the payslip was never being given, and ESIC off the slip",

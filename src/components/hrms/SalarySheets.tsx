@@ -18,6 +18,7 @@ import { MONTHS } from "@/lib/salary-sheet";
 import { Pane } from "./Pane";
 import { C } from "./RecordFields";
 import { inr } from "@/lib/fmt";
+import SlipMail from "./SlipMail";
 
 interface Sheet {
   id: string; month: number; year: number;
@@ -172,11 +173,18 @@ export default function SalarySheets({ who: me, isOwner }: { who: string; isOwne
                         🧾 Slips
                       </a>
                     ) : (
-                      <a href={`/hrms/salary-slips/${s.id}/print?samples=1`} target="_blank" rel="noopener noreferrer"
-                        className="rounded px-2 py-1 font-bold inline-block" style={{ background: "#fff", color: "#8A5B00", border: `1px solid ${C.line}`, fontSize: 10.5 }}
-                        title="Nine DRAFT samples across the pay bands — eyeball a few before freezing">
-                        🧾 Draft samples
-                      </a>
+                      <>
+                        <a href={`/hrms/salary-slips/${s.id}/print?samples=1`} target="_blank" rel="noopener noreferrer"
+                          className="rounded px-2 py-1 font-bold inline-block" style={{ background: "#fff", color: "#8A5B00", border: `1px solid ${C.line}`, fontSize: 10.5 }}
+                          title="Thirteen DRAFT samples — nine across the pay bands, four by shape">
+                          🧾 Draft samples
+                        </a>
+                        <a href={`/hrms/salary-slips/${s.id}/print`} target="_blank" rel="noopener noreferrer"
+                          className="rounded px-2 py-1 font-bold inline-block ml-1" style={{ background: "#fff", color: C.dim, border: `1px solid ${C.line}`, fontSize: 10.5 }}
+                          title="Every slip in the month, one A5 page each — stamped DRAFT until it is frozen">
+                          all
+                        </a>
+                      </>
                     )}
                     {isOwner && (s.status === "Frozen"
                       ? <button onClick={() => { if (window.confirm(`Unfreeze ${MONTHS[s.month - 1]} ${s.year}? It stops being a closed record until you freeze it again.`)) act({ action: "unfreeze", id: s.id }, "Unfrozen"); }} disabled={busy}
@@ -286,6 +294,7 @@ function Upload({ onDone }: { onDone: (msg: string) => void }) {
 function SheetBox({ id, onClose }: { id: string; onClose: () => void }) {
   const [d, setD] = useState<(Sheet & { rows: Line[]; fileUrl: string | null }) | null>(null);
   const [err, setErr] = useState("");
+  const [mailing, setMailing] = useState(false);
   useEffect(() => {
     api.get(`/api/hrms/salary-sheets?id=${encodeURIComponent(id)}`)
       .then((j) => setD(j.sheet)).catch((e) => setErr(e instanceof Error ? e.message : String(e)));
@@ -301,15 +310,40 @@ function SheetBox({ id, onClose }: { id: string; onClose: () => void }) {
           </div>
           <div className="flex gap-2 items-center">
             <a href={`/hrms/salary-register/${id}/print`} target="_blank" rel="noopener noreferrer"
-              className="rounded px-2 py-1 font-bold" style={{ background: "var(--blue)", color: "#fff", fontSize: 11.5 }}>📄 Register PDF</a>
+              className="rounded px-2 py-1 font-bold" style={{ background: "var(--blue)", color: "#fff", fontSize: 11.5 }}
+              title="The full nineteen-column ledger, A4 landscape">📄 Register PDF</a>
+            {/* THE SIGNING COPY (Dr Raghu, 7 Sep 2026: "print it, stamp it,
+                sign it, and keep it on record"). Portrait, one group of
+                people per page, eight columns and the bank account under
+                each name. The landscape ledger above is unchanged. */}
+            <a href={`/hrms/salary-register/${id}/pages`} target="_blank" rel="noopener noreferrer"
+              className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: "var(--blue)", border: "1px solid var(--blue)", fontSize: 11.5 }}
+              title="A4 portrait, a page per group — Management, Contractors, Staff & Labour, Contract, Interns — to print, stamp and sign">📑 Register by group (portrait)</a>
             <a href={`/hrms/salary-slips/${id}/print?samples=1`} target="_blank" rel="noopener noreferrer"
               className="rounded px-2 py-1 font-bold" style={{ background: "var(--green)", color: "#fff", fontSize: 11.5 }}
               title="Nine A5 samples across the pay bands — eyeball a few each month">🧾 Slip samples (A5)</a>
-            {d?.status === "Frozen" && (
-              <a href={`/hrms/salary-slips/${id}/print`} target="_blank" rel="noopener noreferrer"
-                className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: C.dim, border: `1px solid ${C.line}`, fontSize: 11.5 }}
-                title="Every employee's slip, one A5 page each — the single file for the Drive folders">All slips</a>
-            )}
+            {/* ALL SLIPS ON A DRAFT MONTH TOO (Dr Raghu, 7 Sep 2026: "in the
+                samples generate the slip for all as vinay wants to see it").
+                This was gated on Frozen, which is exactly backwards: the month
+                you most need to read every slip of is the one not yet closed,
+                because that is when a mistake can still be corrected. An
+                unfrozen run prints DRAFT across every page, so it cannot be
+                mistaken for the final thing. */}
+            {/* MAIL EACH PERSON THEIR OWN SLIP (Dr Raghu, 7 Sep 2026: "how
+                will the slips go"). Not on the mass-mail screen: that one
+                attaches the same file to everybody, and {{month}} fills from
+                the HRIS record there, so it comes out blank. Here the month
+                is known and every mail carries a different PDF. */}
+            <button onClick={() => setMailing((v) => !v)}
+              className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: "#8A5B00", border: "1px solid #E7C98A", fontSize: 11.5, cursor: "pointer" }}
+              title="One mail each, that person's own slip attached, to their personal address">📧 Mail slips</button>
+            <a href={`/hrms/salary-slips/${id}/print`} target="_blank" rel="noopener noreferrer"
+              className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: C.dim, border: `1px solid ${C.line}`, fontSize: 11.5 }}
+              title={d?.status === "Frozen"
+                ? "Every employee's slip, one A5 page each — the single file for the Drive folders"
+                : "Every employee's slip, one A5 page each — stamped DRAFT until the month is frozen"}>
+              All slips{d?.status === "Frozen" ? "" : " (draft)"}
+            </a>
             <ReRead id={id} onDone={() => { setD(null); setErr(""); api.get(`/api/hrms/salary-sheets?id=${encodeURIComponent(id)}`).then((j) => setD(j.sheet)).catch((e) => setErr(e instanceof Error ? e.message : String(e))); }} />
             {d?.fileUrl && <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" className="rounded px-2 py-1 font-bold" style={{ background: "#F4F2EC", color: C.dim, fontSize: 11.5 }}>Open the original file</a>}
             <button onClick={onClose} className="text-sm font-bold px-2 py-1" style={{ color: C.faint }}>✕ Close</button>
@@ -318,6 +352,7 @@ function SheetBox({ id, onClose }: { id: string; onClose: () => void }) {
         <div className="overflow-auto px-4 py-3" style={{ flex: 1 }}>
           {err && <div className="text-xs font-semibold" style={{ color: C.red }}>{err}</div>}
           {!d && !err && <div className="text-sm py-6 text-center" style={{ color: C.faint }}>loading…</div>}
+          {d && mailing && <SlipMail sheetId={id} status={d.status} onClose={() => setMailing(false)} />}
           {d && (
             <>
               {(d.mapping?.warnings || []).map((w, i) => (

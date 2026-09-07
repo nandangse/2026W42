@@ -254,12 +254,31 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
             <table className="genie-table" style={{ marginTop: 3 }}>
               <tbody>
                 <tr style={{ background: "#FFF9C4" }}>
-                  <td style={{ width: "30%", fontWeight: 800, fontSize: 11, padding: "3px 6px" }}>NET PAID ₹{inr(s.net)}</td>
-                  <td style={{ fontSize: 7.6 }}>
+                  {/* THE FIGURE, THEN THE WORDS UNDER IT (Dr Raghu, 7 Sep
+                      2026: "keep the number of net paid and make it a little
+                      larger in font — below that, write it in words"). Side
+                      by side, the words were competing with the figure for
+                      the eye; stacked, the figure is read first and the words
+                      confirm it, which is the order a person checks a slip. */}
+                  <td style={{ width: "62%", padding: "4px 6px", verticalAlign: "middle" }}>
+                    <div style={{ fontWeight: 800, fontSize: 14, letterSpacing: -0.2 }}>NET PAID ₹{inr(s.net)}</div>
                     {/* the register already writes "Rupees ... Only"; adding
                         our own gave "Rupees Rupees ... Only only" */}
-                    <b>{inWordsLine(s.in_words, s.net)}</b>
-                    {s.round_up != null && s.round_up !== 0 ? ` · Round off ${s.round_up > 0 ? "(+)" : "(−)"}${Math.abs(s.round_up).toFixed(2)}` : ""}
+                    <div style={{ fontSize: 7.6, fontWeight: 700, marginTop: 1 }}>
+                      {inWordsLine(s.in_words, s.net)}
+                      {s.round_up != null && s.round_up !== 0 ? ` · Round off ${s.round_up > 0 ? "(+)" : "(−)"}${Math.abs(s.round_up).toFixed(2)}` : ""}
+                    </div>
+                  </td>
+                  {/* THE SIGNATURE, BESIDE THE FIGURE IT AUTHORISES (Dr Raghu,
+                      7 Sep 2026: "make the second half of this same table on
+                      the right side — put my signature on it"). A signature
+                      loose at the foot of a page signs nothing in particular;
+                      inside the net-paid bar it signs the amount. */}
+                  <td style={{ padding: "2px 6px", textAlign: "right", verticalAlign: "middle" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/nandan-stamp.png" alt="Nandan GSE Pvt Ltd"
+                      style={{ height: 54, width: "auto", maxWidth: 130, objectFit: "contain", display: "inline-block", verticalAlign: "middle" }}
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                   </td>
                 </tr>
               </tbody>
@@ -271,20 +290,16 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
                 by hand. It is drawn only when one has been placed at
                 /nandan-stamp.png; until then nothing shows, because an empty
                 square where a seal belongs looks worse than no seal. */}
+            {/* The "needs no signature" line is GONE (Dr Raghu, 7 Sep 2026:
+                "remove this thing so the computer-generated document needs no
+                signature"). The slip is signed now — a signed document that
+                announces it needs no signature contradicts itself, and the
+                one that is signed is the one that gets kept on record. */}
             <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginTop: 3 }}>
               <div style={{ fontSize: 6.6, color: "#5A6572", lineHeight: 1.45, flex: 1, paddingRight: 4 }}>
                 Note: Leave of one year will be kept in balance (8 nos for Labour and 15 nos for Staff). Please note this.<br />
-                Any issues please contact the HR Department or mail hr@nandan.co.in.<br />
-                <b>This is a computer generated document and needs no signature when it reaches you from a Nandan GSE mail ID.</b>
+                Any issues please contact the HR Department or mail hr@nandan.co.in.
               </div>
-              {/* The round stamp, when one has been put at /nandan-stamp.png.
-                  Until then nothing is drawn — an empty box where a seal
-                  should be looks worse than no seal at all. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/nandan-stamp.png" alt="Nandan GSE Pvt Ltd"
-                style={{ height: 62, width: "auto", maxWidth: 110, objectFit: "contain",
-                  alignSelf: "flex-end", flexShrink: 0, marginRight: 2, marginBottom: 1 }}
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
             </div>
           </div>
         </div>

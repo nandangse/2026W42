@@ -78,17 +78,20 @@ ${money("Arrears", null, s.arrears, s.esi ? "ESIC" : "", s.esi)}
 <div class="grow"></div>
 
 <table style="margin-top:3px"><tbody><tr class="net">
-<td style="width:30%;font-weight:800;font-size:11px;padding:3px 6px">NET PAID ₹${inr(s.net)}</td>
-<td style="font-size:7.6px"><b>${esc(s.in_words && /rupees/i.test(s.in_words) ? s.in_words : `Rupees ${s.in_words || wordsOf(s.net)} only`)}</b></td>
+<td style="width:62%;padding:4px 6px;vertical-align:middle">
+  <div style="font-weight:800;font-size:14px;letter-spacing:-0.2px">NET PAID ₹${inr(s.net)}</div>
+  <div style="font-size:7.6px;font-weight:700;margin-top:1px">${esc(s.in_words && /rupees/i.test(s.in_words) ? s.in_words : `Rupees ${s.in_words || wordsOf(s.net)} only`)}</div>
+</td>
+<td style="padding:2px 6px;text-align:right;vertical-align:middle">
+  ${opts.stampUrl ? `<img src="${opts.stampUrl}" alt="Nandan GSE Pvt Ltd" style="height:54px;width:auto;max-width:130px;object-fit:contain;display:inline-block;vertical-align:middle">` : ""}
+</td>
 </tr></tbody></table>
 
 <div style="display:flex;gap:8px;align-items:flex-end;margin-top:3px">
   <div style="font-size:6.6px;color:#5A6572;line-height:1.45;flex:1">
     Note: Leave of one year will be kept in balance (8 nos for Labour and 15 nos for Staff). Please note this.<br>
-    Any issues please contact the HR Department or mail hr@nandan.co.in.<br>
-    <b>This is a computer generated document and needs no signature when it reaches you from a Nandan GSE mail ID.</b>
+    Any issues please contact the HR Department or mail hr@nandan.co.in.
   </div>
-  ${opts.stampUrl ? `<img src="${opts.stampUrl}" alt="Nandan GSE Pvt Ltd" style="height:62px;width:auto;max-width:110px;object-fit:contain;align-self:flex-end;flex-shrink:0">` : ""}
 </div>
 </div></body></html>`;
 }

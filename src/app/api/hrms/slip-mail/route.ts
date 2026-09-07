@@ -54,7 +54,32 @@ async function load(sheetId: string) {
   const by = new Map(ppl.map((p) => [p.id, p]));
   const days = new Date(Date.UTC(Number(sheet.year), Number(sheet.month), 0)).getUTCDate();
   const slips = slipsFromRegister(rows as never[], (id) => (by.get(id)?.value || {}) as Record<string, string | null>, days);
-  return { sheet, slips, by };
+
+  /**
+   * AN ADDRESS TWO PEOPLE SHARE IS NOT A PERSONAL ADDRESS (found 7 Sep 2026,
+   * checking the August register before the first send).
+   *
+   * Three men — 6608 Tushar Giri, 6864 Pappu Lal, 6993 Sunil Gayakwad — carry
+   * hr@nandan.co.in in the Personal Mail ID column. Sending to it would put
+   * three payslips in the shared HR mailbox, which is the precise thing the
+   * personal-only rule exists to stop; the field being called "personal" does
+   * not make it so.
+   *
+   * The test is SHARED, not company-domain: raghu@nandan.co.in is on the
+   * company domain and belongs to one man, and there is no reason to refuse
+   * him his own slip.
+   */
+  const times = new Map<string, number>();
+  for (const s of slips) {
+    const e = ok(by.get(s.id)?.value?.personal_email);
+    if (e) times.set(e, (times.get(e) || 0) + 1);
+  }
+  const shared = new Set([...times.entries()].filter(([, n]) => n > 1).map(([e]) => e));
+  const addressOf = (id: string) => {
+    const e = ok(by.get(id)?.value?.personal_email);
+    return e && !shared.has(e) ? e : "";
+  };
+  return { sheet, slips, by, addressOf, shared };
 }
 
 export async function GET(req: Request) {
@@ -62,11 +87,14 @@ export async function GET(req: Request) {
     await requireHrms();
     const id = new URL(req.url).searchParams.get("sheet");
     if (!id) throw new HttpError(400, "which month?");
-    const { sheet, slips, by } = await load(id);
+    const { sheet, slips, by, addressOf, shared } = await load(id);
     const rows = slips.map((s: Slip) => {
       const p = by.get(s.id);
-      return { id: s.id, name: s.name, net: s.net, personal: ok(p?.value?.personal_email), type: p?.type || null };
+      const raw = ok(p?.value?.personal_email);
+      return { id: s.id, name: s.name, net: s.net, personal: addressOf(s.id), type: p?.type || null,
+        why: addressOf(s.id) ? "" : raw ? `${raw} is shared by more than one person` : "no personal e-mail on record" };
     });
+    void shared;
     return NextResponse.json({
       month: sheet.month, year: sheet.year, status: sheet.status,
       total: rows.length, withPersonal: rows.filter((r) => r.personal).length,
@@ -80,17 +108,20 @@ export async function POST(req: Request) {
   try {
     const u = await requireHrms();
     const b = await readBody(req, { sheet: "string", from: "string?", subject: "string?", body: "string?" });
-    const { sheet, slips, by } = await load(String(b.sheet));
+    const { sheet, slips, by, addressOf } = await load(String(b.sheet));
     const period = `${MONTHS[Number(sheet.month) - 1]} ${sheet.year}`;
     const wanted = Array.isArray(b.ids) ? b.ids.map(String) : null;
 
     const sendable = slips
       .filter((s: Slip) => !wanted || wanted.includes(s.id))
-      .map((s: Slip) => ({ s, to: ok(by.get(s.id)?.value?.personal_email) }))
+      .map((s: Slip) => ({ s, to: addressOf(s.id) }))
       .filter((x) => x.to);
     const noPersonal = slips
-      .filter((s: Slip) => !ok(by.get(s.id)?.value?.personal_email))
-      .map((s: Slip) => ({ id: s.id, name: s.name }));
+      .filter((s: Slip) => !addressOf(s.id))
+      .map((s: Slip) => {
+        const raw = ok(by.get(s.id)?.value?.personal_email);
+        return { id: s.id, name: s.name, why: raw ? `${raw} is shared` : "no personal e-mail" };
+      });
 
     if (b.action === "preview")
       return NextResponse.json({ ok: true, count: sendable.length, noPersonal, period, sample: sendable.slice(0, 3).map((x) => ({ name: x.s.name, to: x.to })) });
