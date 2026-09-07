@@ -182,7 +182,18 @@ export default function SalarySlipsPrint({ month, year, picked, total, draft = f
                   ["Conveyance", s.conv_rate, s.conveyance, "Advance", s.advance],
                   ["Fixed Allowance", s.fixed_rate, s.fixed, "Loan EMI", s.loan_ded],
                   ["Medical Allowance", s.med_rate, s.medical, "TDS Deduction", s.tds],
-                  [`Leave Encashment${s.compoff_amt || s.leave_encash_amt ? ` (leave ${inr(s.leave_encash_amt)} + comp off ${inr(s.compoff_amt)})` : ""}`, null, s.leave_encash, "Other Deductions", s.other_ded],
+                  /* ONE LINE, NO BREAKDOWN (Dr Raghu, 7 Sep 2026: "this leave
+                     encashment is wrong — just show leave encashment + comp
+                     off, don't give details in the left").
+                     
+                     It read "(leave 6,968 + comp off 0)" on a slip whose own
+                     leave line showed 1.5 comp-off days. The split was reading
+                     compoff_amt, which the generated register does not save —
+                     so it printed 0 whatever the truth was, and contradicted
+                     the correct figures three rows below it. The total is
+                     right; the parenthesis was inventing a split it could not
+                     know. The leave ledger at the foot carries the detail. */
+                  ["Leave Encashment + Comp Off", null, s.leave_encash, "Other Deductions", s.other_ded],
                   ["Site Allowance", null, s.site, "Lunch", s.lunch],
                   ["Interim Bonus", null, s.bonus, "", null],
                   /* ESIC LAST, NOT BESIDE CONVEYANCE (Dr Raghu, 7 Sep 2026:

@@ -58,7 +58,7 @@ ${money("HRA", null, s.hra, "Professional Tax", s.pt)}
 ${money("Conveyance", s.conv_rate, s.conveyance, "Advance", s.advance)}
 ${money("Fixed Allowance", s.fixed_rate, s.fixed, "Loan EMI", s.loan_ded)}
 ${money("Medical Allowance", s.med_rate, s.medical, "TDS Deduction", s.tds)}
-${money("Leave Encashment", null, s.leave_encash, "Other Deductions", s.other_ded)}
+${money("Leave Encashment + Comp Off", null, s.leave_encash, "Other Deductions", s.other_ded)}
 ${money("Site Allowance", null, s.site, "Lunch", s.lunch)}
 ${money("Interim Bonus", null, s.bonus, "", null)}
 ${/* ESIC ONLY WHEN THERE IS ESIC (Dr Raghu, 7 Sep 2026: "ESIC you dont

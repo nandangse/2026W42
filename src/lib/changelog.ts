@@ -78,6 +78,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.17.2",
+    date: "2026-09-07",
+    module: "Leave encashment on the slip, said once and said right",
+    items: [
+      "\"This leave encashment is wrong — just show leave encashment + comp off, don't give details in the left\" (Dr Raghu, 7 Sep 2026). The line read <b>(leave 6,968 + comp off 0)</b> on a slip whose own leave ledger, three rows below, showed 1.5 comp-off days. The split was reading compoff_amt, which the generated register does not store — so it printed 0 whatever the truth was, and contradicted the correct figures underneath it.",
+      "The line is now simply <b>Leave Encashment + Comp Off</b> with the one figure, which is what the figure has always been: encashed leave plus encashed comp off, added. The parenthesis was inventing a split it had no way to know. The leave ledger at the foot carries the detail, and he has confirmed that one is right.",
+    ],
+  },
+  {
     v: "5.0.17.1",
     date: "2026-09-07",
     module: "The payroll run's register heading, made readable",
