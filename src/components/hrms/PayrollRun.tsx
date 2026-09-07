@@ -23,6 +23,10 @@ interface Detail { run: Run; files: FileRow[]; inputs: InputRow[]; live_rates: {
 
 const who = (s: string | null) => (s ? String(s).split("·")[0].trim() : "—");
 
+/** 0 = Sunday. Null when the muster never said which month it is. */
+const dayOfWeek = (year: number | null, month: number | null, day: number): number | null =>
+  year && month ? new Date(Date.UTC(year, month - 1, day)).getUTCDay() : null;
+
 const KINDS = [["essl", "ESSL attendance"], ["muster", "Attendance muster"], ["rates", "Salary rate list"], ["advance", "Advance (Tally)"], ["loan", "Loan (Tally)"], ["other", "Other document"]] as const;
 /** The run's inputs, one form each (Dr Raghu, 5 Sep 2026) — who brings it, how it comes, whether a file is expected. */
 const INPUTS: { key: string; label: string; by: string; how: string; upload: boolean; needFile: boolean; accept: string }[] = [
@@ -97,6 +101,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
   const r = d.run;
   const title = `${MONTHS[r.month - 1]} ${r.year}`;
   const musterRows = (d.muster?.rows || []).filter((m) => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.employee_id.includes(q));
+  const musterMonth = d?.muster?.month ? `${MONTHS[d.muster.month - 1]}${d.muster.year ? ` ${d.muster.year}` : ""}` : "";
   const regRows = (d.register || []).filter((m) => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.employee_id.includes(q));
   const tone = (s: string) => (s === "delivered" || s === "received" ? C.green : s === "failed" ? C.red : s === "sent" ? "var(--blue)" : C.dim);
   const mark = (v: string) => ({ P: { bg: "#E6F4EA", c: C.green }, A: { bg: "#FBEDEA", c: C.red }, WO: { bg: "#F4F2EC", c: C.faint }, MO: { bg: "#DCE8F5", c: "var(--blue)" }, S: { bg: "#FFF3E8", c: C.orange } }[v] || { bg: "transparent", c: C.dim });
@@ -264,11 +269,27 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
         !d.muster ? <div className="text-xs" style={{ color: C.faint }}>No muster uploaded yet.</div> : (
           <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflow: "auto", maxHeight: "calc(100vh - 300px)" }}>
             <table className="genie-table" style={{ fontSize: 11.5, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
-              <thead><tr style={{ color: C.faint, fontSize: 10 }}>
-                <th className="px-2 py-1.5 text-left" style={{ position: "sticky", left: 0, top: 0, background: "#fff", zIndex: 3, minWidth: 60, width: 60 }}>Emp</th>
-                <th className="px-2 py-1.5 text-left" style={{ position: "sticky", left: 60, top: 0, background: "#fff", zIndex: 3, minWidth: 160 }}>Name</th>
-                {Array.from({ length: d.muster.days }, (_, i) => <th key={i} className="px-1 py-1.5" style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, minWidth: 22, textAlign: "center" }}>{i + 1}</th>)}
-                {["P", "A", "WO", "MO", "Pay", "OT", "Adv", "Loan", "Cat", "Mobile"].map((h) => <th key={h} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#fff", zIndex: 2, textAlign: "right" }}>{h}</th>)}
+              {/* THE FROZEN ROW CARRIES THE DATE (Dr Raghu, 7 Sep 2026:
+                  "attendance muster frozen row to have date heading"). Bare
+                  numbers in grey told nobody which day they were looking at;
+                  the weekday sits above the date, and Sundays are shaded, so
+                  the roster reads the way Vishwas keeps it. */}
+              <thead><tr style={{ fontSize: 10 }}>
+                <th className="px-2 py-1.5 text-left" style={{ position: "sticky", left: 0, top: 0, background: "#F4F2EC", zIndex: 3, minWidth: 60, width: 60, color: C.ink, borderBottom: `2px solid ${C.line}` }}>Emp</th>
+                <th className="px-2 py-1.5 text-left" style={{ position: "sticky", left: 60, top: 0, background: "#F4F2EC", zIndex: 3, minWidth: 160, color: C.ink, borderBottom: `2px solid ${C.line}` }}>
+                  Name{musterMonth ? <span style={{ color: C.faint, fontWeight: 400 }}> · {musterMonth}</span> : null}
+                </th>
+                {Array.from({ length: d.muster.days }, (_, i) => {
+                  const dw = dayOfWeek(d.muster!.year, d.muster!.month, i + 1);
+                  const sun = dw === 0;
+                  return (
+                    <th key={i} className="px-1 py-1" style={{ position: "sticky", top: 0, background: sun ? "#FBEFE7" : "#F4F2EC", zIndex: 2, minWidth: 24, textAlign: "center", color: sun ? "#8A5B00" : C.ink, borderBottom: `2px solid ${C.line}`, lineHeight: 1.15 }}>
+                      <div style={{ fontSize: 9, fontWeight: 400, color: sun ? "#8A5B00" : C.faint }}>{dw == null ? "" : "SMTWTFS"[dw]}</div>
+                      <div style={{ fontSize: 11, fontWeight: 700 }}>{i + 1}</div>
+                    </th>
+                  );
+                })}
+                {["P", "A", "WO", "MO", "Pay", "OT", "Adv", "Loan", "Cat", "Mobile"].map((h) => <th key={h} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#F4F2EC", zIndex: 2, textAlign: "right", color: C.ink, borderBottom: `2px solid ${C.line}` }}>{h}</th>)}
               </tr></thead>
               <tbody>
                 {musterRows.map((m) => (

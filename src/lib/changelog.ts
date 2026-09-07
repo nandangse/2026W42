@@ -78,6 +78,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.11.2",
+    date: "2026-09-07",
+    module: "The muster's frozen row carries the date",
+    items: [
+      "\"Attendance muster frozen row to have date heading\" (Dr Raghu, 7 Sep 2026). It carried bare numbers in pale grey, which told nobody which day they were looking at across thirty-one columns.",
+      "The frozen row now shows the weekday above the date, on a solid ground so it reads against the marks below it, with SUNDAYS SHADED — so the roster reads the way Vishwas keeps it, and a week can be counted by eye. The month and year sit beside the Name heading, which also stays frozen.",
+    ],
+  },
+  {
     v: "5.0.11.1",
     date: "2026-09-07",
     module: "Download as Excel — coloured, and from the button",
