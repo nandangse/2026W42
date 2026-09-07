@@ -78,6 +78,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.19.8",
+    date: "2026-09-07",
+    module: "The apply forms: what he may encash, and sizes he can choose",
+    items: [
+      "LEAVE ENCASHMENT SHOWS HIM HIS OWN ARITHMETIC (Dr Raghu, 7 Sep 2026: \"show him his days available. for workers keep 8 and staff keep 15. then show remaining to be encashed =\"). The box asked for a number with nothing to measure it against, so a man had to guess and HR had to refuse him. It now reads his balance, the days that must stay (8 for Labour, 15 for Staff — the rule already printed at the foot of his payslip), and what is left to encash. Where nothing is left it says so rather than taking an application that cannot be granted.",
+      "AND SIZES ARE CHOSEN, NOT TYPED (\"show pant size and shirt size as dropdown\", \"shoe size show as dropdown\"). A free box on a phone gets \"L\", \"lage\", \"36 waist\" and \"9 no\" for the same four things, and stores has to guess. Letters and waist inches for uniform, UK sizes for shoes.",
+    ],
+  },
+  {
     v: "5.0.19.7",
     date: "2026-09-07",
     module: "The password sign-in reaches the page it opens",

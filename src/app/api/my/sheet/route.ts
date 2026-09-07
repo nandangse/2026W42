@@ -48,9 +48,19 @@ const APPLICATION_KINDS: Record<string, { label: string; fields: { key: string; 
     { key: "days", label: "Days to encash", type: "number", required: true }, { key: "reason", label: "Reason", type: "text" } ] },
   uniform: { label: "Uniform", fields: [
     { key: "item", label: "Item", type: "select", options: ["Shirt", "Pant", "Shirt and pant", "Jacket", "Cap"], required: true },
-    { key: "size", label: "Size", type: "text", required: true }, { key: "qty", label: "How many", type: "number", required: true }, { key: "reason", label: "Reason", type: "text" } ] },
+    /* SIZES ARE CHOSEN, NOT TYPED (Dr Raghu, 7 Sep 2026: "show pant size and
+       shirt size as dropdown", "shoe size show as dropdown"). A free box on
+       a phone gets "L", "lage", "36 waist" and "9 no" for the same four
+       things, and stores has to guess. Letters for a shirt, waist inches for
+       a pant, in one list because the Item above already says which. */
+    { key: "size", label: "Size", type: "select", required: true,
+      options: ["S", "M", "L", "XL", "XXL", "XXXL",
+        "28", "30", "32", "34", "36", "38", "40", "42", "44"] },
+    { key: "qty", label: "How many", type: "number", required: true }, { key: "reason", label: "Reason", type: "text" } ] },
   shoes: { label: "Shoes", fields: [
-    { key: "size", label: "Shoe size", type: "text", required: true }, { key: "reason", label: "Reason", type: "select", options: ["Worn out", "New joinee", "Damaged at work", "Other"], required: true } ] },
+    { key: "size", label: "Shoe size (UK)", type: "select", required: true,
+      options: ["5", "6", "7", "8", "9", "10", "11", "12"] },
+    { key: "reason", label: "Reason", type: "select", options: ["Worn out", "New joinee", "Damaged at work", "Other"], required: true } ] },
   other: { label: "Other things", fields: [
     { key: "what", label: "What do you need", type: "text", required: true }, { key: "why", label: "Why", type: "text" } ] },
 };

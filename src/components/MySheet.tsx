@@ -109,6 +109,26 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
   if (d.linked && lastIdp && !(lastIdp.answers?.learning || "").trim()) pending.push("Write your learning goals");
 
   const openQ = d.linked ? d.queries.filter((q) => q.status === "Open").length : 0;
+
+  /**
+   * WHAT HE MAY ACTUALLY ENCASH (Dr Raghu, 7 Sep 2026: "in leave encashment
+   * show him his days available. for workers keep 8 and staff keep 15. then
+   * show remaining to be encashed =").
+   *
+   * The box asked for a number with nothing to measure it against, so a man
+   * had to guess and HR had to refuse him. The rule is already printed at the
+   * foot of his payslip — a year's leave stays in balance, eight days for
+   * labour and fifteen for staff — so the arithmetic is done for him here.
+   */
+  const encashHint = (() => {
+    if (!d.linked) return null;
+    const bal = latest?.slip?.leave_cb;
+    if (bal == null) return null;
+    const worker = /labour/i.test(String(d.me.type || ""));
+    const keep = worker ? 8 : 15;
+    const can = Math.max(0, Math.round((Number(bal) - keep) * 10) / 10);
+    return { bal: Number(bal), keep, can, worker };
+  })();
   const initials = (d.linked ? d.me.name : name || "").split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join("").toUpperCase();
 
   return (
@@ -562,7 +582,9 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
         ))}
       </div>
 
-      {apply && d.linked && <ApplyBox kind={apply} spec={d.kinds[apply]} onClose={() => setApply(null)} onDone={(s) => { setApply(null); setMsg(`Sent to HR: ${s} ✓`); setTab("queries"); load(); }} />}
+      {apply && d.linked && <ApplyBox kind={apply} spec={d.kinds[apply]}
+        hint={apply === "encashment" ? encashHint : null}
+        onClose={() => setApply(null)} onDone={(s) => { setApply(null); setMsg(`Sent to HR: ${s} ✓`); setTab("queries"); load(); }} />}
     </div>
   );
 }
@@ -594,7 +616,11 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
   );
 }
 
-function ApplyBox({ kind, spec, onClose, onDone }: { kind: string; spec: { label: string; fields: Field[] }; onClose: () => void; onDone: (subject: string) => void }) {
+function ApplyBox({ kind, spec, hint, onClose, onDone }: {
+  kind: string; spec: { label: string; fields: Field[] };
+  hint?: { bal: number; keep: number; can: number; worker: boolean } | null;
+  onClose: () => void; onDone: (subject: string) => void;
+}) {
   const [f, setF] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -609,6 +635,26 @@ function ApplyBox({ kind, spec, onClose, onDone }: { kind: string; spec: { label
       <div className="w-full p-4" style={{ background: "#fff", borderRadius: "14px 14px 0 0", maxWidth: 640, maxHeight: "88vh", overflowY: "auto" }} role="button" tabIndex={0} onClick={(e) => e.stopPropagation()}>
         <div className="font-bold" style={{ fontSize: 18 }}>Apply for {spec.label}</div>
         <div className="text-xs mt-1" style={{ color: C.faint }}>Goes to HR as an application under HR Queries. You see the answer there.</div>
+        {hint && (
+          <div className="rounded-lg mt-3" style={{ background: "#F4F2EC", border: `1px solid ${C.line}`, padding: "10px 12px" }}>
+            <div className="flex items-baseline justify-between" style={{ fontSize: 13.5 }}>
+              <span style={{ color: C.dim }}>Your leave balance</span><b className="tnum">{hint.bal} days</b>
+            </div>
+            <div className="flex items-baseline justify-between mt-1" style={{ fontSize: 13.5 }}>
+              <span style={{ color: C.dim }}>Must stay in balance ({hint.worker ? "Labour" : "Staff"})</span>
+              <b className="tnum">− {hint.keep} days</b>
+            </div>
+            <div className="flex items-baseline justify-between mt-1.5 pt-1.5" style={{ borderTop: `1px solid ${C.line}`, fontSize: 15 }}>
+              <b>You may encash</b>
+              <b className="tnum" style={{ color: hint.can > 0 ? C.green : C.red, fontSize: 18 }}>{hint.can} days</b>
+            </div>
+            {hint.can <= 0 && (
+              <div className="mt-1" style={{ fontSize: 12, color: C.red, lineHeight: 1.5 }}>
+                A year&apos;s leave has to stay in balance, so there is nothing to encash this year.
+              </div>
+            )}
+          </div>
+        )}
         {err && <div className="text-sm font-semibold mt-2" style={{ color: C.red }}>{err}</div>}
         {spec.fields.map((fl) => (
           <div key={fl.key} className="mt-3">
