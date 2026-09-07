@@ -33,6 +33,8 @@ interface PersonData {
   employee: { id: string; name: string; department: string | null; designation: string | null; type: string | null; age?: number | null; years?: number | null; doj?: string | null; manager?: string | null; personal_mobile?: string | null; personal_email?: string | null };
   role?: { role: string; department: string | null; grade: string | null; reports_to: string | null; job_description: string | null; deliverable: string | null; metric: string | null; summary: string | null } | null;
   salaryYears?: { year: number; gross: number | null; note: string }[];
+  /** The previous period's rate list — what he was actually on before this round. */
+  prevFromList?: number | null;
   salary: { rows: SalaryRow[]; ctcLakhs: string; exempt: boolean; gross: number } | null;
   idp: {
     id: string; submitted_at: string | null; role_at_time: string | null; role_summary: string | null;
@@ -46,6 +48,7 @@ interface PersonData {
   }[];
   appraisal: {
     new_gross: number | null; prev_gross: number | null; note: string | null; decided_by: string | null; decided_at: string;
+    prev_gross_from?: string | null; prev_gross_stored?: number | null;
     structure?: { components?: Record<string, number>; extras?: Record<string, number> } | null;
     pending_since?: string | null; pending_by?: string | null;
     approved_at?: string | null; approved_by?: string | null;
@@ -596,7 +599,18 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
    * increment split against it put money into two heads that do not exist.
    */
   const isWorker = NO_HRA_NO_MEDICAL.has(String(d.employee.type || ""));
-  const prev = d.salary?.gross ?? null;
+  /**
+   * THE PREVIOUS GROSS IS THE PREVIOUS PERIOD'S RATE LIST (Dr Raghu, 7 Sep
+   * 2026: "in this previous gross is to be taken from the Salary rate list of
+   * the previous period and compared to this").
+   *
+   * It used to read the RECORD's gross — which was right until migration 0153
+   * put the finalised figures onto the records. From that moment the record
+   * held the NEW number, so every card showed Previous Gross equal to New
+   * Gross and an increment of zero. The earlier rate list is the only place
+   * that still remembers what somebody was on.
+   */
+  const prev = d.prevFromList ?? (d.appraisal?.prev_gross ?? null) ?? d.salary?.gross ?? null;
   const proposed = d.reviews.find((r) => r.gross_proposed != null)?.gross_proposed ?? null;
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -780,7 +794,12 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
   return (
     <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line }}>
       <div className="flex gap-x-6 gap-y-1 flex-wrap" style={{ fontSize: 14 }}>
-        <span>Previous Gross: <b className="tnum">₹{inr(prev)}</b>/mo</span>
+        <span>Previous Gross: <b className="tnum">₹{inr(prev)}</b>/mo
+          {d.appraisal?.prev_gross_from ? <span style={{ color: C.faint, fontSize: 12 }}> · from {String(d.appraisal.prev_gross_from)}</span> : null}
+          {d.appraisal?.prev_gross_stored != null && Number(d.appraisal.prev_gross_stored) !== Number(prev)
+            ? <span style={{ color: "#8A5B00", fontSize: 12 }}> · the appraisal had recorded ₹{inr(Number(d.appraisal.prev_gross_stored))}</span>
+            : null}
+        </span>
         {proposed != null && <span style={{ color: C.faint }}>manager proposed <b className="tnum">₹{inr(proposed)}</b></span>}
         {d.idp?.answers?.["ask_gross"] && <span style={{ color: C.faint }}>they asked <b className="tnum">₹{inr(Number(d.idp.answers["ask_gross"]))}</b></span>}
       </div>

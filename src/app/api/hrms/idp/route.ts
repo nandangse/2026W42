@@ -333,11 +333,42 @@ export async function GET(req: Request) {
         }));
       }
 
+      /**
+       * PREVIOUS GROSS COMES FROM THE PREVIOUS PERIOD'S RATE LIST (Dr Raghu,
+       * 7 Sep 2026: "in this previous gross is to be taken from the Salary
+       * rate list of the previous period and compared to this").
+       *
+       * The Live list is now the FINALISED figures, so the previous period is
+       * the structure before it — the one marked Overwritten. Reading it is
+       * also the only thing that catches a previous typed equal to the new
+       * one: Ajay Padelkar sat at a zero increment because both said
+       * 1,30,000, while the earlier list had him on 52,000.
+       *
+       * It is a reading, not a rewrite: what was agreed stays on the
+       * appraisal, and the stored figure answers if no earlier list has him.
+       */
+      let prevFromList: number | null = null;
+      try {
+        const { data: structs } = await admin.from("hrms_salary_structure")
+          .select("id, title, status, created_at").order("created_at", { ascending: false });
+        const earlier = (structs || []).find((x) => String(x.status) !== "Live");
+        if (earlier) {
+          const { data: rate } = await admin.from("hrms_salary_rate")
+            .select("gross").eq("structure_id", earlier.id).eq("employee_id", person).maybeSingle();
+          if (rate?.gross != null) prevFromList = Number(rate.gross);
+        }
+      } catch (e) { swallow("hrms/idp prev list", e); }
+
       let appraisal: Record<string, unknown> | null = null;
       try {
         const { data: ap } = await admin
           .from("hrms_appraisal").select("*").eq("employee_id", person).eq("cycle", "2026-27").maybeSingle();
         appraisal = ap ?? null;
+        if (appraisal && prevFromList != null) {
+          appraisal.prev_gross_stored = appraisal.prev_gross ?? null;
+          appraisal.prev_gross = prevFromList;
+          appraisal.prev_gross_from = "the previous rate list";
+        }
       } catch (e) { swallow("hrms/idp", e); /* pre-0061 */ }
 
       // the person's frame (Dr Raghu, 29 Aug 2026): age, years in the
@@ -408,7 +439,7 @@ export async function GET(req: Request) {
 
       return NextResponse.json({
         employee: { id: emp.id, name: emp.name, department: emp.department, designation: emp.designation, type, ...meta },
-        role, salaryYears,
+        role, salaryYears, prevFromList,
         salary, idp: idpFull, reviews, appraisal,
       });
     }

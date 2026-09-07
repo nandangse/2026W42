@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.14.3",
+    date: "2026-09-07",
+    module: "Previous Gross comes from the previous period's rate list",
+    items: [
+      "\"In this previous gross is to be taken from the Salary rate list of the previous period and compared to this\" (Dr Raghu, 7 Sep 2026) — and he caught something that had only just broken.",
+      "The card read the RECORD's gross as the previous figure. That was right until migration 0153 pushed the finalised appraisals onto the records an hour earlier: from that moment the record held the NEW number, so every card showed Previous Gross equal to New Gross and an increment of <b>zero</b>. The rate list from the period before is the only place that still remembers what somebody was on.",
+      "It reads that list now. Where it disagrees with what the appraisal recorded, the card says so rather than choosing quietly — <b>Ajay Padelkar</b> sat at a zero increment because both his figures said Rs 1,30,000, while the earlier list has him on Rs 52,000. One person of 204, found only because the two sources were finally compared.",
+      "It is a reading and not a rewrite: what was agreed stays on the appraisal, and the stored figure still answers for anybody the earlier list does not carry.",
+    ],
+  },
+  {
     v: "5.0.14.2",
     date: "2026-09-07",
     module: "The leave and loan ledgers, read from the sheet at last",
