@@ -78,6 +78,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.14.2",
+    date: "2026-09-07",
+    module: "The leave and loan ledgers, read from the sheet at last",
+    items: [
+      "\"Leave OB, Leave Added, Leave Used, Leave Encashed, Leave CB — in this also the comp off to be shown. Loan OB, Loan Added, Loan Deducted, Loan CB\" (Dr Raghu, 7 Sep 2026, giving the headers himself).",
+      "The parser had <b>no rule for a single one of them</b>. So an uploaded month could never show a balance however complete the file was — the payslip printed dashes, and it looked like a fault in the slip when the fault was that nothing was ever read. All ten are read now, comp-off days among them.",
+      "They show on the payslip's leave and loan lines, and on the salary register at the far right, where they read as a statement rather than as part of the month's arithmetic.",
+      "One slip reads either name: the generator calls it leave_earned and loan_taken, an uploaded sheet says Leave Added and Loan Added. Whichever the month came from, the same slip prints.",
+      "So a re-upload of August now carries everything — the balances, comp off, and the medical allowance whose rule went in this morning.",
+    ],
+  },
+  {
     v: "5.0.14.1",
     date: "2026-09-07",
     module: "Rewrite all the growth notes, and Dr Raghu's own voice on the page",

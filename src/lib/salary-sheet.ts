@@ -41,6 +41,19 @@ export interface SheetRow {
   hra?: number | null;
   /** Paid to Staff only — workers have no medical allowance (2 Sep 2026). */
   medical?: number | null;
+  /**
+   * THE LEAVE AND LOAN LEDGERS, as the uploaded sheet carries them (Dr Raghu,
+   * 7 Sep 2026, giving the headers himself: "Leave OB, Leave Added, Leave
+   * Used, Leave Encashed, Leave CB ... in this also the comp off to be shown
+   * ... Loan OB, Loan Added, Loan Deducted, Loan CB").
+   *
+   * Until now the parser had no rule for a single one of them, so an uploaded
+   * month could never show a balance however complete the file was — the
+   * payslip printed dashes and looked like a fault in the slip.
+   */
+  leave_ob?: number | null; leave_added?: number | null; leave_used?: number | null;
+  leave_encashed?: number | null; leave_cb?: number | null; compoff_days?: number | null;
+  loan_ob?: number | null; loan_added?: number | null; loan_cb?: number | null;
   fixed_allowance?: number | null;
   conveyance?: number | null;
   site_allowance?: number | null;
@@ -76,6 +89,17 @@ export const REGISTER_COLUMNS: { key: keyof SheetRow; label: string }[] = [
   { key: "deductions", label: "Total Ded." },
   { key: "arrears", label: "Arrears" },
   { key: "net", label: "Net Pay" },
+  /* the ledgers, at the far right where they read as a statement rather than
+     as part of the month's arithmetic (Dr Raghu, 7 Sep 2026) */
+  { key: "leave_ob", label: "Leave OB" },
+  { key: "leave_added", label: "Leave Added" },
+  { key: "compoff_days", label: "Comp Off" },
+  { key: "leave_used", label: "Leave Used" },
+  { key: "leave_encashed", label: "Leave Encashed" },
+  { key: "leave_cb", label: "Leave CB" },
+  { key: "loan_ob", label: "Loan OB" },
+  { key: "loan_added", label: "Loan Added" },
+  { key: "loan_cb", label: "Loan CB" },
 ];
 
 export interface SheetTotals {
@@ -145,6 +169,15 @@ const COLUMN_RULES: { key: keyof SheetRow | "skip"; test: (h: string) => boolean
   { key: "advance", test: (h) => /^advance(deduction|recovered|deducted)?$/.test(h) },
   { key: "other_ded", test: (h) => /otherded|othded|misc(ellaneous)?ded/.test(h) },
   { key: "arrears", test: (h) => /^arrears?(payable)?$/.test(h) },
+  { key: "leave_ob", test: (h) => /^leave(opening|ob)(balance)?$/.test(h) },
+  { key: "leave_added", test: (h) => /^leave(added|earned|credit(ed)?)$/.test(h) },
+  { key: "leave_used", test: (h) => /^leave(used|utilized|utilised|taken)$/.test(h) },
+  { key: "leave_encashed", test: (h) => /^leaveencash(ed|ment)?$/.test(h) },
+  { key: "leave_cb", test: (h) => /^leave(closing|cb)(balance)?$/.test(h) },
+  { key: "compoff_days", test: (h) => /^comp(ensatory)?off(days)?$/.test(h) },
+  { key: "loan_ob", test: (h) => /^loan(opening|ob)(balance)?$/.test(h) },
+  { key: "loan_added", test: (h) => /^loan(added|taken|disbursed)$/.test(h) },
+  { key: "loan_cb", test: (h) => /^loan(closing|cb)(balance)?$/.test(h) },
   { key: "gross", test: (h) => /^(gross|grosssalary|grosssalaryrate|grosspay|monthlygross|fixedgross)$/.test(h) },
   { key: "net", test: (h) => /(netpayable|netsalary|netpayment|netpay|netamount|amountpayable|takehome)/.test(h) || h === "net" },
   { key: "deductions", test: (h) => /^(totaldeductions?|deductions?|lessdeductions?|recovery)$/.test(h) },
@@ -155,6 +188,8 @@ const COLUMN_RULES: { key: keyof SheetRow | "skip"; test: (h: string) => boolean
 const REGISTER_KEYS: (keyof SheetRow)[] = [
   "attendance", "paid_days", "gross", "basic_da", "hra", "fixed_allowance", "conveyance",
   "medical", "site_allowance", "pf", "pt", "other_ded", "loan", "advance", "tds", "arrears",
+  "leave_ob", "leave_added", "leave_used", "leave_encashed", "leave_cb", "compoff_days",
+  "loan_ob", "loan_added", "loan_cb",
 ];
 
 /** OT, as the company books it: Site Allowance + HRA of the labour types. */

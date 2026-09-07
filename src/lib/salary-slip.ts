@@ -244,8 +244,8 @@ export function slipsFromRegister(
     const rec = record(String(r.employee_id)) || {};
     const g = (k: string) => rec[k];
     const encashLeave = N(r.encash_amt) ?? 0, encashComp = N(r.compoff_amt) ?? 0;
-    const compDays = N(r.compoff_days) ?? 0;
-    const encashedDays = N(r.leave_encashed) ?? 0;
+    const compDays = N(r.compoff_days) ?? N(r.compoff) ?? 0;
+    const encashedDays = N(r.leave_encashed) ?? 0;   // the sheet's own Leave Encashed
     const net = N(r.net) ?? 0;
     const s: Slip = {
       id: String(r.employee_id), name: T(r.name) || String(r.employee_id),
@@ -259,16 +259,18 @@ export function slipsFromRegister(
       leave_encash: encashLeave + encashComp,
       bonus: null, arrears: N(r.arrears), total_earned: N(r.earned),
       pf: N(r.pf), pt: N(r.pt), esi: 0, lunch: N(r.lunch),
-      advance: N(r.advance), loan_ded: N(r.loan), tds: N(r.tds),
+      advance: N(r.advance), loan_ded: N(r.loan) ?? N(r.loan_ded), tds: N(r.tds),
       other_ded: (N(r.other_ded) ?? 0) + (N(r.late_ded) ?? 0), total_ded: N(r.deductions),
       net, in_words: `Rupees ${inWords(net)} Only`,
       loan_ob: N(r.loan_ob), loan_cb: N(r.loan_cb),
-      leave_ob: N(r.leave_ob), leave_added: N(r.leave_earned), leave_used: N(r.leave_used), leave_cb: N(r.leave_cb),
+      /* the generator calls it leave_earned, the uploaded sheet Leave Added —
+         one slip reads either (7 Sep 2026) */
+      leave_ob: N(r.leave_ob), leave_added: N(r.leave_earned) ?? N(r.leave_added), leave_used: N(r.leave_used), leave_cb: N(r.leave_cb),
       uan: T(g("uan_no")), pf_no: T(g("pf_no")), esic_no: T(g("esic_no")), pan: T(g("pan")),
       aadhaar: T(g("aadhaar")), mlwf: T(g("mlwf")),
       bank: T(g("bank_name")), account: T(g("account_no")) || T(g("account_15")), ifsc: T(g("ifsc")),
       per_day: N(r.per_day), round_up: null,
-      leave_encashed: encashedDays, loan_added: N(r.loan_taken),
+      leave_encashed: encashedDays, loan_added: N(r.loan_taken) ?? N(r.loan_added),
       compoff_days: compDays,
       compoff_encashed_days: compDays > 0 && N(r.per_day) ? Math.round((encashComp / (N(r.per_day) as number)) * 100) / 100 : 0,
       compoff_amt: encashComp,
