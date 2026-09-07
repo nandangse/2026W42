@@ -78,6 +78,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.11.0",
+    date: "2026-09-07",
+    module: "Payroll takes the rate from the system, and the download takes his shape",
+    items: [
+      "\"From the August month we should not use the salary rates as an upload. It should have an option saying: take the salary rate from the system, which is the latest one available.\" (Dr Raghu, 7 Sep 2026). The payroll run asks where the rate comes from, and <b>From the system</b> is the default.",
+      "THE LATEST AVAILABLE IS THE APPRAISAL HE HAS FINALISED, for a month at or after the date it takes effect. Anybody without one in force falls through to their record — nothing is invented — and the run reports how many rates it took from the system.",
+      "WHY IT HAD TO EXIST. The August run was generated on 5 September from the Live salary structure and paid 43 people their OLD rate — Rs 4,15,032 a month between them, K. Santosh Kumar Patra alone Rs 68,500 short — because the revision went in two days later. A rate list is a copy, and a copy is stale the moment the thing it copied moves. Reading the appraisals cannot drift, because nothing sits in between to drift.",
+      "THE DOWNLOAD NOW HAS THE REVISION MASTER'S OWN SHAPE. \"It should be having the heading as per this CSV\" — so it does, to the column: nineteen columns of what the person is on today, one blank column, then twelve of what they move to, with Genie's own figures kept far to the right where a paste cannot reach.",
+      "AND THE RIGHT-HAND BLOCK IS THE APPRAISAL — \"make the rates as per the appraisal, why isn't it changed?\" The sheet he downloaded had the new block mirroring the old, because a spreadsheet cannot know what was finalised inside Genie. It does now: where an appraisal was saved with its components edited by hand, those exact figures go out, and a Parts agreed column says so.",
+    ],
+  },
+  {
     v: "5.0.10.6",
     date: "2026-09-07",
     module: "The appraisal download carries the whole new structure",

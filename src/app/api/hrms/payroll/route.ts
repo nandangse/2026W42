@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { readBody } from "@/lib/validate";
+import { splitGross } from "@/lib/salary";
 import { swallow } from "@/lib/swallow";
 import * as XLSX from "xlsx";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
@@ -243,7 +244,54 @@ export async function POST(req: Request) {
       const r = await runRow(admin, id);
       const muster = r.muster as Muster | null;
       if (!muster?.rows?.length) throw new HttpError(400, "Upload the muster first — there is nothing to generate from.");
+      /**
+       * THE RATE FROM THE SYSTEM (Dr Raghu, 7 Sep 2026: "from the August
+       * month we should not use the salary rates as an upload. It should
+       * have an option saying take the salary rate from the system, which is
+       * the latest one available").
+       *
+       * The latest one available is the appraisal he has FINALISED, for a
+       * month at or after the date it takes effect. Where a person has no
+       * finalised appraisal in force, nothing is invented for them: they fall
+       * through to their record, exactly as they did before.
+       *
+       * Why this had to exist: the August run generated on 5 September read
+       * the Live salary structure and paid 43 people on their old rate, two
+       * days before the revision was loaded. A rate list is a copy, and a
+       * copy is out of date the moment the thing it copied moves.
+       */
+      const savedSource = ((r.mapping as { rate_source?: string } | null) || {}).rate_source;
+      const wantSystem = String(body.rate_source ?? savedSource ?? "") === "system";
       let rates = (r.rates as Rates | null) || null;
+      let systemCount = 0;
+      if (wantSystem) {
+        const monthEnd = new Date(Date.UTC(Number(r.year), Number(r.month), 0)).toISOString().slice(0, 10);
+        const { data: aps } = await admin.from("hrms_appraisal")
+          .select("employee_id, new_gross, approved_at, effective_from, structure, new_designation")
+          .not("approved_at", "is", null).not("new_gross", "is", null);
+        const inForce = ((aps || []) as { employee_id: string; new_gross: number; effective_from: string | null; structure: { components?: Record<string, number> } | null }[])
+          .filter((a) => !a.effective_from || String(a.effective_from).slice(0, 10) <= monthEnd);
+        const who = await people(admin, inForce.map((a) => String(a.employee_id)));
+        const typeOfId = new Map(who.map((p) => [p.id, p.type]));
+        const nameOfId = new Map(who.map((p) => [p.id, p.name]));
+        const rows2 = inForce.map((a) => {
+          const id = String(a.employee_id);
+          const type = typeOfId.get(id) || null;
+          const c = a.structure?.components;
+          const parts = c && Object.keys(c).length
+            ? { basic_da: Number(c.basic_da) || 0, hra: Number(c.hra) || 0, fixed_allowance: Number(c.fixed) || 0, conveyance: Number(c.conveyance) || 0, medical_allowance: Number(c.medical) || 0 }
+            : splitGross(Number(a.new_gross), undefined, type);
+          return {
+            employee_id: id, name: nameOfId.get(id) || null, type,
+            gross: Number(a.new_gross),
+            basic_da: parts.basic_da, hra: parts.hra, fixed: parts.fixed_allowance,
+            conveyance: parts.conveyance, medical: parts.medical_allowance,
+            site: c ? Number(c.site) || null : null, per_day: null,
+          };
+        });
+        systemCount = rows2.length;
+        rates = { rows: rows2, columns: { source: `Genie — ${rows2.length} finalised appraisals in force on ${monthEnd}` }, warnings: [] };
+      }
       // no rate list uploaded → the Live salary structure (HRIS → Salary Rate List) is the rate list
       if (!rates || !rates.rows?.length) {
         const { data: live } = await admin.from("hrms_salary_structure").select("id, title").eq("status", "Live").maybeSingle();
@@ -277,9 +325,9 @@ export async function POST(req: Request) {
       }, workingDays, month);
       const typeOf = (eid: string | null) => (eid ? byId.get(eid)?.type || null : null);
       const totals = totalsFor(rows.map((x) => ({ employee_id: x.employee_id, name: x.name, type: x.type, earned: x.earned, deductions: x.deductions, net: x.net, attendance: x.attendance, paid_days: x.paid_days, gross: x.gross, basic_da: x.basic_da, hra: x.hra, fixed_allowance: x.fixed_allowance, conveyance: x.conveyance, site_allowance: x.site_allowance, pf: x.pf, pt: x.pt, other_ded: x.other_ded, loan: x.loan, advance: x.advance, tds: x.tds, arrears: x.arrears, hold: x.hold })), typeOf);
-      const { error } = await admin.from("hrms_salary_sheet").update({ rows, ...totals, generated_at: now, generated_by: stamp, updated_at: now, mapping: { source: "generated", muster: muster.columns, rates: rates?.columns || null, warnings: [...muster.warnings, ...(rates?.warnings || []), ...warnings] } }).eq("id", id);
+      const { error } = await admin.from("hrms_salary_sheet").update({ rows, ...totals, generated_at: now, generated_by: stamp, updated_at: now, mapping: { source: "generated", rate_source: wantSystem ? "system" : "list", muster: muster.columns, rates: rates?.columns || null, warnings: [...muster.warnings, ...(rates?.warnings || []), ...warnings] } }).eq("id", id);
       if (error) throw new Error(error.message);
-      return NextResponse.json({ ok: true, lines: rows.length, warnings, totals });
+      return NextResponse.json({ ok: true, lines: rows.length, warnings, totals, rateSource: wantSystem ? "system" : rates?.columns?.source || "record", fromSystem: systemCount });
     }
 
     /** WHATSAPP — the attendance message to everybody on the muster. */

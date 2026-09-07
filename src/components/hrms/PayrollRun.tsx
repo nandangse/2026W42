@@ -41,6 +41,8 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
   const [tab, setTab] = useState<Tab>("overview");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  /** The rate source for Generate — the system by default from August on. */
+  const [rateSource, setRateSource] = useState<"system" | "list">("system");
   const [pick, setPick] = useState<Record<string, FileList | null>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [wa, setWa] = useState<{ count: number; noPhone: number; blanks: Record<string, number>; sample: { id: string; name: string; phone: string; text: string }[]; template: string } | null>(null);
@@ -221,10 +223,32 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
               </div>
             );
           })}
+          {/* WHERE THE RATE COMES FROM (Dr Raghu, 7 Sep 2026: "from the
+              August month we should not use the salary rates as an upload —
+              take the salary rate from the system, the latest one
+              available"). A rate list is a copy, and a copy is stale the
+              moment the thing it copied moves: the August run read one on
+              5 September and paid 43 people their old rate. */}
+          <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line }}>
+            <div className="text-xs font-bold mb-1" style={{ color: C.dim }}>WHERE THE RATE COMES FROM</div>
+            <div className="flex gap-3 flex-wrap">
+              {([["system", "From the system — the finalised appraisals"], ["list", "From the uploaded rate list"]] as const).map(([k, label]) => (
+                <label key={k} className="text-xs flex gap-1.5 items-center" style={{ cursor: "pointer" }}>
+                  <input type="radio" name="ratesrc" checked={rateSource === k} onChange={() => setRateSource(k)} />
+                  <span style={{ fontWeight: rateSource === k ? 700 : 400 }}>{label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="text-xs mt-1" style={{ color: C.faint, lineHeight: 1.5 }}>
+              {rateSource === "system"
+                ? "Each person is paid the appraisal you have finalised, provided its effective date has arrived by the end of this month. Anybody without one falls through to their record — nothing is invented."
+                : "The uploaded list, or the Live salary structure if none is uploaded. A list is a copy: it does not move when an appraisal is finalised after it was made."}
+            </div>
+          </div>
           <div className="bg-white rounded-lg border p-3 flex gap-2 items-center flex-wrap" style={{ borderColor: C.line }}>
             <div className="text-xs" style={{ color: C.dim }}>{d.inputs.filter((x) => x.submitted_at).length} of {INPUTS.length} inputs submitted.{d.files.filter((f) => !INPUTS.some((i) => i.key === f.kind)).length ? ` ${d.files.filter((f) => !INPUTS.some((i) => i.key === f.kind)).length} other file(s) on the run.` : ""}</div>
             <span style={{ flex: 1 }} />
-            <button onClick={() => act({ action: "generate" }, (j) => `Generated ${j.lines} lines${(j.warnings as string[])?.length ? ` · ${(j.warnings as string[]).join("; ")}` : ""}`)} disabled={busy || !d.muster} className="text-xs font-bold rounded px-4 py-2" style={{ background: d.muster ? C.green : "var(--line)", color: d.muster ? "#fff" : C.faint }} title={d.muster ? "Muster × rates → the salary register" : "Upload the muster first"}>▶ Generate</button>
+            <button onClick={() => act({ action: "generate", rate_source: rateSource }, (j) => `Generated ${j.lines} lines${j.fromSystem ? ` · ${j.fromSystem} rates taken from the system` : ""}${(j.warnings as string[])?.length ? ` · ${(j.warnings as string[]).join("; ")}` : ""}`)} disabled={busy || !d.muster} className="text-xs font-bold rounded px-4 py-2" style={{ background: d.muster ? C.green : "var(--line)", color: d.muster ? "#fff" : C.faint }} title={d.muster ? "Muster × rates → the salary register" : "Upload the muster first"}>▶ Generate</button>
           </div>
           {d.muster && (
             <div className="text-xs mt-2" style={{ color: C.faint }}>

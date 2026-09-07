@@ -24,6 +24,8 @@ interface Row {
   /** The agreed new structure — what was saved, or Genie's own split. */
   newParts?: { basic_da: number; hra: number; fixed: number; conveyance: number; medical: number; site: number; agreed: boolean } | null;
   newDesignation?: string | null; siteAllowance?: number | null; payDays?: number | null;
+  oldParts?: { basic_da: number; hra: number; fixed: number; conveyance: number; medical: number; site: number } | null;
+  location?: string | null; mobile?: string | null; personalEmail?: string | null;
 }
 
 const inr = (n: number | null) => (n == null ? "" : Math.round(n).toLocaleString("en-IN"));
@@ -38,68 +40,68 @@ const EXP_BANDS: [string, (n: number) => boolean][] = [
 ];
 
 /**
- * DOWNLOAD AS EXCEL (Dr Raghu, 7 Sep 2026: "use the same headings as the one
- * I showed you in the CSV ... I can just copy-paste it and put it into
- * Vinay's sheet, and it will become live on his roster too. Do not change any
- * sequence of any of the cells").
+ * DOWNLOAD AS EXCEL — THE REVISION MASTER'S OWN SHAPE (Dr Raghu, 7 Sep 2026:
+ * "it should be having the heading as per this CSV", handing over Salary
+ * Revision Master (2), and "make the rates as per the appraisal! why isn't
+ * changed?").
  *
- * The eighteen columns are his, in his order, and nothing may be inserted
- * among them — a paste into a live roster lands by position, not by name, so
- * a column moved here is a wrong number there. Anything Genie can add rides
- * AFTER the last of them, where a paste cannot reach.
+ * His sheet is two blocks side by side with one blank column between them:
+ * the LEFT is what the person is on today, the RIGHT is what they move to.
+ * A paste lands by position, so the shape is copied exactly — nineteen
+ * columns, a gap, then twelve — and nothing is inserted anywhere in it.
  *
- * The parts are worked out by Genie's own split (basic + allowance +
- * conveyance always add back to the gross), not read from the sheet.
+ * The right-hand block is the APPRAISAL, which is what was missing: the
+ * sheet he downloaded had the new block mirroring the old, because the sheet
+ * cannot know what was finalised in Genie. Where an appraisal was saved with
+ * its components edited by hand, those exact figures go out; only where none
+ * was saved does Genie split the new gross by its own rule.
  */
-const SHEET_COLUMNS = [
-  "ID", "Name", "Age", "Yrs in Nandan", "Type",
-  "Old Basic & DA", "Old Allowance", "Old Conveyance", "Old Gross", "Old / day",
-  "New Basic & DA", "New Allowance", "New Conveyance", "New Gross", "New / day",
-  "Increase / day", "Increase / month", "Remarks",
+const LEFT_COLUMNS = [
+  "ID", "Name", "Type", "Experience in Nandan", "Age",
+  "Department", "Designation", "Reporting Manager", "Job Location", "Days Paid",
+  "Basic and DA", "HRA", "Fixed Allowance", "Conveyance", "Medical Allowance",
+  "Gross Salary", "Per Day Rate", "PERSONAL Mobile No", "Personal Mail ID",
 ] as const;
-/**
- * Added AFTER his eighteen, never among them (Dr Raghu, 7 Sep 2026, asking
- * for the new structure in the download): "new basic and DA, HR allowance,
- * site allowance, gross total, total per day, per-day basis, new designation
- * ... approved total increase per month on gross".
- *
- * The parts are the AGREED ones where an appraisal was saved with its
- * components edited; only where none was saved does Genie split the gross by
- * its own rule, and the "Parts agreed" column says which it was.
- */
-const EXTRA_COLUMNS = [
-  "New Basic & DA", "New HRA", "New Fixed Allowance", "New Conveyance", "New Medical",
-  "Site Allowance", "New Gross Total", "New Per Day", "Per-day basis", "Parts agreed",
-  "New Designation", "Department", "Designation", "Reporting manager",
-  "Increase %", "Increase / month", "Stage", "Released on",
+/** One empty column, exactly as his sheet has it. */
+const RIGHT_COLUMNS = [
+  "Department", "Designation", "Reporting Manager", "Job Location", "Days Paid",
+  "Basic and DA", "HRA", "Fixed Allowance", "Conveyance", "Medical Allowance",
+  "Gross Salary", "Per Day Rate",
 ] as const;
+/** Genie's own, far to the right where a paste cannot reach. */
+const TAIL_COLUMNS = ["Site Allowance", "Increase / month", "Increase / day", "Increase %", "Parts agreed", "Stage", "Released on", "Remarks"] as const;
 
 const r0 = (n: number | null | undefined) => (n == null ? "" : Math.round(n));
+const d1 = (n: number | null | undefined) => (n == null ? "" : Number(n.toFixed(1)));
+
 function exportRow(r: Row): (string | number)[] {
   const type = String(r.type || "");
-  const oldP = r.prevGross == null ? null : splitGross(r.prevGross, undefined, type);
-  const newP = r.newGross == null ? null : splitGross(r.newGross, undefined, type);
-  // One "Allowance" column, so the three parts add back to the gross exactly.
-  const allow = (c: ReturnType<typeof splitGross> | null) => (c ? c.hra + c.fixed_allowance + c.medical_allowance : null);
-  const p = r.newParts || null;
+  const days = r.payDays ?? payDaysFor(type);
+  const o = r.oldParts;
+  // Where no structure was agreed, Genie splits the new gross by its own rule.
+  const p = r.newParts || (r.newGross == null ? null : (() => {
+    const sp = splitGross(r.newGross, undefined, type);
+    return { basic_da: sp.basic_da, hra: sp.hra, fixed: sp.fixed_allowance, conveyance: sp.conveyance, medical: sp.medical_allowance, site: 0, agreed: false };
+  })());
   const oldDay = perDayOf(r.prevGross, type);
   const newDay = perDayOf(r.newGross, type);
   return [
-    r.id, r.name, r.age == null ? "" : Number(r.age.toFixed(1)), r.exp == null ? "" : Number(r.exp.toFixed(1)), type,
-    r0(oldP?.basic_da), r0(allow(oldP)), r0(oldP?.conveyance), r0(r.prevGross), r0(oldDay),
-    r0(newP?.basic_da), r0(allow(newP)), r0(newP?.conveyance), r0(r.newGross), r0(newDay),
-    r0(newDay != null && oldDay != null ? newDay - oldDay : null),
-    r0(r.inc),
-    "",                                        // Remarks — his column, left for him
-    // the agreed new structure
+    // ── the left block: what he is on today ──
+    r.id, r.name, type, d1(r.exp), d1(r.age),
+    r.department || "", r.designation || "", r.manager || "", r.location || "", days,
+    r0(o?.basic_da), r0(o?.hra), r0(o?.fixed), r0(o?.conveyance), r0(o?.medical),
+    r0(r.prevGross), r0(oldDay), r.mobile || "", r.personalEmail || "",
+    "",                                              // the blank column
+    // ── the right block: what the appraisal says ──
+    r.department || "", r.newDesignation || r.designation || "", r.manager || "", r.location || "", days,
     r0(p?.basic_da), r0(p?.hra), r0(p?.fixed), r0(p?.conveyance), r0(p?.medical),
-    r0(p?.site ?? r.siteAllowance), r0(r.newGross), r0(newDay),
-    r.payDays ?? payDaysFor(type), p ? (p.agreed ? "agreed" : "split by Genie") : "",
-    r.newDesignation || "",
-    r.department || "", r.designation || "", r.manager || "",
+    r0(r.newGross), r0(newDay),
+    // ── Genie's own ──
+    r0(p?.site ?? r.siteAllowance), r0(r.inc),
+    r0(newDay != null && oldDay != null ? newDay - oldDay : null),
     r.incPct == null ? "" : Number(r.incPct.toFixed(1)),
-    r0(r.inc),
-    r.stage, r.released ? String(r.released).slice(0, 10) : "",
+    p ? (p.agreed ? "agreed" : "split by Genie") : "",
+    r.stage, r.released ? String(r.released).slice(0, 10) : "", "",
   ];
 }
 
@@ -404,7 +406,8 @@ const shown = useMemo(() => {
       const nd = perDayOf(r.newGross, r.type), od = perDayOf(r.prevGross, r.type);
       return nd != null && od != null ? nd - od : 0;
     };
-    const blank = Array(SHEET_COLUMNS.length + EXTRA_COLUMNS.length - 4).fill("");
+    const WIDTH = LEFT_COLUMNS.length + 1 + RIGHT_COLUMNS.length + TAIL_COLUMNS.length;
+    const blank = Array(Math.max(0, WIDTH - 4)).fill("");
     const totals: (string | number)[][] = [
       [],
       ["APPROVED — the finalised only", `${final.length} of ${shown.length} shown`, "", "", ...blank],
@@ -415,11 +418,21 @@ const shown = useMemo(() => {
       ["New per day, total", Math.round(final.reduce((a, r) => a + (perDayOf(r.newGross, r.type) || 0), 0)), "", "", ...blank],
       ["Site allowance, total", Math.round(sum(final, (r) => r.newParts?.site ?? r.siteAllowance)), "", "", ...blank],
     ];
-    const aoa: (string | number)[][] = [[...SHEET_COLUMNS, ...EXTRA_COLUMNS], ...shown.map(exportRow), ...totals];
+    const header = [...LEFT_COLUMNS, "", ...RIGHT_COLUMNS, ...TAIL_COLUMNS];
+    // A second header line names the two blocks, the way his own sheet reads.
+    const band2 = Array(WIDTH).fill("");
+    band2[0] = "AS IT STANDS TODAY";
+    band2[LEFT_COLUMNS.length + 1] = "AS THE APPRAISAL SAYS";
+    band2[LEFT_COLUMNS.length + 1 + RIGHT_COLUMNS.length] = "GENIE";
+    const aoa: (string | number)[][] = [band2, header, ...shown.map(exportRow), ...totals];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 8 }, { wch: 28 }, { wch: 6 }, { wch: 7 }, { wch: 17 },
-      ...Array.from({ length: 12 }, () => ({ wch: 13 })), { wch: 24 },
-      ...Array.from({ length: EXTRA_COLUMNS.length }, () => ({ wch: 16 }))];
+    ws["!cols"] = [{ wch: 8 }, { wch: 28 }, { wch: 16 }, { wch: 9 }, { wch: 6 },
+      { wch: 18 }, { wch: 24 }, { wch: 22 }, { wch: 12 }, { wch: 6 },
+      ...Array.from({ length: 7 }, () => ({ wch: 13 })), { wch: 16 }, { wch: 26 },
+      { wch: 3 },
+      { wch: 18 }, { wch: 24 }, { wch: 22 }, { wch: 12 }, { wch: 6 },
+      ...Array.from({ length: 7 }, () => ({ wch: 13 })),
+      ...Array.from({ length: TAIL_COLUMNS.length }, () => ({ wch: 15 }))];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Appraisal");
     const d = new Date();

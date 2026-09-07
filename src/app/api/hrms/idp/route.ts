@@ -53,8 +53,8 @@ export async function GET(req: Request) {
     if (table) {
       const T = await hrmsTables(admin);
       const [{ data: emps }, { data: eds }, { data: idps }, { data: revs }] = await Promise.all([
-        admin.from(T.employees).select("id, name, department, designation, dob, doj, active, extra"),
-        admin.from(T.edits).select("employee_id, field, value").in("field", ["type", "status", "department", "designation", "reporting_manager", "basic_da", "hra", "fixed_allowance", "conveyance", "medical_allowance", "site_allowance"]),
+        admin.from(T.employees).select("id, name, department, designation, location, dob, doj, active, extra"),
+        admin.from(T.edits).select("employee_id, field, value").in("field", ["type", "status", "department", "designation", "reporting_manager", "basic_da", "hra", "fixed_allowance", "conveyance", "medical_allowance", "site_allowance", "location", "phone", "personal_email"]),
         admin.from("hrms_idp").select("id, employee_id, submitted_at, ratings, ask:answers->>ask_gross").eq("cycle", CYCLE_TBL),
         admin.from("hrms_idp_review").select("idp_id, submitted_at, ratings, gross_proposed"),
       ]);
@@ -138,7 +138,15 @@ export async function GET(req: Request) {
           // on this table and a different one on their Report Card.
           const type = pick("type", "Type") as string | null;
           const salaryGet = (k: string) => pick(SHEET_TO_FIELD[k] || k, k);
-          const gross = salaryTable(salaryGet, type)?.gross ?? 0;
+          const salary = salaryTable(salaryGet, type);
+          const gross = salary?.gross ?? 0;
+          /** The parts as they stand TODAY, read the same way every screen reads them. */
+          const partOf = (label: string) => Number(salary?.rows.find((x) => x.label === label)?.monthly || 0);
+          const oldParts = salary ? {
+            basic_da: partOf("Basic & DA"), hra: partOf("HRA"), fixed: partOf("Fixed Allowance"),
+            conveyance: partOf("Conveyance"), medical: partOf("Medical Allowance"),
+            site: partOf("Site Allowance — while deputed to site"),
+          } : null;
           const idp = idpBy.get(id);
           const mgr = idp ? mgrBy.get(idp.id) : undefined;
           const ap = apprBy.get(id);
@@ -182,6 +190,10 @@ export async function GET(req: Request) {
                 conveyance: sp.conveyance, medical: sp.medical_allowance,
                 site: Number(pick("site_allowance", "Site Allowance") || 0), agreed: false };
             })(),
+            oldParts,
+            location: pick("location", "Job Location", e.location as string | null) as string | null,
+            mobile: pick("phone", "PERSONAL Mobile No") as string | null,
+            personalEmail: pick("personal_email", "Personal Mail ID") as string | null,
             newDesignation: ap?.new_designation ?? null,
             siteAllowance: Number(pick("site_allowance", "Site Allowance") || 0),
             payDays: payDaysFor(type),
