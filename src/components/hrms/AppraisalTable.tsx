@@ -18,7 +18,7 @@ interface Row {
   id: string; name: string; department: string | null; designation: string | null; type: string | null; manager: string | null; growth?: boolean;
   age: number | null; exp: number | null;
   prevGross: number | null; newGross: number | null; inc: number | null; incPct: number | null;
-  stage: string;
+  stage: string; released?: string | null;
 }
 
 const inr = (n: number | null) => (n == null ? "" : Math.round(n).toLocaleString("en-IN"));
@@ -33,11 +33,13 @@ const EXP_BANDS: [string, (n: number) => boolean][] = [
 ];
 
 const STAGE_STYLE: Record<string, { bg: string; fg: string }> = {
-  "Final": { bg: "#E6F4EA", fg: "var(--green)" },
-  "Manager Completed": { bg: "#DCE8F5", fg: "var(--blue)" },
-  "Completed": { bg: "#FFF3E8", fg: "#8A5B00" },
+  "Released": { bg: "#0D7A3F", fg: "#fff" },
+  "Appraisal Finalised": { bg: "#E6F4EA", fg: "var(--green)" },
+  "Awaiting RJ": { bg: "#FFF7E6", fg: "#8A5B00" },
+  "Manager IDP completed": { bg: "#DCE8F5", fg: "var(--blue)" },
+  "IDP Done": { bg: "#FFF3E8", fg: "#8A5B00" },
   "Started": { bg: "#F4F2EC", fg: "var(--muted)" },
-  "—": { bg: "#F4F2EC", fg: "#C9C6BD" },
+  "Not Done": { bg: "#F4F2EC", fg: "#C9C6BD" },
 };
 
 export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: string; onOpenPerson: (id: string) => void; isOwner: boolean }) {
@@ -61,6 +63,7 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
   const [mgrQ, setMgrQ] = useState("");
   // the mass run of growth notes (Dr Raghu, 7 Sep 2026: "it will be generated
   // for all in mass at the end together")
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [run, setRun] = useState<{ done: number; of: number; now: string; fail: number } | null>(null);
   const stop = useState<{ v: boolean }>({ v: false })[0];
   const [minPay, setMinPay] = useState("");
@@ -202,6 +205,11 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
   );
 
   const columns: Column<Row>[] = useMemo(() => [
+    ...(isOwner ? [{
+      key: "pick", label: "✓", width: 40, value: (r: Row) => (picked.has(r.id) ? 1 : 0),
+      render: (r: Row) => <input type="checkbox" checked={picked.has(r.id)} onChange={() => setPicked((s2) => { const n = new Set(s2); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} />,
+      title: "Tick rows, then act on all of them at once",
+    }] : []),
     { key: "id", label: "EmployeeID", width: 110, value: (r) => r.id, render: (r) => link(r, r.id, true) },
     { key: "name", label: "Name", width: 200, value: (r) => r.name, render: (r) => link(r, r.name) },
     { key: "department", label: "Department", width: 140, value: (r) => r.department },
@@ -218,13 +226,45 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
         const st = STAGE_STYLE[r.stage] || STAGE_STYLE["—"];
         return <span className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: st.bg, color: st.fg }}>{r.stage}</span>;
       },
-      title: "Started → Completed (person submitted) → Manager Completed (review submitted) → Final (new gross decided)",
+      title: "Not Done → IDP Done (they submitted) → Manager IDP completed (the review is in) → Appraisal Finalised (the new gross is decided) → Released (they have been told)",
     },
-  ], []);
+    {
+      key: "released", label: "Released", width: 120, value: (r) => (r.released ? String(r.released).slice(0, 10) : ""),
+      title: "The day the person was told. Finalise first; then release — one row, or many at once.",
+      render: (r) => {
+        const on = !!r.released;
+        if (!isOwner) return on ? <span className="tnum" style={{ color: C.green, fontWeight: 700 }}>{String(r.released).slice(8, 10)}-{String(r.released).slice(5, 7)}</span> : <span style={{ color: "#C9C6BD" }}>·</span>;
+        const ready = r.stage === "Appraisal Finalised" || on;
+        return (
+          <button onClick={() => ready && release([r.id], !on)} disabled={!ready}
+            className="rounded px-1.5 py-0.5 font-bold" style={{ fontSize: 10, background: on ? "var(--green)" : ready ? "#fff" : "transparent", color: on ? "#fff" : ready ? "var(--dim)" : "#C9C6BD", border: `1px solid ${on ? "var(--green)" : ready ? C.line : "transparent"}`, cursor: ready ? "pointer" : "default" }}
+            title={on ? `Released ${String(r.released).slice(0, 10)} — click to take it back` : ready ? "Mark as released to the person" : "Finalise the appraisal first"}>
+            {on ? `✓ ${String(r.released).slice(8, 10)}-${String(r.released).slice(5, 7)}` : ready ? "release" : "·"}
+          </button>
+        );
+      },
+    },
+    // the tick and the release cell read state, so the columns rebuild with it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [isOwner, picked, rows]);
 
-  const done = (rows || []).filter((r) => r.stage === "Final").length;
-  const mgr = (rows || []).filter((r) => r.stage === "Manager Completed").length;
-  const sub = (rows || []).filter((r) => r.stage === "Completed").length;
+  const done = (rows || []).filter((r) => r.stage === "Appraisal Finalised" || r.stage === "Released").length;
+  const mgr = (rows || []).filter((r) => r.stage === "Manager IDP completed").length;
+  const sub = (rows || []).filter((r) => r.stage === "IDP Done").length;
+  const released = (rows || []).filter((r) => r.stage === "Released").length;
+  // Dr Raghu, 7 Sep 2026: "also in this put pending" — everybody not yet finalised.
+  const pending = (rows || []).filter((r) => r.stage !== "Appraisal Finalised" && r.stage !== "Released").length;
+
+  /** Mark one or many as released — or take it back. */
+  const release = async (ids: string[], on: boolean) => {
+    setMsg("");
+    try {
+      const r = await api.post("/api/hrms/idp", { action: "release", employee_ids: ids, on });
+      setMsg(`${r.n} ${on ? "released" : "un-released"}${r.skipped ? ` · ${r.skipped} skipped, not finalised yet` : ""} ✓`);
+      const j = await api.get("/api/hrms/idp?table=1"); setRows(j.rows || []);
+      setPicked(new Set());
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  };
 
   /** How many of the rows on screen still have no growth note. */
   const missingNotes = useMemo(() => shown.filter((r) => !r.growth).length, [shown]);
@@ -235,9 +275,10 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
    * Anyone who already has one is skipped, so stopping and starting again
    * simply carries on.
    */
-  const massGrowth = async () => {
-    const todo = shown.filter((r) => !r.growth);
-    if (!todo.length) { window.alert("Every row on screen already has a growth note."); return; }
+  const massGrowth = async (only?: string[]) => {
+    const pool = only ? shown.filter((r) => only.includes(r.id)) : shown;
+    const todo = pool.filter((r) => !r.growth);
+    if (!todo.length) { window.alert(only ? "Every ticked person already has a growth note." : "Every row on screen already has a growth note."); return; }
     if (!window.confirm(`Write the growth note for ${todo.length} ${todo.length === 1 ? "person" : "people"}?\n\nEach one is read and written on its own, so this takes a few minutes. You can stop it, and starting again carries on from where it left off.`)) return;
     stop.v = false;
     setRun({ done: 0, of: todo.length, now: todo[0]?.name || "", fail: 0 });
@@ -268,7 +309,9 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
         <Stat n={(rows || []).length} l="On the roll" />
         <Stat n={sub} l="IDP completed" />
         <Stat n={mgr} l="Manager completed" />
-        <Stat n={done} l="Final" green />
+        <Stat n={done} l="Appraisal Finalised" green />
+        <Stat n={released} l="Released" green />
+        <Stat n={pending} l="Pending" />
       </div>
 
       <div className="flex gap-1.5 flex-wrap items-center mb-2 no-print">
@@ -354,6 +397,21 @@ export default function AppraisalTable({ who, onOpenPerson, isOwner }: { who: st
         </span>
       </div>
 
+      {isOwner && (
+        <div className="flex items-center gap-2 flex-wrap mb-2 text-xs rounded px-3 py-1.5"
+          style={{ background: picked.size ? "#FFF7E6" : "#FBFAF7", border: `1px solid ${picked.size ? "#F5B32B" : C.line}` }}>
+          <button onClick={() => setPicked(new Set(shown.map((r) => r.id)))} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }}>Select all shown ({shown.length})</button>
+          <button onClick={() => setPicked(new Set())} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: C.line, color: C.faint }}>Deselect</button>
+          {picked.size > 0 && <b>{picked.size} ticked →</b>}
+          {picked.size > 0 && (
+            <>
+              <button onClick={() => massGrowth([...picked])} disabled={!!run} className="font-bold rounded px-2.5 py-1 text-white" style={{ background: run ? "#B9BEC4" : "#0D7A3F" }}>✨ Write their growth notes</button>
+              <button onClick={() => release([...picked], true)} className="font-bold rounded px-2.5 py-1 text-white" style={{ background: "var(--green)" }}>✓ Mark released</button>
+              <button onClick={() => release([...picked], false)} className="font-semibold rounded px-2.5 py-1 bg-white" style={{ border: `1px solid ${C.line}`, color: "var(--red)" }}>take release back</button>
+            </>
+          )}
+        </div>
+      )}
       <DataTable columns={columns} rows={shown} rowKey={(r) => r.id} initialFrozen={2}
         empty={rows === null ? "loading…" : "Nobody matches those filters."} />
     </Pane>

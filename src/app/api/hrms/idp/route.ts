@@ -57,7 +57,7 @@ export async function GET(req: Request) {
         admin.from("hrms_idp").select("id, employee_id, submitted_at, ratings, ask:answers->>ask_gross").eq("cycle", CYCLE_TBL),
         admin.from("hrms_idp_review").select("idp_id, submitted_at, ratings, gross_proposed"),
       ]);
-      let appr: { employee_id: string; new_gross: number | null; prev_gross: number | null; approved_at?: string | null; growth_note?: string | null }[] = [];
+      let appr: { employee_id: string; new_gross: number | null; prev_gross: number | null; approved_at?: string | null; growth_note?: string | null; released_at?: string | null }[] = [];
       try {
         /**
          * growth_note arrives with migration 0148. Asking for a column that
@@ -67,7 +67,8 @@ export async function GET(req: Request) {
          */
         type ApRows = { data: Record<string, unknown>[] | null; error: { message: string } | null };
         const BASE = "employee_id, new_gross, prev_gross, approved_at";
-        let q = (await admin.from("hrms_appraisal").select(BASE + ", growth_note").eq("cycle", CYCLE_TBL)) as unknown as ApRows;
+        const EXTRA = ", growth_note, released_at";
+        let q = (await admin.from("hrms_appraisal").select(BASE + EXTRA).eq("cycle", CYCLE_TBL)) as unknown as ApRows;
         if (q.error) q = (await admin.from("hrms_appraisal").select(BASE).eq("cycle", CYCLE_TBL)) as unknown as ApRows;
         if (q.error) throw new Error(q.error.message);
         appr = (q.data || []) as unknown as typeof appr;
@@ -139,11 +140,15 @@ export async function GET(req: Request) {
           const ap = apprBy.get(id);
           const newGross = ap?.new_gross != null ? Number(ap.new_gross) : null;
           const prev = ap?.prev_gross != null ? Number(ap.prev_gross) : gross || null;
-          const stage = ap?.new_gross != null && ap.approved_at ? "Final"
+          // Dr Raghu's own words for where a person stands (7 Sep 2026):
+          // Not Done → IDP Done → Manager IDP completed → Appraisal Finalised
+          // → Released. Released is the day they are told, not the day he decided.
+          const stage = ap?.released_at ? "Released"
+            : ap?.new_gross != null && ap.approved_at ? "Appraisal Finalised"
             : ap?.new_gross != null ? "Awaiting RJ"
-            : idp?.submitted && idp.id && reviewed.has(idp.id) ? "Manager Completed"
-            : idp?.submitted ? "Completed"
-            : idp ? "Started" : "—";
+            : idp?.submitted && idp.id && reviewed.has(idp.id) ? "Manager IDP completed"
+            : idp?.submitted ? "IDP Done"
+            : idp ? "Started" : "Not Done";
           return {
             id, name: String(e.name || id),
             department: pick("department", "Department", e.department) as string | null,
@@ -152,6 +157,7 @@ export async function GET(req: Request) {
             manager: pick("reporting_manager", "Reporting Manager") as string | null,
             // whether the growth note is already written, for the mass run
             growth: !!ap?.growth_note,
+            released: ap?.released_at ?? null,
             type,
             age: years(e.dob), exp: years(e.doj),
             prevGross: prev, newGross,
@@ -520,6 +526,33 @@ export async function POST(req: Request) {
      * a note the person cannot read is not a note. Grounded in the same
      * record as the brief; it invents nothing and never mentions money.
      */
+    /**
+     * { action: "release", employee_ids: [...], on } — the day the person is
+     * told (Dr Raghu, 7 Sep 2026: "have a cell called released"). Only over
+     * appraisals he has already finalised; releasing what is not decided
+     * would say something to somebody that has not been decided.
+     */
+    if (String(body.action || "") === "release") {
+      const u2 = await requireHrms();
+      if (!u2.isOwner) throw new HttpError(403, "Only Dr Raghu releases an appraisal.");
+      const ids = (Array.isArray(body.employee_ids) ? body.employee_ids : [body.employee_id]).map(String).filter(Boolean).slice(0, 500);
+      if (!ids.length) throw new HttpError(400, "nobody chosen");
+      const on = body.on !== false;
+      const patch = on
+        ? { released_at: new Date().toISOString(), released_by: u2.email, updated_at: new Date().toISOString() }
+        : { released_at: null, released_by: null, updated_at: new Date().toISOString() };
+      const { data: ready } = await admin.from("hrms_appraisal").select("employee_id").eq("cycle", "2026-27").in("employee_id", ids).not("approved_at", "is", null);
+      const may = (ready || []).map((r) => String(r.employee_id));
+      if (on && !may.length) throw new HttpError(400, "None of those are finalised yet — finalise the appraisal before releasing it.");
+      const target = on ? may : ids;
+      const { error } = await admin.from("hrms_appraisal").update(patch).eq("cycle", "2026-27").in("employee_id", target);
+      if (error) {
+        if (/released_at|schema cache/i.test(error.message)) throw new HttpError(503, "Run migration 0149 first — released has nowhere to be recorded yet.");
+        throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true, n: target.length, skipped: ids.length - target.length });
+    }
+
     if (String(body.action || "") === "growth-note") {
       const key = process.env.ANTHROPIC_API_KEY;
       if (!key) throw new HttpError(503, "ANTHROPIC_API_KEY is not set on this deploy.");

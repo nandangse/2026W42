@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.6.0",
+    date: "2026-09-07",
+    module: "The Appraisal Table in his own words — Released, Pending, and ticking rows",
+    items: [
+      "\"in this also give status — Not Done, IDP Done, Manager IDP completed, Appraisal Finalised, Released. Have a cell called released.\" (Dr Raghu, 7 Sep 2026). The status column reads in those words, and Released is a cell of its own: finalise first, then release, and the cell carries the day it happened. Clicking it again takes the release back. Migration 0149.",
+      "\"also in this put pending\". Two more counts across the top: Released, and Pending — everybody not yet finalised.",
+      "\"also let me choose multiple and do edit. eg growth notes can be created.\" A tick box on every row for the owner, Select all shown, and then one command for the lot: write their growth notes, mark them released, or take the release back. The growth-note run still skips anyone who already has one, so stopping and starting simply carries on.",
+    ],
+  },
+  {
     v: "5.0.5.4",
     date: "2026-09-07",
     module: "The Appraisal Table's money columns come back",
