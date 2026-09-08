@@ -30,11 +30,11 @@ const d = (s: string | null | undefined) => (s ? new Date(s).toLocaleDateString(
 const statusColour = (s: string) => (/Completed/.test(s) ? GREEN : /Cancelled|Closed/.test(s) ? MUTED : /Draft/.test(s) ? AMBER : /Receive|Bill/.test(s) ? NAVY : RED);
 const erpForm = (base: string, doctype: string, name: string) => `${base}/app/${doctype.toLowerCase().replace(/\s+/g, "-")}/${encodeURIComponent(name)}`;
 
-export default function PurchaseOrders({ erpBase }: { erpBase: string }) {
+export default function PurchaseOrders({ erpBase, openOn }: { erpBase: string; openOn?: "po" | "suppliers" | "grn" }) {
   /* GRNs — what arrived (Dr Raghu, 8 Sep 2026: "from ERP get in Suppliers,
      Purchase orders, GRNs"). A purchase order is a promise; the GRN is the
      arrival, and the only place that records what was REFUSED. */
-  const [tab, setTab] = useState<"po" | "suppliers" | "grn">("po");
+  const [tab, setTab] = useState<"po" | "suppliers" | "grn">(openOn ?? "po");
   const [pos, setPos] = useState<{ rows: Po[]; total: number; page: number; size: number; statuses: Record<string, number>; pull: Pull | null; installed: boolean } | null>(null);
   const [sups, setSups] = useState<{ rows: Sup[]; installed: boolean } | null>(null);
   const [grns, setGrns] = useState<{ rows: Grn[]; total: number; installed: boolean } | null>(null);

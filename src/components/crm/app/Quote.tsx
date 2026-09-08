@@ -437,6 +437,8 @@ export type QLine = {
 };
 
 /** Digits with Indian commas while typing — "545000" reads 5,45,000. */
+export type FxRow = { code: string; name: string; symbol: string; inr_per_unit: number; as_of: string; source?: string | null };
+
 export type TaxRow = { id: string; name: string; total_pct: number; is_default: boolean; sort_order?: number; components?: { name: string; pct: number }[] };
 
 export function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Row) => void }) {
@@ -444,6 +446,11 @@ export function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Ro
   const [q, setQ] = useState<Row>(quote);
   const [lines, setLines] = useState<QLine[] | null>(null);
   const [taxes, setTaxes] = useState<TaxRow[]>([]);
+  /* THE CURRENCY LIST IS A TABLE, NOT A CONSTANT (Dr Raghu, 8 Sep 2026:
+     "later on we can of course add more currencies also. It will come from
+     the table"). Until 0060 has run this is empty and the dropdown falls
+     back to the three it always had. */
+  const [fx, setFx] = useState<FxRow[]>([]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [ghost, setGhost] = useState({ item_group: "", description: "", unit_price: "", quantity: "1", product_id: "" });
@@ -483,6 +490,9 @@ export function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Ro
     fetch("/api/crm/tax_master?limit=50", { cache: "no-store" })
       .then(async (r) => { const j = await r.json(); setTaxes(((j.rows ?? []) as TaxRow[]).sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))); })
       .catch(() => setTaxes([]));
+    fetch("/api/crm/fx", { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); setFx((j.rows ?? []) as FxRow[]); })
+      .catch(() => setFx([]));
   }, [reloadLines]);
 
   const patchQuote = async (fields: Record<string, unknown>) => {
@@ -628,6 +638,82 @@ export function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Ro
   const discPctN = discPct !== null ? Number(discPct) || 0 : Number(q.discount_pct) || 0;
   const discAmt = Math.round(discable * discPctN) / 100;
   const taxRow = taxes.find((t) => t.id === String(q.tax_id ?? ""));
+
+  /* WHAT A UNIT OF THIS QUOTE'S CURRENCY IS WORTH, in rupees. 1 when the
+     table has not been read yet or the code is not on it, which keeps every
+     conversion below a no-op rather than a zero. */
+  const rateOf = (code: string) => Number(fx.find((f) => f.code === code)?.inr_per_unit) || 1;
+  const fxRow = fx.find((f) => f.code === currency);
+
+  /**
+   * WHAT AN ITEM COSTS IN THIS QUOTE'S CURRENCY (Dr Raghu, 8 Sep 2026: "at
+   * the moment I choose a product, it will show that product's amount in that
+   * currency" · "the option is that I will definitely put a USD price in
+   * everything, and euro can be converted in the master").
+   *
+   * So the dollar price is the one that is TYPED, and every other foreign
+   * currency is crossed off it through the rate table — euro from dollars,
+   * not euro from rupees, because that is the number he maintains.
+   *
+   * WHEN THERE IS NO DOLLAR PRICE the rupee price is converted at today's
+   * rate instead. Ten items of 6,672 carry one today, so most picks land on
+   * that path, and it is a fair number rather than a blank box — but it is a
+   * CONVERSION and the screen says so, because a converted price is a guess
+   * about a market and a typed one is a decision about a deal.
+   */
+  const priceLabel = (h: CatHit): string | null => {
+    const { price, converted } = priceOf(h);
+    if (price == null) return null;
+    return `${fm(price)}${converted ? " (converted)" : ""}`;
+  };
+  const priceOf = (p: { approved_price_inr?: unknown; alt_price_usd?: unknown }): { price: number | null; converted: boolean } => {
+    const inr = p.approved_price_inr == null ? null : Number(p.approved_price_inr);
+    const usd = p.alt_price_usd == null ? null : Number(p.alt_price_usd);
+    if (currency === "INR") return { price: inr, converted: false };
+    if (usd != null && isFinite(usd)) {
+      if (currency === "USD") return { price: usd, converted: false };
+      return { price: Math.round(usd * (rateOf("USD") / rateOf(currency)) * 100) / 100, converted: false };
+    }
+    if (inr != null && isFinite(inr)) return { price: Math.round((inr / rateOf(currency)) * 100) / 100, converted: true };
+    return { price: null, converted: false };
+  };
+
+  /**
+   * CHANGING THE CURRENCY (Dr Raghu, 8 Sep 2026: "whenever I choose a USD or
+   * a euro, make sure we make the tax as zero. Change that automatically. It
+   * can always go back").
+   *
+   * An export sale carries no GST, so leaving 18% on a dollar quote is not a
+   * formatting slip — it is a wrong number on a document that goes to a
+   * customer. Off the rupee, the tax scheme moves to No Tax by itself.
+   *
+   * BACK ON THE RUPEE IT COMES BACK, and it comes back the way it was chosen
+   * in the first place — IGST outside Maharashtra, CGST + SGST within, read
+   * from the quote's own address. That is the same rule the desk applies when
+   * a quote first opens, so returning to INR lands on the scheme that quote
+   * would have had, not on whatever was last clicked.
+   */
+  const setCurrency = async (next: string) => {
+    const fields: Record<string, unknown> = { currency: next };
+    const zero = taxes.find((t) => Number(t.total_pct) === 0);
+    if (next !== "INR") {
+      if (zero) fields.tax_id = zero.id;
+    } else if (Number(taxRow?.total_pct ?? 0) === 0) {
+      let inMaha = false, known = false;
+      if (q.address_id) {
+        try {
+          const j = await (await fetch(`/api/crm/address?id=${encodeURIComponent(String(q.address_id))}`, { cache: "no-store" })).json();
+          const st = String(j?.row?.state ?? "").toLowerCase();
+          if (st) { known = true; inMaha = st.includes("maharashtra"); }
+        } catch (e) { swallow("crm/CrmApp", e); /* fall to the default */ }
+      }
+      const pick = known
+        ? taxes.find((t) => (inMaha ? /cgst/i.test(t.name) : /igst/i.test(t.name)))
+        : taxes.find((t) => t.is_default);
+      if (pick) fields.tax_id = pick.id;
+    }
+    await patchQuote(fields);
+  };
   const taxAmt = Math.round((subtotal - discAmt) * (taxRow?.total_pct ?? 18)) / 100;
   const grand = subtotal - discAmt + taxAmt;
   const cellIn = { width: "100%", border: "none", outline: "none", background: "transparent", fontSize: 13, padding: "6px 8px" } as const;
@@ -662,12 +748,28 @@ export function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Ro
                 `Show this quote in ${next}?\n\nThe rates are NOT converted — ${fm(q.grand_total)} stays as it is and simply reads as ${next}. Re-rate the lines yourself if the deal is truly in ${next}.`)) {
                 e.target.value = currency; return;
               }
-              void patchQuote({ currency: next }).catch((x) => setErr(String(x.message || x)));
+              void setCurrency(next).catch((x) => setErr(String(x.message || x)));
             }}
               className="px-2 py-1 rounded text-xs border font-bold" style={{ borderColor: BORDER, background: "#fff", color: INK }}>
-              {["INR", "USD", "EUR"].map((c) => <option key={c}>{c}</option>)}
+              {(fx.length ? fx.map((f) => f.code) : ["INR", "USD", "EUR"]).map((c) => <option key={c}>{c}</option>)}
             </select>
           </label>
+          {/* THE RATE, WHERE HE CAN SEE IT (Dr Raghu, 8 Sep 2026: "show the
+              latest foreign exchange rate for USD and euro"). Off the rupee
+              it says what a unit is worth and the day the ECB said so — a
+              rate with no date is a rate nobody can check. */}
+          {currency !== "INR" && fxRow && (
+            <span className="text-xs rounded px-2 py-1" title={String(fxRow.source ?? "")}
+              style={{ background: "#EEF3F8", border: `1px solid ${BORDER}`, color: NAVY }}>
+              1 {fxRow.code} = <b>₹{Number(fxRow.inr_per_unit).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+              <span style={{ color: MUTED }}> · {String(fxRow.as_of).slice(0, 10).split("-").reverse().join("/")}</span>
+            </span>
+          )}
+          {currency !== "INR" && Number(taxRow?.total_pct ?? 0) === 0 && (
+            <span className="text-xs rounded px-2 py-1" style={{ background: "#EAF5EC", border: "1px solid #BFDCC6", color: "#2A6B39" }}>
+              Tax nil — export
+            </span>
+          )}
           {busy && <span className="text-xs" style={{ color: MUTED }}>saving…</span>}
           {err && <span className="text-xs font-semibold" style={{ color: "#8E2C20" }}>{err}</span>}
         </div>
@@ -695,17 +797,17 @@ export function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Ro
                   </td>
                   <td style={{ paddingLeft: (l.indent ?? 0) ? 14 : 0 }}>
                     <div className="flex items-center gap-1">
-                      <ItemSearchCell style={cellIn} value={D(l, "description")} group={String(l.item_group ?? "") || undefined}
+                      <ItemSearchCell style={cellIn} value={D(l, "description")} group={String(l.item_group ?? "") || undefined} priceLabel={priceLabel}
                         onType={(v) => setD(l.id, "description", v)} onCommit={() => commitD(l, "description")}
                         onPick={(h) => void patchLine(l.id, {
                           product_id: h.id, description: h.name, item_group: h.item_group,
-                          ...(h.approved_price_inr != null ? { unit_price: h.approved_price_inr } : {}),
+                          ...(priceOf(h).price != null ? { unit_price: priceOf(h).price } : {}),
                         })} />
                       <button title="Open this item — name, description and image, for THIS quote alone"
                         onClick={() => setOpenLine(l)} style={{ fontSize: 13, opacity: 0.65, flexShrink: 0 }}>📦</button>
                     </div>
                   </td>
-                  <td><input style={{ ...cellIn, textAlign: "right" }} inputMode="decimal" value={groupIn(D(l, "unit_price"))}
+                  <td><input style={{ ...cellIn, textAlign: "right" }} inputMode="decimal" value={groupIn(D(l, "unit_price"), currency)}
                     onChange={(e) => setD(l.id, "unit_price", ungroup(e.target.value))} onBlur={() => commitD(l, "unit_price")} /></td>
                   <td><input style={{ ...cellIn, textAlign: "right" }} type="number" min={1} value={D(l, "quantity")}
                     onChange={(e) => setD(l.id, "quantity", e.target.value)} onBlur={() => commitD(l, "quantity")} /></td>
@@ -732,12 +834,12 @@ export function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Ro
                 <td><GroupCell value={ghost.item_group} onCommit={(v) => setGhost((g) => ({ ...g, item_group: v }))} /></td>
                 <td>
                   <div className="flex items-center gap-1">
-                    <ItemSearchCell style={cellIn} placeholder="write item…" value={ghost.description} group={ghost.item_group || undefined}
+                    <ItemSearchCell style={cellIn} placeholder="write item…" value={ghost.description} group={ghost.item_group || undefined} priceLabel={priceLabel}
                       onType={(v) => setGhost((g) => ({ ...g, description: v, product_id: "" }))}
                       onEnter={() => void addLine()}
                       onPick={(h) => setGhost((g) => ({
                         ...g, description: h.name, item_group: h.item_group || g.item_group, product_id: h.id,
-                        unit_price: h.approved_price_inr != null ? String(h.approved_price_inr) : g.unit_price,
+                        unit_price: priceOf(h).price != null ? String(priceOf(h).price) : g.unit_price,
                       }))} />
                     <ProductCellPick group={ghost.item_group || undefined} onPick={async (pid) => {
                       try {
@@ -746,13 +848,14 @@ export function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Ro
                         if (p) setGhost((g) => ({
                           ...g, description: g.description || String(p.name ?? ""),
                           item_group: g.item_group || String(p.item_group ?? ""),
-                          unit_price: g.unit_price || (p.approved_price_inr != null ? String(p.approved_price_inr) : ""),
+                          unit_price: g.unit_price || (priceOf(p as { approved_price_inr?: unknown; alt_price_usd?: unknown }).price != null
+                            ? String(priceOf(p as { approved_price_inr?: unknown; alt_price_usd?: unknown }).price) : ""),
                         }));
                       } catch (e) { swallow("crm/CrmApp", e); /* type it by hand */ }
                     }} />
                   </div>
                 </td>
-                <td><input style={{ ...cellIn, textAlign: "right" }} inputMode="decimal" placeholder="rate" value={groupIn(ghost.unit_price)} onChange={(e) => setGhost((g) => ({ ...g, unit_price: ungroup(e.target.value) }))} onKeyDown={(e) => { if (e.key === "Enter") void addLine(); }} /></td>
+                <td><input style={{ ...cellIn, textAlign: "right" }} inputMode="decimal" placeholder="rate" value={groupIn(ghost.unit_price, currency)} onChange={(e) => setGhost((g) => ({ ...g, unit_price: ungroup(e.target.value) }))} onKeyDown={(e) => { if (e.key === "Enter") void addLine(); }} /></td>
                 <td><input style={{ ...cellIn, textAlign: "right" }} type="number" min={1} value={ghost.quantity} onChange={(e) => setGhost((g) => ({ ...g, quantity: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") void addLine(); }} /></td>
                 <td className="px-2 tnum" style={{ textAlign: "right", color: MUTED }}>{ghost.unit_price ? fm((Number(ghost.unit_price) || 0) * (Number(ghost.quantity) || 1)) : "—"}</td>
                 <td className="px-2" style={{ textAlign: "right" }}>
@@ -957,13 +1060,16 @@ export function LineItemBox({ line, onClose, onSaved }: { line: QLine; onClose: 
 /** The Item cell IS the search (Dr Raghu, 30 Aug 2026: "type in the item
  *  and search item name or item group or description") — free text stays
  *  free; a pick fills rate, group and description. Two lines per hit. */
-export type CatHit = { id: string; name: string; sku: string; item_group: string | null; approved_price_inr: number | null; snippet: string };
+export type CatHit = { id: string; name: string; sku: string; item_group: string | null; approved_price_inr: number | null; alt_price_usd?: number | null; snippet: string };
 
-export function ItemSearchCell({ value, group, placeholder, onType, onCommit, onPick, onEnter, style }: {
+export function ItemSearchCell({ value, group, placeholder, onType, onCommit, onPick, onEnter, style, priceLabel }: {
   value: string; group?: string; placeholder?: string;
   onType: (v: string) => void; onCommit?: () => void;
   onPick: (hit: CatHit) => void; onEnter?: () => void;
   style?: React.CSSProperties;
+  /* the desk hands its own currency down, so the list quotes what the item
+     will actually cost on THIS quote (Dr Raghu, 8 Sep 2026) */
+  priceLabel?: (hit: CatHit) => string | null;
 }) {
   const [hits, setHits] = useState<CatHit[]>([]);
   const [note, setNote] = useState("");
@@ -1000,7 +1106,10 @@ export function ItemSearchCell({ value, group, placeholder, onType, onCommit, on
               className="block w-full text-left px-2.5 py-1.5 hover:bg-[#F7F5F0]" style={{ borderBottom: `1px solid ${BORDER}` }}>
               <div className="text-sm font-bold" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.name}</div>
               <div className="text-xs" style={{ color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {[h.item_group, h.approved_price_inr != null ? `₹ ${Number(h.approved_price_inr).toLocaleString("en-IN")}` : null, h.snippet].filter(Boolean).join(" · ")}
+                {[h.item_group,
+                  priceLabel ? priceLabel(h)
+                    : h.approved_price_inr != null ? `₹ ${Number(h.approved_price_inr).toLocaleString("en-IN")}` : null,
+                  h.snippet].filter(Boolean).join(" · ")}
               </div>
             </button>
           ))}

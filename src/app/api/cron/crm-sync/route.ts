@@ -57,6 +57,15 @@ interface Job {
   cursorKey: string;        // where this doctype's high-water mark is kept
   fields: string[];
   row: (r: Record<string, unknown>, who: Map<string, string>) => Record<string, unknown>;
+  /* THE WAY BACK (Dr Raghu, 8 Sep 2026: "make sure that all of them are
+     coming in and going out both, so that any changes made in the genie are
+     also in the erp"). Absent means this doctype is pull-only. */
+  push?: {
+    fields: (r: Record<string, unknown>) => Record<string, unknown>;
+    /* submittable documents refuse edits once submitted; we try, and report
+       the refusal rather than swallowing it */
+    submittable?: boolean;
+  };
 }
 
 const JOBS: Job[] = [
@@ -64,6 +73,7 @@ const JOBS: Job[] = [
     doctype: "Customer", table: "company", key: "erp_name", cursorKey: "sync_customer",
     fields: ["name", "customer_name", "customer_group", "territory", "industry", "website", "modified"],
     row: (r) => ({ erp_name: S(r.name), name: S(r.customer_name) || S(r.name), website: S(r.website) || null }),
+    push: { fields: (c) => ({ customer_name: S(c.name), website: S(c.website) || undefined }) },
   },
   {
     doctype: "Contact", table: "person", key: "erp_name", cursorKey: "sync_contact",
@@ -73,16 +83,22 @@ const JOBS: Job[] = [
       designation: S(r.designation) || null, primary_email: S(r.email_id) || null,
       mobile: S(r.mobile_no) || S(r.phone) || null,
     }),
+    push: { fields: (c) => ({
+      first_name: S(c.first_name), last_name: S(c.last_name) || undefined,
+      designation: S(c.designation) || undefined, mobile_no: S(c.mobile) || undefined,
+    }) },
   },
   {
     doctype: "Opportunity", table: "opportunity", key: "erp_opportunity_name", cursorKey: "sync_opportunity",
     fields: ["name", "customer_name", "title", "transaction_date", "sales_stage", "modified"],
     row: (r) => ({ erp_opportunity_name: S(r.name), name: S(r.title) || S(r.customer_name) || S(r.name) }),
+    push: { fields: (c) => ({ title: S(c.name) || undefined }) },
   },
   {
     doctype: "Quotation", table: "quotation", key: "quote_no", cursorKey: "sync_quotation",
     fields: ["name", "customer_name", "transaction_date", "grand_total", "status", "modified"],
     row: (r) => ({ quote_no: S(r.name), grand_total: Number(r.grand_total) || 0 }),
+    push: { submittable: true, fields: () => ({}) },
   },
   {
     /* the house's own doctype — the CRM's calls and visits, at their source */
@@ -104,6 +120,14 @@ const JOBS: Job[] = [
       erp_ref_doctype: S(r.reference_doctype) || null,
       erp_ref_name: S(r.reference_name) || null,
     }),
+    push: { fields: (c) => ({
+      date: S(c.happened_at).slice(0, 10) || undefined,
+      type_of_call: S(c.call_type) || undefined,
+      result: S(c.result) || undefined,
+      person_interacted_with: S(c.person_name) || undefined,
+      remark: S(c.remark) || undefined,
+      next_action_date: S(c.next_action_on) || undefined,
+    }) },
   },
   {
     doctype: "Sales Order", table: "sales_order", key: "erpnext_so_no", cursorKey: "sync_sales_order",
@@ -120,6 +144,7 @@ const JOBS: Job[] = [
       po_no: S(r.po_no) || null,
       po_date: S(r.po_date) || null,
     }),
+    push: { submittable: true, fields: (c) => ({ po_no: S(c.po_no) || undefined, po_date: S(c.po_date) || undefined }) },
   },
 ];
 
@@ -204,8 +229,98 @@ export async function GET(req: Request) {
       report[job.doctype] = { read, added, had, upto };
     }
 
+    /* ───────────────────────── THE WAY BACK ─────────────────────────
+     * "Make sure that all of them are coming in and going out both, so that
+     * any changes made in the genie are also in the erp" (Dr Raghu, 8 Sep
+     * 2026).
+     *
+     * WHAT IT WILL NOT DO, AND WHY. Read plainly, "push everything Genie has
+     * that the ERP lacks" means creating 30,904 opportunities, 6,531 people
+     * and 2,698 companies over there — some forty thousand documents, into a
+     * live ERP of 54,681 customers, in one run, with no undo. That backlog is
+     * not "changes made in Genie": it is years of imports, merges and Apollo
+     * rows that were never the ERP's. So it is counted and reported, never
+     * sent.
+     *
+     * WHAT IT DOES. From the moment this is switched on: a row the ERP
+     * already knows and Genie has since edited is UPDATED there; a row born
+     * in Genie after that moment is CREATED there and its new ERP name
+     * written back, so it is never created twice. Everything older is left
+     * alone until he says otherwise about the backlog.
+     *
+     * IT IS OFF UNTIL HE ARMS IT. `push_on` in the same config row. While it
+     * is off the run still does the whole calculation and reports exactly
+     * what it WOULD send — which is the only honest way to show a man what a
+     * switch will do to his ERP before he throws it.
+     *
+     * A CAP OF 200 WRITES A RUN. Not because 200 is meaningful, but because a
+     * mistake that can only touch 200 documents is a mistake one can undo by
+     * hand, and a mistake that can touch 40,000 is not.
+     */
+    const armed = String(cfg.push_on || "") === "yes";
+    const CAP = 200;
+    const out: Record<string, { updated: number; created: number; skipped_backlog: number; refused: string[] }> = {};
+    let budget = CAP;
+
+    for (const job of JOBS) {
+      if (!job.push) continue;
+      const since = S(cfg[`push_${job.cursorKey}`]) || S(cfg.push_from) || new Date().toISOString();
+      const o = { updated: 0, created: 0, skipped_backlog: 0, refused: [] as string[] };
+      try {
+        const { data: rows, error } = await db.from(job.table)
+          .select("*").gt("updated_at", since).order("updated_at").limit(CAP);
+        if (error) throw new Error(error.message);
+
+        for (const r of rows ?? []) {
+          if (budget <= 0) { o.refused.push("the run's 200-write cap was reached — the rest follow next hour"); break; }
+          const erpName = S((r as Record<string, unknown>)[job.key]);
+
+          /* no ERP name and older than the switch — that is the backlog */
+          if (!erpName) {
+            if (S(r.created_at) <= since) { o.skipped_backlog++; continue; }
+            if (!armed) { o.created++; budget--; continue; }
+            const body = job.push.fields(r as Record<string, unknown>);
+            const cr = await fetch(`${base}/api/resource/${encodeURIComponent(job.doctype)}`, {
+              method: "POST", headers: { ...EH, "content-type": "application/json" }, body: JSON.stringify(body),
+            });
+            if (!cr.ok) { o.refused.push(`create: the ERP answered ${cr.status}`); continue; }
+            const made = S(((await cr.json()) as { data?: { name?: unknown } }).data?.name);
+            if (made) await db.from(job.table).update({ [job.key]: made }).eq("id", r.id);
+            o.created++; budget--;
+            continue;
+          }
+
+          /* the ERP knows it — send what changed */
+          const body = job.push.fields(r as Record<string, unknown>);
+          if (!Object.keys(body).length) continue;
+          if (!armed) { o.updated++; budget--; continue; }
+          const ur = await fetch(`${base}/api/resource/${encodeURIComponent(job.doctype)}/${encodeURIComponent(erpName)}`, {
+            method: "PUT", headers: { ...EH, "content-type": "application/json" }, body: JSON.stringify(body),
+          });
+          if (!ur.ok) {
+            const why = job.push.submittable && ur.status === 417
+              ? `${erpName} is submitted in the ERP — it cannot be edited from here`
+              : `${erpName}: the ERP answered ${ur.status}`;
+            o.refused.push(why);
+            continue;
+          }
+          o.updated++; budget--;
+        }
+        if (rows?.length) nextCfg[`push_${job.cursorKey}`] = S(rows[rows.length - 1].updated_at) || since;
+        else nextCfg[`push_${job.cursorKey}`] = since;
+      } catch (e) {
+        swallow("cron/crm-sync push", e);
+        o.refused.push(e instanceof Error ? e.message : String(e));
+      }
+      o.refused = o.refused.slice(0, 5);
+      out[job.doctype] = o;
+    }
+    if (!cfg.push_from) nextCfg.push_from = new Date().toISOString();
+
     await db.from("integration_setting").update({ config: nextCfg }).eq("key", "erpnext");
-    await beat("crm-sync", "done", report);
-    return NextResponse.json({ ok: true, report });
+    await beat("crm-sync", "done", { in: report, out });
+    return NextResponse.json({ ok: true, in: report, out,
+      push: armed ? "ARMED — the counts above were really sent to the ERP."
+        : "NOT ARMED — the counts above are what WOULD be sent. Set push_on to \"yes\" in the erpnext integration config to arm it." });
   } catch (e) { return errJson(e); }
 }

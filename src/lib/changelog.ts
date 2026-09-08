@@ -86,6 +86,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.32.0",
+    date: "2026-09-08",
+    module: "A quote in dollars, priced and taxed as one — and the sync learns the way back",
+    items: [
+      "\"Whenever I choose a USD or a euro, make sure we make the tax as zero. Change that automatically. It can always go back\" (Dr Raghu, 8 Sep 2026). An export sale carries no GST, so 18% on a dollar quote is not a formatting slip — it is a wrong number on a document that goes to a customer. Off the rupee the scheme moves to <b>No Tax</b> by itself. <b>Back on the rupee it comes back</b>, and it comes back the way it was chosen in the first place — IGST outside Maharashtra, CGST + SGST within, read from the quote\u2019s own address.",
+      "THE CURRENCY LIST IS NOW A TABLE, not three words in the screen — \"later on we can of course add more currencies also. It will come from the table\". Adding AED is one INSERT and no deploy. The rupee sits in it at 1.0000, so the home currency is not a special case in the code.",
+      "THE RATE, WHERE HE CAN SEE IT. Off the rupee the desk shows <b>1 USD = \u20b994.52</b> and the day it was quoted, because a rate with no date is a rate nobody can check. It comes from the <b>European Central Bank</b> through frankfurter.dev — free, no key, no account to lapse — refreshed once a day at 16:15 UTC, just after the ECB publishes. A failed fetch changes nothing and the last good rate stands; a rate that comes back twice or half what we hold is <b>refused</b>, because a bad rate is worse than a stale one — a stale one is visible on the screen.",
+      "THE ITEM CARRIES ITS OWN DOLLAR PRICE — \"at the moment I choose a product, it will show that product\u2019s amount in that currency\". The USD price is the one that is typed and <b>euro is crossed off it</b> through the rate table, not off the rupee, because the dollar is the number he maintains. Where no dollar price is on the master — 6,662 items of 6,672 today — the rupee price is converted at today\u2019s rate and the screen <b>says \"(converted)\"</b>, because a converted price is a guess about a market and a typed one is a decision about a deal.",
+      "LAKHS AND CRORES ARE FOR RUPEES. The rate box put Indian grouping on every number, so a dollar figure read <b>1,35,000</b> — which reads as a mistake to the man being quoted. Off the rupee it now groups in thousands and millions. The printed document already had this right; only the screen was wrong.",
+      "THE SYNC LEARNS THE WAY BACK — \"make sure that all of them are coming in and going out both\". <b>It is built and it is disarmed.</b> Read plainly, pushing everything Genie holds that the ERP lacks means creating <b>30,904 opportunities, 6,531 people and 2,698 companies</b> — some forty thousand documents, into a live ERP of 54,681 customers, in one run, with no undo. That backlog is not \"changes made in Genie\": it is years of imports, merges and Apollo rows that were never the ERP\u2019s. It is counted and reported, never sent.",
+      "WHAT IT WILL DO, once armed: a row the ERP already knows and Genie has since edited is <b>updated</b> there; a row born in Genie after the switch is <b>created</b> there and its new ERP name written back so it can never be created twice. Capped at <b>200 writes a run</b> — not because 200 is meaningful, but because a mistake that can touch 200 documents can be undone by hand and one that can touch 40,000 cannot. Until it is armed every run reports exactly what it <i>would</i> send.",
+      "\"Where r the GRN and PO and supliers?\" — all three were pulled and all three were on the screen, as <b>tabs inside one navbar row called Purchase orders</b>, which is not where anyone looks for a supplier. <b>1,400 suppliers, 20,928 purchase orders</b> (77,584 lines) and <b>23,900 GRNs</b> (71,180 lines) now have their own doors. And <code>/saamaan/po</code> — which the navbar has been writing into the address bar all along — was not in the router\u2019s list, so reloading that address quietly returned you to the dashboard. It resolves now, with suppliers and GRNs beside it.",
+    ],
+  },
+  {
     v: "5.0.31.0",
     date: "2026-09-08",
     module: "Interaction Master and Sales Order join the sync; a quote that would not go",

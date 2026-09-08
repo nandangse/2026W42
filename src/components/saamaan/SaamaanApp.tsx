@@ -41,7 +41,14 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "mrp", label: "MRP", icon: "📐" },
   { key: "kitting", label: "Kitting register", icon: "✓" },
   { key: "slips", label: "Issue slips", icon: "📨" },
+  /* THREE DOORS, NOT ONE (Dr Raghu, 8 Sep 2026: "where r the GRN and PO and
+     supliers?"). All three were pulled and all three were on the screen —
+     as tabs inside one nav row called "Purchase orders", which is a place
+     nobody looks for a supplier. A thing that is not in the navbar does not
+     exist. Same screen, opened on its own tab. */
   { key: "po", label: "Purchase orders", icon: "🧾" },
+  { key: "suppliers", label: "Suppliers", icon: "🏢" },
+  { key: "grn", label: "GRNs", icon: "📥" },
   { key: "masters", label: "Masters", icon: "⚙" },
   { key: "pull", label: "ERP pull", icon: "⇣" },
 ];
@@ -89,6 +96,8 @@ export default function SaamaanApp({
       case "kitting": return <Kitting />;
       case "slips": return <Slips />;
       case "po": return <PurchaseOrders erpBase={summary.erpBase} />;
+      case "suppliers": return <PurchaseOrders erpBase={summary.erpBase} openOn="suppliers" />;
+      case "grn": return <PurchaseOrders erpBase={summary.erpBase} openOn="grn" />;
       case "masters": return <Masters />;
       case "pull": return <Pull summary={summary} isOwner={isOwner} onDone={reloadSummary} />;
       default: return <Dashboard summary={summary} go={go} />;

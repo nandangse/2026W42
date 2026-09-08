@@ -12,7 +12,12 @@ export const metadata: Metadata = { title: "Nandan Saamaan Genie" };
  * genie.nandan.co.in/saamaan/<section> — every section at its own URL, so a
  * link to the item somebody is asking about still means something tomorrow.
  */
-const SECTIONS = ["dashboard", "items", "projects", "bom", "wip", "mrp", "kitting", "slips", "masters", "pull"];
+/* "po" was missing here while the navbar was already writing /saamaan/po
+   into the address bar — so the address said one thing and a reload of it
+   said another, landing you back on the dashboard (Dr Raghu, 8 Sep 2026:
+   "where r the GRN and PO and supliers?"). */
+const SECTIONS = ["dashboard", "items", "projects", "bom", "wip", "mrp", "kitting", "slips",
+  "po", "suppliers", "grn", "masters", "pull"];
 
 /** The plurals and the plain words all land somewhere sensible. */
 const ALIAS: Record<string, string> = {
@@ -22,7 +27,10 @@ const ALIAS: Record<string, string> = {
   jobs: "wip", job: "wip",
   planning: "mrp", "material-planning": "mrp", "material-resource-planning": "mrp",
   issues: "kitting", register: "kitting", "kitting-register": "kitting",
-  slip: "slips", "issue-slips": "slips", "issue-slip": "slips", purchase: "slips",
+  slip: "slips", "issue-slips": "slips", "issue-slip": "slips",
+  purchase: "po", "purchase-orders": "po", "purchase-order": "po", pos: "po",
+  supplier: "suppliers", vendors: "suppliers", vendor: "suppliers",
+  grns: "grn", "goods-receipt": "grn", receipts: "grn", receipt: "grn",
   master: "masters", settings: "masters", warehouses: "masters", warehouse: "masters",
   erp: "pull", import: "pull", sync: "pull",
 };

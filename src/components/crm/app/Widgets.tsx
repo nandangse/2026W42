@@ -229,12 +229,16 @@ export const dIN = (v: unknown) => (v ? String(v).slice(0, 10).split("-").revers
  * there and simply shows nothing. So money boxes are text boxes with a
  * decimal keypad, which is what MoneyBox below is.
  */
-export const groupIn = (raw: string): string => {
+export const groupIn = (raw: string, currency = "INR"): string => {
   if (!raw) return "";
   const [i, d] = String(raw).replace(/,/g, "").split(".");
   const n = Number(i);
   if (isNaN(n)) return raw;
-  return n.toLocaleString("en-IN") + (d !== undefined ? "." + d : "");
+  /* LAKHS AND CRORES ARE FOR RUPEES (Dr Raghu, 8 Sep 2026: "in the rate, like
+     I said, display euros and USD in millions and thousands, not in lakhs and
+     crores. When it is rupees, then make it lakhs and crores"). A dollar
+     figure grouped 1,35,000 reads as a mistake to the man being quoted. */
+  return n.toLocaleString(currency === "INR" ? "en-IN" : "en-US") + (d !== undefined ? "." + d : "");
 };
 
 export const ungroup = (v: string) => v.replace(/[^0-9.]/g, "");

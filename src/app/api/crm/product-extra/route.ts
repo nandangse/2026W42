@@ -43,7 +43,7 @@ export async function GET(req: Request) {
       // item group is chosen the dropdown will come in") — typing narrows
       if (q.length < 2 && !group) return NextResponse.json({ hits: [] });
       let qy = db.from("product")
-        .select("id, name, sku, item_group, approved_price_inr, last_quoted_price, avg_quoted_price_1y, description")
+        .select("id, name, sku, item_group, approved_price_inr, alt_price_usd, last_quoted_price, avg_quoted_price_1y, description")
         .is("deleted_at", null).eq("is_active", true)
         .order("name").limit(10);
       if (q.length >= 2) qy = qy.or(`name.ilike.*${q}*,item_group.ilike.*${q}*,sku.ilike.*${q}*,description.ilike.*${q}*`);
@@ -57,6 +57,11 @@ export async function GET(req: Request) {
           // the year's average (Dr Raghu, 30 Aug 2026: "why isn't the price
           // being pulled?")
           approved_price_inr: p.approved_price_inr ?? p.last_quoted_price ?? p.avg_quoted_price_1y ?? null,
+          /* the item's OWN dollar price, when the master carries one (Dr
+             Raghu, 8 Sep 2026: "for every item that we choose, if it has got
+             a USD or a euro amount, it will show that"). Null is not zero —
+             null means convert the rupee price and say so. */
+          alt_price_usd: p.alt_price_usd ?? null,
           snippet: String(p.description || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 120),
         })),
       });
