@@ -52,16 +52,24 @@ import { APP_VERSION } from "./version";
  * reading of what came back all happen outside the span between a day's first
  * and last commit. The band was raised by a quarter on his own instruction,
  * which is the only evidence available for the part no clock sees.
+ *
+ * MEASURED AGAIN 8 Sep 2026, on his word: 451 commits became 703, 26 days
+ * became 35, and the window went from 150.5 hours to 303.7 — the fortnight
+ * that built HRMS payroll, the IDP, Saamaan's purchasing and the RBOM page.
+ * Two of those days, the 6th and the 7th, span 22.8 and 23.9 hours: the work
+ * ran through the night, so the window flatters that week more than most. The
+ * method is left unchanged all the same, because a series is only worth
+ * anything if it is measured the same way each time.
  */
 export interface Effort { measuredTo: string; commits: number; days: number; windowHours: number; raghuLow: number; raghuHigh: number }
 
 export const EFFORT: Effort = {
-  measuredTo: "2026-08-30",
-  commits: 451,
-  days: 26,
-  windowHours: 150.5,
-  raghuLow: 75,
-  raghuHigh: 110,
+  measuredTo: "2026-09-08",
+  commits: 703,
+  days: 35,
+  windowHours: 303.7,
+  raghuLow: 151,
+  raghuHigh: 222,
 };
 
 export interface UpdateEntry {
@@ -77,6 +85,17 @@ export interface UpdateEntry {
 
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
+  {
+    v: "5.0.27.0",
+    date: "2026-09-08",
+    module: "A Kanban board in the CRM, and the menu on every app",
+    items: [
+      "KANBAN, BESIDE GROUP BY (Dr Raghu, 8 Sep 2026: \"next to group by show also KANBAN view. And in that u can add the KANBAN by. Keep in memory of the peson and view so it can go there\"). A board of the records on screen, in columns, with a card each carrying the name, the money and the next two useful fields — clicking one opens the same lightbox the table does. <b>Kanban by</b> offers only the fields worth being columns: Stage, Status, Pipeline, Sales Person, Source, Product Family — a board is no use on a field with four hundred values.",
+      "AND IT REMEMBERS, per person and per view. Opening Opportunities takes him back to the board he left and Quotations to its own, rather than to a list he sets up again every morning.",
+      "PROFILE AND ADMIN ARE ON EVERY APP'S MENU (\"show profile and admin also on every app\"). They were supplied by Planning alone, so a man standing in CRM or Saamaan could reach neither — and both are about him and his own access, which do not belong to one module. Admin uses the ?tab= link Planning already understood; Profile got its own, and the parameter is taken off the address afterwards so a reload does not keep reopening it.",
+      "Effort measured again on his word: <b>703 commits over 35 days</b>, a 303.7-hour window, 151–222 hours of his own — up from 451, 26 and 150.5 to 30 August. Two of those days span nearly 24 hours because the work ran through the night, so the last week flatters the window more than most; the method is unchanged all the same, since a series is only worth something measured the same way each time.",
+    ],
+  },
   {
     v: "5.0.26.0",
     date: "2026-09-08",

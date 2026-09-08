@@ -298,6 +298,18 @@ function AccountMenu({ module, user, isAdmin, menu }: { module: ShellModule; use
             </div>
             <a href="/idp" className="block px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, textDecoration: "none", borderBottom: "1px solid #EEECE6" }}>🪪 My sheet &amp; IDP</a>
             {menu && <div className="genie-menu-extra" style={{ borderBottom: "1px solid #EEECE6" }}>{menu(() => setOpen(false))}</div>}
+            {/* PROFILE AND ADMIN ON EVERY APP (Dr Raghu, 8 Sep 2026: "show
+                profile and admin also on every app"). They were passed in by
+                Planning alone, so a man standing in CRM or Saamaan could see
+                neither — and both are about him and his access, which do not
+                belong to one module. Planning still supplies its own richer
+                entries; these fill in wherever it does not. */}
+            {!menu && (
+              <>
+                <a href="/?go=profile" className="block px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, textDecoration: "none", borderBottom: "1px solid #EEECE6" }}>👤 Profile</a>
+                {isAdmin && <a href="/?tab=admin" className="block px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, textDecoration: "none", borderBottom: "1px solid #EEECE6" }}>⚙ Admin</a>}
+              </>
+            )}
             <button onClick={() => window.location.reload()} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, borderBottom: "1px solid #EEECE6" }} title="Same screen, fresh code">⟳ Reload</button>
             <button onClick={logout} className="w-full text-left px-3 py-2 text-sm font-bold hover:bg-gray-50" style={{ color: ORANGE }}>⎋ Logout</button>
             {isAdmin && (

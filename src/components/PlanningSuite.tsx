@@ -110,6 +110,22 @@ export default function PlanningSuite({
     return "suite";
   });
   // Sales-team members' home is the CRM now — Sales Genie's panes moved there.
+  /* PROFILE FROM ANOTHER APP (Dr Raghu, 8 Sep 2026: "show profile and admin
+     also on every app"). Admin is a tab and ?tab=admin already reached it;
+     Profile is a lightbox, so it needs its own word. The parameter is taken
+     off the address afterwards, or a reload would keep reopening it. */
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("go") === "profile") {
+        setProfileOpen(true);
+        p.delete("go");
+        const q = p.toString();
+        window.history.replaceState({}, "", `${window.location.pathname}${q ? `?${q}` : ""}`);
+      }
+    } catch (e) { swallow("PlanningSuite profile link", e); }
+  }, []);
+
   useEffect(() => {
     if (role === "sales") window.location.replace("/crm");
     // eslint-disable-next-line react-hooks/exhaustive-deps

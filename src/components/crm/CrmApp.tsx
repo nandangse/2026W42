@@ -172,7 +172,30 @@ export default function CrmApp({
 
   /** Group-by: aggregate the filtered set, shown in a right-side drawer. */
   const [groupBy, setGroupBy] = useState("");
+  /**
+   * KANBAN, AND IT REMEMBERS (Dr Raghu, 8 Sep 2026: "next to group by show
+   * also KANBAN view. And in that u can add the KANBAN by. Keep in memory of
+   * the peson and view so it can go there").
+   *
+   * Kept in this browser, keyed by the doctype — so opening Opportunities
+   * takes him back to the board he left, and Quotations to its own, rather
+   * than to a list he has to set up again every morning. Per person because
+   * localStorage is; per view because the useful column differs by doctype.
+   */
+  const [kanban, setKanban] = useState(false);
+  const [kanbanBy, setKanbanBy] = useState("");
   const [sumOn, setSumOn] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`crm-view-${slug}`);
+      const v = raw ? JSON.parse(raw) as { kanban?: boolean; kanbanBy?: string } : null;
+      setKanban(!!v?.kanban); setKanbanBy(String(v?.kanbanBy || ""));
+    } catch { setKanban(false); setKanbanBy(""); }
+  }, [slug]);
+  useEffect(() => {
+    try { localStorage.setItem(`crm-view-${slug}`, JSON.stringify({ kanban, kanbanBy })); } catch { /* private window */ }
+  }, [slug, kanban, kanbanBy]);
+
   const [groups, setGroups] = useState<{ field: string; hasMoney: boolean; total: number; sumTotal: number; groups: { key: string; label: string; count: number; sum: number }[] } | null>(null);
   /** Such records total in lakhs and crores (Dr Raghu, 26 Aug 2026). */
   const lakhCr = (n: number) => n >= 1e7 ? `₹ ${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹ ${(n / 1e5).toFixed(1)} L` : `₹ ${Math.round(n).toLocaleString("en-IN")}`;
@@ -694,8 +717,31 @@ export default function CrmApp({
               const CANDIDATES: [string, string][] = [["owner_id", "Sales Person"], ["product_family", "Product Family"], ["source", "Source"], ["sector_id", "Sector"], ["industry_id", "Industry"], ["company_industry", "Industry"]];
               const opts = CANDIDATES.filter(([n]) => dt.fields.some((f) => f.name === n && !f.virtual));
               if (!opts.length) return null;
+              /* KANBAN BY — the fields worth being columns. A board is only
+                 useful when the field has few values and an order to them, so
+                 it is the ladders and the owner, not every link on the form. */
+              const KAN: [string, string][] = [["stage_id", "Stage"], ["status", "Status"], ["pipeline", "Pipeline"], ["owner_id", "Sales Person"], ["source", "Source"], ["product_family", "Product Family"]];
+              const kopts = KAN.filter(([n]) => dt.fields.some((f) => f.name === n && !f.virtual));
               return (
                 <span className="flex items-center gap-1 ml-auto">
+                  {/* KANBAN, next to Group by (Dr Raghu, 8 Sep 2026) */}
+                  {kopts.length > 0 && (
+                    <>
+                      <button onClick={() => { const on = !kanban; setKanban(on); if (on && !kanbanBy) setKanbanBy(kopts[0][0]); }}
+                        title="See these as a board, in columns"
+                        className="px-2 py-1.5 rounded text-sm font-bold border"
+                        style={{ borderColor: kanban ? NAVY : BORDER, background: kanban ? NAVY_SOFT : "#fff", color: kanban ? NAVY : "var(--dim)" }}>
+                        ▦ Kanban
+                      </button>
+                      {kanban && (
+                        <select value={kanbanBy} onChange={(e) => setKanbanBy(e.target.value)}
+                          className="px-2 py-1.5 rounded text-sm font-semibold border"
+                          style={{ borderColor: NAVY, background: "#fff", color: INK }}>
+                          {kopts.map(([n, l]) => <option key={n} value={n}>Kanban by {l}</option>)}
+                        </select>
+                      )}
+                    </>
+                  )}
                   <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}
                     className="px-2 py-1.5 rounded text-sm font-semibold border"
                     style={{ borderColor: groupBy ? NAVY : BORDER, background: "#fff", color: groupBy ? INK : "var(--dim)" }}>
@@ -981,7 +1027,72 @@ export default function CrmApp({
             </div>
           )}
 
-          {rows.length > 0 && (
+          {/* ───────────── THE BOARD ─────────────
+              Columns are the values the loaded rows actually carry, in the
+              order the ladder gives them where there is one. A card shows the
+              row's own name and the two or three things worth seeing without
+              opening it; clicking opens the same lightbox the table does, so
+              nothing is learned twice. */}
+          {rows.length > 0 && kanban && kanbanBy && (() => {
+            const kf = dt.fields.find((f) => f.name === kanbanBy);
+            const title = visible[0]?.name ?? "name";
+            const money = visible.find((f) => f.type === "money" || /value|amount|total/i.test(f.name));
+            /* a link field carries an id; its words live in `links`, keyed by
+               the target doctype, exactly as the table reads them */
+            const label = (r: Record<string, unknown>) => {
+              const v = r[kanbanBy];
+              if (v == null || v === "") return "— not set —";
+              const opts = kf?.link ? links[kf.link] : undefined;
+              const hit = Array.isArray(opts) ? opts.find((o) => String(o.id) === String(v)) : undefined;
+              return String(hit?.label ?? v);
+            };
+            const cols = new Map<string, Record<string, unknown>[]>();
+            for (const r of rows) { const k = label(r); (cols.get(k) ?? cols.set(k, []).get(k)!).push(r); }
+            const order = [...cols.keys()].sort((a2, b2) => (a2 === "— not set —" ? 1 : b2 === "— not set —" ? -1 : cols.get(b2)!.length - cols.get(a2)!.length));
+            return (
+              <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 8, alignItems: "flex-start" }}>
+                {order.map((k) => {
+                  const list = cols.get(k)!;
+                  const sum = money ? list.reduce((a2, r) => a2 + (Number(r[money.name]) || 0), 0) : 0;
+                  return (
+                    <div key={k} style={{ minWidth: 262, maxWidth: 262, flex: "none", background: "#F4F2EC", borderRadius: 10, border: `1px solid ${BORDER}` }}>
+                      <div style={{ padding: "8px 10px", borderBottom: `1px solid ${BORDER}`, position: "sticky", top: 0, background: "#F4F2EC", borderRadius: "10px 10px 0 0" }}>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>{k}</div>
+                        <div style={{ fontSize: 11.5, color: MUTED }}>
+                          {list.length} {list.length === 1 ? "record" : "records"}
+                          {money && sum ? ` · ₹${Math.round(sum).toLocaleString("en-IN")}` : ""}
+                        </div>
+                      </div>
+                      <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8, maxHeight: "calc(100vh - 330px)", overflowY: "auto" }}>
+                        {list.map((r, i) => (
+                          <div key={String(r.id ?? i)} role="button" tabIndex={0}
+                            onClick={() => setView({ dt, row: r, links, mode: "view" })}
+                            style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 10px", cursor: "pointer" }}>
+                            <div style={{ fontWeight: 600, fontSize: 12.5, lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                              {String(r[title] ?? r.name ?? r.id ?? "")}
+                            </div>
+                            {money && r[money.name] != null && (
+                              <div className="tnum" style={{ fontSize: 12, fontWeight: 700, marginTop: 3 }}>
+                                ₹{Math.round(Number(r[money.name]) || 0).toLocaleString("en-IN")}
+                              </div>
+                            )}
+                            {visible.slice(1, 3).filter((f) => f.name !== kanbanBy && f !== money).map((f) => (
+                              <div key={f.name} style={{ fontSize: 11.5, color: MUTED, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                <Cell field={f} value={r[f.name]} links={links} onOpenLink={openLinked} short />
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                {!kf && <div style={{ color: MUTED, fontSize: 13 }}>That field is not on this doctype.</div>}
+              </div>
+            );
+          })()}
+
+          {rows.length > 0 && !kanban && (
             <div
               className="rounded border"
               style={{
