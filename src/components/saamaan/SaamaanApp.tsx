@@ -49,6 +49,7 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "po", label: "Purchase orders", icon: "🧾" },
   { key: "suppliers", label: "Suppliers", icon: "🏢" },
   { key: "grn", label: "GRNs", icon: "📥" },
+  { key: "pinv", label: "Purchase invoices", icon: "🧾" },
   { key: "masters", label: "Masters", icon: "⚙" },
   { key: "pull", label: "ERP pull", icon: "⇣" },
 ];
@@ -98,6 +99,7 @@ export default function SaamaanApp({
       case "po": return <PurchaseOrders erpBase={summary.erpBase} />;
       case "suppliers": return <PurchaseOrders erpBase={summary.erpBase} openOn="suppliers" />;
       case "grn": return <PurchaseOrders erpBase={summary.erpBase} openOn="grn" />;
+      case "pinv": return <PurchaseOrders erpBase={summary.erpBase} openOn="pinv" />;
       case "masters": return <Masters />;
       case "pull": return <Pull summary={summary} isOwner={isOwner} onDone={reloadSummary} />;
       default: return <Dashboard summary={summary} go={go} />;

@@ -31,7 +31,7 @@ const N = (v: unknown) => (v === null || v === undefined || v === "" ? null : Nu
 const B = (v: unknown) => v === 1 || v === "1" || v === true;
 const D = (v: unknown) => { const s = S(v).slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null; };
 const T = (v: unknown) => { const s = S(v); const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/); return m ? `${m[1]}T${m[2]}+05:30` : null; };
-const missing = (m: string) => /material_po|material_supplier|material_grn|does not exist|schema cache/i.test(m);
+const missing = (m: string) => /material_po|material_supplier|material_grn|material_pinv|does not exist|schema cache/i.test(m);
 /** material_setting.value is text; the pull's cursor is JSON in it. */
 const parseSetting = (v: unknown): Doc => { try { const o = JSON.parse(String(v ?? "")); return o && typeof o === "object" ? (o as Doc) : {}; } catch { return {}; } };
 
@@ -58,6 +58,15 @@ const PO_FIELDS = ["name", "supplier", "supplier_name", "status", "docstatus", "
  */
 const GRN_FIELDS = ["name", "supplier", "supplier_name", "status", "docstatus", "posting_date", "posting_time", "grand_total", "net_total", "total_taxes_and_charges", "currency", "project", "set_warehouse", "is_return", "per_billed", "total_qty", "owner", "remarks", "modified"];
 const GRN_ITEM_FIELDS = ["name", "modified", "items.name as row_name", "items.idx as row_idx", "items.item_code", "items.item_name", "items.qty", "items.received_qty", "items.rejected_qty", "items.uom", "items.rate", "items.amount", "items.warehouse", "items.rejected_warehouse", "items.purchase_order", "items.purchase_order_item", "items.batch_no", "items.serial_no", "items.project"];
+/* The invoice is the third fact after the promise and the arrival, and the
+   only one that carries money owed (Dr Raghu, 8 Sep 2026). */
+const PINV_FIELDS = ["name", "supplier", "supplier_name", "status", "docstatus", "posting_date", "posting_time",
+  "due_date", "bill_no", "bill_date", "grand_total", "net_total", "total_taxes_and_charges", "outstanding_amount",
+  "currency", "project", "is_paid", "is_return", "update_stock", "total_qty", "owner", "remarks", "modified"];
+const PINV_ITEM_FIELDS = ["name", "modified", "items.name as row_name", "items.idx as row_idx", "items.item_code",
+  "items.item_name", "items.qty", "items.received_qty", "items.uom", "items.rate", "items.amount", "items.net_amount",
+  "items.taxable_value", "items.warehouse", "items.purchase_order", "items.po_detail", "items.purchase_receipt",
+  "items.pr_detail", "items.item_group", "items.project"];
 const PO_ITEM_FIELDS = ["name", "modified", "items.name as row_name", "items.idx as row_idx", "items.item_code", "items.item_name", "items.qty", "items.uom", "items.rate", "items.amount", "items.received_qty", "items.billed_amt", "items.warehouse", "items.schedule_date", "items.project"];
 
 export async function GET(req: Request) {
@@ -79,6 +88,39 @@ export async function GET(req: Request) {
       return NextResponse.json({ installed: true, rows: (data || []).map((s) => ({ ...s, ...(tally.get(S(s.name)) ?? { n: 0, value: 0, open: 0 }) })) });
     }
     /* ── GRNs: what arrived ── */
+    /* PURCHASE INVOICES — what was billed, and what is still owed on it */
+    if (u.searchParams.get("pinv")) {
+      const vname = S(u.searchParams.get("name"));
+      if (vname) {
+        const [{ data: inv }, { data: lines }] = await Promise.all([
+          admin.from("material_pinv").select("*").eq("name", vname).maybeSingle(),
+          admin.from("material_pinv_item").select("*").eq("pinv_name", vname).order("idx"),
+        ]);
+        if (!inv) throw new HttpError(404, "No such purchase invoice in the mirror — pull first.");
+        return NextResponse.json({ pinv: inv, items: lines || [] });
+      }
+      const vsup = S(u.searchParams.get("supplier")), vproj = S(u.searchParams.get("project"));
+      const vstat = S(u.searchParams.get("status"));
+      const vfrom = D(u.searchParams.get("from")), vto = D(u.searchParams.get("to"));
+      const vpage = Math.max(0, Number(u.searchParams.get("page")) || 0), vsize = 200;
+      let v = admin.from("material_pinv")
+        .select("name, supplier, supplier_name, status, docstatus, posting_date, due_date, bill_no, bill_date, grand_total, outstanding, currency, project, is_paid, is_return, total_qty, erp_modified", { count: "exact" })
+        .order("posting_date", { ascending: false }).order("name", { ascending: false })
+        .range(vpage * vsize, vpage * vsize + vsize - 1);
+      if (vsup) v = v.eq("supplier", vsup);
+      if (vproj) v = v.eq("project", vproj);
+      if (vstat) v = v.eq("status", vstat);
+      if (vfrom) v = v.gte("posting_date", vfrom);
+      if (vto) v = v.lte("posting_date", vto);
+      if (q) v = v.or(`name.ilike.%${q}%,supplier_name.ilike.%${q}%,bill_no.ilike.%${q}%,project.ilike.%${q}%`);
+      const { data: rows, count, error: ve } = await v;
+      if (ve) { if (missing(ve.message)) return NextResponse.json({ installed: false, rows: [], total: 0 }); throw new Error(ve.message); }
+      /* the statuses actually present, so the filter offers only real ones */
+      const { data: st } = await admin.from("material_pinv").select("status").limit(2000);
+      const statuses = [...new Set((st || []).map((r) => S(r.status)).filter(Boolean))].sort();
+      return NextResponse.json({ installed: true, total: count ?? 0, rows: rows || [], statuses });
+    }
+
     if (u.searchParams.get("grns")) {
       const gname = S(u.searchParams.get("name"));
       if (gname) {
@@ -285,6 +327,75 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, phase, found, written, next_start: start + pages * 500, done: false });
       async function finishGrnItems() {
         await admin.from("material_setting").upsert({ key: "po_pull", value: JSON.stringify({ ...st, grn_items_modified: lastMod || st.grn_items_modified || "", grn_items_at: now, by }), updated_by: by, updated_at: now }, { onConflict: "key" });
+        return NextResponse.json({ ok: true, phase, found, written, done: true });
+      }
+    }
+
+    if (phase === "pinv") {
+      const { data: setting } = await admin.from("material_setting").select("value").eq("key", "po_pull").maybeSingle();
+      const st = parseSetting(setting?.value);
+      const since = body.full ? "" : S(st.pinv_modified);
+      const start = Math.max(0, Number(body.start) || 0);
+      const filters = since ? [["modified", ">=", since]] : null;
+      let found = 0, written = 0, lastMod = since, pages = 0;
+      for (let s2 = start; pages < 24; s2 += 500, pages++) {
+        const rows = await erpPage(cfg, "Purchase Invoice", PINV_FIELDS, filters, s2, 500);
+        found += rows.length;
+        if (!rows.length) return finishPinv();
+        const up = rows.map((v) => ({
+          name: S(v.name), supplier: S(v.supplier), supplier_name: S(v.supplier_name), status: S(v.status),
+          docstatus: Number(v.docstatus) || 0, posting_date: D(v.posting_date), posting_time: S(v.posting_time),
+          due_date: D(v.due_date), bill_no: S(v.bill_no), bill_date: D(v.bill_date),
+          grand_total: N(v.grand_total), net_total: N(v.net_total), taxes: N(v.total_taxes_and_charges),
+          outstanding: N(v.outstanding_amount), currency: S(v.currency), project: S(v.project),
+          is_paid: !!Number(v.is_paid), is_return: !!Number(v.is_return), update_stock: !!Number(v.update_stock),
+          total_qty: N(v.total_qty), owner: S(v.owner), remarks: S(v.remarks),
+          erp_modified: T(v.modified), erp: v, pulled_at: now,
+        }));
+        const { error } = await admin.from("material_pinv").upsert(up, { onConflict: "name" });
+        if (error) { if (missing(error.message)) throw new HttpError(503, "Run migration 0162 first — the purchase invoices have nowhere to live yet."); throw new Error(error.message); }
+        written += up.length;
+        for (const v of rows) if (S(v.modified) > lastMod) lastMod = S(v.modified);
+        if (rows.length < 500) return finishPinv();
+      }
+      return NextResponse.json({ ok: true, phase, found, written, next_start: start + pages * 500, done: false });
+      async function finishPinv() {
+        await admin.from("material_setting").upsert({ key: "po_pull", value: JSON.stringify({ ...st, pinv_modified: lastMod || st.pinv_modified || "", pinv_at: now, by }), updated_by: by, updated_at: now }, { onConflict: "key" });
+        return NextResponse.json({ ok: true, phase, found, written, done: true, since: since || "the beginning" });
+      }
+    }
+
+    if (phase === "pinv_items") {
+      const { data: setting } = await admin.from("material_setting").select("value").eq("key", "po_pull").maybeSingle();
+      const st = parseSetting(setting?.value);
+      const since = body.full ? "" : S(st.pinv_items_modified);
+      const start = Math.max(0, Number(body.start) || 0);
+      const filters = since ? [["modified", ">=", since]] : null;
+      let found = 0, written = 0, lastMod = since, pages = 0;
+      for (let s2 = start; pages < 20; s2 += 500, pages++) {
+        const rows = await erpPage(cfg, "Purchase Invoice", PINV_ITEM_FIELDS, filters, s2, 500, "modified asc, `tabPurchase Invoice Item`.idx asc");
+        found += rows.length;
+        if (!rows.length) return finishPinvItems();
+        const up = rows.filter((r) => S(r.row_name)).map((r) => ({
+          row_name: S(r.row_name), pinv_name: S(r.name), idx: Number(r.row_idx) || 0,
+          item_code: S(r.item_code), item_name: S(r.item_name), qty: N(r.qty), received_qty: N(r.received_qty),
+          uom: S(r.uom), rate: N(r.rate), amount: N(r.amount), net_amount: N(r.net_amount),
+          taxable_value: N(r.taxable_value), warehouse: S(r.warehouse),
+          purchase_order: S(r.purchase_order), po_detail: S(r.po_detail),
+          purchase_receipt: S(r.purchase_receipt), pr_detail: S(r.pr_detail),
+          item_group: S(r.item_group), project: S(r.project), pulled_at: now,
+        }));
+        if (up.length) {
+          const { error } = await admin.from("material_pinv_item").upsert(up, { onConflict: "row_name" });
+          if (error) { if (missing(error.message)) throw new HttpError(503, "Run migration 0162 first."); throw new Error(error.message); }
+          written += up.length;
+        }
+        for (const r of rows) if (S(r.modified) > lastMod) lastMod = S(r.modified);
+        if (rows.length < 500) return finishPinvItems();
+      }
+      return NextResponse.json({ ok: true, phase, found, written, next_start: start + pages * 500, done: false });
+      async function finishPinvItems() {
+        await admin.from("material_setting").upsert({ key: "po_pull", value: JSON.stringify({ ...st, pinv_items_modified: lastMod || st.pinv_items_modified || "", pinv_items_at: now, by }), updated_by: by, updated_at: now }, { onConflict: "key" });
         return NextResponse.json({ ok: true, phase, found, written, done: true });
       }
     }

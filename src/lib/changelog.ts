@@ -86,6 +86,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.34.0",
+    date: "2026-09-08",
+    module: "Purchase invoices — the third fact, and the only one that carries money owed",
+    items: [
+      "\"Can you also pull in the purchase invoice from the ERP?\" (Dr Raghu, 8 Sep 2026). <b>23,895 of them</b>, with their lines, mirrored exactly as the ERP holds them.",
+      "SAAMAAN NOW HOLDS ALL THREE. The purchase order is a <b>promise</b>, the GRN is the <b>arrival</b>, and the invoice is the <b>bill</b> — and only the invoice carries money owed. Until now the room could say what was ordered and what came, but not what is owed for it, to whom, or by when.",
+      "OUTSTANDING IS THE POINT OF THE TABLE, and it is shown red above zero, green at zero, and a <b>dash when the ERP never recorded one</b> — because a figure nobody entered is not a bill that has been settled. Overdue is worked out against today rather than read from a status, so an invoice past its due date with money still on it is marked ⚠ whatever the ERP calls it.",
+      "THE SUPPLIER\u2019S OWN BILL NUMBER sits in its own column beside ours. <code>NGSE/PUR/INV/1601</code> means nothing on the telephone to his accounts desk; <code>VNM/DTX-26/2577</code> is what both sides can look up.",
+      "AND THE THREE DOCUMENTS JOIN UP on the line. Each invoice line names the <b>PO it bills</b> and the <b>GRN it answers</b>, side by side — which is the only place a mismatch between promised, arrived and billed is actually visible.",
+      "Needs <b>migration 0162</b>, then Pull from ERP — the pull now runs seven phases instead of five and resumes from its own cursor, so it can be stopped and restarted without re-reading what it already has.",
+    ],
+  },
+  {
     v: "5.0.33.2",
     date: "2026-09-08",
     module: "The Planning Suite comes back — my hook, my fault",

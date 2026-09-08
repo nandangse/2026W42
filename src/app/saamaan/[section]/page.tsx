@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Nandan Saamaan Genie" };
    said another, landing you back on the dashboard (Dr Raghu, 8 Sep 2026:
    "where r the GRN and PO and supliers?"). */
 const SECTIONS = ["dashboard", "items", "projects", "bom", "wip", "mrp", "kitting", "slips",
-  "po", "suppliers", "grn", "masters", "pull"];
+  "po", "suppliers", "grn", "pinv", "masters", "pull"];
 
 /** The plurals and the plain words all land somewhere sensible. */
 const ALIAS: Record<string, string> = {
@@ -31,6 +31,7 @@ const ALIAS: Record<string, string> = {
   purchase: "po", "purchase-orders": "po", "purchase-order": "po", pos: "po",
   supplier: "suppliers", vendors: "suppliers", vendor: "suppliers",
   grns: "grn", "goods-receipt": "grn", receipts: "grn", receipt: "grn",
+  invoice: "pinv", invoices: "pinv", "purchase-invoice": "pinv", "purchase-invoices": "pinv", bills: "pinv",
   master: "masters", settings: "masters", warehouses: "masters", warehouse: "masters",
   erp: "pull", import: "pull", sync: "pull",
 };
