@@ -1340,7 +1340,7 @@ export function CommsFeed({
   };
 
   const pullMail = async () => {
-    if (!contactEmail && type !== "opportunity") return;
+    if (!contactEmail && type !== "opportunity" && type !== "quotation") return;
     setMailBusy(true); setMailMsg("");
     try {
       const r = await fetch("/api/crm/gmail/pull", {
@@ -1410,7 +1410,7 @@ export function CommsFeed({
             >
               {composing ? "Cancel" : "✉ Send email"}
             </button>
-            {(contactEmail || type === "opportunity") && (
+            {(contactEmail || type === "opportunity" || type === "quotation") && (
               <button
                 onClick={() => void pullMail()}
                 disabled={mailBusy}
@@ -1418,9 +1418,11 @@ export function CommsFeed({
                 style={{ borderColor: BORDER, background: "#fff", color: NAVY }}
                 title={type === "opportunity"
                   ? "Search your mailbox for mail with ALL this opportunity's contacts, from 7 days before the enquiry onward, and land it here"
-                  : `Fetch your recent Gmail with ${contactEmail} onto this record`}
+                  : type === "quotation"
+                    ? "Search your mailbox for mail with ALL this quote's contacts, from 7 days before it was raised through to now, and land it here"
+                    : `Fetch your recent Gmail with ${contactEmail} onto this record`}
               >
-                {mailBusy ? "Working…" : type === "opportunity" ? "⟳ Pull Gmail with the contacts" : `⟳ Pull Gmail with ${contactEmail}`}
+                {mailBusy ? "Working…" : (type === "opportunity" || type === "quotation") ? "⟳ Pull Gmail with the contacts" : `⟳ Pull Gmail with ${contactEmail}`}
               </button>
             )}
             <span className="text-xs" style={{ color: MUTED }}>as {gmail.email}</span>

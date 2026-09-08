@@ -86,6 +86,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.27.1",
+    date: "2026-09-08",
+    module: "A quotation can pull its own mail",
+    items: [
+      "\"Keep the pull from email. Check the contacts. From them or to them if there is an email. The date +/- 7 days, upto now, it can be pulled in\" (Dr Raghu, 8 Sep 2026, looking at a quote whose Communication tab said <i>nothing said yet</i> after weeks of talking).",
+      "The opportunity has had exactly this since 26 August; the <b>quotation never did</b> — and the quote is where the conversation actually happens. It now searches its own contact and everybody at the company, from <b>seven days before the quote was raised</b> through to now, because a quote is asked for before it is written. Each mail lands linked to whichever contact it was really with, and to the quote.",
+    ],
+  },
+  {
     v: "5.0.27.0",
     date: "2026-09-08",
     module: "A Kanban board in the CRM, and the menu on every app",

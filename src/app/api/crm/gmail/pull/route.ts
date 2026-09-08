@@ -57,6 +57,43 @@ export async function POST(req: Request) {
         if (!b.company_id && o.company_id) b.company_id = o.company_id;
       }
     }
+    /**
+     * THE SAME FOR A QUOTATION (Dr Raghu, 8 Sep 2026, on a quote whose
+     * Communication tab said "nothing said yet" after weeks of talking:
+     * "keep the pull from email. Check the contacts. From them or to them if
+     * there is an email. The date +/- 7 days, upto now, it can be pulled in").
+     *
+     * The opportunity has had this since 26 Aug; the quotation never did, and
+     * a quote is where the conversation actually happens. Its own contact
+     * first, then everybody at the company, and the window from seven days
+     * before the quote was raised — because a quote is asked for before it is
+     * written.
+     */
+    if (b.quotation_id) {
+      const { data: qt } = await db.from("quotation")
+        .select("quotation_on, created_at, contact_id, company_id, opportunity_id").eq("id", b.quotation_id).maybeSingle();
+      if (qt) {
+        if (qt.contact_id) {
+          const { data: per } = await db.from("person").select("id, primary_email").eq("id", qt.contact_id).maybeSingle();
+          if (per) addPer(per.primary_email, per.id);
+        }
+        if (qt.company_id) {
+          const { data: pers } = await db.from("person")
+            .select("id, primary_email").eq("company_id", qt.company_id)
+            .not("primary_email", "is", null).is("deleted_at", null).limit(10);
+          for (const per of pers ?? []) addPer(per.primary_email, per.id);
+        }
+        const on = String(qt.quotation_on || qt.created_at || "").slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(on)) {
+          const d0 = new Date(`${on}T00:00:00Z`);
+          d0.setUTCDate(d0.getUTCDate() - 7);
+          after = `after:${d0.getUTCFullYear()}/${d0.getUTCMonth() + 1}/${d0.getUTCDate()}`;
+        }
+        if (!b.company_id && qt.company_id) b.company_id = qt.company_id;
+        if (!b.opportunity_id && qt.opportunity_id) b.opportunity_id = qt.opportunity_id;
+      }
+    }
+
     const explicit = String(b.email ?? "").trim().toLowerCase();
     if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(explicit) && !perByEmail.has(explicit))
       perByEmail.set(explicit, String(b.person_id ?? ""));
@@ -98,7 +135,7 @@ export async function POST(req: Request) {
         from_handle: from, to_handles: toHdr ? [toHdr] : [],
         occurred_at: m.internalDate ? new Date(Number(m.internalDate)).toISOString() : new Date().toISOString(),
         person_id: personId || null, company_id: b.company_id ?? null,
-        opportunity_id: b.opportunity_id ?? null, agent_profile_id: user.profileId,
+        opportunity_id: b.opportunity_id ?? null, quotation_id: b.quotation_id ?? null, agent_profile_id: user.profileId,
       }], { onConflict: "channel,external_id", ignoreDuplicates: true });
       if (!error) pulled++;
     }
