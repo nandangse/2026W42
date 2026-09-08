@@ -78,6 +78,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.25.0",
+    date: "2026-09-08",
+    module: "The RBOM as a document of its own",
+    items: [
+      "\"RBOM needs a link of its own ... this link will make it useful\" (Dr Raghu, 8 Sep 2026). It had none: an RBOM lived inside a lightbox, which can be read but cannot be sent to anybody — and a Real BOM is precisely the thing a project argues about. It now has an address, <b>genie.nandan.co.in/saamaan/rbom/&lt;no&gt;</b>, and the lightbox carries <b>↗ Open in own page</b>.",
+      "SIX TABS, IN HIS ORDER: <b>Real BOM</b> (the lines, and where the work is done) · <b>Ordering BOM</b> (the ERP BOM it was built from, untouched, so the two can be read against each other) · <b>Analytics</b> (what it is made of, by group and money) · <b>Projects Used</b> · <b>Kitted Warehouses</b> (WIP no · Project · Job · Value · Item nos · % kitted, read live off the WIP warehouses) · <b>Remarks</b>.",
+      "REMARKS ARE A THREAD, not a field: appended one at a time with a name and a time, newest first, and never edited. A remark can be about the whole RBOM or about one line.",
+      "AND A RELEASE. <b>WIP</b> joins Draft and Released as a third status. Tick lines and move them, or take every line at once; the Release button stamps the header, moves everything not yet Released, and shows the notice as it will read — RBOM, revision, the link, and a table of exactly the items being added — <b>before</b> anything is sent. The addresses are typed rather than guessed, because a release notice that reaches the wrong people is worse than one nobody sent.",
+      "Migration <b>0158</b> adds the remark thread and the release stamp.",
+    ],
+  },
+  {
     v: "5.0.24.0",
     date: "2026-09-08",
     module: "Saamaan: GRNs — what actually arrived",

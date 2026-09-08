@@ -285,6 +285,18 @@ export function BomLines({ kind, bom, base: baseIn }: { kind: "bom" | "rbom"; bo
         </span>
         <Btn onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>‹</Btn>
         <Btn onClick={() => setPage((p) => p + 1)} disabled={to >= total}>›</Btn>
+        {/* OPEN IN ITS OWN PAGE (Dr Raghu, 8 Sep 2026: "After the lightbox
+            make a button — Open in own page — and make it linked to the
+            genie.nandan.co.in/saamaan/<>. This link will make it useful").
+            A lightbox can be read but not sent to anybody; an address can be
+            put in a mail, and that is what makes an RBOM discussable. */}
+        {data?.head ? (
+          <a href={`/saamaan/rbom/${encodeURIComponent(S(data.head.rbom_id))}`} target="_blank" rel="noreferrer"
+            className="text-xs font-bold rounded px-2.5 py-1.5" style={{ background: NAVY, color: "#fff", textDecoration: "none" }}
+            title="The RBOM on a page of its own — tabs, remarks, release, and a link you can send">
+            ↗ Open in own page
+          </a>
+        ) : null}
         <Btn onClick={print} title="Print the rows on screen, with the filters named">Print / PDF</Btn>
       </div>
 
