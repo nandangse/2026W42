@@ -126,6 +126,7 @@ export default function GenieShell({
           <span className="ml-auto" />
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {tools}
+            <Clock />
             <Bell onOpen={onNotif} />
             <AccountMenu module={module} user={user} isAdmin={isAdmin} menu={menu} />
           </div>
@@ -195,6 +196,40 @@ function Bell({ onOpen }: { onOpen?: (n: Notif) => void }) {
           </div>
         </>
       )}
+    </span>
+  );
+}
+
+/* ───────────────────────── the clock ─────────────────────────
+   Dr Raghu, 8 Sep 2026: "show the time and date also next to it in
+   Tuesday, 8th September 5:35 AM format".
+
+   His format exactly, and in IST whatever the machine is set to — the whole
+   company reads one clock. It ticks on the minute rather than the second,
+   because a seconds hand on a page nobody is watching is a repaint a minute
+   for nothing. Narrow screens keep the time and drop the weekday, which is
+   the part you can work out for yourself. */
+function Clock() {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    const tick = () => setNow(new Date());
+    tick();
+    // land on the minute, then every minute
+    const t = setTimeout(function run() { tick(); setInterval(tick, 60000); }, (60 - new Date().getSeconds()) * 1000);
+    return () => clearTimeout(t);
+  }, []);
+  if (!now) return null;                       // nothing until the client knows the time — no hydration mismatch
+  const IST = "Asia/Kolkata";
+  const part = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-IN", { timeZone: IST, ...o }).format(now);
+  const d = Number(part({ day: "numeric" }));
+  const ord = d % 100 >= 11 && d % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][d % 10] || "th";
+  const time = part({ hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase().replace(/\s+/g, " ");
+  return (
+    <span className="genie-tagline text-xs rounded px-2 font-semibold flex-shrink-0 whitespace-nowrap"
+      style={{ height: 32, lineHeight: "30px", background: "#0D161F", color: MUTED, border: `1px solid ${LINE_DARK}` }}
+      title={part({ dateStyle: "full", timeStyle: "short" })}>
+      <span className="genie-wd">{part({ weekday: "long" })}, </span>
+      {d}{ord} {part({ month: "long" })} {time}
     </span>
   );
 }

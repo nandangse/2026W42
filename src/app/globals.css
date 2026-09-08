@@ -242,3 +242,9 @@ img, video, canvas, svg { max-width: 100%; }
    codemod; this makes the focus visible and the cursor honest. */
 [role="button"] { cursor: pointer; }
 [role="button"]:focus-visible, button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+
+/* THE WEEKDAY GOES FIRST WHEN THE BAR IS TIGHT (Dr Raghu, 8 Sep 2026, asking
+   for "Tuesday, 8th September 5:35 AM" on every app). The date and the time
+   are the useful part; which day of the week it is, a man knows. */
+@media (max-width: 900px) { .genie-wd { display: none; } }

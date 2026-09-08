@@ -69,6 +69,7 @@ export default function PlanningSuite({
   management: boolean;
 }) {
   const router = useRouter();
+  const RAGHU_EMAIL_LC = "raghu@nandan.co.in";
   const isAdmin = role === "admin";
   /**
    * Which room this person is in. Not a role — see src/lib/groups.ts.
@@ -81,6 +82,10 @@ export default function PlanningSuite({
   const canEdit = role === "admin" || role === "planner" || role === "project_owner";
   // Upload lives in the account menu now — admins and Shweta only.
   const canUpload = isAdmin || email.toLowerCase() === UPLOADER_EMAIL;
+  /* Synchronize to ERP is the two hands that actually do it — Dr Raghu and
+     Pankaj — and not every admin (Dr Raghu, 8 Sep 2026: "which only pankaj
+     and me can see"). */
+  const canSync = email.toLowerCase() === RAGHU_EMAIL_LC || email.toLowerCase() === UPLOADER_EMAIL;
   const me = useMemo(
     () => ({ email, initials, displayName, erpOwner, role }),
     [email, initials, displayName, erpOwner, role],
@@ -528,10 +533,23 @@ export default function PlanningSuite({
           }
           menu={(close) => (
             <>
-              {canEdit && <button onClick={() => { close(); setWorkspace("suite"); setTab("erp"); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }} title="Changes waiting to be pushed back to the ERP">↗ Update to ERP{queued ? ` (${queued})` : ""}</button>}
-              {canUpload && <button onClick={() => { close(); setWorkspace("suite"); setTab("upload"); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--accent)", fontWeight: 700 }} title="Load the morning files">⬆ Upload Files {loadedCount}/3</button>}
+              {/* ONE DOOR FOR THE ERP (Dr Raghu, 8 Sep 2026: "Update to ERP —
+                  change it to Synchronize to ERP; merge the update to ERP as
+                  well as Upload files which only pankaj and me can see").
+                  They were two entries doing one job — the morning files come
+                  in, the changed rows go back — and between them they showed
+                  a queue count and a file count that meant nothing apart.
+                  Now one entry, named for what it is, and only for the two
+                  hands that do it. */}
+              {canSync && (
+                <button onClick={() => { close(); setWorkspace("suite"); setTab(loadedCount < 3 ? "upload" : "erp"); }}
+                  className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
+                  style={{ color: loadedCount < 3 ? "var(--accent)" : "var(--navy)", fontWeight: loadedCount < 3 ? 700 : 600 }}
+                  title="The morning files in, and the changed rows back out to the ERP">
+                  ⇅ Synchronize to ERP{loadedCount < 3 ? ` · files ${loadedCount}/3` : queued ? ` · ${queued} waiting` : ""}
+                </button>
+              )}
               <button onClick={() => { close(); setWorkspace("suite"); setTab("feature"); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }} title="Ask for something in Genie">💡 Feature Request</button>
-              <button onClick={() => { close(); setWorkspace("suite"); setTab("opsbook"); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }} title="Documents in, one living wiki out">📖 Operations Playbook</button>
               {isAdmin && <button onClick={() => { close(); setWorkspace("suite"); setTab("admin"); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }}>⚙ Admin</button>}
               <button onClick={() => { close(); setProfileOpen(true); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }}>👤 Profile{!initials && <span style={{ color: "var(--red)" }}> · no initials set</span>}</button>
               <button onClick={() => { close(); setPwOpen(true); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }}>🔑 Change Password</button>

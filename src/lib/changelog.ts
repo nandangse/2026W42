@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.23.0",
+    date: "2026-09-08",
+    module: "The clock on every bar, and one door to the ERP",
+    items: [
+      "THE DATE AND TIME STAND BESIDE THE BELL ON EVERY APP (Dr Raghu, 8 Sep 2026), in his format: <b>Tuesday, 8th September 5:35 AM</b>. Always IST, whatever the machine is set to, so the whole company reads one clock. It ticks on the minute — a seconds hand on a page nobody is watching is a repaint a minute for nothing — and a narrow screen drops the weekday, which is the part a man can work out for himself.",
+      "ONE DOOR TO THE ERP (\"Update to ERP — change it to Synchronize to ERP; merge the update to ERP as well as Upload files which only pankaj and me can see\"). They were two entries doing one job — the morning files in, the changed rows back out — and between them they showed a file count and a queue count that meant little apart. Now one entry, named for what it is, showing whichever half still wants doing, and only for the two hands that do it: Dr Raghu and Pankaj, not every admin.",
+      "Operations Playbook is off the menu for now, as he asked. Admin stays where it was, admin only.",
+    ],
+  },
+  {
     v: "5.0.22.0",
     date: "2026-09-08",
     module: "Seva back on the menu, the IDP people on the Users list, and an honest login error",
