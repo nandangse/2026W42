@@ -517,8 +517,21 @@ export default function PlanningSuite({
     ["plan", "Job Plan"],
     ["mplan", "Month & Qtr Plan"],
     ["projects", "Projects"],
-    ["jobcomm", "Job Commercials"],
   ];
+  /**
+   * JOB COMMERCIALS IS STRATCOM'S (Dr Raghu, 8 Sep 2026: "this should be with
+   * stratcom access to edit and view"). The tab is not merely disabled for
+   * everyone else — it is not in their list at all, because a greyed tab
+   * still tells a man what he is not allowed to see, and the page it guards
+   * is the order book's cash position.
+   */
+  const mayCommercials = stratcom || isRaghu;
+  if (mayCommercials) SUITE_TAB_DEFS.push(["jobcomm", "Job Commercials"]);
+  /* Anyone holding a saved tab or a shared ?tab=jobcomm link who may not see
+     it lands on the floor, not on a blank suite wondering what broke. */
+  useEffect(() => {
+    if (tab === "jobcomm" && !mayCommercials) setTab("floor");
+  }, [tab, mayCommercials]);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--paper)", color: "var(--ink)" }}>
@@ -687,7 +700,7 @@ export default function PlanningSuite({
         13-week plan. Editing is planning's and the owners', because these
         are terms, not observations.
       */}
-      {workspace === "suite" && tab === "jobcomm" && (
+      {workspace === "suite" && tab === "jobcomm" && mayCommercials && (
         <JobCommercials
           jobs={byTDD}
           canEdit={canEdit}

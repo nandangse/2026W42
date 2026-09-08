@@ -86,6 +86,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.33.1",
+    date: "2026-09-08",
+    module: "Job Commercials becomes Stratcom's tab, to see as well as to edit",
+    items: [
+      "\"This should be with stratcom access to edit and view\" (Dr Raghu, 8 Sep 2026). The pencil went to Stratcom in 5.0.33.0; the <b>page itself</b> was still open to every planner and project owner, and that page is the order book\u2019s cash position — ₹46.46 Cr of balance due, job by job, with terms.",
+      "THE TAB IS NOT IN THEIR LIST AT ALL, rather than greyed. A disabled tab still tells a man what he is not allowed to see. A saved tab or a shared <code>?tab=jobcomm</code> link lands him on the floor instead of a blank suite.",
+      "WHAT THIS DOES NOT YET CLOSE, said plainly rather than left to be discovered: <code>/api/board</code> answers any signed-in <b>reader</b> and its payload still carries <code>advance</code>, <code>gst</code> and the four percentages. Nobody without the tab can reach them through the screen, but they are on the wire. Closing that properly means changing what On Floor, Live Projects and Accounts receive — those three read the same fields for planners today — so it is a deliberate piece of work, not a line to slip into this one.",
+    ],
+  },
+  {
     v: "5.0.33.0",
     date: "2026-09-08",
     module: "A job's terms as one document — Stratcom's, and Suresh's to fill",
