@@ -930,7 +930,7 @@ export function RelatedTab({
 export function LinkAutocomplete({
   target, value, valueLabel, onPick, extraQuery,
 }: {
-  target: string; value: string; valueLabel: string; onPick: (id: string) => void;
+  target: string; value: string; valueLabel: string; onPick: (id: string, label?: string) => void;
   /** Extra f_ filters for the pick search — a quote line's group throttles its items. */
   extraQuery?: string;
 }) {
@@ -955,7 +955,7 @@ export function LinkAutocomplete({
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Could not add it");
-      onPick(String(j.row.id));
+      onPick(String(j.row.id), name);
       setOpen(false);
     } catch (e) { swallow("crm/CrmApp", e); /* the typed text stays; picking again retries */ }
     finally { setBusy(false); }
@@ -995,7 +995,7 @@ export function LinkAutocomplete({
         placeholder="Type to search…"
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 200)}
-        onChange={(e) => { setText(e.target.value); setOpen(true); if (e.target.value === "") onPick(""); }}
+        onChange={(e) => { setText(e.target.value); setOpen(true); if (e.target.value === "") onPick("", ""); }}
         className="w-full px-2 py-1.5 rounded text-sm border"
         style={{ borderColor: value ? BORDER : BORDER }}
       />
@@ -1011,7 +1011,7 @@ export function LinkAutocomplete({
           {options.map((o) => (
             <button
               key={o.id}
-              onMouseDown={(e) => { e.preventDefault(); onPick(o.id); setText(o.label); setOpen(false); }}
+              onMouseDown={(e) => { e.preventDefault(); onPick(o.id, o.label); setText(o.label); setOpen(false); }}
               className="w-full text-left px-2 py-1.5 text-sm"
               style={{ color: INK }}
             >
@@ -2147,7 +2147,7 @@ export function PersonTypeAhead({
    *  deal's people genuinely can come from elsewhere — a consultant, a PMC —
    *  so this must sort, never exclude. */
   opportunityId?: string;
-  onPick: (id: string) => void;
+  onPick: (id: string, label: string) => void;
 }) {
   const [preferCo, setPreferCo] = useState("");
   useEffect(() => {
@@ -2200,7 +2200,7 @@ export function PersonTypeAhead({
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Could not add the contact");
-      onPick(String(j.row.id));
+      onPick(String(j.row.id), name);
       setOpen(false);
     } catch (e) { swallow("crm/CrmApp", e); /* the field keeps the typed text; picking again retries */ }
     finally { setBusy(false); }
@@ -2215,7 +2215,7 @@ export function PersonTypeAhead({
         placeholder={companyId ? "Type to search this company's people…" : "Pick the company first, or type any name…"}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 200)}
-        onChange={(e) => { setText(e.target.value); setOpen(true); if (e.target.value === "") onPick(""); }}
+        onChange={(e) => { setText(e.target.value); setOpen(true); if (e.target.value === "") onPick("", ""); }}
         className="w-full px-2 py-1.5 rounded text-sm border"
         style={{ borderColor: BORDER }}
       />
@@ -2231,7 +2231,7 @@ export function PersonTypeAhead({
           {options.map((o) => (
             <button
               key={o.id}
-              onMouseDown={(e) => { e.preventDefault(); onPick(o.id); setText(o.label); setOpen(false); }}
+              onMouseDown={(e) => { e.preventDefault(); onPick(o.id, o.label); setText(o.label); setOpen(false); }}
               className="w-full text-left px-2 py-1.5 text-sm"
               style={{ color: INK }}
             >
@@ -2460,6 +2460,24 @@ export function RecordForm({
                 companyId={String(form.company_id ?? "")}
                 value={String(form[f.name] ?? "")}
                 onPick={(id) => set(f.name, id)}
+              />
+            ) : f.personText ? (
+              /* SPOKE WITH COMES FROM THE DATABASE TOO (Dr Raghu, 8 Sep 2026:
+                 "in interaction, please make these two persons from the
+                 database, and also make it suitable to add to the database").
+                 Person already searched and could create; Spoke with was a
+                 free box beside it, so the same man was typed one way here and
+                 picked another way there. It is the same picker now — and
+                 choosing somebody fills BOTH: the name into this column, and
+                 the person into person_id, so the interaction is joined to a
+                 real contact rather than to a spelling. A name nobody in the
+                 database has can still be created from the same box. */
+              <PersonTypeAhead
+                value={String(form["person_id"] ?? "")}
+                valueLabel={String(form[f.name] ?? "")}
+                companyId={String(form["company_id"] ?? "") || undefined}
+                opportunityId={String(form["opportunity_id"] ?? "") || undefined}
+                onPick={(id, label) => { set(f.name, label); set("person_id", id); }}
               />
             ) : f.type === "link" && f.link === "person" ? (
               <PersonTypeAhead

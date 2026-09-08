@@ -28,6 +28,10 @@ export interface Field {
   options?: string[];
   /** For link — the doctype this points at. */
   link?: string;
+  /** A text column filled by picking a PERSON: the name lands here and the
+   *  person_id beside it. Lets "Spoke with" be a real contact rather than a
+   *  spelling, and lets a new one be added without leaving the form. */
+  personText?: boolean;
   /** Narrow the link's dropdown — the two stage ladders share one table. */
   linkFilter?: { column: string; value: string };
   /** Show in the list table. Keep it to the few columns worth scanning. */
@@ -348,7 +352,10 @@ export const DOCTYPES: Doctype[] = [
       { name: "happened_at", label: "Date", type: "date", inList: true, default: "today" },
       { name: "by_id", label: "By", type: "link", link: "profile", inList: true, default: "me" },
       { name: "company_id", label: "Company", type: "link", link: "company", inList: true },
-      { name: "person_name", label: "Spoke with", type: "text", inList: true },
+      /* chosen from the database, not typed — and it fills person_id with
+         whoever was chosen, so an interaction hangs off a real contact
+         (Dr Raghu, 8 Sep 2026) */
+      { name: "person_name", label: "Spoke with", type: "text", personText: true, inList: true },
       { name: "remark", label: "Remark", type: "textarea", required: true },
       { name: "next_action", label: "Next action", type: "text" },
       { name: "next_action_on", label: "Next action on", type: "date" },

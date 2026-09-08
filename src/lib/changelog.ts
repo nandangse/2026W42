@@ -86,6 +86,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.29.1",
+    date: "2026-09-08",
+    module: "Spoke with, from the database",
+    items: [
+      "\"In interaction, please make these two persons from the database, and also make it suitable to add to the database\" (Dr Raghu, 8 Sep 2026). <b>Person</b> already searched the contacts and could create one that was missing; <b>Spoke with</b> sat beside it as a free box — so the same man was typed one way here and picked another way there, and neither the call nor the contact knew about the other.",
+      "Spoke with is the same picker now. Choosing somebody fills <b>both</b>: the name into its own column and the person into person_id, so an interaction hangs off a real contact rather than off a spelling — and a name nobody in the database has can still be added without leaving the form.",
+    ],
+  },
+  {
     v: "5.0.29.0",
     date: "2026-09-08",
     module: "Planning becomes a door, and Marketing gets its tick",
