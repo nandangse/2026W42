@@ -86,6 +86,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.30.0",
+    date: "2026-09-08",
+    module: "The CRM syncs itself from the ERP, hourly through the working day",
+    items: [
+      "\"Make an hourly cron job during working hours, that is from 8am to 8pm, that pulls in all the ERP companies, contacts, interactions, quotations and opportunities\" (Dr Raghu, 8 Sep 2026). <b>8am to 8pm IST is 30 2-14 * * * in UTC</b> — thirteen runs, on the hour. Nothing runs through the night because nothing is entered through the night.",
+      "FOUR OF THE FIVE. Customer → company, Contact → person, Opportunity → opportunity, Quotation → quotation, each with its own cursor on <code>modified</code>, so a slow doctype cannot hold up a fast one and a failure resumes where it stopped.",
+      "THE FIFTH WAITS ON HIS WORD. ERPNext keeps <b>no Interaction doctype</b>. Its nearest relation, Communication, holds <b>526,320 rows of mostly e-mail</b> against the 73,990 calls and visits in the CRM — pouring one into the other would bury the trail the CRM exists to keep. It is left out rather than guessed at, and the route says so in its own answer.",
+      "ADDITIVE ONLY, exactly as the opportunity pull has been since 29 August: a row the ERP has already given us is left alone, Genie-side edits win, and nothing is ever written back to the ERP. Worth knowing what it will find on its first run — the CRM is <b>20,053 contacts behind</b> the ERP, and twenty opportunities.",
+    ],
+  },
+  {
     v: "5.0.29.1",
     date: "2026-09-08",
     module: "Spoke with, from the database",
