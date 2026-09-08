@@ -240,7 +240,15 @@ export default function JobCommercials({
         <b> &ldquo;not known&rdquo; and &ldquo;nothing owed&rdquo; are different facts</b>.
       </div>
 
-      <div className="bg-white rounded-lg border overflow-x-auto" style={{ borderColor: C.line }}>
+      {/* THE TOP ROW STAYS (Dr Raghu, 8 Sep 2026: "in job commercials freeze
+          the top row"). The header cells already said `position: sticky` and
+          had said so all along — but a sticky cell pins inside its nearest
+          SCROLLING box, and this box only scrolled sideways. Vertically the
+          page moved, so the header went up with it and there was nothing to
+          hold it. Bounding the box is what gives it something to stick to,
+          which is the same thing GenieTable does for every other frozen table
+          in Genie. Twenty-nine columns still scroll sideways inside it. */}
+      <div className="bg-white rounded-lg border" style={{ borderColor: C.line, overflow: "auto", maxHeight: "calc(100vh - 230px)" }}>
         <table className="text-xs genie-table" style={{ minWidth: 1900, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
             <tr style={{ background: "var(--ink)", color: "#fff" }}>

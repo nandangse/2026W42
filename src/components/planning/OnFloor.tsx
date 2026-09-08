@@ -153,16 +153,37 @@ export function OnFloor({
   // What actually went out the gate, from the delivery record — the same
   // 7/30-day boxes the walk sheet prints, standing beside the floor's cards.
   const [deliv, setDeliv] = useState<{ on: string | null; val: number; tpv: number }[]>([]);
+  /**
+   * WHETHER THIS READER MAY SEE THE MONEY (Dr Raghu, 8 Sep 2026: "the v and
+   * the T is wrong").
+   *
+   * They were not wrong so much as never asked for. This card read
+   * /api/delivered/recent, which selects id, tag and delivered_on and NOTHING
+   * ELSE — deliberately, because that list is open to every reader on the
+   * floor and the commercials are not. So val and tpv came back undefined,
+   * `Number(undefined) || 0` made them zero, and the card printed ₹0.0 L as
+   * though nothing had been earned on two jobs worth ₹38.5 lakh each.
+   *
+   * A zero that means "not shown to you" is the same lie as a zero that means
+   * "nothing owed" — his own words on the Job Commercials page. So the money
+   * is asked for from the ledger that has it, and when this reader may not
+   * have it the line says what it can and stops, rather than inventing a nil.
+   */
+  const [moneyOk, setMoneyOk] = useState(false);
   useEffect(() => {
-    api.get("/api/delivered/recent")
-      .then((r: { jobs?: Record<string, unknown>[] }) => {
-        setDeliv((r.jobs || []).map((j) => ({
-          on: String(j.on ?? j.delivered_on ?? "").slice(0, 10) || null,
-          val: Number(j.val) || 0,
-          tpv: Number(j.tpv) || 0,
-        })));
-      })
-      .catch(() => {});
+    const norm = (r: { jobs?: Record<string, unknown>[] }) =>
+      (r.jobs || []).map((j) => ({
+        on: String(j.on ?? j.delivered_on ?? "").slice(0, 10) || null,
+        val: Number(j.val) || 0,
+        tpv: Number(j.tpv) || 0,
+      }));
+    api.get("/api/delivered")
+      .then((r: { jobs?: Record<string, unknown>[] }) => { setDeliv(norm(r)); setMoneyOk(true); })
+      .catch(() => {
+        api.get("/api/delivered/recent")
+          .then((r: { jobs?: Record<string, unknown>[] }) => setDeliv(norm(r)))
+          .catch(() => {});
+      });
   }, []);
   const deliveredSince = (days: number) => {
     const from = new Date(new Date(TODAY + "T00:00:00").getTime() - days * 86400000)
@@ -338,9 +359,9 @@ export function OnFloor({
         <StatCard label="VALUE" value={V(totVal)} color="var(--blue)" />
         <StatCard label="THROUGHPUT" value={V(totTp)} sub={totVal ? `${Math.round((totTp / totVal) * 100)}% of value` : ""} color="var(--accent)" />
         <StatCard label="DELIVERED · 7 DAYS" value={String(d7.n)}
-          sub={d7.n ? `${V(d7.val)} · TP ${V(d7.tp)}` : "nothing went out"} color="var(--blue)" />
+          sub={!d7.n ? "nothing went out" : moneyOk ? `${V(d7.val)} · TP ${V(d7.tp)}` : "went out the gate"} color="var(--blue)" />
         <StatCard label="DELIVERED · 30 DAYS" value={String(d30.n)}
-          sub={d30.n ? `${V(d30.val)} · TP ${V(d30.tp)}` : "nothing went out"} color="var(--blue)" />
+          sub={!d30.n ? "nothing went out" : moneyOk ? `${V(d30.val)} · TP ${V(d30.tp)}` : "went out the gate"} color="var(--blue)" />
         {/* WITH PEOPLE (Dr Raghu, 7 Sep 2026: "those number of jobs where
             there is someone today"). Lateness is on every row already; what
             the top of the page could not say was how many jobs actually have

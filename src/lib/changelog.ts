@@ -86,6 +86,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.32.2",
+    date: "2026-09-08",
+    module: "The top row stays, and two delivered jobs stop reading as nil",
+    items: [
+      "\"In job commercials freeze the top row\" (Dr Raghu, 8 Sep 2026). The header cells had said <code>position: sticky</code> all along — but a sticky cell pins inside its nearest <b>scrolling box</b>, and that box only scrolled sideways. Vertically it was the page that moved, so the header went up with it and had nothing to hold onto. Bounding the box is what gives it something to stick to, which is what GenieTable already does for every other frozen table in Genie. All twenty-nine columns still scroll sideways inside it.",
+      "\"The v and T is wrong\" — <b>and they were</b>. The On Floor cards read <code>/api/delivered/recent</code>, which selects <code>id</code>, <code>tag</code> and <code>delivered_on</code> and nothing else, deliberately: that list is open to every reader on the floor and the commercials are not. So value and throughput came back undefined, <code>Number(undefined) || 0</code> turned them into zero, and the card printed <b>₹0.0 L</b> over two jobs worth <b>₹38.5 lakh each</b>.",
+      "A ZERO THAT MEANS \"NOT SHOWN TO YOU\" IS THE SAME LIE as a zero that means \"nothing owed\" — his own words, printed on the Job Commercials page since 2 September. The money is now asked of the ledger that holds it, and a reader who may not see it gets \"went out the gate\" rather than an invented nil. The cards read <b>2 jobs · ₹77.0 L · TP ₹34.6 L</b> over seven days and <b>12 jobs · ₹397.1 L · TP ₹156.5 L</b> over thirty.",
+    ],
+  },
+  {
     v: "5.0.32.1",
     date: "2026-09-08",
     module: "The contact sync had been failing every hour since it shipped",
