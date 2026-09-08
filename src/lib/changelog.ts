@@ -86,6 +86,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.33.2",
+    date: "2026-09-08",
+    module: "The Planning Suite comes back — my hook, my fault",
+    items: [
+      "<b>5.0.33.1 broke the whole Planning Suite</b> with React #310, \"rendered more hooks than during the previous render\". Mine, entirely, and it reached him within minutes of shipping.",
+      "WHAT I DID. The effect that redirects a non-Stratcom reader away from the Job Commercials tab was written <b>next to the tab list it concerns</b> — three hundred lines down, and <b>below this component\u2019s early return</b> for a board that has not loaded yet. First render: board is null, the function returns early, that hook is never reached. Second render: the board arrives, the hook runs, and React counts one more than last time and refuses to draw anything at all.",
+      "A HOOK MUST BE REACHED ON EVERY RENDER OR ON NONE. \"Next to the code it concerns\" is not a thing React allows, and I knew that and put it there anyway. It now sits with the other hooks above the early return, with the reason written beside it so the next hand does not repeat it.",
+      "NEITHER tsc NOR THE BUILD CAUGHT IT, and neither would have: the rule is about the order statements execute, not about types, and the lint rule that does catch it (<code>react-hooks/rules-of-hooks</code>) is not on in this project. That is the second time today the toolchain has been silent about a fault of exactly this shape — the first was a component declared inside a render. Both are worth a lint rule rather than a memory.",
+    ],
+  },
+  {
     v: "5.0.33.1",
     date: "2026-09-08",
     module: "Job Commercials becomes Stratcom's tab, to see as well as to edit",

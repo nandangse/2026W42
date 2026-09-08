@@ -165,6 +165,23 @@ export default function PlanningSuite({
     } catch (e) { swallow("PlanningSuite", e); /* fine */ }
   }, [workspace, tab]);
 
+  /**
+   * WHO MAY SEE JOB COMMERCIALS (Dr Raghu, 8 Sep 2026: "this should be with
+   * stratcom access to edit and view").
+   *
+   * THIS LIVES UP HERE FOR A REASON, and 5.0.33.1 is the reason. The effect
+   * below was first written next to the tab list, three hundred lines down —
+   * which is BELOW this component's early return for a board that has not
+   * loaded yet. So the first render ran one hook fewer than the second, and
+   * React threw #310 across the whole Planning Suite the moment the board
+   * arrived. A hook must be reached on every render or on none; "next to the
+   * code it concerns" is not a thing React lets you have.
+   */
+  const mayCommercials = stratcom || isRaghu;
+  useEffect(() => {
+    if (tab === "jobcomm" && !mayCommercials) setTab("floor");
+  }, [tab, mayCommercials]);
+
   // ---- browser back/forward navigates within the app, not out of it ----
   // Every workspace/tab change pushes a history entry; popstate restores it.
   // Without this the whole app is one history entry and Back exits to the
@@ -525,13 +542,7 @@ export default function PlanningSuite({
    * still tells a man what he is not allowed to see, and the page it guards
    * is the order book's cash position.
    */
-  const mayCommercials = stratcom || isRaghu;
   if (mayCommercials) SUITE_TAB_DEFS.push(["jobcomm", "Job Commercials"]);
-  /* Anyone holding a saved tab or a shared ?tab=jobcomm link who may not see
-     it lands on the floor, not on a blank suite wondering what broke. */
-  useEffect(() => {
-    if (tab === "jobcomm" && !mayCommercials) setTab("floor");
-  }, [tab, mayCommercials]);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--paper)", color: "var(--ink)" }}>
