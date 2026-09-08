@@ -483,9 +483,14 @@ export async function POST(req: Request) {
       // itself happens with an administrator in tow (comms build).
       if ("oauth_available" in body) patch.oauth_available = !!body.oauth_available;
       if ("department_id" in body) patch.department_id = body.department_id || null;
+      /* FOUR KINDS (Dr Raghu, 8 Sep 2026: "make a type called staff,
+         employees, consultant, intern — this should do for now"). Staff is
+         the new one; the other three stand. The stored word stays singular,
+         because it describes one person. */
       if ("kind" in body) {
         const k = String(body.kind || "employee");
-        if (!["employee", "consultant", "intern"].includes(k)) throw new HttpError(400, "kind must be employee, consultant or intern");
+        if (!["staff", "employee", "consultant", "intern"].includes(k))
+          throw new HttpError(400, "kind must be staff, employee, consultant or intern");
         patch.kind = k;
       }
       if ("reports_to" in body) {

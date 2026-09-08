@@ -33,7 +33,7 @@ export interface UserRow {
   department_id: string | null;
   last_sign_in_at: string | null;
   goals_level: "none" | "view" | "edit";
-  kind?: "employee" | "consultant" | "intern";
+  kind?: "staff" | "employee" | "consultant" | "intern";
   has_idp?: boolean; idp_only?: boolean;
   emp_type?: string | null;
   emp_id?: string | null;
@@ -111,7 +111,7 @@ export default function UsersApp({
   const [showGone, setShowGone] = useState(false);
   // Active / Inactive (default Active); Employees / Consultant / Intern (default Employees) — Dr Raghu, 6 Sep 2026
   const [status, setStatusF] = useState<"active" | "inactive" | "all">("active");
-  const [kindF, setKindF] = useState<"genie" | "idp" | "consultant" | "intern" | "all">("genie");
+  const [kindF, setKindF] = useState<"genie" | "idp" | "staff" | "employee" | "consultant" | "intern" | "all">("genie");
   /** Click an app above the table to see who holds it. */
   const [appF, setAppF] = useState<AppKey | "goals" | null>(null);
   const [showId, setShowId] = useState(false);
@@ -218,7 +218,7 @@ export default function UsersApp({
           <option value="active">Active</option><option value="inactive">Inactive</option><option value="all">All</option>
         </select>
         <select value={kindF} onChange={(e) => setKindF(e.target.value as typeof kindF)} className="text-xs" style={{ ...inp, width: 130 }} title="Genie — a login to the system. Employees IDP — the workers who sign in at /idp with the password HR issued. Consultants and Interns come from Kind on each person.">
-          <option value="genie">Genie</option><option value="idp">Employees IDP</option><option value="consultant">Consultants</option><option value="intern">Interns</option><option value="all">Everyone</option>
+          <option value="genie">Genie</option><option value="idp">Employees IDP</option><option value="staff">Staff</option><option value="employee">Employees</option><option value="consultant">Consultants</option><option value="intern">Interns</option><option value="all">Everyone</option>
         </select>
         <label className="text-xs flex items-center gap-1" style={{ color: DIM, cursor: "pointer" }} title="Show the HRMS type, employee id and login id">
           <input type="checkbox" checked={showId} onChange={(e) => setShowId(e.target.checked)} /> show ID
@@ -511,9 +511,9 @@ function UserLightbox({ u, users, departments, canEdit, ownerEmail, isOwner, meE
               </select>
             </Field>
           </div>
-          <div className="mt-2"><Field label="Kind" hint="Employee, consultant or intern — the Users filter reads this; default employee">
+          <div className="mt-2"><Field label="Kind" hint="Staff, employee, consultant or intern — the Users filter reads this; default employee">
             <select value={u.kind || "employee"} disabled={!profOk || busy} onChange={(e) => profile({ kind: e.target.value }, "Kind saved")} style={inp}>
-              <option value="employee">Employee</option><option value="consultant">Consultant</option><option value="intern">Intern</option>
+              <option value="staff">Staff</option><option value="employee">Employee</option><option value="consultant">Consultant</option><option value="intern">Intern</option>
             </select>
           </Field></div>
           <div className="mt-2"><Field label="Reports to" hint="Their line manager — Tasking's “people reporting to me” reads this">

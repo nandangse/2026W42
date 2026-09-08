@@ -78,6 +78,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.23.1",
+    date: "2026-09-08",
+    module: "Four kinds of person",
+    items: [
+      "\"Make a type called staff, employees, consultant, intern — this should do for now\" (Dr Raghu, 8 Sep 2026). <b>Staff</b> joins the three that were there, on the person's own card and in the Users filter, which now offers Genie · Employees IDP · Staff · Employees · Consultants · Interns · Everyone. The stored word stays singular because it describes one person.",
+    ],
+  },
+  {
     v: "5.0.23.0",
     date: "2026-09-08",
     module: "The clock on every bar, and one door to the ERP",
