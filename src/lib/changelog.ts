@@ -86,6 +86,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.31.0",
+    date: "2026-09-08",
+    module: "Interaction Master and Sales Order join the sync; a quote that would not go",
+    items: [
+      "\"Quotation I need to have the sync — Customer / Contact / <b>Interaction Master</b> / Opportunity / Quotation / <b>Sales Order</b>\" (Dr Raghu, 8 Sep 2026). The sync now carries <b>six doctypes, not four</b>.",
+      "I HAD THE FIFTH WRONG BY OMISSION. Yesterday this log said ERPNext keeps no Interaction doctype, and that its nearest relation, Communication, was 526,320 rows of mostly e-mail against the CRM\u2019s 73,990 calls and visits. Stock ERPNext keeps none — but <b>this house built its own</b>. <b>Interaction Master</b> holds <b>74,142 rows</b> against the CRM\u2019s 73,990, keyed <code>NGSE-IM-26-09-00069</code>. Not a near relation: the same trail, a hundred and fifty rows ahead of us. He named it and it went straight in.",
+      "SALES ORDER came in the same breath — 891 there against 890 here, keyed on <code>erpnext_so_no</code>, carrying the PO number and date, the order status, the acquisition source and both values.",
+      "FOREIGN KEYS ARE LEFT NULL AND SAID TO BE. The ERP names a customer as a string; stitching that to a company_id by matching text is how a right row gets a wrong parent. The reference is carried in <code>erp_ref_doctype</code>/<code>erp_ref_name</code> so the joining can be done deliberately. <b>People are resolved</b>, because there the map is exact: the ERP files responsibility as an e-mail, the CRM as a profile id, and anyone with no profile stays null rather than guessed.",
+      "PROVEN ON LIVE DATA BEFORE SHIPPING, not on a type-check: three real interactions and one real sales order pulled through the new mapping and read back — <code>by_id</code> resolved to a profile, the remark stripped of its Quill HTML.",
+      "\"I need to send quote, check why not possible\" — <b>quote 40707 had nobody on To:</b>, and no contact to fall back on. Send refused, correctly, but only <i>after</i> he pressed it and with the words \"Who does it go To?\", which reads as a wall rather than an instruction. The dialog now says so up front and <b>offers the client\u2019s people as one press each</b>. They are offered, never filled in by themselves — a quote addressed by a guess is worse than one not sent. Where the quote already names a contact, that one prefills.",
+      "THE SAME QUOTE STOOD AT \u20b91,65,000 WEARING A DOLLAR SIGN — the only USD quote in a thousand, with <code>fx_rate</code> still 1 and an 18% GST line underneath it. The currency dropdown sits unguarded at the top of the quote and one stray click <b>relabels the money without converting it</b>. It now asks first on any quote that already carries values, and 40707 is back in rupees.",
+    ],
+  },
+  {
     v: "5.0.30.0",
     date: "2026-09-08",
     module: "The CRM syncs itself from the ERP, hourly through the working day",

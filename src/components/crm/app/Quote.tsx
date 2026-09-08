@@ -650,7 +650,20 @@ export function QuoteItemsTab({ quote, onSaved }: { quote: Row; onSaved: (r?: Ro
         <div className="flex items-center gap-3 mb-2 flex-wrap">
           <label className="text-xs font-semibold flex items-center gap-1.5" style={{ color: MUTED }}>
             Currency
-            <select value={currency} onChange={(e) => void patchQuote({ currency: e.target.value }).catch((x) => setErr(String(x.message || x)))}
+            {/* A STRAY CLICK USED TO REDENOMINATE THE QUOTE (Dr Raghu, 8 Sep
+                2026 — 40707 stood at ₹1,65,000 wearing a $). Changing this
+                relabels the money; it does NOT convert it, because fx_rate
+                stays where it was. So on a quote that already carries values
+                it now asks first. */}
+            <select value={currency} onChange={(e) => {
+              const next = e.target.value;
+              const priced = Number(q.subtotal ?? 0) > 0 || Number(q.grand_total ?? 0) > 0;
+              if (priced && next !== currency && !window.confirm(
+                `Show this quote in ${next}?\n\nThe rates are NOT converted — ${fm(q.grand_total)} stays as it is and simply reads as ${next}. Re-rate the lines yourself if the deal is truly in ${next}.`)) {
+                e.target.value = currency; return;
+              }
+              void patchQuote({ currency: next }).catch((x) => setErr(String(x.message || x)));
+            }}
               className="px-2 py-1 rounded text-xs border font-bold" style={{ borderColor: BORDER, background: "#fff", color: INK }}>
               {["INR", "USD", "EUR"].map((c) => <option key={c}>{c}</option>)}
             </select>
@@ -1238,6 +1251,13 @@ export function SubmitQuoteModal({ row, mode, onClose, onSent }: {
     `Submission of Qtn ${String(row.quote_no ?? "")} : Dt ${dISub}${row.subject ? ` | ${row.subject}` : ""}`);
   const [files, setFiles] = useState<{ name: string; path: string; from: "quote" | "library" }[]>([]);
   const [ticked, setTicked] = useState<Set<string>>(new Set());
+  /* WHO IT COULD GO TO (Dr Raghu, 8 Sep 2026: "i need to send quote, check
+     why not possible"). 40707 had no contact and an empty To:, so Send
+     refused — but only AFTER he pressed it, with "Who does it go To?", which
+     reads as a wall rather than an instruction. The client's people are
+     offered here as one press each. They are OFFERED, never filled in by
+     themselves: a quote addressed by a guess is worse than one not sent. */
+  const [book, setBook] = useState<{ id: string; name: string; email: string }[]>([]);
   const [busy, setBusy] = useState<"send" | "up" | null>(null);
   const [err, setErr] = useState("");
 
@@ -1255,11 +1275,23 @@ export function SubmitQuoteModal({ row, mode, onClose, onSent }: {
         }
         return emails.join(", ");
       };
-      setTo(await resolve(row.mail_to));
+      /* the quote's own contact is a link HE made, so it may prefill; the
+         rest of the company's people are only ever offered below */
+      let t = await resolve(row.mail_to);
+      if (!t && row.contact_id) t = await resolve([row.contact_id]);
+      setTo(t);
       const ccR = await resolve(row.mail_cc);
       setCc(["sales@nandan.co.in", ccR].filter(Boolean).join(", "));
       setBcc(await resolve(row.mail_bcc));
     })();
+    if (row.company_id) {
+      fetch(`/api/crm/person?f_company_id=${encodeURIComponent(String(row.company_id))}&limit=200`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((j) => setBook(((j?.rows ?? []) as { id: unknown; full_name: unknown; primary_email: unknown }[])
+          .filter((p) => p.primary_email)
+          .map((p) => ({ id: String(p.id), name: String(p.full_name ?? "—"), email: String(p.primary_email) }))))
+        .catch((e) => swallow("crm/CrmApp", e));
+    }
     fetch(`/api/crm/library?quote=${encodeURIComponent(rid)}`, { cache: "no-store" })
       .then(async (r) => {
         const j = await r.json();
@@ -1329,6 +1361,24 @@ export function SubmitQuoteModal({ row, mode, onClose, onSent }: {
                     className="w-full px-2 py-1.5 rounded border text-sm" style={{ borderColor: BORDER }} />
                 </label>
               ))}
+              {!to.trim() && (
+                <div className="rounded p-2 mb-2 text-xs" style={{ background: "#FDF0E7", border: "1px solid #F0C9A8", color: "#8A4520" }}>
+                  <b>Nobody on To: — this quote cannot go out yet.</b>{" "}
+                  {book.length
+                    ? <>Press a name to address it, or type an address above.</>
+                    : <>This client has no contact with an email on record. Type the address above, or add the person on the Contacts panel.</>}
+                  {book.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {book.map((p) => (
+                        <button key={p.id} onClick={() => setTo((v) => (v.trim() ? `${v}, ${p.email}` : p.email))}
+                          className="rounded px-2 py-0.5" style={{ background: "#fff", border: "1px solid #C9D6E2", color: "#2C5B82" }}>
+                          <b>{p.name}</b> &lt;{p.email}&gt;
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           ) : (
             <div className="text-xs mb-2 rounded px-3 py-2" style={{ background: "#EEF3F8", color: NAVY }}>Goes to <b>raghu@nandan.co.in</b> with the DRAFT-watermarked PDF.</div>

@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     const ccList = (Array.isArray(body.cc) ? body.cc : []).map(String).filter(Boolean);
     const bccList = (Array.isArray(body.bcc) ? body.bcc : []).map(String).filter(Boolean);
     if (!ccList.includes("sales@nandan.co.in")) ccList.push("sales@nandan.co.in");
-    if (mode === "client" && !toList.length) throw new HttpError(400, "Who does it go To?");
+    if (mode === "client" && !toList.length) throw new HttpError(400, "Nobody on To: — add the client's contact in the box above (their people come up as one press), or type the address by hand. Nothing has been sent.");
     const to = mode === "review" ? "raghu@nandan.co.in" : toList.join(", ");
     const subject = String(body.subject || `Submission of Qtn ${q.quote_no} : Dt ${String(q.quoted_on || "").slice(0, 10).split("-").reverse().join("/")}`).slice(0, 300);
     /**
