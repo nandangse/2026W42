@@ -86,6 +86,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.28.0",
+    date: "2026-09-08",
+    module: "The quote asks when the order lands, and has room to write",
+    items: [
+      "DELIVERY OFF THE QUOTE, EXPECTED ORDER DATE ON (Dr Raghu, 8 Sep 2026: \"in quote remove the delivery and put in expected prder date\"). \"Delivery: 8-12 weeks\" was a promise about how long WE would take; what a salesperson needs on a quote is when the ORDER is expected to land, because that is the number the forecast is built on. It shows in the list too.",
+      "The delivery column is <b>not dropped</b> — two years of quotes carry a value in it and the ERP's own imports set it. It simply comes off the form, and a column can be dropped later once nobody misses it. Migration <b>CRM 0059</b>.",
+      "AND NOTES HAS ROOM TO WRITE IN (\"also notes make it big field that can be written in\"). It was a one-line box, which invited one line.",
+    ],
+  },
+  {
     v: "5.0.27.1",
     date: "2026-09-08",
     module: "A quotation can pull its own mail",

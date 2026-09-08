@@ -127,14 +127,23 @@ export const DOCTYPES: Doctype[] = [
         help: "The client's address on the quote — defaults to theirs the moment the company is set." },
       { name: "valid_until", label: "Valid until", type: "date", inList: true, default: "end_next_month",
         help: "The last date of next month unless said otherwise." },
-      { name: "delivery_weeks", label: "Delivery", type: "text", default: "8-12 weeks" },
+      /* DELIVERY OFF, EXPECTED ORDER ON (Dr Raghu, 8 Sep 2026). "Delivery:
+         8-12 weeks" was a promise about how long WE would take; what a
+         salesperson needs on a quote is when the ORDER is expected to land,
+         because that is the number the forecast is built on. The column
+         behind Delivery is kept — two years of quotes carry it — it simply
+         comes off the form. */
+      { name: "expected_order_on", label: "Expected order date", type: "date", inList: true,
+        help: "When this order is expected to land. The forecast reads it." },
       { name: "payment_terms", label: "Payment terms", type: "link", link: "payment_term", noFilter: true,
         help: "From the Payment Terms master — add new terms there." },
       { name: "warranty_months", label: "Warranty (months)", type: "number", default: 12 },
       { name: "grand_total", label: "Value", type: "readonly", format: "money", inList: true, help: "The grand total, computed from the lines. Zero until lines exist." },
       { name: "scope_of_supply", label: "Scope of supply", type: "textarea" },
       { name: "exclusions", label: "Exclusions", type: "textarea" },
-      { name: "notes", label: "Notes", type: "textarea" },
+      /* room to actually write in ("also notes make it big field that can be
+         written in") — the one-line box invited one line */
+      { name: "notes", label: "Notes", type: "textarea", big: true, rich: true },
     ],
   },
 

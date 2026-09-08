@@ -185,10 +185,18 @@ export default function CrmApp({
   const [kanban, setKanban] = useState(false);
   const [kanbanBy, setKanbanBy] = useState("");
   const [sumOn, setSumOn] = useState(false);
+  /**
+   * THE VIEW HE LEFT (Dr Raghu, 8 Sep 2026: "keep the last applied filter as
+   * the view for the sales person!!! i am forced to change everytime").
+   *
+   * The board settings only. Filters, search and sort have their own store,
+   * crmView.<slug>, which has restored them since 30 Aug — see the effect
+   * above. Two stores writing the same keys would fight each other.
+   */
   useEffect(() => {
     try {
       const raw = localStorage.getItem(`crm-view-${slug}`);
-      const v = raw ? JSON.parse(raw) as { kanban?: boolean; kanbanBy?: string } : null;
+      const v = raw ? JSON.parse(raw) as { kanban?: boolean; kanbanBy?: string; filters?: Record<string, string>; sort?: { col: string; dir: "asc" | "desc" } } : null;
       setKanban(!!v?.kanban); setKanbanBy(String(v?.kanbanBy || ""));
     } catch { setKanban(false); setKanbanBy(""); }
   }, [slug]);
