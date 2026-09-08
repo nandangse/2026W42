@@ -691,6 +691,7 @@ export default function PlanningSuite({
         <JobCommercials
           jobs={byTDD}
           canEdit={canEdit}
+          stratcom={stratcom || isRaghu}
           reload={reload}
           today={TODAY}
         />

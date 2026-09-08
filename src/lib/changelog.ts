@@ -86,6 +86,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.33.0",
+    date: "2026-09-08",
+    module: "A job's terms as one document — Stratcom's, and Suresh's to fill",
+    items: [
+      "\"This edit is not working! Show a lightbox to edit for each job ... its a one time exercise ... this will be done by suresh. Access only to STRATCOM\" (Dr Raghu, 8 Sep 2026).",
+      "THE PROOF THAT IT WAS NOT WORKING is in the table, not in an error message: across <b>116 live jobs, a payment term had been recorded exactly ZERO times</b>. No job on the board carried a <code>pay_pct_on</code> or an <code>advance</code>. The database took the writes when asked directly and the route was sound — nothing was refusing anything. The sequence was simply too long to finish: press the pencil, press the cell, type, click away, <b>seven times over, on a table twenty-nine columns wide</b>. A number that is never entered is the same as a number that cannot be.",
+      "AND VALUE WAS NEVER EDITABLE AT ALL — the first field he listed. It is not in the field whitelist, so every attempt to correct it did nothing and said nothing.",
+      "THE LIGHTBOX runs the arithmetic down the page in the order he dictated it: <b>Value · Tax · Amount · Advance received · Balance due</b>, then the balance broken into <b>on delivery, 30, 60 and 90 days</b>. Amount and Balance are never typed — they are Value × (1+GST) and that less the advance, because a screen that lets a man type a total which disagrees with its own parts will be wrong quietly. <b>Each term shows its rupees and its date</b>: \"40%\" means nothing to a man building a 13-week plan; <b>₹18.2 L on 12 Oct</b> is the whole point.",
+      "THE FOUR MUST MAKE 100, and the Save button stays grey until they do. Terms adding to 90 lose a tenth of the order book from the cash plan and nothing on the page would have said so. Empty is still allowed — that means \"not entered yet\", which is a different fact from zero.",
+      "STRATCOM ONLY, both halves. The pencil is hidden from everyone else <b>and</b> <code>/api/job-commercials</code> refuses them, because a screen that hides a button while the endpoint behind it stays open is not access control. A delivered job\u2019s terms stay writable — its dates are a record and stay shut, but money still to be collected is exactly what this screen is for.",
+      "ONE MORE THING CAUGHT BEFORE IT SHIPPED: the input rows were first written as components declared inside the lightbox, which makes them a new component type on every render — React would have remounted each box on every keystroke and the caret would have jumped out after a single character. An edit box that fights the man typing in it is how the last one died.",
+    ],
+  },
+  {
     v: "5.0.32.2",
     date: "2026-09-08",
     module: "The top row stays, and two delivered jobs stop reading as nil",

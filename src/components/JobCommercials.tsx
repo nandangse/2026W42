@@ -92,9 +92,9 @@ const toWip = (j: CommJob): WipJob => ({
 
 
 export default function JobCommercials({
-  jobs, canEdit, reload, today,
+  jobs, canEdit, stratcom, reload, today,
 }: {
-  jobs: CommJob[]; canEdit: boolean; reload: () => Promise<unknown>; today: string;
+  jobs: CommJob[]; canEdit: boolean; stratcom?: boolean; reload: () => Promise<unknown>; today: string;
 }) {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState("");
@@ -108,6 +108,10 @@ export default function JobCommercials({
    * separate cells across a wide table is how three of them get missed.
    */
   const [editing, setEditing] = useState<string | null>(null);
+  /* THE TERMS LIGHTBOX (Dr Raghu, 8 Sep 2026). Stratcom's alone — the pencil
+     is hidden from everyone else and /api/job-commercials refuses them too,
+     because hiding a button while its endpoint stays open is not access. */
+  const [terms, setTerms] = useState<CommJob | null>(null);
   const [picked, setPicked] = useState<CommJob | null>(null);
 
   const save = useCallback(async (id: string, field: string, value: string) => {
@@ -281,14 +285,12 @@ export default function JobCommercials({
                   </button>
                 </td>
                 <td className="px-1 py-1 whitespace-nowrap">
-                  {canEdit && (
-                    <button onClick={() => setEditing(editing === j.id ? null : j.id)}
-                      title={editing === j.id ? "Done editing this row" : "Edit this job's commercials"}
+                  {stratcom && (
+                    <button onClick={() => setTerms(j)}
+                      title="Enter this job's terms — value, tax, advance and how the balance comes in"
                       className="rounded px-1.5 py-0.5 text-xs font-bold"
-                      style={editing === j.id
-                        ? { background: "var(--green)", color: "#fff" }
-                        : { color: C.navy, border: `1px solid ${C.line}`, background: "#fff" }}>
-                      {editing === j.id ? "Done" : "✎"}
+                      style={{ color: C.navy, border: `1px solid ${C.line}`, background: "#fff" }}>
+                      ✎
                     </button>
                   )}
                 </td>
@@ -375,6 +377,12 @@ export default function JobCommercials({
         />
       )}
 
+      {terms && (
+        <TermsLightbox job={terms} today={today}
+          onClose={() => setTerms(null)}
+          onSaved={async () => { await reload(); }} />
+      )}
+
       <div className="text-xs mt-2" style={{ color: C.sub }}>
         This is a plan, not a ledger: it says what the order book <b>should</b> throw off if every job
         delivers on its date and every term is honoured. Test it against the bank statement — never
@@ -437,5 +445,142 @@ function Pct({ v, canEdit, busy, warn, onSave }: {
         <span onClick={() => setEdit(true)} className="cursor-text" title="Click to change">{shown}</span>
       )}
     </td>
+  );
+}
+
+/**
+ * ONE JOB'S TERMS, AS A DOCUMENT (Dr Raghu, 8 Sep 2026: "this edit is not
+ * working! Show a lightbox to edit for each job ... its a one time exercise
+ * ... this will be done by suresh. Access only to STRATCOM").
+ *
+ * The arithmetic runs down the page in the order he dictated it — value, tax,
+ * amount, advance received, balance due — and then the balance is broken into
+ * the four terms. Amount and Balance are never typed: they are Value x (1+GST)
+ * and that less the advance, and a screen that lets a man type a total which
+ * disagrees with its own parts is a screen that will be wrong quietly.
+ *
+ * EACH TERM SHOWS ITS RUPEES AND ITS DATE, because "40%" means nothing to the
+ * man building a 13-week plan and "₹18.2 L on 12 Oct" is the whole point.
+ */
+/* Row and In live OUT HERE deliberately. Declared inside TermsLightbox they
+   would be new component types on every render, so React would unmount and
+   remount each input on every keystroke and the caret would jump out after a
+   single character — an edit box that fights the man typing in it. */
+function Row({ label, children, strong }: { label: string; children: React.ReactNode; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2" style={{ borderBottom: `1px solid ${C.line}` }}>
+      <div className="text-xs" style={{ color: strong ? C.ink : C.sub, fontWeight: strong ? 700 : 600 }}>{label}</div>
+      <div className="tnum" style={{ fontWeight: strong ? 800 : 600, fontSize: strong ? 15 : 13 }}>{children}</div>
+    </div>
+  );
+}
+
+function In({ v, set, w = 130, suffix }: { v: string; set: (s: string) => void; w?: number; suffix?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input type="number" value={v} onChange={(e) => set(e.target.value)} placeholder="—"
+        className="rounded border px-2 py-1 text-xs text-right tnum"
+        style={{ borderColor: C.line, width: w }} />
+      {suffix && <span className="text-xs" style={{ color: C.sub }}>{suffix}</span>}
+    </span>
+  );
+}
+
+function TermsLightbox({ job, today, onClose, onSaved }: {
+  job: CommJob; today: string; onClose: () => void; onSaved: () => Promise<unknown>;
+}) {
+  const S = (v: unknown) => (v == null ? "" : String(v));
+  const [val, setVal] = useState(S(job.val));
+  const [gst, setGst] = useState(S(job.gst));
+  const [adv, setAdv] = useState(S(job.advance));
+  const [p, setP] = useState<Record<string, string>>({
+    pay_pct_on: S(job.payPctOn), pay_pct_30: S(job.payPct30),
+    pay_pct_60: S(job.payPct60), pay_pct_90: S(job.payPct90),
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const nv = Number(val) || 0;
+  const ng = gst === "" ? null : Number(gst);
+  const tax = ng == null ? 0 : (nv * ng) / 100;
+  const amount = nv + tax;
+  const na = Number(adv) || 0;
+  const balance = amount - na;
+  const sum = BUCKETS.reduce((s, b) => s + (Number(p[b.col]) || 0), 0);
+  const anyPct = BUCKETS.some((b) => p[b.col] !== "");
+
+  const save = async () => {
+    setBusy(true); setErr("");
+    const body: Record<string, unknown> = {
+      job_id: job.id, val, gst, advance: adv,
+      ...Object.fromEntries(BUCKETS.map((b) => [b.col, p[b.col]])),
+    };
+    const r = await api.post("/api/job-commercials", body);
+    setBusy(false);
+    if (!r.ok) { setErr(String(r.error || "Could not save.")); return; }
+    await onSaved();
+    onClose();
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(22,35,47,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} className="rounded-lg bg-white"
+        style={{ width: "min(620px, 100%)", maxHeight: "calc(100vh - 40px)", display: "flex", flexDirection: "column", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
+        <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "var(--navy)", borderRadius: "8px 8px 0 0" }}>
+          <div className="text-white font-bold text-sm">
+            {jobNo(job.id)} · terms
+            <span style={{ fontWeight: 400, opacity: .8 }}> — {job.tag || job.cust || ""}</span>
+          </div>
+          <button onClick={onClose} className="text-white font-bold px-2">✕</button>
+        </div>
+
+        <div className="px-4 py-3" style={{ overflowY: "auto" }}>
+          {err && <div className="rounded p-2 mb-2 text-xs" style={{ background: "#FBEAE8", color: "#8E2C20" }}>{err}</div>}
+
+          <Row label="Value"><In v={val} set={setVal} /></Row>
+          <Row label="Tax"><In v={gst} set={setGst} w={64} suffix="%" /> <span style={{ marginLeft: 8, color: C.sub }}>{ng == null ? "no rate on this job" : cr(tax)}</span></Row>
+          <Row label="Amount" strong>{cr(amount)}</Row>
+          <Row label="Advance received"><In v={adv} set={setAdv} /></Row>
+          <Row label="Balance due" strong>{cr(balance)}</Row>
+
+          <div className="text-xs font-bold mt-3 mb-1" style={{ color: C.sub, letterSpacing: .6 }}>
+            HOW THE BALANCE COMES IN — as a % of {cr(balance)}
+          </div>
+          {BUCKETS.map((b) => {
+            const pct = Number(p[b.col]) || 0;
+            const when = job.tdd ? addDays(job.tdd, b.days) : null;
+            return (
+              <div key={b.col} className="flex items-center justify-between gap-3 py-1.5" style={{ borderBottom: `1px solid ${C.line}` }}>
+                <div className="text-xs" style={{ color: C.sub, fontWeight: 600 }}>
+                  {b.label}
+                  <span style={{ color: "#B9B5AA" }}> · TDD +{b.days}d{when ? ` · ${fmt(when)}` : " · no target date"}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="tnum text-xs" style={{ color: pct ? C.green : "#D5D2C9", minWidth: 78, textAlign: "right" }}>
+                    {pct ? cr((balance * pct) / 100) : "—"}
+                  </span>
+                  <In v={p[b.col]} set={(s) => setP((x) => ({ ...x, [b.col]: s }))} w={64} suffix="%" />
+                </div>
+              </div>
+            );
+          })}
+          <div className="flex items-center justify-between py-2 text-xs font-bold">
+            <span style={{ color: C.sub }}>Total</span>
+            <span className="tnum" style={{ color: !anyPct ? C.sub : Math.round(sum) === 100 ? C.green : C.red }}>
+              {!anyPct ? "not entered yet" : `${Math.round(sum)}%${Math.round(sum) === 100 ? "" : " — must be 100"}`}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-4 py-2.5" style={{ borderTop: `1px solid ${C.line}` }}>
+          <button onClick={onClose} className="rounded px-3 py-1.5 text-sm font-bold" style={{ background: "var(--line-soft)", color: "var(--dim)" }}>Cancel</button>
+          <button onClick={() => void save()} disabled={busy || (anyPct && Math.round(sum) !== 100)}
+            className="rounded px-4 py-1.5 text-sm font-bold text-white"
+            style={{ background: busy || (anyPct && Math.round(sum) !== 100) ? "#9AA3B2" : "var(--green)" }}>
+            {busy ? "Saving…" : "Save terms"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
