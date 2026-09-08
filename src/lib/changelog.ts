@@ -78,6 +78,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.21.1",
+    date: "2026-09-08",
+    module: "The bell curves leave Management out",
+    items: [
+      "\"Mention the curve without the management. The management is skewing the chart\" (Dr Raghu, 8 Sep 2026). He is right, and the rupee curve showed it plainly: <b>198 people in the first bucket and a single line out at 2.5 lakh</b> — not a distribution, one man and everybody else. The bucket width is chosen from the largest value, so three managing salaries set the scale for two hundred and the shape of the other 199 vanished.",
+      "Both curves now leave Management out and say so in their titles and their counts. It is the CURVES only: every total, every department figure and the pay bill itself still count everybody. The question a curve answers is whether people were really rated against one another, and for that the board is not a comparable population.",
+    ],
+  },
+  {
     v: "5.0.21.0",
     date: "2026-09-08",
     module: "AiSensy — WhatsApp through Meta's own Business API",

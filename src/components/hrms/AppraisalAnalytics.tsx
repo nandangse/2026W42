@@ -84,10 +84,30 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
      * says whether people were rated; the rupee curve says what it costs and
      * who actually gained.
      */
-    const amts = spoken.map((x) => (x.e.gross ?? 0) - (x.r.prevGross ?? 0)).filter((v) => Number.isFinite(v));
+    /**
+     * THE CURVES LEAVE MANAGEMENT OUT (Dr Raghu, 8 Sep 2026: "mention the
+     * curve without the management. the management is skewing the chart").
+     *
+     * He is right, and the rupee curve showed it plainly: 198 people in the
+     * first bucket and a single line out at 2.5 lakh, which is not a
+     * distribution, it is one man and everybody else. Three managing salaries
+     * among two hundred set the scale for all of them and the shape of the
+     * other 199 disappeared.
+     *
+     * They are left out of the CURVES only. Every total, every department
+     * figure and the pay bill itself still count everybody — what is being
+     * asked here is whether people were really rated against one another, and
+     * for that question the board is not a comparable population.
+     */
+    const rated = spoken.filter((x) => !/^management$/i.test(String(x.r.type || "").trim()));
+    const mgmt = spoken.length - rated.length;
+    const cPcts = rated.map((x) => x.e.pct as number);
+    const cMean = cPcts.length ? cPcts.reduce((a, b) => a + b, 0) / cPcts.length : 0;
+    const cSd = cPcts.length > 1 ? Math.sqrt(cPcts.reduce((a, b) => a + (b - cMean) ** 2, 0) / (cPcts.length - 1)) : 0;
+    const amts = rated.map((x) => (x.e.gross ?? 0) - (x.r.prevGross ?? 0)).filter((v) => Number.isFinite(v));
     const aMean = amts.length ? amts.reduce((a, b) => a + b, 0) / amts.length : 0;
     const aSd = amts.length > 1 ? Math.sqrt(amts.reduce((a, b) => a + (b - aMean) ** 2, 0) / (amts.length - 1)) : 0;
-    return { all, decided, spoken, payNow, payNew, pcts, mean, sd, median, amts, aMean, aSd };
+    return { all, decided, spoken, payNow, payNew, pcts, mean, sd, median, amts, aMean, aSd, cPcts, cMean, cSd, mgmt };
   }, [rows]);
 
   const depts = useMemo(() => {
@@ -188,12 +208,12 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
             <Big n={pct(S.mean)} l="Average increase" sub={`median ${pct(S.median)} · 2026 was +13.25%`} green />
           </div>
 
-          <BellCurve values={S.pcts} mean={S.mean} sd={S.sd} step={2.5} unit="pct"
-            title="The bell curve — increase % across the company"
-            note={`n=${S.pcts.length} · mean ${pct(S.mean)} · spread ±${S.sd.toFixed(1)}. A healthy curve has a middle and two honest tails — everyone bunched at one number means nobody was really rated.`} />
+          <BellCurve values={S.cPcts} mean={S.cMean} sd={S.cSd} step={2.5} unit="pct"
+            title="The bell curve — increase %, Management left out"
+            note={`n=${S.cPcts.length}${S.mgmt ? ` (${S.mgmt} in Management left out)` : ""} · mean ${pct(S.cMean)} · spread ±${S.cSd.toFixed(1)}. A healthy curve has a middle and two honest tails — everyone bunched at one number means nobody was really rated.`} />
           <BellCurve values={S.amts} mean={S.aMean} sd={S.aSd} unit="inr"
-            title="The bell curve — increase in rupees a month"
-            note={`n=${S.amts.length} · mean ₹${inr(Math.round(S.aMean))} a month · spread ±₹${inr(Math.round(S.aSd))}. The same decision in money: a percentage treats a man on 15,000 and a man on 1,50,000 alike, and this does not.`} />
+            title="The bell curve — increase in rupees a month, Management left out"
+            note={`n=${S.amts.length}${S.mgmt ? ` (${S.mgmt} in Management left out)` : ""} · mean ₹${inr(Math.round(S.aMean))} a month · spread ±₹${inr(Math.round(S.aSd))}. The same decision in money: a percentage treats a man on 15,000 and a man on 1,50,000 alike, and this does not. Three managing salaries set the scale for two hundred and the shape of the rest disappeared, so they stand outside the curve — the totals still count everybody.`} />
 
           {/* ── departments ── */}
           <Card title="Department wise" note="Decided money where Final; the manager's proposal where not — that part can still move.">
