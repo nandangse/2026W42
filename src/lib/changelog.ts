@@ -86,6 +86,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.32.1",
+    date: "2026-09-08",
+    module: "The contact sync had been failing every hour since it shipped",
+    items: [
+      "RUNNING IT IS NOT THE SAME AS BUILDING IT. He asked for the cron to be <b>run</b>, not just written — and the first real run threw <code>PGRST204</code> on every Contact batch. The CRM\u2019s <code>person</code> table has <b>job_title</b> and <b>primary_phone</b>; the mapping written yesterday said <code>designation</code> and <code>mobile</code>, which are not columns here. Every hourly run since 5.0.30.0 had reported the failure faithfully in its own answer, and nobody was reading the answer. Contacts flow now.",
+      "THE OTHER FIVE WERE SOUND, and the run proved them rather than assumed them: five quotations and two contacts came in, the rest were already held. Cursors are saved, so the deployed cron resumes exactly where the run stopped.",
+      "WHAT THE WAY BACK WOULD SEND, measured over a week rather than described: <b>227 updates, 45 creates, 303 held back</b> as backlog. That is the shape of it — not the forty thousand a naive push would have made. It stays disarmed until he says.",
+    ],
+  },
+  {
     v: "5.0.32.0",
     date: "2026-09-08",
     module: "A quote in dollars, priced and taxed as one — and the sync learns the way back",

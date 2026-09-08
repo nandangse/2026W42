@@ -80,12 +80,16 @@ const JOBS: Job[] = [
     fields: ["name", "first_name", "last_name", "designation", "email_id", "mobile_no", "phone", "company_name", "modified"],
     row: (r) => ({
       erp_name: S(r.name), first_name: S(r.first_name) || S(r.name), last_name: S(r.last_name) || null,
-      designation: S(r.designation) || null, primary_email: S(r.email_id) || null,
-      mobile: S(r.mobile_no) || S(r.phone) || null,
+      /* job_title and primary_phone — NOT designation and mobile, which is
+         what this said from 5.0.30.0 until the first real run of 8 Sep threw
+         PGRST204 on every Contact batch. The route reported it faithfully
+         each hour; nobody was reading the report. */
+      job_title: S(r.designation) || null, primary_email: S(r.email_id) || null,
+      primary_phone: S(r.mobile_no) || S(r.phone) || null,
     }),
     push: { fields: (c) => ({
       first_name: S(c.first_name), last_name: S(c.last_name) || undefined,
-      designation: S(c.designation) || undefined, mobile_no: S(c.mobile) || undefined,
+      designation: S(c.job_title) || undefined, mobile_no: S(c.primary_phone) || undefined,
     }) },
   },
   {
