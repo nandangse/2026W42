@@ -195,11 +195,60 @@ export async function GET(req: Request) {
     } catch (e) { swallow("admin/users", e); /* pre-0146 */ }
 
     const caller = await requireAdmin();
+
+    /**
+     * THE IDP PEOPLE BELONG ON THIS LIST TOO (Dr Raghu, 8 Sep 2026: "in this
+     * also show IDP users which is all the workers").
+     *
+     * Until now this was the register of GENIE logins, so the hundred and
+     * ninety-odd men who sign in at /idp with the password HR issued did not
+     * appear at all — the very people the IDP round was run for. They have no
+     * profile row, so nothing joined them.
+     *
+     * They are read from hrms_idp_login and folded in: anybody who already
+     * has a Genie login is marked as also having an IDP one, and anybody who
+     * has only the IDP login gets a row of his own. Those rows carry no
+     * module access and cannot be given any — there is nothing behind them to
+     * grant — which is why they are marked `idp_only` and shown read-only.
+     */
+    const idpLogin = new Map<string, { email: string; last: string | null; empId: string }>();
+    try {
+      const { data: lg } = await admin.from("hrms_idp_login").select("employee_id, email, last_login_at");
+      for (const r of (lg || []) as { employee_id: string; email: string; last_login_at: string | null }[])
+        idpLogin.set(String(r.email || "").toLowerCase(), { email: String(r.email || ""), last: r.last_login_at, empId: String(r.employee_id) });
+    } catch (e) { swallow("admin/users idp", e); }
+
+    /** name, type and id for an IDP person, from the employee master */
+    const byEmpId = new Map<string, { name: string; type: string | null; active: boolean }>();
+    if (idpLogin.size) {
+      try {
+        const tt = await hrmsTables(admin);
+        const { data: rows } = await admin.from(tt.employees).select("id, name, type, active")
+          .in("id", [...idpLogin.values()].map((v) => v.empId));
+        for (const r of (rows || []) as { id: string; name: string; type: string | null; active: boolean }[])
+          byEmpId.set(String(r.id), { name: r.name, type: r.type ?? null, active: !!r.active });
+      } catch (e) { swallow("admin/users idp names", e); }
+    }
+
+    const haveProfile = new Set((data || []).map((u) => String(u.email || "").toLowerCase()));
+    const idpOnly = [...idpLogin.entries()]
+      .filter(([mail]) => !haveProfile.has(mail))
+      .map(([mail, v]) => {
+        const e = byEmpId.get(v.empId);
+        return {
+          id: `idp:${v.empId}`, email: v.email, full_name: e?.name || v.empId, initials: null,
+          role: "idp", disabled: false, created_at: null,
+          kind: "employee", idp_only: true, has_idp: true,
+          emp_type: e?.type ?? null, emp_id: v.empId, emp_phone: null, emp_active: e?.active ?? null,
+          last_sign_in_at: v.last,
+        };
+      });
+
     return NextResponse.json({
       departments,
       mayEdit: mayEditUsers(caller),
       editors: [...USER_EDITORS],
-      users: (data || []).map((u) => ({
+      users: [...(data || []).map((u) => ({
         ...u,
         kind: (u.kind as string | undefined) || "employee",
         emp_type: emp.get(String(u.email || "").toLowerCase())?.type ?? null,
@@ -247,7 +296,9 @@ export async function GET(req: Request) {
                 ? "edit"
                 : "view"
               : "none",
-      })),
+        has_idp: idpLogin.has(String(u.email || "").toLowerCase()),
+        idp_only: false,
+      })), ...idpOnly],
     });
   } catch (e) {
     return errJson(e);

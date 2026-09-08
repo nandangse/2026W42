@@ -34,6 +34,7 @@ export interface UserRow {
   last_sign_in_at: string | null;
   goals_level: "none" | "view" | "edit";
   kind?: "employee" | "consultant" | "intern";
+  has_idp?: boolean; idp_only?: boolean;
   emp_type?: string | null;
   emp_id?: string | null;
   emp_phone?: string | null;
@@ -110,7 +111,7 @@ export default function UsersApp({
   const [showGone, setShowGone] = useState(false);
   // Active / Inactive (default Active); Employees / Consultant / Intern (default Employees) — Dr Raghu, 6 Sep 2026
   const [status, setStatusF] = useState<"active" | "inactive" | "all">("active");
-  const [kindF, setKindF] = useState<"employee" | "consultant" | "intern" | "all">("employee");
+  const [kindF, setKindF] = useState<"genie" | "idp" | "consultant" | "intern" | "all">("genie");
   /** Click an app above the table to see who holds it. */
   const [appF, setAppF] = useState<AppKey | "goals" | null>(null);
   const [showId, setShowId] = useState(false);
@@ -127,7 +128,21 @@ export default function UsersApp({
     const needle = q.trim().toLowerCase();
     const list = (users ?? [])
       .filter((u) => status === "all" ? true : status === "active" ? !u.disabled : u.disabled)
-      .filter((u) => kindF === "all" ? true : (u.kind || "employee") === kindF)
+      /**
+       * WHO IS ON THE LIST (Dr Raghu, 8 Sep 2026: "in this also show IDP
+       * users which is all the workers ... Genie (all except the labour
+       * employees who are only IDP users)").
+       *
+       * Two populations that used to be one. GENIE is a login to the system;
+       * EMPLOYEES IDP is the hundred and ninety-odd men who sign in at /idp
+       * with the password HR issued and have nothing else. A man can be both,
+       * and then he counts as Genie — he has the bigger key.
+       */
+      .filter((u) =>
+        kindF === "all" ? true
+        : kindF === "idp" ? !!u.has_idp
+        : kindF === "genie" ? !u.idp_only
+        : (u.kind || "employee") === kindF && !u.idp_only)
       .filter((u) => appF === null ? true : appF === "goals" ? (u.goals_level || "none") !== "none" : hasApp(u, appF))
       .filter((u) => {
       if (!needle) return true;
@@ -202,8 +217,8 @@ export default function UsersApp({
         <select value={status} onChange={(e) => setStatusF(e.target.value as typeof status)} className="text-xs" style={{ ...inp, width: 110 }} title="Active or inactive logins">
           <option value="active">Active</option><option value="inactive">Inactive</option><option value="all">All</option>
         </select>
-        <select value={kindF} onChange={(e) => setKindF(e.target.value as typeof kindF)} className="text-xs" style={{ ...inp, width: 130 }} title="Employees, consultants or interns — set on each person">
-          <option value="employee">Employees</option><option value="consultant">Consultants</option><option value="intern">Interns</option><option value="all">Everyone</option>
+        <select value={kindF} onChange={(e) => setKindF(e.target.value as typeof kindF)} className="text-xs" style={{ ...inp, width: 130 }} title="Genie — a login to the system. Employees IDP — the workers who sign in at /idp with the password HR issued. Consultants and Interns come from Kind on each person.">
+          <option value="genie">Genie</option><option value="idp">Employees IDP</option><option value="consultant">Consultants</option><option value="intern">Interns</option><option value="all">Everyone</option>
         </select>
         <label className="text-xs flex items-center gap-1" style={{ color: DIM, cursor: "pointer" }} title="Show the HRMS type, employee id and login id">
           <input type="checkbox" checked={showId} onChange={(e) => setShowId(e.target.checked)} /> show ID

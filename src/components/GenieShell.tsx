@@ -25,6 +25,12 @@ export const MODULES: { key: ShellModule; label: string; icon: string; href: str
   { key: "main", label: "Planning", icon: "🧞", href: "/", blurb: "jobs, milestones, the floor" },
   { key: "crm", label: "CRM", icon: "🤝", href: "/crm", blurb: "enquiries to orders" },
   { key: "marketing", label: "Marketing", icon: "📣", href: "/marketing", blurb: "leads, lists, campaigns" },
+  /* SEVA WAS MISSING FROM THIS LIST (Dr Raghu, 8 Sep 2026: "we had seva
+     right? where did that go?"). The door was never removed — /seva is
+     there, the access tick is there, the type above names it — it had simply
+     dropped out of the array everyone navigates by, so the only way in was
+     to type the address. */
+  { key: "seva", label: "Seva", icon: "🛎", href: "/seva", blurb: "customer service" },
   { key: "hrms", label: "HRMS", icon: "👤", href: "/hrms", blurb: "people, pay, appraisals" },
   { key: "ims", label: "IMS", icon: "📐", href: "/ims", blurb: "standards, audits, documents" },
   { key: "lms", label: "LMS", icon: "📚", href: "/lms", blurb: "learning" },

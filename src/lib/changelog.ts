@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.22.0",
+    date: "2026-09-08",
+    module: "Seva back on the menu, the IDP people on the Users list, and an honest login error",
+    items: [
+      "SEVA WAS MISSING FROM THE MODULES MENU (Dr Raghu, 8 Sep 2026: \"we had seva right? where did that go?\"). The door was never removed — /seva is there, the access tick is there, the type names it — it had simply dropped out of the array everyone navigates by, so the only way in was to type the address. It is back, between Marketing and HRMS.",
+      "THE IDP PEOPLE ARE ON THE USERS LIST (\"in this also show IDP users which is all the workers\"). Until now that list was the register of GENIE logins, so the hundred and ninety-odd men who sign in at /idp with the password HR issued did not appear at all — the very people the round was run for. The filter is now <b>Genie · Employees IDP · Consultants · Interns · Everyone</b>: Genie is a login to the system, Employees IDP is the workers, and a man who has both counts as Genie because he holds the bigger key.",
+      "AND THE LOGIN SAYS WHAT WENT WRONG. It answered \"that code is wrong or has expired\" whatever Supabase actually said — a rate limit, a disabled account and a stale code all read alike, so there was no way to know what to do next. Their words are shown now. It also tries BOTH token types: a project whose e-mail template is built on ConfirmationURL issues a magic-link token and one built on Token issues an e-mail token, they verify under different types, and only one was ever tried.",
+    ],
+  },
+  {
     v: "5.0.21.1",
     date: "2026-09-08",
     module: "The bell curves leave Management out",

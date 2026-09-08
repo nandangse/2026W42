@@ -42,9 +42,34 @@ export default function LoginPage() {
     if (error) { setErr(/signups not allowed|not found|user/i.test(error.message) ? "No Genie login has that email. Ask HR." : error.message); return; }
     setSent(true); setNote(`A six-digit code is on its way to ${addr()}. It lasts a few minutes.`);
   };
+  /**
+   * THE CODE, AND WHY IT WAS REFUSED (Dr Raghu, 8 Sep 2026: "the supabase
+   * login code doesnt work").
+   *
+   * Two faults, both here. First, this said "wrong or expired" whatever
+   * Supabase actually answered — a rate limit, a disabled account and a
+   * genuinely stale code all read the same, so there was no way to tell what
+   * to do next. Their words are shown now, under ours.
+   *
+   * Second, a project whose e-mail template is built on {{ .ConfirmationURL }}
+   * issues a MAGIC-LINK token, and one built on {{ .Token }} issues an e-mail
+   * token; the two verify under different `type`s and only one was tried. So
+   * a perfectly good code was refused because it was the other kind. Both are
+   * tried now, in the order most projects are set up.
+   */
   const verifyCode = async () => {
-    const { error } = await supabaseBrowser().auth.verifyOtp({ email: addr(), token: code.trim(), type: "email" });
-    if (error) { setBusy(false); setErr("That code is wrong or has expired. Send a new one."); return; }
+    const sb = supabaseBrowser();
+    const token = code.trim().replace(/\s+/g, "");
+    let error = (await sb.auth.verifyOtp({ email: addr(), token, type: "email" })).error;
+    if (error) error = (await sb.auth.verifyOtp({ email: addr(), token, type: "magiclink" })).error;
+    if (error) {
+      setBusy(false);
+      const said = String(error.message || "").trim();
+      setErr(/expired|invalid/i.test(said)
+        ? `That code is wrong or has expired — send a new one. (${said})`
+        : `Supabase refused it: ${said}`);
+      return;
+    }
     done();
   };
   const forgot = async () => {
