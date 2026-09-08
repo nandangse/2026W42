@@ -48,6 +48,7 @@ interface Data {
   head: Head; items: Item[]; remarks: Remark[];
   ordering: Ord[]; orderingHead: Record<string, unknown> | null;
   wip: Wip[]; project: Record<string, unknown> | null;
+  notify?: { emails: string[]; note: string | null };
 }
 
 interface Grp { group: string; n: number; value: number }
@@ -125,7 +126,7 @@ export default function RbomPage({ id, email, displayName, initials, role, isOwn
             {/* RELEASE — the button he asked for, at the top */}
             {isOwner && (
               <Btn kind="primary" disabled={busy || !d0}
-                onClick={() => setRel({ added: notReleased, to: "" })}
+                onClick={() => setRel({ added: notReleased, to: (d0?.notify?.emails ?? []).join(", ") })}
                 title={released ? `Released ${d(head?.released_at)} — releasing again sends the notice a second time` : "Move every Draft and WIP line to Released and tell the project"}>
                 {released ? "↻ Release again" : `✓ Release${notReleased.length ? ` (${notReleased.length})` : ""}`}
               </Btn>
@@ -338,12 +339,28 @@ export default function RbomPage({ id, email, displayName, initials, role, isOwn
               ? <>This moves <b>{rel.added.length}</b> line{rel.added.length === 1 ? "" : "s"} to Released and stamps the RBOM. The notice below names exactly those lines.</>
               : <>Every line is already Released. Releasing again re-stamps it and sends the notice a second time.</>}
           </Note>
-          <div className="text-xs font-bold mt-2 mb-1" style={{ color: MUTED }}>WHO TO TELL — one address per line, or separated by commas</div>
+          {/* WHO TO TELL COMES FROM THE PROJECT (Dr Raghu, 8 Sep 2026: "the
+              rule will come in projects"). Set once against the project and
+              every release on it reads the same list — still shown here, and
+              still editable, because the last look before a notice goes out
+              should be at the actual addresses. */}
+          <div className="text-xs font-bold mt-2 mb-1" style={{ color: MUTED }}>
+            WHO TO TELL — from project {head?.project_id}
+            {d0?.notify?.emails.length ? "" : <span style={{ color: AMBER }}> · nothing set on this project yet</span>}
+          </div>
           <textarea value={rel.to} onChange={(e) => setRel({ ...rel, to: e.target.value })} rows={2}
             placeholder="name@nandan.co.in, someone@nandan.co.in"
             className="w-full text-sm rounded px-2 py-1.5" style={{ border: `1px solid ${BORDER}` }} />
-          <div className="text-xs mt-1" style={{ color: MUTED }}>
-            The addresses are typed rather than guessed, deliberately — a release notice that reaches the wrong people is worse than one nobody sent.
+          <div className="flex items-center gap-2 mt-1">
+            <div className="text-xs" style={{ color: MUTED, flex: 1 }}>
+              {d0?.notify?.note ? <>Project note: {d0.notify.note}. </> : null}
+              Editing here changes this notice only — save it to the project to make it the rule for every RBOM on {head?.project_id}.
+            </div>
+            <Btn disabled={busy}
+              onClick={() => act({ action: "notify", emails: rel.to.split(/[,\n;]+/).map((x) => x.trim()).filter(Boolean) }, "Saved to the project")}
+              title="Keep these addresses against the project, so every RBOM released on it starts here">
+              Save to project
+            </Btn>
           </div>
 
           <div className="text-xs font-bold mt-3 mb-1" style={{ color: MUTED }}>THE NOTICE, AS IT WILL READ</div>

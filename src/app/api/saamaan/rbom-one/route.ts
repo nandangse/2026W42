@@ -61,10 +61,24 @@ export async function GET(req: Request) {
       .select("project_id, project_name, status, customer, product_family, approved_bom, design_stage")
       .eq("project_id", S(head.project_id)).maybeSingle();
 
+    /**
+     * WHO TO TELL, FROM THE PROJECT (Dr Raghu, 8 Sep 2026: "the rule will
+     * come in projects"). Not guessed from the job's owners and not held on
+     * the RBOM — set once per project, and every release against it reads
+     * the same list. The screen still shows it and still lets it be edited
+     * before anything goes out.
+     */
+    let notify: { emails: string[]; note: string | null } = { emails: [], note: null };
+    try {
+      const { data: n } = await admin.from("material_project_notify")
+        .select("emails, note").eq("project_id", S(head.project_id)).maybeSingle();
+      if (n) notify = { emails: Array.isArray(n.emails) ? (n.emails as string[]) : [], note: n.note ?? null };
+    } catch (e) { swallow("rbom notify", e); }
+
     return NextResponse.json({
       head, items: items ?? [], remarks,
       ordering, orderingHead: bomHead,
-      wip: wip ?? [], project: project ?? null,
+      wip: wip ?? [], project: project ?? null, notify,
     });
   } catch (e) { return errJson(e); }
 }
@@ -132,6 +146,20 @@ export async function POST(req: Request) {
       if (hErr) swallow("rbom release header", hErr);
 
       return NextResponse.json({ ok: true, released: (moving ?? []).length, added: moving ?? [], to });
+    }
+
+    /* ── set the project's notify list, from the RBOM page ── */
+    if (action === "notify") {
+      const emails = Array.isArray(b.emails) ? (b.emails as unknown[]).map((x) => ok(x)).filter(Boolean) : [];
+      const { error } = await admin.from("material_project_notify").upsert({
+        project_id: S(head.project_id), emails, note: S(b.note) || null,
+        updated_by: email, updated_at: now,
+      }, { onConflict: "project_id" });
+      if (error) {
+        const gone = /does not exist|schema cache/i.test(error.message);
+        throw new HttpError(gone ? 503 : 500, gone ? "Run migration 0159 first — the project has nowhere to keep its notify list." : error.message);
+      }
+      return NextResponse.json({ ok: true, emails });
     }
 
     throw new HttpError(400, "unknown action");

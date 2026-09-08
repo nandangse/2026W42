@@ -78,6 +78,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.25.1",
+    date: "2026-09-08",
+    module: "Who to tell, kept on the project",
+    items: [
+      "Asked who the \"concerned people\" of an RBOM release are, he said: <b>\"the rule will come in projects\"</b> (8 Sep 2026). So it does. The addresses are set once against a project and every RBOM released on it starts from that list — not guessed from the job's owners, and not held on the RBOM, because the people who need to know a BOM has moved are a property of the job, not of the document.",
+      "The release screen shows the list, says which project it came from, warns when a project has none set yet, and still lets it be edited — the last look before a notice goes out should be at the actual addresses. <b>Save to project</b> makes what is on screen the rule for every future release on that project.",
+      "Migration <b>0159</b> gives it a table of Saamaan's own rather than a column on material_project, which is an ERP mirror: anything typed into that would be wiped by the next pull.",
+    ],
+  },
+  {
     v: "5.0.25.0",
     date: "2026-09-08",
     module: "The RBOM as a document of its own",
