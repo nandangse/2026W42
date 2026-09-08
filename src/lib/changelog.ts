@@ -86,6 +86,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.37.0",
+    date: "2026-09-08",
+    module: "genie.nandan.co.in/present — attendance from a phone, in the field",
+    items: [
+      "\"The guy would login from his IDP then do attendance ... the photo he will click which will have the GPS record and the time stamp\" (Dr Raghu, 8 Sep 2026). A dedicated screen at <b>/present</b>, reached by the same two doors as the IDP — a Genie login, or the personal-e-mail login the two hundred men without one already carry.",
+      "SIGN IN, SIGN OUT, WITH A PHOTOGRAPH. The camera opens, the fix is already being taken while he frames himself, and <b>the time and the place are burned into the picture itself</b> — not only recorded in the row beside it. A photograph that carries its own stamp is evidence on its own, in a folder, a year from now, to somebody who has never seen Genie.",
+      "IT DOES NOT WAIT FOR A PERFECT FIX. A phone inside a workshop may never get one, and refusing the punch would mark a man absent who is standing at the gate. No fix is written as <b>\"location not available\"</b> — never as a zero, and never as a guess.",
+      "THREE DAYS BACK, THREE TIMES A MONTH, without a photo — his rule, enforced rather than trusted: the allowance is <b>counted off the punches themselves</b>, so it cannot drift from what actually happened. Older than that, or anything that looks wrong, goes to a ticket.",
+      "THE LAST THIRTY DAYS underneath, a line a day: first in, last out, and the hours between them. What it does <b>not</b> do is decide anything — \"let\u2019s capture data first and then decide how we will do this\". A table that encodes an unsettled rule has to be rebuilt when the rule settles.",
+      "\"ALSO I WANT TO GET THE ESSL BIOMETRIC DATA INTO THE SYSTEM.\" The machine\u2019s own record lands in the same log with <code>source = \u2019essl\u2019</code>, beside the ones from the field. ESSL exports are not one format, so the columns are <b>found rather than assumed</b> — matched by what they are called, and a file whose headings are not recognised is <b>refused with its own headings quoted back</b>, so the fix is obvious instead of mysterious. A row with no employee number or no readable time is counted and skipped, never guessed at, and the count comes back with the answer.",
+      "A PUNCH A MACHINE SAW AND A PUNCH A MAN TYPED ARE NOT THE SAME EVIDENCE, so the source is on every row. The day somebody asks \"how do we know he was there\", the answer has to be in the record.",
+      "Needs <b>migration 0163</b>. The photo goes to Drive where it belongs; if the service account is not configured or Drive refuses, it is kept in storage instead and the punch still stands — a man who came to work must not be unmarked because a folder was not shared.",
+    ],
+  },
+  {
     v: "5.0.36.0",
     date: "2026-09-08",
     module: "An IDP belonged to an e-mail; it now belongs to a man",
