@@ -86,6 +86,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.35.0",
+    date: "2026-09-08",
+    module: "The Library reaches the mail composer",
+    items: [
+      "\"This should also have from library\" (Dr Raghu, 8 Sep 2026). A <b>📚</b> beside the paperclip, listing the brochures and standard enclosures — the same shelf the quote submission has ticked on since 30 August. Every ordinary mail wanted it and did not have it, so a man with a brochure to send had to go and find his own copy of it.",
+      "THE FILE IS COPIED, NOT LINKED TO. A signed Supabase URL expires and a brochure sent today is opened next month; a link gone dead by then is <b>worse than no attachment</b>, because the sender believes it went. So a library file takes the same road as one off his machine — into the Drive mail folder, anyone-with-link, and only the link travels. Both roads end at the same folder rather than two.",
+      "It refuses a path that is not under <code>library/</code>, and one already on the mail shows as \"on the mail\" rather than attaching twice.",
+      "WORTH KNOWING BEFORE ANYONE LOOKS: <b>the shelf is empty</b> — nought files. The door works; nothing has been put through it. Brochures go on from the quote submission dialog, which has an \"add to library\" upload, and they appear here the moment they are there.",
+    ],
+  },
+  {
     v: "5.0.34.0",
     date: "2026-09-08",
     module: "Purchase invoices — the third fact, and the only one that carries money owed",

@@ -49,6 +49,14 @@ export default function MailComposer({ ctx, onClose, onSent }: {
     : "");
   const [tpl, setTpl] = useState("");
   const [files, setFiles] = useState<Attachment[]>([]);
+  /* THE LIBRARY (Dr Raghu, 8 Sep 2026: "this should also have from library").
+     The brochures and standard enclosures already live in the cards bucket
+     under library/ — the quote submission has ticked them on since 30 August.
+     Every ordinary mail wanted the same shelf and did not have it, so a man
+     with a brochure to send had to go and find his own copy of it. */
+  const [libOpen, setLibOpen] = useState(false);
+  const [lib, setLib] = useState<{ name: string; path: string; size: number | null }[] | null>(null);
+  const [libBusy, setLibBusy] = useState("");
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -151,6 +159,34 @@ export default function MailComposer({ ctx, onClose, onSent }: {
       }
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setUploading(false); }
+  };
+
+  const openLibrary = async () => {
+    setLibOpen((v) => !v);
+    if (lib) return;
+    try {
+      const r = await fetch("/api/crm/library", { cache: "no-store" });
+      const j = await r.json();
+      setLib(r.ok ? (j.library ?? []) : []);
+    } catch { setLib([]); }
+  };
+
+  /* A library file takes the SAME road as one off his machine: into the Drive
+     mail folder, and the link travels. See the note on /gmail/attach. */
+  const attachFromLibrary = async (path: string, name: string) => {
+    if (files.some((f) => f.name === name)) { setLibOpen(false); return; }
+    setLibBusy(path); setErr("");
+    try {
+      const r = await fetch("/api/crm/gmail/attach", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ path }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `${name} did not attach`);
+      setFiles((cur) => [...cur, j]);
+      setLibOpen(false);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setLibBusy(""); }
   };
 
   const send = async () => {
@@ -300,6 +336,41 @@ export default function MailComposer({ ctx, onClose, onSent }: {
             <input type="file" multiple hidden disabled={uploading}
               onChange={(e) => { void upload(e.target.files); e.currentTarget.value = ""; }} />
           </label>
+          <div style={{ position: "relative" }}>
+            <button onClick={() => void openLibrary()} className="text-lg"
+              title="Attach from the Library — the brochures and standard enclosures">📚</button>
+            {libOpen && (
+              <div style={{
+                position: "absolute", bottom: "calc(100% + 8px)", left: 0, zIndex: 90,
+                background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 10,
+                boxShadow: "0 10px 30px rgba(27,34,51,.18)", width: 340, maxHeight: 320, overflowY: "auto",
+              }}>
+                <div className="px-3 py-2 text-xs font-bold" style={{ color: MUTED, borderBottom: `1px solid ${BORDER}`, letterSpacing: .6 }}>
+                  LIBRARY
+                </div>
+                {lib === null && <div className="px-3 py-3 text-xs" style={{ color: MUTED }}>Opening the shelf…</div>}
+                {lib?.length === 0 && (
+                  <div className="px-3 py-3 text-xs" style={{ color: MUTED }}>
+                    Nothing on the shelf yet. Brochures and standard enclosures are added under Settings → Library.
+                  </div>
+                )}
+                {lib?.map((f) => {
+                  const on = files.some((x) => x.name === f.name);
+                  return (
+                    <button key={f.path} disabled={!!libBusy || on}
+                      onClick={() => void attachFromLibrary(f.path, f.name)}
+                      className="w-full text-left px-3 py-2 text-xs flex items-center gap-2"
+                      style={{ borderBottom: `1px solid ${BORDER}`, opacity: on ? .5 : 1, cursor: on ? "default" : "pointer" }}>
+                      <span style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>{f.name}</span>
+                      <span style={{ color: MUTED, flexShrink: 0 }}>
+                        {libBusy === f.path ? "attaching…" : on ? "on the mail" : f.size ? `${(f.size / 1e6).toFixed(1)} MB` : ""}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <button onClick={() => setTplSaveOpen((v) => !v)} className="text-lg" title="Save what is written as a template">💾</button>
 
           <span className="ml-auto" />
