@@ -31,7 +31,7 @@ const N = (v: unknown) => (v === null || v === undefined || v === "" ? null : Nu
 const B = (v: unknown) => v === 1 || v === "1" || v === true;
 const D = (v: unknown) => { const s = S(v).slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null; };
 const T = (v: unknown) => { const s = S(v); const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/); return m ? `${m[1]}T${m[2]}+05:30` : null; };
-const missing = (m: string) => /material_po|material_supplier|does not exist|schema cache/i.test(m);
+const missing = (m: string) => /material_po|material_supplier|material_grn|does not exist|schema cache/i.test(m);
 /** material_setting.value is text; the pull's cursor is JSON in it. */
 const parseSetting = (v: unknown): Doc => { try { const o = JSON.parse(String(v ?? "")); return o && typeof o === "object" ? (o as Doc) : {}; } catch { return {}; } };
 
@@ -49,6 +49,15 @@ async function erpPage(cfg: { base: string; H: Record<string, string> }, doctype
 }
 
 const PO_FIELDS = ["name", "supplier", "supplier_name", "status", "docstatus", "transaction_date", "schedule_date", "grand_total", "net_total", "total_taxes_and_charges", "currency", "project", "per_received", "per_billed", "advance_paid", "set_warehouse", "owner", "modified", "creation", "total_qty", "base_grand_total", "custom_remarks", "terms"];
+/**
+ * GRNs — what actually arrived (Dr Raghu, 8 Sep 2026: "from ERP get in
+ * Suppliers, Purchase orders, GRNs"). In the ERP this is the Purchase
+ * Receipt. A purchase order is a promise; this is the arrival, and it is the
+ * only place that says what was REJECTED — which is the figure that tells you
+ * which supplier keeps sending bad material.
+ */
+const GRN_FIELDS = ["name", "supplier", "supplier_name", "status", "docstatus", "posting_date", "posting_time", "grand_total", "net_total", "total_taxes_and_charges", "currency", "project", "set_warehouse", "is_return", "per_billed", "total_qty", "owner", "remarks", "modified"];
+const GRN_ITEM_FIELDS = ["name", "modified", "items.name as row_name", "items.idx as row_idx", "items.item_code", "items.item_name", "items.qty", "items.received_qty", "items.rejected_qty", "items.uom", "items.rate", "items.amount", "items.warehouse", "items.rejected_warehouse", "items.purchase_order", "items.purchase_order_item", "items.batch_no", "items.serial_no", "items.project"];
 const PO_ITEM_FIELDS = ["name", "modified", "items.name as row_name", "items.idx as row_idx", "items.item_code", "items.item_name", "items.qty", "items.uom", "items.rate", "items.amount", "items.received_qty", "items.billed_amt", "items.warehouse", "items.schedule_date", "items.project"];
 
 export async function GET(req: Request) {
@@ -69,6 +78,45 @@ export async function GET(req: Request) {
       for (const p of agg || []) { const k = S(p.supplier); const t = tally.get(k) ?? { n: 0, value: 0, open: 0 }; t.n++; t.value += Number(p.grand_total) || 0; if (/To Receive|To Bill|Draft/i.test(S(p.status))) t.open++; tally.set(k, t); }
       return NextResponse.json({ installed: true, rows: (data || []).map((s) => ({ ...s, ...(tally.get(S(s.name)) ?? { n: 0, value: 0, open: 0 }) })) });
     }
+    /* ── GRNs: what arrived ── */
+    if (u.searchParams.get("grns")) {
+      const gname = S(u.searchParams.get("name"));
+      if (gname) {
+        const [{ data: grn }, { data: lines }] = await Promise.all([
+          admin.from("material_grn").select("*").eq("name", gname).maybeSingle(),
+          admin.from("material_grn_item").select("*").eq("grn_name", gname).order("idx"),
+        ]);
+        if (!grn) throw new HttpError(404, "No such GRN in the mirror — pull first.");
+        return NextResponse.json({ grn, items: lines || [] });
+      }
+      const gsup = S(u.searchParams.get("supplier")), gproj = S(u.searchParams.get("project"));
+      const gfrom = D(u.searchParams.get("from")), gto = D(u.searchParams.get("to"));
+      const gpage = Math.max(0, Number(u.searchParams.get("page")) || 0), gsize = 200;
+      let g = admin.from("material_grn")
+        .select("name, supplier, supplier_name, status, docstatus, posting_date, grand_total, currency, project, set_warehouse, is_return, per_billed, total_qty, erp_modified", { count: "exact" })
+        .order("posting_date", { ascending: false }).order("name", { ascending: false })
+        .range(gpage * gsize, gpage * gsize + gsize - 1);
+      if (gsup) g = g.eq("supplier", gsup);
+      if (gproj) g = g.eq("project", gproj);
+      if (gfrom) g = g.gte("posting_date", gfrom);
+      if (gto) g = g.lte("posting_date", gto);
+      if (q) g = g.or(`name.ilike.%${q}%,supplier_name.ilike.%${q}%,project.ilike.%${q}%,set_warehouse.ilike.%${q}%`);
+      const { data: rows, count, error: ge } = await g;
+      if (ge) { if (missing(ge.message)) return NextResponse.json({ installed: false, rows: [], total: 0 }); throw new Error(ge.message); }
+      /* what was refused, per GRN — the figure a receipt exists to carry */
+      const names = (rows || []).map((r) => S(r.name));
+      const rej = new Map<string, { rejected: number; lines: number }>();
+      if (names.length) {
+        const { data: li } = await admin.from("material_grn_item").select("grn_name, rejected_qty").in("grn_name", names);
+        for (const l of li || []) {
+          const k = S(l.grn_name); const t = rej.get(k) ?? { rejected: 0, lines: 0 };
+          t.rejected += Number(l.rejected_qty) || 0; t.lines++; rej.set(k, t);
+        }
+      }
+      return NextResponse.json({ installed: true, total: count ?? 0,
+        rows: (rows || []).map((r) => ({ ...r, ...(rej.get(S(r.name)) ?? { rejected: 0, lines: 0 }) })) });
+    }
+
     const one = S(u.searchParams.get("supplier"));
     if (one && u.searchParams.get("one")) {
       const { data } = await admin.from("material_supplier").select("*").eq("name", one).maybeSingle();
@@ -175,6 +223,68 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, phase, found, written, next_start: start + pages * 500, done: false });
       async function finishItems() {
         await admin.from("material_setting").upsert({ key: "po_pull", value: JSON.stringify({ ...st, items_modified: lastMod || st.items_modified || "", items_at: now, by }), updated_by: by, updated_at: now }, { onConflict: "key" });
+        return NextResponse.json({ ok: true, phase, found, written, done: true });
+      }
+    }
+
+    if (phase === "grn") {
+      const { data: setting } = await admin.from("material_setting").select("value").eq("key", "po_pull").maybeSingle();
+      const st = parseSetting(setting?.value);
+      const since = body.full ? "" : S(st.grn_modified);
+      const start = Math.max(0, Number(body.start) || 0);
+      const filters = since ? [["modified", ">=", since]] : null;
+      let found = 0, written = 0, lastMod = since, pages = 0;
+      for (let s2 = start; pages < 24; s2 += 500, pages++) {
+        const rows = await erpPage(cfg, "Purchase Receipt", GRN_FIELDS, filters, s2, 500);
+        found += rows.length;
+        if (!rows.length) return finishGrn();
+        const up = rows.map((g) => ({
+          name: S(g.name), supplier: S(g.supplier), supplier_name: S(g.supplier_name), status: S(g.status), docstatus: Number(g.docstatus) || 0,
+          posting_date: D(g.posting_date), posting_time: S(g.posting_time), grand_total: N(g.grand_total), net_total: N(g.net_total), taxes: N(g.total_taxes_and_charges),
+          currency: S(g.currency), project: S(g.project), set_warehouse: S(g.set_warehouse), is_return: !!Number(g.is_return), per_billed: N(g.per_billed),
+          total_qty: N(g.total_qty), owner: S(g.owner), remarks: S(g.remarks), erp_modified: T(g.modified), erp: g, pulled_at: now,
+        }));
+        const { error } = await admin.from("material_grn").upsert(up, { onConflict: "name" });
+        if (error) { if (missing(error.message)) throw new HttpError(503, "Run migration 0157 first — the GRNs have nowhere to live yet."); throw new Error(error.message); }
+        written += up.length;
+        for (const g of rows) if (S(g.modified) > lastMod) lastMod = S(g.modified);
+        if (rows.length < 500) return finishGrn();
+      }
+      return NextResponse.json({ ok: true, phase, found, written, next_start: start + pages * 500, done: false });
+      async function finishGrn() {
+        await admin.from("material_setting").upsert({ key: "po_pull", value: JSON.stringify({ ...st, grn_modified: lastMod || st.grn_modified || "", grn_at: now, by }), updated_by: by, updated_at: now }, { onConflict: "key" });
+        return NextResponse.json({ ok: true, phase, found, written, done: true, since: since || "the beginning" });
+      }
+    }
+
+    if (phase === "grn_items") {
+      const { data: setting } = await admin.from("material_setting").select("value").eq("key", "po_pull").maybeSingle();
+      const st = parseSetting(setting?.value);
+      const since = body.full ? "" : S(st.grn_items_modified);
+      const start = Math.max(0, Number(body.start) || 0);
+      const filters = since ? [["modified", ">=", since]] : null;
+      let found = 0, written = 0, lastMod = since, pages = 0;
+      for (let s2 = start; pages < 20; s2 += 500, pages++) {
+        const rows = await erpPage(cfg, "Purchase Receipt", GRN_ITEM_FIELDS, filters, s2, 500, "modified asc, `tabPurchase Receipt Item`.idx asc");
+        found += rows.length;
+        if (!rows.length) return finishGrnItems();
+        const up = rows.filter((r) => S(r.row_name)).map((r) => ({
+          row_name: S(r.row_name), grn_name: S(r.name), idx: Number(r.row_idx) || 0, item_code: S(r.item_code), item_name: S(r.item_name),
+          qty: N(r.qty), received_qty: N(r.received_qty), rejected_qty: N(r.rejected_qty), uom: S(r.uom), rate: N(r.rate), amount: N(r.amount),
+          warehouse: S(r.warehouse), rejected_warehouse: S(r.rejected_warehouse), purchase_order: S(r.purchase_order), purchase_order_item: S(r.purchase_order_item),
+          batch_no: S(r.batch_no), serial_no: S(r.serial_no), project: S(r.project), pulled_at: now,
+        }));
+        if (up.length) {
+          const { error } = await admin.from("material_grn_item").upsert(up, { onConflict: "row_name" });
+          if (error) { if (missing(error.message)) throw new HttpError(503, "Run migration 0157 first."); throw new Error(error.message); }
+          written += up.length;
+        }
+        for (const r of rows) if (S(r.modified) > lastMod) lastMod = S(r.modified);
+        if (rows.length < 500) return finishGrnItems();
+      }
+      return NextResponse.json({ ok: true, phase, found, written, next_start: start + pages * 500, done: false });
+      async function finishGrnItems() {
+        await admin.from("material_setting").upsert({ key: "po_pull", value: JSON.stringify({ ...st, grn_items_modified: lastMod || st.grn_items_modified || "", grn_items_at: now, by }), updated_by: by, updated_at: now }, { onConflict: "key" });
         return NextResponse.json({ ok: true, phase, found, written, done: true });
       }
     }

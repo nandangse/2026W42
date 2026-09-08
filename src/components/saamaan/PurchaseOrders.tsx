@@ -20,6 +20,8 @@ const inr = (n: number | null | undefined) => rupee(n, "·");
 
 interface Po { name: string; supplier: string; supplier_name: string; status: string; docstatus: number; transaction_date: string | null; schedule_date: string | null; grand_total: number | null; net_total: number | null; currency: string; project: string; per_received: number | null; per_billed: number | null; advance_paid: number | null; set_warehouse: string; owner: string; erp_modified: string | null }
 interface PoItem { row_name: string; idx: number; item_code: string; item_name: string; qty: number | null; uom: string; rate: number | null; amount: number | null; received_qty: number | null; billed_amt: number | null; warehouse: string; schedule_date: string | null; project: string }
+interface Grn { name: string; supplier: string; supplier_name: string; status: string; docstatus: number; posting_date: string | null; grand_total: number | null; currency: string; project: string; set_warehouse: string; is_return: boolean; per_billed: number | null; total_qty: number | null; erp_modified: string | null; rejected?: number; lines?: number }
+interface GrnItem { row_name: string; idx: number; item_code: string; item_name: string; qty: number | null; received_qty: number | null; rejected_qty: number | null; uom: string; rate: number | null; amount: number | null; warehouse: string; rejected_warehouse: string; purchase_order: string; batch_no: string; serial_no: string; project: string }
 interface Sup { name: string; supplier_name: string; supplier_group: string; supplier_type: string; gst_no: string; country: string; mobile_no: string; email_id: string; primary_address: string; primary_contact: string; status_of_supplier: string; rating_percentage: number | null; disabled: boolean; on_hold: boolean; erp_modified: string | null; n: number; value: number; open: number }
 interface Pull { modified?: string; at?: string; items_modified?: string; items_at?: string; suppliers_at?: string; by?: string }
 
@@ -29,9 +31,14 @@ const statusColour = (s: string) => (/Completed/.test(s) ? GREEN : /Cancelled|Cl
 const erpForm = (base: string, doctype: string, name: string) => `${base}/app/${doctype.toLowerCase().replace(/\s+/g, "-")}/${encodeURIComponent(name)}`;
 
 export default function PurchaseOrders({ erpBase }: { erpBase: string }) {
-  const [tab, setTab] = useState<"po" | "suppliers">("po");
+  /* GRNs — what arrived (Dr Raghu, 8 Sep 2026: "from ERP get in Suppliers,
+     Purchase orders, GRNs"). A purchase order is a promise; the GRN is the
+     arrival, and the only place that records what was REFUSED. */
+  const [tab, setTab] = useState<"po" | "suppliers" | "grn">("po");
   const [pos, setPos] = useState<{ rows: Po[]; total: number; page: number; size: number; statuses: Record<string, number>; pull: Pull | null; installed: boolean } | null>(null);
   const [sups, setSups] = useState<{ rows: Sup[]; installed: boolean } | null>(null);
+  const [grns, setGrns] = useState<{ rows: Grn[]; total: number; installed: boolean } | null>(null);
+  const [grnOpen, setGrnOpen] = useState<{ grn: Grn; items: GrnItem[] } | null>(null);
   const [q, setQ] = useState(""); const [status, setStatus] = useState(""); const [supplier, setSupplier] = useState(""); const [page, setPage] = useState(0);
   const [open, setOpen] = useState<{ po: Po; items: PoItem[] } | null>(null);
   const [supOpen, setSupOpen] = useState<{ supplier: Record<string, unknown>; pos: Po[] } | null>(null);
@@ -45,7 +52,13 @@ export default function PurchaseOrders({ erpBase }: { erpBase: string }) {
     const r = await fetch(`/api/saamaan/po?suppliers=1${q ? `&q=${encodeURIComponent(q)}` : ""}`, { cache: "no-store" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`); setSups(j);
   }, [q]);
   useEffect(() => { loadPos().catch((e) => setMsg(String(e.message || e))); }, [loadPos]);
+  const loadGrns = useCallback(async () => {
+    const u = `/api/saamaan/po?grns=1&page=${page}${supplier ? `&supplier=${encodeURIComponent(supplier)}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+    const r = await fetch(u, { cache: "no-store" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`); setGrns(j);
+  }, [page, supplier, q]);
   useEffect(() => { if (tab === "suppliers") loadSups().catch((e) => setMsg(String(e.message || e))); }, [tab, loadSups]);
+  useEffect(() => { if (tab === "grn") loadGrns().catch((e) => setMsg(String(e.message || e))); }, [tab, loadGrns]);
+  const openGrn = async (name: string) => { const r = await fetch(`/api/saamaan/po?grns=1&name=${encodeURIComponent(name)}`, { cache: "no-store" }); const j = await r.json(); if (r.ok) setGrnOpen(j); else setMsg(j.error); };
 
   const openPo = async (name: string) => { const r = await fetch(`/api/saamaan/po?name=${encodeURIComponent(name)}`, { cache: "no-store" }); const j = await r.json(); if (r.ok) setOpen(j); else setMsg(j.error); };
   const openSup = async (name: string) => { const r = await fetch(`/api/saamaan/po?supplier=${encodeURIComponent(name)}&one=1`, { cache: "no-store" }); const j = await r.json(); if (r.ok) setSupOpen(j); else setMsg(j.error); };
@@ -55,7 +68,7 @@ export default function PurchaseOrders({ erpBase }: { erpBase: string }) {
     setBusy(true); setMsg(""); setLog([]);
     const say = (s: string) => setLog((l) => [...l, `${new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour12: false })} ${s}`]);
     try {
-      for (const phase of ["po", "po_items", "suppliers"] as const) {
+      for (const phase of ["po", "po_items", "suppliers", "grn", "grn_items"] as const) {
         let start = 0, total = 0;
         for (let guard = 0; guard < 400; guard++) {
           const r = await fetch("/api/saamaan/po", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ phase, start, full }) });
@@ -64,7 +77,7 @@ export default function PurchaseOrders({ erpBase }: { erpBase: string }) {
           if (j.done) break; start = Number(j.next_start) || 0;
         }
       }
-      say("pull complete"); await loadPos(); if (tab === "suppliers") await loadSups();
+      say("pull complete"); await loadPos(); if (tab === "suppliers") await loadSups(); if (tab === "grn") await loadGrns();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   };
@@ -77,7 +90,7 @@ export default function PurchaseOrders({ erpBase }: { erpBase: string }) {
       {pos && !pos.installed && <Note kind="warn">Run migration 0136 first — the purchase orders have nowhere to live yet.</Note>}
       {log.length > 0 && <div className="bg-white rounded-lg border p-2 mb-2 text-xs" style={{ borderColor: BORDER, maxHeight: 120, overflowY: "auto", color: MUTED }}>{log.map((l, i) => <div key={i}>{l}</div>)}</div>}
       <div className="flex gap-1.5 mb-2 items-center flex-wrap">
-        {(["po", "suppliers"] as const).map((k) => <button key={k} onClick={() => setTab(k)} className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: tab === k ? NAVY : "#fff", color: tab === k ? "#fff" : INK, border: `1px solid ${tab === k ? NAVY : BORDER}` }}>{k === "po" ? `Purchase orders${pos ? ` (${pos.total.toLocaleString("en-IN")})` : ""}` : `Suppliers${sups ? ` (${sups.rows.length.toLocaleString("en-IN")})` : ""}`}</button>)}
+        {(["po", "suppliers", "grn"] as const).map((k) => <button key={k} onClick={() => { setTab(k); setPage(0); }} className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: tab === k ? NAVY : "#fff", color: tab === k ? "#fff" : INK, border: `1px solid ${tab === k ? NAVY : BORDER}` }}>{k === "po" ? `Purchase orders${pos ? ` (${pos.total.toLocaleString("en-IN")})` : ""}` : k === "suppliers" ? `Suppliers${sups ? ` (${sups.rows.length.toLocaleString("en-IN")})` : ""}` : `GRNs${grns ? ` (${grns.total.toLocaleString("en-IN")})` : ""}`}</button>)}
         <span style={{ flex: 1 }} />
         {p && <span className="text-xs" style={{ color: MUTED }}>POs to {p.modified ? d(p.modified) : "·"} · lines {p.items_at ? d(p.items_at) : "·"} · suppliers {p.suppliers_at ? d(p.suppliers_at) : "·"}</span>}
       </div>
@@ -138,6 +151,75 @@ export default function PurchaseOrders({ erpBase }: { erpBase: string }) {
             ]}
           />
         </>
+      )}
+
+      {tab === "grn" && (
+        <>
+          <div className="flex gap-1.5 mb-2 items-center">
+            {supplier && <Chip text={`supplier ${supplier}`} colour={NAVY} />}
+            {supplier && <Btn onClick={() => { setSupplier(""); setPage(0); }}>clear</Btn>}
+            <span style={{ flex: 1 }} />
+            <input value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} placeholder="🔍 GRN no., supplier, project, warehouse" className="text-xs rounded px-2 py-1" style={{ border: `1px solid ${BORDER}`, width: 280 }} />
+          </div>
+          {grns && !grns.installed && <Note kind="warn">The GRNs have nowhere to live yet — run migration 0157, then Pull from ERP.</Note>}
+          <GenieTable<Grn>
+            rows={grns ? grns.rows : null} minWidth={1300} search={() => true}
+            empty="No GRNs in the mirror yet — Pull from ERP brings them."
+            columns={[
+              { key: "name", label: "GRN", align: "left", sort: (r) => r.name, render: (r) => <button onClick={() => openGrn(r.name)} className="font-bold hover:underline" style={{ color: NAVY }}>{r.name}</button> },
+              { key: "date", label: "Received", align: "left", sort: (r) => r.posting_date || "", render: (r) => <span className="tnum text-xs">{d(r.posting_date)}</span> },
+              { key: "sup", label: "Supplier", align: "left", sort: (r) => r.supplier_name, render: (r) => <button onClick={() => { setSupplier(r.supplier); setPage(0); }} className="hover:underline text-left" style={{ color: INK, whiteSpace: "normal", maxWidth: 260, display: "inline-block" }}>{r.supplier_name || r.supplier}</button> },
+              { key: "wh", label: "Into", align: "left", sort: (r) => r.set_warehouse, render: (r) => <span className="text-xs" style={{ color: MUTED }}>{r.set_warehouse || "·"}</span> },
+              { key: "proj", label: "Project", align: "left", sort: (r) => r.project, render: (r) => <span className="text-xs" style={{ color: MUTED }}>{r.project || "·"}</span> },
+              { key: "qty", label: "Qty", align: "right", sort: (r) => Number(r.total_qty || 0), render: (r) => <span className="tnum">{r.total_qty == null ? "·" : r.total_qty.toLocaleString("en-IN")}</span> },
+              /* THE FIGURE A RECEIPT EXISTS TO CARRY. A GRN that only records
+                 what was accepted cannot tell you which supplier keeps
+                 sending bad material, so what was refused is a column of its
+                 own and shown in red when there is any. */
+              { key: "rej", label: "Rejected", align: "right", sort: (r) => Number(r.rejected || 0), render: (r) => <span className="tnum font-bold" style={{ color: r.rejected ? RED : MUTED }}>{r.rejected ? r.rejected.toLocaleString("en-IN") : "·"}</span> },
+              { key: "val", label: "Value", align: "right", sort: (r) => Number(r.grand_total || 0), render: (r) => <span className="tnum font-bold">{inr(r.grand_total)}</span> },
+              { key: "st", label: "Status", align: "left", render: (r) => <>{r.is_return && <Chip text="return" colour={AMBER} />} <Chip text={r.status} colour={statusColour(r.status)} /></> },
+              { key: "erp", label: "", align: "right", render: (r) => <a href={erpForm(erpBase, "Purchase Receipt", r.name)} target="_blank" rel="noreferrer" className="text-xs hover:underline" style={{ color: MUTED }}>ERP ↗</a> },
+            ]}
+          />
+          {grns && grns.total > 200 && (
+            <div className="flex gap-2 items-center justify-center mt-2 text-xs" style={{ color: MUTED }}>
+              <Btn onClick={() => setPage((x) => Math.max(0, x - 1))} disabled={page === 0}>← Newer</Btn>
+              <span>{page * 200 + 1}–{Math.min(grns.total, (page + 1) * 200)} of {grns.total.toLocaleString("en-IN")}</span>
+              <Btn onClick={() => setPage((x) => x + 1)} disabled={(page + 1) * 200 >= grns.total}>Older →</Btn>
+            </div>
+          )}
+        </>
+      )}
+
+      {grnOpen && (
+        <Modal onClose={() => setGrnOpen(null)} title={`${grnOpen.grn.name} · ${grnOpen.grn.supplier_name || grnOpen.grn.supplier}`} width={1200}>
+          <div className="flex gap-2 flex-wrap mb-2 text-xs items-center">
+            <Chip text={grnOpen.grn.status} colour={statusColour(grnOpen.grn.status)} />
+            {grnOpen.grn.is_return && <Chip text="return" colour={AMBER} />}
+            <span style={{ color: MUTED }}>received {d(grnOpen.grn.posting_date)}{grnOpen.grn.set_warehouse ? ` into ${grnOpen.grn.set_warehouse}` : ""}{grnOpen.grn.project ? ` · ${grnOpen.grn.project}` : ""}</span>
+            <span style={{ flex: 1 }} />
+            <span style={{ color: MUTED }}>billed {grnOpen.grn.per_billed == null ? "·" : `${Math.round(grnOpen.grn.per_billed)}%`}</span>
+            <b className="tnum">{inr(grnOpen.grn.grand_total)}</b>
+            <a href={erpForm(erpBase, "Purchase Receipt", grnOpen.grn.name)} target="_blank" rel="noreferrer" className="text-xs hover:underline" style={{ color: NAVY }}>open in the ERP ↗</a>
+          </div>
+          <GenieTable<GrnItem>
+            rows={grnOpen.items} minWidth={1100} search={() => true} empty="No lines on this GRN."
+            columns={[
+              { key: "idx", label: "#", align: "right", sort: (r) => r.idx, render: (r) => <span className="tnum" style={{ color: MUTED }}>{r.idx}</span> },
+              { key: "item", label: "Item", align: "left", sort: (r) => r.item_code, render: (r) => <div><div className="font-bold tnum text-xs">{r.item_code}</div><div className="text-xs" style={{ color: MUTED, whiteSpace: "normal" }}>{r.item_name}</div></div> },
+              { key: "recd", label: "Received", align: "right", sort: (r) => Number(r.received_qty || 0), render: (r) => <span className="tnum">{r.received_qty == null ? "·" : r.received_qty.toLocaleString("en-IN")}</span> },
+              { key: "acc", label: "Accepted", align: "right", sort: (r) => Number(r.qty || 0), render: (r) => <span className="tnum font-bold">{r.qty == null ? "·" : r.qty.toLocaleString("en-IN")}</span> },
+              { key: "rej", label: "Rejected", align: "right", sort: (r) => Number(r.rejected_qty || 0), render: (r) => <span className="tnum font-bold" style={{ color: r.rejected_qty ? RED : MUTED }}>{r.rejected_qty ? r.rejected_qty.toLocaleString("en-IN") : "·"}</span> },
+              { key: "uom", label: "UOM", align: "left", render: (r) => <span className="text-xs" style={{ color: MUTED }}>{r.uom || "·"}</span> },
+              { key: "rate", label: "Rate", align: "right", sort: (r) => Number(r.rate || 0), render: (r) => <span className="tnum">{inr(r.rate)}</span> },
+              { key: "amt", label: "Amount", align: "right", sort: (r) => Number(r.amount || 0), render: (r) => <span className="tnum font-bold">{inr(r.amount)}</span> },
+              { key: "wh", label: "Into", align: "left", render: (r) => <span className="text-xs" style={{ color: MUTED }}>{r.warehouse || "·"}</span> },
+              /* the promise this arrival answers */
+              { key: "po", label: "Against PO", align: "left", sort: (r) => r.purchase_order, render: (r) => r.purchase_order ? <button onClick={() => { setGrnOpen(null); setTab("po"); openPo(r.purchase_order); }} className="tnum text-xs hover:underline" style={{ color: NAVY }}>{r.purchase_order}</button> : <span style={{ color: MUTED }}>·</span> },
+            ]}
+          />
+        </Modal>
       )}
 
       {open && (

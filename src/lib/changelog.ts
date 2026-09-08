@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.24.0",
+    date: "2026-09-08",
+    module: "Saamaan: GRNs — what actually arrived",
+    items: [
+      "\"From ERP get in Suppliers, Purchase orders, GRNs\" (Dr Raghu, 8 Sep 2026). Suppliers and purchase orders already came across; <b>GRNs did not</b>. A purchase order is a promise — the GRN is the arrival, and without it Saamaan could say what was ordered but not what came, from whom, into which warehouse, on which day. In the ERP it is the Purchase Receipt and its item table, mirrored whole like everything else in that room.",
+      "A third tab beside Purchase orders and Suppliers, and the same Pull walks two more phases. Every GRN opens to its lines: received, accepted, <b>rejected</b>, rate, amount, the warehouse it went into, and the PO it answers — click that and the purchase order opens.",
+      "REJECTED IS A COLUMN OF ITS OWN, in red wherever there is any. A receipt that records only what was accepted cannot tell you which supplier keeps sending bad material, which is half the reason to keep receipts at all.",
+      "Migration <b>0157</b> gives them somewhere to live, and stands them behind the same wall as everything else: RLS on, nothing granted to anon or PUBLIC.",
+    ],
+  },
+  {
     v: "5.0.23.2",
     date: "2026-09-08",
     module: "A hole in the wall, found and shut",
