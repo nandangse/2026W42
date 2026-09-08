@@ -23,6 +23,26 @@ export const maxDuration = 60;
  * The copy behaves exactly like anything he attaches by hand, which is also
  * why both roads end at the same Drive folder rather than two.
  */
+/**
+ * GOOGLE'S OWN WORDS, TRANSLATED (Dr Raghu, 8 Sep 2026, on being told
+ * "Request had insufficient authentication scopes.").
+ *
+ * That sentence is true and useless. It means this mailbox was connected
+ * BEFORE the Drive scope was added to what Genie asks for — the refresh token
+ * carries the grant that was made on the day, and a grant cannot grow by
+ * itself. Nothing is broken and nothing needs fixing in the code: the man has
+ * to consent once more. So say that, and say where.
+ */
+const scopeHelp = (e: unknown, who: string): never => {
+  const m = e instanceof Error ? e.message : String(e);
+  if (/insufficient authentication scopes|insufficientPermissions|ACCESS_TOKEN_SCOPE/i.test(m))
+    throw new HttpError(400,
+      `${who}'s Gmail connection was made before Genie asked for Drive, so it may not put files there. `
+      + `Reconnect it — Profile → ✉ Connect Gmail — and consent again. Nothing else changes; `
+      + `mail already sent and everything filed stays as it is.`);
+  throw e instanceof Error ? e : new Error(m);
+};
+
 export async function POST(req: Request) {
   try {
     const user = await requireCrm();
@@ -45,7 +65,7 @@ export async function POST(req: Request) {
       const out = await driveUploadAttachment(
         token, nameOnly, blob.type || "application/octet-stream",
         Buffer.from(await blob.arrayBuffer()),
-      );
+      ).catch((e) => scopeHelp(e, String(mb.email_address || "This mailbox")));
       return NextResponse.json(out);
     }
 
@@ -55,7 +75,8 @@ export async function POST(req: Request) {
     if (file.size > 4_400_000)
       throw new HttpError(400, `${file.name} is ${(file.size / 1e6).toFixed(1)} MB — this door takes ~4 MB. Put it in Drive yourself and paste the link.`);
     const token = await accessTokenFor(String(mb.id));
-    const out = await driveUploadAttachment(token, file.name, file.type, Buffer.from(await file.arrayBuffer()));
+    const out = await driveUploadAttachment(token, file.name, file.type, Buffer.from(await file.arrayBuffer()))
+      .catch((e) => scopeHelp(e, String(mb.email_address || "This mailbox")));
     return NextResponse.json(out);
   } catch (e) {
     return errJson(e);

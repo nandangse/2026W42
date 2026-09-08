@@ -86,6 +86,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.35.1",
+    date: "2026-09-08",
+    module: "\"Insufficient authentication scopes\", said in English",
+    items: [
+      "The paperclip answered <b>\"Request had insufficient authentication scopes.\"</b> — Google\u2019s own words, true and useless. It now says what it means and what to do about it.",
+      "WHAT IT MEANS. Genie asks Google for three permissions: read mail, send mail, and write to Drive — because a mail attachment goes to the Drive mail folder and only the link travels. The <b>Drive permission was added on 26 August</b>, and <code>raghu@nandan.co.in</code> was connected <b>that same day</b>. A grant does not grow by itself: a token issued before a scope was asked for never gains it, however many times the code asks afterwards.",
+      "SO NOTHING IS BROKEN AND NOTHING NEEDS FIXING IN THE CODE. The connection has to be made once more so Google can be asked again — <b>Profile → ✉ Connect Gmail</b>. Mail already sent and everything filed stays exactly as it is. The three later connections (sales, nitu, hr — 31 Aug, 3 and 4 Sep) were all made after the scope existed and should be unaffected.",
+      "I could not prove that from here: the OAuth client lives on Vercel and not in the local environment, so the scopes on each stored token cannot be read from this machine. The dates and the error are the evidence, not a check I ran.",
+    ],
+  },
+  {
     v: "5.0.35.0",
     date: "2026-09-08",
     module: "The Library reaches the mail composer",
