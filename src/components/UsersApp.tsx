@@ -55,7 +55,15 @@ export interface UserRow {
 
 /** The seven doors that are not Main Genie, in the order the menus show them. */
 export const APPS = [
+  /* PLANNING IS A DOOR TOO (Dr Raghu, 8 Sep 2026: "in this we will want to go
+     to Planning also"). It was open to every login while everybody in Genie
+     was a planner; two hundred men now have logins for their payslip alone.
+     Migration 0161 seeded every login that then existed, so making it a door
+     took nothing from anyone. MARKETING was already wired in the API and had
+     simply never been given a tick. */
+  { key: "planning", label: "Planning", icon: "🧞", color: "#1B2D6B", path: "/" },
   { key: "crm", label: "CRM", icon: "💼", color: "var(--blue)", path: "/crm" },
+  { key: "marketing", label: "Marketing", icon: "📣", color: "#B45309", path: "/marketing" },
   { key: "hrms", label: "HRMS", icon: "👤", color: "var(--accent)", path: "/hrms" },
   { key: "accounts", label: "Kuber", icon: "💰", color: "var(--green)", path: "/kuber" },
   { key: "vishwakarma", label: "Vishwakarma", icon: "🛠", color: "#7C3AED", path: "/vishwakarma" },

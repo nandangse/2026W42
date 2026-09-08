@@ -86,6 +86,24 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.29.0",
+    date: "2026-09-08",
+    module: "Planning becomes a door, and Marketing gets its tick",
+    items: [
+      "\"In this we will want to go to Planning also\" (Dr Raghu, 8 Sep 2026, of the Apps ticks on a login). Every other module was a tick; <b>Planning was the exception</b>, open to every login that existed. That was fine while everybody in Genie was a planner — it is not fine now that two hundred men hold logins for their payslip alone.",
+      "THE DANGEROUS PART, HANDLED. Turning an open room into a locked one locks everybody out the instant it ships, so migration <b>0161 seeds the new table with every login that exists</b>: nobody loses anything, and from now a tick is a tick like all the others. Two further guards — an owner always holds it, and if the table is missing everyone passes, because an empty answer must never read as \"nobody may come in\". A man without the tick is sent to his own sheet, which is the room he wanted.",
+      "AND MARKETING FINALLY HAS A TICK. Its door, its table and its grant have existed since 0146 and worked; it had simply never been drawn on the Apps list, so the only way to grant it was through the database.",
+    ],
+  },
+  {
+    v: "5.0.28.1",
+    date: "2026-09-08",
+    module: "Feature Request from every app",
+    items: [
+      "\"Show profile and feature request also everywhere\" (Dr Raghu, 8 Sep 2026). Profile and Admin went on every app's menu in 5.0.27.0; <b>Feature Request</b> joins them. The ask arrives while a man is standing in the room that prompted it — in Saamaan, in HRMS, in the CRM — and until now he had to leave for Planning to write it down, which is how an ask gets forgotten. Every request is logged against the version that shipped it, so this is the audit trail's front door and it should open from wherever the thought occurred.",
+    ],
+  },
+  {
     v: "5.0.28.0",
     date: "2026-09-08",
     module: "The quote asks when the order lands, and has room to write",

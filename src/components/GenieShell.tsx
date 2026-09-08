@@ -307,6 +307,14 @@ function AccountMenu({ module, user, isAdmin, menu }: { module: ShellModule; use
             {!menu && (
               <>
                 <a href="/?go=profile" className="block px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, textDecoration: "none", borderBottom: "1px solid #EEECE6" }}>👤 Profile</a>
+                {/* FEATURE REQUEST FROM ANYWHERE (Dr Raghu, 8 Sep 2026: "show
+                    profile and feature request also everywhere"). The ask
+                    arrives while a man is standing in the room that prompted
+                    it — in Saamaan, in HRMS, in the CRM — and until now he had
+                    to leave for Planning to write it down, which is how an ask
+                    is forgotten. Every request is logged with the version that
+                    shipped it, so this is the audit trail's front door. */}
+                <a href="/?tab=feature" className="block px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, textDecoration: "none", borderBottom: "1px solid #EEECE6" }}>💡 Feature Request</a>
                 {isAdmin && <a href="/?tab=admin" className="block px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, textDecoration: "none", borderBottom: "1px solid #EEECE6" }}>⚙ Admin</a>}
               </>
             )}

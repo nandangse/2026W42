@@ -31,6 +31,24 @@ export default async function Home() {
       if (/labour/i.test(String(data?.type || "")))
         return <LabourHome email={user.email} displayName={user.displayName} initials={user.initials} role={user.role} />;
     } catch { /* no HRMS yet: the suite */ }
+
+    /**
+     * PLANNING IS A DOOR (Dr Raghu, 8 Sep 2026: "in this we will want to go to
+     * Planning also" — of the Apps ticks on a login).
+     *
+     * Migration 0161 seeded every login that existed when it ran, so this took
+     * nothing from anybody. Two guards keep it that way: an owner always holds
+     * it, and if the TABLE is missing — the migration not yet run — everyone
+     * passes, because an empty answer must not read as "nobody may come in".
+     * A man without the tick is sent to his own sheet, which is the room he
+     * actually wants.
+     */
+    try {
+      const admin = adminClient();
+      const { data: grant, error } = await admin.from("planning_access")
+        .select("email").eq("email", user.email.toLowerCase()).maybeSingle();
+      if (!error && !grant && !user.isOwner) redirect("/idp");
+    } catch { /* pre-0161: Planning is open, as it always was */ }
   }
 
   return (

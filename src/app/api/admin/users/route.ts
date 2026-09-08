@@ -17,6 +17,9 @@ const DOORS: Record<string, { table: string; label: string; migration: string }>
   accounts_access: { table: "accounts_access", label: "Kuber", migration: "0073" },
   crm_access: { table: "crm_access", label: "the CRM", migration: "0055" },
   marketing_access: { table: "marketing_access", label: "Marketing", migration: "0146" },
+  /* Planning was open to every login until 8 Sep 2026; 0161 made it a door
+     and seeded every login that then existed, so nothing was taken away. */
+  planning_access: { table: "planning_access", label: "Planning", migration: "0161" },
 };
 
 export const dynamic = "force-dynamic";
@@ -194,6 +197,18 @@ export async function GET(req: Request) {
       for (const g of mg || []) mkEmails.add(String(g.email || "").toLowerCase());
     } catch (e) { swallow("admin/users", e); /* pre-0146 */ }
 
+    /* Planning became a door on 8 Sep 2026 (migration 0161). Before it ran
+       the table does not exist, and an EMPTY set would read as "nobody has
+       Planning" — so until then everyone is shown as holding it, which is
+       what was true. */
+    const plEmails = new Set<string>();
+    let planningDoorLive = false;
+    try {
+      const { data: pg } = await admin.from("planning_access").select("email");
+      planningDoorLive = true;
+      for (const g of pg || []) plEmails.add(String(g.email || "").toLowerCase());
+    } catch (e) { swallow("admin/users", e); /* pre-0161 — everyone has it */ }
+
     const caller = await requireAdmin();
 
     /**
@@ -288,6 +303,8 @@ export async function GET(req: Request) {
         saamaan_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         marketing_access: mkEmails.has(String(u.email || "").toLowerCase()) || String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         marketing_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        planning_access: !planningDoorLive || plEmails.has(String(u.email || "").toLowerCase()) || String(u.email || "").toLowerCase() === RAGHU_EMAIL,
+        planning_implicit: String(u.email || "").toLowerCase() === RAGHU_EMAIL,
         goals_level:
           String(u.email || "").toLowerCase() === RAGHU_EMAIL
             ? "edit"
