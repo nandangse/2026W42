@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.23.2",
+    date: "2026-09-08",
+    module: "A hole in the wall, found and shut",
+    items: [
+      "<b>hrms_idp_login was readable with the PUBLIC anon key</b> — the one that ships inside the browser JavaScript of genie.nandan.co.in. All 195 rows, and its columns include <b>pw_temp: the plaintext temporary password HR issued</b>. Anyone who opened the site, read the page source and took that key could list every employee's personal e-mail and password, sign in at /idp as any of them, and read that man's salary slip, IDP and HRIS record. Every other hrms_ table was already denied; this one was missed when 0154 created it.",
+      "Migration <b>0156</b> shuts it and sweeps every hrms_ table with the same rule so it cannot recur. Verified after running: all six tables answer 401 to the anon key, and the service key still reads, so nothing in Genie broke — the login route returns its proper 401 on a bad password rather than a 500.",
+      "The first draft of 0156 was not enough and is worth remembering: it revoked from anon and authenticated only. <b>A grant made to PUBLIC is not undone by revoking from anon</b>, because anon inherits it. The corrected file revokes PUBLIC too, and ends with a SELECT that proves itself rather than asking to be trusted.",
+      "It was found by asking, before splitting HRMS into its own Supabase project, what the public key could already reach. Worth noting that the split would NOT have fixed it — the same mistake in a new project leaks the same table. The split is defence in depth; this was the fix.",
+    ],
+  },
+  {
     v: "5.0.23.1",
     date: "2026-09-08",
     module: "Four kinds of person",
