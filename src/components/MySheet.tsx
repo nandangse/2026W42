@@ -20,6 +20,7 @@ import { MONTHS } from "@/lib/salary-sheet";
 import { IDP_SECTIONS, IDP_RATINGS } from "@/lib/idp";
 import { inr } from "@/lib/fmt";
 import { firstName } from "@/lib/person-name";
+import InstallPrompt from "@/components/InstallPrompt";
 
 const C = { ink: "var(--ink)", dim: "var(--dim)", faint: "var(--muted)", line: "var(--line)", orange: "var(--accent)", green: "var(--green)", red: "var(--red)", navy: "var(--navy)", paper: "var(--paper)" };
 
@@ -58,9 +59,9 @@ type Tab = "home" | "idpform" | "records" | "slips" | "leave" | "loan" | "idp" |
 const TABS: [Tab, string][] = [["home", "Home"], ["records", "HRIS Records"], ["slips", "Payslips"], ["leave", "Leave Register"], ["loan", "Loan Register"], ["idp", "IDP Results"], ["learning", "Learning Goals"], ["handbook", "Employee Handbook"], ["queries", "HR Queries"]];
 /** One picture per request, so a man who reads slowly still finds his. */
 const APPLY_ICON: Record<string, string> = {
-  leave: "🗓️", advance: "💳", loan: "🏦", encashment: "💰", uniform: "👕", shoes: "🥾", other: "⋯",
+  leave: "🗓️", advance: "💳", loan: "🏦", encashment: "💰", uniform: "👕", shoes: "🥾", travel: "✈️", other: "⋯",
 };
-const APPLY: [string, string][] = [["leave", "Apply for Leave"], ["advance", "Apply for Advance"], ["loan", "Apply for Loan"], ["encashment", "Apply for Leave Encashment"], ["uniform", "Apply for Uniform"], ["shoes", "Apply for Shoes"], ["other", "Apply for Other Things"]];
+const APPLY: [string, string][] = [["leave", "Apply for Leave"], ["advance", "Apply for Advance"], ["loan", "Apply for Loan"], ["encashment", "Apply for Leave Encashment"], ["uniform", "Apply for Uniform"], ["shoes", "Apply for Shoes"], ["travel", "Apply for Travel & Expense"], ["other", "Apply for Other Things"]];
 
 /**
  * COMING SOON, said plainly (Dr Raghu, 7 Sep 2026). The tab stays where it
@@ -165,6 +166,28 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
         .idpm .avatar{width:40px;height:40px;border-radius:50%;background:var(--i-accent);color:#fff;display:grid;
           place-items:center;font-family:Barlow,system-ui,sans-serif;font-weight:700;font-size:15px;flex:none}
         .idpm .wrap{max-width:560px;margin:0 auto;padding:16px 16px 104px}
+        /* ── the hero, on his blue ground ── */
+        .idpm .hero{background:linear-gradient(160deg,#1F4E9C 0%,#2E6BC4 45%,#1B4B96 100%);
+          color:#fff;border-radius:0 0 20px 20px;margin:-16px -16px 4px;padding:14px 16px 20px;text-align:center;
+          box-shadow:0 6px 20px rgba(27,34,51,.18)}
+        .idpm .hero-date{font-size:12.5px;color:rgba(255,255,255,.72);text-align:right}
+        .idpm .hero-face{width:96px;height:96px;border-radius:50%;margin:6px auto 10px;
+          background:rgba(255,255,255,.16);border:3px solid rgba(255,255,255,.85);
+          display:grid;place-items:center;font-family:Barlow,system-ui,sans-serif;font-weight:700;font-size:34px;
+          box-shadow:0 4px 16px rgba(0,0,0,.2)}
+        .idpm .hero-name{font-family:Barlow,system-ui,sans-serif;font-weight:700;font-size:23px;line-height:1.15}
+        .idpm .hero-role{font-size:15.5px;color:rgba(255,255,255,.92);margin-top:3px}
+        .idpm .hero-team{font-size:14.5px;color:rgba(255,255,255,.75)}
+        .idpm .hero-meta{font-size:11.5px;color:rgba(255,255,255,.6);margin-top:6px}
+        /* ── the tile grid, three across, a picture on each ── */
+        .idpm .apps{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--i-line);
+          border:1px solid var(--i-line);border-radius:14px;overflow:hidden}
+        .idpm .app{background:var(--i-surface);display:flex;flex-direction:column;align-items:center;justify-content:center;
+          gap:7px;padding:16px 8px;min-height:104px;text-align:center;line-height:1.2}
+        .idpm .app:active{background:var(--i-surface-2)}
+        .idpm .app .pic{font-size:30px;line-height:1}
+        .idpm .app .cap{font-family:Barlow,system-ui,sans-serif;font-weight:600;font-size:13.5px;color:var(--i-text)}
+        .idpm .app .cnt{font-size:11px;color:var(--i-accent);font-weight:700}
         .idpm .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
         .idpm .tile{background:var(--i-surface);border:1px solid var(--i-line);border-radius:10px;padding:10px;
           min-height:78px;display:flex;flex-direction:column;justify-content:space-between;text-align:left}
@@ -232,18 +255,20 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
         {tab === "home" ? (
           <div>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <div>
-          <div style={{ fontSize: 13, color: "var(--i-muted)" }}>{d.today}</div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, lineHeight: 1.15 }}>
-            Namaste, {d.linked ? firstName(d.me.name) : firstName(name)}
-          </h1>
+        {/* THE HERO (Dr Raghu, 8 Sep 2026, with a design: "the idp screen use
+            this theme!!! It looks nice"). His face, his name, his role and
+            his team on a blue ground — the app knowing who you are before it
+            asks you for anything. */}
+        <div className="hero">
+          <div className="hero-date">{d.today}</div>
+          <div className="hero-face">{initials || "N"}</div>
+          <div className="hero-name">{d.linked ? d.me.name : name}</div>
           {d.linked && (
             <>
-              <div style={{ fontWeight: 600, marginTop: 4 }}>
-                {d.me.designation || d.me.type}{d.me.department ? ` · ${d.me.department}` : ""}
-              </div>
-              <div style={{ color: "var(--i-muted)", fontSize: 14, marginTop: 2 }}>
-                {d.me.id}{d.me.doj ? ` · with Nandan since ${when(d.me.doj)}` : ""}{d.me.manager ? ` · reports to ${d.me.manager}` : ""}
+              <div className="hero-role">{d.me.designation || d.me.type}</div>
+              <div className="hero-team">{d.me.department || ""}</div>
+              <div className="hero-meta">
+                {d.me.id}{d.me.doj ? ` · since ${when(d.me.doj)}` : ""}{d.me.manager ? ` · reports to ${d.me.manager}` : ""}
               </div>
             </>
           )}
@@ -302,38 +327,51 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
               </button>
             ))}
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button className="action accent" onClick={() => { setApply("leave"); setMsg(""); }}>
-                <div className="ic">🗓️</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="h">Apply for Leave</div>
-                  <div className="dsc">{latest?.slip?.leave_cb != null ? `${d1(latest.slip.leave_cb)} days available` : "Goes to your reporting manager"}</div>
-                </div>
-                <span style={{ opacity: .8 }}>›</span>
+            {/* THE TILES (Dr Raghu, 8 Sep 2026, with a design: "the idp
+                screen use this theme!!! It looks nice"). Three across, a
+                picture over a caption, everything he does on one screen
+                without scrolling for it. The four cards these replace said
+                the same things in four times the height. */}
+            <div className="apps">
+              <button className="app" onClick={() => { setApply("leave"); setMsg(""); }}>
+                <span className="pic">🗓️</span><span className="cap">Leave</span>
+                {latest?.slip?.leave_cb != null && <span className="cnt">{d1(latest.slip.leave_cb)} days</span>}
               </button>
-              <button className="action" onClick={() => setTab("slips")}>
-                <div className="ic">📄</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="h">Payslip{latest ? ` for ${MONTHS[latest.month - 1]} ${latest.year}` : "s"}</div>
-                  <div className="dsc">View, download, or ask a question</div>
-                </div>
-                <span style={{ color: "var(--i-faint)" }}>›</span>
+              <button className="app" onClick={() => setTab("slips")}>
+                <span className="pic">📄</span><span className="cap">Payslip</span>
+                {latest && <span className="cnt">{MONTHS[latest.month - 1].slice(0, 3)} {latest.year}</span>}
               </button>
-              <button className="action" onClick={() => setTab("queries")}>
-                <div className="ic">💬</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="h">Ask HR</div>
-                  <div className="dsc">{openQ ? `${openQ} open · ` : ""}Leave, pay, uniform, safety</div>
-                </div>
-                <span style={{ color: "var(--i-faint)" }}>›</span>
+              <button className="app" onClick={() => setTab("queries")}>
+                <span className="pic">💬</span><span className="cap">Ask HR</span>
+                {openQ > 0 && <span className="cnt">{openQ} open</span>}
               </button>
-              <button className="action" onClick={() => setTab("learning")}>
-                <div className="ic">🎯</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="h">Learning Goals</div>
-                  <div className="dsc">{d.learning.length ? `${d.learning.length} noted` : "Set with your manager"}</div>
-                </div>
-                <span style={{ color: "var(--i-faint)" }}>›</span>
+              <button className="app" onClick={() => setTab("idp")}>
+                <span className="pic">📈</span><span className="cap">My IDP</span>
+              </button>
+              <button className="app" onClick={() => setTab("learning")}>
+                <span className="pic">🎯</span><span className="cap">Learning Goals</span>
+                {d.learning.length ? <span className="cnt">{d.learning.length}</span> : null}
+              </button>
+              <button className="app" onClick={() => setTab("leave")}>
+                <span className="pic">📅</span><span className="cap">Leave Register</span>
+              </button>
+              <button className="app" onClick={() => { setApply("travel"); setMsg(""); }}>
+                <span className="pic">✈️</span><span className="cap">Travel &amp; Expense</span>
+              </button>
+              <button className="app" onClick={() => { setApply("advance"); setMsg(""); }}>
+                <span className="pic">💳</span><span className="cap">Advance</span>
+              </button>
+              <button className="app" onClick={() => setTab("loan")}>
+                <span className="pic">🏦</span><span className="cap">Loan Register</span>
+              </button>
+              <button className="app" onClick={() => setTab("handbook")}>
+                <span className="pic">📘</span><span className="cap">Handbook</span>
+              </button>
+              <button className="app" onClick={() => setTab("records")}>
+                <span className="pic">🪪</span><span className="cap">My Record</span>
+              </button>
+              <button className="app" onClick={() => setTab("more")}>
+                <span className="pic">☰</span><span className="cap">More</span>
               </button>
             </div>
 
@@ -581,6 +619,10 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
           </button>
         ))}
       </div>
+
+      {/* KEEP IT ON THE PHONE (Dr Raghu, 8 Sep 2026). Asked once, then never
+          again — a banner that returns every visit is an advertisement. */}
+      <InstallPrompt />
 
       {apply && d.linked && <ApplyBox kind={apply} spec={d.kinds[apply]}
         hint={apply === "encashment" ? encashHint : null}

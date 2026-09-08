@@ -78,6 +78,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.26.0",
+    date: "2026-09-08",
+    module: "The IDP page in his theme, installable, with Travel & Expense",
+    items: [
+      "\"The idp screen use this theme!!! It looks nice\" (Dr Raghu, 8 Sep 2026, with a design). So it does: a blue hero carrying his face, his name, his role and his team — the app knowing who he is before it asks him for anything — and under it a grid of tiles, three across, a picture over a caption. Twelve things on one screen where four stacked cards used to say the same in four times the height.",
+      "TRAVEL &amp; EXPENSE is in (\"this is one more thing to add in the IDP\"). A claim is a journey and a figure — where he went, what for, how he travelled, what it cost — so it asks exactly that and reaches HR as an application like every other, with the answer on his own HR Queries tab.",
+      "AND IT CAN BE KEPT ON THE PHONE. \"Add to home screen\" now works: Genie has a web app manifest that opens straight to /idp with no browser bar, and a prompt that offers it. Android and Chrome are offered the button outright; on an iPhone, where Safari has never given a page any such hook, it shows the two taps instead — Share, then Add to Home Screen — because a button that did nothing there would be worse than none. It asks once and then stays quiet: a banner that returns every visit is an advertisement.",
+      "Two hundred men reach this page through a link in a mail. A link in a mail is lost by next month; an icon on the phone is not.",
+    ],
+  },
+  {
     v: "5.0.25.1",
     date: "2026-09-08",
     module: "Who to tell, kept on the project",

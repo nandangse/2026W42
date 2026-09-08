@@ -61,6 +61,20 @@ const APPLICATION_KINDS: Record<string, { label: string; fields: { key: string; 
     { key: "size", label: "Shoe size (UK)", type: "select", required: true,
       options: ["5", "6", "7", "8", "9", "10", "11", "12"] },
     { key: "reason", label: "Reason", type: "select", options: ["Worn out", "New joinee", "Damaged at work", "Other"], required: true } ] },
+  /* TRAVEL AND EXPENSE (Dr Raghu, 8 Sep 2026: "this is one more thing to add
+     in the IDP"). A claim is a journey and a figure — where he went, what for,
+     how he travelled and what it cost — so it asks for exactly that and no
+     more. It reaches HR as an application like every other, and the answer
+     comes back on his own HR Queries tab. */
+  travel: { label: "Travel & Expense", fields: [
+    { key: "purpose", label: "What for", type: "text", required: true },
+    { key: "place", label: "Where you went", type: "text", required: true },
+    { key: "from", label: "From", type: "date", required: true },
+    { key: "to", label: "To", type: "date" },
+    { key: "mode", label: "How you travelled", type: "select", required: true,
+      options: ["Own vehicle", "Bus", "Train", "Taxi / auto", "Flight", "Company vehicle", "Other"] },
+    { key: "amount", label: "Amount claimed (₹)", type: "number", required: true },
+    { key: "remarks", label: "Remarks", type: "text" } ] },
   other: { label: "Other things", fields: [
     { key: "what", label: "What do you need", type: "text", required: true }, { key: "why", label: "Why", type: "text" } ] },
 };
@@ -273,6 +287,7 @@ export async function POST(req: Request) {
       else if (kind === "encashment") head = `Leave encashment, ${fields.days} day${Number(fields.days) === 1 ? "" : "s"}`;
       else if (kind === "uniform") head = `Uniform: ${fields.item}, size ${fields.size} × ${fields.qty}`;
       else if (kind === "shoes") head = `Shoes, size ${fields.size}`;
+      else if (kind === "travel") head = `Travel & Expense: ${fields.place} · ₹${fields.amount}`;
       else head = `Other: ${String(fields.what).slice(0, 60)}`;
       const { error } = await admin.from("hrms_query").insert({
         employee_id: p.id, subject: `Application — ${head}`, question: lines.join("\n"), topic: "Application", status: "Open",
