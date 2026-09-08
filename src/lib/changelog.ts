@@ -86,6 +86,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.36.0",
+    date: "2026-09-08",
+    module: "An IDP belonged to an e-mail; it now belongs to a man",
+    items: [
+      "\"How can he reach that place now? It\u2019s not being shown in the IDP right now\" (Dr Raghu, 8 Sep 2026). He could not reach it, and <b>nor could fourteen others</b>. Every query matched <code>hrms_idp.person_email</code> against whatever address the signed-in man resolved to — and those two agree only by luck.",
+      "FIFTEEN OF THE FIFTY-FOUR PEOPLE WITH AN IDP could not open their own. <b>Six</b> carried junk in the HRIS master — the word \"na\", and one telephone number — which beat the real login address simply by not being empty. <b>Four</b> were spelt differently on the two sides: sreenidhi/shreenidhi, sham/shamrao, ajaypadelkar/ajayp, raju/rajendra. <b>Four</b> had a personal address on one side and a work address on the other. And Sandeep Utekar\u2019s work address was filed against a man who had resigned.",
+      "EVERY ONE OF THEM OPENED /idp AND WAS SHOWN NOTHING. No error, no empty state that explained itself — just an IDP that was not there, while the work sat in the table the whole time. Tushar Giri had ten answers and a recording in his.",
+      "THE EMPLOYEE NUMBER IS THE MAN. It does not change when HR corrects a spelling or an address is reissued, so it is matched first now and the address is kept only as a second key for older rows. The same change fixes reading, writing, attaching, recording and submitting — they all asked the same wrong question.",
+      "\"NA\" IS NOT AN ADDRESS, and it used to win. Only something shaped like an address is accepted as one.",
+      "\"Just make sure that you submit everybody\u2019s IDPs, whoever is assessed ... we have given enough time.\" <b>Four closed</b> — Tushar Giri, Sandeep Utekar, Sanjay and Shamrao — carrying between them 37 answers, 33 ratings and two recordings. The fifth was left open: it is his own and it is <b>empty</b>, and submitting an empty IDP would record that a man was assessed when nobody had written a word.",
+    ],
+  },
+  {
     v: "5.0.35.1",
     date: "2026-09-08",
     module: "\"Insufficient authentication scopes\", said in English",

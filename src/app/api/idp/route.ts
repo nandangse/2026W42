@@ -31,12 +31,50 @@ const LINK_TTL = 60 * 60;
  * scoped to the caller's own email — there is no parameter that could name
  * somebody else, so no request can be made that returns another person's IDP.
  */
-async function mine(email: string) {
+/**
+ * WHICH EMPLOYEE IS THIS (Dr Raghu, 8 Sep 2026: "how can he reach that place
+ * now? It's not being shown in the IDP right now").
+ *
+ * AN IDP BELONGED TO AN E-MAIL, AND IT SHOULD BELONG TO A MAN. Every query
+ * below matched `hrms_idp.person_email` against whatever address the signed-in
+ * user resolved to. Those two agree only by luck, and for FIFTEEN of the
+ * fifty-four people who have an IDP they did not:
+ *
+ *   · six carried junk in the HRIS master — "na", and one telephone number —
+ *     which resolves ahead of the login address because it is not empty;
+ *   · four were spelt differently on the two sides — sreenidhi/shreenidhi,
+ *     sham/shamrao, ajaypadelkar/ajayp, raju/rajendra;
+ *   · four had a personal address on the master and a work one on the IDP;
+ *   · and Sandeep Utekar, whose work address was filed against a man who had
+ *     resigned.
+ *
+ * Every one of them opened /idp and was shown nothing — no error, no empty
+ * state that explained itself, just an IDP that was not there. The work was
+ * in the table the whole time.
+ *
+ * THE EMPLOYEE NUMBER IS THE MAN. It does not change when HR corrects a
+ * spelling or an address is reissued. So it is matched first, and the address
+ * is kept only as the second key, for a row filed before ids were carried.
+ */
+function employeeIdOf(u: AuthedUser): string | null {
+  const m = /^idp:(.+)$/.exec(String(u.id || ""));
+  return m ? m[1] : null;
+}
+
+/** A PostgREST `or` that says "this row is his" — by number, or by address. */
+function ownFilter(u: AuthedUser): string {
+  const eid = employeeIdOf(u);
+  const mail = `person_email.eq.${u.email}`;
+  return eid ? `employee_id.eq.${eid},${mail}` : mail;
+}
+
+async function mine(email: string, employeeId?: string | null) {
   const admin = adminClient();
-  const { data } = await admin
+  let q = admin
     .from("hrms_idp")
-    .select("*")
-    .eq("person_email", email)
+    .select("*");
+  q = employeeId ? q.or(`employee_id.eq.${employeeId},person_email.eq.${email}`) : q.eq("person_email", email);
+  const { data } = await q
     .eq("cycle", CYCLE)
     .order("started_at", { ascending: false })
     .limit(5);
@@ -138,7 +176,15 @@ async function whoIsAsking(): Promise<AuthedUser> {
   const T = await hrmsTables(admin);
   const { data: emp } = await admin.from(T.employees).select("id, name, email").eq("id", eid).maybeSingle();
   const { data: lg } = await admin.from("hrms_idp_login").select("email").eq("employee_id", eid).maybeSingle();
-  const email = String(emp?.email || "").trim().toLowerCase() || String(lg?.email || "").trim().toLowerCase();
+  /* "na" IS NOT AN ADDRESS, and it used to win. A non-empty string beat the
+     real login address simply by being non-empty, so six men resolved to the
+     word "na" and saw nobody's IDP, including their own. Only something
+     shaped like an address counts now. */
+  const addr = (v: unknown) => {
+    const t = String(v ?? "").trim().toLowerCase();
+    return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(t) ? t : "";
+  };
+  const email = addr(emp?.email) || addr(lg?.email);
   if (!email) throw new HttpError(403, "Your record has no e-mail on it — ask HR to add one.");
   const name = String(emp?.name || "").trim();
   return {
@@ -216,7 +262,7 @@ export async function GET(req: Request) {
     }
     const who = await whoAreThey(u.email);
     let rows: Record<string, unknown>[] = [];
-    try { rows = await mine(u.email) as Record<string, unknown>[]; }
+    try { rows = await mine(u.email, employeeIdOf(u)) as Record<string, unknown>[]; }
     catch { return NextResponse.json({ needsMigration: true, ...who, open: null, done: [] }); }
 
     /**
@@ -420,7 +466,7 @@ export async function POST(req: Request) {
         if (!(file instanceof File) || !file.size) throw new HttpError(400, "Nothing was chosen.");
         if (file.size > 15 * 1024 * 1024) throw new HttpError(400, "Keep an attachment under 15 MB.");
         const { data: row } = await admin
-          .from("hrms_idp").select("id, attachments, submitted_at").eq("id", id).eq("person_email", u.email).maybeSingle();
+          .from("hrms_idp").select("id, attachments, submitted_at").eq("id", id).or(ownFilter(u)).maybeSingle();
         if (!row) throw new HttpError(404, "That is not your IDP.");
         if (row.submitted_at) throw new HttpError(409, "This IDP has already been completed.");
         const safe = file.name.replace(/[^\w.\- ]+/g, "_").slice(0, 80);
@@ -440,7 +486,7 @@ export async function POST(req: Request) {
       if (!(file instanceof File) || !file.size) throw new HttpError(400, "Nothing was recorded.");
 
       const { data: row } = await admin
-        .from("hrms_idp").select("id, audio, submitted_at").eq("id", id).eq("person_email", u.email).maybeSingle();
+        .from("hrms_idp").select("id, audio, submitted_at").eq("id", id).or(ownFilter(u)).maybeSingle();
       if (!row) throw new HttpError(404, "That is not your IDP.");
       if (row.submitted_at) throw new HttpError(409, "This IDP has already been completed.");
 
@@ -576,7 +622,7 @@ export async function POST(req: Request) {
       const size = Number(body.size || 0);
       if (size > 25 * 1024 * 1024) throw new HttpError(400, "Keep an attachment under 25 MB.");
       const { data: row } = await admin
-        .from("hrms_idp").select("id, submitted_at").eq("id", id).eq("person_email", u.email).maybeSingle();
+        .from("hrms_idp").select("id, submitted_at").eq("id", id).or(ownFilter(u)).maybeSingle();
       if (!row) throw new HttpError(404, "That is not your IDP.");
       if (row.submitted_at) throw new HttpError(409, "This IDP has already been completed.");
       const path = `idp/${id}/files/${Date.now()}-${name}`;
@@ -590,7 +636,7 @@ export async function POST(req: Request) {
       const path = String(body.path || "");
       if (!path.startsWith(`idp/${id}/files/`)) throw new HttpError(400, "That path is not yours.");
       const { data: row } = await admin
-        .from("hrms_idp").select("id, attachments, submitted_at").eq("id", id).eq("person_email", u.email).maybeSingle();
+        .from("hrms_idp").select("id, attachments, submitted_at").eq("id", id).or(ownFilter(u)).maybeSingle();
       if (!row) throw new HttpError(404, "That is not your IDP.");
       if (row.submitted_at) throw new HttpError(409, "This IDP has already been completed.");
       const entry = { path, name: String(body.name || "file"), size: Number(body.size || 0), at: new Date().toISOString() };
@@ -623,7 +669,7 @@ export async function POST(req: Request) {
             "Ask HR to set the Genie user on your record in HRIS.",
         );
       // an abandoned attempt is not resumed — starting over is the rule
-      await admin.from("hrms_idp").delete().eq("person_email", u.email).eq("cycle", CYCLE).is("submitted_at", null);
+      await admin.from("hrms_idp").delete().or(ownFilter(u)).eq("cycle", CYCLE).is("submitted_at", null);
       const { data, error } = await admin.from("hrms_idp").insert({
         employee_id: who.employee?.id ?? null,
         person_email: u.email,
@@ -654,7 +700,7 @@ export async function POST(req: Request) {
     if (action === "reopen") {
       const id = String(body.id || "");
       const { data: row } = await admin
-        .from("hrms_idp").select("id").eq("id", id).eq("person_email", u.email).maybeSingle();
+        .from("hrms_idp").select("id").eq("id", id).or(ownFilter(u)).maybeSingle();
       if (!row) throw new HttpError(404, "That is not your IDP.");
       const { error } = await admin
         .from("hrms_idp").update({ submitted_at: null, updated_at: new Date().toISOString() }).eq("id", id);
@@ -667,7 +713,7 @@ export async function POST(req: Request) {
       if (!id) throw new HttpError(400, "id required");
       // scoped to the caller: somebody else's id simply matches nothing
       const { data: row } = await admin
-        .from("hrms_idp").select("id, submitted_at").eq("id", id).eq("person_email", u.email).maybeSingle();
+        .from("hrms_idp").select("id, submitted_at").eq("id", id).or(ownFilter(u)).maybeSingle();
       if (!row) throw new HttpError(404, "That is not your IDP.");
       if (row.submitted_at) throw new HttpError(409, "This IDP has already been submitted.");
 
