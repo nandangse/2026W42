@@ -125,14 +125,35 @@ export async function POST(req: Request) {
       const crm = crmDb();
       const cfg = await periskopeConfig(crm);
       if ("error" in cfg) throw new HttpError(400, cfg.error);
-      const { data: rows } = await crm.from("wa_queue").select("id, external_id").eq("source", "hrms").eq("status", "sent").not("external_id", "is", null).limit(100);
+      /**
+       * PERISKOPE'S ROWS ONLY (9 Sep 2026).
+       *
+       * This loop hands every sent row's external_id to PERISKOPE and asks
+       * what happened to it. With AiSensy now a second road, an AiSensy
+       * message id asked of Periskope comes back as a stranger — and the
+       * branch below would have marked a perfectly delivered message
+       * FAILED, with "Periskope:" written into the error of a message
+       * Periskope never carried.
+       *
+       * AiSensy rows are not polled at all, by design: their receipts
+       * arrive on the webhook at /api/aisensy/webhook, which is the better
+       * road anyway — it reports READ, and polling never can.
+       */
+      const { data: rows } = await crm.from("wa_queue").select("id, external_id").eq("source", "hrms").eq("status", "sent").eq("provider", "periskope").not("external_id", "is", null).limit(100);
+      const { count: waiting } = await crm.from("wa_queue")
+        .select("id", { count: "exact", head: true })
+        .eq("source", "hrms").eq("status", "sent").eq("provider", "aisensy");
       let delivered = 0, failed = 0;
       for (const row of rows || []) {
         const st = await periskopeStatus(cfg, String(row.external_id));
         if (st.failed) { failed++; await crm.from("wa_queue").update({ status: "failed", error: `Periskope: ${st.status}` }).eq("id", row.id); try { await admin.from("hrms_communication").update({ status: "failed", error: `Periskope: ${st.status}` }).eq("channel", "whatsapp").contains("meta", { queue_id: String(row.id) }); } catch (e) { swallow("hrms/whatsapp", e); /* */ } }
         else if (st.delivered) { delivered++; await crm.from("wa_queue").update({ status: "delivered", delivered_at: new Date().toISOString() }).eq("id", row.id); try { await admin.from("hrms_communication").update({ status: "delivered" }).eq("channel", "whatsapp").contains("meta", { queue_id: String(row.id) }); } catch (e) { swallow("hrms/whatsapp", e); /* */ } }
       }
-      return NextResponse.json({ ok: true, checked: (rows || []).length, delivered, failed });
+      return NextResponse.json({
+        ok: true, checked: (rows || []).length, delivered, failed,
+        aisensyWaiting: waiting || 0,
+        note: waiting ? `${waiting} AiSensy message${waiting === 1 ? "" : "s"} are not polled — their receipts come in on the webhook.` : undefined,
+      });
     }
 
     throw new HttpError(400, "unknown action");

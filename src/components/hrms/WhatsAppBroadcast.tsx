@@ -21,7 +21,7 @@ interface Tpl { key: string; title: string; body: string; note: string | null }
 interface SheetRow { id: string; month: number; year: number; status: string }
 interface Preview { count: number; noPhone: number; blanks: Record<string, number>; sheet: { month: number; year: number; status: string } | null; sample: { id: string; name: string; phone: string; text: string; missing: string[] }[] }
 interface QueueRow { id: string; ref: string; name: string; status: string; error: string; queued_at: string; sent_at: string | null; delivered_at: string | null; template_name: string; phone: string }
-interface State { templates: Tpl[]; sheets: SheetRow[]; byType: Record<string, { n: number; withPhone: number }>; byDept: Record<string, number>; total: number; queue: { counts: Record<string, number>; throttle: { blocked: string | null; sentToday?: number; perDay?: number; sentLastHour?: number; perHour?: number } | null; configured: boolean; configError: string | null; recent: QueueRow[] } }
+interface State { templates: Tpl[]; sheets: SheetRow[]; byType: Record<string, { n: number; withPhone: number }>; byDept: Record<string, number>; total: number; queue: { counts: Record<string, number>; throttle: { blocked: string | null; sentToday?: number; perDay?: number; sentLastHour?: number; perHour?: number } | null; configured: boolean; configError: string | null; recent: QueueRow[]; aisensy?: { configured: boolean; live: boolean; campaign: string | null; error: string | null } } }
 
 const inp: React.CSSProperties = { border: `1px solid ${C.line}`, borderRadius: 6, padding: "6px 8px", fontSize: 13, background: "#fff", width: "100%" };
 
@@ -86,7 +86,34 @@ export default function WhatsAppBroadcast({ who }: { who: string }) {
     <Pane title="WhatsApp — one message to everybody" who={who}
       blurb="A template, the month it speaks of, the people it goes to. Preview, then Queue; the queue sends through Periskope's default number within the ceilings, and Check asks what was delivered.">
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</div>}
-      {q && !q.configured && <div className="rounded p-2 mb-2" style={{ background: "#FBEDEA", border: "1px solid #B3261E", fontSize: 12.5, color: C.red }}>{q.configError || "Periskope is not connected — CRM → Settings → Integrations."}</div>}
+      {/*
+        WHICH ROAD HRMS IS ON (Dr Raghu, 9 Sep 2026: "also this is used in
+        the HRMS also").
+
+        The route has reported both since 8 September and this screen showed
+        neither — so a broadcast could go out by AiSensy while the page still
+        said Periskope. Which number a hundred messages leave from is not a
+        detail to leave to the reader's memory.
+      */}
+      {q?.aisensy?.live ? (
+        <div className="rounded p-2 mb-2" style={{ background: "#F0FAF3", border: "1px solid #1E7A45", fontSize: 12.5, color: "#1E7A45", lineHeight: 1.5 }}>
+          <b>Going out through AiSensy</b> — Meta&apos;s official Business API{q.aisensy.campaign ? <>, default campaign <b>{q.aisensy.campaign}</b></> : null}.
+          {" "}TEMPLATE ONLY: a message must be a campaign you have set <b>Live</b> in AiSensy; there is no free-text send on this road.
+          {" "}Delivered and read come back on the webhook, not by asking.
+        </div>
+      ) : q && !q.configured ? (
+        <div className="rounded p-2 mb-2" style={{ background: "#FBEDEA", border: "1px solid #B3261E", fontSize: 12.5, color: C.red }}>
+          {q.configError || "Periskope is not connected — CRM → Settings → Integrations."}
+          {q.aisensy?.error && <div className="mt-1">AiSensy is the other road, and it is not open either: {q.aisensy.error}</div>}
+        </div>
+      ) : q ? (
+        <div className="rounded p-2 mb-2" style={{ background: "#F4F2EC", border: "1px solid #D9D6CD", fontSize: 12.5, color: C.faint, lineHeight: 1.5 }}>
+          Going out through <b>Periskope</b>, on HR&apos;s own WhatsApp number.
+          {q.aisensy?.configured
+            ? <> AiSensy is configured but <b>paused</b> — clear paused on its card in CRM → Settings → Integrations to move to Meta&apos;s official API.</>
+            : <> AiSensy is not connected yet.</>}
+        </div>
+      ) : null}
 
       <div className="flex gap-3 items-start" style={{ flexWrap: "wrap" }}>
         {/* ── compose ── */}

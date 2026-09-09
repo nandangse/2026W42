@@ -182,8 +182,14 @@ export async function POST(req: Request) {
       const cfg = await periskopeConfig(db);
       if ("error" in cfg) throw new HttpError(400, cfg.error);
       const ids: string[] = Array.isArray(body.ids) ? body.ids.map(String) : [];
-      let qy = db.from("wa_queue").select("*").eq("status", "sent").not("external_id", "is", null).limit(100);
-      if (ids.length) qy = db.from("wa_queue").select("*").in("id", ids).eq("status", "sent").not("external_id", "is", null);
+      /* PERISKOPE'S ROWS ONLY. An AiSensy message id asked of Periskope is
+         a stranger to them, and the `st.failed` branch below would mark a
+         delivered message FAILED with "Periskope:" in the error of a message
+         Periskope never carried. AiSensy's receipts arrive on the webhook at
+         /api/aisensy/webhook instead — which also reports READ, and polling
+         never can. */
+      let qy = db.from("wa_queue").select("*").eq("status", "sent").eq("provider", "periskope").not("external_id", "is", null).limit(100);
+      if (ids.length) qy = db.from("wa_queue").select("*").in("id", ids).eq("status", "sent").eq("provider", "periskope").not("external_id", "is", null);
       const { data: pending } = await qy;
 
       let delivered = 0, failed = 0, waiting = 0;

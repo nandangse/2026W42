@@ -86,6 +86,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.44.9",
+    date: "2026-09-09",
+    module: "HRMS is on the same WhatsApp road \u2014 and Periskope was being asked about AiSensy\u2019s messages",
+    items: [
+      "\"Also this is used in the HRMS also\" (Dr Raghu, 9 Sep 2026). It is \u2014 HRMS and the CRM share one queue and one pair of roads \u2014 and checking that turned up a fault worth catching before AiSensy carries anything real.",
+      "<b>BOTH \u2018CHECK\u2019 LOOPS ASKED PERISKOPE ABOUT EVERY SENT MESSAGE.</b> With AiSensy now a second road, an AiSensy message id handed to Periskope is a stranger to them \u2014 and the branch that reads that answer would have marked a <b>perfectly delivered message FAILED</b>, writing \u201cPeriskope:\u201d into the error of a message Periskope never carried. Both loops now poll <b>Periskope\u2019s rows only</b>, in HRMS and in the CRM.",
+      "AiSensy rows are not polled at all, by design: their receipts arrive on the webhook, which is the better road anyway \u2014 <b>it reports READ, and polling never can</b>. The HRMS check now says how many are waiting on it rather than silently ignoring them.",
+      "AND THE HRMS BROADCAST SCREEN SAYS WHICH ROAD IT IS ON. The route has reported both since 8 September and the page showed neither, so a hundred messages could have gone out by AiSensy while the screen still said Periskope. It now names the road, the default campaign, and \u2014 when AiSensy is on \u2014 the rule that follows from it: <b>template only</b>, no free text.",
+    ],
+  },
+  {
     v: "5.0.44.8",
     date: "2026-09-09",
     module: "Send one WhatsApp message, now \u2014 and the two boxes that were swapped",
