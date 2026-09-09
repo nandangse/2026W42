@@ -86,6 +86,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.44.0",
+    date: "2026-09-09",
+    module: "A look before a tab, and the project wears the house's header",
+    items: [
+      "\"From here while clicked first light box, then a new tab\" (Dr Raghu, 9 Sep 2026). The project book\u2019s number now opens a <b>look</b> — customer, status, stage, director, sales order, committed date, expected end, percent complete and the summary — with <b>Open the project \u2197</b> beneath it. The book answers WHICH project; the lightbox answers whether it is the one he meant; only then is a tab worth spending. Every other list in Genie has worked this way since 2 September; this one had not.",
+      "\"The project should be with the heading of Nandan GSE top header at least.\" A project opened in its own tab arrived <b>bare</b> — a page of white with one initial in the corner, nothing to say whose it was or how to get anywhere from it. It was built as a page rather than a module, so it never got the header every other door wears. It is a module. It has one.",
+      "AND A MEASUREMENT WORTH RECORDING, taken while looking into the tabs: across <b>66 projects and 13 tabs</b> — 858 places a person could have written something — <code>project_doc</code> holds <b>nought rows</b> and <code>project_row</code> holds <b>nought</b>. Not one word, ever. Saving works; I checked the route uses the service role. The screen is not broken. It is asking for typing that nobody will do, which is the same reason the payment terms sat empty across 116 jobs.",
+    ],
+  },
+  {
     v: "5.0.43.0",
     date: "2026-09-09",
     module: "Seva: Support Tickets, and what is attached to them",

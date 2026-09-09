@@ -23,9 +23,12 @@ const LEAD = ["name", "project_name", "status", "percent_complete", "customer",
 /** Plumbing nobody will clean by hand. */
 const HIDE = new Set(["doctype", "docstatus", "idx", "owner", "modified_by", "creation", "_user_tags", "_comments", "_assign", "_liked_by", "naming_series"]);
 
+type Row = Record<string, unknown>;
+
 export default function ErpProjects() {
   const [d, setD] = useState<{ count: number; columns: string[]; rows: Record<string, unknown>[] } | null>(null);
   const [err, setErr] = useState("");
+  const [peek, setPeek] = useState<Row | null>(null);
   const [q, setQ] = useState("");
   /**
    * OPEN ON THE LIVE WORK (Dr Raghu, 2 Sep 2026: "by default show the is as
@@ -119,13 +122,20 @@ export default function ErpProjects() {
                       is. The short number is the address because it is what
                       people say out loud and type from memory.
                     */}
+                    {/* THE LIGHTBOX FIRST (Dr Raghu, 9 Sep 2026: "from here
+                        while clicked first light box, then a new tab" — and
+                        before that, of every other list in Genie: "the
+                        clicking of the job should first give lightbox then
+                        the person can click deeper"). The book answers WHICH
+                        project; the lightbox answers whether it is the one he
+                        meant; only then is a tab worth spending. */}
                     {i === 0 && r.name
                       ? (
-                        <a href={`/project/${encodeURIComponent(String(r.name).replace(/^NGSE-PROJ-/i, ""))}`}
-                          className="underline decoration-dotted" style={{ color: C.navy }}
-                          title={`Open ${String(r.name)} on its own page`}>
+                        <button onClick={() => setPeek(r)}
+                          className="underline decoration-dotted text-left" style={{ color: C.navy }}
+                          title={`${String(r.name)} — a look first, then its own tab`}>
                           {String(r.name)}
-                        </a>
+                        </button>
                       )
                       : cell(r[c])}
                   </td>
@@ -145,6 +155,63 @@ export default function ErpProjects() {
         Live from the ERP · scalar fields only (child tables stay there) · ✳ marks the ERP&apos;s custom fields ·
         say which columns go and this table sheds them.
       </div>
+      {/* ── a look first ─────────────────────────────────────────────────
+          What a man needs to know before deciding whether to open a tab:
+          whose it is, where it has got to, when it was promised, and who
+          answers for it. Everything else is a tab away. */}
+      {peek && (() => {
+        const g = (k: string) => { const v = peek[k]; return v === null || v === undefined || v === "" ? "—" : String(v); };
+        const num = String(peek.name ?? "").replace(/^NGSE-PROJ-/i, "");
+        const F = ({ l, v }: { l: string; v: string }) => (
+          <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 10px", background: "#fff", minWidth: 150 }}>
+            <div style={{ fontSize: 10.5, color: C.sub, fontWeight: 700, letterSpacing: .5 }}>{l}</div>
+            <div style={{ fontWeight: 700, fontSize: 13.5, marginTop: 2 }}>{v}</div>
+          </div>
+        );
+        return (
+          <div onClick={() => setPeek(null)}
+            style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(22,35,47,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} className="rounded-lg bg-white"
+              style={{ width: "min(760px, 100%)", maxHeight: "calc(100vh - 40px)", overflowY: "auto", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
+              <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "var(--navy)", borderRadius: "8px 8px 0 0" }}>
+                <div className="text-white font-bold text-sm">{g("name")}</div>
+                <button onClick={() => setPeek(null)} className="text-white font-bold px-2">✕</button>
+              </div>
+              <div className="p-4">
+                <div style={{ fontFamily: "Barlow, system-ui, sans-serif", fontWeight: 800, fontSize: 19, marginBottom: 10 }}>
+                  {g("project_name")}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <F l="CUSTOMER" v={g("customer")} />
+                  <F l="STATUS" v={g("status")} />
+                  <F l="STAGE" v={g("project_stage")} />
+                  <F l="PROJECT DIRECTOR" v={g("custom_project_director")} />
+                  <F l="SALES ORDER" v={g("sales_order")} />
+                  <F l="COMMITTED" v={g("customer_committed_delivery_")} />
+                  <F l="EXPECTED END" v={g("expected_end_date")} />
+                  <F l="PERCENT COMPLETE" v={g("percent_complete")} />
+                </div>
+                {String(peek.short_summary_description ?? "").trim() && (
+                  <div style={{ marginTop: 12, fontSize: 13.5, lineHeight: 1.5, color: C.ink }}>
+                    {String(peek.short_summary_description)}
+                  </div>
+                )}
+                <div className="flex items-center gap-2 mt-4">
+                  <a href={`/project/${encodeURIComponent(num)}`} target="_blank" rel="noreferrer"
+                    className="rounded px-4 py-2 text-sm font-bold"
+                    style={{ background: "var(--accent)", color: "#fff" }}>
+                    Open the project ↗
+                  </a>
+                  <button onClick={() => setPeek(null)} className="rounded px-3 py-2 text-sm font-bold"
+                    style={{ background: "var(--line-soft)", color: "var(--dim)" }}>Close</button>
+                  <span className="ml-auto text-xs" style={{ color: C.sub }}>opens in a new tab</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
+
   );
 }

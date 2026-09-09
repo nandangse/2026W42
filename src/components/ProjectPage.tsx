@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull, jobNo } from "@/lib/schedule";
+import GenieShell from "@/components/GenieShell";
 import ModuleMenu from "@/components/ModuleMenu";
 import ProjectTabs from "@/components/ProjectTabs";
 
@@ -222,9 +223,21 @@ function Shell({
   children: React.ReactNode;
   email: string; displayName: string | null; initials: string | null; role: string;
 }) {
+  /* THE HOUSE'S OWN HEADER (Dr Raghu, 9 Sep 2026: "the project should be with
+     the heading of Nandan GSE top header at least").
+     A project opened in its own tab arrived bare — a page of white with one
+     initial in the corner, and nothing to say whose it was or how to get
+     anywhere from it. Every other door in Genie wears the same header; this
+     one was the exception because it was built to be a page rather than a
+     module. It is a module. */
   return (
     <div style={{ minHeight: "100vh", background: "#F4F2EC" }}>
-      <ModuleMenu current="main" email={email} displayName={displayName} initials={initials} role={role} />
+      <GenieShell
+        module="main"
+        title="Nandan GSE"
+        tagline="The project book — one project, whole"
+        user={{ email, displayName, initials, role }}
+      />
       {children}
     </div>
   );
