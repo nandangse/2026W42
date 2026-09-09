@@ -51,6 +51,9 @@ export interface YearJob {
   tdd: string | null;
   val: number;
   tpv: number;
+  /** For the hover — where the job actually stands, not just what it is worth. */
+  kit: number | null;
+  pct: number | null;
 }
 
 interface Payload {
@@ -148,7 +151,7 @@ function Box({ head, note, children, tint }: { head: React.ReactNode; note?: Rea
   );
 }
 
-function Block({ label, note, t, V, ink, tint }: { label: string; note: string; t: Tot; V: (n: number) => string; ink: string; tint: string }) {
+function Block({ label, note, t, V, ink, tint, children }: { label: string; note: string; t: Tot; V: (n: number) => string; ink: string; tint: string; children?: React.ReactNode }) {
   return (
   <div className="rounded px-2.5 py-1.5" style={{ background: tint, borderLeft: `4px solid ${ink}` }}>
     <div className="text-xs font-bold" style={{ color: ink, letterSpacing: 0.6 }}>{label}</div>
@@ -159,7 +162,59 @@ function Block({ label, note, t, V, ink, tint }: { label: string; note: string; 
       <span className="text-xs font-bold tnum" style={{ color: C.green }}>{V(t.tp)} tp</span>
     </div>
     <div className="text-xs" style={{ color: C.faint }}>{note}</div>
+    {children}
   </div>
+  );
+}
+
+/**
+ * A JOB AS A CHIP (Dr Raghu, 9 Sep 2026: "customer tag is enough as a
+ * button!", then "mouseover shows the kitting% and production %").
+ *
+ * The tag and the date on the face; everything else on the hover, because a
+ * chip that carries its own dossier stops being a list. The hover is where
+ * the job actually STANDS — kitting and production — which is the pair that
+ * says whether a belief is worth anything.
+ */
+function Chips({ list, ink, V, onOpen, today }: {
+  list: YearJob[]; ink: string; V: (n: number) => string; onOpen?: (id: string) => void; today: string;
+}) {
+  if (!list.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {list.map((j) => {
+        const late = !!j.tdd && j.tdd < today;
+        const k = j.kit == null ? null : Math.round(Number(j.kit));
+        const p = j.pct == null ? null : Math.round(Number(j.pct));
+        return (
+          <button
+            key={j.id}
+            onClick={() => onOpen?.(j.id)}
+            className="rounded px-2 py-0.5 text-xs font-semibold text-left"
+            style={{
+              border: `1px solid ${late ? C.red : C.line}`,
+              background: "#fff",
+              color: ink,
+              cursor: onOpen ? "pointer" : "default",
+              maxWidth: "100%",
+            }}
+            title={[
+              `${jobNo(j.id)} · ${j.tag}`,
+              j.tdd ? `TDD ${fmt(j.tdd)}${late ? " — the date has gone" : ""}` : "no target date",
+              `Kitting ${k == null ? "not recorded" : k + "%"} · Production ${p == null ? "not recorded" : p + "%"}`,
+              `${V(j.val)} · ${V(j.tpv)} throughput`,
+              onOpen ? "\nClick to open the job." : "",
+            ].filter(Boolean).join("\n")}
+          >
+            {j.tag || jobNo(j.id)}
+            <span style={{ color: C.faint, fontWeight: 400 }}> · {j.tdd ? fmt(j.tdd) : "no date"}</span>
+            {k != null && p != null && (
+              <span style={{ color: C.faint, fontWeight: 400 }}> · K{k}/P{p}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -287,17 +342,18 @@ export default function YearPanel({
      * Jobs with no target date sit at the end rather than at the front,
      * where a blank would otherwise sort them.
      */
-    const named: YearJob[] = [];
-    if (!d || !who) return { certain, likely, risk, uncalled, named, any: false };
+    const named: YearJob[] = [], likelyJobs: YearJob[] = [], riskJobs: YearJob[] = [];
+    if (!d || !who) return { certain, likely, risk, uncalled, named, likelyJobs, riskJobs, any: false };
     for (const j of jobs) {
       const pct = d.beliefs[j.id]?.[who];
       if (pct == null) add(uncalled, j);
       else if (pct >= 100) { add(certain, j); named.push(j); }
-      else if (pct > 50) add(likely, j);
-      else add(risk, j);
+      else if (pct > 50) { add(likely, j); likelyJobs.push(j); }
+      else { add(risk, j); riskJobs.push(j); }
     }
-    named.sort((a, b) => (a.tdd || "9999").localeCompare(b.tdd || "9999"));
-    return { certain, likely, risk, uncalled, named, any: certain.jobs + likely.jobs + risk.jobs > 0 };
+    const byDate = (a: YearJob, b: YearJob) => (a.tdd || "9999").localeCompare(b.tdd || "9999");
+    named.sort(byDate); likelyJobs.sort(byDate); riskJobs.sort(byDate);
+    return { certain, likely, risk, uncalled, named, likelyJobs, riskJobs, any: certain.jobs + likely.jobs + risk.jobs > 0 };
   }, [jobs, d, who]);
 
   if (!d) return null;
@@ -366,29 +422,7 @@ export default function YearPanel({
                 100% CERTAIN{person ? <span style={{ color: C.faint }}> · {person.name}</span> : null}
                 <span style={{ color: C.faint }}> · {conf.named.length} job{conf.named.length === 1 ? "" : "s"}, soonest first</span>
               </div>
-              <div className="flex flex-wrap gap-1">
-                {conf.named.map((j) => {
-                  const late = !!j.tdd && j.tdd < TODAY;
-                  return (
-                    <button
-                      key={j.id}
-                      onClick={() => onOpen?.(j.id)}
-                      className="rounded px-2 py-0.5 text-xs font-semibold text-left"
-                      style={{
-                        border: `1px solid ${late ? C.red : C.line}`,
-                        background: late ? "#FEF3F2" : "#fff",
-                        color: late ? C.red : C.body,
-                        cursor: onOpen ? "pointer" : "default",
-                        maxWidth: "100%",
-                      }}
-                      title={`${jobNo(j.id)} · ${j.tag}\n${j.tdd ? `TDD ${fmt(j.tdd)}${late ? " — the date has gone" : ""}` : "no target date"}\n${V(j.val)} · ${V(j.tpv)} throughput${onOpen ? "\n\nClick to open the job." : ""}`}
-                    >
-                      {j.tag || jobNo(j.id)}
-                      <span style={{ color: C.faint, fontWeight: 400 }}> · {j.tdd ? fmt(j.tdd) : "no date"}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <Chips list={conf.named} ink={C.body} V={V} onOpen={onOpen} today={TODAY} />
             </div>
           )}
         </Box>
@@ -425,8 +459,16 @@ export default function YearPanel({
           {conf.any ? (
             <div className="grid gap-1.5">
               <Block label="100% — CERTAIN" note="called at 100" t={conf.certain} V={V} ink={C.green} tint="#F0FAF3" />
-              <Block label="50–100% — LIKELY" note="above 50, below 100" t={conf.likely} V={V} ink={C.amber} tint="#FFF8EE" />
-              <Block label="0–50% — AT RISK" note="50 and below — a coin toss counts here" t={conf.risk} V={V} ink={C.red} tint="#FEF3F2" />
+              {/* THE ONES THAT ARE NOT CERTAIN, BY NAME AND IN RED
+                  (Dr Raghu, 9 Sep 2026). Both lists are red because both are
+                  the same kind of fact — money the planner has not committed
+                  to — and the block's own bar keeps them apart. */}
+              <Block label="50–100% — LIKELY" note="above 50, below 100" t={conf.likely} V={V} ink={C.amber} tint="#FFF8EE">
+                <Chips list={conf.likelyJobs} ink={C.red} V={V} onOpen={onOpen} today={TODAY} />
+              </Block>
+              <Block label="0–50% — AT RISK" note="50 and below — a coin toss counts here" t={conf.risk} V={V} ink={C.red} tint="#FEF3F2">
+                <Chips list={conf.riskJobs} ink={C.red} V={V} onOpen={onOpen} today={TODAY} />
+              </Block>
               {conf.uncalled.jobs > 0 && (
                 <Block label="NOT YET CALLED" note="no belief recorded" t={conf.uncalled} V={V} ink={C.faint} tint="#FAFAF8" />
               )}

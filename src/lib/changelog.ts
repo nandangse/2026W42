@@ -86,6 +86,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.44.5",
+    date: "2026-09-09",
+    module: "The uncertain ones by name too, and where each job actually stands",
+    items: [
+      "\"In the ones which is 0-50 at risk then the jobs; 50-100% then the jobs in red\" (Dr Raghu, 9 Sep 2026). Both blocks now list their jobs the way the certain block does \u2014 one chip each, the customer tag and its date. Both lists are <b>red</b>, because both are the same kind of fact: money the planner has NOT committed to. The block\u2019s own coloured bar keeps 50\u2013100 apart from 0\u201350.",
+      "\"Mouseover shows the kitting% and production %\". Every chip on the panel now carries <b>K__/P__</b> on its face and the full pair on the hover, beside the job number, the target date, the value and the throughput. Kitting against production is the pair that says whether a belief is worth anything \u2014 a job called certain with no material kitted is a different sentence from one called certain at 90% built.",
+      "\"Clicking on the job the lightbox\" \u2014 a chip opens the job\u2019s own lightbox, in every block.",
+      "A chip whose target date has gone keeps a red border wherever it sits, so an overdue commitment reads as overdue in the certain list and the doubtful ones alike.",
+    ],
+  },
+  {
     v: "5.0.44.4",
     date: "2026-09-09",
     module: "The twenty-seven certainties, by name",
