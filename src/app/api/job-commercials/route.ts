@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { errJson, HttpError, requireStratcom } from "@/lib/auth";
 import { readBody } from "@/lib/validate";
-import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { swallow } from "@/lib/swallow";
 
@@ -70,7 +69,24 @@ export async function POST(req: Request) {
         throw new HttpError(400, `The four terms add to ${Math.round(sum)}% of the balance, not 100%. Nothing was saved — a job whose terms do not total 100 is money either invented or lost from the 13-week plan.`);
     }
 
-    const db = supabaseServer();
+    /**
+     * THE GUARD AUTHORISES; THE SERVICE ROLE WRITES (Suresh Lalzare, through
+     * Dr Raghu, 9 Sep 2026: "we are editing the data in Job commercial, but
+     * taking too much to save, see it's showing under process ... not saved
+     * yet").
+     *
+     * This was written with supabaseServer(), which is the ANON key carrying
+     * the reader's own cookie — so every write went through RLS. Dr Raghu is
+     * the owner and the policy let him through, which is why the one job
+     * saved on the 8th was his; Suresh is Stratcom and it did not, so his
+     * update matched no row, the route answered 500, and the button sat on
+     * "Saving..." for ever.
+     *
+     * requireStratcom() above IS the authorisation. Doing it twice — once in
+     * the route and again in a policy that disagrees — is how a screen comes
+     * to refuse the very people it was built for.
+     */
+    const db = adminClient();
     const { data: before } = await db.from("jobs").select("id, val, delivered, delivered_on").eq("id", id).maybeSingle();
     if (!before) throw new HttpError(404, `No job ${id} on the board.`);
 

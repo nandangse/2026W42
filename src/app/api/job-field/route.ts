@@ -101,7 +101,22 @@ export async function POST(req: Request) {
       value = String(body.value ?? "");
     }
 
-    const supabase = supabaseServer();
+    /**
+     * THE GUARD AUTHORISES; THE SERVICE ROLE WRITES (9 Sep 2026).
+     *
+     * This used supabaseServer() — the ANON key carrying the reader's own
+     * cookie — so every correction went through RLS on `jobs`. That is why
+     * across 116 live jobs a payment term had been recorded exactly ZERO
+     * times, and why the one job that did save was the owner's: the policy
+     * let him through and let nobody else. The route's own checks above are
+     * the authorisation, and `requirePlanner()` has already run.
+     *
+     * THE MANAGEMENT-DATE TRIGGER IS NOT LOST WITH IT. That rule is enforced
+     * in this file, explicitly, a few lines up: a mgmt edit by anyone other
+     * than Dr Raghu is refused 403 before a single byte reaches the table.
+     * The database trigger was the second lock on the same door.
+     */
+    const supabase = adminClient();
     // a delivered job's dates and status are settled — the ERP owns them now
     await assertJobEditable(supabase, body.job_id);
 

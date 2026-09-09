@@ -509,17 +509,35 @@ function TermsLightbox({ job, today, onClose, onSaved }: {
   const sum = BUCKETS.reduce((s, b) => s + (Number(p[b.col]) || 0), 0);
   const anyPct = BUCKETS.some((b) => p[b.col] !== "");
 
+  /**
+   * SAVE, AND SAY SO WHEN IT DOES NOT (Suresh, 9 Sep 2026: "taking too much to
+   * save ... not saved yet").
+   *
+   * This had no try/catch, and `api.post` THROWS on any non-2xx — it never
+   * returns { ok: false }. So a refused save skipped setBusy(false) entirely
+   * and the button read "Saving..." until the page was reloaded, with the
+   * reason on the floor. The `if (!r.ok)` branch below it was dead code that
+   * could never run: on success there is no error, and on failure the throw
+   * had already left the function.
+   *
+   * A button that lies about what it is doing is worse than one that fails,
+   * because the man keeps waiting instead of telling somebody.
+   */
   const save = async () => {
     setBusy(true); setErr("");
-    const body: Record<string, unknown> = {
-      job_id: job.id, val, gst, advance: adv,
-      ...Object.fromEntries(BUCKETS.map((b) => [b.col, p[b.col]])),
-    };
-    const r = await api.post("/api/job-commercials", body);
-    setBusy(false);
-    if (!r.ok) { setErr(String(r.error || "Could not save.")); return; }
-    await onSaved();
-    onClose();
+    try {
+      const body: Record<string, unknown> = {
+        job_id: job.id, val, gst, advance: adv,
+        ...Object.fromEntries(BUCKETS.map((b) => [b.col, p[b.col]])),
+      };
+      await api.post("/api/job-commercials", body);
+      await onSaved();
+      onClose();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

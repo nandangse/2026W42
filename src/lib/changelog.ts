@@ -86,6 +86,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.40.1",
+    date: "2026-09-09",
+    module: "A button that said Saving for ever — and why no term had ever saved",
+    items: [
+      "\"Sir we are editing the data in Job commercial, but taking too much to save, see it\u2019s showing under process ... not saved yet\" — Suresh Lalzare, 9 Sep 2026. Two faults, both mine, and the second explains a mystery from yesterday.",
+      "THE WRITE WENT THROUGH THE READER\u2019S OWN KEY. The route used <code>supabaseServer()</code> — the <b>anon key carrying the signed-in reader\u2019s cookie</b> — so every save went through RLS on <code>jobs</code>. Dr Raghu is the owner and the policy let him through, which is why the single job saved on the 8th was his. <b>Suresh is Stratcom and it did not let him</b>: his update matched no row and the route answered 500. Everywhere else in Genie the guard authorises and the service role writes; <code>requireStratcom()</code> IS the authorisation, and asking a policy to decide it again is how a screen comes to refuse the very people it was built for.",
+      "THE BUTTON THEN LIED ABOUT IT. <code>api.post</code> <b>throws</b> on any non-2xx — it never returns <code>{ ok: false }</code> — and the save had no try/catch, so <code>setBusy(false)</code> was skipped and the button read \"Saving...\" until the page was reloaded, with the reason on the floor. The <code>if (!r.ok)</code> branch beneath it was <b>dead code that could never run</b>. A button that lies about what it is doing is worse than one that fails, because the man keeps waiting instead of telling somebody.",
+      "AND THE SAME KEY WAS BEHIND YESTERDAY\u2019S MYSTERY. <code>/api/job-field</code> — the inline editor — wrote the same way, which is why <b>across 116 live jobs a payment term had been recorded exactly zero times</b>. I reported then that the database took the writes when asked directly and the route looked sound. Both were true. Neither was the question.",
+      "THE MANAGEMENT-DATE LOCK IS NOT LOST. That rule is enforced in the route itself — a mgmt edit by anyone but Dr Raghu is refused before a byte reaches the table. The database trigger was the second lock on the same door.",
+    ],
+  },
+  {
     v: "5.0.40.0",
     date: "2026-09-09",
     module: "The CHRO\u2019s Observation — the muster against the machine",
