@@ -63,6 +63,29 @@ export default function ErpSyncPanel() {
    */
   const [pick, setPick] = useState<Record<string, Winner>>({});
   const [fallback, setFallback] = useState<Winner>("erp");
+  /**
+   * WHY A ROW KEEPS COMING BACK (Dr Raghu, 9 Sep 2026: "pressed this 4 times.
+   * why is it still coming?").
+   *
+   * Because it is not a loop and never was. This list is not "what I just
+   * changed" — it is "where the two sides still disagree", worked out afresh
+   * on every run. A correction made in Genie and NOT YET PUSHED to the ERP is
+   * a real disagreement: Genie holds the new date, the ERP holds the old one,
+   * and it will be reported honestly every single time until one of them
+   * moves. Pressing Synchronise again cannot move either.
+   *
+   * So the row now says so. Where a difference has a correction waiting in
+   * the Update-to-ERP queue, it is marked — with the instruction, which is to
+   * PUSH, not to press this button a fifth time.
+   */
+  const [queued, setQueued] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    fetch("/api/erp-update?scope=waiting", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setQueued(new Set(((j.rows ?? j.updates ?? []) as { job_id?: unknown; field?: unknown }[])
+        .map((x) => `${String(x.job_id ?? "")}:${String(x.field ?? "")}`))))
+      .catch(() => {});
+  }, [result]);
 
   const run = async (dry: boolean) => {
     setBusy(dry ? "dry" : "live"); setErr(""); setResult(null);
@@ -241,7 +264,15 @@ export default function ErpSyncPanel() {
                   return (
                     <tr key={i} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
                       <td className="px-2 py-1" style={{ color: MUTED }}>{c.kind}</td>
-                      <td className="px-2 py-1"><b>{c.id}</b>{c.label && c.label !== c.id ? ` · ${c.label}` : ""}</td>
+                      <td className="px-2 py-1">
+                        <b>{c.id}</b>{c.label && c.label !== c.id ? ` · ${c.label}` : ""}
+                        {queued.has(`${c.id}:${c.key}`) && (
+                          <div className="text-xs font-bold" style={{ color: ORANGE, marginTop: 2 }}
+                            title="Genie holds a correction the ERP has not been told about yet. Synchronising again cannot settle this — the queue has to be pushed.">
+                            ⬆ waiting in the ERP queue — push it, this will keep coming until you do
+                          </div>
+                        )}
+                      </td>
                       <td className="px-2 py-1 font-semibold">{c.field}</td>
                       <td className="px-2 py-1">
                         <label className="cursor-pointer flex items-start gap-1">

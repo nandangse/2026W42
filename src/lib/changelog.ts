@@ -86,6 +86,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.39.0",
+    date: "2026-09-09",
+    module: "Why a sync row keeps coming back — and delivered jobs on the calendar",
+    items: [
+      "\"Pressed this 4 times. Why is it still coming?\" (Dr Raghu, 9 Sep 2026). <b>Because it is not a loop, and pressing it a fifth time cannot help.</b> That list is not \"what I just changed\" — it is <b>where the two sides still disagree</b>, worked out afresh on every run.",
+      "WHAT IS ACTUALLY DISAGREEING, checked against the ERP itself rather than the panel: jobs <b>2026272575 and 2026272576</b> hold <b>2026-09-15</b> in Genie and <b>2026-09-12</b> in the ERP — because he changed those target dates on 8 September and the corrections are <b>still sitting in the Update-to-ERP queue, unpushed</b>. Genie has the new date; the ERP has never been told. That is a real difference and it will be reported truthfully on every sync until <b>the queue is pushed</b> — or until he takes the ERP\u2019s date, which would throw his own correction away.",
+      "SO THE ROW NOW SAYS SO: a difference with a correction waiting in the queue is marked <b>\u2b06 waiting in the ERP queue — push it, this will keep coming until you do</b>. A screen that re-lists a row without explaining it teaches a man to press the button again; the instruction was the missing half.",
+      "AND ONE OF THE FIVE HAD ALREADY SETTLED — <b>2025262504</b> now reads 2026-09-10 on both sides. It was in that list because it changed in that very run, not because it was stuck.",
+      "\"THE DELIVERED JOBS SHOULD BE ON THE BOARD TOO SO WE KNOW IT\u2019S GONE\" — and then, precisely: \"board means the calendar view only\". A delivered job leaves the active board, rightly, so its green chip sits on the day it WENT and its target-date cell falls silent. Look at Wednesday and nothing was due; in fact two Navy sets were due and had gone on the Tuesday. A green band above the grid now names what left the gate in the last seven days, before anyone scrolls looking for it.",
+      "A COUNT AND NAMES, NO VALUE. The delivery feed this board reads carries the job, the tag and the day and nothing else, on purpose — the page is open to more readers than the Leadership Circle\u2019s, and a rupee figure here would have quietly widened who can see the order book.",
+    ],
+  },
+  {
     v: "5.0.38.0",
     date: "2026-09-09",
     module: "What went out, beside what was due — and the CRM\u2019s last open table",

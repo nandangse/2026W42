@@ -638,6 +638,41 @@ export function DeliveryBoard({
                 <button onClick={scrollCalToToday} className="px-2 py-1 rounded text-xs font-bold" style={{ background: "var(--accent)", color: "#fff" }}>⤓ Jump to today</button>
               </div>
             </div>
+            {/* GONE, AND THEREFORE INVISIBLE (Dr Raghu, 9 Sep 2026: "the
+                delivered jobs should be on the board too so we know it's
+                gone", and then: "board means the calendar view only").
+                A delivered job leaves the active board — rightly, it is not
+                work any more — so its chip sits on the day it WENT and its
+                TDD cell falls silent. Look at Wednesday and nothing was due;
+                in fact two Navy sets were due and had already gone on the
+                Tuesday. This says so, above the grid, before anyone scrolls.
+                A count and names, no value: the feed this board is allowed to
+                read carries the job, the tag and the day and nothing else, on
+                purpose, because the page is open to more readers than the
+                Leadership Circle's. */}
+            {(() => {
+              const goneWeek = shipped
+                .filter((d) => d.on >= addDays(TODAY, -7) && d.on <= TODAY)
+                .sort((a, b) => b.on.localeCompare(a.on));
+              if (!goneWeek.length) return null;
+              return (
+                <div className="rounded p-2 mb-2" style={{ background: "#E9F5EC", border: "1px solid #BFDCC6" }}>
+                  <div className="text-xs font-bold" style={{ color: "var(--green)", letterSpacing: .5 }}>
+                    ✓ LEFT THE GATE THIS WEEK — {goneWeek.length} job{goneWeek.length === 1 ? "" : "s"}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {goneWeek.map((d) => (
+                      <span key={d.id} title={`Delivered ${fmtFull(d.on)} · ${d.tag}`}
+                        className="rounded px-2 py-0.5"
+                        style={{ background: "var(--green)", color: "#fff", fontSize: 11, fontWeight: 700 }}>
+                        {jobNo(d.id)} <span style={{ fontWeight: 400, opacity: .9 }}>{d.tag}</span>
+                        <span style={{ fontWeight: 400, opacity: .75 }}> · {fmt(d.on)}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             <div ref={calRef} style={{ maxHeight: "70vh", overflowY: "auto" }}>
               <table className="w-full text-xs genie-table" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
                 <thead>
