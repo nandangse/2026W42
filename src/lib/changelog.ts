@@ -86,6 +86,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.43.0",
+    date: "2026-09-09",
+    module: "Seva: Support Tickets, and what is attached to them",
+    items: [
+      "\"Issues import — call it Support Tickets ... please import both of these. Get in all the fields including the attachments. Also the issue details to be in rich text\" (Dr Raghu, 9 Sep 2026).",
+      "<b>11,949 tickets</b> in the ERP, going back to 2016. Seva\u2019s own table was built for tickets typed here and had fifteen columns; the ERP\u2019s Issue carries <b>thirty-four</b>. The difference is not padding — it is the FRF number and date, the checklist used, the mandays invested, the cost spent, the closure rating, whether it was raised as a non-conformance. Those are the questions somebody asks about a service call a year later.",
+      "THE DESCRIPTION STAYS RICH, and an imported one is <b>shown rather than offered for editing</b>. The ERP writes it as Quill markup and the shape a man used to explain a fault is part of the explanation — putting it in a textarea would flatten it on the first keystroke, and it is the ERP\u2019s record, not ours. A ticket typed in Genie has no markup and keeps its plain box. A flat copy is stored beside the markup so the table can be searched without parsing HTML on every keystroke.",
+      "ATTACHMENTS ARE INDEXED, NOT COPIED — and that is a decision, so it is stated. There are <b>18,051 files on the tickets and 5,916 on the contracts</b>, and <b>every one is private in the ERP</b>: the bytes need its own authentication. What lands here is the name, the size, the date and the path — enough to list them, count them and open them there. Copying twenty-four thousand private files into Genie is a decision about storage and confidentiality that nobody has taken, and an importer is not the place to take it quietly.",
+      "THE CONTRACTS WERE ALREADY IN — all 362 — but fifteen of their fields were not: value per annum, visits per annum, the primary handler, the site contact, the payment status. They are now.",
+      "Needs <b>migration 0166</b>. Reads only: nothing on the ERP is ever written.",
+    ],
+  },
+  {
     v: "5.0.42.0",
     date: "2026-09-09",
     module: "What a job actually earns — a margin that admits what it does not know",

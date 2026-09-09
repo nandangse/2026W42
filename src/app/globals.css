@@ -248,3 +248,15 @@ img, video, canvas, svg { max-width: 100%; }
    for "Tuesday, 8th September 5:35 AM" on every app). The date and the time
    are the useful part; which day of the week it is, a man knows. */
 @media (max-width: 900px) { .genie-wd { display: none; } }
+
+/* An imported support ticket keeps the shape it was written in — the ERP's
+   Quill markup, shown rather than flattened (Dr Raghu, 9 Sep 2026: "also the
+   issue details to be in rich text"). Bounded so a long fault report cannot
+   push the rest of the panel off the screen. */
+.seva-rich p { margin: 0 0 .5em; }
+.seva-rich ul, .seva-rich ol { margin: 0 0 .5em 1.2em; }
+.seva-rich li { margin: .15em 0; }
+.seva-rich table { border-collapse: collapse; margin: .4em 0; }
+.seva-rich td, .seva-rich th { border: 1px solid var(--line); padding: 3px 6px; }
+.seva-rich img { max-width: 100%; height: auto; }
+.seva-rich a { color: var(--accent); text-decoration: underline; }

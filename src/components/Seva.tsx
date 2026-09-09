@@ -22,7 +22,7 @@ const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", ORANG
 
 const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: "◧" },
-  { key: "issues", label: "Issues", icon: "⚠" },
+  { key: "issues", label: "Support Tickets", icon: "⚠" },
   { key: "amc", label: "Annual Maintenance", icon: "📅" },
   { key: "push", label: "Push — 1:1", icon: "⇢" },
   { key: "settings", label: "Settings — masters", icon: "⚙" },
@@ -157,7 +157,7 @@ function IssuesScreen() {
   });
 
   return (
-    <Shell installed={installed} title="Issues" onAdd={() => setOpen("new")} addLabel="+ Log an issue"
+    <Shell installed={installed} title="Support Tickets" onAdd={() => setOpen("new")} addLabel="+ Log a ticket"
       blurb="What the customer says is wrong — logged the hour it arrives, owned by a name, and closed only when the resolution is written down."
       extra={
         <>
@@ -175,7 +175,7 @@ function IssuesScreen() {
         </tr></thead>
         <tbody>
           {rows && shown.length === 0 && (<tr><td colSpan={8} className="px-3 py-5 text-center" style={{ color: MUTED }}>
-            {rows.length ? "Nothing matches the filter." : "No issues logged — the first call from a customer belongs here."}</td></tr>)}
+            {rows.length ? "Nothing matches the filter." : "No tickets yet — pull them from the ERP, or the first call from a customer belongs here."}</td></tr>)}
           {!rows && (<tr><td colSpan={8} className="px-3 py-5 text-center" style={{ color: MUTED }}>loading…</td></tr>)}
           {shown.map((r, i) => {
             const late = daysTo(r.due);
@@ -223,7 +223,7 @@ function IssueBox({ row, masters, onClose, onSaved }: { row: Row | null; masters
   return (
     <Modal onClose={onClose} width={720}>
       <div className="flex items-center justify-between mb-2">
-        <div className="font-bold text-sm" style={{ color: INK }}>{row ? "The issue" : "Log an issue"}</div>
+        <div className="font-bold text-sm" style={{ color: INK }}>{row ? "The ticket" : "Log a ticket"}</div>
         <button onClick={onClose} style={{ color: MUTED }}>✕</button>
       </div>
       <div className="space-y-2">
@@ -253,8 +253,24 @@ function IssueBox({ row, masters, onClose, onSaved }: { row: Row | null; masters
           <div><L>Resolved on</L>
             <input type="date" value={f.resolved_at} onChange={(e) => set({ resolved_at: e.target.value })} className="border rounded px-2 py-1.5 text-sm tnum" style={inputCss} /></div>
         </div>
-        <div><L>What happened — the customer&apos;s words, and what was seen</L>
-          <textarea value={f.description} onChange={(e) => set({ description: e.target.value })} rows={3} className="w-full border rounded px-2 py-1.5 text-sm" style={inputCss} /></div>
+        {/* THE FAULT AS IT WAS WRITTEN (Dr Raghu, 9 Sep 2026: "also the issue
+            details to be in rich text"). A ticket pulled from the ERP carries
+            Quill markup — paragraphs, lists, the occasional table — and the
+            shape a man used to explain a fault is part of the explanation.
+            So an imported ticket is SHOWN as it was written and not offered
+            as a textarea: editing it here would flatten it on the first
+            keystroke, and this is the ERP's record, not ours. A ticket typed
+            in Genie has no markup and keeps its plain box. */}
+        {S(row?.description_html) ? (
+          <div><L>What happened — as it was written in the ERP</L>
+            <div className="border rounded px-3 py-2 text-sm seva-rich"
+              style={{ ...inputCss, maxHeight: 260, overflowY: "auto", background: "#FBFAF7" }}
+              dangerouslySetInnerHTML={{ __html: String(row?.description_html) }} />
+          </div>
+        ) : (
+          <div><L>What happened — the customer&apos;s words, and what was seen</L>
+            <textarea value={f.description} onChange={(e) => set({ description: e.target.value })} rows={3} className="w-full border rounded px-2 py-1.5 text-sm" style={inputCss} /></div>
+        )}
         <div><L>The resolution — what was actually done</L>
           <textarea value={f.resolution} onChange={(e) => set({ resolution: e.target.value })} rows={2} className="w-full border rounded px-2 py-1.5 text-sm" style={inputCss} /></div>
         {err && <div className="text-xs font-bold" style={{ color: RED }}>{err}</div>}
