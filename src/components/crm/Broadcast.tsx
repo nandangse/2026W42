@@ -33,14 +33,27 @@ type MailTpl = { id: string; label: string; subject: string | null; body: string
 type WaTpl = { id: string; label: string; body: string; attachments: { name: string; link: string }[] };
 
 export default function Broadcast({
-  channel, people, onClose, onQueued,
+  channel, personIds, onClose, onQueued,
 }: {
   channel: "email" | "whatsapp";
-  people: Picked[];
+  personIds: string[];
   onClose: () => void;
   onQueued: (msg: string) => void;
 }) {
   const mail = channel === "email";
+  /**
+   * WHO THEY ARE IS ASKED FOR, NOT HANDED OVER. The contact list carries
+   * only the columns a person chose to see, so a view with the e-mail
+   * column hidden would otherwise report that none of the forty have one.
+   */
+  const [people, setPeople] = useState<Picked[]>([]);
+  useEffect(() => {
+    if (!personIds.length) return;
+    fetch(`/api/crm/broadcast?people=${encodeURIComponent(personIds.join(","))}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setPeople((j.people || []) as Picked[]))
+      .catch(() => setPeople(personIds.map((id) => ({ id, name: id, email: null, phone: null }))));
+  }, [personIds]);
   const [templates, setTemplates] = useState<{ id: string; label: string; subject?: string | null; body: string; attachments: { name: string; link: string }[] }[]>([]);
   const [tpl, setTpl] = useState("");
   const [subject, setSubject] = useState("");
@@ -58,7 +71,9 @@ export default function Broadcast({
   const [road, setRoad] = useState<{ aisensy: boolean; campaign: string | null } | null>(null);
 
   useEffect(() => {
-    const url = mail ? "/api/crm/gmail/templates" : "/api/crm/wa/templates";
+    /* Mail templates ride on the Gmail status payload — the same place the
+       single-message composer reads them, so the two lists cannot differ. */
+    const url = mail ? "/api/crm/gmail/status" : "/api/crm/wa/templates";
     fetch(url, { cache: "no-store" }).then((r) => r.json())
       .then((j) => setTemplates((j.templates || []) as MailTpl[] | WaTpl[]))
       .catch(() => { /* templates are a convenience, not a gate */ });
@@ -109,7 +124,7 @@ export default function Broadcast({
           params: params.split(",").map((x) => x.trim()).filter(Boolean),
           media: !mail && media.url ? media : null,
           attachments: atts,
-          person_ids: people.map((p) => p.id),
+          person_ids: personIds,
         }),
       });
       const j = await r.json();
@@ -130,7 +145,7 @@ export default function Broadcast({
         style={{ width: "min(860px, 100%)", maxHeight: "calc(100vh - 40px)", overflowY: "auto", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
 
         <div className="flex items-center justify-between px-4 py-2.5" style={{ background: NAVY_DARK, borderRadius: "8px 8px 0 0" }}>
-          <b className="text-white text-sm">{mail ? "✉ Send Email" : "💬 Send WhatsApp"} — {people.length} selected</b>
+          <b className="text-white text-sm">{mail ? "✉ Send Email" : "💬 Send WhatsApp"} — {personIds.length} selected</b>
           <button onClick={onClose} className="text-white font-bold px-2">✕</button>
         </div>
 
@@ -138,9 +153,9 @@ export default function Broadcast({
           {/* WHO IT REACHES, before anything is typed. A number that is
               smaller than the selection is the single most useful fact on
               this screen, and it must not wait until after Queue. */}
-          <div className="rounded p-2 mb-3 text-xs" style={{ background: reachable.length === people.length ? "#F0FAF3" : "#FFF7E6", border: `1px solid ${reachable.length === people.length ? "#BFE3CD" : "#F5D9A8"}`, lineHeight: 1.6, color: INK }}>
-            <b>{reachable.length}</b> of {people.length} can be reached {mail ? "by e-mail" : "on WhatsApp"}.
-            {reachable.length < people.length && (
+          <div className="rounded p-2 mb-3 text-xs" style={{ background: people.length > 0 && reachable.length === people.length ? "#F0FAF3" : "#FFF7E6", border: `1px solid ${people.length > 0 && reachable.length === people.length ? "#BFE3CD" : "#F5D9A8"}`, lineHeight: 1.6, color: INK }}>
+            <b>{reachable.length}</b> of {personIds.length} can be reached {mail ? "by e-mail" : "on WhatsApp"}.
+            {people.length > 0 && reachable.length < people.length && (
               <> The other <b>{people.length - reachable.length}</b> have no {mail ? "e-mail address" : "usable phone number"} on the record — they are listed as skipped on the broadcast rather than silently dropped.</>
             )}
           </div>

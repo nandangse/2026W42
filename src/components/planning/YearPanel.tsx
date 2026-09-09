@@ -236,6 +236,17 @@ export default function YearPanel({
 }) {
   const [d, setD] = useState<Payload | null>(null);
   const [who, setWho] = useState<string>("");
+  /**
+   * HOW FAR BACK THE "WENT OUT" LIST REACHES (Dr Raghu, 9 Sep 2026: "I need
+   * it to only show the jobs that went out this month. If there is space
+   * later on we can also just do a plus, and it will also show you the jobs
+   * of the last month. All the jobs are not required.").
+   *
+   * Sixty-seven tags was the year, and the year is not what anybody scans —
+   * this month is. Last month is one press away and nothing further, on
+   * purpose: a list that keeps growing becomes the thing it replaced.
+   */
+  const [backMonths, setBackMonths] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -253,6 +264,11 @@ export default function YearPanel({
 
   const TODAY = today();
   const thisMonth = monthKey(TODAY);
+  /** The month before this one, for the + on the WENT OUT list. */
+  const lastMonth = useMemo(() => {
+    const d0 = new Date(TODAY + "T00:00:00Z");
+    return monthKey(new Date(Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth() - 1, 1)).toISOString().slice(0, 10));
+  }, [TODAY]);
 
   /** The twelve months of the financial year the panel is reporting. */
   const keys = useMemo(() => {
@@ -317,8 +333,16 @@ export default function YearPanel({
    * this box is the closed year.
    */
   const gone = useMemo(
-    () => (d?.deliveredJobs || []).filter((x) => monthKey(x.on) < thisMonth),
-    [d, thisMonth],
+    () => (d?.deliveredJobs || []).filter((x) => {
+      const k = monthKey(x.on);
+      return backMonths > 0 ? (k === thisMonth || k === lastMonth) : k === thisMonth;
+    }),
+    [d, thisMonth, lastMonth, backMonths],
+  );
+  /** How many more there would be with the + pressed — offered, not hidden. */
+  const goneLast = useMemo(
+    () => (d?.deliveredJobs || []).filter((x) => monthKey(x.on) === lastMonth).length,
+    [d, lastMonth],
   );
 
   /** Pending jobs that fall outside the twelve months, so nothing is silently dropped. */
@@ -412,10 +436,23 @@ export default function YearPanel({
               somebody wants to check is almost always the recent one. Not
               clickable — a delivered job has left the pending board, so
               there is no job lightbox behind it to open. */}
-          {gone.length > 0 && (
+          {(gone.length > 0 || goneLast > 0) && (
             <div className="mt-2.5 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
-              <div className="text-xs font-bold mb-1" style={{ color: C.green, letterSpacing: .6 }}>
-                WENT OUT<span style={{ color: C.faint }}> · {gone.length}, latest first</span>
+              <div className="text-xs font-bold mb-1 flex items-center gap-1.5 flex-wrap" style={{ color: C.green, letterSpacing: .6 }}>
+                <span>
+                  WENT OUT · {monthWord(thisMonth).toUpperCase()}{backMonths > 0 ? ` + ${monthWord(lastMonth).toUpperCase()}` : ""}
+                  <span style={{ color: C.faint }}> · {gone.length}, latest first</span>
+                </span>
+                {(backMonths > 0 || goneLast > 0) && (
+                  <button
+                    onClick={() => setBackMonths((b) => (b ? 0 : 1))}
+                    className="rounded px-1.5 font-bold"
+                    style={{ border: `1px solid ${C.line}`, background: "#fff", color: C.body, letterSpacing: 0 }}
+                    title={backMonths ? `Show ${monthWord(thisMonth)} only` : `Add ${monthWord(lastMonth)}'s ${goneLast} deliveries`}
+                  >
+                    {backMonths ? "− " + monthWord(lastMonth) : "+ " + monthWord(lastMonth)}
+                  </button>
+                )}
               </div>
               <div className="flex flex-wrap gap-1">
                 {gone.map((g2) => (
@@ -427,6 +464,11 @@ export default function YearPanel({
                   </span>
                 ))}
               </div>
+              {gone.length === 0 && (
+                <div className="text-xs" style={{ color: C.faint }}>
+                  Nothing has gone out this month yet. {monthWord(lastMonth)} had {goneLast} — press the +.
+                </div>
+              )}
             </div>
           )}
         </Box>

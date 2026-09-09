@@ -46,7 +46,34 @@ export async function GET(req: Request) {
     await requireCrm();
     if (!crmConfigured()) throw new HttpError(503, new CrmNotConfigured().message);
     const db = crmDb();
-    const id = new URL(req.url).searchParams.get("id");
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
+
+    /**
+     * ?people=id,id,… — who was selected, with the one fact that decides
+     * whether they can be written to.
+     *
+     * The composer asks for this rather than being handed it, because the
+     * contact list only carries the columns a person has chosen to see:
+     * somebody whose view hides the e-mail column would otherwise be told
+     * that none of his forty contacts have one.
+     */
+    const who = url.searchParams.get("people");
+    if (who) {
+      const ids = who.split(",").map((x) => x.trim()).filter(Boolean).slice(0, MOST);
+      if (!ids.length) return NextResponse.json({ people: [] });
+      const { data } = await db.from("person")
+        .select("id, full_name, first_name, primary_email, primary_phone, whatsapp_number")
+        .in("id", ids);
+      return NextResponse.json({
+        people: (data || []).map((p) => ({
+          id: String(p.id),
+          name: String(p.full_name || p.first_name || "").trim() || "(no name)",
+          email: p.primary_email ? String(p.primary_email) : null,
+          phone: String(p.whatsapp_number || p.primary_phone || "") || null,
+        })),
+      });
+    }
 
     if (id) {
       const { data: doc } = await db.from("broadcast").select("*").eq("id", id).maybeSingle();

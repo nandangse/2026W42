@@ -24,6 +24,7 @@ import WaComposer, { type WaCtx } from "./WaComposer";
 import { BORDER, INK, Links, MUTED, setMyEmail, setMyProfileId, NAV, NAVY, NAVY_DARK, NAVY_SOFT, ORANGE, PAPER, PINNED_W, Row, SPECIAL_SECTIONS, URL_OF, ViewState } from "./app/shared";
 import { ContactActions, DateView, DateViewBar, MoneyBox, MultiFilter, TAGGABLE, TagFilterBox, dateRangeOf, isEmailish } from "./app/Widgets";
 import { Cell, ColumnPicker, ConsultRaghuModal, LinkAutocomplete, rowContacts, stickyCell } from "./app/Record";
+import Broadcast from "./Broadcast";
 const RecordModal = dynamic(() => import("./app/Record").then((m) => m.RecordModal), { loading: () => <div className="text-sm p-6" style={{ color: "var(--muted)" }}>Opening…</div> });
 const RecordForm = dynamic(() => import("./app/Record").then((m) => m.RecordForm), { loading: () => <div className="text-sm p-6" style={{ color: "var(--muted)" }}>Opening…</div> });
 
@@ -159,6 +160,14 @@ export default function CrmApp({
 
   /** Multi-select for the bulk Edit — checked row ids. */
   const [sel, setSel] = useState<Set<string>>(new Set());
+  /**
+   * SEND TO THE ONES YOU PICKED (Dr Raghu, 9 Sep 2026: "in the contacts we
+   * will apply filter etc, then after choosing make the select of the
+   * contacts, then click on the button on top which is Send Email / Send
+   * WA"). The filter and the selection already existed; this is the step
+   * between "these forty" and "send".
+   */
+  const [blast, setBlast] = useState<"email" | "whatsapp" | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkField, setBulkField] = useState("");
   const [bulkValue, setBulkValue] = useState("");
@@ -692,6 +701,24 @@ export default function CrmApp({
                 ✎ Edit {sel.size} selected
               </button>
             )}
+            {/* Contacts only. A broadcast needs an e-mail address or a phone
+                number on the row, and no other doctype carries both. */}
+            {sel.size > 0 && slug === "person" && (
+              <>
+                <button onClick={() => setBlast("email")}
+                  className="px-3 py-1.5 rounded text-sm font-bold"
+                  style={{ background: NAVY_SOFT, color: NAVY }}
+                  title="One mail to every selected contact — template, variables, attachments, and a preview before anything is queued">
+                  ✉ Send Email
+                </button>
+                <button onClick={() => setBlast("whatsapp")}
+                  className="px-3 py-1.5 rounded text-sm font-bold"
+                  style={{ background: "#E7F6EC", color: "#1FA855" }}
+                  title="One WhatsApp to every selected contact, through whichever road is switched on">
+                  💬 Send WA
+                </button>
+              </>
+            )}
             {sel.size > 0 && slug === "profile" && (
               <button
                 onClick={async () => {
@@ -869,6 +896,15 @@ export default function CrmApp({
                 </button>
               )}
             </div>
+          )}
+
+          {blast && (
+            <Broadcast
+              channel={blast}
+              personIds={[...sel]}
+              onClose={() => setBlast(null)}
+              onQueued={(m) => { setBlast(null); window.alert(m + "\n\nRelease them from Tools → " + (blast === "email" ? "Email Queue" : "WhatsApp Queue") + "."); }}
+            />
           )}
 
           {bulkOpen && (() => {

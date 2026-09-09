@@ -86,6 +86,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.45.0",
+    date: "2026-09-09",
+    module: "Send Email / Send WA to the contacts you picked",
+    items: [
+      "\"In the contacts we will apply filter etc, then after choosing make the select of the contacts, then click on the button on top which is Send Email / Send WA. Then show this template page \u2026 template with variables \u2026 attachment or image to be shown \u2026 then send\" (Dr Raghu, 9 Sep 2026). The list already filtered and already selected; this is the step that was missing between <b>these forty</b> and <b>send</b>.",
+      "TWO BUTTONS on the contacts list the moment anything is ticked \u2014 <b>\u2709 Send Email</b> and <b>\ud83d\udcac Send WA</b> \u2014 opening one composer: a template picker, the message with its <code>{{variables}}</code> and the list of what they are, and what is attached.",
+      "<b>THE PREVIEW IS THE POINT.</b> A bulk send is the one act nobody can take back, and a variable that renders EMPTY looks identical to one that renders correctly \u2014 until forty people have it. So the box shows the message as the FIRST selected contact will actually read it, and says plainly that a name which is not a real variable travels all the way to the customer in its braces.",
+      "AND WHO IT REACHES IS STATED BEFORE ANYTHING IS TYPED \u2014 \u201c38 of 47 can be reached by e-mail\u201d. The other nine are listed on the broadcast as skipped, with the reason, rather than quietly dropped. The composer asks the server who they are rather than reading the table, because the contact list carries only the columns each person chose to see: a view with the e-mail column hidden would otherwise report that nobody has one.",
+      "<b>ONE SEND IS ONE DOCUMENT.</b> Forty messages sent together are a single act \u2014 one template, one attachment, one decision, one person answering for it \u2014 and spread across forty queue rows there is nothing to open afterwards. The new <code>broadcast</code> record holds what was decided once; the messages stay in the queues that already know how to send, throttle and report. It adds a column, not a third road.",
+      "<b>AND YES \u2014 IT LANDS ON THE CONTACT AND ON THE DEAL.</b> Every message files against the contact always, and against their opportunity when they have <b>exactly one open</b>. With two open deals it is filed against the contact alone and the count is reported, because there is no honest way to choose \u2014 and a mail filed under the wrong deal makes that deal\u2019s history say something which did not happen.",
+      "Nothing leaves from the composer. Queue writes the document and its messages and stops; releasing them stays the queue\u2019s job, within its ceilings, on whichever road is switched on \u2014 and when AiSensy is the road the composer says so and asks for the <b>campaign</b>, because there is no free-text send there.",
+      "ALSO: the WENT OUT list on THE YEAR now shows <b>this month only</b>, with a <b>+</b> for last month. Sixty-seven tags was the year, and the year is not what anybody scans.",
+      "Needs <b>CRM migration 0064</b>.",
+    ],
+  },
+  {
     v: "5.0.44.10",
     date: "2026-09-09",
     module: "20 / 55 / 25, and the year\u2019s deliveries by name",
