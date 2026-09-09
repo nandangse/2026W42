@@ -544,6 +544,22 @@ export function DeliveryBoard({
         </div>
       )}
 
+      {/* HIDE TOTALS SITS HERE (Dr Raghu, 9 Sep 2026: "show here hide header
+          data") — directly under the number cards, where the header ends and
+          the reading begins. It was at the very bottom, past the run rate and
+          THE YEAR, so folding the header away meant first scrolling past
+          everything it was meant to fold. */}
+      <div className="flex justify-end -mt-1 mb-2">
+        <button
+          onClick={() => setCardsOpen(false)}
+          className="rounded px-2 py-0.5 text-xs font-bold"
+          style={{ background: "#F4F2EC", color: "var(--dim)" }}
+          title="Fold the totals, the run rate and THE YEAR away"
+        >
+          ⌃ Hide totals
+        </button>
+      </div>
+
       {/*
         THE YEAR — the month spine and whose confidence sits behind it
         (Dr Raghu, 9 Sep 2026). Placed directly under the number cards and
@@ -570,18 +586,6 @@ export function DeliveryBoard({
           something beside what is left to build. */}
       <RunRate V={V} />
 
-      {/* Collapsing is offered everywhere, including the Priority List --
-          somebody who knows the totals should be able to put them away. */}
-      <div className="flex justify-end -mt-1 mb-2">
-        <button
-          onClick={() => setCardsOpen(false)}
-          className="rounded px-2 py-0.5 text-xs font-bold"
-          style={{ background: "#F4F2EC", color: "var(--dim)" }}
-          title="Fold the totals away"
-        >
-          ⌃ Hide totals
-        </button>
-      </div>
       </>)}
 
       <div className="flex gap-1 rounded p-1 bg-white border mb-3 flex-wrap" style={{ borderColor: "var(--line)", width: "fit-content" }}>

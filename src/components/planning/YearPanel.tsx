@@ -32,7 +32,7 @@
 // folded into 100%. Most of the book has never been inside a month window,
 // and quietly promoting it to certain would make this panel worse than no
 // panel at all.
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { monthKey, monthLabel } from "@/lib/fmt";
 import { today, fmt, jobNo } from "@/lib/schedule";
@@ -247,6 +247,20 @@ export default function YearPanel({
    * purpose: a list that keeps growing becomes the thing it replaced.
    */
   const [backMonths, setBackMonths] = useState(0);
+  /**
+   * JOBS THAT LEFT THE BOARD WITH NO DELIVERY DATE (Dr Raghu, 9 Sep 2026:
+   * "September 2 more jobs got delivered!!!").
+   *
+   * They had. Both 8 BRD jobs left the ERP's in-process list that afternoon
+   * and Genie archived them within the minute. But the ERP holds no
+   * actual_delivery_date for either, and the ledger is keyed on that date —
+   * so they fell into the gap between the two lists: no longer pending, not
+   * yet delivered, and invisible on every screen. This is the ERP's normal
+   * state, not a corner: 1,491 of its 2,717 delivered jobs carry no date.
+   */
+  const [undated, setUndated] = useState<{ id: string; tag: string; left_on: string }[]>([]);
+  const [marking, setMarking] = useState<string | null>(null);
+  const [markOn, setMarkOn] = useState("");
 
   useEffect(() => {
     let live = true;
@@ -259,15 +273,18 @@ export default function YearPanel({
       })
       // A companion to the cards above it, not a gate on them.
       .catch(() => { /* the board works without this panel */ });
+    api.get("/api/delivered/undated")
+      .then((r: { jobs?: { id: string; tag: string; left_on: string }[] }) => { if (live) setUndated(r.jobs || []); })
+      .catch(() => { /* a companion, not a gate */ });
     return () => { live = false; };
   }, []);
 
   const TODAY = today();
   const thisMonth = monthKey(TODAY);
-  /** The month before this one, for the + on the WENT OUT list. */
-  const lastMonth = useMemo(() => {
+  /** monthKey n months before this one. n = 0 is this month. */
+  const monthBack = useCallback((n: number) => {
     const d0 = new Date(TODAY + "T00:00:00Z");
-    return monthKey(new Date(Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth() - 1, 1)).toISOString().slice(0, 10));
+    return monthKey(new Date(Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth() - n, 1)).toISOString().slice(0, 10));
   }, [TODAY]);
 
   /** The twelve months of the financial year the panel is reporting. */
@@ -327,23 +344,23 @@ export default function YearPanel({
   }, [jobs, thisMonth, d]);
 
   /**
-   * The delivered jobs of the COMPLETED months — the same window box one
-   * counts, so the tags and the number can never disagree. September's
-   * four are left out for the same reason the run rate leaves them out:
-   * this box is the closed year.
+   * The window the list covers: this month, and one more each time the
+   * SHOW MORE is pressed. It never opens on the whole year — sixty-seven
+   * tags is the year, and the year is not what anybody scans.
    */
+  const covered = useMemo(
+    () => new Set(Array.from({ length: backMonths + 1 }, (_, i) => monthBack(i))),
+    [backMonths, monthBack],
+  );
   const gone = useMemo(
-    () => (d?.deliveredJobs || []).filter((x) => {
-      const k = monthKey(x.on);
-      return backMonths > 0 ? (k === thisMonth || k === lastMonth) : k === thisMonth;
-    }),
-    [d, thisMonth, lastMonth, backMonths],
+    () => (d?.deliveredJobs || []).filter((x) => covered.has(monthKey(x.on))),
+    [d, covered],
   );
-  /** How many more there would be with the + pressed — offered, not hidden. */
-  const goneLast = useMemo(
-    () => (d?.deliveredJobs || []).filter((x) => monthKey(x.on) === lastMonth).length,
-    [d, lastMonth],
-  );
+  /** What the NEXT press would add — offered by name and count, not blindly. */
+  const nextBack = useMemo(() => {
+    const k = monthBack(backMonths + 1);
+    return { key: k, n: (d?.deliveredJobs || []).filter((x) => monthKey(x.on) === k).length };
+  }, [d, backMonths, monthBack]);
 
   /** Pending jobs that fall outside the twelve months, so nothing is silently dropped. */
   const stray = useMemo(() => {
@@ -436,23 +453,12 @@ export default function YearPanel({
               somebody wants to check is almost always the recent one. Not
               clickable — a delivered job has left the pending board, so
               there is no job lightbox behind it to open. */}
-          {(gone.length > 0 || goneLast > 0) && (
+          {(gone.length > 0 || nextBack.n > 0 || backMonths > 0) && (
             <div className="mt-2.5 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
-              <div className="text-xs font-bold mb-1 flex items-center gap-1.5 flex-wrap" style={{ color: C.green, letterSpacing: .6 }}>
-                <span>
-                  WENT OUT · {monthWord(thisMonth).toUpperCase()}{backMonths > 0 ? ` + ${monthWord(lastMonth).toUpperCase()}` : ""}
-                  <span style={{ color: C.faint }}> · {gone.length}, latest first</span>
-                </span>
-                {(backMonths > 0 || goneLast > 0) && (
-                  <button
-                    onClick={() => setBackMonths((b) => (b ? 0 : 1))}
-                    className="rounded px-1.5 font-bold"
-                    style={{ border: `1px solid ${C.line}`, background: "#fff", color: C.body, letterSpacing: 0 }}
-                    title={backMonths ? `Show ${monthWord(thisMonth)} only` : `Add ${monthWord(lastMonth)}'s ${goneLast} deliveries`}
-                  >
-                    {backMonths ? "− " + monthWord(lastMonth) : "+ " + monthWord(lastMonth)}
-                  </button>
-                )}
+              <div className="text-xs font-bold mb-1" style={{ color: C.green, letterSpacing: .6 }}>
+                WENT OUT · {monthWord(thisMonth).toUpperCase()}
+                {backMonths > 0 && <> \u2013 {monthWord(monthBack(backMonths)).toUpperCase()}</>}
+                <span style={{ color: C.faint }}> · {gone.length}, latest first</span>
               </div>
               <div className="flex flex-wrap gap-1">
                 {gone.map((g2) => (
@@ -465,10 +471,33 @@ export default function YearPanel({
                 ))}
               </div>
               {gone.length === 0 && (
-                <div className="text-xs" style={{ color: C.faint }}>
-                  Nothing has gone out this month yet. {monthWord(lastMonth)} had {goneLast} — press the +.
-                </div>
+                <div className="text-xs" style={{ color: C.faint }}>Nothing has gone out this month yet.</div>
               )}
+              {/* One more month per press. The month it would add is NAMED
+                  with its count, so nobody presses to find out whether
+                  there is anything there. */}
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                {nextBack.key >= (d.from || "").slice(0, 7) && (
+                  <button
+                    onClick={() => setBackMonths((b) => b + 1)}
+                    className="rounded px-2 py-0.5 text-xs font-bold"
+                    style={{ border: `1px solid ${C.line}`, background: "#fff", color: nextBack.n ? C.body : C.faint }}
+                    title={`Add ${monthWord(nextBack.key)}`}
+                  >
+                    ⌄ show more <span style={{ color: C.faint, fontWeight: 400 }}>· {monthWord(nextBack.key)}{nextBack.n ? ` (${nextBack.n})` : " (none)"}</span>
+                  </button>
+                )}
+                {backMonths > 0 && (
+                  <button
+                    onClick={() => setBackMonths(0)}
+                    className="rounded px-2 py-0.5 text-xs font-bold"
+                    style={{ border: `1px solid ${C.line}`, background: "#fff", color: C.faint }}
+                    title={`Back to ${monthWord(thisMonth)} alone`}
+                  >
+                    ⌃ this month only
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </Box>
@@ -490,6 +519,52 @@ export default function YearPanel({
             <Split label="ACHIEVED" t={month.achieved} V={V} ink={C.green} hideMoney={noMoney} />
             <Split label="BALANCE" t={month.balance} V={V} ink={month.balance.jobs ? C.red : C.faint} />
           </div>
+
+          {/* WENT OUT, BUT NOBODY SAID WHEN. A job in this state is counted
+              nowhere — not pending, not delivered — so it must be shown
+              rather than waited for. */}
+          {undated.length > 0 && (
+            <div className="mt-2 rounded p-2" style={{ background: "#FFF7E6", border: "1px solid #F5D9A8" }}>
+              <div className="text-xs font-bold" style={{ color: "#8A5B00" }}>
+                {undated.length} job{undated.length === 1 ? "" : "s"} left the board with no delivery date
+              </div>
+              <div className="text-xs mb-1" style={{ color: "#8A5B00", lineHeight: 1.5 }}>
+                The ERP holds no delivery date for {undated.length === 1 ? "it" : "them"}, so {undated.length === 1 ? "it counts" : "they count"} nowhere —
+                neither pending nor delivered. Say when {undated.length === 1 ? "it" : "each"} went and Genie banks it; the ERP is not written to.
+              </div>
+              {undated.map((u) => (
+                <div key={u.id} className="flex items-center gap-1.5 flex-wrap text-xs py-0.5">
+                  <b style={{ color: C.body }}>{u.tag || u.id.slice(-4)}</b>
+                  <span style={{ color: C.faint }}>left the board {fmt(u.left_on)}</span>
+                  {marking === u.id ? (
+                    <>
+                      <input type="date" value={markOn} max={TODAY} onChange={(e) => setMarkOn(e.target.value)}
+                        className="rounded border px-1 py-0.5" style={{ borderColor: C.line, fontSize: 12 }} />
+                      <button
+                        onClick={async () => {
+                          try {
+                            await api.post("/api/delivered/undated", { job_id: u.id, on: markOn });
+                            setUndated((v) => v.filter((x) => x.id !== u.id));
+                            setMarking(null);
+                            const r = await api.get("/api/board-year") as Payload;
+                            if (r?.installed) setD(r);
+                          } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+                        }}
+                        disabled={!/^\d{4}-\d{2}-\d{2}$/.test(markOn)}
+                        className="rounded px-2 py-0.5 font-bold" style={{ background: C.green, color: "#fff" }}>Save</button>
+                      <button onClick={() => setMarking(null)} className="font-bold" style={{ color: C.faint }}>✕</button>
+                    </>
+                  ) : (
+                    <button onClick={() => { setMarking(u.id); setMarkOn(u.left_on); }}
+                      className="rounded px-2 py-0.5 font-bold"
+                      style={{ border: "1px solid #F5D9A8", background: "#fff", color: "#8A5B00" }}>
+                      say when it went
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* THE CERTAIN ONES, BY NAME — the count on the right made
               actionable. Soonest first; a job already past its date is

@@ -86,6 +86,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.45.1",
+    date: "2026-09-09",
+    module: "The two jobs that went out and counted nowhere",
+    items: [
+      "\"September 2 more jobs got delivered!!!\" (Dr Raghu, 9 Sep 2026). <b>They had</b> \u2014 and the sync had seen them. Both <b>8 BRD</b> jobs left the ERP\u2019s in-process list at 13:02 that afternoon and Genie archived them within the minute. But the ERP holds <b>no actual_delivery_date</b> for either, and the delivered ledger is keyed on that date. So the two fell into the gap between the lists: <b>no longer pending, not yet delivered, invisible on every screen.</b>",
+      "This is not a corner case. <b>1,491 of the ERP\u2019s 2,717 delivered jobs carry no date at all</b> \u2014 it is the ERP\u2019s normal state, which is why the sync already refuses to write those blanks over dates Genie holds.",
+      "So the gap is now SHOWN rather than waited for. PLAN OF SEPT names any job that left the board undated and offers <b>say when it went</b>. The date is banked into the ledger with the date_source naming the person who typed it, so a Genie date is never later mistaken for the ERP\u2019s own \u2014 and the sync\u2019s standing rule (a blank from the ERP may not un-date a banked row) is what keeps it there.",
+      "<b>IT DOES NOT WRITE TO THE ERP.</b> Genie recording what it knows is one thing; reaching into the ERP and stamping a delivery date on somebody else\u2019s document is another, and nobody has asked for that.",
+      "\"Show here hide header data\" \u2014 <b>\u2303 Hide totals</b> now sits directly under the number cards, where the header ends and the reading begins. It was at the very bottom, past the run rate and THE YEAR, so putting the header away meant scrolling past everything it was meant to put away.",
+      "\"Put only this month, below this show an icon show more, add another month then, then add another month.\" The WENT OUT list opens on this month and grows <b>one month per press</b> \u2014 and the month it would add is <b>named with its count</b>, so nobody presses to find out whether there is anything there. <b>\u2303 this month only</b> folds it back.",
+    ],
+  },
+  {
     v: "5.0.45.0",
     date: "2026-09-09",
     module: "Send Email / Send WA to the contacts you picked",
