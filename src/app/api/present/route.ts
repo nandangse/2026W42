@@ -164,6 +164,18 @@ export async function POST(req: Request) {
       if (!se) path = p; else swallow("present/storage", se);
     }
 
+    /* A DOUBLE PRESS IS ONE PUNCH. The database can only refuse an identical
+       timestamp, and two taps a second apart are not identical — so the guard
+       lives here, where a minute is allowed to mean a minute. (The index that
+       tried to do this in SQL was refused: date_trunc over a timestamptz is
+       not IMMUTABLE, and an index that reads differently per session is worse
+       than none.) */
+    const since = new Date(now.getTime() - 60_000).toISOString();
+    const { data: recent } = await admin.from("hrms_attendance_punch")
+      .select("at").eq("employee_id", me.id).eq("kind", kind).gte("at", since).limit(1);
+    if (recent?.length)
+      throw new HttpError(409, `You already signed ${kind} a moment ago — that press went through.`);
+
     const lat = Number(body.lat), lng = Number(body.lng), acc = Number(body.accuracy);
     const { error } = await admin.from("hrms_attendance_punch").insert({
       employee_id: me.id, for_date: today(), at: now.toISOString(), kind, source: "present",

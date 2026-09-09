@@ -54,9 +54,18 @@ create index if not exists hrms_att_punch_date_idx on public.hrms_attendance_pun
 create index if not exists hrms_att_punch_src_idx  on public.hrms_attendance_punch (source);
 create index if not exists hrms_att_punch_batch_idx on public.hrms_attendance_punch (batch_id);
 
--- A man may not sign in twice in the same minute by double-pressing.
+-- THE SAME PUNCH MAY NOT LAND TWICE.
+--
+-- This was first written as a unique index on date_trunc('minute', at), to
+-- stop a double press. Postgres refused it — 42P17 — and was right to:
+-- date_trunc over a timestamptz depends on the session's TimeZone, so the
+-- same row could index differently for two connections, and an index that
+-- disagrees with itself is worse than no index. Plain columns instead; the
+-- double press is caught in the route, where a clock is allowed to be a
+-- clock. This also gives PostgREST a target it can name for on-conflict,
+-- which an expression index cannot be.
 create unique index if not exists hrms_att_punch_once_idx
-  on public.hrms_attendance_punch (employee_id, kind, source, date_trunc('minute', at));
+  on public.hrms_attendance_punch (employee_id, kind, source, at);
 
 -- ── the ESSL machine's imports, so a batch can be named and undone ──
 create table if not exists public.hrms_essl_import (

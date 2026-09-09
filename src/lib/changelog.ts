@@ -86,6 +86,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.37.1",
+    date: "2026-09-09",
+    module: "An index Postgres was right to refuse, and a front door left open on the CRM",
+    items: [
+      "MIGRATION 0163 WOULD NOT RUN: <code>42P17: functions in index expression must be marked IMMUTABLE</code>. Mine. I indexed <code>date_trunc(\u2019minute\u2019, at)</code> over a <b>timestamptz</b> to stop a double press — and that function depends on the session\u2019s TimeZone, so the same row could index differently for two connections. <b>Postgres was right to refuse it</b>: an index that disagrees with itself is worse than no index at all.",
+      "The unique key is plain columns now, which PostgREST can also name for on-conflict — an expression index cannot be. The double press is caught in the route instead, where a minute is allowed to mean a minute: a second mark of the same kind inside sixty seconds is told the first one went through.",
+      "SUPABASE FLAGGED THE CRM — \"table publicly accessible ... anyone with your project URL can read, edit, and delete all data in this table because Row-Level Security is not enabled\". <b>The anon key is not a secret</b>; it ships in every page that uses it. The only thing between it and 57,000 companies, 139,000 people and every quotation this house has written is RLS, and on some tables there was nothing standing there at all.",
+      "IT IS SAFE TO SHUT THEM ALL, and that is what <b>migration 0061</b> does. The CRM never speaks to Supabase from a browser: <code>crmDb()</code> builds one server-side client with the service key, and there is no <code>createBrowserClient</code> anywhere in the CRM. The service role bypasses RLS, so this takes nothing from the application and everything from a stranger with the URL.",
+      "IT REVOKES FROM <code>public</code>, NOT MERELY <code>anon</code> — a grant to PUBLIC is inherited by both roles, so revoking the two while PUBLIC still holds it leaves the door open and the ledger saying it is shut. That was the hrms_idp_login lesson of 7 September. New tables arrive shut too, by default privilege. It ends by proving itself: two counts, both of which must be zero.",
+      "GENIE WAS PROBED RATHER THAN ASSUMED INNOCENT, with the anon key that ships in its own browser: every HR and materials table answers <b>401</b>, and jobs, projects and profiles return an empty set under policy. The exposure was the CRM\u2019s alone.",
+    ],
+  },
+  {
     v: "5.0.37.0",
     date: "2026-09-08",
     module: "genie.nandan.co.in/present — attendance from a phone, in the field",
