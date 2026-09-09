@@ -86,6 +86,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.44.7",
+    date: "2026-09-09",
+    module: "AiSensy is on the Integrations screen \u2014 and its webhook is built",
+    items: [
+      "\"I want to make a quick API connection in the CRM. Show the things that I can add \u2026 add it in the integrations\" (Dr Raghu, 9 Sep 2026). <b>AiSensy had no card.</b> CRM migration 0058 created the settings row on 8 September and its own comment promised \u201cSettings \u2192 Integrations shows them the same way\u201d \u2014 it did not, because the card was never added to the catalogue. There has been a place to STORE the key and nowhere to TYPE it. That is the entire reason AiSensy has sat idle, and it is now the ninth card on the screen.",
+      "<b>WHAT YOU CAN ADD</b>, seven boxes: <code>api_key</code> (Manage \u2192 API Key on their dashboard \u2014 it travels in the body, not a header, which is their design), <code>campaign</code> (the default Meta-approved template set LIVE; there is no free-text send on this road, so a message with no approved template behind it cannot go at all), <code>webhook_secret</code>, and the four you already know \u2014 <code>per_hour</code>, <code>per_day</code>, <code>gap_seconds</code>, <code>paused</code>.",
+      "<b>AND THE WEBHOOK IS BUILT</b>, from the Project Webhook reference he sent. Point a subscription at <code>https://genie.nandan.co.in/api/aisensy/webhook</code> and subscribe to <b>message.status.updated</b>, <b>contact.campaign.sent / delivered / read</b> and <b>message.sender.user</b>. The first four turn \u201csent\u201d into <b>delivered</b> and then <b>read</b> on the queue row; the last is somebody writing back, and it lands in its own table.",
+      "THEIR SPECIFICATION IMPOSES FOUR RULES AND EACH IS ANSWERED. \u201cDelivered AT LEAST ONE TIME\u201d \u2014 every notification is written by its own id first and a repeat stops there. \u201cYou may not always receive them IN THE ORDER they occur\u201d \u2014 so a <i>sent</i> can land after a <i>read</i>, and the status <b>never walks backwards</b> even though each timestamp is stored where it belongs. \u201cAcknowledge within 5 seconds\u201d \u2014 two writes, no outbound calls. And a <b>410 is never returned</b>, because a 410 makes them disable the subscription for good; anything Genie cannot use is answered 200.",
+      "EVERY CALL IS VERIFIED \u2014 HMAC-SHA256 of the RAW body against the shared secret, compared in constant time, 401 and dropped if it fails. Their own Node sample signs the re-serialised body rather than the raw one, so both spellings are accepted: refusing a genuine receipt over a re-serialisation would be worse than allowing a second form of the same bytes.",
+      "ONE HONEST GAP, HANDLED. Their SEND reference promises only \u201ca status of 200\u201d \u2014 no message id \u2014 so a row we really did send can carry no id to match a receipt against, which would have made the whole webhook decorative. The first unmatched receipt for a number therefore falls back to the most recent AiSensy row still at \u201csent\u201d within a week and <b>stamps the id onto it</b>; every receipt after that matches directly.",
+      "Needs <b>CRM migration 0063</b>.",
+    ],
+  },
+  {
     v: "5.0.44.6",
     date: "2026-09-09",
     module: "AiSensy checked against its own reference \u2014 and the plus that would have misdelivered an overseas message",
