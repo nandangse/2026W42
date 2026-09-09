@@ -86,6 +86,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.44.10",
+    date: "2026-09-09",
+    module: "20 / 55 / 25, and the year\u2019s deliveries by name",
+    items: [
+      "\"In this first column make 20% width, second column 55%, third column 25%\" (Dr Raghu, 9 Sep 2026). Set. The middle column carries the twenty-seven certainties and needed the room; the year\u2019s own figures read fine in a narrow one.",
+      "\"In the first column also put the delivered jobs customer tags! eg now I will change the 8BRD deliveries.\" <b>67 delivered</b> is a number; the sixty-seven <b>tags</b> are the year\u2019s work, and the thing a man actually scans when he wants to know whether a particular job has gone. They sit under the run rate, <b>latest first</b> \u2014 the delivery somebody asks about is almost always the recent one \u2014 each with the day it went, and the whole tag on the hover.",
+      "They cover the <b>completed</b> months only, the same window the 67 is counted over, so the tags and the number cannot disagree. September\u2019s four stay in the middle box under ACHIEVED, where they belong.",
+      "Not clickable, and that is deliberate: a delivered job has left the pending board, so there is no job lightbox behind it to open. A button that does nothing is worse than plain text.",
+    ],
+  },
+  {
     v: "5.0.44.9",
     date: "2026-09-09",
     module: "HRMS is on the same WhatsApp road \u2014 and Periskope was being asked about AiSensy\u2019s messages",

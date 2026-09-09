@@ -55,11 +55,22 @@ export async function GET() {
 
     // ---- what went out, month by month --------------------------------
     const months: Record<string, { jobs: number; value: number; tp: number }> = {};
+    /**
+     * THE ONES THAT WENT OUT, BY NAME (Dr Raghu, 9 Sep 2026: "in the first
+     * column also put the delivered jobs customer tags! eg now I will change
+     * the 8BRD deliveries").
+     *
+     * A count of 67 is a number; the sixty-seven tags are the year's work,
+     * and the thing a man actually scans when he wants to know whether a
+     * particular job has gone. Tag and date only — the money stays behind
+     * the Leadership Circle gate, as it does everywhere else on this panel.
+     */
+    const deliveredJobs: { id: string; tag: string; on: string }[] = [];
     let deliveredInstalled = true;
     for (let off = 0; off < MAX_ROWS; off += PAGE) {
       const { data, error } = await db
         .from("delivered_jobs")
-        .select("delivered_on, val, tp, tpv")
+        .select("id, tag, delivered_on, val, tp, tpv")
         .gte("delivered_on", from)
         .lte("delivered_on", to)
         .order("delivered_on", { ascending: true })
@@ -74,6 +85,7 @@ export async function GET() {
         m.jobs += 1;
         m.value += Number(r.val) || 0;
         m.tp += throughputOf(r as { tp: number; tpv: number });
+        deliveredJobs.push({ id: String(r.id), tag: String(r.tag || "").trim(), on: String(r.delivered_on) });
       }
       if (!data || data.length < PAGE) break;
     }
@@ -120,6 +132,8 @@ export async function GET() {
       from, to, end,
       money,
       delivered: months,
+      // Latest first: what just went out is what gets asked about.
+      deliveredJobs: deliveredJobs.sort((a, b) => b.on.localeCompare(a.on)),
       beliefs,
       planners: emails
         .map((e) => ({ email: e, name: names[e] || e.split("@")[0], jobs: counted[e] }))

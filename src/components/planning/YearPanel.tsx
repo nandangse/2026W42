@@ -64,6 +64,7 @@ interface Payload {
   end: string;
   money: boolean;
   delivered: Record<string, { jobs: number; value: number; tp: number }>;
+  deliveredJobs?: { id: string; tag: string; on: string }[];
   beliefs: Record<string, Record<string, number>>;
   planners: { email: string; name: string; jobs: number }[];
 }
@@ -309,6 +310,17 @@ export default function YearPanel({
     return { plan, achieved, balance };
   }, [jobs, thisMonth, d]);
 
+  /**
+   * The delivered jobs of the COMPLETED months — the same window box one
+   * counts, so the tags and the number can never disagree. September's
+   * four are left out for the same reason the run rate leaves them out:
+   * this box is the closed year.
+   */
+  const gone = useMemo(
+    () => (d?.deliveredJobs || []).filter((x) => monthKey(x.on) < thisMonth),
+    [d, thisMonth],
+  );
+
   /** Pending jobs that fall outside the twelve months, so nothing is silently dropped. */
   const stray = useMemo(() => {
     const before = zero(), after = zero(), nodate = zero();
@@ -371,7 +383,10 @@ export default function YearPanel({
         </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 p-3">
+      {/* 20 / 55 / 25, as set (Dr Raghu, 9 Sep 2026). The middle column
+          carries the twenty-seven certainties, so it gets the room; the
+          year's own tags are short and read fine in a narrow column. */}
+      <div className="grid gap-2 p-3 year-cols">
 
         {/* ---- 1. the year, closed ---- */}
         <Box
@@ -392,6 +407,28 @@ export default function YearPanel({
         >
           <Three t={year.t} V={V} ink={C.ink} hideMoney={noMoney} />
           <Rate r={year.rate} V={V} label="run rate" hideMoney={noMoney} />
+
+          {/* WHAT ACTUALLY WENT OUT, BY NAME. Latest first: the delivery
+              somebody wants to check is almost always the recent one. Not
+              clickable — a delivered job has left the pending board, so
+              there is no job lightbox behind it to open. */}
+          {gone.length > 0 && (
+            <div className="mt-2.5 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
+              <div className="text-xs font-bold mb-1" style={{ color: C.green, letterSpacing: .6 }}>
+                WENT OUT<span style={{ color: C.faint }}> · {gone.length}, latest first</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {gone.map((g2) => (
+                  <span key={g2.id} className="rounded px-2 py-0.5 text-xs font-semibold"
+                    style={{ border: `1px solid ${C.line}`, background: "#fff", color: C.body, maxWidth: "100%" }}
+                    title={`${g2.tag}\ndelivered ${fmt(g2.on)}`}>
+                    {g2.tag || g2.id.slice(-4)}
+                    <span style={{ color: C.faint, fontWeight: 400 }}> · {fmt(g2.on)}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </Box>
 
         {/* ---- 2. this month ---- */}
@@ -482,6 +519,10 @@ export default function YearPanel({
           )}
         </Box>
       </div>
+      <style>{`
+        .year-cols { grid-template-columns: 1fr; }
+        @media (min-width: 1024px) { .year-cols { grid-template-columns: 20% 55% 25%; } }
+      `}</style>
 
       {(stray.before.jobs > 0 || stray.after.jobs > 0 || stray.nodate.jobs > 0) && (
         <div className="text-xs px-3 pb-2.5" style={{ color: C.faint, lineHeight: 1.5 }}>
