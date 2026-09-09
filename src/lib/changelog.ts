@@ -86,6 +86,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.44.8",
+    date: "2026-09-09",
+    module: "Send one WhatsApp message, now \u2014 and the two boxes that were swapped",
+    items: [
+      "\"How can I send a message\" (Dr Raghu, 9 Sep 2026). The AiSensy card carries a <b>\u27a4 Send a trial message</b> box: a number, a campaign, and its variables. A REAL message, not a ping \u2014 it is the only thing that proves the key, the campaign being <b>Live</b> rather than merely approved, the number\u2019s format and the template\u2019s variable count, all at once. AiSensy\u2019s own refusal is passed back in their words rather than flattened to \u201cfailed\u201d.",
+      "It writes nothing to the queue, and it <b>ignores paused</b> on purpose. Pausing exists to stop the automation; a man pressing a button on this screen with a number he typed is not the automation.",
+      "AND IT CATCHES THE COMMONEST MISTAKE BEFORE IT COSTS AN HOUR. Checked live after the settings were first saved: <b>the API key had been pasted into the CAMPAIGN box.</b> Theirs is a long <code>eyJ\u2026</code> token and a campaign is a short name, so the two invite exactly that swap \u2014 and swapped, AiSensy answers with something about authentication and sends you hunting the wrong thing entirely. The trial refuses to send and says which box holds what.",
+      "The <code>webhook_secret</code> box is masked like the other credentials. It was showing as plain text.",
+    ],
+  },
+  {
     v: "5.0.44.7",
     date: "2026-09-09",
     module: "AiSensy is on the Integrations screen \u2014 and its webhook is built",

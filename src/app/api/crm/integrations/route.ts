@@ -158,6 +158,61 @@ export async function POST(req: Request) {
       }
     }
 
+    /**
+     * SEND ONE MESSAGE, NOW (Dr Raghu, 9 Sep 2026: "how can i send a
+     * message").
+     *
+     * Not a ping — a real WhatsApp message to a real number, because that
+     * is the only thing that proves the whole chain at once: the key, the
+     * campaign being LIVE rather than merely approved, the number's format,
+     * and the template's variable count. Any one of those failing has its
+     * own reply from AiSensy, and their words are passed back whole rather
+     * than flattened to "failed".
+     *
+     * It deliberately IGNORES `paused`. Pausing exists to stop the queue
+     * running; a man pressing this button, on this screen, with a number he
+     * typed, is not the queue. Nothing is written to wa_queue either — a
+     * test message is not a communication with a customer.
+     */
+    if (String(body.action || "") === "send_test" && key === "aisensy") {
+      const { data: row } = await db.from("integration_setting").select("config").eq("key", key).maybeSingle();
+      const cfg = (row?.config || {}) as Record<string, string>;
+      if (!cfg.api_key) throw new HttpError(400, "Paste the API key first.");
+      /* THE COMMONEST MISTAKE, CAUGHT BEFORE IT COSTS AN HOUR: their API key
+         is a long JWT and the campaign is a short name. Swapped, AiSensy
+         answers with something about authentication and the reply sends you
+         hunting the wrong thing. */
+      const jwt = /^eyJ[\w-]+\.[\w-]+\.[\w-]+$/;
+      if (jwt.test(String(cfg.campaign || "")))
+        throw new HttpError(400, "The CAMPAIGN box holds what looks like the API key (a long eyJ… token). The two are the wrong way round: the JWT belongs in API_KEY, and CAMPAIGN takes the short NAME of a Live campaign.");
+      if (!jwt.test(String(cfg.api_key)))
+        throw new HttpError(400, "The API_KEY box does not hold an AiSensy key — theirs is a long token beginning eyJ. Check the two boxes are not swapped.");
+      const phone = String(body.phone || "").trim();
+      if (!phone) throw new HttpError(400, "Which number? Type one with its country code.");
+      const campaign = String(body.campaign || cfg.campaign || "").trim();
+      if (!campaign) throw new HttpError(400, "Name the campaign — a template you have set LIVE in AiSensy.");
+      const params = Array.isArray(body.params)
+        ? (body.params as unknown[]).map((x) => String(x ?? "")).filter((x) => x !== "")
+        : [];
+      const { aisensyConfig, aisensySend } = await import("@/crm/aisensy");
+      const ai = await aisensyConfig(db);
+      if ("error" in ai) throw new HttpError(400, ai.error);
+      const r = await aisensySend(ai, {
+        campaign,
+        phone,
+        userName: String(body.name || "").trim() || "Nandan GSE",
+        params: params.length ? params : undefined,
+      });
+      if (!r.ok) throw new HttpError(502, r.error || "AiSensy refused, without saying why.");
+      return NextResponse.json({
+        ok: true,
+        id: r.id || null,
+        note: r.id
+          ? "Sent. AiSensy gave a message id, so its delivery receipts will match this send."
+          : "Sent — AiSensy accepted it but returned no message id, which is normal for them. The webhook will attach the first receipt to the right row by number.",
+      });
+    }
+
     // MERGE, never replace — saving only a new URL must not drop the secret
     const { data: existing } = await db.from("integration_setting").select("config").eq("key", key).maybeSingle();
     const config: Record<string, string> = { ...((existing?.config || {}) as Record<string, string>) };

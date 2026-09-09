@@ -17,6 +17,13 @@ export default function Integrations() {
   const [busy, setBusy] = useState<string | null>(null);
   const [zoomTest, setZoomTest] = useState<{ ok: boolean; error?: string; granted?: string[]; missing?: { scope: string; why: string }[]; webhook?: string } | null>(null);
   const [msg, setMsg] = useState("");
+  /**
+   * THE TRIAL SEND (Dr Raghu, 9 Sep 2026: "how can i send a message").
+   * A real message to a real number — the only thing that proves the key,
+   * the campaign being LIVE, the number's format and the variable count
+   * all at once.
+   */
+  const [wa, setWa] = useState({ phone: "", campaign: "", params: "" });
   const [inspect, setInspect] = useState({ doctype: "", name: "" });
   const [inspected, setInspected] = useState<{ field: string; sample: string }[] | null>(null);
 
@@ -127,7 +134,7 @@ export default function Integrations() {
           ) : (
           <div className="flex gap-2 flex-wrap">
             {it.fields.map((f) => {
-              const secret = f === "api_key" || f === "api_secret";
+              const secret = f === "api_key" || f === "api_secret" || f === "webhook_secret";
               const mapped = it.mapping?.[f] || "";
               return (
               <input key={f} value={vals[`${it.key}.${f}`] || ""}
@@ -142,6 +149,52 @@ export default function Integrations() {
               className="rounded px-3 py-1.5 font-bold" style={{ background: NAVY, color: "#fff", fontSize: 12.5 }}>
               {busy === it.key ? "…" : "Save"}
             </button>
+            {it.key === "aisensy" && it.configured && (
+              <div className="rounded border p-2 mt-1" style={{ borderColor: BORDER, background: "#FAFAF8", flexBasis: "100%" }}>
+                <div className="text-xs font-bold mb-1" style={{ color: INK }}>Send one message now</div>
+                <div className="text-xs mb-2" style={{ color: MUTED, lineHeight: 1.5 }}>
+                  A REAL WhatsApp message, not a ping — it is the only thing that proves the key, the campaign
+                  being <b>Live</b> rather than merely approved, the number&apos;s format and the template&apos;s
+                  variable count, all at once. Nothing is written to the queue and <b>paused is ignored</b>:
+                  a man pressing a button with a number he typed is not the automation that pausing exists to stop.
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <input value={wa.phone} onChange={(e) => setWa((w) => ({ ...w, phone: e.target.value }))}
+                    placeholder="+919876543210" title="With the country code. Outside India the + is mandatory."
+                    className="rounded border px-2 py-1.5" style={{ borderColor: BORDER, fontSize: 13, flex: "1 1 30%", minWidth: 150 }} />
+                  <input value={wa.campaign} onChange={(e) => setWa((w) => ({ ...w, campaign: e.target.value }))}
+                    placeholder="campaign name (blank = the default above)"
+                    title="The NAME of a campaign you have set Live in AiSensy"
+                    className="rounded border px-2 py-1.5" style={{ borderColor: BORDER, fontSize: 13, flex: "1 1 30%", minWidth: 150 }} />
+                  <input value={wa.params} onChange={(e) => setWa((w) => ({ ...w, params: e.target.value }))}
+                    placeholder="variables, comma separated — in the template's order"
+                    title="Leave blank for a template with no {{1}} placeholders"
+                    className="rounded border px-2 py-1.5" style={{ borderColor: BORDER, fontSize: 13, flex: "1 1 100%" }} />
+                  <button
+                    onClick={async () => {
+                      setBusy(it.key); setMsg("");
+                      try {
+                        const r = await fetch("/api/crm/integrations", {
+                          method: "POST", headers: { "content-type": "application/json" },
+                          body: JSON.stringify({
+                            key: "aisensy", action: "send_test",
+                            phone: wa.phone, campaign: wa.campaign,
+                            params: wa.params.split(",").map((x) => x.trim()).filter(Boolean),
+                          }),
+                        });
+                        const j = await r.json();
+                        if (!r.ok) throw new Error(String(j.error || r.status));
+                        setMsg(String(j.note || "Sent ✓"));
+                      } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+                      setBusy(null);
+                    }}
+                    disabled={busy === it.key || !wa.phone.trim()}
+                    className="rounded px-3 py-1.5 font-bold" style={{ background: GREEN, color: "#fff", fontSize: 12.5 }}>
+                    {busy === it.key ? "…" : "➤ Send a trial message"}
+                  </button>
+                </div>
+              </div>
+            )}
             {it.key === "erpnext" && it.configured && (
               <>
                 <button onClick={() => test(it.key)} disabled={busy === it.key}
