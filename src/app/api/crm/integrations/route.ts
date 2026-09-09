@@ -120,6 +120,27 @@ export async function GET(req: Request) {
             push_kit_field: cfg.push_kit_field ?? "", push_pct_field: cfg.push_pct_field ?? "",
             opp_info_field: cfg.opp_info_field ?? "",
           } : null,
+          /**
+           * WHAT IS ACTUALLY SAVED (Dr Raghu, 9 Sep 2026: "this setting
+           * should be shown").
+           *
+           * Every card was a row of empty boxes with grey placeholders, and
+           * an empty box looks the same whether nothing is saved or the
+           * wrong thing is. That is not a cosmetic point: the AiSensy key
+           * sat in the CAMPAIGN box for half a day and the screen gave no
+           * hint of it, because the screen showed nothing at all.
+           *
+           * A SECRET IS NEVER ECHOED. Anything whose name says key, secret,
+           * token or password comes back as its last four characters only —
+           * enough to recognise, never enough to use. Everything else is
+           * shown whole, because a rate limit or a campaign name is not a
+           * credential and hiding it helps nobody.
+           */
+          values: Object.fromEntries(k.fields.map((f) => {
+            const v = String(cfg[f] ?? "");
+            if (!v) return [f, ""];
+            return [f, /key|secret|token|password/i.test(f) ? `…${v.slice(-4)} (${v.length} characters)` : v];
+          })),
           updated_by: row?.updated_by ?? null, updated_at: row?.updated_at ?? null,
         };
       }),

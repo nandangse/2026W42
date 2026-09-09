@@ -86,6 +86,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.45.4",
+    date: "2026-09-09",
+    module: "Integrations show what is actually saved, and when",
+    items: [
+      "\"This setting should be shown. Also show when I added it\" (Dr Raghu, 9 Sep 2026). Every card was a row of empty boxes with grey placeholders \u2014 and <b>an empty box looks the same whether nothing is saved or the wrong thing is</b>.",
+      "That is not a cosmetic point, and today proved it: the AiSensy API key sat in the <b>CAMPAIGN</b> box for half a day and the screen gave no hint, because the screen showed nothing at all. It had to be read out of the database to be found.",
+      "Each card now carries a <b>SAVED NOW</b> block \u2014 every field and its current value \u2014 and a line saying <b>who saved it and when</b>, in IST. A key nobody can date is a key nobody can reason about when it stops working.",
+      "<b>A SECRET IS NEVER ECHOED.</b> Anything whose name says key, secret, token or password comes back as its last four characters and its length \u2014 enough to recognise, never enough to use. A rate limit or a campaign name is not a credential, so those are shown whole; hiding them helped nobody.",
+    ],
+  },
+  {
     v: "5.0.45.3",
     date: "2026-09-09",
     module: "A template variable is filled per person, not once for forty",

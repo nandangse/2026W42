@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { NAVY, INK, MUTED, BORDER, GREEN } from "./palette";
 
-interface Integration { key: string; label: string; fields: string[]; help: string; configured: boolean; tail: string | null; url: string | null; ownerOnly?: boolean; mayEdit?: boolean; mapping?: Record<string, string> | null; updated_by: string | null; updated_at: string | null }
+interface Integration { key: string; label: string; fields: string[]; help: string; configured: boolean; tail: string | null; url: string | null; ownerOnly?: boolean; mayEdit?: boolean; mapping?: Record<string, string> | null; values?: Record<string, string>; updated_by: string | null; updated_at: string | null }
 
 export default function Integrations() {
   const [rows, setRows] = useState<Integration[] | null>(null);
@@ -124,6 +124,31 @@ export default function Integrations() {
                   ) : <div className="mt-1" style={{ color: GREEN }}>Every scope Genie needs is there.</div>}
                 </>
               )}
+            </div>
+          )}
+          {/* WHEN IT WAS ADDED, and by whom (Dr Raghu, 9 Sep 2026: "also
+              show when i added it"). A key nobody can date is a key nobody
+              can reason about when it stops working. */}
+          {it.updated_at && (
+            <div className="text-xs mt-0.5" style={{ color: MUTED }}>
+              saved by <b style={{ color: INK }}>{it.updated_by || "—"}</b> on{" "}
+              <b style={{ color: INK }}>
+                {new Date(it.updated_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </b>
+            </div>
+          )}
+          {/* WHAT IS SAVED RIGHT NOW. Secrets show their last four only. */}
+          {it.values && it.fields.some((f) => it.values?.[f]) && (
+            <div className="rounded p-2 mt-2 mb-1" style={{ background: "#FAFAF8", border: `1px solid ${BORDER}` }}>
+              <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: .5 }}>SAVED NOW</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "1px 14px" }}>
+                {it.fields.map((f) => (
+                  <div key={f} className="text-xs" style={{ lineHeight: 1.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <code style={{ color: NAVY, fontWeight: 700 }}>{f}</code>
+                    <span style={{ color: it.values?.[f] ? INK : "#B8B5AC" }}> {it.values?.[f] || "— not set"}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           <p className="text-xs mt-1 mb-2" style={{ color: MUTED, lineHeight: 1.5 }}>{it.help}</p>
