@@ -86,6 +86,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.38.0",
+    date: "2026-09-09",
+    module: "What went out, beside what was due — and the CRM\u2019s last open table",
+    items: [
+      "\"In this view also show the deliveries that have happened in the last week as green\" (Dr Raghu, 9 Sep 2026). The DAY cells have carried green delivery chips all along — 2470 and 2471 on the 7th, 2472 and 2473 on the 8th, each on the day it actually went. <b>The WEEK cell had not.</b> It counted only what was OWED that week, so W37 could read \"18 jobs · \u20b94.47 Cr\" and say nothing whatever about the four that left the gate.",
+      "It now carries <b>\u2713 n out</b> in green beneath the due figure. A count and no value: this board is deliberately open to more readers than the Leadership Circle\u2019s page, and the delivery feed it reads carries no money on purpose — so adding a rupee figure here would have quietly widened who can see the order book.",
+      "THE CRM\u2019S LAST OPEN TABLE. 0061 came back \"tables still without RLS: 1\" — mine, and an ordinary blunder: the loop enabled RLS on every table that existed when it ran, and three lines later the migration <b>created <code>genie_migration</code></b>, after the loop had passed. The ledger table that records the migration was the one table the migration missed. <b>0062</b> closes it.",
+      "AND THE CHECK NOW NAMES RATHER THAN COUNTS. \"1\" sent us both hunting; a name would have ended it in a second. A check that reports a number tells you that you have a problem — one that reports a name tells you what it is.",
+    ],
+  },
+  {
     v: "5.0.37.1",
     date: "2026-09-09",
     module: "An index Postgres was right to refuse, and a front door left open on the CRM",

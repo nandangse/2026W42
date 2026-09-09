@@ -662,12 +662,29 @@ export function DeliveryBoard({
                     }
                     const wkCount = wk.reduce((n, d2) => n + (byDay[d2] || []).length, 0);
                     const wkVal = wk.reduce((v, d2) => v + (byDay[d2] || []).reduce((x, j) => x + (j.val || 0), 0), 0);
+                    /* WHAT ACTUALLY WENT, BESIDE WHAT WAS DUE (Dr Raghu, 9 Sep
+                       2026: "in this view also show the deliveries that have
+                       happened in the last week as green").
+                       The day cells have carried green delivery chips all
+                       along; the week cell only ever counted what was OWED
+                       that week, so a week could read "18 jobs" and say
+                       nothing about the four that left the gate. A COUNT and
+                       no value: this board is deliberately open to more
+                       readers than the LC's page, and its delivery feed
+                       carries no money on purpose. */
+                    const wkDone = wk.reduce((n, d2) => n + (doneDay[d2] || []).length, 0);
                     const isTodayWk = wk[0] <= TODAY && TODAY <= wk[6];
                     rows.push(
                       <tr key={wk[0]} data-today-row={isTodayWk ? "1" : undefined} className="border-t align-top" style={{ borderColor: "var(--line-soft)" }}>
                         <td className="px-1 py-1 font-bold text-center" style={{ background: isTodayWk ? "#FFF3E8" : "#F4F2EC", color: "var(--blue)" }}>
                           W{isoWeek(wk[0])}
                           {wkCount > 0 && (<div className="font-normal" style={{ color: "var(--muted)", fontSize: 9 }}>{wkCount} job{wkCount === 1 ? "" : "s"}<br />{V(wkVal)}</div>)}
+                          {wkDone > 0 && (
+                            <div className="font-bold" style={{ color: "var(--green)", fontSize: 9.5, marginTop: 2 }}
+                              title={`${wkDone} job${wkDone === 1 ? "" : "s"} actually delivered in this week`}>
+                              ✓ {wkDone} out
+                            </div>
+                          )}
                         </td>
                         {wk.map((d2) => {
                           const list = byDay[d2] || [];
@@ -739,7 +756,7 @@ export function DeliveryBoard({
                 </tbody>
               </table>
             </div>
-            <div className="text-xs mt-2" style={{ color: "var(--muted)" }}>Scroll for more months · tap a job chip to open its milestone plan · <b style={{ color: "var(--green)" }}>green = delivered</b>, on the day it actually went, last 30 days · red chip = TDD already past · (n) = jobs due that day · week cell shows count &amp; value due that ISO week</div>
+            <div className="text-xs mt-2" style={{ color: "var(--muted)" }}>Scroll for more months · tap a job chip to open its milestone plan · <b style={{ color: "var(--green)" }}>green = delivered</b>, on the day it actually went, last 30 days · the week cell&apos;s <b style={{ color: "var(--green)" }}>✓ n out</b> is what left the gate that week, against what was due · red chip = TDD already past · (n) = jobs due that day · week cell shows count &amp; value due that ISO week</div>
           </div>
         );
       })()}
