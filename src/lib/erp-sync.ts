@@ -143,6 +143,96 @@ const PROJECT_FIELDS = [
   // carried this all along -- the model, the platform, the max height -- and
   // Genie has had an empty `description` column waiting for it.
   "short_summary_description", "project_name", "customer",
+
+  /**
+   * THE COMPACT PROJECT DOCUMENT (Dr Raghu, 9 Sep 2026: "have a compact
+   * project document which can have intelligence built in — not flab").
+   *
+   * A field earns a place here if somebody would sort, filter or chase by it.
+   * Target-versus-actual pairs earn theirs twice over: a BOM released date on
+   * its own is a fact; beside the date it was DUE it is a question, and
+   * questions are what a project document is for.
+   *
+   * NO COMMERCIALS, on his instruction and on the evidence — the ERP's
+   * gross_margin equals minus the purchase cost in 110 of the 145 projects
+   * where it is not zero, and equals value-minus-cost in none of them. The
+   * margin is rebuilt from Genie's own sources instead.
+   */
+  "is_active", "priority", "custom_product_family", "custom_quantity", "po_number",
+  "expected_start_date", "percent_complete", "on_time_delivery_status",
+  "design_stage", "custom_design_completion_",
+  "custom_bom_release_target_date", "custom_bom_released_date",
+  "custom_manufacturing_drawings_release_target_date", "custom_manufacturing_drawings_released_date",
+  "custom_approved_bom", "material_availability_percentage",
+  "custom_planning_owner", "custom_design_in_charge", "custom_production_job_owner",
+  "custom_purchase_owner", "custom_kitting_owner", "custom_quality_owner", "custom_marketing_owner",
+  "aar_to_be_done", "aar_done_and_filed",
+  "custom_design_escalations", "custom_design_escalations_solved",
+
+  /* the tick-boxes — forty of them, carried as ONE object below, because
+     "14 of 22 gates done" is intelligence and twenty-two booleans is flab */
+  "po_on_file", "kick_off_done", "sales_order_generated", "job_file_created",
+  "responsible_persons_created", "prep_phase_created_and_sign_off_taken",
+  "main_driver_identified", "ga_drawings_on_file", "packing_list",
+  "chassis_inspection_checklist", "all_vehicle_document_received", "sop_made",
+  "risk_assessment_form_", "custom_pre_design", "custom_approved",
+  "updated_with_in_process_inspection_records", "updated_with_qap",
+  "commissioning_and_warranty_certificate", "documents_for_dispatch",
+  "sop_given", "spare_part_list", "file_kept_ready", "as_built_drawings_completed",
+  "critical_review_needed_for_design", "cost_overrun_warning_by_design",
+];
+
+/** The ERP writes its long text as Quill HTML; a project document reads words. */
+const unhtmlish = (v: unknown) => String(v ?? "")
+  .replace(/<\/(p|div|li|br)>/gi, "\n").replace(/<[^>]*>/g, "")
+  .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+  .replace(/\n{3,}/g, "\n\n").trim();
+
+/** The tick-boxes, kept together so they can be counted rather than listed. */
+/**
+ * Everything that earns a column of its own. Anything the ERP sends that is
+ * NOT in here falls through to `notes` — kept, and shown to nobody.
+ */
+const PROJECT_KEEP = new Set<string>([
+  "name", "project_name", "customer", "status", "is_active", "priority",
+  "custom_project_director", "customer_committed_delivery_", "expected_end_date",
+  "expected_start_date", "project_stage", "sales_order", "jobnumberslist",
+  "short_summary_description", "modified", "custom_product_family", "custom_quantity",
+  "po_number", "percent_complete", "on_time_delivery_status", "design_stage",
+  "custom_design_completion_", "custom_bom_release_target_date", "custom_bom_released_date",
+  "custom_manufacturing_drawings_release_target_date", "custom_manufacturing_drawings_released_date",
+  "custom_approved_bom", "material_availability_percentage",
+  "custom_planning_owner", "custom_design_in_charge", "custom_production_job_owner",
+  "custom_purchase_owner", "custom_kitting_owner", "custom_quality_owner", "custom_marketing_owner",
+  "aar_to_be_done", "aar_done_and_filed",
+  "custom_design_escalations", "custom_design_escalations_solved",
+  /* the tick-boxes are kept in `gates`, so they must not fall into notes too */
+  "po_on_file", "kick_off_done", "sales_order_generated", "job_file_created",
+  "responsible_persons_created", "prep_phase_created_and_sign_off_taken",
+  "main_driver_identified", "ga_drawings_on_file", "packing_list",
+  "chassis_inspection_checklist", "all_vehicle_document_received", "sop_made",
+  "risk_assessment_form_", "custom_pre_design", "custom_approved",
+  "updated_with_in_process_inspection_records", "updated_with_qap",
+  "commissioning_and_warranty_certificate", "documents_for_dispatch",
+  "sop_given", "spare_part_list", "file_kept_ready", "as_built_drawings_completed",
+]);
+
+const PROJECT_GATES: [string, string][] = [
+  ["po_on_file", "PO on file"], ["kick_off_done", "Kick-off done"],
+  ["sales_order_generated", "Sales order raised"], ["job_file_created", "Job file created"],
+  ["responsible_persons_created", "Responsible people named"],
+  ["prep_phase_created_and_sign_off_taken", "Prep phase signed off"],
+  ["main_driver_identified", "Main driver identified"], ["ga_drawings_on_file", "GA drawings on file"],
+  ["custom_pre_design", "Pre-design"], ["custom_approved", "Approved"],
+  ["packing_list", "Packing list"], ["chassis_inspection_checklist", "Chassis inspection checklist"],
+  ["all_vehicle_document_received", "Vehicle documents received"], ["sop_made", "SOP made"],
+  ["risk_assessment_form_", "Risk assessment form"],
+  ["updated_with_in_process_inspection_records", "In-process inspection records"],
+  ["updated_with_qap", "QAP updated"],
+  ["commissioning_and_warranty_certificate", "Commissioning & warranty certificate"],
+  ["documents_for_dispatch", "Dispatch documents"], ["sop_given", "SOP given"],
+  ["spare_part_list", "Spare part list"], ["file_kept_ready", "File kept ready"],
+  ["as_built_drawings_completed", "As-built drawings"],
 ];
 
 /**
@@ -366,6 +456,45 @@ export async function erpSync(
       cust: S(p.customer),
       description: S(p.short_summary_description),
       job_numbers: S(p.jobnumberslist).split(/[,\s]+/).filter(Boolean),
+
+      status: S(p.status),
+      active: p.is_active === 1 || p.is_active === "Yes" || p.is_active === true,
+      priority: S(p.priority),
+      product_family: S(p.custom_product_family),
+      quantity: N(p.custom_quantity),
+      po_number: S(p.po_number),
+      exp_start: D(p.expected_start_date),
+      pct_complete: N(p.percent_complete),
+      otd_status: S(p.on_time_delivery_status),
+      design_stage: S(p.design_stage),
+      design_pct: N(p.custom_design_completion_),
+      bom_target: D(p.custom_bom_release_target_date),
+      bom_released: D(p.custom_bom_released_date),
+      dwg_target: D(p.custom_manufacturing_drawings_release_target_date),
+      dwg_released: D(p.custom_manufacturing_drawings_released_date),
+      approved_bom: S(p.custom_approved_bom),
+      material_pct: N(p.material_availability_percentage),
+      planning_owner: S(p.custom_planning_owner),
+      design_owner: S(p.custom_design_in_charge),
+      production_owner: S(p.custom_production_job_owner),
+      purchase_owner: S(p.custom_purchase_owner),
+      kitting_owner: S(p.custom_kitting_owner),
+      quality_owner: S(p.custom_quality_owner),
+      marketing_owner: S(p.custom_marketing_owner),
+      aar_needed: !!Number(p.aar_to_be_done),
+      aar_done: !!Number(p.aar_done_and_filed),
+      escalations: unhtmlish(p.custom_design_escalations),
+      escalations_solved: unhtmlish(p.custom_design_escalations_solved),
+
+      /* counted, not listed */
+      gates: Object.fromEntries(PROJECT_GATES.map(([k, label]) => [k, { label, done: !!Number(p[k]) }])),
+
+      /* THE FLAB, KEPT AND NOT SHOWN. ERPNext's own plumbing means nothing in
+         this house, but a field nobody thought to name is still there when it
+         is wanted. */
+      notes: Object.fromEntries(Object.entries(p).filter(([k, v]) =>
+        !PROJECT_KEEP.has(k) && v !== null && v !== "" && v !== 0)),
+
       _erp_modified: S(p.modified),
     }))
     .filter((p) => p.id);

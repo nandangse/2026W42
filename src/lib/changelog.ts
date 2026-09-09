@@ -86,6 +86,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.41.0",
+    date: "2026-09-09",
+    module: "The project as a compact document — the pull, without the flab",
+    items: [
+      "\"Make yourself like a Project Management Professional and design this project box from all the data we have\" — and then, having seen what the ERP actually holds: \"<b>currently don\u2019t import the commercials from the project, we will rebuild it. All the other cells which you think are frivolous put them all in project notes! Have a compact project document which can have intelligence built in — not flab.</b>\" (Dr Raghu, 9 Sep 2026.)",
+      "NO COMMERCIALS, on his instruction and on the measurement. The ERP\u2019s Project carries gross_margin, per_gross_margin, total_costing_amount and total_expense_claim — and across 400 projects <b>gross_margin equals MINUS the purchase cost in 110 of the 145</b> where it is not zero, and equals value-minus-cost in <b>none</b>. total_expense_claim, total_costing_amount and per_gross_margin are populated on <b>zero</b> projects; actual_time on one. Importing that would have imported a number saying every project loses money.",
+      "WHAT EARNS A COLUMN: something a person would sort, filter or chase by. <b>Target-versus-actual pairs earn theirs twice over</b> — a BOM released date is a fact; beside the date it was DUE it is a question, and questions are what a project document is for. So BOM target/released, drawings target/released, design %, material availability, stage, priority, OTD status, and the seven named owners each get one.",
+      "WHAT DOES NOT: <b>forty tick-boxes do not deserve forty columns</b>. They go into <code>gates</code> as one object, where they can be counted — \"14 of 22 done\" is intelligence; twenty-two booleans strung across a screen is flab.",
+      "AND THE REST GOES INTO <code>notes</code>: ERPNext\u2019s own plumbing — the e-mail digest schedule, from_time, day_to_send, collect_progress, naming_series, the duplicated 10pc status. <b>Kept</b>, because a field nobody thought to name is still there when it is wanted, and <b>shown to nobody</b>, because it means nothing in this house.",
+      "THE ISSUE LOG AND THE RISK REGISTER get tables of their own — they are lists, not fields, and one project already carries three issues going back to 2021.",
+      "Needs <b>migration 0164</b>. This is the pull and the shape only; the half-width box, the project lightbox, Management Analysis, the AAR and the rebuilt margin follow on it.",
+    ],
+  },
+  {
     v: "5.0.40.1",
     date: "2026-09-09",
     module: "A button that said Saving for ever — and why no term had ever saved",
