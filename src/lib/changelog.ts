@@ -36,40 +36,43 @@ import { APP_VERSION } from "./version";
 /**
  * How much time has gone into Genie.
  *
- * MEASURED, not estimated — from the commit history, by
- * `node scratchpad/effort.mjs`, which prints this block ready to paste back.
+ * MEASURED, not estimated — from the commit history:
  *
- * `windowHours` is the sum, over every day worked, of the span between that
- * day's first and last commit. It is a WINDOW rather than a total, and it is
- * wrong in both directions: it over-counts, because a day with a commit at
- * nine and another at six counts nine hours whether or not the middle went on
- * Genie; and it under-counts, because the thinking, the specifying and the
- * reviewing happen before the first commit and after the last.
+ *   git log --pretty=format:'%ad' --date=iso
+ *
+ * grouped by calendar day; `windowHours` is the sum, over every day worked,
+ * of the span between that day's first and last commit. It is a WINDOW rather
+ * than a total, and it is wrong in both directions: it over-counts, because a
+ * day with a commit at nine and another at six counts nine hours whether or
+ * not the middle went on Genie; and it under-counts, because the thinking,
+ * the specifying and the reviewing happen before the first commit and after
+ * the last.
  *
  * Dr Raghu's own share is a RANGE for the same reason. He specifies and
- * reviews, so he is not at the keyboard for every minute of the window -- but
- * the window also UNDER-counts him, because the thinking, the deciding and the
- * reading of what came back all happen outside the span between a day's first
- * and last commit. The band was raised by a quarter on his own instruction,
- * which is the only evidence available for the part no clock sees.
+ * reviews, so he is not at the keyboard for every minute of the window — but
+ * the window also UNDER-counts him, because the deciding and the reading of
+ * what came back happen outside the span between a day's first and last
+ * commit. The band is 50–73% of the window, set on his own instruction, which
+ * is the only evidence available for the part no clock sees.
  *
- * MEASURED AGAIN 8 Sep 2026, on his word: 451 commits became 703, 26 days
- * became 35, and the window went from 150.5 hours to 303.7 — the fortnight
- * that built HRMS payroll, the IDP, Saamaan's purchasing and the RBOM page.
- * Two of those days, the 6th and the 7th, span 22.8 and 23.9 hours: the work
- * ran through the night, so the window flatters that week more than most. The
- * method is left unchanged all the same, because a series is only worth
- * anything if it is measured the same way each time.
+ * A CORRECTION, 9 Sep 2026. The figure published on 8 September — 303.7 hours
+ * over 35 days — was WRONG, and too high. It grouped commits by one timezone
+ * while reading their clock times in another, so two days appeared to span
+ * 22.8 and 23.9 hours when the real spans were 5.4 and 17.3. Recomputed on a
+ * single basis, the window to 8 September was nearer 248 hours, not 303.7.
+ * The number below is measured the corrected way and every future one will
+ * be, because a series is worth nothing unless it is measured the same way
+ * each time — which is exactly the rule the old figure broke.
  */
 export interface Effort { measuredTo: string; commits: number; days: number; windowHours: number; raghuLow: number; raghuHigh: number }
 
 export const EFFORT: Effort = {
-  measuredTo: "2026-09-08",
-  commits: 703,
-  days: 35,
-  windowHours: 303.7,
-  raghuLow: 151,
-  raghuHigh: 222,
+  measuredTo: "2026-09-09",
+  commits: 746,
+  days: 36,
+  windowHours: 256.7,
+  raghuLow: 128,
+  raghuHigh: 188,
 };
 
 export interface UpdateEntry {
@@ -85,6 +88,18 @@ export interface UpdateEntry {
 
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
+  {
+    v: "5.0.45.5",
+    date: "2026-09-09",
+    module: "The Software Description, re-counted \u2014 and a published number corrected",
+    items: [
+      "\"Please regenerate the software description and also the pushes\" (Dr Raghu, 9 Sep 2026). Every figure re-counted from the code rather than remembered. <b>52 API routes \u2192 228. 46 migrations \u2192 169, plus 64 in the CRM. 69 tables \u2192 309 across two databases. 16 components \u2192 169. 131 commits \u2192 746.</b> And a figure the page never carried: <b>133,765 lines of TypeScript</b>.",
+      "<b>A PUBLISHED NUMBER WAS WRONG, AND IT IS CORRECTED RATHER THAN QUIETLY REPLACED.</b> The build window published on 8 September \u2014 303.7 hours over 35 days \u2014 was too high. It grouped commits by one timezone while reading their clock times in another, so two days appeared to span 22.8 and 23.9 hours when the real spans were <b>5.4 and 17.3</b>. Measured on one basis, the window to today is <b>256.7 hours over 36 days and 746 commits</b>, and Dr Raghu\u2019s own share is 128\u2013188 hours. The old figure broke the very rule the note beside it stated: a series is worth nothing unless it is measured the same way each time.",
+      "FIVE MODULES WERE RUNNING AND UNDOCUMENTED \u2014 <b>Kuber, Vishwakarma, Seva, IMS and Marketing</b>. Each now has its row in the same eight fields as every other: space, purpose, who, gate, screens, data, api, ai. An auditor reading this page could not previously have known IMS existed.",
+      "AND THE SECOND DATABASE IS NAMED. The page described \u201cone Postgres database\u201d; the CRM, Marketing and the WhatsApp queues have lived in their <b>own Postgres project</b> since August. A description that understates where the data sits is the one thing an ISO 27001 auditor is actually there to check.",
+      "\"\u0905\u0917\u0930 \u090f\u0915 company \u0915\u093e\u092e \u0915\u0930\u0928\u0947 \u091c\u093e\u090f\u0917\u093e, \u0924\u094b \u0938\u093e\u0932 \u092d\u0930 \u0938\u0947 \u092d\u0940 \u091c\u094d\u092f\u093e\u0926\u093e \u0915\u093e time \u0932\u0917 \u091c\u093e\u090f\u0917\u093e.\" So the page now carries that comparison \u2014 <b>labelled as arithmetic on a stated assumption, not as a measurement</b>. 133,765 lines over 36 days is about 3,700 a day; at an industry 100\u2013200 lines of reviewed production code per developer-day that is <b>670\u20131,340 developer-days \u2014 three to six developer-years</b>, a team of four to six for a year. The rate is printed beside the answer so anybody who disagrees can redo the sum instead of arguing with the conclusion, and the limits are stated too: lines are a poor measure of work.",
+    ],
+  },
   {
     v: "5.0.45.4",
     date: "2026-09-09",

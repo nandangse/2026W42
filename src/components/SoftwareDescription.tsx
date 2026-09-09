@@ -34,7 +34,7 @@ import type { Effort } from "@/lib/changelog";
 import { useEffect, useState } from "react";
 
 /** Last hand-revision of the prose on this page. Bump it when you edit. */
-const DOC_REVISED = "3 September 2026";
+const DOC_REVISED = "9 September 2026";
 
 const NAVY = "var(--navy)";
 const INK = "var(--ink)";
@@ -50,19 +50,54 @@ const RED = "#C0392B";
    and this block is stale.                                                 */
 const SIZE = {
   /** find src/app/api -name route.ts | wc -l */
-  apiRoutes: 52,
+  apiRoutes: 228,
   /** ls supabase/migrations/*.sql | wc -l */
-  migrations: 46,
-  /** create-table statements across every migration, de-duplicated */
-  tables: 69,
-  /** ls src/components/*.tsx | wc -l */
-  components: 16,
+  migrations: 169,
+  /** ls supabase-crm/migrations/*.sql | wc -l — the CRM keeps its own database */
+  crmMigrations: 64,
+  /** create-table statements across every migration of both databases, de-duplicated */
+  tables: 309,
+  /** find src/components -name '*.tsx' | wc -l */
+  components: 169,
+  /** find src -name '*.ts' -o -name '*.tsx' | xargs wc -l */
+  lines: 133765,
   /** storage.buckets rows inserted by the migrations */
   buckets: 4,
   /** git log --oneline | wc -l */
-  commits: 131,
+  commits: 746,
 };
 
+/**
+ * WHAT THIS WOULD HAVE TAKEN THE ORDINARY WAY.
+ *
+ * Dr Raghu, 9 September 2026: "अगर एक company काम करने जाएगा, तो साल भर से भी
+ * ज्यादा का time लग जाएगा" — a company doing this by hand would take more
+ * than a year.
+ *
+ * The figures above are counted. THIS ONE IS ARITHMETIC ON A STATED
+ * ASSUMPTION, and it is set out here so that anybody who disagrees with the
+ * assumption can redo the sum rather than argue with the conclusion:
+ *
+ *   133,765 lines of TypeScript, over 36 days worked.
+ *   = about 3,700 lines a day.
+ *
+ * A working industry figure for REVIEWED, production-quality code is 100–200
+ * lines per developer-day once design, testing and rework are counted in.
+ * At that rate the same output is 670–1,340 developer-days: roughly THREE TO
+ * SIX developer-years, or a team of four to six people for a year — which is
+ * what he said, and it is the low end of the band rather than the high.
+ *
+ * The comparison is honest only if its limits are stated too. Lines of code
+ * are a poor measure of work; some of this is generated boilerplate and some
+ * of it is one line that took an afternoon to be sure of. It also leaves out
+ * the part no rate captures: 151–222 hours of his own specifying and
+ * reviewing, without which none of it would be the right software.
+ */
+const COMPARISON = {
+  linesPerDevDay: [100, 200] as const,
+  devDays: [670, 1340] as const,
+  devYears: [3, 6] as const,
+};
 /* ═══════════════════════════ the repeatable unit ═══════════════════════════ */
 
 interface ModuleSpec {
@@ -378,6 +413,66 @@ const MODULES: ModuleSpec[] = [
     ai: "None. Stock is not yet reduced by an issue — the stated next step.",
   },
   {
+    name: "Kuber — the books",
+    space: "Kuber",
+    since: "4.2.0.0",
+    purpose: "Tally's own ledgers, vouchers and bills, read into Genie so cash, ageing, compliance and the MIS can be asked questions Tally will not answer.",
+    who: "Granted individuals only.",
+    gate: "requireKuber()",
+    screens: ["Books", "Ledgers", "Vouchers", "Bills & ageing", "Suppliers", "Compliance", "MIS inputs", "Year files"],
+    data: ["kuber_upload", "kuber_year_file", "kuber_ledger", "kuber_voucher", "kuber_voucher_item", "kuber_voucher_line", "kuber_bill", "kuber_bill_alloc", "kuber_group", "kuber_supplier_reco", "kuber_compliance", "kuber_compliance_entry", "kuber_payment_plan", "kuber_fd", "kuber_bg", "kuber_insurance", "kuber_loan", "kuber_mis_input", "kuber_ratio_target", "kuber_release", "kuber_bounce", "kuber_cash_item", "kuber_expense_class", "kuber_opening_bill"],
+    api: ["/api/kuber/upload", "/api/kuber/books", "/api/kuber/ingest", "/api/kuber/register", "/api/kuber/compliance", "/api/kuber/years", "/api/kuber/tasking"],
+    ai: "None. The 400 MB UTF-16 exports are parsed IN THE BROWSER and posted as rows, because they cannot pass through a serverless request body.",
+  },
+  {
+    name: "Vishwakarma — design",
+    space: "Vishwakarma",
+    since: "4.3.0.0",
+    purpose: "The design office's own room: what each designer is doing this week, the design plan behind a project, the problems raised and the ideas kept.",
+    who: "Granted individuals only.",
+    gate: "requireVishwakarma()",
+    screens: ["Projects", "Design plan", "Week's work", "Problems", "Ideas", "References", "Reviews"],
+    data: ["vishwa_project", "vishwa_plan", "vishwa_design_plan", "vishwa_week_work", "vishwa_problem", "vishwa_idea", "vishwa_reference", "vishwa_review", "vishwakarma_access"],
+    api: ["/api/vishwakarma/projects", "/api/vishwakarma/genie", "/api/vishwakarma/reg"],
+    ai: "Genie drafts against a design problem when asked; nothing is written without a person pressing save.",
+  },
+  {
+    name: "Seva — customer service",
+    space: "Seva",
+    since: "4.5.0.0",
+    purpose: "What a customer asked for after the machine went out: support tickets and annual maintenance contracts, imported whole from the ERP.",
+    who: "Granted individuals only.",
+    gate: "requireSeva()",
+    screens: ["Support Tickets", "AMC", "Masters", "Attachments"],
+    data: ["seva_issue", "seva_amc", "seva_attachment", "seva_master", "seva_push", "seva_access"],
+    api: ["/api/seva/erp-tickets", "/api/seva/erp-amc", "/api/seva/push", "/api/seva/reg"],
+    ai: "None. 11,949 tickets and 362 contracts are imported READ-ONLY; the 24,000 attachments are INDEXED, not copied — every one is private in the ERP and copying them is a decision about storage and confidentiality nobody has taken.",
+  },
+  {
+    name: "IMS — the management system",
+    space: "IMS",
+    since: "4.6.0.0",
+    purpose: "ISO 9001 and AS9100D as a working system rather than a folder: documents under revision control, clause evidence, audits, findings, CAPA, objectives, training and welding qualifications.",
+    who: "Granted individuals, each with a role on the row.",
+    gate: "requireIms(), and the row's own role",
+    screens: ["Dashboard", "Documents", "Standards & clauses", "Registers", "Audits & findings", "CAPA / RCA", "Objectives", "Training", "Certificates", "Welding"],
+    data: ["ims_document", "ims_document_revision", "ims_document_clause_map", "ims_standard", "ims_standard_clause", "ims_clause_evidence_note", "ims_audit", "ims_audit_plan", "ims_audit_finding", "ims_audit_log", "ims_nonconformity", "ims_capa", "ims_rca", "ims_objective", "ims_objective_reading", "ims_training_record", "ims_training_requirement", "ims_certificate", "ims_certification", "ims_certification_path_step", "ims_register_definition", "ims_register_entry", "ims_number_series", "ims_doc_series", "ims_kaizen", "ims_feedback", "ims_management_review", "ims_weld_log", "ims_welder_qual", "ims_wps", "ims_wpqr", "ims_settings", "ims_access"],
+    api: ["/api/ims/document", "/api/ims/register", "/api/ims/standard", "/api/ims/certification", "/api/ims/certificate", "/api/ims/event", "/api/ims/task", "/api/ims/dashboard", "/api/ims/file", "/api/ims/settings", "/api/cron/ims-expiry"],
+    ai: "None.",
+  },
+  {
+    name: "Marketing",
+    space: "Marketing",
+    since: "4.8.0.0",
+    purpose: "Campaigns, lists, landing pages and the tracking behind them — on the CRM's database, beside the contacts they speak to.",
+    who: "CRM members; scope is member-only or everybody, decided per campaign.",
+    gate: "requireCrm(), plus the campaign's own scope",
+    screens: ["Campaigns", "Lists", "Templates", "Landing pages", "Assets", "Leads", "Channels", "Notes"],
+    data: ["CRM database — campaign, list, template, landing page, asset and tracking tables"],
+    api: ["/api/marketing/campaigns", "/api/marketing/lists", "/api/marketing/templates", "/api/marketing/landing", "/api/marketing/leads", "/api/marketing/channels", "/api/marketing/webhook", "/api/marketing/unsubscribe", "/api/cron/marketing-drain"],
+    ai: "Genie drafts campaign copy on request. Apollo imports stay OUT of the CRM by instruction — a bought list is not a contact.",
+  },
+  {
     name: "Notifications",
     space: "Cross-cutting",
     since: "2.x",
@@ -413,6 +508,11 @@ const SPACES: SpaceSpec[] = [
   { icon: "👤", name: "HRMS", what: "The employee master and directory, at its own URL: records, contact details, next of kin, and the history of every change.", who: "Three named accounts — the owner, one director, HR.", how: "Explicit grant — hrms_access, ticked by the owner alone." },
   { icon: "🤝", name: "CRM", what: "The funnel at its own URL: the whole opportunity book since 2015, quotations, the Deal Board, mail and WhatsApp from each person's own accounts, EVA company briefs. A second database entirely.", who: "Everyone the grant admits.", how: "Explicit grant — crm_access; one Genie login, bridged on email." },
   { icon: "📦", name: "Saamaan", what: "Materials, at its own URL: the ERP's Item master mirrored with live stock, projects and BOMs, the Real BOM, a WIP per live job, MRP runs with planning, kitting into WIP, issue slips to the store and requisitions to purchase with a daily escalation ladder. Every table wears the material_ prefix; every ERP call is a read.", who: "Everyone the grant admits; the owner implicit.", how: "Explicit grant — material_access, ticked by the owner alone." },
+  { icon: "💰", name: "Kuber", what: "The books, at its own URL: Tally's ledgers, vouchers, bills and ageing, supplier reconciliation, compliance, the MIS inputs and the year files. The 400 MB UTF-16 exports are parsed IN THE BROWSER, because they cannot pass through a serverless request body.", who: "Granted individuals only.", how: "Explicit grant — kuber access." },
+  { icon: "📐", name: "Vishwakarma", what: "The design office, at its own URL: each designer's week, the design plan behind a project, the problems raised and the ideas kept.", who: "Granted individuals only.", how: "Explicit grant — vishwakarma_access." },
+  { icon: "🛠", name: "Seva", what: "Customer service, at its own URL: support tickets and annual maintenance contracts imported whole from the ERP. 11,949 tickets back to 2016; their 24,000 attachments are INDEXED, not copied — every one is private in the ERP.", who: "Granted individuals only.", how: "Explicit grant — seva_access." },
+  { icon: "📗", name: "IMS", what: "ISO 9001 and AS9100D as a working system, at its own URL: documents under revision control, clause evidence, audits, findings, CAPA, objectives, training, certificates and welding qualifications.", who: "Granted individuals, each with a role on their own row.", how: "Explicit grant — ims_access, plus the row's role." },
+  { icon: "📣", name: "Marketing", what: "Campaigns, lists, landing pages and their tracking — on the CRM's database, beside the contacts they speak to. Apollo imports stay OUT of the CRM by instruction.", who: "CRM members; each campaign is scoped to members or to everybody.", how: "Explicit grant — crm_access, plus the campaign's scope." },
   { icon: "👤", name: "Account menu", what: "The tools for the few: Morning Update, Update to ERP, Feature Request, Admin.", who: "Each gated on its own right.", how: "Role or grant, per tool." },
 ];
 
@@ -426,6 +526,8 @@ const DATA_DOMAINS: [string, string, string[]][] = [
   ["Shop floor", "What was said and photographed at the machine.", ["job_voice_note", "job_photo", "job_hint"]],
   ["Goals / OPSP", "The cascade, its bands, its links and its comments.", ["goal_node", "goal_item", "goal_band", "goal_csf_link", "goal_node_comment", "goal_item_comment", "csf", "kra", "kpi", "kpi_watcher", "rock_project", "opsp_section", "person_band", "swimlanes"]],
   ["Delivery & money", "Delivered history and the year's targets.", ["delivered_jobs", "fy_targets", "erp_update"]],
+  ["Attendance (HRMS)", "Who was present, from a phone in the field and from the biometric machine, kept apart by source so neither can be mistaken for the other.", ["hrms_attendance_punch", "hrms_essl_import"]],
+  ["The second database (CRM)", "The CRM, Marketing and the WhatsApp queues live in their OWN Postgres project, not in Genie's. One login, bridged on e-mail. Row Level Security is on every table there and revoked from public, anon and authenticated.", ["company", "person", "opportunity", "quotation", "sales_order", "interaction", "message", "wa_queue", "wa_inbound", "wa_webhook_event", "outbound_queue", "broadcast", "integration_setting", "fx_rate"]],
   ["Sales", "My Sales Plan's entity tables and the playbook content.", ["sp_companies", "sp_deals", "sp_industries", "sp_people", "sp_products", "sp_settings", "sp_support", "sp_todos", "sales_content"]],
   ["Learning", "Books, sections, lessons, progress, plans.", ["lms_book", "lms_section", "lms_lesson", "lms_lesson_book", "lms_progress", "lms_plan", "lms_extra"]],
   ["Company voice", "Principles, quotes, moods, requests and notifications.", ["principles", "principle_doc", "principle_file", "image_quote", "day_mood", "feature_request", "feature_file", "notifications"]],
@@ -617,8 +719,12 @@ export default function SoftwareDescription() {
           <KV k="Owner" v="Dr Raghunandan Jagdish. The owner account sits above the admin role and is protected by both an API check and a database trigger." />
           <KV k="Production address" v={<><b>genie.nandan.co.in</b> — verified serving. The Vercel project address remains reachable as a fallback.</>} />
           <KV k="Users" v="Nandan GSE staff only. No customer, supplier or public access of any kind." />
-          <KV k="Size" v={`${SIZE.apiRoutes} API routes · ${SIZE.tables} tables · ${SIZE.migrations} migrations · ${SIZE.components} React components · ${SIZE.buckets} object-storage buckets`} />
+          <KV k="Size" v={`${SIZE.apiRoutes} API routes · ${SIZE.tables} tables across two databases · ${SIZE.migrations} Genie migrations and ${SIZE.crmMigrations} CRM · ${SIZE.components} React components · ${SIZE.lines.toLocaleString("en-IN")} lines of TypeScript · ${SIZE.buckets} object-storage buckets`} />
           <KV k="Build effort" v={`${EFFORT.raghuLow}–${EFFORT.raghuHigh} hours of Dr Raghu's own time specifying and reviewing; a ${EFFORT.windowHours}-hour build window across ${EFFORT.days} days; ${EFFORT.commits} commits, measured to ${EFFORT.measuredTo}.`} />
+          <KV
+            k="What it would take the ordinary way"
+            v={`About ${SIZE.lines.toLocaleString("en-IN")} lines over ${EFFORT.days} days worked is roughly 3,700 lines a day. At an industry rate of ${COMPARISON.linesPerDevDay[0]}–${COMPARISON.linesPerDevDay[1]} lines of reviewed, production-quality code per developer-day, the same output is ${COMPARISON.devDays[0].toLocaleString("en-IN")}–${COMPARISON.devDays[1].toLocaleString("en-IN")} developer-days — ${COMPARISON.devYears[0]} to ${COMPARISON.devYears[1]} developer-years, or a team of four to six for a year. THIS ONE IS ARITHMETIC ON A STATED ASSUMPTION, not a measurement: lines of code are a poor measure of work, and the sum is printed with its rate so anybody who disagrees can redo it rather than argue with the conclusion.`}
+          />
           <KV k="Ownership of the code" v="Private GitHub repository. Single main branch. Secrets are never committed." />
         </div>
       </Sec>
