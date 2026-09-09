@@ -119,6 +119,8 @@ export async function POST(req: Request) {
     if (channel === "email" && !String(body.subject || "").trim()) throw new HttpError(400, "A subject, please — a bulk mail without one is a bulk mail nobody opens.");
 
     const attachments = Array.isArray(body.attachments) ? body.attachments : [];
+    /** The template's positional variables, as typed — {{name}} and the rest still in them. */
+    const paramsRaw = (Array.isArray(body.params) ? body.params : []).map(String);
 
     // ---- who they are -----------------------------------------------------
     const { data: people, error: pe } = await db.from("person")
@@ -180,14 +182,27 @@ export async function POST(req: Request) {
       if (deals.length === 0) noDeal++;
       if (deals.length > 1) manyDeals++;
 
+      /**
+       * VARIABLES ARE RESOLVED PER PERSON — AND SO ARE THE TEMPLATE'S
+       * PARAMS (9 Sep 2026).
+       *
+       * A Meta template is positional: "Dear {{1}}, {{2}}". If {{1}} is the
+       * contact's name then a single list shared by forty recipients would
+       * greet all forty by the same name — the worst possible failure for a
+       * bulk WhatsApp, and a silent one. So each param is put through the
+       * same renderer as the body, per person, and each queue row keeps its
+       * own finished list.
+       */
       let rendered = text;
-      if (text) {
+      let rowParams = paramsRaw;
+      if (text || paramsRaw.length) {
         try {
           const vals = await variableValues({
             personId: id, companyId: p.company_id ? String(p.company_id) : null,
             opportunityId: opportunity_id, quotationId: null,
           });
-          rendered = renderTemplate(text, vals);
+          if (text) rendered = renderTemplate(text, vals);
+          if (paramsRaw.length) rowParams = paramsRaw.map((x) => renderTemplate(x, vals));
         } catch (e) { swallow("crm/broadcast", e); /* an unresolvable variable must not lose the message */ }
       }
 
@@ -207,7 +222,7 @@ export async function POST(req: Request) {
         rows.push({
           phone, body: rendered,
           template_name: campaign || String(body.template || "").slice(0, 120),
-          params: Array.isArray(body.params) && body.params.length ? body.params.map(String) : null,
+          params: rowParams.length ? rowParams : null,
           media: body.media && (body.media as { url?: string }).url ? body.media : null,
           person_id: id, company_id: p.company_id ?? null, opportunity_id,
           broadcast_id: bid, batch_id: bid,

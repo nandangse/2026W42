@@ -195,6 +195,10 @@ export default function Broadcast({
               </div>
               <div style={{ flex: "1 1 45%", minWidth: 200 }}>
                 <L>VARIABLES, IN THE TEMPLATE&apos;S ORDER</L>
+                <div className="text-xs mb-1" style={{ color: MUTED, lineHeight: 1.5 }}>
+                  A Meta template is positional \u2014 <code>{"{{1}}"}</code>, <code>{"{{2}}"}</code>. Put a Genie variable here
+                  and it is filled <b>per person</b>: <code>{"{{name}}"}</code> as the first value greets each contact by their own name.
+                </div>
                 <input value={params} onChange={(e) => setParams(e.target.value)} placeholder="comma separated — blank if the template has none"
                   className="rounded border px-2 py-1.5 w-full" style={{ borderColor: BORDER, fontSize: 13 }} />
               </div>

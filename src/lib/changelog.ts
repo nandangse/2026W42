@@ -86,6 +86,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.45.3",
+    date: "2026-09-09",
+    module: "A template variable is filled per person, not once for forty",
+    items: [
+      "Dr Raghu asked for a template shaped <code>Dear {{name}} / {{message}}</code> while building it in AiSensy (9 Sep 2026). Writing it exposed a fault in the broadcast that would have been silent and very public.",
+      "<b>A META TEMPLATE IS POSITIONAL</b> \u2014 <code>{{1}}</code>, <code>{{2}}</code> \u2014 and the composer sent ONE list of values for the whole send. If <code>{{1}}</code> is the contact\u2019s name, forty people would have been greeted by the same name. The worst kind of failure for a bulk WhatsApp: wrong on every message, visible to every recipient, and invisible on our side.",
+      "Each param is now put through the SAME renderer as the message body, <b>per person</b>, and every queue row keeps its own finished list. Type <code>{{name}}</code> as the first value and each contact is greeted by their own.",
+      "The composer says so where it is typed, rather than leaving it to be discovered.",
+    ],
+  },
+  {
     v: "5.0.45.2",
     date: "2026-09-09",
     module: "Delivered is written in two places, and Genie only read one",
