@@ -58,17 +58,30 @@ export async function aisensyConfig(db: SupabaseClient): Promise<AisensyCfg | { 
 }
 
 /**
- * The number as AiSensy wants it: digits, with the country code.
+ * The number as AiSensy wants it: +(country code)(number).
  *
- * A bare ten-digit Indian mobile is refused at their end, and the refusal
- * reads like a bad key rather than a bad number — an hour spent debugging
- * the wrong thing. So it is fixed here, where the mistake is visible.
+ * Their reference is explicit, and the two halves of the rule are not the
+ * same rule (checked against the published API docs, 9 Sep 2026):
+ *
+ *   "For all numbers outside India, it's MANDATORY to provide it in
+ *    +(country code)(phone number). For Indian numbers it's optional. If a
+ *    phone number can't be resolved to any country then it is by default
+ *    considered to be from India (+91)."
+ *
+ * So the "+" is not decoration. Without it a Spanish or a British number is
+ * read as Indian and the send either fails or, worse, goes somewhere else.
+ * We deal with Airbus in Spain; this had to be right before the first
+ * overseas send, not after it.
+ *
+ * A bare ten-digit Indian mobile is still given its 91, because their
+ * refusal for a short number reads like a bad key rather than a bad number
+ * — an hour spent debugging the wrong thing.
  */
 export function destinationOf(phone: string): string {
   const d = String(phone || "").replace(/\D/g, "");
   if (!d) return "";
-  if (d.length === 10) return `91${d}`;
-  return d.replace(/^0+/, "");
+  if (d.length === 10) return `+91${d}`;
+  return `+${d.replace(/^0+/, "")}`;
 }
 
 export interface AisensySend {
@@ -80,6 +93,13 @@ export interface AisensySend {
   params?: (string | number | null | undefined)[];
   media?: { url: string; filename: string } | null;
   tags?: string[];
+  /**
+   * Stamped onto the contact in AiSensy's own dashboard, for segmentation
+   * there. Their rule, quoted: "only string is allowed as the key's value" —
+   * so anything numeric is stringified below rather than sent as a number
+   * and refused.
+   */
+  attributes?: Record<string, string | number | null | undefined>;
 }
 
 export interface SendResult { ok: boolean; id?: string; error?: string }
@@ -101,6 +121,12 @@ export async function aisensySend(cfg: AisensyCfg, msg: AisensySend): Promise<Se
   if (msg.params?.length) body.templateParams = msg.params.map((p) => String(p ?? ""));
   if (msg.media?.url) body.media = { url: msg.media.url, filename: msg.media.filename || "document.pdf" };
   if (msg.tags?.length) body.tags = msg.tags;
+  if (msg.attributes && Object.keys(msg.attributes).length)
+    body.attributes = Object.fromEntries(
+      Object.entries(msg.attributes)
+        .filter(([, v]) => v !== null && v !== undefined && String(v) !== "")
+        .map(([k, v]) => [k, String(v)]),
+    );
 
   try {
     const r = await fetch(cfg.url, {

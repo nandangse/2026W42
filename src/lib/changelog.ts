@@ -86,6 +86,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.44.6",
+    date: "2026-09-09",
+    module: "AiSensy checked against its own reference \u2014 and the plus that would have misdelivered an overseas message",
+    items: [
+      "Dr Raghu sent the AiSensy API reference (9 Sep 2026). The client built on 8 September already speaks exactly that endpoint \u2014 <code>POST backend.aisensy.com/campaign/t1/api/v2</code>, key in the body, campaign by name, params in order. Two things did not match, and one of them mattered.",
+      "<b>THE PLUS WAS NOT DECORATION.</b> Their reference: \u201cFor all numbers outside India it is MANDATORY to provide it in +(country code)(phone number) \u2026 If a phone number can\u2019t be resolved to any country then it is by default considered to be from India (+91).\u201d Genie was sending bare digits. An Indian number would have been fine; a <b>Spanish or British number would have been read as Indian</b> \u2014 failing, or worse, going somewhere else. We deal with Airbus in Spain. Fixed before the first overseas send rather than after it.",
+      "<code>attributes</code> is now passed through \u2014 key/value pairs stamped onto the contact in AiSensy\u2019s own dashboard for segmentation there. Their rule is that only strings are allowed as values, so anything numeric is stringified rather than sent as a number and refused.",
+      "AND WHAT IS ACTUALLY STOPPING IT, measured rather than assumed: the <code>aisensy</code> settings row holds <b>an empty API key, no campaign, and paused = yes</b>. The integration is not broken and is not half-built \u2014 it is switched off for want of three things only Dr Raghu can supply: the API key from Manage \u2192 API Key, one Meta-approved template set <b>Live</b> as a campaign, and paused = no.",
+    ],
+  },
+  {
     v: "5.0.44.5",
     date: "2026-09-09",
     module: "The uncertain ones by name too, and where each job actually stands",
