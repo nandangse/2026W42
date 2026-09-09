@@ -35,7 +35,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { monthKey, monthLabel } from "@/lib/fmt";
-import { today } from "@/lib/schedule";
+import { today, fmt, jobNo } from "@/lib/schedule";
 
 const C = {
   ink: "var(--navy)", body: "var(--ink)", sub: "var(--dim)", mute: "var(--muted)", faint: "#B8B5AC",
@@ -46,6 +46,8 @@ const C = {
 /** Only the fields this panel reads — so it never has to track the Job type. */
 export interface YearJob {
   id: string;
+  /** The customer tag — the only label a job needs on a chip. */
+  tag: string;
   tdd: string | null;
   val: number;
   tpv: number;
@@ -166,9 +168,12 @@ export default function YearPanel({
   V,
   planPerMonth,
   planTpPerMonth,
+  onOpen,
 }: {
   jobs: YearJob[];
   V: (n: number) => string;
+  /** Open a job from its chip — the list is only useful if it goes somewhere. */
+  onOpen?: (id: string) => void;
   /** Sales that has to be billed every month to make the year. Null = no target set, or not permitted to see it. */
   planPerMonth: number | null;
   planTpPerMonth: number | null;
@@ -271,15 +276,28 @@ export default function YearPanel({
    */
   const conf = useMemo(() => {
     const certain = zero(), likely = zero(), risk = zero(), uncalled = zero();
-    if (!d || !who) return { certain, likely, risk, uncalled, any: false };
+    /**
+     * THE CERTAIN ONES, NAMED (Dr Raghu, 9 Sep 2026: "show the 100% certain
+     * in the box below plan of Sept. Show the order. Customer tag is enough
+     * as a button!").
+     *
+     * A count of 27 certainties is a number; the twenty-seven tags are a
+     * list somebody can work down. IN DATE ORDER, soonest first — a
+     * commitment list sorted by anything else is a list nobody can act on.
+     * Jobs with no target date sit at the end rather than at the front,
+     * where a blank would otherwise sort them.
+     */
+    const named: YearJob[] = [];
+    if (!d || !who) return { certain, likely, risk, uncalled, named, any: false };
     for (const j of jobs) {
       const pct = d.beliefs[j.id]?.[who];
       if (pct == null) add(uncalled, j);
-      else if (pct >= 100) add(certain, j);
+      else if (pct >= 100) { add(certain, j); named.push(j); }
       else if (pct > 50) add(likely, j);
       else add(risk, j);
     }
-    return { certain, likely, risk, uncalled, any: certain.jobs + likely.jobs + risk.jobs > 0 };
+    named.sort((a, b) => (a.tdd || "9999").localeCompare(b.tdd || "9999"));
+    return { certain, likely, risk, uncalled, named, any: certain.jobs + likely.jobs + risk.jobs > 0 };
   }, [jobs, d, who]);
 
   if (!d) return null;
@@ -337,6 +355,42 @@ export default function YearPanel({
             <Split label="ACHIEVED" t={month.achieved} V={V} ink={C.green} hideMoney={noMoney} />
             <Split label="BALANCE" t={month.balance} V={V} ink={month.balance.jobs ? C.red : C.faint} />
           </div>
+
+          {/* THE CERTAIN ONES, BY NAME — the count on the right made
+              actionable. Soonest first; a job already past its date is
+              red, because a commitment called certain and overdue is the
+              one worth a telephone call this morning. */}
+          {conf.named.length > 0 && (
+            <div className="mt-2.5 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
+              <div className="text-xs font-bold mb-1" style={{ color: C.green, letterSpacing: .6 }}>
+                100% CERTAIN{person ? <span style={{ color: C.faint }}> · {person.name}</span> : null}
+                <span style={{ color: C.faint }}> · {conf.named.length} job{conf.named.length === 1 ? "" : "s"}, soonest first</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {conf.named.map((j) => {
+                  const late = !!j.tdd && j.tdd < TODAY;
+                  return (
+                    <button
+                      key={j.id}
+                      onClick={() => onOpen?.(j.id)}
+                      className="rounded px-2 py-0.5 text-xs font-semibold text-left"
+                      style={{
+                        border: `1px solid ${late ? C.red : C.line}`,
+                        background: late ? "#FEF3F2" : "#fff",
+                        color: late ? C.red : C.body,
+                        cursor: onOpen ? "pointer" : "default",
+                        maxWidth: "100%",
+                      }}
+                      title={`${jobNo(j.id)} · ${j.tag}\n${j.tdd ? `TDD ${fmt(j.tdd)}${late ? " — the date has gone" : ""}` : "no target date"}\n${V(j.val)} · ${V(j.tpv)} throughput${onOpen ? "\n\nClick to open the job." : ""}`}
+                    >
+                      {j.tag || jobNo(j.id)}
+                      <span style={{ color: C.faint, fontWeight: 400 }}> · {j.tdd ? fmt(j.tdd) : "no date"}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </Box>
 
         {/* ---- 3. whose plan ---- */}

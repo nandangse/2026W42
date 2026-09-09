@@ -555,6 +555,7 @@ export function DeliveryBoard({
         V={V}
         planPerMonth={showForward && rr?.hasTarget ? rrPerMonth(rr).sales : null}
         planTpPerMonth={showForward && rr?.hasTarget ? rrPerMonth(rr).tp : null}
+        onOpen={(id) => { const j = jobs.find((x) => x.id === id); if (j) setPicked(j); }}
       />
 
       {/* Opened from the PENDING JOBS card. It reads the SAME filtered list the

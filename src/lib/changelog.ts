@@ -86,6 +86,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.44.4",
+    date: "2026-09-09",
+    module: "The twenty-seven certainties, by name",
+    items: [
+      "\"Show the 100% certain in the box below Plan of Sept. Show the order. Customer tag is enough as a button!\" (Dr Raghu, 9 Sep 2026). The right-hand box says <b>27 jobs called certain</b>. That is a number. The twenty-seven <b>tags</b> are a list somebody can work down, so they now sit under ACHIEVED and BALANCE in the middle box \u2014 one chip each, the customer tag and its target date, nothing else.",
+      "<b>SOONEST FIRST.</b> A commitment list sorted by anything but the date it is owed is a list nobody can act on. Jobs with no target date sit at the end rather than at the front, where an empty date would otherwise sort them.",
+      "A chip whose date has already gone is <b>red</b> \u2014 a job called certain and overdue is the one worth a telephone call this morning. Clicking any chip opens the job.",
+    ],
+  },
+  {
     v: "5.0.44.3",
     date: "2026-09-09",
     module: "One project lightbox for two screens, and a TDD window on the commercials",
