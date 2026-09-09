@@ -86,6 +86,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.42.0",
+    date: "2026-09-09",
+    module: "What a job actually earns — a margin that admits what it does not know",
+    items: [
+      "\"Project cost minus RM from RBOM, minus labour, minus transport and OHs which is also there in the JOB, minus any other expense costs or claims assigned to job or project, giving the gross margin and gross margin %. We need to set this for the jobs\" (Dr Raghu, 9 Sep 2026).",
+      "THREE OF THE FOUR HAD NOWHERE TO LIVE, measured before a line was written: the RBOM carries <b>4,459 priced lines</b>, so raw material is real — but <code>wip_labour</code> is populated on <b>nought jobs of 114</b>, <code>invested</code> on nought, and transport, overheads and expense claims had <b>no column anywhere in Genie</b>. Migration 0165 gives them one, plus a small ledger for claims that can hang off a job or off a whole project.",
+      "AND THE MARGIN NEVER PRETENDS. A margin worked out from one of five costs reports a magnificent profit — which is precisely the fault I found in the ERP\u2019s own gross_margin this morning, only inverted, and <b>inverting a bad number is not fixing it</b>. So every cost line is nullable, <b>null means \"not known\" and never zero</b>, and the figure carries a count beside it: <i>3 of 5 costs are in. Not yet counted: labour, overheads. Until they are, this reads higher than the truth.</i>",
+      "RAW MATERIAL CANNOT BE TYPED HERE. It is read from the RBOM the job reaches through <code>material_wip.rbom_no</code>, because the BOM is where that number is decided — and a second copy typed on this screen would be the one that goes stale. Where a job has no RBOM built yet, which is most of them, it says so rather than showing a zero.",
+      "A PROJECT-LEVEL CLAIM IS SPREAD BY VALUE, not equally: a cost against an order of two machines, one worth twice the other, did not fall equally on them. Where the sibling jobs carry no value at all it splits evenly, because an equal split of a known cost beats discarding it.",
+      "Needs <b>migration 0165</b>. Labour, transport and overheads are Suresh\u2019s to enter in the same Stratcom lightbox that already holds value, tax and the payment terms.",
+    ],
+  },
+  {
     v: "5.0.41.1",
     date: "2026-09-09",
     module: "The issue log comes across — and what the registers actually hold",

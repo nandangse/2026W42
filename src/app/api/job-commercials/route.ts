@@ -3,6 +3,7 @@ import { errJson, HttpError, requireStratcom } from "@/lib/auth";
 import { readBody } from "@/lib/validate";
 import { adminClient } from "@/lib/supabase/admin";
 import { swallow } from "@/lib/swallow";
+import { marginsFor } from "@/lib/job-margin";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,18 @@ const N = (v: unknown): number | null => {
 
 const PCTS = ["pay_pct_on", "pay_pct_30", "pay_pct_60", "pay_pct_90"] as const;
 
+/** GET /api/job-commercials?id=<job> — the margin as it stands. */
+export async function GET(req: Request) {
+  try {
+    await requireStratcom();
+    const id = String(new URL(req.url).searchParams.get("id") ?? "").trim();
+    if (!id) throw new HttpError(400, "Which job?");
+    const [margin] = await marginsFor(adminClient(), [id]);
+    if (!margin) throw new HttpError(404, `No job ${id} on the board.`);
+    return NextResponse.json({ ok: true, margin });
+  } catch (e) { return errJson(e); }
+}
+
 export async function POST(req: Request) {
   try {
     const user = await requireStratcom();
@@ -45,7 +58,7 @@ export async function POST(req: Request) {
     if (!id) throw new HttpError(400, "Which job?");
 
     const patch: Record<string, number | null> = {};
-    for (const k of ["val", "gst", "advance"] as const) {
+    for (const k of ["val", "gst", "advance", "wip_labour", "transport", "overheads"] as const) {
       if (k in b) {
         const n = N(b[k]);
         if (n != null && n < 0) throw new HttpError(400, `${k} cannot be negative.`);
@@ -113,6 +126,10 @@ export async function POST(req: Request) {
       } catch (e) { swallow("job-commercials", e); /* the local edit still stands */ }
     }
 
-    return NextResponse.json({ ok: true, row: data });
+    /* the margin, worked out fresh off what was just stored — so the screen
+       never shows a figure computed from what it thought it was saving */
+    let margin = null;
+    try { [margin] = await marginsFor(db, [id]); } catch (e) { swallow("job-commercials margin", e); }
+    return NextResponse.json({ ok: true, row: data, margin });
   } catch (e) { return errJson(e); }
 }

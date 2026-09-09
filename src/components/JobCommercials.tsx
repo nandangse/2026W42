@@ -486,6 +486,15 @@ function In({ v, set, w = 130, suffix }: { v: string; set: (s: string) => void; 
   );
 }
 
+/** What /api/job-commercials answers with — see src/lib/job-margin.ts. */
+type CostLine = { amount: number | null; known: boolean; from: string };
+type Margin = {
+  job_id: string; value: number | null;
+  rm: CostLine; labour: CostLine; transport: CostLine; overheads: CostLine; other: CostLine;
+  cost: number; margin: number | null; pct: number | null;
+  have: number; complete: boolean; missing: string[];
+};
+
 function TermsLightbox({ job, today, onClose, onSaved }: {
   job: CommJob; today: string; onClose: () => void; onSaved: () => Promise<unknown>;
 }) {
@@ -499,6 +508,17 @@ function TermsLightbox({ job, today, onClose, onSaved }: {
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  /* WHAT IT COST, AND WHAT IT THEREFORE EARNED (Dr Raghu, 9 Sep 2026). RM
+     comes from the RBOM and cannot be typed; the other three are his to
+     enter, which is what "we need to set this for the jobs" means. */
+  const [labour, setLabour] = useState(S(job.wipLabour));
+  const [transport, setTransport] = useState(S((job as unknown as Record<string, unknown>).transport));
+  const [overheads, setOverheads] = useState(S((job as unknown as Record<string, unknown>).overheads));
+  const [margin, setMargin] = useState<Margin | null>(null);
+  useEffect(() => {
+    fetch(`/api/job-commercials?id=${encodeURIComponent(job.id)}`, { cache: "no-store" })
+      .then((r) => r.json()).then((j) => setMargin(j.margin ?? null)).catch(() => {});
+  }, [job.id]);
 
   const nv = Number(val) || 0;
   const ng = gst === "" ? null : Number(gst);
@@ -528,9 +548,11 @@ function TermsLightbox({ job, today, onClose, onSaved }: {
     try {
       const body: Record<string, unknown> = {
         job_id: job.id, val, gst, advance: adv,
+        wip_labour: labour, transport, overheads,
         ...Object.fromEntries(BUCKETS.map((b) => [b.col, p[b.col]])),
       };
-      await api.post("/api/job-commercials", body);
+      const out = await api.post("/api/job-commercials", body) as { margin?: Margin };
+      if (out?.margin) setMargin(out.margin);
       await onSaved();
       onClose();
     } catch (e) {
@@ -560,6 +582,61 @@ function TermsLightbox({ job, today, onClose, onSaved }: {
           <Row label="Amount" strong>{cr(amount)}</Row>
           <Row label="Advance received"><In v={adv} set={setAdv} /></Row>
           <Row label="Balance due" strong>{cr(balance)}</Row>
+
+          {/* ── WHAT IT COST, AND WHAT IT EARNED ──────────────────────────
+              RM is read from the RBOM and cannot be typed here: the BOM is
+              where that number is decided, and a second copy typed on this
+              screen would be the one that goes stale. */}
+          <div className="text-xs font-bold mt-3 mb-1" style={{ color: C.sub, letterSpacing: .6 }}>
+            WHAT IT COST
+          </div>
+          <div className="flex items-center justify-between gap-3 py-2" style={{ borderBottom: `1px solid ${C.line}` }}>
+            <div className="text-xs" style={{ color: C.sub, fontWeight: 600 }}>
+              Raw material <span style={{ color: "#B9B5AA" }}>· from the RBOM, not typed</span>
+            </div>
+            <div className="tnum" style={{ fontWeight: 600 }}>
+              {margin?.rm.known
+                ? <span>{cr(margin.rm.amount ?? 0)} <span style={{ color: C.sub, fontWeight: 400, fontSize: 11 }}>{margin.rm.from}</span></span>
+                : <span style={{ color: "#B26A00", fontSize: 12, fontWeight: 600 }}>{margin?.rm.from ?? "…"}</span>}
+            </div>
+          </div>
+          <Row label="Labour"><In v={labour} set={setLabour} /></Row>
+          <Row label="Transport"><In v={transport} set={setTransport} /></Row>
+          <Row label="Overheads"><In v={overheads} set={setOverheads} /></Row>
+          <div className="flex items-center justify-between gap-3 py-2" style={{ borderBottom: `1px solid ${C.line}` }}>
+            <div className="text-xs" style={{ color: C.sub, fontWeight: 600 }}>Claims &amp; other</div>
+            <div className="tnum" style={{ fontWeight: 600 }}>
+              {margin?.other.known
+                ? <span>{cr(margin.other.amount ?? 0)} <span style={{ color: C.sub, fontWeight: 400, fontSize: 11 }}>{margin.other.from}</span></span>
+                : <span style={{ color: C.sub, fontSize: 12 }}>none recorded</span>}
+            </div>
+          </div>
+
+          {margin && (
+            <div className="rounded p-2 mt-2" style={{
+              background: margin.complete ? "#EAF5EC" : "#FDF0E7",
+              border: `1px solid ${margin.complete ? "#BFDCC6" : "#F0C9A8"}`,
+            }}>
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold" style={{ color: margin.complete ? C.green : "#8A4520" }}>
+                  GROSS MARGIN
+                </div>
+                <div className="tnum" style={{ fontWeight: 800, fontSize: 17, color: margin.complete ? C.green : "#8A4520" }}>
+                  {margin.margin == null ? "—" : cr(margin.margin)}
+                  {margin.pct != null && <span style={{ fontSize: 13, fontWeight: 700 }}> · {margin.pct}%</span>}
+                </div>
+              </div>
+              {/* THE COUNT BESIDE THE NUMBER. A margin worked out from one of
+                  five costs reports a magnificent profit — which is the exact
+                  fault found in the ERP's own gross_margin. It is not hidden
+                  and it is not rounded away. */}
+              <div className="text-xs mt-1" style={{ color: margin.complete ? C.green : "#8A4520" }}>
+                {margin.complete
+                  ? "All five costs are in — this figure is complete."
+                  : <><b>{margin.have} of 5 costs are in.</b> Not yet counted: {margin.missing.join(", ")}. Until they are, this reads higher than the truth.</>}
+              </div>
+            </div>
+          )}
 
           <div className="text-xs font-bold mt-3 mb-1" style={{ color: C.sub, letterSpacing: .6 }}>
             HOW THE BALANCE COMES IN — as a % of {cr(balance)}
