@@ -16,6 +16,8 @@ import { deliveryReportHtml } from "@/lib/delivery-report";
 
 import DeliveryOutlook from "../DeliveryOutlook";
 
+import YearPanel from "./YearPanel";
+
 import { JobLightbox } from "../JobsInProgress";
 
 import { Board, Job, TODAY, groupAnchor, investedIn, ownerInk, ownerTint, personLabel, stamp } from "./shared";
@@ -541,6 +543,19 @@ export function DeliveryBoard({
           />
         </div>
       )}
+
+      {/*
+        THE YEAR — the month spine and whose confidence sits behind it
+        (Dr Raghu, 9 Sep 2026). Placed directly under the number cards and
+        inside the same fold, so "Hide totals" puts it away with them: it is
+        the same question those cards raise, answered month by month.
+      */}
+      <YearPanel
+        jobs={jobs}
+        V={V}
+        planPerMonth={showForward && rr?.hasTarget ? rrPerMonth(rr).sales : null}
+        planTpPerMonth={showForward && rr?.hasTarget ? rrPerMonth(rr).tp : null}
+      />
 
       {/* Opened from the PENDING JOBS card. It reads the SAME filtered list the
           rest of the board is showing, so the owner filter and the search box

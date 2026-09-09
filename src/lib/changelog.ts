@@ -86,6 +86,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.44.1",
+    date: "2026-09-09",
+    module: "The year, month by month \u2014 and whose confidence sits behind it",
+    items: [
+      "\"Show months, plan, how many jobs, what value, what throughput, how many delivered \u2026 next to that one big large window \u2026 jobs at 100% confidence, 0 to 50, 50 to 100 \u2026 dependent upon Pankaj\u2019s view of the quarter and month view\" (Dr Raghu, 9 Sep 2026). <b>THE YEAR</b> now sits under the number cards on the Job Delivery Board and folds away with them.",
+      "THE LEFT HALF IS ARITHMETIC. Twelve cards, one per month of the financial year, each carrying the <b>plan</b> the year\u2019s target requires, the <b>jobs</b> due that month in large figures, their <b>value</b> beside it and the <b>throughput</b> in small green \u2014 and then what actually <b>went out of the door</b> that month, which the board could never answer on its own because a job leaves the pending list the day it is delivered. The current month is marked; a past month still holding open jobs says so in red.",
+      "THE RIGHT HALF IS A PERSON. <code>plan_belief</code> holds one row per job per planner from the Month &amp; Qtr Plan \u2014 <b>225 of them across eleven planners</b>, Pankaj\u2019s 43 among them. The panel opens on his read and splits the book three ways: <b>100% certain</b>, <b>above 50 and below 100</b> (75 or 90), and <b>50% and below</b> \u2014 a coin toss counts as doubt, not as likelihood. Change the name at the top to see another planner\u2019s.",
+      "AND A FOURTH BLOCK THAT MATTERS MORE THAN THE THREE: <b>NOT YET CALLED</b>. The month-plan route treats a missing belief as 100, which is fair there \u2014 a signer has looked at every row in their own window. Here it would be a lie, because most of the pending book has never been inside anybody\u2019s month window. Those jobs are counted apart and never promoted to certain.",
+      "Both halves read the SAME filtered list as the rest of the board, so the planning-owner filter and the search box carry into them. An analytics panel that quietly ignores the filter above it is how two people end up quoting different numbers off one screen. Delivered <i>counts</i> are shown to everyone who may read the board; delivered <i>value</i> stays behind the Leadership Circle gate, and the panel says so rather than showing a silent zero.",
+    ],
+  },
+  {
     v: "5.0.44.0",
     date: "2026-09-09",
     module: "A look before a tab, and the project wears the house's header",
