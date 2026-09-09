@@ -1,27 +1,31 @@
 "use client";
-// THE YEAR — the month spine, and whose confidence sits behind it.
-// (Dr Raghu, 9 Sep 2026: "show months, plan, how many jobs, what value, what
-// throughput, how many delivered ... next to that one big large window ...
-// jobs at 100% confidence, 0 to 50, 50 to 100 ... dependent upon Pankaj's
-// view of the quarter and month view.")
+// THE YEAR — three boxes, and nothing else.
+// (Dr Raghu, 9 Sep 2026: "Just show one box saying Year upto <August>
+// Completed — Jobs, Value, Throughput (Runrate: Jobs, Value,
+// Throughput/month). Next to it Plan of <month> Month ... Achieved ...
+// Balance Planned. Next to it make Plan of <person> dropdown, show Pankaj by
+// default.")
 //
-// It sits under the number cards on the Job Delivery Board and folds away
-// with them, because it answers the question those cards raise and cannot
-// settle: ₹39 Cr pending is a total, "₹12 Cr of it lands in one month and
-// only ₹4 Cr of that is called certain by the man who plans it" is a
-// decision.
+// The twelve month cards this replaced were honest and useless: eight of
+// them said "nothing due" and the two that mattered were separated by a
+// row of them. Three boxes, read left to right, are the whole sentence —
+// WHAT THE YEAR HAS DONE, WHAT THIS MONTH IS FOR, WHO BELIEVES IT.
 //
-// TWO HALVES, DELIBERATELY DIFFERENT KINDS OF FACT.
+// THE THREE ARE DIFFERENT KINDS OF FACT, which is why they are three boxes
+// and not one table:
 //
-//   THE MONTHS are arithmetic — every pending job stacked on the month its
-//   Target Delivery Date falls in, against what the year's target requires
-//   per month, beside what actually went out of the door that month. Nobody
-//   has an opinion in this half.
+//   THE YEAR SO FAR is closed. Every completed month of the financial year,
+//   read from the delivered ledger — what went out of the door, not what was
+//   promised. Its run rate is what we ACTUALLY ran at, per month, which is
+//   the only number the required run rate can be argued against.
 //
-//   THE CONFIDENCE is a person. plan_belief carries one row per job per
-//   planner from the Month & Qtr Plan, so the three blocks on the right are
-//   somebody's stated read and are labelled with their name. Change the
-//   name at the top and the three blocks change with it.
+//   THIS MONTH is open, so it splits three ways: what the month is for,
+//   what is already out, and what is still owed. Plan = achieved + balance,
+//   always, so the box can never quietly disagree with itself.
+//
+//   THE PERSON is an opinion. plan_belief carries one row per job per
+//   planner from the Month & Qtr Plan; the box is headed with their name
+//   because a confidence with no name on it is nobody's.
 //
 // A JOB NOBODY HAS CALLED IS NOT A CERTAINTY. Jobs with no belief row from
 // the chosen planner are counted separately as "not yet called", never
@@ -60,31 +64,100 @@ interface Payload {
 }
 
 /**
- * WHOSE VIEW THIS OPENS ON (Dr Raghu, 9 Sep 2026: "dependent upon Pankaj's
- * view of the quarter and month view"). Falls back to whoever has called the
- * most jobs if he has none recorded, so the panel is never blank because one
- * person did not type this month.
+ * WHOSE VIEW THIS OPENS ON (Dr Raghu, 9 Sep 2026: "Show Pankaj by default").
+ * Falls back to whoever has called the most jobs if he has none recorded, so
+ * the box is never blank because one person did not type this month.
  */
 const DEFAULT_PLANNER = "pankajs@nandan.co.in";
 
 interface Tot { jobs: number; value: number; tp: number }
 const zero = (): Tot => ({ jobs: 0, value: 0, tp: 0 });
 const add = (t: Tot, j: YearJob) => { t.jobs += 1; t.value += Number(j.val) || 0; t.tp += Number(j.tpv) || 0; };
+/** month key → "August". The month spoken, not the month coded. */
+const monthWord = (k: string) => monthLabel(k).split(" ")[0];
 
+
+/*
+ * THE FIVE SHAPES, HOISTED OUT OF THE RENDER.
+ *
+ * A component declared inside another component's body is a NEW component
+ * type on every render, so React unmounts and remounts it — which is how a
+ * dropdown loses focus the moment it is used. This project has no lint rule
+ * for it (react/no-unstable-nested-components is not enabled), so it has to
+ * be a habit rather than a check. They take V as a prop instead of closing
+ * over it.
+ */
 /**
  * The three numbers, always in the same shapes (Dr Raghu: "make the jobs
  * number big, the value relatively big, and the throughput in small green
- * letters"). One component so the month cards and the confidence blocks can
- * never drift into two different typographies for the same three facts.
+ * letters"). One component, so no two boxes can drift into two
+ * typographies for the same three facts.
  */
-function Three({ t, V, ink }: { t: Tot; V: (n: number) => string; ink: string }) {
+function Three({ t, V, ink = C.ink, hideMoney = false }: { t: Tot; V: (n: number) => string; ink?: string; hideMoney?: boolean }) {
   return (
+  <div className="flex items-baseline gap-2 flex-wrap">
+    <span className="font-bold tnum" style={{ color: ink, fontSize: 30, lineHeight: 1.05 }}>{t.jobs}</span>
+    <span className="text-xs font-bold" style={{ color: C.faint }}>job{t.jobs === 1 ? "" : "s"}</span>
+    {hideMoney
+      ? <span className="text-xs" style={{ color: C.faint }}>value not shown at your access</span>
+      : <>
+          <span className="font-bold tnum" style={{ color: C.navy, fontSize: 18 }}>{V(t.value)}</span>
+          <span className="text-xs font-bold tnum" style={{ color: C.green }}>{V(t.tp)} tp</span>
+        </>}
+  </div>
+  );
+}
+
+/** A run rate, always spelled the same way: three facts and the word "per month". */
+function Rate({ r, V, label, hideMoney = false }: { r: { jobs: number; value: number; tp: number } | null; V: (n: number) => string; label: string; hideMoney?: boolean }) {
+  return (
+  <div className="text-xs tnum mt-1" style={{ color: C.sub }}>
+    {r
+      ? <>{label} <b>{r.jobs.toFixed(1)}</b> jobs{hideMoney ? "" : <> · <b>{V(r.value)}</b> · <span style={{ color: C.green }}>{V(r.tp)} tp</span></>} <span style={{ color: C.faint }}>per month</span></>
+      : <span style={{ color: C.faint }}>{label} — not enough of the year has run</span>}
+  </div>
+  );
+}
+
+/** One of the two lines under this month's plan. */
+function Split({ label, t, V, ink, hideMoney = false }: { label: string; t: Tot; V: (n: number) => string; ink: string; hideMoney?: boolean }) {
+  return (
+  <div className="flex items-baseline gap-2 flex-wrap py-1" style={{ borderTop: `1px solid ${C.line}` }}>
+    <span className="text-xs font-bold" style={{ color: ink, letterSpacing: 0.6, minWidth: 92 }}>{label}</span>
+    <span className="font-bold tnum" style={{ color: ink, fontSize: 17 }}>{t.jobs}</span>
+    <span className="text-xs" style={{ color: C.faint }}>job{t.jobs === 1 ? "" : "s"}</span>
+    {hideMoney
+      ? <span className="text-xs" style={{ color: C.faint }}>—</span>
+      : <>
+          <span className="font-bold tnum" style={{ color: C.navy, fontSize: 14 }}>{V(t.value)}</span>
+          <span className="text-xs tnum font-bold" style={{ color: C.green }}>{V(t.tp)} tp</span>
+        </>}
+  </div>
+  );
+}
+
+function Box({ head, note, children, tint }: { head: React.ReactNode; note?: React.ReactNode; children: React.ReactNode; tint?: string }) {
+  return (
+  <div className="rounded-lg border p-3" style={{ borderColor: C.line, background: tint || "#fff" }}>
+    <div className="text-xs font-bold mb-1" style={{ color: C.mute, letterSpacing: 1 }}>{head}</div>
+    {children}
+    {note && <div className="text-xs mt-1.5" style={{ color: C.faint, lineHeight: 1.5 }}>{note}</div>}
+  </div>
+  );
+}
+
+function Block({ label, note, t, V, ink, tint }: { label: string; note: string; t: Tot; V: (n: number) => string; ink: string; tint: string }) {
+  return (
+  <div className="rounded px-2.5 py-1.5" style={{ background: tint, borderLeft: `4px solid ${ink}` }}>
+    <div className="text-xs font-bold" style={{ color: ink, letterSpacing: 0.6 }}>{label}</div>
     <div className="flex items-baseline gap-2 flex-wrap">
-      <span className="font-bold tnum" style={{ color: ink, fontSize: 28, lineHeight: 1.05 }}>{t.jobs}</span>
-      <span className="text-xs font-bold" style={{ color: C.faint }}>job{t.jobs === 1 ? "" : "s"}</span>
-      <span className="font-bold tnum" style={{ color: C.navy, fontSize: 17 }}>{V(t.value)}</span>
+      <span className="font-bold tnum" style={{ color: ink, fontSize: 22, lineHeight: 1.1 }}>{t.jobs}</span>
+      <span className="text-xs" style={{ color: C.faint }}>job{t.jobs === 1 ? "" : "s"}</span>
+      <span className="font-bold tnum" style={{ color: C.navy, fontSize: 15 }}>{V(t.value)}</span>
       <span className="text-xs font-bold tnum" style={{ color: C.green }}>{V(t.tp)} tp</span>
     </div>
+    <div className="text-xs" style={{ color: C.faint }}>{note}</div>
+  </div>
   );
 }
 
@@ -129,18 +202,63 @@ export default function YearPanel({
     );
   }, [d?.from, TODAY]);
 
-  const { byMonth, before, after, nodate } = useMemo(() => {
-    const map = new Map<string, Tot>(keys.map((k) => [k, zero()]));
-    const b = zero(), a = zero(), n = zero();
+  /**
+   * THE YEAR SO FAR — every COMPLETED month, and only completed months.
+   *
+   * September is deliberately left out of it. A month three days old
+   * dragged into a run rate halves the rate and makes a good year look
+   * like a bad one, which is the commonest way an honest average lies.
+   */
+  const year = useMemo(() => {
+    const done = keys.filter((k) => k < thisMonth);
+    const t = zero();
+    for (const k of done) {
+      const del = d?.delivered[k];
+      if (!del) continue;
+      t.jobs += del.jobs; t.value += del.value; t.tp += del.tp;
+    }
+    const months = done.length;
+    return {
+      t, months,
+      upto: done.length ? done[done.length - 1] : null,
+      rate: months
+        ? { jobs: t.jobs / months, value: t.value / months, tp: t.tp / months }
+        : null,
+    };
+  }, [keys, thisMonth, d]);
+
+  /**
+   * THIS MONTH — plan, achieved, balance.
+   *
+   * BALANCE is the pending jobs whose target date falls in this month; it
+   * is what the board is still carrying. ACHIEVED is what the ledger says
+   * already went out this month. PLAN is the two added, so it is a fact
+   * about the month rather than a wish typed into it — and it means plan
+   * minus achieved is always exactly the balance.
+   */
+  const month = useMemo(() => {
+    const balance = zero();
+    for (const j of jobs) if (j.tdd && monthKey(j.tdd) === thisMonth) add(balance, j);
+    const del = d?.delivered[thisMonth];
+    const achieved: Tot = { jobs: del?.jobs || 0, value: del?.value || 0, tp: del?.tp || 0 };
+    const plan: Tot = {
+      jobs: balance.jobs + achieved.jobs,
+      value: balance.value + achieved.value,
+      tp: balance.tp + achieved.tp,
+    };
+    return { plan, achieved, balance };
+  }, [jobs, thisMonth, d]);
+
+  /** Pending jobs that fall outside the twelve months, so nothing is silently dropped. */
+  const stray = useMemo(() => {
+    const before = zero(), after = zero(), nodate = zero();
     const first = keys[0], last = keys[keys.length - 1];
     for (const j of jobs) {
-      if (!j.tdd) { add(n, j); continue; }
-      const k = monthKey(j.tdd);
-      if (k < first) add(b, j);
-      else if (k > last) add(a, j);
-      else add(map.get(k)!, j);
+      if (!j.tdd) add(nodate, j);
+      else if (monthKey(j.tdd) < first) add(before, j);
+      else if (monthKey(j.tdd) > last) add(after, j);
     }
-    return { byMonth: map, before: b, after: a, nodate: n };
+    return { before, after, nodate };
   }, [jobs, keys]);
 
   /**
@@ -167,121 +285,116 @@ export default function YearPanel({
   if (!d) return null;
 
   const person = d.planners.find((p) => p.email === who);
-
-  const MonthCard = ({ k }: { k: string }) => {
-    const t = byMonth.get(k) || zero();
-    const del = d.delivered[k];
-    const past = k < thisMonth;
-    const now = k === thisMonth;
-    return (
-      <div
-        className="rounded-lg border px-2.5 py-2"
-        style={{
-          borderColor: now ? C.accent : C.line,
-          background: now ? "#FFF9F3" : past ? "#FAFAF8" : "#fff",
-          boxShadow: now ? `0 0 0 1px ${C.accent}` : undefined,
-        }}
-      >
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-xs font-bold" style={{ color: now ? C.accent : C.body }}>
-            {monthLabel(k)}{now ? " · now" : ""}
-          </span>
-          {planPerMonth != null && (
-            <span className="text-xs tnum" style={{ color: C.faint }} title="What sales billing has to average every month to make the year's target">
-              plan {V(planPerMonth)}
-            </span>
-          )}
-        </div>
-        {t.jobs > 0
-          ? <Three t={t} V={V} ink={past ? C.red : C.ink} />
-          : <div className="text-xs py-1.5" style={{ color: C.faint }}>nothing due</div>}
-        <div className="text-xs mt-0.5" style={{ color: del ? C.green : C.faint }}>
-          {del
-            ? <>▲ {del.jobs} delivered{d.money && del.value ? ` · ${V(del.value)}` : ""}</>
-            : past ? "none delivered" : "—"}
-        </div>
-        {past && t.jobs > 0 && (
-          <div className="text-xs" style={{ color: C.red }}>still open — the date has gone</div>
-        )}
-      </div>
-    );
-  };
-
-  const Block = ({ label, note, t, ink, tint }: { label: string; note: string; t: Tot; ink: string; tint: string }) => (
-    <div className="rounded-lg px-3 py-2.5" style={{ background: tint, borderLeft: `4px solid ${ink}` }}>
-      <div className="text-xs font-bold" style={{ color: ink, letterSpacing: 0.8 }}>{label}</div>
-      <Three t={t} V={V} ink={ink} />
-      <div className="text-xs" style={{ color: C.faint }}>{note}</div>
-    </div>
-  );
+  /** Delivered money is behind the Leadership Circle gate; the counts are not. */
+  const noMoney = !d.money;
 
   return (
     <div className="rounded-lg border bg-white mb-3" style={{ borderColor: C.line, overflow: "hidden" }}>
       <div className="flex items-center gap-2 flex-wrap px-3 py-2" style={{ background: C.panel, borderBottom: `1px solid ${C.line}` }}>
         <span className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>THE YEAR</span>
         <span className="text-xs" style={{ color: C.sub }}>
-          {d.fy} · {jobs.length} pending job{jobs.length === 1 ? "" : "s"} on the month each one is due, and what actually went out
+          {d.fy} · what is closed, what this month is for, and who believes it
         </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr]">
-        {/* ---- the months ---- */}
-        <div className="p-3" style={{ borderRight: `1px solid ${C.line}` }}>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {keys.map((k) => <MonthCard key={k} k={k} />)}
-          </div>
-          <div className="text-xs mt-2" style={{ color: C.faint, lineHeight: 1.5 }}>
-            {before.jobs > 0 && <>{before.jobs} job{before.jobs === 1 ? "" : "s"} ({V(before.value)}) carry a target date from before this financial year. </>}
-            {after.jobs > 0 && <>{after.jobs} ({V(after.value)}) fall beyond 31 March. </>}
-            {nodate.jobs > 0 && <>{nodate.jobs} ({V(nodate.value)}) carry no target date at all and cannot be placed in a month — left off rather than dropped into one. </>}
-            {planPerMonth != null && <>The plan on each card is the run rate the {d.fy} target requires{planTpPerMonth ? ` (${V(planTpPerMonth)} throughput)` : ""} — a straight line, until a month-by-month plan is set.</>}
-            {!d.money && <> Delivered value is not shown at your access; the counts are.</>}
-          </div>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 p-3">
 
-        {/* ---- whose confidence ---- */}
-        <div className="p-3">
-          <div className="flex items-center gap-2 flex-wrap mb-2">
-            <span className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>CONFIDENCE</span>
-            {d.planners.length > 0 ? (
-              <select
-                value={who}
-                onChange={(e) => setWho(e.target.value)}
-                className="px-2 py-0.5 rounded border text-xs font-bold"
-                style={{ borderColor: C.line, color: C.body }}
-                title="Whose stated belief this is. Set on the Month & Qtr Plan, job by job."
-              >
-                {d.planners.map((p) => (
-                  <option key={p.email} value={p.email}>{p.name} · {p.jobs} called</option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-xs" style={{ color: C.faint }}>nobody has called a job yet</span>
-            )}
-          </div>
+        {/* ---- 1. the year, closed ---- */}
+        <Box
+          head={<>YEAR UP TO {year.upto ? monthWord(year.upto).toUpperCase() : "—"} · COMPLETED</>}
+          note={
+            <>
+              {year.months} completed month{year.months === 1 ? "" : "s"} of {d.fy}, from the delivered ledger — what went out of the door.
+              {" "}{monthWord(thisMonth)} is left out on purpose: a month three days old dragged into an average halves it.
+              {planPerMonth != null && year.rate && (
+                <> The year needs <b>{V(planPerMonth)}</b> a month
+                  {year.rate.value >= planPerMonth
+                    ? <span style={{ color: C.green }}> — ahead of it.</span>
+                    : <span style={{ color: C.red }}> — running at {Math.round((year.rate.value / planPerMonth) * 100)}% of that.</span>}
+                </>
+              )}
+            </>
+          }
+        >
+          <Three t={year.t} V={V} ink={C.ink} hideMoney={noMoney} />
+          <Rate r={year.rate} V={V} label="run rate" hideMoney={noMoney} />
+        </Box>
 
+        {/* ---- 2. this month ---- */}
+        <Box
+          head={<>PLAN OF {monthWord(thisMonth).toUpperCase()}</>}
+          tint="#FFF9F3"
+          note={
+            <>
+              Plan is what the month is for: everything still due on it plus everything already out.
+              {" "}Achieved plus balance is the plan, always — so the box cannot disagree with itself.
+              {planPerMonth != null && <> The required run rate is <b>{V(planPerMonth)}</b> sales{planTpPerMonth ? <> and <b>{V(planTpPerMonth)}</b> throughput</> : null} a month.</>}
+            </>
+          }
+        >
+          <Three t={month.plan} V={V} ink={C.accent} />
+          <div className="mt-1.5">
+            <Split label="ACHIEVED" t={month.achieved} V={V} ink={C.green} hideMoney={noMoney} />
+            <Split label="BALANCE" t={month.balance} V={V} ink={month.balance.jobs ? C.red : C.faint} />
+          </div>
+        </Box>
+
+        {/* ---- 3. whose plan ---- */}
+        <Box
+          head={
+            <span className="flex items-center gap-2 flex-wrap">
+              PLAN OF
+              {d.planners.length > 0 ? (
+                <select
+                  value={who}
+                  onChange={(e) => setWho(e.target.value)}
+                  className="px-2 py-0.5 rounded border text-xs font-bold"
+                  style={{ borderColor: C.line, color: C.body, background: "#fff" }}
+                  title="Whose stated belief this is. Set on the Month & Qtr Plan, job by job."
+                >
+                  {d.planners.map((p) => (
+                    <option key={p.email} value={p.email}>{p.name} · {p.jobs} called</option>
+                  ))}
+                </select>
+              ) : (
+                <span style={{ color: C.faint }}>— nobody has called a job yet</span>
+              )}
+            </span>
+          }
+          note={
+            <>
+              Confidence is stated on <b>Month &amp; Qtr Plan</b>, one job at a time — this box only reports it.
+              {conf.uncalled.jobs > 0 && <> A job nobody has called is <b>not</b> a certainty, so it is counted apart.</>}
+            </>
+          }
+        >
           {conf.any ? (
-            <div className="grid gap-2">
-              <Block label="100% — CERTAIN" note="called at 100 on the Month & Qtr Plan" t={conf.certain} ink={C.green} tint="#F0FAF3" />
-              <Block label="50–100% — LIKELY" note="above 50, below 100 (75 or 90)" t={conf.likely} ink={C.amber} tint="#FFF8EE" />
-              <Block label="0–50% — AT RISK" note="50 and below — a coin toss counts here" t={conf.risk} ink={C.red} tint="#FEF3F2" />
+            <div className="grid gap-1.5">
+              <Block label="100% — CERTAIN" note="called at 100" t={conf.certain} V={V} ink={C.green} tint="#F0FAF3" />
+              <Block label="50–100% — LIKELY" note="above 50, below 100" t={conf.likely} V={V} ink={C.amber} tint="#FFF8EE" />
+              <Block label="0–50% — AT RISK" note="50 and below — a coin toss counts here" t={conf.risk} V={V} ink={C.red} tint="#FEF3F2" />
               {conf.uncalled.jobs > 0 && (
-                <Block label="NOT YET CALLED" note="no belief recorded — NOT counted as certain" t={conf.uncalled} ink={C.faint} tint="#FAFAF8" />
+                <Block label="NOT YET CALLED" note="no belief recorded" t={conf.uncalled} V={V} ink={C.faint} tint="#FAFAF8" />
               )}
             </div>
           ) : (
-            <div className="text-xs rounded p-3" style={{ color: C.sub, background: C.panel, lineHeight: 1.6 }}>
-              {person ? <>{person.name} has called {person.jobs} job{person.jobs === 1 ? "" : "s"}, but none of them are in the list this board is showing.</> : <>No beliefs have been recorded yet.</>}
-              {" "}Confidence is stated on <b>Month &amp; Qtr Plan</b>, one job at a time — this panel only reports it.
+            <div className="text-xs rounded p-2.5" style={{ color: C.sub, background: C.panel, lineHeight: 1.6 }}>
+              {person
+                ? <>{person.name} has called {person.jobs} job{person.jobs === 1 ? "" : "s"}, but none of them are in the list this board is showing.</>
+                : <>No beliefs have been recorded yet.</>}
             </div>
           )}
-
-          <div className="text-xs mt-2" style={{ color: C.faint, lineHeight: 1.5 }}>
-            {person && conf.any && <>{person.name}&rsquo;s read of the month and quarter, carried onto the whole pending book. </>}
-            Change the name to see another planner&rsquo;s.
-          </div>
-        </div>
+        </Box>
       </div>
+
+      {(stray.before.jobs > 0 || stray.after.jobs > 0 || stray.nodate.jobs > 0) && (
+        <div className="text-xs px-3 pb-2.5" style={{ color: C.faint, lineHeight: 1.5 }}>
+          Outside the three boxes:
+          {stray.before.jobs > 0 && <> <b>{stray.before.jobs}</b> pending job{stray.before.jobs === 1 ? "" : "s"} ({V(stray.before.value)}) carry a target date from before {d.fy}.</>}
+          {stray.after.jobs > 0 && <> <b>{stray.after.jobs}</b> ({V(stray.after.value)}) fall beyond 31 March.</>}
+          {stray.nodate.jobs > 0 && <> <b>{stray.nodate.jobs}</b> ({V(stray.nodate.value)}) carry no target date at all and cannot be placed in a month — left out rather than dropped into one.</>}
+        </div>
+      )}
     </div>
   );
 }

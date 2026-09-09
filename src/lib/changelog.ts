@@ -86,6 +86,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.44.2",
+    date: "2026-09-09",
+    module: "Three boxes instead of twelve cards",
+    items: [
+      "\"Just show one box saying Year upto August Completed \u2014 Jobs, Value, Throughput (Runrate\u2026). Next to it Plan of month \u2026 Achieved \u2026 Balance Planned. Next to it Plan of person, show Pankaj by default\" (Dr Raghu, 9 Sep 2026).",
+      "The twelve month cards shipped an hour ago were honest and <b>useless</b>: eight of them said \u201cnothing due\u201d and the two that mattered had a row of them in between. Three boxes, read left to right, are the whole sentence \u2014 <b>what the year has done, what this month is for, who believes it.</b>",
+      "<b>YEAR UP TO AUGUST \u00b7 COMPLETED</b> \u2014 jobs, value, throughput from the delivered ledger across every CLOSED month of the year, and the run rate we actually ran at, per month, beside the one the target requires. September is deliberately left out: a month three days old dragged into an average halves it, which is the commonest way an honest number lies.",
+      "<b>PLAN OF SEPTEMBER</b> \u2014 the plan, then <b>ACHIEVED</b> and <b>BALANCE</b> under it. Plan is everything still due on the month plus everything already out of the door, so achieved plus balance IS the plan, always. It is a fact about the month rather than a wish typed into it, and the box cannot disagree with itself.",
+      "<b>PLAN OF <i>Pankaj</i></b> \u2014 opens on his read, with every planner who has called a job in the dropdown. 100% certain, above-50-below-100, and 50-and-below, each with jobs, value and throughput. A coin toss counts as doubt. And a fourth block, <b>NOT YET CALLED</b>, because a job nobody has looked at is not a certainty \u2014 the month-plan route may default a missing belief to 100 inside a signer\u2019s own window, but out here most of the book has never been in anybody\u2019s window.",
+      "The five shapes are declared at module scope rather than inside the render, so the planner dropdown does not remount \u2014 and lose focus \u2014 the moment it is used. This project has no lint rule for that; it has to be habit.",
+    ],
+  },
+  {
     v: "5.0.44.1",
     date: "2026-09-09",
     module: "The year, month by month \u2014 and whose confidence sits behind it",
