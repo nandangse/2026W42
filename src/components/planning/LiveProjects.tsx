@@ -8,6 +8,8 @@ import { fmt, fmtFull, jobNo, diffDays, addDays, computeSchedule, type Plan, typ
 
 import { JobLightbox } from "../JobsInProgress";
 
+import ProjectPeek from "../ProjectPeek";
+
 import { Board, Job, TODAY, redactMoney } from "./shared";
 import { jobMoney, toWip } from "./OnFloor";
 
@@ -47,6 +49,16 @@ export function LiveProjects({
   const [openJobs, setOpenJobs] = useState<Set<string>>(new Set());
   const [pickedJob, setPickedJob] = useState<Job | null>(null);
   const [openProj, setOpenProj] = useState<string | null>(null);
+  /**
+   * THE LOOK BEFORE THE TAB (Dr Raghu, 9 Sep 2026: "in this the project plan
+   * should open up which is same as the lightbox in projects!").
+   *
+   * The PROJ number used to go straight to the GANTT-and-plan panel. It now
+   * opens the SAME lightbox Projects opens — the shared one in
+   * ProjectPeek.tsx — and that panel is offered from inside it, so nothing
+   * that was reachable stopped being reachable.
+   */
+  const [peek, setPeek] = useState<string | null>(null);
 
   // what is open against a job, counted the same way the other tabs count it:
   // materials — every kitting line not yet Received (QC Defective is pending);
@@ -205,7 +217,7 @@ export function LiveProjects({
               <div className="flex items-baseline gap-x-3 gap-y-0.5 flex-wrap">
                 <button onClick={() => toggle(g.id)} className="font-bold" title={shut ? "Expand the jobs" : "Collapse the jobs"} style={{ color: "#8FA1B3", fontSize: 13, width: 16 }}>{shut ? "▸" : "▾"}</button>
                 <b className="text-sm cursor-pointer" style={{ color: "#fff" }} onClick={() => toggle(g.id)}>{g.meta?.name || g.id}</b>
-                <button onClick={() => setOpenProj(g.id)} className="text-xs font-bold rounded px-1.5 py-0.5" title="Open the project — description, combined GANTT, project plan" style={{ background: "var(--accent)", color: "#fff" }}>
+                <button onClick={() => setPeek(g.id)} className="text-xs font-bold rounded px-1.5 py-0.5" title="A look at the project first — then the tab, or its plan and GANTT" style={{ background: "var(--accent)", color: "#fff" }}>
                   {g.id.replace(/^NGSE-PROJ-/, "PROJ ")}
                 </button>
                 {g.meta?.mgr && <span className="text-xs" style={{ color: "#8FA1B3" }}>PM <b style={{ color: "#D7DEE6" }}>{g.meta.mgr}</b></span>}
@@ -323,6 +335,40 @@ export function LiveProjects({
           onSaved={reload}
         />
       )}
+
+      {peek && (() => {
+        const pg = groupsAll.find((x) => x.id === peek);
+        return (
+          <ProjectPeek
+            id={peek}
+            /* Seeded from what the band already shows, so the card is
+               readable in the same instant it opens; the ERP record fills
+               the rest in behind it. */
+            row={{
+              name: peek,
+              project_name: pg?.meta?.name || "",
+              customer: pg?.meta?.cust || "",
+              project_stage: pg?.meta?.stage || "",
+              custom_project_director: pg?.meta?.mgr || "",
+              sales_order: pg?.meta?.so || "",
+              customer_committed_delivery_: pg?.meta?.committed || "",
+              expected_end_date: pg?.meta?.exp_end || "",
+              short_summary_description: pg?.meta?.description || "",
+            }}
+            onClose={() => setPeek(null)}
+            extra={
+              <button
+                onClick={() => { setOpenProj(peek); setPeek(null); }}
+                className="rounded px-4 py-2 text-sm font-bold"
+                style={{ background: "var(--navy)", color: "#fff" }}
+                title="The combined GANTT across its jobs, and the project plan kept here"
+              >
+                Plan &amp; GANTT
+              </button>
+            }
+          />
+        );
+      })()}
 
       {openGroup && (
         <ProjectLightbox

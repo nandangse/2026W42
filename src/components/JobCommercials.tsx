@@ -45,6 +45,12 @@ import { monthKey, monthLabel } from "@/lib/fmt";
 
 const C = { navy: "var(--blue)", ink: "var(--navy)", sub: "var(--muted)", line: "var(--line)", green: "var(--green)", accent: "var(--accent)", amber: "#B26A00", red: "var(--red)" };
 
+/** The last day of the month `iso` falls in — day 0 of the next month. */
+const monthEnd = (iso: string): string => {
+  const d = new Date(iso.slice(0, 10) + "T00:00:00Z");
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+};
+
 /** The four collection buckets, and how long after the TDD each one lands. */
 const BUCKETS: { key: "payPctOn" | "payPct30" | "payPct60" | "payPct90"; col: string; days: number; label: string }[] = [
   { key: "payPctOn", col: "pay_pct_on", days: 3,  label: "On delivery" },
@@ -97,6 +103,21 @@ export default function JobCommercials({
   jobs: CommJob[]; canEdit: boolean; stratcom?: boolean; reload: () => Promise<unknown>; today: string;
 }) {
   const [q, setQ] = useState("");
+  /**
+   * THE TDD WINDOW (Dr Raghu, 9 Sep 2026: "make a filter TDD from and to.
+   * From will be default to start of month and end will be the last day").
+   *
+   * It opens on THIS MONTH, because that is the question this screen is
+   * usually open to answer — what should be collected against what is going
+   * out now. Clearing both dates puts the whole book back.
+   *
+   * A job with no target date cannot be inside any window and cannot be
+   * outside one either. Rather than dropping it silently it is left out and
+   * COUNTED under the table, because "no date" and "not due" are different
+   * facts and this screen feeds a cash plan.
+   */
+  const [from, setFrom] = useState(() => today.slice(0, 8) + "01");
+  const [to, setTo] = useState(() => monthEnd(today));
   const [busy, setBusy] = useState("");
   /**
    * ONE ROW AT A TIME (Dr Raghu, 2 Sep 2026: "keep the edit at the next of
@@ -130,11 +151,24 @@ export default function JobCommercials({
       new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + i, 1)).toISOString().slice(0, 7));
   }, [today]);
 
+  /** Jobs with no target date, so the count under the table is honest. */
+  const undated = useMemo(
+    () => ((from || to) ? jobs.filter((j) => !j.tdd).length : 0),
+    [jobs, from, to],
+  );
+
   const rows = useMemo(() => {
     const k = q.trim().toLowerCase();
-    const list = k
+    let list = k
       ? jobs.filter((j) => [j.id, j.tag, j.cust, j.fam, j.ownerName].some((v) => String(v ?? "").toLowerCase().includes(k)))
       : jobs;
+    if (from || to) {
+      list = list.filter((j) => {
+        if (!j.tdd) return false;
+        const d = String(j.tdd).slice(0, 10);
+        return (!from || d >= from) && (!to || d <= to);
+      });
+    }
     return list.map((j) => {
       /**
        * THE ARITHMETIC, AS DR RAGHU SET IT OUT (2 Sep 2026):
@@ -182,7 +216,7 @@ export default function JobCommercials({
       const termsPct = BUCKETS.reduce((a, b) => a + Number(j[b.key] ?? 0), 0);
       return { j, adv, gst, throughput, material, invested, invoice, balance, cash, termsPct };
     });
-  }, [jobs, q]);
+  }, [jobs, q, from, to]);
 
   const totals = useMemo(() => {
     const t: Record<string, number> = {};
@@ -232,10 +266,40 @@ export default function JobCommercials({
             What the order book should pay, and when
           </div>
         </div>
-        <input value={q} onChange={(e) => setQ(e.target.value)}
-          placeholder="Search job, tag, customer, family, manager…"
-          className="rounded border px-2 py-1 text-sm ml-auto" style={{ borderColor: C.line, minWidth: 280 }} />
+        <div className="ml-auto flex items-end gap-2 flex-wrap">
+          {/* THE TDD WINDOW. Two dates and a way back to the whole book. */}
+          <label className="text-xs" style={{ color: C.sub }}>
+            <div className="font-bold" style={{ letterSpacing: .5 }}>TDD FROM</div>
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+              className="rounded border px-2 py-1 text-sm" style={{ borderColor: from ? C.accent : C.line }} />
+          </label>
+          <label className="text-xs" style={{ color: C.sub }}>
+            <div className="font-bold" style={{ letterSpacing: .5 }}>TO</div>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
+              className="rounded border px-2 py-1 text-sm" style={{ borderColor: to ? C.accent : C.line }} />
+          </label>
+          <button
+            onClick={() => { setFrom(today.slice(0, 8) + "01"); setTo(monthEnd(today)); }}
+            className="rounded px-2 py-1 text-xs font-bold" style={{ border: `1px solid ${C.line}`, color: C.sub, background: "#fff" }}
+            title="Back to this month — the 1st to the last day">This month</button>
+          <button
+            onClick={() => { setFrom(""); setTo(""); }}
+            className="rounded px-2 py-1 text-xs font-bold" style={{ border: `1px solid ${C.line}`, color: C.sub, background: "#fff" }}
+            title="Every job on the book, dated or not">All dates</button>
+          <input value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder="Search job, tag, customer, family, manager…"
+            className="rounded border px-2 py-1 text-sm" style={{ borderColor: C.line, minWidth: 260 }} />
+        </div>
       </div>
+
+      {(from || to) && (
+        <div className="text-xs mb-2" style={{ color: C.sub }}>
+          Showing <b>{rows.length}</b> of {jobs.length} jobs — target delivery date
+          {from ? <> from <b>{fmtFull(from)}</b></> : <> up to</>}
+          {to ? <> to <b>{fmtFull(to)}</b></> : from ? <> onwards</> : null}.
+          {undated > 0 && <> <b>{undated}</b> job{undated === 1 ? " carries" : "s carry"} no target date and cannot sit in any window — left out rather than dropped in. Press <b>All dates</b> to see them.</>}
+        </div>
+      )}
 
       <div className="text-xs mb-2" style={{ color: C.sub }}>
         The four percentages are <b>of the balance due</b>, not of the value, and land on the target delivery
@@ -256,9 +320,13 @@ export default function JobCommercials({
         <table className="text-xs genie-table" style={{ minWidth: 1900, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
             <tr style={{ background: "var(--ink)", color: "#fff" }}>
-              {["Job", "", "Customer tag", "Product type", "Value", "T %", "Throughput", "Material",
+              {/* TDD leads now rather than sitting nineteen columns to the
+                  right: it is the column the table is filtered on, and a
+                  filter whose column is off the edge of the screen is a
+                  filter nobody trusts. */}
+              {["Job", "", "TDD", "Customer tag", "Product type", "Value", "T %", "Throughput", "Material",
                 "Kit %", "Invested", "WIP labour", "Prod %", "GST %", "Advance", "Balance due",
-                "TDD", "Manager"].map((h) => (
+                "Manager"].map((h) => (
                 <th key={h} className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0 }}>{h}</th>
               ))}
               {BUCKETS.map((b) => (
@@ -294,6 +362,7 @@ export default function JobCommercials({
                     </button>
                   )}
                 </td>
+                <td className="px-2 py-1 whitespace-nowrap tnum" style={{ color: j.tdd && j.tdd < today ? C.red : C.ink }}>{fmt(j.tdd)}</td>
                 <td className="px-2 py-1" style={{ color: C.ink, maxWidth: 240 }}>{j.tag}</td>
                 <td className="px-2 py-1 whitespace-nowrap" style={{ color: C.sub }}>{j.fam}</td>
                 <td className="px-2 py-1 whitespace-nowrap tnum" style={{ color: C.accent }}>{cr(Number(j.val || 0))}</td>
@@ -315,7 +384,6 @@ export default function JobCommercials({
                   style={{ color: gst == null ? C.amber : C.ink }}>
                   {cr(balance)}{gst == null && <span title="No GST rate on this job — the invoice is the bare value"> ⚠</span>}
                 </td>
-                <td className="px-2 py-1 whitespace-nowrap tnum" style={{ color: j.tdd && j.tdd < today ? C.red : C.ink }}>{fmt(j.tdd)}</td>
                 <td className="px-2 py-1 whitespace-nowrap" style={{ color: C.sub }}>{j.ownerName || j.ownerInitials || "—"}</td>
                 {BUCKETS.map((b) => (
                   <Pct key={b.col} v={j[b.key] ?? null} canEdit={canEdit && editing === j.id}

@@ -86,6 +86,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.44.3",
+    date: "2026-09-09",
+    module: "One project lightbox for two screens, and a TDD window on the commercials",
+    items: [
+      "\"In this the project plan should open up which is same as the lightbox in projects!\" (Dr Raghu, 9 Sep 2026). On <b>Live Projects</b> the PROJ number used to go straight to the GANTT-and-plan panel. It now opens the <b>same lightbox Projects opens</b> \u2014 customer, status, stage, director, sales order, committed date, expected end, percent complete and the summary \u2014 with <b>Open the project \u2197</b> and <b>Plan &amp; GANTT</b> beneath it. Nothing that was reachable stopped being reachable.",
+      "It is literally the same component, not a copy. <code>ProjectPeek.tsx</code> is mounted by both screens, because two copies of a card is two cards to disagree the first time one of them learns a field. Projects hands it the ERP row it already holds; Live Projects hands it the project id and the card <b>fetches the real record</b> rather than half-filling itself from what happened to be on the band \u2014 a lightbox showing a dash where the other screen shows a status is two lightboxes.",
+      "\"In this also show the TDD. And make a filter TDD from and to. From will be default to start of month and end will be the last day.\" <b>Job Commercials</b> now opens on the current month, 1st to last day, with both dates editable, a <b>This month</b> button and an <b>All dates</b> button.",
+      "AND THE TDD COLUMN HAS MOVED TO THE FRONT, beside the job number. It was nineteen columns to the right, off the edge of the screen \u2014 and a filter whose column cannot be seen is a filter nobody trusts.",
+      "A job with <b>no target date</b> is left out of a window rather than dropped into one, and the count of them is printed under the filter with the way back. \u201cNo date\u201d and \u201cnot due this month\u201d are different facts, and this screen feeds a cash plan.",
+    ],
+  },
+  {
     v: "5.0.44.2",
     date: "2026-09-09",
     module: "Three boxes instead of twelve cards",
