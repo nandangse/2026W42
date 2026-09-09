@@ -86,6 +86,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.41.1",
+    date: "2026-09-09",
+    module: "The issue log comes across — and what the registers actually hold",
+    items: [
+      "0164 ran clean: <b>projects went from 10 columns to 42</b>, and the issue log and risk register exist. The sync now fills them.",
+      "THE ISSUE LOG IS READ THROUGH THE PARENT with dotted child fields — <b>one query rather than 1,693 document fetches</b>. A child table cannot come back from an ordinary list read, and asking for each project in turn would take minutes to collect what turns out to be twenty rows.",
+      "AND TWENTY IS ALL THERE IS. Across <b>every project in the ERP</b> the issue log holds <b>twenty entries</b>, the oldest from 2021 — and the risk list holds <b>none at all</b>. Worth saying plainly rather than shipping an empty register that looks broken: the table is here so the habit has somewhere to go, but the ERP is not where that habit currently lives.",
+      "THE RISK REGISTER IS DELIBERATELY NOT PULLED. Its child table is empty on every project, so its column names cannot be read off a real row — and a mapping written against <b>guessed</b> field names is one that fails silently the first time somebody actually uses the feature. The table waits; the mapping goes in when there is a row to write it against.",
+      "Press <b>Synchronise</b> and the 30-odd new project fields fill from the ERP.",
+    ],
+  },
+  {
     v: "5.0.41.0",
     date: "2026-09-09",
     module: "The project as a compact document — the pull, without the flab",

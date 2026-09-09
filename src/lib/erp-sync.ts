@@ -291,7 +291,7 @@ export interface FieldChange {
 export interface SyncResult {
   /** Fields Genie kept that are now waiting to go back to the ERP. */
   queuedForErp?: number;
-  projects: { read: number; written: number; created: number; changed: number };
+  projects: { read: number; written: number; created: number; changed: number; issues?: number };
   jobs: { read: number; written: number; archived: number; created: number; changed: number };
   delivered: { read: number; written: number; undated: number; created: number; changed: number };
   changes: FieldChange[];
@@ -616,6 +616,49 @@ export async function erpSync(
     projWritten += slice.length;
   }
 
+  /**
+   * THE ISSUE LOG (Dr Raghu, 9 Sep 2026 — the PMP box).
+   *
+   * Read through the PARENT with dotted child fields, which is one query
+   * rather than 1,693 document fetches. A child table cannot come back from
+   * an ordinary list read, and asking for each project in turn would take
+   * minutes to collect twenty rows.
+   *
+   * TWENTY ROWS IS ALL THERE IS. Across every project in the ERP the issue log
+   * holds twenty entries, the oldest from 2021, and the risk list holds none
+   * at all — which is worth saying plainly rather than shipping an empty
+   * register that looks broken. The table is here so the habit has somewhere
+   * to go; the ERP is not where that habit currently lives.
+   *
+   * THE RISK REGISTER IS NOT PULLED. Its child table is empty on every project
+   * I could find, so its column names cannot be read off a real row — and a
+   * mapping written against guessed field names is a mapping that fails
+   * silently the first time somebody uses the feature.
+   */
+  let issueWritten = 0;
+  try {
+    const rows = await erpAll(cfg, "Project", [
+      "name",
+      "issue_log_details.name as row_name", "issue_log_details.idx as row_idx",
+      "issue_log_details.issue_log", "issue_log_details.issue",
+      "issue_log_details.issue_date", "issue_log_details.customer",
+    ]);
+    const live = new Set(projRows.map((p) => p.id));
+    const up = rows
+      .filter((r) => S(r.row_name) && S(r.issue) && live.has(S(r.name)))
+      .map((r) => ({
+        id: S(r.row_name), project_id: S(r.name), idx: Number(r.row_idx) || 0,
+        issue_log: S(r.issue_log) || null, issue: S(r.issue),
+        issue_date: D(r.issue_date), customer: S(r.customer) || null,
+        pulled_at: new Date().toISOString(),
+      }));
+    if (up.length) {
+      const { error } = await genie.from("project_issue").upsert(up, { onConflict: "id" });
+      if (error) notes.push(`issue log: ${error.message}`);
+      else issueWritten = up.length;
+    }
+  } catch (e) { swallow("erp-sync issues", e); }
+
   // Jobs are upserted column by column so the ones Genie owns survive. A new
   // job arrives active; an existing one keeps its mgmt date, its percentages,
   // its floor note and everything else typed on this side.
@@ -702,7 +745,7 @@ export async function erpSync(
 
   return {
     queuedForErp: queued,
-    projects: { read: projRows.length, written: projWritten, created: projCreated, changed: projChanged },
+    projects: { read: projRows.length, written: projWritten, created: projCreated, changed: projChanged, issues: issueWritten },
     jobs: { read: jobRows.length, written: jobWritten, archived, created: jobsCreated, changed: jobsChanged },
     delivered: { read: delRows.length, written: delWritten, undated, created: delCreated, changed: delChanged },
     changes,
