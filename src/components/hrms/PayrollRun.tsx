@@ -38,11 +38,47 @@ const INPUTS: { key: string; label: string; by: string; how: string; upload: boo
   { key: "lunch", label: "Lunch", by: "HR", how: "in the muster — check and submit", upload: false, needFile: false, accept: "" },
   { key: "site", label: "Site allowance", by: "HR", how: "in the muster — check and submit", upload: false, needFile: false, accept: "" },
 ];
-type Tab = "overview" | "uploads" | "muster" | "register" | "comms";
+type Tab = "overview" | "uploads" | "muster" | "register" | "obs" | "comms";
+
+/** What /api/hrms/observation answers with. */
+type ObsFlag = { day: string; mark: string; what: string; in?: string; out?: string; mins?: number };
+type ObsPerson = {
+  employee_id: string; name: string; department: string; designation: string;
+  category: string; location: string;
+  paid_present: number; seen_at_gate: number; site_days: number;
+  never_on_machine: boolean; unexplained: number; flags: ObsFlag[]; flag_count: number;
+};
+type ObsData = {
+  ok: boolean; ready: boolean; why?: string;
+  month?: number; year?: number; days?: number;
+  totals?: {
+    people: number; punches: number; on_machine: number; matched: number;
+    paid_no_record: number; absent_but_punched: number; site_days: number;
+    short_days: number; never_on_machine: number; not_in_muster: number;
+  };
+  not_in_muster?: string[];
+  people?: ObsPerson[];
+};
+
+const TH: React.CSSProperties = { textAlign: "left", padding: "6px 8px", background: "var(--navy)", color: "#fff", fontWeight: 700, position: "sticky", top: 0, zIndex: 2 };
 
 export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwner: boolean; onBack: () => void }) {
   const [d, setD] = useState<Detail | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
+  /* THE CHRO'S OBSERVATION (Dr Raghu, 9 Sep 2026) — computed on opening, never
+     stored: a saved observation disagrees with its own sources the first time
+     either the muster or the punches are corrected. */
+  const [obs, setObs] = useState<ObsData | null>(null);
+  const [obsBusy, setObsBusy] = useState(false);
+  useEffect(() => {
+    if (tab !== "obs" || obs || obsBusy || !d) return;
+    setObsBusy(true);
+    fetch(`/api/hrms/observation?id=${encodeURIComponent(String(d.run.id))}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setObs(j))
+      .catch((e) => setObs({ ok: false, ready: false, why: String(e?.message || e) }))
+      .finally(() => setObsBusy(false));
+  }, [tab, obs, obsBusy, d]);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   /** The rate source for Generate — the system by default from August on. */
@@ -151,10 +187,10 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
 
       {/* ── tabs ── */}
       <div className="flex gap-1 flex-wrap mb-2">
-        {([["overview", "Overview"], ["uploads", `Uploads (${d.files.length})`], ["muster", `Attendance muster${d.muster ? ` (${d.muster.rows.length})` : ""}`], ["register", `Salary register${d.register.length ? ` (${d.register.length})` : ""}`], ["comms", `Communications (${d.messages.length})`]] as [Tab, string][]).map(([k, l]) => (
+        {([["overview", "Overview"], ["uploads", `Uploads (${d.files.length})`], ["muster", `Attendance muster${d.muster ? ` (${d.muster.rows.length})` : ""}`], ["register", `Salary register${d.register.length ? ` (${d.register.length})` : ""}`], ["obs", "Observation"], ["comms", `Communications (${d.messages.length})`]] as [Tab, string][]).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} className="text-xs font-bold rounded px-2.5 py-1.5" style={tab === k ? { background: "var(--navy)", color: "#fff" } : { color: "#5B6B7A", background: "#EAE7DF" }}>{l}</button>
         ))}
-        {(tab === "muster" || tab === "register" || tab === "comms") && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="find a person" className="text-xs rounded px-2 py-1 ml-auto" style={{ border: `1px solid ${C.line}`, width: 180 }} />}
+        {(tab === "muster" || tab === "register" || tab === "obs" || tab === "comms") && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="find a person" className="text-xs rounded px-2 py-1 ml-auto" style={{ border: `1px solid ${C.line}`, width: 180 }} />}
         {/* PRINT THE MUSTER (Dr Raghu, 7 Sep 2026: "once you give me the
             muster and the salary register for print, I can print it, sign
             it, and then freeze it"). The register had a print; the muster,
@@ -361,6 +397,79 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           <Rules />
           </div>
         )
+      )}
+
+      {tab === "obs" && (
+        <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line }}>
+          <div className="font-bold mb-1" style={{ color: C.ink }}>
+            CHRO observation
+            <span className="text-xs font-normal" style={{ color: C.dim }}> · the muster HR declared, against what the machine at the gate saw</span>
+          </div>
+          {obsBusy && <div className="text-xs" style={{ color: C.dim }}>Reading both sides…</div>}
+          {obs && !obs.ready && (
+            <div className="rounded p-2 text-xs" style={{ background: "#FDF0E7", border: "1px solid #F0C9A8", color: "#8A4520" }}>{obs.why}</div>
+          )}
+          {obs?.ready && obs.totals && (
+            <>
+              {/* EVERY LINE IS A QUESTION, NOT A FINDING. A man with no punch
+                  may have been on a customer's site all week — which is why
+                  the site mark is set apart rather than counted against him. */}
+              <div className="flex flex-wrap gap-2 my-2">
+                {([
+                  ["Paid present, nothing at the gate", obs.totals.paid_no_record, "#8E2C20"],
+                  ["Marked absent, machine saw him", obs.totals.absent_but_punched, "#B26A00"],
+                  ["Under four hours", obs.totals.short_days, "#B26A00"],
+                  ["Explained by a site mark", obs.totals.site_days, "#2A6B39"],
+                  ["Agreed", obs.totals.matched, "#2A6B39"],
+                  ["Never on the machine all month", obs.totals.never_on_machine, "#5B6B7A"],
+                  ["On the machine, not in the muster", obs.totals.not_in_muster, "#5B6B7A"],
+                ] as [string, number, string][]).map(([label, n, col]) => (
+                  <div key={label} className="rounded px-3 py-2" style={{ border: `1px solid ${C.line}`, minWidth: 150 }}>
+                    <div className="tnum font-bold" style={{ fontSize: 20, color: col, lineHeight: 1.1 }}>{n.toLocaleString("en-IN")}</div>
+                    <div style={{ fontSize: 11, color: C.dim }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="text-xs mb-2" style={{ color: C.dim }}>
+                {obs.totals.punches.toLocaleString("en-IN")} punches read for {obs.totals.on_machine} people.
+                <b> Nothing here is an accusation</b> — a day with no gate record is reported as exactly that,
+                never as absence, because service and sales are out of the building by design.
+              </div>
+              <div style={{ maxHeight: "56vh", overflow: "auto" }}>
+                <table className="w-full text-xs genie-table">
+                  <thead><tr>
+                    <th style={TH}>Employee</th><th style={TH}>Dept</th>
+                    <th style={{ ...TH, textAlign: "right" }}>Paid present</th>
+                    <th style={{ ...TH, textAlign: "right" }}>At the gate</th>
+                    <th style={{ ...TH, textAlign: "right" }}>On site</th>
+                    <th style={{ ...TH, textAlign: "right" }}>Unexplained</th>
+                    <th style={TH}>What the days say</th>
+                  </tr></thead>
+                  <tbody>
+                    {(obs.people ?? []).filter((p) => !q || `${p.name} ${p.employee_id} ${p.department}`.toLowerCase().includes(q.toLowerCase())).map((p) => (
+                      <tr key={p.employee_id} className="border-t" style={{ borderColor: C.line }}>
+                        <td className="px-2 py-1"><b>{p.name}</b> <span style={{ color: C.dim }}>{p.employee_id}</span></td>
+                        <td className="px-2 py-1" style={{ color: C.dim }}>{p.department || "·"}</td>
+                        <td className="px-2 py-1 text-right tnum">{p.paid_present}</td>
+                        <td className="px-2 py-1 text-right tnum" style={{ color: p.never_on_machine ? "#5B6B7A" : undefined }}>
+                          {p.never_on_machine ? "never" : p.seen_at_gate}
+                        </td>
+                        <td className="px-2 py-1 text-right tnum" style={{ color: C.dim }}>{p.site_days || "·"}</td>
+                        <td className="px-2 py-1 text-right tnum font-bold" style={{ color: p.unexplained ? "#8E2C20" : "#2A6B39" }}>{p.unexplained || "·"}</td>
+                        <td className="px-2 py-1" style={{ color: C.dim, maxWidth: 420 }}>
+                          {p.flags.slice(0, 4).map((f, i) => (
+                            <div key={i}>{f.day.slice(8)} <b>{f.mark}</b> — {f.what}{f.in ? ` (${f.in}→${f.out})` : ""}</div>
+                          ))}
+                          {p.flag_count > 4 && <div style={{ opacity: .7 }}>…and {p.flag_count - 4} more</div>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {tab === "comms" && (

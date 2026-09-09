@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { driveConfig, uploadToFolder, trashFile } from "@/lib/drive";
+import { readEssl, type EsslPunch } from "@/lib/essl";
 import { parseMuster, parseRates, generateRegister, musterVars, OPTIONAL_MUSTER_VARS, type Muster, type Rates, workingDaysFor } from "@/lib/muster";
 import { totalsFor } from "@/lib/salary-sheet";
 import { MONTHS } from "@/lib/hrms-template";
@@ -135,6 +136,42 @@ export async function POST(req: Request) {
         const ab = await f.arrayBuffer();
         const buf = Buffer.from(ab);
         let parsed: unknown = null, summary: string | null = null, warnings: string[] = [];
+        /* THE BIOMETRIC EXPORT NOW LANDS SOMEWHERE (Dr Raghu, 9 Sep 2026).
+           Until today an ESSL file was filed to Drive and nothing else —
+           the bytes were kept and the facts inside them were not. It is
+           parsed into punches now, beside the ones from /present, and
+           several files may be dropped at once because one machine per
+           gate means one export per gate. */
+        if (kind === "essl") {
+          try {
+            const read = readEssl(buf, f.name);
+            summary = `${read.punches.length} punch(es) · ${read.rows} rows · ${read.from || "?"} to ${read.to || "?"}`;
+            if (read.skipped.noEmployee || read.skipped.noTime)
+              warnings.push(`Skipped ${read.skipped.noEmployee} row(s) with no employee number and ${read.skipped.noTime} with no readable time — nothing was guessed at.`);
+            const batch = crypto.randomUUID();
+            let written = 0;
+            for (let i = 0; i < read.punches.length; i += 500) {
+              const slice = read.punches.slice(i, i + 500).map((x: EsslPunch) => ({ ...x, batch_id: batch, created_by: stamp }));
+              const { error: pe } = await admin.from("hrms_attendance_punch")
+                .upsert(slice, { onConflict: "employee_id,kind,source,at", ignoreDuplicates: true });
+              if (pe) {
+                if (/does not exist|schema cache/i.test(pe.message)) { warnings.push("Run migration 0163 — attendance has nowhere to live yet, so the punches were not kept."); break; }
+                warnings.push(pe.message); break;
+              }
+              written += slice.length;
+            }
+            if (written) {
+              summary += ` · ${written} kept`;
+              await admin.from("hrms_essl_import").insert({
+                id: batch, filename: f.name, rows_read: read.rows, rows_written: written,
+                from_date: read.from || null, to_date: read.to || null, uploaded_by: stamp,
+              });
+            }
+            parsed = { columns: read.columns, rows: read.rows, punches: read.punches.length, from: read.from, to: read.to };
+          } catch (e) {
+            warnings.push(e instanceof Error ? e.message : String(e));
+          }
+        }
         if (kind === "muster" || kind === "rates") {
           try {
             const grid = gridOf(buf, f.name);

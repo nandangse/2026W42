@@ -86,6 +86,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.40.0",
+    date: "2026-09-09",
+    module: "The CHRO\u2019s Observation — the muster against the machine",
+    items: [
+      "\"In HRMS they will upload the ESSL file, which can be multiple too. After that make a sheet called Observation. This observation is the CHRO observations which is the data analytics between the muster that is uploaded in the finalised salary sheet and this one of the month\" (Dr Raghu, 9 Sep 2026).",
+      "FIRST, THE FILE HAD NOWHERE TO GO. The payroll run has had an ESSL slot for weeks and it only ever <b>filed the bytes to Drive</b> — of the seven inputs, only the muster and the rate list were ever parsed. The biometric export was kept and never read. It is read now, into the same punch log as the field marks from <code>/present</code>, and several files may be dropped at once because one machine per gate means one export per gate.",
+      "THE OBSERVATION IS THE TWO RECORDS SIDE BY SIDE. The muster is what HR declared and what the payroll paid; the ESSL export is what the machine at the gate saw. Where they agree there is nothing to say. Where they differ there is either an error or a story, and <b>only a person can tell which</b>.",
+      "SO IT ACCUSES NOBODY, and that is a design decision, not a softness. A man with no punch may have been on a customer\u2019s site all week — which is the whole reason /present exists — so a day with no gate record is reported as <b>exactly that</b> and never as absence. The muster\u2019s own site mark (ST) is read and those days are set apart, because counting them as unexplained would bury the real ones under a hundred that are not.",
+      "SEVEN FIGURES, and only one of them matters: <b>days paid as present with nothing at the gate and no site mark to explain them</b>. The rest — agreed days, site days, short days, marked-absent-but-seen, never on the machine, on the machine but not in the muster — are the context for reading that number honestly.",
+      "IT COMPUTES AND DOES NOT STORE. A saved observation disagrees with its own sources the first time either the muster or a punch is corrected, and a stale answer about who was paid for what is worse than none.",
+      "THE PUNCH LIST IS PAGED. PostgREST truncates a read at a thousand rows without saying so, and a truncated punch list would have invented absences for everybody after the first thousand — which is precisely the shape of mistake this page exists to catch.",
+    ],
+  },
+  {
     v: "5.0.39.0",
     date: "2026-09-09",
     module: "Why a sync row keeps coming back — and delivered jobs on the calendar",
