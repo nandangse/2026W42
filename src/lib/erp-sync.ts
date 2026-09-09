@@ -274,6 +274,32 @@ const DELIVERED_FIELDS = [
   "job_start_date", "project", "job_status", "planning_owner", "status",
 ];
 const JOB_DELIVERED_STATUS = "Delivered";
+/**
+ * A JOB IS DELIVERED BY ITS job_status, NOT ONLY BY ITS status.
+ *
+ * Dr Raghu, 9 Sep 2026: "It can also go from Job in process to Installation
+ * Stage also, like you know before. But the actual delivery date will be
+ * there." Both 8 BRD jobs proved it — the ERP holds
+ * actual_delivery_date = 2026-09-09 and job_status = "D: Delivered" on each,
+ * while `status` still reads "Installation Stage". This sync asked only for
+ * status = "Delivered", so it archived them off the board and never banked
+ * them: no longer pending, not yet delivered, counted nowhere.
+ *
+ * MEASURED BEFORE CHANGING ANYTHING (9 Sep 2026, against the live ERP):
+ *
+ *   status = "Delivered"              2,721
+ *   job_status = "D: Delivered"       2,436
+ *   D: Delivered AND status != Delivered   11
+ *     of those 11 — Installation Stage 6, Cancelled 5
+ *
+ * So the second pull adds SIX real deliveries and would have added five
+ * CANCELLED jobs with them. Cancelled is excluded by name: migration 0020
+ * exists because five cancelled jobs once sat archived looking exactly like
+ * deliveries, and this is the same five. A cancellation is not a delivery
+ * however it is spelled.
+ */
+const JOB_DELIVERED_STATUS_2 = "D: Delivered";
+const JOB_CANCELLED_STATUS = "Cancelled";
 
 /** One field that moved, in the words the morning needs to read it. */
 export interface FieldChange {
@@ -503,7 +529,19 @@ export async function erpSync(
   if (missing.length) notes.push(`${missing.length} project(s) named by a live job were not returned by the ERP: ${missing.slice(0, 5).join(", ")}`);
 
   // ---------------- delivered jobs ----------------
-  const erpDelivered = await erpAll(cfg, "Jobmaster", DELIVERED_FIELDS, [["status", "=", JOB_DELIVERED_STATUS]]);
+  /* Two questions, because the ERP answers "is it delivered?" in two
+     places. Merged by name — a job that satisfies both is one delivery. */
+  const erpDeliveredA = await erpAll(cfg, "Jobmaster", DELIVERED_FIELDS, [["status", "=", JOB_DELIVERED_STATUS]]);
+  const erpDeliveredB = await erpAll(cfg, "Jobmaster", DELIVERED_FIELDS, [
+    ["job_status", "=", JOB_DELIVERED_STATUS_2],
+    ["status", "!=", JOB_CANCELLED_STATUS],
+  ]);
+  const byName = new Map<string, Record<string, unknown>>();
+  for (const j of erpDeliveredA) byName.set(S(j.name), j);
+  let extra = 0;
+  for (const j of erpDeliveredB) { if (!byName.has(S(j.name))) { byName.set(S(j.name), j); extra++; } }
+  if (extra) notes.push(`${extra} job(s) the ERP calls "D: Delivered" while their stage still reads something else — banked as deliveries.`);
+  const erpDelivered = [...byName.values()];
   const delRows = erpDelivered.map((j) => ({
     id: S(j.name),
     tag: S(j.customer_tag),

@@ -86,6 +86,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.45.2",
+    date: "2026-09-09",
+    module: "Delivered is written in two places, and Genie only read one",
+    items: [
+      "\"Actual delivery date is the label. When the job is delivered the actual delivery date is written\" \u2014 \"it can also go from Job in process to Installation Stage also \u2026 but the actual delivery date will be there\" (Dr Raghu, 9 Sep 2026). <b>He was right and I was wrong.</b> An hour earlier I reported that the ERP held no delivery date for the two 8 BRD jobs. It holds one: <code>actual_delivery_date = 2026-09-09</code> on both, with <code>job_status = \"D: Delivered\"</code>.",
+      "THE FAULT WAS THE QUESTION GENIE ASKED. The delivered pull filtered on <code>status = \"Delivered\"</code> alone \u2014 and those two jobs still carry <code>status = \"Installation Stage\"</code>, because that is a real road a job takes. So the sync archived them off the board and never banked them: <b>no longer pending, not yet delivered, counted nowhere.</b> The pending count fell from 47 to 45 and ACHIEVED stayed at 4.",
+      "MEASURED BEFORE CHANGING ANYTHING, against the live ERP: <b>2,721</b> jobs answer <code>status = Delivered</code>; <b>2,436</b> answer <code>job_status = \"D: Delivered\"</code>; and <b>11</b> answer the second but not the first \u2014 <b>6 at Installation Stage and 5 Cancelled</b>. So the second question adds six real deliveries, and would have dragged five cancellations in with them.",
+      "<b>CANCELLED IS EXCLUDED BY NAME.</b> Migration 0020 exists because five cancelled jobs once sat archived looking exactly like deliveries \u2014 and this is the same five. A cancellation is not a delivery, however the ERP spells it.",
+      "The two 8 BRD jobs will bank themselves with the ERP\u2019s own date on the next Synchronise, and the amber \u201csay when it went\u201d block will empty on its own. That block stays: <b>1,468 delivered jobs genuinely carry no date</b>, and those still need a person to say.",
+    ],
+  },
+  {
     v: "5.0.45.1",
     date: "2026-09-09",
     module: "The two jobs that went out and counted nowhere",
