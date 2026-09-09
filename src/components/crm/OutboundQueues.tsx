@@ -36,9 +36,13 @@ export function EmailQueue() { return <QueueScreen channel="email" />; }
  *   MANUAL     the salesperson's own number. SEND opens WhatsApp with the
  *              words ready and a human presses send there. No limits apply
  *              because no automation is involved.
- *   BUSINESS   Periskope. The message leaves the server under the company's
- *              WhatsApp Business number, throttled, and reaches Communication
- *              only once Periskope confirms it arrived.
+ *   BUSINESS   The company's own WhatsApp Business number. The message
+ *              leaves the SERVER, throttled — by AiSensy through Meta's
+ *              official API since 9 Sep 2026, and by Periskope before that.
+ *              The screen names whichever road is live rather than assuming
+ *              one, because a screen that says Periskope while the server
+ *              sends by AiSensy is a screen that will be believed and be
+ *              wrong.
  *
  * Keeping them side by side rather than merging them means nobody sends a
  * hundred automated messages believing they were opening their own WhatsApp.
@@ -54,7 +58,7 @@ export function WhatsAppQueue() {
         </button>
         <button onClick={() => setDoor("biz")} className="rounded px-3 py-1.5 text-sm font-bold"
           style={door === "biz" ? { background: NAVY, color: "#fff" } : { background: NAVY_SOFT, color: NAVY }}>
-          🏢 Business — Periskope
+          🏢 Business — WhatsApp Business API
         </button>
       </div>
       {door === "manual" ? <QueueScreen channel="whatsapp" /> : <PeriskopeQueue />}

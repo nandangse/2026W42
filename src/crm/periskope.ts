@@ -89,7 +89,17 @@ export interface ThrottleState {
  * limit that resets whenever the platform feels like it. The day is IST,
  * because that is the day the person sending them lives in.
  */
-export async function throttleState(db: SupabaseClient, cfg: PeriskopeCfg): Promise<ThrottleState> {
+/**
+ * The three ceilings, whoever set them. AiSensy and Periskope both carry
+ * perHour / perDay / gapSeconds and nothing else here is read, so the
+ * throttle is written against the SHAPE rather than against one provider —
+ * a queue that could only count Periskope's messages would stop counting on
+ * the day the road changed (Dr Raghu, 9 Sep 2026: "ignore Periskope for
+ * now, it has been delinked").
+ */
+export interface Ceilings { perHour: number; perDay: number; gapSeconds: number }
+
+export async function throttleState(db: SupabaseClient, cfg: Ceilings): Promise<ThrottleState> {
   const now = Date.now();
   const hourAgo = new Date(now - 3600_000).toISOString();
   // Midnight IST, expressed as an instant.

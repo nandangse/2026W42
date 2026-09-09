@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.45.6",
+    date: "2026-09-09",
+    module: "The WhatsApp queue goes by AiSensy, and says so",
+    items: [
+      "\"This WhatsApp queue currently is going to go from AiSensy. Ignore Periskope for now. It has been delinked\" (Dr Raghu, 9 Sep 2026). The CRM queue\u2019s Send was <b>Periskope-only</b> \u2014 the HRMS drain had learned about AiSensy on 8 September and this one never had. With Periskope delinked, every Send on this screen would have failed with Periskope\u2019s own configuration error.",
+      "The queue now picks the road: <b>AiSensy wherever it is switched on and unpaused</b>, Periskope as the fallback. Periskope is kept rather than deleted because its rows and its history are still here, and a road that is merely unused must not become a road that cannot be read.",
+      "<b>AND THE SCREEN NAMES THE ROAD IT IS ON.</b> The heading said \u201cWhatsApp Business \u2014 Periskope\u201d, the ceilings pointed at Periskope\u2019s card, and the ban warning quoted Periskope\u2019s guidance \u2014 none of which is true on Meta\u2019s official API. A screen that says Periskope while the server sends by AiSensy is a screen that will be believed and be wrong.",
+      "<b>THE THING THAT CHANGED WHEN THE ROAD CHANGED, said out loud.</b> AiSensy sends a Meta-approved CAMPAIGN, not prose \u2014 so the free-text message sitting in the queue tonight (\u201cHope you are fine and have you seen my website\u201d) <b>cannot go out at all</b>. Send now refuses it before claiming the row and says to re-queue it naming a Live campaign, instead of letting it fail with an authentication error that reads like a broken key.",
+      "The three ceilings are read from whichever card is live, and the throttle is written against the SHAPE of a config rather than one provider\u2019s \u2014 a queue that could only count Periskope\u2019s messages would have stopped counting on the day the road changed.",
+    ],
+  },
+  {
     v: "5.0.45.5",
     date: "2026-09-09",
     module: "The Software Description, re-counted \u2014 and a published number corrected",

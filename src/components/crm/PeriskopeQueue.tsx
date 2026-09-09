@@ -37,7 +37,7 @@ const stamp = (v: unknown) =>
   v ? new Date(String(v)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 
 export default function PeriskopeQueue() {
-  const [data, setData] = useState<{ installed: boolean; configured: boolean; configError: string | null; throttle: Throttle | null; rows: QRow[] } | null>(null);
+  const [data, setData] = useState<{ installed: boolean; configured: boolean; configError: string | null; throttle: Throttle | null; rows: QRow[]; road?: "aisensy" | "periskope" | "none"; roadLabel?: string | null; templateOnly?: boolean; defaultCampaign?: string | null } | null>(null);
   const [filter, setFilter] = useState("queued");
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
@@ -70,18 +70,30 @@ export default function PeriskopeQueue() {
     <div style={{ maxWidth: 1100 }}>
       <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
         <div>
-          <div className="text-lg font-bold" style={{ color: INK }}>WhatsApp Business — Periskope</div>
-          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 640, lineHeight: 1.5 }}>
-            Personalised messages are made here and <b>parked</b>. A hand releases each one; only what Periskope
-            confirms as delivered becomes a WhatsApp Biz message on the record.
+          {/* THE ROAD NAMES ITSELF (Dr Raghu, 9 Sep 2026: "this WhatsApp
+              queue currently is going to go from AiSensy. Ignore Periskope
+              for now. It has been delinked."). A screen that says Periskope
+              while the server sends by AiSensy is a screen that will be
+              believed and be wrong. */}
+          <div className="text-lg font-bold" style={{ color: INK }}>
+            WhatsApp Business — {data?.roadLabel ? data.roadLabel.split(" — ")[0] : "not connected"}
+          </div>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 680, lineHeight: 1.5 }}>
+            Personalised messages are made here and <b>parked</b>. A hand releases each one.
+            {data?.road === "aisensy"
+              ? <> They go out through <b>Meta&apos;s official Business API</b>, and delivered and <b>read</b> come back
+                  on the webhook rather than by asking.</>
+              : <> Only what Periskope confirms as delivered becomes a WhatsApp Biz message on the record.</>}
           </div>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setCompose(true)} className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: ORANGE }}>✎ Compose</button>
           <button onClick={() => void act({ action: "check" }, "check")} disabled={!!busy}
             className="rounded border px-3 py-1.5 text-sm font-bold" style={{ borderColor: NAVY, color: NAVY }}
-            title="Ask Periskope what arrived — delivered messages land in Communication">
-            {busy === "check" ? "Asking Periskope…" : "↻ Check delivery"}
+            title={data?.road === "aisensy"
+              ? "Periskope's rows only. AiSensy reports delivered and read on its webhook, so its messages are never polled."
+              : "Ask Periskope what arrived — delivered messages land in Communication"}>
+            {busy === "check" ? "Asking…" : "↻ Check delivery"}
           </button>
         </div>
       </div>
@@ -89,6 +101,17 @@ export default function PeriskopeQueue() {
       {data?.installed === false && (
         <div className="rounded p-3 text-sm font-semibold mb-3" style={{ background: "#FCF6E8", color: "#8A6D1A" }}>
           Run CRM migration 0049 first — the WhatsApp queue has nowhere to live yet.
+        </div>
+      )}
+      {/* THE ONE THING THAT CHANGED WHEN THE ROAD CHANGED. A message parked
+          as prose was sendable yesterday and cannot go at all today. Better
+          said here than discovered on a Send button. */}
+      {data?.templateOnly && (
+        <div className="rounded p-3 text-sm mb-3" style={{ background: "#F0FAF3", border: "1px solid #BFE3CD", color: "#1E7A45", lineHeight: 1.6 }}>
+          <b>This road sends TEMPLATES, not prose.</b> AiSensy carries a Meta-approved <b>campaign</b> and its variables —
+          so a free-text message parked here while Periskope was live <b>cannot go out</b>, and Send will say so rather
+          than fail with an authentication error. Re-queue it naming a campaign that is <b>Live</b> in AiSensy
+          {data.defaultCampaign ? <>, or leave it blank to use the default, <b>{data.defaultCampaign}</b></> : <>, or set a default campaign on the AiSensy card</>}.
         </div>
       )}
       {data?.configError && (
@@ -109,9 +132,13 @@ export default function PeriskopeQueue() {
               : <span className="font-bold" style={{ color: GREEN }}>clear to send</span>}
           </div>
           <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
-            The ceilings live in Settings → Integrations → Periskope and are enforced by the server, not this screen.
-            <b style={{ color: "#8A6D1A" }}> Periskope&apos;s own guidance calls 100+ messages a day high risk of a ban</b> and
-            suggests 20–50 for an established number, spread across the day rather than fired in one minute.
+            The ceilings live in Settings → Integrations → {data?.road === "aisensy" ? "AiSensy" : "Periskope"} and are
+            enforced by the server, not this screen.
+            {data?.road === "aisensy"
+              ? <> Meta meters this road itself and there is no ban risk of the Periskope kind, but a template sent to
+                  people who did not ask for it is reported as spam and <b>the quality rating is what Meta throttles</b>.</>
+              : <><b style={{ color: "#8A6D1A" }}> Periskope&apos;s own guidance calls 100+ messages a day high risk of a ban</b> and
+                  suggests 20–50 for an established number, spread across the day rather than fired in one minute.</>}
           </div>
         </div>
       )}

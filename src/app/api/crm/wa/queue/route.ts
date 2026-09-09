@@ -5,7 +5,8 @@ import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { crmDb, crmConfigured, CrmNotConfigured } from "@/crm/db";
 import { variableValues, renderTemplate } from "@/crm/variables";
-import { periskopeConfig, throttleState, periskopeSend, periskopeStatus, isPaused } from "@/crm/periskope";
+import { periskopeConfig, throttleState, periskopeSend, periskopeStatus, isPaused, type PeriskopeCfg } from "@/crm/periskope";
+import { aisensyConfig, aisensySend, aisensyReady, type AisensyCfg } from "@/crm/aisensy";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -32,6 +33,42 @@ export const maxDuration = 60;
 
 const missing = (m: string) => /wa_queue|does not exist|schema cache/i.test(m);
 const BOSS = ["admin", "ceo", "sales_head"];
+
+/**
+ * WHICH ROAD THE QUEUE IS ON (Dr Raghu, 9 Sep 2026: "this WhatsApp queue
+ * currently is going to go from AiSensy. Ignore Periskope for now. It has
+ * been delinked.").
+ *
+ * AiSensy wins whenever it is switched on and unpaused; Periskope remains as
+ * the fallback because its rows and its history are still here and a road
+ * that is merely unused must not become a road that cannot be read.
+ *
+ * The consequence is not cosmetic and is carried into the reply, because the
+ * screen has to say it out loud: <b>AiSensy cannot send prose</b>. It sends a
+ * Meta-approved CAMPAIGN with its variables. A free-text message parked in
+ * this queue was perfectly sendable yesterday and cannot go at all today, and
+ * the only wrong way to handle that is to let a man press Send and read an
+ * authentication error.
+ */
+type Road =
+  | { kind: "aisensy"; cfg: AisensyCfg; label: string; templateOnly: true }
+  | { kind: "periskope"; cfg: PeriskopeCfg; label: string; templateOnly: false }
+  | { kind: "none"; error: string };
+
+async function roadFor(db: ReturnType<typeof crmDb>): Promise<Road> {
+  const ai = await aisensyConfig(db);
+  if (aisensyReady(ai)) return { kind: "aisensy", cfg: ai, label: "AiSensy — Meta's official Business API", templateOnly: true };
+  const pk = await periskopeConfig(db);
+  if (!("error" in pk) && !isPaused(pk)) return { kind: "periskope", cfg: pk, label: "Periskope", templateOnly: false };
+  return {
+    kind: "none",
+    error: "error" in ai
+      ? ai.error
+      : !aisensyReady(ai)
+        ? "AiSensy is switched off (paused = yes on its card in Settings → Integrations). Nothing can go out until it is cleared."
+        : "error" in pk ? pk.error : "Periskope is paused.",
+  };
+}
 
 /** GET — the queue, and where the three ceilings currently stand. */
 export async function GET(req: Request) {
@@ -64,12 +101,16 @@ export async function GET(req: Request) {
       for (const p of ppl ?? []) names.set(String(p.id), String(p.full_name || ""));
     }
 
-    const cfg = await periskopeConfig(db);
-    const throttle = "error" in cfg ? null : await throttleState(db, cfg);
+    const road = await roadFor(db);
+    const throttle = road.kind === "none" ? null : await throttleState(db, road.cfg);
     return NextResponse.json({
       installed: true,
-      configured: !("error" in cfg),
-      configError: "error" in cfg ? cfg.error : null,
+      configured: road.kind !== "none",
+      configError: road.kind === "none" ? road.error : null,
+      road: road.kind,
+      roadLabel: road.kind === "none" ? null : road.label,
+      templateOnly: road.kind === "aisensy",
+      defaultCampaign: road.kind === "aisensy" ? (road.cfg.defaultCampaign || null) : null,
       throttle,
       rows: rows.map((r) => ({ ...r, person_name: r.person_id ? names.get(String(r.person_id)) ?? null : null })),
     });
@@ -143,11 +184,10 @@ export async function POST(req: Request) {
     if (action === "send") {
       const id = String(body.id || "");
       if (!id) throw new HttpError(400, "Which message?");
-      const cfg = await periskopeConfig(db);
-      if ("error" in cfg) throw new HttpError(400, cfg.error);
-      if (isPaused(cfg)) throw new HttpError(423, "WhatsApp sending is paused on the Periskope card (paused = yes). Nothing goes out until it is cleared.");
+      const road = await roadFor(db);
+      if (road.kind === "none") throw new HttpError(423, road.error);
 
-      const t = await throttleState(db, cfg);
+      const t = await throttleState(db, road.cfg);
       if (t.blocked) return NextResponse.json({ ok: false, throttled: true, reason: t.blocked, throttle: t }, { status: 429 });
 
       const { data: row } = await db.from("wa_queue").select("*").eq("id", id).maybeSingle();
@@ -156,20 +196,40 @@ export async function POST(req: Request) {
       if (!BOSS.includes(String(me.crmRole)) && String(row.queued_by) !== String(me.profileId))
         throw new HttpError(403, "That one is somebody else's to send.");
 
+      /* A ROW PARKED FOR THE OTHER ROAD IS REFUSED BEFORE IT IS CLAIMED, and
+         the refusal says what to do. AiSensy sends an approved CAMPAIGN, not
+         prose: a free-text row queued while Periskope was live cannot go out
+         on this road at all, and pretending otherwise buys an authentication
+         error that reads like a broken key. */
+      const campaign = String(row.template_name || "").trim()
+        || (road.kind === "aisensy" ? road.cfg.defaultCampaign : "");
+      if (road.kind === "aisensy" && !campaign)
+        throw new HttpError(400, "This message is free text, and AiSensy can only send a Meta-approved CAMPAIGN. Queue it again naming a campaign that is Live in AiSensy, or set a default campaign on the AiSensy card.");
+
       // Claimed first, so two clicks cannot send it twice.
       const { data: claimed } = await db.from("wa_queue")
         .update({ status: "sending" }).eq("id", id).eq("status", "queued").select("id").maybeSingle();
       if (!claimed) throw new HttpError(409, "Someone just sent that one.");
 
-      const res = await periskopeSend(cfg, String(row.phone), String(row.body));
+      const res = road.kind === "aisensy"
+        ? await aisensySend(road.cfg, {
+            campaign,
+            phone: String(row.phone),
+            userName: String(row.ref || "").slice(0, 60) || String(row.phone),
+            params: Array.isArray(row.params) ? (row.params as string[]) : undefined,
+            media: (row.media as { url: string; filename: string } | null) || null,
+          }).then((r) => ({ ok: r.ok, uniqueId: r.id, error: r.error }))
+        : await periskopeSend(road.cfg, String(row.phone), String(row.body));
+
       if (!res.ok) {
         await db.from("wa_queue").update({ status: "failed", error: String(res.error || "").slice(0, 500) }).eq("id", id);
         return NextResponse.json({ ok: false, error: res.error }, { status: 502 });
       }
       await db.from("wa_queue").update({
-        status: "sent", external_id: res.uniqueId ?? null, sent_at: new Date().toISOString(), error: "",
+        status: "sent", provider: road.kind, external_id: res.uniqueId ?? null,
+        sent_at: new Date().toISOString(), error: "",
       }).eq("id", id);
-      const after = await throttleState(db, cfg);
+      const after = await throttleState(db, road.cfg);
       return NextResponse.json({ ok: true, unique_id: res.uniqueId, throttle: after });
     }
 
