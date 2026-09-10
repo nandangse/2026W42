@@ -112,10 +112,40 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
     return { all, decided, spoken, payNow, payNew, pcts, mean, sd, median, amts, aMean, aSd, cPcts, cMean, cSd, mgmt };
   }, [rows]);
 
+  /**
+   * PRODUCTION IS 129 OF 204 PEOPLE (Dr Raghu, 10 Sep 2026: "break up
+   * production — staff and production labour").
+   *
+   * One row was hiding most of the company, and the two halves of it are
+   * not comparable: a production staff increase and a production labour
+   * increase are different decisions taken on different grounds, averaged
+   * together into a number that describes neither.
+   *
+   * So a department that holds BOTH is split, on the same line the payroll
+   * already draws — the day-paid types against the month-paid. A department
+   * with only one kind keeps its plain name rather than growing a suffix
+   * that says nothing.
+   */
+  const dayPaid = (r: Row) => (r.payDays || 31) === 26;
+  const deptKey = useMemo(() => {
+    const mixed = new Set<string>();
+    const seen = new Map<string, Set<boolean>>();
+    for (const r of S.all) {
+      const d = r.department || "(no department)";
+      if (!seen.has(d)) seen.set(d, new Set());
+      seen.get(d)!.add(dayPaid(r));
+    }
+    for (const [d, kinds] of seen) if (kinds.size > 1) mixed.add(d);
+    return (r: Row) => {
+      const d = r.department || "(no department)";
+      return mixed.has(d) ? `${d} — ${dayPaid(r) ? "Labour" : "Staff"}` : d;
+    };
+  }, [S]);
+
   const depts = useMemo(() => {
     const m = new Map<string, { n: number; now: number; next: number; rated: number[]; pcts: number[] }>();
     for (const r of S.all) {
-      const k = r.department || "(no department)";
+      const k = deptKey(r);
       if (!m.has(k)) m.set(k, { n: 0, now: 0, next: 0, rated: [], pcts: [] });
       const d = m.get(k)!;
       d.n++; d.now += r.prevGross || 0;
@@ -129,7 +159,7 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
       avgPct: d.pcts.length ? d.pcts.reduce((a, b) => a + b, 0) / d.pcts.length : null,
       avgRating: d.rated.length ? d.rated.reduce((a, b) => a + b, 0) / d.rated.length : null,
     })).sort((a, b) => b.cost - a.cost);
-  }, [S]);
+  }, [S, deptKey]);
 
   const pip = useMemo(() => S.all
     .filter((r) => r.mgrAvg != null && (r.mgrAvg <= 4 || (r.mgrAvg <= 5 && (eff(r).pct ?? 99) <= 2)))

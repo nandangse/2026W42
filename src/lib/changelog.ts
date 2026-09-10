@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.46.5",
+    date: "2026-09-10",
+    module: "Production, split — and what the one row was hiding",
+    items: [
+      "\"Break up production \u2014 staff and production labour\" (Dr Raghu, 10 Sep 2026). Production was <b>129 of 204 people in a single row</b>, and the split says why that mattered:",
+      "<b>Production \u2014 Labour: 106 people, +18.5%. Production \u2014 Staff: 23 people, +9.8%.</b> The merged row read <b>+19.1%</b>, which described neither half. Production staff took roughly <b>half</b> the increase production labour took, and the average hid it completely.",
+      "The rule is general rather than a special case for one department: a department holding <b>both</b> day-paid and month-paid people is split on that line \u2014 the same line the payroll already draws \u2014 and a department holding only one kind keeps its plain name instead of growing a suffix that says nothing. So Service, Stores and Housekeeping split as well; Sales, Accounts, Design and the rest do not.",
+      "Screen and paper read from the same computation, so the wall and the printed document cannot disagree about a department.",
+    ],
+  },
+  {
     v: "5.0.46.4",
     date: "2026-09-10",
     module: "Salary as a share of turnover, asked plainly",
