@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.46.4",
+    date: "2026-09-10",
+    module: "Salary as a share of turnover, asked plainly",
+    items: [
+      "\"Sales \u2014 % of salary to sales. I want to know at what turnover how much is the % of salary in the table\" (Dr Raghu, 10 Sep 2026). The table asked three questions where he had asked one. The <i>Before</i> column is gone \u2014 last year\u2019s wage bill against next year\u2019s sales answers nothing \u2014 and what is left is the question itself: the turnover, and the percentage.",
+      "The salary is the <b>annual bill AFTER this appraisal</b> \u2014 \u20b910.10 Cr \u2014 because that is what the company will actually carry. The second column carries it with the ten per cent for overtime, \u20b911.11 Cr: the first is what has been committed, the second is what it really costs.",
+      "At the five levels: <b>\u20b956 Cr \u2192 18.04%</b> (19.84% with overtime), \u20b965 Cr \u2192 15.54%, \u20b975 Cr \u2192 13.47%, \u20b985 Cr \u2192 11.89%, and <b>\u20b9100 Cr \u2192 10.10%</b> (11.11%).",
+      "The note under it names the divisor in rupees and says what is NOT in the number \u2014 no material, no overhead, no other cost \u2014 so nobody reads it as the cost of running the company.",
+    ],
+  },
+  {
     v: "5.0.46.3",
     date: "2026-09-10",
     module: "The appraisal document — summary, curve, the pay bill against sales, every name, three signatures",

@@ -233,12 +233,21 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
     const monthNow = S.payNow, monthNew = S.payNew;
     const annualNow = monthNow * 12, annualNew = monthNew * 12;
     const withOtNew = annualNew * 1.1;
+    /**
+     * SALARY AS A SHARE OF TURNOVER (Dr Raghu, 10 Sep 2026: "I want to know
+     * at what turnover how much is the % of salary").
+     *
+     * One question, asked at five levels of sales: what does the wage bill
+     * come to as a percentage of what we sell. The salary is the ANNUAL bill
+     * AFTER this appraisal — the number the company will actually carry —
+     * and the second column adds the ten per cent for overtime, because the
+     * first is what is committed and the second is what it really costs.
+     */
     const SALES: number[] = [56, 65, 75, 85, 100];
     const breakEven = SALES.map((cr) => {
       const sale = cr * 1e7;
       return `<tr><td class="n">₹${cr} Cr</td>
-        <td class="n">${((annualNow / sale) * 100).toFixed(2)}%</td>
-        <td class="n">${((annualNew / sale) * 100).toFixed(2)}%</td>
+        <td class="n"><b>${((annualNew / sale) * 100).toFixed(2)}%</b></td>
         <td class="n">${((withOtNew / sale) * 100).toFixed(2)}%</td></tr>`;
     }).join("");
 
@@ -369,10 +378,13 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
       <div class="note">The ten per cent is a stated allowance for overtime and what rides with it, not a measured figure.</div>
     </div>
     <div>
-      <h2>What it costs against sales</h2>
-      <table><thead><tr><th>Sales for the year</th><th class="n">Before</th><th class="n">After</th><th class="n">After, +10%</th></tr></thead>
+      <h2>Salary as a share of turnover</h2>
+      <table><thead><tr><th>Turnover for the year</th><th class="n">Salary %</th><th class="n">Salary +10% (OT etc)</th></tr></thead>
       <tbody>${breakEven}</tbody></table>
-      <div class="note">The annual pay bill as a share of sales, at each level. Salary alone — no material, no overhead.</div>
+      <div class="note">
+        The annual wage bill after this appraisal — <b>${rupee(annualNew)}</b>, or <b>${rupee(withOtNew)}</b> with the ten per cent —
+        divided by the year's sales. Salary alone: no material, no overhead, no other cost.
+      </div>
     </div>
   </div>
 
