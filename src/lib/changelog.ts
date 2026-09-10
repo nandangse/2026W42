@@ -89,6 +89,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.46.0",
+    date: "2026-09-10",
+    module: "Labour that was measured, money that has a month, and two filters",
+    items: [
+      "\"The WIP is showing zero \u2026 whatever labour is there, multiply that by the rates that are put into admin\" (Dr Raghu, 10 Sep 2026). It was showing zero because <code>wip_labour</code> is a box somebody has to type, and it stands at <b>zero on all 114 jobs</b>. Meanwhile the floor has been recording crew every day since August and nobody had ever multiplied it out.",
+      "So the column is now <b>DERIVED</b>: <code>job_manpower</code> \u00d7 <code>labour_rate</code>, summed over every day and every trade. <b>585 crew-days across 44 jobs \u2014 1,374 man-days, \u20b916.47 L</b>, of which \u20b911.08 L is on jobs still live. The number existed the whole time.",
+      "\"It is not the WIP labour \u2014 for each job, whatever we are writing is the manpower deployment calculated from that.\" The column is <b>Labour deployed</b>, and the total carries the <b>man-days</b> beside the rupees, because the man-days are the measured fact and the money is only the arithmetic. Every cell\u2019s hover shows its working: so many man-days over so many days. A labour cost with no man-days behind it is a number nobody can check.",
+      "A TRADE WITH NO RATE COSTS NOTHING AND IS NAMED, rather than silently counting as free.",
+      "\"The amount of money that we will receive, please break up into what will come in this month, October, November and December \u2026 make a total on the top.\" The months were a thin grey line of six figures with <b>no total</b> \u2014 a reference, not an answer. They now stand as their own band with the sum in front of them, because a cash plan asks HOW MUCH first and WHEN second.",
+      "AND THE TOTAL REFUSES TO SWALLOW WHAT IT CANNOT PLACE. Money landing beyond the six months is stated separately, and so are the jobs with a balance but <b>no target date or no payment terms</b> \u2014 named and counted, and explicitly NOT in the total. A total that quietly disagrees with its own parts is worse than no total.",
+      "\"Give a filter by product \u2026 and also by job owner so that they know how to follow it up.\" Both, beside the date window, and the line under the header names every filter in force.",
+      "\"Anything that people enter, whether it is a kitting percentage or a production percentage, is just humbug theory.\" He is right, and the screen now says so out loud: Labour deployed is <b>measured</b>; Kit % and Prod % are <b>typed</b>, and Material and Invested descend from them, so they inherit it. Costing a job from the material actually issued and the labour actually deployed is filed as its own request.",
+    ],
+  },
+  {
     v: "5.0.45.6",
     date: "2026-09-09",
     module: "The WhatsApp queue goes by AiSensy, and says so",

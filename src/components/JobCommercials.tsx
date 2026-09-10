@@ -118,7 +118,40 @@ export default function JobCommercials({
    */
   const [from, setFrom] = useState(() => today.slice(0, 8) + "01");
   const [to, setTo] = useState(() => monthEnd(today));
+  /**
+   * BY PRODUCT AND BY OWNER (Dr Raghu, 10 Sep 2026: "give a filter by
+   * product so that we can work it out, and also by job owner so that they
+   * know how to follow it up"). The same pair the Pending Material screen
+   * carries, because the two questions asked of this table are "how does
+   * this product line pay" and "what is mine to chase".
+   */
+  const [fam, setFam] = useState("all");
+  const [own, setOwn] = useState("all");
   const [busy, setBusy] = useState("");
+  /**
+   * WIP LABOUR IS DERIVED, NOT TYPED (Dr Raghu, 10 Sep 2026: "the WIP is
+   * showing zero ... whatever labour is there, multiply that by the rates
+   * that are put into admin").
+   *
+   * `jobs.wip_labour` is a box, and the box stands at zero on all 114 jobs.
+   * The floor has meanwhile recorded crew every day since August. So the
+   * column now shows the floor's own entries priced at Admin's day rates,
+   * and the typed value is only a fallback for a job somebody costed by
+   * hand before this existed.
+   */
+  const [labourBy, setLabourBy] = useState<Record<string, { cost: number; mandays: number; days: number }>>({});
+  const [labourMeta, setLabourMeta] = useState<{ rates: Record<string, number>; unratedTrades?: string[] } | null>(null);
+  useEffect(() => {
+    let live = true;
+    api.get("/api/job-labour")
+      .then((r: { installed?: boolean; jobs?: Record<string, { cost: number; mandays: number; days: number }>; rates?: Record<string, number>; unratedTrades?: string[] }) => {
+        if (!live || !r?.installed) return;
+        setLabourBy(r.jobs || {});
+        setLabourMeta({ rates: r.rates || {}, unratedTrades: r.unratedTrades });
+      })
+      .catch(() => { /* the column falls back to the typed value */ });
+    return () => { live = false; };
+  }, []);
   /**
    * ONE ROW AT A TIME (Dr Raghu, 2 Sep 2026: "keep the edit at the next of
    * the job so these data can be edited").
@@ -151,6 +184,15 @@ export default function JobCommercials({
       new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + i, 1)).toISOString().slice(0, 7));
   }, [today]);
 
+  const famOptions = useMemo(
+    () => [...new Set(jobs.map((j) => String(j.fam || "").trim()).filter(Boolean))].sort(),
+    [jobs],
+  );
+  const ownOptions = useMemo(
+    () => [...new Set(jobs.map((j) => String(j.ownerName || j.ownerInitials || "").trim()).filter(Boolean))].sort(),
+    [jobs],
+  );
+
   /** Jobs with no target date, so the count under the table is honest. */
   const undated = useMemo(
     () => ((from || to) ? jobs.filter((j) => !j.tdd).length : 0),
@@ -162,6 +204,8 @@ export default function JobCommercials({
     let list = k
       ? jobs.filter((j) => [j.id, j.tag, j.cust, j.fam, j.ownerName].some((v) => String(v ?? "").toLowerCase().includes(k)))
       : jobs;
+    if (fam !== "all") list = list.filter((j) => String(j.fam || "").trim() === fam);
+    if (own !== "all") list = list.filter((j) => String(j.ownerName || j.ownerInitials || "").trim() === own);
     if (from || to) {
       list = list.filter((j) => {
         if (!j.tdd) return false;
@@ -214,9 +258,13 @@ export default function JobCommercials({
         }
       }
       const termsPct = BUCKETS.reduce((a, b) => a + Number(j[b.key] ?? 0), 0);
-      return { j, adv, gst, throughput, material, invested, invoice, balance, cash, termsPct };
+      /* The floor's own entries priced at Admin's rates; the typed box only
+         as a fallback for a job costed by hand before this existed. */
+      const lab = labourBy[j.id];
+      const labour = lab ? lab.cost : (j.wipLabour == null ? null : Number(j.wipLabour));
+      return { j, adv, gst, throughput, material, invested, invoice, balance, cash, termsPct, labour, lab };
     });
-  }, [jobs, q, from, to]);
+  }, [jobs, q, from, to, fam, own, labourBy]);
 
   const totals = useMemo(() => {
     const t: Record<string, number> = {};
@@ -245,17 +293,70 @@ export default function JobCommercials({
           <Big n={cr(sum((r) => r.throughput))} l="throughput" c={C.green} />
           <Big n={cr(sum((r) => r.material))} l="material" c={C.sub} />
           <Big n={cr(sum((r) => r.invested))} l="invested" c={C.navy} />
-          <Big n={cr(sum((r) => r.j.wipLabour ?? null))} l="WIP labour" c={C.navy} />
+          {/* NOT "WIP labour" (Dr Raghu, 10 Sep 2026: "it is not the WIP
+              labour — for each job, whatever we are writing is the manpower
+              deployment calculated from that"). It is what the floor
+              actually deployed, priced. The man-days ride with it because
+              they are the measured fact; the rupees are the arithmetic. */}
+          <Big
+            n={cr(sum((r) => r.labour))}
+            l={`labour deployed · ${rows.reduce((a, r) => a + (r.lab?.mandays ?? 0), 0).toLocaleString("en-IN")} man-days`}
+            c={C.navy}
+          />
           <Big n={cr(sum((r) => r.adv))} l="advance in" c={C.green} />
           <Big n={cr(sum((r) => r.balance))} l="balance due" c={C.ink} />
         </div>
-        <div className="flex gap-3 flex-wrap mt-2 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
-          {months.map((m) => (
-            <div key={m} className="text-xs">
-              <span style={{ color: C.sub }}>{monthLabel(m)} </span>
-              <b className="tnum" style={{ color: totals[m] ? C.green : "#D5D2C9" }}>{totals[m] ? cr(totals[m]) : "·"}</b>
+        {/*
+          WHAT COMES IN, AND WHEN (Dr Raghu, 10 Sep 2026: "the amount of money
+          that we will receive, please break up into what will come in this
+          month, what will come in October, November and December ... make a
+          total on the top so that we can total it up").
+
+          It was a thin grey line of six figures with no total, which is a
+          reference rather than an answer. The months now stand as their own
+          band with the sum in front of them, because the first question a
+          cash plan asks is HOW MUCH, and only then WHEN.
+
+          The total is the six months shown — not the whole balance due.
+          Money landing beyond the horizon, and money on a job with no terms
+          or no date, is stated underneath rather than folded in, since a
+          total that quietly disagrees with its own parts is worse than no
+          total.
+        */}
+        <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
+          <div className="flex gap-4 flex-wrap items-baseline">
+            <div>
+              <div className="text-xs font-bold" style={{ color: C.sub, letterSpacing: 1 }}>COMING IN — NEXT {MONTHS} MONTHS</div>
+              <div className="font-bold tnum" style={{ color: C.green, fontSize: 22, lineHeight: 1.15 }}>
+                {cr(months.reduce((a, m) => a + (totals[m] || 0), 0))}
+              </div>
             </div>
-          ))}
+            {months.map((m) => (
+              <div key={m} style={{ minWidth: 92 }}>
+                <div className="text-xs" style={{ color: C.sub }}>{monthLabel(m)}</div>
+                <b className="tnum" style={{ color: totals[m] ? C.green : "#D5D2C9", fontSize: 15 }}>
+                  {totals[m] ? cr(totals[m]) : "·"}
+                </b>
+              </div>
+            ))}
+          </div>
+          {(() => {
+            const shown = months.reduce((a, m) => a + (totals[m] || 0), 0);
+            const dated = Object.values(totals).reduce((a, v) => a + v, 0);
+            const beyond = dated - shown;
+            const noTerms = rows.filter((r) => r.balance > 0 && (!r.j.tdd || r.termsPct === 0));
+            const unplaced = noTerms.reduce((a, r) => a + r.balance, 0);
+            if (beyond <= 0 && !noTerms.length) return null;
+            return (
+              <div className="text-xs mt-1.5" style={{ color: C.sub, lineHeight: 1.5 }}>
+                {beyond > 0 && <>A further <b className="tnum">{cr(beyond)}</b> lands beyond {monthLabel(months[months.length - 1])}. </>}
+                {noTerms.length > 0 && (
+                  <><b>{noTerms.length}</b> job{noTerms.length === 1 ? "" : "s"} worth <b className="tnum">{cr(unplaced)}</b> cannot
+                    be placed in any month — no target date, or no payment terms recorded. That money is <b>not</b> in the totals above.</>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -282,6 +383,20 @@ export default function JobCommercials({
             onClick={() => { setFrom(today.slice(0, 8) + "01"); setTo(monthEnd(today)); }}
             className="rounded px-2 py-1 text-xs font-bold" style={{ border: `1px solid ${C.line}`, color: C.sub, background: "#fff" }}
             title="Back to this month — the 1st to the last day">This month</button>
+          <select value={fam} onChange={(e) => setFam(e.target.value)}
+            className="rounded border px-2 py-1 text-sm font-semibold"
+            style={{ borderColor: fam === "all" ? C.line : C.accent, background: fam === "all" ? "#fff" : "#FFF3E8", color: fam === "all" ? C.ink : C.accent }}
+            title="Narrow to one product type">
+            <option value="all">All products</option>
+            {famOptions.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
+          <select value={own} onChange={(e) => setOwn(e.target.value)}
+            className="rounded border px-2 py-1 text-sm font-semibold"
+            style={{ borderColor: own === "all" ? C.line : C.accent, background: own === "all" ? "#fff" : "#FFF3E8", color: own === "all" ? C.ink : C.accent }}
+            title="Narrow to one manager — what is theirs to follow up">
+            <option value="all">All managers</option>
+            {ownOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
           <button
             onClick={() => { setFrom(""); setTo(""); }}
             className="rounded px-2 py-1 text-xs font-bold" style={{ border: `1px solid ${C.line}`, color: C.sub, background: "#fff" }}
@@ -292,11 +407,28 @@ export default function JobCommercials({
         </div>
       </div>
 
-      {(from || to) && (
+      {/* WHAT IS MEASURED AND WHAT IS TYPED (Dr Raghu, 10 Sep 2026: "anything
+          that people enter, whether it is a kitting percentage or a production
+          percentage, is just humbug theory"). Stated on the screen, so a
+          reader knows which columns to trust. */}
+      <div className="text-xs mb-2" style={{ color: C.sub, lineHeight: 1.5 }}>
+        <b>Labour deployed</b> is measured — the crew the floor recorded, day by day, priced at Admin&apos;s day rates.
+        {" "}<b>Kit %</b> and <b>Prod %</b> are typed by a person and carry only as much weight as the person typing them;
+        material and invested are computed from them, so they inherit that. The work in hand is to cost a job from the
+        detailed material actually issued and the labour actually deployed, and stop asking anyone for a percentage.
+      </div>
+
+      {(from || to || fam !== "all" || own !== "all") && (
         <div className="text-xs mb-2" style={{ color: C.sub }}>
-          Showing <b>{rows.length}</b> of {jobs.length} jobs — target delivery date
+          Showing <b>{rows.length}</b> of {jobs.length} jobs
+          {fam !== "all" && <> · product <b>{fam}</b></>}
+          {own !== "all" && <> · manager <b>{own}</b></>}
+          {(from || to) && <> — target delivery date</>}
           {from ? <> from <b>{fmtFull(from)}</b></> : <> up to</>}
-          {to ? <> to <b>{fmtFull(to)}</b></> : from ? <> onwards</> : null}.
+          {to ? <> to <b>{fmtFull(to)}</b></> : from ? <> onwards</> : null}
+          {(fam !== "all" || own !== "all") && (
+            <button onClick={() => { setFam("all"); setOwn("all"); }} className="ml-2 font-bold" style={{ color: C.accent }}>clear ✕</button>
+          )}.
           {undated > 0 && <> <b>{undated}</b> job{undated === 1 ? " carries" : "s carry"} no target date and cannot sit in any window — left out rather than dropped in. Press <b>All dates</b> to see them.</>}
         </div>
       )}
@@ -325,7 +457,7 @@ export default function JobCommercials({
                   filter whose column is off the edge of the screen is a
                   filter nobody trusts. */}
               {["Job", "", "TDD", "Customer tag", "Product type", "Value", "T %", "Throughput", "Material",
-                "Kit %", "Invested", "WIP labour", "Prod %", "GST %", "Advance", "Balance due",
+                "Kit %", "Invested", "Labour deployed", "Prod %", "GST %", "Advance", "Balance due",
                 "Manager"].map((h) => (
                 <th key={h} className="px-2 py-2 text-left whitespace-nowrap" style={{ position: "sticky", top: 0 }}>{h}</th>
               ))}
@@ -343,7 +475,7 @@ export default function JobCommercials({
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ j, adv, gst, throughput, material, invested, invoice, balance, cash, termsPct }, i) => (
+            {rows.map(({ j, adv, gst, throughput, material, invested, invoice, balance, cash, termsPct, labour, lab }, i) => (
               <tr key={j.id} style={{ borderTop: "1px solid #EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                 {/* The number opens the job's read; the pencil opens this row. */}
                 <td className="px-2 py-1 font-bold tnum whitespace-nowrap">
@@ -374,7 +506,16 @@ export default function JobCommercials({
                 <td className="px-2 py-1 text-center tnum">{j.kit == null ? "·" : `${Math.round(Number(j.kit))}%`}</td>
                 <td className="px-2 py-1 whitespace-nowrap tnum" style={{ color: C.ink }}
                   title="Material × Kitting %">{cr(invested)}</td>
-                <Money v={j.wipLabour ?? null} canEdit={canEdit && editing === j.id} busy={busy === j.id + "wip_labour"} onSave={(v) => save(j.id, "wip_labour", v)} />
+                {/* DERIVED from the floor's own manpower entries, so it is not
+                    typed here any more. The hover shows the working, because a
+                    labour cost with no man-days behind it is a number nobody
+                    can check. */}
+                <td className="px-2 py-1 whitespace-nowrap tnum" style={{ color: lab ? C.navy : "#B9B5AA" }}
+                  title={lab
+                    ? `${lab.mandays} man-day${lab.mandays === 1 ? "" : "s"} over ${lab.days} day${lab.days === 1 ? "" : "s"} on the floor, at Admin's day rates`
+                    : "Nobody has recorded crew on this job yet — On Floor → manpower"}>
+                  {labour == null || labour === 0 ? "·" : cr(labour)}
+                </td>
                 <td className="px-2 py-1 text-center tnum">{j.pct == null ? "·" : `${Math.round(Number(j.pct))}%`}</td>
                 <Pct v={gst} canEdit={canEdit && editing === j.id} busy={busy === j.id + "gst"}
                   warn={false} onSave={(v) => save(j.id, "gst", v)} />
@@ -421,7 +562,7 @@ export default function JobCommercials({
               <td className="px-2 py-2 whitespace-nowrap tnum">{cr(sum((r) => r.balance))}</td>
               <td colSpan={2} />
               <td className="px-2 py-2 whitespace-nowrap tnum">{cr(sum((r) => r.j.invested ?? null))}</td>
-              <td className="px-2 py-2 whitespace-nowrap tnum">{cr(sum((r) => r.j.wipLabour ?? null))}</td>
+              <td className="px-2 py-2 whitespace-nowrap tnum">{cr(sum((r) => r.labour))}</td>
               <td colSpan={BUCKETS.length} />
               {months.map((m) => (
                 <td key={m} className="px-2 py-2 text-center whitespace-nowrap tnum" style={{ background: "#0D3B24", color: "#9BE8B8" }}>
