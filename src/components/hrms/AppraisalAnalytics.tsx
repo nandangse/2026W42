@@ -287,8 +287,13 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
     const ordered = [...ORDER.filter((t) => present.includes(t)), ...present.filter((t) => !ORDER.includes(t)).sort()];
 
     const peopleTable = (t: string) => {
+      /* HIGHEST PAID FIRST (Dr Raghu, 10 Sep 2026: "also sort by salary
+         gross high to low"). By the NEW gross — the decision this document
+         is about — falling back to the old one where a new gross is
+         somehow absent, so nobody sinks to the bottom for want of a
+         number. */
       const list = S.all.filter((r) => (r.type || "(no type)").trim() === t)
-        .sort((a, b) => (a.department || "").localeCompare(b.department || "") || a.name.localeCompare(b.name));
+        .sort((a, b) => (b.newGross ?? b.prevGross ?? 0) - (a.newGross ?? a.prevGross ?? 0) || a.name.localeCompare(b.name));
       if (!list.length) return "";
       const byDay = list.some((r) => (r.payDays || 31) === 26);
       const head = byDay
@@ -315,7 +320,7 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
       }).join("");
       const sub = list.reduce((a, r) => a + (r.inc ?? 0), 0);
       const cols = byDay ? 13 : 10;
-      return `<h2 class="break">${esc(t)} <span class="muted">— ${list.length} ${list.length === 1 ? "person" : "people"}</span></h2>
+      return `<h2>${esc(t)} <span class="muted">— ${list.length} ${list.length === 1 ? "person" : "people"}</span></h2>
         <table class="people-t"><thead>${head}</thead><tbody>${body}
         <tr class="tot"><td colspan="${cols - 4}">Total</td><td class="n">${rupee(list.reduce((a, r) => a + (r.prevGross ?? 0), 0))}</td>${byDay ? '<td></td>' : ''}<td class="n">${rupee(list.reduce((a, r) => a + (r.newGross ?? r.prevGross ?? 0), 0))}</td>${byDay ? '<td></td>' : ''}<td class="n">${rupee(sub)}</td><td></td>${byDay ? '<td></td>' : ''}</tr>
         </tbody></table>`;
@@ -351,8 +356,11 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
   .card .v { font-size:13pt; font-weight:700; }
   .card .l { font-size:7.5pt; color:#555; }
   .card .s { font-size:7pt; color:#888; }
-  h2 { font-size:11pt; margin:13px 0 5px; border-bottom:1px solid #CFCBC0; padding-bottom:3px; }
-  h2.break { break-before: page; }
+  /* A HEADING NO LONGER FORCES A NEW PAGE (Dr Raghu, 10 Sep 2026: "why the
+     gaps"). Starting each employee type on a fresh sheet left half-empty
+     pages between them — fifteen pages where eleven would do. Sections now
+     flow, and a heading simply refuses to be the last thing on a page. */
+  h2 { font-size:11pt; margin:13px 0 5px; border-bottom:1px solid #CFCBC0; padding-bottom:3px; break-after: avoid; }
   table { width:100%; border-collapse:collapse; font-size:8.5pt; }
   th { text-align:left; background:#F2EFE8; padding:3.5px 5px; border-bottom:1px solid #CFCBC0; font-size:7.5pt; text-transform:uppercase; letter-spacing:.03em; }
   td { padding:3px 5px; border-bottom:1px solid #EDEAE2; }
@@ -367,7 +375,7 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
   .note { font-size:8pt; color:#666; margin-top:8px; }
   .two { display:flex; gap:14px; align-items:flex-start; }
   .two > * { flex:1 1 0; min-width:0; }
-  .sign { break-before: page; margin-top:26px; }
+  .sign { margin-top:26px; break-inside: avoid; }
   .sign .row { display:flex; gap:30px; margin-top:52px; }
   .sign .box { flex:1 1 0; border-top:1px solid #16203A; padding-top:5px; font-size:9.5pt; font-weight:700; }
   .sign .box span { display:block; font-weight:400; font-size:8pt; color:#666; }

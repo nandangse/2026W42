@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.46.6",
+    date: "2026-09-10",
+    module: "Highest paid first, and the gaps closed",
+    items: [
+      "\"Also sort by salary gross high to low\" (Dr Raghu, 10 Sep 2026). Every people table now runs from the largest new gross down, instead of by department and then by name. Where a new gross is somehow absent the old one stands in, so nobody sinks to the bottom of the page for want of a number.",
+      "\"Why the gaps\" \u2014 they were mine. I had forced <b>each employee type onto a fresh sheet</b> and the signatures onto another, which left half-empty pages between the tables: fifteen pages where eleven will do. The forced breaks are gone. Sections flow, a heading refuses to be the last thing on a page, and the signature block simply refuses to be split in half.",
+      "Table headers still repeat on every page and a row is still never broken across two \u2014 those are the breaks worth keeping.",
+    ],
+  },
+  {
     v: "5.0.46.5",
     date: "2026-09-10",
     module: "Production, split — and what the one row was hiding",
