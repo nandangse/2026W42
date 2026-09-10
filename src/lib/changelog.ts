@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.46.2",
+    date: "2026-09-10",
+    module: "Appraisal Analytics prints its own paper",
+    items: [
+      "\"This is not coming, the pdf on appraisal analytics\" (Dr Raghu, 10 Sep 2026) \u2014 and he sent the file, which settles it. <b>Four pages, and the only text drawn on them is the browser\u2019s own date header.</b> The body contains two filled rectangles, the beige ground and a white one, and nothing else. Four blank sheets.",
+      "THE CAUSE WAS A MISSING PAGE, NOT A BROKEN BUTTON. The pane asked for a print button but handed over no document, so it fell back to <code>window.print()</code> \u2014 and this wall is precisely the shape that does not survive it: nested scrollers, flex heights, and SVG curves sized to the viewport. The Appraisal Table printed a blank sheet the same way on 2 September, and the offer letter and the floor report before that. <b>Three times is a pattern, not bad luck.</b>",
+      "So the wall now builds its OWN A4 document, as the delivery report and the salary register already do: the seven totals, <b>every department</b> with its people, its pay bill now and after, its cost and its average rating, the experience bands, and the three lists that are the point of the exercise \u2014 the conversations that must not be skipped, the widest self-versus-manager gaps, and asked against given.",
+      "It carries <b>who printed it and when</b>, the employee types in force, and CONFIDENTIAL on the masthead \u2014 because this one goes into a personnel file. It also repeats table headers across pages and refuses to break a row in half.",
+      "And it states its own arithmetic at the foot: where a decision is Final the decided gross is used, where only the manager has spoken the proposal is used and counted as indicative. The screen\u2019s curves leave management out because three managing salaries set the scale for two hundred people \u2014 but every total and department figure on the paper counts everybody, and the note says so rather than leaving a reader to wonder.",
+    ],
+  },
+  {
     v: "5.0.46.1",
     date: "2026-09-10",
     module: "Pending Material: a date to follow up to, material added in one go, and the job stays put",

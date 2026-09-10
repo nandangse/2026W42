@@ -163,8 +163,113 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
 
   const indicativeN = S.spoken.filter((x) => x.e.indicative).length;
 
+  /**
+   * ITS OWN PAPER (Dr Raghu, 10 Sep 2026: "this is not coming, the pdf on
+   * appraisal analytics").
+   *
+   * The pane asked for a print button but handed over no page, so it fell
+   * back to window.print() — and this wall is exactly the shape that does
+   * not survive it: nested scrollers, flex heights, SVG curves sized to the
+   * viewport. The Appraisal Table printed a blank sheet for the same reason
+   * on 2 September, and the offer letter and floor report before that.
+   *
+   * So the wall builds its own document — the totals, the departments, the
+   * bands, and the three lists that are the point of the exercise. It is
+   * written as a table on paper rather than a screenshot of the screen,
+   * because the thing that goes into a file has to be readable at A4 and
+   * has to carry who printed it and when.
+   */
+  const printPaper = () => {
+    const esc = (v: unknown) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
+    const when = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const card = (v: string, l: string, sub?: string) =>
+      `<div class="card"><div class="v">${esc(v)}</div><div class="l">${esc(l)}</div>${sub ? `<div class="s">${esc(sub)}</div>` : ""}</div>`;
+
+    const deptRows = depts.map((d) => `<tr>
+      <td>${esc(d.dept)}</td><td class="n">${d.n}</td>
+      <td class="n">${esc(lakh(d.now))}</td><td class="n">${esc(lakh(d.next))}</td>
+      <td class="n">${esc(lakh(d.cost))}</td>
+      <td class="n">${d.avgPct == null ? "—" : esc(pct(d.avgPct))}</td>
+      <td class="n">${d.avgRating == null ? "—" : d.avgRating.toFixed(1)}</td></tr>`).join("");
+
+    const bandRows = bands.map((b) => `<tr><td>${esc(b.band)}</td><td class="n">${b.n}</td><td class="n">${b.avg == null ? "—" : esc(pct(b.avg))}</td></tr>`).join("");
+
+    const list = (title: string, note: string, items: string[]) =>
+      items.length
+        ? `<h2>${esc(title)} <span class="muted">— ${esc(note)}</span></h2><ol class="people">${items.map((x) => `<li>${x}</li>`).join("")}</ol>`
+        : `<h2>${esc(title)}</h2><p class="muted">Nobody.</p>`;
+
+    const pipItems = pip.map((r) => `<b>${esc(r.name)}</b> <span class="muted">${esc(r.department || "—")} · manager ${r.mgrAvg?.toFixed(1) ?? "—"} · ${esc(pct(eff(r).pct))}</span>`);
+    const gapItems = gaps.slice(0, 15).map((g) => `<b>${esc(g.r.name)}</b> <span class="muted">self ${g.r.selfAvg?.toFixed(1)} vs manager ${g.r.mgrAvg?.toFixed(1)} · gap ${g.gap.toFixed(1)}</span>`);
+    const askItems = asks.slice(0, 15).map((a) => `<b>${esc(a.r.name)}</b> <span class="muted">asked ${esc(pct(a.askPct))} · ${a.indicative ? "proposed" : "got"} ${esc(pct(a.gotPct))}</span>`);
+
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Appraisal Summary — Nandan GSE</title>
+<style>
+  @page { size: A4; margin: 12mm 10mm; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color:#16203A; font-size:10.5pt; line-height:1.45; margin:0; }
+  .head { border-bottom:2px solid #16203A; padding-bottom:6px; margin-bottom:12px; }
+  .head h1 { font-size:15pt; margin:0 0 2px; }
+  .head .sub { font-size:8.5pt; color:#555; }
+  .cards { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .card { border:1px solid #CFCBC0; border-radius:5px; padding:7px 11px; min-width:118px; }
+  .card .v { font-size:14pt; font-weight:700; }
+  .card .l { font-size:8pt; color:#555; }
+  .card .s { font-size:7.5pt; color:#888; }
+  h2 { font-size:11pt; margin:14px 0 5px; border-bottom:1px solid #CFCBC0; padding-bottom:3px; }
+  table { width:100%; border-collapse:collapse; font-size:9pt; }
+  th { text-align:left; background:#F2EFE8; padding:4px 6px; border-bottom:1px solid #CFCBC0; font-size:8pt; text-transform:uppercase; letter-spacing:.04em; }
+  td { padding:3.5px 6px; border-bottom:1px solid #EDEAE2; }
+  td.n, th.n { text-align:right; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  ol.people { font-size:9pt; margin:4px 0 0; padding-left:20px; }
+  ol.people li { margin-bottom:2px; break-inside:avoid; }
+  .muted { color:#666; font-weight:400; }
+  .note { font-size:8.5pt; color:#666; margin-top:10px; border-top:1px solid #CFCBC0; padding-top:6px; }
+</style></head><body>
+  <div class="head">
+    <h1>Nandan GSE — Appraisal Summary Data Analytics</h1>
+    <div class="sub">Printed by ${esc(who)} on ${esc(when)} · ${esc(typeLabel)} · CONFIDENTIAL — personnel record</div>
+  </div>
+  <div class="cards">
+    ${card(String(S.all.length), "On the roll")}
+    ${card(String(S.spoken.length), "Increments on the table", indicativeN ? `${S.decided.length} final, ${indicativeN} indicative` : "all Final")}
+    ${card(lakh(S.payNow), "Payroll today / month")}
+    ${card(lakh(S.payNew), "Payroll after / month")}
+    ${card(lakh(S.payNew - S.payNow), "Increase / month", S.payNow ? `+${(((S.payNew - S.payNow) / S.payNow) * 100).toFixed(1)}% of today's payroll` : "")}
+    ${card(lakh((S.payNew - S.payNow) * 12), "Cost of the cycle / year")}
+    ${card(pct(S.mean), "Average increase", `median ${pct(S.median)}`)}
+  </div>
+
+  <h2>By department</h2>
+  <table><thead><tr><th>Department</th><th class="n">People</th><th class="n">Now / month</th><th class="n">After / month</th><th class="n">Cost / month</th><th class="n">Avg %</th><th class="n">Avg rating</th></tr></thead>
+  <tbody>${deptRows}</tbody></table>
+
+  <h2>By experience</h2>
+  <table><thead><tr><th>Band</th><th class="n">People</th><th class="n">Average increase</th></tr></thead>
+  <tbody>${bandRows}</tbody></table>
+
+  ${list("Conversations that must not be skipped", "lowest manager scores, or scored low with almost no increment", pipItems)}
+  ${list("Widest self vs manager gaps", "top 15 — where the two readings disagree most", gapItems)}
+  ${list("Asked against given", "top 15 by the size of the gap", askItems)}
+
+  <div class="note">
+    Computed live from the appraisal rows. Where a decision is <b>Final</b> the decided gross is used; where only the manager has spoken the proposal is used and counted as indicative${indicativeN ? ` (${indicativeN} such)` : ""}.
+    The curves on screen leave management out — they skew a distribution of two hundred — but every total, department figure and the pay bill here counts everybody.
+  </div>
+</body></html>`;
+
+    const w = window.open("", "_blank");
+    if (!w) { setMsg("Your browser blocked the print window. Allow pop-ups for this site and press PDF / Print again."); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 250);
+  };
+
+
   return (
-    <Pane title="Appraisal Summary Data Analytics" who={who} print
+    <Pane title="Appraisal Summary Data Analytics" who={who} print onPrint={printPaper}
       blurb="The whole cycle on one wall: the money, the curve, the departments, the outliers — and the conversations that must not be skipped. Every name opens the Report Card.">
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: C.red }}>{msg}</div>}
       {rows === null && <div className="text-sm py-6 text-center" style={{ color: C.faint }}>reading the cycle…</div>}
