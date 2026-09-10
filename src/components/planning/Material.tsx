@@ -9,6 +9,8 @@ import { today, fmtFull, jobNo, whoTag, addDays, escalated } from "@/lib/schedul
 
 import { MatBox, type Mat } from "../MaterialKitting";
 
+import { JobLightbox } from "../JobsInProgress";
+import { toWip } from "./OnFloor";
 import { Board, Job, TODAY, Task, assignees, taskJobRef, taskLate } from "./shared";
 import { TaskModal } from "./Tasking";
 
@@ -102,6 +104,19 @@ export function PendingMaterial({
     ["all", "All jobs"],
   ];
   const [horizon, setHorizon] = useState("30");
+  /**
+   * SHOW JOBS FOR DELIVERY UP TO ‹date› (Dr Raghu, 10 Sep 2026).
+   *
+   * "Delivery within 30 days" is a moving span; a planner following up on a
+   * tablet needs a FIXED line — everything wanted for what goes out by the
+   * end of this month. So the horizon is a real date, and it opens on the
+   * last day of the current month. Clearing it shows everything, which is
+   * what the old "All jobs" option did.
+   */
+  const [upto, setUpto] = useState(() => {
+    const d = new Date(TODAY + "T00:00:00Z");
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+  });
   const [q, setQ] = useState("");
   /**
    * The filters Dr Raghu asked for (28 Aug 2026): project, job, assigned-to
@@ -119,13 +134,30 @@ export function PendingMaterial({
   const [msg, setMsg] = useState("");
   /** The line whose own box is open. Same box the job page uses. */
   const [picked, setPicked] = useState<{ jobId: string; mat: Mat } | null>(null);
+  /**
+   * THE JOB OPENS HERE, NOT ELSEWHERE (Dr Raghu, 10 Sep 2026: "open the job
+   * number in the light box only, please"). The number used to jump to the
+   * Job Plan tab, which threw away the filter, the horizon and the scroll
+   * position — everything the planner had set up to ask this question.
+   */
+  const [peekJob, setPeekJob] = useState<Job | null>(null);
+  /**
+   * ADD MORE MATERIAL (Dr Raghu, 10 Sep 2026: "so that the planning engineer
+   * doesn't have to make multiple clicks"). Opened with a job already chosen
+   * from a row, or blank from the top button. It takes SEVERAL lines at once,
+   * because a planner who has just found a job short is rarely short of one
+   * thing.
+   */
+  const [adding, setAdding] = useState<{ jobId: string } | null>(null);
 
   const jobById = useMemo(() => new Map(board.jobs.map((j) => [j.id, j])), [board.jobs]);
 
   /** Every line in the horizon BEFORE the narrower filters — the option lists
       come off this so a filter never hides its own choices. */
   const pool = useMemo(() => {
-    const cutoff = horizon === "all" ? null : addDays(TODAY, Number(horizon));
+    /* The date wins when it is set — it is the precise question. The old
+       span is kept for the person who thinks in "next 60 days". */
+    const cutoff = upto ? upto : horizon === "all" ? null : addDays(TODAY, Number(horizon));
     const out: { job: Job; m: Board["materials"][string][number] }[] = [];
     for (const [jobId, list] of Object.entries(board.materials || {})) {
       const job = jobById.get(jobId);
@@ -134,7 +166,7 @@ export function PendingMaterial({
       for (const m of list) out.push({ job, m });
     }
     return out;
-  }, [board.materials, jobById, horizon]);
+  }, [board.materials, jobById, horizon, upto]);
 
   const projOptions = useMemo(() => [...new Set(pool.map((r) => (r.job.proj || "").trim()).filter(Boolean))].sort(), [pool]);
   const jobOptions = useMemo(() => [...new Map(pool.map((r) => [r.job.id, r.job])).values()].sort((a, b) => a.id.localeCompare(b.id)), [pool]);
@@ -213,7 +245,7 @@ export function PendingMaterial({
     const esc = (v: unknown) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
     const horizonLabel = HORIZONS.find(([k]) => k === horizon)?.[1] || horizon;
     const statusLabel = ({ open: "Yet to receive + QC Defective", yet: "Yet to receive only", defect: "QC Defective only", received: "Received", all: "Every status" } as Record<string, string>)[fStatus] || fStatus;
-    const bits = [horizonLabel, `status: ${statusLabel}`];
+    const bits = [upto ? `delivery up to ${fmtFull(upto)}` : horizonLabel, `status: ${statusLabel}`];
     if (q.trim()) bits.push(`search: "${q.trim()}"`);
     if (fProj !== "all") bits.push(`project: ${fProj}`);
     if (fJob !== "all") bits.push(`job: ${jobNo(fJob)}`);
@@ -276,12 +308,27 @@ Showing: ${esc(bits.join(" &middot; "))}</div>
       </div>
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
+        <label className="text-sm flex items-center gap-1.5" style={{ color: "var(--dim)" }}>
+          <span className="font-semibold">Delivery up to</span>
+          <input
+            type="date"
+            value={upto}
+            onChange={(e) => setUpto(e.target.value)}
+            className="px-2 py-1 rounded border text-sm font-semibold"
+            style={{ borderColor: upto ? "var(--accent)" : "#D9D6CD", background: upto ? "#FFF3E8" : "#fff" }}
+            title="Only the material wanted for jobs going out on or before this date"
+          />
+          {upto && (
+            <button onClick={() => setUpto("")} className="font-bold" style={{ color: "var(--accent)" }} title="Show every job, whenever it is due">✕</button>
+          )}
+        </label>
         <select
           value={horizon}
+          disabled={!!upto}
           onChange={(e) => setHorizon(e.target.value)}
           className="px-2 py-1 rounded border text-sm font-semibold"
-          style={{ borderColor: horizon === "all" ? "var(--accent)" : "#D9D6CD", background: horizon === "all" ? "#FFF3E8" : "#fff" }}
-          title="Which jobs to show, by how soon they are due to be delivered"
+          style={{ borderColor: "#D9D6CD", background: upto ? "#F4F2EC" : "#fff", color: upto ? "var(--muted)" : "var(--ink)" }}
+          title={upto ? "Not in use — the date above is the line" : "Which jobs to show, by how soon they are due to be delivered"}
         >
           {HORIZONS.map(([k, l]) => (<option key={k} value={k}>{l}</option>))}
         </select>
@@ -321,6 +368,17 @@ Showing: ${esc(bits.join(" &middot; "))}</div>
           title="Print what is on the screen — the same filters, the same sort order">
           ⎙ PDF of this view
         </button>
+        {/* ADD MORE MATERIAL, from the top as well as from a row — whichever
+            is nearer the planner's hand at the moment they notice. */}
+        {canEdit && (
+          <button
+            onClick={() => setAdding({ jobId: fJob !== "all" ? fJob : "" })}
+            className="rounded px-3 py-1.5 text-sm font-bold"
+            style={{ background: "var(--accent)", color: "#fff", whiteSpace: "nowrap" }}
+            title="Add material to a job — several lines at once">
+            + Add more material
+          </button>
+        )}
         {msg && <span className="text-xs font-bold" style={{ color: "var(--red)" }}>{msg}</span>}
       </div>
 
@@ -352,13 +410,21 @@ Showing: ${esc(bits.join(" &middot; "))}</div>
                 <tr key={m.id} className="border-t align-top" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                   <td className="px-2 py-1.5 whitespace-nowrap">
                     <button
-                      onClick={() => onOpen(job.id)}
+                      onClick={() => setPeekJob(job)}
                       className="font-bold"
                       style={{ color: "var(--blue)", textDecoration: "underline" }}
-                      title="Open this job's board"
+                      title="Open this job — without losing the filters you set"
                     >
                       {jobNo(job.id)}
                     </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => setAdding({ jobId: job.id })}
+                        className="ml-1.5 rounded px-1.5 font-bold"
+                        style={{ background: "#F4F2EC", color: "var(--dim)", fontSize: 11 }}
+                        title={`Add material to ${jobNo(job.id)} — the job is already chosen`}
+                      >+ material</button>
+                    )}
                     <div className="truncate" style={{ color: "var(--muted)", maxWidth: 190 }} title={job.tag}>{job.tag}</div>
                   </td>
                   <td className="px-2 py-1.5 text-center whitespace-nowrap font-bold" style={{ color: job.tdd && job.tdd < TODAY ? "var(--red)" : "var(--ink)" }}>{fmtFull(job.tdd)}</td>
@@ -435,6 +501,32 @@ Showing: ${esc(bits.join(" &middot; "))}</div>
           </tbody>
         </table>
       </div>
+
+      {/* The job, without leaving the page. */}
+      {peekJob && (
+        <JobLightbox
+          job={toWip(peekJob)}
+          V={(n) => (n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹${(n / 1e5).toFixed(1)} L` : `₹${Math.round(n).toLocaleString("en-IN")}`)}
+          colour="var(--blue)"
+          canEdit={canEdit}
+          onClose={() => setPeekJob(null)}
+          onOpenPlan={() => { const id = peekJob.id; setPeekJob(null); onOpen(id); }}
+          onSaved={reload}
+        />
+      )}
+
+      {adding && (
+        <AddMaterialBox
+          jobId={adding.jobId}
+          /* EVERY live job, not just the ones inside the date window. A
+             planner adding material for a job due in November must not be
+             told it does not exist because the screen is filtered to
+             September. */
+          jobs={[...board.jobs].sort((a, b) => String(a.tdd || "9999").localeCompare(String(b.tdd || "9999")))}
+          onClose={() => setAdding(null)}
+          onAdded={async (n: number) => { setAdding(null); setMsg(`${n} line${n === 1 ? "" : "s"} added ✓`); await reload(); }}
+        />
+      )}
 
       {picked && (
         <MatBox
@@ -678,6 +770,128 @@ export function Escalations({
           reload={reload}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * ADD MORE MATERIAL — several lines, one trip.
+ *
+ * Dr Raghu, 10 Sep 2026: "make a provision to add more material, either way,
+ * so that the planning engineer doesn't have to make multiple clicks."
+ *
+ * Two things follow from that sentence and shape this box:
+ *
+ *   THE JOB ARRIVES ALREADY CHOSEN when it is opened from a row, because
+ *   the planner has just been looking at that job and asking them to pick it
+ *   again from a list of 114 is the click the request is about.
+ *
+ *   IT TAKES A HANDFUL OF LINES AT ONCE. A planner who has found a job short
+ *   is rarely short of one thing. Enter fills the row and opens the next, so
+ *   a list can be typed without the hands leaving the keyboard.
+ *
+ * Lines are added as CUSTOM, because they were typed here rather than
+ * arriving from a BOM — that flag is how the board tells the two apart.
+ */
+function AddMaterialBox({
+  jobId, jobs, onClose, onAdded,
+}: {
+  jobId: string;
+  jobs: Job[];
+  onClose: () => void;
+  onAdded: (n: number) => Promise<void> | void;
+}) {
+  const [job, setJob] = useState(jobId);
+  const [lines, setLines] = useState<{ item: string; qty: string }[]>([{ item: "", qty: "" }]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const filled = lines.filter((l) => l.item.trim());
+
+  const setLine = (i: number, patch: Partial<{ item: string; qty: string }>) =>
+    setLines((v) => v.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+
+  const save = async () => {
+    if (!job) { setErr("Which job?"); return; }
+    if (!filled.length) { setErr("Nothing to add — type at least one item."); return; }
+    setBusy(true); setErr("");
+    try {
+      for (const l of filled) {
+        await api.post("/api/materials", {
+          action: "add", job_id: job,
+          item: l.item.trim(),
+          qty: l.qty.trim() || "as BOM",
+          custom: true,
+        });
+      }
+      await onAdded(filled.length);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(22,35,47,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} className="rounded-lg bg-white"
+        style={{ width: "min(680px, 100%)", maxHeight: "calc(100vh - 40px)", overflowY: "auto", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
+        <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "var(--navy)", borderRadius: "8px 8px 0 0" }}>
+          <b className="text-white text-sm">+ Add material</b>
+          <button onClick={onClose} className="text-white font-bold px-2">✕</button>
+        </div>
+        <div className="p-4">
+          <div className="text-xs font-bold mb-1" style={{ color: "var(--muted)", letterSpacing: .5 }}>JOB</div>
+          <select value={job} onChange={(e) => setJob(e.target.value)}
+            className="px-2 py-1.5 rounded border text-sm w-full font-semibold"
+            style={{ borderColor: job ? "var(--line)" : "var(--amber)" }}>
+            <option value="">— choose the job —</option>
+            {jobs.map((j) => (<option key={j.id} value={j.id}>{jobNo(j.id)} · {j.tag}</option>))}
+          </select>
+
+          <div className="text-xs font-bold mt-3 mb-1" style={{ color: "var(--muted)", letterSpacing: .5 }}>WHAT IS WANTED</div>
+          {lines.map((l, i) => (
+            <div key={i} className="flex gap-2 mb-1.5">
+              <input
+                value={l.item}
+                onChange={(e) => setLine(i, { item: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && l.item.trim() && i === lines.length - 1) {
+                    e.preventDefault();
+                    setLines((v) => [...v, { item: "", qty: "" }]);
+                  }
+                }}
+                autoFocus={i === 0}
+                placeholder="item — as the store would recognise it"
+                className="px-2 py-1.5 rounded border text-sm" style={{ borderColor: "var(--line)", flex: "1 1 auto" }} />
+              <input
+                value={l.qty}
+                onChange={(e) => setLine(i, { qty: e.target.value })}
+                placeholder="qty"
+                className="px-2 py-1.5 rounded border text-sm" style={{ borderColor: "var(--line)", width: 96 }} />
+              {lines.length > 1 && (
+                <button onClick={() => setLines((v) => v.filter((_, j) => j !== i))}
+                  className="font-bold px-1" style={{ color: "var(--red)" }} title="Drop this line">✕</button>
+              )}
+            </div>
+          ))}
+          <button onClick={() => setLines((v) => [...v, { item: "", qty: "" }])}
+            className="rounded px-2 py-1 text-xs font-bold" style={{ background: "#F4F2EC", color: "var(--dim)" }}>
+            + another line
+          </button>
+          <div className="text-xs mt-1.5" style={{ color: "var(--muted)" }}>
+            Blank quantity is recorded as <b>as BOM</b>. Press Enter on the last line to open another.
+          </div>
+
+          {err && <div className="text-xs font-semibold mt-2" style={{ color: "var(--red)" }}>{err}</div>}
+
+          <div className="flex items-center gap-2 mt-4">
+            <button onClick={save} disabled={busy || !job || !filled.length}
+              className="rounded px-4 py-2 text-sm font-bold"
+              style={{ background: busy || !job || !filled.length ? "#D9D6CD" : "var(--green)", color: "#fff" }}>
+              {busy ? "Adding…" : `Add ${filled.length || ""} line${filled.length === 1 ? "" : "s"}`}
+            </button>
+            <button onClick={onClose} className="rounded px-3 py-2 text-sm font-bold" style={{ background: "var(--line-soft)", color: "var(--dim)" }}>Cancel</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

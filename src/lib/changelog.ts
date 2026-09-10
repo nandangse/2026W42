@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.46.1",
+    date: "2026-09-10",
+    module: "Pending Material: a date to follow up to, material added in one go, and the job stays put",
+    items: [
+      "\"Make a date field which says \u2018show jobs for delivery up to\u2019 \u2026 it will only show those items which are required for the jobs being delivered up to the 30th\" (Dr Raghu, 10 Sep 2026). <b>Delivery up to</b> is a real date, opening on the <b>last day of this month</b>. \u201cWithin 30 days\u201d is a moving span; a man following up on a tablet needs a fixed line, and \u201ceverything wanted for what goes out this month\u201d is that line. Clearing the date shows every job again. The old span dropdown stays for whoever thinks that way, and greys itself when the date is set \u2014 two controls answering the same question is how a screen stops being believed.",
+      "\"Open the job number in the light box only, please.\" It used to jump to the Job Plan tab, <b>throwing away the horizon, the filters and the scroll position</b> \u2014 everything the planner had just set up to ask the question. It now opens the job\u2019s own lightbox in place, with a way through to the plan for anyone who wants it.",
+      "\"Make a button saying add more material \u2026 so that the planning engineer doesn\u2019t have to make multiple clicks.\" Both roads, as asked: <b>+ Add more material</b> at the top, and <b>+ material</b> beside every job in the table. Opened from a row, <b>the job arrives already chosen</b> \u2014 asking a planner to pick it again out of 114 is the click the request was about.",
+      "AND IT TAKES SEVERAL LINES AT ONCE. A planner who has found a job short is rarely short of one thing. Enter on the last line opens the next, so a list is typed without the hands leaving the keyboard; a blank quantity is recorded as <b>as BOM</b> rather than as nothing.",
+    ],
+  },
+  {
     v: "5.0.46.0",
     date: "2026-09-10",
     module: "Labour that was measured, money that has a month, and two filters",
