@@ -22,6 +22,8 @@ interface Row {
   age: number | null; exp: number | null;
   prevGross: number | null; newGross: number | null; inc: number | null; incPct: number | null;
   stage: string; selfAvg: number | null; mgrAvg: number | null; askGross: number | null; mgrProposed: number | null;
+  /** 26 for the types paid by the day, 31 for the rest — the API's own rule. */
+  payDays?: number | null;
 }
 
 
@@ -164,26 +166,121 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
   const indicativeN = S.spoken.filter((x) => x.e.indicative).length;
 
   /**
-   * ITS OWN PAPER (Dr Raghu, 10 Sep 2026: "this is not coming, the pdf on
-   * appraisal analytics").
+   * THE APPRAISAL DOCUMENT (Dr Raghu, 10 Sep 2026).
    *
-   * The pane asked for a print button but handed over no page, so it fell
-   * back to window.print() — and this wall is exactly the shape that does
-   * not survive it: nested scrollers, flex heights, SVG curves sized to the
-   * viewport. The Appraisal Table printed a blank sheet for the same reason
-   * on 2 September, and the offer letter and floor report before that.
+   * Not a printout of the screen — a signed paper. He set out its parts:
+   * the summary, the curve WITHOUT management, the pay bill monthly and
+   * annual with a ten per cent allowance for overtime, what that bill costs
+   * as a share of sales at five levels, the outliers, then every person by
+   * employee type, and three signatures at the end.
    *
-   * So the wall builds its own document — the totals, the departments, the
-   * bands, and the three lists that are the point of the exercise. It is
-   * written as a table on paper rather than a screenshot of the screen,
-   * because the thing that goes into a file has to be readable at A4 and
-   * has to carry who printed it and when.
+   * WHY IT BUILDS ITS OWN PAGE. The pane asked for a print button and handed
+   * over no document, so it fell back to window.print() — and the file he
+   * sent proved the result: four pages carrying nothing but the browser's
+   * date header. This wall is nested scrollers, flex heights and SVG sized
+   * to the viewport; none of it survives being asked to become paper.
+   *
+   * EVERY FIGURE IS FINAL (Dr Raghu, 10 Sep 2026: "it is now final, there is
+   * no indicative"). The decided gross is the only money used; nothing here
+   * falls back to a manager's proposal, and the word indicative does not
+   * appear on the paper.
+   *
+   * THE CURVE LEAVES MANAGEMENT OUT and the totals do not. Three managing
+   * salaries among two hundred set the scale for everybody and the shape of
+   * the other 199 disappears — but the pay bill is the pay bill. Both facts
+   * are printed beside their own tables so a reader is never left guessing
+   * which population a number covers.
    */
   const printPaper = () => {
     const esc = (v: unknown) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
     const when = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const rupee = (n: number | null | undefined) => (n == null || !Number.isFinite(n) ? "—" : `₹${Math.round(n).toLocaleString("en-IN")}`);
+    /** His rule: the types paid by the day divide by 26, the rest by 31. */
+    const perDay = (g: number | null | undefined, r: Row) => (g == null ? null : g / (r.payDays || 31));
+
     const card = (v: string, l: string, sub?: string) =>
       `<div class="card"><div class="v">${esc(v)}</div><div class="l">${esc(l)}</div>${sub ? `<div class="s">${esc(sub)}</div>` : ""}</div>`;
+
+    // ── the curve, management excluded ──────────────────────────────────
+    const curve = (() => {
+      const xs = S.cPcts;
+      if (!xs.length) return "<p class='muted'>No decided increases to draw.</p>";
+      const lo = Math.floor(Math.min(...xs) / 5) * 5;
+      const hi = Math.ceil(Math.max(...xs) / 5) * 5;
+      const step = 5;
+      const buckets: { from: number; n: number }[] = [];
+      for (let a = lo; a < hi; a += step) buckets.push({ from: a, n: xs.filter((x) => x >= a && x < a + step).length });
+      if (buckets.length) buckets[buckets.length - 1].n += xs.filter((x) => x >= hi).length;
+      const peak = Math.max(1, ...buckets.map((b) => b.n));
+      const W = 700, H = 190, pad = 26, bw = (W - pad * 2) / buckets.length;
+      const bars = buckets.map((b, i) => {
+        const h = (b.n / peak) * (H - 54);
+        const x = pad + i * bw, y = H - 26 - h;
+        return `<rect x="${(x + 2).toFixed(1)}" y="${y.toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${h.toFixed(1)}" fill="#1B2D6B"/>`
+          + (b.n ? `<text x="${(x + bw / 2).toFixed(1)}" y="${(y - 3).toFixed(1)}" font-size="8" text-anchor="middle" fill="#16203A">${b.n}</text>` : "")
+          + `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 12}" font-size="7.5" text-anchor="middle" fill="#666">${b.from}%</text>`;
+      }).join("");
+      const mx = pad + ((S.cMean - lo) / (hi - lo)) * (W - pad * 2);
+      return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">
+        <line x1="${pad}" y1="${H - 26}" x2="${W - pad}" y2="${H - 26}" stroke="#CFCBC0"/>
+        ${bars}
+        <line x1="${mx.toFixed(1)}" y1="18" x2="${mx.toFixed(1)}" y2="${H - 26}" stroke="#B4460D" stroke-dasharray="3 3"/>
+        <text x="${Math.min(W - pad - 2, mx + 4).toFixed(1)}" y="14" font-size="8" fill="#B4460D">mean ${S.cMean.toFixed(1)}%</text>
+      </svg>`;
+    })();
+
+    // ── the pay bill, and what it costs against sales ───────────────────
+    const monthNow = S.payNow, monthNew = S.payNew;
+    const annualNow = monthNow * 12, annualNew = monthNew * 12;
+    const withOtNew = annualNew * 1.1;
+    const SALES: number[] = [56, 65, 75, 85, 100];
+    const breakEven = SALES.map((cr) => {
+      const sale = cr * 1e7;
+      return `<tr><td class="n">₹${cr} Cr</td>
+        <td class="n">${((annualNow / sale) * 100).toFixed(2)}%</td>
+        <td class="n">${((annualNew / sale) * 100).toFixed(2)}%</td>
+        <td class="n">${((withOtNew / sale) * 100).toFixed(2)}%</td></tr>`;
+    }).join("");
+
+    // ── every person, by employee type ──────────────────────────────────
+    const ORDER = ["Staff", "Contractor", "Labour", "Labour - Contract"];
+    const present = [...new Set(S.all.map((r) => (r.type || "(no type)").trim()))];
+    const ordered = [...ORDER.filter((t) => present.includes(t)), ...present.filter((t) => !ORDER.includes(t)).sort()];
+
+    const peopleTable = (t: string) => {
+      const list = S.all.filter((r) => (r.type || "(no type)").trim() === t)
+        .sort((a, b) => (a.department || "").localeCompare(b.department || "") || a.name.localeCompare(b.name));
+      if (!list.length) return "";
+      const byDay = list.some((r) => (r.payDays || 31) === 26);
+      const head = byDay
+        ? `<tr><th>ID</th><th>Name</th><th>Dept</th><th>Designation</th><th class="n">Yrs</th><th class="n">Age</th><th class="n">Prev gross</th><th class="n">Prev / day</th><th class="n">New gross</th><th class="n">New / day</th><th class="n">Increase</th><th class="n">Inc %</th><th class="n">Inc / day</th></tr>`
+        : `<tr><th>ID</th><th>Name</th><th>Dept</th><th>Designation</th><th class="n">Yrs</th><th class="n">Age</th><th class="n">Prev gross</th><th class="n">New gross</th><th class="n">Increase</th><th class="n">Inc %</th></tr>`;
+      const body = list.map((r) => {
+        const pd0 = perDay(r.prevGross, r), pd1 = perDay(r.newGross, r);
+        const cells = [
+          `<td class="mono">${esc(r.id)}</td>`,
+          `<td>${esc(r.name)}</td>`,
+          `<td>${esc(r.department || "—")}</td>`,
+          `<td>${esc(r.designation || "—")}</td>`,
+          `<td class="n">${r.exp == null ? "—" : r.exp.toFixed(1)}</td>`,
+          `<td class="n">${r.age == null ? "—" : Math.round(r.age)}</td>`,
+          `<td class="n">${rupee(r.prevGross)}</td>`,
+          ...(byDay ? [`<td class="n">${rupee(pd0)}</td>`] : []),
+          `<td class="n">${rupee(r.newGross)}</td>`,
+          ...(byDay ? [`<td class="n">${rupee(pd1)}</td>`] : []),
+          `<td class="n">${rupee(r.inc)}</td>`,
+          `<td class="n">${r.incPct == null ? "—" : pct(r.incPct)}</td>`,
+          ...(byDay ? [`<td class="n">${pd0 != null && pd1 != null ? rupee(pd1 - pd0) : "—"}</td>`] : []),
+        ].join("");
+        return `<tr>${cells}</tr>`;
+      }).join("");
+      const sub = list.reduce((a, r) => a + (r.inc ?? 0), 0);
+      const cols = byDay ? 13 : 10;
+      return `<h2 class="break">${esc(t)} <span class="muted">— ${list.length} ${list.length === 1 ? "person" : "people"}</span></h2>
+        <table class="people-t"><thead>${head}</thead><tbody>${body}
+        <tr class="tot"><td colspan="${cols - 4}">Total</td><td class="n">${rupee(list.reduce((a, r) => a + (r.prevGross ?? 0), 0))}</td>${byDay ? '<td></td>' : ''}<td class="n">${rupee(list.reduce((a, r) => a + (r.newGross ?? r.prevGross ?? 0), 0))}</td>${byDay ? '<td></td>' : ''}<td class="n">${rupee(sub)}</td><td></td>${byDay ? '<td></td>' : ''}</tr>
+        </tbody></table>`;
+    };
 
     const deptRows = depts.map((d) => `<tr>
       <td>${esc(d.dept)}</td><td class="n">${d.n}</td>
@@ -199,46 +296,84 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
         ? `<h2>${esc(title)} <span class="muted">— ${esc(note)}</span></h2><ol class="people">${items.map((x) => `<li>${x}</li>`).join("")}</ol>`
         : `<h2>${esc(title)}</h2><p class="muted">Nobody.</p>`;
 
-    const pipItems = pip.map((r) => `<b>${esc(r.name)}</b> <span class="muted">${esc(r.department || "—")} · manager ${r.mgrAvg?.toFixed(1) ?? "—"} · ${esc(pct(eff(r).pct))}</span>`);
+    const pipItems = pip.map((r) => `<b>${esc(r.name)}</b> <span class="muted">${esc(r.department || "—")} · manager ${r.mgrAvg?.toFixed(1) ?? "—"} · ${esc(pct(r.incPct))}</span>`);
     const gapItems = gaps.slice(0, 15).map((g) => `<b>${esc(g.r.name)}</b> <span class="muted">self ${g.r.selfAvg?.toFixed(1)} vs manager ${g.r.mgrAvg?.toFixed(1)} · gap ${g.gap.toFixed(1)}</span>`);
-    const askItems = asks.slice(0, 15).map((a) => `<b>${esc(a.r.name)}</b> <span class="muted">asked ${esc(pct(a.askPct))} · ${a.indicative ? "proposed" : "got"} ${esc(pct(a.gotPct))}</span>`);
+    const askItems = asks.slice(0, 15).map((a) => `<b>${esc(a.r.name)}</b> <span class="muted">asked ${esc(pct(a.askPct))} · got ${esc(pct(a.gotPct))}</span>`);
 
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Appraisal Summary — Nandan GSE</title>
 <style>
-  @page { size: A4; margin: 12mm 10mm; }
-  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color:#16203A; font-size:10.5pt; line-height:1.45; margin:0; }
-  .head { border-bottom:2px solid #16203A; padding-bottom:6px; margin-bottom:12px; }
+  @page { size: A4 landscape; margin: 10mm 8mm; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color:#16203A; font-size:9.5pt; line-height:1.4; margin:0; }
+  .head { border-bottom:2px solid #16203A; padding-bottom:6px; margin-bottom:11px; }
   .head h1 { font-size:15pt; margin:0 0 2px; }
   .head .sub { font-size:8.5pt; color:#555; }
-  .cards { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
-  .card { border:1px solid #CFCBC0; border-radius:5px; padding:7px 11px; min-width:118px; }
-  .card .v { font-size:14pt; font-weight:700; }
-  .card .l { font-size:8pt; color:#555; }
-  .card .s { font-size:7.5pt; color:#888; }
-  h2 { font-size:11pt; margin:14px 0 5px; border-bottom:1px solid #CFCBC0; padding-bottom:3px; }
-  table { width:100%; border-collapse:collapse; font-size:9pt; }
-  th { text-align:left; background:#F2EFE8; padding:4px 6px; border-bottom:1px solid #CFCBC0; font-size:8pt; text-transform:uppercase; letter-spacing:.04em; }
-  td { padding:3.5px 6px; border-bottom:1px solid #EDEAE2; }
+  .cards { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:12px; }
+  .card { border:1px solid #CFCBC0; border-radius:5px; padding:6px 10px; min-width:112px; }
+  .card .v { font-size:13pt; font-weight:700; }
+  .card .l { font-size:7.5pt; color:#555; }
+  .card .s { font-size:7pt; color:#888; }
+  h2 { font-size:11pt; margin:13px 0 5px; border-bottom:1px solid #CFCBC0; padding-bottom:3px; }
+  h2.break { break-before: page; }
+  table { width:100%; border-collapse:collapse; font-size:8.5pt; }
+  th { text-align:left; background:#F2EFE8; padding:3.5px 5px; border-bottom:1px solid #CFCBC0; font-size:7.5pt; text-transform:uppercase; letter-spacing:.03em; }
+  td { padding:3px 5px; border-bottom:1px solid #EDEAE2; }
   td.n, th.n { text-align:right; }
+  td.mono { font-family: ui-monospace, Menlo, monospace; font-size:7.5pt; color:#555; }
+  tr.tot td { font-weight:700; background:#F7F5F0; border-top:1px solid #CFCBC0; }
   thead { display: table-header-group; }
   tr { break-inside: avoid; }
-  ol.people { font-size:9pt; margin:4px 0 0; padding-left:20px; }
+  ol.people { font-size:8.5pt; margin:4px 0 0; padding-left:18px; column-count:2; column-gap:22px; }
   ol.people li { margin-bottom:2px; break-inside:avoid; }
   .muted { color:#666; font-weight:400; }
-  .note { font-size:8.5pt; color:#666; margin-top:10px; border-top:1px solid #CFCBC0; padding-top:6px; }
+  .note { font-size:8pt; color:#666; margin-top:8px; }
+  .two { display:flex; gap:14px; align-items:flex-start; }
+  .two > * { flex:1 1 0; min-width:0; }
+  .sign { break-before: page; margin-top:26px; }
+  .sign .row { display:flex; gap:30px; margin-top:52px; }
+  .sign .box { flex:1 1 0; border-top:1px solid #16203A; padding-top:5px; font-size:9.5pt; font-weight:700; }
+  .sign .box span { display:block; font-weight:400; font-size:8pt; color:#666; }
 </style></head><body>
   <div class="head">
-    <h1>Nandan GSE — Appraisal Summary Data Analytics</h1>
+    <h1>Nandan GSE — Appraisal ${esc(new Date().getFullYear())} — Summary and Full Results</h1>
     <div class="sub">Printed by ${esc(who)} on ${esc(when)} · ${esc(typeLabel)} · CONFIDENTIAL — personnel record</div>
   </div>
+
+  <h2>Summary</h2>
   <div class="cards">
     ${card(String(S.all.length), "On the roll")}
-    ${card(String(S.spoken.length), "Increments on the table", indicativeN ? `${S.decided.length} final, ${indicativeN} indicative` : "all Final")}
-    ${card(lakh(S.payNow), "Payroll today / month")}
-    ${card(lakh(S.payNew), "Payroll after / month")}
-    ${card(lakh(S.payNew - S.payNow), "Increase / month", S.payNow ? `+${(((S.payNew - S.payNow) / S.payNow) * 100).toFixed(1)}% of today's payroll` : "")}
-    ${card(lakh((S.payNew - S.payNow) * 12), "Cost of the cycle / year")}
+    ${card(String(S.spoken.length), "Increments decided")}
+    ${card(lakh(monthNow), "Payroll today / month")}
+    ${card(lakh(monthNew), "Payroll after / month")}
+    ${card(lakh(monthNew - monthNow), "Increase / month", monthNow ? `+${(((monthNew - monthNow) / monthNow) * 100).toFixed(1)}% of today's payroll` : "")}
+    ${card(lakh((monthNew - monthNow) * 12), "Cost of the cycle / year")}
     ${card(pct(S.mean), "Average increase", `median ${pct(S.median)}`)}
+  </div>
+
+  <h2>The curve — without management</h2>
+  ${curve}
+  <div class="note">
+    ${S.cPcts.length} people, mean <b>${pct(S.cMean)}</b>, standard deviation <b>${S.cSd.toFixed(1)}</b>.
+    ${S.mgmt} management ${S.mgmt === 1 ? "salary is" : "salaries are"} left out of this chart on purpose — three managing salaries among two hundred set the scale for everybody and the shape of the rest disappears.
+    <b>Every total elsewhere on this paper counts everybody.</b>
+  </div>
+
+  <div class="two">
+    <div>
+      <h2>The pay bill</h2>
+      <table><thead><tr><th>&nbsp;</th><th class="n">Per month</th><th class="n">Annual</th></tr></thead><tbody>
+        <tr><td>Before this cycle</td><td class="n">${rupee(monthNow)}</td><td class="n">${rupee(annualNow)}</td></tr>
+        <tr><td>After this cycle</td><td class="n">${rupee(monthNew)}</td><td class="n">${rupee(annualNew)}</td></tr>
+        <tr><td>Increase</td><td class="n">${rupee(monthNew - monthNow)}</td><td class="n">${rupee(annualNew - annualNow)}</td></tr>
+        <tr class="tot"><td>With overtime and the rest, +10%</td><td class="n">${rupee(monthNew * 1.1)}</td><td class="n">${rupee(withOtNew)}</td></tr>
+      </tbody></table>
+      <div class="note">The ten per cent is a stated allowance for overtime and what rides with it, not a measured figure.</div>
+    </div>
+    <div>
+      <h2>What it costs against sales</h2>
+      <table><thead><tr><th>Sales for the year</th><th class="n">Before</th><th class="n">After</th><th class="n">After, +10%</th></tr></thead>
+      <tbody>${breakEven}</tbody></table>
+      <div class="note">The annual pay bill as a share of sales, at each level. Salary alone — no material, no overhead.</div>
+    </div>
   </div>
 
   <h2>By department</h2>
@@ -253,9 +388,15 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
   ${list("Widest self vs manager gaps", "top 15 — where the two readings disagree most", gapItems)}
   ${list("Asked against given", "top 15 by the size of the gap", askItems)}
 
-  <div class="note">
-    Computed live from the appraisal rows. Where a decision is <b>Final</b> the decided gross is used; where only the manager has spoken the proposal is used and counted as indicative${indicativeN ? ` (${indicativeN} such)` : ""}.
-    The curves on screen leave management out — they skew a distribution of two hundred — but every total, department figure and the pay bill here counts everybody.
+  ${ordered.map(peopleTable).join("")}
+
+  <div class="sign">
+    <h2>Approved</h2>
+    <div class="row">
+      <div class="box">Chairman<span>Signature and date</span></div>
+      <div class="box">MD &amp; CEO<span>Signature and date</span></div>
+      <div class="box">COO<span>Signature and date</span></div>
+    </div>
   </div>
 </body></html>`;
 
@@ -264,7 +405,7 @@ export default function AppraisalAnalytics({ who, onOpenPerson }: { who: string;
     w.document.write(html);
     w.document.close();
     w.focus();
-    setTimeout(() => w.print(), 250);
+    setTimeout(() => w.print(), 300);
   };
 
 

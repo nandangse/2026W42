@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.46.3",
+    date: "2026-09-10",
+    module: "The appraisal document — summary, curve, the pay bill against sales, every name, three signatures",
+    items: [
+      "Dr Raghu set out the paper he wants (10 Sep 2026) and it is built: <b>Summary</b>, the <b>curve without management</b>, the pay bill <b>per month and annual</b> with a stated <b>+10% for overtime and what rides with it</b>, what that bill costs <b>as a share of sales at \u20b956, 65, 75, 85 and 100 Cr</b>, the outlier lists, then <b>every person by employee type</b>, and <b>Chairman / MD &amp; CEO / COO</b> to sign at the end.",
+      "<b>EVERY NAME, GROUPED THE WAY HE ASKED.</b> Staff, Contractor, Labour and Labour-Contract each get their own table \u2014 ID, name, department, designation, years in the company, age, previous gross, new gross, increase and increase % \u2014 with a total line under each. <b>The labour tables carry the per-day columns</b> as well: previous per day, new per day and the increase per day, divided by 26 or 31 on his own rule rather than a guess. Any employee type not on his list still gets its own table rather than being dropped.",
+      "\"It is now final, there is no indicative\" \u2014 checked before printing it: <b>204 of 204 carry a decided new gross</b>. The document uses the decided money only, the word <i>indicative</i> does not appear on it, and nothing falls back to a manager\u2019s proposal.",
+      "THE CURVE LEAVES MANAGEMENT OUT AND THE TOTALS DO NOT, and the paper says so under the chart instead of leaving a reader to work it out. Three managing salaries among two hundred set the scale for everybody; the pay bill is still the pay bill.",
+      "It prints <b>A4 landscape</b> \u2014 thirteen columns of labour will not fit portrait \u2014 repeats every table header across pages, refuses to break a row in half, starts each employee type on a fresh page, and puts the signatures on their own.",
+    ],
+  },
+  {
     v: "5.0.46.2",
     date: "2026-09-10",
     module: "Appraisal Analytics prints its own paper",
