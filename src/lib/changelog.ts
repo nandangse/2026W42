@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.47.6",
+    date: "2026-09-14",
+    module: "The channels had not disappeared \u2014 and a pending migration will never say they did",
+    items: [
+      "<b>\u201cThe channel disappeared!\u201d \u2014 it had not.</b> Both channels sat in the database untouched, one of them with 196 sends against it that same afternoon. The screen said <i>No channel yet</i> because this route asked for a <i>reply_to</i> column that migration 0067 has not been run to create, and the old guard treated <b>any</b> mk_channel error as \u201cthe table is not installed\u201d. A missing COLUMN was reported as an empty TABLE.",
+      "<b>That is the worst kind of wrong: confident, tidy, and about somebody\u2019s data.</b> The newest column is now asked for on its own, its absence is a fact the page is told rather than an error that erases the rows, and a failed read shows as a failed read \u2014 in red, saying outright that nothing has been deleted. Only a missing table now means \u201cnot installed\u201d.",
+      "Saving a channel works whether or not 0067 has run; without it, the Reply-To field is simply not offered and a note says why.",
+      "<b>And a reply that is not JSON now says what it is.</b> \u201cUnterminated string in JSON at position 2451\u201d is the browser\u2019s parser complaining, not Genie speaking. Every call in Marketing now reads the reply as text first and, when it will not parse, names the route, the status and the first words of what actually came back \u2014 and says plainly that reading the answer failed, which is not the same as the work failing. The campaign behind that message had saved perfectly: 30,558 characters, all of them intact.",
+    ],
+  },
+  {
     v: "5.0.47.5",
     date: "2026-09-14",
     module: "A ten-thousand-row import that finishes \u2014 and says so as it goes",

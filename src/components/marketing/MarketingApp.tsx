@@ -35,10 +35,36 @@ const INK = "var(--ink)", MUTED = "var(--muted)", LINE = "var(--line)", ACCENT =
 const inp: React.CSSProperties = { border: `1px solid #E2E0DA`, borderRadius: 6, padding: "6px 8px", fontSize: 13, background: "#fff", color: "#22303C", width: "100%" };
 const btn = (bg: string, fg = "#fff"): React.CSSProperties => ({ background: bg, color: fg, borderRadius: 6, padding: "6px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" });
 
+/**
+ * A REPLY THAT IS NOT JSON MUST SAY WHAT IT IS.
+ *
+ * Dr Raghu, 14 Sep 2026, on the message editor: "Unterminated string in JSON
+ * at position 2451 (line 3 column 2386)". That sentence tells the reader
+ * nothing they can act on — it is the browser's parser complaining, not
+ * Genie speaking. The campaign had in fact saved perfectly; something else on
+ * the screen had been answered by a gateway rather than by the app.
+ *
+ * So the body is read as TEXT first and parsed second. When it will not
+ * parse, the error names the route, the HTTP status and the first words of
+ * what actually came back — which is usually enough to see at a glance
+ * whether it was a timeout, a redirect to the login page, or a truncated
+ * reply — and it says plainly that the failure was in reading the answer,
+ * not necessarily in the work.
+ */
 async function api<T = Record<string, unknown>>(path: string, body?: unknown): Promise<T> {
   const r = await fetch(path, body === undefined ? { cache: "no-store" } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  const j = await r.json();
-  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  const text = await r.text();
+  let j: Record<string, unknown>;
+  try { j = text ? JSON.parse(text) : {}; }
+  catch {
+    const head = text.replace(/\s+/g, " ").trim().slice(0, 90);
+    throw new Error(
+      `${path} answered with something that is not JSON (HTTP ${r.status})` +
+      (head ? ` — it began “${head}…”` : " — it sent nothing at all") +
+      ". The reply could not be read; the work itself may well have gone through.",
+    );
+  }
+  if (!r.ok) throw new Error(String(j.error || `HTTP ${r.status} from ${path}`));
   return j as T;
 }
 
@@ -606,13 +632,25 @@ function Channels({ seesAll }: { seesAll: boolean }) {
   const [rows, setRows] = useState<Channel[] | null>(null);
   const [f, setF] = useState<{ id?: string; email: string; label: string; kind: "gmail" | "resend" | "mailercloud"; reply_to: string; api_key: string; daily_limit: number; hourly_limit: number; active: boolean }>({ email: "", label: "", kind: "gmail", reply_to: "", api_key: "", daily_limit: 200, hourly_limit: 50, active: true });
   const [msg, setMsg] = useState("");
-  const load = useCallback(() => api<{ channels: Channel[] }>("/api/marketing/channels").then((j) => setRows(j.channels || [])).catch(() => setRows([])), []);
+  const [replyToReady, setReplyToReady] = useState(true);
+  /* A failed load must NOT render as "no channel yet" — that is how a pending
+     migration came to look like deleted data. An error stays an error. */
+  const [loadErr, setLoadErr] = useState("");
+  const load = useCallback(() => api<{ channels: Channel[]; replyToReady?: boolean }>("/api/marketing/channels")
+    .then((j) => { setRows(j.channels || []); setReplyToReady(j.replyToReady !== false); setLoadErr(""); })
+    .catch((e) => { setLoadErr(e instanceof Error ? e.message : String(e)); }), []);
   useEffect(() => { load(); }, [load]);
   const save = async () => { try { await api("/api/marketing/channels", { action: "save", ...f }); setF({ email: "", label: "", kind: "gmail", reply_to: "", api_key: "", daily_limit: 200, hourly_limit: 50, active: true }); setMsg("saved ✓"); load(); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); } };
   return (
     <div>
       <div className="font-bold mb-1" style={{ fontSize: 16, color: INK }}>📡 Sending Channels</div>
       <div className="text-xs mb-3" style={{ color: MUTED, lineHeight: 1.6 }}>Each address is a channel with its own limits and its own API: <b>Gmail</b> sends through the mailbox connected under CRM → Integrations for that address; <b>Resend</b> sends through Resend's API with the key on the channel (or the deploy's); <b>Mailercloud</b> sends through its Email API with the key on the channel — the sender address must be verified there. A campaign ticks the addresses it goes from.</div>
+      {loadErr && <div className="rounded border p-2 mb-3 text-xs font-semibold" style={{ borderColor: RED, color: RED, background: "#FDF3F2" }}>
+        The channels could not be read — <b>they have not been deleted</b>. {loadErr}
+      </div>}
+      {!replyToReady && <div className="rounded border p-2 mb-3 text-xs" style={{ borderColor: "#E0C88A", background: "#FDF8EC", color: "#7A5B00", lineHeight: 1.6 }}>
+        <b>Replies still go to the sending address.</b> Run CRM migration <b>0067</b> to give each channel its own “Replies go to”. Everything else works as normal.
+      </div>}
       {seesAll && (
         <div className="rounded border p-3 mb-3 grid gap-2" style={{ borderColor: LINE, background: "#FBFAF7", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
           <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>E-mail<input value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} style={inp} /></label>
@@ -621,7 +659,7 @@ function Channels({ seesAll }: { seesAll: boolean }) {
               mailbox anybody reads — Resend sends from nandangse.com, whose
               MX is Zoho, while the inbox that is actually watched is on
               Google. Blank means sales@, never "back to the sender". */}
-          <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Replies go to<input value={f.reply_to} onChange={(e) => setF({ ...f, reply_to: e.target.value })} placeholder="sales@nandan.co.in" style={inp} /></label>
+          {replyToReady && <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Replies go to<input value={f.reply_to} onChange={(e) => setF({ ...f, reply_to: e.target.value })} placeholder="sales@nandan.co.in" style={inp} /></label>}
           <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Sending API<select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as "gmail" | "resend" | "mailercloud" })} style={inp}><option value="gmail">Gmail (connected mailbox)</option><option value="resend">Resend</option><option value="mailercloud">Mailercloud</option></select></label>
           {f.kind !== "gmail" && <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>{f.kind === "resend" ? "Resend API key" : "Mailercloud API key"}<input value={f.api_key} onChange={(e) => setF({ ...f, api_key: e.target.value })} placeholder={f.kind === "resend" ? "blank = deploy's key" : "from Mailercloud → Settings → API"} style={inp} /></label>}
           <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Per hour<input type="number" value={f.hourly_limit} onChange={(e) => setF({ ...f, hourly_limit: Number(e.target.value) })} style={inp} /></label>
@@ -632,7 +670,7 @@ function Channels({ seesAll }: { seesAll: boolean }) {
       )}
       <GenieTable<Channel> rows={rows} minWidth={760} empty="No channel yet."
         columns={[
-          { key: "email", label: "From", render: (r) => <span><b>{r.email}</b>{r.label ? <span className="text-xs" style={{ color: MUTED }}> · {r.label}</span> : null}<span className="text-xs block" style={{ color: MUTED }}>replies → {r.reply_to || "sales@nandan.co.in"}</span></span> },
+          { key: "email", label: "From", render: (r) => <span><b>{r.email}</b>{r.label ? <span className="text-xs" style={{ color: MUTED }}> · {r.label}</span> : null}{replyToReady && <span className="text-xs block" style={{ color: MUTED }}>replies → {r.reply_to || "sales@nandan.co.in"}</span>}</span> },
           { key: "kind", label: "API", render: (r) => r.kind === "gmail" ? `Gmail · ${r.gmail || "not connected"}` : r.kind === "mailercloud" ? `Mailercloud · ${r.api_key ? "key set" : "NO KEY"}` : `Resend · ${r.api_key ? "own key" : r.resendKeyOnDeploy ? "deploy key" : "NO KEY"}` },
           { key: "h", label: "/hour", align: "right", render: (r) => <span className="tnum">{r.sent_this_hour} / {r.hourly_limit}</span> },
           { key: "d", label: "/day", align: "right", render: (r) => <span className="tnum">{r.sent_today} / {r.daily_limit}</span> },
