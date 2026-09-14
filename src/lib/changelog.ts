@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.47.1",
+    date: "2026-09-14",
+    module: "The cron says which database it is looking at",
+    items: [
+      "Four passes in a row reported <b>campaigns: 0</b> while a campaign sat plainly at <i>sending</i> \u2014 and the identical query, with the same service key, returns that campaign from a laptop. One of the two is looking at something different from the other, and guessing which has already cost an afternoon.",
+      "So the heartbeat now carries the <b>CRM host</b> \u2014 never the key, never a secret, only which project answered \u2014 plus a tally of campaigns by status as that process sees them, and any error the read returned.",
+      "<b>It reads as a diagnosis rather than a clue.</b> Wrong host: the answer is an environment variable on Vercel. Right host and an empty tally: the answer is permissions. Right host, right tally, still nothing drained: the fault is in the drain itself. One pass from now we will know which, instead of inferring.",
+      "The lesson underneath it is the same one as this morning\u2019s: <b>a silent nought and a silent failure must never look alike.</b> The drain threw its error away, and half an hour of queue stood still without anybody being able to say why.",
+    ],
+  },
+  {
     v: "5.0.47.0",
     date: "2026-09-14",
     module: "Marketing: lists you can upload into, a campaign that cannot be edited mid-flight, and a cron that reports itself",

@@ -15,8 +15,36 @@ export async function GET(req: Request) {
   if (!crmConfigured()) return NextResponse.json({ ok: false, note: "CRM not configured" });
   await beat("marketing-drain", "fired");
   try {
-    const r = await drain(crmDb());
-    await beat("marketing-drain", "done", r);
+    /**
+     * WHICH DATABASE, AND WHAT DOES IT SEE? (14 Sep 2026.)
+     *
+     * Four passes in a row reported "campaigns: 0" while a campaign sat
+     * plainly at status = sending, and the identical query returns that
+     * campaign from a laptop using the same service key. One of the two is
+     * looking at something different from the other, and guessing which has
+     * cost an afternoon.
+     *
+     * So the heartbeat now carries the CRM's HOST — never the key, never a
+     * secret, just which project answered — and a tally of campaigns by
+     * status as this process sees them. If the host is wrong the answer is
+     * an environment variable; if the host is right and the tally is empty,
+     * the answer is permissions. Either way it is one pass away instead of
+     * an afternoon of inference.
+     */
+    const db = crmDb();
+    const host = (() => { try { return new URL(String(process.env.CRM_SUPABASE_URL)).host; } catch { return "unreadable"; } })();
+    const { data: seen, error: seenErr } = await db.from("mk_campaign").select("status");
+    const tally: Record<string, number> = {};
+    for (const x of seen || []) tally[String(x.status)] = (tally[String(x.status)] || 0) + 1;
+
+    const r = await drain(db);
+    await beat("marketing-drain", "done", {
+      ...r,
+      crmHost: host,
+      campaignsVisible: (seen || []).length,
+      byStatus: tally,
+      seeError: seenErr ? String(seenErr.message).slice(0, 160) : null,
+    });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
