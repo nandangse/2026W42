@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.47.5",
+    date: "2026-09-14",
+    module: "A ten-thousand-row import that finishes \u2014 and says so as it goes",
+    items: [
+      "<b>A 10,505-row file died on commit</b> with \u201cUnexpected token \u2018A\u2019 \u2026 is not valid JSON\u201d. The reply was not from Genie at all \u2014 it was the gateway\u2019s own timeout page, because one serverless invocation had been asked to carry the whole file. The browser now walks the file in slices of 1,500, each request doing a bounded piece, with a bar showing how far it has got.",
+      "<b>Repeating a slice is safe.</b> A person the previous slice created is found on the next run, not inserted again \u2014 matching is still by e-mail and the rule is still fill-blanks-only \u2014 so a slice that fails can simply be retried.",
+      "<b>It stopped reading the whole table to answer a question about one file.</b> The import used to page all 139,807 people to build an e-mail index \u2014 140 round trips and the lot held in memory, once to preview and again to commit. It now asks only for the addresses the file actually contains. That, more than anything, is what ran the clock out.",
+      "Filling blanks went from one request per person \u2014 468 of them in a row on the file that failed \u2014 to twenty at a time.",
+      "<b>And a reply that is not JSON now says what it is.</b> Showing a reader a parser error about the letter \u2018A\u2019 tells them nothing; it now says the server did not answer properly, and that nothing before that point was lost.",
+    ],
+  },
+  {
     v: "5.0.47.4",
     date: "2026-09-14",
     module: "Found it \u2014 the cron was reading a cached answer, not the database",

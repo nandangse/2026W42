@@ -118,16 +118,50 @@ export async function POST(req: Request) {
       if (seen.has(e)) shared.add(e); seen.add(e);
     }
 
-    /* The CRM's own e-mail index, paged — PostgREST truncates at 1,000. */
+    /**
+     * A COMMIT DOES ONE SLICE OF THE FILE (14 Sep 2026).
+     *
+     * A 10,505-row file died on commit with a reply that was not even JSON —
+     * it was Vercel's own timeout page. No single serverless invocation
+     * should be asked to carry a whole import, so the browser walks the file
+     * in slices and each request does a bounded piece of work. A slice that
+     * fails can be repeated; nothing is written twice, because a person the
+     * previous slice created is simply found rather than inserted.
+     *
+     * The PREVIEW still reads the whole file — it writes nothing and the
+     * reader needs the true totals before pressing anything.
+     */
+    const from = Math.max(0, Number(form.get("from") || 0));
+    const size = Math.min(4000, Math.max(200, Number(form.get("size") || 1500)));
+    const slice = action === "commit" ? body.slice(from, from + size) : body;
+    const to = action === "commit" ? Math.min(body.length, from + size) : body.length;
+
+    /**
+     * ONLY THE ADDRESSES IN THIS FILE, NOT THE WHOLE TABLE.
+     *
+     * This used to page the entire person table to build an e-mail index:
+     * 140 round trips and 139,807 rows held in memory, twice — once to
+     * preview and again to commit — to answer a question about 10,000
+     * addresses. That, more than anything else, is what ran the clock out.
+     *
+     * Both spellings are asked for: the address lowercased, and exactly as
+     * the file writes it. 34 of the 139,807 rows in the CRM are stored with
+     * a capital in them, and an address stored in a case neither form
+     * matches would be inserted as a second person rather than found. Rare,
+     * visible, and never silent — far better than the scan it replaces.
+     */
+    const want = new Set<string>();
+    if (emailCol >= 0) for (const r of slice) {
+      const raw = norm(r[emailCol]); if (!raw) continue;
+      want.add(raw.toLowerCase()); want.add(raw);
+    }
     const byEmail = new Map<string, { id: string; [k: string]: unknown }>();
-    for (let off = 0; ; off += 1000) {
+    for (const c of chunk([...want], 300)) {
       const { data, error } = await db.from("person")
         .select("id, primary_email, primary_phone, whatsapp_number, job_title, department, linkedin_url, city, country, full_name")
-        .range(off, off + 999);
+        .in("primary_email", c);
       if (error) throw new HttpError(500, error.message);
-      if (!data || !data.length) break;
-      for (const p of data) if (p.primary_email) byEmail.set(lower(p.primary_email), p as { id: string });
-      if (data.length < 1000) break;
+      for (const p of data || []) if (p.primary_email) byEmail.set(lower(p.primary_email), p as { id: string });
     }
 
     const inserts: Record<string, unknown>[] = [];
@@ -135,7 +169,7 @@ export async function POST(req: Request) {
     const memberIds: string[] = [];
     let matched = 0, blankEmail = 0, sharedRows = 0, empty = 0;
 
-    for (const r of body) {
+    for (const r of slice) {
       const vals: Record<string, string> = {};
       for (const [i, key] of Object.entries(guessed)) {
         const v = norm(r[Number(i)]);
@@ -188,7 +222,8 @@ export async function POST(req: Request) {
 
     const summary = {
       file: file.name,
-      rows: body.length,
+      rows: slice.length,
+      fileRows: body.length,
       headers,
       mapping: Object.fromEntries(Object.entries(guessed).map(([i, k]) => [headers[Number(i)] || `col ${i}`, k])),
       unmapped: headers.filter((h, i) => h && !guessed[i]),
@@ -209,9 +244,13 @@ export async function POST(req: Request) {
     let hasNotes = true;
     { const { error } = await db.from("person").select("notes").limit(1); if (error) hasNotes = false; }
 
-    for (const p of patches) {
-      const { error } = await db.from("person").update(p.patch).eq("id", p.id);
-      if (error) throw new HttpError(500, `filling blanks: ${error.message}`);
+    /* Fill blanks in parallel batches. One request per person meant 468
+       sequential round trips on the file that failed — minutes of the
+       budget spent on a job that takes seconds twenty at a time. */
+    for (const c of chunk(patches, 20)) {
+      const rs = await Promise.all(c.map((p) => db.from("person").update(p.patch).eq("id", p.id)));
+      const bad = rs.find((r) => r.error);
+      if (bad?.error) throw new HttpError(500, `filling blanks: ${bad.error.message}`);
     }
     for (const c of chunk(inserts, 200)) {
       const rows = c.map((r) => {
@@ -233,6 +272,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true, committed: true, ...summary, listed,
+      /* Where the browser should carry on from, and whether it is finished. */
+      from, to, total: body.length, done: to >= body.length,
       notesCarried: hasNotes,
       note: hasNotes ? undefined : "person.notes does not exist yet — run CRM migration 0065; the unmapped columns were not kept.",
     });

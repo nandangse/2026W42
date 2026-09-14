@@ -696,6 +696,8 @@ type Preview = {
   matched: number; willInsert: number; willFill: number;
   blankEmail: number; sharedAddresses: number; emptyRows: number;
   sample?: Record<string, unknown>[]; listed?: number; committed?: boolean; notesCarried?: boolean; note?: string;
+  /* Where a sliced commit reached, and whether the file is finished. */
+  from?: number; to?: number; total?: number; done?: boolean; fileRows?: number;
 };
 
 function ListUpload({ list, onClose, onDone, inline }: { list: List; onClose: () => void; onDone: () => void; inline?: boolean }) {
@@ -704,19 +706,68 @@ function ListUpload({ list, onClose, onDone, inline }: { list: List; onClose: ()
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
+  const [prog, setProg] = useState<{ done: number; total: number } | null>(null);
+
+  /**
+   * A BIG FILE IS COMMITTED IN SLICES (Dr Raghu, 14 Sep 2026: "problem!").
+   *
+   * A 10,505-row import died on commit with "Unexpected token 'A'" — the
+   * reply was not JSON at all, it was Vercel's own timeout page, because one
+   * serverless invocation had been asked to carry the whole file. So the
+   * browser walks it now: each request does a bounded slice and says where
+   * to carry on from, and the bar shows how far it has got.
+   *
+   * REPEATING A SLICE IS SAFE. A person the previous slice created is found
+   * on the next run, not inserted again — matching is by e-mail and the rule
+   * is still fill-blanks-only. So a slice that fails can simply be retried.
+   */
   const send = async (action: "preview" | "commit") => {
     if (!file) return;
-    setBusy(true); setErr("");
+    setBusy(true); setErr(""); setProg(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("list_id", list.id);
-      fd.append("action", action);
-      const r = await fetch("/api/marketing/import", { method: "POST", body: fd });
-      const j = await r.json();
-      if (!r.ok) throw new Error(String(j.error || r.status));
-      setPrev(j as Preview);
-      if (action === "commit") setTimeout(onDone, 1800);
+      const post = async (from: number) => {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("list_id", list.id);
+        fd.append("action", action);
+        if (action === "commit") { fd.append("from", String(from)); fd.append("size", "1500"); }
+        const r = await fetch("/api/marketing/import", { method: "POST", body: fd });
+        const text = await r.text();
+        let j: Record<string, unknown>;
+        try { j = JSON.parse(text); }
+        catch {
+          /* Not JSON means the reply did not come from Genie — a gateway
+             timeout page, almost always. Say that, rather than showing the
+             reader a parser error about the letter A. */
+          throw new Error(r.status === 413
+            ? "That file is too large to upload in one piece."
+            : `The server did not answer properly (HTTP ${r.status}). The slice was too big or took too long — nothing before this point was lost.`);
+        }
+        if (!r.ok) throw new Error(String(j.error || r.status));
+        return j as unknown as Preview;
+      };
+
+      if (action === "preview") { setPrev(await post(0)); setBusy(false); return; }
+
+      /* Commit: walk the file, accumulating the totals as we go. */
+      let at = 0, guard = 0;
+      const tally = { willInsert: 0, matched: 0, willFill: 0, listed: 0, blankEmail: 0, sharedAddresses: 0, emptyRows: 0 };
+      let last: Preview | null = null;
+      for (;;) {
+        const j = await post(at);
+        last = j;
+        tally.willInsert += j.willInsert || 0; tally.matched += j.matched || 0;
+        tally.willFill += j.willFill || 0; tally.listed += j.listed || 0;
+        tally.blankEmail += j.blankEmail || 0; tally.sharedAddresses += j.sharedAddresses || 0;
+        tally.emptyRows += j.emptyRows || 0;
+        const to = Number(j.to ?? 0), total = Number(j.total ?? 0);
+        setProg({ done: to, total });
+        setPrev({ ...j, ...tally, rows: to });
+        if (j.done || !to || to <= at || ++guard > 200) break;
+        at = to;
+      }
+      setPrev({ ...(last as Preview), ...tally, rows: Number(last?.total ?? tally.willInsert) });
+      setTimeout(onDone, 1800);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
   };
@@ -753,6 +804,18 @@ function ListUpload({ list, onClose, onDone, inline }: { list: List; onClose: ()
                 {prev.sharedAddresses > 0 && <><b>{prev.sharedAddresses}</b> rows share an e-mail with another row in this file — kept as separate people, not merged, because one address used twice identifies nobody.<br /></>}
                 {prev.emptyRows > 0 && <><b>{prev.emptyRows}</b> rows had no name and no e-mail and were skipped.<br /></>}
                 {prev.note && <span style={{ color: prev.notesCarried === false ? "#8A5B00" : MUTED }}>{prev.note}</span>}
+              </div>
+            </div>
+          )}
+
+          {prog && prog.total > 0 && (
+            <div className="mb-3">
+              <div className="text-xs mb-1" style={{ color: MUTED }}>
+                <b className="tnum">{prog.done}</b> of <b className="tnum">{prog.total}</b> rows written
+                {prog.done < prog.total && " — leave this open until it finishes"}
+              </div>
+              <div style={{ height: 6, background: "var(--line-soft)", borderRadius: 3, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${Math.round((prog.done / prog.total) * 100)}%`, background: GREEN, transition: "width .3s" }} />
               </div>
             </div>
           )}
