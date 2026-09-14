@@ -24,7 +24,7 @@ import LandingPages, { uploadPublic } from "@/components/marketing/LandingPages"
 
 type List = { id: string; name: string; description: string | null; created_by_email: string; created_at: string; count: number };
 type Campaign = { id: string; name: string; status: string; subject: string | null; body_html?: string | null; list_ids: string[]; person_ids: string[]; channel_ids: string[]; speed_per_hour: number; created_by_email: string; created_at: string; started_at: string | null; done_at: string | null; counts: Record<string, number> | null; checklist?: Record<string, number | string> | null; deliverability?: { score: number; issues: string[] } | null };
-type Channel = { id: string; email: string; label: string | null; kind: "gmail" | "resend" | "mailercloud"; daily_limit: number; hourly_limit: number; active: boolean; sent_today: number; sent_this_hour: number; gmail: string | null; api_key: string | null; resendKeyOnDeploy: boolean };
+type Channel = { id: string; email: string; label: string | null; kind: "gmail" | "resend" | "mailercloud"; reply_to: string | null; daily_limit: number; hourly_limit: number; active: boolean; sent_today: number; sent_this_hour: number; gmail: string | null; api_key: string | null; resendKeyOnDeploy: boolean };
 type Template = { id: string; name: string; subject: string | null; body_html: string | null };
 
 const SECTIONS = [
@@ -487,8 +487,8 @@ function CampaignWizard({ c, seesAll, onClose }: { c: Campaign | null; seesAll: 
             {status === "paused" && <button onClick={() => act("resume")} disabled={!!busy} style={btn(GREEN)}>▶ Resume</button>}
             {seesAll && status !== "sending" && id && <button onClick={() => { if (window.confirm("Delete this campaign and its send log?")) act("delete", () => onClose()); }} style={btn("#fff", RED)}>delete</button>}
           </div>
-          {/* THE RESULT — the eight lines he asked for, each with its share
-              of the audience, and the two we do not measure saying so. */}
+          {/* THE RESULT — the eight figures he asked for, read across in one
+              line, and the two we do not measure saying so rather than nought. */}
           {detail?.cron && sending && <CronPanel c={detail.cron} onRefresh={loadDetail} />}
           {detail?.result && detail.total > 0 && <ResultPanel r={detail.result} />}
           {detail && detail.total > 0 && (
@@ -604,11 +604,11 @@ function Templates() {
 
 function Channels({ seesAll }: { seesAll: boolean }) {
   const [rows, setRows] = useState<Channel[] | null>(null);
-  const [f, setF] = useState<{ id?: string; email: string; label: string; kind: "gmail" | "resend" | "mailercloud"; api_key: string; daily_limit: number; hourly_limit: number; active: boolean }>({ email: "", label: "", kind: "gmail", api_key: "", daily_limit: 200, hourly_limit: 50, active: true });
+  const [f, setF] = useState<{ id?: string; email: string; label: string; kind: "gmail" | "resend" | "mailercloud"; reply_to: string; api_key: string; daily_limit: number; hourly_limit: number; active: boolean }>({ email: "", label: "", kind: "gmail", reply_to: "", api_key: "", daily_limit: 200, hourly_limit: 50, active: true });
   const [msg, setMsg] = useState("");
   const load = useCallback(() => api<{ channels: Channel[] }>("/api/marketing/channels").then((j) => setRows(j.channels || [])).catch(() => setRows([])), []);
   useEffect(() => { load(); }, [load]);
-  const save = async () => { try { await api("/api/marketing/channels", { action: "save", ...f }); setF({ email: "", label: "", kind: "gmail", api_key: "", daily_limit: 200, hourly_limit: 50, active: true }); setMsg("saved ✓"); load(); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); } };
+  const save = async () => { try { await api("/api/marketing/channels", { action: "save", ...f }); setF({ email: "", label: "", kind: "gmail", reply_to: "", api_key: "", daily_limit: 200, hourly_limit: 50, active: true }); setMsg("saved ✓"); load(); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); } };
   return (
     <div>
       <div className="font-bold mb-1" style={{ fontSize: 16, color: INK }}>📡 Sending Channels</div>
@@ -617,22 +617,27 @@ function Channels({ seesAll }: { seesAll: boolean }) {
         <div className="rounded border p-3 mb-3 grid gap-2" style={{ borderColor: LINE, background: "#FBFAF7", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
           <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>E-mail<input value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} style={inp} /></label>
           <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Sender name<input value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} placeholder="e.g. Raghu at Nandan" style={inp} /></label>
+          {/* WHERE AN ANSWER GOES. The sending domain is not always a
+              mailbox anybody reads — Resend sends from nandangse.com, whose
+              MX is Zoho, while the inbox that is actually watched is on
+              Google. Blank means sales@, never "back to the sender". */}
+          <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Replies go to<input value={f.reply_to} onChange={(e) => setF({ ...f, reply_to: e.target.value })} placeholder="sales@nandan.co.in" style={inp} /></label>
           <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Sending API<select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as "gmail" | "resend" | "mailercloud" })} style={inp}><option value="gmail">Gmail (connected mailbox)</option><option value="resend">Resend</option><option value="mailercloud">Mailercloud</option></select></label>
           {f.kind !== "gmail" && <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>{f.kind === "resend" ? "Resend API key" : "Mailercloud API key"}<input value={f.api_key} onChange={(e) => setF({ ...f, api_key: e.target.value })} placeholder={f.kind === "resend" ? "blank = deploy's key" : "from Mailercloud → Settings → API"} style={inp} /></label>}
           <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Per hour<input type="number" value={f.hourly_limit} onChange={(e) => setF({ ...f, hourly_limit: Number(e.target.value) })} style={inp} /></label>
           <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Per day<input type="number" value={f.daily_limit} onChange={(e) => setF({ ...f, daily_limit: Number(e.target.value) })} style={inp} /></label>
-          <div className="flex items-end gap-2"><button onClick={save} style={btn(ACCENT)}>{f.id ? "Update" : "+ Add channel"}</button>{f.id && <button onClick={() => setF({ email: "", label: "", kind: "gmail", api_key: "", daily_limit: 200, hourly_limit: 50, active: true })} style={btn("#fff", "var(--dim)")}>cancel</button>}</div>
+          <div className="flex items-end gap-2"><button onClick={save} style={btn(ACCENT)}>{f.id ? "Update" : "+ Add channel"}</button>{f.id && <button onClick={() => setF({ email: "", label: "", kind: "gmail", reply_to: "", api_key: "", daily_limit: 200, hourly_limit: 50, active: true })} style={btn("#fff", "var(--dim)")}>cancel</button>}</div>
           {msg && <div className="text-xs" style={{ color: msg.includes("✓") ? GREEN : RED, gridColumn: "1 / -1" }}>{msg}</div>}
         </div>
       )}
       <GenieTable<Channel> rows={rows} minWidth={760} empty="No channel yet."
         columns={[
-          { key: "email", label: "From", render: (r) => <span><b>{r.email}</b>{r.label ? <span className="text-xs" style={{ color: MUTED }}> · {r.label}</span> : null}</span> },
+          { key: "email", label: "From", render: (r) => <span><b>{r.email}</b>{r.label ? <span className="text-xs" style={{ color: MUTED }}> · {r.label}</span> : null}<span className="text-xs block" style={{ color: MUTED }}>replies → {r.reply_to || "sales@nandan.co.in"}</span></span> },
           { key: "kind", label: "API", render: (r) => r.kind === "gmail" ? `Gmail · ${r.gmail || "not connected"}` : r.kind === "mailercloud" ? `Mailercloud · ${r.api_key ? "key set" : "NO KEY"}` : `Resend · ${r.api_key ? "own key" : r.resendKeyOnDeploy ? "deploy key" : "NO KEY"}` },
           { key: "h", label: "/hour", align: "right", render: (r) => <span className="tnum">{r.sent_this_hour} / {r.hourly_limit}</span> },
           { key: "d", label: "/day", align: "right", render: (r) => <span className="tnum">{r.sent_today} / {r.daily_limit}</span> },
           { key: "active", label: "Active", render: (r) => (r.active ? "✓" : "off") },
-          { key: "x", label: "", render: (r) => seesAll ? <span className="flex gap-2"><button onClick={() => setF({ id: r.id, email: r.email, label: r.label || "", kind: r.kind, api_key: "", daily_limit: r.daily_limit, hourly_limit: r.hourly_limit, active: r.active })} className="text-xs" style={{ color: "var(--blue)" }}>edit</button><button onClick={async () => { if (window.confirm(`Remove ${r.email}?`)) { await api("/api/marketing/channels", { action: "delete", id: r.id }); load(); } }} className="text-xs" style={{ color: RED }}>remove</button></span> : null },
+          { key: "x", label: "", render: (r) => seesAll ? <span className="flex gap-2"><button onClick={() => setF({ id: r.id, email: r.email, label: r.label || "", kind: r.kind, reply_to: r.reply_to || "", api_key: "", daily_limit: r.daily_limit, hourly_limit: r.hourly_limit, active: r.active })} className="text-xs" style={{ color: "var(--blue)" }}>edit</button><button onClick={async () => { if (window.confirm(`Remove ${r.email}?`)) { await api("/api/marketing/channels", { action: "delete", id: r.id }); load(); } }} className="text-xs" style={{ color: RED }}>remove</button></span> : null },
         ]} />
     </div>
   );
@@ -908,43 +913,64 @@ function ListBox({ list, onClose, onChanged }: { list: List; onClose: () => void
    THE RESULT OF A CAMPAIGN
 
    Dr Raghu, 14 Sep 2026: "in this have — List, Qued, Sent (100%), Delivered
-   (%), Opened (%), Clicked (%), Bounced (%), Unsubscribed (%)."
+   (%), Opened (%), Clicked (%), Bounced (%), Unsubscribed (%)" — then, the
+   same day: "this should be in a nice display on one line, show the number
+   on top and the % below that."
 
-   Every percentage is OF THE AUDIENCE, never of each other, so a reader can
-   run their eye down the column and compare like with like.
+   So it is a strip, not a table. Eight figures read left to right in one
+   glance instead of down a column; the number is the thing, the percentage
+   sits under it as the smaller fact that qualifies it.
 
-   TWO LINES SAY "NOT MEASURED" RATHER THAN NOUGHT, and that is deliberate.
-   DELIVERED is Resend's word, not ours — we know the message was handed
-   over, not that it arrived; it becomes real when the webhook carries
-   email.delivered. CLICKED needs the links rewritten to count, and nothing
-   rewrites them. A nought in either row would read as "nobody opened it",
-   which is a different fact from "we are not counting", and on a page that
-   decides whether a campaign worked that difference matters.
+   WHAT EACH PERCENTAGE IS OF — his correction, and it matters:
+
+     of the AUDIENCE   queued · sent · delivered · failed · skipped
+     of what WENT OUT  opened · clicked · bounced · unsubscribed
+
+   An open rate against a list you have only half-sent to is a number that
+   flatters and means nothing. The honest base is delivered; until Resend's
+   webhook arrives it is sent, and the footnote names which — never silently.
+
+   TWO CELLS SAY "not measured" RATHER THAN NOUGHT. Delivered is Resend's
+   word, not ours: we know the message was handed over, not that it arrived.
+   Clicked needs the links rewritten to count, and nothing rewrites them. A
+   nought would read as "nobody opened it", which is a different fact from
+   "we are not counting", and on a page that decides whether a campaign
+   worked, that difference is the whole point.
    ══════════════════════════════════════════════════════════════════════ */
 type Result = {
-  lists: string[]; audience: number; queued: number;
+  lists: string[]; audience: number;
+  queued: number; queuedPc: number;
   sent: number; sentPc: number;
-  delivered: number | null;
+  delivered: number | null; deliveredPc: number | null;
   opened: number; openedPc: number;
   clicked: number | null;
   bounced: number; bouncedPc: number;
   unsubscribed: number; unsubscribedPc: number;
-  failed: number; failedPc: number; skipped: number;
+  failed: number; failedPc: number;
+  skipped: number; skippedPc?: number;
+  reach?: number; reachLabel?: string;
 };
 
-function ResultPanel({ r }: { r: Result }) {
-  const Row = ({ label, v, pc, ink, why }: { label: string; v: number | null; pc?: number; ink?: string; why?: string }) => (
-    <tr>
-      <td style={{ padding: "6px 10px 6px 0", color: MUTED }}>{label}</td>
-      <td className="tnum" style={{ padding: "6px 10px 6px 0", textAlign: "right", fontWeight: 700, fontSize: 15, color: ink || INK }}>
-        {v === null ? <span style={{ fontWeight: 400, fontSize: 13, color: MUTED }}>not measured</span> : v}
-      </td>
-      <td className="tnum" style={{ padding: "6px 0", textAlign: "right", color: MUTED, width: 64 }}>
-        {v === null || pc === undefined ? "" : `${pc}%`}
-      </td>
-      {why && <td style={{ padding: "6px 0 6px 12px", fontSize: 11.5, color: MUTED, lineHeight: 1.4 }}>{why}</td>}
-    </tr>
+/** One figure in the strip: what it is, the number, and the share beneath it. */
+function Stat({ label, v, pc, ink, why }: { label: string; v: number | null; pc?: number | null; ink?: string; why?: string }) {
+  return (
+    <div title={why || undefined} style={{ flex: "1 1 92px", minWidth: 84, padding: "2px 10px", borderLeft: "1px solid var(--line)" }}>
+      <div style={{ fontSize: 10.5, color: MUTED, letterSpacing: .4, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
+      {v === null ? (
+        <div style={{ fontSize: 12, color: MUTED, marginTop: 4, lineHeight: 1.2 }}>not<br />measured</div>
+      ) : (
+        <>
+          <div className="tnum" style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15, color: ink || INK }}>{v}</div>
+          <div className="tnum" style={{ fontSize: 11.5, color: MUTED }}>{pc === null || pc === undefined ? "" : `${pc}%`}</div>
+        </>
+      )}
+    </div>
   );
+}
+
+function ResultPanel({ r }: { r: Result }) {
+  const base = r.reachLabel || "sent";
+  const reach = r.reach ?? r.sent;
   return (
     <div className="rounded border p-3 mt-3" style={{ borderColor: "var(--line)", background: "#FAFAF8" }}>
       <div className="text-xs font-bold mb-2" style={{ color: MUTED, letterSpacing: .8 }}>THE RESULT</div>
@@ -953,21 +979,21 @@ function ResultPanel({ r }: { r: Result }) {
         <b>{r.lists.length ? r.lists.join(", ") : "chosen people only"}</b>
         <span style={{ color: MUTED }}> · audience </span><b className="tnum">{r.audience}</b>
       </div>
-      <table style={{ width: "100%", maxWidth: 560, borderCollapse: "collapse", fontSize: 14 }}>
-        <tbody>
-          <Row label="Queued — still to go" v={r.queued} pc={r.audience ? Math.round((r.queued / r.audience) * 1000) / 10 : 0} />
-          <Row label="Sent" v={r.sent} pc={r.sentPc} ink={GREEN} />
-          <Row label="Delivered" v={r.delivered} why="needs Resend's email.delivered webhook" />
-          <Row label="Opened" v={r.opened} pc={r.openedPc} ink={GREEN} why="images-off readers never count" />
-          <Row label="Clicked" v={r.clicked} why="links are not rewritten, so clicks are not counted" />
-          <Row label="Bounced" v={r.bounced} pc={r.bouncedPc} ink={r.bounced ? RED : undefined} why="arrives on the webhook; goes straight onto the unsubscribe list" />
-          <Row label="Unsubscribed" v={r.unsubscribed} pc={r.unsubscribedPc} ink={r.unsubscribed ? "var(--warn)" : undefined} />
-          {r.failed > 0 && <Row label="Failed" v={r.failed} pc={r.failedPc} ink={RED} why="refused outright — see the rows below" />}
-          {r.skipped > 0 && <Row label="Skipped" v={r.skipped} why="already unsubscribed when their turn came" />}
-        </tbody>
-      </table>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 10, borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "8px 0" }}>
+        <Stat label="Queued" v={r.queued} pc={r.queuedPc} why="still to go — share of the audience" />
+        <Stat label="Sent" v={r.sent} pc={r.sentPc} ink={GREEN} why="handed to the channel — share of the audience" />
+        <Stat label="Delivered" v={r.delivered} pc={r.deliveredPc} why="needs Resend's email.delivered webhook; would be a share of the audience" />
+        <Stat label="Opened" v={r.opened} pc={r.openedPc} ink={r.opened ? GREEN : undefined} why={`share of ${base} (${reach}) — images-off readers never count`} />
+        <Stat label="Clicked" v={r.clicked} why="links are not rewritten, so clicks are not counted" />
+        <Stat label="Bounced" v={r.bounced} pc={r.bouncedPc} ink={r.bounced ? RED : undefined} why={`share of ${base} (${reach}) — arrives on the webhook, goes straight onto the unsubscribe list`} />
+        <Stat label="Unsub" v={r.unsubscribed} pc={r.unsubscribedPc} ink={r.unsubscribed ? "var(--warn)" : undefined} why={`share of ${base} (${reach})`} />
+        {r.failed > 0 && <Stat label="Failed" v={r.failed} pc={r.failedPc} ink={RED} why="refused outright — see the rows below" />}
+        {r.skipped > 0 && <Stat label="Skipped" v={r.skipped} pc={r.skippedPc} why="already unsubscribed when their turn came" />}
+      </div>
       <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.5 }}>
-        Every percentage is of the <b>audience</b> ({r.audience}), not of each other.
+        Queued, sent and delivered are shares of the <b>audience</b> ({r.audience}).
+        Opened, bounced and unsubscribed are shares of <b>{base}</b> ({reach})
+        {base === "sent" && <> — they move onto delivered once Resend&rsquo;s webhook is on</>}.
       </div>
     </div>
   );

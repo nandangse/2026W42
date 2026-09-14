@@ -62,8 +62,20 @@ export async function GET(req: Request) {
        *   A zero here would read as "nobody clicked", which is a different
        *   fact from "we are not measuring".
        *
-       * Every percentage is OF THE AUDIENCE, not of each other, so the
-       * numbers can be compared down the column.
+       * WHAT EACH PERCENTAGE IS OF (Dr Raghu, 14 Sep 2026: "the % is on the
+       * delivered ... or sent, not on the audience. Only the delivered is %
+       * of the audience list size.")
+       *
+       * He is right, and the old way flattered us. Queued, sent, delivered,
+       * failed and skipped are shares of the AUDIENCE — they answer "how far
+       * through the list are we". Opened, clicked, bounced and unsubscribed
+       * are shares of what actually went out, because an open rate against
+       * a list you have only half-sent to is a number that means nothing.
+       *
+       * The honest base for those is DELIVERED; we do not have it yet, so
+       * they are computed against SENT and the panel says which. The moment
+       * the email.delivered webhook is on, `reach` becomes delivered and
+       * every engagement rate corrects itself with no other change.
        */
       const n = (k: string) => counts[k] || 0;
       const total = (sends || []).length;
@@ -74,19 +86,24 @@ export async function GET(req: Request) {
         const { data } = await db.from("mk_list").select("name").in("id", ids);
         return (data || []).map((l) => String(l.name));
       })();
-      const pc = (v: number) => (total ? Math.round((v / total) * 1000) / 10 : 0);
+      const share = (v: number, of: number) => (of ? Math.round((v / of) * 1000) / 10 : 0);
+      const pc = (v: number) => share(v, total);            // of the audience
+      const delivered: number | null = null;                // until the webhook says so
+      const reach = delivered ?? sent;                       // what engagement is measured against
+      const rp = (v: number) => share(v, reach);
       const result = {
         lists: await listNames,
         audience: total,
-        queued: n("queued"),
+        queued: n("queued"), queuedPc: pc(n("queued")),
         sent, sentPc: pc(sent),
-        delivered: null as number | null,
-        opened: n("opened"), openedPc: pc(n("opened")),
+        delivered, deliveredPc: delivered === null ? null : pc(delivered),
+        opened: n("opened"), openedPc: rp(n("opened")),
         clicked: null as number | null,
-        bounced: n("bounced"), bouncedPc: pc(n("bounced")),
-        unsubscribed: n("unsubscribed"), unsubscribedPc: pc(n("unsubscribed")),
+        bounced: n("bounced"), bouncedPc: rp(n("bounced")),
+        unsubscribed: n("unsubscribed"), unsubscribedPc: rp(n("unsubscribed")),
         failed: n("failed"), failedPc: pc(n("failed")),
-        skipped: n("skipped"),
+        skipped: n("skipped"), skippedPc: pc(n("skipped")),
+        reach, reachLabel: delivered === null ? "sent" : "delivered",
         notMeasured: ["delivered", "clicked"],
       };
       /**

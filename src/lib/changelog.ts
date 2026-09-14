@@ -89,6 +89,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.47.2",
+    date: "2026-09-14",
+    module: "The campaign result in one line, each percentage of the right thing \u2014 and replies that reach somebody",
+    items: [
+      "<b>The result is a strip now, not a column.</b> Queued, sent, delivered, opened, clicked, bounced and unsubscribed run left to right in a single line, the number large and the share beneath it. Eight figures in one glance rather than eight trips down a table.",
+      "<b>The percentages were flattering us.</b> Every one of them was a share of the audience, so an open rate on a list only a sixth sent to read as 3% when the honest figure was six times that. Queued, sent and delivered are shares of the <i>audience</i> \u2014 they say how far through the list we are. Opened, bounced and unsubscribed are shares of what actually <i>went out</i>.",
+      "The truest base for those is <b>delivered</b>, and we do not have it until Resend\u2019s webhook is on \u2014 so they are computed against <b>sent</b>, and the footnote says so outright with the number it used. When the webhook arrives they correct themselves with nothing else changed.",
+      "<b>Delivered and clicked still say \u201cnot measured\u201d rather than nought</b>, for the same reason as before: a zero would read as \u201cnobody opened it\u201d, which is a different fact from \u201cwe are not counting\u201d.",
+      "<b>A REPLY NOW REACHES SOMEBODY.</b> The send set a From header and nothing else, so answers went back to the sending address \u2014 raghu@nandangse.com, a domain whose mail server is Zoho, not the Google mailbox anybody reads. Thirty-four people were invited to reply into an empty room. Every channel now carries a <b>Replies go to</b> address, <b>sales@nandan.co.in</b> unless it is told otherwise, editable per channel for when there are more mailboxes.",
+      "The drain\u2019s missing campaign is now cornered: the host is right, the campaign is visible, the read returns no error \u2014 so the fault is inside the drain\u2019s own query, and this pass asks that exact question twice in one process so the two answers have to meet.",
+    ],
+  },
+  {
     v: "5.0.47.1",
     date: "2026-09-14",
     module: "The cron says which database it is looking at",

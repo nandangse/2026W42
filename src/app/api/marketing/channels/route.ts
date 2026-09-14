@@ -11,7 +11,7 @@ export async function GET() {
   try {
     await requireMarketing();
     const db = crmDb();
-    const { data, error } = await db.from("mk_channel").select("id, email, label, kind, daily_limit, hourly_limit, active, sent_on, sent_today, sent_this_hour, hour_mark, api_key").order("email");
+    const { data, error } = await db.from("mk_channel").select("id, email, label, kind, reply_to, daily_limit, hourly_limit, active, sent_on, sent_today, sent_this_hour, hour_mark, api_key").order("email");
     if (error) {
       if (/mk_channel|schema cache/i.test(error.message)) return NextResponse.json({ installed: false, channels: [] });
       throw new Error(error.message);
@@ -27,7 +27,7 @@ export async function GET() {
   }
 }
 
-/** POST — { action: "save", id?, email, label, kind, api_key?, daily_limit, hourly_limit, active } · { action: "delete", id } — managers and sales only. */
+/** POST — { action: "save", id?, email, label, kind, reply_to?, api_key?, daily_limit, hourly_limit, active } · { action: "delete", id } — managers and sales only. */
 export async function POST(req: Request) {
   try {
     const u = await requireMarketing();
@@ -38,6 +38,10 @@ export async function POST(req: Request) {
       const row: Record<string, unknown> = {
         email: String(b.email || "").trim().toLowerCase(), label: b.label || null, kind: b.kind === "resend" ? "resend" : b.kind === "mailercloud" ? "mailercloud" : "gmail",
         daily_limit: Math.max(1, Number(b.daily_limit) || 200), hourly_limit: Math.max(1, Number(b.hourly_limit) || 50), active: b.active !== false,
+        /* Blank means "answer to sales@" (the column's default), never
+           "answer to the sending address" — the sending domain is not
+           always a mailbox anybody reads. */
+        reply_to: String(b.reply_to || "").trim().toLowerCase() || "sales@nandan.co.in",
       };
       if (typeof b.api_key === "string" && b.api_key && !b.api_key.startsWith("•••")) row.api_key = b.api_key;
       if (!row.email) throw new HttpError(400, "an e-mail address is required");

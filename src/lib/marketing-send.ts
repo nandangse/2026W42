@@ -12,7 +12,7 @@ import { swallow } from "@/lib/swallow";
 
 export const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://genie.nandan.co.in";
 
-export type Channel = { id: string; email: string; label: string | null; kind: "gmail" | "resend" | "mailercloud"; api_key: string | null; daily_limit: number; hourly_limit: number; active: boolean; sent_on: string | null; sent_today: number; sent_this_hour: number; hour_mark: string | null };
+export type Channel = { id: string; email: string; label: string | null; kind: "gmail" | "resend" | "mailercloud"; api_key: string | null; reply_to?: string | null; daily_limit: number; hourly_limit: number; active: boolean; sent_on: string | null; sent_today: number; sent_this_hour: number; hour_mark: string | null };
 type Person = { id: string; first_name: string | null; last_name: string | null; full_name: string | null; job_title: string | null; primary_email: string | null; city: string | null; country: string | null; company_id: string | null };
 
 /** {{first_name}}, {{name}}, {{title}}, {{company}}, {{city}}, {{country}}, {{email}} — plus the CRM's static variables. */
@@ -59,6 +59,22 @@ class SendError extends Error {
 /** 429 and 5xx pass; a network error passes; a 4xx refusal does not. */
 const transient = (status: number) => status === 408 || status === 425 || status === 429 || status >= 500;
 
+/**
+ * WHERE AN ANSWER GOES (Dr Raghu, 14 Sep 2026).
+ *
+ * The send used to set a From header and nothing else, so a reply went back
+ * to the sending address. For the Resend channel that is raghu@nandangse.com
+ * — a domain whose MX points at Zoho, not at the Google Workspace mailbox
+ * anybody reads. Replies were landing in a room with nobody in it, and a
+ * campaign that cannot be answered is a leaflet, not a letter.
+ *
+ * So the mail goes out branded from the domain Resend is verified for, and
+ * the answer comes back to a mailbox that is read. Per channel, because the
+ * right answer will differ once there are more mailboxes; sales@ until then.
+ */
+const REPLY_TO_FALLBACK = "sales@nandan.co.in";
+const answersTo = (ch: Channel) => (ch.reply_to || "").trim() || REPLY_TO_FALLBACK;
+
 /** Resend's own limit is a couple a second; a fast pass must not outrun it. */
 const PACE_MS = Number(process.env.MARKETING_PACE_MS || 550);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -70,7 +86,7 @@ async function viaResend(ch: Channel, to: string, subject: string, html: string)
   try {
     r = await fetch("https://api.resend.com/emails", {
       method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-      body: JSON.stringify({ from: `${ch.label || "Nandan GSE"} <${ch.email}>`, to: [to], subject, html }),
+      body: JSON.stringify({ from: `${ch.label || "Nandan GSE"} <${ch.email}>`, to: [to], subject, html, reply_to: answersTo(ch) }),
       signal: AbortSignal.timeout(20000),
     });
   } catch (e) {
@@ -85,7 +101,7 @@ async function viaMailercloud(ch: Channel, to: string, subject: string, html: st
   if (!ch.api_key) throw new Error("no Mailercloud API key on the channel");
   const r = await fetch("https://email-api.mailercloud.com/email", {
     method: "POST", headers: { "content-type": "application/json", authorization: ch.api_key },
-    body: JSON.stringify({ version: "1.0", email: { from: ch.email, fromName: ch.label || "Nandan GSE", replyTo: [ch.email], subject, html, text: html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(), recipients: { to: [{ email: to, ...(name ? { name } : {}) }] } }, metadata: { campaignType: "marketing", ...(messageId ? { messageId } : {}) } }) });
+    body: JSON.stringify({ version: "1.0", email: { from: ch.email, fromName: ch.label || "Nandan GSE", replyTo: [answersTo(ch)], subject, html, text: html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(), recipients: { to: [{ email: to, ...(name ? { name } : {}) }] } }, metadata: { campaignType: "marketing", ...(messageId ? { messageId } : {}) } }) });
   if (!r.ok) throw new Error(`Mailercloud ${r.status}: ${(await r.text()).slice(0, 160)}`);
   const j = await r.json().catch(() => null) as { status?: string; message?: string } | null;
   if (j && j.status && j.status !== "SUCCESS") throw new Error(`Mailercloud: ${j.message || j.status}`);
@@ -95,7 +111,7 @@ async function viaGmail(db: SupabaseClient, ch: Channel, to: string, subject: st
   const { data: mb } = await db.from("mailbox").select("id, email_address, display_name").eq("email_address", ch.email).maybeSingle();
   if (!mb) throw new Error(`${ch.email} has no connected Gmail in CRM → Integrations`);
   const token = await accessTokenFor(String(mb.id));
-  await gmailSend(token, String(mb.email_address), to, subject, html, undefined, undefined, ch.label || String(mb.display_name || "") || undefined);
+  await gmailSend(token, String(mb.email_address), to, subject, html, undefined, undefined, ch.label || String(mb.display_name || "") || undefined, undefined, null, answersTo(ch));
 }
 
 /**

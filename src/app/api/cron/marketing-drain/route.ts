@@ -37,6 +37,25 @@ export async function GET(req: Request) {
     const tally: Record<string, number> = {};
     for (const x of seen || []) tally[String(x.status)] = (tally[String(x.status)] || 0) + 1;
 
+    /**
+     * AND THE SAME QUESTION THE DRAIN ASKS (14 Sep 2026, second pass).
+     *
+     * The first diagnostic answered half of it: the host is right
+     * (ixzwpgexrumdirtqzoxz), the campaign is visible, the read returned no
+     * error — and the drain still found nothing. So the fault is no longer
+     * "which database"; it is inside the drain's own query.
+     *
+     * This asks the drain's exact question in the same process, a moment
+     * before the drain asks it, and reports what came back. Two answers that
+     * disagree cannot both be right, and this is the line where they meet:
+     * if `sendingSeen` is 1 and `campaigns` is 0, the difference is in the
+     * drain; if both are 0 while the tally says otherwise, it is the filter.
+     */
+    const { data: same, error: sameErr } = await db
+      .from("mk_campaign")
+      .select("id, name, subject, body_html, channel_ids, speed_per_hour, status")
+      .eq("status", "sending");
+
     const r = await drain(db);
     await beat("marketing-drain", "done", {
       ...r,
@@ -44,6 +63,8 @@ export async function GET(req: Request) {
       campaignsVisible: (seen || []).length,
       byStatus: tally,
       seeError: seenErr ? String(seenErr.message).slice(0, 160) : null,
+      sendingSeen: (same || []).length,
+      sameError: sameErr ? String(sameErr.message).slice(0, 200) : null,
     });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
