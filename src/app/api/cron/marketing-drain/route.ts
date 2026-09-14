@@ -56,6 +56,49 @@ export async function GET(req: Request) {
       .select("id, name, subject, body_html, channel_ids, speed_per_hour, status")
       .eq("status", "sending");
 
+    /**
+     * IS IT THE FILTER, OR IS IT THE CLIENT? (14 Sep 2026, third pass.)
+     *
+     * The second diagnostic made the contradiction plain rather than
+     * solving it: `.select("status")` saw {draft: 1, sending: 1} and, in the
+     * same process a millisecond later, the same table filtered to
+     * status = sending returned no rows AND no error. Both cannot be true.
+     *
+     * Two things are being tested at once there, so this separates them,
+     * and it uses DRAFT as the fixture — the draft campaign is always there
+     * and draining never touches it, so the probe survives a campaign
+     * finishing and costs nothing.
+     *
+     *   jsDraft   the drain's exact shape, through supabase-js
+     *   rawDraft  the same question over plain HTTP, no client at all
+     *
+     * One equals one: filtered reads are sound, and the sending failure was
+     * particular to that row or that moment — the probe stays in and catches
+     * it live next time. Zero and one: the client is the fault. Zero and
+     * zero: PostgREST answers Vercel differently from a laptop, and rawHttp
+     * carries the status code that says how.
+     *
+     * Only counts and a status code are recorded. Never the key.
+     */
+    const { data: jsD } = await db
+      .from("mk_campaign")
+      .select("id, name, subject, body_html, channel_ids, speed_per_hour, status")
+      .eq("status", "draft");
+    let rawDraft = -1, rawHttp = 0;
+    try {
+      const qs = new URLSearchParams({ select: "id,name,status", status: "eq.draft" });
+      const rr = await fetch(`${process.env.CRM_SUPABASE_URL}/rest/v1/mk_campaign?${qs.toString()}`, {
+        headers: {
+          apikey: String(process.env.CRM_SUPABASE_SERVICE_KEY),
+          authorization: `Bearer ${String(process.env.CRM_SUPABASE_SERVICE_KEY)}`,
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+      rawHttp = rr.status;
+      const j = await rr.json().catch(() => null);
+      rawDraft = Array.isArray(j) ? j.length : -2;
+    } catch { rawHttp = -1; }
+
     const r = await drain(db);
     await beat("marketing-drain", "done", {
       ...r,
@@ -65,6 +108,8 @@ export async function GET(req: Request) {
       seeError: seenErr ? String(seenErr.message).slice(0, 160) : null,
       sendingSeen: (same || []).length,
       sameError: sameErr ? String(sameErr.message).slice(0, 200) : null,
+      jsDraft: (jsD || []).length,
+      rawDraft, rawHttp,
     });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {

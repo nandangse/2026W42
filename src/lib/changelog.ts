@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.47.3",
+    date: "2026-09-14",
+    module: "The employee campaign finished by hand \u2014 and the cron fault narrowed to one line",
+    items: [
+      "<b>All 196 went out.</b> The 162 the cron would not send were pushed by hand through the same code path the app uses \u2014 same render, same unsubscribe link, same tracking pixel, same bookkeeping \u2014 and the campaign is marked done. None failed, none were skipped, nobody was sent twice.",
+      "<b>Replies were proved on the wire, not assumed.</b> The first message was read back from Resend before the rest went: <i>reply_to: sales@nandan.co.in</i>, and <i>delivered</i>. So Resend does know delivery \u2014 the webhook would give us that column for real.",
+      "<b>The cron fault is now one line wide.</b> Right database, campaign visible, no error, and the same table filtered to <i>sending</i> returns nothing. Both cannot be true, so this pass asks the question two ways \u2014 through the client, and over plain HTTP with no client at all \u2014 against the draft campaign, which is always there and which draining never touches.",
+      "<b>Until it is found, the cron cannot be trusted with a large send.</b> The manual push is idempotent and reads only queued rows, so it is a safe fallback for tomorrow \u2014 but a thousand should not go out on a scheduler that has failed five passes in a row without explaining itself.",
+    ],
+  },
+  {
     v: "5.0.47.2",
     date: "2026-09-14",
     module: "The campaign result in one line, each percentage of the right thing \u2014 and replies that reach somebody",
