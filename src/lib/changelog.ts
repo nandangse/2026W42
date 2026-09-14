@@ -89,6 +89,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.47.0",
+    date: "2026-09-14",
+    module: "Marketing: lists you can upload into, a campaign that cannot be edited mid-flight, and a cron that reports itself",
+    items: [
+      "\"Can we have lists and then upload a csv or excel which will add it to the list and also to the leads \u2014 add records and also map them, not overwrite it for now\" (Dr Raghu, 14 Sep 2026). Every list now takes a file. Two presses, not one: the first READS it and reports what would happen \u2014 how many are already here, how many are new, which columns it recognised, which it did not \u2014 and only the second writes. A bulk import into 139,000 people is not a thing to set off with one click on a file nobody has looked at.",
+      "<b>NOTHING IS OVERWRITTEN</b>, as instructed. Where a person is already in the CRM the file may fill an EMPTY field and nothing more \u2014 what was typed here outranks what was exported from somewhere else. Unrecognised columns are kept as a note on the person rather than thrown away.",
+      "\"After clicking and opening on lightbox \u2014 have a search; remove from list should be an option; import csv/excel; add contact\". All four, and the remove button says <b>remove from list</b> and asks before it acts, because a person can be on many lists and deleting one membership must never look like deleting the person.",
+      "<b>\"THE MESSAGE IS NOT SAVED!\" \u2014 IT WAS.</b> 2,338 characters of it, untouched in the database. The campaign LIST query never fetched <code>body_html</code>, so the wizard opened on an empty editor. Worse than looking lost: one press of Save on that blank box would have made it true and the remaining 162 people would have received nothing. The list carries the body now.",
+      "\"This should be as run!\" \u2014 <b>a sending campaign is frozen</b>. Thirty-four people had already received a particular subject and message; editing either would mean two different mails under one campaign name and a report describing neither. Pause, change, resume.",
+      "<b>THE RESULT PANEL</b>, as he set it out: list, queued, sent, delivered, opened, clicked, bounced, unsubscribed \u2014 each as a share of the audience rather than of each other. <b>Delivered and clicked say \u201cnot measured\u201d rather than nought</b>, because a nought would read as \u201cnobody opened it\u201d when the truth is \u201cwe are not counting\u201d \u2014 delivered needs Resend\u2019s webhook, clicked needs the links rewritten.",
+      "\"How many crons completed and how much time to the next cron?\" \u2014 on the Send step now: passes since this campaign started, what they sent, and a live countdown. It shouts when the answer is <b>none</b>, which is exactly what it is shouting today.",
+      "AND THE FAULT THAT PROMPTED IT. Three cron passes in a row reported \u201ccampaigns: 0\u201d while a campaign sat plainly at <i>sending</i> \u2014 the queue has not drained since. The drain read only <code>data</code> and threw <code>error</code> away, so a silent nought and a silent failure looked identical from outside. It now reports the error, and the next pass will say what it actually is.",
+      "<b>READY FOR A THOUSAND.</b> A temporary failure \u2014 429, 5xx, a timeout \u2014 goes BACK to the queue instead of dying, capped at three attempts by a new <code>tries</code> column; a 429 stops the whole pass rather than spending it collecting more; sends are paced at 550 ms so a fast pass cannot outrun Resend\u2019s limit; and a row that just failed cools off for five minutes before its next turn. Needs <b>CRM migrations 0065 and 0066</b>.",
+    ],
+  },
+  {
     v: "5.0.46.6",
     date: "2026-09-10",
     module: "Highest paid first, and the gaps closed",

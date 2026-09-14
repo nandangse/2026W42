@@ -46,9 +46,98 @@ export async function GET(req: Request) {
       const counts: Record<string, number> = {};
       for (const s of sends || []) counts[String(s.status)] = (counts[String(s.status)] || 0) + 1;
       const { data: recent } = await db.from("mk_send").select("email, status, sent_at, opened_at, open_count, error").eq("campaign_id", id).order("sent_at", { ascending: false, nullsFirst: false }).limit(200);
-      return NextResponse.json({ campaign: c, counts, total: (sends || []).length, recent: recent ?? [] });
+
+      /**
+       * THE RESULT, AS HE ASKED FOR IT (Dr Raghu, 14 Sep 2026): the list,
+       * queued, sent, delivered, opened, clicked, bounced, unsubscribed —
+       * each with its percentage.
+       *
+       * TWO OF THOSE WE CANNOT HONESTLY CLAIM YET, and they are reported as
+       * unknown rather than as zero:
+       *
+       *   DELIVERED. Resend knows; Genie only knows it handed the message
+       *   over. It becomes real when the webhook carries email.delivered.
+       *
+       *   CLICKED. Nothing rewrites the links, so no click can be counted.
+       *   A zero here would read as "nobody clicked", which is a different
+       *   fact from "we are not measuring".
+       *
+       * Every percentage is OF THE AUDIENCE, not of each other, so the
+       * numbers can be compared down the column.
+       */
+      const n = (k: string) => counts[k] || 0;
+      const total = (sends || []).length;
+      const sent = n("sent") + n("opened") + n("bounced") + n("unsubscribed");
+      const listNames = (async () => {
+        const ids = (c.list_ids as string[]) || [];
+        if (!ids.length) return [];
+        const { data } = await db.from("mk_list").select("name").in("id", ids);
+        return (data || []).map((l) => String(l.name));
+      })();
+      const pc = (v: number) => (total ? Math.round((v / total) * 1000) / 10 : 0);
+      const result = {
+        lists: await listNames,
+        audience: total,
+        queued: n("queued"),
+        sent, sentPc: pc(sent),
+        delivered: null as number | null,
+        opened: n("opened"), openedPc: pc(n("opened")),
+        clicked: null as number | null,
+        bounced: n("bounced"), bouncedPc: pc(n("bounced")),
+        unsubscribed: n("unsubscribed"), unsubscribedPc: pc(n("unsubscribed")),
+        failed: n("failed"), failedPc: pc(n("failed")),
+        skipped: n("skipped"),
+        notMeasured: ["delivered", "clicked"],
+      };
+      /**
+       * IS THE CRON ACTUALLY RUNNING? (Dr Raghu, 14 Sep 2026: "can u also
+       * let me know how many crons completed and how much time to the next
+       * cron?")
+       *
+       * Every pass writes a heartbeat, so the answer is a query rather than
+       * a belief. It matters more than it sounds: a campaign can sit at
+       * "sending" for ever if the cron is not picking it up, and until now
+       * the only way to notice was to watch the number stop moving.
+       *
+       * vercel.json schedules it every ten minutes, so the next pass is the
+       * next ten-minute boundary plus the ~35 seconds Vercel takes to fire.
+       */
+      const { data: beats } = await db.from("crm_audit")
+        .select("action, after, at").eq("entity", "cron").eq("entity_id", "marketing-drain")
+        .eq("action", "done").order("at", { ascending: false }).limit(12);
+      const since = c.started_at ? new Date(c.started_at).getTime() : 0;
+      const passes = (beats || []).map((x) => ({
+        at: x.at as string,
+        sent: Number((x.after as Record<string, number> | null)?.sent || 0),
+        failed: Number((x.after as Record<string, number> | null)?.failed || 0),
+        retrying: Number((x.after as Record<string, number> | null)?.retrying || 0),
+      }));
+      const now = Date.now();
+      const nextAt = new Date(Math.ceil(now / 600_000) * 600_000 + 35_000).toISOString();
+      const cron = {
+        passesSinceStart: passes.filter((p) => new Date(p.at).getTime() >= since).length,
+        lastPassAt: passes[0]?.at ?? null,
+        sentByCron: passes.filter((p) => new Date(p.at).getTime() >= since).reduce((a, p) => a + p.sent, 0),
+        nextAt,
+        secondsToNext: Math.max(0, Math.round((new Date(nextAt).getTime() - now) / 1000)),
+        recent: passes.slice(0, 6),
+      };
+      return NextResponse.json({ campaign: c, counts, total, recent: recent ?? [], result, cron });
     }
-    let q = db.from("mk_campaign").select("id, name, status, subject, list_ids, person_ids, channel_ids, speed_per_hour, created_by_email, created_at, started_at, done_at, counts").order("created_at", { ascending: false });
+    /**
+     * body_html RIDES WITH THE LIST (Dr Raghu, 14 Sep 2026: "the message is
+     * not saved!").
+     *
+     * It WAS saved — 2,338 characters of it, untouched in the database. The
+     * list query simply did not fetch it, so the wizard opened on a campaign
+     * whose editor started empty, and the message looked lost. Worse than
+     * looking lost: one press of Save on that blank box would have made it
+     * true, and the remaining 162 people would have received nothing.
+     *
+     * A few kilobytes on a list of a dozen campaigns is a cheap price for a
+     * screen that cannot lie about its own contents.
+     */
+    let q = db.from("mk_campaign").select("id, name, status, subject, body_html, list_ids, person_ids, channel_ids, speed_per_hour, created_by_email, created_at, started_at, done_at, counts").order("created_at", { ascending: false });
     if (u.scope === "mine") q = q.eq("created_by_email", u.email.toLowerCase());
     const { data, error } = await q;
     if (error) {
@@ -106,6 +195,24 @@ export async function POST(req: Request) {
       if (u.scope !== "all" && data.created_by_email !== me) throw new HttpError(403, "not your campaign");
       return data;
     };
+    /**
+     * A RUNNING CAMPAIGN IS FROZEN (Dr Raghu, 14 Sep 2026: "this should be
+     * as run!").
+     *
+     * Thirty-four people have already received a particular subject and a
+     * particular message. Editing either one now would mean two different
+     * mails went out under one campaign name, and the report afterwards
+     * would describe neither. Pause it, change it, resume it — that is what
+     * Pause is for, and it is one click away.
+     */
+    if (b.action === "save" && b.id) {
+      const now = await own(String(b.id));
+      if (now.status === "sending" || now.status === "done")
+        throw new HttpError(409, now.status === "done"
+          ? "This campaign has finished. Copy it into a new one rather than editing what was already sent."
+          : "This campaign is sending — press Pause first. The message that reached the first people must be the one that reaches the rest.");
+    }
+
     if (b.action === "save") {
       const fields = {
         name: String(b.name || "Untitled campaign").trim(), subject: b.subject ?? null, body_html: b.body_html ?? null,

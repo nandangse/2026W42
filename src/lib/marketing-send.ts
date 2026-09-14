@@ -42,14 +42,42 @@ export function room(ch: Channel): { ok: boolean; ch: Channel } {
   return { ok: c.active && c.sent_today < c.daily_limit && c.sent_this_hour < c.hourly_limit, ch: c };
 }
 
+/**
+ * A FAILURE THAT MAY PASS, AND ONE THAT NEVER WILL.
+ *
+ * Dr Raghu, before a thousand go out: "so that tomorrow while sending
+ * thousand this should not have a problem." Today every failure is final,
+ * which is right for a dead address and wrong for a 429 or a timeout. A
+ * thirty-second wobble at Resend would bury eighty good addresses as
+ * permanently failed, and nothing would ever pick them up again.
+ */
+class SendError extends Error {
+  retryable: boolean;
+  constructor(message: string, retryable: boolean) { super(message); this.retryable = retryable; }
+}
+
+/** 429 and 5xx pass; a network error passes; a 4xx refusal does not. */
+const transient = (status: number) => status === 408 || status === 425 || status === 429 || status >= 500;
+
+/** Resend's own limit is a couple a second; a fast pass must not outrun it. */
+const PACE_MS = Number(process.env.MARKETING_PACE_MS || 550);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function viaResend(ch: Channel, to: string, subject: string, html: string): Promise<void> {
   const key = ch.api_key || process.env.RESEND_API_KEY;
   if (!key) throw new Error("no Resend key on the channel or the deploy");
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-    body: JSON.stringify({ from: `${ch.label || "Nandan GSE"} <${ch.email}>`, to: [to], subject, html }),
-  });
-  if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text()).slice(0, 160)}`);
+  let r: Response;
+  try {
+    r = await fetch("https://api.resend.com/emails", {
+      method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+      body: JSON.stringify({ from: `${ch.label || "Nandan GSE"} <${ch.email}>`, to: [to], subject, html }),
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch (e) {
+    /* A network fault or a timeout says nothing about the address. */
+    throw new SendError(`Resend unreachable: ${e instanceof Error ? e.message : String(e)}`, true);
+  }
+  if (!r.ok) throw new SendError(`Resend ${r.status}: ${(await r.text()).slice(0, 160)}`, transient(r.status));
 }
 
 /** Mailercloud's Email API (apidoc.mailercloud.com): POST https://email-api.mailercloud.com/email, the key bare in Authorization. */
@@ -75,11 +103,25 @@ async function viaGmail(db: SupabaseClient, ch: Channel, to: string, subject: st
  * queued rows (a tenth of an hour, six passes an hour), round-robin over
  * its ticked channels, skipping unsubscribed addresses. Returns counts.
  */
-export async function drain(db: SupabaseClient, opts: { campaignId?: string; max?: number } = {}): Promise<Record<string, number>> {
-  const out: Record<string, number> = { sent: 0, failed: 0, skipped: 0, campaigns: 0 };
+/** Three attempts on a temporary fault, then it is a real failure. */
+const MAX_TRIES = 3;
+
+export async function drain(db: SupabaseClient, opts: { campaignId?: string; max?: number } = {}): Promise<Record<string, number | string>> {
+  const out: Record<string, number | string> = { sent: 0, failed: 0, skipped: 0, campaigns: 0, retrying: 0 };
   let q = db.from("mk_campaign").select("id, name, subject, body_html, channel_ids, speed_per_hour, status").eq("status", "sending");
   if (opts.campaignId) q = q.eq("id", opts.campaignId);
-  const { data: camps } = await q;
+  /**
+   * THE ERROR WAS BEING SWALLOWED (14 Sep 2026).
+   *
+   * Three cron passes in a row reported "campaigns: 0" while a campaign sat
+   * plainly at status = sending, and there was no way to tell whether the
+   * query had found nothing or failed — because only `data` was read and
+   * `error` was thrown away. A silent nought and a silent failure looked
+   * identical from the outside, which is why the queue stalled for half an
+   * hour without anybody being able to say why.
+   */
+  const { data: camps, error: campErr } = await q;
+  if (campErr) { out.error = String(campErr.message).slice(0, 200); return out; }
   if (!camps?.length) return out;
   const { data: statics } = await db.from("message_variable").select("key, value").eq("kind", "static");
   const S: Record<string, string> = Object.fromEntries((statics || []).map((r) => [String(r.key), String(r.value ?? "")]));
@@ -87,12 +129,20 @@ export async function drain(db: SupabaseClient, opts: { campaignId?: string; max
   const U = new Set((unsub || []).map((r) => String(r.email).toLowerCase()));
 
   for (const c of camps) {
-    out.campaigns++;
+    out.campaigns = (Number(out.campaigns) || 0) + 1;
     const perPass = Math.max(1, Math.min(opts.max ?? 500, Math.ceil(Number(c.speed_per_hour || 50) / 6)));
     const { data: chans } = await db.from("mk_channel").select("*").in("id", (c.channel_ids as string[]) || []);
     const channels = ((chans || []) as Channel[]).map((ch) => room(ch)).filter((r) => r.ok).map((r) => r.ch);
     if (!channels.length) continue;
-    const { data: rows } = await db.from("mk_send").select("id, person_id, email, token").eq("campaign_id", c.id).eq("status", "queued").limit(perPass);
+    /* A row that failed seconds ago is given a pass to cool off, so a
+       transient fault is not retried inside the same minute. */
+    const cool = new Date(Date.now() - 5 * 60_000).toISOString();
+    const { data: rows } = await db.from("mk_send")
+      .select("id, person_id, email, token, tries, last_try_at")
+      .eq("campaign_id", c.id).eq("status", "queued")
+      .or(`last_try_at.is.null,last_try_at.lt.${cool}`)
+      .order("tries", { ascending: true })
+      .limit(perPass);
     if (!rows?.length) {
       const { count } = await db.from("mk_send").select("id", { count: "exact", head: true }).eq("campaign_id", c.id).eq("status", "queued");
       if (!count) await db.from("mk_campaign").update({ status: "done", done_at: new Date().toISOString() }).eq("id", c.id);
@@ -107,10 +157,10 @@ export async function drain(db: SupabaseClient, opts: { campaignId?: string; max
     let i = 0;
     for (const r of rows) {
       const to = String(r.email).toLowerCase();
-      if (U.has(to)) { await db.from("mk_send").update({ status: "skipped", error: "unsubscribed" }).eq("id", r.id); out.skipped++; continue; }
+      if (U.has(to)) { await db.from("mk_send").update({ status: "skipped", error: "unsubscribed" }).eq("id", r.id); out.skipped = (Number(out.skipped) || 0) + 1; continue; }
       const ch = channels[i++ % channels.length];
       const rm = room(ch);
-      if (!rm.ok) { out.skipped++; continue; }
+      if (!rm.ok) { out.skipped = (Number(out.skipped) || 0) + 1; continue; }
       const p = r.person_id ? P.get(String(r.person_id)) ?? null : null;
       const subject = render(String(c.subject || ""), p, p?.company_id ? C.get(String(p.company_id)) ?? null : null, S);
       const bodyHtml = render(String(c.body_html || ""), p, p?.company_id ? C.get(String(p.company_id)) ?? null : null, S)
@@ -124,12 +174,26 @@ export async function drain(db: SupabaseClient, opts: { campaignId?: string; max
         rm.ch.sent_today += 1; rm.ch.sent_this_hour += 1;
         Object.assign(ch, rm.ch);
         await db.from("mk_channel").update({ sent_on: ch.sent_on, sent_today: ch.sent_today, sent_this_hour: ch.sent_this_hour, hour_mark: ch.hour_mark }).eq("id", ch.id);
-        out.sent++;
+        out.sent = (Number(out.sent) || 0) + 1;
+        /* Keep under the provider's rate limit. Gmail is not an API key
+           being counted, so it does not need the gap. */
+        if (ch.kind !== "gmail" && PACE_MS > 0) await sleep(PACE_MS);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        const mayPass = e instanceof SendError && e.retryable;
+        const tries = Number((r as { tries?: number }).tries || 0) + 1;
         swallow("marketing/send", e);
-        await db.from("mk_send").update({ status: "failed", error: msg.slice(0, 300), channel_id: ch.id }).eq("id", r.id);
-        out.failed++;
+        if (mayPass && tries < MAX_TRIES) {
+          /* Back to the queue — the next pass will try again. */
+          await db.from("mk_send").update({ status: "queued", tries, last_try_at: new Date().toISOString(), error: `attempt ${tries}: ${msg.slice(0, 240)}` }).eq("id", r.id);
+          out.retrying = (Number(out.retrying) || 0) + 1;
+          /* A rate limit is about the CHANNEL, not this message: stop the
+             pass rather than spending the rest of it collecting 429s. */
+          if (/\b429\b/.test(msg)) { out.ratelimited = 1; break; }
+        } else {
+          await db.from("mk_send").update({ status: "failed", tries, last_try_at: new Date().toISOString(), error: msg.slice(0, 300), channel_id: ch.id }).eq("id", r.id);
+          out.failed = (Number(out.failed) || 0) + 1;
+        }
       }
     }
   }

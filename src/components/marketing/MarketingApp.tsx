@@ -246,14 +246,19 @@ function AddLead({ kind, onClose }: { kind: "person" | "company"; onClose: () =>
 function Lists() {
   const [lists, setLists] = useState<List[] | null>(null);
   const [open, setOpen] = useState<List | null>(null);
-  const [members, setMembers] = useState<{ person_id: string; added_at: string; person: Person | null }[] | null>(null);
   const [name, setName] = useState(""); const [desc, setDesc] = useState("");
   const [msg, setMsg] = useState("");
+  /**
+   * UPLOAD INTO A LIST (Dr Raghu, 14 Sep 2026: "can we have lists and then
+   * upload a csv or excel which will add it to the list and also to the
+   * leads. It will add records and also map them, not overwrite it for
+   * now"). Which list the file is going into, and the preview it must pass
+   * through first — a bulk write into 139,000 people is not a one-click act.
+   */
+  const [upTo, setUpTo] = useState<List | null>(null);
   const load = useCallback(() => api<{ lists: List[] }>("/api/marketing/lists").then((j) => setLists(j.lists || [])).catch(() => setLists([])), []);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { if (open) api<{ members: typeof members }>(`/api/marketing/lists?id=${open.id}`).then((j) => setMembers(j.members)).catch(() => setMembers([])); }, [open]);
   const create = async () => { if (!name.trim()) return; try { await api("/api/marketing/lists", { action: "create", name, description: desc }); setName(""); setDesc(""); load(); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); } };
-  const remove = async (pid: string) => { if (!open) return; await api("/api/marketing/lists", { action: "remove", list_id: open.id, person_ids: [pid] }); setMembers((m) => (m || []).filter((x) => x.person_id !== pid)); load(); };
   const del = async (l: List) => { if (!window.confirm(`Delete the list "${l.name}"? The people stay; only the list goes.`)) return; await api("/api/marketing/lists", { action: "delete", list_id: l.id }); load(); };
   return (
     <div>
@@ -263,7 +268,7 @@ function Lists() {
         <button onClick={create} style={btn(ACCENT)}>+ Create</button>
         {msg && <span className="text-xs" style={{ color: RED }}>{msg}</span>}
       </div>
-      <div className="text-xs mb-2" style={{ color: MUTED }}>Add people from Leads: tick them and choose the list. Lists feed campaigns.</div>
+      <div className="text-xs mb-2" style={{ color: MUTED }}>Add people from Leads: tick them and choose the list — or press <b>⬆ upload</b> on a list to bring in a CSV or Excel file. Lists feed campaigns.</div>
       <GenieTable<List> rows={lists} minWidth={640} empty="No lists yet — make one above, then tick people on Leads."
         columns={[
           { key: "name", label: "List", sort: (r) => r.name, render: (r) => <button onClick={() => setOpen(r)} className="font-semibold" style={{ color: "var(--blue)", textDecoration: "underline" }}>{r.name}</button> },
@@ -271,19 +276,16 @@ function Lists() {
           { key: "count", label: "People", align: "right", sort: (r) => r.count, render: (r) => <span className="tnum">{r.count}</span> },
           { key: "by", label: "Made by", render: (r) => r.created_by_email.split("@")[0] },
           { key: "at", label: "On", render: (r) => fmtAt(r.created_at) },
+          { key: "up", label: "", render: (r) => <button onClick={() => setUpTo(r)} className="text-xs font-semibold" style={{ color: "var(--blue)" }}>⬆ upload</button> },
           { key: "x", label: "", render: (r) => <button onClick={() => del(r)} className="text-xs" style={{ color: RED }}>delete</button> },
         ]} />
+      {upTo && <ListUpload list={upTo} onClose={() => setUpTo(null)} onDone={() => { setUpTo(null); load(); }} />}
       {open && (
-        <Modal title={`${open.name} · ${open.count} people`} onClose={() => { setOpen(null); setMembers(null); }} width={820}>
-          <GenieTable rows={members} minWidth={600} maxHeight="60vh" empty="Nobody on this list yet."
-            columns={[
-              { key: "n", label: "Name", render: (r) => r.person?.full_name || "—" },
-              { key: "t", label: "Title", render: (r) => r.person?.job_title || "·" },
-              { key: "c", label: "Company", render: (r) => r.person?.company?.name || "·" },
-              { key: "e", label: "E-mail", render: (r) => r.person?.primary_email || <span style={{ color: RED }}>none</span> },
-              { key: "x", label: "", render: (r) => <button onClick={() => remove(r.person_id)} className="text-xs" style={{ color: RED }}>remove</button> },
-            ]} />
-        </Modal>
+        <ListBox
+          list={open}
+          onClose={() => { setOpen(null); load(); }}
+          onChanged={load}
+        />
       )}
     </div>
   );
@@ -334,7 +336,7 @@ function CampaignWizard({ c, seesAll, onClose }: { c: Campaign | null; seesAll: 
   const [deliv, setDeliv] = useState<{ score: number; issues: string[] } | null>(c?.deliverability ?? null);
   const [unsubs, setUnsubs] = useState<number | null>(null);
   const [status, setStatus] = useState(c?.status || "draft");
-  const [detail, setDetail] = useState<{ counts: Record<string, number>; total: number; recent: { email: string; status: string; sent_at: string | null; open_count: number; error: string | null }[] } | null>(null);
+  const [detail, setDetail] = useState<{ counts: Record<string, number>; total: number; recent: { email: string; status: string; sent_at: string | null; open_count: number; error: string | null }[]; result?: Result; cron?: Cron } | null>(null);
   const [magic, setMagic] = useState<{ subject: string; body_html: string; why: string[]; before: { score: number }; after: { score: number } } | null>(null);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
@@ -485,6 +487,10 @@ function CampaignWizard({ c, seesAll, onClose }: { c: Campaign | null; seesAll: 
             {status === "paused" && <button onClick={() => act("resume")} disabled={!!busy} style={btn(GREEN)}>▶ Resume</button>}
             {seesAll && status !== "sending" && id && <button onClick={() => { if (window.confirm("Delete this campaign and its send log?")) act("delete", () => onClose()); }} style={btn("#fff", RED)}>delete</button>}
           </div>
+          {/* THE RESULT — the eight lines he asked for, each with its share
+              of the audience, and the two we do not measure saying so. */}
+          {detail?.cron && sending && <CronPanel c={detail.cron} onRefresh={loadDetail} />}
+          {detail?.result && detail.total > 0 && <ResultPanel r={detail.result} />}
           {detail && detail.total > 0 && (
             <div className="mt-3">
               <div className="flex gap-3 flex-wrap text-sm">{Object.entries(detail.counts).map(([k, v]) => <span key={k}><b className="tnum">{v}</b> {k}</span>)}<span style={{ color: MUTED }}>of {detail.total}</span></div>
@@ -659,6 +665,369 @@ function Unsubscribes({ seesAll }: { seesAll: boolean }) {
           { key: "at", label: "When", sort: (r) => r.at, render: (r) => fmtAt(r.at) },
           { key: "x", label: "", render: (r) => seesAll ? <button onClick={async () => { if (window.confirm(`Take ${r.email} off the list? They will get mail again.`)) { await api("/api/marketing/unsubscribe", { action: "remove", email: r.email }); load(); } }} className="text-xs" style={{ color: RED }}>remove</button> : null },
         ]} />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   UPLOAD A CSV OR EXCEL INTO A LIST
+
+   Dr Raghu, 14 Sep 2026: "upload a csv or excel which will add it to the
+   list and also to the leads. It will add records and also map them, not
+   overwrite it for now."
+
+   TWO PRESSES, NOT ONE. The first reads the file and reports what WOULD
+   happen — how many are already here, how many are new, which columns it
+   recognised and which it did not. Only the second writes. A bulk import
+   into a hundred and thirty-nine thousand people is not a thing to set off
+   with a single click on a file somebody has not looked at.
+
+   NOTHING IS OVERWRITTEN, and the preview says so where it can be read.
+   The file fills blanks on people already here; it never replaces a value
+   somebody in this office typed.
+   ══════════════════════════════════════════════════════════════════════ */
+type Preview = {
+  file: string; rows: number; headers: string[]; mapping: Record<string, string>; unmapped: string[];
+  matched: number; willInsert: number; willFill: number;
+  blankEmail: number; sharedAddresses: number; emptyRows: number;
+  sample?: Record<string, unknown>[]; listed?: number; committed?: boolean; notesCarried?: boolean; note?: string;
+};
+
+function ListUpload({ list, onClose, onDone, inline }: { list: List; onClose: () => void; onDone: () => void; inline?: boolean }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [prev, setPrev] = useState<Preview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const send = async (action: "preview" | "commit") => {
+    if (!file) return;
+    setBusy(true); setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("list_id", list.id);
+      fd.append("action", action);
+      const r = await fetch("/api/marketing/import", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(String(j.error || r.status));
+      setPrev(j as Preview);
+      if (action === "commit") setTimeout(onDone, 1800);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+
+  const inner = (
+        <div className={inline ? "" : "p-4"}>
+          <div className="text-xs mb-3" style={{ color: MUTED, lineHeight: 1.6 }}>
+            A CSV or Excel file. Every row becomes a person in <b>Leads</b> and a member of <b>{list.name}</b>.
+            Columns are matched by their headings — name, e-mail, phone, job title, company and the rest —
+            and <b>anything not recognised is kept as a note on the person</b> rather than thrown away.
+            {" "}<b>Nothing is overwritten:</b> where somebody is already here, the file may fill a blank field and nothing more.
+          </div>
+
+          <input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => { setFile(e.target.files?.[0] || null); setPrev(null); }}
+            className="text-sm mb-3" />
+
+          {err && <div className="text-xs font-semibold mb-2" style={{ color: RED }}>{err}</div>}
+
+          {prev && (
+            <div className="rounded border p-3 mb-3" style={{ borderColor: prev.committed ? GREEN : "var(--line)", background: prev.committed ? "#F0FAF3" : "#FAFAF8" }}>
+              <div className="text-xs font-bold mb-1" style={{ color: prev.committed ? GREEN : "var(--dim)", letterSpacing: .6 }}>
+                {prev.committed ? "DONE" : "WHAT THIS WOULD DO"} · {prev.file} · {prev.rows} rows
+              </div>
+              <div className="flex gap-4 flex-wrap text-sm mb-2">
+                <span><b className="tnum" style={{ fontSize: 17 }}>{prev.willInsert}</b> <span style={{ color: MUTED }}>new people</span></span>
+                <span><b className="tnum" style={{ fontSize: 17 }}>{prev.matched}</b> <span style={{ color: MUTED }}>already here</span></span>
+                <span><b className="tnum" style={{ fontSize: 17 }}>{prev.willFill}</b> <span style={{ color: MUTED }}>gain a blank field</span></span>
+                {prev.committed && <span><b className="tnum" style={{ fontSize: 17, color: GREEN }}>{prev.listed}</b> <span style={{ color: MUTED }}>in the list</span></span>}
+              </div>
+              <div className="text-xs" style={{ color: MUTED, lineHeight: 1.6 }}>
+                <b>Recognised:</b> {Object.entries(prev.mapping).map(([h, k]) => `${h} → ${k}`).join(" · ") || "nothing"}<br />
+                {prev.unmapped.length > 0 && <><b>Kept as a note:</b> {prev.unmapped.join(" · ")}<br /></>}
+                {prev.blankEmail > 0 && <><b>{prev.blankEmail}</b> rows carry no e-mail — added anyway, they can still be telephoned.<br /></>}
+                {prev.sharedAddresses > 0 && <><b>{prev.sharedAddresses}</b> rows share an e-mail with another row in this file — kept as separate people, not merged, because one address used twice identifies nobody.<br /></>}
+                {prev.emptyRows > 0 && <><b>{prev.emptyRows}</b> rows had no name and no e-mail and were skipped.<br /></>}
+                {prev.note && <span style={{ color: prev.notesCarried === false ? "#8A5B00" : MUTED }}>{prev.note}</span>}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <button onClick={() => send("preview")} disabled={!file || busy} style={btn(prev ? "var(--line-soft)" : ACCENT)}>
+              {busy ? "Reading…" : prev ? "Read it again" : "Read the file"}
+            </button>
+            {prev && !prev.committed && (
+              <button onClick={() => send("commit")} disabled={busy} style={btn(GREEN)}>
+                {busy ? "Importing…" : `Import ${prev.willInsert + prev.matched} into ${list.name}`}
+              </button>
+            )}
+            <button onClick={onClose} style={btn("var(--line-soft)")}>Close</button>
+          </div>
+        </div>
+  );
+  /* Inside the list lightbox it is a panel; on its own it is a lightbox. */
+  if (inline) return <div className="rounded border p-3 mb-3" style={{ borderColor: "var(--line)", background: "#FAFAF8" }}>{inner}</div>;
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(22,35,47,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} className="rounded-lg bg-white"
+        style={{ width: "min(760px, 100%)", maxHeight: "calc(100vh - 40px)", overflowY: "auto", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
+        <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "var(--navy)", borderRadius: "8px 8px 0 0" }}>
+          <b className="text-white text-sm">⬆ Upload into “{list.name}”</b>
+          <button onClick={onClose} className="text-white font-bold px-2">✕</button>
+        </div>
+        {inner}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ONE LIST, OPENED
+
+   Dr Raghu, 14 Sep 2026: "after clicking and opening on lightbox — have a
+   search; remove from list should be an option; import csv/excel; add
+   contact. It's understood it will add to lead and to this list too. A
+   contact can be part of multiple lists."
+
+   The last sentence is the one that shapes the code. A list is a MEMBERSHIP,
+   not a home: the same person can sit on the aviation list, the employees
+   list and three campaign lists at once, and removing them from one must
+   never touch the person or their place on the others. So REMOVE deletes a
+   membership row and says so on the button — "remove from list", never
+   "delete" — because a person deleted by somebody who meant to tidy a list
+   is not recoverable from a screen.
+
+   ADD and IMPORT both do the same two things, which is what he means by "it
+   is understood": the person is created in Leads if they are not there, and
+   joined to this list either way. Neither is a separate act to remember.
+   ══════════════════════════════════════════════════════════════════════ */
+type Member = { person_id: string; added_at: string; person: Person | null };
+
+function ListBox({ list, onClose, onChanged }: { list: List; onClose: () => void; onChanged: () => void }) {
+  const [members, setMembers] = useState<Member[] | null>(null);
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState("");
+  const [msg, setMsg] = useState("");
+  const [upload, setUpload] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [f, setF] = useState({ first_name: "", last_name: "", primary_email: "", primary_phone: "", job_title: "", company_name: "", country: "" });
+
+  const load = useCallback(() => {
+    api<{ members: Member[] }>(`/api/marketing/lists?id=${list.id}`)
+      .then((j) => setMembers(j.members || [])).catch(() => setMembers([]));
+  }, [list.id]);
+  useEffect(() => { load(); }, [load]);
+
+  const shown = useMemo(() => {
+    const k = q.trim().toLowerCase();
+    if (!k || !members) return members;
+    return members.filter((m) => [m.person?.full_name, m.person?.primary_email, m.person?.job_title, m.person?.company?.name, m.person?.primary_phone]
+      .some((v) => String(v || "").toLowerCase().includes(k)));
+  }, [members, q]);
+
+  /** Removes the MEMBERSHIP. The person stays, and so do their other lists. */
+  const remove = async (pid: string, who: string) => {
+    if (!window.confirm(`Take ${who} off "${list.name}"?\n\nThe person stays in Leads, and stays on any other list they are on. Only this membership goes.`)) return;
+    setBusy(pid);
+    try {
+      await api("/api/marketing/lists", { action: "remove", list_id: list.id, person_ids: [pid] });
+      setMembers((m) => (m || []).filter((x) => x.person_id !== pid));
+      onChanged();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy("");
+  };
+
+  const addOne = async () => {
+    if (!f.first_name.trim() && !f.primary_email.trim()) { setMsg("A name or an e-mail, at least."); return; }
+    setBusy("add"); setMsg("");
+    try {
+      const j = await api<{ id: string }>("/api/marketing/leads", { action: "create", kind: "person", ...f });
+      await api("/api/marketing/lists", { action: "add", list_id: list.id, person_ids: [j.id] });
+      setF({ first_name: "", last_name: "", primary_email: "", primary_phone: "", job_title: "", company_name: "", country: "" });
+      setAdding(false); setMsg("Added to Leads and to this list ✓");
+      load(); onChanged();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy("");
+  };
+
+  const n = members?.length ?? 0;
+  return (
+    <Modal title={`${list.name} · ${n} ${n === 1 ? "person" : "people"}`} onClose={onClose} width={920}>
+      <div className="flex items-center gap-2 flex-wrap mb-2">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 search this list — name, e-mail, title, company, phone"
+          style={{ ...inp, width: 330 }} />
+        {q && <button onClick={() => setQ("")} className="text-xs font-bold" style={{ color: ACCENT }}>clear ✕</button>}
+        <div className="flex-1" />
+        <button onClick={() => { setAdding((v) => !v); setUpload(false); }} style={btn(adding ? "var(--line-soft)" : ACCENT)}>+ Add contact</button>
+        <button onClick={() => { setUpload((v) => !v); setAdding(false); }} style={btn(upload ? "var(--line-soft)" : "var(--navy)")}>⬆ Import CSV / Excel</button>
+      </div>
+      <div className="text-xs mb-2" style={{ color: MUTED, lineHeight: 1.5 }}>
+        Adding or importing puts the person in <b>Leads</b> and on <b>this list</b> — both, always.
+        A person can sit on as many lists as you like; <b>remove</b> takes them off this one only and leaves the person alone.
+      </div>
+
+      {adding && (
+        <div className="rounded border p-3 mb-3" style={{ borderColor: "var(--line)", background: "#FAFAF8" }}>
+          <div className="flex gap-2 flex-wrap">
+            <input value={f.first_name} onChange={(e) => setF({ ...f, first_name: e.target.value })} placeholder="first name" style={{ ...inp, width: 150 }} />
+            <input value={f.last_name} onChange={(e) => setF({ ...f, last_name: e.target.value })} placeholder="last name" style={{ ...inp, width: 150 }} />
+            <input value={f.primary_email} onChange={(e) => setF({ ...f, primary_email: e.target.value })} placeholder="e-mail" style={{ ...inp, width: 210 }} />
+            <input value={f.primary_phone} onChange={(e) => setF({ ...f, primary_phone: e.target.value })} placeholder="phone" style={{ ...inp, width: 140 }} />
+            <input value={f.job_title} onChange={(e) => setF({ ...f, job_title: e.target.value })} placeholder="job title" style={{ ...inp, width: 180 }} />
+            <input value={f.country} onChange={(e) => setF({ ...f, country: e.target.value })} placeholder="country" style={{ ...inp, width: 130 }} />
+            <button onClick={addOne} disabled={busy === "add"} style={btn(GREEN)}>{busy === "add" ? "Adding…" : "Add"}</button>
+          </div>
+        </div>
+      )}
+
+      {upload && <ListUpload list={list} inline onClose={() => setUpload(false)} onDone={() => { setUpload(false); load(); onChanged(); }} />}
+
+      {msg && <div className="text-xs font-semibold mb-2" style={{ color: msg.includes("✓") ? GREEN : RED }}>{msg}</div>}
+      {q && members && <div className="text-xs mb-1" style={{ color: MUTED }}>{shown?.length ?? 0} of {members.length} match “{q}”.</div>}
+
+      <GenieTable<Member> rows={shown} minWidth={640} maxHeight="52vh"
+        empty={q ? "Nobody on this list matches that." : "Nobody on this list yet — add a contact or import a file."}
+        columns={[
+          { key: "n", label: "Name", sort: (r) => r.person?.full_name || "", render: (r) => r.person?.full_name || "—" },
+          { key: "t", label: "Title", sort: (r) => r.person?.job_title || "", render: (r) => r.person?.job_title || "·" },
+          { key: "c", label: "Company", sort: (r) => r.person?.company?.name || "", render: (r) => r.person?.company?.name || "·" },
+          { key: "e", label: "E-mail", sort: (r) => r.person?.primary_email || "", render: (r) => r.person?.primary_email || <span style={{ color: RED }}>none</span> },
+          { key: "p", label: "Phone", render: (r) => r.person?.primary_phone || "·" },
+          { key: "x", label: "", render: (r) => (
+            <button onClick={() => remove(r.person_id, r.person?.full_name || "this person")} disabled={busy === r.person_id}
+              className="text-xs" style={{ color: RED }} title="Take them off this list. The person and their other lists are untouched.">
+              {busy === r.person_id ? "…" : "remove from list"}
+            </button>
+          ) },
+        ]} />
+    </Modal>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE RESULT OF A CAMPAIGN
+
+   Dr Raghu, 14 Sep 2026: "in this have — List, Qued, Sent (100%), Delivered
+   (%), Opened (%), Clicked (%), Bounced (%), Unsubscribed (%)."
+
+   Every percentage is OF THE AUDIENCE, never of each other, so a reader can
+   run their eye down the column and compare like with like.
+
+   TWO LINES SAY "NOT MEASURED" RATHER THAN NOUGHT, and that is deliberate.
+   DELIVERED is Resend's word, not ours — we know the message was handed
+   over, not that it arrived; it becomes real when the webhook carries
+   email.delivered. CLICKED needs the links rewritten to count, and nothing
+   rewrites them. A nought in either row would read as "nobody opened it",
+   which is a different fact from "we are not counting", and on a page that
+   decides whether a campaign worked that difference matters.
+   ══════════════════════════════════════════════════════════════════════ */
+type Result = {
+  lists: string[]; audience: number; queued: number;
+  sent: number; sentPc: number;
+  delivered: number | null;
+  opened: number; openedPc: number;
+  clicked: number | null;
+  bounced: number; bouncedPc: number;
+  unsubscribed: number; unsubscribedPc: number;
+  failed: number; failedPc: number; skipped: number;
+};
+
+function ResultPanel({ r }: { r: Result }) {
+  const Row = ({ label, v, pc, ink, why }: { label: string; v: number | null; pc?: number; ink?: string; why?: string }) => (
+    <tr>
+      <td style={{ padding: "6px 10px 6px 0", color: MUTED }}>{label}</td>
+      <td className="tnum" style={{ padding: "6px 10px 6px 0", textAlign: "right", fontWeight: 700, fontSize: 15, color: ink || INK }}>
+        {v === null ? <span style={{ fontWeight: 400, fontSize: 13, color: MUTED }}>not measured</span> : v}
+      </td>
+      <td className="tnum" style={{ padding: "6px 0", textAlign: "right", color: MUTED, width: 64 }}>
+        {v === null || pc === undefined ? "" : `${pc}%`}
+      </td>
+      {why && <td style={{ padding: "6px 0 6px 12px", fontSize: 11.5, color: MUTED, lineHeight: 1.4 }}>{why}</td>}
+    </tr>
+  );
+  return (
+    <div className="rounded border p-3 mt-3" style={{ borderColor: "var(--line)", background: "#FAFAF8" }}>
+      <div className="text-xs font-bold mb-2" style={{ color: MUTED, letterSpacing: .8 }}>THE RESULT</div>
+      <div className="text-sm mb-2">
+        <span style={{ color: MUTED }}>List </span>
+        <b>{r.lists.length ? r.lists.join(", ") : "chosen people only"}</b>
+        <span style={{ color: MUTED }}> · audience </span><b className="tnum">{r.audience}</b>
+      </div>
+      <table style={{ width: "100%", maxWidth: 560, borderCollapse: "collapse", fontSize: 14 }}>
+        <tbody>
+          <Row label="Queued — still to go" v={r.queued} pc={r.audience ? Math.round((r.queued / r.audience) * 1000) / 10 : 0} />
+          <Row label="Sent" v={r.sent} pc={r.sentPc} ink={GREEN} />
+          <Row label="Delivered" v={r.delivered} why="needs Resend's email.delivered webhook" />
+          <Row label="Opened" v={r.opened} pc={r.openedPc} ink={GREEN} why="images-off readers never count" />
+          <Row label="Clicked" v={r.clicked} why="links are not rewritten, so clicks are not counted" />
+          <Row label="Bounced" v={r.bounced} pc={r.bouncedPc} ink={r.bounced ? RED : undefined} why="arrives on the webhook; goes straight onto the unsubscribe list" />
+          <Row label="Unsubscribed" v={r.unsubscribed} pc={r.unsubscribedPc} ink={r.unsubscribed ? "var(--warn)" : undefined} />
+          {r.failed > 0 && <Row label="Failed" v={r.failed} pc={r.failedPc} ink={RED} why="refused outright — see the rows below" />}
+          {r.skipped > 0 && <Row label="Skipped" v={r.skipped} why="already unsubscribed when their turn came" />}
+        </tbody>
+      </table>
+      <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.5 }}>
+        Every percentage is of the <b>audience</b> ({r.audience}), not of each other.
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   IS THE CRON RUNNING?
+
+   Dr Raghu, 14 Sep 2026: "can u also let me know how many crons completed
+   and how much time to the next cron?"
+
+   A fair question, and today the only way to answer it was to watch the
+   number and see whether it moved. A campaign can sit at "sending" for ever
+   if the cron is not picking it up, and nothing on the screen would say so.
+
+   The countdown runs in the browser off a server timestamp, so it keeps
+   ticking without asking the server every second — and when it reaches zero
+   it refetches once, which is the moment the numbers will have changed.
+   ══════════════════════════════════════════════════════════════════════ */
+type Cron = {
+  passesSinceStart: number; lastPassAt: string | null; sentByCron: number;
+  nextAt: string; secondsToNext: number;
+  recent: { at: string; sent: number; failed: number; retrying: number }[];
+};
+
+function CronPanel({ c, onRefresh }: { c: Cron; onRefresh: () => void }) {
+  const [left, setLeft] = useState(c.secondsToNext);
+  useEffect(() => { setLeft(c.secondsToNext); }, [c.secondsToNext, c.nextAt]);
+  useEffect(() => {
+    const t = setInterval(() => {
+      setLeft((s) => {
+        if (s <= 1) { onRefresh(); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [onRefresh]);
+  const mm = String(Math.floor(left / 60)).padStart(2, "0");
+  const ss = String(left % 60).padStart(2, "0");
+  /* No pass since the campaign started is the thing worth shouting about. */
+  const stalled = c.passesSinceStart === 0;
+  return (
+    <div className="rounded border p-3 mt-3" style={{ borderColor: stalled ? "var(--warn)" : "var(--line)", background: stalled ? "#FFF7E6" : "#FAFAF8" }}>
+      <div className="flex gap-4 flex-wrap items-baseline text-sm">
+        <span><b className="tnum" style={{ fontSize: 17 }}>{c.passesSinceStart}</b> <span style={{ color: MUTED }}>cron passes since this started</span></span>
+        <span><b className="tnum" style={{ fontSize: 17, color: GREEN }}>{c.sentByCron}</b> <span style={{ color: MUTED }}>sent by them</span></span>
+        <span style={{ color: MUTED }}>next pass in <b className="tnum" style={{ color: INK, fontSize: 16 }}>{mm}:{ss}</b></span>
+        <button onClick={onRefresh} className="text-xs font-semibold" style={{ color: "var(--blue)" }}>refresh now</button>
+      </div>
+      {stalled && (
+        <div className="text-xs mt-1.5" style={{ color: "#8A5B00", lineHeight: 1.5 }}>
+          <b>No pass has picked this campaign up yet.</b> If this is still nought after the countdown reaches zero, the
+          queue is not draining — press <b>Pause</b> then <b>Resume</b>, and if it stays nought, say so.
+        </div>
+      )}
+      {c.recent.length > 0 && (
+        <div className="text-xs mt-1.5" style={{ color: MUTED }}>
+          Last passes: {c.recent.map((p) => `${fmtAt(p.at)} — ${p.sent} sent${p.failed ? `, ${p.failed} failed` : ""}${p.retrying ? `, ${p.retrying} retrying` : ""}`).join(" · ")}
+        </div>
+      )}
     </div>
   );
 }
