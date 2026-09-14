@@ -23,7 +23,7 @@ import ApolloLeads from "@/components/marketing/ApolloLeads";
 import LandingPages, { uploadPublic } from "@/components/marketing/LandingPages";
 
 type List = { id: string; name: string; description: string | null; created_by_email: string; created_at: string; count: number };
-type Campaign = { id: string; name: string; status: string; subject: string | null; body_html?: string | null; list_ids: string[]; person_ids: string[]; channel_ids: string[]; speed_per_hour: number; created_by_email: string; created_at: string; started_at: string | null; done_at: string | null; counts: Record<string, number> | null; checklist?: Record<string, number | string> | null; deliverability?: { score: number; issues: string[] } | null };
+type Campaign = { id: string; name: string; status: string; subject: string | null; body_html?: string | null; show_unsub_link?: boolean; list_ids: string[]; person_ids: string[]; channel_ids: string[]; speed_per_hour: number; created_by_email: string; created_at: string; started_at: string | null; done_at: string | null; counts: Record<string, number> | null; checklist?: Record<string, number | string> | null; deliverability?: { score: number; issues: string[] } | null };
 type Channel = { id: string; email: string; label: string | null; kind: "gmail" | "resend" | "mailercloud"; reply_to: string | null; daily_limit: number; hourly_limit: number; active: boolean; sent_today: number; sent_this_hour: number; gmail: string | null; api_key: string | null; resendKeyOnDeploy: boolean };
 type Template = { id: string; name: string; subject: string | null; body_html: string | null };
 
@@ -353,7 +353,7 @@ function Campaigns({ seesAll }: { seesAll: boolean }) {
 function CampaignWizard({ c, seesAll, onClose }: { c: Campaign | null; seesAll: boolean; onClose: () => void }) {
   const [step, setStep] = useState(0);
   const [id, setId] = useState<string | null>(c?.id ?? null);
-  const [f, setF] = useState({ name: c?.name || "", subject: c?.subject || "", body_html: c?.body_html || "", list_ids: c?.list_ids || [], person_ids: c?.person_ids || [], channel_ids: c?.channel_ids || [], speed_per_hour: c?.speed_per_hour || 50 });
+  const [f, setF] = useState({ name: c?.name || "", subject: c?.subject || "", body_html: c?.body_html || "", list_ids: c?.list_ids || [], person_ids: c?.person_ids || [], channel_ids: c?.channel_ids || [], speed_per_hour: c?.speed_per_hour || 50, show_unsub_link: c?.show_unsub_link !== false });
   const [lists, setLists] = useState<List[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -481,8 +481,25 @@ function CampaignWizard({ c, seesAll, onClose }: { c: Campaign | null; seesAll: 
       {step === 5 && (
         <div className="text-sm" style={{ lineHeight: 1.7 }}>
           <div><b className="tnum">{unsubs ?? "…"}</b> addresses on the unsubscribe list. Every one is skipped at send time, whatever list they sit on.</div>
-          <div>Every mail carries an unsubscribe link; one click puts the address on the list for good. Bounces and complaints reported by Resend land there on their own. Gmail bounces come back to the mailbox — add them under Unsubscribes.</div>
-          <div className="text-xs mt-1" style={{ color: MUTED }}>The list itself is under Unsubscribes on the rail.</div>
+          <div><b>Every mail carries the one-click header</b> — the mail client draws its own Unsubscribe button beside your name, and that always unsubscribes outright. Google has required it of anybody sending over 5,000 a day to Gmail since 2024, and it cannot be turned off here.</div>
+          <div>Bounces and complaints reported by Resend land on the list on their own. Gmail bounces come back to the mailbox — add those under Unsubscribes.</div>
+
+          {/* THE VISIBLE LINK is a separate obligation from the header, and a
+              separate decision. It opens a choice — three months' quiet, or
+              stop for good — because somebody handed an easy way out does not
+              press "report spam" instead, and a complaint costs far more than
+              an opt-out. */}
+          <label className="flex items-start gap-2 mt-3 rounded border p-2" style={{ borderColor: f.show_unsub_link ? "var(--line)" : "#E0C88A", background: f.show_unsub_link ? "#FBFAF7" : "#FDF8EC", cursor: sending ? "default" : "pointer" }}>
+            <input type="checkbox" checked={f.show_unsub_link} disabled={sending} onChange={(e) => setF({ ...f, show_unsub_link: e.target.checked })} style={{ marginTop: 3 }} />
+            <span>
+              <b>Show the unsubscribe link at the bottom of this mail</b>
+              <div className="text-xs" style={{ color: MUTED, lineHeight: 1.6 }}>
+                It opens a choice rather than a trapdoor — <i>pause for three months</i> or <i>stop all marketing e-mail</i>.
+                {!f.show_unsub_link && <span style={{ color: "#8A5B00" }}><br /><b>Turned off.</b> The one-click header still goes, but a visible opt-out inside the message is what CAN-SPAM asks for. Leave it on unless you have a reason.</span>}
+              </div>
+            </span>
+          </label>
+          <div className="text-xs mt-2" style={{ color: MUTED }}>The list itself is under Unsubscribes on the rail.</div>
         </div>
       )}
       {step === 6 && (

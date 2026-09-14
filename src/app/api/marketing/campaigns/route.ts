@@ -154,14 +154,27 @@ export async function GET(req: Request) {
      * A few kilobytes on a list of a dozen campaigns is a cheap price for a
      * screen that cannot lie about its own contents.
      */
-    let q = db.from("mk_campaign").select("id, name, status, subject, body_html, list_ids, person_ids, channel_ids, speed_per_hour, created_by_email, created_at, started_at, done_at, counts").order("created_at", { ascending: false });
-    if (u.scope === "mine") q = q.eq("created_by_email", u.email.toLowerCase());
-    const { data, error } = await q;
+    /* The newest column is asked for separately: before 0068 has run, naming
+       it would fail the whole query and the screen would show no campaigns at
+       all — the same way the channels came to look deleted. */
+    const COLS = "id, name, status, subject, body_html, list_ids, person_ids, channel_ids, speed_per_hour, created_by_email, created_at, started_at, done_at, counts";
+    const ask = async (cols: string) => {
+      let q = db.from("mk_campaign").select(cols).order("created_at", { ascending: false });
+      if (u.scope === "mine") q = q.eq("created_by_email", u.email.toLowerCase());
+      const r = await q;
+      return { data: r.data as unknown as Record<string, unknown>[] | null, error: r.error };
+    };
+    let unsubChoiceReady = true;
+    let { data, error } = await ask(COLS + ", show_unsub_link");
+    if (error && /show_unsub_link/i.test(error.message)) {
+      unsubChoiceReady = false;
+      ({ data, error } = await ask(COLS));
+    }
     if (error) {
-      if (/mk_campaign|schema cache/i.test(error.message)) return NextResponse.json({ installed: false, campaigns: [] });
+      if (/relation|does not exist|could not find the table/i.test(error.message)) return NextResponse.json({ installed: false, campaigns: [] });
       throw new Error(error.message);
     }
-    return NextResponse.json({ installed: true, campaigns: data ?? [] });
+    return NextResponse.json({ installed: true, unsubChoiceReady, campaigns: data ?? [] });
   } catch (e) {
     return errJson(e);
   }
@@ -235,7 +248,10 @@ export async function POST(req: Request) {
         name: String(b.name || "Untitled campaign").trim(), subject: b.subject ?? null, body_html: b.body_html ?? null,
         list_ids: Array.isArray(b.list_ids) ? b.list_ids : [], person_ids: Array.isArray(b.person_ids) ? b.person_ids : [],
         channel_ids: Array.isArray(b.channel_ids) ? b.channel_ids : [], speed_per_hour: Math.max(1, Math.min(2000, Number(b.speed_per_hour) || 50)),
-      };
+      } as Record<string, unknown>;
+      /* Only written once 0068 exists; saving must work either way. */
+      { const probe = await db.from("mk_campaign").select("show_unsub_link").limit(1);
+        if (!probe.error) fields.show_unsub_link = b.show_unsub_link !== false; }
       if (b.id) {
         const c = await own(b.id);
         if (c.status === "sending") throw new HttpError(400, "Pause the campaign before changing it.");

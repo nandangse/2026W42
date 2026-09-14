@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.48.0",
+    date: "2026-09-15",
+    module: "One-click unsubscribe \u2014 and a choice at the bottom instead of a cliff",
+    items: [
+      "<b>Every mail now carries the one-click header pair</b> (RFC 8058: <i>List-Unsubscribe</i> and <i>List-Unsubscribe-Post</i>). The mail client draws its own Unsubscribe button beside the sender\u2019s name and posts to Genie; the reader never opens the message. <b>Google has required this of anybody sending over 5,000 a day to Gmail since 2024</b>, and at the 5\u201310,000 a day being planned it is the difference between arriving and not. It goes on Resend, Mailercloud and Gmail alike, and it cannot be turned off.",
+      "<b>The footer link now opens a choice, not a trapdoor.</b> <i>Pause for three months</i> \u2014 we stop now and write again after, nothing for them to remember \u2014 or <i>stop all marketing e-mail</i>, for good. Three months\u2019 quiet keeps a relationship that \u201cunsubscribe\u201d ends for ever.",
+      "<b>The commercial reason, plainly:</b> the button next to Unsubscribe says <i>report spam</i>. An opt-out costs one name; a complaint is counted against the sending domain by every mailbox provider watching, and at 10,000 a day the allowance is about ten complaints, not thirty. Making it easy to leave is how you keep arriving.",
+      "A campaign can decide whether the visible link is drawn \u2014 it defaults to on, and says outright when it has been turned off that the header satisfies Google while a visible opt-out is what CAN-SPAM asks for. They are different obligations.",
+      "<b>And every one of these reads degrades rather than dies.</b> Naming a column that does not exist fails the whole query, which is how the channels came to look deleted this evening; the drain, the campaign list and the channel list now drop the newest column and carry on. <b>Needs CRM migration 0068</b>, but nothing breaks while it waits.",
+    ],
+  },
+  {
     v: "5.0.47.6",
     date: "2026-09-14",
     module: "The channels had not disappeared \u2014 and a pending migration will never say they did",

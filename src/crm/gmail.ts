@@ -158,6 +158,11 @@ export async function gmailSend(
   /** Filled with the conversation Gmail put this message in — free here,
    *  where the send's own answer already carries it. */
   out?: { threadId?: string },
+  /** Extra headers, verbatim. Marketing puts List-Unsubscribe and
+   *  List-Unsubscribe-Post here (RFC 8058) so the client draws its own
+   *  Unsubscribe button. A newline in a value would inject a header of its
+   *  own, so they are stripped. */
+  extraHeaders?: Record<string, string>,
 ): Promise<string> {
   // The sender reads as the PERSON, not the address — RFC 2047-encoded so
   // any script in the name survives the wire.
@@ -172,6 +177,7 @@ export async function gmailSend(
     ...(replyTo ? [`Reply-To: ${replyTo}`] : []),
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
     ...(reply?.inReplyTo ? [`In-Reply-To: ${reply.inReplyTo}`, `References: ${reply.inReplyTo}`] : []),
+    ...Object.entries(extraHeaders || {}).map(([k, v]) => `${k.replace(/[^\w-]/g, "")}: ${String(v).replace(/[\r\n]+/g, " ")}`),
     "MIME-Version: 1.0",
   ];
   let mime: string;

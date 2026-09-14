@@ -79,14 +79,32 @@ const answersTo = (ch: Channel) => (ch.reply_to || "").trim() || REPLY_TO_FALLBA
 const PACE_MS = Number(process.env.MARKETING_PACE_MS || 550);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function viaResend(ch: Channel, to: string, subject: string, html: string): Promise<void> {
+/**
+ * THE HEADERS THAT LET A READER LEAVE WITHOUT COMPLAINING (RFC 8058).
+ *
+ * The mail client draws its own Unsubscribe button beside the sender's name
+ * and POSTs to the first URI; the reader never opens the message. Google has
+ * required this of anybody sending over 5,000 a day to Gmail since 2024, and
+ * at 5–10,000 a day it is the difference between arriving and not.
+ *
+ * It is also the cheapest deliverability there is. The alternative button,
+ * the one right next to it, says "report spam" — and a complaint is counted
+ * against the sending domain by every provider watching, where an opt-out
+ * only costs one name.
+ */
+const unsubHeaders = (token: string) => ({
+  "List-Unsubscribe": `<${SITE}/api/marketing/u/${token}>`,
+  "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+});
+
+async function viaResend(ch: Channel, to: string, subject: string, html: string, token?: string): Promise<void> {
   const key = ch.api_key || process.env.RESEND_API_KEY;
   if (!key) throw new Error("no Resend key on the channel or the deploy");
   let r: Response;
   try {
     r = await fetch("https://api.resend.com/emails", {
       method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-      body: JSON.stringify({ from: `${ch.label || "Nandan GSE"} <${ch.email}>`, to: [to], subject, html, reply_to: answersTo(ch) }),
+      body: JSON.stringify({ from: `${ch.label || "Nandan GSE"} <${ch.email}>`, to: [to], subject, html, reply_to: answersTo(ch), ...(token ? { headers: unsubHeaders(token) } : {}) }),
       signal: AbortSignal.timeout(20000),
     });
   } catch (e) {
@@ -97,21 +115,21 @@ async function viaResend(ch: Channel, to: string, subject: string, html: string)
 }
 
 /** Mailercloud's Email API (apidoc.mailercloud.com): POST https://email-api.mailercloud.com/email, the key bare in Authorization. */
-async function viaMailercloud(ch: Channel, to: string, subject: string, html: string, name?: string | null, messageId?: string): Promise<void> {
+async function viaMailercloud(ch: Channel, to: string, subject: string, html: string, name?: string | null, messageId?: string, token?: string): Promise<void> {
   if (!ch.api_key) throw new Error("no Mailercloud API key on the channel");
   const r = await fetch("https://email-api.mailercloud.com/email", {
     method: "POST", headers: { "content-type": "application/json", authorization: ch.api_key },
-    body: JSON.stringify({ version: "1.0", email: { from: ch.email, fromName: ch.label || "Nandan GSE", replyTo: [answersTo(ch)], subject, html, text: html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(), recipients: { to: [{ email: to, ...(name ? { name } : {}) }] } }, metadata: { campaignType: "marketing", ...(messageId ? { messageId } : {}) } }) });
+    body: JSON.stringify({ version: "1.0", email: { from: ch.email, fromName: ch.label || "Nandan GSE", replyTo: [answersTo(ch)], subject, html, text: html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(), recipients: { to: [{ email: to, ...(name ? { name } : {}) }] }, ...(token ? { headers: unsubHeaders(token) } : {}) }, metadata: { campaignType: "marketing", ...(messageId ? { messageId } : {}) } }) });
   if (!r.ok) throw new Error(`Mailercloud ${r.status}: ${(await r.text()).slice(0, 160)}`);
   const j = await r.json().catch(() => null) as { status?: string; message?: string } | null;
   if (j && j.status && j.status !== "SUCCESS") throw new Error(`Mailercloud: ${j.message || j.status}`);
 }
 
-async function viaGmail(db: SupabaseClient, ch: Channel, to: string, subject: string, html: string): Promise<void> {
+async function viaGmail(db: SupabaseClient, ch: Channel, to: string, subject: string, html: string, token?: string): Promise<void> {
   const { data: mb } = await db.from("mailbox").select("id, email_address, display_name").eq("email_address", ch.email).maybeSingle();
   if (!mb) throw new Error(`${ch.email} has no connected Gmail in CRM → Integrations`);
-  const token = await accessTokenFor(String(mb.id));
-  await gmailSend(token, String(mb.email_address), to, subject, html, undefined, undefined, ch.label || String(mb.display_name || "") || undefined, undefined, null, answersTo(ch));
+  const tok = await accessTokenFor(String(mb.id));
+  await gmailSend(tok, String(mb.email_address), to, subject, html, undefined, undefined, ch.label || String(mb.display_name || "") || undefined, undefined, null, answersTo(ch), undefined, token ? unsubHeaders(token) : undefined);
 }
 
 /**
@@ -124,8 +142,6 @@ const MAX_TRIES = 3;
 
 export async function drain(db: SupabaseClient, opts: { campaignId?: string; max?: number } = {}): Promise<Record<string, number | string>> {
   const out: Record<string, number | string> = { sent: 0, failed: 0, skipped: 0, campaigns: 0, retrying: 0 };
-  let q = db.from("mk_campaign").select("id, name, subject, body_html, channel_ids, speed_per_hour, status").eq("status", "sending");
-  if (opts.campaignId) q = q.eq("id", opts.campaignId);
   /**
    * THE ERROR WAS BEING SWALLOWED (14 Sep 2026).
    *
@@ -135,14 +151,56 @@ export async function drain(db: SupabaseClient, opts: { campaignId?: string; max
    * `error` was thrown away. A silent nought and a silent failure looked
    * identical from the outside, which is why the queue stalled for half an
    * hour without anybody being able to say why.
+   *
+   * AND A PENDING MIGRATION MUST NOT STOP THE POST (15 Sep 2026). Naming a
+   * column that does not exist yet fails the WHOLE query, so asking for
+   * `show_unsub_link` before 0068 has run would have halted every campaign
+   * in the same silent way — which is precisely how the channels came to
+   * look deleted an hour ago. The newest column is dropped and the send
+   * carries on, with the link drawn, which is the safe default.
    */
-  const { data: camps, error: campErr } = await q;
+  const BASE = "id, name, subject, body_html, channel_ids, speed_per_hour, status";
+  type Camp = {
+    id: string; name: string; subject: string | null; body_html: string | null;
+    channel_ids: string[]; speed_per_hour: number; status: string; show_unsub_link?: boolean;
+  };
+  const ask = async (cols: string) => {
+    let q = db.from("mk_campaign").select(cols).eq("status", "sending");
+    if (opts.campaignId) q = q.eq("id", opts.campaignId);
+    const r = await q;
+    return { data: r.data as unknown as Camp[] | null, error: r.error };
+  };
+  let { data: camps, error: campErr } = await ask(BASE + ", show_unsub_link");
+  if (campErr && /show_unsub_link/i.test(campErr.message)) {
+    out.note = "0068 not run — the unsubscribe link is always drawn";
+    ({ data: camps, error: campErr } = await ask(BASE));
+  }
   if (campErr) { out.error = String(campErr.message).slice(0, 200); return out; }
   if (!camps?.length) return out;
   const { data: statics } = await db.from("message_variable").select("key, value").eq("kind", "static");
   const S: Record<string, string> = Object.fromEntries((statics || []).map((r) => [String(r.key), String(r.value ?? "")]));
-  const { data: unsub } = await db.from("mk_unsubscribe").select("email");
-  const U = new Set((unsub || []).map((r) => String(r.email).toLowerCase()));
+  /**
+   * WHO IS QUIET, AND UNTIL WHEN (0068).
+   *
+   * `until` null means gone for good; a date means they asked for three
+   * months' quiet and become mailable again on their own afterwards. Until
+   * the migration runs the column is not there, and the fallback treats
+   * every row as permanent — the safe direction to be wrong in, since it
+   * sends nobody a mail they asked not to have.
+   */
+  let U = new Set<string>();
+  {
+    const now = Date.now();
+    const r = await db.from("mk_unsubscribe").select("email, until");
+    if (r.error && /until/i.test(r.error.message)) {
+      const plain = await db.from("mk_unsubscribe").select("email");
+      U = new Set((plain.data || []).map((x) => String(x.email).toLowerCase()));
+    } else {
+      U = new Set((r.data || [])
+        .filter((x) => { const u = (x as { until?: string | null }).until; return !u || new Date(u).getTime() > now; })
+        .map((x) => String(x.email).toLowerCase()));
+    }
+  }
 
   for (const c of camps) {
     out.campaigns = (Number(out.campaigns) || 0) + 1;
@@ -179,13 +237,23 @@ export async function drain(db: SupabaseClient, opts: { campaignId?: string; max
       if (!rm.ok) { out.skipped = (Number(out.skipped) || 0) + 1; continue; }
       const p = r.person_id ? P.get(String(r.person_id)) ?? null : null;
       const subject = render(String(c.subject || ""), p, p?.company_id ? C.get(String(p.company_id)) ?? null : null, S);
+      /**
+       * THE VISIBLE LINK is a separate obligation from the header. Google
+       * wants List-Unsubscribe; CAN-SPAM wants an opt-out a reader can see
+       * and use inside the message. A campaign may turn the visible one off,
+       * and the header still goes — but it should not, and the wizard says
+       * so where the tick-box lives.
+       */
+      const showLink = (c as { show_unsub_link?: boolean }).show_unsub_link !== false;
       const bodyHtml = render(String(c.body_html || ""), p, p?.company_id ? C.get(String(p.company_id)) ?? null : null, S)
-        + `<div style="margin-top:24px;font-size:11px;color:#8A94A0">Nandan GSE · <a href="${SITE}/api/marketing/u/${r.token}" style="color:#8A94A0">unsubscribe</a></div>`
+        + (showLink
+          ? `<div style="margin-top:24px;font-size:11px;color:#8A94A0">Nandan GSE · <a href="${SITE}/api/marketing/u/${r.token}" style="color:#8A94A0">unsubscribe or pause</a></div>`
+          : "")
         + `<img src="${SITE}/api/marketing/t/${r.token}" width="1" height="1" alt="" />`;
       try {
-        if (ch.kind === "resend") await viaResend(ch, to, subject, bodyHtml);
-        else if (ch.kind === "mailercloud") await viaMailercloud(ch, to, subject, bodyHtml, p?.full_name || null, `genie-${r.token}`);
-        else await viaGmail(db, ch, to, subject, bodyHtml);
+        if (ch.kind === "resend") await viaResend(ch, to, subject, bodyHtml, String(r.token));
+        else if (ch.kind === "mailercloud") await viaMailercloud(ch, to, subject, bodyHtml, p?.full_name || null, `genie-${r.token}`, String(r.token));
+        else await viaGmail(db, ch, to, subject, bodyHtml, String(r.token));
         await db.from("mk_send").update({ status: "sent", sent_at: new Date().toISOString(), channel_id: ch.id, error: null }).eq("id", r.id);
         rm.ch.sent_today += 1; rm.ch.sent_this_hour += 1;
         Object.assign(ch, rm.ch);
