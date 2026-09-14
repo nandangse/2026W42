@@ -6,12 +6,16 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { env } from "@/lib/env";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { noStoreFetch } from "@/lib/no-store-fetch";
 
 export function supabaseServer(): SupabaseClient {
   const cookieStore = cookies();
   const url = env("NEXT_PUBLIC_SUPABASE_URL");
   const anon = env("NEXT_PUBLIC_SUPABASE_ANON_KEY");
   return createServerClient(url, anon, {
+    /* Never a cached read — see src/lib/no-store-fetch.ts. Closing the whole
+       class rather than the one client it was caught on. */
+    global: { fetch: noStoreFetch },
     cookies: {
       get(name: string) {
         return cookieStore.get(name)?.value;

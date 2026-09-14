@@ -4,6 +4,7 @@
 //   - scripts/seed.ts and scripts/acceptance-test.ts
 // NEVER import this into a client component.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { noStoreFetch } from "@/lib/no-store-fetch";
 
 let cached: SupabaseClient | null = null;
 
@@ -18,6 +19,10 @@ export function adminClient(): SupabaseClient {
   }
   cached = createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
+    /* Never a cached read — see src/lib/no-store-fetch.ts. The marketing
+       cron was served a stale empty array for six passes; this client runs
+       the ERP sync and the playbook crons, which could go the same way. */
+    global: { fetch: noStoreFetch },
   });
   return cached;
 }

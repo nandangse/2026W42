@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.47.4",
+    date: "2026-09-14",
+    module: "Found it \u2014 the cron was reading a cached answer, not the database",
+    items: [
+      "<b>Six passes reported \u201ccampaigns: 0\u201d while a campaign sat at <i>sending</i>.</b> Right database, campaign visible, no error, and still nothing found. The proof arrived by accident: the campaign was finished by hand at 15:42 and its row set to <i>done</i> \u2014 and at 15:50 the cron still reported <i>sending: 1</i>, a state that no longer existed anywhere in the database. It was not reading the database. It was replaying an answer from earlier.",
+      "<b>Next.js caches fetch, and supabase-js reads through fetch.</b> A PostgREST GET is a cacheable URL like any other, so the drain\u2019s campaign query was cached as an empty array the first time it ran \u2014 before the campaign existed \u2014 and every pass since was served that same empty array. <i>force-dynamic</i> does not help: it governs how the route is rendered, not what the route\u2019s own outbound calls do.",
+      "<b>Why it hid for a day:</b> no error, no warning, a plausible answer, and a pass that finished in the same second it fired \u2014 because a cache hit is instant. A silent nought and a silent failure looking identical, again.",
+      "<b>Every Supabase client in Genie now reads with no-store</b> \u2014 the CRM client, the service-role client and the user-scoped one. Not just the client it was caught on: the service-role client runs the ERP sync and the playbook crons, which could have gone the same way without anybody noticing.",
+      "Two theories were tested and thrown away before this one: a typo in the Vercel variable names, and spaces in the select list. Neither survived contact with evidence, and neither was shipped as an explanation.",
+    ],
+  },
+  {
     v: "5.0.47.3",
     date: "2026-09-14",
     module: "The employee campaign finished by hand \u2014 and the cron fault narrowed to one line",

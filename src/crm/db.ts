@@ -17,6 +17,7 @@
  * NEVER import this into a client component.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { noStoreFetch } from "@/lib/no-store-fetch";
 
 let cached: SupabaseClient | null = null;
 
@@ -40,7 +41,12 @@ export function crmDb(): SupabaseClient {
   cached = createClient(
     process.env.CRM_SUPABASE_URL as string,
     process.env.CRM_SUPABASE_SERVICE_KEY as string,
-    { auth: { autoRefreshToken: false, persistSession: false } },
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+      /* Never a cached read — see src/lib/no-store-fetch.ts for the day
+         this cost and the six cron passes it silently emptied. */
+      global: { fetch: noStoreFetch },
+    },
   );
   return cached;
 }
