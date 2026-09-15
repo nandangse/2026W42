@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireMarketing } from "@/lib/marketing";
 import { crmDb } from "@/crm/db";
+import { pageAll } from "@/lib/page-all";
 import { readBody } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,11 @@ export async function GET(req: Request) {
     const db = crmDb();
     const id = new URL(req.url).searchParams.get("id");
     if (id) {
-      const { data, error } = await db.from("mk_list_member").select("person_id, added_at, person:person_id(id, first_name, last_name, full_name, job_title, primary_email, city, company:company_id(name))").eq("list_id", id).order("added_at", { ascending: false }).limit(5000);
+      /* PAGED: .limit(5000) returned 1,000 and said nothing — see
+         src/lib/page-all.ts. A 10,137-member list showed as 1,000. */
+      type M = Record<string, unknown>;
+      const data = await pageAll<M>((f, t) => db.from("mk_list_member").select("person_id, added_at, person:person_id(id, first_name, last_name, full_name, job_title, primary_email, city, company:company_id(name))").eq("list_id", id).order("added_at", { ascending: false }).range(f, t), "the list's members");
+      const error = null as { message: string } | null;
       if (error) throw new Error(error.message);
       return NextResponse.json({ members: data ?? [] });
     }
@@ -27,8 +32,8 @@ export async function GET(req: Request) {
     const ids = (data || []).map((l) => l.id);
     const counts = new Map<string, number>();
     if (ids.length) {
-      const { data: m } = await db.from("mk_list_member").select("list_id").in("list_id", ids).limit(50000);
-      for (const r of m || []) counts.set(String(r.list_id), (counts.get(String(r.list_id)) || 0) + 1);
+      const m = await pageAll<{ list_id: string }>((f, t) => db.from("mk_list_member").select("list_id").in("list_id", ids).range(f, t), "list membership");
+      for (const r of m) counts.set(String(r.list_id), (counts.get(String(r.list_id)) || 0) + 1);
     }
     return NextResponse.json({ installed: true, lists: (data || []).map((l) => ({ ...l, count: counts.get(String(l.id)) || 0 })) });
   } catch (e) {

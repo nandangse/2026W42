@@ -9,6 +9,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { accessTokenFor, gmailSend } from "@/crm/gmail";
 import { swallow } from "@/lib/swallow";
+import { pageAll } from "@/lib/page-all";
 
 export const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://genie.nandan.co.in";
 
@@ -191,15 +192,19 @@ export async function drain(db: SupabaseClient, opts: { campaignId?: string; max
   let U = new Set<string>();
   {
     const now = Date.now();
-    const r = await db.from("mk_unsubscribe").select("email, until");
-    if (r.error && /until/i.test(r.error.message)) {
-      const plain = await db.from("mk_unsubscribe").select("email");
-      U = new Set((plain.data || []).map((x) => String(x.email).toLowerCase()));
-    } else {
-      U = new Set((r.data || [])
-        .filter((x) => { const u = (x as { until?: string | null }).until; return !u || new Date(u).getTime() > now; })
-        .map((x) => String(x.email).toLowerCase()));
+    /* PAGED. Read as one call it stops at 1,000 and Genie starts mailing
+       people who asked it not to — see src/lib/page-all.ts. */
+    type Row = { email: string; until?: string | null };
+    let rows: Row[];
+    try {
+      rows = await pageAll<Row>((f, t) => db.from("mk_unsubscribe").select("email, until").range(f, t), "the unsubscribe list");
+    } catch (e) {
+      if (!/until/i.test(e instanceof Error ? e.message : "")) throw e;
+      rows = await pageAll<Row>((f, t) => db.from("mk_unsubscribe").select("email").range(f, t), "the unsubscribe list");
     }
+    U = new Set(rows
+      .filter((x) => !x.until || new Date(x.until).getTime() > now)
+      .map((x) => String(x.email).toLowerCase()));
   }
 
   for (const c of camps) {

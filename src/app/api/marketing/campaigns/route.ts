@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireMarketing } from "@/lib/marketing";
 import { crmDb } from "@/crm/db";
+import { pageAll } from "@/lib/page-all";
 import { readBody } from "@/lib/validate";
 import { drain } from "@/lib/marketing-send";
 
@@ -42,9 +43,21 @@ export async function GET(req: Request) {
       const { data: c, error } = await db.from("mk_campaign").select("*").eq("id", id).maybeSingle();
       if (error) throw new Error(error.message);
       if (!c) throw new HttpError(404, "no such campaign");
-      const { data: sends } = await db.from("mk_send").select("status").eq("campaign_id", id).limit(50000);
+      /**
+       * `.limit(50000)` did NOT read fifty thousand rows — PostgREST caps at
+       * a thousand and says nothing, so every campaign over a thousand people
+       * was being tallied from its first thousand. Ask the view, which counts
+       * in the database; page the rows only where the view is not there yet.
+       */
       const counts: Record<string, number> = {};
-      for (const s of sends || []) counts[String(s.status)] = (counts[String(s.status)] || 0) + 1;
+      const stat = await db.from("mk_campaign_stat").select("*").eq("campaign_id", id).maybeSingle();
+      if (!stat.error && stat.data) {
+        const x = stat.data as unknown as Record<string, number>;
+        for (const k of ["queued", "sent", "opened", "bounced", "unsubscribed", "failed", "skipped"]) if (x[k]) counts[k] = x[k];
+      } else {
+        const sends = await pageAll<{ status: string }>((f, t) => db.from("mk_send").select("status").eq("campaign_id", id).range(f, t), "this campaign's sends");
+        for (const sn of sends) counts[String(sn.status)] = (counts[String(sn.status)] || 0) + 1;
+      }
       const { data: recent } = await db.from("mk_send").select("email, status, sent_at, opened_at, open_count, error").eq("campaign_id", id).order("sent_at", { ascending: false, nullsFirst: false }).limit(200);
 
       /**
@@ -78,7 +91,8 @@ export async function GET(req: Request) {
        * every engagement rate corrects itself with no other change.
        */
       const n = (k: string) => counts[k] || 0;
-      const total = (sends || []).length;
+      /* The audience is the sum of every state, whichever way it was counted. */
+      const total = Object.values(counts).reduce((a, b) => a + b, 0);
       const sent = n("sent") + n("opened") + n("bounced") + n("unsubscribed");
       const listNames = (async () => {
         const ids = (c.list_ids as string[]) || [];
@@ -158,17 +172,22 @@ export async function GET(req: Request) {
        it would fail the whole query and the screen would show no campaigns at
        all — the same way the channels came to look deleted. */
     const COLS = "id, name, status, subject, body_html, list_ids, person_ids, channel_ids, speed_per_hour, created_by_email, created_at, started_at, done_at, counts";
+    const CACHE = ", stat_cache, stat_at";
     const ask = async (cols: string) => {
       let q = db.from("mk_campaign").select(cols).order("created_at", { ascending: false });
       if (u.scope === "mine") q = q.eq("created_by_email", u.email.toLowerCase());
       const r = await q;
       return { data: r.data as unknown as Record<string, unknown>[] | null, error: r.error };
     };
-    let unsubChoiceReady = true;
-    let { data, error } = await ask(COLS + ", show_unsub_link");
+    let unsubChoiceReady = true, cacheReady = true;
+    let { data, error } = await ask(COLS + ", show_unsub_link" + CACHE);
+    if (error && /stat_cache|stat_at/i.test(error.message)) {
+      cacheReady = false;
+      ({ data, error } = await ask(COLS + ", show_unsub_link"));
+    }
     if (error && /show_unsub_link/i.test(error.message)) {
       unsubChoiceReady = false;
-      ({ data, error } = await ask(COLS));
+      ({ data, error } = await ask(cacheReady ? COLS + CACHE : COLS));
     }
     if (error) {
       if (/relation|does not exist|could not find the table/i.test(error.message)) return NextResponse.json({ installed: false, campaigns: [] });
@@ -208,16 +227,33 @@ export async function GET(req: Request) {
      * before migration 0069 exists there is simply no stat block, and the
      * screen says "not counted yet" rather than showing a made-up nought.
      */
-    type Stat = { campaign_id: string; contacts: number; queued: number; sent: number; delivered: number; opened: number; bounced: number; unsubscribed: number; failed: number; skipped: number };
-    const ids = rows.map((c) => String(c.id));
+    /**
+     * THE FIGURES COME FROM THE SNAPSHOT, NOT FROM COUNTING AGAIN.
+     *
+     * Dr Raghu, 15 Sep 2026: "in a cron so we can get the data without it
+     * calculating everytime." The cron writes stat_cache on the curve the
+     * numbers actually move on — every half hour for two days, hourly for a
+     * week, daily after. This screen reads what it wrote.
+     *
+     * A campaign the cron has not reached yet is counted live, once, so a
+     * brand-new send is never blank while it waits for the next pass. And the
+     * campaign's own page always counts live: that is the screen somebody
+     * watches while a send is running, where a figure half an hour old would
+     * be its own kind of lie.
+     */
+    type Stat = { campaign_id?: string; contacts: number; queued: number; sent: number; delivered: number; opened: number; bounced: number; unsubscribed: number; failed: number; skipped: number };
     let statsReady = true;
-    const byId = new Map<string, Stat>();
-    if (ids.length) {
-      const r = await db.from("mk_campaign_stat").select("*").in("campaign_id", ids);
+    const uncached = rows.filter((c) => !c.stat_cache).map((c) => String(c.id));
+    const live = new Map<string, Stat>();
+    if (uncached.length) {
+      const r = await db.from("mk_campaign_stat").select("*").in("campaign_id", uncached);
       if (r.error) statsReady = false;
-      else for (const x of (r.data as unknown as Stat[]) || []) byId.set(String(x.campaign_id), x);
+      else for (const x of (r.data as unknown as Stat[]) || []) live.set(String(x.campaign_id), x);
     }
-    rows = rows.map((c) => ({ ...c, stat: byId.get(String(c.id)) ?? null }));
+    rows = rows.map((c) => ({ ...c, stat: (c.stat_cache as Stat | null) ?? live.get(String(c.id)) ?? null }));
+    /* The oldest snapshot on screen is the one the reader should be told about. */
+    const stamps = rows.map((c) => String(c.stat_at || "")).filter(Boolean).sort();
+    const statAt = stamps.length ? stamps[0] : null;
 
     /* Whether anything has ever been delivered decides whether the column can
        speak at all — nought deliveries across every campaign means the
@@ -233,19 +269,43 @@ export async function GET(req: Request) {
 
     const senders = [...new Set((data ?? []).map((c) => String(c.created_by_email || "")).filter(Boolean))].sort();
 
+    /* Has anything ever reported a delivery, a bounce or a complaint? */
+    const heard = async (t: string) => { const r = await db.from(t.split("|")[0]).select("*", { count: "exact", head: true }); return r; };
+    void heard;
+    const [dlv, bnc] = await Promise.all([
+      db.from("mk_send").select("id", { count: "exact", head: true }).not("delivered_at", "is", null),
+      db.from("mk_unsubscribe").select("email", { count: "exact", head: true }).in("reason", ["bounce", "complaint"]),
+    ]);
+    const webhookHeard = {
+      delivered: !dlv.error && (dlv.count ?? 0) > 0,
+      bounce: !bnc.error && (bnc.count ?? 0) > 0,
+    };
+
     return NextResponse.json({
-      installed: true, unsubChoiceReady, statsReady,
+      installed: true, unsubChoiceReady, statsReady, cacheReady, statAt,
       campaigns: rows,
       totals,
       senders,
       /* Said plainly, so the screen never has to guess why a column is blank. */
+      /**
+       * BOUNCED WAS SHOWING A CONFIDENT NOUGHT (Dr Raghu, 15 Sep 2026: "how
+       * is delivered and bounced blank?"). Delivered said "not measured" and
+       * bounced said "0 · 0%", and both were nought for the very same reason:
+       * the Resend webhook has never fired once. A nought there reads as "no
+       * bounces", which is a claim, not an absence.
+       *
+       * So the webhook has to have SPOKEN before either column speaks. Any
+       * delivery recorded, any bounce, any complaint — one is enough to know
+       * somebody is listening.
+       */
       measured: {
-        delivered: statsReady && totals.delivered > 0,
+        delivered: statsReady && webhookHeard.delivered,
         replied: false,
-        bounced: statsReady,
+        bounced: statsReady && webhookHeard.bounce,
       },
       notMeasured: {
         delivered: "Add the email.delivered event to the Resend webhook — nothing has been recorded yet.",
+        bounced: "The Resend webhook has never reported a bounce or a complaint — add email.bounced and email.complained to it. Nought here would mean nobody is listening, not that nothing bounced.",
         replied: "Genie does not see replies. They go to the Reply-To mailbox, and matching them back to a campaign is inbound-mail work that has not been built.",
       },
     });
@@ -258,8 +318,11 @@ export async function GET(req: Request) {
 async function audience(db: ReturnType<typeof crmDb>, c: { list_ids: string[]; person_ids: string[] }) {
   const ids = new Set<string>((c.person_ids || []).map(String));
   if ((c.list_ids || []).length) {
-    const { data } = await db.from("mk_list_member").select("person_id").in("list_id", c.list_ids).limit(50000);
-    for (const r of data || []) ids.add(String(r.person_id));
+    /* PAGED. The aviation list holds 10,137 people; read as one call this
+       returned 1,000, and a send to it would have dropped 9,137 of them
+       without a word. */
+    const mem = await pageAll<{ person_id: string }>((f, t) => db.from("mk_list_member").select("person_id").in("list_id", c.list_ids).range(f, t), "the list's members");
+    for (const r of mem) ids.add(String(r.person_id));
   }
   const people: { id: string; primary_email: string | null; full_name: string | null }[] = [];
   const arr = [...ids];
@@ -267,8 +330,8 @@ async function audience(db: ReturnType<typeof crmDb>, c: { list_ids: string[]; p
     const { data } = await db.from("person").select("id, primary_email, full_name").in("id", arr.slice(i, i + 500)).is("deleted_at", null);
     people.push(...((data || []) as typeof people));
   }
-  const { data: unsub } = await db.from("mk_unsubscribe").select("email");
-  const U = new Set((unsub || []).map((r) => String(r.email).toLowerCase()));
+  const unsub = await pageAll<{ email: string }>((f, t) => db.from("mk_unsubscribe").select("email").range(f, t), "the unsubscribe list");
+  const U = new Set(unsub.map((r) => String(r.email).toLowerCase()));
   const seen = new Set<string>();
   const ok: { id: string; email: string }[] = [];
   let noEmail = 0, duplicates = 0, unsubscribed = 0;

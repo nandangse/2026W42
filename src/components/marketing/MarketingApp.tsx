@@ -370,20 +370,30 @@ function Campaigns({ seesAll }: { seesAll: boolean }) {
   const [totals, setTotals] = useState<Totals | null>(null);
   const [senders, setSenders] = useState<string[]>([]);
   const [measured, setMeasured] = useState<{ delivered: boolean; replied: boolean; bounced: boolean }>({ delivered: false, replied: false, bounced: false });
-  const [why, setWhy] = useState<{ delivered?: string; replied?: string }>({});
+  const [why, setWhy] = useState<{ delivered?: string; replied?: string; bounced?: string }>({});
   const [statsReady, setStatsReady] = useState(true);
+  const [statAt, setStatAt] = useState<string | null>(null);
+  const [cacheReady, setCacheReady] = useState(true);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const [by, setBy] = useState(""); const [from, setFrom] = useState(""); const [to, setTo] = useState("");
+  /**
+   * THE DATES OPEN ON THE FINANCIAL YEAR (Dr Raghu, 15 Sep 2026: "from and
+   * to keep default of 1/4/2026 and today"). India's year begins on 1 April,
+   * so that is the span anybody here means by "so far" — and it rolls on its
+   * own rather than being a date typed once and left to go stale.
+   */
+  const fyStart = (() => { const n = new Date(); const y = n.getMonth() >= 3 ? n.getFullYear() : n.getFullYear() - 1; return `${y}-04-01`; })();
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const [by, setBy] = useState(""); const [from, setFrom] = useState(fyStart); const [to, setTo] = useState(today);
   const [q, setQ] = useState(""); const [status, setStatus] = useState("");
 
   const load = useCallback(() => {
     const p = new URLSearchParams();
     if (by) p.set("by", by); if (from) p.set("from", from); if (to) p.set("to", to);
     if (q) p.set("q", q); if (status) p.set("status", status);
-    return api<{ campaigns: Campaign[]; totals: Totals; senders: string[]; statsReady: boolean; measured: typeof measured; notMeasured: typeof why }>(`/api/marketing/campaigns?${p.toString()}`)
-      .then((j) => { setRows(j.campaigns || []); setTotals(j.totals || null); setSenders(j.senders || []); setStatsReady(j.statsReady !== false); if (j.measured) setMeasured(j.measured); if (j.notMeasured) setWhy(j.notMeasured); setErr(""); })
+    return api<{ campaigns: Campaign[]; totals: Totals; senders: string[]; statsReady: boolean; cacheReady: boolean; statAt: string | null; measured: typeof measured; notMeasured: typeof why }>(`/api/marketing/campaigns?${p.toString()}`)
+      .then((j) => { setRows(j.campaigns || []); setTotals(j.totals || null); setSenders(j.senders || []); setStatsReady(j.statsReady !== false); setCacheReady(j.cacheReady !== false); setStatAt(j.statAt ?? null); if (j.measured) setMeasured(j.measured); if (j.notMeasured) setWhy(j.notMeasured); setErr(""); })
       .catch((e) => { setErr(e instanceof Error ? e.message : String(e)); });
   }, [by, from, to, q, status]);
   useEffect(() => { const t = setTimeout(load, q ? 300 : 0); return () => clearTimeout(t); }, [load, q]);
@@ -428,10 +438,9 @@ function Campaigns({ seesAll }: { seesAll: boolean }) {
           </select></label>
         <label className="text-xs font-semibold flex-1" style={{ color: "var(--dim)", minWidth: 180 }}>Search name or subject
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ganpati, Lisbon, expo…" style={inp} /></label>
-        {(by || from || to || q || status) && (
-          <button onClick={() => { setBy(""); setFrom(""); setTo(""); setQ(""); setStatus(""); }} style={btn("#fff", "var(--dim)")}>clear</button>
-        )}
-        <span className="text-xs" style={{ color: MUTED }}>the cards and the table both obey these</span>
+        <button onClick={() => { setBy(""); setFrom(fyStart); setTo(today); setQ(""); setStatus(""); }} style={btn("#fff", "var(--dim)")}>reset</button>
+        <button onClick={() => { setFrom(""); setTo(""); }} style={btn("#fff", "var(--dim)")} title="Ignore the dates and show every campaign ever">all time</button>
+        <span className="text-xs" style={{ color: MUTED }}>the cards and the table both obey these · opens on the financial year to date</span>
       </div>
 
       {err && <div className="rounded border p-2 mb-2 text-xs font-semibold" style={{ borderColor: RED, color: RED, background: "#FDF3F2" }}>{err}</div>}
@@ -450,12 +459,15 @@ function Campaigns({ seesAll }: { seesAll: boolean }) {
             <Card label="Delivered" v={measured.delivered ? totals.delivered : "—"} sub={measured.delivered ? pct(totals.delivered, totals.sent) : "not measured"} />
             <Card label="Opened" v={totals.opened} sub={pct(totals.opened, measured.delivered ? totals.delivered : totals.sent)} ink={totals.opened ? GREEN : undefined} />
             <Card label="Replied" v="—" sub="not measured" />
-            <Card label="Bounced" v={totals.bounced} sub={pct(totals.bounced, totals.sent)} ink={totals.bounced ? RED : undefined} />
+            <Card label="Bounced" v={measured.bounced ? totals.bounced : "—"} sub={measured.bounced ? pct(totals.bounced, totals.sent) : "not measured"} ink={measured.bounced && totals.bounced ? RED : undefined} />
             <Card label="U/s" v={totals.unsubscribed} sub={pct(totals.unsubscribed, totals.sent)} ink={totals.unsubscribed ? "var(--warn)" : undefined} />
           </div>
           <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.5 }}>
             Sent is a share of <b>contacts</b>; opened, bounced and unsubscribed are shares of what actually went out.
+            {statAt && <> · <b>Figures as of {fmtAt(statAt)}</b> — refreshed every 30 minutes for the first two days, hourly for a week, then daily. A campaign&rsquo;s own page always counts live.</>}
+            {!cacheReady && <> · <b>Counted live</b> — run CRM migration 0070 to have the cron keep them.</>}
             {!measured.delivered && <> · <b>Delivered</b>: {why.delivered}</>}
+            {!measured.bounced && <> · <b>Bounced</b>: {why.bounced}</>}
             <> · <b>Replied</b>: {why.replied}</>
           </div>
         </div>
@@ -476,7 +488,8 @@ function Campaigns({ seesAll }: { seesAll: boolean }) {
           { key: "open", label: "Opened", align: "right", render: (r) => r.stat ? <span className="tnum" style={{ color: r.stat.opened ? GREEN : undefined }}>{r.stat.opened}<span style={{ color: MUTED }}> {pct(r.stat.opened, measured.delivered ? r.stat.delivered : r.stat.sent)}</span></span> : "·" },
           { key: "rep", label: "Replied", align: "right", render: () => <span title={why.replied} style={{ color: MUTED }}>—</span> },
           { key: "by", label: "By", render: (r) => r.created_by_email.split("@")[0] },
-          { key: "bounce", label: "Bounced", align: "right", render: (r) => r.stat ? <span className="tnum" style={{ color: r.stat.bounced ? RED : undefined }}>{r.stat.bounced}<span style={{ color: MUTED }}> {pct(r.stat.bounced, r.stat.sent)}</span></span> : "·" },
+          { key: "bounce", label: "Bounced", align: "right", render: (r) => !r.stat ? "·" : !measured.bounced ? <span title={why.bounced} style={{ color: MUTED }}>—</span>
+            : <span className="tnum" style={{ color: r.stat.bounced ? RED : undefined }}>{r.stat.bounced}<span style={{ color: MUTED }}> {pct(r.stat.bounced, r.stat.sent)}</span></span> },
           { key: "uns", label: "U/s", align: "right", render: (r) => r.stat ? <span className="tnum" style={{ color: r.stat.unsubscribed ? "var(--warn)" : undefined }}>{r.stat.unsubscribed}<span style={{ color: MUTED }}> {pct(r.stat.unsubscribed, r.stat.sent)}</span></span> : "·" },
           { key: "x", label: "", render: (r) => (
             <span className="flex" style={{ gap: 1 }}>

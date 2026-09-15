@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireMarketing } from "@/lib/marketing";
 import { crmDb } from "@/crm/db";
+import { pageAll } from "@/lib/page-all";
 import { readBody } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     await requireMarketing();
-    const { data, error } = await crmDb().from("mk_unsubscribe").select("email, reason, campaign_id, note, at").order("at", { ascending: false }).limit(5000);
+    /* PAGED: the screen that proves nobody is mailed twice must itself be
+       complete. .limit(5000) showed the first thousand and nothing else. */
+    const data = await pageAll<Record<string, unknown>>((f, t) => crmDb().from("mk_unsubscribe").select("email, reason, campaign_id, note, at").order("at", { ascending: false }).range(f, t), "the unsubscribe list");
+    const error = null as { message: string } | null;
     if (error) {
       if (/mk_unsubscribe|schema cache/i.test(error.message)) return NextResponse.json({ installed: false, rows: [] });
       throw new Error(error.message);

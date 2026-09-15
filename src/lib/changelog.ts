@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.48.2",
+    date: "2026-09-15",
+    module: "The thousand-row ceiling \u2014 and the figures kept rather than reckoned",
+    items: [
+      "<b>A send to the aviation list would have quietly dropped 9,137 of its 10,137 people.</b> PostgREST answers at most a thousand rows and says nothing about the rest, and <i>.limit(50000)</i> does not lift that \u2014 it is capped at the server, so the call returns a thousand rows, no error, no warning, looking exactly like a list that holds a thousand. Every whole-table read in Marketing now pages, and throws rather than returning a part that looks like the whole.",
+      "<b>The worst of them was the suppression list.</b> It is read once per drain pass; past a thousand unsubscribes the rest went invisible and Genie would have started mailing people who asked it not to. At 240,000 sends a month that was weeks away, and it is the one mistake in this module that cannot be apologised for.",
+      "<b>Bounced was showing a confident nought</b> \u2014 \u201chow is delivered and bounced blank?\u201d Delivered said <i>not measured</i> and bounced said <i>0 \u00b7 0%</i>, and both were nought for the same reason: the Resend webhook has never fired once. A nought there reads as \u201cno bounces\u201d, which is a claim rather than an absence. Both columns now stay silent until the webhook has actually spoken.",
+      "<b>The figures are kept, not reckoned afresh each time.</b> A new cron refreshes each campaign on the curve its numbers really move on \u2014 <b>every 30 minutes for the first two days, hourly for a week, then daily</b> \u2014 and a campaign still sending is always due. The list reads that snapshot and shows its age, because a figure without its date is a rumour. A campaign\u2019s own page still counts live: that is the screen watched during a send, where half an hour old would be its own kind of lie.",
+      "The date filters open on the <b>financial year to date</b> \u2014 1 April to today, rolling on their own \u2014 with <i>all time</i> one click away. <b>Needs CRM migration 0070</b>; without it the figures are counted live and the screen says so.",
+    ],
+  },
+  {
     v: "5.0.48.1",
     date: "2026-09-15",
     module: "Email Marketing: what every campaign did, and what the filtered set did",
