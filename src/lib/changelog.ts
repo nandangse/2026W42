@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.48.1",
+    date: "2026-09-15",
+    module: "Email Marketing: what every campaign did, and what the filtered set did",
+    items: [
+      "<b>The campaign list now carries the whole story</b> \u2014 date, campaign, subject, lists, contacts, sent, delivered, opened, replied, by, bounced and unsubscribed \u2014 each with its share beneath it, and <b>View, Edit, Duplicate and Delete</b> at the end. <b>Delete works only on a draft:</b> what went out is a record of what people were sent, and that is not ours to tidy away. The icon says so on hover rather than just refusing.",
+      "<b>Filters across the top \u2014 sent by, date from and to, status, and a search of name and subject \u2014 and the cards obey them.</b> Nine small figures summarising exactly the set below, so \u201chow did Raghu\u2019s September sends do\u201d is two clicks rather than a spreadsheet.",
+      "<b>Delivered is now a real thing Genie can know.</b> Resend has always reported it \u2014 the first employee mail read back on 14 Sep said <i>delivered</i> \u2014 and nobody was listening. <i>mk_send.delivered_at</i> records it and the webhook fills it; add <b>email.delivered</b> to the Resend webhook and the column starts speaking. Until something is actually recorded it shows \u201c\u2014\u201d, never 0%: nought deliveries everywhere means nobody is listening, not that nothing arrived.",
+      "<b>Replied says \u201cnot measured\u201d, and will keep saying it until it is true.</b> Nothing in Genie sees an answer \u2014 replies go to the Reply-To mailbox and matching them back to a campaign is inbound-mail work that has not been built. A nought there would claim nobody answered, which is a far worse thing to say than \u201cwe are not counting\u201d.",
+      "<b>The tallies are counted by the database, in one query.</b> At 5\u201310,000 sends a day \u2014 240,000 a month \u2014 dragging every send row into the API to print a dozen numbers would read a quarter of a million rows to fill one screen. <b>Needs CRM migration 0069</b>; without it the list still shows every campaign and says plainly that the counts are missing.",
+    ],
+  },
+  {
     v: "5.0.48.0",
     date: "2026-09-15",
     module: "One-click unsubscribe \u2014 and a choice at the bottom instead of a cliff",

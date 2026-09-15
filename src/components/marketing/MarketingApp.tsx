@@ -23,7 +23,8 @@ import ApolloLeads from "@/components/marketing/ApolloLeads";
 import LandingPages, { uploadPublic } from "@/components/marketing/LandingPages";
 
 type List = { id: string; name: string; description: string | null; created_by_email: string; created_at: string; count: number };
-type Campaign = { id: string; name: string; status: string; subject: string | null; body_html?: string | null; show_unsub_link?: boolean; list_ids: string[]; person_ids: string[]; channel_ids: string[]; speed_per_hour: number; created_by_email: string; created_at: string; started_at: string | null; done_at: string | null; counts: Record<string, number> | null; checklist?: Record<string, number | string> | null; deliverability?: { score: number; issues: string[] } | null };
+type Stat = { contacts: number; queued: number; sent: number; delivered: number; opened: number; bounced: number; unsubscribed: number; failed: number; skipped: number };
+type Campaign = { id: string; name: string; status: string; subject: string | null; body_html?: string | null; show_unsub_link?: boolean; stat?: Stat | null; list_ids: string[]; person_ids: string[]; channel_ids: string[]; speed_per_hour: number; created_by_email: string; created_at: string; started_at: string | null; done_at: string | null; counts: Record<string, number> | null; checklist?: Record<string, number | string> | null; deliverability?: { score: number; issues: string[] } | null };
 type Channel = { id: string; email: string; label: string | null; kind: "gmail" | "resend" | "mailercloud"; reply_to: string | null; daily_limit: number; hourly_limit: number; active: boolean; sent_today: number; sent_this_hour: number; gmail: string | null; api_key: string | null; resendKeyOnDeploy: boolean };
 type Template = { id: string; name: string; subject: string | null; body_html: string | null };
 
@@ -321,12 +322,86 @@ function Lists() {
 
 const STEPS = ["Campaign", "Lists & people", "Check list", "Message", "Check message", "Unsubscribes", "Speed", "Send"];
 
+/* ══════════════════════════════════════════════════════════════════════════
+   EMAIL MARKETING — WHAT EVERY CAMPAIGN DID, AND WHAT THE FILTERED SET DID
+
+   Dr Raghu, 15 Sep 2026: "Date - Campaign - Subject - Lists - Contacts -
+   Sent - Delivered (%) - Opened (%) - Replied (%) - By - Bounced - U/s. At
+   the end put View, Edit, Duplicate, Delete icons. Delete will work only if
+   in draft. After send it can't." And the same figures as small cards on
+   top, obeying the filters.
+
+   TWO OF THOSE COLUMNS CANNOT SPEAK YET AND SAY SO.
+
+     DELIVERED is real the moment the email.delivered event is added to the
+     Resend webhook — Resend has always known it, Genie was not listening.
+     Until something has actually been recorded the column reads "—", not 0%,
+     because nought deliveries across every campaign means nobody is
+     listening, not that nothing arrived.
+
+     REPLIED is not measured at all. Nothing in Genie sees an answer; replies
+     go to the Reply-To mailbox and matching them back to a campaign is
+     inbound-mail work nobody has built. A nought there would say "nobody
+     answered", which is a different and much worse claim than "we are not
+     counting".
+
+   Every percentage follows the rule set on 14 Sep: what went OUT is a share
+   of the audience; what people DID with it is a share of what went out.
+   ══════════════════════════════════════════════════════════════════════ */
+
+const pct = (n: number, of: number) => (of > 0 ? `${Math.round((n / of) * 1000) / 10}%` : "—");
+
+/** One small figure on the summary strip. */
+function Card({ label, v, sub, ink }: { label: string; v: string | number; sub?: string; ink?: string }) {
+  return (
+    <div style={{ flex: "1 1 88px", minWidth: 84, padding: "2px 10px", borderLeft: "1px solid var(--line)" }}>
+      <div style={{ fontSize: 10, color: MUTED, letterSpacing: .4, textTransform: "uppercase", whiteSpace: "nowrap" }}>{label}</div>
+      <div className="tnum" style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.2, color: ink || INK }}>{v}</div>
+      {sub !== undefined && <div className="tnum" style={{ fontSize: 11, color: MUTED }}>{sub}</div>}
+    </div>
+  );
+}
+
+type Totals = { campaigns: number; lists: number; contacts: number; sent: number; delivered: number; opened: number; bounced: number; unsubscribed: number; queued: number; failed: number };
+
 function Campaigns({ seesAll }: { seesAll: boolean }) {
   const [rows, setRows] = useState<Campaign[] | null>(null);
   const [open, setOpen] = useState<Campaign | "new" | null>(null);
-  const load = useCallback(() => api<{ campaigns: Campaign[] }>("/api/marketing/campaigns").then((j) => setRows(j.campaigns || [])).catch(() => setRows([])), []);
-  useEffect(() => { load(); }, [load]);
+  const [totals, setTotals] = useState<Totals | null>(null);
+  const [senders, setSenders] = useState<string[]>([]);
+  const [measured, setMeasured] = useState<{ delivered: boolean; replied: boolean; bounced: boolean }>({ delivered: false, replied: false, bounced: false });
+  const [why, setWhy] = useState<{ delivered?: string; replied?: string }>({});
+  const [statsReady, setStatsReady] = useState(true);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const [by, setBy] = useState(""); const [from, setFrom] = useState(""); const [to, setTo] = useState("");
+  const [q, setQ] = useState(""); const [status, setStatus] = useState("");
+
+  const load = useCallback(() => {
+    const p = new URLSearchParams();
+    if (by) p.set("by", by); if (from) p.set("from", from); if (to) p.set("to", to);
+    if (q) p.set("q", q); if (status) p.set("status", status);
+    return api<{ campaigns: Campaign[]; totals: Totals; senders: string[]; statsReady: boolean; measured: typeof measured; notMeasured: typeof why }>(`/api/marketing/campaigns?${p.toString()}`)
+      .then((j) => { setRows(j.campaigns || []); setTotals(j.totals || null); setSenders(j.senders || []); setStatsReady(j.statsReady !== false); if (j.measured) setMeasured(j.measured); if (j.notMeasured) setWhy(j.notMeasured); setErr(""); })
+      .catch((e) => { setErr(e instanceof Error ? e.message : String(e)); });
+  }, [by, from, to, q, status]);
+  useEffect(() => { const t = setTimeout(load, q ? 300 : 0); return () => clearTimeout(t); }, [load, q]);
+
+  const act = async (body: Record<string, unknown>, ok?: () => void) => {
+    setBusy(true); setErr("");
+    try { await api("/api/marketing/campaigns", body); await load(); ok?.(); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+
   const colour = (s: string) => (s === "sending" ? "#0F766E" : s === "done" ? "var(--green)" : s === "paused" ? "var(--warn)" : s === "ready" ? "var(--blue)" : MUTED);
+  const icon = (title: string, glyph: string, on: () => void, dead?: string) => (
+    <button title={dead || title} disabled={!!dead || busy} onClick={on}
+      style={{ fontSize: 14, padding: "1px 4px", cursor: dead ? "not-allowed" : "pointer", opacity: dead ? .3 : 1, background: "none", border: "none" }}>{glyph}</button>
+  );
+  const day = (c: Campaign) => (c.started_at || c.created_at || "").slice(0, 10).split("-").reverse().join("/");
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
@@ -334,16 +409,83 @@ function Campaigns({ seesAll }: { seesAll: boolean }) {
         <span className="ml-auto" />
         <button onClick={() => setOpen("new")} style={btn(ACCENT)}>+ New campaign</button>
       </div>
-      <GenieTable<Campaign> rows={rows} minWidth={800} empty="No campaigns yet. New campaign walks you through: lists, the list check, the message, the message check, unsubscribes, speed, send."
+
+      {/* FILTERS — every one of them narrows the cards as well as the table. */}
+      <div className="rounded border p-2 mb-2 flex flex-wrap items-end gap-2" style={{ borderColor: LINE, background: "#FBFAF7" }}>
+        <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Sent by
+          <select value={by} onChange={(e) => setBy(e.target.value)} style={{ ...inp, width: 170 }}>
+            <option value="">anybody</option>
+            {senders.map((x) => <option key={x} value={x}>{x.split("@")[0]}</option>)}
+          </select></label>
+        <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>From
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ ...inp, width: 150 }} /></label>
+        <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>To
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ ...inp, width: 150 }} /></label>
+        <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Status
+          <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ ...inp, width: 120 }}>
+            <option value="">any</option>
+            {["draft", "ready", "sending", "paused", "done"].map((x) => <option key={x} value={x}>{x}</option>)}
+          </select></label>
+        <label className="text-xs font-semibold flex-1" style={{ color: "var(--dim)", minWidth: 180 }}>Search name or subject
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ganpati, Lisbon, expo…" style={inp} /></label>
+        {(by || from || to || q || status) && (
+          <button onClick={() => { setBy(""); setFrom(""); setTo(""); setQ(""); setStatus(""); }} style={btn("#fff", "var(--dim)")}>clear</button>
+        )}
+        <span className="text-xs" style={{ color: MUTED }}>the cards and the table both obey these</span>
+      </div>
+
+      {err && <div className="rounded border p-2 mb-2 text-xs font-semibold" style={{ borderColor: RED, color: RED, background: "#FDF3F2" }}>{err}</div>}
+      {!statsReady && <div className="rounded border p-2 mb-2 text-xs" style={{ borderColor: "#E0C88A", background: "#FDF8EC", color: "#7A5B00" }}>
+        <b>The counts are not available.</b> Run CRM migration <b>0069</b> — it adds the per-campaign tally the database does in one query. The campaigns themselves are all here.
+      </div>}
+
+      {/* THE CARDS — the filtered set, totalled. */}
+      {totals && (
+        <div className="rounded border p-2 mb-3" style={{ borderColor: LINE, background: "#FAFAF8" }}>
+          <div className="flex flex-wrap" style={{ rowGap: 8 }}>
+            <Card label="Campaigns" v={totals.campaigns} />
+            <Card label="Lists" v={totals.lists} />
+            <Card label="Contacts" v={totals.contacts} />
+            <Card label="Sent" v={totals.sent} sub={pct(totals.sent, totals.contacts)} ink={GREEN} />
+            <Card label="Delivered" v={measured.delivered ? totals.delivered : "—"} sub={measured.delivered ? pct(totals.delivered, totals.sent) : "not measured"} />
+            <Card label="Opened" v={totals.opened} sub={pct(totals.opened, measured.delivered ? totals.delivered : totals.sent)} ink={totals.opened ? GREEN : undefined} />
+            <Card label="Replied" v="—" sub="not measured" />
+            <Card label="Bounced" v={totals.bounced} sub={pct(totals.bounced, totals.sent)} ink={totals.bounced ? RED : undefined} />
+            <Card label="U/s" v={totals.unsubscribed} sub={pct(totals.unsubscribed, totals.sent)} ink={totals.unsubscribed ? "var(--warn)" : undefined} />
+          </div>
+          <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.5 }}>
+            Sent is a share of <b>contacts</b>; opened, bounced and unsubscribed are shares of what actually went out.
+            {!measured.delivered && <> · <b>Delivered</b>: {why.delivered}</>}
+            <> · <b>Replied</b>: {why.replied}</>
+          </div>
+        </div>
+      )}
+
+      <GenieTable<Campaign> rows={rows} minWidth={1180} empty="No campaign matches. New campaign walks you through: lists, the list check, the message, the message check, unsubscribes, speed, send."
         columns={[
-          { key: "name", label: "Campaign", sort: (r) => r.name, render: (r) => <button onClick={() => setOpen(r)} className="font-semibold" style={{ color: "var(--blue)", textDecoration: "underline" }}>{r.name}</button> },
-          { key: "status", label: "Status", render: (r) => <span className="rounded px-1.5 text-xs font-bold" style={{ background: colour(r.status), color: "#fff" }}>{r.status}</span> },
-          { key: "subject", label: "Subject", render: (r) => r.subject || "·" },
+          { key: "at", label: "Date", sort: (r) => r.started_at || r.created_at, render: (r) => <span className="tnum">{day(r)}</span> },
+          { key: "name", label: "Campaign", sort: (r) => r.name, render: (r) => (
+            <span><button onClick={() => setOpen(r)} className="font-semibold" style={{ color: "var(--blue)", textDecoration: "underline" }}>{r.name}</button>
+              <span className="rounded px-1.5 text-xs font-bold ml-1" style={{ background: colour(r.status), color: "#fff" }}>{r.status}</span></span>) },
+          { key: "subject", label: "Subject", render: (r) => <span title={r.subject || ""}>{(r.subject || "·").slice(0, 46)}{(r.subject || "").length > 46 ? "…" : ""}</span> },
           { key: "lists", label: "Lists", align: "right", render: (r) => <span className="tnum">{r.list_ids.length}{r.person_ids.length ? ` +${r.person_ids.length}` : ""}</span> },
-          { key: "speed", label: "/hour", align: "right", render: (r) => <span className="tnum">{r.speed_per_hour}</span> },
-          { key: "sent", label: "Queued / sent", align: "right", render: (r) => <span className="tnum">{r.counts?.queued ?? "·"}</span> },
+          { key: "contacts", label: "Contacts", align: "right", render: (r) => <span className="tnum">{r.stat ? r.stat.contacts : "·"}</span> },
+          { key: "sent", label: "Sent", align: "right", render: (r) => r.stat ? <span className="tnum" style={{ color: GREEN, fontWeight: 600 }}>{r.stat.sent}<span style={{ color: MUTED, fontWeight: 400 }}> {pct(r.stat.sent, r.stat.contacts)}</span></span> : "·" },
+          { key: "deliv", label: "Delivered", align: "right", render: (r) => !r.stat ? "·" : !measured.delivered ? <span title={why.delivered} style={{ color: MUTED }}>—</span>
+            : <span className="tnum">{r.stat.delivered}<span style={{ color: MUTED }}> {pct(r.stat.delivered, r.stat.sent)}</span></span> },
+          { key: "open", label: "Opened", align: "right", render: (r) => r.stat ? <span className="tnum" style={{ color: r.stat.opened ? GREEN : undefined }}>{r.stat.opened}<span style={{ color: MUTED }}> {pct(r.stat.opened, measured.delivered ? r.stat.delivered : r.stat.sent)}</span></span> : "·" },
+          { key: "rep", label: "Replied", align: "right", render: () => <span title={why.replied} style={{ color: MUTED }}>—</span> },
           { key: "by", label: "By", render: (r) => r.created_by_email.split("@")[0] },
-          { key: "at", label: "Started", render: (r) => (r.started_at ? fmtAt(r.started_at) : "·") },
+          { key: "bounce", label: "Bounced", align: "right", render: (r) => r.stat ? <span className="tnum" style={{ color: r.stat.bounced ? RED : undefined }}>{r.stat.bounced}<span style={{ color: MUTED }}> {pct(r.stat.bounced, r.stat.sent)}</span></span> : "·" },
+          { key: "uns", label: "U/s", align: "right", render: (r) => r.stat ? <span className="tnum" style={{ color: r.stat.unsubscribed ? "var(--warn)" : undefined }}>{r.stat.unsubscribed}<span style={{ color: MUTED }}> {pct(r.stat.unsubscribed, r.stat.sent)}</span></span> : "·" },
+          { key: "x", label: "", render: (r) => (
+            <span className="flex" style={{ gap: 1 }}>
+              {icon("View", "👁", () => setOpen(r))}
+              {icon("Edit", "✏️", () => setOpen(r), r.status === "sending" ? "Pause it before changing anything" : undefined)}
+              {icon("Duplicate — a fresh draft with the same message and audience", "⧉", () => act({ action: "duplicate", id: r.id }))}
+              {icon("Delete", "🗑", () => { if (window.confirm(`Delete the draft “${r.name}”?`)) act({ action: "delete", id: r.id }); },
+                r.status !== "draft" ? `Only a draft can be deleted — this one is ${r.status}. What went out is a record of what people were sent.` : undefined)}
+            </span>) },
         ]} />
       {open && <CampaignWizard c={open === "new" ? null : open} seesAll={seesAll} onClose={() => { setOpen(null); load(); }} />}
     </div>

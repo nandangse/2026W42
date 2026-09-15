@@ -174,7 +174,81 @@ export async function GET(req: Request) {
       if (/relation|does not exist|could not find the table/i.test(error.message)) return NextResponse.json({ installed: false, campaigns: [] });
       throw new Error(error.message);
     }
-    return NextResponse.json({ installed: true, unsubChoiceReady, campaigns: data ?? [] });
+
+    /**
+     * THE FILTERS, APPLIED HERE RATHER THAN IN THE BROWSER (15 Sep 2026:
+     * "Have filter — sent by, date from - to, some more search").
+     *
+     * A campaign's date is the day it STARTED where it has started, and the
+     * day it was made where it has not, because a draft has no send date and
+     * would otherwise vanish from every date range.
+     */
+    const url = new URL(req.url);
+    const by = (url.searchParams.get("by") || "").trim().toLowerCase();
+    const from = (url.searchParams.get("from") || "").trim();
+    const to = (url.searchParams.get("to") || "").trim();
+    const q = (url.searchParams.get("q") || "").trim().toLowerCase();
+    const st = (url.searchParams.get("status") || "").trim();
+    const when = (c: Record<string, unknown>) => String(c.started_at || c.created_at || "").slice(0, 10);
+    let rows = (data ?? []).filter((c) => {
+      if (by && String(c.created_by_email || "").toLowerCase() !== by) return false;
+      if (st && String(c.status) !== st) return false;
+      const d = when(c);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      if (q && !`${c.name ?? ""} ${c.subject ?? ""}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+
+    /**
+     * THE TALLIES COME FROM THE DATABASE, NOT FROM COUNTING ROWS HERE.
+     *
+     * At 240,000 sends a month, reading mk_send into this route to print a
+     * dozen numbers would be absurd. The view does it in one query — and
+     * before migration 0069 exists there is simply no stat block, and the
+     * screen says "not counted yet" rather than showing a made-up nought.
+     */
+    type Stat = { campaign_id: string; contacts: number; queued: number; sent: number; delivered: number; opened: number; bounced: number; unsubscribed: number; failed: number; skipped: number };
+    const ids = rows.map((c) => String(c.id));
+    let statsReady = true;
+    const byId = new Map<string, Stat>();
+    if (ids.length) {
+      const r = await db.from("mk_campaign_stat").select("*").in("campaign_id", ids);
+      if (r.error) statsReady = false;
+      else for (const x of (r.data as unknown as Stat[]) || []) byId.set(String(x.campaign_id), x);
+    }
+    rows = rows.map((c) => ({ ...c, stat: byId.get(String(c.id)) ?? null }));
+
+    /* Whether anything has ever been delivered decides whether the column can
+       speak at all — nought deliveries across every campaign means the
+       webhook is not wired, not that nothing arrived. */
+    type Totals = { campaigns: number; lists: number; contacts: number; sent: number; delivered: number; opened: number; bounced: number; unsubscribed: number; queued: number; failed: number };
+    const totals = rows.reduce<Totals>((a, c) => {
+      const x = (c as { stat: Stat | null }).stat;
+      a.campaigns += 1;
+      a.lists += Array.isArray(c.list_ids) ? (c.list_ids as string[]).length : 0;
+      if (x) { a.contacts += x.contacts; a.sent += x.sent; a.delivered += x.delivered; a.opened += x.opened; a.bounced += x.bounced; a.unsubscribed += x.unsubscribed; a.queued += x.queued; a.failed += x.failed; }
+      return a;
+    }, { campaigns: 0, lists: 0, contacts: 0, sent: 0, delivered: 0, opened: 0, bounced: 0, unsubscribed: 0, queued: 0, failed: 0 });
+
+    const senders = [...new Set((data ?? []).map((c) => String(c.created_by_email || "")).filter(Boolean))].sort();
+
+    return NextResponse.json({
+      installed: true, unsubChoiceReady, statsReady,
+      campaigns: rows,
+      totals,
+      senders,
+      /* Said plainly, so the screen never has to guess why a column is blank. */
+      measured: {
+        delivered: statsReady && totals.delivered > 0,
+        replied: false,
+        bounced: statsReady,
+      },
+      notMeasured: {
+        delivered: "Add the email.delivered event to the Resend webhook — nothing has been recorded yet.",
+        replied: "Genie does not see replies. They go to the Reply-To mailbox, and matching them back to a campaign is inbound-mail work that has not been built.",
+      },
+    });
   } catch (e) {
     return errJson(e);
   }
@@ -292,8 +366,29 @@ export async function POST(req: Request) {
     }
     if (b.action === "pause") { await db.from("mk_campaign").update({ status: "paused" }).eq("id", b.id); return NextResponse.json({ ok: true }); }
     if (b.action === "resume") { await db.from("mk_campaign").update({ status: "sending" }).eq("id", b.id); return NextResponse.json({ ok: true }); }
+    /**
+     * DUPLICATE — the quickest honest way to send the same thing again.
+     * It copies the message and the audience and nothing that happened: the
+     * copy is a draft with no history, no counts and no send log.
+     */
+    if (b.action === "duplicate") {
+      const copy: Record<string, unknown> = {
+        name: `${c.name} (copy)`, subject: c.subject, body_html: c.body_html,
+        list_ids: c.list_ids, person_ids: c.person_ids, channel_ids: c.channel_ids,
+        speed_per_hour: c.speed_per_hour, status: "draft", created_by_email: me,
+      };
+      { const probe = await db.from("mk_campaign").select("show_unsub_link").limit(1);
+        if (!probe.error) copy.show_unsub_link = (c as { show_unsub_link?: boolean }).show_unsub_link !== false; }
+      const { data: made, error } = await db.from("mk_campaign").insert(copy).select("id").single();
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, id: made.id });
+    }
+
     if (b.action === "delete") {
-      if (c.status === "sending") throw new HttpError(400, "Pause it first.");
+      /* Dr Raghu, 15 Sep 2026: "Delete will work only if in draft. After send
+         it can't." A campaign that has gone out is a record of what people
+         were sent, and that is not ours to tidy away. */
+      if (c.status !== "draft") throw new HttpError(400, `This campaign is ${c.status} — only a draft can be deleted. What went out is a record of what people were sent.`);
       await db.from("mk_campaign").delete().eq("id", b.id); return NextResponse.json({ ok: true });
     }
     throw new HttpError(400, "unknown action");
