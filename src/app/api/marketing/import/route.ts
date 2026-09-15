@@ -96,6 +96,16 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) throw new HttpError(400, "No file came with the upload.");
     if (!listId) throw new HttpError(400, "Which list?");
 
+    /**
+     * WHERE THIS NAME CAME FROM (0073).
+     *
+     * Defaults to the file's own name, and is editable because a file called
+     * "Book1 (3).xlsx" tells nobody anything while "Aahar 2024" tells them
+     * everything. Recorded on the MEMBERSHIP: the same person can arrive on
+     * one list from two different shows, and both reasons are true.
+     */
+    const source = String(form.get("source") || "").trim().slice(0, 160) || file.name;
+
     const mapRaw = String(form.get("map") || "");
     const map: Record<number, string> = mapRaw ? JSON.parse(mapRaw) : {};
 
@@ -158,7 +168,7 @@ export async function POST(req: Request) {
     const byEmail = new Map<string, { id: string; [k: string]: unknown }>();
     for (const c of chunk([...want], 300)) {
       const { data, error } = await db.from("person")
-        .select("id, primary_email, primary_phone, whatsapp_number, job_title, department, linkedin_url, city, country, full_name")
+        .select("id, primary_email, primary_phone, whatsapp_number, job_title, department, linkedin_url, city, country, full_name, notes")
         .in("primary_email", c);
       if (error) throw new HttpError(500, error.message);
       for (const p of data || []) if (p.primary_email) byEmail.set(lower(p.primary_email), p as { id: string });
@@ -200,6 +210,26 @@ export async function POST(req: Request) {
         for (const k of ["primary_phone", "whatsapp_number", "job_title", "department", "linkedin_url", "city", "country"]) {
           if (vals[k] && !hit[k]) patch[k] = vals[k];
         }
+        /**
+         * AND THE COLUMNS WITH NOWHERE TO GO ARE ADDED TO THEIR NOTES
+         * (Dr Raghu, 15 Sep 2026: "also the fields in the record that don't
+         * have a cell to go to should be merged in the notes").
+         *
+         * A new person has always kept them. Somebody ALREADY in the CRM did
+         * not: their landlines, their PIN code, their business description
+         * were read out of the file and then dropped, which is the worst of
+         * both — the work of reading with none of the keeping.
+         *
+         * APPENDED, NEVER REPLACED, and skipped when the same block is
+         * already there, so importing the same file twice does not write the
+         * same paragraph twice.
+         */
+        if (note) {
+          const had = String(hit.notes || "").trim();
+          const body = note.split("\n").slice(1).join("\n").trim();   // without its own header line
+          if (!had) patch.notes = note;
+          else if (body && !had.includes(body)) patch.notes = `${had}\n\n${note}`;
+        }
         if (Object.keys(patch).length) patches.push({ id: hit.id, patch });
       } else {
         const row: Record<string, unknown> = {
@@ -222,12 +252,14 @@ export async function POST(req: Request) {
 
     const summary = {
       file: file.name,
+      source,
       rows: slice.length,
       fileRows: body.length,
       headers,
       mapping: Object.fromEntries(Object.entries(guessed).map(([i, k]) => [headers[Number(i)] || `col ${i}`, k])),
       unmapped: headers.filter((h, i) => h && !guessed[i]),
       matched, willInsert: inserts.length, willFill: patches.length,
+      willNote: patches.filter((p) => p.patch.notes !== undefined).length,
       blankEmail, sharedAddresses: sharedRows, emptyRows: empty,
     };
 
@@ -263,9 +295,15 @@ export async function POST(req: Request) {
     }
     let listed = 0;
     for (const c of chunk([...new Set(memberIds)], 500)) {
-      const { error } = await db.from("mk_list_member")
-        .upsert(c.map((pid) => ({ list_id: listId, person_id: pid, added_by_email: u.email.toLowerCase() })),
-          { onConflict: "list_id,person_id", ignoreDuplicates: true });
+      const rows = c.map((pid) => ({ list_id: listId, person_id: pid, added_by_email: u.email.toLowerCase(), source }));
+      let { error } = await db.from("mk_list_member")
+        .upsert(rows, { onConflict: "list_id,person_id", ignoreDuplicates: true });
+      /* Before 0073 there is no column for it; the membership still matters
+         more than the note about where it came from. */
+      if (error && /source/i.test(error.message)) {
+        ({ error } = await db.from("mk_list_member")
+          .upsert(rows.map(({ source: _s, ...r }) => r), { onConflict: "list_id,person_id", ignoreDuplicates: true }));
+      }
       if (error) throw new HttpError(500, `adding to the list: ${error.message}`);
       listed += c.length;
     }

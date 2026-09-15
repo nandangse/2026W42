@@ -903,7 +903,7 @@ function Unsubscribes({ seesAll }: { seesAll: boolean }) {
    ══════════════════════════════════════════════════════════════════════ */
 type Preview = {
   file: string; rows: number; headers: string[]; mapping: Record<string, string>; unmapped: string[];
-  matched: number; willInsert: number; willFill: number;
+  matched: number; willInsert: number; willFill: number; willNote?: number;
   blankEmail: number; sharedAddresses: number; emptyRows: number;
   sample?: Record<string, unknown>[]; listed?: number; committed?: boolean; notesCarried?: boolean; note?: string;
   /* Where a sliced commit reached, and whether the file is finished. */
@@ -912,6 +912,8 @@ type Preview = {
 
 function ListUpload({ list, onClose, onDone, inline }: { list: List; onClose: () => void; onDone: () => void; inline?: boolean }) {
   const [file, setFile] = useState<File | null>(null);
+  /** Where these names came from — the file's own name unless told otherwise. */
+  const [source, setSource] = useState("");
   const [prev, setPrev] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -940,6 +942,7 @@ function ListUpload({ list, onClose, onDone, inline }: { list: List; onClose: ()
         fd.append("file", file);
         fd.append("list_id", list.id);
         fd.append("action", action);
+        fd.append("source", source.trim() || file.name);
         if (action === "commit") { fd.append("from", String(from)); fd.append("size", "1500"); }
         const r = await fetch("/api/marketing/import", { method: "POST", body: fd });
         const text = await r.text();
@@ -991,8 +994,25 @@ function ListUpload({ list, onClose, onDone, inline }: { list: List; onClose: ()
             {" "}<b>Nothing is overwritten:</b> where somebody is already here, the file may fill a blank field and nothing more.
           </div>
 
-          <input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => { setFile(e.target.files?.[0] || null); setPrev(null); }}
-            className="text-sm mb-3" />
+          <input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => {
+            const f = e.target.files?.[0] || null;
+            setFile(f); setPrev(null);
+            /* The file's own name, without its extension, is the honest
+               default — and editable, because "Book1 (3).xlsx" tells nobody
+               anything while "Aahar 2024" tells them everything. */
+            if (f) setSource(f.name.replace(/\.[^.]+$/, ""));
+          }} className="text-sm mb-2" />
+
+          {file && (
+            <label className="block mb-3 text-xs font-semibold" style={{ color: "var(--dim)" }}>
+              Source — what put these names on the list
+              <input value={source} onChange={(e) => setSource(e.target.value)} placeholder={file.name}
+                style={{ ...inp, maxWidth: 380 }} />
+              <span className="font-normal" style={{ color: MUTED }}>
+                Kept against each name, so four files in one list stay tellable apart. A person already on the list keeps the source they arrived with.
+              </span>
+            </label>
+          )}
 
           {err && <div className="text-xs font-semibold mb-2" style={{ color: RED }}>{err}</div>}
 
@@ -1009,7 +1029,8 @@ function ListUpload({ list, onClose, onDone, inline }: { list: List; onClose: ()
               </div>
               <div className="text-xs" style={{ color: MUTED, lineHeight: 1.6 }}>
                 <b>Recognised:</b> {Object.entries(prev.mapping).map(([h, k]) => `${h} → ${k}`).join(" · ") || "nothing"}<br />
-                {prev.unmapped.length > 0 && <><b>Kept as a note:</b> {prev.unmapped.join(" · ")}<br /></>}
+                {prev.unmapped.length > 0 && <><b>Kept as a note:</b> {prev.unmapped.join(" · ")}
+                  {!!prev.willNote && <> — <b>{prev.willNote}</b> {prev.willNote === 1 ? "person already here gains" : "people already here gain"} these on their notes, added below what is there</>}<br /></>}
                 {prev.blankEmail > 0 && <><b>{prev.blankEmail}</b> rows carry no e-mail — added anyway, they can still be telephoned.<br /></>}
                 {prev.sharedAddresses > 0 && <><b>{prev.sharedAddresses}</b> rows share an e-mail with another row in this file — kept as separate people, not merged, because one address used twice identifies nobody.<br /></>}
                 {prev.emptyRows > 0 && <><b>{prev.emptyRows}</b> rows had no name and no e-mail and were skipped.<br /></>}
@@ -1079,7 +1100,7 @@ function ListUpload({ list, onClose, onDone, inline }: { list: List; onClose: ()
    is understood": the person is created in Leads if they are not there, and
    joined to this list either way. Neither is a separate act to remember.
    ══════════════════════════════════════════════════════════════════════ */
-type Member = { person_id: string; added_at: string; person: Person | null };
+type Member = { person_id: string; added_at: string; source?: string | null; person: Person | null };
 
 function ListBox({ list, onClose, onChanged }: { list: List; onClose: () => void; onChanged: () => void }) {
   const [members, setMembers] = useState<Member[] | null>(null);
@@ -1099,7 +1120,9 @@ function ListBox({ list, onClose, onChanged }: { list: List; onClose: () => void
   const shown = useMemo(() => {
     const k = q.trim().toLowerCase();
     if (!k || !members) return members;
-    return members.filter((m) => [m.person?.full_name, m.person?.primary_email, m.person?.job_title, m.person?.company?.name, m.person?.primary_phone]
+    /* The source is searchable too — typing "Aahar" should find that show's
+       people without anybody having to remember who they were. */
+    return members.filter((m) => [m.person?.full_name, m.person?.primary_email, m.person?.job_title, m.person?.company?.name, m.person?.primary_phone, m.source]
       .some((v) => String(v || "").toLowerCase().includes(k)));
   }, [members, q]);
 
@@ -1171,6 +1194,12 @@ function ListBox({ list, onClose, onChanged }: { list: List; onClose: () => void
           { key: "c", label: "Company", sort: (r) => r.person?.company?.name || "", render: (r) => r.person?.company?.name || "·" },
           { key: "e", label: "E-mail", sort: (r) => r.person?.primary_email || "", render: (r) => r.person?.primary_email || <span style={{ color: RED }}>none</span> },
           { key: "p", label: "Phone", render: (r) => r.person?.primary_phone || "·" },
+          /* WHICH FILE PUT THEM HERE. A list named for three years of shows
+             is several shows in one, and "was this Aahar or Lisbon?" is the
+             first thing asked when a reply comes back. */
+          { key: "s", label: "Source", sort: (r) => r.source || "", render: (r) => r.source
+            ? <span title={r.source} style={{ fontSize: 12 }}>{r.source.length > 26 ? r.source.slice(0, 26) + "…" : r.source}</span>
+            : <span style={{ color: MUTED }}>·</span> },
           { key: "x", label: "", render: (r) => (
             <button onClick={() => remove(r.person_id, r.person?.full_name || "this person")} disabled={busy === r.person_id}
               className="text-xs" style={{ color: RED }} title="Take them off this list. The person and their other lists are untouched.">

@@ -17,7 +17,19 @@ export async function GET(req: Request) {
       /* PAGED: .limit(5000) returned 1,000 and said nothing — see
          src/lib/page-all.ts. A 10,137-member list showed as 1,000. */
       type M = Record<string, unknown>;
-      const data = await pageAll<M>((f, t) => db.from("mk_list_member").select("person_id, added_at, person:person_id(id, first_name, last_name, full_name, job_title, primary_email, city, company:company_id(name))").eq("list_id", id).order("added_at", { ascending: false }).range(f, t), "the list's members");
+      const PERSON = "person:person_id(id, first_name, last_name, full_name, job_title, primary_email, city, company:company_id(name))";
+      const members = async (cols: string) => pageAll<M>(async (f, t) => {
+        const r = await db.from("mk_list_member").select(cols).eq("list_id", id).order("added_at", { ascending: false }).range(f, t);
+        return { data: r.data as unknown as M[] | null, error: r.error };
+      }, "the list's members");
+      let data: M[];
+      try { data = await members(`person_id, added_at, source, ${PERSON}`); }
+      catch (e) {
+        /* 0073 not run yet — the members matter more than the note about
+           where they came from. */
+        if (!/source/i.test(e instanceof Error ? e.message : "")) throw e;
+        data = await members(`person_id, added_at, ${PERSON}`);
+      }
       const error = null as { message: string } | null;
       if (error) throw new Error(error.message);
       return NextResponse.json({ members: data ?? [] });

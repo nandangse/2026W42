@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.48.5",
+    date: "2026-09-15",
+    module: "Where a name came from, and the columns that had nowhere to go",
+    items: [
+      "<b>A list upload now records its SOURCE against every name it adds</b>, defaulting to the file\u2019s own name and editable before you press Import \u2014 because \u201cBook1 (3).xlsx\u201d tells nobody anything while \u201cAahar 2024\u201d tells them everything. A list called <i>Various Exhibition Visitors 2024-26</i> is several shows in one, and \u201cwas this Aahar or Lisbon?\u201d is the first question asked when a reply comes back.",
+      "It sits on the MEMBERSHIP, not on the person: the same contact can turn up at Aahar in 2024 and Lisbon in 2026, one person with two true reasons to be on the list. The list shows it as a column and the search box reaches it \u2014 type \u201cAahar\u201d and that show\u2019s people appear.",
+      "<b>And the columns with nowhere to go now reach people who were already here.</b> A new person has always kept them as a note; somebody already in the CRM did not \u2014 their landlines, PIN code and business description were read out of the file and then dropped, which is the worst of both, the work of reading with none of the keeping. They are <b>added below what is already on the record, never over it</b>, and the same block is not written twice if the same file is imported again. The preview says how many people will gain one.",
+      "<b>Needs CRM migration 0073</b>; without it the upload still works and simply records no source.",
+    ],
+  },
+  {
     v: "5.0.48.4",
     date: "2026-09-15",
     module: "A home for the card thank-you \u2014 the template modules were the missing half",
