@@ -564,7 +564,7 @@ export const DOCTYPES: Doctype[] = [
     onlyFor: ["raghu@nandan.co.in"],
     blurb: "The letters the company sends, written once. Each shows in the composer as Module - Name; its subject, cc, body and attachments are fixed on the template, and {{variables}} render on send.",
     fields: [
-      { name: "module", label: "Module", type: "select", options: ["Enquiry", "Quotation"], required: true, inList: true, default: "Enquiry",
+      { name: "module", label: "Module", type: "select", options: ["Enquiry", "Quotation", "Visiting card", "Marketing", "General"], required: true, inList: true, default: "Enquiry",
         help: "Where this letter belongs. It shows in the composer as Module - Name." },
       { name: "name", label: "Template name", type: "text", required: true, inList: true },
       { name: "subject", label: "Subject", type: "text", inList: true, help: "Fixed on the template — {{variables}} render on send." },
@@ -582,7 +582,7 @@ export const DOCTYPES: Doctype[] = [
     onlyFor: ["raghu@nandan.co.in"],
     blurb: "The WhatsApp messages the company sends, written once. Each shows as Module - Name; body and attachments are fixed on the template, and {{variables}} render on send.",
     fields: [
-      { name: "module", label: "Module", type: "select", options: ["Enquiry", "Quotation"], required: true, inList: true, default: "Enquiry",
+      { name: "module", label: "Module", type: "select", options: ["Enquiry", "Quotation", "Visiting card", "Marketing", "General"], required: true, inList: true, default: "Enquiry",
         help: "Where this message belongs. It shows as Module - Name." },
       { name: "name", label: "Template name", type: "text", required: true, inList: true },
       { name: "body", label: "Body", type: "textarea", big: true, inList: true, help: "Hi {{small_name}}, … — every message variable works here." },

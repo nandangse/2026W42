@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.48.4",
+    date: "2026-09-15",
+    module: "A home for the card thank-you \u2014 the template modules were the missing half",
+    items: [
+      "<b>Why both template tables were empty:</b> New email template offered <i>Enquiry</i> and <i>Quotation</i> and nothing else, and a thank-you for a scanned visiting card belongs to neither. The feature was finished except for the place to put the words \u2014 so nobody ever wrote any, and the two ticks on the card lightbox have been falling back to hard-coded text all along.",
+      "<b>Three modules are opened</b> \u2014 <b>Visiting card</b>, <b>Marketing</b> and <b>General</b> \u2014 on both the e-mail and WhatsApp templates. The check constraint is replaced rather than dropped: a typo\u2019d module is still a typo.",
+      "<b>And the card now looks in the right place.</b> A template written under <i>Visiting card</i> is preferred over one merely named \u201ccard thank you\u201d, which is still preferred over the fallback. <b>The fallback stays</b> \u2014 a card scanned before anybody writes a template must still be thanked, and it is better for that to be plain prose than nothing.",
+      "<b>Needs CRM migration 0072.</b>",
+    ],
+  },
+  {
     v: "5.0.48.3",
     date: "2026-09-15",
     module: "Visiting cards: a rectangle to put the card in, and what the card does not say",

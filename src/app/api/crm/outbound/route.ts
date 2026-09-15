@@ -170,16 +170,31 @@ export async function POST(req: Request) {
         let subject: string | null = null, text = "";
         if (channel === "email") {
           const tn = String(body.email_template || "").trim();
+          /**
+           * WHICH TEMPLATE, WHEN NOBODY PICKED ONE (15 Sep 2026).
+           *
+           * Both template tables were empty until today, because the Module
+           * dropdown offered only Enquiry and Quotation and a card thank-you
+           * belongs to neither — so every thank-you has quietly used the
+           * hard-coded FALLBACK below. Migration 0072 opens "Visiting card",
+           * and anything written there is preferred over a name match, which
+           * is preferred over the fallback. The fallback stays: a card
+           * scanned before anybody writes a template must still be thanked.
+           */
           const { data: t } = tn
             ? await db.from("email_template").select("subject, body").eq("name", tn).limit(1).maybeSingle()
-            : await db.from("email_template").select("subject, body").ilike("name", "%card thank you%").limit(1).maybeSingle();
+            : (await db.from("email_template").select("subject, body").eq("module", "Visiting card").order("name").limit(1).maybeSingle()).data
+              ? await db.from("email_template").select("subject, body").eq("module", "Visiting card").order("name").limit(1).maybeSingle()
+              : await db.from("email_template").select("subject, body").ilike("name", "%card thank you%").limit(1).maybeSingle();
           subject = renderTemplate(fill(String(t?.subject || FALLBACK.email_subject), vars), vars);
           text = renderTemplate(fill(String(t?.body || FALLBACK.email_body), vars), vars);
         } else {
           const tn = String(body.wa_template || "").trim();
           const { data: t } = tn
             ? await db.from("whatsapp_template").select("body").eq("name", tn).limit(1).maybeSingle()
-            : await db.from("whatsapp_template").select("body").ilike("name", "%card thank you%").limit(1).maybeSingle();
+            : (await db.from("whatsapp_template").select("body").eq("module", "Visiting card").order("name").limit(1).maybeSingle()).data
+              ? await db.from("whatsapp_template").select("body").eq("module", "Visiting card").order("name").limit(1).maybeSingle()
+              : await db.from("whatsapp_template").select("body").ilike("name", "%card thank you%").limit(1).maybeSingle();
           text = renderTemplate(fill(String(t?.body || FALLBACK.wa_body), vars), vars);
         }
         rows.push({

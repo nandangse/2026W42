@@ -309,7 +309,7 @@ export default function MailComposer({ ctx, onClose, onSent }: {
             <div className="flex items-center gap-2 flex-wrap rounded border p-2 mb-2" style={{ borderColor: BORDER, background: "#FBFAF7" }}>
               <select value={tplModule} onChange={(e) => setTplModule(e.target.value)}
                 className="rounded border px-2 py-1 text-xs font-semibold" style={{ borderColor: BORDER, background: "#fff" }}>
-                <option>Enquiry</option><option>Quotation</option>
+                <option>Enquiry</option><option>Quotation</option><option>Visiting card</option><option>Marketing</option><option>General</option>
               </select>
               <input value={tplName} onChange={(e) => setTplName(e.target.value)} placeholder="Template name"
                 className="flex-1 rounded border px-2 py-1 text-xs" style={{ borderColor: BORDER, minWidth: 140 }} />
