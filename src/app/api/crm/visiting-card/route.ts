@@ -174,10 +174,13 @@ export async function POST(req: Request) {
         image_back_path: String(body.back_path || "").trim() || null,
         transcript: String(body.transcript || "").trim() || null,
         extracted: body.extracted ?? null,
+        context: String(body.context || "").trim() || null,
         status: "saved",
         added_by: me.email.toLowerCase(),
       }).select("id").maybeSingle();
       if (error) {
+        if (/context/i.test(error.message))
+          throw new HttpError(503, "Run CRM migration 0071 — the context box has nowhere to go yet.");
         if (/visiting_card|schema cache|does not exist/i.test(error.message))
           throw new HttpError(503, "Run CRM migrations 0018 and 0019 first.");
         throw new HttpError(500, error.message);
@@ -213,6 +216,7 @@ export async function POST(req: Request) {
       image_back_path: String(body.back_path || "").trim() || null,
       transcript: String(body.transcript || "").trim() || null,
       extracted: body.extracted ?? null,
+      context: String(body.context || "").trim() || null,
       company_id: companyId, person_id: p ? String(p.id) : null,
       status: "added",
       added_by: me.email.toLowerCase(),
@@ -223,7 +227,49 @@ export async function POST(req: Request) {
       : await db.from("visiting_card").insert(cardRow);
     if (ve && !/visiting_card|schema cache/i.test(ve.message)) throw new HttpError(500, ve.message);
 
-    return NextResponse.json({ ok: true, person_id: p ? String(p.id) : null, company_id: companyId });
+    /**
+     * THE CONTEXT GOES ON THE PERSON TOO, not only on the scan.
+     *
+     * Somebody opening the contact in six months is looking at the person,
+     * not at the photograph of their card, and "met at the Lisbon stand, wants
+     * a quote for two belt loaders" is the whole reason the card was kept.
+     */
+    const ctx = String(body.context || "").trim();
+    if (ctx && p) {
+      const line = `— Visiting card, ${new Date().toISOString().slice(0, 10)} —\n${ctx}`;
+      const { data: cur } = await db.from("person").select("notes").eq("id", p.id).maybeSingle();
+      const had = String(cur?.notes || "").trim();
+      await db.from("person").update({ notes: had ? `${had}\n\n${line}` : line }).eq("id", p.id);
+    }
+
+    /**
+     * THE TAGS — found or made, then linked to the contact.
+     *
+     * crm_tag_link has a unique (tag_id, entity, entity_id), and PostgREST
+     * needs that spelled out in the query string before it will ignore a
+     * duplicate rather than refuse the whole insert — learned the hard way
+     * on 12 Sep. Tagging the same person twice is a no-op, not a failure.
+     */
+    const tags = (Array.isArray(body.tags) ? body.tags : []).map((t: unknown) => String(t).trim()).filter(Boolean).slice(0, 12);
+    const tagged: string[] = [];
+    if (tags.length && p) {
+      for (const name of tags) {
+        try {
+          const { data: found } = await db.from("crm_tag").select("id").ilike("name", name).limit(1);
+          let tagId = found?.[0]?.id ? String(found[0].id) : null;
+          if (!tagId) {
+            const { data: made, error } = await db.from("crm_tag").insert({ name, owner_id: me.profileId }).select("id").maybeSingle();
+            if (error) continue;
+            tagId = made ? String(made.id) : null;
+          }
+          if (!tagId) continue;
+          await db.from("crm_tag_link").upsert({ tag_id: tagId, entity: "person", entity_id: String(p.id) }, { onConflict: "tag_id,entity,entity_id", ignoreDuplicates: true });
+          tagged.push(name);
+        } catch { /* one bad tag must not lose the contact */ }
+      }
+    }
+
+    return NextResponse.json({ ok: true, person_id: p ? String(p.id) : null, company_id: companyId, tagged });
   } catch (e) {
     return errJson(e);
   }

@@ -35,10 +35,12 @@ const EMPTY_FORM = { person_name: "", salutation: "", designation: "", company: 
  * reader never sees an image it must refuse. Falls back to the original if
  * the canvas cannot cope.
  */
-async function shrinkImage(file: File, maxEdge = 1600): Promise<{ blob: Blob; name: string }> {
+async function shrinkImage(file: File, maxEdge = 1600, alreadyFramed = false): Promise<{ blob: Blob; name: string }> {
   try {
     const bmp = await createImageBitmap(file);
-    const cropped = autoCropCard(bmp);
+    /* A shot taken inside the guide is already the card. Guessing at its
+       edges a second time can only make it worse. */
+    const cropped = alreadyFramed ? null : autoCropCard(bmp);
     const src = cropped ?? bmp;
     const sw = cropped ? cropped.width : bmp.width;
     const sh = cropped ? cropped.height : bmp.height;
@@ -136,6 +138,214 @@ function autoCropCard(bmp: ImageBitmap): HTMLCanvasElement | null {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   THE CAMERA, WITH A RECTANGLE TO PUT THE CARD IN
+
+   Dr Raghu, 15 Sep 2026: "can it show a rectangle in the portrait camera as
+   well as the landscape camera so that only that much is taken in. will be
+   much cleaner."
+
+   Until now a tap opened the PHONE'S OWN camera app, which is somebody
+   else's screen — nothing can be drawn on it — and it handed back the whole
+   frame: the card, the desk, the cup, a hand. Genie then guessed where the
+   card was by sampling the border colour, which works on a plain desk and
+   not on a patterned one.
+
+   A guide removes the guess. The card is framed by the person holding the
+   phone, who can see it, and ONLY THE INSIDE OF THE RECTANGLE IS KEPT — the
+   crop is taken from the sensor's own pixels, not from the preview, so
+   nothing is lost to the screen being smaller than the camera.
+
+   IT WORKS HELD EITHER WAY, which was the actual request. The guide is
+   computed from the live preview's shape every frame: held upright it lies
+   across the middle, held sideways it fills nearly the whole screen. The
+   card gets the most pixels the sensor can give it in both.
+
+   A card standing upright is a real thing too, so ⟳ flips the guide — and a
+   portrait capture is rotated to landscape on the way out, because the rest
+   of this file has always held that a card is read lying down.
+
+   FALLING BACK IS NOT AN ERROR. No camera, a refused permission, or a page
+   not on https: the file picker opens instead and says why in one line. */
+
+/** 89 × 51 mm is the common Indian card; 3.5 × 2 in the American one. */
+const CARD_RATIO = 1.7;
+
+function CardCamera({ side, onShot, onClose, onFallback }: {
+  side: "front" | "back"; onShot: (f: File) => void; onClose: () => void; onFallback: (why: string) => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [ready, setReady] = useState(false);
+  const [upright, setUpright] = useState(false);          // the CARD's shape, not the phone's
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const [err, setErr] = useState("");
+
+  /* The guide, in the preview's own coordinates. */
+  const ratio = upright ? 1 / CARD_RATIO : CARD_RATIO;
+  const guide = (() => {
+    if (!box.w || !box.h) return null;
+    let w = box.w * 0.92, h = w / ratio;
+    if (h > box.h * 0.82) { h = box.h * 0.82; w = h * ratio; }
+    return { x: (box.w - w) / 2, y: (box.h - h) / 2, w, h };
+  })();
+
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+        onFallback("This browser will not open a camera here — choose a photo instead."); return;
+      }
+      try {
+        const st = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1440 } },
+          audio: false,
+        });
+        if (dead) { st.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = st;
+        if (videoRef.current) { videoRef.current.srcObject = st; await videoRef.current.play().catch(() => {}); }
+        setReady(true);
+      } catch (e) {
+        const m = e instanceof Error ? e.message : String(e);
+        onFallback(/denied|NotAllowed/i.test(m) ? "The camera was not allowed — choose a photo instead." : "The camera would not open — choose a photo instead.");
+      }
+    })();
+    return () => { dead = true; streamRef.current?.getTracks().forEach((t) => t.stop()); };
+  }, [onFallback]);
+
+  /* The preview's size decides the guide, so it is measured, not assumed. */
+  useEffect(() => {
+    const el = boxRef.current; if (!el) return;
+    const measure = () => setBox({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure); ro.observe(el);
+    return () => ro.disconnect();
+  }, [ready]);
+
+  /**
+   * Cut the guide out of the SENSOR, not out of the preview.
+   *
+   * The video is drawn object-fit: cover, so part of the frame is off-screen
+   * and the rest is scaled. The same transform is undone here, which is why
+   * the saved card has the camera's full resolution inside the rectangle
+   * rather than the handful of pixels the phone screen was showing.
+   */
+  const shoot = () => {
+    const v = videoRef.current;
+    if (!v || !guide || !v.videoWidth) return;
+    const scale = Math.max(box.w / v.videoWidth, box.h / v.videoHeight);
+    const offX = (box.w - v.videoWidth * scale) / 2;
+    const offY = (box.h - v.videoHeight * scale) / 2;
+    const sx = Math.max(0, (guide.x - offX) / scale);
+    const sy = Math.max(0, (guide.y - offY) / scale);
+    const sw = Math.min(v.videoWidth - sx, guide.w / scale);
+    const sh = Math.min(v.videoHeight - sy, guide.h / scale);
+
+    const out = document.createElement("canvas");
+    /* A card is read lying down — an upright shot is turned on the way out. */
+    out.width = Math.round(upright ? sh : sw);
+    out.height = Math.round(upright ? sw : sh);
+    const ctx = out.getContext("2d");
+    if (!ctx) { setErr("This browser could not take the picture."); return; }
+    if (upright) { ctx.translate(out.width, 0); ctx.rotate(Math.PI / 2); }
+    ctx.drawImage(v, sx, sy, sw, sh, 0, 0, sw, sh);
+    out.toBlob((b) => {
+      if (!b) { setErr("This browser could not take the picture."); return; }
+      onShot(new File([b], `card-${side}.jpg`, { type: "image/jpeg" }));
+    }, "image/jpeg", 0.9);
+  };
+
+  return (
+    <div onClick={(e) => e.stopPropagation()} style={{ position: "fixed", inset: 0, zIndex: 90, background: "#000", display: "flex", flexDirection: "column" }}>
+      <div className="flex items-center justify-between px-3 py-2" style={{ background: NAVY, flexShrink: 0 }}>
+        <b className="text-white" style={{ fontSize: 14 }}>📷 {side === "front" ? "Front" : "Back"} of the card</b>
+        <span className="flex items-center gap-2">
+          <button onClick={() => setUpright((u) => !u)} className="px-2 py-1 rounded text-xs font-bold"
+            style={{ background: "rgba(255,255,255,.14)", color: "#fff" }}
+            title="Some cards stand upright. This turns the rectangle — the picture is still saved lying down.">
+            ⟳ {upright ? "upright card" : "card lying down"}
+          </button>
+          <button onClick={onClose} className="px-2 py-1 rounded text-sm font-semibold" style={{ background: "rgba(255,255,255,.12)", color: "#C8D2DC" }}>✕</button>
+        </span>
+      </div>
+
+      <div ref={boxRef} style={{ position: "relative", flex: 1, minHeight: 0, overflow: "hidden", background: "#000" }}>
+        <video ref={videoRef} playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        {guide && (
+          <>
+            {/* Everything outside the rectangle is dimmed, so the frame is
+                obvious at a glance and in bright sun. */}
+            <div style={{ position: "absolute", inset: 0, pointerEvents: "none",
+              background: "rgba(0,0,0,.55)",
+              clipPath: `polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${guide.x}px ${guide.y}px, ${guide.x}px ${guide.y + guide.h}px, ${guide.x + guide.w}px ${guide.y + guide.h}px, ${guide.x + guide.w}px ${guide.y}px, ${guide.x}px ${guide.y}px)` }} />
+            <div style={{ position: "absolute", left: guide.x, top: guide.y, width: guide.w, height: guide.h,
+              border: "2px solid #fff", borderRadius: 10, boxShadow: "0 0 0 1px rgba(0,0,0,.45)", pointerEvents: "none" }}>
+              {/* corner ticks — the thing the eye actually lines up on */}
+              {([["top", "left"], ["top", "right"], ["bottom", "left"], ["bottom", "right"]] as const).map(([v, h]) => (
+                <span key={v + h} style={{ position: "absolute", [v]: -2, [h]: -2, width: 26, height: 26,
+                  [`border${v === "top" ? "Top" : "Bottom"}`]: `4px solid ${ORANGE}`,
+                  [`border${h === "left" ? "Left" : "Right"}`]: `4px solid ${ORANGE}`,
+                  [`border${v === "top" ? "TopLeftRadius" : "BottomLeftRadius"}`]: 0 } as React.CSSProperties} />
+              ))}
+            </div>
+            <div style={{ position: "absolute", left: 0, right: 0, top: guide.y + guide.h + 10, textAlign: "center",
+              color: "#fff", fontSize: 12.5, textShadow: "0 1px 3px rgba(0,0,0,.9)", pointerEvents: "none" }}>
+              Fill the rectangle with the card — only this is kept
+            </div>
+          </>
+        )}
+        {!ready && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#C8D2DC", fontSize: 13 }}>opening the camera…</div>}
+      </div>
+
+      {err && <div className="px-3 py-1 text-xs font-semibold" style={{ background: "#3A1512", color: "#FFC9BE" }}>{err}</div>}
+      <div className="flex items-center justify-center gap-4 py-3" style={{ background: "#111", flexShrink: 0 }}>
+        <button onClick={() => onFallback("")} className="text-xs" style={{ color: "#8FA0B0" }}>choose a photo instead</button>
+        <button onClick={shoot} disabled={!ready} title="Take the picture"
+          style={{ width: 62, height: 62, borderRadius: "50%", background: ready ? "#fff" : "#555", border: `4px solid ${ORANGE}`, cursor: ready ? "pointer" : "default" }} />
+        <span style={{ width: 120 }} />
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   WHAT CARRIES FROM ONE CARD TO THE NEXT
+
+   Dr Raghu, 15 Sep 2026: "I'll put two for all the cards I meet today, next
+   cards will also be the same. The tick of whatsapp and email also follow
+   the previous options."
+
+   A show is forty cards in two days. Everything that is the same for all
+   forty — the context sentence, the tags, whether a thank-you goes by mail
+   or WhatsApp — should be typed once and then left alone. Anything that must
+   be re-entered forty times will be entered wrongly by the tenth.
+
+   It lives in this browser, not in the database: it is a convenience for the
+   person holding the phone, not a fact about the company, and the next show
+   will want different words. A browser that refuses storage (a private
+   window, site data blocked) simply starts from the defaults.
+   ══════════════════════════════════════════════════════════════════════ */
+const STICKY = "genie.card.sticky.v1";
+type Sticky = { context: string; tags: string[]; email: boolean; whatsapp: boolean; auto: boolean };
+const STICKY_DEFAULT: Sticky = { context: "", tags: [], email: true, whatsapp: true, auto: true };
+
+function readSticky(): Sticky {
+  try {
+    const raw = window.localStorage.getItem(STICKY);
+    if (!raw) return STICKY_DEFAULT;
+    const j = JSON.parse(raw) as Partial<Sticky>;
+    return {
+      context: typeof j.context === "string" ? j.context : "",
+      tags: Array.isArray(j.tags) ? j.tags.map(String).slice(0, 12) : [],
+      email: j.email !== false, whatsapp: j.whatsapp !== false, auto: j.auto !== false,
+    };
+  } catch { return STICKY_DEFAULT; }
+}
+function writeSticky(v: Sticky) {
+  try { window.localStorage.setItem(STICKY, JSON.stringify(v)); } catch { /* storage refused — the session still works */ }
+}
+
 export default function VisitingCard({ onOpen }: { onOpen: (target: string, id: string) => void }) {
   const [cards, setCards] = useState<CardRow[] | null>(null);
   const [needs, setNeeds] = useState(false);
@@ -210,6 +420,26 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
   const [note, setNote] = useState("");
   /** The courtesy: a thank-you at 6 AM tomorrow, on the ticked channels. */
   const [thanks, setThanks] = useState<{ email: boolean; whatsapp: boolean; auto: boolean }>({ email: true, whatsapp: true, auto: true });
+  /** Typed once at a show and carried to every card after it. */
+  const [cam, setCam] = useState<"front" | "back" | null>(null);
+  const [camErr, setCamErr] = useState("");
+  const [context, setContext] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
+  /* Read on the first render only — after that the person is editing them. */
+  useEffect(() => {
+    const st = readSticky();
+    setContext(st.context); setTags(st.tags);
+    setThanks({ email: st.email, whatsapp: st.whatsapp, auto: st.auto });
+  }, []);
+  /* Remembered as they are changed, so a crash mid-show costs nothing. */
+  useEffect(() => { writeSticky({ context, tags, email: thanks.email, whatsapp: thanks.whatsapp, auto: thanks.auto }); }, [context, tags, thanks]);
+  const addTag = (raw: string) => {
+    const t = raw.trim().replace(/,+$/, "");
+    if (!t) return;
+    setTags((xs) => (xs.some((x) => x.toLowerCase() === t.toLowerCase()) ? xs : [...xs, t].slice(0, 12)));
+    setTagDraft("");
+  };
   const [tpl, setTpl] = useState<{ email: string; wa: string }>({ email: "", wa: "" });
   const [tplOptions, setTplOptions] = useState<{ email: string[]; wa: string[] }>({ email: [], wa: [] });
   useEffect(() => {
@@ -221,12 +451,12 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
     }).catch(() => {});
   }, []);
 
-  const upload = async (side: "front" | "back", file: File | null) => {
+  const upload = async (side: "front" | "back", file: File | null, framed = false) => {
     if (!file) return;
     setPreviews((p) => ({ ...p, [side]: URL.createObjectURL(file) }));
     setBusy(side); setErr("");
     try {
-      const small = await shrinkImage(file);
+      const small = await shrinkImage(file, 1600, framed);
       const fd = new FormData();
       fd.append("file", small.blob, small.name); fd.append("side", side);
       const r = await fetch("/api/crm/visiting-card", { method: "POST", body: fd });
@@ -253,7 +483,7 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
   const saveOnly = async (): Promise<string | null> => {
     const r = await fetch("/api/crm/visiting-card", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "save", path: paths.front, back_path: paths.back, transcript, extracted: read }),
+      body: JSON.stringify({ action: "save", path: paths.front, back_path: paths.back, transcript, extracted: read, context }),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(String(j.error || r.status));
@@ -262,7 +492,7 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
   const addToCrm = async (cardId: string | null) => {
     const r = await fetch("/api/crm/visiting-card", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "create", ...f, path: paths.front, back_path: paths.back, transcript, extracted: read, card_id: cardId }),
+      body: JSON.stringify({ action: "create", ...f, path: paths.front, back_path: paths.back, transcript, extracted: read, card_id: cardId, context, tags }),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(String(j.error || r.status));
@@ -272,6 +502,8 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
   const reset = () => {
     setPreviews({ front: null, back: null }); setPaths({ front: null, back: null });
     setRead(null); setTranscript(""); setMatches([]); setF({ ...EMPTY_FORM }); setNote(""); setErr("");
+    /* context, tags and the two ticks are deliberately NOT cleared — the next
+       card at the same show wants exactly the same ones. */
     if (frontRef.current) frontRef.current.value = "";
     if (backRef.current) backRef.current.value = "";
   };
@@ -313,7 +545,7 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
     const ref = side === "front" ? frontRef : backRef;
     const img = previews[side];
     return (
-      <button onClick={() => ref.current?.click()} className="rounded border relative"
+      <button onClick={() => { setCamErr(""); setCam(side); }} className="rounded border relative"
         title={`${side === "front" ? "Front" : "Back"} — tap to photograph or choose an image`}
         style={{ borderColor: paths[side] ? GREEN : BORDER, borderStyle: img ? "solid" : "dashed", height: 150, background: "#F8F9FC", overflow: "hidden" }}>
         {img
@@ -321,7 +553,9 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
           ? <img src={img} alt={side} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
           : <span style={{ fontSize: 12.5, color: MUTED, fontWeight: 700 }}>📷 {side === "front" ? "FRONT" : "BACK"}</span>}
         {busy === side && <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,.7)", fontSize: 12, fontWeight: 700, color: NAVY }}>reading…</span>}
-        <input ref={ref} type="file" accept="image/*" capture="environment" hidden
+        {/* Still here: the camera falls back to it, and a card already
+            photographed or e-mailed is chosen from the gallery. */}
+        <input ref={ref} type="file" accept="image/*" hidden
           onChange={(e) => upload(side, e.target.files?.[0] ?? null)} />
       </button>
     );
@@ -338,6 +572,12 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(22,35,47,.5)", display: "flex", alignItems: "stretch", justifyContent: "center", padding: "10px 16px" }}>
       <div onClick={(e) => e.stopPropagation()} className="rounded" style={{ background: "#fff", width: "min(760px,100%)", height: "calc(100vh - 20px)", display: "flex", flexDirection: "column", minHeight: 0, boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
+        {cam && (
+          <CardCamera side={cam}
+            onShot={(file) => { setCam(null); upload(cam, file, true); }}
+            onClose={() => setCam(null)}
+            onFallback={(why) => { setCam(null); setCamErr(why); (cam === "front" ? frontRef : backRef).current?.click(); }} />
+        )}
         <div className="flex items-center justify-between px-4 py-3" style={{ background: NAVY, borderRadius: "6px 6px 0 0", flexShrink: 0 }}>
           <b className="text-white" style={{ fontSize: 15 }}>🪪 Add Visiting Card</b>
           <button onClick={onClose} className="px-2 py-1 rounded text-sm font-semibold" style={{ background: "rgba(255,255,255,.12)", color: "#C8D2DC" }}>✕</button>
@@ -370,6 +610,44 @@ function CardLightbox({ onClose, onChanged, onOpen }: {
             </div>
           )}
           {f.company_id && <div className="text-xs mt-1" style={{ color: GREEN }}>✓ attaching to the existing company</div>}
+          {camErr && <div className="text-xs mt-1" style={{ color: "#8A5B00" }}>{camErr}</div>}
+
+          {/* ── CONTEXT AND TAGS — typed once, carried to the next card ──
+              What is printed on a card is the easy half. Where you met them
+              and what was said is the half that decides whether the record is
+              worth anything in six months, and it is never on the card. */}
+          <div className="rounded border p-2 mt-2" style={{ borderColor: BORDER, background: "#FAFBFD" }}>
+            <label className="block" style={{ fontSize: 11, color: MUTED }}>
+              Context — where you met them, what was said, what you promised
+              <textarea value={context} onChange={(e) => setContext(e.target.value)} rows={2}
+                placeholder="Met at the Nandan stand, Hall 3. Wants a quote for two belt loaders before Diwali."
+                className="w-full rounded border px-2 py-1 block mt-0.5"
+                style={{ borderColor: BORDER, fontSize: 13, color: INK, resize: "vertical" }} />
+            </label>
+            <div className="mt-1.5">
+              <div style={{ fontSize: 11, color: MUTED }}>Tags</div>
+              <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                {tags.map((t) => (
+                  <span key={t} className="rounded px-1.5 py-0.5 flex items-center gap-1"
+                    style={{ background: NAVY_SOFT, color: NAVY, fontSize: 12, fontWeight: 600 }}>
+                    {t}
+                    <button onClick={() => setTags((xs) => xs.filter((x) => x !== t))} title="Remove this tag"
+                      style={{ color: MUTED, fontWeight: 700, lineHeight: 1 }}>×</button>
+                  </span>
+                ))}
+                <input value={tagDraft}
+                  onChange={(e) => { const v = e.target.value; if (v.includes(",")) v.split(",").forEach(addTag); else setTagDraft(v); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Tab") { if (tagDraft.trim()) { e.preventDefault(); addTag(tagDraft); } } }}
+                  onBlur={() => addTag(tagDraft)}
+                  placeholder={tags.length ? "another tag…" : "GSE Expo 2026, Met"}
+                  className="rounded border px-2 py-0.5"
+                  style={{ borderColor: BORDER, fontSize: 12.5, color: INK, minWidth: 130, flex: "0 1 180px" }} />
+              </div>
+              <div style={{ fontSize: 10.5, color: MUTED, marginTop: 3 }}>
+                Enter or a comma adds one. <b>These stay for the next card</b> — set them once at the show and keep scanning.
+              </div>
+            </div>
+          </div>
           {(read?.phones?.length || 0) > 1 && (
             <div className="text-xs mt-1" style={{ color: MUTED }}>
               Other numbers: {read!.phones.slice(1).map((p) => (

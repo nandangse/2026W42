@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.48.3",
+    date: "2026-09-15",
+    module: "Visiting cards: a rectangle to put the card in, and what the card does not say",
+    items: [
+      "<b>A rectangle in the camera, and only what is inside it is kept.</b> A tap used to open the phone\u2019s own camera app \u2014 somebody else\u2019s screen, nothing can be drawn on it \u2014 and hand back the whole frame: card, desk, cup, hand. Genie then guessed where the card was by sampling the border colour, which works on a plain desk and not on a patterned one. Now the camera runs in the page, the guide is drawn on it, and the crop is cut from the sensor\u2019s own pixels, so the card keeps full resolution rather than whatever the phone screen was showing.",
+      "<b>It works held either way</b>, which was the ask. The rectangle is computed from the live preview every frame: upright it lies across the middle, sideways it fills nearly the whole screen. \u27f3 flips it for a card that stands upright, and that capture is turned on the way out \u2014 a card is read lying down.",
+      "<b>A Context box, and tags.</b> What is printed on a card is the easy half; where you met them and what was promised is the half that decides whether the record is worth anything in six months, and it is never on the card. The context is written onto the contact as well as the scan.",
+      "<b>Both carry to the next card, and so do the WhatsApp and e-mail ticks.</b> A show is forty cards in two days. Set \u201cGSE Expo 2026\u201d and \u201cMet\u201d once and keep scanning \u2014 anything that must be typed forty times will be typed wrongly by the tenth. It is remembered in the browser, because it is a convenience for the person holding the phone, not a fact about the company.",
+      "<b>Falling back is not an error.</b> No camera, a refused permission, or a page not on https: the picker opens instead and says why in one line. <b>Needs CRM migration 0071</b> for the context box.",
+    ],
+  },
+  {
     v: "5.0.48.2",
     date: "2026-09-15",
     module: "The thousand-row ceiling \u2014 and the figures kept rather than reckoned",
