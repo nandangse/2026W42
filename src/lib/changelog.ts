@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.48.6",
+    date: "2026-09-15",
+    module: "A pile of files at once \u2014 years of spreadsheets, in one go",
+    items: [
+      "<b>The list upload takes as many files as you like.</b> Years of shows are years of spreadsheets, and doing them one at a time is how three of them get forgotten. They are read together and shown as one total \u2014 new people, already here, gaining a blank field \u2014 with each file\u2019s own line beside it.",
+      "<b>Each file keeps its own name as its source</b>, and each can be renamed before it goes, because \u201cBook1 (3)\u201d says nothing and \u201cAahar 2024\u201d says everything. That is the whole point of doing them in a batch: afterwards \u201cwas this Aahar or Lisbon?\u201d is a column rather than a memory.",
+      "<b>They commit one file at a time, so a bad file spoils only itself.</b> The ones already written stay written, the bar says which file stopped and why, and pressing Import again carries on from there rather than starting over.",
+      "<b>\u201cSafely\u201d is the operative word</b>, and it is what the whole design serves: nothing is overwritten \u2014 somebody already here may gain a blank field and a note, never a replacement \u2014 and the same file twice does not duplicate anybody with a unique address, nor write the same note twice.",
+    ],
+  },
+  {
     v: "5.0.48.5",
     date: "2026-09-15",
     module: "Where a name came from, and the columns that had nowhere to go",

@@ -910,164 +910,223 @@ type Preview = {
   from?: number; to?: number; total?: number; done?: boolean; fileRows?: number;
 };
 
+/**
+ * UPLOAD A PILE OF FILES, NOT ONE (Dr Raghu, 15 Sep 2026: "and allow
+ * multiple files to upload!!! so this way can upload all my previous
+ * database safely here.")
+ *
+ * Years of shows are years of spreadsheets, and doing them one at a time is
+ * how three of them get forgotten. They are read together, previewed
+ * together, and then committed ONE FILE AT A TIME so that a bad file spoils
+ * only itself — the ones already in stay in, and the bar says which file
+ * stopped and why.
+ *
+ * EACH FILE KEEPS ITS OWN NAME AS ITS SOURCE, which is the whole point of
+ * doing them in a batch: afterwards "was this Aahar or Lisbon?" is a column,
+ * not a memory. Each can be renamed before it goes, because a file called
+ * "Book1 (3)" says nothing.
+ *
+ * "SAFELY" IS THE OPERATIVE WORD. Nothing is overwritten — a person already
+ * here may gain a blank field and a note, never a replacement — and the same
+ * file twice does not duplicate anybody with a unique address, nor write the
+ * same note twice.
+ */
+type FilePlan = { file: File; source: string; prev: Preview | null; err: string; done: boolean };
+
 function ListUpload({ list, onClose, onDone, inline }: { list: List; onClose: () => void; onDone: () => void; inline?: boolean }) {
-  const [file, setFile] = useState<File | null>(null);
-  /** Where these names came from — the file's own name unless told otherwise. */
-  const [source, setSource] = useState("");
-  const [prev, setPrev] = useState<Preview | null>(null);
+  const [plans, setPlans] = useState<FilePlan[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [prog, setProg] = useState<{ fileIx: number; name: string; done: number; total: number } | null>(null);
+  const [tally, setTally] = useState<Preview | null>(null);
 
-  const [prog, setProg] = useState<{ done: number; total: number } | null>(null);
-
-  /**
-   * A BIG FILE IS COMMITTED IN SLICES (Dr Raghu, 14 Sep 2026: "problem!").
-   *
-   * A 10,505-row import died on commit with "Unexpected token 'A'" — the
-   * reply was not JSON at all, it was Vercel's own timeout page, because one
-   * serverless invocation had been asked to carry the whole file. So the
-   * browser walks it now: each request does a bounded slice and says where
-   * to carry on from, and the bar shows how far it has got.
-   *
-   * REPEATING A SLICE IS SAFE. A person the previous slice created is found
-   * on the next run, not inserted again — matching is by e-mail and the rule
-   * is still fill-blanks-only. So a slice that fails can simply be retried.
-   */
-  const send = async (action: "preview" | "commit") => {
-    if (!file) return;
-    setBusy(true); setErr(""); setProg(null);
-    try {
-      const post = async (from: number) => {
-        const fd = new FormData();
-        fd.append("file", file);
-        fd.append("list_id", list.id);
-        fd.append("action", action);
-        fd.append("source", source.trim() || file.name);
-        if (action === "commit") { fd.append("from", String(from)); fd.append("size", "1500"); }
-        const r = await fetch("/api/marketing/import", { method: "POST", body: fd });
-        const text = await r.text();
-        let j: Record<string, unknown>;
-        try { j = JSON.parse(text); }
-        catch {
-          /* Not JSON means the reply did not come from Genie — a gateway
-             timeout page, almost always. Say that, rather than showing the
-             reader a parser error about the letter A. */
-          throw new Error(r.status === 413
-            ? "That file is too large to upload in one piece."
-            : `The server did not answer properly (HTTP ${r.status}). The slice was too big or took too long — nothing before this point was lost.`);
-        }
-        if (!r.ok) throw new Error(String(j.error || r.status));
-        return j as unknown as Preview;
-      };
-
-      if (action === "preview") { setPrev(await post(0)); setBusy(false); return; }
-
-      /* Commit: walk the file, accumulating the totals as we go. */
-      let at = 0, guard = 0;
-      const tally = { willInsert: 0, matched: 0, willFill: 0, listed: 0, blankEmail: 0, sharedAddresses: 0, emptyRows: 0 };
-      let last: Preview | null = null;
-      for (;;) {
-        const j = await post(at);
-        last = j;
-        tally.willInsert += j.willInsert || 0; tally.matched += j.matched || 0;
-        tally.willFill += j.willFill || 0; tally.listed += j.listed || 0;
-        tally.blankEmail += j.blankEmail || 0; tally.sharedAddresses += j.sharedAddresses || 0;
-        tally.emptyRows += j.emptyRows || 0;
-        const to = Number(j.to ?? 0), total = Number(j.total ?? 0);
-        setProg({ done: to, total });
-        setPrev({ ...j, ...tally, rows: to });
-        if (j.done || !to || to <= at || ++guard > 200) break;
-        at = to;
-      }
-      setPrev({ ...(last as Preview), ...tally, rows: Number(last?.total ?? tally.willInsert) });
-      setTimeout(onDone, 1800);
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
-    setBusy(false);
+  const pick = (list: FileList | null) => {
+    const fs = Array.from(list || []);
+    setPlans(fs.map((file) => ({ file, source: file.name.replace(/\.[^.]+$/, ""), prev: null, err: "", done: false })));
+    setTally(null); setErr(""); setProg(null);
   };
 
+  /** One request. Not-JSON is named for what it is, never as a parser error. */
+  const post = async (p: FilePlan, action: "preview" | "commit", from: number) => {
+    const fd = new FormData();
+    fd.append("file", p.file);
+    fd.append("list_id", list.id);
+    fd.append("action", action);
+    fd.append("source", p.source.trim() || p.file.name);
+    if (action === "commit") { fd.append("from", String(from)); fd.append("size", "1500"); }
+    const r = await fetch("/api/marketing/import", { method: "POST", body: fd });
+    const text = await r.text();
+    try { return JSON.parse(text) as Preview & { error?: string; to?: number; total?: number; done?: boolean }; }
+    catch {
+      throw new Error(r.status === 413
+        ? `${p.file.name} is too large to upload in one piece.`
+        : `The server did not answer properly for ${p.file.name} (HTTP ${r.status}). Nothing before this point was lost.`);
+    }
+  };
+
+  const sum = (list: Preview[]): Preview => list.reduce((a, b) => ({
+    ...b,
+    file: `${list.length} file${list.length === 1 ? "" : "s"}`,
+    rows: (a.rows || 0) + (b.rows || 0),
+    matched: (a.matched || 0) + (b.matched || 0),
+    willInsert: (a.willInsert || 0) + (b.willInsert || 0),
+    willFill: (a.willFill || 0) + (b.willFill || 0),
+    willNote: (a.willNote || 0) + (b.willNote || 0),
+    blankEmail: (a.blankEmail || 0) + (b.blankEmail || 0),
+    sharedAddresses: (a.sharedAddresses || 0) + (b.sharedAddresses || 0),
+    emptyRows: (a.emptyRows || 0) + (b.emptyRows || 0),
+    listed: (a.listed || 0) + (b.listed || 0),
+    unmapped: [...new Set([...(a.unmapped || []), ...(b.unmapped || [])])],
+    mapping: { ...(a.mapping || {}), ...(b.mapping || {}) },
+  }), { file: "", rows: 0, headers: [], mapping: {}, unmapped: [], matched: 0, willInsert: 0, willFill: 0, blankEmail: 0, sharedAddresses: 0, emptyRows: 0 } as Preview);
+
+  const readAll = async () => {
+    setBusy(true); setErr(""); setTally(null);
+    const next = [...plans];
+    for (let i = 0; i < next.length; i++) {
+      setProg({ fileIx: i, name: next[i].file.name, done: 0, total: 0 });
+      try { next[i] = { ...next[i], prev: await post(next[i], "preview", 0), err: "" }; }
+      catch (e) { next[i] = { ...next[i], prev: null, err: e instanceof Error ? e.message : String(e) }; }
+      setPlans([...next]);
+    }
+    const good = next.map((p) => p.prev).filter(Boolean) as Preview[];
+    setTally(good.length ? sum(good) : null);
+    setProg(null); setBusy(false);
+  };
+
+  const commitAll = async () => {
+    setBusy(true); setErr(""); const next = [...plans];
+    const got: Preview[] = [];
+    for (let i = 0; i < next.length; i++) {
+      const already = next[i].prev;
+      /* A file already written keeps its figures in the total; one that never
+         read cannot contribute. */
+      if (!already || next[i].done) { if (already && next[i].done) got.push(already); continue; }
+      let at = 0, guard = 0;
+      const one = { ...already, willInsert: 0, matched: 0, willFill: 0, willNote: 0, listed: 0, blankEmail: 0, sharedAddresses: 0, emptyRows: 0, committed: true } as Preview;
+      try {
+        for (;;) {
+          const j = await post(next[i], "commit", at);
+          if (j.error) throw new Error(String(j.error));
+          one.willInsert += j.willInsert || 0; one.matched += j.matched || 0;
+          one.willFill += j.willFill || 0; one.willNote = (one.willNote || 0) + (j.willNote || 0);
+          one.listed = (one.listed || 0) + (j.listed || 0);
+          one.blankEmail += j.blankEmail || 0; one.sharedAddresses += j.sharedAddresses || 0; one.emptyRows += j.emptyRows || 0;
+          const to = Number(j.to ?? 0), total = Number(j.total ?? 0);
+          setProg({ fileIx: i, name: next[i].file.name, done: to, total });
+          if (j.done || !to || to <= at || ++guard > 400) break;
+          at = to;
+        }
+        next[i] = { ...next[i], done: true, err: "" };
+        got.push(one);
+      } catch (e) {
+        /* One bad file must not lose the good ones already written. */
+        next[i] = { ...next[i], err: e instanceof Error ? e.message : String(e) };
+        setPlans([...next]);
+        setTally(got.length ? { ...sum(got), committed: true } : null);
+        setErr(`Stopped at ${next[i].file.name}. Files before it are in; press Import again to carry on from here.`);
+        setBusy(false); return;
+      }
+      setPlans([...next]);
+    }
+    setTally({ ...sum(got), committed: true });
+    setProg(null); setBusy(false);
+    setTimeout(onDone, 1800);
+  };
+
+  const ready = plans.length > 0 && plans.some((p) => p.prev && !p.done);
+  const n = plans.length;
+
   const inner = (
-        <div className={inline ? "" : "p-4"}>
-          <div className="text-xs mb-3" style={{ color: MUTED, lineHeight: 1.6 }}>
-            A CSV or Excel file. Every row becomes a person in <b>Leads</b> and a member of <b>{list.name}</b>.
-            Columns are matched by their headings — name, e-mail, phone, job title, company and the rest —
-            and <b>anything not recognised is kept as a note on the person</b> rather than thrown away.
-            {" "}<b>Nothing is overwritten:</b> where somebody is already here, the file may fill a blank field and nothing more.
+    <div className={inline ? "" : "p-4"}>
+      <div className="text-xs mb-3" style={{ color: MUTED, lineHeight: 1.6 }}>
+        CSV or Excel — <b>as many files at once as you like</b>. Every row becomes a person in <b>Leads</b> and a member of <b>{list.name}</b>.
+        Columns are matched by their headings, and <b>anything not recognised is kept as a note on the person</b> rather than thrown away.
+        {" "}<b>Nothing is overwritten:</b> somebody already here may gain a blank field and a note, never a replacement.
+      </div>
+
+      <input type="file" accept=".csv,.xlsx,.xls" multiple onChange={(e) => pick(e.target.files)} className="text-sm mb-2" />
+
+      {n > 0 && (
+        <div className="rounded border mb-3" style={{ borderColor: "var(--line)" }}>
+          <div className="text-xs font-bold px-2 py-1" style={{ background: "#FAFAF8", color: "var(--dim)", letterSpacing: .5 }}>
+            {n} FILE{n === 1 ? "" : "S"} · each keeps its own name as its source — rename any of them before importing
           </div>
-
-          <input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => {
-            const f = e.target.files?.[0] || null;
-            setFile(f); setPrev(null);
-            /* The file's own name, without its extension, is the honest
-               default — and editable, because "Book1 (3).xlsx" tells nobody
-               anything while "Aahar 2024" tells them everything. */
-            if (f) setSource(f.name.replace(/\.[^.]+$/, ""));
-          }} className="text-sm mb-2" />
-
-          {file && (
-            <label className="block mb-3 text-xs font-semibold" style={{ color: "var(--dim)" }}>
-              Source — what put these names on the list
-              <input value={source} onChange={(e) => setSource(e.target.value)} placeholder={file.name}
-                style={{ ...inp, maxWidth: 380 }} />
-              <span className="font-normal" style={{ color: MUTED }}>
-                Kept against each name, so four files in one list stay tellable apart. A person already on the list keeps the source they arrived with.
+          {plans.map((p, i) => (
+            <div key={p.file.name + i} className="flex items-center gap-2 px-2 py-1" style={{ borderTop: "1px solid var(--line-soft)" }}>
+              <span style={{ fontSize: 15, width: 18 }}>{p.done ? "✅" : p.err ? "⚠️" : p.prev ? "•" : "·"}</span>
+              <span className="text-xs" style={{ flex: "1 1 180px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.file.name}>{p.file.name}</span>
+              <input value={p.source} disabled={busy || p.done}
+                onChange={(e) => setPlans((xs) => xs.map((x, j) => (j === i ? { ...x, source: e.target.value } : x)))}
+                placeholder="source" style={{ ...inp, width: 200, fontSize: 12 }} />
+              <span className="tnum text-xs" style={{ color: MUTED, width: 120, textAlign: "right" }}>
+                {p.err ? <span style={{ color: RED }}>failed</span>
+                  : p.prev ? `${p.prev.willInsert} new · ${p.prev.matched} here` : "not read yet"}
               </span>
-            </label>
-          )}
-
-          {err && <div className="text-xs font-semibold mb-2" style={{ color: RED }}>{err}</div>}
-
-          {prev && (
-            <div className="rounded border p-3 mb-3" style={{ borderColor: prev.committed ? GREEN : "var(--line)", background: prev.committed ? "#F0FAF3" : "#FAFAF8" }}>
-              <div className="text-xs font-bold mb-1" style={{ color: prev.committed ? GREEN : "var(--dim)", letterSpacing: .6 }}>
-                {prev.committed ? "DONE" : "WHAT THIS WOULD DO"} · {prev.file} · {prev.rows} rows
-              </div>
-              <div className="flex gap-4 flex-wrap text-sm mb-2">
-                <span><b className="tnum" style={{ fontSize: 17 }}>{prev.willInsert}</b> <span style={{ color: MUTED }}>new people</span></span>
-                <span><b className="tnum" style={{ fontSize: 17 }}>{prev.matched}</b> <span style={{ color: MUTED }}>already here</span></span>
-                <span><b className="tnum" style={{ fontSize: 17 }}>{prev.willFill}</b> <span style={{ color: MUTED }}>gain a blank field</span></span>
-                {prev.committed && <span><b className="tnum" style={{ fontSize: 17, color: GREEN }}>{prev.listed}</b> <span style={{ color: MUTED }}>in the list</span></span>}
-              </div>
-              <div className="text-xs" style={{ color: MUTED, lineHeight: 1.6 }}>
-                <b>Recognised:</b> {Object.entries(prev.mapping).map(([h, k]) => `${h} → ${k}`).join(" · ") || "nothing"}<br />
-                {prev.unmapped.length > 0 && <><b>Kept as a note:</b> {prev.unmapped.join(" · ")}
-                  {!!prev.willNote && <> — <b>{prev.willNote}</b> {prev.willNote === 1 ? "person already here gains" : "people already here gain"} these on their notes, added below what is there</>}<br /></>}
-                {prev.blankEmail > 0 && <><b>{prev.blankEmail}</b> rows carry no e-mail — added anyway, they can still be telephoned.<br /></>}
-                {prev.sharedAddresses > 0 && <><b>{prev.sharedAddresses}</b> rows share an e-mail with another row in this file — kept as separate people, not merged, because one address used twice identifies nobody.<br /></>}
-                {prev.emptyRows > 0 && <><b>{prev.emptyRows}</b> rows had no name and no e-mail and were skipped.<br /></>}
-                {prev.note && <span style={{ color: prev.notesCarried === false ? "#8A5B00" : MUTED }}>{prev.note}</span>}
-              </div>
             </div>
-          )}
+          ))}
+        </div>
+      )}
 
-          {prog && prog.total > 0 && (
-            <div className="mb-3">
-              <div className="text-xs mb-1" style={{ color: MUTED }}>
-                <b className="tnum">{prog.done}</b> of <b className="tnum">{prog.total}</b> rows written
-                {prog.done < prog.total && " — leave this open until it finishes"}
-              </div>
-              <div style={{ height: 6, background: "var(--line-soft)", borderRadius: 3, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${Math.round((prog.done / prog.total) * 100)}%`, background: GREEN, transition: "width .3s" }} />
-              </div>
-            </div>
-          )}
+      {plans.some((p) => p.err) && (
+        <div className="text-xs mb-2" style={{ color: RED, lineHeight: 1.6 }}>
+          {plans.filter((p) => p.err).map((p) => <div key={p.file.name}>{p.file.name}: {p.err}</div>)}
+        </div>
+      )}
+      {err && <div className="text-xs font-semibold mb-2" style={{ color: RED }}>{err}</div>}
 
-          <div className="flex items-center gap-2">
-            <button onClick={() => send("preview")} disabled={!file || busy} style={btn(prev ? "var(--line-soft)" : ACCENT)}>
-              {busy ? "Reading…" : prev ? "Read it again" : "Read the file"}
-            </button>
-            {prev && !prev.committed && (
-              <button onClick={() => send("commit")} disabled={busy} style={btn(GREEN)}>
-                {busy ? "Importing…" : `Import ${prev.willInsert + prev.matched} into ${list.name}`}
-              </button>
-            )}
-            <button onClick={onClose} style={btn("var(--line-soft)")}>Close</button>
+      {tally && (
+        <div className="rounded border p-3 mb-3" style={{ borderColor: tally.committed ? GREEN : "var(--line)", background: tally.committed ? "#F0FAF3" : "#FAFAF8" }}>
+          <div className="text-xs font-bold mb-1" style={{ color: tally.committed ? GREEN : "var(--dim)", letterSpacing: .6 }}>
+            {tally.committed ? "DONE" : "WHAT THIS WOULD DO"} · {tally.file} · {tally.rows} rows
+          </div>
+          <div className="flex gap-4 flex-wrap text-sm mb-2">
+            <span><b className="tnum" style={{ fontSize: 17 }}>{tally.willInsert}</b> <span style={{ color: MUTED }}>new people</span></span>
+            <span><b className="tnum" style={{ fontSize: 17 }}>{tally.matched}</b> <span style={{ color: MUTED }}>already here</span></span>
+            <span><b className="tnum" style={{ fontSize: 17 }}>{tally.willFill}</b> <span style={{ color: MUTED }}>gain a blank field</span></span>
+            {tally.committed && <span><b className="tnum" style={{ fontSize: 17, color: GREEN }}>{tally.listed}</b> <span style={{ color: MUTED }}>in the list</span></span>}
+          </div>
+          <div className="text-xs" style={{ color: MUTED, lineHeight: 1.6 }}>
+            {tally.unmapped.length > 0 && <><b>Kept as a note:</b> {tally.unmapped.join(" · ")}
+              {!!tally.willNote && <> — <b>{tally.willNote}</b> already here gain these on their notes, added below what is there</>}<br /></>}
+            {tally.blankEmail > 0 && <><b>{tally.blankEmail}</b> rows carry no e-mail — added anyway, they can still be telephoned.<br /></>}
+            {tally.sharedAddresses > 0 && <><b>{tally.sharedAddresses}</b> rows share an e-mail with another row in the same file — kept as separate people, because one address used twice identifies nobody.<br /></>}
+            {tally.emptyRows > 0 && <><b>{tally.emptyRows}</b> rows had no name and no e-mail and were skipped.<br /></>}
+            {!tally.committed && "Nothing has been written. Press Import to commit."}
           </div>
         </div>
+      )}
+
+      {prog && (
+        <div className="mb-3">
+          <div className="text-xs mb-1" style={{ color: MUTED }}>
+            File <b>{prog.fileIx + 1}</b> of <b>{n}</b> — {prog.name}
+            {prog.total > 0 && <> · <b className="tnum">{prog.done}</b> of <b className="tnum">{prog.total}</b> rows</>}
+            {busy && " — leave this open until it finishes"}
+          </div>
+          <div style={{ height: 6, background: "var(--line-soft)", borderRadius: 3, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.round(((prog.fileIx + (prog.total ? prog.done / prog.total : 0)) / Math.max(1, n)) * 100)}%`, background: GREEN, transition: "width .3s" }} />
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <button onClick={readAll} disabled={!n || busy} style={btn(tally ? "var(--line-soft)" : ACCENT)}>
+          {busy && !tally ? "reading…" : tally ? "Read them again" : `Read ${n || ""} file${n === 1 ? "" : "s"}`}
+        </button>
+        {ready && (
+          <button onClick={commitAll} disabled={busy} style={btn(GREEN)}>
+            {busy ? "importing…" : `Import ${tally ? tally.willInsert + tally.matched : ""} into ${list.name}`}
+          </button>
+        )}
+        <button onClick={onClose} disabled={busy} style={btn("#fff", "var(--dim)")}>Close</button>
+      </div>
+    </div>
   );
-  /* Inside the list lightbox it is a panel; on its own it is a lightbox. */
-  if (inline) return <div className="rounded border p-3 mb-3" style={{ borderColor: "var(--line)", background: "#FAFAF8" }}>{inner}</div>;
+
+  if (inline) return inner;
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(22,35,47,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(22,35,47,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div onClick={(e) => e.stopPropagation()} className="rounded-lg bg-white"
         style={{ width: "min(760px, 100%)", maxHeight: "calc(100vh - 40px)", overflowY: "auto", boxShadow: "0 12px 40px rgba(27,45,107,.35)" }}>
         <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "var(--navy)", borderRadius: "8px 8px 0 0" }}>
