@@ -404,7 +404,9 @@ export default function VisitingCard({ onOpen }: { onOpen: (target: string, id: 
 }
 
 /* ══════════ the lightbox ══════════ */
-function CardLightbox({ onClose, onChanged, onOpen }: {
+/* Exported so People I Met can scan a card without leaving the form it is
+   already standing in — the same lightbox, not a second one that drifts. */
+export function CardLightbox({ onClose, onChanged, onOpen }: {
   onClose: () => void; onChanged: () => void; onOpen: (t: string, id: string) => void;
 }) {
   const frontRef = useRef<HTMLInputElement>(null);

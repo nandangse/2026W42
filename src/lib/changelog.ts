@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.1.0.5",
+    date: "2026-09-16",
+    module: "The CRM search that was typing into nothing, and a card scanned without leaving the form",
+    items: [
+      "<b>Searching the CRM from \u201cSomeone I met\u201d found nobody, ever.</b> It called <i>/api/crm/search</i>, which does not exist \u2014 so the box sat there accepting letters and answering with silence, which is the worst way for a screen to fail: it looks like an empty database rather than a broken call. It now uses the route every other screen uses, and says <i>looking\u2026</i>, then either the names or <i>nobody matches that</i>.",
+      "Picking somebody from the CRM now brings their <b>phone as well as their e-mail</b>, so the WhatsApp has a number to go to without it being typed again.",
+      "<b>\u201cScan a new card\u201d opens the card lightbox inside the form.</b> Previously a card had to exist already, which meant leaving a half-filled form, going to Add Visiting Card, and coming back \u2014 at a stand, with somebody waiting, that is the difference between recording them and not. The card just scanned fills the fields the moment it closes.",
+    ],
+  },
+  {
     v: "5.1.0.4",
     date: "2026-09-16",
     module: "The selfie can come from the gallery",

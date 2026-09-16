@@ -25,6 +25,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { NAVY, NAVY_SOFT, INK, MUTED, BORDER, ORANGE, GREEN } from "./palette";
+import { CardLightbox } from "./VisitingCard";
 
 type Met = {
   id: string; source: string; person_id: string | null; card_id: string | null;
@@ -338,36 +339,81 @@ function AddBox({ reasons, known, onClose, onDone }: { reasons: Reason[]; known:
   const [tags, setTags] = useState<string[]>([]);
   useEffect(() => { setTags(lastTags()); }, []);
   const [f, setF] = useState({ name: "", company_name: "", job_title: "", email: "", phone: "", context: "", event: "", reason: "keep_warm", person_id: "", card_id: "" });
-  const [hits, setHits] = useState<{ id: string; full_name: string; primary_email: string | null; company: string | null }[]>([]);
+  const [hits, setHits] = useState<{ id: string; full_name: string; primary_email: string | null; primary_phone: string | null; company: string | null }[]>([]);
   const [look, setLook] = useState("");
-  const [cards, setCards] = useState<{ id: string; name: string; company: string | null; email: string | null }[]>([]);
+  const [cards, setCards] = useState<{ id: string; name: string; company: string | null; email: string | null; phone: string | null; title: string | null }[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  /* Scanning a card from inside this form, rather than leaving it. */
+  const [scanning, setScanning] = useState(false);
 
+  /**
+   * SEARCHING THE CRM.
+   *
+   * Through the doctype list route, which is what every other screen here
+   * uses: /api/crm/person?q=… answers { rows }. The first version of this
+   * invented /api/crm/search, which does not exist — so the box sat there
+   * typing into nothing and said nothing about it, which is the worst way
+   * for a screen to fail.
+   *
+   * The row shape is read defensively because a person row carries its
+   * company as a join whose name has moved before.
+   */
+  const [looking, setLooking] = useState(false);
+  const [lookErr, setLookErr] = useState("");
   useEffect(() => {
-    if (door !== "database" || look.trim().length < 2) { setHits([]); return; }
+    if (door !== "database" || look.trim().length < 2) { setHits([]); setLookErr(""); return; }
+    let dead = false;
+    setLooking(true);
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/crm/search?q=${encodeURIComponent(look)}&doctype=person`, { cache: "no-store" });
+        const r = await fetch(`/api/crm/person?q=${encodeURIComponent(look.trim())}&limit=8`, { cache: "no-store" });
         const j = await r.json();
-        setHits((j.rows || j.results || []).slice(0, 8));
-      } catch { setHits([]); }
+        if (!r.ok) throw new Error(String(j.error || r.status));
+        if (dead) return;
+        const rows = (j.rows || []) as Record<string, unknown>[];
+        setHits(rows.slice(0, 8).map((x) => ({
+          id: String(x.id),
+          full_name: String(x.full_name || [x.first_name, x.last_name].filter(Boolean).join(" ") || "(no name)"),
+          primary_email: (x.primary_email as string) || null,
+          primary_phone: (x.whatsapp_number as string) || (x.primary_phone as string) || null,
+          company: (x.company_name as string)
+            || ((x.company as { name?: string } | null)?.name)
+            || ((x.company_join as { name?: string } | null)?.name)
+            || null,
+        })));
+        setLookErr(rows.length ? "" : "Nobody in the CRM matches that.");
+      } catch (e) { if (!dead) { setHits([]); setLookErr(e instanceof Error ? e.message : String(e)); } }
+      if (!dead) setLooking(false);
     }, 250);
-    return () => clearTimeout(t);
+    return () => { dead = true; clearTimeout(t); };
   }, [look, door]);
 
-  useEffect(() => {
-    if (door !== "card") return;
-    fetch("/api/crm/visiting-card", { cache: "no-store" }).then(async (r) => {
+  const loadCards = useCallback(async (pickNewest?: boolean) => {
+    try {
+      const r = await fetch("/api/crm/visiting-card", { cache: "no-store" });
       const j = await r.json();
       const list = (j.cards || []).filter((c: Record<string, unknown>) => c.extracted).slice(0, 30)
         .map((c: Record<string, unknown>) => {
           const x = c.extracted as Record<string, unknown>;
-          return { id: String(c.id), name: String(x.person_name || "(no name read)"), company: (x.company as string) || null, email: ((x.emails as string[]) || [])[0] || null };
+          return {
+            id: String(c.id), name: String(x.person_name || "(no name read)"),
+            company: (x.company as string) || null,
+            email: ((x.emails as string[]) || [])[0] || null,
+            phone: ((x.phones as string[]) || [])[0] || null,
+            title: (x.designation as string) || null,
+          };
         });
       setCards(list);
-    }).catch(() => setCards([]));
-  }, [door]);
+      /* A card just scanned is the one wanted — it is already at the top,
+         so it fills the form rather than waiting to be found again. */
+      if (pickNewest && list[0]) {
+        const c = list[0];
+        setF((x) => ({ ...x, card_id: c.id, name: c.name, company_name: c.company || "", email: c.email || "", phone: c.phone || "", job_title: c.title || "" }));
+      }
+    } catch { setCards([]); }
+  }, []);
+  useEffect(() => { if (door === "card") loadCards(); }, [door, loadCards]);
 
   const save = async () => {
     setBusy(true); setErr("");
@@ -404,8 +450,10 @@ function AddBox({ reasons, known, onClose, onDone }: { reasons: Reason[]; known:
           {door === "database" && (
             <div className="mb-3">
               <input value={look} onChange={(e) => setLook(e.target.value)} placeholder="search the CRM for a name…" style={box} />
+              {looking && <div className="text-xs px-1 py-1" style={{ color: MUTED }}>looking…</div>}
+              {!looking && lookErr && <div className="text-xs px-1 py-1" style={{ color: lookErr.startsWith("Nobody") ? MUTED : "#B3261E" }}>{lookErr}</div>}
               {hits.map((h) => (
-                <button key={h.id} onClick={() => { setF((x) => ({ ...x, person_id: h.id, name: h.full_name, email: h.primary_email || "", company_name: h.company || "" })); setLook(h.full_name); setHits([]); }}
+                <button key={h.id} onClick={() => { setF((x) => ({ ...x, person_id: h.id, name: h.full_name, email: h.primary_email || "", phone: h.primary_phone || "", company_name: h.company || "" })); setLook(h.full_name); setHits([]); setLookErr(""); }}
                   className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-50" style={{ color: INK }}>
                   {h.full_name} <span style={{ color: MUTED, fontSize: 11 }}>{h.company || ""} {h.primary_email || ""}</span>
                 </button>
@@ -415,16 +463,31 @@ function AddBox({ reasons, known, onClose, onDone }: { reasons: Reason[]; known:
           )}
 
           {door === "card" && (
-            <div className="mb-3" style={{ maxHeight: 170, overflowY: "auto", border: `1px solid ${BORDER}`, borderRadius: 6 }}>
-              {cards.length === 0 && <div className="p-2 text-xs" style={{ color: MUTED }}>No scanned cards yet — use Add Visiting Card first.</div>}
+            <>
+              <button onClick={() => setScanning(true)} className="text-xs font-bold rounded px-3 py-2 mb-2 text-white" style={{ background: ORANGE }}>
+                📷 Scan a new card
+              </button>
+              <div className="mb-3" style={{ maxHeight: 170, overflowY: "auto", border: `1px solid ${BORDER}`, borderRadius: 6 }}>
+              {cards.length === 0 && <div className="p-2 text-xs" style={{ color: MUTED }}>No scanned cards yet — press Scan a new card.</div>}
               {cards.map((c) => (
-                <button key={c.id} onClick={() => setF((x) => ({ ...x, card_id: c.id, name: c.name, company_name: c.company || "", email: c.email || "" }))}
+                <button key={c.id} onClick={() => setF((x) => ({ ...x, card_id: c.id, name: c.name, company_name: c.company || "", email: c.email || "", phone: c.phone || "", job_title: c.title || "" }))}
                   className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-50"
                   style={{ color: INK, background: f.card_id === c.id ? "#EFF6FF" : undefined }}>
                   {c.name} <span style={{ color: MUTED, fontSize: 11 }}>{c.company || ""}</span>
                 </button>
               ))}
-            </div>
+              </div>
+            </>
+          )}
+
+          {/* The same lightbox Add Visiting Card uses, opened here so a card
+              can be scanned without leaving the form already being filled.
+              When it closes, the newest card fills the fields. */}
+          {scanning && (
+            <CardLightbox
+              onClose={() => { setScanning(false); loadCards(true); }}
+              onChanged={() => loadCards(true)}
+              onOpen={() => { /* not navigating away from this form */ }} />
           )}
 
           <div className="met-2col" style={{ display: "grid", gap: 6 }}>
