@@ -4,6 +4,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { erpConfig, erpSync, type Winner } from "@/lib/erp-sync";
 import { beat } from "@/lib/cron-beat";
+import { isOn } from "@/lib/erp-hourly";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -53,10 +54,30 @@ export async function GET(req: Request) {
     const cfg = await erpConfig(crmDb());
     if ("error" in cfg) return NextResponse.json({ ok: false, note: cfg.error });
     const genie = adminClient();
-    const fallback: Winner = "latest";
+
+    /**
+     * THE TICKS ON THE SCREEN DECIDE (Dr Raghu, 16 Sep 2026: "tick the
+     * documents which will refresh here"), and the winner with them: "in all
+     * these decisions the later one wins!!!" is the default, not a constant,
+     * because it is now his to change without a deploy.
+     *
+     * A database where 0168 has not run answers nothing, and nothing means
+     * everything is on and the later edit wins — which is exactly what was
+     * happening before the column existed.
+     */
+    const st = await genie.from("app_settings").select("erp_hourly, erp_winner").eq("id", true).maybeSingle();
+    const ticks = (st.error ? {} : ((st.data?.erp_hourly ?? {}) as Record<string, unknown>));
+    const want = { jobs: isOn(ticks, "jobs"), delivered: isOn(ticks, "delivered"), projects: isOn(ticks, "projects") };
+    const fallback: Winner = (st.error ? "latest" : (String(st.data?.erp_winner || "latest") as Winner));
+
+    if (!want.jobs && !want.delivered && !want.projects) {
+      await beat("erp-sync", "done", { skipped: "every document is unticked on Synchronize to ERP" });
+      return NextResponse.json({ ok: true, note: "Nothing is ticked to come down from the ERP." });
+    }
 
     // 1. PUSH — the button's own road, signed as the cron
     let push: Record<string, unknown> = {};
+    let pushFailed: { status: number; said: string } | null = null;
     if (!secret) return NextResponse.json({ ok: false, note: "CRON_SECRET is not set, so the cron cannot push." });
     const pr = await fetch(new URL("/api/erp-update", req.url), {
       method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
@@ -89,11 +110,31 @@ export async function GET(req: Request) {
         answeredWith: ctype.split(";")[0] || "nothing",
         secretSet: !!secret, secretLen: secret ? secret.length : 0,
       });
-      return NextResponse.json({ ok: false, step: "push", push, note: "Push failed, so the pull was skipped — a pull over unpushed edits would overwrite them." }, { status: 502 });
+      /**
+       * THE PULL NO LONGER WAITS ON THE PUSH (Dr Raghu, 16 Sep 2026: "in all
+       * these decisions the later one wins!!!").
+       *
+       * This used to return here. The reasoning was sound when it was
+       * written — a pull over unpushed edits would overwrite them — but it
+       * assumed the ERP always wins. Under LATEST WINS it does not: a Genie
+       * edit made after the ERP's own last change survives the pull, which
+       * is the whole point of the rule.
+       *
+       * What that guard actually cost: twenty-six hours in which the push
+       * failed every hour and took the jobs, projects and delivered pull
+       * down with it, so the board quietly stopped hearing from the ERP
+       * because a DIFFERENT half of the same cron was broken. One fault
+       * should break one thing.
+       *
+       * The failure is still recorded and still shown. It simply no longer
+       * takes the other half hostage.
+       */
+      pushFailed = { status: pr.status, said: String(said).slice(0, 200) };
     }
 
     // 2. PULL — the ERP's word comes down, with the day's winner
     try {
+      /* Jobs, delivered and projects are one pull — see ERP_DOCS.group. */
       const out = await erpSync(genie, cfg, { dry: false, fallback });
       await genie.from("erp_sync_log").insert({
         by: "cron", dry: false, ok: true,
@@ -102,8 +143,8 @@ export async function GET(req: Request) {
         deliv_new: out.delivered.created, deliv_changed: out.delivered.changed,
         changes: out.changes, notes: [...(out.notes || []), `winner on a difference: ${fallback}`], seconds: out.seconds,
       }).then(() => null, () => null);
-      await beat("erp-sync", "done", { fallback, pushed: push.pushed, rejected: push.rejected, jobs_changed: out.jobs.changed, proj_changed: out.projects.changed, seconds: out.seconds });
-      return NextResponse.json({ ok: true, fallback, push: { pushed: push.pushed, rejected: push.rejected, notInErp: push.notInErp }, pull: { jobs: out.jobs, projects: out.projects, delivered: out.delivered, seconds: out.seconds } });
+      await beat("erp-sync", pushFailed ? "failed" : "done", { fallback, want, pushFailed, pushed: push.pushed, rejected: push.rejected, jobs_changed: out.jobs.changed, proj_changed: out.projects.changed, seconds: out.seconds });
+      return NextResponse.json({ ok: !pushFailed, fallback, pushFailed, push: { pushed: push.pushed, rejected: push.rejected, notInErp: push.notInErp }, pull: { jobs: out.jobs, projects: out.projects, delivered: out.delivered, seconds: out.seconds }, note: pushFailed ? "The push failed; the pull ran anyway because the later edit wins." : undefined });
     } catch (e) {
       await genie.from("erp_sync_log").insert({ by: "cron", dry: false, ok: false, error: `pull: ${String(e instanceof Error ? e.message : e).slice(0, 400)}` }).then(() => null, () => null);
       await beat("erp-sync", "failed", { step: "pull", error: String(e instanceof Error ? e.message : e).slice(0, 300) });

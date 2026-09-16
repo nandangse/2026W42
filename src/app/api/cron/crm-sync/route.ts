@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { beat } from "@/lib/cron-beat";
+import { isOn } from "@/lib/erp-hourly";
+import { adminClient } from "@/lib/supabase/admin";
 import { swallow } from "@/lib/swallow";
 
 export const dynamic = "force-dynamic";
@@ -194,7 +196,33 @@ export async function GET(req: Request) {
     const report: Record<string, { read: number; added: number; had: number; upto: string }> = {};
     const nextCfg: Record<string, string> = { ...cfg };
 
+    /**
+     * THE TICKS ON Synchronize to ERP DECIDE WHICH STREAMS RUN.
+     *
+     * Dr Raghu, 16 Sep 2026: "tick the documents which will refresh here."
+     * These five are genuinely independent — each has its own cursor and its
+     * own table — so unlike the planning pull they can be turned off one at a
+     * time without leaving the others half-informed.
+     *
+     * The ticks live in Genie's app_settings, which is a different database
+     * from the one this cron writes to; reading it is one small query an hour
+     * and it is worth it to have one screen that tells the truth. A database
+     * without 0168 answers nothing, and nothing means everything is on.
+     */
+    const BY_DOCTYPE: Record<string, string> = {
+      "Customer": "customer", "Contact": "contact", "Opportunity": "opportunity",
+      "Quotation": "quotation", "Sales Order": "sales_order",
+    };
+    let ticks: Record<string, unknown> = {};
+    try {
+      const st = await adminClient().from("app_settings").select("erp_hourly").eq("id", true).maybeSingle();
+      if (!st.error) ticks = (st.data?.erp_hourly ?? {}) as Record<string, unknown>;
+    } catch { /* unreadable settings must not stop the sync */ }
+    const skipped: string[] = [];
+
     for (const job of JOBS) {
+      const tick = BY_DOCTYPE[job.doctype];
+      if (tick && !isOn(ticks, tick)) { skipped.push(job.doctype); continue; }
       const cursor = S(cfg[job.cursorKey]) || "2026-09-08 00:00:00";
       let read = 0, added = 0, had = 0, upto = cursor;
       try {
@@ -322,7 +350,7 @@ export async function GET(req: Request) {
     if (!cfg.push_from) nextCfg.push_from = new Date().toISOString();
 
     await db.from("integration_setting").update({ config: nextCfg }).eq("key", "erpnext");
-    await beat("crm-sync", "done", { in: report, out });
+    await beat("crm-sync", "done", { in: report, out, ...(skipped.length ? { unticked: skipped } : {}) });
     return NextResponse.json({ ok: true, in: report, out,
       push: armed ? "ARMED — the counts above were really sent to the ERP."
         : "NOT ARMED — the counts above are what WOULD be sent. Set push_on to \"yes\" in the erpnext integration config to arm it." });

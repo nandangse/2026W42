@@ -79,6 +79,103 @@ export function MonthlyTargetsCard() {
   );
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   WHAT COMES DOWN FROM THE ERP EVERY HOUR
+
+   Dr Raghu, 16 Sep 2026: "i want hourly refresh with nandanerp" — then
+   twelve documents named one after another — "also in all these decisions
+   the later one wins!!!" and "tick the documents which will refresh here".
+
+   Until now the answer lived in three crons across two databases and could
+   only be had by reading the source. It is a list now, on the screen, and
+   what is on is on.
+
+   THE FOUR THAT CANNOT BE TICKED SAY SO RATHER THAN PRETENDING. Items, BOMs,
+   purchase orders and GRNs are still brought in by hand from Saamaan; a tick
+   that did nothing would be worse than no tick at all, which is the same
+   lesson as Delivered and Replied on the campaign screen.
+   ══════════════════════════════════════════════════════════════════════ */
+type HourlyDoc = { key: string; label: string; doctype: string; carrier: string; where: string; hourly: boolean; on: boolean; group?: string };
+
+function HourlyFromErp() {
+  const [docs, setDocs] = useState<HourlyDoc[] | null>(null);
+  const [winner, setWinner] = useState("latest");
+  const [note, setNote] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState("");
+
+  const load = useCallback(() => api.get("/api/erp-hourly")
+    .then((r) => { const j = r as { docs?: HourlyDoc[]; winner?: string; note?: string };
+      setDocs(j.docs || []); setWinner(j.winner || "latest"); setNote(j.note || ""); setErr(""); })
+    .catch((e) => setErr(e instanceof Error ? e.message : String(e))), []);
+  useEffect(() => { load(); }, [load]);
+
+  const flip = async (d: HourlyDoc) => {
+    setBusy(d.key); setErr("");
+    try { await api.post("/api/erp-hourly", { key: d.key, on: !d.on }); await load(); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy("");
+  };
+  const setWin = async (w: string) => {
+    setBusy("winner"); setErr("");
+    try { await api.post("/api/erp-hourly", { action: "winner", winner: w }); setWinner(w); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy("");
+  };
+
+  const byCarrier: Record<string, string> = { "erp-sync": "on the hour, :05", "crm-sync": "on the hour, :30", saamaan: "by hand" };
+
+  return (
+    <div className="rounded border mb-4" style={{ borderColor: "var(--line)", background: "#FBFAF7" }}>
+      <div className="px-3 py-2" style={{ borderBottom: "1px solid var(--line)" }}>
+        <div className="text-xs font-bold" style={{ color: "var(--muted)", letterSpacing: 1.4 }}>FROM NANDANERP, EVERY HOUR</div>
+        <div className="text-sm" style={{ color: "var(--muted)", marginTop: 2 }}>
+          Tick what should come down. Untick and the next pass leaves it alone.
+        </div>
+      </div>
+
+      {err && <div className="px-3 py-2 text-xs font-semibold" style={{ color: "var(--red)" }}>{err}</div>}
+      {note && <div className="px-3 py-2 text-xs" style={{ background: "#FDF8EC", color: "#7A5B00" }}>{note}</div>}
+
+      <div className="p-2" style={{ display: "grid", gap: 6, gridTemplateColumns: "repeat(auto-fill, minmax(232px, 1fr))" }}>
+        {(docs || []).map((d) => (
+          <label key={d.key} title={d.hourly ? `${d.doctype} → ${d.where}` : `${d.doctype} — pulled by hand from Saamaan; nothing brings it down on the hour yet`}
+            className="flex items-start gap-2 rounded border px-2 py-1.5"
+            style={{ borderColor: "var(--line)", background: d.hourly ? "#fff" : "#F6F5F2", cursor: d.hourly ? "pointer" : "not-allowed", opacity: d.hourly ? 1 : .72 }}>
+            <input type="checkbox" checked={d.on} disabled={!d.hourly || busy === d.key} onChange={() => flip(d)} style={{ marginTop: 3 }} />
+            <span style={{ minWidth: 0 }}>
+              <span className="text-sm font-semibold" style={{ color: "var(--navy)" }}>{d.label}</span>
+              <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.45 }}>
+                {d.doctype} → {d.where}
+                <br />{d.hourly ? byCarrier[d.carrier] : <span style={{ color: "#8A5B00" }}>by hand, in Saamaan — not on the hour yet</span>}
+                {d.group === "planning" && <><br /><span style={{ color: "var(--muted)" }}>one pull with jobs &amp; projects</span></>}
+              </div>
+            </span>
+          </label>
+        ))}
+        {!docs && <div className="text-xs" style={{ color: "var(--muted)" }}>reading…</div>}
+      </div>
+
+      {/* THE RULE UNDER ALL OF IT. It is what makes a pull safe over an
+          unpushed Genie edit — and therefore what lets the pull carry on
+          when the push is broken. */}
+      <div className="px-3 py-2 flex items-center gap-2 flex-wrap" style={{ borderTop: "1px solid var(--line)" }}>
+        <span className="text-xs font-bold" style={{ color: "var(--muted)" }}>WHEN THEY DISAGREE</span>
+        {[["latest", "the later edit wins"], ["erp", "the ERP always wins"], ["genie", "Genie always wins"]].map(([k, label]) => (
+          <button key={k} onClick={() => setWin(k)} disabled={busy === "winner"}
+            className="text-xs font-bold rounded px-2 py-1"
+            style={{ background: winner === k ? "var(--navy)" : "#fff", color: winner === k ? "#fff" : "var(--navy)", border: "1px solid var(--line)" }}>
+            {label}
+          </button>
+        ))}
+        <span className="text-xs" style={{ color: "var(--muted)" }}>
+          Later-wins is why a pull can never trample a change made here after the ERP&rsquo;s own.
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPush?: boolean }) {
   const [rows, setRows] = useState<{ id: string; job_id: string; field: string; label: string; old_value: string | null; new_value: string | null; changed_by: string | null; changed_at: string; push_status?: string | null; push_error?: string | null; pushed_by?: string | null; pushed_at?: string | null }[] | null>(null);
   const [installed, setInstalled] = useState(true);
@@ -143,6 +240,7 @@ export function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPus
 
   return (
     <div className="p-4">
+      <HourlyFromErp />
       <div className="flex items-center gap-2 flex-wrap mb-3">
         <div>
           <div className="text-xs font-bold" style={{ color: "var(--muted)", letterSpacing: 1.4 }}>UPDATE TO ERP</div>

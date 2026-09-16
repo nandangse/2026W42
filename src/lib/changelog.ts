@@ -89,6 +89,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.49.0",
+    date: "2026-09-16",
+    module: "Synchronize to ERP: tick what comes down every hour",
+    items: [
+      "<b>Twelve documents, listed on one screen, each with a tick.</b> Jobs, delivered jobs, projects, opportunities, quotations, sales orders, contacts, companies, items, BOMs, purchase orders and GRNs. Until now the answer to \u201cdoes this refresh?\u201d lived in three crons across two databases and could only be had by reading the source.",
+      "<b>Four of them cannot be ticked, and say so instead of pretending.</b> Items, BOMs, purchase orders and GRNs are still brought in by hand from Saamaan; a tick that did nothing would be worse than no tick at all. Three of them \u2014 jobs, delivered and projects \u2014 share a tick, because they come down in one interleaved pull where a job knows its project and an archive decision needs all three lists in hand.",
+      "<b>The pull no longer waits on the push.</b> The ERP push had failed every hour for twenty-six hours and was taking the jobs, delivered and projects pull down with it \u2014 the board quietly stopped hearing from the ERP because a different half of the same cron was broken. Under <b>later-one-wins</b> a pull cannot trample a newer Genie edit, so the guard that justified it no longer holds. One fault should break one thing.",
+      "<b>Later one wins is now his to set</b>, not a constant in the source \u2014 the later edit, or always the ERP, or always Genie.",
+      "<b>The sales streams come down around the clock.</b> crm-sync ran only between 2 and 14 UTC, so anything entered in the ERP after half past seven in the evening waited until the following morning. Hourly now, like the rest.",
+      "<b>Synchronize to ERP opens to Pankaj Sutar and Mukesh Tiwari</b> alongside Dr Raghu \u2014 and <b>the \u201cfiles 0/3\u201d badge is gone</b>. It counted the morning\u2019s three spreadsheets, a habit from before the ERP was read on the hour, and sat there in orange every day as if something were missing when nothing was. What shows now is work actually waiting. <b>Needs Genie migration 0168.</b>",
+    ],
+  },
+  {
     v: "5.0.48.7",
     date: "2026-09-16",
     module: "The sheet with the people on it \u2014 and two crons made to explain themselves",

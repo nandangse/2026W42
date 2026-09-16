@@ -82,10 +82,12 @@ export default function PlanningSuite({
   const canEdit = role === "admin" || role === "planner" || role === "project_owner";
   // Upload lives in the account menu now — admins and Shweta only.
   const canUpload = isAdmin || email.toLowerCase() === UPLOADER_EMAIL;
-  /* Synchronize to ERP is the two hands that actually do it — Dr Raghu and
-     Pankaj — and not every admin (Dr Raghu, 8 Sep 2026: "which only pankaj
-     and me can see"). */
-  const canSync = email.toLowerCase() === RAGHU_EMAIL_LC || email.toLowerCase() === UPLOADER_EMAIL;
+  /* Synchronize to ERP is the hands that actually do it — and not every
+     admin. Dr Raghu, 8 Sep 2026: "which only pankaj and me can see"; then
+     16 Sep 2026: "make this available to pankaj, mukesh and me". Named
+     rather than roled, because it is three people and not a tier. */
+  const SYNC_HANDS = new Set([RAGHU_EMAIL_LC, UPLOADER_EMAIL, "pankajs@nandan.co.in", "mukesh@nandan.co.in"]);
+  const canSync = SYNC_HANDS.has(email.toLowerCase());
   const me = useMemo(
     () => ({ email, initials, displayName, erpOwner, role }),
     [email, initials, displayName, erpOwner, role],
@@ -581,12 +583,18 @@ export default function PlanningSuite({
                   a queue count and a file count that meant nothing apart.
                   Now one entry, named for what it is, and only for the two
                   hands that do it. */}
+              {/* THE FILE COUNT IS GONE (Dr Raghu, 16 Sep 2026: "remove the
+                  file 0/3!!!"). It counted the morning's three spreadsheets,
+                  which is a habit from before the ERP was read on the hour —
+                  it sat there in orange saying 0/3 every day as if something
+                  were missing when nothing was. What is worth showing is
+                  work actually waiting: rows queued to go back out. */}
               {canSync && (
-                <button onClick={() => { close(); setWorkspace("suite"); setTab(loadedCount < 3 ? "upload" : "erp"); }}
+                <button onClick={() => { close(); setWorkspace("suite"); setTab("erp"); }}
                   className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50"
-                  style={{ color: loadedCount < 3 ? "var(--accent)" : "var(--navy)", fontWeight: loadedCount < 3 ? 700 : 600 }}
-                  title="The morning files in, and the changed rows back out to the ERP">
-                  ⇅ Synchronize to ERP{loadedCount < 3 ? ` · files ${loadedCount}/3` : queued ? ` · ${queued} waiting` : ""}
+                  style={{ color: queued ? "var(--accent)" : "var(--navy)", fontWeight: queued ? 700 : 600 }}
+                  title="What comes down from the ERP every hour, and the changed rows going back out">
+                  ⇅ Synchronize to ERP{queued ? ` · ${queued} waiting` : ""}
                 </button>
               )}
               <button onClick={() => { close(); setWorkspace("suite"); setTab("feature"); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }} title="Ask for something in Genie">💡 Feature Request</button>
