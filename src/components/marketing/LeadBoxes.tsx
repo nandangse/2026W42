@@ -203,11 +203,122 @@ function AddContact({ companyId, onClose }: { companyId: string; onClose: () => 
   );
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MERGE — the same person, five times over
+
+   Dr Raghu, 16 Sep 2026, looking at five Renato Ramellas on one screen:
+   "also in these leads have a provision to merge as a tab!"
+
+   Clean Database is for working through thousands. This is the other half:
+   you are already looking at somebody, you can see they are in here five
+   times, and the merge should be where your eyes are.
+
+   EACH MATCH SAYS WHY IT MATCHED, and the order is the strength of the
+   evidence. An address identifies a person. A shared number usually does.
+   A NAME ON ITS OWN DOES NOT — there are four Rahul Kumars in this database
+   and they are four different men — so a name-only match is shown last, in
+   amber, and says so.
+
+   THE KEEPER TAKES WHAT THE OTHERS HAD. Renato's five rows carry his company
+   on one, his title on another and his number written four ways; merged, the
+   survivor has all of it. The losers are hidden, never destroyed.
+   ══════════════════════════════════════════════════════════════════════ */
+type Twin = {
+  id: string; full_name: string | null; job_title: string | null; primary_email: string | null;
+  primary_phone: string | null; whatsapp_number: string | null; city: string | null;
+  country: string | null; company: string | null; created_at: string; why: string[];
+};
+
+function MergeTab({ id, onCounted, onMerged, onClose }: {
+  id: string; onCounted: (t: Twin[]) => void; onMerged: () => void; onClose: () => void;
+}) {
+  const [rows, setRows] = useState<Twin[] | null>(null);
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState("");
+  const [pick, setPick] = useState<Set<string>>(new Set());
+
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/crm/clean?twins=${id}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(String(j.error || r.status));
+      setRows(j.twins || []); onCounted(j.twins || []);
+      setPick(new Set((j.twins || []).filter((t: Twin) => !t.why.every((w) => w === "the same name")).map((t: Twin) => t.id)));
+      setErr("");
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); setRows([]); }
+  }, [id, onCounted]);
+  useEffect(() => { load(); }, [load]);
+
+  const merge = async () => {
+    const drop = [...pick];
+    if (!drop.length) return;
+    if (!window.confirm(`Fold ${drop.length} record${drop.length === 1 ? "" : "s"} into this one?\n\nThis one keeps everything it has and gains whatever the others had that it lacks. Their list memberships move across. The others are hidden, not destroyed, so this can be undone.`)) return;
+    setBusy("merge"); setErr("");
+    try {
+      const r = await fetch("/api/crm/clean", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "merge_ids", kind: "person", keep: id, drop }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(String(j.error || r.status));
+      setDone(`${j.merged} folded in. This record now has whatever they had that it did not.`);
+      await load(); onMerged();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy("");
+  };
+
+  const nameOnly = (t: Twin) => t.why.every((w) => w === "the same name");
+
+  return (
+    <div>
+      <div className="text-xs mb-2" style={{ color: MUTED, lineHeight: 1.6 }}>
+        Other records that look like this person. <b>Tick the ones that are the same person</b> and they fold into this one —
+        this record keeps what it has and gains what they had that it lacks, their list memberships move across, and they are
+        hidden rather than destroyed.
+      </div>
+      {err && <div className="text-xs font-semibold mb-2" style={{ color: RED }}>{err}</div>}
+      {done && <div className="text-xs font-semibold mb-2" style={{ color: GREEN }}>{done}</div>}
+      {!rows && <div className="text-sm" style={{ color: MUTED }}>looking…</div>}
+      {rows && rows.length === 0 && <div className="text-sm" style={{ color: MUTED }}>Nobody else in here looks like this person.</div>}
+
+      {(rows || []).map((t) => (
+        <label key={t.id} className="flex items-start gap-2 rounded border p-2 mb-1.5"
+          style={{ borderColor: nameOnly(t) ? "#E0C88A" : "var(--line)", background: nameOnly(t) ? "#FDF8EC" : "#fff", cursor: "pointer" }}>
+          <input type="checkbox" checked={pick.has(t.id)} style={{ marginTop: 3 }}
+            onChange={(e) => setPick((s2) => { const n = new Set(s2); if (e.target.checked) n.add(t.id); else n.delete(t.id); return n; })} />
+          <span style={{ minWidth: 0, flex: 1 }}>
+            <b style={{ fontSize: 13 }}>{t.full_name || "(no name)"}</b>
+            <span style={{ fontSize: 11.5, color: MUTED }}>{[t.job_title, t.company].filter(Boolean).map((x) => ` · ${x}`).join("")}</span>
+            <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5 }}>
+              {[t.primary_email, t.whatsapp_number || t.primary_phone, t.city, t.country].filter(Boolean).join(" · ") || "nothing on it"}
+            </div>
+            <div style={{ fontSize: 11, color: nameOnly(t) ? "#8A5B00" : "var(--green)", marginTop: 1 }}>
+              matched on {t.why.join(" and ")}
+              {nameOnly(t) && " — a name on its own is weak evidence. There are four Rahul Kumars in here and they are four different men."}
+            </div>
+          </span>
+        </label>
+      ))}
+
+      {rows && rows.length > 0 && (
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          <button onClick={merge} disabled={!!busy || !pick.size} style={btn(pick.size ? RED : "var(--line-soft)")}>
+            {busy ? "folding…" : `Fold ${pick.size} into this record`}
+          </button>
+          <button onClick={onClose} style={btn("#fff", "var(--dim)")}>close</button>
+          <span className="text-xs" style={{ color: MUTED }}>Name-only matches are left unticked on purpose.</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ───────────────────────────── the person ───────────────────────────── */
 
 export function PersonBox({ id, seesAll, lists, onClose, onChanged }: { id: string; seesAll: boolean; lists: ListLite[]; onClose: () => void; onChanged: () => void }) {
   const [d, setD] = useState<{ row: Person; tags: Tag[]; allTags: { id: string; name: string }[] } | null>(null);
-  const [tab, setTab] = useState<"record" | "tags" | "notes">("record");
+  const [tab, setTab] = useState<"record" | "tags" | "notes" | "merge">("record");
+  const [twins, setTwins] = useState<Twin[] | null>(null);
   const [msg, setMsg] = useState("");
   const [cq, setCq] = useState(""); const [chits, setChits] = useState<Company[]>([]);
   const load = useCallback(() => api<NonNullable<typeof d>>(`/api/marketing/leads?kind=person&id=${id}`).then(setD).catch((e) => setMsg(e instanceof Error ? e.message : String(e))), [id]);
@@ -219,8 +330,9 @@ export function PersonBox({ id, seesAll, lists, onClose, onChanged }: { id: stri
   return (
     <Modal width={900} title={<>{p.full_name || p.primary_email || "—"}{p.is_decision_maker && <span className="ml-2 text-sm" title="decision maker">★</span>}</>}
       sub={<>{[p.job_title, p.company?.name, p.city, p.country].filter(Boolean).join(" · ")} · source {p.source}{p.assigned_to ? ` · assigned ${p.assigned_to.split("@")[0]}` : ""}</>} onClose={onClose}>
-      <Tabs tabs={[["record", "👤 Record"], ["tags", `🏷 Tags (${d.tags.length})`], ["notes", "📝 Notes & sends"]]} tab={tab} setTab={setTab} />
+      <Tabs tabs={[["record", "👤 Record"], ["tags", `🏷 Tags (${d.tags.length})`], ["notes", "📝 Notes & sends"], ["merge", `⧉ Merge${twins ? ` (${twins.length})` : ""}`]]} tab={tab} setTab={setTab} />
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: msg.includes("✓") ? GREEN : RED }}>{msg}</div>}
+      {tab === "merge" && <MergeTab id={id} onCounted={setTwins} onMerged={() => { load(); onChanged(); }} onClose={onClose} />}
       {tab === "record" && (
         <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
           <F label="First name" value={p.first_name} onSave={(v) => save({ first_name: v })} />

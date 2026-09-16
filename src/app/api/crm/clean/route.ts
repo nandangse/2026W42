@@ -45,6 +45,75 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const kind = S(url.searchParams.get("kind"));
 
+    /**
+     * THE TWINS OF ONE PERSON, found live and cheaply.
+     *
+     * Dr Raghu, 16 Sep 2026, looking at five Renato Ramellas: "also in these
+     * leads have a provision to merge as a tab!"
+     *
+     * The whole-database scan is for working through thousands. This is the
+     * other half: you are already looking at somebody, you can see they are
+     * in here five times, and the merge should be where your eyes are.
+     *
+     * Three indexed questions, no scan: the same address, the same last ten
+     * digits, the same name. Each match says WHY it matched, because an
+     * address is strong evidence, a name on its own is weak, and the person
+     * pressing the button deserves to know which they are looking at.
+     */
+    const twinOf = S(url.searchParams.get("twins"));
+    if (twinOf) {
+      const { data: meRow } = await db.from("person")
+        .select("id, full_name, first_name, last_name, primary_email, primary_phone, whatsapp_number, company_id")
+        .eq("id", twinOf).maybeSingle();
+      if (!meRow) throw new HttpError(404, "No such person.");
+      const m = meRow as Record<string, unknown>;
+      const found = new Map<string, { id: string; why: string[] }>();
+      const add = (rows: Record<string, unknown>[] | null, why: string) => {
+        for (const r of rows || []) {
+          const id = String(r.id);
+          if (id === twinOf) continue;
+          const cur = found.get(id) || { id, why: [] };
+          if (!cur.why.includes(why)) cur.why.push(why);
+          found.set(id, cur);
+        }
+      };
+      const email = S(m.primary_email).toLowerCase();
+      if (email) {
+        const { data } = await db.from("person").select("id").ilike("primary_email", email).is("deleted_at", null).limit(40);
+        add(data as Record<string, unknown>[] | null, "the same e-mail");
+      }
+      const key = phoneKey(S(m.whatsapp_number) || S(m.primary_phone));
+      if (key) {
+        const { data } = await db.from("person").select("id")
+          .or(`primary_phone.ilike.%${key}%,whatsapp_number.ilike.%${key}%`).is("deleted_at", null).limit(40);
+        add(data as Record<string, unknown>[] | null, "the same number");
+      }
+      const nm = S(m.full_name) || [S(m.first_name), S(m.last_name)].filter(Boolean).join(" ");
+      if (nm.length > 3) {
+        const { data } = await db.from("person").select("id").ilike("full_name", nm).is("deleted_at", null).limit(40);
+        add(data as Record<string, unknown>[] | null, "the same name");
+      }
+      const ids = [...found.keys()];
+      let rows: Record<string, unknown>[] = [];
+      if (ids.length) {
+        const { data } = await db.from("person")
+          .select("id, full_name, first_name, last_name, job_title, primary_email, primary_phone, whatsapp_number, city, country, company_id, created_at")
+          .in("id", ids);
+        rows = (data || []) as Record<string, unknown>[];
+        const cids = [...new Set(rows.map((r) => r.company_id).filter(Boolean))] as string[];
+        const cn = new Map<string, string>();
+        if (cids.length) {
+          const { data: cs } = await db.from("company").select("id, name").in("id", cids);
+          for (const c of (cs || []) as { id: string; name: string }[]) cn.set(String(c.id), c.name);
+        }
+        rows = rows.map((r) => ({ ...r, company: r.company_id ? cn.get(String(r.company_id)) ?? null : null, why: found.get(String(r.id))?.why || [] }));
+        /* Strongest evidence first: an address identifies, a name guesses. */
+        const rank = (w: string[]) => (w.includes("the same e-mail") ? 0 : w.includes("the same number") ? 1 : 2);
+        rows.sort((a, b) => rank((a.why as string[]) || []) - rank((b.why as string[]) || []));
+      }
+      return NextResponse.json({ ok: true, me: meRow, twins: rows });
+    }
+
     const { data: runs } = await db.from("crm_clean_run").select("*").order("at", { ascending: false }).limit(1);
     const run = (runs || [])[0] as { at: string; seconds: number; summary: Record<string, number> } | undefined;
 
@@ -199,10 +268,16 @@ export async function POST(req: Request) {
      * wrong. Nothing is destroyed, every screen that filters deleted_at stops
      * showing it, and it can be brought back by clearing one column.
      */
-    if (b.action === "merge") {
-      const f = await finding(S(b.id));
+    if (b.action === "merge" || b.action === "merge_ids") {
+      /* From the cleaner it is a finding; from a person's own Merge tab it
+         is simply two ids. One road afterwards, so a merge behaves the same
+         whichever screen asked for it. */
+      const fromIds = b.action === "merge_ids";
+      const f = fromIds
+        ? { id: "", kind: S(b.kind) === "company" ? "company_dup" : "person_email", ids: [S(b.keep), ...((b.drop as string[]) || []).map(S)], labels: [], suggestion: null }
+        : await finding(S(b.id));
       const keep = S(b.keep) || f.ids[0];
-      const drop = f.ids.filter((x) => x !== keep);
+      const drop = f.ids.filter((x) => x !== keep && x);
       if (!drop.length) throw new HttpError(400, "Nothing to merge into it.");
       const table = f.kind === "company_dup" ? "company" : "person";
 
@@ -239,7 +314,7 @@ export async function POST(req: Request) {
 
       const { error } = await db.from(table).update({ deleted_at: new Date().toISOString() }).in("id", drop);
       if (error) throw new Error(error.message);
-      await close(f.id, "done");
+      if (f.id) await close(f.id, "done");
       return NextResponse.json({ ok: true, kept: keep, merged: drop.length });
     }
 

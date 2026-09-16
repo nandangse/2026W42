@@ -127,27 +127,52 @@ export async function POST(req: Request) {
      * we recognise beats a bigger one that names nothing. The chosen sheet is
      * reported, because a file with four tabs should say which it read.
      */
-    type Pick = { name: string; grid: unknown[][]; score: number };
+    /**
+     * AND THE ROW THE HEADINGS ARE ACTUALLY ON.
+     *
+     * An exhibitor book does not begin with its column names. It begins with
+     * a title, or a notice — one file carried "Attention Viewer We Are Given
+     * The Participants List Of Electronica India & Productronica India 2021
+     * ... Sorry For Inconvenience To All, Thanks" across row one. Taking row
+     * zero as the header meant the headings were that sentence, nothing
+     * mapped, and every row in the file fell through as "no name and no
+     * e-mail" and was skipped. The file looked imported. It was not.
+     *
+     * So the first ten rows are each tried as the header and the one that
+     * names the most columns we recognise wins. A tie goes to the earlier
+     * row, because a real header sits above its data.
+     */
+    type Pick = { name: string; grid: unknown[][]; score: number; headerRow: number };
     const candidates: Pick[] = [];
     for (const name of wb.SheetNames) {
       const sh = wb.Sheets[name];
       if (!sh) continue;
       const g = XLSX.utils.sheet_to_json<unknown[]>(sh, { header: 1, blankrows: false, raw: false });
       if (g.length < 2) continue;
-      const hdr = (g[0] || []).map(norm);
-      const known = Object.keys(guessMap(hdr)).length;
-      candidates.push({ name, grid: g, score: known * 100000 + g.length });
+      let best = { row: 0, known: -1 };
+      for (let r = 0; r < Math.min(10, g.length - 1); r++) {
+        const hdr = (g[r] || []).map(norm);
+        /* A header is short labels, not sentences. A row carrying a
+           paragraph is a notice, whatever words happen to be in it. */
+        if (hdr.some((h) => h.length > 60)) continue;
+        const known = Object.keys(guessMap(hdr)).length;
+        if (known > best.known) best = { row: r, known };
+      }
+      if (best.known <= 0) continue;                    // no row here names anything
+      const body = g.slice(best.row);
+      candidates.push({ name, grid: body, score: best.known * 100000 + body.length, headerRow: best.row });
     }
     if (!candidates.length) {
       const tabs = wb.SheetNames.length;
       throw new HttpError(400, tabs > 1
-        ? `No sheet in this file has a header row and data under it — ${tabs} tabs were tried.`
-        : "That file has a header and no rows.");
+        ? `No sheet in this file has headings this reads — ${tabs} tabs were tried, and the first ten rows of each. Check that one row names the columns (name, e-mail, phone, company).`
+        : "No row in the first ten names any column this reads. Check that one row carries the headings — name, e-mail, phone, company.");
     }
     candidates.sort((a, b) => b.score - a.score);
     const chosen = candidates[0];
     const grid = chosen.grid;
     const sheetName = chosen.name;
+    const headerRow = chosen.headerRow;
 
     const headers = (grid[0] || []).map(norm);
     const guessed = Object.keys(map).length ? map : guessMap(headers);
@@ -288,6 +313,8 @@ export async function POST(req: Request) {
       source,
       sheet: sheetName,
       sheets: wb.SheetNames.length,
+      /* 1-based, because that is what the row is called in Excel. */
+      headerRow: headerRow + 1,
       rows: slice.length,
       fileRows: body.length,
       headers,

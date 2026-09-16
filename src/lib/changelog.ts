@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.2.0.1",
+    date: "2026-09-16",
+    module: "Merge from the person you are looking at \u2014 and the header row found, not assumed",
+    items: [
+      "<b>A Merge tab on every lead.</b> Clean Database is for working through thousands; this is the other half \u2014 you are already looking at somebody, you can see they are in here five times, and the merge should be where your eyes are. Renato Ramella was five rows on one address, his company on one of them, his title on another and his number written four ways.",
+      "<b>Every match says why it matched, strongest first.</b> An address identifies a person, a shared number usually does, and <b>a name on its own does not</b> \u2014 there are four Rahul Kumars in here and they are four different men. Name-only matches are shown in amber, say exactly that, and are <b>left unticked on purpose</b>.",
+      "<b>The keeper takes what the others had.</b> Merged, the survivor carries the company from one row, the title from another and the best-written number. Their list memberships move across so nobody loses their place on a list, and the losers are hidden rather than destroyed.",
+      "<b>And the header row is found rather than assumed.</b> An exhibitor book does not begin with its column names \u2014 one file carried \u201cAttention Viewer We Are Given The Participants List Of Electronica India \u2026 Sorry For Inconvenience To All, Thanks\u201d across row one. Taking row zero as the header meant nothing mapped and every row in that file fell through as \u201cno name and no e-mail\u201d. <b>The file looked imported. It was not.</b> The first ten rows are now each tried and the one naming the most real columns wins.",
+    ],
+  },
+  {
     v: "5.2.0.0",
     date: "2026-09-16",
     module: "Clean Database \u2014 what is actually wrong in there, measured",
