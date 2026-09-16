@@ -16,6 +16,7 @@ import ProspectQueue from "./ProspectQueue";
 import VariableHelp from "./VariableHelp";
 import VisitingCard from "./VisitingCard";
 import PeopleIMet from "./PeopleIMet";
+import CleanDatabase from "./CleanDatabase";
 import Integrations from "./Integrations";
 import SalesPersonPlan from "./SalesPersonPlan";
 import SalesPlan from "./SalesPlan";
@@ -600,6 +601,8 @@ export default function CrmApp({
               <VisitingCard onOpen={openLinked} />
             ) : special.name === "peopleimet" ? (
               <PeopleIMet onOpen={openLinked} />
+            ) : special.name === "cleandb" ? (
+              <CleanDatabase />
             ) : special.name === "integrations" ? (
               <Integrations />
             ) : special.name === "emailqueue" ? (

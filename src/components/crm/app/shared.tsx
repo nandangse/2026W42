@@ -48,6 +48,8 @@ export const SPECIAL_SECTIONS = [
   { name: "deals", label: "Deals", icon: "◆", blurb: "" },
   { name: "visitingcard", label: "Add Visiting Card", icon: "🪪", blurb: "" },
   /* The context nobody else writes down, and the follow-up it produces. */
+  /* Shweta's screen: what is wrong in the data, and a button beside each. */
+  { name: "cleandb", label: "Clean Database", icon: "🧹", blurb: "Duplicate companies and contacts, the Pvt Ltd spellings, and every mobile written the way WhatsApp wants it. Every row is a proposal — nothing changes until you press it." },
   { name: "peopleimet", label: "People I Met", icon: "🤝", blurb: "Everybody you met at a show, with what was actually said — and the personal e-mail and WhatsApp it writes from that." },
   { name: "integrations", label: "Integrations", icon: "🔌", blurb: "" },
   { name: "emailqueue", label: "Email", icon: "📮", blurb: "" },
@@ -75,7 +77,7 @@ export const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string
       { sp: "dashboard" }, { sp: "analytics" }, { sp: "salespersonplan" }, { sp: "salesplan" },
     ],
   },
-  { header: "TOOLS", collapsible: true, items: [{ sp: "visitingcard" }, { sp: "peopleimet" }, { sp: "emailqueue" }, { sp: "waqueue" }, { sp: "playbook" }] },
+  { header: "TOOLS", collapsible: true, items: [{ sp: "visitingcard" }, { sp: "peopleimet" }, { sp: "cleandb" }, { sp: "emailqueue" }, { sp: "waqueue" }, { sp: "playbook" }] },
   { header: "PIPELINE", items: [{ dt: "lead" }, { dt: "opportunity" }, { dt: "quotation" }, { dt: "sales_order" }] },
   { items: [{ sp: "deals" }] },
   {

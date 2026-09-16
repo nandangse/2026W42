@@ -89,6 +89,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.2.0.0",
+    date: "2026-09-16",
+    module: "Clean Database \u2014 what is actually wrong in there, measured",
+    items: [
+      "<b>A new screen under CRM \u2192 Tools, for Shweta</b> (and Raghu, Pankaj and Mukesh). It reads every company and every contact once and reports what it found, with the time it was found on it.",
+      "<b>What is in there, measured rather than guessed:</b> 57,817 companies, of which <b>1,262 names collide</b> across 2,869 rows \u2014 and \u201cPvt Ltd\u201d is spelled at least eleven ways (Pvt Ltd 5,918 \u00b7 Limited 2,850 \u00b7 PVT LTD 583 \u00b7 Ltd 264 \u00b7 Pvt&nbsp;&nbsp;Ltd 94 \u00b7 pvt ltd 30). Of 255,288 live contacts, <b>30,797 surplus rows share an e-mail</b> across 13,696 addresses, <b>28,343 share a mobile</b>, and <b>10,907 numbers are not written as +country-code</b>.",
+      "<b>Nothing is cleaned automatically, and the measurement is why.</b> Among the colliding company names are \u201cKuldeep\u201d four times and \u201cRahul Kumar\u201d four times \u2014 people\u2019s names used as a company, almost certainly four different people at four different firms. <b>A name alone is not identity.</b> Those groups are flagged in amber, say so in plain words, and can be dismissed for good.",
+      "<b>A merge is reversible.</b> The keeper takes whatever the loser had that it lacked, the loser\u2019s list memberships move across so nobody loses their place on a list, and the loser is hidden rather than destroyed.",
+      "<b>Numbers are only corrected where they can be read confidently.</b> Ten digits are taken as India, a leading zero is dropped, a written 00 country code becomes a plus. Anything ambiguous \u2014 letters in the field, two numbers in one box, an odd length \u2014 is left exactly as it is and reported rather than guessed at, because a wrongly corrected number reaches a stranger.",
+      "<b>The scan is kept, not repeated.</b> Reading a quarter of a million people takes about ninety seconds; doing that on every page load would make the screen unusable. <b>Needs CRM migration 0078.</b>",
+    ],
+  },
+  {
     v: "5.1.0.6",
     date: "2026-09-16",
     module: "A search that does not read the whole table, a Cc, send now, and Genie learning the voice",
