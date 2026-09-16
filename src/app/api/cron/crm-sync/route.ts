@@ -70,6 +70,40 @@ interface Job {
   };
 }
 
+/**
+ * AN OPPORTUNITY NEEDS A STAGE, AND THE ERP DOES NOT SEND ONE WE KNOW.
+ *
+ * Found 16 Sep 2026 in the cron's own heartbeat: "Opportunity — read 47,
+ * added 0, stopped: null value in column stage_id violates not-null
+ * constraint". Forty-seven opportunities were read from the ERP every hour
+ * and every one of them was refused, silently, for as long as the stream has
+ * existed — the row builder never set a stage and the column will not take a
+ * null.
+ *
+ * The ERP's own `sales_stage` is mapped where its wording matches a stage
+ * here; where it does not, the opportunity lands on NEW, which is what a
+ * freshly arrived enquiry is. Landing it somewhere true is better than
+ * refusing it: an opportunity nobody can see cannot be moved to the right
+ * stage by hand either.
+ */
+const OPP_STAGE = new Map<string, number>();
+let OPP_FALLBACK = 0;
+
+async function loadOppStages(db: ReturnType<typeof crmDb>) {
+  OPP_STAGE.clear(); OPP_FALLBACK = 0;
+  const { data } = await db.from("stage").select("id, code, name, sort_order, active").eq("entity", "opportunity");
+  const rows = (data || []) as { id: number; code: string; name: string; sort_order: number; active: boolean }[];
+  for (const st of rows) {
+    OPP_STAGE.set(String(st.name).trim().toLowerCase(), st.id);
+    OPP_STAGE.set(String(st.code).trim().toLowerCase(), st.id);
+  }
+  const live = rows.filter((x) => x.active).sort((a, b) => a.sort_order - b.sort_order);
+  OPP_FALLBACK = OPP_STAGE.get("new") ?? (live[0]?.id ?? rows[0]?.id ?? 0);
+}
+
+const stageFor = (sales_stage: unknown) =>
+  OPP_STAGE.get(String(sales_stage ?? "").trim().toLowerCase()) ?? OPP_FALLBACK;
+
 const JOBS: Job[] = [
   {
     doctype: "Customer", table: "company", key: "erp_name", cursorKey: "sync_customer",
@@ -97,7 +131,12 @@ const JOBS: Job[] = [
   {
     doctype: "Opportunity", table: "opportunity", key: "erp_opportunity_name", cursorKey: "sync_opportunity",
     fields: ["name", "customer_name", "title", "transaction_date", "sales_stage", "modified"],
-    row: (r) => ({ erp_opportunity_name: S(r.name), name: S(r.title) || S(r.customer_name) || S(r.name) }),
+    row: (r) => ({
+      erp_opportunity_name: S(r.name),
+      name: S(r.title) || S(r.customer_name) || S(r.name),
+      /* NOT NULL — see loadOppStages. Without this every row was refused. */
+      stage_id: stageFor(r.sales_stage),
+    }),
     push: { fields: (c) => ({ title: S(c.name) || undefined }) },
   },
   {
@@ -192,6 +231,9 @@ export async function GET(req: Request) {
         if (e) who.set(e, String((p as { id: unknown }).id));
       }
     }
+
+    /* The stage map must exist before the first opportunity is built. */
+    await loadOppStages(db).catch(() => { /* an unreadable stage table leaves the fallback at 0, and the insert will say so */ });
 
     const report: Record<string, { read: number; added: number; had: number; upto: string }> = {};
     const nextCfg: Record<string, string> = { ...cfg };

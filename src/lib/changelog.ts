@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.49.1",
+    date: "2026-09-16",
+    module: "Forty-seven opportunities an hour, refused and never mentioned",
+    items: [
+      "<b>Every opportunity the ERP sent was being thrown away.</b> The hourly sync read forty-seven of them, added nought, and stopped with <i>null value in column stage_id violates not-null constraint</i> \u2014 the row builder never set a stage and the column will not take a null. It has been doing this for as long as the stream has existed, and it only came to light because the tick-box work made somebody read the cron\u2019s own heartbeat.",
+      "The ERP\u2019s <i>sales_stage</i> is now matched against the stages here by name or code, and anything unrecognised lands on <b>New</b> \u2014 which is what a freshly arrived enquiry is. <b>Landing it somewhere true beats refusing it:</b> an opportunity nobody can see cannot be moved to the right stage by hand either.",
+      "<b>zoom-sweep is reporting that CRON_SECRET is not set</b>, which it was not doing yesterday. Worth checking on Vercel \u2014 it may be the same fault behind the ERP push\u2019s 401, and the next erp-sync pass now records whether the secret is present and what the push answered with.",
+    ],
+  },
+  {
     v: "5.0.49.0",
     date: "2026-09-16",
     module: "Synchronize to ERP: tick what comes down every hour",
