@@ -80,6 +80,61 @@ export async function GET(req: Request) {
   try {
     const u = await requireCrm();
     const db = crmDb();
+
+    /**
+     * THE TYPEAHEAD, ON THE INDEX THAT WAS ALREADY THERE.
+     *
+     * Dr Raghu, 16 Sep 2026: "improve the speed of the search."
+     *
+     * `person` holds 270,103 rows and the search was matching %name% — a
+     * leading wildcard, which no btree can help with, so every keystroke read
+     * the whole table: measured at 666ms and worsening with every import.
+     *
+     * person_search_idx is a GIN index over search_vector and was sitting
+     * unused. The same query through it is about 210ms and, far more
+     * importantly, does not grow with the table. Prefixes are kept (rena:*)
+     * because a typeahead is judged on the fourth letter, not the tenth.
+     *
+     * An address or a number skips the text search entirely and goes to its
+     * own index, because that is somebody pasting rather than typing.
+     */
+    const find = (new URL(req.url).searchParams.get("find") || "").trim();
+    if (find) {
+      if (find.length < 2) return NextResponse.json({ ok: true, rows: [] });
+      const COLS = "id, full_name, first_name, last_name, job_title, primary_email, primary_phone, whatsapp_number, company_id";
+      let q;
+      if (find.includes("@")) {
+        q = db.from(COLS ? "person" : "person").select(COLS).ilike("primary_email", `%${find}%`).is("deleted_at", null).limit(8);
+      } else if (/^[\d+][\d\s+-]{5,}$/.test(find)) {
+        const digits = find.replace(/\D/g, "");
+        q = db.from("person").select(COLS).or(`primary_phone.ilike.%${digits}%,whatsapp_number.ilike.%${digits}%`).is("deleted_at", null).limit(8);
+      } else {
+        const tsq = find.split(/\s+/).filter(Boolean).slice(0, 4)
+          .map((w) => `${w.replace(/[^\p{L}\p{N}]/gu, "")}:*`).filter((w) => w.length > 2).join(" & ");
+        if (!tsq) return NextResponse.json({ ok: true, rows: [] });
+        q = db.from("person").select(COLS).textSearch("search_vector", tsq).is("deleted_at", null).limit(8);
+      }
+      const { data, error } = await q;
+      if (error) throw new Error(error.message);
+      const rows = (data || []) as Record<string, unknown>[];
+      const cids = [...new Set(rows.map((r) => r.company_id).filter(Boolean))] as string[];
+      const names = new Map<string, string>();
+      if (cids.length) {
+        const { data: cs } = await db.from("company").select("id, name").in("id", cids);
+        for (const c of (cs || []) as { id: string; name: string }[]) names.set(String(c.id), c.name);
+      }
+      return NextResponse.json({
+        ok: true,
+        rows: rows.map((r) => ({
+          id: String(r.id),
+          full_name: String(r.full_name || [r.first_name, r.last_name].filter(Boolean).join(" ") || "(no name)"),
+          job_title: (r.job_title as string) || null,
+          primary_email: (r.primary_email as string) || null,
+          primary_phone: (r.whatsapp_number as string) || (r.primary_phone as string) || null,
+          company: r.company_id ? names.get(String(r.company_id)) ?? null : null,
+        })),
+      });
+    }
     /* A head of sales may look across the team; everybody else sees the
        people they themselves met, which is the only useful default anyway. */
     const seesAll = u.isOwner || /head|manager|admin/i.test(u.crmRole);
@@ -260,8 +315,26 @@ export async function POST(req: Request) {
       const senderDoes = S((cfg?.config as Record<string, unknown> | undefined)?.does) || null;
       const device = S((cfg?.config as Record<string, unknown> | undefined)?.device) || null;
 
+      /**
+       * HIS OWN OUTBOX, FOR REGISTER ONLY (16 Sep 2026: "have genie learn
+       * from my mails!"). The last few real e-mails this person sent, so the
+       * follow-up sounds like them rather than like a model's idea of a
+       * businessman. What they may lend is manner; the writer is told twice,
+       * hard, that no fact may cross over.
+       */
+      const { data: sent } = await db.from("message")
+        .select("subject, body_text")
+        .eq("direction", "outbound").eq("channel", channel === "email" ? "email" : "whatsapp")
+        .eq("from_handle", me)
+        .order("occurred_at", { ascending: false }).limit(6);
+      const voice = ((sent || []) as { subject: string | null; body_text: string | null }[])
+        .map((m) => ({ subject: m.subject, body: S(m.body_text) }))
+        .filter((m) => m.body.length > 60)
+        .slice(0, 4);
+
       const wrote = await writeFollowUp({
         channel,
+        voice,
         name: S(p.name),
         company: S(p.company_name) || null,
         jobTitle: S(p.job_title) || null,
@@ -295,6 +368,9 @@ export async function POST(req: Request) {
         to_email: channel === "email" ? S(p.email) || null : null,
         to_phone: channel === "whatsapp" ? S(p.phone) || null : null,
         subject: channel === "email" ? S(b.subject) || null : null,
+        /* Comma-separated, stored as typed so the box reads back what will
+           actually be on the mail. */
+        cc: channel === "email" ? (S(b.cc) || null) : null,
         body,
         /* ALWAYS MANUAL. Nothing written here leaves on its own — an e-mail
            is sent by the hand that read it, and a WhatsApp goes from his own
@@ -304,9 +380,30 @@ export async function POST(req: Request) {
       };
       const { data, error } = await db.from("outbound_queue").insert(row).select("id").single();
       if (error) {
+        if (/\bcc\b/i.test(error.message)) throw new HttpError(503, "Run CRM migration 0077 first.");
         if (/channel_id/i.test(error.message)) throw new HttpError(503, "Run CRM migration 0076 first.");
         if (/met_id/i.test(error.message)) throw new HttpError(503, "Run CRM migration 0074 first.");
         throw new Error(error.message);
+      }
+      /**
+       * AND SEND IT NOW, IF HE TICKED THAT (16 Sep 2026: "have a checkbox on
+       * send now so it goes!").
+       *
+       * It goes through the SAME road the queue screen uses, so one path
+       * sends and one path records — an e-mail sent by a second, private
+       * route is an e-mail nobody can find afterwards. Unticked, nothing
+       * moves, which stays the default: a message with no undo should take a
+       * deliberate act.
+       */
+      if (channel === "email" && b.send_now === true) {
+        const r = await fetch(new URL("/api/crm/outbound", req.url), {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie: req.headers.get("cookie") || "" },
+          body: JSON.stringify({ action: "send", id: data.id }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) return NextResponse.json({ ok: true, queue_id: data.id, sent: false, sendError: String(j.error || `HTTP ${r.status}`) });
+        return NextResponse.json({ ok: true, queue_id: data.id, sent: true, from: j.from });
       }
       return NextResponse.json({ ok: true, queue_id: data.id });
     }

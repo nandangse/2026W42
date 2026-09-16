@@ -339,7 +339,7 @@ function AddBox({ reasons, known, onClose, onDone }: { reasons: Reason[]; known:
   const [tags, setTags] = useState<string[]>([]);
   useEffect(() => { setTags(lastTags()); }, []);
   const [f, setF] = useState({ name: "", company_name: "", job_title: "", email: "", phone: "", context: "", event: "", reason: "keep_warm", person_id: "", card_id: "" });
-  const [hits, setHits] = useState<{ id: string; full_name: string; primary_email: string | null; primary_phone: string | null; company: string | null }[]>([]);
+  const [hits, setHits] = useState<{ id: string; full_name: string; job_title: string | null; primary_email: string | null; primary_phone: string | null; company: string | null }[]>([]);
   const [look, setLook] = useState("");
   const [cards, setCards] = useState<{ id: string; name: string; company: string | null; email: string | null; phone: string | null; title: string | null }[]>([]);
   const [busy, setBusy] = useState(false);
@@ -367,25 +367,17 @@ function AddBox({ reasons, known, onClose, onDone }: { reasons: Reason[]; known:
     setLooking(true);
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/crm/person?q=${encodeURIComponent(look.trim())}&limit=8`, { cache: "no-store" });
+        const r = await fetch(`/api/crm/met?find=${encodeURIComponent(look.trim())}`, { cache: "no-store" });
         const j = await r.json();
         if (!r.ok) throw new Error(String(j.error || r.status));
         if (dead) return;
-        const rows = (j.rows || []) as Record<string, unknown>[];
-        setHits(rows.slice(0, 8).map((x) => ({
-          id: String(x.id),
-          full_name: String(x.full_name || [x.first_name, x.last_name].filter(Boolean).join(" ") || "(no name)"),
-          primary_email: (x.primary_email as string) || null,
-          primary_phone: (x.whatsapp_number as string) || (x.primary_phone as string) || null,
-          company: (x.company_name as string)
-            || ((x.company as { name?: string } | null)?.name)
-            || ((x.company_join as { name?: string } | null)?.name)
-            || null,
-        })));
+        /* The route answers in exactly this shape, so nothing is guessed here. */
+        const rows = (j.rows || []) as { id: string; full_name: string; job_title: string | null; primary_email: string | null; primary_phone: string | null; company: string | null }[];
+        setHits(rows);
         setLookErr(rows.length ? "" : "Nobody in the CRM matches that.");
       } catch (e) { if (!dead) { setHits([]); setLookErr(e instanceof Error ? e.message : String(e)); } }
       if (!dead) setLooking(false);
-    }, 250);
+    }, 180);
     return () => { dead = true; clearTimeout(t); };
   }, [look, door]);
 
@@ -453,7 +445,7 @@ function AddBox({ reasons, known, onClose, onDone }: { reasons: Reason[]; known:
               {looking && <div className="text-xs px-1 py-1" style={{ color: MUTED }}>looking…</div>}
               {!looking && lookErr && <div className="text-xs px-1 py-1" style={{ color: lookErr.startsWith("Nobody") ? MUTED : "#B3261E" }}>{lookErr}</div>}
               {hits.map((h) => (
-                <button key={h.id} onClick={() => { setF((x) => ({ ...x, person_id: h.id, name: h.full_name, email: h.primary_email || "", phone: h.primary_phone || "", company_name: h.company || "" })); setLook(h.full_name); setHits([]); setLookErr(""); }}
+                <button key={h.id} onClick={() => { setF((x) => ({ ...x, person_id: h.id, name: h.full_name, email: h.primary_email || "", phone: h.primary_phone || "", company_name: h.company || "", job_title: h.job_title || x.job_title })); setLook(h.full_name); setHits([]); setLookErr(""); }}
                   className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-50" style={{ color: INK }}>
                   {h.full_name} <span style={{ color: MUTED, fontSize: 11 }}>{h.company || ""} {h.primary_email || ""}</span>
                 </button>
@@ -547,6 +539,9 @@ function MetBox({ met, reasons, known, channels, queued, onClose, onChanged }: {
   /* Blank is the sender's own Gmail, which is the right default for a note
      to somebody met an hour ago. */
   const [chan, setChan] = useState("");
+  const [cc, setCc] = useState("");
+  /* Unticked by default: a message with no undo should take a deliberate act. */
+  const [sendNow, setSendNow] = useState(false);
 
   const post = async (body: Record<string, unknown>) => {
     const r = await fetch("/api/crm/met", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -576,8 +571,12 @@ function MetBox({ met, reasons, known, channels, queued, onClose, onChanged }: {
     if (!draft) return;
     setBusy("queue"); setErr("");
     try {
-      await post({ action: "queue", id: met.id, channel: draft.channel, subject: draft.subject, body: draft.body, channel_id: chan });
-      setNote(draft.channel === "email" ? "In the e-mail queue. Nothing sends until you press send there." : "Kept. Copy it and send from your own WhatsApp.");
+      const j = await post({ action: "queue", id: met.id, channel: draft.channel, subject: draft.subject, body: draft.body, channel_id: chan, cc, send_now: draft.channel === "email" && sendNow });
+      setNote(
+        j.sent ? `Sent${j.from ? ` from ${j.from}` : ""}. It is on their record too.`
+        : j.sendError ? `Kept in the queue, but it did not go: ${j.sendError}`
+        : draft.channel === "email" ? "In the e-mail queue. Nothing sends until you press send there."
+        : "Kept. Copy it and send from your own WhatsApp.");
       onChanged();
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     setBusy("");
@@ -691,14 +690,25 @@ function MetBox({ met, reasons, known, channels, queued, onClose, onChanged }: {
                       {chan ? "A branded address. Replies go where that channel says." : "It arrives from you, in a thread they can reply to."}
                     </span>
                   </label>
+                  {/* The colleague who will actually handle it, on the thread
+                      from the first message rather than a forward a week on. */}
+                  <label className="block mb-1" style={{ fontSize: 11, color: MUTED }}>Cc
+                    <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="nobody, or add more with a comma" style={box} />
+                  </label>
                 </>
               )}
               <textarea value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} rows={draft.channel === "email" ? 9 : 5}
                 style={{ ...box, resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }} />
               <div className="flex gap-2 mt-2 flex-wrap items-center">
-                <button onClick={keep} disabled={!!busy} className="text-xs font-bold rounded px-3 py-2 text-white" style={{ background: GREEN }}>
-                  {draft.channel === "email" ? "Keep it in the e-mail queue" : "Keep it"}
+                <button onClick={keep} disabled={!!busy} className="text-xs font-bold rounded px-3 py-2 text-white" style={{ background: sendNow && draft.channel === "email" ? ORANGE : GREEN }}>
+                  {busy === "queue" ? "…" : draft.channel === "email" ? (sendNow ? "Send it now" : "Keep it in the e-mail queue") : "Keep it"}
                 </button>
+                {draft.channel === "email" && (
+                  <label className="flex items-center gap-1" style={{ fontSize: 11.5, color: sendNow ? "#B23B12" : MUTED, cursor: "pointer" }}>
+                    <input type="checkbox" checked={sendNow} onChange={(e) => setSendNow(e.target.checked)} />
+                    <b>send it now</b>{sendNow ? " — there is no undo" : ""}
+                  </label>
+                )}
                 <button onClick={() => { navigator.clipboard?.writeText(draft.body); setCopied(true); }} className="text-xs font-bold rounded px-3 py-2" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: NAVY }}>
                   {copied ? "copied ✓" : "Copy the text"}
                 </button>

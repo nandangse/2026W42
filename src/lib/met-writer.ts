@@ -71,6 +71,8 @@ export async function writeFollowUp(input: {
   senderName: string;
   senderDoes: string | null;
   device: string | null;
+  /** A few things this person has actually sent, for register only. */
+  voice?: { subject: string | null; body: string }[];
 }): Promise<Wrote> {
   const r = REASONS.find((x) => x.key === input.reason) ?? REASONS[4];
   const isMail = input.channel === "email";
@@ -119,13 +121,41 @@ export async function writeFollowUp(input: {
     isMail ? "" : 'For WhatsApp set "subject" to an empty string.',
   ].filter(Boolean).join("\n");
 
+  /**
+   * LEARNING THE VOICE FROM MAIL ACTUALLY SENT (Dr Raghu, 16 Sep 2026:
+   * "have genie learn from my mails!").
+   *
+   * Real letters, from this person's own outbox, shown as EXAMPLES OF
+   * REGISTER AND NOTHING ELSE. How long their sentences run, whether they
+   * write "Dear" or "Hi", whether they sign off warmly or flatly.
+   *
+   * The danger is obvious and is guarded twice below: a model handed old
+   * letters will lift facts out of them — a product, a price, a promise made
+   * to somebody else entirely — and put them in a message to a stranger.
+   * That is the one failure this whole app cannot survive, so the examples
+   * are fenced hard: copy the manner, never the matter.
+   */
+  const voiceBlock = (input.voice || []).length
+    ? [
+        "",
+        "HOW THIS PERSON ACTUALLY WRITES. Below are real messages they have sent.",
+        "Use them for REGISTER ONLY: sentence length, how they greet, how they sign off, how formal they are.",
+        "⛔ Do NOT take any fact, product, price, promise, name or company from them.",
+        "⛔ Do NOT reuse their sentences. The message you write is about the person named above and nothing else.",
+        "If these examples contradict the rules above, the rules above win.",
+        "",
+        ...(input.voice || []).slice(0, 4).map((v, i) =>
+          `--- example ${i + 1} ---\n${v.subject ? `Subject: ${v.subject}\n` : ""}${v.body.slice(0, 700)}`),
+      ].join("\n")
+    : "";
+
   const facts = [
     `The person met: ${input.name}${input.jobTitle ? `, ${input.jobTitle}` : ""}${input.company ? `, at ${input.company}` : ""}.`,
     input.event ? `Where: ${input.event}.` : null,
     input.context ? `What happened, in the sender's own words: ${input.context}` : "No context was given, so say only that you met and ask the one question. Do not invent a conversation.",
     `The sender is ${input.senderName}.`,
     input.senderDoes ? `What the sender's company does: ${input.senderDoes}. Use AT MOST ONE fact from this, and only if it answers something the other person actually said. Otherwise leave it out entirely.` : "Nothing is known about the sender's company, so make no claim about it.",
-  ].filter(Boolean).join("\n");
+  ].filter(Boolean).join("\n") + voiceBlock;
 
   const client = anthropicClient();
   const res = await client.messages.create({

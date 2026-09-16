@@ -7,6 +7,9 @@ import { variableValues, renderTemplate } from "@/crm/variables";
 import { myMailbox, accessTokenFor, gmailSend } from "@/crm/gmail";
 
 export const dynamic = "force-dynamic";
+
+/** Trimmed text, for the fields that may be null. */
+const S = (v: unknown) => String(v ?? "").trim();
 export const maxDuration = 60;
 
 type Row = Record<string, unknown>;
@@ -281,7 +284,9 @@ export async function POST(req: Request) {
               headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
               body: JSON.stringify({
                 from: name ? `${name} <${from}>` : from,
-                to: [to], subject: String(q.subject || "(no subject)"),
+                to: [to],
+                ...(S(q.cc) ? { cc: S(q.cc).split(",").map((x) => x.trim()).filter(Boolean) } : {}),
+                subject: String(q.subject || "(no subject)"),
                 html: String(q.body || "").replace(/\n/g, "<br>"),
                 reply_to: replyTo,
               }),
@@ -294,14 +299,14 @@ export async function POST(req: Request) {
             const { data: mbx } = await db.from("mailbox").select("id, email_address").eq("email_address", from).maybeSingle();
             if (!mbx) throw new HttpError(400, `${from} has no connected Gmail in CRM → Integrations.`);
             const tok = await accessTokenFor(String(mbx.id));
-            await gmailSend(tok, String(mbx.email_address), to, String(q.subject || "(no subject)"), String(q.body || ""), undefined, undefined, name || undefined, undefined, null, replyTo);
+            await gmailSend(tok, String(mbx.email_address), to, String(q.subject || "(no subject)"), String(q.body || ""), S(q.cc) || undefined, undefined, name || undefined, undefined, null, replyTo);
             sentVia = from;
           }
         } else {
           const mb = me.profileId ? await myMailbox(me.profileId) : null;
           if (!mb || mb.status !== "active") throw new HttpError(400, "Connect your Gmail first — Profile → Gmail connection.");
           const token = await accessTokenFor(String(mb.id));
-          await gmailSend(token, String(mb.email_address), to, String(q.subject || "(no subject)"), String(q.body || ""), undefined, undefined, me.displayName || undefined);
+          await gmailSend(token, String(mb.email_address), to, String(q.subject || "(no subject)"), String(q.body || ""), S(q.cc) || undefined, undefined, me.displayName || undefined);
           from = String(mb.email_address);
         }
 

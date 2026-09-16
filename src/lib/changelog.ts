@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.1.0.6",
+    date: "2026-09-16",
+    module: "A search that does not read the whole table, a Cc, send now, and Genie learning the voice",
+    items: [
+      "<b>The search was reading 270,103 people on every keystroke.</b> Matching <i>%name%</i> has a leading wildcard, which no btree can help with, so each letter cost 666ms and worsened with every import. <b>person_search_idx \u2014 a GIN index over search_vector \u2014 was sitting there unused.</b> The same search through it is about 210ms and, far more importantly, does not grow with the table. Prefixes are kept, because a typeahead is judged on the fourth letter and not the tenth. An address or a phone number skips the text search and goes to its own index.",
+      "<b>A Cc box on the e-mail</b>, comma-separated, so the colleague who will actually handle it is on the thread from the first message rather than a forward a week later. It carries on both roads \u2014 your own Gmail and a branded address alike.",
+      "<b>A \u201csend it now\u201d tick beside Keep.</b> Unticked by default and it stays that way: a message with no undo should take a deliberate act. When it is ticked the button says <i>Send it now</i> and warns there is no undo, and the send goes down the <b>same road the queue screen uses</b> \u2014 an e-mail sent by a second, private route is an e-mail nobody can find afterwards.",
+      "<b>Genie now learns the voice from mail actually sent.</b> The last few real messages from that outbox are shown to the writer as examples of <b>register only</b> \u2014 sentence length, how you greet, how you sign off. The obvious danger is fenced twice and hard: <b>copy the manner, never the matter.</b> No fact, product, price, promise or name may cross from an old letter into a message to somebody new, because that is the one failure this app could not survive.",
+      "<b>Needs CRM migration 0077</b> for the Cc.",
+    ],
+  },
+  {
     v: "5.1.0.5",
     date: "2026-09-16",
     module: "The CRM search that was typing into nothing, and a card scanned without leaving the form",
