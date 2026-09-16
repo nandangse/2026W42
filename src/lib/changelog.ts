@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.1.0.3",
+    date: "2026-09-16",
+    module: "Choose the address it leaves from \u2014 and a screen that works at a stand",
+    items: [
+      "<b>The follow-up now picks its own sending address.</b> Your own Gmail first and by default, because a note to somebody met an hour ago should arrive from a person and land in a thread they can answer \u2014 then any branded address Marketing keeps, for the follow-up that belongs to the brand rather than to the man. Replies go wherever that channel says.",
+      "<b>Whichever address it leaves from, it carries no marketing furniture.</b> No tracking pixel, no unsubscribe footer, no rewritten links. Those belong to a campaign; this is one person writing to one person they just met, and the moment it looks like a campaign it stops being that.",
+      "<b>The screen folds to one column on a phone.</b> A stand is where this gets used and a two-column form on a 375px screen is unusable there \u2014 which would have been found the hard way, in a hall, holding a card.",
+      "<b>Needs CRM migration 0076.</b> Without it the picker still shows, and saving a draft against a branded address says so rather than failing oddly.",
+    ],
+  },
+  {
     v: "5.1.0.2",
     date: "2026-09-16",
     module: "What we do, in a line \u2014 the only thing a follow-up may claim",

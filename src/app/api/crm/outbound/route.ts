@@ -248,20 +248,74 @@ export async function POST(req: Request) {
       if (q.channel === "email") {
         const to = String(q.to_email || "");
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new HttpError(400, "The queue entry has no valid address — edit it first.");
-        const mb = me.profileId ? await myMailbox(me.profileId) : null;
-        if (!mb || mb.status !== "active") throw new HttpError(400, "Connect your Gmail first — Profile → Gmail connection.");
-        const token = await accessTokenFor(String(mb.id));
-        await gmailSend(token, String(mb.email_address), to, String(q.subject || "(no subject)"), String(q.body || ""), undefined, undefined, me.displayName || undefined);
+
+        /**
+         * WHICH ADDRESS IT LEAVES FROM (0076).
+         *
+         * Null is the sender's own Gmail, which is the default and the right
+         * one for a note to somebody met an hour ago: it arrives from a
+         * person and lands in a thread they can answer. A chosen channel is
+         * a branded address Marketing keeps, for the follow-up that belongs
+         * to the brand rather than to the man.
+         *
+         * WHATEVER IT LEAVES FROM, IT CARRIES NO MARKETING FURNITURE. No
+         * tracking pixel, no unsubscribe footer, no rewritten links. Those
+         * belong to a campaign; this is one person writing to one person,
+         * and the moment it looks like a campaign it stops being that.
+         */
+        let from = "";
+        const chanId = String((q as Record<string, unknown>).channel_id || "");
+        let sentVia = "your Gmail";
+        if (chanId) {
+          const { data: ch } = await db.from("mk_channel").select("*").eq("id", chanId).maybeSingle();
+          if (!ch) throw new HttpError(400, "That sending address is gone — pick another.");
+          const c = ch as Record<string, unknown>;
+          from = String(c.email);
+          const name = String(c.label || me.displayName || "").trim();
+          const replyTo = String(c.reply_to || "").trim() || me.email;
+          if (String(c.kind) === "resend") {
+            const key = String(c.api_key || "") || String(process.env.RESEND_API_KEY || "");
+            if (!key) throw new HttpError(400, `${from} has no Resend key on it or on the deploy.`);
+            const r = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+              body: JSON.stringify({
+                from: name ? `${name} <${from}>` : from,
+                to: [to], subject: String(q.subject || "(no subject)"),
+                html: String(q.body || "").replace(/\n/g, "<br>"),
+                reply_to: replyTo,
+              }),
+              signal: AbortSignal.timeout(20000),
+            });
+            if (!r.ok) throw new HttpError(502, `Resend refused it: ${(await r.text()).slice(0, 160)}`);
+            sentVia = from;
+          } else {
+            /* A Gmail channel still needs that mailbox connected here. */
+            const { data: mbx } = await db.from("mailbox").select("id, email_address").eq("email_address", from).maybeSingle();
+            if (!mbx) throw new HttpError(400, `${from} has no connected Gmail in CRM → Integrations.`);
+            const tok = await accessTokenFor(String(mbx.id));
+            await gmailSend(tok, String(mbx.email_address), to, String(q.subject || "(no subject)"), String(q.body || ""), undefined, undefined, name || undefined, undefined, null, replyTo);
+            sentVia = from;
+          }
+        } else {
+          const mb = me.profileId ? await myMailbox(me.profileId) : null;
+          if (!mb || mb.status !== "active") throw new HttpError(400, "Connect your Gmail first — Profile → Gmail connection.");
+          const token = await accessTokenFor(String(mb.id));
+          await gmailSend(token, String(mb.email_address), to, String(q.subject || "(no subject)"), String(q.body || ""), undefined, undefined, me.displayName || undefined);
+          from = String(mb.email_address);
+        }
+
         await db.from("message").insert({
           channel: "email", direction: "outbound",
           subject: q.subject, body_text: q.body,
-          from_handle: String(mb.email_address), to_handles: [to],
+          from_handle: from, to_handles: [to],
           occurred_at: new Date().toISOString(),
           person_id: q.person_id, company_id: q.company_id,
           agent_profile_id: me.profileId,
         });
-        await db.from("outbound_queue").update({ status: "sent", sent_at: new Date().toISOString(), sent_note: "by hand" }).eq("id", id);
-        return NextResponse.json({ ok: true, sent: "email" });
+        void sentVia;
+        await db.from("outbound_queue").update({ status: "sent", sent_at: new Date().toISOString(), sent_note: `by hand, from ${from}` }).eq("id", id);
+        return NextResponse.json({ ok: true, sent: "email", from });
       }
 
       const digits = String(q.to_phone || "").replace(/\D/g, "");

@@ -36,6 +36,7 @@ type Met = {
 };
 type Reason = { key: string; label: string; ask: string };
 type Draft = { channel: "email" | "whatsapp"; subject: string; body: string };
+type Chan = { id: string; email: string; label: string; kind: string; own: boolean };
 
 const box: React.CSSProperties = { border: `1px solid ${BORDER}`, borderRadius: 6, padding: "4px 7px", fontSize: 13, color: INK, width: "100%" };
 
@@ -209,11 +210,16 @@ function SenderLine() {
   );
 }
 
+/* One column on a phone, two on anything wider. A stand is where this gets
+   used, and a two-column form on a 375px screen is unusable there. */
+const MOBILE_CSS = `.met-2col{grid-template-columns:1fr}@media(min-width:560px){.met-2col{grid-template-columns:1fr 1fr}}`;
+
 export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: string) => void }) {
   const [rows, setRows] = useState<Met[] | null>(null);
   const [queued, setQueued] = useState<Record<string, { email?: string; whatsapp?: string }>>({});
   const [reasons, setReasons] = useState<Reason[]>([]);
   const [known, setKnown] = useState<string[]>([]);
+  const [channels, setChannels] = useState<Chan[]>([]);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
@@ -224,7 +230,7 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
       const r = await fetch("/api/crm/met", { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(String(j.error || r.status));
-      setRows(j.people || []); setQueued(j.queued || {}); setReasons(j.reasons || []); setKnown(j.knownTags || []); setErr("");
+      setRows(j.people || []); setQueued(j.queued || {}); setReasons(j.reasons || []); setKnown(j.knownTags || []); setChannels(j.channels || []); setErr("");
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); setRows([]); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -244,6 +250,7 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
 
   return (
     <div className="p-4">
+      <style>{MOBILE_CSS}</style>
       <div className="flex items-center gap-2 flex-wrap mb-2">
         <div>
           <div className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 1.4 }}>TOOLS</div>
@@ -277,7 +284,7 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
           <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 1 }}>
             {event === "—" ? "NO EVENT NAMED" : event.toUpperCase()} · {people.length}
           </div>
-          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))" }}>
+          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))" }}>
             {people.map((m) => (
               <div key={m.id} className="rounded border p-2" style={{ borderColor: BORDER, background: "#fff" }}>
                 <div className="flex items-start gap-2">
@@ -319,7 +326,7 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
       ))}
 
       {adding && <AddBox reasons={reasons} known={known} onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
-      {open && <MetBox met={open} reasons={reasons} known={known} queued={queued[open.id] || {}} onClose={() => setOpen(null)} onChanged={load} />}
+      {open && <MetBox met={open} reasons={reasons} known={known} channels={channels} queued={queued[open.id] || {}} onClose={() => setOpen(null)} onChanged={load} />}
     </div>
   );
 }
@@ -420,7 +427,7 @@ function AddBox({ reasons, known, onClose, onDone }: { reasons: Reason[]; known:
             </div>
           )}
 
-          <div style={{ display: "grid", gap: 6, gridTemplateColumns: "1fr 1fr" }}>
+          <div className="met-2col" style={{ display: "grid", gap: 6 }}>
             {I("name", "Name *")}{I("company_name", "Company")}
             {I("job_title", "Designation")}{I("event", "Where you met", "GSE Expo Lisbon 2026")}
             {I("email", "E-mail")}{I("phone", "WhatsApp / phone")}
@@ -462,8 +469,8 @@ function AddBox({ reasons, known, onClose, onDone }: { reasons: Reason[]; known:
 }
 
 /* ── ONE PERSON: the context, and the two messages ────────────────────── */
-function MetBox({ met, reasons, known, queued, onClose, onChanged }: {
-  met: Met; reasons: Reason[]; known: string[]; queued: { email?: string; whatsapp?: string }; onClose: () => void; onChanged: () => void;
+function MetBox({ met, reasons, known, channels, queued, onClose, onChanged }: {
+  met: Met; reasons: Reason[]; known: string[]; channels: Chan[]; queued: { email?: string; whatsapp?: string }; onClose: () => void; onChanged: () => void;
 }) {
   const [f, setF] = useState({ context: met.context || "", reason: met.reason, email: met.email || "", phone: met.phone || "", event: met.event || "" });
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -474,6 +481,9 @@ function MetBox({ met, reasons, known, queued, onClose, onChanged }: {
   const [tags, setTags] = useState<string[]>(met.tags || []);
   const [selfie, setSelfie] = useState<string | null>(met.selfie || null);
   const [shot, setShot] = useState(false);
+  /* Blank is the sender's own Gmail, which is the right default for a note
+     to somebody met an hour ago. */
+  const [chan, setChan] = useState("");
 
   const post = async (body: Record<string, unknown>) => {
     const r = await fetch("/api/crm/met", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -503,7 +513,7 @@ function MetBox({ met, reasons, known, queued, onClose, onChanged }: {
     if (!draft) return;
     setBusy("queue"); setErr("");
     try {
-      await post({ action: "queue", id: met.id, channel: draft.channel, subject: draft.subject, body: draft.body });
+      await post({ action: "queue", id: met.id, channel: draft.channel, subject: draft.subject, body: draft.body, channel_id: chan });
       setNote(draft.channel === "email" ? "In the e-mail queue. Nothing sends until you press send there." : "Kept. Copy it and send from your own WhatsApp.");
       onChanged();
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
@@ -525,7 +535,7 @@ function MetBox({ met, reasons, known, queued, onClose, onChanged }: {
           <label className="block" style={{ fontSize: 11, color: MUTED }}>Context — what was actually said
             <textarea value={f.context} onChange={(e) => setF((x) => ({ ...x, context: e.target.value }))} rows={3} style={{ ...box, resize: "vertical" }} /></label>
 
-          <div style={{ display: "grid", gap: 6, gridTemplateColumns: "1fr 1fr", marginTop: 6 }}>
+          <div className="met-2col" style={{ display: "grid", gap: 6, marginTop: 6 }}>
             <label style={{ fontSize: 11, color: MUTED }}>E-mail<input value={f.email} onChange={(e) => setF((x) => ({ ...x, email: e.target.value }))} style={box} /></label>
             <label style={{ fontSize: 11, color: MUTED }}>WhatsApp / phone<input value={f.phone} onChange={(e) => setF((x) => ({ ...x, phone: e.target.value }))} style={box} /></label>
             <label style={{ fontSize: 11, color: MUTED }}>Where you met<input value={f.event} onChange={(e) => setF((x) => ({ ...x, event: e.target.value }))} style={box} /></label>
@@ -593,8 +603,25 @@ function MetBox({ met, reasons, known, queued, onClose, onChanged }: {
                 {draft.channel === "email" ? "THE E-MAIL" : "THE WHATSAPP"} · edit anything before you keep it
               </div>
               {draft.channel === "email" && (
-                <label className="block mb-1" style={{ fontSize: 11, color: MUTED }}>Subject
-                  <input value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} style={box} /></label>
+                <>
+                  <label className="block mb-1" style={{ fontSize: 11, color: MUTED }}>Subject
+                    <input value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} style={box} /></label>
+                  {/* WHICH ADDRESS IT LEAVES FROM. Your own Gmail is the
+                      default and usually the right one — it arrives from a
+                      person and lands in a thread they can answer. */}
+                  <label className="block mb-1" style={{ fontSize: 11, color: MUTED }}>Send it from
+                    <select value={chan} onChange={(e) => setChan(e.target.value)} style={box}>
+                      {channels.map((c) => (
+                        <option key={c.id || "own"} value={c.id}>
+                          {c.own ? `${c.email} — your own Gmail` : `${c.email} — ${c.label} (${c.kind})`}
+                        </option>
+                      ))}
+                    </select>
+                    <span style={{ color: MUTED }}>
+                      {chan ? "A branded address. Replies go where that channel says." : "It arrives from you, in a thread they can reply to."}
+                    </span>
+                  </label>
+                </>
               )}
               <textarea value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} rows={draft.channel === "email" ? 9 : 5}
                 style={{ ...box, resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }} />

@@ -112,7 +112,24 @@ export async function GET(req: Request) {
        and a show does not end up spelled three ways. */
     const seen = new Set<string>();
     for (const r of rows) for (const t of ((r.tags as string[]) || [])) if (t) seen.add(t);
-    return NextResponse.json({ ok: true, people: rows, queued, reasons: REASONS, knownTags: [...seen].sort() });
+    /**
+     * THE ADDRESSES IT MAY LEAVE FROM (Dr Raghu, 16 Sep 2026: "in this also
+     * choose channel to send!!!").
+     *
+     * The sender's own Gmail is first and is the default, because a note to
+     * somebody met an hour ago should arrive from a person and land in a
+     * thread they can answer. The branded addresses Marketing keeps are
+     * offered after it, for the follow-up that belongs to the brand rather
+     * than to the man.
+     */
+    const { data: chans } = await db.from("mk_channel").select("id, email, label, kind, active").eq("active", true).order("email");
+    const channels = [
+      { id: "", email: u.email.toLowerCase(), label: "your own Gmail", kind: "gmail", own: true },
+      ...((chans || []) as { id: string; email: string; label: string | null; kind: string }[])
+        .filter((c) => c.email.toLowerCase() !== u.email.toLowerCase())
+        .map((c) => ({ id: String(c.id), email: c.email, label: c.label || c.email, kind: c.kind, own: false })),
+    ];
+    return NextResponse.json({ ok: true, people: rows, queued, reasons: REASONS, knownTags: [...seen].sort(), channels });
   } catch (e) { return errJson(e); }
 }
 
@@ -271,6 +288,9 @@ export async function POST(req: Request) {
 
       const row: Record<string, unknown> = {
         channel, met_id: S(b.id),
+        /* Null means the sender's own Gmail, which is the default and the
+           right one for a personal note. */
+        channel_id: channel === "email" ? (S(b.channel_id) || null) : null,
         person_id: p.person_id ?? null, company_id: p.company_id ?? null, card_id: p.card_id ?? null,
         to_email: channel === "email" ? S(p.email) || null : null,
         to_phone: channel === "whatsapp" ? S(p.phone) || null : null,
@@ -284,6 +304,7 @@ export async function POST(req: Request) {
       };
       const { data, error } = await db.from("outbound_queue").insert(row).select("id").single();
       if (error) {
+        if (/channel_id/i.test(error.message)) throw new HttpError(503, "Run CRM migration 0076 first.");
         if (/met_id/i.test(error.message)) throw new HttpError(503, "Run CRM migration 0074 first.");
         throw new Error(error.message);
       }
