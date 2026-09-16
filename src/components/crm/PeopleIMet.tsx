@@ -31,6 +31,7 @@ type Met = {
   name: string; company_name: string | null; job_title: string | null;
   email: string | null; phone: string | null;
   context: string | null; met_on: string; event: string | null; reason: string;
+  tags: string[] | null; selfie_path: string | null; selfie?: string | null; interaction_id: string | null;
   added_by: string;
 };
 type Reason = { key: string; label: string; ask: string };
@@ -38,10 +39,67 @@ type Draft = { channel: "email" | "whatsapp"; subject: string; body: string };
 
 const box: React.CSSProperties = { border: `1px solid ${BORDER}`, borderRadius: 6, padding: "4px 7px", fontSize: 13, color: INK, width: "100%" };
 
+
+/**
+ * THE LAST TAG CARRIES (Dr Raghu, 16 Sep 2026: "last filled tag continues").
+ *
+ * A show is forty people over two days and the label is the same for all
+ * forty. Anything that has to be retyped forty times gets typed wrongly by
+ * the tenth, or — worse — spelled three different ways, which is how a month
+ * stops being countable by show.
+ *
+ * It lives in this browser, not the database: it is a convenience for the
+ * person holding the phone, and the next trip will want different words.
+ */
+const TAG_KEY = "genie.met.tags.v1";
+const lastTags = (): string[] => {
+  try { const v = JSON.parse(window.localStorage.getItem(TAG_KEY) || "[]"); return Array.isArray(v) ? v.map(String).slice(0, 12) : []; }
+  catch { return []; }
+};
+const keepTags = (t: string[]) => { try { window.localStorage.setItem(TAG_KEY, JSON.stringify(t)); } catch { /* storage refused */ } };
+
+/** One tag chip row with an input, used on both boxes. */
+function TagRow({ tags, known, onChange }: { tags: string[]; known: string[]; onChange: (t: string[]) => void }) {
+  const [draft, setDraft] = useState("");
+  const add = (raw: string) => {
+    const t = raw.trim().replace(/,+$/, "");
+    if (!t) return;
+    if (!tags.some((x) => x.toLowerCase() === t.toLowerCase())) onChange([...tags, t].slice(0, 12));
+    setDraft("");
+  };
+  const spare = known.filter((k) => !tags.some((x) => x.toLowerCase() === k.toLowerCase())).slice(0, 6);
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-1">
+        {tags.map((t) => (
+          <span key={t} className="rounded px-1.5 py-0.5 flex items-center gap-1" style={{ background: NAVY_SOFT, color: NAVY, fontSize: 12, fontWeight: 600 }}>
+            {t}
+            <button onClick={() => onChange(tags.filter((x) => x !== t))} title="Remove" style={{ color: MUTED, fontWeight: 700, lineHeight: 1 }}>×</button>
+          </span>
+        ))}
+        <input value={draft}
+          onChange={(e) => { const v = e.target.value; if (v.includes(",")) v.split(",").forEach(add); else setDraft(v); }}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Tab") { if (draft.trim()) { e.preventDefault(); add(draft); } } }}
+          onBlur={() => add(draft)}
+          placeholder={tags.length ? "another…" : "GSE Expo 2026, Met"}
+          style={{ ...box, width: 150, flex: "0 1 170px", fontSize: 12.5 }} />
+      </div>
+      {spare.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-1">
+          {spare.map((k) => (
+            <button key={k} onClick={() => add(k)} className="rounded px-1.5" style={{ fontSize: 11, color: MUTED, border: `1px dashed ${BORDER}` }}>+ {k}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: string) => void }) {
   const [rows, setRows] = useState<Met[] | null>(null);
   const [queued, setQueued] = useState<Record<string, { email?: string; whatsapp?: string }>>({});
   const [reasons, setReasons] = useState<Reason[]>([]);
+  const [known, setKnown] = useState<string[]>([]);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
@@ -52,7 +110,7 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
       const r = await fetch("/api/crm/met", { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(String(j.error || r.status));
-      setRows(j.people || []); setQueued(j.queued || {}); setReasons(j.reasons || []); setErr("");
+      setRows(j.people || []); setQueued(j.queued || {}); setReasons(j.reasons || []); setKnown(j.knownTags || []); setErr("");
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); setRows([]); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -60,7 +118,7 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
   const shown = useMemo(() => {
     const k = q.trim().toLowerCase();
     if (!k || !rows) return rows || [];
-    return rows.filter((m) => [m.name, m.company_name, m.event, m.context, m.job_title]
+    return rows.filter((m) => [m.name, m.company_name, m.event, m.context, m.job_title, ...(m.tags || [])]
       .some((v) => String(v || "").toLowerCase().includes(k)));
   }, [rows, q]);
 
@@ -117,11 +175,21 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
                     {m.source === "database" ? "from CRM" : m.source === "card" ? "from a card" : "typed"}
                   </span>
                 </div>
+                {m.selfie && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={m.selfie} alt="" style={{ width: "100%", height: 96, objectFit: "cover", borderRadius: 4, margin: "5px 0" }} />
+                )}
                 <div style={{ fontSize: 12, color: m.context ? INK : "#B23B12", margin: "5px 0", lineHeight: 1.5 }}>
                   {m.context || "No context yet — without it the follow-up has nothing true to say."}
                 </div>
+                {!!(m.tags || []).length && (
+                  <div className="flex flex-wrap gap-1 mb-1">
+                    {(m.tags || []).map((t) => <span key={t} className="rounded px-1.5" style={{ background: NAVY_SOFT, color: NAVY, fontSize: 10.5, fontWeight: 700 }}>{t}</span>)}
+                  </div>
+                )}
                 <div className="flex items-center gap-1 flex-wrap" style={{ fontSize: 11, color: MUTED }}>
                   <span>{m.met_on}</span>
+                  {m.interaction_id && <span title="Counted as a meeting in Interactions" style={{ color: MUTED }}>▣ counted</span>}
                   {queued[m.id]?.email && <span title="An e-mail is written and waiting in the queue" style={{ color: GREEN, fontWeight: 700 }}>✉ ready</span>}
                   {queued[m.id]?.whatsapp && <span title="A WhatsApp is written and waiting for you to send" style={{ color: GREEN, fontWeight: 700 }}>💬 ready</span>}
                   <span className="flex-1" />
@@ -134,15 +202,18 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
         </div>
       ))}
 
-      {adding && <AddBox reasons={reasons} onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
-      {open && <MetBox met={open} reasons={reasons} queued={queued[open.id] || {}} onClose={() => setOpen(null)} onChanged={load} />}
+      {adding && <AddBox reasons={reasons} known={known} onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
+      {open && <MetBox met={open} reasons={reasons} known={known} queued={queued[open.id] || {}} onClose={() => setOpen(null)} onChanged={load} />}
     </div>
   );
 }
 
 /* ── ADDING: three doors, one row ─────────────────────────────────────── */
-function AddBox({ reasons, onClose, onDone }: { reasons: Reason[]; onClose: () => void; onDone: () => void }) {
+function AddBox({ reasons, known, onClose, onDone }: { reasons: Reason[]; known: string[]; onClose: () => void; onDone: () => void }) {
   const [door, setDoor] = useState<"typed" | "database" | "card">("typed");
+  /* Whatever was tagged last is already here — a show is one label, forty times. */
+  const [tags, setTags] = useState<string[]>([]);
+  useEffect(() => { setTags(lastTags()); }, []);
   const [f, setF] = useState({ name: "", company_name: "", job_title: "", email: "", phone: "", context: "", event: "", reason: "keep_warm", person_id: "", card_id: "" });
   const [hits, setHits] = useState<{ id: string; full_name: string; primary_email: string | null; company: string | null }[]>([]);
   const [look, setLook] = useState("");
@@ -178,9 +249,10 @@ function AddBox({ reasons, onClose, onDone }: { reasons: Reason[]; onClose: () =
   const save = async () => {
     setBusy(true); setErr("");
     try {
-      const r = await fetch("/api/crm/met", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "add", source: door, ...f }) });
+      const r = await fetch("/api/crm/met", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "add", source: door, ...f, tags }) });
       const j = await r.json();
       if (!r.ok) throw new Error(String(j.error || r.status));
+      keepTags(tags);
       onDone();
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
@@ -246,6 +318,12 @@ function AddBox({ reasons, onClose, onDone }: { reasons: Reason[]; onClose: () =
             <span style={{ color: MUTED }}>This is the record. The follow-up can only say what you put here.</span>
           </label>
 
+          <div className="mt-2" style={{ fontSize: 11, color: MUTED }}>
+            Tag
+            <TagRow tags={tags} known={known} onChange={setTags} />
+            <span style={{ color: MUTED }}>Carried to the next person you add, and counted with the meeting.</span>
+          </div>
+
           <label className="block mt-2" style={{ fontSize: 11, color: MUTED }}>
             What do you want out of it
             <select value={f.reason} onChange={(e) => setF((x) => ({ ...x, reason: e.target.value }))} style={box}>
@@ -268,8 +346,8 @@ function AddBox({ reasons, onClose, onDone }: { reasons: Reason[]; onClose: () =
 }
 
 /* ── ONE PERSON: the context, and the two messages ────────────────────── */
-function MetBox({ met, reasons, queued, onClose, onChanged }: {
-  met: Met; reasons: Reason[]; queued: { email?: string; whatsapp?: string }; onClose: () => void; onChanged: () => void;
+function MetBox({ met, reasons, known, queued, onClose, onChanged }: {
+  met: Met; reasons: Reason[]; known: string[]; queued: { email?: string; whatsapp?: string }; onClose: () => void; onChanged: () => void;
 }) {
   const [f, setF] = useState({ context: met.context || "", reason: met.reason, email: met.email || "", phone: met.phone || "", event: met.event || "" });
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -277,6 +355,9 @@ function MetBox({ met, reasons, queued, onClose, onChanged }: {
   const [err, setErr] = useState("");
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState(false);
+  const [tags, setTags] = useState<string[]>(met.tags || []);
+  const [selfie, setSelfie] = useState<string | null>(met.selfie || null);
+  const [shot, setShot] = useState(false);
 
   const post = async (body: Record<string, unknown>) => {
     const r = await fetch("/api/crm/met", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -295,7 +376,7 @@ function MetBox({ met, reasons, queued, onClose, onChanged }: {
   const write = async (channel: "email" | "whatsapp") => {
     setBusy(channel); setErr(""); setNote(""); setCopied(false);
     try {
-      await post({ action: "save", id: met.id, ...f });          // write from what is on screen now
+      await post({ action: "save", id: met.id, ...f, tags });    // write from what is on screen now
       const j = await post({ action: "write", id: met.id, channel });
       setDraft({ channel, subject: String(j.subject || ""), body: String(j.body || "") });
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
@@ -338,6 +419,42 @@ function MetBox({ met, reasons, queued, onClose, onChanged }: {
               </select></label>
           </div>
 
+          <div className="mt-2" style={{ fontSize: 11, color: MUTED }}>
+            Tag
+            <TagRow tags={tags} known={known} onChange={setTags} />
+          </div>
+
+          {/* THE SELFIE. A photograph of the two of them does more than any
+              sentence can — it is the proof the conversation happened, and on
+              WhatsApp it arrives as a picture of a person they met an hour
+              ago rather than as a message from a company. */}
+          <div className="mt-2 flex items-start gap-3">
+            {selfie
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={selfie} alt="" style={{ width: 110, height: 110, objectFit: "cover", borderRadius: 6, border: `1px solid ${BORDER}` }} />
+              : <div style={{ width: 110, height: 110, borderRadius: 6, border: `1px dashed ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center", color: MUTED, fontSize: 11, textAlign: "center", padding: 6 }}>no photo yet</div>}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.5 }}>
+                A selfie with them. It goes out with the WhatsApp — from your phone, so it arrives as a picture of you two rather than a company message.
+              </div>
+              <label className="inline-block mt-1 text-xs font-bold rounded px-3 py-1.5" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: NAVY, cursor: "pointer" }}>
+                {shot ? "uploading…" : selfie ? "Replace the photo" : "📷 Add a selfie"}
+                <input type="file" accept="image/*" capture="user" hidden onChange={async (e) => {
+                  const file = e.target.files?.[0]; if (!file) return;
+                  setShot(true); setErr("");
+                  try {
+                    const fd = new FormData(); fd.append("id", met.id); fd.append("file", file);
+                    const r = await fetch("/api/crm/met", { method: "POST", body: fd });
+                    const j = await r.json();
+                    if (!r.ok) throw new Error(String(j.error || r.status));
+                    setSelfie(j.selfie || null); onChanged();
+                  } catch (e2) { setErr(e2 instanceof Error ? e2.message : String(e2)); }
+                  setShot(false);
+                }} />
+              </label>
+            </div>
+          </div>
+
           <div className="flex gap-2 mt-3 flex-wrap items-center">
             <button onClick={save} disabled={!!busy} className="text-xs font-bold rounded px-3 py-2" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: NAVY }}>Save</button>
             <button onClick={() => write("email")} disabled={!!busy} className="text-xs font-bold rounded px-3 py-2 text-white" style={{ background: busy === "email" ? "#B9BEC4" : ORANGE }}>
@@ -373,10 +490,17 @@ function MetBox({ met, reasons, queued, onClose, onChanged }: {
                   {copied ? "copied ✓" : "Copy the text"}
                 </button>
                 {waLink && <a href={waLink} target="_blank" rel="noreferrer" className="text-xs font-bold rounded px-3 py-2 text-white" style={{ background: "#128C7E" }}>Open in WhatsApp</a>}
+                {draft.channel === "whatsapp" && selfie && (
+                  <a href={selfie} download={`selfie-${met.name.replace(/\W+/g, "-").toLowerCase()}.jpg`} target="_blank" rel="noreferrer"
+                    className="text-xs font-bold rounded px-3 py-2" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: NAVY }}>
+                    ⬇ The selfie
+                  </a>
+                )}
                 <button onClick={() => write(draft.channel)} disabled={!!busy} className="text-xs rounded px-3 py-2" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: MUTED }}>Write it again</button>
               </div>
               <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.5 }}>
                 Read it before it goes. <b>Nothing here sends itself</b> — the e-mail waits in the queue for your hand, and the WhatsApp opens on your own phone so it arrives from you.
+                {draft.channel === "whatsapp" && selfie && <> Save the selfie and attach it in WhatsApp: a link to a photograph is not the same thing as the photograph.</>}
               </div>
             </div>
           )}

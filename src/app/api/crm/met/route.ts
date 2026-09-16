@@ -29,6 +29,53 @@ export const maxDuration = 120;
  */
 const S = (v: unknown) => String(v ?? "").trim();
 
+
+/**
+ * EVERY PERSON MET IS ALSO AN INTERACTION (Dr Raghu, 16 Sep 2026: "add this
+ * to interaction so it adds to my meeting quota").
+ *
+ * A meeting recorded here and nowhere else is a private note. The CRM counts
+ * interactions, and that count is what a month is judged on — so the work
+ * done at a show belongs where the work is counted, not in a side list
+ * nobody totals.
+ *
+ * IT IS A LINK, NOT A COPY. The id of the row it made is kept, so editing
+ * the context updates that same interaction instead of leaving a staler twin
+ * behind. Forty people met at a show must be forty interactions, not eighty.
+ *
+ * It never throws. A CRM that cannot take the interaction must not cost
+ * somebody the record of who they met — that is the more important half.
+ */
+async function alsoAnInteraction(
+  db: ReturnType<typeof crmDb>, row: Record<string, unknown>, profileId: string | null,
+): Promise<string | null> {
+  try {
+    const when = S(row.met_on) ? `${S(row.met_on)}T12:00:00+05:30` : new Date().toISOString();
+    const where = S(row.event);
+    const fields: Record<string, unknown> = {
+      kind: "Meeting",
+      call_type: "Meeting",
+      happened_at: when,
+      person_name: S(row.name) || null,
+      remark: [where ? `Met at ${where}.` : "Met.", S(row.context)].filter(Boolean).join(" "),
+      person_id: row.person_id ?? null,
+      company_id: row.company_id ?? null,
+      by_id: profileId,
+      tags: Array.isArray(row.tags) ? row.tags : [],
+    };
+    const existing = S(row.interaction_id);
+    if (existing) {
+      const { error } = await db.from("interaction").update(fields).eq("id", existing);
+      if (!error) return existing;
+      /* The row it pointed at is gone — make a fresh one rather than losing
+         the meeting from the count. */
+    }
+    const { data, error } = await db.from("interaction").insert(fields).select("id").single();
+    if (error) return null;
+    return String(data.id);
+  } catch { return null; }
+}
+
 export async function GET(req: Request) {
   try {
     const u = await requireCrm();
@@ -55,7 +102,17 @@ export async function GET(req: Request) {
         queued[q.met_id] = { ...(queued[q.met_id] || {}), [q.channel]: q.id };
       }
     }
-    return NextResponse.json({ ok: true, people: rows, queued, reasons: REASONS });
+    /* A private photograph, read back through a URL that expires. */
+    for (const r of rows) {
+      if (!r.selfie_path) continue;
+      const { data: sgn } = await db.storage.from("cards").createSignedUrl(String(r.selfie_path), 3600);
+      r.selfie = sgn?.signedUrl ?? null;
+    }
+    /* The labels already used, so the next one is picked rather than retyped
+       and a show does not end up spelled three ways. */
+    const seen = new Set<string>();
+    for (const r of rows) for (const t of ((r.tags as string[]) || [])) if (t) seen.add(t);
+    return NextResponse.json({ ok: true, people: rows, queued, reasons: REASONS, knownTags: [...seen].sort() });
   } catch (e) { return errJson(e); }
 }
 
@@ -63,6 +120,37 @@ export async function POST(req: Request) {
   try {
     const u = await requireCrm();
     const db = crmDb();
+
+    /**
+     * THE SELFIE comes as a form, not as JSON. It rides in the same private
+     * bucket as the visiting cards and is read back through a signed URL
+     * that expires — a photograph of two people at a stand is nobody's to
+     * publish, least of all ours.
+     */
+    if ((req.headers.get("content-type") || "").includes("multipart/form-data")) {
+      const form = await req.formData();
+      const id = S(form.get("id"));
+      const file = form.get("file");
+      if (!id) throw new HttpError(400, "Which meeting is the photo for?");
+      if (!(file instanceof File) || !file.size) throw new HttpError(400, "No photograph was attached.");
+      if (file.size > 10 * 1024 * 1024) throw new HttpError(400, "That image is over 10MB — a phone photo should be far smaller.");
+      const { data: own } = await db.from("met_person").select("added_by").eq("id", id).maybeSingle();
+      if (!own) throw new HttpError(404, "No such meeting.");
+      const seesAll0 = u.isOwner || /head|manager|admin/i.test(u.crmRole);
+      if (!seesAll0 && String(own.added_by) !== u.email.toLowerCase()) throw new HttpError(403, "That is somebody else's.");
+
+      const buf = Buffer.from(await file.arrayBuffer());
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const path = `selfie/${new Date().toISOString().slice(0, 7)}/${Date.now()}.${ext}`;
+      const { error: up } = await db.storage.from("cards").upload(path, buf, { contentType: file.type || "image/jpeg" });
+      if (up) throw new HttpError(502, `Could not store the photo: ${up.message}`);
+      const { error } = await db.from("met_person").update({ selfie_path: path }).eq("id", id);
+      if (error) throw new HttpError(/selfie_path/i.test(error.message) ? 503 : 500,
+        /selfie_path/i.test(error.message) ? "Run CRM migration 0075 first." : error.message);
+      const { data: sgn } = await db.storage.from("cards").createSignedUrl(path, 3600);
+      return NextResponse.json({ ok: true, selfie: sgn?.signedUrl ?? null });
+    }
+
     const b = await readBody(req, { action: "string" });
     const me = u.email.toLowerCase();
     const mine = async (id: string) => {
@@ -87,6 +175,7 @@ export async function POST(req: Request) {
         context: S(b.context) || null,
         event: S(b.event) || null,
         reason: REASONS.some((r) => r.key === S(b.reason)) ? S(b.reason) : "keep_warm",
+        tags: Array.isArray(b.tags) ? (b.tags as unknown[]).map(S).filter(Boolean).slice(0, 12) : [],
         added_by: me,
       };
       if (S(b.met_on)) row.met_on = S(b.met_on);
@@ -112,10 +201,13 @@ export async function POST(req: Request) {
 
       const { data, error } = await db.from("met_person").insert(row).select("*").single();
       if (error) {
+        if (/tags|interaction_id|selfie_path/i.test(error.message)) throw new HttpError(503, "Run CRM migration 0075 first.");
         if (/met_person|schema cache|does not exist/i.test(error.message)) throw new HttpError(503, "Run CRM migration 0074 first.");
         throw new Error(error.message);
       }
-      return NextResponse.json({ ok: true, person: data });
+      const iid = await alsoAnInteraction(db, data as Record<string, unknown>, u.profileId);
+      if (iid) await db.from("met_person").update({ interaction_id: iid }).eq("id", data.id).then(() => null, () => null);
+      return NextResponse.json({ ok: true, person: { ...data, interaction_id: iid }, counted: !!iid });
     }
 
     if (b.action === "save") {
@@ -125,10 +217,16 @@ export async function POST(req: Request) {
         if (b[k] !== undefined) patch[k] = S(b[k]) || null;
       }
       if (b.reason !== undefined && REASONS.some((r) => r.key === S(b.reason))) patch.reason = S(b.reason);
-      void cur;
+      if (Array.isArray(b.tags)) patch.tags = (b.tags as unknown[]).map(S).filter(Boolean).slice(0, 12);
       const { error } = await db.from("met_person").update(patch).eq("id", S(b.id));
-      if (error) throw new Error(error.message);
-      return NextResponse.json({ ok: true });
+      if (error) throw new HttpError(/tags|selfie_path|interaction_id/i.test(error.message) ? 503 : 500,
+        /tags|selfie_path|interaction_id/i.test(error.message) ? "Run CRM migration 0075 first." : error.message);
+      /* The interaction follows the record, so a corrected context corrects
+         what the month is counted on too. */
+      const after = { ...cur, ...patch };
+      const iid = await alsoAnInteraction(db, after, u.profileId);
+      if (iid && iid !== S(cur.interaction_id)) await db.from("met_person").update({ interaction_id: iid }).eq("id", S(b.id)).then(() => null, () => null);
+      return NextResponse.json({ ok: true, counted: !!iid });
     }
 
     if (b.action === "write") {
@@ -193,7 +291,11 @@ export async function POST(req: Request) {
     }
 
     if (b.action === "delete") {
-      await mine(S(b.id));
+      const gone = await mine(S(b.id));
+      /* The meeting leaves the count with the record. Leaving the
+         interaction behind would flatter the month with a meeting whose
+         evidence has been deleted. */
+      if (S(gone.interaction_id)) await db.from("interaction").delete().eq("id", S(gone.interaction_id)).then(() => null, () => null);
       await db.from("outbound_queue").delete().eq("met_id", S(b.id)).eq("status", "queued");
       const { error } = await db.from("met_person").delete().eq("id", S(b.id));
       if (error) throw new Error(error.message);

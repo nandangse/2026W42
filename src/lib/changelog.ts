@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.1.0.1",
+    date: "2026-09-16",
+    module: "The tag, the selfie, and the meeting that actually counts",
+    items: [
+      "<b>Every person met is now also an interaction of kind \u201cMeeting\u201d.</b> A meeting recorded in People I Met and nowhere else is a private note; the CRM counts interactions, and that count is what a month is judged on. The work done at a show now shows up where work is counted instead of in a side list nobody totals.",
+      "<b>It is a link, not a copy.</b> The record remembers the interaction it made, so correcting the context corrects what the month is counted on rather than leaving a staler twin behind. Forty people met at a show are forty interactions, not eighty \u2014 and deleting the meeting takes it back out of the count, because a month should not be flattered by a meeting whose evidence has been deleted.",
+      "<b>A tag, and the last one carries.</b> A show is forty people over two days with the same label on all forty; anything retyped forty times gets typed wrongly by the tenth, or spelled three ways, which is how a month stops being countable by show. Tags already used are offered as chips, and the tag goes onto the interaction too.",
+      "<b>A place for the selfie</b>, taken with the front camera and kept in the same private bucket as the visiting cards \u2014 read back through a link that expires, never public. It comes down beside the WhatsApp draft so it can be attached from the phone that sends it: <b>a link to a photograph is not the same thing as the photograph.</b>",
+      "<b>Needs CRM migration 0075.</b>",
+    ],
+  },
+  {
     v: "5.1.0.0",
     date: "2026-09-16",
     module: "People I Met \u2014 the context nobody writes down, and the follow-up it produces",
