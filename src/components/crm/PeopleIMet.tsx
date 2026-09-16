@@ -564,8 +564,15 @@ function MetBox({ met, reasons, known, channels, queued, onClose, onChanged }: {
                 A selfie with them. It goes out with the WhatsApp — from your phone, so it arrives as a picture of you two rather than a company message.
               </div>
               <label className="inline-block mt-1 text-xs font-bold rounded px-3 py-1.5" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: NAVY, cursor: "pointer" }}>
-                {shot ? "uploading…" : selfie ? "Replace the photo" : "📷 Add a selfie"}
-                <input type="file" accept="image/*" capture="user" hidden onChange={async (e) => {
+                {shot ? "uploading…" : selfie ? "Replace the photo" : "📷 Add a selfie — camera or gallery"}
+                {/* NO `capture` ATTRIBUTE, deliberately (Dr Raghu, 16 Sep 2026:
+                    "add selfie can be from gallary"). capture="user" forces
+                    the front camera open and hides the photo library
+                    entirely, which is wrong for the commonest case: the
+                    selfie was taken on the phone's own camera app at the
+                    stand, minutes ago, and is already in the gallery.
+                    Without it the phone offers both, and the person chooses. */}
+                <input type="file" accept="image/*" hidden onChange={async (e) => {
                   const file = e.target.files?.[0]; if (!file) return;
                   setShot(true); setErr("");
                   try {

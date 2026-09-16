@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.1.0.4",
+    date: "2026-09-16",
+    module: "The selfie can come from the gallery",
+    items: [
+      "<b>Add a selfie no longer forces the camera open.</b> It was set to <i>capture=\"user\"</i>, which opens the front camera and hides the photo library entirely \u2014 wrong for the commonest case by far: the photograph was taken on the phone\u2019s own camera at the stand a few minutes ago and is already in the gallery. The phone now offers both and the person chooses.",
+    ],
+  },
+  {
     v: "5.1.0.3",
     date: "2026-09-16",
     module: "Choose the address it leaves from \u2014 and a screen that works at a stand",
