@@ -908,6 +908,8 @@ type Preview = {
   sample?: Record<string, unknown>[]; listed?: number; committed?: boolean; notesCarried?: boolean; note?: string;
   /* Where a sliced commit reached, and whether the file is finished. */
   from?: number; to?: number; total?: number; done?: boolean; fileRows?: number;
+  /* Which tab of a multi-sheet workbook was actually read. */
+  sheet?: string; sheets?: number;
 };
 
 /**
@@ -1020,18 +1022,31 @@ function ListUpload({ list, onClose, onDone, inline }: { list: List; onClose: ()
         next[i] = { ...next[i], done: true, err: "" };
         got.push(one);
       } catch (e) {
-        /* One bad file must not lose the good ones already written. */
+        /**
+         * A BAD FILE IS SET ASIDE, NOT ALLOWED TO STOP THE QUEUE.
+         *
+         * The first version of this returned here, which meant one unreadable
+         * spreadsheet in the middle of forty silently cancelled the
+         * thirty-nine after it — the opposite of what "a bad file spoils only
+         * itself" is supposed to mean, and exactly the kind of quiet nothing
+         * this module keeps having to be cured of.
+         *
+         * What was written stays written; the file that failed keeps its
+         * reason against its own row; the rest carry on. Import again and
+         * only the ones still outstanding are attempted, because a file that
+         * finished is marked done and skipped.
+         */
         next[i] = { ...next[i], err: e instanceof Error ? e.message : String(e) };
         setPlans([...next]);
-        setTally(got.length ? { ...sum(got), committed: true } : null);
-        setErr(`Stopped at ${next[i].file.name}. Files before it are in; press Import again to carry on from here.`);
-        setBusy(false); return;
+        continue;
       }
       setPlans([...next]);
     }
+    const bad = next.filter((p) => p.err).length;
     setTally({ ...sum(got), committed: true });
     setProg(null); setBusy(false);
-    setTimeout(onDone, 1800);
+    if (bad) setErr(`${got.length} file${got.length === 1 ? "" : "s"} in. ${bad} could not be read — their reasons are against their names above, and the rest went in regardless. Fix or drop those, then press Import again.`);
+    else setTimeout(onDone, 1800);
   };
 
   const ready = plans.length > 0 && plans.some((p) => p.prev && !p.done);
@@ -1060,8 +1075,13 @@ function ListUpload({ list, onClose, onDone, inline }: { list: List; onClose: ()
                 onChange={(e) => setPlans((xs) => xs.map((x, j) => (j === i ? { ...x, source: e.target.value } : x)))}
                 placeholder="source" style={{ ...inp, width: 200, fontSize: 12 }} />
               <span className="tnum text-xs" style={{ color: MUTED, width: 120, textAlign: "right" }}>
-                {p.err ? <span style={{ color: RED }}>failed</span>
-                  : p.prev ? `${p.prev.willInsert} new · ${p.prev.matched} here` : "not read yet"}
+                {p.err ? <span style={{ color: RED }} title={p.err}>failed — skipped</span>
+                  : p.prev ? (
+                    <span title={p.prev.sheets && p.prev.sheets > 1 ? `${p.prev.sheets} tabs — read “${p.prev.sheet}”` : undefined}>
+                      {p.prev.willInsert} new · {p.prev.matched} here
+                      {!!p.prev.sheets && p.prev.sheets > 1 && <span style={{ color: MUTED }}> · {p.prev.sheet}</span>}
+                    </span>
+                  ) : "not read yet"}
               </span>
             </div>
           ))}

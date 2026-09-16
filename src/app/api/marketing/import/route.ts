@@ -111,10 +111,43 @@ export async function POST(req: Request) {
 
     const buf = Buffer.from(await file.arrayBuffer());
     const wb = XLSX.read(buf, { type: "buffer", raw: /\.csv$/i.test(file.name), cellDates: false });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    if (!sheet) throw new HttpError(400, "That file has no readable sheet in it.");
-    const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false, raw: false });
-    if (grid.length < 2) throw new HttpError(400, "That file has a header and no rows.");
+
+    /**
+     * THE SHEET WITH THE PEOPLE ON IT, NOT SIMPLY THE FIRST ONE.
+     *
+     * An exhibitor book opens on a cover page, or a legend, or an empty tab
+     * somebody left behind — and reading SheetNames[0] blindly meant the
+     * whole file was refused as "a header and no rows" while the 400 names
+     * sat on the next tab along. One unreadable file out of forty then
+     * stopped the batch, which is how "intralogistic warehousing show 2025"
+     * took thirty-nine others down with it.
+     *
+     * So every sheet is looked at and the one that actually carries a table
+     * is used: most rows wins, and a sheet whose header row names something
+     * we recognise beats a bigger one that names nothing. The chosen sheet is
+     * reported, because a file with four tabs should say which it read.
+     */
+    type Pick = { name: string; grid: unknown[][]; score: number };
+    const candidates: Pick[] = [];
+    for (const name of wb.SheetNames) {
+      const sh = wb.Sheets[name];
+      if (!sh) continue;
+      const g = XLSX.utils.sheet_to_json<unknown[]>(sh, { header: 1, blankrows: false, raw: false });
+      if (g.length < 2) continue;
+      const hdr = (g[0] || []).map(norm);
+      const known = Object.keys(guessMap(hdr)).length;
+      candidates.push({ name, grid: g, score: known * 100000 + g.length });
+    }
+    if (!candidates.length) {
+      const tabs = wb.SheetNames.length;
+      throw new HttpError(400, tabs > 1
+        ? `No sheet in this file has a header row and data under it — ${tabs} tabs were tried.`
+        : "That file has a header and no rows.");
+    }
+    candidates.sort((a, b) => b.score - a.score);
+    const chosen = candidates[0];
+    const grid = chosen.grid;
+    const sheetName = chosen.name;
 
     const headers = (grid[0] || []).map(norm);
     const guessed = Object.keys(map).length ? map : guessMap(headers);
@@ -253,6 +286,8 @@ export async function POST(req: Request) {
     const summary = {
       file: file.name,
       source,
+      sheet: sheetName,
+      sheets: wb.SheetNames.length,
       rows: slice.length,
       fileRows: body.length,
       headers,

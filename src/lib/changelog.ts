@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.0.48.7",
+    date: "2026-09-16",
+    module: "The sheet with the people on it \u2014 and two crons made to explain themselves",
+    items: [
+      "<b>An import now reads the sheet that has the table on it, not simply the first tab.</b> An exhibitor book opens on a cover page or a legend, and reading SheetNames[0] blindly refused the whole file as \u201ca header and no rows\u201d while four hundred names sat on the next tab along. Every sheet is weighed \u2014 recognisable headings first, then most rows \u2014 and the one chosen is named on screen for any workbook with more than one tab.",
+      "<b>A file that cannot be read is now set aside instead of stopping the queue.</b> The first version returned on the first failure, so one bad spreadsheet in the middle of forty silently cancelled the thirty-nine after it \u2014 the precise opposite of what \u201ca bad file spoils only itself\u201d is supposed to mean. What was written stays written, the failed file keeps its reason against its own row, and pressing Import again attempts only what is still outstanding.",
+      "<b>The ERP push has failed every hour for twenty-six hours</b>, and the one line that should have explained it read <i>[object Object]</i> \u2014 an object put through String(). It now records what the push actually said, and <b>what it answered with</b>: JSON means Genie refused the call and the secret is the suspect; HTML means the hop never reached the route at all and deployment protection is. Those need opposite fixes, and until now they looked identical.",
+      "<b>zoom-sweep fired twenty-six times and finished none of them</b> \u2014 because Zoom is not set up in CRM \u2192 Integrations and it returned before writing its heartbeat. Nothing was broken; nothing could be seen either. It now finishes and says it had nothing to do. <b>Not set up must never look the same as broken.</b>",
+    ],
+  },
+  {
     v: "5.0.48.6",
     date: "2026-09-15",
     module: "A pile of files at once \u2014 years of spreadsheets, in one go",

@@ -42,10 +42,14 @@ export async function GET(req: Request) {
       if (!u || u.disabled || !u.isOwner) throw new HttpError(401, "The hourly cron, or Raghu.");
     }
     await beat("zoom-sweep", "fired", { fromCron });
-    if (!crmConfigured()) return NextResponse.json({ ok: false, note: "CRM not configured." });
+    /* NOT SET UP IS NOT THE SAME AS BROKEN. These used to return without a
+       heartbeat, so twenty-six passes showed as "fired, never finished" —
+       indistinguishable from a cron dying halfway. It finished; there was
+       simply nothing to do. */
+    if (!crmConfigured()) { await beat("zoom-sweep", "done", { skipped: "CRM is not configured" }); return NextResponse.json({ ok: false, note: "CRM not configured." }); }
     const crm = crmDb();
     const cfg = await zoomConfig(crm);
-    if (!cfg) return NextResponse.json({ ok: false, note: "Zoom is not set up in CRM → Integrations." });
+    if (!cfg) { await beat("zoom-sweep", "done", { skipped: "Zoom is not set up in CRM → Integrations" }); return NextResponse.json({ ok: false, note: "Zoom is not set up in CRM → Integrations." }); }
 
     const to = new Date(), from = new Date(Date.now() - 2 * 86400_000);
     const d = (x: Date) => x.toISOString().slice(0, 10);

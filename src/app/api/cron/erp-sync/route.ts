@@ -62,10 +62,33 @@ export async function GET(req: Request) {
       method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
       body: JSON.stringify({ action: "push" }),
     });
-    push = (await pr.json().catch(() => ({}))) as Record<string, unknown>;
+    /**
+     * WHAT THE PUSH ACTUALLY SAID (16 Sep 2026).
+     *
+     * Twenty-six hourly passes in a row logged `push failed (401) — pull
+     * skipped: [object Object]`, which names the symptom and hides the
+     * cause: an object was put through String(), and the one line that would
+     * have explained a day of failures became four words of nothing.
+     *
+     * It matters WHICH 401 this is. Genie's own route answers JSON — that
+     * would mean the CRON_SECRET the caller signs with is not the one the
+     * callee reads. A platform answering HTML means the hop never reached
+     * the route at all, and the fix is deployment protection, not a secret.
+     * The content type tells those two apart, so it is recorded.
+     */
+    const ctype = pr.headers.get("content-type") || "";
+    const raw = await pr.text();
+    try { push = JSON.parse(raw) as Record<string, unknown>; } catch { push = { error: raw.slice(0, 300) }; }
     if (!pr.ok) {
-      await genie.from("erp_sync_log").insert({ by: "cron", dry: false, ok: false, error: `push failed (${pr.status}) — pull skipped: ${String(push.error || "").slice(0, 300)}` }).then(() => null, () => null);
-      await beat("erp-sync", "failed", { step: "push", status: pr.status });
+      const said = typeof push.error === "string" ? push.error : JSON.stringify(push.error ?? push);
+      await genie.from("erp_sync_log").insert({ by: "cron", dry: false, ok: false, error: `push failed (${pr.status}) — pull skipped: ${String(said).slice(0, 300)}` }).then(() => null, () => null);
+      await beat("erp-sync", "failed", {
+        step: "push", status: pr.status,
+        said: String(said).slice(0, 200),
+        /* JSON = Genie refused it; HTML = the hop never arrived. */
+        answeredWith: ctype.split(";")[0] || "nothing",
+        secretSet: !!secret, secretLen: secret ? secret.length : 0,
+      });
       return NextResponse.json({ ok: false, step: "push", push, note: "Push failed, so the pull was skipped — a pull over unpushed edits would overwrite them." }, { status: 502 });
     }
 
