@@ -95,6 +95,120 @@ function TagRow({ tags, known, onChange }: { tags: string[]; known: string[]; on
   );
 }
 
+
+/**
+ * WHAT WE DO, IN A LINE — the only thing a follow-up is allowed to claim.
+ *
+ * Dr Raghu, 16 Sep 2026: "keep it as a field. n genie can improve it all the
+ * time."
+ *
+ * With nothing here every message is claim-free, which is shorter and never
+ * wrong. With a line here, at most ONE fact from it may be used, and only
+ * when it answers something the other person actually said.
+ *
+ * GENIE PROPOSES, HE DECIDES. The suggestion appears beside the current
+ * words and changes nothing until he saves it. A sentence that rewrote
+ * itself would mean the claim in tomorrow's e-mail is not the one he last
+ * read, and this is the field whose entire job is to be true.
+ */
+function SenderLine() {
+  const [open, setOpen] = useState(false);
+  const [does, setDoes] = useState("");
+  const [device, setDevice] = useState("");
+  const [idea, setIdea] = useState<{ does: string; why: string; grounded: number } | null>(null);
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+  const [note, setNote] = useState("");
+
+  const post = async (body: Record<string, unknown>) => {
+    const r = await fetch("/api/crm/met", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(String(j.error || r.status));
+    return j;
+  };
+  const load = useCallback(async () => {
+    try { const j = await post({ action: "sender" }); setDoes(j.does || ""); setDevice(j.device || ""); } catch { /* it simply stays empty */ }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    setBusy("save"); setErr("");
+    try { await post({ action: "sender_save", does, device }); setNote("saved ✓"); setIdea(null); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy("");
+  };
+  const improve = async () => {
+    setBusy("improve"); setErr(""); setNote("");
+    try { const j = await post({ action: "sender_improve", does }); setIdea({ does: j.does || "", why: j.why || "", grounded: j.grounded || 0 }); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy("");
+  };
+
+  return (
+    <div className="rounded border mb-3" style={{ borderColor: does ? BORDER : "#E0C88A", background: does ? "#FBFAF7" : "#FDF8EC" }}>
+      <button onClick={() => setOpen((o) => !o)} className="w-full text-left px-3 py-2">
+        <span style={{ fontSize: 12, fontWeight: 700, color: does ? MUTED : "#7A5B00", letterSpacing: .6 }}>
+          WHAT WE DO, IN A LINE {open ? "▾" : "▸"}
+        </span>
+        <div style={{ fontSize: 12.5, color: does ? INK : "#7A5B00", marginTop: 2, lineHeight: 1.5 }}>
+          {does || "Not set. Until it is, no follow-up makes any claim about Nandan — shorter, and never wrong."}
+        </div>
+      </button>
+
+      {open && (
+        <div className="px-3 pb-3">
+          <textarea value={does} onChange={(e) => setDoes(e.target.value)} rows={2}
+            placeholder="We build ground support equipment for airports in India. Belt loaders, tow tractors, ground power units."
+            style={{ ...box, resize: "vertical" }} />
+          <div className="text-xs mt-1" style={{ color: MUTED, lineHeight: 1.5 }}>
+            At most <b>one fact from this</b> reaches any message, and only where it answers something the other person actually said. Plain and concrete beats impressive.
+          </div>
+
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <label style={{ fontSize: 11, color: MUTED }}>Sent from
+              <select value={device} onChange={(e) => setDevice(e.target.value)} style={{ ...box, width: 180 }}>
+                <option value="">nothing under the name</option>
+                <option value="Sent from my iPhone">Sent from my iPhone</option>
+                <option value="Sent from my phone">Sent from my phone</option>
+              </select>
+            </label>
+            <span style={{ fontSize: 11, color: MUTED, maxWidth: 300, lineHeight: 1.45 }}>
+              It goes under your first name. Only pick one that is true — the whole power of these e-mails is that everything in them is checkable.
+            </span>
+          </div>
+
+          <div className="flex gap-2 mt-2 flex-wrap items-center">
+            <button onClick={save} disabled={!!busy} className="text-xs font-bold rounded px-3 py-2 text-white" style={{ background: busy === "save" ? "#B9BEC4" : GREEN }}>
+              {busy === "save" ? "saving…" : "Save"}
+            </button>
+            <button onClick={improve} disabled={!!busy} className="text-xs font-bold rounded px-3 py-2" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: NAVY }}>
+              {busy === "improve" ? "thinking…" : "✨ Ask Genie to sharpen it"}
+            </button>
+            {note && <span style={{ fontSize: 11, color: GREEN, fontWeight: 700 }}>{note}</span>}
+          </div>
+          {err && <div className="text-xs mt-2 font-semibold" style={{ color: "#B3261E" }}>{err}</div>}
+
+          {idea && (
+            <div className="rounded border p-2 mt-2" style={{ borderColor: BORDER, background: "#fff" }}>
+              <div style={{ fontSize: 11, color: MUTED, fontWeight: 700, letterSpacing: .5 }}>GENIE SUGGESTS</div>
+              <div style={{ fontSize: 13, color: INK, margin: "3px 0", lineHeight: 1.55 }}>{idea.does || "(it could not find anything to say — tell it what you make)"}</div>
+              {idea.why && <div style={{ fontSize: 11, color: MUTED }}>{idea.why}</div>}
+              <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>
+                {idea.grounded ? `Grounded in ${idea.grounded} of your actual conversations. It may only reword what you gave it — it invents nothing.` : "Nothing to ground it in yet, so it only tidied your own words."}
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button onClick={() => { setDoes(idea.does); setIdea(null); }} disabled={!idea.does} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: ORANGE, color: "#fff" }}>Use it</button>
+                <button onClick={() => setIdea(null)} className="text-xs rounded px-3 py-1.5" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: MUTED }}>Keep mine</button>
+              </div>
+              <div style={{ fontSize: 11, color: MUTED, marginTop: 4 }}>Nothing changes until you press Save.</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: string) => void }) {
   const [rows, setRows] = useState<Met[] | null>(null);
   const [queued, setQueued] = useState<Record<string, { email?: string; whatsapp?: string }>>({});
@@ -149,6 +263,8 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
       </div>
 
       {err && <div className="rounded border p-2 mb-2 text-xs font-semibold" style={{ borderColor: "#B3261E", color: "#B3261E", background: "#FDF3F2" }}>{err}</div>}
+
+      <SenderLine />
 
       {rows && rows.length === 0 && (
         <div className="rounded border p-4 text-sm" style={{ borderColor: BORDER, color: MUTED, background: "#FAFBFD" }}>

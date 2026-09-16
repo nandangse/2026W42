@@ -290,6 +290,78 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, queue_id: data.id });
     }
 
+    /**
+     * WHAT WE DO, IN A LINE — the only thing a follow-up may claim.
+     *
+     * Dr Raghu, 16 Sep 2026: "keep it as a field. n genie can improve it all
+     * the time."
+     *
+     * It decides what a message can honestly say. With nothing here, every
+     * follow-up is claim-free — shorter, and never wrong. With a line here,
+     * at most ONE fact from it may be used, and only when it answers
+     * something the other person actually said.
+     *
+     * GENIE PROPOSES, HE DECIDES. "Improve" returns a suggestion beside the
+     * current words and changes nothing until he saves it. A sentence that
+     * rewrote itself would mean the claim in tomorrow's e-mail is not the one
+     * he last read, and this is the one field in the app whose whole job is
+     * to be true.
+     */
+    if (b.action === "sender") {
+      const { data } = await db.from("integration_setting").select("config").eq("key", "met_sender").maybeSingle();
+      const cfg = (data?.config || {}) as Record<string, unknown>;
+      return NextResponse.json({ ok: true, does: S(cfg.does), device: S(cfg.device) });
+    }
+
+    if (b.action === "sender_save") {
+      const cfg = { does: S(b.does).slice(0, 600), device: S(b.device).slice(0, 60) };
+      const { error } = await db.from("integration_setting").upsert({ key: "met_sender", config: cfg }, { onConflict: "key" });
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, ...cfg });
+    }
+
+    if (b.action === "sender_improve") {
+      await assertAiOn();
+      const now = S(b.does);
+      /* Sharpened against what is actually being written about — the real
+         conversations, not an imagined customer. */
+      const { data: recent } = await db.from("met_person").select("context").not("context", "is", null).order("added_at", { ascending: false }).limit(12);
+      const said = (recent || []).map((r) => S(r.context)).filter(Boolean).slice(0, 12);
+      const client = (await import("@/lib/ai")).anthropicClient();
+      const { AI } = await import("@/lib/ai");
+      const res = await client.messages.create({
+        model: AI.FRONT,
+        max_tokens: 400,
+        system: [
+          "You sharpen ONE line describing what a company does, used to decide what a follow-up e-mail may honestly claim.",
+          "",
+          "Rules, all of them hard:",
+          "- One or two plain sentences. Words somebody would say out loud.",
+          "- Concrete. What they make or do, who for. Not a mission and not an adjective.",
+          "- INVENT NOTHING. You may only reword, tighten and order what you are given.",
+          "  No numbers, no certifications, no years, no claims of scale unless they are already there.",
+          "- No marketing words: solutions, synergies, leverage, streamline, world-class, leading.",
+          "- No em dashes, no semicolons, no exclamation marks.",
+          "",
+          "If the line you are given is already plain and concrete, say so by returning it nearly unchanged.",
+          "Answer as JSON only: {\"does\": \"...\", \"why\": \"one short sentence on what you changed and why\"}",
+        ].join("\n"),
+        messages: [{
+          role: "user",
+          content: [
+            now ? `The line as it stands:\n${now}` : "There is no line yet. Write one only from the conversations below, and if they do not say what the company does, answer with an empty string and say so.",
+            said.length ? `\nRecent conversations this company has actually had, for grounding only. Do not quote them:\n- ${said.join("\n- ")}` : "",
+          ].filter(Boolean).join("\n"),
+        }],
+      });
+      const text = res.content.map((c) => (c.type === "text" ? c.text : "")).join("").trim();
+      const json = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1);
+      let out: { does?: string; why?: string };
+      try { out = JSON.parse(json); } catch { throw new HttpError(502, "The writer did not answer in the shape asked for. Try again."); }
+      const clean = (x: string) => String(x || "").replace(/\s*[—–]\s*/g, ". ").replace(/;/g, ",").replace(/!/g, ".").trim();
+      return NextResponse.json({ ok: true, does: clean(out.does || ""), why: clean(out.why || ""), grounded: said.length });
+    }
+
     if (b.action === "delete") {
       const gone = await mine(S(b.id));
       /* The meeting leaves the count with the record. Leaving the

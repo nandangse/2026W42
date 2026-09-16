@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.1.0.2",
+    date: "2026-09-16",
+    module: "What we do, in a line \u2014 the only thing a follow-up may claim",
+    items: [
+      "<b>A field at the top of People I Met</b> holding one plain line about what Nandan does. It is the only thing any follow-up is allowed to claim, and <b>at most one fact from it reaches a message</b>, only where it answers something the other person actually said. Left empty, every message stays claim-free \u2014 shorter, and never wrong.",
+      "<b>Genie will sharpen it on request, grounded in the conversations actually being had</b> \u2014 it reads the last dozen contexts for grounding and may only reword, tighten and reorder what it is given. It invents no numbers, no certifications, no years, no claims of scale.",
+      "<b>It proposes; he decides.</b> The suggestion appears beside the current words, says what it changed and why, and <b>nothing moves until Save is pressed</b>. A sentence that rewrote itself would mean the claim in tomorrow\u2019s e-mail is not the one he last read, and this is the one field whose entire job is to be true.",
+      "The sign-off line lives here too \u2014 <i>sent from my iPhone</i>, <i>sent from my phone</i>, or nothing. Only pick one that is true: the whole power of these e-mails is that everything in them is checkable.",
+    ],
+  },
+  {
     v: "5.1.0.1",
     date: "2026-09-16",
     module: "The tag, the selfie, and the meeting that actually counts",
