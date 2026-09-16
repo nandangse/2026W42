@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.1.0.0",
+    date: "2026-09-16",
+    module: "People I Met \u2014 the context nobody writes down, and the follow-up it produces",
+    items: [
+      "<b>A new app in the Sales CRM, under Tools.</b> Add somebody three ways \u2014 from the CRM when they are already known, from a card you scanned, or typed from nothing at all when there was no card, because somebody met at a stand with no card is still somebody met and refusing to record them is how the record never gets made.",
+      "<b>The context is the record.</b> A name and a company are already in the CRM and already useless alone; what decides whether a follow-up is worth sending is the line nobody writes down \u2014 which hall, what was said, what was promised. By the evening they are a face half remembered. By next week they are nobody.",
+      "<b>Genie writes the e-mail and the WhatsApp from that context</b>, in the voice of somebody who was actually standing there: plain words, no em dashes, no \u201cI hope this finds you well\u201d, no \u201creach out\u201d, a lowercase three-word subject carrying the connection, and one question answerable with a single word. <b>Clever is worse than clear</b> \u2014 a phrase that lands hard reads as something somebody sat down and crafted, which is the opposite of what the message is claiming.",
+      "<b>It can invent nothing.</b> The message may only say what is in the context; given little it is simply shorter, which is not weaker. And an <b>ask is not compulsory</b> \u2014 \u201ckeep warm\u201d earns its place, because without it every friendly chat turns into a pitch and a forced ask after a warm two-minute conversation is exactly what makes somebody decide not to reply.",
+      "<b>Nothing sends itself.</b> The e-mail waits in the outbound queue for the hand that read it. The WhatsApp is written, kept, and opened on his own phone \u2014 because a WhatsApp from a business gateway reads as a business gateway, while the same words from his own number, to somebody who met him an hour ago, read as him. <b>Needs CRM migration 0074.</b>",
+    ],
+  },
+  {
     v: "5.0.49.1",
     date: "2026-09-16",
     module: "Forty-seven opportunities an hour, refused and never mentioned",

@@ -47,6 +47,8 @@ export const SPECIAL_SECTIONS = [
   { name: "salesplan", label: "Sales Plan", icon: "◩", blurb: "" },
   { name: "deals", label: "Deals", icon: "◆", blurb: "" },
   { name: "visitingcard", label: "Add Visiting Card", icon: "🪪", blurb: "" },
+  /* The context nobody else writes down, and the follow-up it produces. */
+  { name: "peopleimet", label: "People I Met", icon: "🤝", blurb: "Everybody you met at a show, with what was actually said — and the personal e-mail and WhatsApp it writes from that." },
   { name: "integrations", label: "Integrations", icon: "🔌", blurb: "" },
   { name: "emailqueue", label: "Email", icon: "📮", blurb: "" },
   { name: "playbook", label: "Sales Playbook", icon: "📖", blurb: "" },
@@ -73,7 +75,7 @@ export const NAV: { header?: string; collapsible?: boolean; items: ({ dt: string
       { sp: "dashboard" }, { sp: "analytics" }, { sp: "salespersonplan" }, { sp: "salesplan" },
     ],
   },
-  { header: "TOOLS", collapsible: true, items: [{ sp: "visitingcard" }, { sp: "emailqueue" }, { sp: "waqueue" }, { sp: "playbook" }] },
+  { header: "TOOLS", collapsible: true, items: [{ sp: "visitingcard" }, { sp: "peopleimet" }, { sp: "emailqueue" }, { sp: "waqueue" }, { sp: "playbook" }] },
   { header: "PIPELINE", items: [{ dt: "lead" }, { dt: "opportunity" }, { dt: "quotation" }, { dt: "sales_order" }] },
   { items: [{ sp: "deals" }] },
   {
