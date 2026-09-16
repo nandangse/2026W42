@@ -238,6 +238,72 @@ export async function POST(req: Request) {
     const close = (id: string, status: "done" | "ignored") =>
       db.from("crm_clean_finding").update({ status, acted_by: me, acted_at: new Date().toISOString() }).eq("id", id);
 
+    /**
+     * LEAD OR CONTACT — set by hand, and remembered as set by hand.
+     *
+     * Dr Raghu, 16 Sep 2026: "always interchangeable. Make a toggle saying
+     * convert lead to contact, and then vice versa."
+     *
+     * The rule — no opportunity and no quotation means lead — is a good
+     * default and not a truth. Once somebody has decided by hand, the
+     * recompute steps around that row for good, because a badge that keeps
+     * changing back on its own looks like the screen lying rather than a
+     * rule doing its job.
+     */
+    if (b.action === "set_lead") {
+      const table = S(b.kind) === "company" ? "company" : "person";
+      const id = S(b.id);
+      if (!id) throw new HttpError(400, "Which record?");
+      const patch = {
+        is_lead: b.is_lead === true,
+        lead_manual: true,
+        lead_changed_by: me,
+        lead_changed_at: new Date().toISOString(),
+      };
+      const { error } = await db.from(table).update(patch).eq("id", id);
+      if (error) throw new HttpError(/is_lead|lead_manual/i.test(error.message) ? 503 : 500,
+        /is_lead|lead_manual/i.test(error.message) ? "Run CRM migration 0079 first." : error.message);
+      return NextResponse.json({ ok: true, is_lead: patch.is_lead });
+    }
+
+    /**
+     * THE RULE, RUN OVER EVERYTHING. Rows somebody has set by hand are left
+     * exactly as they are.
+     */
+    if (b.action === "recount_leads") {
+      const t0 = Date.now();
+      const worked = { people: new Set<string>(), firms: new Set<string>() };
+      const opp = await pageAll<{ point_of_contact_id: string | null; company_id: string | null }>(async (f, t) => {
+        const r = await db.from("opportunity").select("point_of_contact_id, company_id").range(f, t);
+        return { data: r.data as unknown as { point_of_contact_id: string | null; company_id: string | null }[] | null, error: r.error };
+      }, "opportunities");
+      for (const o of opp) { if (o.point_of_contact_id) worked.people.add(o.point_of_contact_id); if (o.company_id) worked.firms.add(o.company_id); }
+      const qt = await pageAll<{ contact_id: string | null; company_id: string | null }>(async (f, t) => {
+        const r = await db.from("quotation").select("contact_id, company_id").range(f, t);
+        return { data: r.data as unknown as { contact_id: string | null; company_id: string | null }[] | null, error: r.error };
+      }, "quotations");
+      for (const q of qt) { if (q.contact_id) worked.people.add(q.contact_id); if (q.company_id) worked.firms.add(q.company_id); }
+
+      let people = 0, firms = 0;
+      const mark = async (table: string, ids: string[]) => {
+        let n = 0;
+        for (let i = 0; i < ids.length; i += 200) {
+          const { error } = await db.from(table).update({ is_lead: false })
+            .in("id", ids.slice(i, i + 200)).eq("lead_manual", false).eq("is_lead", true);
+          if (error) throw new HttpError(/is_lead|lead_manual/i.test(error.message) ? 503 : 500,
+            /is_lead|lead_manual/i.test(error.message) ? "Run CRM migration 0079 first." : error.message);
+          n += Math.min(200, ids.length - i);
+        }
+        return n;
+      };
+      people = await mark("person", [...worked.people]);
+      firms = await mark("company", [...worked.firms]);
+      return NextResponse.json({
+        ok: true, seconds: Math.round((Date.now() - t0) / 100) / 10,
+        workedPeople: worked.people.size, workedFirms: worked.firms.size, touchedPeople: people, touchedFirms: firms,
+      });
+    }
+
     if (b.action === "ignore") { await close(S(b.id), "ignored"); return NextResponse.json({ ok: true }); }
 
     if (b.action === "rename_company") {

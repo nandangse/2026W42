@@ -315,6 +315,21 @@ export async function POST(req: Request) {
       sheets: wb.SheetNames.length,
       /* 1-based, because that is what the row is called in Excel. */
       headerRow: headerRow + 1,
+      /**
+       * THE ARITHMETIC, SO IT CANNOT HIDE (Dr Raghu, 16 Sep 2026: "these
+       * numbers seem too small. Are you sure you are taking the whole file
+       * records?").
+       *
+       * A fair question the screen could not answer, because it showed only
+       * "new" and "already here" — and those two do not add up to a file.
+       * Rows above the header are dropped, rows with neither a name nor an
+       * address are skipped, and blank rows never existed. Each is a number
+       * on the screen now, so the sum can be checked against the spreadsheet
+       * instead of trusted.
+       */
+      sheetRows: body.length + headerRow + 1,
+      skippedAbove: headerRow,
+      dataRows: body.length,
       rows: slice.length,
       fileRows: body.length,
       headers,

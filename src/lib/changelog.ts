@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.2.1.0",
+    date: "2026-09-16",
+    module: "A lead is a state, where a record came from, and the import\u2019s arithmetic shown",
+    items: [
+      "<b>A LEAD IS A STATE, NOT A PLACE</b> \u2014 somebody with no opportunity and no quotation. They stay in the same list wearing a badge; nothing is moved anywhere. Measured under that rule: <b>15,509 people have an opportunity or a quotation</b> and are contacts, <b>241,363 do not</b> and are leads. Companies: 37,549 live, 20,269 leads.",
+      "<b>And it is interchangeable by hand.</b> <i>Convert lead to contact</i> sits on the record, and back again. A hand-set value is <b>remembered as hand-set</b> and the automatic rule steps around that row for good \u2014 a badge that changed back on its own would read as the screen lying rather than a rule working.",
+      "<b>Where this came from, and when.</b> The Notes tab now opens with the record\u2019s own history: the day it was made and by whom, every list it is on <b>with the file that put it there</b> and the date, any visiting card scanned, any meeting recorded. All of it was already written down and none of it was being shown \u2014 four hundred exhibitor books went in this week, and without this a name is a name with no history.",
+      "<b>The import now shows its arithmetic.</b> \u201cThese numbers seem too small \u2014 are you taking the whole file?\u201d was a fair question the screen could not answer, because it showed only <i>new</i> and <i>already here</i>, and those two never add up to a file. Each file now reports <b>rows under the header</b>, how many were dropped above it, which tab was read, and how many carried neither a name nor an address \u2014 so the sum can be checked against the spreadsheet instead of trusted.",
+      "<b>Needs CRM migration 0079.</b>",
+    ],
+  },
+  {
     v: "5.2.0.1",
     date: "2026-09-16",
     module: "Merge from the person you are looking at \u2014 and the header row found, not assumed",

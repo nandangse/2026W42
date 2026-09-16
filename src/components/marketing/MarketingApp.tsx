@@ -909,7 +909,8 @@ type Preview = {
   /* Where a sliced commit reached, and whether the file is finished. */
   from?: number; to?: number; total?: number; done?: boolean; fileRows?: number;
   /* Which tab of a multi-sheet workbook was actually read. */
-  sheet?: string; sheets?: number;
+  sheet?: string; sheets?: number; headerRow?: number;
+  sheetRows?: number; skippedAbove?: number; dataRows?: number;
 };
 
 /**
@@ -1074,12 +1075,20 @@ function ListUpload({ list, onClose, onDone, inline }: { list: List; onClose: ()
               <input value={p.source} disabled={busy || p.done}
                 onChange={(e) => setPlans((xs) => xs.map((x, j) => (j === i ? { ...x, source: e.target.value } : x)))}
                 placeholder="source" style={{ ...inp, width: 200, fontSize: 12 }} />
-              <span className="tnum text-xs" style={{ color: MUTED, width: 120, textAlign: "right" }}>
+              <span className="tnum text-xs" style={{ color: MUTED, width: 210, textAlign: "right" }}>
                 {p.err ? <span style={{ color: RED }} title={p.err}>failed — skipped</span>
                   : p.prev ? (
-                    <span title={p.prev.sheets && p.prev.sheets > 1 ? `${p.prev.sheets} tabs — read “${p.prev.sheet}”` : undefined}>
-                      {p.prev.willInsert} new · {p.prev.matched} here
+                    <span title={[
+                      `${p.prev.sheetRows ?? "?"} rows in the tab, header included`,
+                      p.prev.skippedAbove ? `${p.prev.skippedAbove} row(s) above the header, dropped` : null,
+                      `${p.prev.dataRows ?? "?"} rows under the header`,
+                      `${p.prev.willInsert} new + ${p.prev.matched} already here + ${p.prev.emptyRows} with no name and no e-mail`,
+                      p.prev.sheets && p.prev.sheets > 1 ? `${p.prev.sheets} tabs — read “${p.prev.sheet}”` : null,
+                    ].filter(Boolean).join("\n")}>
+                      <b className="tnum">{p.prev.dataRows ?? p.prev.rows}</b> rows · {p.prev.willInsert} new · {p.prev.matched} here
+                      {!!p.prev.emptyRows && <span style={{ color: RED }}> · {p.prev.emptyRows} blank</span>}
                       {!!p.prev.sheets && p.prev.sheets > 1 && <span style={{ color: MUTED }}> · {p.prev.sheet}</span>}
+                      {!!p.prev.skippedAbove && <span style={{ color: MUTED }}> · hdr r{(p.prev.headerRow ?? 1)}</span>}
                     </span>
                   ) : "not read yet"}
               </span>

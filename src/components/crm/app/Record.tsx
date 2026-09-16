@@ -481,6 +481,37 @@ export function RecordModal({
                 ⤴ Create the enquiry
               </button>
             )}
+            {/* LEAD OR CONTACT, INTERCHANGEABLE (Dr Raghu, 16 Sep 2026:
+                "always interchangeable. Make a toggle saying convert lead to
+                contact, and then vice versa").
+
+                A lead is somebody with no opportunity and no quotation, which
+                is a good default and not a truth — so it can be set by hand,
+                and once it has been, the automatic rule leaves the row alone.
+                A badge that changed back on its own would read as the screen
+                lying rather than a rule working. */}
+            {mode === "view" && (dt.name === "company" || dt.name === "person") && (
+              <button
+                onClick={async () => {
+                  const nowLead = (row as Record<string, unknown>).is_lead !== false;
+                  if (!window.confirm(nowLead
+                    ? `Make ${title} a contact?\n\nIt keeps everything it has and simply stops being counted as a lead. The automatic rule — no opportunity and no quotation means lead — will leave it alone from now on.`
+                    : `Put ${title} back among the leads?\n\nNothing is deleted. It stops being counted as a contact, and the automatic rule will leave it alone from now on.`)) return;
+                  try {
+                    const r = await fetch("/api/crm/clean", { method: "POST", headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ action: "set_lead", kind: dt.name, id: rid, is_lead: !nowLead }) });
+                    const j = await r.json();
+                    if (!r.ok) throw new Error(String(j.error || r.status));
+                    onSaved({ id: rid });
+                  } catch (e) { window.alert(e instanceof Error ? e.message : String(e)); }
+                }}
+                className="rounded px-2.5 py-1 text-xs font-bold"
+                style={{ background: "rgba(255,255,255,.10)", color: "#fff", border: "1px solid rgba(255,255,255,.3)" }}
+                title="A lead is somebody with no opportunity and no quotation. You can overrule that either way."
+              >
+                {(row as Record<string, unknown>).is_lead !== false ? "→ Convert lead to contact" : "← Back to a lead"}
+              </button>
+            )}
             {mode === "view" && (dt.name === "company" || dt.name === "person") && (
               <button
                 onClick={async () => {
@@ -667,7 +698,10 @@ export function RecordModal({
               }
             />
           ) : tab === "notes" ? (
-            <NotesTab type={dt.name} id={rid} />
+            <>
+              <WhereFrom type={dt.name} id={rid} />
+              <NotesTab type={dt.name} id={rid} />
+            </>
           ) : tab === "ifs" ? (
             <IfsTab row={row} onSaved={onSaved} />
           ) : tab === "merge" ? (
@@ -1534,7 +1568,63 @@ export async function uploadEditorImage(fd: FormData): Promise<string> {
   return String(j.url);
 }
 
-export function NotesTab({ type, id }: { type: string; id: string }) {
+export 
+/* ══════════════════════════════════════════════════════════════════════════
+   WHERE THIS CAME FROM, AND WHEN
+
+   Dr Raghu, 16 Sep 2026: "this also doesn't tell me where it was added from
+   and when! show all that in notes."
+
+   All of it was already written down and none of it was shown. A person
+   carries the day they were made; every list carries the FILE that put them
+   there and the day it did; a scanned card and a meeting carry their own
+   dates. Four hundred exhibitor books went in this week, and without this a
+   name is a name with no history — which is the state the whole import was
+   meant to rescue it from.
+
+   Nothing here is computed. It is the record's own history, read back.
+   ══════════════════════════════════════════════════════════════════════ */
+type Prov = {
+  created_at: string; created_by: string | null; source: string | null;
+  lists: { list: string; source: string | null; added_at: string; by: string | null }[];
+  cards: { at: string; by: string }[];
+  met: { at: string; event: string | null; context: string | null }[];
+};
+
+function WhereFrom({ type, id }: { type: string; id: string }) {
+  const [p, setP] = useState<Prov | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    fetch(`/api/crm/provenance?type=${type}&id=${id}`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(String(j.error || r.status)); setP(j); })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [type, id]);
+  const day = (v: string) => (v ? new Date(v).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—");
+  if (err) return null;
+  if (!p) return <div className="text-xs" style={{ color: "var(--muted)" }}>reading its history…</div>;
+  return (
+    <div className="rounded border p-2 mb-3" style={{ borderColor: "var(--line)", background: "#FAFBFD" }}>
+      <div className="text-xs font-bold mb-1" style={{ color: "var(--muted)", letterSpacing: .8 }}>WHERE THIS CAME FROM</div>
+      <div style={{ fontSize: 12.5, lineHeight: 1.7 }}>
+        <div>Made <b>{day(p.created_at)}</b>{p.created_by ? <> by {p.created_by.split("@")[0]}</> : null}{p.source ? <> · source <b>{p.source}</b></> : null}</div>
+        {p.lists.map((l, i) => (
+          <div key={i}>
+            On <b>{l.list}</b>{l.source ? <> from the file <b>{l.source}</b></> : <> <span style={{ color: "var(--muted)" }}>(the file was not recorded — added before Genie kept that)</span></>} · {day(l.added_at)}
+          </div>
+        ))}
+        {p.cards.map((c, i) => <div key={"c" + i}>A visiting card was scanned <b>{day(c.at)}</b> by {String(c.by).split("@")[0]}</div>)}
+        {p.met.map((m, i) => (
+          <div key={"m" + i}>Met <b>{day(m.at)}</b>{m.event ? <> at <b>{m.event}</b></> : null}{m.context ? <span style={{ color: "var(--muted)" }}> — {m.context.slice(0, 120)}</span> : null}</div>
+        ))}
+        {!p.lists.length && !p.cards.length && !p.met.length && (
+          <div style={{ color: "var(--muted)" }}>Not on any list, no card scanned, no meeting recorded. It was typed straight in.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NotesTab({ type, id }: { type: string; id: string }) {
   type NoteRow = { id: string; title: string | null; body: string; author: string | null; created_at: string };
   const [notes, setNotes] = useState<NoteRow[] | null>(null);
   const [text, setText] = useState("");
