@@ -273,6 +273,23 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
   const [known, setKnown] = useState<string[]>([]);
   const [events, setEvents] = useState<string[]>([]);
   const [channels, setChannels] = useState<Chan[]>([]);
+  const [sentMap, setSentMap] = useState<Record<string, { email: number; whatsapp: number }>>({});
+  const [byList, setByList] = useState<string[]>([]);
+  const [mine, setMine] = useState("");
+  /**
+   * THE FILTERS (Dr Raghu, 17 Sep 2026: "By — default me. Date — default one
+   * month. Event — give the DD. And show count.")
+   *
+   * Mine, this month, is what somebody wants nine times out of ten; the
+   * other tenth is two clicks away. The count is the point — after a show
+   * the question is "how many did I actually record", and a list you have to
+   * scroll to answer that is not answering it.
+   */
+  const [fBy, setFBy] = useState("");
+  const [fEvent, setFEvent] = useState("");
+  const monthAgo = (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toLocaleDateString("en-CA"); })();
+  const [fFrom, setFFrom] = useState(monthAgo);
+  const [fTo, setFTo] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }));
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
@@ -283,17 +300,26 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
       const r = await fetch("/api/crm/met", { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(String(j.error || r.status));
-      setRows(j.people || []); setQueued(j.queued || {}); setReasons(j.reasons || []); setKnown(j.knownTags || []); setEvents(j.knownEvents || []); setChannels(j.channels || []); setErr("");
+      setRows(j.people || []); setQueued(j.queued || {}); setReasons(j.reasons || []); setKnown(j.knownTags || []); setEvents(j.knownEvents || []); setChannels(j.channels || []); setSentMap(j.sent || {}); setByList(j.byList || []);
+      if (j.mine) { setMine(j.mine); setFBy((b) => (b === "" ? j.mine : b)); }
+      setErr("");
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); setRows([]); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
   const shown = useMemo(() => {
     const k = q.trim().toLowerCase();
-    if (!k || !rows) return rows || [];
-    return rows.filter((m) => [m.name, m.company_name, m.event, m.context, m.job_title, ...(m.tags || [])]
-      .some((v) => String(v || "").toLowerCase().includes(k)));
-  }, [rows, q]);
+    return (rows || []).filter((m) => {
+      if (fBy && String(m.added_by || "").toLowerCase() !== fBy.toLowerCase()) return false;
+      if (fEvent && String(m.event || "") !== fEvent) return false;
+      const d = String(m.met_on || "").slice(0, 10);
+      if (fFrom && d && d < fFrom) return false;
+      if (fTo && d && d > fTo) return false;
+      if (!k) return true;
+      return [m.name, m.company_name, m.event, m.context, m.job_title, ...(m.tags || [])]
+        .some((v) => String(v || "").toLowerCase().includes(k));
+    });
+  }, [rows, q, fBy, fEvent, fFrom, fTo]);
 
   const byEvent = useMemo(() => {
     const g = new Map<string, Met[]>();
@@ -323,6 +349,31 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
       </div>
 
       {err && <div className="rounded border p-2 mb-2 text-xs font-semibold" style={{ borderColor: "#B3261E", color: "#B3261E", background: "#FDF3F2" }}>{err}</div>}
+
+      <div className="rounded border p-2 mb-2 flex flex-wrap items-end gap-2" style={{ borderColor: BORDER, background: "#FBFAF7" }}>
+        <label style={{ fontSize: 11, color: MUTED }}>By
+          <select value={fBy} onChange={(e) => setFBy(e.target.value)} style={{ ...box, width: 170 }}>
+            <option value="">everyone</option>
+            {byList.map((b) => <option key={b} value={b}>{b === mine ? `${b.split("@")[0]} (me)` : b.split("@")[0]}</option>)}
+          </select></label>
+        <label style={{ fontSize: 11, color: MUTED }}>From
+          <input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} style={{ ...box, width: 150 }} /></label>
+        <label style={{ fontSize: 11, color: MUTED }}>To
+          <input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} style={{ ...box, width: 150 }} /></label>
+        <label style={{ fontSize: 11, color: MUTED }}>Show
+          <select value={fEvent} onChange={(e) => setFEvent(e.target.value)} style={{ ...box, width: 210 }}>
+            <option value="">every show</option>
+            {events.map((e) => <option key={e} value={e}>{e}</option>)}
+          </select></label>
+        <button onClick={() => { setFBy(mine); setFEvent(""); setFFrom(monthAgo); setFTo(new Date().toLocaleDateString("en-CA")); setQ(""); }}
+          className="text-xs font-bold rounded px-2 py-1.5" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: MUTED }}>reset</button>
+        <button onClick={() => { setFBy(""); setFEvent(""); setFFrom(""); setFTo(""); }}
+          className="text-xs rounded px-2 py-1.5" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: MUTED }}>all time, everyone</button>
+        <span className="ml-auto" style={{ fontSize: 13 }}>
+          <b className="tnum" style={{ fontSize: 20, color: NAVY }}>{shown.length}</b>
+          <span style={{ color: MUTED }}> {shown.length === 1 ? "person" : "people"}{rows && shown.length !== rows.length ? ` of ${rows.length}` : ""}</span>
+        </span>
+      </div>
 
       <SenderLine />
 
@@ -366,6 +417,8 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
                 <div className="flex items-center gap-1 flex-wrap" style={{ fontSize: 11, color: MUTED }}>
                   <span>{m.met_on}</span>
                   {m.interaction_id && <span title="Counted as a meeting in Interactions" style={{ color: MUTED }}>▣ counted</span>}
+                  {!!sentMap[m.id]?.email && <span title={`${sentMap[m.id].email} e-mail(s) actually sent`} style={{ color: GREEN, fontWeight: 700 }}>✉ {sentMap[m.id].email} sent</span>}
+                  {!!sentMap[m.id]?.whatsapp && <span title={`${sentMap[m.id].whatsapp} WhatsApp(s) marked sent`} style={{ color: GREEN, fontWeight: 700 }}>💬 {sentMap[m.id].whatsapp} sent</span>}
                   {queued[m.id]?.email && <span title="An e-mail is written and waiting in the queue" style={{ color: GREEN, fontWeight: 700 }}>✉ ready</span>}
                   {queued[m.id]?.whatsapp && <span title="A WhatsApp is written and waiting for you to send" style={{ color: GREEN, fontWeight: 700 }}>💬 ready</span>}
                   <span className="flex-1" />
@@ -379,7 +432,7 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
       ))}
 
       {adding && <AddBox reasons={reasons} known={known} events={events} onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
-      {open && <MetBox met={open} reasons={reasons} known={known} events={events} channels={channels} queued={queued[open.id] || {}} onClose={() => setOpen(null)} onChanged={load} />}
+      {open && <MetBox met={open} reasons={reasons} known={known} events={events} channels={channels} sent={sentMap[open.id]} queued={queued[open.id] || {}} onClose={() => setOpen(null)} onChanged={load} />}
     </div>
   );
 }
@@ -580,8 +633,8 @@ function AddBox({ reasons, known, events, onClose, onDone }: { reasons: Reason[]
 }
 
 /* ── ONE PERSON: the context, and the two messages ────────────────────── */
-function MetBox({ met, reasons, known, events, channels, queued, onClose, onChanged }: {
-  met: Met; reasons: Reason[]; known: string[]; events: string[]; channels: Chan[]; queued: { email?: string; whatsapp?: string }; onClose: () => void; onChanged: () => void;
+function MetBox({ met, reasons, known, events, channels, queued, sent, onClose, onChanged }: {
+  met: Met; reasons: Reason[]; known: string[]; events: string[]; channels: Chan[]; queued: { email?: string; whatsapp?: string }; sent?: { email: number; whatsapp: number }; onClose: () => void; onChanged: () => void;
 }) {
   const [f, setF] = useState({ context: met.context || "", reason: met.reason, email: met.email || "", phone: met.phone || "", event: met.event || "", met_on: met.met_on || todayISO() });
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -745,9 +798,42 @@ function MetBox({ met, reasons, known, events, channels, queued, onClose, onChan
             <button onClick={() => write("whatsapp")} disabled={!!busy} className="text-xs font-bold rounded px-3 py-2 text-white" style={{ background: busy === "whatsapp" ? "#B9BEC4" : "#128C7E" }}>
               {busy === "whatsapp" ? "writing…" : "💬 Write the WhatsApp"}
             </button>
-            {queued.email && <span style={{ fontSize: 11, color: GREEN, fontWeight: 700 }}>✉ one already waiting</span>}
-            {queued.whatsapp && <span style={{ fontSize: 11, color: GREEN, fontWeight: 700 }}>💬 one already kept</span>}
+            {queued.email && <span style={{ fontSize: 11, color: MUTED }}>✉ one waiting in the queue</span>}
+            {queued.whatsapp && <span style={{ fontSize: 11, color: MUTED }}>💬 one kept, not yet sent</span>}
+            <span className="flex-1" />
+            {/* A record made by mistake should not need somebody else to
+                remove it. The meeting leaves the interaction count with it. */}
+            <button onClick={async () => {
+              if (!window.confirm(`Delete ${met.name}?\n\nThe meeting goes, and so does the interaction it added to your count. Anything already written and waiting for them is removed too. The CRM contact, if there is one, is untouched.`)) return;
+              setBusy("delete"); setErr("");
+              try { await post({ action: "delete", id: met.id }); onChanged(); onClose(); }
+              catch (e) { setErr(e instanceof Error ? e.message : String(e)); setBusy(""); }
+            }} disabled={!!busy} className="text-xs font-bold rounded px-3 py-2"
+              style={{ background: "#fff", border: "1px solid #B3261E", color: "#B23B12" }}>
+              {busy === "delete" ? "deleting…" : "🗑 Delete"}
+            </button>
           </div>
+
+          {/* WHAT HAS ACTUALLY GONE. Queued is not sent, and the difference
+              is the whole point: a follow-up written and never sent is the
+              failure this app exists to prevent. */}
+          {(sent?.email || sent?.whatsapp || queued.email || queued.whatsapp) && (
+            <div className="rounded border p-2 mt-2" style={{ borderColor: BORDER, background: "#FAFBFD" }}>
+              <div style={{ fontSize: 10.5, color: MUTED, fontWeight: 700, letterSpacing: .5 }}>COMMUNICATIONS</div>
+              <div style={{ fontSize: 12.5, lineHeight: 1.7 }}>
+                <b className="tnum" style={{ color: (sent?.email || 0) + (sent?.whatsapp || 0) ? GREEN : MUTED }}>
+                  {(sent?.email || 0) + (sent?.whatsapp || 0)}
+                </b> sent
+                {!!sent?.email && <span style={{ color: MUTED }}> · {sent.email} e-mail{sent.email === 1 ? "" : "s"}</span>}
+                {!!sent?.whatsapp && <span style={{ color: MUTED }}> · {sent.whatsapp} WhatsApp</span>}
+                {(queued.email || queued.whatsapp) && (
+                  <span style={{ color: "#8A5B00" }}>
+                    {" · "}<b>{(queued.email ? 1 : 0) + (queued.whatsapp ? 1 : 0)}</b> written and <b>not sent</b>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           {!f.context.trim() && <div className="text-xs mt-1" style={{ color: "#8A5B00" }}>With no context it can only say that you met. Write a line first and it will say something true.</div>}
 
           {err && <div className="text-xs mt-2 font-semibold" style={{ color: "#B3261E" }}>{err}</div>}

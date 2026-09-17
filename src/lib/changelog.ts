@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.3.2.0",
+    date: "2026-09-17",
+    module: "People I Met: filters with a count, what was actually sent, and a delete",
+    items: [
+      "<b>Filters across the top \u2014 by, dates, show \u2014 and a count beside them.</b> Mine, this last month, which is what somebody wants nine times out of ten; everything else is two clicks away. <b>The count is the point:</b> after a show the question is \u201chow many did I actually record\u201d, and a list you have to scroll to answer that is not answering it.",
+      "<b>Communications, and the distinction that matters: queued is not sent.</b> Each person shows how many e-mails and WhatsApps actually went, and separately how many are <b>written and still not sent</b> \u2014 because a follow-up written and never sent is the exact failure this app exists to prevent, and it must not hide inside one number.",
+      "<b>A delete on the record.</b> A meeting made by mistake should not need somebody else to remove it \u2014 and it takes its interaction out of the month\u2019s count with it, because a month should not be flattered by a meeting whose evidence has been deleted.",
+      "<b>And the Drive fallback now says why it fell back.</b> The first selfie after the change went to Supabase and nothing anywhere said what Drive had objected to \u2014 the picture was safe and the reason was silent, which is the same fault this codebase keeps having to be cured of. Every upload now reports which store it landed in and, when it is not Drive, exactly what Drive said.",
+    ],
+  },
+  {
     v: "5.3.1.2",
     date: "2026-09-17",
     module: "Where you met: type it, or pick it",

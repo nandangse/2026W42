@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { swallow } from "@/lib/swallow";
 import { putFile, fileUrl } from "@/lib/genie-files";
 import { readBody } from "@/lib/validate";
 import { AI } from "@/lib/ai";
@@ -151,9 +152,10 @@ export async function POST(req: Request) {
          fallback: a card photographed at a stand must never be refused
          because a setting is missing. */
       let path: string;
-      const sent = await putFile("card", `card-${Date.now()}.${ext}`, buf, file.type || "image/jpeg").catch(() => null);
-      if (sent) path = sent.ref;
+      const sent = await putFile("card", `card-${Date.now()}.${ext}`, buf, file.type || "image/jpeg");
+      if (sent.ok) path = sent.ref;
       else {
+        swallow("card drive", new Error(sent.why));
         path = `${new Date().toISOString().slice(0, 7)}/${Date.now()}.${ext}`;
         const { error: up } = await db.storage.from("cards").upload(path, buf, { contentType: file.type || "image/jpeg" });
         if (up) {

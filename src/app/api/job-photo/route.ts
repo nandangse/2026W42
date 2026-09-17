@@ -84,8 +84,8 @@ export async function POST(req: Request) {
      * must never be refused because a Drive setting is missing.
      */
     let path: string;
-    const up = await putFile("job", `${jobId}-${Date.now()}.${ext}`, buf, file.type).catch(() => null);
-    if (up) path = up.ref;
+    const up = await putFile("job", `${jobId}-${Date.now()}.${ext}`, buf, file.type);
+    if (up.ok) path = up.ref;
     else {
       path = `${jobId}/${Date.now()}.${ext}`;
       const { error: ue } = await admin.storage.from(BUCKET).upload(path, buf, { contentType: file.type });

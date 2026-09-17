@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { crmDb } from "@/crm/db";
+import { swallow } from "@/lib/swallow";
 import { requireCrm } from "@/crm/auth";
 import { errJson, HttpError } from "@/lib/auth";
 import { readBody } from "@/lib/validate";
@@ -139,7 +140,10 @@ export async function GET(req: Request) {
     /* A head of sales may look across the team; everybody else sees the
        people they themselves met, which is the only useful default anyway. */
     const seesAll = u.isOwner || /head|manager|admin/i.test(u.crmRole);
-    const all = new URL(req.url).searchParams.get("all") === "1" && seesAll;
+    /* Everything this person is entitled to see comes down once; the screen
+       filters it. The set is small — people you have actually met — and a
+       filter that needs a round trip is a filter nobody uses. */
+    const all = seesAll;
     const rows = await pageAll<Record<string, unknown>>(async (f, t) => {
       let q = db.from("met_person").select("*").order("met_on", { ascending: false }).order("added_at", { ascending: false }).range(f, t);
       if (!all) q = q.eq("added_by", u.email.toLowerCase());
@@ -191,7 +195,35 @@ export async function GET(req: Request) {
         .filter((c) => c.email.toLowerCase() !== u.email.toLowerCase())
         .map((c) => ({ id: String(c.id), email: c.email, label: c.label || c.email, kind: c.kind, own: false })),
     ];
-    return NextResponse.json({ ok: true, people: rows, queued, reasons: REASONS, knownTags: [...seen].sort(), knownEvents: [...events].sort(), channels });
+    /* Who has recorded somebody, so "By" can be a list rather than a guess. */
+    const byList = [...new Set(rows.map((r) => String(r.added_by || "")).filter(Boolean))].sort();
+
+    /**
+     * WHAT WAS ACTUALLY SENT, per meeting.
+     *
+     * Dr Raghu, 17 Sep 2026: "email or whatsapp sent should also be there in
+     * this in a communications tab with a number on it which shows how many."
+     *
+     * Queued is not sent. The queue says what is written and waiting; the
+     * message table says what left. Both are counted, separately, because a
+     * follow-up written and never sent is the failure this app exists to
+     * prevent and it must not hide inside a single number.
+     */
+    const sent: Record<string, { email: number; whatsapp: number }> = {};
+    if (ids.length) {
+      const { data: q } = await db.from("outbound_queue")
+        .select("met_id, channel, status").in("met_id", ids).eq("status", "sent");
+      for (const x of (q || []) as { met_id: string; channel: string }[]) {
+        const k = String(x.met_id);
+        sent[k] = sent[k] || { email: 0, whatsapp: 0 };
+        if (x.channel === "email") sent[k].email++; else sent[k].whatsapp++;
+      }
+    }
+    return NextResponse.json({
+      ok: true, people: rows, queued, sent, reasons: REASONS,
+      knownTags: [...seen].sort(), knownEvents: [...events].sort(),
+      channels, byList, mine: u.email.toLowerCase(), seesAll,
+    });
   } catch (e) { return errJson(e); }
 }
 
@@ -222,9 +254,12 @@ export async function POST(req: Request) {
       const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
       /* DRIVE FIRST, bucket as the fallback — see src/lib/genie-files.ts. */
       let path: string;
-      const sent = await putFile("selfie", `selfie-${Date.now()}.${ext}`, buf, file.type || "image/jpeg").catch(() => null);
-      if (sent) path = sent.ref;
+      let driveWhy: string | null = null;
+      const sent = await putFile("selfie", `selfie-${Date.now()}.${ext}`, buf, file.type || "image/jpeg");
+      if (sent.ok) path = sent.ref;
       else {
+        driveWhy = sent.why;
+        swallow("met/selfie drive", new Error(sent.why));
         path = `selfie/${new Date().toISOString().slice(0, 7)}/${Date.now()}.${ext}`;
         const { error: up } = await db.storage.from("cards").upload(path, buf, { contentType: file.type || "image/jpeg" });
         if (up) throw new HttpError(502, `Could not store the photo: ${up.message}`);
@@ -236,7 +271,9 @@ export async function POST(req: Request) {
         const { data: sgn } = await db.storage.from("cards").createSignedUrl(bp, 3600);
         return sgn?.signedUrl ?? null;
       });
-      return NextResponse.json({ ok: true, selfie: url });
+      /* Kept, and honest about where: a picture in the wrong place is still
+         a picture, but nobody should have to guess which place. */
+      return NextResponse.json({ ok: true, selfie: url, storedIn: driveWhy ? "supabase" : "drive", driveWhy });
     }
 
     const b = await readBody(req, { action: "string" });

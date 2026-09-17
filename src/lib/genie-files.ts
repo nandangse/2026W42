@@ -53,15 +53,35 @@ export function driveReady(): boolean {
  * bucket rather than losing somebody's photograph — a picture taken at a
  * stand must never be refused because a setting is missing.
  */
+export type PutResult =
+  | { ok: true; ref: string; link: string | null }
+  | { ok: false; why: string };
+
 export async function putFile(
   kind: FileKind, filename: string, bytes: Buffer, mime: string,
-): Promise<{ ref: string; link: string | null } | null> {
+): Promise<PutResult> {
+  /**
+   * A FALLBACK MUST SAY WHY IT FELL BACK.
+   *
+   * The first version returned null on any failure and the caller quietly
+   * used the bucket. It worked — the picture was never lost — but the first
+   * selfie taken after the change went to Supabase and there was nothing
+   * anywhere saying what Drive had objected to. That is the same silent
+   * nought this codebase keeps having to be cured of: the safe behaviour is
+   * right, and hiding the reason for it is not.
+   */
   const cfg = driveConfig();
+  if (!cfg) return { ok: false, why: "GOOGLE_SA_EMAIL / GOOGLE_SA_PRIVATE_KEY are not set on the deploy" };
   const root = filesRoot();
-  if (!cfg || !root) return null;
-  const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-  const up = await uploadToFolder(cfg, root, FOLDERS[kind], body, filename, mime || "image/jpeg");
-  return { ref: DRIVE_PREFIX + up.id, link: up.link };
+  if (!root) return { ok: false, why: "neither DRIVE_FILES_FOLDER_ID nor DRIVE_UPLOAD_FOLDER_ID is set" };
+  try {
+    const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    const up = await uploadToFolder(cfg, root, FOLDERS[kind], body, filename, mime || "image/jpeg");
+    if (!up?.id) return { ok: false, why: "Drive accepted the upload but returned no file id" };
+    return { ok: true, ref: DRIVE_PREFIX + up.id, link: up.link };
+  } catch (e) {
+    return { ok: false, why: (e instanceof Error ? e.message : String(e)).slice(0, 300) };
+  }
 }
 
 /**
