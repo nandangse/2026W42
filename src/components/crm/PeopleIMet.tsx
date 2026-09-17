@@ -25,7 +25,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { NAVY, NAVY_SOFT, INK, MUTED, BORDER, ORANGE, GREEN } from "./palette";
-import { CardLightbox } from "./VisitingCard";
+import { CardLightbox, shrinkImage } from "./VisitingCard";
 
 type Met = {
   id: string; source: string; person_id: string | null; card_id: string | null;
@@ -689,9 +689,37 @@ function MetBox({ met, reasons, known, events, channels, queued, onClose, onChan
                   const file = e.target.files?.[0]; if (!file) return;
                   setShot(true); setErr("");
                   try {
-                    const fd = new FormData(); fd.append("id", met.id); fd.append("file", file);
+                    /**
+                     * SHRUNK HERE, BEFORE IT GOES (Dr Raghu, 17 Sep 2026:
+                     * "image unable to be uploaded").
+                     *
+                     * The answer came back "Unexpected token 'R', Request
+                     * En…" — which is not JSON because it is not from Genie.
+                     * It is the platform refusing the upload: REQUEST ENTITY
+                     * TOO LARGE. A phone photograph is four to eight
+                     * megabytes and the ceiling on a request is four and a
+                     * half, so the picture never reached us.
+                     *
+                     * Nothing on a selfie needs eight megabytes. The browser
+                     * resizes it first — which also turns an iPhone's HEIC
+                     * into a plain JPEG and makes the upload quick on mobile
+                     * data at a stand.
+                     */
+                    const small = await shrinkImage(file, 1400, true);
+                    const fd = new FormData();
+                    fd.append("id", met.id);
+                    fd.append("file", small.blob, small.name);
                     const r = await fetch("/api/crm/met", { method: "POST", body: fd });
-                    const j = await r.json();
+                    const text = await r.text();
+                    let j: { selfie?: string; error?: string };
+                    try { j = JSON.parse(text); }
+                    catch {
+                      /* Still not JSON means it still never arrived. Say which
+                         it is, rather than showing a parser error. */
+                      throw new Error(r.status === 413
+                        ? "That photo is still too large to upload. Take it again at a smaller size."
+                        : `The photo did not reach Genie (HTTP ${r.status}).`);
+                    }
                     if (!r.ok) throw new Error(String(j.error || r.status));
                     setSelfie(j.selfie || null); onChanged();
                   } catch (e2) { setErr(e2 instanceof Error ? e2.message : String(e2)); }

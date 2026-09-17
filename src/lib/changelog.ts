@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.2.1.2",
+    date: "2026-09-17",
+    module: "The selfie is shrunk before it goes",
+    items: [
+      "<b>\u201cUnexpected token \u2018R\u2019, Request En\u2026\u201d was not Genie answering.</b> It was the platform refusing the upload \u2014 <i>Request Entity Too Large</i>. A phone photograph is four to eight megabytes and the ceiling on a request is four and a half, so the picture never arrived and the screen showed a parser error about the letter R.",
+      "<b>The browser resizes it first now</b>, the same way visiting cards have always been handled: nothing on a selfie needs eight megabytes. It also turns an iPhone\u2019s HEIC into a plain JPEG and makes the upload quick on mobile data, which is where this gets used.",
+      "And if a photo still cannot get through, it says so in words rather than as a parser error about a letter.",
+    ],
+  },
+  {
     v: "5.2.1.1",
     date: "2026-09-17",
     module: "A dash is not an address \u2014 and every duplicate opens where you are standing",

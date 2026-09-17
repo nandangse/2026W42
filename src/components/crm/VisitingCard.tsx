@@ -35,7 +35,7 @@ const EMPTY_FORM = { person_name: "", salutation: "", designation: "", company: 
  * reader never sees an image it must refuse. Falls back to the original if
  * the canvas cannot cope.
  */
-async function shrinkImage(file: File, maxEdge = 1600, alreadyFramed = false): Promise<{ blob: Blob; name: string }> {
+export async function shrinkImage(file: File, maxEdge = 1600, alreadyFramed = false): Promise<{ blob: Blob; name: string }> {
   try {
     const bmp = await createImageBitmap(file);
     /* A shot taken inside the guide is already the card. Guessing at its
