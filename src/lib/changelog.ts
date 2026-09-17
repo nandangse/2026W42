@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.3.1.1",
+    date: "2026-09-17",
+    module: "A button that cannot be pressed no longer looks pressable",
+    items: [
+      "<b>Back it up now</b> stayed orange with no folder set. It was disabled and did nothing, which is correct \u2014 but it looked ready, which is a small lie of exactly the kind this app spends its time removing. It is grey until there is somewhere for the archive to go.",
+    ],
+  },
+  {
     v: "5.3.1.0",
     date: "2026-09-17",
     module: "Pictures live in Drive now \u2014 job photos, visiting cards and selfies",

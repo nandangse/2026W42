@@ -70,8 +70,10 @@ export default function Backups() {
       <div className="flex gap-2 mt-2 flex-wrap items-center">
         <button onClick={() => save(kind)} disabled={!!busy || !link[kind].trim()} className="text-xs font-bold rounded px-3 py-1.5"
           style={{ background: "#fff", border: "1px solid var(--line)", color: "var(--navy)" }}>Save the folder</button>
+        {/* A BUTTON THAT CANNOT BE PRESSED MUST NOT LOOK PRESSABLE. It was
+            orange with no folder set — disabled, and lying about it. */}
         <button onClick={() => run(kind)} disabled={!!busy || !folder} className="text-xs font-bold rounded px-3 py-1.5 text-white"
-          style={{ background: busy === kind ? "#B9BEC4" : "var(--accent)" }}>
+          style={{ background: (busy === kind || !folder) ? "#B9BEC4" : "var(--accent)", cursor: folder && !busy ? "pointer" : "not-allowed" }}>
           {busy === kind ? "working…" : "Back it up now"}
         </button>
         {folder && <a href={`https://drive.google.com/drive/folders/${folder}`} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "var(--blue)", textDecoration: "underline" }}>open the folder</a>}
