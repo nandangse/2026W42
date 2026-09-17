@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.2.1.3",
+    date: "2026-09-17",
+    module: "Searching an opportunity no longer dies on the pipeline column",
+    items: [
+      "<b>\u201coperator does not exist: pipeline_type ~~* unknown\u201d</b> \u2014 typing anything into the Opportunities search killed the whole search, and the message read like nonsense because <b>Postgres names the TYPE, not the column</b>. <i>pipeline</i> is declared a select here and is an enum in the database, and there is no ILIKE for an enum.",
+      "<b>A select is now searched by its own options</b>, which is more correct anyway: typing \u201ccapital\u201d finds the capital pipeline, and typing \u201cramp360\u201d no longer drags the pipeline column into the question at all. A query matching none of a select\u2019s options simply does not mention that column.",
+    ],
+  },
+  {
     v: "5.2.1.2",
     date: "2026-09-17",
     module: "The selfie is shrunk before it goes",

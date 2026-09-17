@@ -123,7 +123,27 @@ async function searchClause(
   addText(d.titleField);
   for (const f of d.fields) {
     if (f.virtual) continue;
-    if (f.type === "text" || f.type === "textarea" || f.type === "select") addText(f.name);
+    if (f.type === "text" || f.type === "textarea") { addText(f.name); continue; }
+    /**
+     * A SELECT IS NOT ALWAYS TEXT (found 17 Sep 2026: searching an
+     * opportunity answered "operator does not exist: pipeline_type ~~*
+     * unknown" and the whole search died).
+     *
+     * `pipeline` is declared a select here and is a POSTGRES ENUM in the
+     * database — Postgres names the type in the error, not the column, which
+     * is why it reads so strangely. There is no ILIKE for an enum.
+     *
+     * Matching its OPTIONS is better than a text match anyway: typing
+     * "capital" should find the capital pipeline, and typing "ramp360"
+     * should not drag the pipeline column into it at all. So a select is
+     * searched by equality against the options it actually has, and a query
+     * matching none of them simply does not mention that column.
+     */
+    if (f.type === "select" && Array.isArray(f.options)) {
+      const needle = q.trim().toLowerCase();
+      const hit = (f.options as unknown[]).map(String).filter((o) => o.toLowerCase().includes(needle));
+      for (const o of hit.slice(0, 6)) parts.push(`${f.name}.eq.${o}`);
+    }
   }
 
   // The linked columns, by the name shown rather than the uuid stored.
