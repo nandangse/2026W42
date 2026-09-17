@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { putFile, fileUrl } from "@/lib/genie-files";
 import { readBody } from "@/lib/validate";
 import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
@@ -115,8 +116,12 @@ export async function GET(req: Request) {
     const cards = await Promise.all((data || []).map(async (c) => {
       const sign = async (path: unknown) => {
         if (!path) return null;
-        const { data: sgn } = await db.storage.from("cards").createSignedUrl(String(path), 3600);
-        return sgn?.signedUrl ?? null;
+        /* Drive references go through Genie's proxy; bucket paths are still
+           signed, so every card scanned before today opens as it always did. */
+        return fileUrl(String(path), async (bp) => {
+          const { data: sgn } = await db.storage.from("cards").createSignedUrl(bp, 3600);
+          return sgn?.signedUrl ?? null;
+        });
       };
       return { ...c, front_url: await sign(c.image_path), back_url: await sign(c.image_back_path) };
     }));
@@ -142,12 +147,20 @@ export async function POST(req: Request) {
       if (file.size > 10 * 1024 * 1024) throw new HttpError(400, "That image is over 10MB — a card photo should be far smaller.");
       const buf = Buffer.from(await file.arrayBuffer());
       const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
-      const path = `${new Date().toISOString().slice(0, 7)}/${Date.now()}.${ext}`;
-      const { error: up } = await db.storage.from("cards").upload(path, buf, { contentType: file.type || "image/jpeg" });
-      if (up) {
-        if (/bucket/i.test(up.message))
-          throw new HttpError(503, "Run CRM migration 0018 first — the cards bucket does not exist yet.");
-        throw new HttpError(502, `Could not store the card: ${up.message}`);
+      /* DRIVE FIRST — see src/lib/genie-files.ts. The bucket remains the
+         fallback: a card photographed at a stand must never be refused
+         because a setting is missing. */
+      let path: string;
+      const sent = await putFile("card", `card-${Date.now()}.${ext}`, buf, file.type || "image/jpeg").catch(() => null);
+      if (sent) path = sent.ref;
+      else {
+        path = `${new Date().toISOString().slice(0, 7)}/${Date.now()}.${ext}`;
+        const { error: up } = await db.storage.from("cards").upload(path, buf, { contentType: file.type || "image/jpeg" });
+        if (up) {
+          if (/bucket/i.test(up.message))
+            throw new HttpError(503, "Run CRM migration 0018 first — the cards bucket does not exist yet.");
+          throw new HttpError(502, `Could not store the card: ${up.message}`);
+        }
       }
       // the back is stored, not read — the front carries the identity, and a
       // second model call for a works list is money spent on decoration

@@ -6,6 +6,7 @@ import { readBody } from "@/lib/validate";
 import { assertAiOn } from "@/lib/ai-gate";
 import { writeFollowUp, REASONS, type Reason } from "@/lib/met-writer";
 import { pageAll } from "@/lib/page-all";
+import { putFile, fileUrl } from "@/lib/genie-files";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -160,8 +161,10 @@ export async function GET(req: Request) {
     /* A private photograph, read back through a URL that expires. */
     for (const r of rows) {
       if (!r.selfie_path) continue;
-      const { data: sgn } = await db.storage.from("cards").createSignedUrl(String(r.selfie_path), 3600);
-      r.selfie = sgn?.signedUrl ?? null;
+      r.selfie = await fileUrl(String(r.selfie_path), async (bp) => {
+        const { data: sgn } = await db.storage.from("cards").createSignedUrl(bp, 3600);
+        return sgn?.signedUrl ?? null;
+      });
     }
     /* The labels already used, so the next one is picked rather than retyped
        and a show does not end up spelled three ways. */
@@ -217,14 +220,23 @@ export async function POST(req: Request) {
 
       const buf = Buffer.from(await file.arrayBuffer());
       const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
-      const path = `selfie/${new Date().toISOString().slice(0, 7)}/${Date.now()}.${ext}`;
-      const { error: up } = await db.storage.from("cards").upload(path, buf, { contentType: file.type || "image/jpeg" });
-      if (up) throw new HttpError(502, `Could not store the photo: ${up.message}`);
+      /* DRIVE FIRST, bucket as the fallback — see src/lib/genie-files.ts. */
+      let path: string;
+      const sent = await putFile("selfie", `selfie-${Date.now()}.${ext}`, buf, file.type || "image/jpeg").catch(() => null);
+      if (sent) path = sent.ref;
+      else {
+        path = `selfie/${new Date().toISOString().slice(0, 7)}/${Date.now()}.${ext}`;
+        const { error: up } = await db.storage.from("cards").upload(path, buf, { contentType: file.type || "image/jpeg" });
+        if (up) throw new HttpError(502, `Could not store the photo: ${up.message}`);
+      }
       const { error } = await db.from("met_person").update({ selfie_path: path }).eq("id", id);
       if (error) throw new HttpError(/selfie_path/i.test(error.message) ? 503 : 500,
         /selfie_path/i.test(error.message) ? "Run CRM migration 0075 first." : error.message);
-      const { data: sgn } = await db.storage.from("cards").createSignedUrl(path, 3600);
-      return NextResponse.json({ ok: true, selfie: sgn?.signedUrl ?? null });
+      const url = await fileUrl(path, async (bp) => {
+        const { data: sgn } = await db.storage.from("cards").createSignedUrl(bp, 3600);
+        return sgn?.signedUrl ?? null;
+      });
+      return NextResponse.json({ ok: true, selfie: url });
     }
 
     const b = await readBody(req, { action: "string" });

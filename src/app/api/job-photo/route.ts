@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { putFile, fileUrl } from "@/lib/genie-files";
 import { requireReader, requireTasker, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -31,7 +32,12 @@ export async function GET(req: Request) {
     }
     const photos = await Promise.all(
       (data || []).map(async (p) => {
-        const { data: s } = await admin.storage.from(BUCKET).createSignedUrl(p.path, LINK_TTL);
+        /* Drive references become Genie's own proxy; bucket paths are still
+           signed exactly as they were, so nothing taken before today breaks. */
+        const s = { signedUrl: await fileUrl(p.path, async (bp) => {
+          const { data } = await admin.storage.from(BUCKET).createSignedUrl(bp, LINK_TTL);
+          return data?.signedUrl ?? null;
+        }) };
         return { ...p, url: s?.signedUrl ?? null };
       }),
     );
@@ -64,14 +70,30 @@ export async function POST(req: Request) {
       throw new HttpError(413, "That photo is over 12 MB — a phone photo is usually well under it.");
 
     const ext = (file.type.split("/")[1] || "jpg").split("+")[0];
-    const path = `${jobId}/${Date.now()}.${ext}`;
-    const { error: ue } = await admin.storage
-      .from(BUCKET)
-      .upload(path, await file.arrayBuffer(), { contentType: file.type });
-    if (ue) {
-      if (/bucket|not found/i.test(ue.message))
-        throw new HttpError(503, "Run migration 0042 first — the job-photos bucket does not exist yet.");
-      throw new Error(ue.message);
+    const buf = Buffer.from(await file.arrayBuffer());
+
+    /**
+     * DRIVE FIRST (Dr Raghu, 17 Sep 2026: "the job photos can easily be in
+     * the drive ... the supabase can bloat quickly").
+     *
+     * 150 job photographs were 517 MB of a database project's storage. A
+     * shared drive does not care. What is stored is "drive:<id>" in the same
+     * column the bucket path used, so nothing taken before today changes.
+     *
+     * The bucket stays as the fallback: a photograph taken on a factory floor
+     * must never be refused because a Drive setting is missing.
+     */
+    let path: string;
+    const up = await putFile("job", `${jobId}-${Date.now()}.${ext}`, buf, file.type).catch(() => null);
+    if (up) path = up.ref;
+    else {
+      path = `${jobId}/${Date.now()}.${ext}`;
+      const { error: ue } = await admin.storage.from(BUCKET).upload(path, buf, { contentType: file.type });
+      if (ue) {
+        if (/bucket|not found/i.test(ue.message))
+          throw new HttpError(503, "Run migration 0042 first — the job-photos bucket does not exist yet.");
+        throw new Error(ue.message);
+      }
     }
 
     const pctRaw = form.get("pct");
@@ -90,7 +112,7 @@ export async function POST(req: Request) {
     });
     if (error) {
       // The row failed, so the object is an orphan nothing will ever list.
-      await admin.storage.from(BUCKET).remove([path]);
+      if (!path.startsWith("drive:")) await admin.storage.from(BUCKET).remove([path]);
       if (/job_photo|schema cache|does not exist/i.test(error.message))
         throw new HttpError(503, "Run migration 0042 first — photos have nowhere to be recorded yet.");
       throw new Error(error.message);
@@ -109,7 +131,10 @@ export async function DELETE(req: Request) {
     const id = new URL(req.url).searchParams.get("id");
     if (!id) throw new HttpError(400, "id required");
     const { data: row } = await admin.from("job_photo").select("path").eq("id", id).maybeSingle();
-    if (row?.path) await admin.storage.from(BUCKET).remove([row.path]);
+    /* A Drive file is left in Drive on purpose — the folder is his, and a
+       delete here should not reach into it. The row goes; the picture stays
+       where somebody can still find it. */
+    if (row?.path && !String(row.path).startsWith("drive:")) await admin.storage.from(BUCKET).remove([row.path]);
     const { error } = await admin.from("job_photo").delete().eq("id", id);
     if (error) throw new Error(error.message);
     return NextResponse.json({ ok: true });

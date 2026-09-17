@@ -89,6 +89,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.3.1.0",
+    date: "2026-09-17",
+    module: "Pictures live in Drive now \u2014 job photos, visiting cards and selfies",
+    items: [
+      "<b>Measured first:</b> 150 job photographs were <b>517 MB</b> \u2014 3.4 MB each, because nothing shrinks them \u2014 on top of 336 voice notes at 214 MB and 31 MB of cards. <b>768 MB sitting in a database project whose storage is paid and finite.</b> A shared drive does not care.",
+      "<b>New pictures go to Drive; the link is what is kept.</b> Job photos, visiting cards and selfies, each into their own folder. <b>No migration and no new columns</b> \u2014 a Drive file is written into the same column that held the bucket path, as <i>drive:&lt;id&gt;</i>, so everything taken before today still opens exactly as it did and there is no day on which half the photographs are somewhere else with nothing to tell them apart.",
+      "<b>The one cost, said plainly:</b> a browser cannot fetch a private Drive file, so Genie fetches it and passes it on through <i>/api/file/&lt;id&gt;</i>, behind the same sign-in as everything else, cached hard because a picture at a given id never changes. <b>The alternative was making the folder public</b> \u2014 and these are visiting cards, selfies with customers and photographs inside a customer\u2019s plant.",
+      "<b>The bucket stays as the fallback.</b> If Drive is not configured or refuses, the picture still goes to Supabase: a photograph taken at a stand or on a factory floor must never be lost because a setting is missing.",
+      "Deleting a job photo removes the row and <b>leaves the Drive file alone</b> \u2014 the folder is his, and a tidy-up here should not reach into it.",
+      "Set <b>DRIVE_FILES_FOLDER_ID</b> on Vercel to choose the folder; without it Genie uses the Drive folder it already has.",
+    ],
+  },
+  {
     v: "5.3.0.0",
     date: "2026-09-17",
     module: "Backups we own \u2014 the code and the data, nightly, into his own Drive",
