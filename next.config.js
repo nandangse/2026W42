@@ -88,19 +88,30 @@ const nextConfig = {
           // don't leak internal URLs to the ERP / Google Sheets when links open
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           /**
-           * The microphone is allowed to THIS ORIGIN and nowhere else.
+           * The microphone AND THE CAMERA are allowed to THIS ORIGIN and
+           * nowhere else.
            *
-           * It was switched off with the camera and geolocation on the grounds
-           * that a planning app needs no sensors. On Floor changed that: voice
-           * notes are recorded at the machine, and this header refused
-           * getUserMedia before the browser ever asked the person -- which
-           * surfaced as "No microphone, or permission was refused", a message
-           * blaming a device that was working fine.
+           * Both were switched off with geolocation on the grounds that a
+           * planning app needs no sensors. On Floor broke that for the
+           * microphone: voice notes are recorded at the machine, and this
+           * header refused getUserMedia before the browser ever asked the
+           * person -- which surfaced as "No microphone, or permission was
+           * refused", a message blaming a device that was working fine.
            *
-           * self, not *: an embedded third-party frame still cannot open the
-           * microphone, which is the thing the header is actually for.
+           * THE CAMERA WAS LEFT SWITCHED OFF, AND THE SAME FAULT CAME BACK
+           * (Dr Raghu, 17 Sep 2026: "didnt work. it warned. but did not get
+           * camera"). Visiting cards and selfies are photographed on a phone
+           * at a stand. camera=() refuses that request in the browser before
+           * a permission prompt is ever shown, so the scanner sat on
+           * "opening the camera" with nothing to answer -- a header saying no
+           * on the person's behalf and never telling them.
+           *
+           * self, not *: an embedded third-party frame still cannot open
+           * either sensor, which is the thing the header is actually for.
+           * The landing pages below keep both at (), because nothing there
+           * ever photographs anything.
            */
-          { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=()" },
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()" },
           // HTTPS only (Vercel serves HTTPS; pin it for a year)
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
         ],

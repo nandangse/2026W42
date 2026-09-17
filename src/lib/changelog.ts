@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.3.2.3",
+    date: "2026-09-17",
+    module: "Genie was refusing its own camera, in a header",
+    items: [
+      "<b>Every page of Genie carried <code>camera=()</code></b> \u2014 a Permissions-Policy header switching the camera off for this site, sent on every response. The browser obeys it <b>before</b> it asks the person anything, so no permission prompt was ever shown and there was nothing to allow. The scanner sat on \u201copening the camera\u201d because it was waiting for an answer to a question the phone had already been told not to ask.",
+      "<b>It is now <code>camera=(self)</code>:</b> allowed to Genie and to nothing else. An embedded third-party frame still cannot open it, which is the only thing the header was ever for. The landing pages keep it off entirely \u2014 nothing there photographs anything.",
+      "<b>This is the second time this header has done this.</b> The microphone was freed for On Floor voice notes in the same way, for the same reason, and the camera was left switched off beside it \u2014 so visiting cards and selfies failed on a phone in exactly the manner the note above it described. The comment now names both.",
+    ],
+  },
+  {
     v: "5.3.2.2",
     date: "2026-09-17",
     module: "The card camera opens \u2014 and when it cannot, it says so",
