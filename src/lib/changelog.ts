@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.3.2.4",
+    date: "2026-09-17",
+    module: "The card scanner takes the still, not the preview",
+    items: [
+      "<b>It was photographing the video feed.</b> A preview stream is sized for showing on a screen \u2014 about a megapixel \u2014 and the guide rectangle is a crop of roughly two thirds of it, so a business card arrived around 800 pixels wide and six-point type was a smudge. It now asks the camera for a <b>still</b>, which is the whole sensor, and cuts the card out of that. Ten megapixels instead of one, where the phone allows it.",
+      "<b>And it asks the preview for everything the sensor has.</b> <code>ideal: 1920</code> is a wish, not an instruction, and an Android phone commonly answers it with 1280\u00d7720; the camera\u2019s own stated maximum is now requested instead. That alone is most of the difference on a phone that will not take a still while previewing.",
+      "<b>It was also being squeezed twice.</b> The shot was saved as a JPEG and then re-encoded on the way up \u2014 a second generation of loss on the exact picture a machine has to read a mobile number out of \u2014 while shrinking nothing, because it was already under the limit. A framed shot is now handed over untouched, and the limit itself is raised from 1600 to 2200.",
+      "<b>The camera tells you what it is giving.</b> Beside the shutter: the sensor size, and <b>how many real pixels wide the card will be</b> \u2014 which is the number that decides whether it can be read, not the megapixels on the box. Under 900 it says <b>move closer</b>, because that is the fix and no amount of processing is a substitute for it.",
+    ],
+  },
+  {
     v: "5.3.2.3",
     date: "2026-09-17",
     module: "Genie was refusing its own camera, in a header",

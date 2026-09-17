@@ -44,6 +44,16 @@ export async function shrinkImage(file: File, maxEdge = 1600, alreadyFramed = fa
     const src = cropped ?? bmp;
     const sw = cropped ? cropped.width : bmp.width;
     const sh = cropped ? cropped.height : bmp.height;
+    /**
+     * A SHOT TAKEN IN THE GUIDE IS ALREADY FINISHED. Re-encoding it here put
+     * a second generation of JPEG loss on top of the first, on the exact
+     * picture a machine has to read six-point type out of -- and shrank
+     * nothing, because it was already under the limit. It is handed back
+     * untouched.
+     */
+    if (alreadyFramed && !cropped && Math.max(sw, sh) <= maxEdge) {
+      return { blob: file, name: file.name };
+    }
     const scale = Math.min(1, maxEdge / Math.max(sw, sh));
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(sw * scale); canvas.height = Math.round(sh * scale);
@@ -184,6 +194,9 @@ function CardCamera({ side, onShot, onClose, onFallback }: {
   /* How long the camera has been opening, so a wait can say so instead of
      showing a black rectangle that means nothing. */
   const [waited, setWaited] = useState(0);
+  /* What the camera is really giving, so a poor picture has a visible cause
+     rather than being a thing that just happens sometimes. */
+  const [sensor, setSensor] = useState({ w: 0, h: 0 });
   /**
    * WHY THE CALLBACK IS HELD IN A REF.
    *
@@ -206,6 +219,14 @@ function CardCamera({ side, onShot, onClose, onFallback }: {
     let w = box.w * 0.92, h = w / ratio;
     if (h > box.h * 0.82) { h = box.h * 0.82; w = h * ratio; }
     return { x: (box.w - w) / 2, y: (box.h - h) / 2, w, h };
+  })();
+  /* How many real pixels the card will be, which is the number that decides
+     whether a machine can read it — not the megapixels on the box. */
+  const cardPx = (() => {
+    const v = videoRef.current;
+    if (!v?.videoWidth || !guide || !box.w) return 0;
+    const sc = Math.max(box.w / v.videoWidth, box.h / v.videoHeight);
+    return (upright ? guide.h : guide.w) / sc;
   })();
 
   useEffect(() => { fallbackRef.current = onFallback; });
@@ -237,13 +258,30 @@ function CardCamera({ side, onShot, onClose, onFallback }: {
         }
       }
       if (dead || !st) { st?.getTracks().forEach((t) => t.stop()); return; }
+      /**
+       * TAKE WHAT THE CAMERA ACTUALLY HAS.
+       *
+       * ideal: 1920 is a wish, not an instruction, and an Android phone
+       * commonly answers it with 1280x720 -- from which the guide rectangle
+       * is a crop of maybe two thirds, so a business card arrives about 800
+       * pixels wide and six-point type is a smudge. The capabilities say
+       * what the sensor will really give; ask for that.
+       */
+      try {
+        const track = st.getVideoTracks()[0];
+        const caps = track?.getCapabilities?.() as { width?: { max?: number }; height?: { max?: number } } | undefined;
+        const now = track?.getSettings?.().width || 0;
+        if (caps?.width?.max && caps.width.max > now) {
+          await track.applyConstraints({ width: { ideal: caps.width.max }, height: { ideal: caps.height?.max } });
+        }
+      } catch { /* the phone keeps whatever it first offered */ }
       streamRef.current = st;
       const v = videoRef.current;
       if (!v) { fallbackRef.current("The camera opened but there was nowhere to show it — choose a photo instead."); return; }
       v.srcObject = st;
       /* Ready means there are real pixels. A phone that hands over a stream
          and then never produces a frame must not offer a shutter. */
-      const live = () => { if (!dead) setReady(true); };
+      const live = () => { if (dead) return; setReady(true); setSensor({ w: v.videoWidth, h: v.videoHeight }); };
       v.onloadedmetadata = live;
       await v.play().catch(() => { /* some phones autoplay only on metadata */ });
       if (v.readyState >= 2) live();
@@ -268,9 +306,10 @@ function CardCamera({ side, onShot, onClose, onFallback }: {
    * the saved card has the camera's full resolution inside the rectangle
    * rather than the handful of pixels the phone screen was showing.
    */
-  const shoot = () => {
+  const shoot = async () => {
     const v = videoRef.current;
     if (!v || !guide || !v.videoWidth) return;
+    setErr("");
     const scale = Math.max(box.w / v.videoWidth, box.h / v.videoHeight);
     const offX = (box.w - v.videoWidth * scale) / 2;
     const offY = (box.h - v.videoHeight * scale) / 2;
@@ -278,19 +317,55 @@ function CardCamera({ side, onShot, onClose, onFallback }: {
     const sy = Math.max(0, (guide.y - offY) / scale);
     const sw = Math.min(v.videoWidth - sx, guide.w / scale);
     const sh = Math.min(v.videoHeight - sy, guide.h / scale);
+    /* Held as fractions of the frame, so the same rectangle can be cut out
+       of a bigger picture of the same scene. */
+    const nx = sx / v.videoWidth, ny = sy / v.videoHeight;
+    const nw = sw / v.videoWidth, nh = sh / v.videoHeight;
 
+    /**
+     * THE STILL, NOT THE PREVIEW (Dr Raghu, 17 Sep 2026: "resolution is
+     * poor").
+     *
+     * The preview stream is a video feed and is sized for showing on a
+     * screen. The same camera's STILL is the full sensor -- ten or twelve
+     * megapixels against the preview's one. takePhoto() asks for that, and
+     * the card is cut out of it instead.
+     *
+     * ONLY WHEN IT IS THE SAME SCENE. A still is often framed more widely
+     * than the preview, and a rectangle measured against one picture cuts
+     * the wrong thing out of the other. So it is used only when the shapes
+     * agree, and the preview frame is a perfectly good answer otherwise.
+     */
+    let src: CanvasImageSource = v;
+    let W = v.videoWidth, H = v.videoHeight;
+    setErr("");
+    try {
+      const track = streamRef.current?.getVideoTracks()[0];
+      const IC = (window as unknown as { ImageCapture?: new (t: MediaStreamTrack) => { takePhoto: () => Promise<Blob> } }).ImageCapture;
+      if (track && IC) {
+        const photo = await new IC(track).takePhoto();
+        const bmp = await createImageBitmap(photo);
+        const same = Math.abs(bmp.width / bmp.height - v.videoWidth / v.videoHeight) < 0.03;
+        if (same && bmp.width > v.videoWidth) { src = bmp; W = bmp.width; H = bmp.height; }
+        else bmp.close?.();
+      }
+    } catch { /* not every phone will take a still while previewing */ }
+
+    const cx = nx * W, cy = ny * H, cw = nw * W, ch = nh * H;
     const out = document.createElement("canvas");
     /* A card is read lying down — an upright shot is turned on the way out. */
-    out.width = Math.round(upright ? sh : sw);
-    out.height = Math.round(upright ? sw : sh);
+    out.width = Math.round(upright ? ch : cw);
+    out.height = Math.round(upright ? cw : ch);
     const ctx = out.getContext("2d");
     if (!ctx) { setErr("This browser could not take the picture."); return; }
     if (upright) { ctx.translate(out.width, 0); ctx.rotate(Math.PI / 2); }
-    ctx.drawImage(v, sx, sy, sw, sh, 0, 0, sw, sh);
+    ctx.drawImage(src, cx, cy, cw, ch, 0, 0, cw, ch);
+    /* 0.95, and nothing re-encodes it after this. Six-point type does not
+       survive being squeezed twice. */
     out.toBlob((b) => {
       if (!b) { setErr("This browser could not take the picture."); return; }
       onShot(new File([b], `card-${side}.jpg`, { type: "image/jpeg" }));
-    }, "image/jpeg", 0.9);
+    }, "image/jpeg", 0.95);
   };
 
   return (
@@ -354,7 +429,13 @@ function CardCamera({ side, onShot, onClose, onFallback }: {
         <button onClick={() => onFallback("")} className="text-xs" style={{ color: "#8FA0B0" }}>choose a photo instead</button>
         <button onClick={shoot} disabled={!ready} title="Take the picture"
           style={{ width: 62, height: 62, borderRadius: "50%", background: ready ? "#fff" : "#555", border: `4px solid ${ORANGE}`, cursor: ready ? "pointer" : "default" }} />
-        <span style={{ width: 120 }} />
+        {/* WHAT THE CAMERA IS ACTUALLY GIVING. A blurred card should have a
+            visible cause rather than being a thing that just happens. */}
+        <span style={{ width: 120, fontSize: 10.5, color: cardPx < 900 ? "#FFC9BE" : "#8FA0B0", lineHeight: 1.35 }}>
+          {ready && sensor.w
+            ? <>{sensor.w}×{sensor.h}<br />card ≈ {Math.round(cardPx)}px wide{cardPx < 900 ? <><br /><b>move closer</b></> : null}</>
+            : null}
+        </span>
       </div>
     </div>
   );
@@ -509,7 +590,14 @@ export function CardLightbox({ onClose, onChanged, onOpen }: {
     setPreviews((p) => ({ ...p, [side]: URL.createObjectURL(file) }));
     setBusy(side); setErr("");
     try {
-      const small = await shrinkImage(file, 1600, framed);
+      /**
+       * 2200, NOT 1600. A visiting card is read by a machine, off six-point
+       * type, and every pixel thrown away here is a character it has to
+       * guess at. The picture is a crop of one card, not a photograph of a
+       * room -- at this size it is a few hundred kilobytes, which is nothing
+       * against the cost of a misread mobile number.
+       */
+      const small = await shrinkImage(file, 2200, framed);
       const fd = new FormData();
       fd.append("file", small.blob, small.name); fd.append("side", side);
       const r = await fetch("/api/crm/visiting-card", { method: "POST", body: fd });
