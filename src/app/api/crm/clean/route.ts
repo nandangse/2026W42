@@ -143,19 +143,32 @@ export async function POST(req: Request) {
 
       /* Companies: one read, two questions — do two names collide, and is
          the suffix spelled oddly. */
-      const co = await pageAll<{ id: string; name: string }>(async (f, t) => {
-        const r = await db.from("company").select("id, name").is("deleted_at", null).range(f, t);
-        return { data: r.data as unknown as { id: string; name: string }[] | null, error: r.error };
+      /**
+       * ENOUGH OF THE RECORD TO JUDGE IT (Dr Raghu, 17 Sep 2026: "in cleanup
+       * also show some record details whatever can be fitted on one line,
+       * make it clickable to open in lightbox").
+       *
+       * Eleven rows all reading "Sachin" tell nobody anything. The city, the
+       * GSTIN, the title, the address — that is what decides whether two rows
+       * are one firm, and asking somebody to merge without it is asking them
+       * to guess.
+       */
+      type Co = { id: string; name: string; city: string | null; state: string | null; country: string | null; gstin: string | null; website: string | null };
+      const co = await pageAll<Co>(async (f, t) => {
+        const r = await db.from("company").select("id, name, city, state, country, gstin, website").is("deleted_at", null).range(f, t);
+        return { data: r.data as unknown as Co[] | null, error: r.error };
       }, "companies");
+      const coLabel = (c: Co) => [c.name, [c.city, c.state, c.country].filter(Boolean).join(", "), c.gstin ? `GST ${c.gstin}` : null, c.website]
+        .filter(Boolean).join(" · ");
 
-      const byKey = new Map<string, { id: string; name: string }[]>();
+      const byKey = new Map<string, Co[]>();
       for (const c of co) {
         const k = companyKey(c.name);
         if (!k) continue;
         byKey.set(k, [...(byKey.get(k) || []), c]);
         const tidy = tidyCompanyName(c.name);
         if (tidy && tidy !== S(c.name)) {
-          rows.push({ kind: "company_name", grp: c.id, ids: [c.id], labels: [c.name], n: 1, suggestion: tidy, status: "open" });
+          rows.push({ kind: "company_name", grp: c.id, ids: [c.id], labels: [coLabel(c)], n: 1, suggestion: tidy, status: "open" });
         }
       }
       for (const [k, group] of byKey) {
@@ -163,7 +176,7 @@ export async function POST(req: Request) {
         rows.push({
           kind: "company_dup", grp: k,
           ids: group.map((g) => g.id),
-          labels: group.map((g) => g.name),
+          labels: group.map(coLabel),
           n: group.length,
           /* A name that looks like a person is proposed with a warning on it. */
           suggestion: looksLikeAPerson(group[0].name) ? "RISKY: this reads as a person's name, not a firm" : tidyCompanyName(group[0].name),
@@ -172,22 +185,50 @@ export async function POST(req: Request) {
       }
 
       /* People: one read, three questions. */
-      const pp = await pageAll<{ id: string; full_name: string | null; primary_email: string | null; primary_phone: string | null; whatsapp_number: string | null }>(async (f, t) => {
-        const r = await db.from("person").select("id, full_name, primary_email, primary_phone, whatsapp_number").is("deleted_at", null).range(f, t);
-        return { data: r.data as unknown as { id: string; full_name: string | null; primary_email: string | null; primary_phone: string | null; whatsapp_number: string | null }[] | null, error: r.error };
+      type Pp = { id: string; full_name: string | null; job_title: string | null; primary_email: string | null; primary_phone: string | null; whatsapp_number: string | null; city: string | null; country: string | null; company_id: string | null; created_at: string };
+      const pp = await pageAll<Pp>(async (f, t) => {
+        const r = await db.from("person").select("id, full_name, job_title, primary_email, primary_phone, whatsapp_number, city, country, company_id, created_at").is("deleted_at", null).range(f, t);
+        return { data: r.data as unknown as Pp[] | null, error: r.error };
       }, "people");
+      const firmName = new Map(co.map((c) => [c.id, c.name]));
+      const ppLabel = (x: Pp) => [
+        S(x.full_name) || "(no name)", S(x.job_title) || null,
+        x.company_id ? firmName.get(x.company_id) ?? null : null,
+        S(x.primary_email) || null, S(x.whatsapp_number) || S(x.primary_phone) || null,
+        [S(x.city), S(x.country)].filter(Boolean).join(", ") || null,
+        `made ${String(x.created_at).slice(0, 10)}`,
+      ].filter(Boolean).join(" · ");
+
+      /**
+       * A DASH IS NOT AN ADDRESS (found 17 Sep 2026, in the wild).
+       *
+       * The first scan grouped on whatever sat in the e-mail column, so every
+       * row carrying "-" or "N/A" collided into one enormous group of
+       * strangers. Sixty-seven people proposed as one person because they
+       * all had a dash where an address should be. Only something shaped
+       * like an address can identify anybody.
+       */
+      const LOOKS_LIKE_MAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+      /**
+       * AND A COMPANY INBOX IS NOT A PERSON. info@, sales@, hr@ belong to a
+       * whole department — sixty-seven exhibitors really can share one, and
+       * merging them would destroy sixty-six real contacts. They are still
+       * shown, because a human may know better, but they are marked and
+       * never proposed as an obvious merge.
+       */
+      const ROLE_MAIL = /^(info|sales|admin|contact|office|enquiry|enquiries|support|mail|marketing|hr|accounts|care|help|service|team)@/i;
 
       const byMail = new Map<string, typeof pp>();
       const byNum = new Map<string, typeof pp>();
       for (const p of pp) {
         const e = S(p.primary_email).toLowerCase();
-        if (e) byMail.set(e, [...(byMail.get(e) || []), p]);
+        if (e && LOOKS_LIKE_MAIL.test(e)) byMail.set(e, [...(byMail.get(e) || []), p]);
         const raw = S(p.whatsapp_number) || S(p.primary_phone);
         const k = phoneKey(raw);
         if (k) byNum.set(k, [...(byNum.get(k) || []), p]);
         if (raw) {
           const fix = tidyPhone(raw);
-          if (fix.to && fix.to !== raw) rows.push({ kind: "phone_format", grp: p.id, ids: [p.id], labels: [S(p.full_name) || "(no name)", raw], n: 1, suggestion: fix.to, status: "open" });
+          if (fix.to && fix.to !== raw) rows.push({ kind: "phone_format", grp: p.id, ids: [p.id], labels: [ppLabel(p), raw], n: 1, suggestion: fix.to, status: "open" });
         }
       }
       const CAP = 400;   // the worst offenders first; a screen cannot use 13,000 at once
@@ -195,8 +236,13 @@ export async function POST(req: Request) {
         [...m.entries()].filter(([, g]) => g.length > 1).sort((a, b) => b[1].length - a[1].length).slice(0, CAP)
           .map(([k, g]) => ({
             kind, grp: k, ids: g.map((x) => x.id),
-            labels: g.map((x) => `${S(x.full_name) || "(no name)"}${x.primary_email ? ` · ${x.primary_email}` : ""}`),
-            n: g.length, suggestion: null as string | null, status: "open",
+            labels: g.map(ppLabel),
+            n: g.length,
+            /* A department inbox says so, and is never an obvious merge. */
+            suggestion: (kind === "person_email" && ROLE_MAIL.test(k))
+              ? `RISKY: ${k.split("@")[0]}@ is a company inbox, not a person — these are probably ${g.length} different people`
+              : null as string | null,
+            status: "open",
           }));
       rows.push(...take(byMail, "person_email"));
       rows.push(...take(byNum, "person_phone"));

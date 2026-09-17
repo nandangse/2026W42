@@ -33,7 +33,39 @@ const KINDS = [
   { key: "phone_format", label: "Numbers not written for WhatsApp",        verb: "Fix",    note: "+<country code> then the number. Ten digits are read as India; anything that cannot be read confidently is left alone rather than guessed at." },
 ];
 
-export default function CleanDatabase() {
+/**
+  * Dr Raghu, 17 Sep 2026: "make it clickable to open in lightbox", twice.
+  * A row of a duplicate group is a record; the only way to judge whether two
+  * rows are one person is to look at them, so every line opens.
+  */
+
+/** The record itself, read straight back — the only way to judge a duplicate. */
+function Peek({ kind, id }: { kind: string; id: string }) {
+  const [row, setRow] = useState<Record<string, unknown> | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    fetch(`/api/crm/${kind}?id=${id}`, { cache: "no-store" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(String(j.error || r.status)); setRow(j.row || null); })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [kind, id]);
+  if (err) return <div className="p-4 text-sm" style={{ color: "#B3261E" }}>{err}</div>;
+  if (!row) return <div className="p-4 text-sm" style={{ color: MUTED }}>opening…</div>;
+  const skip = new Set(["id", "search_vector", "deleted_at", "match_key", "merged_into_id"]);
+  const shown = Object.entries(row).filter(([k, v]) => !skip.has(k) && v !== null && v !== "" && typeof v !== "object");
+  return (
+    <div className="p-4" style={{ display: "grid", gap: 6, gridTemplateColumns: "repeat(auto-fill, minmax(min(100%,230px), 1fr))" }}>
+      {shown.map(([k, v]) => (
+        <div key={k}>
+          <div style={{ fontSize: 10.5, color: MUTED, textTransform: "uppercase", letterSpacing: .4 }}>{k.replace(/_/g, " ")}</div>
+          <div style={{ fontSize: 13, color: INK, wordBreak: "break-word" }}>{String(v)}</div>
+        </div>
+      ))}
+      {!shown.length && <div className="text-sm" style={{ color: MUTED }}>Nothing on this record but its id.</div>}
+    </div>
+  );
+}
+
+export default function CleanDatabase({ onOpen }: { onOpen?: (target: string, id: string) => void }) {
   const [run, setRun] = useState<Run | null>(null);
   const [installed, setInstalled] = useState(true);
   const [kind, setKind] = useState("");
@@ -41,6 +73,10 @@ export default function CleanDatabase() {
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
   const [note, setNote] = useState("");
+  const [peek, setPeek] = useState<{ kind: string; id: string } | null>(null);
+  /* Which row of a group survives. Defaults to the first — usually the oldest. */
+  const [keep, setKeep] = useState<Record<string, string>>({});
+  const [wide, setWide] = useState<Record<string, boolean>>({});
 
   const get = useCallback(async (k: string) => {
     try {
@@ -134,6 +170,24 @@ export default function CleanDatabase() {
         </>
       )}
 
+      {peek && (
+        <div onClick={() => setPeek(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(22,35,47,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} className="rounded bg-white"
+            style={{ width: "min(900px,100%)", maxHeight: "calc(100vh - 32px)", overflowY: "auto" }}>
+            <div className="flex items-center justify-between px-4 py-2.5" style={{ background: NAVY, borderRadius: "6px 6px 0 0" }}>
+              <b className="text-white text-sm">{peek.kind === "company" ? "🏢" : "👤"} the record</b>
+              <span className="flex items-center gap-2">
+                {onOpen && <button onClick={() => { const t = peek; setPeek(null); onOpen(t.kind, t.id); }}
+                  className="text-xs font-bold rounded px-2 py-1" style={{ background: "rgba(255,255,255,.14)", color: "#fff" }}>open it properly</button>}
+                <button onClick={() => setPeek(null)} className="px-2 py-1 rounded text-sm font-semibold" style={{ background: "rgba(255,255,255,.12)", color: "#C8D2DC" }}>✕</button>
+              </span>
+            </div>
+            <Peek kind={peek.kind} id={peek.id} />
+          </div>
+        </div>
+      )}
+
       {kind && (
         <div className="mt-3">
           <div className="text-xs mb-2" style={{ color: MUTED, lineHeight: 1.6 }}>
@@ -146,11 +200,32 @@ export default function CleanDatabase() {
               <div key={f.id} className="rounded border p-2 mb-1.5" style={{ borderColor: risky ? "#E0C88A" : BORDER, background: risky ? "#FDF8EC" : "#fff" }}>
                 <div className="flex items-start gap-2 flex-wrap">
                   <div style={{ flex: "1 1 260px", minWidth: 0 }}>
-                    {f.labels.map((l, i) => (
-                      <div key={i} style={{ fontSize: 12.5, color: INK, lineHeight: 1.5 }}>
-                        {f.kind === "phone_format" && i === 1 ? <code>{l}</code> : l}
-                      </div>
-                    ))}
+                    {/* EVERY LINE OPENS. Two rows can only be judged the same
+                        person by looking at them, and a label never carries
+                        enough. The one that will survive is ticked. */}
+                    {(wide[f.id] ? f.labels : f.labels.slice(0, 8)).map((l, i) => {
+                      const rowId = f.ids[i];
+                      const isGroup = f.kind === "company_dup" || f.kind === "person_email" || f.kind === "person_phone";
+                      const survivor = (keep[f.id] || f.ids[0]) === rowId;
+                      return (
+                        <div key={i} className="flex items-start gap-1.5" style={{ fontSize: 12.5, color: INK, lineHeight: 1.6 }}>
+                          {isGroup && (
+                            <input type="radio" name={`keep-${f.id}`} checked={survivor} onChange={() => setKeep((k) => ({ ...k, [f.id]: rowId }))}
+                              title="Keep this one" style={{ marginTop: 4 }} />
+                          )}
+                          <button onClick={() => rowId && setPeek({ kind: f.kind.startsWith("company") ? "company" : "person", id: rowId })}
+                            className="text-left" style={{ color: survivor && isGroup ? INK : "var(--blue)", fontWeight: survivor && isGroup ? 700 : 400, textDecoration: rowId ? "underline" : "none", minWidth: 0 }}
+                            title="Open this record">
+                            {f.kind === "phone_format" && i === 1 ? <code>{l}</code> : l}
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {f.labels.length > 8 && (
+                      <button onClick={() => setWide((w) => ({ ...w, [f.id]: !w[f.id] }))} style={{ fontSize: 11.5, color: "var(--blue)", textDecoration: "underline" }}>
+                        {wide[f.id] ? "show fewer" : `and ${f.labels.length - 8} more…`}
+                      </button>
+                    )}
                     {f.suggestion && !risky && (
                       <div style={{ fontSize: 12, color: GREEN, marginTop: 2 }}>→ <b>{f.suggestion}</b></div>
                     )}
@@ -161,13 +236,13 @@ export default function CleanDatabase() {
                     )}
                   </div>
                   <div className="flex gap-1 flex-wrap">
-                    {(f.kind === "company_dup" || f.kind === "person_email" || f.kind === "person_phone") && f.ids.map((id, i) => (
-                      <button key={id} onClick={() => act(f, "merge", { keep: id })} disabled={!!busy}
-                        title={`Keep "${f.labels[i]}" and fold the other${f.ids.length > 2 ? "s" : ""} into it`}
-                        className="text-xs font-bold rounded px-2 py-1" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: NAVY }}>
-                        keep #{i + 1}
+                    {(f.kind === "company_dup" || f.kind === "person_email" || f.kind === "person_phone") && (
+                      <button onClick={() => act(f, "merge", { keep: keep[f.id] || f.ids[0] })} disabled={!!busy}
+                        title="Fold the rest into the ticked one. Reversible."
+                        className="text-xs font-bold rounded px-2 py-1 text-white" style={{ background: risky ? "#8A5B00" : GREEN }}>
+                        Fold {f.ids.length - 1} into the ticked one
                       </button>
-                    ))}
+                    )}
                     {f.kind === "company_name" && (
                       <button onClick={() => act(f, "rename_company")} disabled={!!busy} className="text-xs font-bold rounded px-2 py-1 text-white" style={{ background: GREEN }}>Rename</button>
                     )}

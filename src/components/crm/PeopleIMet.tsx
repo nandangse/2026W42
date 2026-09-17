@@ -215,11 +215,55 @@ function SenderLine() {
    used, and a two-column form on a 375px screen is unusable there. */
 const MOBILE_CSS = `.met-2col{grid-template-columns:1fr}@media(min-width:560px){.met-2col{grid-template-columns:1fr 1fr}}`;
 
+
+/**
+ * WHERE YOU MET — pick one already named, or type a new one.
+ *
+ * Dr Raghu, 17 Sep 2026: "the where you met should be a dropdown which keeps
+ * adding. When you met should also be available, default today's date."
+ *
+ * A free text box spells one show three ways across forty cards, and a show
+ * spelled three ways stops being countable. A closed dropdown is worse — it
+ * cannot hold a show nobody has typed yet, which at a stand is every show.
+ * So: a list of what has been used, and a box to add one, and the new one
+ * joins the list for the next card.
+ */
+function EventField({ value, events, onChange }: { value: string; events: string[]; onChange: (v: string) => void }) {
+  const [typing, setTyping] = useState(!value && events.length === 0);
+  const known = events.filter(Boolean);
+  if (typing || !known.length) {
+    return (
+      <>
+        <input value={value} onChange={(e) => onChange(e.target.value)} placeholder="GSE Expo Lisbon 2026" style={box} />
+        {known.length > 0 && (
+          <button onClick={() => setTyping(false)} className="mt-0.5" style={{ fontSize: 11, color: "var(--blue)", textDecoration: "underline" }}>
+            pick one already used
+          </button>
+        )}
+      </>
+    );
+  }
+  return (
+    <>
+      <select value={known.includes(value) ? value : ""} onChange={(e) => { if (e.target.value === "__new") { onChange(""); setTyping(true); } else onChange(e.target.value); }} style={box}>
+        <option value="">— where did you meet them —</option>
+        {known.map((e) => <option key={e} value={e}>{e}</option>)}
+        <option value="__new">+ a show not on this list…</option>
+      </select>
+      {value && !known.includes(value) && <div style={{ fontSize: 11, color: MUTED }}>new: <b>{value}</b></div>}
+    </>
+  );
+}
+
+const todayISO = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+
+
 export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: string) => void }) {
   const [rows, setRows] = useState<Met[] | null>(null);
   const [queued, setQueued] = useState<Record<string, { email?: string; whatsapp?: string }>>({});
   const [reasons, setReasons] = useState<Reason[]>([]);
   const [known, setKnown] = useState<string[]>([]);
+  const [events, setEvents] = useState<string[]>([]);
   const [channels, setChannels] = useState<Chan[]>([]);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
@@ -231,7 +275,7 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
       const r = await fetch("/api/crm/met", { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(String(j.error || r.status));
-      setRows(j.people || []); setQueued(j.queued || {}); setReasons(j.reasons || []); setKnown(j.knownTags || []); setChannels(j.channels || []); setErr("");
+      setRows(j.people || []); setQueued(j.queued || {}); setReasons(j.reasons || []); setKnown(j.knownTags || []); setEvents(j.knownEvents || []); setChannels(j.channels || []); setErr("");
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); setRows([]); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -326,19 +370,19 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
         </div>
       ))}
 
-      {adding && <AddBox reasons={reasons} known={known} onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
-      {open && <MetBox met={open} reasons={reasons} known={known} channels={channels} queued={queued[open.id] || {}} onClose={() => setOpen(null)} onChanged={load} />}
+      {adding && <AddBox reasons={reasons} known={known} events={events} onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
+      {open && <MetBox met={open} reasons={reasons} known={known} events={events} channels={channels} queued={queued[open.id] || {}} onClose={() => setOpen(null)} onChanged={load} />}
     </div>
   );
 }
 
 /* ── ADDING: three doors, one row ─────────────────────────────────────── */
-function AddBox({ reasons, known, onClose, onDone }: { reasons: Reason[]; known: string[]; onClose: () => void; onDone: () => void }) {
+function AddBox({ reasons, known, events, onClose, onDone }: { reasons: Reason[]; known: string[]; events: string[]; onClose: () => void; onDone: () => void }) {
   const [door, setDoor] = useState<"typed" | "database" | "card">("typed");
   /* Whatever was tagged last is already here — a show is one label, forty times. */
   const [tags, setTags] = useState<string[]>([]);
   useEffect(() => { setTags(lastTags()); }, []);
-  const [f, setF] = useState({ name: "", company_name: "", job_title: "", email: "", phone: "", context: "", event: "", reason: "keep_warm", person_id: "", card_id: "" });
+  const [f, setF] = useState({ name: "", company_name: "", job_title: "", email: "", phone: "", context: "", event: "", met_on: todayISO(), reason: "keep_warm", person_id: "", card_id: "" });
   const [hits, setHits] = useState<{ id: string; full_name: string; job_title: string | null; primary_email: string | null; primary_phone: string | null; company: string | null }[]>([]);
   const [look, setLook] = useState("");
   const [cards, setCards] = useState<{ id: string; name: string; company: string | null; email: string | null; phone: string | null; title: string | null }[]>([]);
@@ -484,7 +528,11 @@ function AddBox({ reasons, known, onClose, onDone }: { reasons: Reason[]; known:
 
           <div className="met-2col" style={{ display: "grid", gap: 6 }}>
             {I("name", "Name *")}{I("company_name", "Company")}
-            {I("job_title", "Designation")}{I("event", "Where you met", "GSE Expo Lisbon 2026")}
+            {I("job_title", "Designation")}
+            <label className="block" style={{ fontSize: 11, color: MUTED }}>Where you met
+              <EventField value={f.event} events={events} onChange={(v) => setF((x) => ({ ...x, event: v }))} /></label>
+            <label className="block" style={{ fontSize: 11, color: MUTED }}>When you met
+              <input type="date" value={f.met_on} max={todayISO()} onChange={(e) => setF((x) => ({ ...x, met_on: e.target.value }))} style={box} /></label>
             {I("email", "E-mail")}{I("phone", "WhatsApp / phone")}
           </div>
 
@@ -524,10 +572,10 @@ function AddBox({ reasons, known, onClose, onDone }: { reasons: Reason[]; known:
 }
 
 /* ── ONE PERSON: the context, and the two messages ────────────────────── */
-function MetBox({ met, reasons, known, channels, queued, onClose, onChanged }: {
-  met: Met; reasons: Reason[]; known: string[]; channels: Chan[]; queued: { email?: string; whatsapp?: string }; onClose: () => void; onChanged: () => void;
+function MetBox({ met, reasons, known, events, channels, queued, onClose, onChanged }: {
+  met: Met; reasons: Reason[]; known: string[]; events: string[]; channels: Chan[]; queued: { email?: string; whatsapp?: string }; onClose: () => void; onChanged: () => void;
 }) {
-  const [f, setF] = useState({ context: met.context || "", reason: met.reason, email: met.email || "", phone: met.phone || "", event: met.event || "" });
+  const [f, setF] = useState({ context: met.context || "", reason: met.reason, email: met.email || "", phone: met.phone || "", event: met.event || "", met_on: met.met_on || todayISO() });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
@@ -600,7 +648,10 @@ function MetBox({ met, reasons, known, channels, queued, onClose, onChanged }: {
           <div className="met-2col" style={{ display: "grid", gap: 6, marginTop: 6 }}>
             <label style={{ fontSize: 11, color: MUTED }}>E-mail<input value={f.email} onChange={(e) => setF((x) => ({ ...x, email: e.target.value }))} style={box} /></label>
             <label style={{ fontSize: 11, color: MUTED }}>WhatsApp / phone<input value={f.phone} onChange={(e) => setF((x) => ({ ...x, phone: e.target.value }))} style={box} /></label>
-            <label style={{ fontSize: 11, color: MUTED }}>Where you met<input value={f.event} onChange={(e) => setF((x) => ({ ...x, event: e.target.value }))} style={box} /></label>
+            <label style={{ fontSize: 11, color: MUTED }}>Where you met
+              <EventField value={f.event} events={events} onChange={(v) => setF((x) => ({ ...x, event: v }))} /></label>
+            <label style={{ fontSize: 11, color: MUTED }}>When you met
+              <input type="date" value={f.met_on} max={todayISO()} onChange={(e) => setF((x) => ({ ...x, met_on: e.target.value }))} style={box} /></label>
             <label style={{ fontSize: 11, color: MUTED }}>What you want out of it
               <select value={f.reason} onChange={(e) => setF((x) => ({ ...x, reason: e.target.value }))} style={box}>
                 {reasons.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}

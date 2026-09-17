@@ -602,7 +602,7 @@ export default function CrmApp({
             ) : special.name === "peopleimet" ? (
               <PeopleIMet onOpen={openLinked} />
             ) : special.name === "cleandb" ? (
-              <CleanDatabase />
+              <CleanDatabase onOpen={openLinked} />
             ) : special.name === "integrations" ? (
               <Integrations />
             ) : special.name === "emailqueue" ? (

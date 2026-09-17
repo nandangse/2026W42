@@ -89,6 +89,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.2.1.1",
+    date: "2026-09-17",
+    module: "A dash is not an address \u2014 and every duplicate opens where you are standing",
+    items: [
+      "<b>Sixty-seven strangers were proposed as one person</b>, because they all carried \u201c-\u201d where an address should be and the scan grouped on whatever sat in that column. Only something shaped like an address can identify anybody; those groups are gone.",
+      "<b>A company inbox is not a person.</b> info@, sales@, hr@ and the rest belong to a whole department \u2014 sixty-seven exhibitors really can share one, and merging them would destroy sixty-six real contacts. They are still shown, because a human may know better, but they are marked in amber and never proposed as an obvious merge.",
+      "<b>Every row now carries enough to judge it</b> \u2014 name, title, company, address, number, city and the day it was made for a person; city, state, GSTIN and website for a firm. Eleven rows all reading \u201cSachin\u201d told nobody anything, and asking somebody to merge on that is asking them to guess.",
+      "<b>And every row opens.</b> Click any line to read the whole record in a lightbox without leaving the list \u2014 two rows can only be judged the same person by looking at them. \u201cOpen it properly\u201d goes to the full record when that is wanted.",
+      "<b>Sixty-seven \u201ckeep #N\u201d buttons is not a choice, it is a wall.</b> A group now has one tick beside the row that will survive and a single button to fold the rest into it, and long groups collapse to eight with the rest one click away.",
+      "<b>Where you met is a list that grows.</b> Every show already named is offered, and a new one joins the list for the next card \u2014 a show spelled three ways stops being countable. <b>When you met</b> sits beside it, defaulting to today.",
+    ],
+  },
+  {
     v: "5.2.1.0",
     date: "2026-09-16",
     module: "A lead is a state, where a record came from, and the import\u2019s arithmetic shown",

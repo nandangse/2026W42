@@ -167,6 +167,10 @@ export async function GET(req: Request) {
        and a show does not end up spelled three ways. */
     const seen = new Set<string>();
     for (const r of rows) for (const t of ((r.tags as string[]) || [])) if (t) seen.add(t);
+    /* Every show already named, so the next one is picked rather than typed —
+       a show spelled three ways stops being countable. */
+    const events = new Set<string>();
+    for (const r of rows) { const e = S(r.event); if (e) events.add(e); }
     /**
      * THE ADDRESSES IT MAY LEAVE FROM (Dr Raghu, 16 Sep 2026: "in this also
      * choose channel to send!!!").
@@ -184,7 +188,7 @@ export async function GET(req: Request) {
         .filter((c) => c.email.toLowerCase() !== u.email.toLowerCase())
         .map((c) => ({ id: String(c.id), email: c.email, label: c.label || c.email, kind: c.kind, own: false })),
     ];
-    return NextResponse.json({ ok: true, people: rows, queued, reasons: REASONS, knownTags: [...seen].sort(), channels });
+    return NextResponse.json({ ok: true, people: rows, queued, reasons: REASONS, knownTags: [...seen].sort(), knownEvents: [...events].sort(), channels });
   } catch (e) { return errJson(e); }
 }
 
