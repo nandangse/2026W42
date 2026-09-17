@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.3.2.2",
+    date: "2026-09-17",
+    module: "The card camera opens \u2014 and when it cannot, it says so",
+    items: [
+      "<b>The camera was asking for permission and then cancelling its own question.</b> The callback handed to it was a new function on every render of the lightbox, and it sat in the effect\u2019s dependencies \u2014 so the camera was torn down and requested again on each one, and every teardown withdrew the permission prompt that was still on screen waiting to be answered. A camera permanently opening and never open. It is now asked for <b>once</b>.",
+      "<b>A wait that says what it is waiting for.</b> The seconds are counted on screen; at six it says to tap Allow if the phone asked; at twelve it says plainly that this browser is not going to open one and to use <b>choose a photo instead</b>. A black rectangle reading \u201copening the camera\u201d told nobody anything.",
+      "<b>If the size is impossible, it tries a plain camera before giving up</b> \u2014 and if it still fails, the message now carries what the phone actually said instead of one sentence covering every cause. Refused stays refused: asking a second time only asks again.",
+      "<b>The shutter waits for real pixels.</b> Ready now means a frame has arrived, not merely that a stream was handed over \u2014 a phone that promises a camera and never produces a picture must not offer a button that takes one.",
+    ],
+  },
+  {
     v: "5.3.2.1",
     date: "2026-09-17",
     module: "People I Met: three tabs \u2014 the record, their card, and what has gone",

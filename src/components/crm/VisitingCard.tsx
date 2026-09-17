@@ -181,6 +181,23 @@ function CardCamera({ side, onShot, onClose, onFallback }: {
   const [upright, setUpright] = useState(false);          // the CARD's shape, not the phone's
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [err, setErr] = useState("");
+  /* How long the camera has been opening, so a wait can say so instead of
+     showing a black rectangle that means nothing. */
+  const [waited, setWaited] = useState(0);
+  /**
+   * WHY THE CALLBACK IS HELD IN A REF.
+   *
+   * It arrives as an inline arrow from the lightbox, so it is a NEW FUNCTION
+   * on every render of the parent. With it in the effect's dependencies the
+   * effect tore itself down and asked for the camera again on every one of
+   * those renders — and each teardown cancels the permission request that
+   * was still on screen waiting to be answered. The result is a camera that
+   * is always opening and never opens.
+   *
+   * The ref keeps the latest callback without the effect depending on its
+   * identity, so the camera is asked for ONCE.
+   */
+  const fallbackRef = useRef(onFallback);
 
   /* The guide, in the preview's own coordinates. */
   const ratio = upright ? 1 / CARD_RATIO : CARD_RATIO;
@@ -191,28 +208,48 @@ function CardCamera({ side, onShot, onClose, onFallback }: {
     return { x: (box.w - w) / 2, y: (box.h - h) / 2, w, h };
   })();
 
+  useEffect(() => { fallbackRef.current = onFallback; });
+
   useEffect(() => {
     let dead = false;
+    const t0 = Date.now();
+    const tick = window.setInterval(() => { if (!dead) setWaited(Math.round((Date.now() - t0) / 1000)); }, 1000);
     (async () => {
       if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-        onFallback("This browser will not open a camera here — choose a photo instead."); return;
+        fallbackRef.current("This browser will not open a camera here — choose a photo instead."); return;
       }
+      const ask = (video: MediaTrackConstraints | boolean) => navigator.mediaDevices.getUserMedia({ video, audio: false });
+      let st: MediaStream | null = null;
       try {
-        const st = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1440 } },
-          audio: false,
-        });
-        if (dead) { st.getTracks().forEach((t) => t.stop()); return; }
-        streamRef.current = st;
-        if (videoRef.current) { videoRef.current.srcObject = st; await videoRef.current.play().catch(() => {}); }
-        setReady(true);
+        st = await ask({ facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1440 } });
       } catch (e) {
-        const m = e instanceof Error ? e.message : String(e);
-        onFallback(/denied|NotAllowed/i.test(m) ? "The camera was not allowed — choose a photo instead." : "The camera would not open — choose a photo instead.");
+        const m = e instanceof Error ? `${e.name} ${e.message}` : String(e);
+        /* Refused is refused — asking again only asks again. Anything else
+           may be the size being impossible on this phone, so try a plain
+           camera before giving up on it. */
+        if (/NotAllowed|denied|Permission/i.test(m)) {
+          fallbackRef.current("The camera was not allowed — choose a photo instead."); return;
+        }
+        try { st = await ask(true); }
+        catch (e2) {
+          const m2 = e2 instanceof Error ? `${e2.name}: ${e2.message}` : String(e2);
+          fallbackRef.current(`The camera would not open (${m2}) — choose a photo instead.`); return;
+        }
       }
+      if (dead || !st) { st?.getTracks().forEach((t) => t.stop()); return; }
+      streamRef.current = st;
+      const v = videoRef.current;
+      if (!v) { fallbackRef.current("The camera opened but there was nowhere to show it — choose a photo instead."); return; }
+      v.srcObject = st;
+      /* Ready means there are real pixels. A phone that hands over a stream
+         and then never produces a frame must not offer a shutter. */
+      const live = () => { if (!dead) setReady(true); };
+      v.onloadedmetadata = live;
+      await v.play().catch(() => { /* some phones autoplay only on metadata */ });
+      if (v.readyState >= 2) live();
     })();
-    return () => { dead = true; streamRef.current?.getTracks().forEach((t) => t.stop()); };
-  }, [onFallback]);
+    return () => { dead = true; window.clearInterval(tick); streamRef.current?.getTracks().forEach((t) => t.stop()); };
+  }, []);
 
   /* The preview's size decides the guide, so it is measured, not assumed. */
   useEffect(() => {
@@ -295,7 +332,21 @@ function CardCamera({ side, onShot, onClose, onFallback }: {
             </div>
           </>
         )}
-        {!ready && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#C8D2DC", fontSize: 13 }}>opening the camera…</div>}
+        {/* A WAIT THAT SAYS WHAT IT IS WAITING FOR. Eight seconds of a black
+            rectangle reading "opening the camera" tells nobody that the
+            phone is holding a permission question, or that this phone is
+            simply not going to open one. */}
+        {!ready && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, color: "#C8D2DC", fontSize: 13, textAlign: "center", padding: 24 }}>
+            <div>opening the camera{waited > 2 ? ` — ${waited}s` : "…"}</div>
+            {waited >= 6 && (
+              <div style={{ fontSize: 12.5, lineHeight: 1.6, maxWidth: 320 }}>
+                If your phone asked whether Genie may use the camera, <b style={{ color: "#fff" }}>tap Allow</b>.
+                {waited >= 12 && <> If it asked nothing, this browser is not going to open one here — use <b style={{ color: "#fff" }}>choose a photo instead</b> below and take the picture with your own camera app.</>}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {err && <div className="px-3 py-1 text-xs font-semibold" style={{ background: "#3A1512", color: "#FFC9BE" }}>{err}</div>}
