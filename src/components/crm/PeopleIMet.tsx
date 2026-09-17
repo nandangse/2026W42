@@ -229,28 +229,36 @@ const MOBILE_CSS = `.met-2col{grid-template-columns:1fr}@media(min-width:560px){
  * joins the list for the next card.
  */
 function EventField({ value, events, onChange }: { value: string; events: string[]; onChange: (v: string) => void }) {
-  const [typing, setTyping] = useState(!value && events.length === 0);
-  const known = events.filter(Boolean);
-  if (typing || !known.length) {
-    return (
-      <>
-        <input value={value} onChange={(e) => onChange(e.target.value)} placeholder="GSE Expo Lisbon 2026" style={box} />
-        {known.length > 0 && (
-          <button onClick={() => setTyping(false)} className="mt-0.5" style={{ fontSize: 11, color: "var(--blue)", textDecoration: "underline" }}>
-            pick one already used
-          </button>
-        )}
-      </>
-    );
-  }
+  /**
+   * TYPE IT, OR PICK IT. Not one or the other.
+   *
+   * Dr Raghu, 17 Sep 2026: "this should be typable!" The first version was a
+   * dropdown with a "+ a show not on this list" option that swapped the box
+   * for an input — a mode switch, which at a stand is one thought too many.
+   *
+   * A datalist is the native answer: it IS a text box, so anything can be
+   * typed, and the shows already used appear as you type. Picking one costs
+   * a tap; inventing one costs nothing.
+   *
+   * It matters for more than convenience. This list already holds "GSE Expo
+   * Europe 2026, Lisbon" AND "GSE Expo Lisbon 2026" — the same show, twice,
+   * which is how a month stops being countable by show. Seeing the existing
+   * spelling while typing is what stops the third one.
+   */
+  const known = [...new Set(events.filter(Boolean))].sort();
+  const listId = "shows-" + known.length;
   return (
     <>
-      <select value={known.includes(value) ? value : ""} onChange={(e) => { if (e.target.value === "__new") { onChange(""); setTyping(true); } else onChange(e.target.value); }} style={box}>
-        <option value="">— where did you meet them —</option>
-        {known.map((e) => <option key={e} value={e}>{e}</option>)}
-        <option value="__new">+ a show not on this list…</option>
-      </select>
-      {value && !known.includes(value) && <div style={{ fontSize: 11, color: MUTED }}>new: <b>{value}</b></div>}
+      <input value={value} list={listId} onChange={(e) => onChange(e.target.value)}
+        placeholder="GSE Expo Lisbon 2026 — type it, or pick one you have used" style={box} />
+      <datalist id={listId}>{known.map((e) => <option key={e} value={e} />)}</datalist>
+      {value && known.length > 0 && !known.includes(value) && (
+        <div style={{ fontSize: 11, color: MUTED }}>
+          new show{known.some((k) => k.toLowerCase().includes(value.trim().toLowerCase().slice(0, 6)) && k !== value)
+            ? " — check the list first, the same show spelled twice cannot be counted"
+            : ""}
+        </div>
+      )}
     </>
   );
 }

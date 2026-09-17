@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.3.1.2",
+    date: "2026-09-17",
+    module: "Where you met: type it, or pick it",
+    items: [
+      "<b>The show is a text box again</b>, with the shows already used offered as you type. The first version was a dropdown with a \u201c+ a show not on this list\u201d option that swapped the box for an input \u2014 a mode switch, which at a stand is one thought too many.",
+      "<b>It matters for more than convenience.</b> The list already holds \u201cGSE Expo Europe 2026, Lisbon\u201d and \u201cGSE Expo Lisbon 2026\u201d \u2014 the same show, twice, which is how a month stops being countable by show. Seeing the existing spelling while typing is what stops the third one, and a near-match now says so.",
+    ],
+  },
+  {
     v: "5.3.1.1",
     date: "2026-09-17",
     module: "A button that cannot be pressed no longer looks pressable",
