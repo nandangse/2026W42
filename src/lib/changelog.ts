@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.3.2.1",
+    date: "2026-09-17",
+    module: "People I Met: three tabs \u2014 the record, their card, and what has gone",
+    items: [
+      "<b>A Card tab on every meeting.</b> Everything else on the record is our own words \u2014 typed by him, or written by Genie. The card is the only part that is <b>theirs</b>: their spelling of the company, the mobile they chose to print, the title they actually hold. When the typed record and the card disagree the card is usually the one telling the truth, so it now sits an inch from the fields instead of in another screen. Front, back, every word read off it, and a tap to open it full size \u2014 because a mobile number read off a thumbnail is a mobile number dialled wrongly.",
+      "<b>Communications is a tab now, with the number on it.</b> It opens on two counts that are deliberately kept apart: what <b>left</b>, in green, with the hour it left, and what is <b>written and still waiting</b>, in amber. Each message can be opened to read the words that actually went. <b>The badge goes green only when something has really gone</b> \u2014 amber while all it holds is good intentions.",
+      "<b>The two write buttons stay under every tab.</b> The tabs change what you are looking at, never what you can do: the whole app exists for that one press and it must not be a tab away.",
+    ],
+  },
+  {
     v: "5.3.2.0",
     date: "2026-09-17",
     module: "People I Met: filters with a count, what was actually sent, and a delete",

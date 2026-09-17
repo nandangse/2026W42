@@ -170,6 +170,42 @@ export async function GET(req: Request) {
         return sgn?.signedUrl ?? null;
       });
     }
+    /**
+     * THE CARD THEY HANDED OVER (Dr Raghu, 17 Sep 2026: "this also can have
+     * a card").
+     *
+     * The scan is the only part of the meeting that is not our own words —
+     * it is the thing itself, in their typeface, with the mobile number they
+     * chose to print. When the typed record and the card disagree, the card
+     * is usually right, so it belongs beside the record rather than in
+     * another screen.
+     *
+     * One read for all of them, not one per person.
+     */
+    const cardIds = [...new Set(rows.map((r) => S(r.card_id)).filter(Boolean))];
+    if (cardIds.length) {
+      const { data: cards } = await db.from("visiting_card")
+        .select("id, image_path, image_back_path, transcript, extracted, added_at").in("id", cardIds);
+      const byId = new Map<string, Record<string, unknown>>();
+      for (const c of (cards || []) as Record<string, unknown>[]) byId.set(String(c.id), c);
+      const sign = (p: unknown) => !p ? Promise.resolve(null) : fileUrl(String(p), async (bp) => {
+        const { data: sgn } = await db.storage.from("cards").createSignedUrl(bp, 3600);
+        return sgn?.signedUrl ?? null;
+      });
+      for (const r of rows) {
+        const c = byId.get(S(r.card_id));
+        if (!c) continue;
+        r.card = {
+          id: String(c.id),
+          front: await sign(c.image_path),
+          back: await sign(c.image_back_path),
+          transcript: (c.transcript as string) || null,
+          extracted: (c.extracted as Record<string, unknown>) || null,
+          added_at: (c.added_at as string) || null,
+        };
+      }
+    }
+
     /* The labels already used, so the next one is picked rather than retyped
        and a show does not end up spelled three ways. */
     const seen = new Set<string>();
@@ -210,17 +246,21 @@ export async function GET(req: Request) {
      * prevent and it must not hide inside a single number.
      */
     const sent: Record<string, { email: number; whatsapp: number }> = {};
+    const comms: Record<string, Record<string, unknown>[]> = {};
     if (ids.length) {
       const { data: q } = await db.from("outbound_queue")
-        .select("met_id, channel, status").in("met_id", ids).eq("status", "sent");
-      for (const x of (q || []) as { met_id: string; channel: string }[]) {
+        .select("id, met_id, channel, status, subject, body, to_email, to_phone, added_at, sent_at, sent_note")
+        .in("met_id", ids).order("added_at", { ascending: false });
+      for (const x of (q || []) as Record<string, unknown>[]) {
         const k = String(x.met_id);
+        (comms[k] = comms[k] || []).push(x);
+        if (S(x.status) !== "sent") continue;
         sent[k] = sent[k] || { email: 0, whatsapp: 0 };
-        if (x.channel === "email") sent[k].email++; else sent[k].whatsapp++;
+        if (S(x.channel) === "email") sent[k].email++; else sent[k].whatsapp++;
       }
     }
     return NextResponse.json({
-      ok: true, people: rows, queued, sent, reasons: REASONS,
+      ok: true, people: rows, queued, sent, comms, reasons: REASONS,
       knownTags: [...seen].sort(), knownEvents: [...events].sort(),
       channels, byList, mine: u.email.toLowerCase(), seesAll,
     });

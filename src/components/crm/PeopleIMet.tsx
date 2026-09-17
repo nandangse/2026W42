@@ -33,7 +33,15 @@ type Met = {
   email: string | null; phone: string | null;
   context: string | null; met_on: string; event: string | null; reason: string;
   tags: string[] | null; selfie_path: string | null; selfie?: string | null; interaction_id: string | null;
-  added_by: string;
+  added_by: string; card?: MetCard | null;
+};
+type MetCard = {
+  id: string; front: string | null; back: string | null;
+  transcript: string | null; extracted: Record<string, unknown> | null; added_at: string | null;
+};
+type Comm = {
+  id: string; channel: string; status: string; subject: string | null; body: string | null;
+  to_email: string | null; to_phone: string | null; added_at: string; sent_at: string | null; sent_note: string | null;
 };
 type Reason = { key: string; label: string; ask: string };
 type Draft = { channel: "email" | "whatsapp"; subject: string; body: string };
@@ -274,6 +282,7 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
   const [events, setEvents] = useState<string[]>([]);
   const [channels, setChannels] = useState<Chan[]>([]);
   const [sentMap, setSentMap] = useState<Record<string, { email: number; whatsapp: number }>>({});
+  const [commsMap, setCommsMap] = useState<Record<string, Comm[]>>({});
   const [byList, setByList] = useState<string[]>([]);
   const [mine, setMine] = useState("");
   /**
@@ -300,7 +309,7 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
       const r = await fetch("/api/crm/met", { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(String(j.error || r.status));
-      setRows(j.people || []); setQueued(j.queued || {}); setReasons(j.reasons || []); setKnown(j.knownTags || []); setEvents(j.knownEvents || []); setChannels(j.channels || []); setSentMap(j.sent || {}); setByList(j.byList || []);
+      setRows(j.people || []); setQueued(j.queued || {}); setReasons(j.reasons || []); setKnown(j.knownTags || []); setEvents(j.knownEvents || []); setChannels(j.channels || []); setSentMap(j.sent || {}); setCommsMap(j.comms || {}); setByList(j.byList || []);
       if (j.mine) { setMine(j.mine); setFBy((b) => (b === "" ? j.mine : b)); }
       setErr("");
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); setRows([]); }
@@ -432,7 +441,7 @@ export default function PeopleIMet({ onOpen }: { onOpen: (target: string, id: st
       ))}
 
       {adding && <AddBox reasons={reasons} known={known} events={events} onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
-      {open && <MetBox met={open} reasons={reasons} known={known} events={events} channels={channels} sent={sentMap[open.id]} queued={queued[open.id] || {}} onClose={() => setOpen(null)} onChanged={load} />}
+      {open && <MetBox met={open} reasons={reasons} known={known} events={events} channels={channels} sent={sentMap[open.id]} comms={commsMap[open.id] || []} queued={queued[open.id] || {}} onClose={() => setOpen(null)} onChanged={load} />}
     </div>
   );
 }
@@ -633,8 +642,8 @@ function AddBox({ reasons, known, events, onClose, onDone }: { reasons: Reason[]
 }
 
 /* ── ONE PERSON: the context, and the two messages ────────────────────── */
-function MetBox({ met, reasons, known, events, channels, queued, sent, onClose, onChanged }: {
-  met: Met; reasons: Reason[]; known: string[]; events: string[]; channels: Chan[]; queued: { email?: string; whatsapp?: string }; sent?: { email: number; whatsapp: number }; onClose: () => void; onChanged: () => void;
+function MetBox({ met, reasons, known, events, channels, queued, sent, comms, onClose, onChanged }: {
+  met: Met; reasons: Reason[]; known: string[]; events: string[]; channels: Chan[]; queued: { email?: string; whatsapp?: string }; sent?: { email: number; whatsapp: number }; comms: Comm[]; onClose: () => void; onChanged: () => void;
 }) {
   const [f, setF] = useState({ context: met.context || "", reason: met.reason, email: met.email || "", phone: met.phone || "", event: met.event || "", met_on: met.met_on || todayISO() });
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -651,6 +660,18 @@ function MetBox({ met, reasons, known, events, channels, queued, sent, onClose, 
   const [cc, setCc] = useState("");
   /* Unticked by default: a message with no undo should take a deliberate act. */
   const [sendNow, setSendNow] = useState(false);
+  /**
+   * THREE TABS, ONE WORKING AREA (Dr Raghu, 17 Sep 2026: "this also can have
+   * a card. And email or whatsapp sent should also be there in this in a
+   * communications tab with a number on it which shows how many").
+   *
+   * The tabs change what you are LOOKING at. They never move the two buttons
+   * that write the follow-up, which stay under every tab — the whole app
+   * exists for that one press and it must not be a tab away.
+   */
+  const [tab, setTab] = useState<"record" | "card" | "comms">("record");
+  const sentTotal = (sent?.email || 0) + (sent?.whatsapp || 0);
+  const waiting = (queued.email ? 1 : 0) + (queued.whatsapp ? 1 : 0);
 
   const post = async (body: Record<string, unknown>) => {
     const r = await fetch("/api/crm/met", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -702,7 +723,33 @@ function MetBox({ met, reasons, known, events, channels, queued, sent, onClose, 
           <b className="text-white" style={{ fontSize: 15 }}>{met.name}{met.company_name ? ` · ${met.company_name}` : ""}</b>
           <button onClick={onClose} className="px-2 py-1 rounded text-sm font-semibold" style={{ background: "rgba(255,255,255,.12)", color: "#C8D2DC" }}>✕</button>
         </div>
+        <div className="flex items-end gap-1 px-3 pt-2" style={{ background: NAVY, borderBottom: `1px solid ${BORDER}` }}>
+          {([
+            ["record", "Record", null],
+            ["card", "Card", met.card ? "•" : null],
+            ["comms", "Communications", sentTotal + waiting ? String(sentTotal + waiting) : null],
+          ] as const).map(([k, label, badge]) => (
+            <button key={k} onClick={() => setTab(k)}
+              className="px-3 py-1.5 rounded-t text-xs font-bold flex items-center gap-1.5"
+              style={{ background: tab === k ? "#fff" : "rgba(255,255,255,.10)", color: tab === k ? NAVY : "#C8D2DC" }}>
+              {label}
+              {badge && (
+                <span className="rounded-full px-1.5 tnum" style={{
+                  fontSize: 10.5, lineHeight: "16px", minWidth: 16, textAlign: "center",
+                  /* Green only when something actually LEFT. Amber when all
+                     it holds is written-and-waiting, because that is not the
+                     same fact and must not wear the same colour. */
+                  background: sentTotal ? GREEN : waiting ? "#8A5B00" : tab === k ? NAVY_SOFT : "rgba(255,255,255,.18)",
+                  color: sentTotal || waiting ? "#fff" : tab === k ? NAVY : "#C8D2DC",
+                }}>{badge}</span>
+              )}
+            </button>
+          ))}
+        </div>
         <div className="p-4">
+          {tab === "card" && <CardPane card={met.card} />}
+          {tab === "comms" && <CommsPane comms={comms} sent={sent} queued={queued} />}
+          {tab === "record" && (<>
           <label className="block" style={{ fontSize: 11, color: MUTED }}>Context — what was actually said
             <textarea value={f.context} onChange={(e) => setF((x) => ({ ...x, context: e.target.value }))} rows={3} style={{ ...box, resize: "vertical" }} /></label>
 
@@ -789,6 +836,7 @@ function MetBox({ met, reasons, known, events, channels, queued, sent, onClose, 
               </label>
             </div>
           </div>
+          </>)}
 
           <div className="flex gap-2 mt-3 flex-wrap items-center">
             <button onClick={save} disabled={!!busy} className="text-xs font-bold rounded px-3 py-2" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: NAVY }}>Save</button>
@@ -814,26 +862,6 @@ function MetBox({ met, reasons, known, events, channels, queued, sent, onClose, 
             </button>
           </div>
 
-          {/* WHAT HAS ACTUALLY GONE. Queued is not sent, and the difference
-              is the whole point: a follow-up written and never sent is the
-              failure this app exists to prevent. */}
-          {(sent?.email || sent?.whatsapp || queued.email || queued.whatsapp) && (
-            <div className="rounded border p-2 mt-2" style={{ borderColor: BORDER, background: "#FAFBFD" }}>
-              <div style={{ fontSize: 10.5, color: MUTED, fontWeight: 700, letterSpacing: .5 }}>COMMUNICATIONS</div>
-              <div style={{ fontSize: 12.5, lineHeight: 1.7 }}>
-                <b className="tnum" style={{ color: (sent?.email || 0) + (sent?.whatsapp || 0) ? GREEN : MUTED }}>
-                  {(sent?.email || 0) + (sent?.whatsapp || 0)}
-                </b> sent
-                {!!sent?.email && <span style={{ color: MUTED }}> · {sent.email} e-mail{sent.email === 1 ? "" : "s"}</span>}
-                {!!sent?.whatsapp && <span style={{ color: MUTED }}> · {sent.whatsapp} WhatsApp</span>}
-                {(queued.email || queued.whatsapp) && (
-                  <span style={{ color: "#8A5B00" }}>
-                    {" · "}<b>{(queued.email ? 1 : 0) + (queued.whatsapp ? 1 : 0)}</b> written and <b>not sent</b>
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
           {!f.context.trim() && <div className="text-xs mt-1" style={{ color: "#8A5B00" }}>With no context it can only say that you met. Write a line first and it will say something true.</div>}
 
           {err && <div className="text-xs mt-2 font-semibold" style={{ color: "#B3261E" }}>{err}</div>}
@@ -901,6 +929,169 @@ function MetBox({ met, reasons, known, events, channels, queued, sent, onClose, 
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+/**
+ * THE CARD TAB (Dr Raghu, 17 Sep 2026: "this also can have a card").
+ *
+ * WHY THE PICTURE AND NOT JUST THE FIELDS. Everything else on this record is
+ * our own words — typed by him, or written by Genie. The card is the only
+ * part that is theirs: their spelling of the company, the mobile they chose
+ * to print, the title they actually hold. When the typed record and the card
+ * disagree, the card is usually the one telling the truth, so it belongs an
+ * inch away from the fields rather than in a different screen.
+ *
+ * It opens full size, because a mobile number read off a thumbnail is a
+ * mobile number dialled wrongly.
+ */
+function CardPane({ card }: { card?: MetCard | null }) {
+  const [big, setBig] = useState<string | null>(null);
+  if (!card) {
+    return (
+      <div className="rounded border p-4" style={{ borderColor: BORDER, background: "#FAFBFD", color: MUTED, fontSize: 12.5, lineHeight: 1.6 }}>
+        <b style={{ color: INK }}>No card for this meeting.</b><br />
+        Either they did not hand one over, or this record was typed in rather than scanned.
+        A card added later through <b>Visiting Cards</b> and linked to the same person will show here.
+      </div>
+    );
+  }
+  const shot = (url: string | null, which: string) => !url ? null : (
+    <button onClick={() => setBig(url)} title="Open it full size" style={{ display: "block" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt={which} style={{ width: "100%", maxWidth: 300, borderRadius: 6, border: `1px solid ${BORDER}`, display: "block" }} />
+      <span style={{ fontSize: 10.5, color: MUTED }}>{which} · tap to enlarge</span>
+    </button>
+  );
+  const ex = card.extracted || {};
+  const line = (k: string, v: unknown) => !v ? null : (
+    <div key={k} style={{ fontSize: 12.5, lineHeight: 1.7 }}>
+      <span style={{ color: MUTED }}>{k}</span> <b style={{ color: INK }}>{String(v)}</b>
+    </div>
+  );
+  return (
+    <div>
+      <div className="flex flex-wrap gap-3">
+        {shot(card.front, "Front")}
+        {shot(card.back, "Back")}
+        {!card.front && !card.back && (
+          <div style={{ fontSize: 12.5, color: MUTED }}>The card was recorded but its picture is no longer readable.</div>
+        )}
+        <div style={{ flex: 1, minWidth: 190 }}>
+          {line("Name", ex.name)}
+          {line("Title", ex.title || ex.job_title)}
+          {line("Company", ex.company)}
+          {line("E-mail", ex.email)}
+          {line("Mobile", ex.phone || ex.mobile)}
+          {line("Website", ex.website)}
+          {card.added_at && <div style={{ fontSize: 11, color: MUTED, marginTop: 4 }}>Scanned {new Date(card.added_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>}
+        </div>
+      </div>
+      {card.transcript && (
+        <div className="rounded border p-2 mt-3" style={{ borderColor: BORDER, background: "#FAFBFD" }}>
+          <div style={{ fontSize: 10.5, color: MUTED, fontWeight: 700, letterSpacing: .5 }}>EVERY WORD ON THE CARD</div>
+          <div style={{ fontSize: 12, color: INK, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{card.transcript}</div>
+        </div>
+      )}
+      {big && (
+        <div onClick={() => setBig(null)} style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(22,35,47,.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={big} alt="" style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 6 }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/**
+ * THE COMMUNICATIONS TAB (Dr Raghu, 17 Sep 2026: "email or whatsapp sent
+ * should also be there in this in a communications tab with a number on it
+ * which shows how many").
+ *
+ * QUEUED IS NOT SENT, and the two must never add up into one number. A
+ * follow-up written and never sent is precisely the failure this app was
+ * built to stop — hide it inside a total and the app starts lying in the
+ * exact place it was supposed to tell the truth.
+ *
+ * So: what LEFT is counted in green with the date it left. What is written
+ * and WAITING is counted separately, in amber, and says so in words.
+ */
+function CommsPane({ comms, sent, queued }: {
+  comms: Comm[]; sent?: { email: number; whatsapp: number }; queued: { email?: string; whatsapp?: string };
+}) {
+  const [show, setShow] = useState<string | null>(null);
+  const total = (sent?.email || 0) + (sent?.whatsapp || 0);
+  const waiting = comms.filter((c) => c.status === "queued");
+  const gone = comms.filter((c) => c.status === "sent");
+  const when = (d: string | null) => !d ? "" : new Date(d).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+
+  if (!comms.length) {
+    return (
+      <div className="rounded border p-4" style={{ borderColor: BORDER, background: "#FAFBFD", color: MUTED, fontSize: 12.5, lineHeight: 1.6 }}>
+        <b style={{ color: INK }}>Nothing written yet.</b><br />
+        Press <b>Write the e-mail</b> or <b>Write the WhatsApp</b> below and it will appear here — first as waiting, then, once it goes, as sent.
+      </div>
+    );
+  }
+  const row = (c: Comm) => (
+    <div key={c.id} className="rounded border p-2" style={{ borderColor: BORDER, background: "#fff" }}>
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <span style={{ fontSize: 13 }}>{c.channel === "email" ? "✉" : "💬"}</span>
+        <b style={{ fontSize: 12.5, color: INK, flex: 1, minWidth: 120 }}>
+          {c.subject || (c.channel === "whatsapp" ? "WhatsApp message" : "(no subject)")}
+        </b>
+        {c.status === "sent"
+          ? <span style={{ fontSize: 11, color: GREEN, fontWeight: 700 }}>sent {when(c.sent_at || c.added_at)}</span>
+          : c.status === "cancelled"
+            ? <span style={{ fontSize: 11, color: MUTED }}>cancelled</span>
+            : <span style={{ fontSize: 11, color: "#8A5B00", fontWeight: 700 }}>written {when(c.added_at)} · not sent</span>}
+      </div>
+      <div style={{ fontSize: 11, color: MUTED }}>
+        {c.to_email || c.to_phone || "no address recorded"}
+        {c.sent_note ? ` · ${c.sent_note}` : ""}
+      </div>
+      {c.body && (
+        <>
+          <button onClick={() => setShow(show === c.id ? null : c.id)} className="mt-1" style={{ fontSize: 11, color: NAVY, fontWeight: 700 }}>
+            {show === c.id ? "hide what it said" : "what it said"}
+          </button>
+          {show === c.id && (
+            <div className="mt-1 rounded p-2" style={{ background: "#FAFBFD", border: `1px solid ${BORDER}`, fontSize: 12, color: INK, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{c.body}</div>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="flex gap-4 flex-wrap rounded border p-2 mb-2" style={{ borderColor: BORDER, background: "#FAFBFD" }}>
+        <div>
+          <div className="tnum" style={{ fontSize: 20, fontWeight: 800, color: total ? GREEN : MUTED, lineHeight: 1.1 }}>{total}</div>
+          <div style={{ fontSize: 10.5, color: MUTED, fontWeight: 700, letterSpacing: .4 }}>SENT</div>
+        </div>
+        {!!sent?.email && <div><div className="tnum" style={{ fontSize: 20, fontWeight: 800, color: INK, lineHeight: 1.1 }}>{sent.email}</div><div style={{ fontSize: 10.5, color: MUTED, fontWeight: 700, letterSpacing: .4 }}>E-MAIL</div></div>}
+        {!!sent?.whatsapp && <div><div className="tnum" style={{ fontSize: 20, fontWeight: 800, color: INK, lineHeight: 1.1 }}>{sent.whatsapp}</div><div style={{ fontSize: 10.5, color: MUTED, fontWeight: 700, letterSpacing: .4 }}>WHATSAPP</div></div>}
+        {waiting.length > 0 && (
+          <div>
+            <div className="tnum" style={{ fontSize: 20, fontWeight: 800, color: "#8A5B00", lineHeight: 1.1 }}>{waiting.length}</div>
+            <div style={{ fontSize: 10.5, color: "#8A5B00", fontWeight: 700, letterSpacing: .4 }}>WRITTEN, NOT SENT</div>
+          </div>
+        )}
+        {(queued.email || queued.whatsapp) && (
+          <div style={{ flex: 1, minWidth: 150, fontSize: 11, color: "#8A5B00", alignSelf: "center", lineHeight: 1.5 }}>
+            Waiting on you. The e-mail goes from the queue in Tools; the WhatsApp goes from your own phone.
+          </div>
+        )}
+      </div>
+      <div style={{ display: "grid", gap: 6 }}>
+        {waiting.map(row)}
+        {gone.map(row)}
+        {comms.filter((c) => c.status !== "queued" && c.status !== "sent").map(row)}
       </div>
     </div>
   );
