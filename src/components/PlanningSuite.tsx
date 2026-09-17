@@ -1,4 +1,5 @@
 "use client";
+import Backups from "./planning/Backups";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { swallow } from "@/lib/swallow";
 import { useRouter } from "next/navigation";
@@ -140,7 +141,7 @@ export default function PlanningSuite({
   }, [workspace, canSeeDelivered]);
 
   // land on "My Week" within the suite, not the delivery board
-  const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "mplan" | "projects" | "jobcomm" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature" | "opsbook">(() => {
+  const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "mplan" | "projects" | "jobcomm" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature" | "opsbook" | "backups">(() => {
     if (typeof window === "undefined") return "home";
     /**
      * A LINK MAY NAME THE TAB. The back-arrow on a project page says
@@ -151,7 +152,7 @@ export default function PlanningSuite({
      * Home every time, from wherever you had been.
      */
     const OK = ["home", "wip", "liveproj", "delivery", "load", "plan", "mplan",
-      "projects", "jobcomm", "floor", "material", "esc", "erp", "upload", "admin", "feature", "opsbook"];
+      "projects", "jobcomm", "floor", "material", "esc", "erp", "upload", "admin", "feature", "opsbook", "backups"];
     try {
       const asked = new URLSearchParams(window.location.search).get("tab");
       if (asked && OK.includes(asked)) return asked as "home";
@@ -599,6 +600,16 @@ export default function PlanningSuite({
               )}
               <button onClick={() => { close(); setWorkspace("suite"); setTab("feature"); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }} title="Ask for something in Genie">💡 Feature Request</button>
               {isAdmin && <button onClick={() => { close(); setWorkspace("suite"); setTab("admin"); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }}>⚙ Admin</button>}
+              {/* HIS ALONE (Dr Raghu, 17 Sep 2026: "ONLY raghu"). A backup
+                  carries every row of every table out of the building —
+                  that is not an admin permission. */}
+              {email.toLowerCase() === RAGHU_EMAIL_LC && (
+                <button onClick={() => { close(); setWorkspace("suite"); setTab("backups"); }}
+                  className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }}
+                  title="The code and the data, zipped into your own Drive — and what every run weighed">
+                  💾 Backups
+                </button>
+              )}
               <button onClick={() => { close(); setProfileOpen(true); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }}>👤 Profile{!initials && <span style={{ color: "var(--red)" }}> · no initials set</span>}</button>
               <button onClick={() => { close(); setPwOpen(true); }} className="w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: "var(--navy)" }}>🔑 Change Password</button>
             </>
@@ -730,6 +741,7 @@ export default function PlanningSuite({
       )}
       {workspace === "suite" && tab === "plan" && <JobPlan isAdmin={isAdmin} board={board} activeId={activeId} setActiveId={setActiveId} V={V} reload={reload} isRaghu={isRaghu} canEdit={canEdit} pushERP={pushERP} />}
       {workspace === "suite" && tab === "erp" && <UpdateToErp erpLog={erpLog} canPush={role === "admin" || role === "planner"} />}
+      {workspace === "suite" && tab === "backups" && email.toLowerCase() === RAGHU_EMAIL_LC && <Backups />}
       {workspace === "suite" && tab === "upload" && canUpload && <MorningUpload email={email} embedded />}
       {workspace === "suite" && tab === "admin" && isAdmin && <Admin board={board} reload={reload} users={users} loadUsers={loadUsers} departments={departments} isOwner={isRaghu} meEmail={me.email} usersMeta={usersMeta} appSettings={appSettings} loadAppSettings={loadAppSettings} />}
       {/* Mounted on first visit and then kept (hidden) — the tree is a slow

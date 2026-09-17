@@ -51,6 +51,10 @@
     {
       "path": "/api/cron/marketing-stats",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/backup",
+      "schedule": "0 20 * * *"
     }
   ]
 }

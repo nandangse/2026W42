@@ -89,6 +89,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.3.0.0",
+    date: "2026-09-17",
+    module: "Backups we own \u2014 the code and the data, nightly, into his own Drive",
+    items: [
+      "<b>The oldest must-have on the register, and the only one whose absence cannot be recovered from.</b> Everything else in Genie can be rebuilt from the code and the data; nothing can rebuild the code and the data. Admin \u2192 \ud83d\udcbe Backups, <b>his account alone</b> \u2014 a backup carries every row of every table out of the building, which is not an admin permission.",
+      "<b>Both archives land in folders on HIS Drive</b>, pasted as ordinary folder links. A backup living in the account it backs up is a second copy of the same risk. They also run every night at half past one.",
+      "<b>The code comes from GitHub, not off the disk</b> \u2014 a deployed app carries its built output, not its source, and built output cannot be edited back into a codebase. The archive is the whole tree at main, the same bytes anybody cloning would get. About eleven megabytes.",
+      "<b>The database is every row of every table, as JSON lines, both projects in one zip</b> \u2014 and the archive carries a read-me saying plainly what it is NOT: <b>it is not a pg_dump</b>. No schema, no indexes, no policies. The schema is the migration files, which are in the code backup. Believing you have a dump when you have an export is the discovery nobody wants to make on the day.",
+      "<b>Every run records its SIZE, its link and what failed.</b> That is the point of the screen: a backup nobody checks the size of is a backup nobody knows is empty, and that is exactly how people find out it has been writing nought bytes for a month.",
+      "The zip is written with Node\u2019s own deflate rather than a new dependency, with a CRC of its own in case the runtime lacks one \u2014 a backup must not fail on which machine it landed on. <b>Needs Genie migration 0169</b>, and a read-only <b>GITHUB_TOKEN</b> on Vercel for the code half.",
+    ],
+  },
+  {
     v: "5.2.1.3",
     date: "2026-09-17",
     module: "Searching an opportunity no longer dies on the pipeline column",
