@@ -15,8 +15,21 @@ export const num = (v: unknown) => {
 /** HRA, PF and PT do not apply to Management and the contract types. */
 export const NO_STATUTORY = new Set(["Management", "Contractor", "Labour - Contract", "Staff - Contract"]);
 
-/** The whole Benefits block does not apply to Management (Dr Raghu, 23 Aug 2026). */
-export const NO_BENEFITS = new Set(["Management"]);
+/**
+ * WHO THE BENEFITS BLOCK IS FOR — Staff and Labour, and nobody else.
+ *
+ * Dr Raghu, 23 Aug 2026: it does not apply to Management. Restated as a
+ * positive rule on 26 Sep 2026: "The CTC will not include all these things
+ * in contractor. Its only in staff and labour."
+ *
+ * Said this way round it cannot rot. The old list named who was excluded, so
+ * every type added afterwards quietly joined the included side — which is
+ * how a Trainee came to carry a mediclaim, a bonus, twenty paid leaves and
+ * twelve third Saturdays in their CTC, none of which they get. A CTC is a
+ * number a person is shown and holds us to; it must contain only what they
+ * are actually given.
+ */
+export const BENEFIT_TYPES = new Set(["Staff", "Labour"]);
 
 /** Contract engagements are taxed flat at source; employees by the slab. */
 const CONTRACT_TDS = new Set(["Contractor", "Labour - Contract", "Staff - Contract"]);
@@ -94,7 +107,7 @@ export interface SalaryRow { label: string; monthly: number | null; yearly: numb
 export function salaryTable(get: (k: string) => unknown, type: string | null, extras?: ExtraRow[]): { rows: SalaryRow[]; ctcLakhs: string; exempt: boolean; gross: number } | null {
   const t = String(type || "").trim();
   const exempt = NO_STATUTORY.has(t);
-  const noBenefits = NO_BENEFITS.has(t);
+  const noBenefits = !BENEFIT_TYPES.has(t);
   const worker = NO_HRA_NO_MEDICAL.has(t);
   const isContract = CONTRACT_TDS.has(t);
   const basic = num(get("Basic and DA"));
@@ -170,7 +183,9 @@ export function salaryTable(get: (k: string) => unknown, type: string | null, ex
 
     { label: "Benefits", monthly: null, yearly: null, kind: "head" },
     ...(noBenefits || isContract
-      ? [{ label: isContract ? "A contract engagement — no benefits; the CTC is the Basic & DA alone" : "Benefits are not applicable for Management", monthly: null, yearly: null, kind: "note" as const }]
+      ? [{ label: isContract
+            ? "A contract engagement — no benefits; the CTC is the Basic & DA alone"
+            : `Benefits are not applicable for ${t || "this type of employment"}`, monthly: null, yearly: null, kind: "note" as const }]
       : [
           ...(exempt ? [] : [R("Provident Fund Employer", pf)]),
           R("Site Allowance — while deputed to site", site),

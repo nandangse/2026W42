@@ -89,6 +89,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.4.0.0",
+    date: "2026-09-26",
+    module: "The offer letter says the job, not the register",
+    items: [
+      "<b>The letter names the designation.</b> It was printing the register\u2019s role list, so a man hired as <i>Operations Manager</i> was offered \u201cGeneral Manager (Operations) \u00b7 Inventory Manager \u00b7 Planning Engineer \u00b7 Stores Manager\u201d \u2014 four job titles, none of them his. The designation is the thing he agreed to and it is what the letter now says, followed by the <b>type of employment</b>: \u201cas a Contractor\u201d, \u201cas an Intern\u201d.",
+      "<b>The annual CTC is out of the opening paragraph.</b> The gross is the agreed number and the one a person checks; the CTC is a computed total that belongs in Annexure 1 under the rows that build it, not asserted in a sentence before they have been shown.",
+      "<b>Their e-mail and mobile are on the letter</b>, under the address \u2014 so the copy on file says how to reach them.",
+      "<b>Annexure 2 starts a new page in the PDF</b>, and the on-screen letter marks where the break will fall. Roles and responsibilities are now <b>a list</b> rather than forty duties in one grey paragraph: this is the annexure a person is being asked to agree to, and a paragraph that long is one nobody reads.",
+      "<b>Benefits are for Staff and Labour, and nobody else</b> (Dr Raghu: \u201cThe CTC will not include all these things in contractor. Its only in staff and labour\u201d). The rule used to name who was excluded, so every employment type added afterwards quietly joined the included side \u2014 which is how a <b>Trainee</b> came to carry a mediclaim, a bonus, twenty paid leaves and twelve third Saturdays in a CTC they do not receive. <b>This changes the CTC shown for Trainees</b> across HRMS, not only on offers.",
+      "<b>\u201cSend it now\u201d works after the first send.</b> A corrected letter, or one that never arrived, needed the offer wound back to Draft \u2014 which erased the fact that it had gone. It now reads <b>Send it again</b> and the confirmation says when it last went, because sending twice is normal and only sending twice <i>silently</i> is dangerous.",
+      "<b>The employee number makes the appointment letter, whatever the status says.</b> Somebody who has turned up and been given a number has joined, whether or not anyone remembered to press Accepted first. The box is open from the moment the offer goes out, and once joined there is a button straight to the appointment letter.",
+    ],
+  },
+  {
     v: "5.3.2.4",
     date: "2026-09-17",
     module: "The card scanner takes the still, not the preview",

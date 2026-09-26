@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 import { TYPE_OPTIONS, splitMulti, joinMulti } from "@/lib/hrms";
 import { type SalaryRow, type Components, SPLIT_DEFAULTS } from "@/lib/salary";
-import { OFFER_STEPS, STATUS_TONE, OFFER_STATUS, DOC_KINDS, defaultJoining, iso, coveringLetter, titleCase, splitPhone } from "@/lib/offer";
+import { OFFER_STEPS, STATUS_TONE, OFFER_STATUS, DOC_KINDS, defaultJoining, iso, coveringLetter, titleCase, splitPhone, bulletsHtml, withArticle } from "@/lib/offer";
 import RichText, { RichTextView } from "./RichText";
 import { LOGO } from "@/lib/logo";
 import { Pane } from "./Pane";
@@ -689,19 +689,35 @@ function PageReview({ d, save, setStatus, busy, isOwner }: { d: Offer; save: (p:
 
         <div className="flex gap-2 mt-3 flex-wrap items-center no-print">
           <button
+            /**
+             * IT CAN GO AGAIN (Dr Raghu, 26 Sep 2026: "It should be able to
+             * 'send it now' again also").
+             *
+             * A letter is corrected, or it never arrived, or it went to the
+             * wrong address — and the button being dead after the first send
+             * meant re-sending a corrected offer was impossible without
+             * winding the offer back to Draft, which loses the fact that it
+             * was already sent. Sending again is a normal act; only
+             * SILENTLY sending again is dangerous, so the confirmation says
+             * it has gone before and when.
+             */
             onClick={async () => {
-              if (!window.confirm(`Send this offer to ${to}, copying ${cc}?`)) return;
+              const again = !!d.sent_at;
+              if (!window.confirm(again
+                ? `This offer already went out on ${day(d.sent_at)}.\n\nSend it to ${to} again, copying ${cc}? They will receive a second e-mail.`
+                : `Send this offer to ${to}, copying ${cc}?`)) return;
               setSending(true); setSendMsg("");
               try {
                 await api.post("/api/hrms/offers", { action: "send", id: d.id, send_to: to, send_from: from, send_cc: cc, covering_letter: body });
-                setSendMsg("Sent ✓"); setStatus("Sent");
+                setSendMsg(again ? "Sent again ✓" : "Sent ✓");
+                if (d.status === "Draft") setStatus("Sent");
               } catch (e) { setSendMsg(e instanceof Error ? e.message : String(e)); }
               setSending(false);
             }}
-            disabled={sending || !to || d.status !== "Draft"}
+            disabled={sending || !to}
             className="rounded px-3 py-1.5 font-bold"
-            style={{ background: d.status === "Draft" && to ? C.green : "var(--line)", color: d.status === "Draft" && to ? "#fff" : "var(--muted)", fontSize: 12.5 }}>
-            {sending ? "Sending…" : "✉ Send it now"}
+            style={{ background: to ? C.green : "var(--line)", color: to ? "#fff" : "var(--muted)", fontSize: 12.5 }}>
+            {sending ? "Sending…" : d.sent_at ? "✉ Send it again" : "✉ Send it now"}
           </button>
           <a href={`/hrms/offer/${d.id}/print`} target="_blank" rel="noopener noreferrer"
             className="rounded px-3 py-1.5 font-bold" style={{ background: "var(--blue)", color: "#fff", fontSize: 12.5 }}>
@@ -724,14 +740,32 @@ function PageReview({ d, save, setStatus, busy, isOwner }: { d: Offer; save: (p:
             <B onClick={() => setStatus("Accepted")} busy={busy} bg={C.green}>Accepted</B>
             <B onClick={() => setStatus("Declined")} busy={busy} bg="#fff" fg={C.red} border>Declined</B>
           </>}
-          {d.status === "Accepted" && (
+          {/**
+            * THE EMPLOYEE NUMBER IS THE KEY, NOT THE STATUS (Dr Raghu, 26 Sep
+            * 2026: "when employee id is written you should be able to make
+            * the appointment letter too").
+            *
+            * Somebody who has turned up and been given a number HAS joined,
+            * whether or not anybody remembered to press Accepted first. The
+            * box is open from the moment the offer has gone out, and the
+            * number is what arms the button.
+            */}
+          {(d.status === "Sent" || d.status === "Accepted") && (
             <>
               <input value={empId} onChange={(e) => setEmpId(e.target.value.replace(/[^0-9]/g, ""))} placeholder="EmployeeID"
                 className="rounded px-2 py-1.5 tnum" style={{ border: `1px solid ${C.line}`, width: 120, fontSize: 13 }} />
               <B onClick={() => setStatus("Joined", empId)} busy={busy || !empId} bg={C.green}>Joined — make it the appointment letter</B>
             </>
           )}
-          {d.status === "Joined" && <span style={{ fontSize: 13, color: C.green, fontWeight: 700 }}>✓ Joined {day(d.joined_at)}{d.employee_id ? ` as ${d.employee_id}` : ""}</span>}
+          {d.status === "Joined" && (
+            <>
+              <span style={{ fontSize: 13, color: C.green, fontWeight: 700 }}>✓ Joined {day(d.joined_at)}{d.employee_id ? ` as ${d.employee_id}` : ""}</span>
+              <a href={`/hrms/offer/${d.id}/print`} target="_blank" rel="noopener noreferrer"
+                className="rounded px-3 py-1.5 font-bold" style={{ background: "var(--blue)", color: "#fff", fontSize: 12.5 }}>
+                📄 The appointment letter
+              </a>
+            </>
+          )}
           {isOwner && d.status !== "Draft" && d.status !== "Joined" && <B onClick={() => setStatus("Draft")} busy={busy} bg="#fff" fg="#8A5B00" border>Back to draft</B>}
         </div>
         <div style={{ fontSize: 11.5, color: C.faint, marginTop: 8 }}>
@@ -867,13 +901,20 @@ function LetterPreview({ d }: { d: Offer }) {
 
       <div><b>{d.name}</b></div>
       {d.address && <div style={{ whiteSpace: "pre-wrap", color: C.dim }}>{d.address}</div>}
+      {(d.email || d.mobile) && (
+        <div style={{ color: C.dim }}>
+          {[d.email, d.mobile ? `${d.country_code || "+91"} ${d.mobile}` : ""].filter(Boolean).join("  ·  ")}
+        </div>
+      )}
 
       <p style={{ marginTop: 12 }}>Dear {String(d.name || "").split(" ")[0]},</p>
       <p>
-        We are happy to have you join us for the role of <b>{d.role_doc?.role || d.designation || "—"}</b>.
-        The roles and responsibility are as documented in Annexure 2.
-        Your offered gross monthly salary shall be <b>Rs. {inr(d.agreed_gross)}/-</b>
-        {d.salary ? <> and the annual CTC shall be <b>Rs. {d.salary.ctcLakhs} Lakhs</b></> : null} as detailed in Annexure 1.
+        We are happy to have you join us for the role of <b>{d.designation || d.role_doc?.role || "—"}</b>
+        {d.type ? <> as {withArticle(d.type)}</> : null}.
+      </p>
+      <p>The roles and responsibility are as documented in Annexure 2.</p>
+      <p>
+        Your offered gross monthly salary shall be <b>Rs. {inr(d.agreed_gross)}/-</b> as detailed in Annexure 1.
       </p>
       <p>
         You shall join on or around <b>{day(d.joining_date)}</b>, reporting to <b>{d.reporting_to || "—"}</b>.
@@ -885,11 +926,17 @@ function LetterPreview({ d }: { d: Offer }) {
       <div className="font-bold" style={{ marginTop: 16 }}>Annexure 1 — Compensation</div>
       {d.salary ? <SalaryTable rows={d.salary.rows} ctc={d.salary.ctcLakhs} /> : <div style={{ color: C.faint }}>Not yet set.</div>}
 
+      {/* Where the paper will break, said on screen so it is not a surprise
+          in the PDF. */}
+      <div className="no-print" style={{ borderTop: `1px dashed ${C.line}`, margin: "16px 0 4px", paddingTop: 4, fontSize: 10.5, color: C.faint, letterSpacing: .4 }}>
+        NEW PAGE IN THE PDF
+      </div>
+      <div style={{ pageBreakBefore: "always", breakBefore: "page" }} />
       <div className="font-bold" style={{ marginTop: 16 }}>Annexure 2 — Roles and Responsibility</div>
       {d.role_doc?.purpose && <><div className="font-bold" style={{ fontSize: 12.5, marginTop: 8 }}>Purpose of the role</div><RichTextView html={d.role_doc.purpose} /></>}
-      {d.role_doc?.job_description && <><div className="font-bold" style={{ fontSize: 12.5, marginTop: 8 }}>Job description</div><RichTextView html={d.role_doc.job_description} /></>}
-      {d.role_doc?.deliverable && <><div className="font-bold" style={{ fontSize: 12.5, marginTop: 8 }}>Key responsibility areas</div><RichTextView html={d.role_doc.deliverable} /></>}
-      {d.role_doc?.metric && <><div className="font-bold" style={{ fontSize: 12.5, marginTop: 8 }}>KPI metrics</div><RichTextView html={d.role_doc.metric} /></>}
+      {d.role_doc?.job_description && <><div className="font-bold" style={{ fontSize: 12.5, marginTop: 8 }}>Job description</div><RichTextView html={bulletsHtml(d.role_doc.job_description)} /></>}
+      {d.role_doc?.deliverable && <><div className="font-bold" style={{ fontSize: 12.5, marginTop: 8 }}>Key responsibility areas</div><RichTextView html={bulletsHtml(d.role_doc.deliverable)} /></>}
+      {d.role_doc?.metric && <><div className="font-bold" style={{ fontSize: 12.5, marginTop: 8 }}>KPI metrics</div><RichTextView html={bulletsHtml(d.role_doc.metric)} /></>}
       {!!(d.competencies || []).length && (
         <>
           <div className="font-bold" style={{ fontSize: 12.5, marginTop: 8 }}>Competencies expected</div>

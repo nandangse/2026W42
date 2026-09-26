@@ -155,6 +155,36 @@ export const RESUME_SYSTEM =
 
 const rupees = (n: unknown) => (n == null || n === "" ? "—" : Math.round(Number(n)).toLocaleString("en-IN"));
 
+/** "a Contractor", "an Intern" — the article picked off the word, not guessed. */
+export const withArticle = (w: string) => `${/^[aeiou]/i.test(w.trim()) ? "an" : "a"} ${w.trim()}`;
+
+/**
+ * ROLES AND RESPONSIBILITY, AS A LIST (Dr Raghu, 26 Sep 2026: "the roles and
+ * resoonsibility should hve bullers").
+ *
+ * The register keeps a job description as one long line with a middle dot
+ * between duties, which is how it was typed and is unreadable on a letter:
+ * forty responsibilities in a single grey paragraph is a paragraph nobody
+ * reads, and this is the annexure a person is being asked to agree to.
+ *
+ * Split on the dot and each duty gets its own line. A description already
+ * written as a list is left exactly as it is — it was already right.
+ */
+export function bulletsHtml(html?: string | null): string {
+  const raw = String(html || "").trim();
+  if (!raw) return "";
+  if (/<(ul|ol|li)\b/i.test(raw)) return raw;
+  const parts = raw
+    .replace(/<\/?(p|div|br)[^>]*>/gi, "\n")
+    .split(/[·•]|\n+/)
+    .map((x) => x.replace(/^[\s.;,-]+|[\s;,]+$/g, "").trim())
+    .filter((x) => x.length > 1);
+  if (parts.length < 2) return raw;
+  return `<ul style="margin:4px 0 0;padding-left:20px">${parts
+    .map((x) => `<li style="margin:0 0 4px">${/[.?!]$/.test(x) ? x : `${x}.`}</li>`)
+    .join("")}</ul>`;
+}
+
 
 
 /** Plain text (the covering note) into paragraphs a mail client will honour. */
@@ -167,7 +197,8 @@ export function textToHtml(t: string): string {
 
 export interface LetterOffer {
   offer_no?: string | null; name?: string | null; address?: string | null;
-  offer_date?: string | null; joining_date?: string | null;
+  email?: string | null; mobile?: string | null; country_code?: string | null;
+  offer_date?: string | null; joining_date?: string | null; type?: string | null;
   designation?: string | null; reporting_to?: string | null; probation_months?: number | null;
   agreed_gross?: number | null;
   salary?: { rows: { label: string; monthly: number | null; yearly: number | null; kind: string }[]; ctcLakhs: string } | null;
@@ -192,7 +223,14 @@ export function offerLetterHtml(d: LetterOffer, draft = false, withLetterhead = 
   }).join("");
 
   const rd = d.role_doc || {};
+  /* The two ways to reach them, on the letter itself — a letter that names no
+     address is a letter nobody can answer. */
+  const contact = [d.email, d.mobile ? `${d.country_code || "+91"} ${d.mobile}` : ""].filter(Boolean).join("  ·  ");
   const section = (title: string, html?: string) => (html ? `<div style="${S.h}">${esc(title)}</div>${html}` : "");
+  /* Annexure 2 starts its own page: the compensation table is what a person
+     reads first and what they come back to, and a page that begins halfway
+     down under a table belongs to the table above it. */
+  const PAGE_BREAK = `<div style="page-break-before:always;break-before:page"></div>`;
 
   return `<div style="${S.body}">
 <table width="100%" style="margin-bottom:14px;border-bottom:2px solid #16232F;padding-bottom:8px"><tr>
@@ -209,10 +247,13 @@ export function offerLetterHtml(d: LetterOffer, draft = false, withLetterhead = 
 
 <div><b>${esc(d.name)}</b></div>
 ${d.address ? `<div style="color:#46545F;white-space:pre-wrap">${esc(d.address)}</div>` : ""}
+${contact ? `<div style="color:#46545F">${esc(contact)}</div>` : ""}
 
 <p style="margin:16px 0 0">Dear ${esc(String(d.name || "").split(" ")[0])},</p>
-<p>We are happy to have you join us for the role of <b>${esc(rd.role || d.designation)}</b>. The roles and responsibility are as documented in Annexure 2. Your offered gross monthly salary shall be <b>Rs. ${rupees(d.agreed_gross)}/-</b>${sal ? ` and the annual CTC shall be <b>Rs. ${esc(sal.ctcLakhs)} Lakhs</b>` : ""} as detailed in Annexure 1.</p>
-<p>You shall join on or around <b>${dmy(d.joining_date)}</b>, reporting to <b>${esc(d.reporting_to)}</b>. Your probation period shall be <b>${esc(d.probation_months || 3)} months</b>. The terms and conditions of employment are set out below. The finalised hard copy shall be given on joining along with your roles and responsibilities.</p>
+<p>We are happy to have you join us for the role of <b>${esc(d.designation || rd.role)}</b>${d.type ? ` as ${esc(withArticle(String(d.type)))}` : ""}.</p>
+<p>The roles and responsibility are as documented in Annexure 2.</p>
+<p>Your offered gross monthly salary shall be <b>Rs. ${rupees(d.agreed_gross)}/-</b> as detailed in Annexure 1.</p>
+<p>You shall join on or around <b>${dmy(d.joining_date)}</b>, reporting to <b>${esc(d.reporting_to)}</b>. Your probation period shall be <b>${esc(d.probation_months || 3)} months</b>. The terms and conditions of employment are as attached. The finalised hard copy shall be given on joining along with your roles and responsibilities.</p>
 
 <div style="${S.h}">Annexure 1 — Compensation</div>
 ${sal ? `<table width="100%" style="border-collapse:collapse;font-size:13px">
@@ -220,11 +261,12 @@ ${sal ? `<table width="100%" style="border-collapse:collapse;font-size:13px">
   ${rows}
 </table><p style="margin-top:6px"><b>CTC ≈ Rs ${esc(sal.ctcLakhs)} Lakhs per annum</b></p>` : "<p>To be confirmed.</p>"}
 
+${PAGE_BREAK}
 <div style="${S.h}">Annexure 2 — Roles and Responsibility</div>
 ${section("Purpose of the role", rd.purpose)}
-${section("Job description", rd.job_description)}
-${section("Key responsibility areas", rd.deliverable)}
-${section("KPI metrics", rd.metric)}
+${section("Job description", bulletsHtml(rd.job_description))}
+${section("Key responsibility areas", bulletsHtml(rd.deliverable))}
+${section("KPI metrics", bulletsHtml(rd.metric))}
 ${(d.competencies || []).length ? `<div style="${S.h}">Competencies expected</div><p>${(d.competencies || []).map((c) => `${esc(c.name)} <b>${esc(c.level)}/5</b>`).join(" &nbsp;·&nbsp; ")}</p>` : ""}
 
 ${section("Terms of Employment", d.terms || "")}
