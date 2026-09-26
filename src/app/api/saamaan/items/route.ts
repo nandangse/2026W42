@@ -4,6 +4,8 @@ import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
 import { crmDb, crmConfigured } from "@/crm/db";
 
+import { mayTouchErp } from "@/lib/erp-hands";
+
 export const dynamic = "force-dynamic";
 
 /**
@@ -132,7 +134,7 @@ const safe = (q: string) => q.replace(/[,()"'\\%]/g, " ").trim();
 
 export async function GET(req: Request) {
   try {
-    await requireSaamaan();
+    const me = await requireSaamaan();
     const admin = adminClient();
     const p = new URL(req.url).searchParams;
     const mode = String(p.get("mode") || "list");
@@ -171,6 +173,9 @@ export async function GET(req: Request) {
         groups: (groups.data as { item_group: string; n: number }[] | null) ?? [],
         pulls: pulls.data ?? [],
         lastPulledAt: lastItems?.at ?? null,
+        /* Decided here, not guessed at in the browser: the screen shows the
+           button to exactly the hands the route will let through. */
+        mayPull: me.isOwner || mayTouchErp(me.email),
       });
     }
 

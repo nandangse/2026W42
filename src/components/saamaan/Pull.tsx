@@ -7,8 +7,13 @@
  * files, the projects, the BOM headers, then the BOM lines of the jobs in
  * process. Each phase reports what it found and what it
  * wrote before the next begins, so a walk that stops half-way says exactly
- * where. Raghu's hand only, as with Seva's ERP door; everyone else sees the
- * ledger.
+ * where.
+ *
+ * WHOSE HANDS (Dr Raghu, 26 Sep 2026: "this pull from ERP should be
+ * available from Mukesh and pankaj also"). Raghu, Pankaj and Mukesh — the
+ * same three as the hourly refresh, from the one list in lib/erp-hands.
+ * Everyone else sees the ledger, which is the useful half anyway: it says
+ * when the mirror was last filled, by whom, and what each phase found.
  */
 
 import { useState } from "react";
@@ -29,6 +34,9 @@ const PHASES: { key: string; label: string; what: string }[] = [
 type Line = { phase: string; state: "waiting" | "running" | "done" | "failed"; note: string };
 
 export default function Pull({ summary, isOwner, onDone }: { summary: Summary; isOwner: boolean; onDone: () => void }) {
+  /* The server decides and says so. isOwner is kept only as the answer for
+     an older summary that predates the flag — never as a second opinion. */
+  const mayPull = summary.mayPull ?? isOwner;
   const [busy, setBusy] = useState(false);
   const [lines, setLines] = useState<Line[]>([]);
 
@@ -56,8 +64,8 @@ export default function Pull({ summary, isOwner, onDone }: { summary: Summary; i
     <Screen
       title="ERP pull"
       blurb="Reads nandanerp into Saamaan — items, child tables, files, projects, BOMs, then the BOM lines of the jobs in process. Nothing on the ERP is written, ever."
-      action={isOwner ? <Btn kind="primary" onClick={run} disabled={busy} title="Seven phases, one after the other">{busy ? "Pulling…" : "⇣ Pull from the ERP"}</Btn> : undefined}>
-      {!isOwner && <Note kind="info">The ERP door is Raghu&apos;s to use, for now. The ledger below shows every walk that was made.</Note>}
+      action={mayPull ? <Btn kind="primary" onClick={run} disabled={busy} title="Seven phases, one after the other">{busy ? "Pulling…" : "⇣ Pull from the ERP"}</Btn> : undefined}>
+      {!mayPull && <Note kind="info">The ERP door is Raghu, Pankaj and Mukesh. The ledger below shows every walk that was made, and when.</Note>}
       {!summary.erpBase && <Note kind="warn">The ERP&apos;s URL is not saved — CRM → Settings → Integrations holds the ERPNext keys, and Saamaan borrows them from there.</Note>}
 
       <div className="rounded-lg border mb-3" style={{ borderColor: BORDER, background: "#fff" }}>

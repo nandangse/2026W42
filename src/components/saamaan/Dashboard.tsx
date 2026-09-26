@@ -39,6 +39,8 @@ export interface Summary {
   groups: { item_group: string; n: number }[];
   pulls: PullLine[];
   lastPulledAt: string | null;
+  /** Whether THIS person may pull — answered by the server, not guessed here. */
+  mayPull?: boolean;
 }
 
 const pct = (n: number, of: number) => (of > 0 ? `${Math.round((n / of) * 100)}%` : "");

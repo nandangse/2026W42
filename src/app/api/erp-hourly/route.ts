@@ -3,6 +3,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { errJson, HttpError, requireUser } from "@/lib/auth";
 import { readBody } from "@/lib/validate";
 import { ERP_DOCS, isOn } from "@/lib/erp-hourly";
+import { ERP_HANDS_WITH_FILES } from "@/lib/erp-hands";
 
 export const dynamic = "force-dynamic";
 
@@ -16,12 +17,7 @@ export const dynamic = "force-dynamic";
  * than roled: it is three people, not a tier, and writing it down is more
  * honest than inventing a permission nobody asked for.
  */
-const HANDS = new Set([
-  "raghu@nandan.co.in",
-  "pankajs@nandan.co.in",   // Pankaj Sutar
-  "mukesh@nandan.co.in",    // Mukesh Tiwari
-  "shweta@nandan.co.in",    // the morning files, as before
-]);
+const HANDS = ERP_HANDS_WITH_FILES;
 
 async function hand() {
   const u = await requireUser();

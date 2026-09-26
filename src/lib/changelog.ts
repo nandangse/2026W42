@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.4.0.1",
+    date: "2026-09-26",
+    module: "Pull from the ERP: Pankaj and Mukesh too",
+    items: [
+      "<b>Saamaan\u2019s ERP pull is Raghu, Pankaj and Mukesh</b> \u2014 the same three hands as the hourly refresh. Both already hold the Saamaan door, so there is nothing to tick: the button is simply there when they open it.",
+      "<b>And it is now one list, in one file.</b> The hourly refresh already knew these three; the pull was still asking \u201cis this the owner?\u201d \u2014 so the same question had two answers in two places and only one of them moved when the answer changed. A permission written twice is a permission that will eventually disagree with itself.",
+      "<b>The screen asks the server who may pull, rather than working it out itself.</b> The button now appears for exactly the hands the route will let through, so it can no longer offer something that is then refused. For everyone else the ledger stays, which is the useful half: when the mirror was last filled, by whom, and what each phase found.",
+    ],
+  },
+  {
     v: "5.4.0.0",
     date: "2026-09-26",
     module: "The offer letter says the job, not the register",

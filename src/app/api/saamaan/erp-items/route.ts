@@ -5,6 +5,8 @@ import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
 import { crmDb, crmConfigured } from "@/crm/db";
 
+import { mayTouchErp, ERP_HANDS_REFUSAL } from "@/lib/erp-hands";
+
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
@@ -212,7 +214,10 @@ function toRow(d: Doc, pulledAt: string): Doc {
 export async function POST(req: Request) {
   try {
     const me = await requireSaamaan();
-    if (!me.isOwner) throw new HttpError(403, "The ERP door is Raghu's to use, for now.");
+    /* Dr Raghu, 26 Sep 2026: "this pull from ERP should be available from
+       Mukesh and pankaj also." One list, in erp-hands, shared with the
+       hourly refresh so the same question cannot get two answers. */
+    if (!me.isOwner && !mayTouchErp(me.email)) throw new HttpError(403, ERP_HANDS_REFUSAL);
     const body = await readBody(req, {}).catch((): AnyBody => ({}));
     const phase = String(body.phase || "items");
     const { base, H } = await erpConfig();
