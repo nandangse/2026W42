@@ -20,6 +20,46 @@ export const STATUS_META: Record<LessonStatus, { label: string; color: string; b
 
 export const STATUS_ORDER: LessonStatus[] = ["in_progress", "planned", "completed"];
 
+/**
+ * WHO A LIBRARY IS FOR (Dr Raghu, 27 Sep 2026).
+ *
+ * Five named groups, and an empty audience meaning every logged-in Genie
+ * user. Said that way round a new library is open by default and is narrowed
+ * on purpose — which is the safe direction here. The cost of an open training
+ * library is that somebody reads a course meant for another team; the cost of
+ * a closed one is training that nobody can see and so nobody does.
+ */
+export const LMS_GROUPS = ["Sales", "Operations", "Worker", "Consultant", "Lean"] as const;
+export type LmsGroup = (typeof LMS_GROUPS)[number];
+
+export const EVERYONE = "All logged-in Genie users";
+
+/** What a library's audience should be called on screen. */
+export function audienceLabel(audience?: string[] | null): string {
+  const a = (audience || []).filter(Boolean);
+  return a.length ? a.join(" · ") : EVERYONE;
+}
+
+/**
+ * May this person see this library?
+ *
+ * An admin sees every library, because somebody has to be able to put a
+ * lesson into one — but that is the ONLY way through: being an admin is not
+ * a group, so an admin's own shelf shows what their groups say, and what
+ * they see extra is visibly marked rather than silently mixed in.
+ */
+export function maySeeBook(
+  book: { audience?: string[] | null },
+  groups: string[] | null | undefined,
+  isAdmin = false,
+): boolean {
+  const a = (book.audience || []).filter(Boolean);
+  if (!a.length) return true;               // empty means everybody
+  if (isAdmin) return true;
+  const mine = new Set((groups || []).map((g) => g.toLowerCase()));
+  return a.some((g) => mine.has(String(g).toLowerCase()));
+}
+
 export interface Book {
   id: string;
   name: string;
@@ -27,6 +67,8 @@ export interface Book {
   icon: string | null;
   color: string;
   sort_order: number;
+  /** Groups that may see it. Empty = everybody. Absent until migration 0170. */
+  audience?: string[] | null;
   /** The book's URL name — genie.nandan.co.in/lms/<slug>. Two words max,
    *  dashed. Absent until migration 0101. */
   slug?: string | null;
@@ -59,6 +101,10 @@ export interface Progress {
   status: LessonStatus;
   completed_on: string | null;
   learning: string;
+  /** Scratch notes taken while watching. NEVER counts towards the fifty
+   *  words — the floor means something only because it is written after,
+   *  about what was taken. Absent until migration 0170. */
+  notes?: string;
   minutes: number;
   planned_by: string | null;
   /** Queue position within a status — smaller floats up. Assigned trainings

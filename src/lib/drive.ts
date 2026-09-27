@@ -56,6 +56,9 @@ const b64url = (b: Buffer | string) =>
 /** Access tokens last an hour; minting one per upload would be three round trips a day wasted. */
 let cached: { token: string; expires: number } | null = null;
 
+/** The same token the rest of this file uses, for callers that stream. */
+export async function driveToken(cfg: DriveConfig): Promise<string> { return accessToken(cfg); }
+
 async function accessToken(cfg: DriveConfig): Promise<string> {
   if (cached && cached.expires > Date.now() + 60_000) return cached.token;
 

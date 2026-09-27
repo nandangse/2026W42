@@ -4,7 +4,7 @@ import { swallow } from "@/lib/swallow";
 import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { teamOf } from "@/lib/team";
-import { MIN_LEARNING_WORDS, wordCount, type LessonStatus } from "@/lib/lms";
+import { MIN_LEARNING_WORDS, wordCount, maySeeBook, LMS_GROUPS, type LessonStatus } from "@/lib/lms";
 import { today } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export async function GET(req: Request) {
       admin.from("lms_section").select("*").order("sort_order"),
       admin.from("lms_lesson").select("*").eq("active", true).order("title"),
       admin.from("lms_lesson_book").select("*"),
-      admin.from("profiles").select("id,email,display_name,initials,designation,department_id,reports_to,disabled"),
+      admin.from("profiles").select("id,email,display_name,initials,designation,department_id,reports_to,disabled,lms_groups,lms_only"),
     ]);
     const firstErr = bookRes.error || secRes.error || lessonRes.error || shelfRes.error || profRes.error;
     if (firstErr) throw new Error(firstErr.message);
@@ -67,13 +67,36 @@ export async function GET(req: Request) {
       shelvesByLesson.set(s.lesson_id, list);
     }
 
+    /**
+     * THE SHELF IS CUT TO THE PERSON (Dr Raghu, 27 Sep 2026).
+     *
+     * Cut HERE, on the server, and not hidden in the browser: a library a
+     * person may not see must not travel to their machine at all. Hiding a
+     * row that was already sent is a curtain, not a wall.
+     *
+     * A lesson shelved only in libraries they cannot see goes with them —
+     * otherwise a closed library leaks its contents through the open one.
+     */
+    const myGroups: string[] = (people.find((p) => p.id === personId)?.lms_groups as string[] | null) || [];
+    const allBooks = bookRes.data || [];
+    const books = allBooks.filter((b) => maySeeBook(b, myGroups, isAdmin));
+    const visibleBookIds = new Set(books.map((b) => String(b.id)));
+    const lessons = (lessonRes.data || [])
+      .map((l) => ({ ...l, shelves: (shelvesByLesson.get(l.id) || []).filter((sh) => visibleBookIds.has(String(sh.book_id))) }))
+      .filter((l) => l.shelves.length > 0);
+
     return NextResponse.json({
       installed: true,
-      me: { id: user.id, name: user.displayName || user.email.split("@")[0], isAdmin },
+      me: {
+        id: user.id, name: user.displayName || user.email.split("@")[0], isAdmin,
+        groups: (people.find((p) => p.id === user.id)?.lms_groups as string[] | null) || [],
+        lmsOnly: !!people.find((p) => p.id === user.id)?.lms_only,
+      },
       person: personId,
-      books: bookRes.data || [],
+      groupNames: LMS_GROUPS,
+      books,
       sections: secRes.data || [],
-      lessons: (lessonRes.data || []).map((l) => ({ ...l, shelves: shelvesByLesson.get(l.id) || [] })),
+      lessons,
       progress: progRes.data || [],
       extras: extraRes.data || [],
       plan: planRes.data ?? null,
@@ -83,6 +106,15 @@ export async function GET(req: Request) {
         return { id: m.id, depth: m.depth, name: p?.display_name || p?.email || m.id, designation: p?.designation ?? null };
       }),
       canAuthor: isAdmin,
+      /* Who is in which group — only an admin is shown it, because only an
+         admin can change it, and a list of everybody's training groups is
+         nobody else's to read. */
+      roster: isAdmin
+        ? people.map((p) => ({
+            id: p.id, email: p.email, name: p.display_name || p.email,
+            groups: (p.lms_groups as string[] | null) || [], lmsOnly: !!p.lms_only,
+          })).sort((a, b) => String(a.name).localeCompare(String(b.name)))
+        : [],
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -340,13 +372,116 @@ export async function POST(req: Request) {
         sort_order: int(body.sort_order),
         active: body.active !== false,
         slug,
+        /* Only names from the list get in. An audience holding a group that
+           does not exist is a library nobody can open, and it would look
+           exactly like one that is simply empty. */
+        audience: Array.isArray(body.audience)
+          ? (body.audience as unknown[]).map((g) => String(g)).filter((g) => (LMS_GROUPS as readonly string[]).includes(g))
+          : [],
       };
       let { error } = await admin.from("lms_book").upsert(row);
       if (error && /slug/.test(error.message)) {
         delete row.slug;
         ({ error } = await admin.from("lms_book").upsert(row));
       }
+      if (error && /audience/.test(error.message)) {
+        delete row.audience;
+        ({ error } = await admin.from("lms_book").upsert(row));
+        if (!error) return NextResponse.json({ ok: true, warning: "Saved, but WITHOUT the audience — migration 0170 has not been run, so this library is still open to everybody." });
+      }
       if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true });
+    }
+
+    /**
+     * NOTES WHILE WATCHING (Dr Raghu, 27 Sep 2026: "Have a place to write
+     * notes when seeing on mobile as well in laptop/tablet").
+     *
+     * Its own action and its own column, deliberately apart from the fifty
+     * words. Notes are taken DURING, in fragments, and they are nobody's to
+     * mark; the learning text is written AFTER, about what was taken, and it
+     * is the thing the IDP is built from. Letting scribbles count towards the
+     * floor would quietly end the only rule this module has.
+     *
+     * It never changes the lesson's status — writing a note is not progress.
+     */
+    if (action === "progress.notes") {
+      const lessonId = str(body.lesson_id, 64);
+      if (!lessonId) throw new HttpError(400, "lesson_id is required");
+      const notes = str(body.notes, 20000);
+      const { data: existing } = await admin.from("lms_progress")
+        .select("lesson_id").eq("person_id", user.id).eq("lesson_id", lessonId).maybeSingle();
+      const { error } = existing
+        ? await admin.from("lms_progress").update({ notes }).eq("person_id", user.id).eq("lesson_id", lessonId)
+        : await admin.from("lms_progress").insert({ person_id: user.id, lesson_id: lessonId, status: "in_progress", notes, learning: "", minutes: 0 });
+      if (error) {
+        if (/notes/.test(error.message)) throw new HttpError(503, "Notes need migration 0170 — it has not been run yet.");
+        throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    /**
+     * MOVE A LESSON FROM ONE LIBRARY TO ANOTHER (Dr Raghu, 27 Sep 2026:
+     * "Move file from one library to other").
+     *
+     * A move, not a copy: the shelf row is repointed, so the lesson leaves
+     * the old library as it joins the new one. Everybody's completions and
+     * their fifty words hang off the LESSON, not off the shelf, so nothing
+     * anybody has written is touched by moving where it sits.
+     */
+    if (action === "lesson.shelf") {
+      needAuthor();
+      const lessonId = str(body.lesson_id, 64);
+      const from = str(body.from_book, 64);
+      const to = str(body.to_book, 64);
+      if (!lessonId || !from || !to) throw new HttpError(400, "lesson_id, from_book and to_book are required");
+      if (from === to) return NextResponse.json({ ok: true, note: "It is already there." });
+      /* Already shelved in the destination: drop the old row rather than
+         inserting a duplicate that the shelf would show twice. */
+      const { data: there } = await admin.from("lms_lesson_book")
+        .select("lesson_id").eq("lesson_id", lessonId).eq("book_id", to).maybeSingle();
+      if (there) {
+        const { error } = await admin.from("lms_lesson_book").delete().eq("lesson_id", lessonId).eq("book_id", from);
+        if (error) throw new Error(error.message);
+        return NextResponse.json({ ok: true, note: "It was already in that library, so the old shelf was cleared." });
+      }
+      const { error } = await admin.from("lms_lesson_book")
+        .update({ book_id: to, section_id: null }).eq("lesson_id", lessonId).eq("book_id", from);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true });
+    }
+
+    /**
+     * WHICH GROUPS A PERSON IS IN, and whether the library is all they get.
+     *
+     * Dr Raghu, 27 Sep 2026: "can the LMS in the genie be given access to
+     * other people as a standalone user."
+     *
+     * lms_only closes every other door rather than opening one. A consultant
+     * given a login for the training library has no business seeing jobs,
+     * salaries or the order book, and the safe way to write that is as a
+     * restriction on the person, not as a permission on each module that
+     * somebody has to remember to withhold.
+     */
+    if (action === "person.groups") {
+      needAuthor();
+      const id = str(body.person_id, 64);
+      if (!id) throw new HttpError(400, "person_id is required");
+      const groups = Array.isArray(body.groups)
+        ? (body.groups as unknown[]).map((g) => String(g)).filter((g) => (LMS_GROUPS as readonly string[]).includes(g))
+        : [];
+      const patch: Record<string, unknown> = { lms_groups: groups };
+      if (typeof body.lms_only === "boolean") {
+        /* The owner cannot lock himself out of Genie by a mis-click. */
+        if (body.lms_only && id === user.id) throw new HttpError(400, "That would close every other door on yourself.");
+        patch.lms_only = body.lms_only;
+      }
+      const { error } = await admin.from("profiles").update(patch).eq("id", id);
+      if (error) {
+        if (/lms_groups|lms_only/.test(error.message)) throw new HttpError(503, "Groups need migration 0170 — it has not been run yet.");
+        throw new Error(error.message);
+      }
       return NextResponse.json({ ok: true });
     }
 

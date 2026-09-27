@@ -19,6 +19,10 @@ export function moduleDoor(table: string, moduleName: string) {
   return async function require(): Promise<AuthedUser> {
     const u = await currentUser();
     if (!u || u.disabled) throw new HttpError(401, "Sign in first.");
+    /* A learner's only door is the library — checked here, above the grant,
+       so it holds for every module at once and cannot be forgotten on the
+       next one somebody adds. */
+    if (u.lmsOnly) throw new HttpError(403, "This login opens the training library only.");
     if (!(await hasGrant(adminClient(), table, u.email, u.isOwner)))
       throw new HttpError(403, `${moduleName} is granted per person — the tick on Admin → module access.`);
     return u;

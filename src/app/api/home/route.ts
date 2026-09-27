@@ -38,6 +38,23 @@ export async function GET() {
 
     const kind: "labour" | "staff" = /labour/i.test(String(employee?.type || "")) && u.role !== "admin" ? "labour" : "staff";
 
+    /**
+     * A LEARNER SEES ONE DOOR (Dr Raghu, 27 Sep 2026: "given access to other
+     * people as a standalone user").
+     *
+     * Returned before any grant is read, so a consultant's home page cannot
+     * be a row of doors that all refuse — which reads as a fault in Genie
+     * rather than as the deliberate shape of their login.
+     */
+    if (u.lmsOnly) {
+      return NextResponse.json({
+        kind: "staff" as const, employee,
+        doors: { main: false, crm: false, marketing: false, hrms: false, ims: false, lms: true, accounts: false, vishwakarma: false, saamaan: false },
+        goals: false,
+        me: { email: u.email, displayName: u.displayName, initials: u.initials, role: u.role, isOwner: u.isOwner, lmsOnly: true },
+      });
+    }
+
     const [crm, hrms, accounts, vishwakarma, seva, ims, saamaan, goals, marketing] = await Promise.all([
       mayUseCrm(),
       hasGrant(admin, "hrms_access", email, u.isOwner),

@@ -89,6 +89,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.5.0.0",
+    date: "2026-09-27",
+    module: "LMS: who a library is for, and a login that is only a library",
+    items: [
+      "<b>Every library now says who it is for</b> \u2014 all logged-in Genie users, or any of <b>Sales, Operations, Worker, Consultant, Lean</b>. An empty audience means everybody, so a library made today is open and is narrowed on purpose: the cost of an open training library is somebody reading a course meant for another team, and the cost of a closed one is training nobody can see and so nobody does.",
+      "<b>It is cut on the server, not hidden in the browser.</b> A library somebody may not see does not travel to their machine at all, and nor do the lessons shelved only in it \u2014 otherwise a closed library leaks its contents through an open one. Hiding a row that was already sent is a curtain, not a wall.",
+      "<b>Learner-only logins.</b> A consultant or contractor can be given a Genie account whose <b>only</b> door is the training library. Written as a restriction on the person rather than as eight permissions to withhold \u2014 a permission has to be correctly withheld eight times and again on the ninth module somebody adds; a restriction has to be applied once.",
+      "<b>Move a lesson from one library to another</b>, from the shelf itself. A move, not a copy: it leaves the old library as it joins the new one. Nobody\u2019s completion or written learning is touched \u2014 those hang off the lesson, never off the shelf it happens to sit on.",
+      "<b>Notes while you watch</b>, under the video, on a phone as much as on a laptop, saving themselves a second after you stop typing. <b>They are not the fifty words</b> and the screen says so: notes are fragments written during, nobody marks them; the learning text is written after, about what was taken, and it is still the only thing that completes a lesson.",
+      "<b>Google Drive videos now play on the page, with speed.</b> Drive\u2019s embed is an iframe from another origin, and that single fact refused both asks \u2014 its player carries a pop-out that takes the lesson into a Drive tab, and nothing outside the frame can set its speed. Genie serves the file itself now, so the video is an ordinary element on our own page: <b>no pop-out, and 1x to 1.5x.</b> Where Drive will not give Genie the file, it falls back to Google\u2019s player and <b>says which refusal it was</b>, since \u201cnot shared\u201d and \u201cnot there\u201d have different fixes.",
+      "<b>Speed stops at 1.5x</b>, for YouTube lessons too. It used to run to 2x \u2014 and a training video at double speed is one somebody has watched the shape of rather than the content.",
+      "<b>Needs migration 0170.</b> Until it is run, audiences, groups, learner-only logins and notes are all refused in plain words rather than half-working.",
+    ],
+  },
+  {
     v: "5.4.0.1",
     date: "2026-09-26",
     module: "Pull from the ERP: Pankaj and Mukesh too",

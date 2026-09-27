@@ -20,6 +20,9 @@ export interface AuthedUser {
   lc: boolean;
   stratcom: boolean;
   management: boolean;
+  /** Their only door is the training library. See currentUser() for why it
+   *  is written as a restriction rather than as eight permissions. */
+  lmsOnly: boolean;
 }
 
 /** Tiers, mirroring the SQL helpers in migration 0008. */
@@ -44,7 +47,7 @@ export async function currentUser(): Promise<AuthedUser | null> {
   // the caller's own role from this lookup.
   const { data: profile } = await adminClient()
     .from("profiles")
-    .select("role, disabled, email, initials, display_name, erp_owner, lc, stratcom, management")
+    .select("role, disabled, email, initials, display_name, erp_owner, lc, stratcom, management, lms_only")
     .eq("id", user.id)
     .maybeSingle();
   const role = (profile?.role as Role) ?? "planner";
@@ -61,6 +64,17 @@ export async function currentUser(): Promise<AuthedUser | null> {
     lc: !!profile?.lc,
     stratcom: !!profile?.stratcom,
     management: !!profile?.management,
+    /**
+     * A LEARNER AND NOTHING ELSE (Dr Raghu, 27 Sep 2026).
+     *
+     * Someone given a Genie login only for the training library — a
+     * consultant, a contractor. Written as a restriction on the PERSON, not
+     * as a permission on each module, because a permission has to be
+     * withheld eight times and correctly every time, while a restriction has
+     * to be applied once. Undefined until migration 0170, which reads as
+     * false: an existing user does not become a learner by our forgetting.
+     */
+    lmsOnly: !!profile?.lms_only,
   };
 }
 

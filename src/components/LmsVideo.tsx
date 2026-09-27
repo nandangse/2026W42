@@ -58,26 +58,106 @@ export default function LmsVideo({ video }: { video: VideoRef }) {
     ) : null;
   }
   if (video.kind === "youtube") return <YouTubePlayer id={video.id!} />;
+  /**
+   * DRIVE IS NOW OURS TOO (Dr Raghu, 27 Sep 2026: "Google drive vide should
+   * be able to be seen only here and not on new page", "Able to see the
+   * video in 1x upto 1.5x").
+   *
+   * Google's /preview is an iframe from another origin, and that single fact
+   * refuses both asks: its player carries a pop-out that takes the lesson
+   * into a Drive tab, and nothing outside the frame can set its speed. So
+   * the bytes come through Genie instead and the video is an ordinary
+   * element on our own page — no pop-out, because there is no Drive player,
+   * and speed is a property, because the element is ours.
+   *
+   * If Drive will not give Genie the file, we say so and fall back to the
+   * embed rather than showing a black rectangle.
+   */
+  if (video.kind === "drive") return <DrivePlayer id={video.id!} embed={video.embed} />;
   return (
-    <div>
-      <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${C.line}`, background: "#000" }}>
-        {video.kind === "file" ? (
-          <video src={video.embed} controls controlsList="nodownload" style={{ width: "100%", display: "block" }} />
-        ) : (
-          <iframe src={video.embed} allow="autoplay" allowFullScreen
-            style={{ width: "100%", aspectRatio: "16 / 9", border: "none", display: "block" }} />
-        )}
-      </div>
-      {video.kind === "drive" && (
-        <div className="text-xs mt-1" style={{ color: C.faint, lineHeight: 1.45 }}>
-          Google Drive supplies its own player, so its controls cannot be trimmed the way a YouTube lesson&apos;s are.
-        </div>
-      )}
+    <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${C.line}`, background: "#000" }}>
+      <SelfPlayer src={video.embed} />
     </div>
   );
 }
 
-const RATES = [1, 1.25, 1.5, 1.75, 2];
+/**
+ * 1x TO 1.5x, and no further (Dr Raghu, 27 Sep 2026: "Able to see the video
+ * in 1x upto 1.5x").
+ *
+ * The old list ran to 2x. A training video at double speed is a video
+ * somebody has watched the shape of rather than the content, and this module
+ * exists to make training count. 1.5 is the top, and the steps in between are
+ * there because 1.25 is what most people actually settle on.
+ */
+const RATES = [1, 1.25, 1.5];
+
+/** A real <video>, with speed, because it is ours. */
+function SelfPlayer({ src, onFail }: { src: string; onFail?: (why: string) => void }) {
+  const ref = useRef<HTMLVideoElement | null>(null);
+  const [rate, setRate] = useState(1);
+  useEffect(() => { if (ref.current) ref.current.playbackRate = rate; }, [rate]);
+  return (
+    <div>
+      <video ref={ref} src={src} controls controlsList="nodownload noplaybackrate" disablePictureInPicture
+        onError={() => onFail?.("the video would not load")}
+        style={{ width: "100%", display: "block", background: "#000" }} />
+      <div className="flex items-center gap-1 px-2 py-1.5" style={{ background: "#111" }}>
+        <span className="text-xs" style={{ color: C.faint }}>Speed</span>
+        {RATES.map((r) => (
+          <button key={r} onClick={() => setRate(r)} className="text-xs font-bold rounded px-2 py-0.5"
+            style={{ background: rate === r ? C.accent : "rgba(255,255,255,.10)", color: rate === r ? "#fff" : "#C8D2DC" }}>
+            {r}x
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DrivePlayer({ id, embed }: { id: string; embed: string | null }) {
+  /* "ours" while Genie can serve it; "google" once it cannot, and the reason
+     is shown rather than swallowed. */
+  const [mode, setMode] = useState<"ours" | "google">("ours");
+  const [why, setWhy] = useState("");
+
+  useEffect(() => {
+    let dead = false;
+    /* One tiny ranged read answers the only question that matters: will
+       Drive give Genie this file? Asking first means a failure is a sentence
+       rather than a black rectangle. */
+    fetch(`/api/lms/video/${id}`, { headers: { range: "bytes=0-1" }, cache: "no-store" })
+      .then(async (r) => {
+        if (dead) return;
+        if (r.ok || r.status === 206) return;
+        setWhy(await r.text().catch(() => "") || `Drive answered ${r.status}.`);
+        setMode("google");
+      })
+      .catch(() => { if (!dead) { setWhy("Genie could not reach Drive."); setMode("google"); } });
+    return () => { dead = true; };
+  }, [id]);
+
+  if (mode === "ours") {
+    return (
+      <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${C.line}`, background: "#000" }}>
+        <SelfPlayer src={`/api/lms/video/${id}`} onFail={(w) => { setWhy(w); setMode("google"); }} />
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${C.line}`, background: "#000" }}>
+        <iframe src={embed || ""} allow="autoplay" allowFullScreen
+          style={{ width: "100%", aspectRatio: "16 / 9", border: "none", display: "block" }} />
+      </div>
+      <div className="rounded-lg p-2 mt-1 text-xs" style={{ background: "#FFF7E6", border: "1px solid #F0D9A8", color: "#8A5A00", lineHeight: 1.5 }}>
+        <b>Playing through Google&apos;s own player, so there is no speed control here.</b>{" "}
+        {why || "Genie could not read this file from Drive."}{" "}
+        Share the file with Genie&apos;s service account and it will play on this page instead, with 1x to 1.5x.
+      </div>
+    </div>
+  );
+}
 
 function YouTubePlayer({ id }: { id: string }) {
   const host = useRef<HTMLDivElement | null>(null);

@@ -24,7 +24,7 @@ import LmsText from "./LmsText";
 import LmsVideo from "./LmsVideo";
 import {
   MIN_LEARNING_WORDS, STATUS_META, STATUS_ORDER, wordCount, learningShortfall,
-  meetsLearningFloor, totalsOf, hhmm, parseVideo, pdfEmbed,
+  meetsLearningFloor, totalsOf, hhmm, parseVideo, pdfEmbed, LMS_GROUPS, audienceLabel, EVERYONE,
   type Book, type Section, type Lesson, type Progress, type Extra, type Plan, type LessonStatus,
 } from "@/lib/lms";
 import { today, fmtFull } from "@/lib/schedule";
@@ -45,8 +45,10 @@ type TabKey = (typeof TABS)[number]["key"];
 
 interface Payload {
   installed: boolean;
-  me: { id: string; name: string; isAdmin: boolean };
+  me: { id: string; name: string; isAdmin: boolean; groups?: string[]; lmsOnly?: boolean };
   person: string;
+  groupNames?: readonly string[];
+  roster?: { id: string; email: string; name: string; groups: string[]; lmsOnly: boolean }[];
   books: Book[];
   sections: Section[];
   lessons: Lesson[];
@@ -430,6 +432,29 @@ function LessonRows({ ctx, rows, book }: { ctx: Ctx; rows: { l: Lesson; shelf?: 
                 {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             )}
+            {/**
+              * MOVE IT TO ANOTHER LIBRARY (Dr Raghu, 27 Sep 2026: "Move file
+              * from one library to other").
+              *
+              * A MOVE, NOT A COPY — it leaves this shelf as it joins the
+              * other, which is what the word means and what somebody
+              * tidying a library expects. Nobody's completion or their fifty
+              * words are touched: those hang off the lesson, never off the
+              * shelf it happens to sit on.
+              */}
+            {ctx.d.canAuthor && ctx.d.books.length > 1 && (
+              <select value="" onChange={async (e) => {
+                const to = e.target.value; if (!to) return;
+                const dest = ctx.d.books.find((b) => b.id === to);
+                if (!window.confirm(`Move "${l.title}" out of ${book.name} and into ${dest?.name}?\n\nNobody's completions or written learning are affected — only where the lesson sits.`)) return;
+                await ctx.post({ action: "lesson.shelf", lesson_id: l.id, from_book: book.id, to_book: to });
+              }}
+                className="text-xs border rounded px-1 py-0.5 bg-white" style={{ borderColor: C.line, color: C.sub }}
+                title="Move this lesson into a different library">
+                <option value="">move to…</option>
+                {ctx.d.books.filter((b) => b.id !== book.id).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            )}
           </div>
         );
       })}
@@ -448,6 +473,22 @@ function LessonDrawer({ ctx, lesson, onClose }: { ctx: Ctx; lesson: Lesson; onCl
   const [completedOn, setCompletedOn] = useState(existing?.completed_on || today());
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  /**
+   * NOTES WHILE IT PLAYS (Dr Raghu, 27 Sep 2026: "Have a place to write
+   * notes when seeing on mobile as well in laptop/tablet").
+   *
+   * It sits directly under the video, on every size of screen, because a
+   * note is taken at the moment the thing is said and a box two scrolls away
+   * is a box nobody uses. It saves itself a second after typing stops —
+   * nobody presses Save on a note while watching, and a note lost to a
+   * closed tab is worse than no note at all.
+   *
+   * IT IS NOT THE FIFTY WORDS, and the screen says so. Notes are fragments
+   * written during; the learning text is written after, about what was
+   * taken, and it is the only thing that completes a lesson.
+   */
+  const [notes, setNotes] = useState(existing?.notes || "");
+  const [noteState, setNoteState] = useState<"" | "saving" | "saved" | string>("");
 
   const words = wordCount(learning);
   const short = learningShortfall(learning);
@@ -478,6 +519,18 @@ function LessonDrawer({ ctx, lesson, onClose }: { ctx: Ctx; lesson: Lesson; onCl
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   };
+
+  /* Saved a second after the typing stops, and once more on the way out. */
+  useEffect(() => {
+    if (notes === (existing?.notes || "")) return;
+    setNoteState("saving");
+    const t = window.setTimeout(async () => {
+      try { await ctx.post({ action: "progress.notes", lesson_id: lesson.id, notes }); setNoteState("saved"); }
+      catch (e) { setNoteState(e instanceof Error ? e.message : String(e)); }
+    }, 1000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes]);
 
   // the lesson's URL, copied from the top bar (Dr Raghu, 29 Aug 2026:
   // "how do I point to the movie?") — /lms/<4-digit code>
@@ -525,6 +578,26 @@ function LessonDrawer({ ctx, lesson, onClose }: { ctx: Ctx; lesson: Lesson; onCl
           )}
 
           {video.embed && <div className="mb-3"><LmsVideo video={video} /></div>}
+
+          {/* Under the video, on a phone as much as on a laptop. */}
+          <div className="rounded-lg bg-white border p-3 mb-3" style={{ borderColor: C.line }}>
+            <div className="flex items-baseline gap-2 mb-1">
+              <div className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>MY NOTES</div>
+              <div className="text-xs" style={{ color: C.faint }}>while you watch · saves itself</div>
+              <div className="flex-1" />
+              <div className="text-xs font-bold" style={{ color: noteState === "saved" ? "var(--green)" : noteState === "saving" ? C.faint : noteState ? "#B3261E" : "transparent" }}>
+                {noteState === "saving" ? "saving…" : noteState === "saved" ? "saved ✓" : noteState || "·"}
+              </div>
+            </div>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4}
+              placeholder="Anything worth keeping — a number, a phrase, the minute it was said."
+              className="w-full text-sm border rounded px-2 py-1.5"
+              style={{ borderColor: C.line, lineHeight: 1.6, resize: "vertical" }} />
+            <div className="text-xs mt-1" style={{ color: C.faint, lineHeight: 1.5 }}>
+              These are yours and nobody marks them. They do <b>not</b> count towards the {MIN_LEARNING_WORDS} words —
+              that is written below, afterwards, about what you took from the lesson.
+            </div>
+          </div>
 
           {lesson.content && (
             <div className="rounded-lg bg-white border p-3 mb-3" style={{ borderColor: C.line }}>
@@ -851,6 +924,102 @@ function TeamTab({ ctx }: { ctx: Ctx }) {
   );
 }
 
+/**
+ * WHO IS IN WHICH GROUP, AND WHOSE ONLY DOOR THIS IS.
+ *
+ * Dr Raghu, 27 Sep 2026: "can the LMS in the genie be given access to other
+ * people as a standalone user."
+ *
+ * THE GROUPS ARE WHAT MAKE THE AUDIENCES MEAN ANYTHING. A library set to
+ * Sales shows to nobody until somebody is in Sales — so the two live on the
+ * same screen, because setting one without the other is the commonest way to
+ * end up with a library that looks configured and is invisible.
+ *
+ * LEARNER ONLY is a restriction, not a grant: it CLOSES every other door in
+ * Genie for that login. A consultant given the training library has no
+ * business in jobs, salaries or the order book, and the honest way to write
+ * that is once, on the person, rather than eight times as a permission
+ * somebody must remember to withhold.
+ */
+function PeoplePanel({ ctx }: { ctx: Ctx }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [msg, setMsg] = useState("");
+  const roster = ctx.d.roster || [];
+  const needle = q.trim().toLowerCase();
+  const shown = roster.filter((p) => !needle || p.name.toLowerCase().includes(needle) || p.email.toLowerCase().includes(needle));
+  const inGroup = (g: string) => roster.filter((p) => p.groups.includes(g)).length;
+
+  const set = async (p: { id: string; groups: string[]; lmsOnly: boolean }, patch: { groups?: string[]; lms_only?: boolean }) => {
+    setMsg("");
+    try {
+      await ctx.post({ action: "person.groups", person_id: p.id, groups: patch.groups ?? p.groups, ...(patch.lms_only === undefined ? {} : { lms_only: patch.lms_only }) });
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  };
+
+  if (!ctx.d.canAuthor) return null;
+
+  return (
+    <div className="rounded-lg border bg-white mb-3" style={{ borderColor: C.line, overflow: "hidden" }}>
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-2 px-3 py-2 text-left" style={{ background: C.panel }}>
+        <span className="text-xs font-bold" style={{ color: C.mute, letterSpacing: 1.1 }}>WHO SEES WHAT · {roster.length}</span>
+        <span className="text-xs" style={{ color: C.faint }}>
+          {LMS_GROUPS.map((g) => `${g} ${inGroup(g)}`).join(" · ")}
+        </span>
+        <div className="flex-1" />
+        <span style={{ color: C.sub }}>{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div className="p-3">
+          <div className="text-xs mb-2" style={{ color: C.faint, lineHeight: 1.55 }}>
+            A library set to a group shows to nobody until somebody is in that group.
+            <b> Learner only</b> closes every other door in Genie for that login — for a consultant or a
+            contractor who should have the training library and nothing else.
+          </div>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 Find a person"
+            className="text-xs border rounded px-2 py-1.5 mb-2" style={{ borderColor: C.line, minWidth: 240 }} />
+          {msg && <div className="text-xs font-bold mb-2" style={{ color: "#B3261E" }}>{msg}</div>}
+          <div className="flex flex-col gap-1" style={{ maxHeight: 420, overflowY: "auto" }}>
+            {shown.map((p) => (
+              <div key={p.id} className="flex items-center gap-2 flex-wrap rounded px-2 py-1.5" style={{ border: `1px solid ${C.line}` }}>
+                <div style={{ minWidth: 170, flex: "1 1 170px" }}>
+                  <div className="text-sm font-bold" style={{ color: C.ink }}>{p.name}</div>
+                  <div className="text-xs" style={{ color: C.faint }}>{p.email}</div>
+                </div>
+                <div className="flex gap-1 flex-wrap">
+                  {LMS_GROUPS.map((g) => {
+                    const on = p.groups.includes(g);
+                    return (
+                      <button key={g} onClick={() => set(p, { groups: on ? p.groups.filter((x) => x !== g) : [...p.groups, g] })}
+                        className="text-xs font-bold rounded px-2 py-0.5"
+                        style={{ background: on ? "var(--blue)" : "#fff", color: on ? "#fff" : C.sub, border: `1px solid ${on ? "var(--blue)" : C.line}` }}>
+                        {g}
+                      </button>
+                    );
+                  })}
+                </div>
+                <label className="flex items-center gap-1 text-xs" style={{ color: p.lmsOnly ? "#8A5B00" : C.faint, cursor: "pointer" }}>
+                  <input type="checkbox" checked={p.lmsOnly} onChange={(e) => {
+                    if (e.target.checked && !window.confirm(`Make ${p.name} a learner only?\n\nEvery other door in Genie closes for this login — Planning, CRM, HRMS, all of them. Only the training library stays open.`)) return;
+                    set(p, { lms_only: e.target.checked });
+                  }} />
+                  learner only
+                </label>
+              </div>
+            ))}
+            {shown.length === 0 && <div className="text-xs p-3" style={{ color: C.faint }}>Nobody by that name.</div>}
+          </div>
+          <div className="text-xs mt-2" style={{ color: C.faint, lineHeight: 1.5 }}>
+            A consultant needs a Genie login before they can appear here — made in <b>Admin → Users</b>. Tick
+            <b> learner only</b> and the library is all they will ever see.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ===========================================================================
 // Tab 4 — Library (admins)
 // ===========================================================================
@@ -864,6 +1033,7 @@ function LibraryTab({ ctx, onEdit }: { ctx: Ctx; onEdit: (t: { id?: string }) =>
   return (
     <>
       <BooksPanel ctx={ctx} />
+      <PeoplePanel ctx={ctx} />
 
       <div className="flex items-center gap-2 flex-wrap mb-3">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 Search lessons"
@@ -938,6 +1108,7 @@ function BooksPanel({ ctx }: { ctx: Ctx }) {
         id: edit.isNew ? undefined : edit.id,
         name: edit.name, icon: edit.icon, color: edit.color, blurb: edit.blurb,
         sort_order: edit.sort_order, active: true,
+        audience: edit.audience || [],
       });
       setEdit(null);
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
@@ -959,8 +1130,13 @@ function BooksPanel({ ctx }: { ctx: Ctx }) {
             {ctx.d.books.map((b) => (
               <button key={b.id} onClick={() => setEdit({ ...b })} className="text-xs font-bold rounded px-2 py-1"
                 style={{ background: b.color + "1A", color: b.color, border: `1px solid ${b.color}33` }}
-                title={`Edit "${b.name}"`}>
+                title={`Edit "${b.name}" — seen by ${audienceLabel(b.audience)}`}>
                 {b.icon ? `${b.icon} ` : ""}{b.name}
+                {/* A narrowed library says so on the chip: a library nobody
+                    can see looks exactly like one everybody can. */}
+                {(b.audience || []).length > 0 && (
+                  <span className="ml-1 font-normal" style={{ opacity: .75 }}>· {(b.audience || []).join(", ")}</span>
+                )}
               </button>
             ))}
             <button onClick={() => setEdit(blank)} className="text-xs font-bold rounded px-2 py-1"
@@ -996,6 +1172,49 @@ function BooksPanel({ ctx }: { ctx: Ctx }) {
                   <div className="text-xs font-semibold mb-0.5" style={{ color: C.mute }}>Order</div>
                   <input value={String(edit.sort_order ?? 0)} onChange={(e) => setEdit({ ...edit, sort_order: Number(e.target.value) || 0 })}
                     inputMode="numeric" className="text-sm border rounded px-2 py-1.5 tnum text-right" style={{ borderColor: C.line, width: 70 }} />
+                </div>
+              </div>
+
+              {/**
+                * WHO THE LIBRARY IS FOR (Dr Raghu, 27 Sep 2026).
+                *
+                * Nothing ticked means everybody, and it says so in words
+                * rather than leaving an empty row to be read either way. A
+                * library made today is open until somebody narrows it on
+                * purpose: the cost of an open training library is that a
+                * person reads a course meant for another team; the cost of
+                * a closed one is training nobody can see and so nobody does.
+                */}
+              <div className="mt-3">
+                <div className="text-xs font-semibold mb-1" style={{ color: C.mute }}>Who can see it</div>
+                <div className="flex gap-1.5 flex-wrap items-center">
+                  <button onClick={() => setEdit({ ...edit, audience: [] })}
+                    className="text-xs font-bold rounded px-2 py-1"
+                    style={{
+                      background: (edit.audience || []).length === 0 ? C.accent : "#fff",
+                      color: (edit.audience || []).length === 0 ? "#fff" : C.sub,
+                      border: `1px solid ${(edit.audience || []).length === 0 ? C.accent : C.line}`,
+                    }}>
+                    {EVERYONE}
+                  </button>
+                  <span style={{ color: C.faint, fontSize: 11 }}>or</span>
+                  {LMS_GROUPS.map((g) => {
+                    const on = (edit.audience || []).includes(g);
+                    return (
+                      <button key={g} onClick={() => setEdit({
+                        ...edit,
+                        audience: on ? (edit.audience || []).filter((x) => x !== g) : [...(edit.audience || []), g],
+                      })} className="text-xs font-bold rounded px-2 py-1"
+                        style={{ background: on ? "var(--blue)" : "#fff", color: on ? "#fff" : C.sub, border: `1px solid ${on ? "var(--blue)" : C.line}` }}>
+                        {g}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="text-xs mt-1" style={{ color: C.faint }}>
+                  {(edit.audience || []).length
+                    ? <>Only <b>{(edit.audience || []).join(", ")}</b> will see this library, and the lessons shelved only in it.</>
+                    : <>Every logged-in Genie user will see this library.</>}
                 </div>
               </div>
               <div className="mt-2">
