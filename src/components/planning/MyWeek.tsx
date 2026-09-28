@@ -14,6 +14,180 @@ import { hhmm } from "@/lib/lms";
 import { Board, Job, TODAY, Task, assignees, myHandles, stamp, taskJobRef, taskLate } from "./shared";
 import { TaskModal } from "./Tasking";
 
+/**
+ * DELIVERY, AS A CALENDAR (Dr Raghu, 28 Sep 2026: "instead of this list show
+ * a calendar ... Make a box for each job ... then next day, then next day").
+ *
+ * WHY A DAY IS A ROW AND NOT A COLUMN. A month grid would give every day the
+ * same square whether it holds nothing or nine machines, and the days that
+ * matter here are exactly the crowded ones. Days stacked as rows let a day
+ * with nine jobs be nine boxes tall and a day with one be one box tall, so
+ * the shape of the week is the shape of the load.
+ *
+ * EMPTY DAYS ARE NOT DRAWN. A calendar that prints every date to be a
+ * calendar pushes the next real delivery off the screen.
+ */
+function dayHead(iso: string): { day: string; weekday: string } {
+  const d = new Date(`${iso}T00:00:00`);
+  const n = d.getDate();
+  const suffix = n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th";
+  return {
+    day: `${n}${suffix} ${d.toLocaleDateString("en-IN", { month: "short" })}`,
+    weekday: d.toLocaleDateString("en-IN", { weekday: "long" }),
+  };
+}
+
+/** Whole days between two ISO dates — for "4 days late", which is the fact. */
+const daysBetween = (a: string, b: string) =>
+  Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime()) / 86400000);
+
+function DeliveryCalendar({ jobs, onOpen }: { jobs: Job[]; onOpen: (id: string) => void }) {
+  const [peek, setPeek] = useState<Job | null>(null);
+
+  /* Grouped in order, so the days come out oldest first and each day keeps
+     the jobs in the order the run gave them. */
+  const days: { date: string; jobs: Job[] }[] = [];
+  for (const j of jobs) {
+    const d = j.tdd as string;
+    const last = days[days.length - 1];
+    if (last && last.date === d) last.jobs.push(j);
+    else days.push({ date: d, jobs: [j] });
+  }
+  const late = jobs.filter((j) => (j.tdd || "") < TODAY).length;
+
+  return (
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: "var(--line)" }}>
+      <div className="flex items-baseline gap-2 flex-wrap mb-2">
+        <div className="font-bold text-sm">Delivery run</div>
+        <div className="text-xs" style={{ color: "var(--muted)" }}>the next {jobs.length} going out</div>
+        <div className="flex-1" />
+        {late > 0 && (
+          <div className="text-xs font-bold rounded px-1.5 py-0.5" style={{ background: "var(--red)", color: "#fff" }}>
+            {late} past due
+          </div>
+        )}
+      </div>
+
+      {days.length === 0 ? (
+        <div className="text-sm py-4 text-center" style={{ color: "var(--muted)" }}>Nothing has a delivery date.</div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {days.map(({ date, jobs: onDay }) => {
+            const h = dayHead(date);
+            const isToday = date === TODAY;
+            const overdue = date < TODAY;
+            const off = daysBetween(TODAY, date);
+            return (
+              <div key={date}>
+                <div className="flex items-baseline gap-2 rounded px-2 py-1"
+                  style={{ background: overdue ? "#FBEAE8" : isToday ? "var(--navy)" : "#F4F2EC" }}>
+                  <span className="text-xs font-bold" style={{ color: overdue ? "var(--red)" : isToday ? "#fff" : "var(--ink)" }}>
+                    {h.day}, {h.weekday}
+                  </span>
+                  <span className="text-xs" style={{ color: overdue ? "#B3392E" : isToday ? "#8FA1B3" : "var(--muted)" }}>
+                    {isToday ? "today" : overdue ? `${-off} day${off === -1 ? "" : "s"} late` : off === 1 ? "tomorrow" : `in ${off} days`}
+                  </span>
+                  <div className="flex-1" />
+                  <span className="text-xs tnum" style={{ color: overdue ? "#B3392E" : isToday ? "#8FA1B3" : "var(--muted)" }}>
+                    {onDay.length} job{onDay.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                <div className="grid gap-1.5 mt-1.5" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(168px,1fr))" }}>
+                  {onDay.map((j) => (
+                    <button key={j.id} onClick={() => setPeek(j)}
+                      className="rounded-lg border text-left p-2"
+                      style={{ borderColor: overdue ? "#F0C6C0" : "var(--line)", background: "#fff" }}
+                      title={`${j.tag} — open`}>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="font-bold tnum" style={{ color: "var(--blue)", fontSize: 14 }}>{jobNo(j.id)}</span>
+                        <div className="flex-1" />
+                        {/* Per cent is the one number on the box that can be
+                            read without reading: colour says whether it is
+                            going to make it, the figure says how far. */}
+                        <span className="font-bold tnum" style={{ fontSize: 12, color: j.pct >= 100 ? "var(--green)" : j.pct >= 60 ? "#8A5B00" : "var(--red)" }}>
+                          {j.pct}%
+                        </span>
+                      </div>
+                      <div className="text-xs mt-0.5" style={{ color: "var(--ink)", lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {j.tag}
+                      </div>
+                      <div className="text-xs mt-1 truncate" style={{ color: "var(--dim)" }} title={j.own || undefined}>
+                        {j.ownerName || j.ownerInitials || (j.own ? j.own.split("@")[0] : "—")}
+                      </div>
+                      <div className="rounded mt-1" style={{ height: 3, background: "var(--line-soft)" }}>
+                        <div style={{ height: 3, width: `${Math.max(0, Math.min(100, j.pct))}%`, background: j.pct >= 100 ? "var(--green)" : j.pct >= 60 ? "#D97706" : "var(--red)", borderRadius: 3 }} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {peek && <JobPeek job={peek} onClose={() => setPeek(null)} onOpen={onOpen} />}
+    </div>
+  );
+}
+
+/**
+ * The box, opened. Enough to decide whether to act without leaving the
+ * morning page — and one button to the job itself when it is not enough.
+ */
+function JobPeek({ job: j, onClose, onOpen }: { job: Job; onClose: () => void; onOpen: (id: string) => void }) {
+  const overdue = !!j.tdd && j.tdd < TODAY;
+  const L = ({ k, v, tone }: { k: string; v: React.ReactNode; tone?: string }) => (
+    <div className="flex gap-2 py-1 border-b" style={{ borderColor: "var(--line-soft)" }}>
+      <span className="text-xs" style={{ color: "var(--muted)", minWidth: 118 }}>{k}</span>
+      <span className="text-xs font-semibold" style={{ color: tone || "var(--ink)", flex: 1 }}>{v || "—"}</span>
+    </div>
+  );
+  return (
+    <div onClick={onClose} role="button" tabIndex={0}
+      style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(22,35,47,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} role="button" tabIndex={0} className="rounded-lg bg-white"
+        style={{ width: "min(520px,100%)", maxHeight: "calc(100vh - 32px)", overflowY: "auto" }}>
+        <div className="flex items-start gap-3 px-4 py-3" style={{ background: "var(--navy)", borderRadius: "8px 8px 0 0" }}>
+          <div style={{ flex: 1 }}>
+            <div className="text-xs font-bold" style={{ color: "#8FA1B3", letterSpacing: 1.2 }}>JOB {jobNo(j.id)}</div>
+            <div className="font-bold text-white" style={{ fontSize: 15, lineHeight: 1.3 }}>{j.tag}</div>
+          </div>
+          <button onClick={onClose} className="font-bold" style={{ color: "#8FA1B3", fontSize: 18, lineHeight: 1 }}>✕</button>
+        </div>
+        <div className="p-3">
+          <div className="flex gap-2 mb-2">
+            <Chip label="Production" value={`${j.pct}%`} color={j.pct >= 100 ? "var(--green)" : j.pct >= 60 ? "#8A5B00" : "var(--red)"} />
+            <Chip label="TDD" value={fmtFull(j.tdd)} color={overdue ? "var(--red)" : "var(--ink)"} />
+            {j.otd && <Chip label="OTD" value={fmtFull(j.otd)} />}
+          </div>
+          <L k="Customer" v={j.cust} />
+          <L k="Planning owner" v={j.ownerName || j.ownerInitials || (j.own ? j.own.split("@")[0] : "")} />
+          <L k="Production owner" v={j.productionOwner} />
+          <L k="Quality owner" v={j.qualityOwner} />
+          <L k="Project" v={j.proj} />
+          <L k="Status" v={j.stat} />
+          <L k="On the floor" v={j.onFloor ? `yes${j.onFloorAt ? ` · since ${fmtFull(j.onFloorAt)}` : ""}` : "not yet"} tone={j.onFloor ? "var(--green)" : "var(--muted)"} />
+          {j.escalation && j.escalation !== "None" && <L k="Escalation" v={j.escalation} tone="var(--red)" />}
+          {j.floorSummary && (
+            <div className="rounded p-2 mt-2" style={{ background: "#F4F2EC" }}>
+              <div className="text-xs font-bold mb-0.5" style={{ color: "var(--muted)", letterSpacing: 1 }}>
+                FROM THE FLOOR{j.floorSummaryAt ? ` · ${fmtFull(j.floorSummaryAt)}` : ""}
+              </div>
+              <div className="text-xs" style={{ color: "var(--ink)", lineHeight: 1.5 }}>{j.floorSummary}</div>
+            </div>
+          )}
+          <button onClick={() => { onClose(); onOpen(j.id); }}
+            className="w-full rounded font-bold mt-3 py-2" style={{ background: "var(--accent)", color: "#fff", fontSize: 13 }}>
+            Open the full job →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ============================ shared bits ============================
 export function Chip({ label, value, color = "var(--ink)" }: { label: string; value: string; color?: string }) {
   return (
@@ -127,6 +301,27 @@ export function MyWeek({
         .filter((j) => j.tdd && j.tdd <= weekEnd)
         .sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1)),
     [board.jobs, weekEnd],
+  );
+
+  /**
+   * THE DELIVERY RUN — what is going out, oldest first (Dr Raghu, 28 Sep
+   * 2026: "Today, day... all previous jobs also ... Show the next 20 jobs").
+   *
+   * IT STARTS BEHIND TODAY, NOT AT IT. A machine that was due on the 24th and
+   * has not gone is the most urgent thing on the floor, and a list that began
+   * at today would be the one list in Genie that hides its worst news. The
+   * overdue days come first, in their own dated rows, and say how late.
+   *
+   * Twenty boxes, because the question this answers is "what is going out
+   * next" and the twenty-first is not that question.
+   */
+  const deliveryRun = useMemo(
+    () =>
+      board.jobs
+        .filter((j) => !!j.tdd)
+        .sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1))
+        .slice(0, 20),
+    [board.jobs],
   );
 
   // milestones of mine landing this week
@@ -259,47 +454,8 @@ export function MyWeek({
 
         {/* CENTRE — what is going out, and what I am driving */}
         <div className="flex flex-col gap-4" style={{ minWidth: 0 }}>
-        {/* deliveries expected this week */}
-        <div className="bg-white rounded-lg border p-3" style={{ borderColor: "var(--line)" }}>
-          <div className="font-bold text-sm mb-2">Delivery expected in the next 7 days</div>
-          {dueJobs.length === 0 ? (
-            <div className="text-sm py-4 text-center" style={{ color: "var(--muted)" }}>No deliveries due this week.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs genie-table">
-                <thead>
-                  <tr style={{ color: "var(--muted)" }}>
-                    <th className="text-left py-1 font-semibold">Job</th>
-                    <th className="text-left py-1 font-semibold">Customer tag</th>
-                    <th className="text-left py-1 font-semibold">Planning Owner</th>
-                    <th className="text-center py-1 font-semibold">TDD</th>
-                    <th className="text-center py-1 font-semibold">Prod %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dueJobs.map((j) => (
-                    <tr key={j.id} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
-                      <td className="py-1.5">
-                        <button onClick={() => onOpen(j.id)} className="font-bold underline decoration-dotted" style={{ color: "var(--blue)" }}>{jobNo(j.id)}</button>
-                      </td>
-                      <td className="py-1.5">{j.tag}</td>
-                      {/* the login is what the Jobmaster carries; the person is
-                          who anybody actually asks. Show the name and keep the
-                          address on hover. */}
-                      <td className="py-1.5" style={{ color: "var(--dim)" }} title={j.own || undefined}>
-                        {j.ownerName || j.ownerInitials || (j.own ? j.own.split("@")[0] : "—")}
-                      </td>
-                      {/* no year: the table is already headed "the next 7 days",
-                          and 18-08-2026 wrapped onto two lines to say so twice */}
-                      <td className="py-1.5 text-center font-bold tnum whitespace-nowrap" style={{ color: j.tdd && j.tdd < TODAY ? "var(--red)" : "var(--ink)" }} title={fmtFull(j.tdd)}>{fmt(j.tdd)}</td>
-                      <td className="py-1.5 text-center tnum">{j.pct}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        {/* what is going out, day by day */}
+        <DeliveryCalendar jobs={deliveryRun} onOpen={onOpen} />
         {/* goal work owed today — the merge of the two layers */}
         {goalItems.length > 0 && (
           <div className="bg-white rounded-lg border p-3" style={{ borderColor: "var(--line)" }}>

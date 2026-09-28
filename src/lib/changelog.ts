@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.5.1.0",
+    date: "2026-09-28",
+    module: "Delivery becomes a calendar, and a job becomes a box",
+    items: [
+      "<b>The delivery table is now a run of days.</b> Each day is a row \u2014 <i>28th Sep, Monday</i> \u2014 with a box for every machine going out on it. A day is a row rather than a square on a grid because the days that matter here are the crowded ones: a day with nine jobs is nine boxes tall and a day with one is one box tall, so the shape of the list is the shape of the load. Empty days are not drawn, because a calendar that prints every date to prove it is a calendar pushes the next real delivery off the screen.",
+      "<b>It starts behind today, not at it.</b> A machine that was due on the 24th and has not gone is the most urgent thing on the floor, so the overdue days come first, in their own rows, in red, saying <b>how many days late</b>. A list that began at today would have been the one list in Genie that hides its worst news.",
+      "<b>Each box carries the four things you look for</b> \u2014 job number, customer tag, planning owner, production per cent \u2014 with the per cent coloured and drawn as a bar, so a row of boxes can be read without being read.",
+      "<b>Open one and it lifts into a lightbox</b>: customer, planning, production and quality owners, project, status, whether it is on the floor and since when, the escalation if there is one, and the last word from the floor. <b>Open the full job</b> is one button away when that is not enough \u2014 but most mornings it will be.",
+      "<b>Twenty jobs.</b> The question this answers is \u201cwhat is going out next\u201d, and the twenty-first is not that question.",
+    ],
+  },
+  {
     v: "5.5.0.1",
     date: "2026-09-28",
     module: "Everybody had quietly become a planner. Fixed.",
