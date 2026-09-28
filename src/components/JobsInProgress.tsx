@@ -619,10 +619,12 @@ function Scatter({
  * that not worth doing.
  */
 export function JobLightbox({
-  job, V, colour, onClose, onOpenPlan, canEdit, onSaved,
+  job, V, colour, onClose, onOpenPlan, canEdit, onSaved, statuses,
 }: {
   job: WipJob; V: (n: number) => string; colour: string; onClose: () => void; onOpenPlan: () => void;
   canEdit: boolean; onSaved: () => Promise<unknown>;
+  /** Every status in use on the board, so the list is the real vocabulary. */
+  statuses?: string[];
 }) {
   const [msg, setMsg] = useState("");
   const today = new Date().toISOString().slice(0, 10);
@@ -701,9 +703,8 @@ export function JobLightbox({
               is the worst of both — the correction gets made in two places or
               in neither. */}
           {(job.stat || canEdit) && (
-            <EditText label="Status" value={job.stat || ""} canEdit={canEdit}
-              tone={C.body} onSave={(v) => save("stat", v)}
-              hint="The ERP's Job Status — P: Assembly Fabrication, Q: Final Inspection, and the rest" />
+            <StatusPick value={job.stat || ""} canEdit={canEdit} options={statuses || []}
+              onSave={(v) => save("stat", v)} />
           )}
 
           {msg && (
@@ -831,6 +832,70 @@ export const MANDAY_BANDS = ["B/O", "0-50", "51-100", "101-200", "201-300",
   "301-400", "401-500", "501-600", "601-700", "700+"];
 
 /** A Bit whose value is chosen from a list rather than typed. */
+/**
+ * STATUS, AS A LIST (Dr Raghu, 28 Sep 2026: "this has to be dropdown").
+ *
+ * THE LIST IS THE BOARD'S OWN VOCABULARY, not one invented here. Every
+ * distinct status already in use is offered — twenty-one of them today,
+ * "S: Order Received" through "Q: Final Inspection" — so it cannot drift
+ * from what the ERP actually sends, and a stage added there appears here the
+ * day a job carries it.
+ *
+ * TYPING STAYS POSSIBLE. A free-text box let somebody write a twenty-second
+ * spelling of a stage that already existed, which is what the list is for;
+ * but refusing a status the board has never seen would mean the first job to
+ * reach a new stage could not be marked at all. So: pick from the list, or
+ * choose "something else" and type it.
+ */
+function StatusPick({ value, options, canEdit, onSave }: {
+  value: string; options: string[]; canEdit: boolean; onSave: (v: string) => Promise<void>;
+}) {
+  const [typing, setTyping] = useState(false);
+  const [free, setFree] = useState(value);
+  const [busy, setBusy] = useState(false);
+  const known = [...new Set([...(options || []), value].filter(Boolean))].sort();
+
+  if (!canEdit) {
+    return (
+      <div className="rounded p-2 mt-2" style={{ background: C.panel }}>
+        <div style={{ fontSize: 10, color: C.mute, letterSpacing: 0.4 }}>STATUS</div>
+        <div style={{ fontSize: 13.5, color: C.body }}>{value || "—"}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded p-2 mt-2" style={{ background: C.panel }}>
+      <div style={{ fontSize: 10, color: C.mute, letterSpacing: 0.4 }}>STATUS ✎</div>
+      {typing ? (
+        <div className="flex gap-1 mt-1">
+          <input autoFocus value={free} onChange={(e) => setFree(e.target.value)}
+            placeholder="A stage the board has not seen yet"
+            className="flex-1 rounded border px-2 py-1" style={{ borderColor: C.line, fontSize: 13.5 }} />
+          <button disabled={busy} onClick={async () => { setBusy(true); await onSave(free.trim()); setBusy(false); setTyping(false); }}
+            className="rounded px-3 font-bold" style={{ background: C.green, color: "#fff", fontSize: 12 }}>Save</button>
+          <button onClick={() => { setTyping(false); setFree(value); }}
+            className="rounded px-2" style={{ color: C.mute, fontSize: 12 }}>Cancel</button>
+        </div>
+      ) : (
+        <select value={value} disabled={busy}
+          onChange={async (ev) => {
+            if (ev.target.value === "__other") { setFree(""); setTyping(true); return; }
+            setBusy(true); await onSave(ev.target.value); setBusy(false);
+          }}
+          className="w-full bg-transparent mt-0.5"
+          style={{ fontSize: 13.5, fontWeight: 600, color: value ? C.body : C.mute, border: 0, outline: "none", cursor: "pointer" }}>
+          <option value="">—</option>
+          {known.map((o) => <option key={o} value={o}>{o}</option>)}
+          <option value="__other">— something else, type it —</option>
+        </select>
+      )}
+      <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>
+        The ERP&apos;s Job Status. Changing it queues it for the ERP like every other field here.
+      </div>
+    </div>
+  );
+}
+
 function PickBit({ label, value, options, canEdit, color, onSave }: {
   label: string; value: string; options: string[]; canEdit: boolean;
   color: string; onSave: (v: string) => Promise<void>;

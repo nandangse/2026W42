@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.6.0.4",
+    date: "2026-09-28",
+    module: "The board fits the screen, and Status is a list",
+    items: [
+      "<b>The delivery board fits the width.</b> Sunday was being pushed off the right-hand edge \u2014 and the last day of the week is exactly the one somebody scrolls to find. The columns now share whatever width there is instead of each holding out for a minimum, and <b>the customer tag is the line that gives up size first</b>: it is the longest thing on a box and the one a reader skims rather than reads. Three lines of it now, smaller, with the whole tag on hover.",
+      "<b>Status is a dropdown, and the list is the board\u2019s own vocabulary</b> \u2014 every status actually in use, twenty-one of them today, from <i>S: Order Received</i> to <i>Q: Final Inspection</i>. Built from the data rather than from a list typed here, so it cannot drift from what the ERP sends, and a stage added there appears the day a job carries it.",
+      "<b>Typing is still possible</b>, behind \u201csomething else\u201d. Free text let somebody invent a twenty-second spelling of a stage that already existed \u2014 which is what the list is for \u2014 but refusing a status the board has never seen would mean the first job to reach a new stage could not be marked at all.",
+    ],
+  },
+  {
     v: "5.6.0.3",
     date: "2026-09-28",
     module: "The picture says FY, and what each period earned",

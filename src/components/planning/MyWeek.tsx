@@ -99,12 +99,14 @@ function JobBox({ j, onPeek, dense }: { j: Job; onPeek: (j: Job) => void; dense?
     <button onClick={() => onPeek(j)} className="rounded-lg text-left w-full"
       style={{ border: `1px solid ${c}44`, borderLeft: `4px solid ${c}`, background: `${c}0D`, padding: dense ? "5px 7px" : "7px 8px" }}
       title={`${j.tag} — ${who}`}>
-      <div className="flex items-baseline gap-1.5">
-        <span className="font-bold tnum" style={{ color: c, fontSize: 13.5 }}>{jobNo(j.id)}</span>
+      <div className="flex items-baseline gap-1">
+        <span className="font-bold tnum" style={{ color: c, fontSize: 12.5 }}>{jobNo(j.id)}</span>
         <div className="flex-1" />
-        <span className="font-bold tnum" style={{ fontSize: 11.5, color: j.pct >= 100 ? "var(--green)" : j.pct >= 60 ? "#8A5B00" : "var(--red)" }}>{j.pct}%</span>
+        <span className="font-bold tnum" style={{ fontSize: 10.5, color: j.pct >= 100 ? "var(--green)" : j.pct >= 60 ? "#8A5B00" : "var(--red)" }}>{j.pct}%</span>
       </div>
-      <div style={{ fontSize: 11, color: "var(--ink)", lineHeight: 1.3, marginTop: 1, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+      {/* The tag is the line that gives up size first: it is the longest
+          thing on the box and the one a reader skims rather than reads. */}
+      <div title={j.tag} style={{ fontSize: 9.5, color: "var(--ink)", lineHeight: 1.28, marginTop: 1, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>
         {j.tag}
       </div>
       {/* THE OTD, NOT THE OWNER (Dr Raghu, 28 Sep 2026: "remove project
@@ -116,7 +118,7 @@ function JobBox({ j, onPeek, dense }: { j: Job; onPeek: (j: Job) => void; dense?
           a thing that had already labelled itself. The OTD is the date the
           customer was ORIGINALLY given, and the distance from it is the only
           number on this board that says whether we have kept our word. */}
-      <div className="truncate" style={{ fontSize: 10.5, marginTop: 2, fontWeight: 700, color: otd.tone }}>{otd.text}</div>
+      <div className="truncate" style={{ fontSize: 9.5, marginTop: 2, fontWeight: 700, color: otd.tone }}>{otd.text}</div>
       <div className="rounded" style={{ height: 3, background: "rgba(0,0,0,.08)", marginTop: 3 }}>
         <div style={{ height: 3, width: `${Math.max(0, Math.min(100, j.pct))}%`, background: j.pct >= 100 ? "var(--green)" : j.pct >= 60 ? "#D97706" : "var(--red)", borderRadius: 3 }} />
       </div>
@@ -283,9 +285,14 @@ function DeliveryBoard({ jobs, board, onOpen, V, reload, canEdit, isStrat }: {
         </div>
       </div>
 
-      <div className="grid gap-2" style={{
-        gridTemplateColumns: `minmax(330px,2.05fr) repeat(7, minmax(150px,1fr))`,
-        overflowX: "auto",
+      {/* IT MUST FIT THE SCREEN (Dr Raghu, 28 Sep 2026: "make this fit into
+          the screen width. Reduce font size of the customer tag if needed").
+          minmax(0,…) rather than a pixel floor: a minimum width is a promise
+          the grid keeps by pushing Sunday off the right-hand edge, and the
+          last day of the week is exactly the one somebody scrolls to find.
+          The columns share what there is and the tag gives up the points. */}
+      <div className="grid gap-1.5" style={{
+        gridTemplateColumns: `minmax(0,1.9fr) repeat(7, minmax(0,1fr))`,
       }}>
         {/* ---- past due: ONE heading, two columns under it ---- */}
         <div style={{ minWidth: 0 }}>
@@ -335,8 +342,8 @@ function DeliveryBoard({ jobs, board, onOpen, V, reload, canEdit, isStrat }: {
           return (
             <div key={d} style={{ minWidth: 0 }}>
               <div className="rounded px-2 py-1 mb-1.5" style={{ background: isToday ? "var(--navy)" : "#F4F2EC" }}>
-                <div className="text-xs font-bold" style={{ color: isToday ? "#fff" : "var(--ink)" }}>{h.day}</div>
-                <div style={{ fontSize: 10.5, color: isToday ? "#8FA1B3" : "var(--muted)" }}>
+                <div className="font-bold" style={{ fontSize: 11.5, color: isToday ? "#fff" : "var(--ink)" }}>{h.day}</div>
+                <div className="truncate" style={{ fontSize: 9.5, color: isToday ? "#8FA1B3" : "var(--muted)" }}>
                   {h.weekday}{isToday ? " · today" : ""} · {mine.length}
                 </div>
               </div>
@@ -365,6 +372,9 @@ function DeliveryBoard({ jobs, board, onOpen, V, reload, canEdit, isStrat }: {
           onOpenPlan={() => { setPeekId(null); onOpen(peek.id); }}
           canEdit={canEdit}
           onSaved={reload}
+          /* The board's own vocabulary of statuses, so the list cannot drift
+             from what the ERP actually sends. */
+          statuses={[...new Set(jobs.map((j) => (j.stat || "").trim()).filter(Boolean))]}
         />
       )}
     </div>
